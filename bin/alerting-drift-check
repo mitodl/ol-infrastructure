@@ -18,6 +18,10 @@ nothing noticed because `pulumi preview` showed no diff.
   - Every Grafana Slack contact point held a JSON-escaped webhook URL for six
     weeks. Declared config == live config the whole time; both were wrong.
     Only the *delivery* result distinguished them.
+  - odl-video-service spent two days pointed at a DEACTIVATED Sentry client
+    key. The DSN was well-formed and carried the right project id, Sentry's
+    key API listed the dead key exactly like a live one, and ingest answered
+    every event with 403. Only the *submission* result distinguished them.
 
 So this checks live state against expectations recorded here, and reports.
 It never repairs: auto-repairing config the provider cannot fully represent
@@ -43,14 +47,17 @@ Usage:
     bin/alerting-drift-check sentry-rules
     bin/alerting-drift-check grafana-delivery
     bin/alerting-drift-check sentry-liveness --max-silent-days 14
+    bin/alerting-drift-check sentry-dsn-liveness
 """
 
+import json
 import re
 import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import cyclopts
 import httpx
@@ -111,6 +118,13 @@ DELIVERY_CHECK_EXEMPT = frozenset({"oblivion"})
 
 # Grafana reports "no notification has ever been attempted" as the zero time.
 NEVER_ATTEMPTED = "0001-01-01"
+
+# Sentry client keys allowed to be deactivated, as `<project>/<key name>`.
+# Retiring a key means DELETING it: a deactivated key still appears in the API
+# and still produces a DSN that looks correct everywhere except at ingest,
+# which is exactly how odl-video-service came to drop every event. An entry
+# here has to say why the key must survive in a state no app can use.
+SENTRY_INACTIVE_KEY_EXEMPT: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -691,6 +705,89 @@ def check_sentry_liveness(report: Report, max_silent_days: int) -> None:
         )
 
 
+def _probe_sentry_ingest(dsn: str) -> tuple[int, str]:
+    """Submit to a DSN's ingest endpoint and return the HTTP status and body.
+
+    The submission result is the only thing that separates a working DSN from a
+    dead one. Length, key prefix, host, project id and even an exact match
+    against Sentry's own key API all pass for a deactivated key, and the SDK
+    hides the rejection: `capture_message` returns a client-generated event id
+    and `flush` returns normally while the server answers 403.
+
+    The envelope carries one `client_report` item, which authenticates over the
+    same path as an event -- a deactivated or unknown key gets the same 403
+    `with_reason: ProjectId` -- but creates no issue, so a nightly probe adds
+    no noise to the project it is checking.
+    """
+    parts = urlsplit(dsn)
+    client_report = json.dumps(
+        {"timestamp": datetime.now(UTC).isoformat(), "discarded_events": []}
+    )
+    envelope = (
+        "{}\n"
+        f'{{"type":"client_report","length":{len(client_report)}}}\n'
+        f"{client_report}\n"
+    )
+    response = httpx.post(
+        f"{parts.scheme}://{parts.hostname}/api/{parts.path.strip('/')}/envelope/",
+        headers={
+            "Content-Type": "application/x-sentry-envelope",
+            "X-Sentry-Auth": (
+                "Sentry sentry_version=7, "
+                "sentry_client=alerting-drift-check/1.0, "
+                f"sentry_key={parts.username}"
+            ),
+        },
+        content=envelope,
+        timeout=30,
+    )
+    return response.status_code, response.text.strip()[:200]
+
+
+def check_sentry_dsn_liveness(report: Report) -> None:
+    """Assert every Sentry client key actually accepts submissions.
+
+    Covers the whole org rather than only the keys exported as app DSNs: any
+    key here can be picked up as an app's SENTRY_DSN, and one that no longer
+    ingests is a trap whether or not it is wired up today.
+
+    Pulumi's own guard (`export_dsn` in the sentry stack) asserts `is_active`
+    from state, so it cannot see a key deactivated in the Sentry UI until the
+    next refresh. This is the live half of that pair.
+    """
+    check = "sentry-dsn-liveness"
+    client, org = _sentry_client()
+
+    projects = _sentry_pages(client, f"{SENTRY_API}/organizations/{org}/projects/")
+    for project in sorted(projects, key=lambda item: item["slug"]):
+        keys = _sentry_pages(
+            client, f"{SENTRY_API}/projects/{org}/{project['slug']}/keys/"
+        )
+        for key in keys:
+            subject = f"{project['slug']}/{key['name']}"
+            if not key["isActive"]:
+                detail = (
+                    f"client key {key['id']} is deactivated. Its DSN still "
+                    "looks correct everywhere except at ingest, which rejects "
+                    "every event with 403 ProjectId. Delete it, or re-activate "
+                    "it and record why it exists"
+                )
+                if subject in SENTRY_INACTIVE_KEY_EXEMPT:
+                    report.known(check, subject, detail)
+                else:
+                    report.drift(check, subject, detail)
+                continue
+
+            status, body = _probe_sentry_ingest(key["dsn"]["public"])
+            if status != httpx.codes.OK:
+                report.drift(
+                    check,
+                    subject,
+                    f"active client key {key['id']} but ingest refused a "
+                    f"submission with HTTP {status}: {body}",
+                )
+
+
 def _sentry_error_volumes() -> dict[str, int]:
     """14-day error counts keyed by project slug, for the alerting projects."""
     client, org = _sentry_client()
@@ -746,6 +843,14 @@ def grafana_delivery_command() -> None:
     sys.exit(report.render())
 
 
+@app.command(name="sentry-dsn-liveness")
+def sentry_dsn_liveness_command() -> None:
+    """Check every Sentry client key still accepts submissions."""
+    report = Report()
+    check_sentry_dsn_liveness(report)
+    sys.exit(report.render())
+
+
 @app.command(name="sentry-liveness")
 def sentry_liveness_command(max_silent_days: int = 7) -> None:
     """Check Sentry alerts are still reaching Rootly.
@@ -776,6 +881,7 @@ def all_checks(max_silent_days: int = 7) -> None:
     check_rootly_routes(report)
     check_grafana_delivery(report)
     check_sentry_liveness(report, max_silent_days)
+    check_sentry_dsn_liveness(report)
     sys.exit(report.render())
 
 

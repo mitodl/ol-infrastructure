@@ -75,8 +75,16 @@ configuration, then `pulumi import --file sentry_imports.json` followed by
   `dagster_sentry_dsn` stack output is consumed by the Dagster application
   stack, which writes it to Vault at `secret-data/dagster/sentry`. The same
   naming-convergence caveat as above applies to `key_dagster`.
+- `export_dsn()`: hand-added helper, defined just above the
+  `project_ol_analytics_api` block, used by every `*_sentry_dsn` export below.
+  It asserts the key's `is_active` before exporting its DSN, because a
+  deactivated key produces a well-formed DSN with the correct project id while
+  ingest rejects every event with 403 -- the 2026-09-01 odl-video-service
+  incident. `is_active` comes from state, so it is only as fresh as the last
+  refresh; the live half of the pair is `bin/alerting-drift-check
+  sentry-dsn-liveness`, which submits to each key's ingest endpoint nightly.
 - `*_sentry_dsn` stack outputs for every other generated `key_*` resource
-  (see ol-infrastructure#5004): hand-added `pulumi.export(...)` calls at the
+  (see ol-infrastructure#5004): hand-added `export_dsn(...)` calls at the
   end of the file, exposing each project's DSN as `<project_slug>_sentry_dsn`
   (name-suffixed for projects with more than one key, e.g.
   `odl_video_service_eternal_mink_sentry_dsn`) so consuming Pulumi stacks can

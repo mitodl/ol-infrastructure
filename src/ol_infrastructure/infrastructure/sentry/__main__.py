@@ -4881,6 +4881,43 @@ issue_alert_xpro_xpro_slack_notifications_15045794 = sentry.SentryIssueAlert(
     opts=sentry_issue_alert_opts,
 )
 
+
+def export_dsn(output_name: str, key: sentry.SentryKey) -> None:
+    """Export a client key's public DSN, refusing to export a deactivated key.
+
+    A deactivated key yields a perfectly well-formed DSN carrying the correct
+    project id, and Sentry's key-list API returns it indistinguishably from a
+    live one, while ingest drops every event with 403 ProjectId. That is the
+    2026-09-01 odl-video-service incident: three environments silently
+    discarded every event and every string-level check on the DSN passed.
+    ``is_active`` is the only property that separates the two cases, so a key
+    that has it false must fail the run rather than reach an app's SENTRY_DSN.
+
+    This reads the key's state, so it is only as fresh as the last refresh. A
+    key deactivated in the Sentry UI is caught here on the next refresh, and in
+    the meantime by the live ingest probe in ``bin/alerting-drift-check
+    sentry-dsn-liveness``.
+    """
+
+    def assert_active(key_state: dict[str, Any]) -> str:
+        if not key_state["is_active"]:
+            msg = (
+                f"Sentry client key for stack output {output_name!r} is "
+                "DEACTIVATED: its DSN is well-formed but ingest will reject "
+                "every event with 403 ProjectId. Re-activate the key in Sentry "
+                "(PUT keys/<id>/ with isActive=true) or export a different key."
+            )
+            raise ValueError(msg)
+        return key_state["dsn"]
+
+    pulumi.export(
+        output_name,
+        pulumi.Output.all(is_active=key.is_active, dsn=key.dsn_public).apply(
+            assert_active
+        ),
+    )
+
+
 # Hand-authored addition (not yet live in Sentry, so bin/import-sentry-config
 # has never seen it) -- see IMPORT_SUMMARY.md. Follows the generator's naming
 # convention (project_<slug>, key_<project_slug>) so a future regeneration,
@@ -4915,7 +4952,7 @@ key_ol_analytics_api = sentry.SentryKey(
     opts=sentry_opts,
 )
 
-pulumi.export("ol_analytics_api_sentry_dsn", key_ol_analytics_api.dsn_public)
+export_dsn("ol_analytics_api_sentry_dsn", key_ol_analytics_api)
 
 # Hand-authored addition, same rationale as project_ol_analytics_api above --
 # see IMPORT_SUMMARY.md.
@@ -4950,7 +4987,7 @@ key_dagster = sentry.SentryKey(
     opts=sentry_opts,
 )
 
-pulumi.export("dagster_sentry_dsn", key_dagster.dsn_public)
+export_dsn("dagster_sentry_dsn", key_dagster)
 
 # Hand-authored addition, same rationale as project_ol_analytics_api above --
 # see IMPORT_SUMMARY.md.
@@ -4985,66 +5022,66 @@ key_witan = sentry.SentryKey(
     opts=sentry_opts,
 )
 
-pulumi.export("witan_sentry_dsn", key_witan.dsn_public)
+export_dsn("witan_sentry_dsn", key_witan)
 
 # Hand-added stack outputs (not produced by bin/import-sentry-config) exposing
 # each project's DSN so consuming stacks can read it via
 # sentry_stack.require_output(...) instead of a hard-coded/SOPS/Vault secret.
 # See ol-infrastructure#5004. Naming convention: `<project_slug>_sentry_dsn`,
 # with a name-suffixed variant for projects that have more than one key.
-pulumi.export(
+export_dsn(
     "learn_ai_sentry_dsn",
-    key_learn_ai_default_5e497d1f33127fc35dfc811b290747c7.dsn_public,
+    key_learn_ai_default_5e497d1f33127fc35dfc811b290747c7,
 )
-pulumi.export(
+export_dsn(
     "micromasters_sentry_dsn",
-    key_micromasters_default_6134fa8f62f74ba49d3892f9eb8c2fb7.dsn_public,
+    key_micromasters_default_6134fa8f62f74ba49d3892f9eb8c2fb7,
 )
-pulumi.export(
+export_dsn(
     "mitxonline_sentry_dsn",
-    key_mitxonline_default_8ba006dc817541a0865033722f8289ad.dsn_public,
+    key_mitxonline_default_8ba006dc817541a0865033722f8289ad,
 )
-pulumi.export(
+export_dsn(
     "ocw_site_sentry_dsn",
-    key_ocw_next_default_eee58f41dda54d2b814296e12dced4b7.dsn_public,
+    key_ocw_next_default_eee58f41dda54d2b814296e12dced4b7,
 )
-pulumi.export(
+export_dsn(
     "ocw_studio_sentry_dsn",
-    key_ocw_studio_default_ba06ef0080e342db9b9ae1db53944f1a.dsn_public,
+    key_ocw_studio_default_ba06ef0080e342db9b9ae1db53944f1a,
 )
-pulumi.export(
+export_dsn(
     "odl_video_service_sentry_dsn",
-    key_odl_video_service_default_f75d3b6abb8f4a30b95769f8f9644ee3.dsn_public,
+    key_odl_video_service_default_f75d3b6abb8f4a30b95769f8f9644ee3,
 )
-pulumi.export(
+export_dsn(
     "odl_video_service_eternal_mink_sentry_dsn",
-    key_odl_video_service_eternal_mink_7e70a5f1227743959ba1cb1e8db1240f.dsn_public,
+    key_odl_video_service_eternal_mink_7e70a5f1227743959ba1cb1e8db1240f,
 )
-pulumi.export(
+export_dsn(
     "open_sentry_dsn",
-    key_open_default_005a98ba45c3472dbb4c12405d814557.dsn_public,
+    key_open_default_005a98ba45c3472dbb4c12405d814557,
 )
-pulumi.export(
+export_dsn(
     "mit_learn_sentry_dsn",
-    key_open_next_default_8131564a9b9e31ac3cbcf7952f0fea80.dsn_public,
+    key_open_next_default_8131564a9b9e31ac3cbcf7952f0fea80,
 )
-pulumi.export(
+export_dsn(
     "openedx_mitxonline_sentry_dsn",
-    key_openedx_mitxonline_default_8807f1e77ff44d91beeb2580507ad84a.dsn_public,
+    key_openedx_mitxonline_default_8807f1e77ff44d91beeb2580507ad84a,
 )
-pulumi.export(
+export_dsn(
     "openedx_mitxpro_sentry_dsn",
-    key_openedx_mitxpro_default_3b523a8e89c040f0a46ddc90a64f9d14.dsn_public,
+    key_openedx_mitxpro_default_3b523a8e89c040f0a46ddc90a64f9d14,
 )
-pulumi.export(
+export_dsn(
     "openedx_residential_sentry_dsn",
-    key_openedx_residential_default_3741f5e8334b429eaa048bec1e3daa30.dsn_public,
+    key_openedx_residential_default_3741f5e8334b429eaa048bec1e3daa30,
 )
-pulumi.export(
+export_dsn(
     "release_script_sentry_dsn",
-    key_release_script_default_67d74d4e5121a4ca332f1523ff8affdd.dsn_public,
+    key_release_script_default_67d74d4e5121a4ca332f1523ff8affdd,
 )
-pulumi.export(
+export_dsn(
     "xpro_sentry_dsn",
-    key_xpro_default_c9f9886a461647708cd0c0c551166866.dsn_public,
+    key_xpro_default_c9f9886a461647708cd0c0c551166866,
 )
