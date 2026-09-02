@@ -2,12 +2,34 @@
 # Shared Python base image for MIT Open Learning services.
 #
 # Bakes the substrate that every Python app Dockerfile previously duplicated:
-# slim Python, the common-core apt packages, the uv binary, a non-root `mitodl`
-# user, and the /opt/venv environment configuration. App images do
+# hardened Python, the common-core apt packages, the uv binary, a non-root
+# `mitodl` user, and the /opt/venv environment configuration. App images do
 # `FROM mitodl/ol-python-base:<python-version>` and add only their app-specific
 # layers (extra apt, node build stages, project source, run command).
 #
+# The base is Docker Hardened Images' Python `-dev` variant (Debian 13/trixie):
+# near-zero-CVE, continuously rebuilt, signed provenance. The `-dev` variant is
+# deliberate — it keeps the shell and apt this build (and downstream app
+# builds and dev stages) depend on; the shell-less runtime variant is only for
+# per-app production stages (see the hardened-images RFC). Pulls require
+# `docker login dhi.io` (any Docker account; CI uses the dockerhub service
+# credentials).
+#
+# DHI's layers are zstd-compressed. Earlier attempts at this rebase tried
+# mirroring the base with forced gzip recompression (mitodl/ol-infrastructure
+# #5712) to work around that, but the mirror needed a brand-new Docker Hub
+# repo whose push permissions were never verified before merging — which
+# broke production. The actual, permanent fix is OUTPUT_OCI=true on any
+# single-platform build consuming this base (see
+# src/ol_concourse/pipelines/infrastructure/k8s_apps/pipeline.py and
+# mitodl/ol-infrastructure#5714): it preserves DHI's original zstd layers
+# and their correct labeling end-to-end, with no mirroring, no new registry
+# artifact, and no new permission surface. This build itself needs no such
+# flag — it's already multi-arch, which oci-build-task treats as requiring
+# OCI output regardless.
+#
 # Build:
+#   docker login dhi.io
 #   docker build --build-arg PYTHON_VERSION=3.12 -t mitodl/ol-python-base:3.12 .
 # Multi-arch build (published for both amd64 and arm64/Apple Silicon; --push
 # is required since a multi-platform result can't be loaded into the local
@@ -15,7 +37,7 @@
 #   docker buildx build --platform linux/amd64,linux/arm64 --push \
 #     --build-arg PYTHON_VERSION=3.12 -t mitodl/ol-python-base:3.12 .
 ARG PYTHON_VERSION=3.12
-FROM python:${PYTHON_VERSION}-slim
+FROM dhi.io/python:${PYTHON_VERSION}-debian13-dev
 
 LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 
@@ -24,6 +46,10 @@ LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 # own Dockerfile / apt.txt.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+      # adduser is absent from the DHI dev image's curated package set
+      # (python:X-slim shipped it implicitly); required by the mitodl user
+      # creation below.
+      adduser \
       build-essential \
       ca-certificates \
       curl \
@@ -38,6 +64,13 @@ RUN apt-get update && \
       zlib1g-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# DHI's Python is Debian-packaged (`python3` in /usr/bin) rather than the
+# python.org /usr/local layout that python:X-slim used, and Debian packaging
+# ships no bare `python` binary. Provide one for downstream Dockerfiles and
+# scripts that expect it. Guarded so this stays a no-op if a future base adds
+# its own.
+RUN command -v python >/dev/null 2>&1 || ln -s "$(command -v python3)" /usr/local/bin/python
 
 # Install uv (pinned via the upstream tag; bump deliberately).
 COPY --from=ghcr.io/astral-sh/uv:0.12.5@sha256:e85be844203885286c60ffad8a858d48afb6c5a5c237ca0e67f12e74b8f174b1 /uv /uvx /usr/local/bin/
