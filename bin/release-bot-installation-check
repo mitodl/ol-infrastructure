@@ -81,7 +81,7 @@ def check(
     as_json: Annotated[
         bool, cyclopts.Parameter(name=["--json"], help="Emit JSON instead of text.")
     ] = False,
-) -> int:
+) -> None:
     """Report installation status for every repo in the app registry."""
     jwt = _app_jwt()
     # Two app entries can share one repo (mit-learn / mit-learn-nextjs), and the
@@ -99,13 +99,16 @@ def check(
 
     missing = [repo for repo, installation_id in results.items() if not installation_id]
     if missing:
+        # sys.exit rather than `return 1`: cyclopts discards a handler's return
+        # value, so returning a status here would exit 0 and a CI gate built on
+        # this script would pass while reporting missing repos.
         print(
             f"\n{len(missing)} repo(s) missing. Add them at "
             "https://github.com/organizations/mitodl/settings/installations/150138801"
             " before flipping their pipeline.",
             file=sys.stderr,
         )
-    return 1 if missing else 0
+        sys.exit(1)
 
 
 if __name__ == "__main__":
