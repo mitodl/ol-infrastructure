@@ -273,10 +273,20 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                     views=["admin", "user"], edits=["admin", "user"]
                 ),
             ),
-            # Populated via IdP-broker attribute mappers (e.g. Apply7's
-            # customer_id/customer_name OIDC claims) rather than user input,
-            # so these are admin-only and never required -- most users have
-            # no value here at all.
+            # Populated via IdP-broker attribute mappers, not user input, so
+            # these are admin-only and never required -- most users have no
+            # value here at all. Per Apply7 (the current source of both
+            # claims): "customer" means whichever of *their* downstream
+            # customers -- a school or institution using Apply7's platform
+            # -- this Apply7-authenticated user is attributed to, i.e. the
+            # school/institution attribution blarghmatey asked about, not
+            # Apply7 itself and not an MIT Learn concept. If a future OIDC
+            # partner sends similarly-named claims with different semantics,
+            # give them their own attribute(s) rather than reusing these --
+            # the definitions below are Apply7-specific.
+            #
+            # customerId: a unique and stable identifier, assigned by
+            # Apply7, for that customer.
             keycloak.RealmUserProfileAttributeArgs(
                 name="customerId",
                 display_name="${customerId}",
@@ -286,6 +296,8 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                     views=["admin"], edits=["admin"]
                 ),
             ),
+            # customerName: that same customer's human-readable display
+            # name (e.g. "Springfield High School"), also as sent by Apply7.
             keycloak.RealmUserProfileAttributeArgs(
                 name="customerName",
                 display_name="${customerName}",
@@ -1532,11 +1544,15 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             ),
         )
         if apply7_oidc_identity_provider is not None:
-            # Apply7-proposed claims identifying which of their customers a
-            # user belongs to. Requires customerId/customerName to be
-            # declared (admin-only) on the realm's user profile above --
-            # otherwise Keycloak silently drops attribute-importer writes to
-            # undeclared ("unmanaged") user attributes.
+            # customer_id/customer_name claims identifying which of
+            # Apply7's own downstream customers (a school/institution on
+            # their platform) a given user belongs to -- see the
+            # customerId/customerName attribute definitions above for the
+            # full explanation of what "customer" means here. Requires
+            # customerId/customerName to be declared (admin-only) on the
+            # realm's user profile above -- otherwise Keycloak silently
+            # drops attribute-importer writes to undeclared ("unmanaged")
+            # user attributes.
             keycloak.AttributeImporterIdentityProviderMapper(
                 "map-apply7-oidc-customer-id-attribute",
                 realm=ol_apps_realm.id,
