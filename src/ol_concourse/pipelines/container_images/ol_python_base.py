@@ -41,21 +41,41 @@ ol_infrastructure_repo = git_repo(
 # override — confirmed by reading its source: neither the Config struct nor
 # the buildctl invocation it shells out to expose a compression flag)
 # preserves that original compression for pass-through layers rather than
-# recompressing everything to match the new layers it adds. So a straight
-# `FROM dhi.io/...` build produces a manifest with mixed zstd/gzip layers.
-# Concourse's registry-image resource — bundled at v1.18.0 with our pinned
-# Concourse 8.3.0, and confirmed to be the latest release with zero zstd
-# handling anywhere in its source — can only decode gzip, and fails with
-# "gzip: invalid header" the moment it fetches such an image back (this is
-# exactly what broke the first learn-ai canary build after this rebase).
+# recompressing everything to match the new layers it adds.
+#
+# That alone is survivable — Concourse's registry-image resource genuinely
+# can decode OCI zstd-labeled layers (verified by reading its source,
+# commands/rootfs.go, at v1.18.0, the version bundled with our pinned
+# Concourse 8.3.0: it has an explicit case for the OCI zstd media type using
+# klauspost/compress/zstd). The actual break is one step further downstream.
+# oci-build-task only requests OCI-format output (which can *label* a zstd
+# layer correctly) when a build sets IMAGE_PLATFORM for multiple platforms;
+# any single-platform build — i.e. nearly every k8s_apps app image, unlike
+# this multi-arch ol-python-base build — defaults to Docker's legacy
+# manifest format instead (verified: oci-build-task's task.go hardcodes
+# `outputType := "docker"` unless multi-platform output forces OCI). That
+# legacy format's manifest.json has no per-layer media-type field at all —
+# there is no way to *declare* a layer zstd — so oci-build-task's loader for
+# that path (tarball.ImageFromPath, go-containerregistry's legacy reader)
+# pushes DHI's still-zstd-compressed bytes under the implicit legacy
+# "tar.gzip" label, silently mislabeling them rather than transcoding them.
+# Confirmed directly: `docker manifest inspect --verbose` on the exact
+# learn-ai-app digest that failed the canary showed every layer declared as
+# application/vnd.docker.image.rootfs.diff.tar.gzip — Docker's legacy gzip
+# media type — despite carrying DHI's genuinely zstd-compressed bytes
+# through unchanged. registry-image resource correctly trusts that label,
+# tries gzip.NewReader on real zstd bytes, and fails with exactly the
+# "gzip: invalid header" error that broke the canary build.
 #
 # mirror_dhi_python_base_task fixes this once, upstream of every consumer:
 # it mirrors dhi.io into mitodl/dhi-python-mirror using skopeo's
 # --dest-force-compress-format, which forces every layer — including ones
-# copied verbatim from the source — to gzip. Verified locally against the
-# real dhi.io/python image: zstd layers came out uniformly gzip after the
-# copy. Every downstream build (this image and every app built FROM it)
-# then inherits a uniformly-compressed image and never touches dhi.io.
+# copied verbatim from the source — to genuinely, not just nominally, gzip.
+# Verified locally against the real dhi.io/python image: zstd layers came
+# out uniformly gzip after the copy. With no zstd bytes left anywhere in the
+# chain, there's nothing left for any downstream build's legacy-format
+# output to mislabel, regardless of whether that build is single- or
+# multi-platform.
 dhi_python_base_resources = {
     version: registry_image(
         name=Identifier(f"dhi-python-{version.replace('.', '')}-image"),

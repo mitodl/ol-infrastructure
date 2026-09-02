@@ -14,11 +14,16 @@
 # per-app production stages (see the hardened-images RFC).
 #
 # This pulls mitodl/dhi-python-mirror, NOT dhi.io directly. DHI's images carry
-# zstd-compressed layers, which our Concourse pipeline's registry-image
-# resources can't decode (they can only handle gzip); the ol-python-base
-# Concourse pipeline mirrors dhi.io into this repo with every layer forced to
-# gzip before this Dockerfile ever builds. See mirror_dhi_python_base_task in
-# src/ol_concourse/pipelines/container_images/ol_python_base.py for why.
+# zstd-compressed layers; single-platform downstream builds (nearly every app
+# image built FROM this base) silently mislabel those as gzip when they push
+# through Docker's legacy manifest format, which has no field to declare
+# anything else — and Concourse's registry-image resource then fails trying
+# to gzip-decode the real zstd bytes. The ol-python-base Concourse pipeline
+# mirrors dhi.io into this repo with every layer forced to genuinely, not
+# just nominally, gzip before this Dockerfile ever builds — see
+# mirror_dhi_python_base_task in
+# src/ol_concourse/pipelines/container_images/ol_python_base.py for the full
+# mechanism and how this was confirmed.
 #
 # Build:
 #   docker build --build-arg PYTHON_VERSION=3.12 -t mitodl/ol-python-base:3.12 .
