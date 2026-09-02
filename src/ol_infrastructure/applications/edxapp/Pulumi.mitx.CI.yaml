@@ -150,7 +150,7 @@ config:
   typesense:deploy: "true"
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
-  typesense:forum_search_enabled: "false"
+  typesense:forum_search_enabled: "true"
   edxapp:site_project:
     deployment: mitx
     mfe_apps:
