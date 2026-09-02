@@ -31,9 +31,10 @@ grow a `package.json`.
    throws without it. Do not add a default, and do not branch on the base URL to pick
    different expected data — see "Do not key assertions on the environment".
 
-3. **Do not add dependencies.** `@playwright/test` plus TypeScript, and nothing else.
-   That is what keeps `npm ci` a 6-package, sub-second install; every dependency added
-   here is paid on every run of every canary, forever.
+3. **Do not add dependencies.** Keep the direct dependency set to
+   `@playwright/test`, `@types/node`, and TypeScript. That is what keeps `npm ci` a
+   6-package, sub-second install; every dependency added here is paid on every run of
+   every canary, forever.
 
 ---
 

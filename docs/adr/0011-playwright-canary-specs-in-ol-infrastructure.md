@@ -36,7 +36,7 @@ and who owns a failing canary.
 - The ECR pull-through cache covers only `public.ecr.aws` (`ecr-public`) and Docker Hub
   (`dockerhub`) — see `src/ol_infrastructure/infrastructure/aws/ecr/__main__.py`. There
   is **no cache rule for `mcr.microsoft.com`**, where the official Playwright images
-  are published, and MCR is not an upstream ECR pull-through supports. Pulling MCR
+  are published, and MCR is not an upstream that ECR pull-through supports. Pulling MCR
   directly is nonetheless consistent with existing practice: pipelines already pull
   `quay.io/keycloak/keycloak` and `ghcr.io/astral-sh/uv` directly.
 - Canaries run against live deployed environments, including production, and need real
@@ -63,9 +63,10 @@ Established empirically on 2026-09-01, not assumed:
    and `yarn`. `npx --yes playwright test` therefore fails to resolve
    `@playwright/test` from the config. An install step is mandatory.
 4. **That install is nearly free when the dependency set is tiny.** With
-   `@playwright/test` plus TypeScript as the only dependencies, `npm ci` is **6 packages
-   in ~400 ms**, and no browser download happens because the image already has them. A
-   full canary run against RC completed in ~1.1 s. This is what makes a purpose-built
+   `@playwright/test`, `@types/node`, and TypeScript as the only direct dependencies,
+   `npm ci` installs **6 packages in ~400 ms**, and no browser download happens because
+   the image already has them. A full canary run against RC completed in ~1.1 s. This
+   is what makes a purpose-built
    container image unnecessary machinery rather than an optimization.
 5. **The image is acceptable to pull:** `mcr.microsoft.com/playwright:v1.62.1-noble`
    carries ~2.4 GB of filesystem content, 1.3 GB of which is the baked browsers under
@@ -174,7 +175,8 @@ apply. That is more machinery than the tidiness was worth.
   A stray `.only` in a canary silently stops every other journey for that property from
   being checked, and nothing would report the gap.
 - Dependency discipline is a written rule in the directory's `AGENTS.md`: only
-  `@playwright/test` and TypeScript. Finding 4's economics hold only while that is true.
+  `@playwright/test`, `@types/node`, and TypeScript. Finding 4's economics hold only
+  while that is true.
 
 ## Consequences
 
