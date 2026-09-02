@@ -540,9 +540,9 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             # ChatGPT/Codex desktop app: connector setup happens against the
             # ChatGPT web app first (the desktop app reuses that connection),
             # so this is chatgpt.com's callback, not a loopback address —
-            # observed redirect targets for MCP connector OAuth as of
-            # 2026-09; unconfirmed against OpenAI's own written spec, revisit
-            # if the callback fails at login time.
+            # candidate redirect targets for MCP connector OAuth sourced from
+            # web search, NOT verified against an OpenAI spec or an
+            # end-to-end login; revisit if the callback fails at login time.
             "https://chatgpt.com/oauth/callback",
             "https://chatgpt.com/connector_platform_oauth_redirect",
             "https://chat.openai.com/oauth/callback",

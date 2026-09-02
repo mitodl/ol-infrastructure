@@ -28,8 +28,10 @@ metadata document instead.
 
 - **MCP endpoint:** `https://witan.<env>.ol.mit.edu/mcp` (Production:
   `https://witan.ol.mit.edu/mcp`)
-- **Issuer:** `https://sso.<env>.ol.mit.edu/realms/ol-platform-engineering`
-  (Production: `https://sso.ol.mit.edu/realms/ol-platform-engineering`)
+- **Issuer:** `https://sso-<env>.ol.mit.edu/realms/ol-platform-engineering`
+  (Production: `https://sso.ol.mit.edu/realms/ol-platform-engineering`) — note
+  the hyphen for non-production, not a dot; matches `KEYCLOAK_DOMAIN` in
+  `src/ol_infrastructure/applications/witan/__main__.py:278-281`.
 - **Client ID:** `witan-desktop`
 - **Client secret:** none — PUBLIC client, PKCE (S256) only
 - Access requires membership in the `ol-platform-engineering` realm; realm
@@ -59,10 +61,11 @@ connector UI.
 4. Complete the browser login; the redirect targets already registered on
    `witan-desktop` (`chatgpt.com/oauth/callback`,
    `chatgpt.com/connector_platform_oauth_redirect`,
-   `chat.openai.com/oauth/callback`) were observed empirically, not taken
-   from a published OpenAI spec — if login fails with an invalid-redirect
-   error, capture the exact `redirect_uri` ChatGPT sent and add it to
-   `valid_redirect_uris` on the `witan-desktop` client.
+   `chat.openai.com/oauth/callback`) are candidates sourced from web search,
+   not verified against a published OpenAI spec or an end-to-end login — if
+   login fails with an invalid-redirect error, capture the exact
+   `redirect_uri` ChatGPT sent and add it to `valid_redirect_uris` on the
+   `witan-desktop` client.
 5. Reopen the Codex surface in the desktop app; it should pick up the
    connection made in step 1–4.
 
