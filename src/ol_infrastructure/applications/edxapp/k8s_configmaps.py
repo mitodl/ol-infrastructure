@@ -461,6 +461,7 @@ class EdxappConfigMaps:
     waffle_flags_yaml: kubernetes.core.v1.ConfigMap
     ssh_known_hosts: kubernetes.core.v1.ConfigMap
     settings_override: kubernetes.core.v1.ConfigMap
+    azure_openai: kubernetes.core.v1.ConfigMap | None
 
     general_config_name: str
     interpolated_config_name: str
@@ -471,6 +472,7 @@ class EdxappConfigMaps:
     waffle_flags_yaml_config_name: str
     ssh_known_hosts_config_name: str
     settings_override_config_name: str
+    azure_openai_config_name: str | None
 
 
 def create_k8s_configmaps(  # noqa: PLR0915
@@ -481,6 +483,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
     edxapp_cache: OLAmazonCache,
     notes_stack: StackReference,
     opensearch_hostname: Output[str],
+    azure_openai_stack: StackReference | None = None,
 ) -> EdxappConfigMaps:
     """Create all Kubernetes configmaps for EDXApp using dictionary-based configuration.
 
@@ -492,6 +495,8 @@ def create_k8s_configmaps(  # noqa: PLR0915
         edxapp_cache: Redis cache instance
         notes_stack: StackReference for notes service
         opensearch_hostname: OpenSearch hostname
+        azure_openai_stack: StackReference on infrastructure/azure/openai, or None
+            where Azure OpenAI is not wired up for this deployment
 
     Returns:
         EdxappConfigMaps dataclass containing all ConfigMap resources
@@ -920,6 +925,56 @@ def create_k8s_configmaps(  # noqa: PLR0915
         data={"production.py": settings_override_module},
     )
 
+    # Azure OpenAI identity configuration. Nothing here is secret: the managed identity
+    # is reached by exchanging the pod's projected ServiceAccount token, so the client
+    # id is an identifier rather than a credential.
+    #
+    # Delivered as flat top-level settings in its own config source rather than as a
+    # second `TRANSLATIONS_PROVIDERS:` block. The init container concatenates the
+    # config sources with `cat` instead of deep-merging them, so a second file emitting
+    # that key would silently clobber the deepl / openai / gemini / mistral providers --
+    # last one wins, no error anywhere. The edx-extensions plugin folds these into
+    # TRANSLATIONS_PROVIDERS in Python, at Django settings load.
+    azure_openai_config_name: str | None = None
+    azure_openai_config_map = None
+    if azure_openai_stack is not None:
+        azure_openai_config_name = "18-azure-openai-config-yaml"
+        azure_openai_config_map = kubernetes.core.v1.ConfigMap(
+            f"ol-{stack_info.env_prefix}-edxapp-azure-openai-config-{stack_info.env_suffix}",
+            metadata={
+                "name": azure_openai_config_name,
+                "namespace": namespace,
+                "labels": k8s_global_labels,
+            },
+            data=Output.all(
+                identities=azure_openai_stack.require_output("workload_identities"),
+                accounts=azure_openai_stack.require_output("cognitive_accounts"),
+                tenant_id=azure_openai_stack.require_output("tenant_id"),
+            ).apply(
+                lambda args: {
+                    "18-azure-openai-config.yaml": render_yaml(
+                        {
+                            "AZURE_OPENAI_CLIENT_ID": args["identities"]["mitxonline"][
+                                "client_id"
+                            ],
+                            "AZURE_OPENAI_TENANT_ID": args["tenant_id"],
+                            "AZURE_OPENAI_ENDPOINT": args["accounts"]["mitxonline"][
+                                "endpoint"
+                            ],
+                            "AZURE_OPENAI_API_VERSION": edxapp_config.get(
+                                "azure_openai_api_version"
+                            )
+                            or "2024-10-21",
+                            "AZURE_OPENAI_DEFAULT_DEPLOYMENT": edxapp_config.get(
+                                "azure_openai_default_deployment"
+                            )
+                            or "gpt-5.2",
+                        }
+                    )
+                }
+            ),
+        )
+
     return EdxappConfigMaps(
         general=general_config_map,
         interpolated=interpolated_config_map,
@@ -930,6 +985,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
         waffle_flags_yaml=waffle_flags_yaml_config_map,
         ssh_known_hosts=ssh_known_hosts_config_map,
         settings_override=settings_override_config_map,
+        azure_openai=azure_openai_config_map,
         general_config_name=general_config_name,
         interpolated_config_name=interpolated_config_name,
         cms_general_config_name=cms_general_config_name,
@@ -939,4 +995,5 @@ def create_k8s_configmaps(  # noqa: PLR0915
         waffle_flags_yaml_config_name=waffle_flags_yaml_config_name,
         ssh_known_hosts_config_name=ssh_known_hosts_config_name,
         settings_override_config_name=settings_override_config_name,
+        azure_openai_config_name=azure_openai_config_name,
     )

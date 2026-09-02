@@ -120,6 +120,22 @@ mongodb_atlas_stack = make_stack_reference(
 notes_stack = make_stack_reference(
     projects.EDX_NOTES, f"{stack_info.env_prefix}.{stack_info.name}"
 )
+# Azure OpenAI is provisioned for the mitxonline deployment only, and only in
+# environments where infrastructure/azure/openai has been deployed -- a StackReference
+# to a stack that does not exist fails the whole preview, so the config switch is
+# needed as well as the env_prefix check.
+#
+# Both conditions are load-bearing. The wiring below reads the "mitxonline" key out of
+# the azure stack's workload_identities, so setting the flag on any other edxapp
+# deployment would hand it mitxonline's client id while its own ServiceAccount subject
+# does not match that identity's federated credential -- token exchange would fail
+# every time, at runtime, with AADSTS70021 and no deploy-time signal.
+azure_openai_stack = (
+    make_stack_reference(projects.AZURE_OPENAI, stack_info.name)
+    if edxapp_config.get_bool("enable_azure_openai")
+    and stack_info.env_prefix == "mitxonline"
+    else None
+)
 
 #############
 # Variables #
@@ -1295,6 +1311,7 @@ k8s_resources = create_k8s_resources(
     stack_info=stack_info,
     vault_config=Config("vault"),
     vault_policy=edxapp_vault_policy,
+    azure_openai_stack=azure_openai_stack,
 )
 
 export_dict = {

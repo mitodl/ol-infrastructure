@@ -1515,6 +1515,7 @@ dependencies = [
     { name = "pulumi" },
     { name = "pulumi-aws" },
     { name = "pulumi-aws-native" },
+    { name = "pulumi-azure-native" },
     { name = "pulumi-command" },
     { name = "pulumi-consul" },
     { name = "pulumi-docker" },
@@ -1574,6 +1575,7 @@ requires-dist = [
     { name = "pulumi", specifier = ">=3.39.1,<4" },
     { name = "pulumi-aws", specifier = ">=7.1,<8" },
     { name = "pulumi-aws-native", specifier = ">=1.25.0,<2" },
+    { name = "pulumi-azure-native", specifier = ">=3.19.0,<4" },
     { name = "pulumi-command", specifier = ">=1.0,<2" },
     { name = "pulumi-consul", specifier = ">=3.5.0,<4" },
     { name = "pulumi-docker", specifier = ">=5,<6" },
@@ -1989,6 +1991,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/b6/a0/6a8ad8d3954b014cb584d4fd720de9b96d53bdb51517fe9d909bbe4388ca/pulumi_aws_native-1.76.0.tar.gz", hash = "sha256:7a70e0bc1e38abe9016a4ebcabd7e4d1be0540ef418f26ae7c601f1bb38af884", size = 9472775, upload-time = "2026-08-24T06:48:47.249Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/88/eb/abf73cf486d688249626dadfc0c50f837a5a63bec57aff544d6e1cdc6387/pulumi_aws_native-1.76.0-py3-none-any.whl", hash = "sha256:15d6a55ccf46075b7e81d87551c2f7b595e9ed6e7b677b4dc66eea901ee53278", size = 13494053, upload-time = "2026-08-24T06:48:44.898Z" },
+]
+
+[[package]]
+name = "pulumi-azure-native"
+version = "3.24.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "parver" },
+    { name = "pulumi" },
+    { name = "semver" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2f/df/8970e1f7b31b900a9c56a6b6f9f2f950fd24dd4ff986e9f77c903afdd31c/pulumi_azure_native-3.24.0.tar.gz", hash = "sha256:0c3ca233e7e0406ca661cc8d41d6b425b8a5fd08b230fee0f73433324edfe61d", size = 12817262, upload-time = "2026-07-29T14:48:35.875Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/54/74/ce49565562cebaa064c46ff7190f31f05624e1cc306f8caabf711bd932f7/pulumi_azure_native-3.24.0-py3-none-any.whl", hash = "sha256:50135f45e88d84aae2112521c8d63770cf98a536c865d67edf5f369040849c6f", size = 21637390, upload-time = "2026-07-29T14:48:32.963Z" },
 ]
 
 [[package]]

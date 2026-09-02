@@ -112,6 +112,11 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/xqwatcher/": [],
     # ---- infrastructure/ ----------------------------------------------------
     "infrastructure/aws/data_warehouse/": [],
+    # Empty deliberately: the Azure OpenAI project pins no version constants.
+    # Model versions are stack config (azure_openai:model_versions), not
+    # src/bridge/lib/versions.py entries, because which versions exist is a
+    # property of the subscription and region rather than of this repo.
+    "infrastructure/azure/openai/": [],
     "infrastructure/aws/dns/": [],
     "infrastructure/aws/ecr/": [],
     "infrastructure/aws/eks/": [

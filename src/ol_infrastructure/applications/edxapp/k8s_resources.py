@@ -63,6 +63,11 @@ from ol_infrastructure.lib.aws.eks_helper import (
     default_psg_egress_args,
     get_default_psg_ingress_args,
 )
+from ol_infrastructure.lib.azure_workload_identity import (
+    azure_identity_env,
+    azure_identity_token_mount,
+    azure_identity_token_volume,
+)
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -129,6 +134,7 @@ def create_k8s_resources(  # noqa: C901
     stack_info: StackInfo,
     vault_config: Config,
     vault_policy: vault.Policy,
+    azure_openai_stack: StackReference | None = None,
 ) -> dict[str, Any]:
     """Create all Kubernetes resources for the edxapp LMS and CMS deployments."""
     env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
@@ -359,6 +365,7 @@ def create_k8s_resources(  # noqa: C901
         edxapp_cache=edxapp_cache,
         notes_stack=notes_stack,
         opensearch_hostname=opensearch_hostname,
+        azure_openai_stack=azure_openai_stack,
     )
 
     openedx_data_pvc = kubernetes.core.v1.PersistentVolumeClaim(
@@ -400,9 +407,34 @@ def create_k8s_resources(  # noqa: C901
         command=["/bin/sh", "-c", "mkdir -p /openedx/data/export_course_repos"],
     )
 
+    # Azure OpenAI workload identity federation, mitxonline only. Every LMS and CMS
+    # workload including the CronJobs runs under vault_k8s_resources.service_account_name
+    # (see edxapp_service_account_name above), which is the single subject the federated
+    # credential in infrastructure/azure/openai trusts.
+    #
+    # AZURE_CLIENT_ID and AZURE_TENANT_ID also appear as Django settings in the
+    # 18-azure-openai config source; the copies here are what DefaultAzureCredential
+    # itself reads out of the process environment, with no application code involved.
+    azure_identity_volumes = (
+        [azure_identity_token_volume()] if azure_openai_stack else []
+    )
+    azure_identity_volume_mounts = (
+        [azure_identity_token_mount()] if azure_openai_stack else []
+    )
+    azure_identity_config: dict[str, Any] = (
+        azure_identity_env(azure_openai_stack, "mitxonline")
+        if azure_openai_stack
+        else {}
+    )
+    azure_identity_env_vars = [
+        kubernetes.core.v1.EnvVarArgs(name=name, value=value)
+        for name, value in azure_identity_config.items()
+    ]
+
     # Common volume mounts for main application containers (both webapp and celery).
     # These are injected by the component into all containers via extra_volume_mounts.
     common_extra_volume_mounts = [
+        *azure_identity_volume_mounts,
         kubernetes.core.v1.VolumeMountArgs(
             name="edxapp-config",
             mount_path="/openedx/config",
@@ -682,6 +714,10 @@ def create_k8s_resources(  # noqa: C901
         lms_edxapp_secret_names.append(secrets.webhook_tokens_secret_name)
     if secrets.typesense:
         lms_edxapp_secret_names.append(secrets.typesense_secret_name)
+    if configmaps.azure_openai:
+        lms_edxapp_config_sources[configmaps.azure_openai_config_name] = (
+            configmaps.azure_openai
+        )
     lms_edxapp_configmap_names = [
         configmaps.general_config_name,
         configmaps.interpolated_config_name,
@@ -691,6 +727,8 @@ def create_k8s_resources(  # noqa: C901
         # init container cats into lms.env.yml. This is a Python module, not config.
         configmaps.settings_override_config_name,
     ]
+    if configmaps.azure_openai:
+        lms_edxapp_configmap_names.append(configmaps.azure_openai_config_name)
 
     lms_edxapp_volumes = [
         kubernetes.core.v1.VolumeArgs(
@@ -755,6 +793,7 @@ def create_k8s_resources(  # noqa: C901
             ),
         ]
     )
+    lms_edxapp_volumes.extend(azure_identity_volumes)
 
     # Mounts injected into init containers only: the config source paths that
     # the config-aggregator uses to concatenate config YAMLs.
@@ -788,6 +827,7 @@ def create_k8s_resources(  # noqa: C901
                 "DJANGO_SETTINGS_MODULE": "lms.envs.mitol.production",
                 "OTEL_SERVICE_NAME": f"{env_name}-edxapp-lms",
                 **_OTEL_SDK_ENV,
+                **azure_identity_config,
             },
             application_lb_service_name=lms_webapp_deployment_name,
             application_lb_service_port_name="http",
@@ -1024,6 +1064,10 @@ def create_k8s_resources(  # noqa: C901
         cms_edxapp_secret_names.append(secrets.meilisearch_secret_name)
     if secrets.typesense:
         cms_edxapp_secret_names.append(secrets.typesense_secret_name)
+    if configmaps.azure_openai:
+        cms_edxapp_config_sources[configmaps.azure_openai_config_name] = (
+            configmaps.azure_openai
+        )
     cms_edxapp_configmap_names = [
         configmaps.general_config_name,
         configmaps.interpolated_config_name,
@@ -1032,6 +1076,8 @@ def create_k8s_resources(  # noqa: C901
         # Volume only -- see the note on lms_edxapp_configmap_names.
         configmaps.settings_override_config_name,
     ]
+    if configmaps.azure_openai:
+        cms_edxapp_configmap_names.append(configmaps.azure_openai_config_name)
 
     cms_edxapp_volumes = [
         kubernetes.core.v1.VolumeArgs(
@@ -1096,6 +1142,7 @@ def create_k8s_resources(  # noqa: C901
             ),
         ]
     )
+    cms_edxapp_volumes.extend(azure_identity_volumes)
 
     cms_edxapp_init_volume_mounts = [
         kubernetes.core.v1.VolumeMountArgs(
@@ -1125,6 +1172,7 @@ def create_k8s_resources(  # noqa: C901
                 "DJANGO_SETTINGS_MODULE": "cms.envs.mitol.production",
                 "OTEL_SERVICE_NAME": f"{env_name}-edxapp-cms",
                 **_OTEL_SDK_ENV,
+                **azure_identity_config,
             },
             application_lb_service_name=cms_webapp_deployment_name,
             application_lb_service_port_name="http",
@@ -1419,6 +1467,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
@@ -1605,6 +1654,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
@@ -1742,6 +1792,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={"cpu": "100m", "memory": "512Mi"},
@@ -1860,6 +1911,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             volume_mounts=celery_volume_mounts,
                         ),
@@ -1984,6 +2036,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
