@@ -9,8 +9,7 @@ This directory contains Dockerfiles for MIT Open Learning services.
 Published as `mitodl/ol-python-base:{3.11,3.12,3.13}` via the Concourse pipeline at
 [`pipelines/infrastructure/ol_python_base_docker.yaml`](../pipelines/infrastructure/ol_python_base_docker.yaml).
 
-Bakes the substrate every app Dockerfile previously duplicated: hardened Python
-(Docker Hardened Images `-dev` variant, Debian 13; pulls require `docker login dhi.io`), common-core
+Bakes the substrate every app Dockerfile previously duplicated: Python slim, common-core
 apt packages, the `uv` binary, non-root `mitodl` user, `/opt/venv` + `UV_CACHE_DIR`
 env vars. App Dockerfiles do `FROM mitodl/ol-python-base:<python-version>` and add only
 app-specific layers.
