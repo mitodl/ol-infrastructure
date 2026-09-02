@@ -1529,6 +1529,22 @@ redis_cache = OLAmazonCache(
     ),
 )
 
+# Dynamic StarRocks credentials for the warehouse-pull catalog ETL, minted per
+# environment from Vault's `database-starrocks` mount. The mount name is not
+# environment-qualified because QA and Production each run their own separate
+# Vault server, and that is what scopes the environment.
+#
+# STARROCKS_HOST is the single switch for the whole feature. Setting it in a
+# stack's `mitlearn:vars` is what makes mit-learn register the warehouse-pull
+# beat entries (it requires STARROCKS_HOST and STARROCKS_USER together), so
+# minting credentials for a stack that has no host would rotate a StarRocks
+# user on every refresh for nothing. Only CI lacks a StarRocks cluster
+# entirely; QA has one but is held back for the reason recorded in
+# Pulumi.QA.yaml.
+starrocks_vault_mount_path = (
+    "database-starrocks" if env_vars.get("STARROCKS_HOST") else None
+)
+
 # Create all Kubernetes secrets needed by the application
 secret_names, secret_resources = create_mitlearn_k8s_secrets(
     stack_info=stack_info,
@@ -1539,6 +1555,7 @@ secret_names, secret_resources = create_mitlearn_k8s_secrets(
     db_config=mitlearn_vault_backend,  # Use the original DB config object
     redis_password=redis_config.require("password"),
     redis_cache=redis_cache,
+    starrocks_vault_mount_path=starrocks_vault_mount_path,
 )
 
 # KEDA webapp autoscaling: scale on APISIX request-rate + p95 latency

@@ -1065,6 +1065,19 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
 # annotation below means it becomes the sole authority on the NLB's ingress, so
 # every legitimate caller must be listed here.
 FE_MYSQL_PORT = 9030
+
+# Stable name for the FE MySQL endpoint, published by external-dns from the
+# annotation on the Service below.  Consumers outside this stack need a name
+# they can put in configuration, and the NLB's own AWS hostname is not that:
+# it is regenerated whenever the Service is recreated, which would silently
+# cut off every client still holding the old one.
+#
+# A stack reference would be the usual way to share this, but it is not
+# available here -- this stack already references applications.mit_learn for
+# the security group above, so mit_learn referencing it back would close a
+# cycle.
+fe_mysql_domain = f"mysql.{starrocks_config.require('domain')}"
+
 fe_mysql_nlb_security_group = ec2.SecurityGroup(
     f"starrocks-{stack_info.env_suffix}-fe-mysql-nlb-security-group",
     name=f"starrocks-{stack_info.env_suffix}-fe-mysql-nlb",
@@ -1116,6 +1129,13 @@ fe_mysql_nlb_service = kubernetes.core.v1.Service(
             "service.beta.kubernetes.io/aws-load-balancer-security-groups": (
                 fe_mysql_nlb_security_group.id
             ),
+            # external-dns runs with sources including "service" and a domain
+            # filter covering ol.mit.edu on every cluster, so this annotation
+            # is all that is needed to publish the record.  The NLB is
+            # internal, so the record resolves to VPC-private addresses; it is
+            # reachable only from the peered VPCs the security group above
+            # admits.
+            "external-dns.alpha.kubernetes.io/hostname": fe_mysql_domain,
         },
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
@@ -1137,6 +1157,8 @@ fe_mysql_nlb_service = kubernetes.core.v1.Service(
     ),
     opts=ResourceOptions(depends_on=[starrocks_release]),
 )
+
+export("fe_mysql_domain", fe_mysql_domain)
 
 export(
     "fe_mysql_host",
