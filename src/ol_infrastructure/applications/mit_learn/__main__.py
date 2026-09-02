@@ -67,12 +67,14 @@ from ol_infrastructure.components.services.k8s import (
     OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
+    application_deployment_names,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -1529,35 +1531,6 @@ redis_cache = OLAmazonCache(
     ),
 )
 
-# Dynamic StarRocks credentials for the warehouse-pull catalog ETL, minted per
-# environment from Vault's `database-starrocks` mount. The mount name is not
-# environment-qualified because QA and Production each run their own separate
-# Vault server, and that is what scopes the environment.
-#
-# STARROCKS_HOST is the single switch for the whole feature. Setting it in a
-# stack's `mitlearn:vars` is what makes mit-learn register the warehouse-pull
-# beat entries (it requires STARROCKS_HOST and STARROCKS_USER together), so
-# minting credentials for a stack that has no host would rotate a StarRocks
-# user on every refresh for nothing. Only CI lacks a StarRocks cluster
-# entirely; QA has one but is held back for the reason recorded in
-# Pulumi.QA.yaml.
-starrocks_vault_mount_path = (
-    "database-starrocks" if env_vars.get("STARROCKS_HOST") else None
-)
-
-# Create all Kubernetes secrets needed by the application
-secret_names, secret_resources = create_mitlearn_k8s_secrets(
-    stack_info=stack_info,
-    mitlearn_namespace=learn_namespace,
-    k8s_global_labels=k8s_app_labels,
-    vault_k8s_resources=vault_k8s_resources,
-    mitlearn_vault_mount=mitlearn_vault_mount,
-    db_config=mitlearn_vault_backend,  # Use the original DB config object
-    redis_password=redis_config.require("password"),
-    redis_cache=redis_cache,
-    starrocks_vault_mount_path=starrocks_vault_mount_path,
-)
-
 # KEDA webapp autoscaling: scale on APISIX request-rate + p95 latency
 # (CPU backstop) instead of CPU/memory alone, since search blocks on I/O.
 webapp_trigger_auth, webapp_trigger_auth_name = create_webapp_trigger_auth(
@@ -1640,6 +1613,87 @@ celery_beat_resource_requests = _resource_config(
 )
 celery_beat_resource_limits = _resource_config(
     "celery_beat_resource_limits", {"memory": "1536Mi"}
+)
+
+# Celery topology is declared here rather than inline in the OLApplicationK8s
+# config below, because the secrets need the resulting Deployment names before
+# the component exists -- see the restart targets below.
+mitlearn_celery_worker_configs = [
+    OLApplicationK8sCeleryWorkerConfig(
+        queue_name="default",
+        max_replicas=20,
+        redis_host=redis_cache.address,
+        redis_password=redis_config.require("password"),
+        resource_requests=celery_default_resource_requests,
+        resource_limits=celery_default_resource_limits,
+    ),
+    OLApplicationK8sCeleryWorkerConfig(
+        queue_name="edx_content",
+        redis_host=redis_cache.address,
+        redis_password=redis_config.require("password"),
+        resource_requests=celery_edx_content_resource_requests,
+        resource_limits=celery_edx_content_resource_limits,
+    ),
+    OLApplicationK8sCeleryWorkerConfig(
+        queue_name="embeddings",
+        max_replicas=30,
+        redis_host=redis_cache.address,
+        redis_password=redis_config.require("password"),
+        resource_requests=celery_embeddings_resource_requests,
+        resource_limits=celery_embeddings_resource_limits,
+    ),
+]
+mitlearn_celery_beat_config = OLApplicationK8sCeleryBeatConfig(
+    resource_requests=celery_beat_resource_requests,
+    resource_limits=celery_beat_resource_limits,
+)
+
+# Dynamic StarRocks credentials for the warehouse-pull catalog ETL, minted per
+# environment from Vault's `database-starrocks` mount. The mount name is not
+# environment-qualified because QA and Production each run their own separate
+# Vault server, and that is what scopes the environment.
+#
+# STARROCKS_HOST is the single switch for the whole feature. Setting it in a
+# stack's `mitlearn:vars` is what makes mit-learn register the warehouse-pull
+# beat entries (it requires STARROCKS_HOST and STARROCKS_USER together), so
+# minting credentials for a stack that has no host would rotate a StarRocks
+# user on every refresh for nothing. Only CI lacks a StarRocks cluster
+# entirely; QA has one but is held back for the reason recorded in
+# Pulumi.QA.yaml.
+starrocks_vault_mount_path = (
+    "database-starrocks" if env_vars.get("STARROCKS_HOST") else None
+)
+
+# The StarRocks credential reaches the app through env_from_secret_names, i.e.
+# envFrom, so its values become pod environment variables fixed at pod start.
+# Re-rendering the Kubernetes Secret does not touch a running pod. Vault
+# rotates this lease on its own (the StarRocks role's max TTL is six months),
+# so without these restart targets the rotation lands in the Secret, Vault
+# revokes the old StarRocks user with DROP USER, and beat keeps authenticating
+# as a user that no longer exists -- the sync stops until something unrelated
+# rolls the pods. That failure is silent in exactly the way the missing
+# configuration this PR fixes was.
+starrocks_secret_restart_targets = [
+    OLVaultRestartTarget(kind="Deployment", name=deployment_name)
+    for deployment_name in application_deployment_names(
+        application_name="mitlearn",
+        celery_worker_configs=mitlearn_celery_worker_configs,
+        celery_beat_config=mitlearn_celery_beat_config,
+    )
+]
+
+# Create all Kubernetes secrets needed by the application
+secret_names, secret_resources = create_mitlearn_k8s_secrets(
+    stack_info=stack_info,
+    mitlearn_namespace=learn_namespace,
+    k8s_global_labels=k8s_app_labels,
+    vault_k8s_resources=vault_k8s_resources,
+    mitlearn_vault_mount=mitlearn_vault_mount,
+    db_config=mitlearn_vault_backend,  # Use the original DB config object
+    redis_password=redis_config.require("password"),
+    redis_cache=redis_cache,
+    starrocks_vault_mount_path=starrocks_vault_mount_path,
+    starrocks_restart_targets=starrocks_secret_restart_targets,
 )
 
 # Configure and deploy the mitlearn application using OLApplicationK8s
@@ -1739,35 +1793,8 @@ mitlearn_k8s_app = OLApplicationK8s(
         init_migrations=False,
         init_collectstatic=True,  # Assuming Django app needs collectstatic
         pre_deploy_commands=[("migrate", ["scripts/heroku-release-phase.sh"])],
-        celery_worker_configs=[
-            OLApplicationK8sCeleryWorkerConfig(
-                queue_name="default",
-                max_replicas=20,
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
-                resource_requests=celery_default_resource_requests,
-                resource_limits=celery_default_resource_limits,
-            ),
-            OLApplicationK8sCeleryWorkerConfig(
-                queue_name="edx_content",
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
-                resource_requests=celery_edx_content_resource_requests,
-                resource_limits=celery_edx_content_resource_limits,
-            ),
-            OLApplicationK8sCeleryWorkerConfig(
-                queue_name="embeddings",
-                max_replicas=30,
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
-                resource_requests=celery_embeddings_resource_requests,
-                resource_limits=celery_embeddings_resource_limits,
-            ),
-        ],
-        celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-            resource_requests=celery_beat_resource_requests,
-            resource_limits=celery_beat_resource_limits,
-        ),
+        celery_worker_configs=mitlearn_celery_worker_configs,
+        celery_beat_config=mitlearn_celery_beat_config,
         resource_requests=webapp_resource_requests,
         resource_limits=webapp_resource_limits,
         # The component would default this floor to resource_requests["memory"],
