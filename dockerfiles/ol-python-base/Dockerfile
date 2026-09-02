@@ -50,6 +50,12 @@ RUN apt-get update && \
       # (python:X-slim shipped it implicitly); required by the mitodl user
       # creation below.
       adduser \
+      # bsdutils provides `logger`, also absent from the curated set.
+      # adduser (and other Debian maintainer scripts) call it optionally to
+      # notify syslog and degrade gracefully without it -- confirmed
+      # harmless in practice -- but installing it removes the warning noise
+      # and any theoretical dependency on that graceful-degradation path.
+      bsdutils \
       build-essential \
       ca-certificates \
       curl \
