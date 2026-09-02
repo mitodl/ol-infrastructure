@@ -136,3 +136,23 @@ async def test_a_failed_lookup_is_retried_sooner_than_a_successful_one(monkeypat
     client.users["alice@example.com"] = {"id": "U1"}
 
     assert await slack_users.mention(client, "alice@example.com") == "<@U1>"
+
+
+async def test_malformed_addresses_are_still_redacted():
+    """A git author field is an arbitrary string, not a valid address.
+
+    Anything with an "@" is truncated at the first one whether or not it
+    parses as an email, so a malformed address cannot post itself in full.
+    """
+    client = _FakeClient()
+
+    assert await slack_users.mention(client, "alice@@example.com") == "`alice`"
+    assert await slack_users.mention(client, '"alice@work"@example.com') == '`"alice`'
+    assert client.lookups == []
+
+
+async def test_a_bare_name_is_left_alone():
+    """Not every author string is address-shaped; one without "@" survives."""
+    client = _FakeClient()
+
+    assert await slack_users.mention(client, "Alice Example") == "`Alice Example`"

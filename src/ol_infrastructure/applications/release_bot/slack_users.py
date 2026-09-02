@@ -66,9 +66,12 @@ def _fallback(author: str) -> str:
     noreply = _GITHUB_NOREPLY_RE.match(author)
     if noreply:
         return f"`{noreply.group('handle')}`"
-    if _EMAIL_RE.match(author):
-        return f"`{author.split('@', 1)[0]}`"
-    return f"`{author}`"
+    # Truncate at the first "@" whatever the rest looks like: a git author
+    # field is an arbitrary string, and something address-shaped but invalid
+    # ("alice@@example.com") must not post itself in full just because it
+    # fails _EMAIL_RE. That pattern gates API lookups, not redaction.
+    local_part = author.split("@", 1)[0]
+    return f"`{local_part or 'unknown author'}`"
 
 
 def _error_code(exc: Exception) -> str:

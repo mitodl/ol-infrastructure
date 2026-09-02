@@ -617,6 +617,12 @@ async def _notify_ready_to_promote(app, repos) -> None:
                     "Failed to send ready-to-promote notification for %s", app_name
                 )
                 continue
+            # The mention has been delivered. Dropping it here keeps a failed
+            # add_issue_label below -- which leaves the issue eligible on
+            # every 120s poll -- from re-pinging the same person on each
+            # repeat; the duplicate message is a nuisance, a repeating
+            # notification is not.
+            _release_requesters.pop(app_name, None)
             try:
                 await github.add_issue_label(
                     cfg.repo, issue["number"], github.PROMOTE_READY_LABEL

@@ -715,3 +715,54 @@ async def test_promote_clears_the_recorded_requester(repos, slack, monkeypatch):
     )
 
     assert "my-app" not in bot._release_requesters
+
+
+def _ready_issue():
+    return {
+        "number": 1,
+        "title": "Release my-app",
+        "url": "https://github.com/mitodl/my-app/issues/1",
+        "body": "## Release 2026.9.1.1\n\n- [x] **A** (#1) by alice@example.com",
+        "labels": ["release"],
+    }
+
+
+async def test_ready_to_promote_stops_pinging_after_the_first_post(repos, monkeypatch):
+    """A failed label write leaves the issue eligible on every 120s poll.
+
+    The duplicate message is a known nuisance; repeating the @-mention with it
+    would turn that into a notification every two minutes for the same person.
+    """
+    bot._release_requesters["my-app"] = "UDANA"
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[_ready_issue()])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "add_issue_label",
+        AsyncMock(side_effect=RuntimeError("GitHub is down")),
+    )
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+
+    await bot._notify_ready_to_promote(app, repos)
+    await bot._notify_ready_to_promote(app, repos)
+
+    first, second = app.client.chat_postMessage.call_args_list
+    assert "<@UDANA>" in first.kwargs["blocks"][0]["text"]["text"]
+    assert "<@UDANA>" not in second.kwargs["blocks"][0]["text"]["text"]
+
+
+async def test_a_failed_post_keeps_the_requester_for_the_next_poll(repos, monkeypatch):
+    """Dropping the requester on a failed post would lose the ping entirely."""
+    bot._release_requesters["my-app"] = "UDANA"
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[_ready_issue()])
+    )
+    monkeypatch.setattr(bot.github, "add_issue_label", AsyncMock())
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock(side_effect=RuntimeError("Slack is down"))
+
+    await bot._notify_ready_to_promote(app, repos)
+
+    assert bot._release_requesters["my-app"] == "UDANA"
