@@ -208,9 +208,18 @@ def _required_checks_bypass(
 ) -> list[github.RepositoryRulesetBypassActorArgs]:
     """Bypass actors for one repo's required-status-checks ruleset.
 
-    The App is added ONLY to repos whose releases it cuts. `ol-infrastructure` also
-    requires `ci-gate` and must not get an entry: it is released by hand, so a bypass
-    there would be privilege granted to an actor that never pushes to it.
+    The App is added ONLY to repos registered in `bridge.settings.apps.APPS`.
+    `ol-infrastructure` also requires `ci-gate` and correctly gets no entry: it is
+    released by hand, so a bypass there would be privilege granted to an actor that
+    never pushes to it.
+
+    THAT SET IS WIDER THAN THE REPOS ACTUALLY ON THE NEW WORKFLOW, deliberately.
+    `AppPipelineParams.use_release_resource_workflow` is the real opt-in and today
+    only `ol-analytics-api` sets it, so `mit-learn` and `mitxonline` get a bypass here
+    before the App releases them. `release_workflow_repos()` carries the reasoning and
+    the conditions for narrowing it later; the short version is that pre-granting
+    keeps a pipeline flip from needing a privileged GitHub edit alongside it, which is
+    the step that stranded a shipped release once already.
 
     Membership is derived rather than listed so the two cannot drift -- registering an
     app in `APPS` is what grants it the bypass, and a repo that declares no

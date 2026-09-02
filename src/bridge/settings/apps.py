@@ -105,16 +105,30 @@ RELEASE_BOT_APP_ID = 4437866
 
 
 def release_workflow_repos() -> frozenset[str]:
-    """Return the "owner/repo" slugs whose releases ol-release-bot cuts.
+    """Return the "owner/repo" slugs slated for the ol-release-bot release workflow.
+
+    EVERY REGISTERED APP, NOT ONLY THE ONES ALREADY RUNNING THE NEW WORKFLOW. That
+    is deliberate and it over-grants on purpose (decision: Tobias, 2026-09-01). The
+    actual opt-in is ``AppPipelineParams.use_release_resource_workflow`` in
+    ``src/ol_concourse/pipelines/infrastructure/k8s_apps/pipeline.py``, which
+    defaults to ``False`` and today is set on ``ol-analytics-api`` alone -- so the
+    consumer below grants a bypass on ``mit-learn`` and ``mitxonline`` for an App
+    that does not yet finish their releases.
+
+    The trade is pre-provisioning against a rollout that would otherwise need a
+    GitHub ruleset edit interleaved with every pipeline flip -- and that edit is the
+    step that already went wrong once: ol-analytics-api's ``releases/2026.8.28.2``
+    shipped to production and then sat unmerged because the bypass was missing at
+    exactly this moment. Granting ahead means flipping a pipeline is a one-line
+    change with no privileged GitHub operation behind it.
+
+    What it costs is bounded: the bypass only exists where a repo also declares
+    ``required_status_checks``, and the App still cannot act on a repo it is not
+    installed on. Narrow this to opted-in apps once the rollout finishes -- by then
+    the two sets are the same and the over-grant is free to drop.
 
     Deduplicated, because two app entries can share one repo -- ``mit-learn`` and
     ``mit-learn-nextjs`` are independently versioned pipelines over the same
     ``mitodl/mit-learn`` history.
-
-    Consumed by ``ol_infrastructure/saas/github/repositories/rulesets.py`` to decide
-    which repos need a bypass actor for the App. Deriving it from ``APPS`` rather
-    than re-listing the repos over there is what keeps the two from drifting: adding
-    an app here is the single edit that also grants it the bypass it will need the
-    first time ``action: finish`` pushes to its default branch.
     """
     return frozenset(github_repo(app_name) for app_name in APPS)

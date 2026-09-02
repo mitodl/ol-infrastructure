@@ -131,14 +131,22 @@ _ADMIN_BYPASS = [
     # deployed to production but never merged back, until it was finished by hand
     # (mitodl/ol-analytics-api#43).
     #
-    # THIS RESTORES PARITY, IT DOES NOT WIDEN ANYTHING. The legacy release-script bot
-    # ("Doof") does the identical direct push and was never blocked, purely because
-    # its `odlbot` identity is a member of `odl-engineering-owners` above and inherits
-    # that team's `always` bypass -- it pushed mit-learn 31d67335 ("Release date for
-    # 0.78.2", no associated PR) straight onto that repo's default branch on
-    # 2026-09-01, three weeks after these rulesets went `active`.
-    # An App installed on selected repos holding `contents: write` is a narrower
-    # actor than the human PAT it replaces, so the net grant here is a reduction.
+    # BLAST RADIUS, STATED PLAINLY: this ADDS a bypass actor and removes none. The App
+    # can now push directly to, force-push, and delete the default branch of every
+    # `tier-1`/`standard` repo it is installed on, without review. Two things bound
+    # that, and neither is enforced here: the installation is `selected` rather than
+    # org-wide, and the App holds only `contents`/`deployments`/`issues` write.
+    #
+    # It is not a net privilege reduction, and an earlier draft of this comment was
+    # wrong to call it one. The capability is one the release workflow ALREADY
+    # exercises -- the legacy release-script bot ("Doof") does the identical direct
+    # push and was never blocked, because its `odlbot` identity is a member of
+    # `odl-engineering-owners` above and inherits that team's `always` bypass; it
+    # pushed mit-learn 31d67335 ("Release date for 0.78.2", no associated PR) straight
+    # onto that repo's default branch on 2026-09-01, three weeks after these rulesets
+    # went `active`. So the fleet gains no capability it lacked. It gains a second
+    # holder of that capability, and only becomes a swap when Doof is decommissioned
+    # and odlbot leaves the owners team (mitodl/hq#7185).
     #
     # `always` rather than `pull_request`, unlike the two contractor teams: the whole
     # point is a direct push, and a `pull_request`-mode bypass only relaxes rules at
