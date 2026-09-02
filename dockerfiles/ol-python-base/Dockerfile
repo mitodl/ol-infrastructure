@@ -11,12 +11,21 @@
 # near-zero-CVE, continuously rebuilt, signed provenance. The `-dev` variant is
 # deliberate — it keeps the shell and apt that this build (and downstream app
 # builds and dev stages) depend on; the shell-less runtime variant is only for
-# per-app production stages (see the hardened-images RFC). Note that dhi.io
-# denies anonymous pulls, so building this image requires `docker login dhi.io`
-# first (any Docker account works; CI uses the dockerhub service credentials).
+# per-app production stages (see the hardened-images RFC).
+#
+# This pulls mitodl/dhi-python-mirror, NOT dhi.io directly. DHI's images carry
+# zstd-compressed layers; single-platform downstream builds (nearly every app
+# image built FROM this base) silently mislabel those as gzip when they push
+# through Docker's legacy manifest format, which has no field to declare
+# anything else — and Concourse's registry-image resource then fails trying
+# to gzip-decode the real zstd bytes. The ol-python-base Concourse pipeline
+# mirrors dhi.io into this repo with every layer forced to genuinely, not
+# just nominally, gzip before this Dockerfile ever builds — see
+# mirror_dhi_python_base_task in
+# src/ol_concourse/pipelines/container_images/ol_python_base.py for the full
+# mechanism and how this was confirmed.
 #
 # Build:
-#   docker login dhi.io
 #   docker build --build-arg PYTHON_VERSION=3.12 -t mitodl/ol-python-base:3.12 .
 # Multi-arch build (published for both amd64 and arm64/Apple Silicon; --push
 # is required since a multi-platform result can't be loaded into the local
@@ -24,7 +33,7 @@
 #   docker buildx build --platform linux/amd64,linux/arm64 --push \
 #     --build-arg PYTHON_VERSION=3.12 -t mitodl/ol-python-base:3.12 .
 ARG PYTHON_VERSION=3.12
-FROM dhi.io/python:${PYTHON_VERSION}-debian13-dev
+FROM mitodl/dhi-python-mirror:${PYTHON_VERSION}-debian13-dev
 
 LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 
