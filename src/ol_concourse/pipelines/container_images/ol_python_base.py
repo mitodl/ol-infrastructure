@@ -33,10 +33,29 @@ ol_infrastructure_repo = git_repo(
 # Upstream Docker Hardened Images bases (see the hardened-images RFC). These
 # resources exist to trigger rebuilds whenever Docker ships a CVE-patched
 # rebuild of the base — without them the hardening silently decays between
-# Dockerfile edits. The build itself pulls the base straight from dhi.io
-# (authenticated via the docker config written by dhi_docker_config_task;
-# dhi.io denies anonymous pulls, and feeding the fetched image in via
-# IMAGE_ARG would collapse the multi-arch build to a single platform).
+# Dockerfile edits.
+#
+# The build does NOT pull dhi.io directly. DHI's images carry zstd-compressed
+# layers for anything Docker built and we didn't modify; buildkit's OCI
+# exporter (which oci-build-task uses, with no documented option to
+# override — confirmed by reading its source: neither the Config struct nor
+# the buildctl invocation it shells out to expose a compression flag)
+# preserves that original compression for pass-through layers rather than
+# recompressing everything to match the new layers it adds. So a straight
+# `FROM dhi.io/...` build produces a manifest with mixed zstd/gzip layers.
+# Concourse's registry-image resource — bundled at v1.18.0 with our pinned
+# Concourse 8.3.0, and confirmed to be the latest release with zero zstd
+# handling anywhere in its source — can only decode gzip, and fails with
+# "gzip: invalid header" the moment it fetches such an image back (this is
+# exactly what broke the first learn-ai canary build after this rebase).
+#
+# mirror_dhi_python_base_task fixes this once, upstream of every consumer:
+# it mirrors dhi.io into mitodl/dhi-python-mirror using skopeo's
+# --dest-force-compress-format, which forces every layer — including ones
+# copied verbatim from the source — to gzip. Verified locally against the
+# real dhi.io/python image: zstd layers came out uniformly gzip after the
+# copy. Every downstream build (this image and every app built FROM it)
+# then inherits a uniformly-compressed image and never touches dhi.io.
 dhi_python_base_resources = {
     version: registry_image(
         name=Identifier(f"dhi-python-{version.replace('.', '')}-image"),
@@ -48,18 +67,62 @@ dhi_python_base_resources = {
     for version in PYTHON_VERSIONS
 }
 
+DHI_MIRROR_REPOSITORY = "mitodl/dhi-python-mirror"
 
-def dhi_docker_config_task() -> TaskStep:
-    """Write a docker config authorizing pulls from dhi.io.
 
-    oci-build-task resolves FROM-image credentials through the standard
-    docker config machinery, honoring the DOCKER_CONFIG env var, so the
-    build task consumes this task's output directory via
-    DOCKER_CONFIG=docker-config.
+def mirror_dhi_python_base_task(python_version: str) -> TaskStep:
+    """Mirror the DHI Python dev image with layers forced to gzip.
+
+    skopeo takes registry credentials directly as flags, so unlike the
+    docker-config dance below (needed because oci-build-task has no
+    credential flags of its own), this task needs no separate config file.
+    """
+    tag = f"{python_version}-debian13-dev"
+    return TaskStep(
+        task=Identifier(f"mirror-dhi-python-{python_version.replace('.', '')}"),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=AnonymousResource(
+                type=REGISTRY_IMAGE,
+                source={"repository": "quay.io/skopeo/stable", "tag": "latest"},
+            ),
+            params={
+                "DHI_USERNAME": "((dockerhub.username))",
+                "DHI_PASSWORD": "((dockerhub.password))",
+            },
+            run=Command(
+                path="sh",
+                # -e only: -x would echo the credentials into the build log.
+                args=[
+                    "-ec",
+                    (
+                        "skopeo copy --all"
+                        ' --src-creds="$DHI_USERNAME:$DHI_PASSWORD"'
+                        ' --dest-creds="$DHI_USERNAME:$DHI_PASSWORD"'
+                        " --dest-compress-format=gzip"
+                        " --dest-force-compress-format"
+                        f" docker://dhi.io/python:{tag}"
+                        f" docker://{DHI_MIRROR_REPOSITORY}:{tag}"
+                    ),
+                ],
+            ),
+        ),
+    )
+
+
+def dockerhub_docker_config_task() -> TaskStep:
+    """Write a docker config authorizing pulls from Docker Hub.
+
+    Needed so the build's `FROM mitodl/dhi-python-mirror:...` pull is
+    authenticated regardless of that repo's default visibility — cheaper
+    than depending on a Docker Hub visibility setting staying put. oci-build-
+    task resolves FROM-image credentials through the standard docker config
+    machinery, honoring the DOCKER_CONFIG env var, so the build task consumes
+    this task's output directory via DOCKER_CONFIG=docker-config.
     """
     docker_config = Output(name=Identifier("docker-config"))
     return TaskStep(
-        task=Identifier("write-dhi-docker-config"),
+        task=Identifier("write-dockerhub-docker-config"),
         config=TaskConfig(
             platform=Platform.linux,
             image_resource=AnonymousResource(
@@ -72,8 +135,8 @@ def dhi_docker_config_task() -> TaskStep:
             ),
             outputs=[docker_config],
             params={
-                "DHI_USERNAME": "((dockerhub.username))",
-                "DHI_PASSWORD": "((dockerhub.password))",
+                "DOCKERHUB_USERNAME": "((dockerhub.username))",
+                "DOCKERHUB_PASSWORD": "((dockerhub.password))",
             },
             run=Command(
                 path="sh",
@@ -81,10 +144,11 @@ def dhi_docker_config_task() -> TaskStep:
                 args=[
                     "-ec",
                     (
-                        'auth="$(printf \'%s:%s\' "$DHI_USERNAME"'
-                        ' "$DHI_PASSWORD" | base64 | tr -d \'\\n\')"\n'
-                        'printf \'{"auths": {"dhi.io": {"auth": "%s"}}}\''
-                        f' "$auth" > {docker_config.name}/config.json\n'
+                        'auth="$(printf \'%s:%s\' "$DOCKERHUB_USERNAME"'
+                        ' "$DOCKERHUB_PASSWORD" | base64 | tr -d \'\\n\')"\n'
+                        'printf \'{"auths": {"https://index.docker.io/v1/":'
+                        ' {"auth": "%s"}}}\' "$auth"'
+                        f" > {docker_config.name}/config.json\n"
                     ),
                 ],
             ),
@@ -125,7 +189,8 @@ def build_job(python_version: str) -> Job:
                 get=dhi_python_base_resources[python_version].name,
                 trigger=True,
             ),
-            dhi_docker_config_task(),
+            mirror_dhi_python_base_task(python_version),
+            dockerhub_docker_config_task(),
             container_build_task(
                 inputs=[
                     Input(name=ol_infrastructure_repo.name),
