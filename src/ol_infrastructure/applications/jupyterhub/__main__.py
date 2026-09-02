@@ -221,6 +221,7 @@ COURSE_NAMES.extend(
             "edm1",
             "scm1",
             "scm2",
+            "cls1",
         ]
     ]
 )
