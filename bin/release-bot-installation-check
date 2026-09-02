@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""Report which repos the ol-release-bot GitHub App is actually installed on.
+
+A ruleset bypass actor entry and an App installation are independent facts:
+GitHub stores an Integration bypass actor for an App that has no access to the
+repo at all. `release_workflow_repos()` grants the bypass on every registered
+app ahead of the rollout, so the bypass list says nothing about installation.
+
+This matters at exactly one moment. Flipping an app to
+`use_release_resource_workflow=True` on a repo the App is not installed on
+fails in `action: finish` at *authentication* -- the installation token mint or
+the git push credential -- not on rules. That failure looks nothing like the
+GH013 ruleset rejection everyone will be expecting, and will be misdiagnosed.
+
+Why this needs its own script: the installed-repo list is unreachable from a
+`gh auth` token. `GET /repos/{owner}/{repo}/installation` needs an App JWT;
+`GET /user/installations/{id}/repositories` needs a token authorized to
+*ol-release-bot itself*, which the GitHub CLI's user-to-server token is not,
+regardless of scopes. Only the App's own credentials answer the question, so
+this mints a short-lived App JWT from the sops-encrypted PEM.
+
+The JWT is App-level and read-only here: it authenticates as the App to ask
+"are you installed on this repo", and is never exchanged for an installation
+token, so this cannot write anything.
+
+Usage:
+    uv run bin/release-bot-installation-check
+    uv run bin/release-bot-installation-check --json
+"""
+
+import json
+import sys
+from pathlib import Path
+from typing import Annotated
+
+import cyclopts
+import requests
+from github import Auth
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from bridge.secrets.sops import read_yaml_secrets
+from bridge.settings.apps import APPS
+from bridge.settings.apps import github_repo as app_github_repo
+
+app = cyclopts.App(
+    help="Check which repos the ol-release-bot GitHub App is installed on."
+)
+
+_SECRETS_PATH = Path("concourse/operations.production.yaml")
+_API = "https://api.github.com"
+_TIMEOUT = 30
+
+
+def _app_jwt() -> str:
+    secrets = read_yaml_secrets(_SECRETS_PATH)["pipelines"]["shared/github_app"]
+    return Auth.AppAuth(
+        int(secrets["release_bot_app_id"]), secrets["release_bot_app_pem"]
+    ).create_jwt()
+
+
+def _installation_id(repo: str, jwt: str) -> int | None:
+    """Return the installation id on *repo*, or None if the App is not installed."""
+    response = requests.get(
+        f"{_API}/repos/{repo}/installation",
+        headers={
+            "Authorization": f"Bearer {jwt}",
+            "Accept": "application/vnd.github+json",
+        },
+        timeout=_TIMEOUT,
+    )
+    if response.status_code == requests.codes.not_found:
+        return None
+    response.raise_for_status()
+    return response.json()["id"]
+
+
+@app.default
+def check(
+    *,
+    as_json: Annotated[
+        bool, cyclopts.Parameter(name=["--json"], help="Emit JSON instead of text.")
+    ] = False,
+) -> int:
+    """Report installation status for every repo in the app registry."""
+    jwt = _app_jwt()
+    # Two app entries can share one repo (mit-learn / mit-learn-nextjs), and the
+    # answer is a property of the repo, so ask once per repo.
+    repos = sorted({app_github_repo(name) for name in APPS})
+    results = {repo: _installation_id(repo, jwt) for repo in repos}
+
+    if as_json:
+        print(json.dumps(results, indent=2))
+    else:
+        for repo, installation_id in results.items():
+            mark = "installed" if installation_id else "NOT INSTALLED"
+            suffix = f" (installation {installation_id})" if installation_id else ""
+            print(f"{mark:>14}  {repo}{suffix}")
+
+    missing = [repo for repo, installation_id in results.items() if not installation_id]
+    if missing:
+        print(
+            f"\n{len(missing)} repo(s) missing. Add them at "
+            "https://github.com/organizations/mitodl/settings/installations/150138801"
+            " before flipping their pipeline.",
+            file=sys.stderr,
+        )
+    return 1 if missing else 0
+
+
+if __name__ == "__main__":
+    app()
