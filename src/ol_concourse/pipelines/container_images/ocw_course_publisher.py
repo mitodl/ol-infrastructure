@@ -66,7 +66,9 @@ docker_pipeline = Pipeline(
                 GetStep(get=ocw_studio_repo.name, trigger=True),
                 build_task,
                 ensure_ecr_task("mitodl/ocw-course-publisher"),
-                configure_ecr_repository_task("mitodl/ocw-course-publisher"),
+                configure_ecr_repository_task(
+                    "mitodl/ocw-course-publisher", keep_last_n_images=10
+                ),
                 PutStep(
                     put=ocw_course_publisher_image.name,
                     params={

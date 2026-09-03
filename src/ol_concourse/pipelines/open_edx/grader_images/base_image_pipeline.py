@@ -156,7 +156,7 @@ def grader_base_image_pipeline() -> Pipeline:
                 },
             ),
             ensure_ecr_task(_BASE_IMAGE_REPO),
-            configure_ecr_repository_task(_BASE_IMAGE_REPO),
+            configure_ecr_repository_task(_BASE_IMAGE_REPO, keep_last_n_images=10),
             _version_tag_task(str(xqwatcher_repo.name), python_version),
             # Push to DockerHub first — fail fast if credentials are wrong
             # before consuming the ECR push quota.

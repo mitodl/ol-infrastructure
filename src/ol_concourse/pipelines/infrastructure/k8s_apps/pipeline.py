@@ -49,6 +49,7 @@ from ol_concourse.pipelines.constants import (
     PULUMI_WATCHED_PATHS,
     dockerhub_ecr_image_uri,
 )
+from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
@@ -311,33 +312,59 @@ def _fastly_purge_params(purge_scope: str) -> dict[str, str]:
     return {"mode": "surrogate_key", "surrogate_key": purge_scope}
 
 
-def _ensure_ecr_repository_step(ecr_registry_image_resource: Resource) -> TaskStep:
-    """Return the shared 'create the ECR repo if it does not exist yet' step."""
-    return TaskStep(
-        task=Identifier("ensure-ecr-repository"),
-        config=TaskConfig(
-            platform=Platform.linux,
-            image_resource=AnonymousResource(
-                type="registry-image",
-                source={
-                    "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
-                    "tag": "latest",
-                    "aws_region": ECR_REGION,
+def _ensure_ecr_repository_step(
+    ecr_registry_image_resource: Resource,
+) -> list[TaskStep]:
+    """Return steps to create the ECR repo if missing, then apply its
+    scan-on-push + lifecycle-policy configuration.
+
+    Without the second step, every build permanently accumulates as its own
+    image in ECR -- Inspector re-scans and re-reports the same CVEs against
+    every old, unused build forever. Other pipeline generators
+    (witan, omnigraph, superset, ...) already pair ensure_ecr_task with
+    configure_ecr_repository_task; this generator's apps (mit-learn,
+    mitxonline, xpro, odl-video-service, and others sharing this step) were
+    missing the second half of that pairing, confirmed live via
+    `aws ecr describe-images` -- mit-learn-app alone had 1,204 accumulated
+    images, each carrying its own full copy of the same ~1,900 CVEs.
+    """
+    repo_name = ecr_registry_image_resource.source["repository"]
+    return [
+        TaskStep(
+            task=Identifier("ensure-ecr-repository"),
+            config=TaskConfig(
+                platform=Platform.linux,
+                image_resource=AnonymousResource(
+                    type="registry-image",
+                    source={
+                        "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
+                        "tag": "latest",
+                        "aws_region": ECR_REGION,
+                    },
+                ),
+                params={
+                    "REPO_NAME": repo_name,
+                    "AWS_PAGER": "cat",
                 },
-            ),
-            params={
-                "REPO_NAME": ecr_registry_image_resource.source["repository"],
-                "AWS_PAGER": "cat",
-            },
-            run=Command(
-                path="sh",
-                args=[
-                    "-exc",
-                    "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",
-                ],
+                run=Command(
+                    path="sh",
+                    args=[
+                        "-exc",
+                        "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",
+                    ],
+                ),
             ),
         ),
-    )
+        # expire_after_days, not keep_last_n_images: this repo is shared by
+        # independent CI (every main-branch commit) and release build jobs
+        # (see the registry_image() calls above/below using the same
+        # image_repository) -- a count-based policy would let CI churn
+        # push the still-deployed release image out of the "N most
+        # recent" window and delete it. Age-based means CI volume can't
+        # threaten a release image redeployed within any reasonable
+        # window. Flagged by Copilot review on PR #5728.
+        configure_ecr_repository_task(repo_name, expire_after_days=90),
+    ]
 
 
 # ============================================================================
@@ -619,7 +646,7 @@ def _build_image_job_legacy(
         put_params["version"] = f"((.:{version_var}))"
         put_params["bump_aliases"] = True
 
-    plan.append(_ensure_ecr_repository_step(ecr_registry_image_resource))
+    plan.extend(_ensure_ecr_repository_step(ecr_registry_image_resource))
     plan.append(PutStep(put=dockerhub_registry_image_resource.name, params=put_params))
     plan.append(PutStep(put=ecr_registry_image_resource.name, params=put_params))
 
@@ -1042,7 +1069,7 @@ def _build_image_job(
             },
             build_args=[],
         ),
-        _ensure_ecr_repository_step(ecr_registry_image_resource),
+        *_ensure_ecr_repository_step(ecr_registry_image_resource),
         PutStep(
             put=dockerhub_registry_image_resource.name,
             params={
@@ -1149,7 +1176,7 @@ def _build_release_image_job(
             },
             build_args=[],
         ),
-        _ensure_ecr_repository_step(ecr_registry_image_resource),
+        *_ensure_ecr_repository_step(ecr_registry_image_resource),
         PutStep(put=dockerhub_registry_image_resource.name, params=put_params),
         PutStep(put=ecr_registry_image_resource.name, params=put_params),
     ]
