@@ -10,6 +10,7 @@ config:
     max: 3
     min: 1
   edxnotes:business_unit: residential-staging
+  edxnotes:elasticsearch_enabled: "false"
   edxnotes:dns_zone: mitx
   edxnotes:domain: staging-notes.mitx.mit.edu
   vault:address: https://vault-production.odl.mit.edu
