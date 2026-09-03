@@ -877,6 +877,30 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             depends_on=[ebs_csi_driver_role, *node_groups],
         ),
     )
+    # Rollback target for the class above, and the only way back. Clearing
+    # volumeAttributesClassName on a PVC means "no class applies" -- it does not call
+    # ec2:ModifyVolume, so it leaves the volume at whatever geometry it was last given.
+    # Reverting the commit that set the class would therefore strand a volume at 500
+    # MB/s with nothing left in the repo describing how to undo it. Rolling back means
+    # pointing the PVC at this class and waiting for the modification to apply, then
+    # removing the reference.
+    kubernetes.storage.v1.VolumeAttributesClass(
+        resource_name=f"{cluster_name}-ebs-gp3-throughput-125-volumeattributesclass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="ebs-gp3-throughput-125",
+            labels=k8s_global_labels,
+        ),
+        driver_name="ebs.csi.aws.com",
+        parameters={
+            "type": "gp3",
+            "iops": "5000",
+            "throughput": "125",
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[ebs_csi_driver_role, *node_groups],
+        ),
+    )
     aws_ebs_cni_driver_addon = eks.Addon(
         f"{cluster_name}-eks-addon-ebs-cni-driver-addon",
         cluster=cluster,

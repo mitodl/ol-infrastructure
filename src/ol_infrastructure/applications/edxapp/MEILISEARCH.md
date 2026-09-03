@@ -65,10 +65,28 @@ volume: online, no pod restart, and no rebind — which matters because this PVC
 is zone-locked and its pod is pinned to a core node, so anything that forces a
 reschedule risks leaving `meilisearch-0` `Pending`.
 
-`ebs-gp3-throughput-500` is declared for every cluster in
-`infrastructure/aws/eks/__main__.py` and costs nothing until a PVC names it. The
-EKS stack has to be applied before the stack that references it, or the PVC will
-name a class that does not exist yet.
+`ebs-gp3-throughput-500` and its rollback counterpart `ebs-gp3-throughput-125`
+are declared for every cluster in `infrastructure/aws/eks/__main__.py` and cost
+nothing until a PVC names one. Apply the EKS stack before the stack that
+references a class: a PVC naming a class that does not exist yet is held in
+`Pending` under `status.modifyVolumeStatus` until it appears. The claim stays
+bound and the pod keeps running throughout — it is the modification that waits,
+not the volume.
+
+### Rolling back
+
+Do not roll back by reverting the config key. Clearing
+`volumeAttributesClassName` means "no class applies"; it does not call
+`ec2:ModifyVolume`, so the volume keeps whatever geometry it was last given and
+the revert silently leaves it at 500 MB/s. Point the claim at the baseline class
+instead, let the modification finish, and only then drop the reference:
+
+```yaml
+meilisearch:volume_attributes_class: ebs-gp3-throughput-125
+```
+
+Confirm `Throughput` reads `125` on the volume before removing the key, using
+the commands below.
 
 EBS allows one modification per volume per six hours, so a mistake here is slow
 to walk back. Confirm the result against the volume rather than the PVC:
