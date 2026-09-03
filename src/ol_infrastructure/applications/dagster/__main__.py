@@ -2165,11 +2165,13 @@ edxorg_gcp_secret = OLVaultK8SSecret(
 # volume needs a sampling decision of its own first. But the user-deployments
 # chart copies each deployment's whole `env` list into
 # DAGSTER_CLI_API_GRPC_CONTAINER_CONTEXT, and K8sRunLauncher applies that to
-# every run worker pod, so PYTHONPATH set here reaches them by default.
-# dagster_instance.yaml overrides it back to "" under
-# run_launcher.config.run_k8s_config.container_config.env; an empty PYTHONPATH
-# contributes no sys.path entries, so the agent is never imported there. The
-# remaining OTEL_* variables ride along to run workers and are inert without it.
+# every run worker pod, so PYTHONPATH set here reaches them by default -- and it
+# cannot be taken back by naming PYTHONPATH again on the run launcher, because
+# both values land in the same merged list with the code location's last and
+# kubelet resolves duplicates by last assignment. dagster_instance.yaml strips it
+# with a container `command` of `env -u PYTHONPATH` instead, which the merge does
+# not touch; see the comment there. The remaining OTEL_* variables ride along to
+# run workers and are inert once the agent is off the path.
 OTEL_AGENT_PYTHONPATH = "/opt/otel/auto_instrumentation"
 
 
