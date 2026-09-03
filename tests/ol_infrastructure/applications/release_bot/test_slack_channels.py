@@ -20,10 +20,15 @@ class _FakeClient:
     def __init__(self, pages=None, error=None):
         self.pages = pages if pages is not None else [[]]
         self.error = error
+        # Raised on the first call only, so a test can model a request that
+        # fails for the types it asked for and succeeds once narrowed.
+        self.error_once: str | None = None
         self.calls: list[dict[str, object]] = []
 
     async def conversations_list(self, **kwargs):
         self.calls.append(kwargs)
+        if self.error_once and len(self.calls) == 1:
+            raise _FakeSlackError(self.error_once)
         if self.error:
             raise _FakeSlackError(self.error)
         index = 0
@@ -37,15 +42,19 @@ class _FakeClient:
         }
 
 
+def _reset():
+    slack_channels._name_to_id.clear()
+    slack_channels._last_refresh = None
+    slack_channels._last_refresh_ok = False
+    slack_channels._listing_disabled = False
+    slack_channels._channel_types = slack_channels._ALL_CHANNEL_TYPES
+
+
 @pytest.fixture(autouse=True)
 def _reset_module_state():
-    slack_channels._name_to_id.clear()
-    slack_channels._last_refresh = None
-    slack_channels._listing_disabled = False
+    _reset()
     yield
-    slack_channels._name_to_id.clear()
-    slack_channels._last_refresh = None
-    slack_channels._listing_disabled = False
+    _reset()
 
 
 async def test_a_name_resolves_to_an_id():
@@ -110,8 +119,22 @@ async def test_an_unknown_name_falls_back_to_the_input():
     assert await slack_channels.resolve(client, "product-typo") == "product-typo"
 
 
-async def test_missing_scope_stops_further_listing():
-    """Without groups:read every call fails identically -- stop asking."""
+async def test_missing_scope_narrows_to_private_channels_and_retries():
+    """Slack does not document what a partial-scope token gets back.
+
+    Rather than assuming the whole call fails (or that it quietly filters),
+    drop to the type the release channels actually are and try once more.
+    """
+    client = _FakeClient([[{"id": "C123", "name": "product-ovs"}]])
+    client.error_once = _MISSING_SCOPE
+
+    assert await slack_channels.resolve(client, "product-ovs") == "C123"
+    assert client.calls[0]["types"] == slack_channels._ALL_CHANNEL_TYPES
+    assert client.calls[1]["types"] == "private_channel"
+
+
+async def test_missing_scope_on_the_narrowed_request_stops_further_listing():
+    """With neither scope every call fails identically -- stop asking."""
     client = _FakeClient(error=_MISSING_SCOPE)
 
     first = await slack_channels.resolve(client, "product-ovs")
@@ -119,7 +142,8 @@ async def test_missing_scope_stops_further_listing():
 
     assert first == "product-ovs"
     assert second == "product-xpro"
-    assert len(client.calls) == 1
+    # One for the full request, one for the narrowed retry, then nothing.
+    assert len(client.calls) == 2
     assert slack_channels._listing_disabled
 
 
@@ -134,13 +158,26 @@ async def test_a_failed_refresh_keeps_previously_resolved_ids():
     assert await slack_channels.resolve(client, "product-ovs") == "C123"
 
 
-async def test_the_private_channel_type_is_requested_by_default():
-    """Asking for public_channel too would need channels:read and 400 the call."""
+async def test_both_channel_types_are_requested_by_default():
+    """A configured channel may be public; the fallback announce one especially."""
     client = _FakeClient([[]])
 
     await slack_channels.resolve(client, "product-ovs")
 
-    assert client.calls[0]["types"] == "private_channel"
+    assert client.calls[0]["types"] == "public_channel,private_channel"
+
+
+async def test_unresolvable_raises_when_the_listing_itself_failed():
+    """A Slack outage must not read as "all your channels are misconfigured".
+
+    Without this, one failed listing leaves every name unresolved and the
+    startup check blames the configuration, sending someone to check invites
+    that are fine.
+    """
+    client = _FakeClient(error="ratelimited")
+
+    with pytest.raises(slack_channels.ListingError):
+        await slack_channels.unresolvable(client, {"product-ovs"})
 
 
 async def test_unresolvable_names_the_channels_that_cannot_be_reached():
