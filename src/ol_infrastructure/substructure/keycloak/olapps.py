@@ -687,8 +687,11 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     # create/update/delete, identity-provider/import-config, and org<->IdP linking
     # all route through requireManageIdentityProviders(), which RealmPermissions
     # resolves to the manage-identity-providers role alone; manage-realm is a
-    # distinct, non-composite role and does not satisfy it. Without these two the
-    # client cannot even list an organization's IdPs.
+    # distinct, non-composite role and does not satisfy it. Reads go through
+    # requireViewIdentityProviders(), which accepts EITHER identity-provider role,
+    # so view-identity-providers is redundant with manage granted -- it is listed
+    # anyway so the account's read scope is visible here rather than inferred,
+    # matching how view-realm is listed alongside manage-realm above.
     for resource_name, role in [
         ("olapps-mitxonline-b2b-client-view-realm-role", "view-realm"),
         ("olapps-mitxonline-b2b-client-view-users-role", "view-users"),
