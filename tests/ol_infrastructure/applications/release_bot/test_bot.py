@@ -911,6 +911,42 @@ async def test_unchanged_deployment_is_not_re_announced(repos, slack_app, monkey
 
 
 @pytest.mark.usefixtures("_no_release_issue")
+async def test_a_brand_new_apps_first_ever_deployment_is_announced(
+    repos, slack_app, monkeypatch
+):
+    """A never-deployed app's first real deployment is news, not a restart-seed.
+
+    Regression: collapsing "never polled this (app, environment)" and "polled
+    it and found nothing yet" both looked like `.get(key) is None`, so the
+    first real deployment for a brand-new app was silently swallowed as if it
+    were an already-known deployment observed right after a bot restart.
+    """
+    rc_calls = {"n": 0}
+
+    async def _lookup(_repo, environment):
+        # Production never has a deployment in this test; only RC's polls
+        # progress, so the assertions below can inspect a single message.
+        if environment != bot.github.RC_ENVIRONMENT:
+            return None
+        rc_calls["n"] += 1
+        return None if rc_calls["n"] == 1 else _deployment(7, "2026.9.2.1", "RC")
+
+    monkeypatch.setattr(bot.github, "latest_successful_deployment", _lookup)
+    state = bot.ReleaseProgressState()
+
+    await bot._announce_deployments(slack_app, repos, state)
+    slack_app.client.chat_postMessage.assert_not_called()
+    assert state.last_deployment[("my-app", "RC")] is None
+
+    await bot._announce_deployments(slack_app, repos, state)
+
+    slack_app.client.chat_postMessage.assert_called_once()
+    text = slack_app.client.chat_postMessage.call_args.kwargs["text"]
+    assert "2026.9.2.1" in text
+    assert state.last_deployment[("my-app", "RC")] == 7
+
+
+@pytest.mark.usefixtures("_no_release_issue")
 async def test_a_failed_post_is_retried_on_the_next_poll(repos, slack_app, monkeypatch):
     """Recording a milestone as announced when the post failed loses it forever."""
     monkeypatch.setattr(

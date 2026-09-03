@@ -704,7 +704,10 @@ class ReleaseProgressState:
     after a restart, and re-reporting it once is the point.
     """
 
-    last_deployment: dict[tuple[str, str], int] = field(default_factory=dict)
+    # None means "polled and confirmed no successful deployment yet" -- a real
+    # baseline, distinct from a (app, environment) pair never having been
+    # polled at all (absent from the dict). See _announce_deployments.
+    last_deployment: dict[tuple[str, str], int | None] = field(default_factory=dict)
     nagged_at: dict[tuple[str, str], datetime] = field(default_factory=dict)
 
 
@@ -763,12 +766,22 @@ async def _announce_deployments(app, repos, state: ReleaseProgressState) -> None
                     "Failed to read %s deployments for %s", environment, app_name
                 )
                 continue
-            if deployment is None:
-                continue
             key = (app_name, environment)
+            # Distinguish "never polled this (app, environment)" from "polled
+            # it and there was no successful deployment yet" -- both leave
+            # `.get(key)` as None, but only the former should suppress the
+            # announcement. Collapsing them missed a brand-new app's very
+            # first deployment: it would poll None once (recording nothing),
+            # then see a real id with no key present and treat that first
+            # real deployment as the restart-seed case instead of a genuine
+            # no-deployment -> deployed transition.
+            first_observation = key not in state.last_deployment
+            if deployment is None:
+                state.last_deployment.setdefault(key, None)
+                continue
             previous = state.last_deployment.get(key)
             state.last_deployment[key] = deployment["id"]
-            if previous is None or previous == deployment["id"]:
+            if first_observation or previous == deployment["id"]:
                 # First observation seeds the watcher; an unchanged id is the
                 # steady state between releases.
                 continue
