@@ -12,6 +12,7 @@
   meilisearch:memory_request: "4Gi"
   meilisearch:memory_limit: "4Gi"
   meilisearch:max_indexing_memory: "2Gi" # optional, see Sizing below
+  # meilisearch:course_indexing: "all" # optional; defaults to library_downstream_only, see Course indexing scope below
 ```
 
 The difference between `deploy` and `enabled`. Deploy means "deploy the helm chart" whereas enabled means "enable meilisearch integration in the Open edX platform". You can deploy the chart but not enable it in Open edX if you want to test things out first.
@@ -99,3 +100,71 @@ grep -iR MEILISEARCH ../config/
 ./manage.py cms reindex_studio --experimental
 ```
 Depending on how much content you have, it could be hours.
+
+## Course indexing scope
+
+`MEILISEARCH_COURSE_INDEXING` on the CMS controls how much course content Studio
+writes to the `studio_content` index. Library content (Libraries V2 blocks,
+collections and containers) is indexed in every mode.
+
+| Value | Course blocks indexed |
+| --- | --- |
+| `all` | Every course XBlock. This is the upstream default. |
+| `library_downstream_only` | Only blocks with an `upstream` link to a library. |
+| `none` | None. No indexing task is even enqueued. |
+
+**Every deployment with `meilisearch:enabled` set defaults to
+`library_downstream_only`.** The default lives in `k8s_configmaps.py` rather
+than in each stack, because we run Meilisearch for Libraries V2 and course
+search runs on Typesense; indexing course content here only ever cost us
+memory. Stacks with Meilisearch disabled get no `MEILISEARCH_COURSE_INDEXING`
+key at all.
+
+`meilisearch:course_indexing` overrides the default on a single stack if you
+need `all` or `none` for a specific reason. It is validated during the Pulumi
+run and anything outside the three values above fails the preview, because the
+CMS treats an unrecognised value as `all` — a typo would otherwise silently
+restore full course indexing.
+
+The motivating case: as of 2026-08-28 the mitxonline production index held
+1,319,937 documents of which 966 were library content, at 11.91 GiB against a
+4Gi pod limit. The rest was course XBlocks written by ordinary publishes plus a
+batch of course reruns and imports on 2026-08-19/20. See mitodl/hq#13014.
+
+`library_downstream_only` keeps the set the Authoring MFE's course-libraries
+Review tab needs — it lists library components used in a course that have
+upstream updates ready to sync, and queries the index by `usage_key` to hydrate
+them for display. What it gives up, in Studio:
+
+- the course content search modal;
+- the block-type breakdown in the course outline info sidebar.
+
+LMS-side courseware search and discovery are unaffected: those run on Typesense
+through edx-search, not on Meilisearch.
+
+### Restoring course indexing
+
+The scope is config, not code. To restore it on a stack:
+
+1. Set `meilisearch:course_indexing: all` on that stack and deploy, so the CMS
+   emits `MEILISEARCH_COURSE_INDEXING: all`.
+2. Confirm the running CMS pods picked it up:
+   ```bash
+   kubectl exec -n <namespace> <cms-pod-name> -- \
+     grep MEILISEARCH_COURSE_INDEXING ../config/cms.env.yml
+   ```
+3. Rebuild the index so existing course content reappears — ongoing publishes
+   only index blocks as they change:
+   ```bash
+   ./manage.py cms reindex_studio --experimental
+   ```
+   Use the non-incremental form. It builds into a temp index and swaps, which is
+   also the only path that reclaims LMDB free pages (see Sizing above).
+4. Size the pod for the result first. A full course index needs far more memory
+   and disk than the library-only one; check `usedIndexSize` from `/stats` on a
+   comparable environment before committing to `memory_limit` and `pv_size`.
+
+The same steps in reverse apply after *narrowing* the scope on a stack that had
+been indexing everything: the setting stops new writes immediately, but the
+existing documents only go away on a non-incremental `reindex_studio`, and the
+space they occupied is only returned to the filesystem by that same rebuild.
