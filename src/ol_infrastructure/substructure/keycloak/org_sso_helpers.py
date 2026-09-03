@@ -10,6 +10,7 @@ from ol_infrastructure.substructure.keycloak.oidc_helpers import (
 )
 from ol_infrastructure.substructure.keycloak.saml_helpers import (
     SAML_FRIENDLY_NAMES,
+    SamlMetadataError,
     extract_saml_metadata,
     generate_pulumi_args_dict,
     get_saml_attribute_mappers,
@@ -126,7 +127,7 @@ def create_org_for_learn(org_config: OrgConfig) -> keycloak.Organization:
     )
 
 
-def onboard_saml_org(  # noqa: C901, PLR0912
+def onboard_saml_org(  # noqa: C901
     saml_config: SamlIdpConfig,
     org: OrgConfig | keycloak.Organization,
 ) -> None:
@@ -149,15 +150,9 @@ def onboard_saml_org(  # noqa: C901, PLR0912
         saml_config.org_saml_metadata_xml or saml_config.org_saml_metadata_url
     )
     if metadata_source is None:  # Type guard, should not happen due to validation
-        pulumi.log.error(f"No metadata source configured for {saml_config.idp_alias}")
-        return
+        msg = f"No metadata source configured for {saml_config.idp_alias}"
+        raise SamlMetadataError(msg)
     saml_metadata = extract_saml_metadata(metadata_source)
-    if not saml_metadata:
-        pulumi.log.warn(
-            f"Skipping SAML IdP creation for {saml_config.idp_alias} due to "
-            f"inaccessible metadata source"
-        )
-        return
     saml_args = generate_pulumi_args_dict(saml_metadata)
 
     # Apply overrides if provided
@@ -263,16 +258,10 @@ def onboard_saml_idp(saml_config: SamlIdpConfig) -> None:  # noqa: C901
     metadata_source = (
         saml_config.org_saml_metadata_xml or saml_config.org_saml_metadata_url
     )
-    if metadata_source is None:
-        pulumi.log.error(f"No metadata source configured for {saml_config.idp_alias}")
-        return
+    if metadata_source is None:  # Type guard, should not happen due to validation
+        msg = f"No metadata source configured for {saml_config.idp_alias}"
+        raise SamlMetadataError(msg)
     saml_metadata = extract_saml_metadata(metadata_source)
-    if not saml_metadata:
-        pulumi.log.warn(
-            f"Skipping SAML IdP creation for {saml_config.idp_alias} due to "
-            f"inaccessible metadata source"
-        )
-        return
     saml_args = generate_pulumi_args_dict(saml_metadata)
 
     if saml_config.single_sign_on_service_url is not None:
@@ -373,21 +362,24 @@ class OIDCIdpConfig(BaseModel):
 def onboard_oidc_org(
     oidc_config: OIDCIdpConfig,
     org: OrgConfig | keycloak.Organization,
-) -> keycloak.oidc.IdentityProvider | None:
+) -> keycloak.oidc.IdentityProvider:
     """Create an OIDC IdP and link it to an org.
 
     Pass an OrgConfig to create the org, or an existing keycloak.Organization
     to attach a second IdP to an org that was already created.
 
-    Returns the created IdentityProvider, or None if
-    oidc_identity_provider_args_from_discovery_url could not build a config
-    for it -- an inaccessible/unparseable discovery URL, a provider missing
-    required scopes (openid, email, profile), or a provider that doesn't
-    support the selected client-auth method (client_secret_basic when
-    oidc_config.client_secret is set, private_key_jwt otherwise). Callers
-    should check for None before attaching identity_provider_alias-scoped
-    resources, e.g. AttributeImporterIdentityProviderMapper, which need a
-    real Pulumi dependency edge rather than a bare alias string.
+    Returns the created IdentityProvider so callers can attach
+    identity_provider_alias-scoped resources, e.g.
+    AttributeImporterIdentityProviderMapper, with a real Pulumi dependency
+    edge instead of a bare alias string.
+
+    :raises OidcDiscoveryError: propagated from
+        oidc_identity_provider_args_from_discovery_url if the discovery
+        document is inaccessible/unparseable, the provider is missing
+        required scopes (openid, email, profile), or it doesn't support the
+        selected client-auth method (client_secret_basic when
+        oidc_config.client_secret is set, private_key_jwt otherwise) -- this
+        fails the deploy rather than silently dropping the IdP resource.
     """
     keycloak_org = (
         org if isinstance(org, keycloak.Organization) else create_org_for_learn(org)
@@ -403,17 +395,6 @@ def onboard_oidc_org(
         oidc_config.org_oidc_metadata_url,
         client_secret=oidc_config.client_secret,
     )
-    if oidc_idp_arg_map is None:
-        # oidc_identity_provider_args_from_discovery_url already logged the
-        # specific cause (unreachable/unparseable URL, missing required
-        # scopes, or an unsupported client-auth method) via the standard
-        # logging module; this is a Pulumi-visible pointer to that, not a
-        # restatement of the cause.
-        pulumi.log.warn(
-            f"Skipping OIDC IdP creation for {oidc_config.idp_alias}; see "
-            f"the preceding log message for the specific cause"
-        )
-        return None
     oidc_idp_arg_map["extra_config"] = {
         "jwtX509HeadersEnabled": True,
     } | oidc_idp_arg_map.get("extra_config", {})

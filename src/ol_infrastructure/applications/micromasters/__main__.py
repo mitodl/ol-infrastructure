@@ -101,6 +101,7 @@ micromasters_config = Config("micromasters")
 stack_info = parse_stack()
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 dns_stack = make_stack_reference(projects.DNS, "default")
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 vector_log_proxy_stack = make_stack_reference(
     projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
 )
@@ -385,6 +386,19 @@ micromasters_vault_k8s_policy = vault.Policy(
     policy=Path(__file__).parent.joinpath("micromasters_policy.hcl").read_text(),
 )
 
+# Dedicated single-purpose path for the Sentry DSN, sourced from the
+# ol-infrastructure-sentry stack output. It deliberately does NOT write to
+# secret-micromasters/sentry: that path also holds a hand-managed auth_token
+# with no source in this repo, and is kv-v1 (unversioned) in QA/Production, so
+# a whole-secret overwrite there would silently drop the token. See #5004.
+micromasters_operations_sentry_dsn = vault.generic.Secret(
+    f"micromasters-operations-sentry-dsn-{stack_info.env_suffix}",
+    path="secret-operations/global/micromasters/sentry-dsn",
+    data_json=sentry_stack.require_output("micromasters_sentry_dsn").apply(
+        lambda dsn: json.dumps({"value": dsn})
+    ),
+)
+
 micromasters_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
     f"micromasters-vault-k8s-auth-backend-role-{stack_info.env_suffix}",
     role_name="micromasters",
@@ -639,7 +653,9 @@ django_secret = OLVaultK8SSecret(
     opts=secret_opts,
 )
 
-# Static secrets - Sentry credentials
+# Static secrets - Sentry auth token. The DSN used to live alongside it on this
+# path; it now comes from the sentry stack via the dedicated secret-operations
+# path below, leaving the hand-managed auth_token here untouched.
 sentry_secret_name = "micromasters-sentry-secret"  # noqa: S105  # pragma: allowlist secret
 sentry_secret = OLVaultK8SSecret(
     f"micromasters-{stack_info.env_suffix}-sentry-secret",
@@ -656,11 +672,36 @@ sentry_secret = OLVaultK8SSecret(
         exclude_raw=True,
         templates={
             "SENTRY_AUTH_TOKEN": '{{ get .Secrets "auth_token" }}',
-            "SENTRY_DSN": '{{ get .Secrets "dsn" }}',
         },
         vaultauth=vaultauth,
     ),
     opts=secret_opts,
+)
+
+# Static secrets - Sentry DSN, owned by the ol-infrastructure-sentry stack
+sentry_dsn_secret_name = "micromasters-sentry-dsn-secret"  # noqa: S105  # pragma: allowlist secret
+sentry_dsn_secret = OLVaultK8SSecret(
+    f"micromasters-{stack_info.env_suffix}-sentry-dsn-secret",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name=sentry_dsn_secret_name,
+        namespace=micromasters_namespace,
+        labels=k8s_global_labels,
+        dest_secret_name=sentry_dsn_secret_name,
+        dest_secret_labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="global/micromasters/sentry-dsn",
+        excludes=[".*"],
+        exclude_raw=True,
+        templates={
+            "SENTRY_DSN": '{{ get .Secrets "value" }}',
+        },
+        vaultauth=vaultauth,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[vault_k8s_resources, micromasters_operations_sentry_dsn],
+    ),
 )
 
 # Static secrets - CyberSource credentials
@@ -773,6 +814,7 @@ k8s_secret_names = [
     mailgun_secret_name,
     mit_smtp_secret_name,
     redis_creds_secret_name,
+    sentry_dsn_secret_name,
 ]
 k8s_secret_resources = [
     aws_creds_secret,
@@ -789,6 +831,7 @@ k8s_secret_resources = [
     mailgun_secret,
     mit_smtp_secret,
     redis_creds_secret,
+    sentry_dsn_secret,
 ]
 
 k8s_env_vars: dict[str, str | int] = {
@@ -863,7 +906,8 @@ micromasters_k8s_app = OLApplicationK8s(
             application_module="micromasters.wsgi:application",
             # Stage 2 of docs/plans/granian-configuration-overhaul.md: holding pins
             # removed, so this app now runs on the component defaults (1 worker, 8
-            # blocking threads, 16 backpressure, runtime defaults).
+            # blocking threads, DEFAULT_WSGI_BACKPRESSURE connections, runtime
+            # defaults).
             blocking_threads_idle_timeout=120,
             enable_metrics=True,
             # Serve /static/* from Granian's Rust layer instead of the sidecar
@@ -971,8 +1015,13 @@ micromasters_k8s_app = OLApplicationK8s(
                 ),
                 initial_delay_seconds=15,
                 period_seconds=15,
-                failure_threshold=3,
-                timeout_seconds=3,
+                # Matches default_probe_configs: readiness shares the Granian
+                # connection budget with user traffic and its failure is
+                # correlated across replicas, so a fast eviction empties the
+                # EndpointSlice instead of shedding load. Kept in step with the
+                # component default -- see components/services/k8s.py.
+                failure_threshold=6,
+                timeout_seconds=5,
             ),
             "startup_probe": kubernetes.core.v1.ProbeArgs(
                 http_get=kubernetes.core.v1.HTTPGetActionArgs(

@@ -25,6 +25,10 @@ path "secret-micromasters/metadata/*" {
   capabilities = ["read", "list"]
 }
 
+path "secret-operations/global/micromasters/sentry-dsn" {
+  capabilities = ["read"]
+}
+
 path "secret-operations/mailgun" {
   capabilities = ["read"]
 }

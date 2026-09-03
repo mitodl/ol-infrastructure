@@ -32,6 +32,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
+from ol_infrastructure.lib.aws.iam_helper import cross_environment_glue_denial
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -274,12 +275,41 @@ if starrocks_config.get_bool("oidc_enabled"):
 _DATA_LAKE_ENVS = ("QA", "Production")
 
 if starrocks_config.get_bool("enable_data_lake_integration"):
+    _dw_stacks = {}
     for _data_lake_env in _DATA_LAKE_ENVS:
-        _dw_stack = make_stack_reference(projects.DATA_WAREHOUSE, _data_lake_env)
+        _dw_stacks[_data_lake_env] = make_stack_reference(
+            projects.DATA_WAREHOUSE, _data_lake_env
+        )
         iam.RolePolicyAttachment(
             f"starrocks-data-lake-policy-{stack_info.env_suffix}-{_data_lake_env}",
-            policy_arn=_dw_stack.require_output(
+            policy_arn=_dw_stacks[_data_lake_env].require_output(
                 "data_lake_query_engine_iam_policy_arn"
+            ),
+            role=starrocks_auth_binding.irsa_role.name,
+            opts=ResourceOptions(parent=starrocks_auth_binding),
+        )
+
+    # The attachments above hand this role both environments' catalogs, which for
+    # a lower environment means handing it production. The guard has to be scoped
+    # to this role rather than folded into either policy above, since those are
+    # shared across environments and a Deny in one of them also lands on the
+    # production role and revokes production's access to its own catalog.
+    #
+    # It is attached as a managed policy, not an inline one: the Concourse deploy
+    # role has iam:AttachRolePolicy but not iam:PutRolePolicy, so an inline policy
+    # cannot be applied from CI. Gate on the helper rather than on the presence of
+    # the stack output -- it is empty in production, where no such policy exists.
+    if cross_environment_glue_denial(stack_info.env_suffix):
+        # Reuse the reference from the loop when this environment is one of the
+        # data lake envs; a second StackReference to the same stack is a
+        # duplicate-URN error. CI is not in _DATA_LAKE_ENVS and needs its own.
+        _same_env_dw_stack = _dw_stacks.get(stack_info.name) or make_stack_reference(
+            projects.DATA_WAREHOUSE, stack_info.name
+        )
+        iam.RolePolicyAttachment(
+            f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-cross-environment-glue-denial",
+            policy_arn=_same_env_dw_stack.require_output(
+                "data_lake_cross_environment_glue_denial_policy_arn"
             ),
             role=starrocks_auth_binding.irsa_role.name,
             opts=ResourceOptions(parent=starrocks_auth_binding),
@@ -762,7 +792,10 @@ def _build_fe_config(  # noqa: PLR0913
     prevent FE startup.
 
     When oidc_issuer_url is provided, the full set of oauth2_* FE params is
-    written so that the StarRocks web UI shows the "OAuth2 Login" button.
+    written. Those serve locally-created `IDENTIFIED WITH authentication_oauth2`
+    users and the JDBC driver's browser authorization-code flow; they do not
+    add an "OAuth2 Login" button to the FE web dashboard, which has no OIDC
+    entry point (StarRocks#75370).
     The client secret ends up in a ConfigMap (StarRocks Helm chart limitation);
     access is RBAC-gated and marked as a Pulumi secret so it is not stored
     in plaintext Pulumi state.
@@ -772,7 +805,8 @@ def _build_fe_config(  # noqa: PLR0913
     if oidc_issuer_url is not None:
         _oidc_base = f"{oidc_issuer_url}/protocol/openid-connect"
         conf += (
-            # oauth2_* — web UI "OAuth2 Login" button (browser-redirect flow).
+            # oauth2_* — read by locally-created authentication_oauth2 users
+            # and by the JDBC driver's browser authorization-code flow.
             # StarRocks FE exchanges the authorization code server-side using
             # these credentials; the id_token is stored on the connection context
             # and forwarded to Iceberg REST catalogs when security = JWT.
@@ -859,8 +893,15 @@ if _needs_fe_config:
     fe_spec = cast(dict[str, Any], starrocks_values["starrocksFESpec"])
     _domain = starrocks_config.require("domain")
 
-    # Pull OIDC client credentials from Vault when OIDC is enabled so the FE web
-    # UI can display the "OAuth2 Login" button (requires oauth2_* in fe.conf).
+    # Pull OIDC client credentials from Vault when OIDC is enabled so the
+    # oauth2_* keys can go into fe.conf. Those are what a locally-created
+    # `CREATE USER ... IDENTIFIED WITH authentication_oauth2` account
+    # authenticates against -- the security integration alone is not sufficient
+    # for a user created that way, which is how starrocks:oidc_users works.
+    # They do NOT put an "OAuth2 Login" button on the FE web dashboard: it
+    # answers with `WWW-Authenticate: Basic` unconditionally and has no OIDC
+    # entry point at all (StarRocks#75370). The browser redirect belongs to the
+    # JDBC driver's authorization-code flow, which returns to /api/oauth2.
     _oidc_vault_data: Output | None = None
     if starrocks_config.get_bool("oidc_enabled"):
         _oidc_vault_data = pulumi_vault.generic.get_secret_output(
@@ -981,7 +1022,31 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
         OLApisixHTTPRouteConfig(
             route_name=f"{stack_info.env_prefix}-starrocks",
             hosts=[starrocks_config.require("domain")],
-            paths=["/*"],
+            # Publish ONLY the OAuth2 callback. The JDBC OAuth2 flow completes
+            # its token exchange at this path, and nothing else on the FE's HTTP
+            # port is meant to be reachable from the internet.
+            #
+            # This used to be ["/*"], which exposed the whole FE HTTP surface.
+            # StarRocks gates those endpoints on Config.enable_http_auth, which
+            # upstream defaults to false, so they answered anonymously. Measured
+            # against QA on 2026-08-28: /api/show_data returned the cluster's
+            # total data size and /api/show_runtime_info returned FE JVM memory
+            # and thread counts, both with no credentials.
+            #
+            # Do NOT "fix" that by setting enable_http_auth = true instead. The
+            # operator wires the FE's startup, liveness AND readiness probes to
+            # an unauthenticated HTTPGet on /api/health (fe_pod.go:72-74,
+            # HEALTH_API_PATH), and HealthAction.needAuth() returns that same
+            # flag -- so enabling it 401s all three probes and crashloops every
+            # FE pod. The @ConfField comment in Config.java claiming health
+            # probes are "always exempt" does not hold for the FE.
+            #
+            # The FE web dashboard is no longer reachable over this domain. It
+            # only ever accepted native Basic Auth (OIDC users cannot log into
+            # it at all -- StarRocks#75370), so its audience was operators
+            # holding native credentials, who can port-forward instead.
+            paths=["/api/oauth2"],
+            path_match_type="Exact",
             backend_service_name=f"{stack_info.env_prefix}-starrocks-fe-service",
             backend_service_port=8030,
             plugins=[],
@@ -1000,6 +1065,19 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
 # annotation below means it becomes the sole authority on the NLB's ingress, so
 # every legitimate caller must be listed here.
 FE_MYSQL_PORT = 9030
+
+# Stable name for the FE MySQL endpoint, published by external-dns from the
+# annotation on the Service below.  Consumers outside this stack need a name
+# they can put in configuration, and the NLB's own AWS hostname is not that:
+# it is regenerated whenever the Service is recreated, which would silently
+# cut off every client still holding the old one.
+#
+# A stack reference would be the usual way to share this, but it is not
+# available here -- this stack already references applications.mit_learn for
+# the security group above, so mit_learn referencing it back would close a
+# cycle.
+fe_mysql_domain = f"mysql.{starrocks_config.require('domain')}"
+
 fe_mysql_nlb_security_group = ec2.SecurityGroup(
     f"starrocks-{stack_info.env_suffix}-fe-mysql-nlb-security-group",
     name=f"starrocks-{stack_info.env_suffix}-fe-mysql-nlb",
@@ -1051,6 +1129,13 @@ fe_mysql_nlb_service = kubernetes.core.v1.Service(
             "service.beta.kubernetes.io/aws-load-balancer-security-groups": (
                 fe_mysql_nlb_security_group.id
             ),
+            # external-dns runs with sources including "service" and a domain
+            # filter covering ol.mit.edu on every cluster, so this annotation
+            # is all that is needed to publish the record.  The NLB is
+            # internal, so the record resolves to VPC-private addresses; it is
+            # reachable only from the peered VPCs the security group above
+            # admits.
+            "external-dns.alpha.kubernetes.io/hostname": fe_mysql_domain,
         },
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
@@ -1072,6 +1157,8 @@ fe_mysql_nlb_service = kubernetes.core.v1.Service(
     ),
     opts=ResourceOptions(depends_on=[starrocks_release]),
 )
+
+export("fe_mysql_domain", fe_mysql_domain)
 
 export(
     "fe_mysql_host",

@@ -99,6 +99,7 @@ aws_account = get_caller_identity()
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 policy_stack = make_stack_reference(projects.POLICIES, "default")
 dns_stack = make_stack_reference(projects.DNS, "default")
+sentry_stack = make_stack_reference(projects.SENTRY, "default")
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
@@ -666,10 +667,15 @@ ovs_server_vault_mount = vault.Mount(
     ),
     opts=ResourceOptions(delete_before_replace=True),
 )
+# The Sentry DSN is owned by the ol-infrastructure-sentry stack rather than SOPS,
+# so it is merged into the collected secrets here instead of being carried in
+# data.{env}.yaml. See ol-infrastructure#5004.
 ovs_server_secrets = vault.generic.Secret(
     "ovs-server-configuration-secrets",
     path=ovs_server_vault_mount.path.apply("{}/ovs-secrets".format),
-    data_json=json.dumps(secrets),
+    data_json=sentry_stack.require_output("odl_video_service_sentry_dsn").apply(
+        lambda dsn: json.dumps({**secrets, "sentry": {"dsn": dsn}})
+    ),
 )
 
 
@@ -827,15 +833,29 @@ app_env_vars.update(k8s_extra_vars)
 # in the one environment nobody watches.
 #
 # OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES are read straight from the
-# environment; OPENTELEMETRY_ENDPOINT is a Django setting odl_video/settings.py
-# reads, which is why it carries the full /v1/traces path rather than a base URL
-# the SDK would append to.
+# environment, and so is the endpoint: OTEL_EXPORTER_OTLP_ENDPOINT is a *base*
+# URL that the SDK appends the signal path to, which is what lets one variable
+# serve both traces (/v1/traces) and metrics (/v1/metrics).
+#
+# It replaced the OPENTELEMETRY_ENDPOINT Django setting, which carried the full
+# /v1/traces path and therefore could not configure metrics -- POSTing a metrics
+# batch at the traces path delivers nothing, so mitol-django-observability
+# deliberately refuses to reuse it and leaves the MeterProvider off. Setting the
+# base URL here is what turns on http.server.duration, the unsampled RED signal
+# the Service RED dashboard reads.
+#
+# Requires mitol-django-observability >= 2026.8.19, which both added the
+# MeterProvider and stopped passing an environment-sourced endpoint to
+# OTLPSpanExporter(endpoint=...) verbatim. On an older release this base URL
+# would be POSTed to the collector root -- a 404 per batch, surfaced as nothing
+# louder than a BatchSpanProcessor warning. OVS pins >=2026.8.19 and its running
+# 0.95.0 image locks exactly that, checked before this change.
 if stack_info.env_suffix != "ci":
     app_env_vars.update(
         {
-            "OPENTELEMETRY_ENDPOINT": (
+            "OTEL_EXPORTER_OTLP_ENDPOINT": (
                 "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc"
-                ".cluster.local:4318/v1/traces"
+                ".cluster.local:4318"
             ),
             "OTEL_RESOURCE_ATTRIBUTES": (
                 f"service.namespace={ovs_namespace},"
@@ -892,7 +912,8 @@ ovs_k8s_app = OLApplicationK8s(
             application_module="odl_video.wsgi:application",
             # Stage 1 of docs/plans/granian-configuration-overhaul.md: holding pins
             # removed, so this app now runs on the component defaults (1 worker, 8
-            # blocking threads, 16 backpressure, runtime defaults).
+            # blocking threads, DEFAULT_WSGI_BACKPRESSURE connections, runtime
+            # defaults).
             blocking_threads_idle_timeout=120,
             enable_metrics=True,
             log_level=(ovs_config.get("log_level") or "info").lower(),
@@ -941,7 +962,12 @@ ovs_k8s_app = OLApplicationK8s(
                 ),
                 initial_delay_seconds=15,
                 period_seconds=15,
-                failure_threshold=3,
+                # Matches default_probe_configs: readiness shares the Granian
+                # connection budget with user traffic and its failure is
+                # correlated across replicas, so a fast eviction empties the
+                # EndpointSlice instead of shedding load. Kept in step with the
+                # component default -- see components/services/k8s.py.
+                failure_threshold=6,
                 timeout_seconds=5,
             ),
             "startup_probe": kubernetes.core.v1.ProbeArgs(

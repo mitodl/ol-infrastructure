@@ -637,7 +637,11 @@ mitxonline_k8s_app = OLApplicationK8s(
             # this app's stage of the rollout. Granian derived backpressure=64
             # (backlog=128 // workers=2) and blocking_threads=64 // 2 = 32.
             # Delete all four (and revert workers to the default) to adopt the
-            # component defaults (1 worker, 8 blocking threads, 16 backpressure).
+            # component defaults (1 worker, 8 blocking threads, and
+            # DEFAULT_WSGI_BACKPRESSURE connections). Note backpressure is no
+            # longer derived from blocking_threads: it caps connections, and the
+            # component default is well above this 64 (which is not binding here --
+            # this app peaks at 23 connections per worker).
             # See docs/plans/granian-configuration-overhaul.md
             workers=MITXONLINE_GRANIAN_WORKERS,
             runtime_mode="mt",
@@ -1102,12 +1106,29 @@ course_program_redirect_vcl = "\n".join(
 
 # Catalog pages redirect to MIT Learn's unit catalog view - no per-page mapping,
 # every /catalog/* path (and any sub-filter/department) goes to the same fixed
-# destination. Uses a distinct error code (604) from the course/program
-# redirects (603) and UAI B2C redirects (602) so this is fully additive.
+# destination. Bare /courses/ and /programs/ (no ID) are included here too,
+# since they're the index/listing views for those sections - the per-ID
+# redirect above requires a non-empty path segment, so it never matches these.
+# Uses a distinct error code (604) from the course/program redirects (603) and
+# UAI B2C redirects (602) so this is fully additive.
 catalog_redirect_vcl = (
-    f'if (req.url.path ~ "^/catalog(/.*)?$") {{\n'
+    f'if (req.url.path ~ "^/catalog(/.*)?$" || req.url.path ~ "^/(courses|programs)/?$") {{\n'
     f'  set req.http.x-redir-location = "https://{learn_frontend_domain}/c/unit/mitx";\n'
     f"  error 604;\n"
+    f"}}"
+)
+
+# Home page redirects to MIT Learn's unit catalog view too - per hq#12506,
+# matches only the exact site root, not any deeper path, so /cms and
+# /staff-dashboard (and everything else) are unaffected by construction.
+# Applies to all requests regardless of login state - there's no distinct
+# logged-in experience at bare "/" today for this to disrupt. Uses a
+# distinct error code (605) from the catalog (604), course/program (603),
+# and UAI B2C (602) redirects above so this is fully additive.
+home_redirect_vcl = (
+    f'if (req.url.path == "/") {{\n'
+    f'  set req.http.x-redir-location = "https://{learn_frontend_domain}/c/unit/mitx";\n'
+    f"  error 605;\n"
     f"}}"
 )
 
@@ -1222,6 +1243,15 @@ mitxonline_service = fastly.ServiceVcl(
             type="recv",
         ),
         vcl_snippet(
+            content=home_redirect_vcl,
+            name="Redirect home page to MIT Learn",
+            # Exact match on "/" only, so it can't shadow /cms, /staff-dashboard,
+            # or any other path - ordering relative to the other recv snippets
+            # isn't load-bearing, placed after them for readability only.
+            priority=170,
+            type="recv",
+        ),
+        vcl_snippet(
             content=textwrap.dedent("""\
             if (obj.status == 602) {
               set obj.status = 301;
@@ -1275,6 +1305,23 @@ mitxonline_service = fastly.ServiceVcl(
               return(deliver);
             }"""),
             name="Handle catalog redirects to MIT Learn",
+            type="error",
+        ),
+        vcl_snippet(
+            content=textwrap.dedent("""\
+            if (obj.status == 605) {
+              set obj.status = 301;
+              set obj.response = "Moved Permanently";
+              set obj.http.Location = req.http.x-redir-location;
+              set obj.http.Cache-Control = "no-store";
+              if (req.url.qs != "") {
+                # 605's Location is a fixed URL with no query string, so a
+                # plain "?" append is always correct here.
+                set obj.http.Location = obj.http.Location "?" req.url.qs;
+              }
+              return(deliver);
+            }"""),
+            name="Handle home page redirects to MIT Learn",
             type="error",
         ),
         vcl_snippet(

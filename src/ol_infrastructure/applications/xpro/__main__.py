@@ -337,7 +337,7 @@ vault.kv.Secret(
     "xpro-vault-secrets-sentry",
     path="secret-xpro/sentry",
     data_json=sentry_stack.require_output("xpro_sentry_dsn").apply(
-        lambda dsn: json.dumps({**xpro_vault_secrets["sentry"], "dsn": dsn})
+        lambda dsn: json.dumps({"dsn": dsn})
     ),
 )
 
@@ -588,7 +588,18 @@ if k8s_deploy:
                 application_module="mitxpro.wsgi:application",
                 # Stage 2 of docs/plans/granian-configuration-overhaul.md: holding
                 # pins removed, so this app now runs on the component defaults (1
-                # worker, 8 blocking threads, 16 backpressure, runtime defaults).
+                # worker, 8 blocking threads, runtime defaults).
+                #
+                # The backpressure=128 pin added by #5692 to end the 2026-08-31
+                # outage is gone: the component default is no longer derived from
+                # blocking_threads, so this app inherits a connection budget sized
+                # for the gateway's keepalive population rather than for its thread
+                # pool. That is what the pin existed to work around. Rationale and
+                # the outage evidence now live on GranianConfig.backpressure in
+                # components/services/k8s.py, so they are not restated per app.
+                # Request concurrency is unaffected: ~3 req/s at ~0.2s of in-Python
+                # time per request is well under 1 in flight, and blocking_threads
+                # stays at 8 as the real limit on concurrent work.
                 blocking_threads_idle_timeout=120,
                 enable_metrics=True,
                 # Serve /static/* from Granian's Rust layer instead of the sidecar

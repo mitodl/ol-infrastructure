@@ -58,6 +58,7 @@ def build_keycloak_substructure_pipeline() -> PipelineFragment:
         project_name="ol-substructure-keycloak",
         project_source_path=PULUMI_CODE_PATH.joinpath("substructure/keycloak/"),
         topology="preview-gated",
+        record_deployments=False,
         auto_deploy_stages=["CI"],
     )
     substructure_fragment.resources.append(keycloak_pulumi_code)
@@ -255,6 +256,7 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
             "KEYCLOAK_DOCKER_DIGEST": f"{keycloak_registry_image.name}/digest",
         },
         topology="preview-gated",
+        record_deployments=False,
         auto_deploy_stages=["CI"],
     )
 

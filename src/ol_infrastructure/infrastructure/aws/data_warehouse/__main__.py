@@ -148,6 +148,25 @@ for data_stage in data_stages:
         config=S3BucketConfig(
             bucket_name=f"ol-data-lake-{data_stage}-{stack_info.env_suffix}",
             versioning_enabled=True,
+            # These buckets are versioned and are written by systems that
+            # delete constantly -- dbt-trino drops the previous generation of
+            # every model on each full rebuild -- so without this every deleted
+            # object was billed forever. Audited 2026-08-31: 802 TB across the
+            # staging, mart and dimensional production buckets against 20.9 TB
+            # of current-version bytes; 95.5-99.9% was noncurrent versions and
+            # delete markers.
+            #
+            # Safe for Iceberg by construction: Iceberg never mutates an object,
+            # so a file any retained snapshot references has never been deleted
+            # and is the current version. A noncurrent version exists only
+            # because the key was already deleted or overwritten.
+            #
+            # 90 days is the undelete window, not a reclaim horizon. The
+            # historical backlog is well past it (100% of sampled noncurrent
+            # bytes in staging, 90.6% in mart), but the dimensional layer
+            # rebuilds often enough that ~76% of its churn is younger than 90
+            # days and stays resident at steady state.
+            noncurrent_version_expiration_days=90,
             server_side_encryption_enabled=True,
             kms_key_id=s3_kms_key["arn"],
             bucket_key_enabled=True,
@@ -284,10 +303,17 @@ query_engine_permissions: list[dict[str, str | list[str]]] = [
     },
 ]
 
+# The cross-environment Deny deliberately does not belong in this document.
+# applications/starrocks attaches every environment's copy of this policy to
+# every StarRocks IRSA role so each instance can query both data lake catalogs.
+# A Deny embedded here travels onto those foreign principals: the QA copy landed
+# its "deny production" statement on the production role, where an explicit Deny
+# beat the Allow from the production copy attached alongside it, and production
+# StarRocks lost the production Glue catalog. The Deny constrains a principal,
+# not a grant, so it ships as its own policy below.
 query_engine_iam_permissions = {
     "Version": "2012-10-17",
-    "Statement": query_engine_permissions
-    + cross_environment_glue_denial(stack_info.env_suffix),
+    "Statement": query_engine_permissions,
 }
 
 # Create instance profile for granting access to S3 buckets
@@ -304,6 +330,41 @@ query_engine_iam_policy = iam.Policy(
 )
 
 export("data_lake_query_engine_iam_policy_arn", query_engine_iam_policy.arn)
+
+# A standalone managed policy rather than an inline RolePolicy on each principal.
+# The Concourse deploy role is granted iam:CreatePolicy, iam:CreatePolicyVersion
+# and iam:AttachRolePolicy but NOT iam:PutRolePolicy, so an inline policy cannot
+# be applied from CI at all -- it fails with AccessDenied while the surrounding
+# managed-policy update succeeds, which strands the environment with the Allow
+# published and the Deny missing. Keep this as a managed policy attached to the
+# specific roles that need it; see cross_environment_glue_denial.
+#
+# Empty in production, which is the environment being protected, so no policy is
+# created there and consumers must gate on the same helper before referencing
+# the export.
+cross_environment_glue_denial_statements = cross_environment_glue_denial(
+    stack_info.env_suffix
+)
+if cross_environment_glue_denial_statements:
+    cross_environment_glue_denial_policy = iam.Policy(
+        f"data-lake-cross-environment-glue-denial-policy-{stack_info.env_suffix}",
+        name=f"data-lake-cross-environment-glue-denial-policy-{stack_info.env_suffix}",
+        path=f"/ol-data/etl-policy-{stack_info.env_suffix}/",
+        policy=json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": cross_environment_glue_denial_statements,
+            }
+        ),
+        description=(
+            "Denies this environment's data lake identities any Glue action on a "
+            "protected environment's catalog"
+        ),
+    )
+    export(
+        "data_lake_cross_environment_glue_denial_policy_arn",
+        cross_environment_glue_denial_policy.arn,
+    )
 
 # The external query engine (Starburst Galaxy) cross-account trust role is only
 # configured for environments that actually connect an external query engine to
@@ -351,5 +412,14 @@ if query_engine_aws_account_id and query_engine_aws_external_id:
         policy_arn=query_engine_iam_policy.arn,
         role=query_engine_role.name,
     )
+
+    # Carried on the role rather than in the policy above, for the reason given
+    # where that policy is built. Empty in production.
+    if cross_environment_glue_denial_statements:
+        iam.RolePolicyAttachment(
+            f"data-lake-query-engine-role-glue-denial-{stack_info.env_suffix}",
+            policy_arn=cross_environment_glue_denial_policy.arn,
+            role=query_engine_role.name,
+        )
 
     export("sql_engine_role_arn", query_engine_role.arn)

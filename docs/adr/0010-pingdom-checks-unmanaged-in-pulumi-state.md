@@ -85,7 +85,7 @@ Read directly from the installed SDK source
 ```python
 def get_provider(props, config):
     ...
-    providerStr = props[PROVIDER_KEY]   # PROVIDER_KEY = "__provider"
+    providerStr = props[PROVIDER_KEY]  # PROVIDER_KEY = "__provider"
 ```
 
 Every dynamic resource carries its entire CRUD implementation as a pickled (`dill`) Python object
@@ -175,7 +175,7 @@ provider mechanism in the future.
 
 Add an explicit safety check so `pingdom_checks.create()` cannot be invoked via a bare `pulumi up`
 without deliberate opt-in, and document the gap clearly here and in
-`grafana_alerting/CLAUDE.md`. The 39 checks keep working exactly as they do today.
+`grafana_alerting/AGENTS.md`. The 39 checks keep working exactly as they do today.
 
 - **Pros:** Zero risk, minutes of work, fully reversible.
 - **Cons:** Doesn't actually close the gap. Pingdom checks stay outside normal `pulumi

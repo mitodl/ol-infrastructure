@@ -7,6 +7,46 @@ in-process publisher CAS lets optimize rebase-and-retry against concurrent
 writers, so this is safe to run while the data tier is serving, and neither
 command needs (or can use) the HTTP API.
 
+★ THAT SAFETY CLAIM IS NARROWER THAN IT READS, AND WE HAVE COUNTEREXAMPLES.
+The CAS above is about concurrent WRITERS, and nothing observed contradicts it.
+It says nothing about the RECOVERY BARRIER, and there the interaction with a
+long-lived server is not benign: on four days between 2026-08-15 and 08-25 the
+first write to arrive after this job compacted ``code-bridge`` left a pending
+Mutation recovery operation on branch ``main`` that the running server could
+not clear. Every subsequent bridge write failed with
+
+    recovery required for operation <ULID>: pending Mutation recovery operation
+    on branch 'main' blocks the synchronous write/control recovery barrier
+    (datasets dataset for node type 'RepoSymbol'); reopen the graph read-write
+    before retrying
+
+for as long as the server stayed up — 15 hours on 08-25, ending only when it
+was restarted. The evidence that this job is the trigger rather than a
+coincidence: the operation ids are ULIDs, and all four decode to 04:01:3x UTC,
+within five seconds of each other, on four different days — the first CI
+indexer run (04:00, every 4h) after this job's 03:20 slot. The dataset named in
+the barrier, ``RepoSymbol``, is one this job compacts (``frags 14 → 1``).
+
+NOT fully understood: the same compaction runs daily and the wedge appeared on
+four days out of fourteen, so compaction alone is not sufficient; the additional
+condition that triggers the wedge is unknown.
+Server uptime across the optimize run is not the discriminator either — it was
+identical on clean days.
+
+So: do NOT read the paragraph above as "compaction while serving is free". It
+is free for write conflicts. A cure requires reopening the graph, which today
+means restarting omnigraph-server. Tracked in
+``tk-production-code-bridge-graph-is-wedged-on-a-pend-8318a4``; filed upstream
+because if this is what it looks like it affects every deployment following the
+documented maintenance pattern, not just ours.
+
+Deliberately NOT worked around here: adding a post-optimize rollout restart to
+this file would make it claim safety while scheduling a daily outage to
+compensate, and would need the maintenance ServiceAccount — IRSA for S3, with
+no Kubernetes RBAC — granted permission to restart the data tier. If that
+workaround is wanted before an upstream fix, it belongs in its own CronJob with
+its own narrowly-scoped role, where the privilege is visible.
+
 WHY TWO CRONJOBS AND NOT ONE
 
 They have genuinely different cadences and different risk. ``optimize`` is

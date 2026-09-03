@@ -712,18 +712,24 @@ open_metadata_application = kubernetes.helm.v3.Release(
             "hpa": {
                 "enabled": True,
             },
-            # Ref: https://docs.open-metadata.org/v1.13.x/deployment/semantic-search
-            # 1.13: hybrid search is now automatic when SEMANTIC_SEARCH_ENABLED=true;
-            # the per-query semanticSearch flag is removed. Run the Search Index App
-            # after upgrading to populate vector fields in OpenSearch.
+            # Ref: https://docs.open-metadata.org/latest/deployment/semantic-search
+            # Hybrid search is automatic when SEMANTIC_SEARCH_ENABLED=true; there is no
+            # per-query semanticSearch flag. Run the Search Index App after upgrading
+            # to populate vector fields in OpenSearch.
+            # 2.0 moved the embedding settings out of naturalLanguageSearch:
+            # provider/model now live under llmConfiguration.embeddings, while
+            # credentials live under llmConfiguration.bedrock.awsConfig. Every env var
+            # name below remains except AWS_BEDROCK_REGION. llmConfiguration's own
+            # `enabled` flag gates only the chat/completion client, not embeddings, so
+            # semantic search needs no LLM_* vars.
             # EMBEDDING_PROVIDER=bedrock (not djl): DJL is unusable on the official
             # Alpine/musl-based server image - it fails to load its glibc-linked
             # PyTorch native runtime every time. Unresolved upstream as of 1.13.1:
             # https://github.com/open-metadata/OpenMetadata/issues/29576
             # Bedrock auth uses the pod's IRSA role (open_metadata_bedrock_iam_policy
             # below) via the AWS default credential provider chain - no API key
-            # needed, just AWS_DEFAULT_REGION.
-            # LOG_FORMAT=json (1.13) enables JSON-structured Dropwizard server logs.
+            # needed, just the region and the IAM-auth flag below.
+            # LOG_FORMAT=json enables JSON-structured Dropwizard server logs.
             "extraEnvs": [
                 {
                     "name": "SEMANTIC_SEARCH_ENABLED",
@@ -733,11 +739,36 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "name": "EMBEDDING_PROVIDER",
                     "value": "bedrock",
                 },
-                # Bedrock's region (parsed by OM from AWS_DEFAULT_REGION per
-                # conf/openmetadata.yaml) and the AWS SDK v2 region-provider
-                # chain (which the IRSA credentials exchange uses internally,
-                # and only recognizes AWS_REGION) read two different env vars -
-                # set both rather than assume one covers the other.
+                # BedrockEmbeddingClient rejects an empty embeddingModelId in its
+                # constructor, and 1.13.x defaulted AWS_BEDROCK_EMBED_MODEL_ID to "",
+                # so the vector search service never initialized: OM logged a single
+                # ERROR ("Bedrock embedding model ID is required") per pod start and
+                # per reindex, then served lexical-only results without complaint.
+                # 2.0 now defaults to this same model id, making the setting redundant
+                # but explicit - it pins the model the existing index was built with.
+                {
+                    "name": "AWS_BEDROCK_EMBED_MODEL_ID",
+                    "value": "amazon.titan-embed-text-v2:0",
+                },
+                # titan-embed-text-v2 supports 1024/512/256. 512 matches the 2.0
+                # default, so the knn_vector mapping does not change at upgrade time.
+                {
+                    "name": "AWS_BEDROCK_EMBEDDING_DIMENSION",
+                    "value": "512",
+                },
+                # Selects the IRSA credential chain over the static access-key fields,
+                # which are empty. 2.0 already defaults this to true, so it is
+                # redundant - kept because being explicit beats depending on a default
+                # that upstream has already flipped once (1.13.x had it false).
+                {
+                    "name": "BEDROCK_AWS_IAM_AUTH_ENABLED",
+                    "value": "true",
+                },
+                # Two region vars for two consumers. 2.0 reads the Bedrock block's
+                # region from AWS_DEFAULT_REGION (llmConfiguration.bedrock.awsConfig);
+                # AWS_BEDROCK_REGION, which 1.13.x used, no longer appears anywhere in
+                # conf/openmetadata.yaml. The AWS SDK v2 region-provider chain used by
+                # the IRSA credentials exchange only recognizes AWS_REGION.
                 {
                     "name": "AWS_DEFAULT_REGION",
                     "value": "us-east-1",
@@ -758,11 +789,31 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "eks.amazonaws.com/role-arn": open_metadata_irsa_role.role.arn,
                 },
             },
+            # The chart defaults omjobOperator to 256Mi/128Mi, which is well under
+            # what this actually uses. Measured on data-production over 7 days to
+            # 2026-08-31: working set idles at ~215Mi right after a restart, climbs
+            # monotonically, and gets OOMKilled at the 256Mi ceiling having peaked at
+            # 254Mi - 11 kills in 7 days, roughly one every 15 hours. The old 128Mi
+            # request understated real usage (p50 ~230Mi) by nearly half, so the
+            # scheduler was placing this pod as if it were tiny.
+            # Not version-specific: the same sawtooth shows on 1.13.3, 1.13.4 and
+            # (in QA) 2.0.0, while CI on 2.0.0 never restarts. It tracks OMJob volume,
+            # so the busiest environment is the most exposed.
+            # The 254Mi peak is a CENSORED observation - the container is killed at the
+            # limit, so real demand is unknown and could be higher. 1Gi is deliberately
+            # generous to uncover the true plateau rather than to be a tight fit; once
+            # a few days of unclipped data exist, re-measure and set this from the
+            # observed ceiling. If the climb never plateaus it is a leak in
+            # omjob-operator and belongs upstream.
             "omjobOperator": {
                 "enabled": True,
                 "image": {
                     "repository": "docker.getcollate.io/openmetadata/omjob-operator",
                     "tag": OPEN_METADATA_VERSION,
+                },
+                "resources": {
+                    "requests": {"cpu": "100m", "memory": "256Mi"},
+                    "limits": {"cpu": "500m", "memory": "1Gi"},
                 },
             },
             "envFrom": [

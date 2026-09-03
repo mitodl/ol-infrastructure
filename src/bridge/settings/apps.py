@@ -88,3 +88,47 @@ def slack_channel(app_name: str) -> str | None:
     """Return the configured Slack channel ID for release notifications, if any."""
     entry = APPS.get(app_name)
     return entry.slack_channel if entry else None
+
+
+#: GitHub App id for `ol-release-bot`, the identity the Concourse `release`,
+#: `github-issues` and `github-deployments` resources authenticate as. This is the
+#: APP id (`app_id`), not the installation id -- ruleset bypass actors key on the
+#: former. Re-derive with:
+#:
+#:     gh api /orgs/mitodl/installations \
+#:       --jq '.installations[] | select(.app_slug=="ol-release-bot") | .app_id'
+#:
+#: Lives here rather than in the GitHub Pulumi stacks because both of them need it
+#: and neither owns it: it is a fact about the release workflow, which this module
+#: is the registry for.
+RELEASE_BOT_APP_ID = 4437866
+
+
+def release_workflow_repos() -> frozenset[str]:
+    """Return the "owner/repo" slugs slated for the ol-release-bot release workflow.
+
+    EVERY REGISTERED APP, NOT ONLY THE ONES ALREADY RUNNING THE NEW WORKFLOW. That
+    is deliberate and it over-grants on purpose (decision: Tobias, 2026-09-01). The
+    actual opt-in is ``AppPipelineParams.use_release_resource_workflow`` in
+    ``src/ol_concourse/pipelines/infrastructure/k8s_apps/pipeline.py``, which
+    defaults to ``False`` and today is set on ``ol-analytics-api`` alone -- so the
+    consumer below grants a bypass on ``mit-learn`` and ``mitxonline`` for an App
+    that does not yet finish their releases.
+
+    The trade is pre-provisioning against a rollout that would otherwise need a
+    GitHub ruleset edit interleaved with every pipeline flip -- and that edit is the
+    step that already went wrong once: ol-analytics-api's ``releases/2026.8.28.2``
+    shipped to production and then sat unmerged because the bypass was missing at
+    exactly this moment. Granting ahead means flipping a pipeline is a one-line
+    change with no privileged GitHub operation behind it.
+
+    What it costs is bounded: the bypass only exists where a repo also declares
+    ``required_status_checks``, and the App still cannot act on a repo it is not
+    installed on. Narrow this to opted-in apps once the rollout finishes -- by then
+    the two sets are the same and the over-grant is free to drop.
+
+    Deduplicated, because two app entries can share one repo -- ``mit-learn`` and
+    ``mit-learn-nextjs`` are independently versioned pipelines over the same
+    ``mitodl/mit-learn`` history.
+    """
+    return frozenset(github_repo(app_name) for app_name in APPS)

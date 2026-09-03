@@ -73,6 +73,9 @@ concourse_url = bot_config.get("concourse_url") or "https://cicd.odl.mit.edu"
 release_announce_channel = (
     bot_config.get("release_announce_channel") or "product-infrastructure"
 )
+# How long a release may sit cut-but-unfinished before the bot reports it in
+# Slack. Left unset the bot uses 24h, matching the cadence Doof nagged at.
+release_stuck_after_hours = bot_config.get("release_stuck_after_hours")
 
 # Derived from bridge.settings.apps -- the shared app registry also used by
 # the Concourse pipeline generator (k8s_apps/pipeline.py) -- so an app's repo,
@@ -121,6 +124,11 @@ bot_secret = kubernetes.core.v1.Secret(
         namespace=namespace,
     ),
     string_data={
+        # The bot token needs "users:read.email" on top of the usual
+        # chat/commands scopes: slack_users.py resolves each commit author's
+        # email to a Slack id so release notifications @-mention real people
+        # instead of pasting addresses. Without the scope the bot logs one
+        # error and degrades to plain-text names.
         "slack-bot-token": bot_secrets["slack-bot-token"],
         "slack-app-token": bot_secrets["slack-app-token"],
         "concourse-user": bot_secrets["concourse-username"],
@@ -212,6 +220,16 @@ bot_deployment = kubernetes.apps.v1.Deployment(
                                     )
                                 ]
                                 if release_announce_channel
+                                else []
+                            ),
+                            *(
+                                [
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name="RELEASE_STUCK_AFTER_HOURS",
+                                        value=release_stuck_after_hours,
+                                    )
+                                ]
+                                if release_stuck_after_hours
                                 else []
                             ),
                         ],

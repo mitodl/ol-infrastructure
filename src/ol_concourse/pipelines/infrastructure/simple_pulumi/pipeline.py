@@ -139,6 +139,12 @@ class SimplePulumiParams(BaseModel):
         auto_deploy_stages: Only used with topology="preview-gated". Stages
                            listed here keep today's auto-deploy-on-change
                            behavior instead of being gated. Typically ["CI"].
+        record_deployments: Only used with topology="preview-gated". Whether
+                           each deploy posts a "... deployed." GitHub issue as
+                           an audit record. Defaults to False -- under
+                           preview-gated the gate issue is what authorises the
+                           deploy, so the record issue is pure noise unless a
+                           pipeline specifically wants an audit trail.
     """
 
     app_name: str
@@ -156,6 +162,7 @@ class SimplePulumiParams(BaseModel):
     refresh_stack: bool = True
     topology: Literal["deploy-chained", "preview-gated"] = "deploy-chained"
     auto_deploy_stages: list[str] | None = None
+    record_deployments: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -321,6 +328,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="airbyte",
         pulumi_project_path="applications/airbyte/",
         pulumi_project_name="ol-application-airbyte",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "celery-monitoring": SimplePulumiParams(
         app_name="celery-monitoring",
@@ -331,29 +340,39 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             image_tag="0.7.5",  # Must match LEEK_VERSION in bridge.lib.versions
             ecr_region=ECR_REGION,
         ),
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "clickhouse": SimplePulumiParams(
         app_name="clickhouse",
         pulumi_project_path="applications/clickhouse/",
         pulumi_project_name="ol-application-clickhouse",
         stages=["CI", "QA", "Production"],
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "data_warehouse": SimplePulumiParams(
         app_name="data_warehouse",
         pulumi_project_path="infrastructure/aws/data_warehouse/",
         pulumi_project_name="ol-infrastructure-data-warehouse",
         stages=["CI", "QA", "Production"],
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "digital-credentials": SimplePulumiParams(
         app_name="digital-credentials",
         pulumi_project_path="applications/digital_credentials/",
         pulumi_project_name="ol-application-digital-credentials",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "fastly-redirector": SimplePulumiParams(
         app_name="fastly-redirector",
         pulumi_project_path="applications/fastly_redirector/",
         pulumi_project_name="ol-application-fastly-redirector",
         refresh_stack=False,
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "gcp": SimplePulumiParams(
         app_name="gcp",
@@ -386,22 +405,30 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="grafana-alerting",
         pulumi_project_path="infrastructure/grafana_alerting/",
         pulumi_project_name="ol-infrastructure-grafana-alerting",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "jupyterhub-data": SimplePulumiParams(
         app_name="jupyterhub-data",
         pulumi_project_path="applications/jupyterhub_data/",
         pulumi_project_name="ol-application-jupyterhub-data",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "marimo-data": SimplePulumiParams(
         app_name="marimo-data",
         pulumi_project_path="applications/marimo_data/",
         pulumi_project_name="ol-application-marimo-data",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "mongodb-atlas": SimplePulumiParams(
         app_name="mongodb-atlas",
         pulumi_project_path="infrastructure/mongodb_atlas/",
         pulumi_project_name="ol-infrastructure-mongodb-atlas",
         deployment_groups=["mitx", "mitx-staging", "mitxonline", "xpro"],
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "ocw-site": SimplePulumiParams(
         app_name="ocw-site",
@@ -409,23 +436,28 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-application-ocw-site",
         stages=["QA", "Production"],
         refresh_stack=False,
+        topology="preview-gated",
     ),
     "open-discussions": SimplePulumiParams(
         app_name="open-discussions",
         pulumi_project_path="applications/open_discussions/",
         pulumi_project_name="ol-application-open-discussions",
         stages=["QA", "Production"],
+        topology="preview-gated",
     ),
     "open-metadata": SimplePulumiParams(
         app_name="open-metadata",
         pulumi_project_path="applications/open_metadata/",
         pulumi_project_name="ol-application-open-metadata",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "open-metadata-substructure": SimplePulumiParams(
         app_name="open-metadata-substructure",
         pulumi_project_path="substructure/open_metadata/",
         pulumi_project_name="ol-substructure-open-metadata",
         stages=["QA", "Production"],
+        topology="preview-gated",
     ),
     "opensearch": SimplePulumiParams(
         app_name="opensearch",
@@ -442,18 +474,24 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "open_metadata",
             "xpro",
         ],
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "opik": SimplePulumiParams(
         app_name="opik",
         pulumi_project_path="applications/opik/",
         pulumi_project_name="ol-application-opik",
         stages=["CI", "QA", "Production"],
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "qdrant-cloud": SimplePulumiParams(
         app_name="qdrant-cloud",
         pulumi_project_path="infrastructure/qdrant_cloud/",
         pulumi_project_name="ol-infrastructure-qdrant-cloud",
         stack_prefix="mitlearn",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "rootly": SimplePulumiParams(
         app_name="rootly",
@@ -484,6 +522,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "lakehouse",
         ],
         stages=["CI", "QA", "Production"],
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     # The substructure stack makes direct TCP connections to the StarRocks NLB, which
     # is internal to the data VPC.  Each ops VPC is only peered with its same-env data
@@ -523,26 +563,36 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="tika",
         pulumi_project_path="applications/tika/",
         pulumi_project_name="ol-application-tika",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "toolhive-apps": SimplePulumiParams(
         app_name="toolhive-apps",
         pulumi_project_path="applications/toolhive_apps/",
         pulumi_project_name="ol-application-toolhive-apps",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "toolhive-data": SimplePulumiParams(
         app_name="toolhive-data",
         pulumi_project_path="applications/toolhive_data/",
         pulumi_project_name="ol-application-toolhive-data",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "toolhive-operator": SimplePulumiParams(
         app_name="toolhive-operator",
         pulumi_project_path="applications/toolhive_operator/",
         pulumi_project_name="ol-application-toolhive-operator",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "toolhive-swe": SimplePulumiParams(
         app_name="toolhive-swe",
         pulumi_project_path="applications/toolhive_swe/",
         pulumi_project_name="ol-application-toolhive-swe",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     # NOTE: omnigraph and witan are deliberately NOT simple_pulumi (deploy-only)
     # apps. Each builds a container image from a foreign repo (agent-kit) and
@@ -553,6 +603,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_path="infrastructure/vector_log_proxy/",
         pulumi_project_name="ol-infrastructure-vector-log-proxy",
         stack_prefix="operations",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "aws-ecr": SimplePulumiParams(
         app_name="aws-ecr",
@@ -570,16 +622,21 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         # barely changed in a year never needed one. The default CI stage
         # was failing every run with StackNotFoundError.
         stages=["QA", "Production"],
+        topology="preview-gated",
     ),
     "b2b-partners-storage": SimplePulumiParams(
         app_name="b2b-partners-storage",
         pulumi_project_path="applications/b2b_partners_storage/",
         pulumi_project_name="ol-application-b2b-partners-storage",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "mailgun": SimplePulumiParams(
         app_name="mailgun",
         pulumi_project_path="applications/mailgun/",
         pulumi_project_name="ol-application-mailgun",
+        topology="preview-gated",
+        auto_deploy_stages=["CI"],
     ),
     "monitoring": SimplePulumiParams(
         app_name="monitoring",
@@ -616,6 +673,30 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             env_var_for_digest="RELEASE_BOT_DOCKER_SHA",
         ),
         build=BuildConfig(dockerfile_path="./Dockerfile"),
+    ),
+    "vuln-scanner": SimplePulumiParams(
+        app_name="vuln-scanner",
+        pulumi_project_path="applications/vuln_scanner/",
+        pulumi_project_name="ol-application-vuln-scanner",
+        # Only Pulumi.QA.yaml exists -- this scans MIT Learn's QA endpoint
+        # specifically, deliberately not Production (see __main__.py's
+        # module docstring).
+        stages=["QA"],
+        # Same reasoning as release-bot: don't auto-deploy a tool that runs
+        # active attack payloads and holds real S3-write/Security-Hub
+        # credentials on every push -- gate it on a reviewed preview instead.
+        topology="preview-gated",
+        # The reporter image's Dockerfile lives in a `reporter/` subdirectory
+        # of pulumi_project_path, not at its root like release-bot's --
+        # dockerfile_path is relative to pulumi_project_path (this job's
+        # build CONTEXT), so the Dockerfile's own COPY sources are
+        # `reporter/...`, not bare filenames.
+        docker_image=DockerImageConfig(
+            image_repository="vuln-scanner-reporter",
+            ecr_region=ECR_REGION,
+            env_var_for_digest="VULN_SCANNER_REPORTER_DOCKER_SHA",
+        ),
+        build=BuildConfig(dockerfile_path="./reporter/Dockerfile"),
     ),
 }
 
@@ -815,6 +896,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                     custom_dependencies=cross_env_custom_deps or None,
                     topology=params.topology,
                     auto_deploy_stages=params.auto_deploy_stages,
+                    record_deployments=params.record_deployments,
                 )
 
                 # Collect resources and jobs
@@ -849,6 +931,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
                 custom_dependencies=cross_env_custom_deps or None,
                 topology=params.topology,
                 auto_deploy_stages=params.auto_deploy_stages,
+                record_deployments=params.record_deployments,
             )
 
             all_pipeline_resources = [
@@ -886,6 +969,7 @@ def build_simple_pulumi_pipeline(app_name: str) -> Pipeline:
             custom_dependencies=cross_env_custom_deps or None,
             topology=params.topology,
             auto_deploy_stages=params.auto_deploy_stages,
+            record_deployments=params.record_deployments,
         )
 
         all_pipeline_resources = [

@@ -1,0 +1,888 @@
+{
+  "detectors": [
+    {
+      "id": "2814155",
+      "projectId": "1413655",
+      "name": "XPro Users Experiencing Issues Alert",
+      "description": null,
+      "type": "metric_issue",
+      "workflowIds": [
+        "2210772"
+      ],
+      "owner": {
+        "type": "team",
+        "id": "433984",
+        "name": "devops"
+      },
+      "createdBy": "2598939",
+      "dateCreated": "2024-08-15T20:39:35.829022Z",
+      "dateUpdated": "2025-07-22T17:08:27.987082Z",
+      "dataSources": [
+        {
+          "id": "296287",
+          "organizationId": "48788",
+          "type": "snuba_query_subscription",
+          "sourceId": "231411",
+          "queryObj": {
+            "id": "231411",
+            "status": 0,
+            "subscription": "45/15fdb5282abb11f087b4a66d1a67ac91",
+            "snubaQuery": {
+              "id": "293429",
+              "dataset": "events",
+              "query": "is:unresolved",
+              "aggregate": "count_unique(tags[sentry:user])",
+              "timeWindow": 3600,
+              "environment": "production",
+              "eventTypes": [
+                "error"
+              ],
+              "extrapolationMode": "unknown"
+            }
+          }
+        }
+      ],
+      "conditionGroup": {
+        "id": "4737206",
+        "organizationId": "48788",
+        "logicType": "any",
+        "conditions": [
+          {
+            "id": "4248695",
+            "type": "gt",
+            "comparison": 25.0,
+            "conditionResult": 75
+          },
+          {
+            "id": "4248697",
+            "type": "lte",
+            "comparison": 25.0,
+            "conditionResult": 0
+          }
+        ],
+        "actions": []
+      },
+      "config": {
+        "detectionType": "static",
+        "comparisonDelta": null
+      },
+      "enabled": true,
+      "alertRuleId": 271338,
+      "ruleId": null,
+      "latestGroup": null
+    },
+    {
+      "id": "2814156",
+      "projectId": "5939801",
+      "name": "openedx-mitxonline Userse Experiencing Errors Rootly Alert",
+      "description": null,
+      "type": "metric_issue",
+      "workflowIds": [
+        "2210773"
+      ],
+      "owner": {
+        "type": "team",
+        "id": "433984",
+        "name": "devops"
+      },
+      "createdBy": "2598939",
+      "dateCreated": "2024-08-16T21:03:30.335616Z",
+      "dateUpdated": "2025-07-22T17:08:27.988980Z",
+      "dataSources": [
+        {
+          "id": "296288",
+          "organizationId": "48788",
+          "type": "snuba_query_subscription",
+          "sourceId": "231661",
+          "queryObj": {
+            "id": "231661",
+            "status": 0,
+            "subscription": "50/e6ba62621fb511f08a9946ae00aa52c6",
+            "snubaQuery": {
+              "id": "293739",
+              "dataset": "events",
+              "query": "",
+              "aggregate": "count_unique(tags[sentry:user])",
+              "timeWindow": 3600,
+              "environment": "mitxonline-production",
+              "eventTypes": [
+                "error"
+              ],
+              "extrapolationMode": "unknown"
+            }
+          }
+        }
+      ],
+      "conditionGroup": {
+        "id": "4737208",
+        "organizationId": "48788",
+        "logicType": "any",
+        "conditions": [
+          {
+            "id": "4248698",
+            "type": "gt",
+            "comparison": 25.0,
+            "conditionResult": 75
+          },
+          {
+            "id": "4248700",
+            "type": "lte",
+            "comparison": 25.0,
+            "conditionResult": 0
+          }
+        ],
+        "actions": []
+      },
+      "config": {
+        "detectionType": "static",
+        "comparisonDelta": null
+      },
+      "enabled": true,
+      "alertRuleId": 271648,
+      "ruleId": null,
+      "latestGroup": null
+    },
+    {
+      "id": "2814157",
+      "projectId": "1730882",
+      "name": "openedx-mitxpro User Experienced Errors Opsgenie Alert",
+      "description": null,
+      "type": "metric_issue",
+      "workflowIds": [
+        "2210774"
+      ],
+      "owner": {
+        "type": "team",
+        "id": "433984",
+        "name": "devops"
+      },
+      "createdBy": "2598939",
+      "dateCreated": "2024-08-16T21:13:06.898467Z",
+      "dateUpdated": "2025-07-22T17:08:27.994153Z",
+      "dataSources": [
+        {
+          "id": "296289",
+          "organizationId": "48788",
+          "type": "snuba_query_subscription",
+          "sourceId": "231662",
+          "queryObj": {
+            "id": "231662",
+            "status": 0,
+            "subscription": "41/5dc61a4c2ab311f09e73ce453f85bbfb",
+            "snubaQuery": {
+              "id": "293740",
+              "dataset": "events",
+              "query": "is:unresolved",
+              "aggregate": "count_unique(tags[sentry:user])",
+              "timeWindow": 3600,
+              "environment": "xpro-production",
+              "eventTypes": [
+                "error"
+              ],
+              "extrapolationMode": "unknown"
+            }
+          }
+        }
+      ],
+      "conditionGroup": {
+        "id": "4737210",
+        "organizationId": "48788",
+        "logicType": "any",
+        "conditions": [
+          {
+            "id": "4248701",
+            "type": "gt",
+            "comparison": 25.0,
+            "conditionResult": 75
+          },
+          {
+            "id": "4248703",
+            "type": "lte",
+            "comparison": 25.0,
+            "conditionResult": 0
+          }
+        ],
+        "actions": []
+      },
+      "config": {
+        "detectionType": "static",
+        "comparisonDelta": null
+      },
+      "enabled": true,
+      "alertRuleId": 271649,
+      "ruleId": null,
+      "latestGroup": null
+    },
+    {
+      "id": "2814158",
+      "projectId": "4506260054540288",
+      "name": "open-next (mit learn) Users Experiencing Errors OpsGenie Alert",
+      "description": null,
+      "type": "metric_issue",
+      "workflowIds": [
+        "2210775"
+      ],
+      "owner": {
+        "type": "team",
+        "id": "433984",
+        "name": "devops"
+      },
+      "createdBy": "2598939",
+      "dateCreated": "2024-08-16T21:28:53.183663Z",
+      "dateUpdated": "2025-07-22T17:08:27.998362Z",
+      "dataSources": [
+        {
+          "id": "296290",
+          "organizationId": "48788",
+          "type": "snuba_query_subscription",
+          "sourceId": "231668",
+          "queryObj": {
+            "id": "231668",
+            "status": 0,
+            "subscription": "57/26e8380e370e11f0822466d435fc0e24",
+            "snubaQuery": {
+              "id": "293741",
+              "dataset": "events",
+              "query": "is:unresolved",
+              "aggregate": "count_unique(tags[sentry:user])",
+              "timeWindow": 3600,
+              "environment": "production",
+              "eventTypes": [
+                "error"
+              ],
+              "extrapolationMode": "unknown"
+            }
+          }
+        }
+      ],
+      "conditionGroup": {
+        "id": "4737212",
+        "organizationId": "48788",
+        "logicType": "any",
+        "conditions": [
+          {
+            "id": "4248704",
+            "type": "gt",
+            "comparison": 25.0,
+            "conditionResult": 75
+          },
+          {
+            "id": "4248706",
+            "type": "lte",
+            "comparison": 25.0,
+            "conditionResult": 0
+          }
+        ],
+        "actions": []
+      },
+      "config": {
+        "detectionType": "static",
+        "comparisonDelta": null
+      },
+      "enabled": true,
+      "alertRuleId": 271650,
+      "ruleId": null,
+      "latestGroup": null
+    },
+    {
+      "id": "2925266",
+      "projectId": "5864687",
+      "name": "MITx Online User Issues - On-Call",
+      "description": null,
+      "type": "metric_issue",
+      "workflowIds": [
+        "2327347"
+      ],
+      "owner": {
+        "type": "team",
+        "id": "433984",
+        "name": "devops"
+      },
+      "createdBy": "62429",
+      "dateCreated": "2025-05-22T13:36:20.517462Z",
+      "dateUpdated": "2025-07-22T17:10:42.152072Z",
+      "dataSources": [
+        {
+          "id": "369146",
+          "organizationId": "48788",
+          "type": "snuba_query_subscription",
+          "sourceId": "294551",
+          "queryObj": {
+            "id": "294551",
+            "status": 0,
+            "subscription": "13/308ec0b869bb11f184255e2353d87373",
+            "snubaQuery": {
+              "id": "362316",
+              "dataset": "events",
+              "query": "is:unresolved",
+              "aggregate": "count_unique(tags[sentry:user])",
+              "timeWindow": 3600,
+              "environment": "production",
+              "eventTypes": [
+                "error"
+              ],
+              "extrapolationMode": "unknown"
+            }
+          }
+        }
+      ],
+      "conditionGroup": {
+        "id": "5154306",
+        "organizationId": "48788",
+        "logicType": "any",
+        "conditions": [
+          {
+            "id": "5376361",
+            "type": "gt",
+            "comparison": 125.0,
+            "conditionResult": 50
+          },
+          {
+            "id": "5376364",
+            "type": "gt",
+            "comparison": 150.0,
+            "conditionResult": 75
+          },
+          {
+            "id": "5376367",
+            "type": "lte",
+            "comparison": 125.0,
+            "conditionResult": 0
+          }
+        ],
+        "actions": []
+      },
+      "config": {
+        "detectionType": "percent",
+        "comparisonDelta": 604800
+      },
+      "enabled": false,
+      "alertRuleId": 340225,
+      "ruleId": null,
+      "latestGroup": null
+    },
+    {
+      "id": "2925269",
+      "projectId": "1757731",
+      "name": "MITx Residential User Issues - On-Call",
+      "description": null,
+      "type": "metric_issue",
+      "workflowIds": [
+        "2327352"
+      ],
+      "owner": {
+        "type": "team",
+        "id": "433984",
+        "name": "devops"
+      },
+      "createdBy": "62429",
+      "dateCreated": "2025-05-22T13:37:38.906840Z",
+      "dateUpdated": "2026-03-06T19:23:33.908921Z",
+      "dataSources": [
+        {
+          "id": "369147",
+          "organizationId": "48788",
+          "type": "snuba_query_subscription",
+          "sourceId": "294552",
+          "queryObj": {
+            "id": "294552",
+            "status": 0,
+            "subscription": "60/3301243a69bb11f1ae38925a12d7111e",
+            "snubaQuery": {
+              "id": "362317",
+              "dataset": "events",
+              "query": "is:unresolved",
+              "aggregate": "count_unique(tags[sentry:user])",
+              "timeWindow": 300,
+              "environment": "mitx-production",
+              "eventTypes": [
+                "error"
+              ],
+              "extrapolationMode": "unknown"
+            }
+          }
+        }
+      ],
+      "conditionGroup": {
+        "id": "5154317",
+        "organizationId": "48788",
+        "logicType": "any",
+        "conditions": [
+          {
+            "id": "5376385",
+            "type": "lte",
+            "comparison": 10.0,
+            "conditionResult": 0
+          },
+          {
+            "id": "5376379",
+            "type": "gt",
+            "comparison": 10.0,
+            "conditionResult": 50
+          },
+          {
+            "id": "5376382",
+            "type": "gt",
+            "comparison": 30.0,
+            "conditionResult": 75
+          }
+        ],
+        "actions": []
+      },
+      "config": {
+        "detectionType": "static",
+        "comparisonDelta": null
+      },
+      "enabled": true,
+      "alertRuleId": 340226,
+      "ruleId": null,
+      "latestGroup": {
+        "id": "7253427038",
+        "title": "MITx Residential User Issues - On-Call",
+        "culprit": "",
+        "shortId": "OPENEDX-RESIDENTIAL-AZP",
+        "level": "error",
+        "status": "resolved",
+        "substatus": null,
+        "platform": "python",
+        "project": {
+          "id": "1757731",
+          "name": "openedx-residential",
+          "slug": "openedx-residential",
+          "platform": "python-django"
+        },
+        "type": "generic",
+        "issueType": "metric_issue",
+        "issueCategory": "metric",
+        "metadata": {
+          "title": "MITx Residential User Issues - On-Call",
+          "value": "Warning: Number of users affected in the last 5 minutes above 10.0",
+          "initial_priority": 50
+        },
+        "numComments": 0,
+        "firstSeen": "2026-02-09T17:39:45.976477Z",
+        "lastSeen": "2026-07-20T18:49:08.748392Z"
+      }
+    }
+  ],
+  "workflows": {
+    "2210772": {
+      "id": "2210772",
+      "name": "Notify OpsGenie via Opsgenie",
+      "organizationId": "48788",
+      "createdBy": "2598939",
+      "dateCreated": "2024-08-15T20:39:35.829022Z",
+      "dateUpdated": "2025-04-30T17:42:35.628503Z",
+      "triggers": null,
+      "actionFilters": [
+        {
+          "id": "4737207",
+          "organizationId": "48788",
+          "logicType": "any",
+          "conditions": [
+            {
+              "id": "5170546",
+              "type": "issue_priority_deescalating",
+              "comparison": 75,
+              "conditionResult": true
+            },
+            {
+              "id": "4248696",
+              "type": "issue_priority_greater_or_equal",
+              "comparison": 75,
+              "conditionResult": true
+            }
+          ],
+          "actions": [
+            {
+              "id": "3147465",
+              "type": "sentry_app",
+              "integrationId": null,
+              "data": {},
+              "config": {
+                "targetType": "sentry_app",
+                "targetDisplay": "Rootly",
+                "targetIdentifier": "39357"
+              },
+              "status": "active"
+            }
+          ]
+        }
+      ],
+      "environment": null,
+      "config": {},
+      "detectorIds": [
+        "2814155"
+      ],
+      "enabled": true,
+      "lastTriggered": null,
+      "owner": "team:433984"
+    },
+    "2210773": {
+      "id": "2210773",
+      "name": "Notify Rootly",
+      "organizationId": "48788",
+      "createdBy": "2598939",
+      "dateCreated": "2024-08-16T21:03:30.335616Z",
+      "dateUpdated": "2025-04-30T17:42:35.676812Z",
+      "triggers": null,
+      "actionFilters": [
+        {
+          "id": "4737209",
+          "organizationId": "48788",
+          "logicType": "any",
+          "conditions": [
+            {
+              "id": "5170549",
+              "type": "issue_priority_deescalating",
+              "comparison": 75,
+              "conditionResult": true
+            },
+            {
+              "id": "4248699",
+              "type": "issue_priority_greater_or_equal",
+              "comparison": 75,
+              "conditionResult": true
+            }
+          ],
+          "actions": [
+            {
+              "id": "2968916",
+              "type": "sentry_app",
+              "integrationId": null,
+              "data": {},
+              "config": {
+                "targetType": "sentry_app",
+                "targetDisplay": "Rootly",
+                "targetIdentifier": "39357"
+              },
+              "status": "active"
+            }
+          ]
+        }
+      ],
+      "environment": null,
+      "config": {},
+      "detectorIds": [
+        "2814156"
+      ],
+      "enabled": true,
+      "lastTriggered": null,
+      "owner": "team:433984"
+    },
+    "2210774": {
+      "id": "2210774",
+      "name": "Notify OpsGenie via Opsgenie",
+      "organizationId": "48788",
+      "createdBy": "2598939",
+      "dateCreated": "2024-08-16T21:13:06.898467Z",
+      "dateUpdated": "2025-04-30T17:42:35.725447Z",
+      "triggers": null,
+      "actionFilters": [
+        {
+          "id": "4737211",
+          "organizationId": "48788",
+          "logicType": "any",
+          "conditions": [
+            {
+              "id": "5170547",
+              "type": "issue_priority_deescalating",
+              "comparison": 75,
+              "conditionResult": true
+            },
+            {
+              "id": "4248702",
+              "type": "issue_priority_greater_or_equal",
+              "comparison": 75,
+              "conditionResult": true
+            }
+          ],
+          "actions": [
+            {
+              "id": "3146847",
+              "type": "sentry_app",
+              "integrationId": null,
+              "data": {},
+              "config": {
+                "targetType": "sentry_app",
+                "targetDisplay": "Rootly",
+                "targetIdentifier": "39357"
+              },
+              "status": "active"
+            }
+          ]
+        }
+      ],
+      "environment": null,
+      "config": {},
+      "detectorIds": [
+        "2814157"
+      ],
+      "enabled": true,
+      "lastTriggered": null,
+      "owner": "team:433984"
+    },
+    "2210775": {
+      "id": "2210775",
+      "name": "Notify OpsGenie via Opsgenie",
+      "organizationId": "48788",
+      "createdBy": "2598939",
+      "dateCreated": "2024-08-16T21:28:53.183663Z",
+      "dateUpdated": "2025-04-30T17:42:35.768899Z",
+      "triggers": null,
+      "actionFilters": [
+        {
+          "id": "4737213",
+          "organizationId": "48788",
+          "logicType": "any",
+          "conditions": [
+            {
+              "id": "5170551",
+              "type": "issue_priority_deescalating",
+              "comparison": 75,
+              "conditionResult": true
+            },
+            {
+              "id": "4248705",
+              "type": "issue_priority_greater_or_equal",
+              "comparison": 75,
+              "conditionResult": true
+            }
+          ],
+          "actions": [
+            {
+              "id": "3344723",
+              "type": "sentry_app",
+              "integrationId": null,
+              "data": {
+                "settings": [
+                  {
+                    "name": "rootly_notification_target",
+                    "label": "[Team] Platform Engineering",
+                    "value": "Group:9f00e9f1-2f13-470e-a856-50ab5003f260"
+                  }
+                ]
+              },
+              "config": {
+                "targetType": "sentry_app",
+                "targetDisplay": "Rootly",
+                "targetIdentifier": "39357"
+              },
+              "status": "active"
+            }
+          ]
+        }
+      ],
+      "environment": null,
+      "config": {},
+      "detectorIds": [
+        "2814158"
+      ],
+      "enabled": true,
+      "lastTriggered": null,
+      "owner": "team:433984"
+    },
+    "2327347": {
+      "id": "2327347",
+      "name": "Critical - Notify Rootly, Warning - Notify Rootly",
+      "organizationId": "48788",
+      "createdBy": "62429",
+      "dateCreated": "2025-05-22T13:36:20.553524Z",
+      "dateUpdated": "2025-05-22T13:36:20.553506Z",
+      "triggers": null,
+      "actionFilters": [
+        {
+          "id": "5154307",
+          "organizationId": "48788",
+          "logicType": "any",
+          "conditions": [
+            {
+              "id": "5376362",
+              "type": "issue_priority_greater_or_equal",
+              "comparison": 50,
+              "conditionResult": true
+            },
+            {
+              "id": "5376363",
+              "type": "issue_priority_deescalating",
+              "comparison": 50,
+              "conditionResult": true
+            }
+          ],
+          "actions": [
+            {
+              "id": "3345189",
+              "type": "sentry_app",
+              "integrationId": null,
+              "data": {
+                "settings": [
+                  {
+                    "name": "rootly_notification_target",
+                    "label": "[Escalation Policy] Default Escalation Policy",
+                    "value": "EscalationPolicy:96629210-cc41-4e57-b059-b182a0f01c5b"
+                  }
+                ]
+              },
+              "config": {
+                "targetType": "sentry_app",
+                "targetDisplay": "Rootly",
+                "targetIdentifier": "39357"
+              },
+              "status": "active"
+            }
+          ]
+        },
+        {
+          "id": "5154308",
+          "organizationId": "48788",
+          "logicType": "any",
+          "conditions": [
+            {
+              "id": "5376365",
+              "type": "issue_priority_greater_or_equal",
+              "comparison": 75,
+              "conditionResult": true
+            },
+            {
+              "id": "5376366",
+              "type": "issue_priority_deescalating",
+              "comparison": 75,
+              "conditionResult": true
+            }
+          ],
+          "actions": [
+            {
+              "id": "3345190",
+              "type": "sentry_app",
+              "integrationId": null,
+              "data": {
+                "settings": [
+                  {
+                    "name": "rootly_notification_target",
+                    "label": "[Escalation Policy] Default Escalation Policy",
+                    "value": "EscalationPolicy:96629210-cc41-4e57-b059-b182a0f01c5b"
+                  }
+                ]
+              },
+              "config": {
+                "targetType": "sentry_app",
+                "targetDisplay": "Rootly",
+                "targetIdentifier": "39357"
+              },
+              "status": "active"
+            }
+          ]
+        }
+      ],
+      "environment": null,
+      "config": {},
+      "detectorIds": [
+        "2925266"
+      ],
+      "enabled": true,
+      "lastTriggered": null,
+      "owner": "team:433984"
+    },
+    "2327352": {
+      "id": "2327352",
+      "name": "Critical - Notify Rootly, Warning - Notify Rootly",
+      "organizationId": "48788",
+      "createdBy": "62429",
+      "dateCreated": "2025-05-22T13:37:38.934468Z",
+      "dateUpdated": "2025-05-22T13:37:38.934453Z",
+      "triggers": null,
+      "actionFilters": [
+        {
+          "id": "5154318",
+          "organizationId": "48788",
+          "logicType": "any",
+          "conditions": [
+            {
+              "id": "5376380",
+              "type": "issue_priority_greater_or_equal",
+              "comparison": 50,
+              "conditionResult": true
+            },
+            {
+              "id": "5376381",
+              "type": "issue_priority_deescalating",
+              "comparison": 50,
+              "conditionResult": true
+            }
+          ],
+          "actions": [
+            {
+              "id": "3345205",
+              "type": "sentry_app",
+              "integrationId": null,
+              "data": {
+                "settings": [
+                  {
+                    "name": "rootly_notification_target",
+                    "label": "[Escalation Policy] Default Escalation Policy",
+                    "value": "EscalationPolicy:96629210-cc41-4e57-b059-b182a0f01c5b"
+                  }
+                ]
+              },
+              "config": {
+                "targetType": "sentry_app",
+                "targetDisplay": "Rootly",
+                "targetIdentifier": "39357"
+              },
+              "status": "active"
+            }
+          ]
+        },
+        {
+          "id": "5154319",
+          "organizationId": "48788",
+          "logicType": "any",
+          "conditions": [
+            {
+              "id": "5376383",
+              "type": "issue_priority_greater_or_equal",
+              "comparison": 75,
+              "conditionResult": true
+            },
+            {
+              "id": "5376384",
+              "type": "issue_priority_deescalating",
+              "comparison": 75,
+              "conditionResult": true
+            }
+          ],
+          "actions": [
+            {
+              "id": "3345206",
+              "type": "sentry_app",
+              "integrationId": null,
+              "data": {
+                "settings": [
+                  {
+                    "name": "rootly_notification_target",
+                    "label": "[Escalation Policy] Default Escalation Policy",
+                    "value": "EscalationPolicy:96629210-cc41-4e57-b059-b182a0f01c5b"
+                  }
+                ]
+              },
+              "config": {
+                "targetType": "sentry_app",
+                "targetDisplay": "Rootly",
+                "targetIdentifier": "39357"
+              },
+              "status": "active"
+            }
+          ]
+        }
+      ],
+      "environment": null,
+      "config": {},
+      "detectorIds": [
+        "2925269"
+      ],
+      "enabled": true,
+      "lastTriggered": "2026-07-20T18:50:04.709971Z",
+      "owner": "team:433984"
+    }
+  }
+}

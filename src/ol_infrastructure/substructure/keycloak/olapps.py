@@ -23,7 +23,7 @@ from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
 )
 
 
-def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
+def create_olapps_realm(  # noqa: PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -715,7 +715,8 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     # MITXONLINE B2B [START]
     # This client is used by MITx Online for B2B operations via the Keycloak
     # Admin API. It requires service account roles to view realms, users, and
-    # organizations.
+    # organizations, to manage organization membership, and to manage the
+    # identity providers organizations are linked to.
     olapps_mitxonline_b2b_client = keycloak.openid.Client(
         "olapps-mitxonline-b2b-client",
         name="mitxonline-b2b-client",
@@ -741,11 +742,45 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     # Assign required service account roles for Keycloak Admin API access
     # These roles allow the client to list/view realms, users, and organizations
     # Refactored repetitive role assignments into a loop for maintainability
+    #
+    # manage-realm covers Organizations but NOT identity providers. IdP
+    # create/update/delete, identity-provider/import-config, and org<->IdP linking
+    # all route through requireManageIdentityProviders(), which RealmPermissions
+    # resolves to the manage-identity-providers role alone; manage-realm is a
+    # distinct, non-composite role and does not satisfy it. Reads go through
+    # requireViewIdentityProviders(), which accepts EITHER identity-provider role,
+    # so view-identity-providers is redundant with manage granted -- it is listed
+    # anyway so the account's read scope is visible here rather than inferred,
+    # matching how view-realm is listed alongside manage-realm above.
+    #
+    # manage-users is required for the same reason, on a different endpoint:
+    # OrganizationMemberResource.addMember() requires BOTH
+    # auth.orgs().requireManage(organization) (satisfied by manage-realm) AND
+    # auth.users().requireManage(user), which only accepts the manage-users role
+    # (UserPermissions.canManage() checks AdminRoles.MANAGE_USERS specifically --
+    # manage-realm is not in its role list, unlike OrganizationPermissions.canManage()
+    # which explicitly accepts manage-realm as an alternative to manage-organizations).
+    # Without it, adding a user to an organization 403s even though the client can
+    # already view/manage the organization itself. This realm does not run Fine-Grained
+    # Admin Permissions (no `features` set on the Keycloak CR), so there is no way to
+    # scope this to just organization members; UserPermissions.canManageByGroup() only
+    # applies when FGAP's AuthorizationProvider is wired up, which it is not here --
+    # the grant is realm-wide, matching the existing mitlearn-admin-client precedent
+    # above.
     for resource_name, role in [
         ("olapps-mitxonline-b2b-client-view-realm-role", "view-realm"),
         ("olapps-mitxonline-b2b-client-view-users-role", "view-users"),
         ("olapps-mitxonline-b2b-client-query-users-role", "query-users"),
         ("olapps-mitxonline-b2b-client-manage-realm-role", "manage-realm"),
+        ("olapps-mitxonline-b2b-client-manage-users-role", "manage-users"),
+        (
+            "olapps-mitxonline-b2b-client-view-identity-providers-role",
+            "view-identity-providers",
+        ),
+        (
+            "olapps-mitxonline-b2b-client-manage-identity-providers-role",
+            "manage-identity-providers",
+        ),
     ]:
         keycloak.openid.ClientServiceAccountRole(
             resource_name,
@@ -1251,6 +1286,37 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         )
         onboard_saml_org(
             SamlIdpConfig(
+                idp_alias="RobCol",
+                idp_display_name="American Robert College of Istanbul",
+                org_saml_metadata_url="https://login.microsoftonline.com/d4bc61be-6893-44c0-8f85-a6e62e5bebee/federationmetadata/2007-06/federationmetadata.xml?appid=90601514-0347-4331-99cc-e2947959d287",
+                principal_type="SUBJECT",
+                principal_attribute="user.mail",
+                login_hint=False,
+                name_id_format=NameIdFormat.email,
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_name_map={
+                    "email": "user.mail",
+                    "firstName": "user.givenname",
+                    "lastName": "user.surname",
+                    "fullName": "user.displayname",
+                },
+                want_assertions_encrypted=False,
+                want_assertions_signed=False,
+            ),
+            org=OrgConfig(
+                org_domains=["robcol.k12.tr"],
+                org_name="American Robert College of Istanbul",
+                org_alias="RobCol",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        onboard_saml_org(
+            SamlIdpConfig(
                 idp_alias="UCV",
                 idp_display_name="Universidad Cesar Vallejo",
                 org_saml_metadata_xml=Path(__file__)
@@ -1569,38 +1635,36 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 resource_options=resource_options,
             ),
         )
-        if apply7_oidc_identity_provider is not None:
-            # customer_id/customer_name claims identifying which of
-            # Apply7's own downstream customers (a school/institution on
-            # their platform) a given user belongs to -- see the
-            # customerId/customerName attribute definitions above for the
-            # full explanation of what "customer" means here. Requires
-            # customerId/customerName to be declared (admin-only) on the
-            # realm's user profile above -- otherwise Keycloak silently
-            # drops attribute-importer writes to undeclared ("unmanaged")
-            # user attributes.
-            keycloak.AttributeImporterIdentityProviderMapper(
-                "map-apply7-oidc-customer-id-attribute",
-                realm=ol_apps_realm.id,
-                claim_name="customer_id",
-                identity_provider_alias=apply7_oidc_identity_provider.alias,
-                user_attribute="customerId",
-                extra_config={
-                    "syncMode": "INHERIT",
-                },
-                opts=resource_options,
-            )
-            keycloak.AttributeImporterIdentityProviderMapper(
-                "map-apply7-oidc-customer-name-attribute",
-                realm=ol_apps_realm.id,
-                claim_name="customer_name",
-                identity_provider_alias=apply7_oidc_identity_provider.alias,
-                user_attribute="customerName",
-                extra_config={
-                    "syncMode": "INHERIT",
-                },
-                opts=resource_options,
-            )
+        # customer_id/customer_name claims identifying which of Apply7's
+        # own downstream customers (a school/institution on their platform)
+        # a given user belongs to -- see the customerId/customerName
+        # attribute definitions above for the full explanation of what
+        # "customer" means here. Requires customerId/customerName to be
+        # declared (admin-only) on the realm's user profile above --
+        # otherwise Keycloak silently drops attribute-importer writes to
+        # undeclared ("unmanaged") user attributes.
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-apply7-oidc-customer-id-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="customer_id",
+            identity_provider_alias=apply7_oidc_identity_provider.alias,
+            user_attribute="customerId",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-apply7-oidc-customer-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="customer_name",
+            identity_provider_alias=apply7_oidc_identity_provider.alias,
+            user_attribute="customerName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
 
     # B2B Organizations [END]
 

@@ -24,6 +24,9 @@ jupyterhub_pulumi_code = git_repo(
 jupyter_pulumi_fragment = pulumi_jobs_chain(
     jupyterhub_pulumi_code,
     refresh_stack=True,
+    topology="preview-gated",
+    record_deployments=False,
+    auto_deploy_stages=["CI"],
     stack_names=["CI", "QA", "Production"],
     project_name="ol-infrastructure-jupyterhub",
     project_source_path=PULUMI_CODE_PATH.joinpath("applications/jupyterhub/"),

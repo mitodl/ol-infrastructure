@@ -79,6 +79,16 @@ kubectl -n omnigraph run omnigraph-version-probe --rm -it --restart=Never \
 Same number as the deployed stores → ordinary deploy, stop reading. Different
 number → continue.
 
+> **"Ordinary deploy" is not always ordinary.** An upgrade can leave
+> `internal-schema` untouched and still require an offline, per-branch
+> maintenance pass — omnigraph 0.10.0 kept schema 6 while changing the
+> full-text analyzer (Lance 11), which makes every existing full-text index
+> unproven and search fail closed with HTTP 409 until it is rebuilt. This gate
+> is correct to pass it; it is not the only gate. See
+> [`rebuild-full-text-indexes`](omnigraph-store-maintenance-runbook.md#omnigraph-rebuild-full-text-indexes--an-analyzer-generation-cutover)
+> in the maintenance runbook, and read the upstream release notes for anything
+> describing an index or analyzer change.
+
 ## Before you start
 
 - **Pause the `pulumi-omnigraph` Concourse pipeline.** The chain is

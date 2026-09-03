@@ -225,6 +225,20 @@ def _build_interpolated_config_dict(
         "ENABLE_MFE_CONFIG_API": True,
         "FRONTEND_SITE_CONFIG": {
             "basename": "/",
+            # The origin the Site Project itself is served from. It is the LMS
+            # host because Fastly serves the Site Project under /apps there
+            # rather than giving it a host of its own (see the "Handle Site
+            # Project routing" VCL snippets in __main__.py).
+            #
+            # Must be set here rather than left to the value compiled into the
+            # bundle: one build artifact is promoted CI -> QA -> Production, and
+            # the mitx artifact additionally serves mitx-staging, whose LMS
+            # origins differ again. Without this, every environment but the one
+            # the build config names falls back to that environment's origin for
+            # auth redirects. frontend-base awaits the runtime config before
+            # configureAuth, so the value set here is the one the auth service
+            # is built with.
+            "baseUrl": f"https://{domains['lms']}",
             "lmsBaseUrl": f"https://{domains['lms']}",
             "loginUrl": f"https://{domains['lms']}/login",
             "logoutUrl": f"https://{domains['lms']}/logout",
@@ -372,6 +386,16 @@ def _build_interpolated_config_dict(
                 "COURSE_ABOUT_VISIBILITY_PERMISSION": "see_about_page",
                 "MITXONLINE_BASE_URL": f"https://{marketing_domain}/",
                 "ENROLLMENT_WEBHOOK_URL": f"https://{marketing_domain}/api/openedx_webhook/enrollment/",
+                # The edX account MITx Online authenticates as when it
+                # creates enrollments through the enrollment REST API; the
+                # plugin skips webhooking those back to it. Each stack names
+                # its own account -- RC's differs from Production's -- so
+                # this is required rather than defaulted, and a new
+                # mitxonline stack has to state it instead of silently
+                # inheriting an account it does not use.
+                "ENROLLMENT_WEBHOOK_SERVICE_WORKER_USERNAME": edxapp_config.require(
+                    "enrollment_webhook_service_worker_username"
+                ),
                 "CERTIFICATE_WEBHOOK_URL": f"https://{marketing_domain}/api/openedx_webhook/certificate/",
                 "USE_EXTRACTED_HTML_BLOCK": edxapp_config.get_bool(
                     "use_extracted_html_block", False

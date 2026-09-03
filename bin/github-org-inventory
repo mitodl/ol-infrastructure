@@ -46,6 +46,10 @@ from ol_infrastructure.lib.github_helper import (
     GITHUB_API,
     get_installation_token,
 )
+from ol_infrastructure.saas.github.repositories.rulesets import (
+    RELEASE_BRANCHES_RULESET_NAME,
+    REQUIRED_CHECKS_RULESET_NAME,
+)
 from ol_infrastructure.saas.github.tiers import TIER_PROPERTY_NAME
 
 app = cyclopts.App(help="Inventory the mitodl GitHub org for the Pulumi import.")
@@ -261,6 +265,101 @@ def _count(client: httpx.Client, path: str) -> int | None:
     return len(payload)
 
 
+def _required_checks(
+    client: httpx.Client,
+    name: str,
+    protection: Any,
+    rulesets: list[dict[str, Any]],
+) -> tuple[list[str], list[str]]:
+    """Split a repo's required check contexts into (ours, everyone else's).
+
+    THIS EXISTS BECAUSE `crawl` REBUILDS EVERY YAML FROM SCRATCH. A key the crawl does
+    not derive from live state is not preserved, it is deleted -- so a hand-added
+    `required_status_checks` survives exactly until the next `crawl`, after which the
+    ruleset it described is gone from the fleet data and Pulumi wants to remove the
+    resource. Reading the value back out of GitHub is what closes that loop and keeps
+    "one crawl produces both the code and the state" true for this field.
+
+    THE SPLIT IS THE WHOLE POINT, not tidiness. `lehrer` and `ol-analytics-api` already
+    require checks through rulesets somebody built by hand. Returning those as
+    `required_status_checks` would have rulesets.py declare a SECOND ruleset beside the
+    working one -- two overlapping sets of required contexts on the same branch. They
+    come back in the second list, land under `_required_status_checks_live`, and satisfy
+    SEC-03 without generating a resource.
+
+    Ours is identified by ruleset NAME (`REQUIRED_CHECKS_RULESET_NAME`), which is the
+    only stable handle: the id is assigned by GitHub at creation and differs per repo.
+
+    `source_type` filtering is required. `/repos/{repo}/rulesets` includes inherited ORG
+    rulesets by default, so without it every repo would appear to carry whatever the org
+    baseline requires.
+
+    Classic branch protection contexts are always foreign. Pulumi declares no
+    BranchProtection anywhere (see repository.py), so anything there predates it.
+    """
+    ours: list[str] = []
+    foreign: list[str] = []
+    if protection:
+        foreign.extend(
+            (protection.get("required_status_checks") or {}).get("contexts", []) or []
+        )
+    for listed in rulesets:
+        if listed.get("source_type") != "Repository":
+            continue
+        detail = _maybe(client, f"/repos/{ORG}/{name}/rulesets/{listed['id']}")
+        if not detail:
+            continue
+        contexts = [
+            check["context"]
+            for rule in detail.get("rules") or []
+            if rule.get("type") == "required_status_checks"
+            for check in (rule.get("parameters") or {}).get(
+                "required_status_checks", []
+            )
+        ]
+        if detail.get("name") == REQUIRED_CHECKS_RULESET_NAME:
+            ours.extend(contexts)
+        else:
+            foreign.extend(contexts)
+    return sorted(set(ours)), sorted(set(foreign))
+
+
+def _release_branches(
+    client: httpx.Client,
+    name: str,
+    rulesets: list[dict[str, Any]],
+) -> list[str]:
+    """Recover the branch names our release-branch ruleset protects, if any.
+
+    Same reasoning as `_required_checks` above, and the same failure without it:
+    `crawl` rebuilds every repo YAML from scratch, so a hand-added
+    `protected_release_branches` value is not preserved unless the crawl derives it
+    from live state -- it is deleted, the ruleset it described disappears from the
+    fleet data, and Pulumi wants to remove the resource. That already happened once
+    to `required_status_checks` (#5566); this closes the same gap for release-branch
+    protection before it can repeat.
+
+    Identified by ruleset NAME (`RELEASE_BRANCHES_RULESET_NAME`), same as
+    `_required_checks` -- the id is assigned by GitHub at creation and differs per
+    repo. `source_type` filtering excludes inherited org rulesets for the same reason
+    it does there, though no org ruleset targets these branches today.
+    """
+    branches: set[str] = set()
+    for listed in rulesets:
+        if listed.get("source_type") != "Repository":
+            continue
+        if listed.get("name") != RELEASE_BRANCHES_RULESET_NAME:
+            continue
+        detail = _maybe(client, f"/repos/{ORG}/{name}/rulesets/{listed['id']}")
+        if not detail:
+            continue
+        includes = ((detail.get("conditions") or {}).get("ref_name") or {}).get(
+            "includes"
+        ) or []
+        branches.update(ref.removeprefix("refs/heads/") for ref in includes)
+    return sorted(branches)
+
+
 def _push_restrictions(
     protection: dict[str, Any] | None,
 ) -> dict[str, list[str]] | None:
@@ -342,11 +441,10 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
             _maybe(client, f"/repos/{ORG}/{name}/environments?per_page=30") or {}
         )
 
-        required_checks: list[str] = []
-        if protection:
-            required_checks = (protection.get("required_status_checks") or {}).get(
-                "contexts", []
-            )
+        required_checks, foreign_required_checks = _required_checks(
+            client, name, protection, rulesets
+        )
+        release_branches = _release_branches(client, name, rulesets)
         push_restrictions = _push_restrictions(protection)
 
         return {
@@ -392,6 +490,8 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
                 (protection or {}).get("enforce_admins", {}).get("enabled")
             ),
             "required_status_checks": required_checks,
+            "foreign_required_status_checks": foreign_required_checks,
+            "protected_release_branches": release_branches,
             "ruleset_count": len(rulesets),
             "rulesets": [
                 {
@@ -449,10 +549,50 @@ def _crawl_repo(token: str, listed: dict[str, Any]) -> dict[str, Any]:
         }
 
 
+#: Repo-record keys this file reads by subscript rather than `.get()`, so a cache
+#: written before one of them existed crashes far away from the cause. Every command
+#: here runs off the same cached crawl, and the cache carries no version, so the only
+#: thing separating "stale schema" from "current" is which keys the records have.
+#: Adding a field to a repo record means adding it here too.
+_EXPECTED_REPO_KEYS = frozenset(
+    {
+        "name",
+        "has_branch_protection",
+        "ruleset_count",
+        "required_status_checks",
+        "foreign_required_status_checks",
+        "protected_release_branches",
+        "secret_scanning",
+        "secret_scanning_push_protection",
+        "dependabot_security_updates",
+    }
+)
+
+
 def _crawl_org(cache: Path, *, refresh: bool) -> dict[str, Any]:
-    """Return the org crawl, from cache unless --refresh."""
+    """Return the org crawl, from cache unless --refresh.
+
+    A cache from before a field was added is the failure worth naming here. It loads
+    fine, and then some rule 300 lines away subscripts the missing key and dies with a
+    bare `KeyError` that says nothing about caching -- which is how this was reported
+    on #5566, against `foreign_required_status_checks`. The remedy has always been
+    `--refresh`; the point of this check is that the message says so, once, instead of
+    every added field becoming its own puzzle.
+    """
     if cache.exists() and not refresh:
-        return json.loads(cache.read_text())
+        data = json.loads(cache.read_text())
+        repos = data.get("repos") or []
+        # Intersection, not the first record: a half-written cache with one short
+        # record is as broken as one written by older code, and reads the same way.
+        shared = set.intersection(*(set(r) for r in repos)) if repos else set()
+        missing = _EXPECTED_REPO_KEYS - shared if repos else set()
+        if missing:
+            message = (
+                f"{cache} predates {sorted(missing)} and every command here reads the "
+                "same crawl. Re-run with --refresh."
+            )
+            raise SystemExit(message)
+        return data
 
     token = get_installation_token()
     with _client(token) as client:
@@ -737,7 +877,10 @@ def _findings(
             r["name"] for r in live if _blocked_by_push_restriction(r)
         ],
         "SEC-03 no required status checks": [
-            r["name"] for r in live if not r["required_status_checks"]
+            r["name"]
+            for r in live
+            if not r["required_status_checks"]
+            and not r["foreign_required_status_checks"]
         ],
         "SEC-04 secret scanning or push protection off": [
             r["name"]
@@ -1115,6 +1258,11 @@ def crawl(
         # The one genuinely per-repo rule (§5.4) -- check names differ per repo.
         if repo["required_status_checks"]:
             doc["required_status_checks"] = repo["required_status_checks"]
+        # Same reasoning: without this, `crawl` deletes the declaration on every repo
+        # that has one and Pulumi tries to remove the ruleset it protects. See
+        # `_release_branches`.
+        if repo["protected_release_branches"]:
+            doc["protected_release_branches"] = repo["protected_release_branches"]
         if repo["teams"]:
             doc["teams"] = repo["teams"]
         # "Not enforced" must not become "not recorded". Where the archetype has no
@@ -1159,6 +1307,13 @@ def crawl(
                 "branch_protection_enforce_admins"
             ]
         doc["_ruleset_count"] = repo["ruleset_count"]
+        # Checks a repo requires through protection Pulumi does NOT manage -- its own
+        # ruleset, or classic branch protection. Inventory rather than configuration:
+        # declaring these under `required_status_checks` would make rulesets.py build a
+        # SECOND ruleset next to the one already doing the job. SEC-03 reads both keys
+        # so the repos that solved this themselves do not read as findings.
+        if repo["foreign_required_status_checks"]:
+            doc["_required_status_checks_live"] = repo["foreign_required_status_checks"]
         if repo.get("direct_collaborators"):
             doc["_direct_collaborators"] = repo["direct_collaborators"]
 

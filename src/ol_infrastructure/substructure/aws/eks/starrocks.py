@@ -9,6 +9,7 @@ from ol_infrastructure.components.aws.eks import (
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import check_cluster_namespace
+from ol_infrastructure.lib.aws.iam_helper import cross_environment_glue_denial
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import (
     StackInfo,
@@ -77,6 +78,20 @@ def setup_starrocks(
         policy_arn=data_lake_query_engine_iam_policy_arn,
         role=starrocks_trust_role.role.name,
     )
+
+    # Scoped to this role rather than folded into the managed policy above, which
+    # is shared across environments and so cannot hold a Deny that applies to only
+    # one of them. Attached as a managed policy because the Concourse deploy role
+    # has iam:AttachRolePolicy but not iam:PutRolePolicy. Empty in production.
+    # Defence in depth: the policy's Allow is already scoped to this environment.
+    if cross_environment_glue_denial(stack_info.env_suffix):
+        iam.RolePolicyAttachment(
+            f"{cluster_name}-starrocks-cross-environment-glue-denial",
+            policy_arn=data_warehouse_stack.require_output(
+                "data_lake_cross_environment_glue_denial_policy_arn"
+            ),
+            role=starrocks_trust_role.role.name,
+        )
 
     # skip_await=False (the default) makes this resource block until Helm confirms
     # the operator is actually deployed. The applications/starrocks stack requires

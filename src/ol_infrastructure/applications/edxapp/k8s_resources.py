@@ -851,8 +851,13 @@ def create_k8s_resources(  # noqa: C901
                     ),
                     initial_delay_seconds=15,
                     period_seconds=15,
-                    failure_threshold=3,
-                    timeout_seconds=3,
+                    # Matches default_probe_configs: readiness shares the Granian
+                    # connection budget with user traffic and its failure is
+                    # correlated across replicas, so a fast eviction empties the
+                    # EndpointSlice instead of shedding load. Kept in step with
+                    # the component default -- see components/services/k8s.py.
+                    failure_threshold=6,
+                    timeout_seconds=5,
                 ),
                 "startup_probe": kubernetes.core.v1.ProbeArgs(
                     http_get=kubernetes.core.v1.HTTPGetActionArgs(
@@ -1148,22 +1153,30 @@ def create_k8s_resources(  # noqa: C901
                 application_module="cms.wsgi:application",
                 port=8000,
                 no_ws=True,
-                # Restore the pre-overhaul holding pins after the 2026-08-26
-                # mitxonline production rollout showed that the component defaults
-                # cannot absorb Studio's bursty authoring traffic. With 1 worker,
-                # 8 blocking threads, and backpressure 16, every CMS pod repeatedly
-                # saturated at 16 active connections, HTTP readiness fell to 1/3,
-                # and APISIX p95/p99 latency reached 60s while Django spans remained
-                # around 0.2-1.1s. CPU- and request-rate-based autoscaling stayed at
-                # the three-replica floor because it cannot see this connection
-                # backlog. Keep these known-good values until CMS concurrency is
-                # retuned with a saturation-aware scaling signal.
-                # See docs/plans/granian-configuration-overhaul.md stage 3.
+                # Thread pins restored after the 2026-08-26 mitxonline production
+                # rollout, when the component defaults (1 worker, 8 blocking threads,
+                # backpressure 16) left every CMS pod saturated at 16 active
+                # connections with HTTP readiness at 1/3 and APISIX p95/p99 latency at
+                # 60s while Django spans stayed around 0.2-1.1s.
+                #
+                # That rollback conflated two limits, and only one of them was the
+                # cause. Saturating at exactly 2 * blocking_threads is the connection
+                # ceiling, not the thread pool -- backpressure caps connections, and
+                # idle APISIX keepalives spend it doing no work. So backpressure is
+                # unpinned here and takes DEFAULT_WSGI_BACKPRESSURE.
+                #
+                # The thread pins stay, because unlike every other app CMS does have
+                # real thread demand: measured over 7 days its concurrently-busy
+                # blocking threads reach 21.6 per pod (p99 17.2), and
+                # granian_blocking_queue reaches 32 deep on individual workers. 8
+                # threads would queue on every busy pod. Retuning these is a separate
+                # exercise from the connection fix and needs its own rollout window --
+                # see tk-mitxonline-cms-needs-a-saturation-aware-scaling and
+                # docs/plans/granian-configuration-overhaul.md stage 3.
                 workers=2,
                 runtime_mode="mt",
                 runtime_threads=2,
                 blocking_threads=32,
-                backpressure=64,
                 respawn_failed_workers=True,
                 backlog=128,
                 static_path_mounts=["/openedx/staticfiles"],
@@ -1197,8 +1210,13 @@ def create_k8s_resources(  # noqa: C901
                     ),
                     initial_delay_seconds=15,
                     period_seconds=15,
-                    failure_threshold=3,
-                    timeout_seconds=3,
+                    # Matches default_probe_configs: readiness shares the Granian
+                    # connection budget with user traffic and its failure is
+                    # correlated across replicas, so a fast eviction empties the
+                    # EndpointSlice instead of shedding load. Kept in step with
+                    # the component default -- see components/services/k8s.py.
+                    failure_threshold=6,
+                    timeout_seconds=5,
                 ),
                 "startup_probe": kubernetes.core.v1.ProbeArgs(
                     http_get=kubernetes.core.v1.HTTPGetActionArgs(

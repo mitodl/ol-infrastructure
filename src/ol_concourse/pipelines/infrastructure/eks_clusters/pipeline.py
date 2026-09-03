@@ -43,6 +43,7 @@ for cluster in ["data", "operations", "applications", "residential"]:
         # hand-touched during incidents -- and that drift is invisible in the
         # diff of the stage that was just deployed.
         topology="preview-gated",
+        record_deployments=False,
         auto_deploy_stages=["CI"],
         project_name="ol-infrastructure-eks",
         project_source_path=PULUMI_CODE_PATH.joinpath("infrastructure/aws/eks"),
@@ -54,6 +55,7 @@ for cluster in ["data", "operations", "applications", "residential"]:
         eks_substructure_code,
         refresh_stack=True,
         topology="preview-gated",
+        record_deployments=False,
         auto_deploy_stages=["CI"],
         project_name="ol-substructure-eks",
         project_source_path=PULUMI_CODE_PATH.joinpath("substructure/aws/eks"),

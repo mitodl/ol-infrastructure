@@ -94,7 +94,6 @@ config:
       workers: 1
       runtime_threads: 1
       blocking_threads: 8
-      backpressure: 16
   edxapp:k8s_replicas:
     webapp:
       cms:
@@ -141,7 +140,7 @@ config:
   typesense:deploy: "true"
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
-  typesense:forum_search_enabled: "false"
+  typesense:forum_search_enabled: "true"
   edxapp:site_project:
     deployment: mitx-staging
     mfe_apps:

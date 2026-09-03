@@ -269,11 +269,13 @@ gateway = kubernetes.apiextensions.CustomResource(
 )
 
 # OLApisixHTTPRoute: References shared Gateway
-spec={
-    "parentRefs": [{
-        "name": "apisix",  # Shared Gateway in operations namespace
-        "namespace": "operations",
-    }]
+spec = {
+    "parentRefs": [
+        {
+            "name": "apisix",  # Shared Gateway in operations namespace
+            "namespace": "operations",
+        }
+    ]
 }
 ```
 

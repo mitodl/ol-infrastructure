@@ -67,9 +67,17 @@ is deliberately asymmetric:
   fix for a bad index is a reindex), no `branch_merge` (promotion into `main` is
   CI's, with a git merge behind it), no `branch_delete` (Cedar cannot tell whose
   WIP view a delete targets).
-- **`omnigraph repair` / `optimize` / `cleanup`** — not this principal, not this
+- **`omnigraph repair` / `optimize` / `cleanup` /
+  `rebuild-full-text-indexes`** — not this principal, not this
   namespace. Those are direct-storage commands gated by AWS IAM on the bucket and
-  scheduled by the omnigraph stack. See `omnigraph-store-maintenance-runbook.md`.
+  scheduled by (or run beside) the omnigraph stack. See
+  `omnigraph-store-maintenance-runbook.md`.
+
+  `rebuild-full-text-indexes` is the one that misleads, because it *does* take
+  `--as svc-witan-admin` — it is actor-bound, so the actor attributes the write.
+  That does not make it a Cedar-authorized operation or a break-glass one: it
+  still needs the bucket IRSA grant and so runs on the `omnigraph-server`
+  ServiceAccount in the `omnigraph` namespace, not in a pod here.
 
 ### Which identity is an environment actually on?
 
@@ -209,6 +217,8 @@ pod start.
 
 ## Related
 
+- `witan-council-probe-runbook.md` — `svc-witan-probe`, the same opt-in shape,
+  for synthetic monitoring rather than maintenance.
 - `witan-token-sync-runbook.md` — per-user tokens, and the `actor-tokens` /
   `service-tokens` writer split this builds on.
 - `omnigraph-store-maintenance-runbook.md` — the *other* kind of maintenance

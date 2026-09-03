@@ -30,7 +30,7 @@ Use an existing app (e.g., `learn-ai/`) as a template. In particular, copy the `
 In `local-dev/infra/modules/database.py`, add to the `postInitSQL` list:
 
 ```python
-"CREATE DATABASE myapp OWNER app;",
+("CREATE DATABASE myapp OWNER app;",)
 ```
 
 ### 3. Register the namespace (TLS secret comes with it)
@@ -46,22 +46,24 @@ In `local-dev/infra/modules/keycloak.py`, add a new client and call `_make_oidc_
 In `Tiltfile`, add an entry to the `APPS` list:
 
 ```python
-{
-    "name": "my-app",
-    "dir": "my-app",              # sibling repo directory name
-    "namespace": "my-app",
-    "deploy_name": "myapp-webapp",
-    "image_backend": "mitodl/my-app",
-    "prebuilt_tag_backend": "1.0.0",
-    "tiltfile": "./local-dev/apps/my-app/Tiltfile",
-    "seed_commands": [
-        {
-            "label": "seed-myapp-data",
-            "description": "Load initial data",
-            "cmd": "python manage.py loaddata initial_data",
-        },
-    ],
-},
+(
+    {
+        "name": "my-app",
+        "dir": "my-app",  # sibling repo directory name
+        "namespace": "my-app",
+        "deploy_name": "myapp-webapp",
+        "image_backend": "mitodl/my-app",
+        "prebuilt_tag_backend": "1.0.0",
+        "tiltfile": "./local-dev/apps/my-app/Tiltfile",
+        "seed_commands": [
+            {
+                "label": "seed-myapp-data",
+                "description": "Load initial data",
+                "cmd": "python manage.py loaddata initial_data",
+            },
+        ],
+    },
+)
 ```
 
 ### 6. Add hosts and DNS

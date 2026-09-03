@@ -3,13 +3,15 @@
 import asyncio
 import logging
 import os
-from datetime import UTC, datetime
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from functools import partial
 from typing import Any
 
 import bot_config as config
 import concourse_client as concourse
 import github_client as github
+import slack_users
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
 
@@ -21,6 +23,14 @@ log = logging.getLogger(__name__)
 # A module global is safe here: Socket Mode connections are not multiplexed,
 # so this process runs exactly one AsyncApp (see __main__.py's replicas=1).
 _slack_app: AsyncApp | None = None
+
+
+# app name -> Slack user id of whoever last ran `/doof release` for it, so the
+# ready-to-promote notification can ping the person who owns the release
+# rather than posting into the channel addressed to no one (Doof pinged "the
+# Merginator" there). Process-local and deliberately not persisted: a bot
+# restart costs one mention, and the message is still posted either way.
+_release_requesters: dict[str, str] = {}
 
 
 _USAGE = (
@@ -48,7 +58,7 @@ def _describe_in_flight(in_flight: dict[str, Any]) -> str:
     return f"<{in_flight['url']}|{in_flight['version']}>{when}"
 
 
-async def _cmd_release(repos, ack, respond, command, _context):
+async def _cmd_release(repos, ack, respond, command, context):
     await ack()
     app_name = command["text"].strip()
     if app_name not in repos:
@@ -92,6 +102,10 @@ async def _cmd_release(repos, ack, respond, command, _context):
         log.exception("Failed to trigger release for %s", app_name)
         await respond(f"❌ Failed to trigger release for `{app_name}`. Check logs.")
         return
+
+    requester = (context or {}).get("user_id")
+    if requester:
+        _release_requesters[app_name] = requester
 
     message = f"🚀 Release triggered for `{app_name}`. Build: {build_url}"
     if in_flight:
@@ -233,6 +247,7 @@ async def _cmd_promote(repos, ack, respond, command, context):
         await concourse.check_resource(cfg.pipeline, f"{app_name}-release-gate")
     except Exception:
         log.exception("Failed to force release-gate check for %s", app_name)
+    _release_requesters.pop(app_name, None)
     await respond(
         f"✅ `{app_name}` {issues[0]['title']} promoted. Production deploy triggered."
     )
@@ -269,6 +284,7 @@ async def _cmd_abandon(repos, ack, respond, command, _context):
         log.exception("Failed to trigger abandon for %s", app_name)
         await respond(f"❌ Failed to trigger release abandon for `{app_name}`.")
         return
+    _release_requesters.pop(app_name, None)
     await respond(f"🗑️ Release abandon triggered for `{app_name}`. Build: {build_url}")
 
 
@@ -309,6 +325,7 @@ async def _handle_promote_button(repos, ack, body, say):
         await concourse.check_resource(cfg.pipeline, f"{app_name}-release-gate")
     except Exception:
         log.exception("Failed to force release-gate check for %s", app_name)
+    _release_requesters.pop(app_name, None)
     await say(
         f"🚀 <@{user_id}> promoted `{app_name}` `{version}` to Production. "
         "Concourse deploy triggered."
@@ -321,10 +338,6 @@ _CHECKBOX_POLL_SECONDS = 60
 # `/doof wait-for-checkboxes` for the same app doesn't start a duplicate loop
 # posting every progress message twice.
 _checkbox_watchers: set[str] = set()
-
-
-def _format_authors(authors) -> str:
-    return ", ".join(sorted(authors))
 
 
 async def _watch_checkboxes(app, app_name, cfg, channel) -> None:
@@ -390,7 +403,7 @@ async def _watch_checkboxes(app, app_name, cfg, channel) -> None:
                     channel=channel,
                     text=(
                         f"Thanks for checking off your boxes, "
-                        f"{_format_authors(newly_done)}!"
+                        f"{await slack_users.format_authors(app.client, newly_done)}!"
                     ),
                 )
     finally:
@@ -398,34 +411,41 @@ async def _watch_checkboxes(app, app_name, cfg, channel) -> None:
 
 
 def _checkbox_watch_preflight(repos, app_name):
-    """Return (channel, None) if a watcher can start, else (None, error message)."""
+    """Return (app, channel, None) if a watcher can start, else (None, None, error).
+
+    The app is handed back rather than re-read from the module global by the
+    caller, so the `_slack_app is None` check below is what narrows the type
+    for everything downstream.
+    """
     if app_name not in repos:
-        return None, f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}"
+        return None, None, f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}"
     channel = repos[app_name].channel or os.environ.get("RELEASE_ANNOUNCE_CHANNEL")
     if not channel:
-        return None, (
+        return (
+            None,
+            None,
             f"No Slack channel configured for `{app_name}`, so there is nowhere "
-            "to post checklist progress."
+            "to post checklist progress.",
         )
     if _slack_app is None:
-        return None, "Bot is still starting up; try again in a moment."
+        return None, None, "Bot is still starting up; try again in a moment."
     if app_name in _checkbox_watchers:
-        return None, f"Already watching `{app_name}`'s release checklist."
+        return None, None, f"Already watching `{app_name}`'s release checklist."
     # Reserve the slot here rather than after the GitHub lookup below. Nothing
     # awaits between this check and the add, so it is atomic on the event loop;
     # claiming it later would let two concurrent invocations both pass this
     # check, interleave at open_release_issues, and start duplicate watchers
     # that post every progress message twice.
     _checkbox_watchers.add(app_name)
-    return channel, None
+    return _slack_app, channel, None
 
 
 async def _cmd_wait_for_checkboxes(repos, ack, respond, command, _context):
     """Watch a release checklist and report who is still outstanding."""
     await ack()
     app_name = command["text"].strip()
-    channel, error = _checkbox_watch_preflight(repos, app_name)
-    if error:
+    app, channel, error = _checkbox_watch_preflight(repos, app_name)
+    if error or app is None:
         await respond(error)
         return
     cfg = repos[app_name]
@@ -454,12 +474,13 @@ async def _cmd_wait_for_checkboxes(repos, ack, respond, command, _context):
         return
 
     asyncio.create_task(  # noqa: RUF006
-        _watch_checkboxes(_slack_app, app_name, cfg, channel)
+        _watch_checkboxes(app, app_name, cfg, channel)
     )
     await respond(
         f"👀 Watching `{app_name}`'s <{issue['url']}|release checklist> "
         f"({checked}/{total} checked).\n"
-        f"Still waiting on: {_format_authors(outstanding)}"
+        f"Still waiting on: "
+        f"{await slack_users.format_authors(app.client, outstanding)}"
     )
 
 
@@ -515,9 +536,15 @@ def create_app():
 _READY_TO_PROMOTE_POLL_SECONDS = 120
 
 
+def _announce_channel(cfg) -> str | None:
+    """Return the Slack channel for proactive posts about *cfg*'s app, if any."""
+    return cfg.channel or os.environ.get("RELEASE_ANNOUNCE_CHANNEL")
+
+
 def _ready_to_promote_blocks(
-    app_name: str, version: str, issue_url: str
+    app_name: str, version: str, issue_url: str, requester: str | None = None
 ) -> list[dict[str, object]]:
+    cc = f" cc <@{requester}>" if requester else ""
     return [
         {
             "type": "section",
@@ -525,7 +552,8 @@ def _ready_to_promote_blocks(
                 "type": "mrkdwn",
                 "text": (
                     f"✅ *`{app_name}` {version}* — all checklist items are "
-                    f"checked off. <{issue_url}|Release issue> ready for promotion."
+                    f"checked off. <{issue_url}|Release issue> ready for "
+                    f"promotion.{cc}"
                 ),
             },
         },
@@ -551,7 +579,7 @@ async def _notify_ready_to_promote(app, repos) -> None:
     polls don't re-send the same notification every cycle.
     """
     for app_name, cfg in repos.items():
-        channel = cfg.channel or os.environ.get("RELEASE_ANNOUNCE_CHANNEL")
+        channel = _announce_channel(cfg)
         if not channel:
             continue
         try:
@@ -583,13 +611,24 @@ async def _notify_ready_to_promote(app, repos) -> None:
                 await app.client.chat_postMessage(
                     channel=channel,
                     text=f"✅ `{app_name}` {version} is ready to promote.",
-                    blocks=_ready_to_promote_blocks(app_name, version, issue["url"]),
+                    blocks=_ready_to_promote_blocks(
+                        app_name,
+                        version,
+                        issue["url"],
+                        _release_requesters.get(app_name),
+                    ),
                 )
             except Exception:
                 log.exception(
                     "Failed to send ready-to-promote notification for %s", app_name
                 )
                 continue
+            # The mention has been delivered. Dropping it here keeps a failed
+            # add_issue_label below -- which leaves the issue eligible on
+            # every 120s poll -- from re-pinging the same person on each
+            # repeat; the duplicate message is a nuisance, a repeating
+            # notification is not.
+            _release_requesters.pop(app_name, None)
             try:
                 await github.add_issue_label(
                     cfg.repo, issue["number"], github.PROMOTE_READY_LABEL
@@ -625,9 +664,231 @@ async def _poll_ready_to_promote_loop(app, repos) -> None:
         await asyncio.sleep(_READY_TO_PROMOTE_POLL_SECONDS)
 
 
+_RELEASE_PROGRESS_POLL_SECONDS = 120
+# Doof nagged when a deploy had not landed within a timeout and then repeated
+# every 24h; that nag was the only thing in Slack that made a stalled release
+# visible. ol-analytics-api's releases/2026.8.3.1 sat cut-but-unfinished from
+# 2026-08-03 with no red build and no message anywhere.
+_STUCK_RENAG_INTERVAL = timedelta(hours=24)
+_DEFAULT_STUCK_AFTER_HOURS = 24.0
+
+
+def _stuck_release_after() -> timedelta:
+    raw = os.environ.get("RELEASE_STUCK_AFTER_HOURS", "").strip()
+    if not raw:
+        return timedelta(hours=_DEFAULT_STUCK_AFTER_HOURS)
+    try:
+        return timedelta(hours=float(raw))
+    except ValueError:
+        log.warning(
+            "RELEASE_STUCK_AFTER_HOURS=%r is not a number; using %sh",
+            raw,
+            _DEFAULT_STUCK_AFTER_HOURS,
+        )
+        return timedelta(hours=_DEFAULT_STUCK_AFTER_HOURS)
+
+
+@dataclass
+class ReleaseProgressState:
+    """What the release-progress poller has already said, held in process.
+
+    `last_deployment` is seeded on first observation rather than starting
+    empty, because the poller announces *transitions*: an empty map would
+    replay every app's current RC and Production deployment into Slack on
+    every bot restart. The cost of seeding is at most one missed announcement,
+    when the bot restarts in the window between a deploy landing and the next
+    poll -- much cheaper than a release channel that repeats itself, which is
+    the failure that makes people mute it.
+
+    `nagged_at` is deliberately not seeded: a stuck release is still stuck
+    after a restart, and re-reporting it once is the point.
+    """
+
+    # None means "polled and confirmed no successful deployment yet" -- a real
+    # baseline, distinct from a (app, environment) pair never having been
+    # polled at all (absent from the dict). See _announce_deployments.
+    last_deployment: dict[tuple[str, str], int | None] = field(default_factory=dict)
+    nagged_at: dict[tuple[str, str], datetime] = field(default_factory=dict)
+
+
+def _format_age(age: timedelta) -> str:
+    hours = int(age.total_seconds() // 3600)
+    return f"{hours}h" if hours < 24 else f"{hours // 24}d"  # noqa: PLR2004
+
+
+async def _milestone_text(app_name, cfg, environment, deployment) -> str:
+    """Render the Slack message for a deployment that just reached success."""
+    version = deployment["version"]
+    issue = None
+    try:
+        issue = await github.release_issue_for_version(cfg.repo, version)
+    except Exception:
+        # The milestone still goes out without the link; "what is in this
+        # release" is one click worse, not missing.
+        log.exception("Failed to find the release issue for %s %s", app_name, version)
+    link = f" <{issue['url']}|Release issue>" if issue else ""
+    if environment == github.PRODUCTION_ENVIRONMENT:
+        return f"🎉 `{app_name}` {version} is live in production.{link}"
+    return (
+        f"🚢 `{app_name}` {version} is deployed to RC.{link}"
+        " Check off your items once you have verified them."
+    )
+
+
+async def _announce_deployments(app, repos, state: ReleaseProgressState) -> None:
+    """Post to Slack when an app's RC or Production deployment changes.
+
+    Reads GitHub Deployments rather than watching the cluster: the pipeline
+    already records one per environment (`_define_release_resources`), and
+    they carry the release version and therefore the release issue, which a
+    Kubernetes rollout event does not.
+
+    This does not replace kubewatch-webhook-handler, and does not duplicate it
+    either. kubewatch reports *rollouts* -- every workload, including infra
+    changes that are not releases -- routed by the `ol.mit.edu/slack-channel`
+    pod label, which most workloads do not set, so it lands in the ops
+    channel. This reports *releases*, in the product channel from
+    bridge.settings.apps, naming the version and linking what is in it. The
+    two only collide if a team labels its workload with the same product
+    channel; that is a per-workload choice, not something to arbitrate here.
+    """
+    for app_name, cfg in repos.items():
+        channel = _announce_channel(cfg)
+        if not channel:
+            continue
+        for environment in (github.RC_ENVIRONMENT, github.PRODUCTION_ENVIRONMENT):
+            try:
+                deployment = await github.latest_successful_deployment(
+                    cfg.repo, environment
+                )
+            except Exception:
+                log.exception(
+                    "Failed to read %s deployments for %s", environment, app_name
+                )
+                continue
+            key = (app_name, environment)
+            # Distinguish "never polled this (app, environment)" from "polled
+            # it and there was no successful deployment yet" -- both leave
+            # `.get(key)` as None, but only the former should suppress the
+            # announcement. Collapsing them missed a brand-new app's very
+            # first deployment: it would poll None once (recording nothing),
+            # then see a real id with no key present and treat that first
+            # real deployment as the restart-seed case instead of a genuine
+            # no-deployment -> deployed transition.
+            first_observation = key not in state.last_deployment
+            if deployment is None:
+                state.last_deployment.setdefault(key, None)
+                continue
+            previous = state.last_deployment.get(key)
+            state.last_deployment[key] = deployment["id"]
+            if first_observation or previous == deployment["id"]:
+                # First observation seeds the watcher; an unchanged id is the
+                # steady state between releases.
+                continue
+            try:
+                await app.client.chat_postMessage(
+                    channel=channel,
+                    text=await _milestone_text(app_name, cfg, environment, deployment),
+                )
+            except Exception:
+                log.exception(
+                    "Failed to announce the %s deployment of %s", environment, app_name
+                )
+                # Put the previous id back so the next poll retries this
+                # milestone instead of silently treating it as announced.
+                state.last_deployment[key] = previous
+
+
+async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta) -> str:
+    version = in_flight["version"]
+    reached = set()
+    for environment in (github.RC_ENVIRONMENT, github.PRODUCTION_ENVIRONMENT):
+        deployment = await github.latest_successful_deployment(cfg.repo, environment)
+        if deployment is not None and deployment["version"] == version:
+            reached.add(environment)
+    if github.PRODUCTION_ENVIRONMENT in reached:
+        # The deploy landed and `action: finish` did not. The release branch
+        # outliving its production deploy is what freezes the calver counter,
+        # so the next release silently reuses this version number.
+        state_line = (
+            "It reached production but the release never finished, so its "
+            "branch is still open and the next release will collide with "
+            "this version."
+        )
+    elif github.RC_ENVIRONMENT in reached:
+        state_line = "It is deployed to RC and waiting to be promoted."
+    else:
+        state_line = "It has not reached RC."
+    return (
+        f"⏳ `{app_name}` {version} was cut {_format_age(age)} ago and is not "
+        f"finished. {state_line} <{in_flight['url']}|{in_flight['branch']}>"
+    )
+
+
+async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> None:
+    """Report releases that were cut and never shipped."""
+    threshold = _stuck_release_after()
+    now = datetime.now(tz=UTC)
+    for app_name, cfg in repos.items():
+        channel = _announce_channel(cfg)
+        if not channel:
+            continue
+        try:
+            in_flight = await github.in_flight_release(cfg.repo)
+        except Exception:
+            log.exception("Failed to check for a stuck release for %s", app_name)
+            continue
+        if not in_flight or in_flight.get("cut_at") is None:
+            continue
+        age = now - in_flight["cut_at"]
+        if age < threshold:
+            continue
+        key = (app_name, in_flight["version"])
+        last_nag = state.nagged_at.get(key)
+        if last_nag is not None and now - last_nag < _STUCK_RENAG_INTERVAL:
+            continue
+        try:
+            text = await _stuck_release_text(app_name, cfg, in_flight, age)
+        except Exception:
+            log.exception(
+                "Failed to describe the stuck release %s for %s",
+                in_flight["version"],
+                app_name,
+            )
+            continue
+        try:
+            await app.client.chat_postMessage(channel=channel, text=text)
+        except Exception:
+            log.exception(
+                "Failed to report the stuck release %s for %s",
+                in_flight["version"],
+                app_name,
+            )
+            continue
+        state.nagged_at[key] = now
+
+
+async def _poll_release_progress_loop(app, repos) -> None:
+    state = ReleaseProgressState()
+    while True:
+        for step, name in (
+            (_announce_deployments, "deployment milestone"),
+            (_nag_stuck_releases, "stuck release"),
+        ):
+            try:
+                await step(app, repos, state)
+            except Exception:
+                # Neither step may take the other down, and an unexpected
+                # exception here must not kill the task permanently and
+                # silently the way an unguarded loop body would.
+                log.exception("%s poll iteration failed", name)
+        await asyncio.sleep(_RELEASE_PROGRESS_POLL_SECONDS)
+
+
 async def main():
     app, repos = create_app()
     asyncio.create_task(_poll_ready_to_promote_loop(app, repos))  # noqa: RUF006
+    asyncio.create_task(_poll_release_progress_loop(app, repos))  # noqa: RUF006
     handler = AsyncSocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
     await handler.start_async()
 

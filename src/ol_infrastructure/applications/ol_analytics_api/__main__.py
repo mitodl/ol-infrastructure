@@ -438,8 +438,13 @@ _probe_configs = {
         ),
         initial_delay_seconds=15,
         period_seconds=15,
-        failure_threshold=3,
-        timeout_seconds=3,
+        # Matches default_probe_configs: readiness shares the Granian connection
+        # budget with user traffic and its failure is correlated across replicas,
+        # so a fast eviction empties the EndpointSlice instead of shedding load.
+        # Kept in step with the component default -- see
+        # components/services/k8s.py.
+        failure_threshold=6,
+        timeout_seconds=5,
     ),
     # TCP rather than HTTP so a saturated Granian worker pool cannot fail
     # liveness and trigger a restart that removes capacity from an already

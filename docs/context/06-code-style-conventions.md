@@ -20,6 +20,7 @@
   ```python
   from pydantic import BaseModel
 
+
   class AppConfig(BaseModel):
       environment: str
       replicas: int = 3
@@ -71,6 +72,7 @@
 - Example structure:
   ```python
   from pulumi import ComponentResource, export
+
 
   class MyComponent(ComponentResource):
       def __init__(self, name: str, config: MyConfig, opts=None):

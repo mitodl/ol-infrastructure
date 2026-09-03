@@ -1,11 +1,11 @@
 ## Secret Layout
 
 ```
-secret-airbyte/sentry-dsn :
+secret-airbyte/dagster :
 {
-  "value": ""
+  "credentials": ""
 }
 ```
 ## Descriptions
 
-- `sentry_dsn:value`: This is the DSN for the sentry application obtained from the configuration in sentry.
+- `dagster:credentials`: Password for the `dagster` APISIX basic-auth consumer, used by Dagster to authenticate against the Airbyte API.

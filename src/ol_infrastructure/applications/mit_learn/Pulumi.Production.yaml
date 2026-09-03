@@ -81,7 +81,6 @@ config:
     AWS_S3_CUSTOM_DOMAIN: "learn.mit.edu"
     AWS_S3_PREFIX: "media"
     CANVAS_COURSE_BUCKET_NAME: "ol-data-lake-landing-zone-production"
-    CELERY_WORKER_CONCURRENCY: 1
     COOKIE_TOMBSTONES: '[{"name":"csrftoken","domain":"learn.mit.edu","path":"/"}]'
     CSRF_COOKIE_NAME: "learn_csrftoken"
     DEBUG: "false"
@@ -129,7 +128,7 @@ config:
     OCW_ITERATOR_CHUNK_SIZE: 50
     OCW_LIVE_BUCKET: "ocw-content-live-production"
     OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
-    OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318"
     OPENTELEMETRY_SERVICE_NAME: "learn-webapp"
     OTEL_RESOURCE_ATTRIBUTES: "service.namespace=learn,service.instance.id=$(KUBERNETES_POD_NAME)"
     OTEL_TRACES_SAMPLER: "parentbased_traceidratio"
@@ -154,6 +153,8 @@ config:
     SENTRY_TRACES_SAMPLE_RATE: "0.001"
     SESSION_COOKIE_NAME: "session_mitlearn"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT: "https://sso.ol.mit.edu/realms/olapps"
+    STARROCKS_HOST: "mysql.lakehouse.starrocks.ol.mit.edu"
+    STARROCKS_PORT: 9030
     TIKA_SERVER_ENDPOINT: "https://tika-production.ol.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3

@@ -57,7 +57,6 @@ config:
     AWS_S3_PREFIX: "media"
     CANVAS_COURSE_BUCKET_NAME: "ol-data-lake-landing-zone-production"
     COURSE_ARCHIVE_BUCKET_NAME: "ol-data-lake-landing-zone-qa"
-    CELERY_WORKER_CONCURRENCY: 1
     CREATE_HIDDEN_OCW_LEARNING_MATERIALS: "true"
     COOKIE_TOMBSTONES: '[{"name":"csrftoken","domain":"rc.learn.mit.edu","path":"/"}]'
     CSRF_COOKIE_NAME: "learn_rc_csrftoken"
@@ -92,7 +91,7 @@ config:
     QDRANT_CHUNK_SIZE: 8
     OCW_LIVE_BUCKET: "ocw-content-live-production"
     OIDC_ENDPOINT: "https://sso-qa.ol.mit.edu/realms/olapps"
-    OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318"
     OPENTELEMETRY_SERVICE_NAME: "learn-webapp"
     OTEL_RESOURCE_ATTRIBUTES: "service.namespace=learn,service.instance.id=$(KUBERNETES_POD_NAME)"
     OTEL_TRACES_SAMPLER: "parentbased_traceidratio"
@@ -119,6 +118,16 @@ config:
     SESSION_COOKIE_NAME: "session_mitlearn_rc"
     SHOW_OCW_LECTURE_VIDEOS: "true"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
+    # STARROCKS_HOST/STARROCKS_PORT are deliberately unset here, even though
+    # QA has both a StarRocks cluster and the Vault mount behind it.
+    # SyncProgramCertificatesTask pins its view_name to the
+    # ol_data_lake_production catalog with no setting to override it, and QA's
+    # StarRocks registers that catalog too -- so setting the host here would
+    # not rehearse the sync against QA data, it would replicate production
+    # learner PII (gender, year of birth, country, city, street address,
+    # postal code) into the RC database. mit-learn declines to register the
+    # beat entry while these are unset, which is the behaviour we want.
+    # Set them once the view name is environment-aware.
     TIKA_SERVER_ENDPOINT: "https://tika-qa.ol.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3

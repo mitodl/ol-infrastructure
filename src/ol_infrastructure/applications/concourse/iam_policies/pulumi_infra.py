@@ -189,6 +189,7 @@ policy_definition = {
                 "ecr:BatchCheckLayerAvailability",
                 "ecr:BatchGetImage",
                 "ecr:CompleteLayerUpload",
+                "ecr:CreateRepository",
                 "ecr:DescribePullThroughCacheRules",
                 "ecr:DescribeRepositories",
                 "ecr:DescribeRepositoryCreationTemplates",
@@ -203,6 +204,7 @@ policy_definition = {
                 "ecr:PutImage",
                 "ecr:PutImageScanningConfiguration",
                 "ecr:PutLifecyclePolicy",
+                "ecr:TagResource",
                 "ecr:UploadLayerPart",
                 "eks:DescribeAccessEntry",
                 "eks:DescribeAddonVersions",
@@ -309,6 +311,9 @@ policy_definition = {
                 "kms:ListResourceTags",
                 "kms:Sign",
                 "lambda:ListFunctions",
+                "logs:CreateScheduledQuery",
+                "logs:DeleteScheduledQuery",
+                "logs:GetScheduledQuery",
                 "mediaconvert:CreateQueue",
                 "mediaconvert:DeleteQueue",
                 "mediaconvert:DescribeEndpoints",
@@ -317,9 +322,18 @@ policy_definition = {
                 "mediaconvert:UpdateQueue",
                 "rds:AddTagsToResource",
                 "rds:CreateBlueGreenDeployment",
+                # The four actions below complete the blue/green deployment
+                # lifecycle documented at
+                # https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/blue-green-deployments-authorizing-access.html
+                # -- Terraform's (and so Pulumi's) aws_db_instance blue_green_update
+                # runs create, switchover, and old-instance deletion in a single
+                # apply, so all of them are needed together or the same update
+                # just fails one step later each retry.
+                "rds:CreateDBInstanceReadReplica",
                 "rds:CreateDBParameterGroup",
                 "rds:CreateTenantDatabase",
                 "rds:DeleteBlueGreenDeployment",
+                "rds:DeleteDBInstance",
                 "rds:DeleteDBParameterGroup",
                 "rds:DescribeDBEngineVersions",
                 "rds:DescribeDBInstances",
@@ -329,7 +343,9 @@ policy_definition = {
                 "rds:ListTagsForResource",
                 "rds:ModifyDBInstance",
                 "rds:ModifyDBSubnetGroup",
+                "rds:PromoteReadReplica",
                 "rds:ResetDBParameterGroup",
+                "rds:SwitchoverBlueGreenDeployment",
                 "route53:CreateHostedZone",
                 "route53:CreateKeySigningKey",
                 "route53:EnableHostedZoneDNSSEC",

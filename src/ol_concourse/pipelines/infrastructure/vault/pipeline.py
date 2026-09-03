@@ -88,6 +88,9 @@ vault_ami_fragment = packer_jobs(
 vault_pulumi_fragment = pulumi_jobs_chain(
     vault_pulumi_code,
     refresh_stack=True,
+    topology="preview-gated",
+    record_deployments=False,
+    auto_deploy_stages=["CI"],
     project_name="ol-infrastructure-vault-server",
     stack_names=[f"operations.{stage}" for stage in ("CI", "QA", "Production")],
     project_source_path=PULUMI_CODE_PATH.joinpath("infrastructure/vault/"),
@@ -107,6 +110,9 @@ for substructure in VAULT_SUBSTRUCTURE_PROJECTS:
         pulumi_jobs_chain(
             vault_pulumi_substructure_code,
             refresh_stack=True,
+            topology="preview-gated",
+            record_deployments=False,
+            auto_deploy_stages=["CI"],
             project_name=f"ol-substructure-vault-{substructure}",
             stack_names=[f"operations.{stage}" for stage in ("CI", "QA", "Production")],
             project_source_path=PULUMI_CODE_PATH.joinpath(

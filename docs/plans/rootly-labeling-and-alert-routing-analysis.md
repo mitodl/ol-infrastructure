@@ -499,9 +499,9 @@ Add to `K8sAppLabels` in `ol_types.py`:
 class AlertTier(StrEnum):
     """Paging eligibility for alerts about this workload."""
 
-    page = "page"        # Wake someone up. User-facing or data-integrity impact.
-    notify = "notify"    # Business-hours attention. Degraded, self-healing, or redundant.
-    ticket = "ticket"    # Record only. Never notifies.
+    page = "page"  # Wake someone up. User-facing or data-integrity impact.
+    notify = "notify"  # Business-hours attention. Degraded, self-healing, or redundant.
+    ticket = "ticket"  # Record only. Never notifies.
 ```
 
 and extend `Component` with the values the decision actually needs:
@@ -509,10 +509,10 @@ and extend `Component` with the values the decision actually needs:
 ```python
 @unique
 class Component(StrEnum):
-    celery = "celery"          # existing
-    webapp = "webapp"          # existing
-    frontend = "frontend"      # existing
-    keycloak = "keycloak"      # existing
+    celery = "celery"  # existing
+    webapp = "webapp"  # existing
+    frontend = "frontend"  # existing
+    keycloak = "keycloak"  # existing
     worker = "worker"
     beat = "beat"
     api = "api"

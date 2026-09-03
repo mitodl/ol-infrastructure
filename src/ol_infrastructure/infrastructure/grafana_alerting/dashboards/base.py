@@ -14,6 +14,13 @@ Sub-modules
     the olapps realm.
   keycloak_incident_lookup — Ad-hoc single-incident investigation (event
     timeline, error trends, realm/client/IdP scoping) across all realms.
+  service_red — Rate/errors/duration for the OTel-instrumented Django
+    services, read from each app's own MeterProvider rather than from
+    Tempo-derived spanmetrics.
+
+Dashboards live in per-subject folders (Keycloak, Application Performance)
+so an unrelated dashboard is not filed under a service it has nothing to do
+with; add a new Folder in `create()` rather than widening an existing one.
 """
 
 import json
@@ -27,6 +34,7 @@ from ol_infrastructure.infrastructure.grafana_alerting.dashboards import (
     keycloak_incident_lookup,
     keycloak_olapps_realm,
     keycloak_overview,
+    service_red,
 )
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources import (
     LOKI_DATASOURCE_REF,
@@ -319,6 +327,86 @@ def _logs_panel(
     }
 
 
+def _table_panel(
+    *,
+    title: str,
+    join_field: str,
+    columns: list[dict[str, Any]],
+    grid_pos: dict[str, Any],
+    datasource_ref: dict[str, str] = MIMIR_DATASOURCE_REF,
+    description: str = "",
+    sort_by: str | None = None,
+) -> dict[str, Any]:
+    """Build a table panel that joins several instant queries into one row set.
+
+    Each entry in `columns` is `{"expr": ..., "title": ..., "unit": ...}`
+    (`unit` optional). Every expression must aggregate down to exactly
+    `join_field` -- e.g. `sum by (http_target) (...)` -- so each returned
+    frame has a single label column for `joinByField` to align on. An
+    expression that leaks a second label produces one row per label
+    combination instead of one row per endpoint, and the join silently
+    yields a mostly-empty table rather than an error.
+
+    Prometheus table frames come back as `Time` + label columns + `Value`,
+    and Grafana disambiguates the value columns across targets as
+    `Value #<refId>`. The `organize` transformation below both drops the
+    per-frame `Time` columns and renames each `Value #<refId>` to its
+    human-readable `title`; the field overrides then attach units by that
+    renamed name, which is what the override matcher sees.
+    """
+    targets = [
+        {
+            "datasource": datasource_ref,
+            "expr": column["expr"],
+            "refId": chr(65 + i),
+            "instant": True,
+            "format": "table",
+        }
+        for i, column in enumerate(columns)
+    ]
+    exclude = {"Time": True} | {f"Time {i + 1}": True for i, _ in enumerate(columns)}
+    rename = {
+        f"Value #{chr(65 + i)}": column["title"] for i, column in enumerate(columns)
+    }
+    overrides = [
+        {
+            "matcher": {"id": "byName", "options": column["title"]},
+            "properties": [{"id": "unit", "value": column["unit"]}],
+        }
+        for column in columns
+        if column.get("unit")
+    ]
+    options: dict[str, Any] = {
+        "showHeader": True,
+        "footer": {"show": False, "reducer": ["sum"], "countRows": False},
+    }
+    if sort_by is not None:
+        options["sortBy"] = [{"displayName": sort_by, "desc": True}]
+    return {
+        "title": title,
+        "description": description,
+        "type": "table",
+        "datasource": datasource_ref,
+        "gridPos": grid_pos,
+        "fieldConfig": {
+            "defaults": {
+                "custom": {"align": "auto", "filterable": True},
+                "decimals": 2,
+            },
+            "overrides": overrides,
+        },
+        "options": options,
+        "transformations": [
+            {"id": "joinByField", "options": {"byField": join_field, "mode": "outer"}},
+            {
+                "id": "organize",
+                "options": {"excludeByName": exclude, "renameByName": rename},
+            },
+        ],
+        "targets": targets,
+    }
+
+
 def _row_panel(*, title: str, y: int) -> dict[str, Any]:
     """Build a row divider panel to visually group the panels beneath it."""
     return {
@@ -381,6 +469,23 @@ def create(resource_opts: ResourceOptions) -> None:
         _timeseries_panel,
         _bar_gauge_panel,
         _logs_panel,
+        _row_panel,
+        _create_dashboard,
+        resource_opts,
+    )
+
+    apm_folder = Folder(
+        "application-performance-dashboards-folder",
+        title="Application Performance",
+        uid="application-performance-dashboards",
+        opts=resource_opts,
+    )
+
+    service_red.create(
+        apm_folder.uid,
+        _timeseries_panel,
+        _stat_panel,
+        _table_panel,
         _row_panel,
         _create_dashboard,
         resource_opts,
