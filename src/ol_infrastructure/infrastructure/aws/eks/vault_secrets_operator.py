@@ -8,6 +8,12 @@ import pulumi_vault as vault
 from pulumi import ResourceOptions, export
 from pulumi_eks import Cluster
 
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
@@ -101,13 +107,27 @@ def setup_vault_secrets_operator(
                 "image": {
                     "pullPolicy": "IfNotPresent",
                 },
-                "extraLabels": k8s_global_labels,
                 "defaultVaultConnection": {
                     "enabled": True,
                     "address": f"https://vault-{stack_info.env_suffix}.odl.mit.edu",
                     "skipTLSVerify": False,
                 },
                 "controller": {
+                    # The chart has no top-level extraLabels, which is where
+                    # this release used to pass the labels: unrecognized values
+                    # are not an error in Helm, so they were silently dropped
+                    # and the operator's pod carried none of them. The
+                    # controller-scoped key reaches the pod template only, not
+                    # the immutable selector.
+                    "extraLabels": cluster_addon_labels(
+                        base_labels=k8s_global_labels,
+                        stack_info=stack_info,
+                        service=Services.vault_secrets_operator,
+                        component=Component.controller,
+                        # Already-synced Secrets stay valid; new syncs and
+                        # rotations stall, which breaks pod starts within hours.
+                        alert_tier=AlertTier.notify,
+                    ),
                     "replicas": 1,
                     "tolerations": operations_tolerations,
                     "manager": {

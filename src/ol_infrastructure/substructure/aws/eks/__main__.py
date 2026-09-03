@@ -21,7 +21,13 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    AWSBase,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
@@ -236,6 +242,14 @@ if cluster_stack.require_output("has_ebs_storage"):
         ),
     )
 
+    vantage_labels = cluster_addon_labels(
+        base_labels=k8s_global_labels,
+        stack_info=stack_info,
+        service=Services.vantage_agent,
+        component=Component.agent,
+        # Cost telemetry. A gap in it is a reporting problem, not an outage.
+        alert_tier=AlertTier.ticket,
+    )
     vantage_k8s_agent_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-vantage-k8s-agent-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
@@ -248,6 +262,8 @@ if cluster_stack.require_output("has_ebs_storage"):
                 repo="https://vantage-sh.github.io/helm-charts",
             ),
             values={
+                "appLabels": vantage_labels,
+                "podLabels": vantage_labels,
                 "agent": {
                     "secret": {
                         "name": vantage_api_token_secret_name,
@@ -338,6 +354,7 @@ setup_karpenter(
     k8s_provider=k8s_provider,
     aws_account=aws_account,
     k8s_global_labels=k8s_global_labels,
+    stack_info=stack_info,
 )
 
 ############################################################
@@ -350,12 +367,15 @@ setup_keda(
     aws_config=aws_config,
     k8s_provider=k8s_provider,
     k8s_global_labels=k8s_global_labels,
+    stack_info=stack_info,
 )
 
 # Setup NVIDIA GPU resources
 setup_nvidia(
     cluster_name=cluster_name,
     k8s_provider=k8s_provider,
+    k8s_global_labels=k8s_global_labels,
+    stack_info=stack_info,
     nvidia_dcgm_exporter_version=VERSIONS["NVIDIA_DCGM_EXPORTER_VERSION"],
     nvidia_k8s_device_plugin_version=VERSIONS["NVIDIA_K8S_DEVICE_PLUGIN_VERSION"],
 )

@@ -7,7 +7,14 @@ from pulumi_eks import Cluster
 
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    AWSBase,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
+from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
 def setup_cert_manager(
@@ -21,6 +28,7 @@ def setup_cert_manager(
     k8s_global_labels: dict[str, str],
     operations_tolerations: list[dict[str, str]],
     versions: dict[str, str],
+    stack_info: StackInfo,
 ):
     """
     Configure and install cert-manager.
@@ -35,7 +43,18 @@ def setup_cert_manager(
     :param k8s_global_labels: A dictionary of global labels to apply to Kubernetes resources.
     :param operations_tolerations: A list of tolerations for scheduling on operations nodes.
     :param versions: A dictionary of component versions.
+    :param stack_info: Information about the current Pulumi stack.
     """
+    # The chart puts global.commonLabels on both the workload and the pod
+    # template of all three deployments, and on neither selector.
+    cert_manager_labels = cluster_addon_labels(
+        base_labels=k8s_global_labels,
+        stack_info=stack_info,
+        service=Services.cert_manager,
+        component=Component.controller,
+        # A failed renewal has weeks of slack before a certificate expires.
+        alert_tier=AlertTier.notify,
+    )
     cert_manager_parliament_config = {
         "UNKNOWN_FEDERATION_SOURCE": {"ignore_locations": [{"principal": "federated"}]},
         "PERMISSIONS_MANAGEMENT_ACTIONS": {"ignore_locations": []},
@@ -136,7 +155,7 @@ def setup_cert_manager(
                     "keep": True,
                 },
                 "global": {
-                    "commonLabels": k8s_global_labels,
+                    "commonLabels": cert_manager_labels,
                 },
                 "resources": default_cert_manager_resources,
                 "tolerations": operations_tolerations,

@@ -9,6 +9,13 @@ from pulumi import ResourceOptions
 
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
+from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
 def setup_aws_integrations(
@@ -23,12 +30,33 @@ def setup_aws_integrations(
     node_groups,
     versions,
     cert_manager,
+    stack_info: StackInfo,
 ):
     """
     Set up AWS integrations for EKS.
 
     This includes the AWS Load Balancer Controller and the AWS Node Termination Handler.
     """
+    lb_controller_labels = cluster_addon_labels(
+        base_labels=k8s_global_labels,
+        stack_info=stack_info,
+        service=Services.aws_load_balancer_controller,
+        component=Component.controller,
+        # Its mservice/mtargetgroupbinding webhooks are failurePolicy: Fail with
+        # no namespace selector, so losing the last replica blocks Service and
+        # TargetGroupBinding admission cluster-wide -- and a replacement cannot
+        # cold start to fix it.
+        alert_tier=AlertTier.page,
+    )
+    node_termination_labels = cluster_addon_labels(
+        base_labels=k8s_global_labels,
+        stack_info=stack_info,
+        service=Services.aws_node_termination_handler,
+        component=Component.agent,
+        # Losing it means spot reclaims and ASG lifecycle events stop draining
+        # gracefully; workloads restart harder, nothing goes dark.
+        alert_tier=AlertTier.notify,
+    )
     ############################################################
     # Install and configure AWS Load Balancer Controller
     ############################################################
@@ -341,7 +369,8 @@ def setup_aws_integrations(
                 },
                 "vpcId": target_vpc["id"],
                 "region": aws.get_region().name,
-                "podLabels": k8s_global_labels,
+                "podLabels": lb_controller_labels,
+                "additionalLabels": lb_controller_labels,
                 "tolerations": operations_tolerations,
                 # Sized for the cold-start Pod informer sync, not steady state.
                 # The controller builds a cluster-wide Pod cache (the "podInfo
@@ -404,7 +433,8 @@ def setup_aws_integrations(
             cleanup_on_fail=True,
             skip_await=True,
             values={
-                "podLabels": k8s_global_labels,
+                "podLabels": node_termination_labels,
+                "customLabels": node_termination_labels,
                 "serviceAccount": {
                     "labels": k8s_global_labels,
                 },

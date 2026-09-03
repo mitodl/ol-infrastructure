@@ -13,6 +13,7 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Product,
     Services,
+    cluster_addon_labels,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -161,3 +162,58 @@ def test_app_labels_sanitize_the_source_repository(stack_info):
         source_repository="https://github.com/mitodl/mit-learn",
     ).model_dump()
     assert labels["ol.mit.edu/source_repository"] == "github.com_mitodl_mit-learn"
+
+
+def test_addon_labels_render_the_full_routing_set(stack_info):
+    labels = cluster_addon_labels(
+        base_labels={"pulumi_managed": "true"},
+        stack_info=stack_info,
+        service=Services.cert_manager,
+        component=Component.controller,
+        alert_tier=AlertTier.notify,
+    )
+    assert labels == {
+        # Platform engineering owns the addons, whatever cluster they run in.
+        "ol.mit.edu/ou": "operations",
+        "ol.mit.edu/service": "cert-manager",
+        "ol.mit.edu/component": "controller",
+        "ol.mit.edu/alert_tier": "notify",
+        "ol.mit.edu/stack": "ol-application-example.QA",
+        "ol.mit.edu/environment": "qa",
+        "pulumi_managed": "true",
+    }
+
+
+def test_addon_labels_omit_a_role_the_caller_cannot_state(stack_info):
+    """A chart key covering several roles publishes only what is true of all.
+
+    The VPA and KEDA charts each expose one label key that reaches Deployments
+    with different roles and, for VPA, different tiers. Emitting a shared
+    component or tier there would mis-route the odd one out; emitting neither
+    leaves those workloads on the severity catch-all.
+    """
+    labels = cluster_addon_labels(
+        base_labels={},
+        stack_info=stack_info,
+        service=Services.vertical_pod_autoscaler,
+    )
+    assert "ol.mit.edu/component" not in labels
+    assert "ol.mit.edu/alert_tier" not in labels
+    assert labels["ol.mit.edu/service"] == "vertical-pod-autoscaler"
+
+
+def test_addon_labels_never_overwrite_the_program_labels(stack_info):
+    """The base dict wins, so a shared label keeps the value it already had.
+
+    substructure/aws/eks sets its own ol.mit.edu/stack; rewriting it would
+    churn every addon's pod template for a value that means the same thing.
+    """
+    labels = cluster_addon_labels(
+        base_labels={"ol.mit.edu/stack": "substructure.aws.eks.operations.Production"},
+        stack_info=stack_info,
+        service=Services.karpenter,
+        component=Component.controller,
+        alert_tier=AlertTier.page,
+    )
+    assert labels["ol.mit.edu/stack"] == "substructure.aws.eks.operations.Production"
+    assert labels["ol.mit.edu/alert_tier"] == "page"

@@ -66,7 +66,13 @@ from ol_infrastructure.lib.aws.iam_helper import (
     lint_iam_policy,
 )
 from ol_infrastructure.lib.fastly import get_fastly_provider
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    AWSBase,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
@@ -1060,6 +1066,7 @@ setup_vault_secrets_operator(
 )
 
 setup_external_dns(
+    stack_info=stack_info,
     cluster_name=cluster_name,
     cluster=cluster,
     aws_account=aws_account,
@@ -1074,6 +1081,7 @@ setup_external_dns(
 )
 
 cert_manager_release = setup_cert_manager(
+    stack_info=stack_info,
     cluster_name=cluster_name,
     cluster=cluster,
     aws_account=aws_account,
@@ -1104,6 +1112,7 @@ fastly_provider = cast(Any, get_fastly_provider(wrap_in_pulumi_options=False))
 # AWS Load Balancer Controller, AWS Node Termination Handler
 ############################################################
 lb_controller = setup_aws_integrations(
+    stack_info=stack_info,
     aws_account=aws_account,
     cluster_name=cluster_name,
     cluster=cluster,
@@ -1122,6 +1131,7 @@ lb_controller = setup_aws_integrations(
 # configured with vertical autoscaling
 ############################################################
 vpa_release = setup_vpa(
+    stack_info=stack_info,
     cluster_name=cluster_name,
     cluster=cluster,
     k8s_provider=k8s_provider,
@@ -1172,6 +1182,15 @@ setup_apisix(
 ############################################################
 # Install and configure metrics-server
 ############################################################
+metrics_server_labels = cluster_addon_labels(
+    base_labels=k8s_global_labels,
+    stack_info=stack_info,
+    service=Services.metrics_server,
+    component=Component.api,
+    # Every HPA in the cluster goes blind without it, but nothing scales
+    # down or sheds traffic on its own while it is gone.
+    alert_tier=AlertTier.notify,
+)
 metrics_server_release = kubernetes.helm.v3.Release(
     f"{cluster_name}-metrics-server-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
@@ -1184,7 +1203,8 @@ metrics_server_release = kubernetes.helm.v3.Release(
         cleanup_on_fail=True,
         skip_await=False,
         values={
-            "commonLabels": k8s_global_labels,
+            "commonLabels": metrics_server_labels,
+            "podLabels": metrics_server_labels,
             "tolerations": operations_tolerations,
             # Every HPA in the cluster depends on metrics-server for resource
             # metrics. A single replica means any restart or node drain leaves
