@@ -1037,7 +1037,15 @@ if witan_probe_token_vault_secret is not None:
             dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
             mount="secret-operations",
             mount_type="kv-v1",
-            path=WITAN_PROBE_TOKEN_VAULT_PATH,
+            # Relative to `mount`, same as actor_tokens_secret's `path=
+            # "witan/actor-tokens"` above — NOT the full
+            # WITAN_PROBE_TOKEN_VAULT_PATH, which already includes the
+            # `secret-operations/` mount prefix for the vault.generic.Secret
+            # WRITE above (a different resource with a different path
+            # convention). Passing the full path here double-counts the
+            # mount and 403s: "GET .../secret-operations/secret-operations
+            # /witan/probe-token".
+            path="witan/probe-token",
             exclude_raw=True,
             excludes=[".*"],
             templates={
