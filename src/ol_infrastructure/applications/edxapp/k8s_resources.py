@@ -113,6 +113,10 @@ _OTEL_SDK_ENV: dict[str, str] = {
     "OTEL_METRICS_EXPORTER": "none",
     "OTEL_LOGS_EXPORTER": "none",
     "OTEL_LOG_LEVEL": "info",
+    # Explicit rather than relying on the SDK default being parentbased_always_on:
+    # edxapp is upstream of everything it calls, so a head sample here would
+    # discard whole traces. The Alloy tail sampler owns that (see lib/otel.py).
+    "OTEL_TRACES_SAMPLER": "parentbased_always_on",
 }
 
 

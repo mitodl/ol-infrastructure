@@ -428,7 +428,10 @@ if stack_info.name != "CI":
     tracing_config = {
         "enabled": True,
         "endpoint": "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4317",
-        "samplerRatio": 0.25,
+        # No head sampling: Keycloak sits in the auth path for the whole SOA
+        # stack, so a fraction here discards end-to-end traces, not Keycloak's.
+        # The Alloy tail sampler decides (see lib/otel.py).
+        "samplerRatio": 1.0,
     }
 else:
     tracing_config = {"enabled": False}
