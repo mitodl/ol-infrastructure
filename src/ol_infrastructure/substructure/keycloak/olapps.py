@@ -655,8 +655,8 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     # MITXONLINE B2B [START]
     # This client is used by MITx Online for B2B operations via the Keycloak
     # Admin API. It requires service account roles to view realms, users, and
-    # organizations, and to manage the identity providers organizations are
-    # linked to.
+    # organizations, to manage organization membership, and to manage the
+    # identity providers organizations are linked to.
     olapps_mitxonline_b2b_client = keycloak.openid.Client(
         "olapps-mitxonline-b2b-client",
         name="mitxonline-b2b-client",
@@ -692,11 +692,27 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     # so view-identity-providers is redundant with manage granted -- it is listed
     # anyway so the account's read scope is visible here rather than inferred,
     # matching how view-realm is listed alongside manage-realm above.
+    #
+    # manage-users is required for the same reason, on a different endpoint:
+    # OrganizationMemberResource.addMember() requires BOTH
+    # auth.orgs().requireManage(organization) (satisfied by manage-realm) AND
+    # auth.users().requireManage(user), which only accepts the manage-users role
+    # (UserPermissions.canManage() checks AdminRoles.MANAGE_USERS specifically --
+    # manage-realm is not in its role list, unlike OrganizationPermissions.canManage()
+    # which explicitly accepts manage-realm as an alternative to manage-organizations).
+    # Without it, adding a user to an organization 403s even though the client can
+    # already view/manage the organization itself. This realm does not run Fine-Grained
+    # Admin Permissions (no `features` set on the Keycloak CR), so there is no way to
+    # scope this to just organization members; UserPermissions.canManageByGroup() only
+    # applies when FGAP's AuthorizationProvider is wired up, which it is not here --
+    # the grant is realm-wide, matching the existing mitlearn-admin-client precedent
+    # above.
     for resource_name, role in [
         ("olapps-mitxonline-b2b-client-view-realm-role", "view-realm"),
         ("olapps-mitxonline-b2b-client-view-users-role", "view-users"),
         ("olapps-mitxonline-b2b-client-query-users-role", "query-users"),
         ("olapps-mitxonline-b2b-client-manage-realm-role", "manage-realm"),
+        ("olapps-mitxonline-b2b-client-manage-users-role", "manage-users"),
         (
             "olapps-mitxonline-b2b-client-view-identity-providers-role",
             "view-identity-providers",

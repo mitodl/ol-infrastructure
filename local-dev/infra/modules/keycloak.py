@@ -557,6 +557,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         ("b2b-view-users", "view-users"),
         ("b2b-query-users", "query-users"),
         ("b2b-manage-realm", "manage-realm"),
+        ("b2b-manage-users", "manage-users"),
         ("b2b-view-identity-providers", "view-identity-providers"),
         ("b2b-manage-identity-providers", "manage-identity-providers"),
     ]:
