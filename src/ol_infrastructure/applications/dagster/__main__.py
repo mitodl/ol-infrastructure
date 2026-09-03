@@ -2160,9 +2160,11 @@ edxorg_gcp_secret = OLVaultK8SSecret(
 # DAGSTER_CODE_SERVER_TIMEOUT_SECONDS, both of which are currently guesses.
 #
 # RUN WORKERS ARE DELIBERATELY EXCLUDED, and excluding them takes explicit work.
-# They live 7-9 seconds, so an 8s process would depend entirely on
-# BatchSpanProcessor's at-exit flush -- a SIGKILL loses the spans -- and the
-# volume needs a sampling decision of its own first. But the user-deployments
+# Not because their data is uninteresting -- it is the most interesting part, and
+# tk-extend-otel-auto-instrumentation-to-dagster-run--378bda tracks turning them
+# on. The open question is the span-flush policy: they are preemptible by design,
+# so a SIGKILL drops whatever BatchSpanProcessor has not flushed, biased towards
+# the runs killed during a capacity event. But the user-deployments
 # chart copies each deployment's whole `env` list into
 # DAGSTER_CLI_API_GRPC_CONTAINER_CONTEXT, and K8sRunLauncher applies that to
 # every run worker pod, so PYTHONPATH set here reaches them by default -- and it

@@ -175,9 +175,20 @@ run_launcher:
         # would not do this, it only makes TracerProvider hand out NoOp tracers
         # (sdk/trace/__init__.py) after the agent has already loaded.
         #
-        # Run workers stay excluded until their span volume has a sampling
-        # decision: they live 7-9 seconds, so an 8s process depends entirely on
-        # BatchSpanProcessor's at-exit flush, and a SIGKILL loses the spans.
+        # Run workers stay excluded until the span-flush policy is decided, not
+        # because the data is uninteresting -- it is the most interesting, since
+        # 2026-08-10 was 178 run workers holding connections and their per-worker
+        # footprint is still unmeasured. The blocker is that they are preemptible
+        # by design (priority_class_name below), so a SIGKILL drops whatever
+        # BatchSpanProcessor has not flushed, and it drops it with a bias: the
+        # preempted runs are the ones from a capacity event. Measured
+        # 2026-09-03 on data-production, run duration is p50 17s / p90 32s -- three
+        # BSP cycles at the 5s default, not zero -- and arrivals are bursty
+        # (~2.2/s inside a burst against ~0.006/s outside), so the flush and
+        # sampling settings have to be sized against the burst rather than any
+        # runs/day average. Tracked in
+        # tk-extend-otel-auto-instrumentation-to-dagster-run--378bda; deleting
+        # this command block is the whole toggle.
         command:
         - env
         - -u
