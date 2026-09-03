@@ -1084,3 +1084,71 @@ async def test_the_stuck_threshold_is_configurable(repos, slack_app, monkeypatch
     await bot._nag_stuck_releases(slack_app, repos, bot.ReleaseProgressState())
 
     slack_app.client.chat_postMessage.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# channel resolution
+# ---------------------------------------------------------------------------
+
+
+async def test_proactive_posts_go_to_the_resolved_channel_id(repos, monkeypatch):
+    """chat.postMessage rejects the configured name; it must get the id."""
+    monkeypatch.setattr(
+        bot.slack_channels, "resolve", AsyncMock(return_value="C0RESOLVED")
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "open_release_issues",
+        AsyncMock(
+            return_value=[
+                {
+                    "number": 1,
+                    "title": "Release my-app",
+                    "url": "https://github.com/mitodl/my-app/issues/1",
+                    "body": (
+                        "## Release 2026.9.1.1\n\n- [x] **A** (#1) by alice@example.com"
+                    ),
+                    "labels": ["release"],
+                }
+            ]
+        ),
+    )
+    monkeypatch.setattr(bot.github, "add_issue_label", AsyncMock())
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+
+    await bot._notify_ready_to_promote(app, repos)
+
+    assert app.client.chat_postMessage.call_args.kwargs["channel"] == "C0RESOLVED"
+
+
+async def test_startup_reports_channels_the_bot_cannot_reach(
+    repos, monkeypatch, caplog
+):
+    """A channel the bot was never invited to must be visible at boot.
+
+    Otherwise it surfaces only as a failed post inside a poll loop, which is
+    how 137 channel_not_found errors went unnoticed.
+    """
+    monkeypatch.setattr(
+        bot.slack_channels,
+        "unresolvable",
+        AsyncMock(return_value=["product-mit-learn"]),
+    )
+    app = MagicMock()
+
+    with caplog.at_level("ERROR"):
+        await bot._report_unreachable_channels(app, repos)
+
+    assert "product-mit-learn" in caplog.text
+
+
+async def test_startup_check_survives_a_slack_failure(repos, monkeypatch):
+    """A validation that can kill startup is worse than no validation."""
+    monkeypatch.setattr(
+        bot.slack_channels,
+        "unresolvable",
+        AsyncMock(side_effect=RuntimeError("Slack is down")),
+    )
+
+    await bot._report_unreachable_channels(MagicMock(), repos)

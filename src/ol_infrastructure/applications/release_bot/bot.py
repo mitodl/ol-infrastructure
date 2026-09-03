@@ -11,6 +11,7 @@ from typing import Any
 import bot_config as config
 import concourse_client as concourse
 import github_client as github
+import slack_channels
 import slack_users
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
@@ -362,7 +363,7 @@ async def _watch_checkboxes(app, app_name, cfg, channel) -> None:
                 continue
             if not issues:
                 await app.client.chat_postMessage(
-                    channel=channel,
+                    channel=await slack_channels.resolve(app.client, channel),
                     text=(
                         f"`{app_name}`: no open release issue any more — "
                         "no longer watching checkboxes."
@@ -400,7 +401,7 @@ async def _watch_checkboxes(app, app_name, cfg, channel) -> None:
             newly_done = outstanding - still_outstanding
             if newly_done:
                 await app.client.chat_postMessage(
-                    channel=channel,
+                    channel=await slack_channels.resolve(app.client, channel),
                     text=(
                         f"Thanks for checking off your boxes, "
                         f"{await slack_users.format_authors(app.client, newly_done)}!"
@@ -609,7 +610,7 @@ async def _notify_ready_to_promote(app, repos) -> None:
                 continue
             try:
                 await app.client.chat_postMessage(
-                    channel=channel,
+                    channel=await slack_channels.resolve(app.client, channel),
                     text=f"✅ `{app_name}` {version} is ready to promote.",
                     blocks=_ready_to_promote_blocks(
                         app_name,
@@ -787,7 +788,7 @@ async def _announce_deployments(app, repos, state: ReleaseProgressState) -> None
                 continue
             try:
                 await app.client.chat_postMessage(
-                    channel=channel,
+                    channel=await slack_channels.resolve(app.client, channel),
                     text=await _milestone_text(app_name, cfg, environment, deployment),
                 )
             except Exception:
@@ -857,7 +858,9 @@ async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> None:
             )
             continue
         try:
-            await app.client.chat_postMessage(channel=channel, text=text)
+            await app.client.chat_postMessage(
+                channel=await slack_channels.resolve(app.client, channel), text=text
+            )
         except Exception:
             log.exception(
                 "Failed to report the stuck release %s for %s",
@@ -885,8 +888,40 @@ async def _poll_release_progress_loop(app, repos) -> None:
         await asyncio.sleep(_RELEASE_PROGRESS_POLL_SECONDS)
 
 
+async def _report_unreachable_channels(app, repos) -> None:
+    """Log configured channels the bot cannot post to, at boot.
+
+    Every proactive message is fire-and-forget inside a poll loop, so a
+    channel the bot was never invited to shows up only as a failed post
+    buried in the logs hours later. Say it once, at startup, naming the
+    channels.
+    """
+    configured = {
+        channel
+        for cfg in repos.values()
+        if (channel := _announce_channel(cfg)) is not None
+    }
+    if not configured:
+        return
+    try:
+        missing = await slack_channels.unresolvable(app.client, configured)
+    except Exception:
+        log.exception("Failed to check configured Slack channels at startup")
+        return
+    if missing:
+        log.error(
+            "Cannot resolve %s of %s configured Slack channel(s) to an id: %s."
+            " Posts to these will fail with channel_not_found until the bot is"
+            " invited to them (private channels are only visible to members)",
+            len(missing),
+            len(configured),
+            ", ".join(missing),
+        )
+
+
 async def main():
     app, repos = create_app()
+    await _report_unreachable_channels(app, repos)
     asyncio.create_task(_poll_ready_to_promote_loop(app, repos))  # noqa: RUF006
     asyncio.create_task(_poll_release_progress_loop(app, repos))  # noqa: RUF006
     handler = AsyncSocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
