@@ -469,21 +469,32 @@ GRANT ALL ON ALL DATABASES TO ROLE ol_data_engineer;
 -- database naming is confirmed, at which point these grants will be narrowed to
 -- the named databases.  Until then all four roles see the same read surface.
 --
+-- Each also needs SELECT ON ALL MATERIALIZED VIEWS.  MATERIALIZED VIEW is its
+-- own privilege object type in StarRocks, so an ALL TABLES grant does not reach
+-- an MV -- which is why readonly and app above carry the same pair.  Without it
+-- these roles cannot read b2b_analytics.mv_b2b_*, the whole B2B analytics
+-- surface.  admin, ol_platform_admin and ol_data_engineer need no equivalent:
+-- db_admin already covers every MV.
+--
 -- ol_data_analyst: target scope Silver_Analytics + Gold (read-only)
 GRANT USAGE ON CATALOG default_catalog TO ROLE ol_data_analyst;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_data_analyst;
+GRANT SELECT ON ALL MATERIALIZED VIEWS IN ALL DATABASES TO ROLE ol_data_analyst;
 
 -- ol_researcher: target scope Silver_Analytics + Gold_Analytics (read-only)
 GRANT USAGE ON CATALOG default_catalog TO ROLE ol_researcher;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_researcher;
+GRANT SELECT ON ALL MATERIALIZED VIEWS IN ALL DATABASES TO ROLE ol_researcher;
 
 -- ol_instructor: target scope Gold_Analytics + Gold_Operations (read-only)
 GRANT USAGE ON CATALOG default_catalog TO ROLE ol_instructor;
 GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_instructor;
+GRANT SELECT ON ALL MATERIALIZED VIEWS IN ALL DATABASES TO ROLE ol_instructor;
 
 -- ol_business_analyst: target scope Silver_Operations + Gold (read-only)
 GRANT USAGE ON CATALOG default_catalog TO ROLE ol_business_analyst;
-GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_business_analyst;"""
+GRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE ol_business_analyst;
+GRANT SELECT ON ALL MATERIALIZED VIEWS IN ALL DATABASES TO ROLE ol_business_analyst;"""
 
 _roles_sql = _base_roles_sql + _iceberg_roles_sql
 _role_deps: list[pulumi.Resource] = [starrocks_db_connection, *catalog_setups]
