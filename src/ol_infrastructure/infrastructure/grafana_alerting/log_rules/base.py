@@ -11,6 +11,15 @@ LogQL metric expression instead of PromQL:
              Must be metric-producing (count_over_time, rate, etc.) with the
              threshold baked in so it returns no rows when the condition is
              not met.
+
+             EXCEPTION: witan.py's ``_no_bindings_expr`` deliberately returns
+             a real, visible 0 in the healthy case instead of omitting the
+             row -- ``sum(...) == 0`` alone would return a row carrying 0 and
+             never fire against Stage C's ``last(A) > 0`` below, so it is a
+             PRODUCT (line count when the condition is met, 0 when it isn't)
+             rather than a bare comparison. Do not read that shape as
+             violating this contract; it is the one rule that has to return a
+             value either way, by construction of Stage C's threshold.
   Stage B — reduce: passes each series returned by A through unchanged.
   Stage C — threshold: fires per-series when B's value is > 0.
 
