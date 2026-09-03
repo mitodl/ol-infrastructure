@@ -217,6 +217,8 @@ pod start.
 
 ## Related
 
+- `witan-council-probe-runbook.md` — `svc-witan-probe`, the same opt-in shape,
+  for synthetic monitoring rather than maintenance.
 - `witan-token-sync-runbook.md` — per-user tokens, and the `actor-tokens` /
   `service-tokens` writer split this builds on.
 - `omnigraph-store-maintenance-runbook.md` — the *other* kind of maintenance
