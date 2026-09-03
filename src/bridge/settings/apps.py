@@ -28,8 +28,12 @@ class AppRegistration:
         when unset -- only set this when the repo name differs from the app
         name (e.g. app ``xpro`` lives in repo ``mitodl/mitxpro``).
     :param repo_main_branch: The repo's default branch.
-    :param slack_channel: Slack channel ID for release-bot notifications
-        (e.g. "ready to promote"). Unset means notifications are skipped for
+    :param slack_channel: Slack channel for release-bot notifications (e.g.
+        "ready to promote"), as either a channel id or a channel name. Slack's
+        Web API only accepts ids, so a name is resolved through
+        conversations.list at runtime (release_bot/slack_channels.py) -- which
+        needs groups:read on the bot token and, for a private channel, the bot
+        to have been invited to it. Unset means notifications are skipped for
         this app unless RELEASE_ANNOUNCE_CHANNEL provides a fallback.
     """
 
@@ -85,7 +89,7 @@ def repo_main_branch(app_name: str) -> str:
 
 
 def slack_channel(app_name: str) -> str | None:
-    """Return the configured Slack channel ID for release notifications, if any."""
+    """Return the configured Slack channel for release notifications, if any."""
     entry = APPS.get(app_name)
     return entry.slack_channel if entry else None
 
