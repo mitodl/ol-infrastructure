@@ -66,7 +66,9 @@ def build_job(python_version: str) -> Job:
                 },
             ),
             ensure_ecr_task("mitodl/ol-python-base"),
-            configure_ecr_repository_task("mitodl/ol-python-base"),
+            configure_ecr_repository_task(
+                "mitodl/ol-python-base", keep_last_n_images=10
+            ),
             PutStep(
                 put=image_resources[python_version].name,
                 inputs="detect",

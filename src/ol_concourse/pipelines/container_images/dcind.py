@@ -105,7 +105,7 @@ docker_pipeline = Pipeline(
                     },
                 ),
                 ensure_ecr_task("mitodl/dcind"),
-                configure_ecr_repository_task("mitodl/dcind"),
+                configure_ecr_repository_task("mitodl/dcind", keep_last_n_images=10),
                 PutStep(
                     put=dcind_release_image.name,
                     inputs="detect",

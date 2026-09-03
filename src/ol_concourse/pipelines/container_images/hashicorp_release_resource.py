@@ -59,7 +59,9 @@ docker_pipeline = Pipeline(
                 GetStep(get=hashicorp_release_repository.name, trigger=True),
                 build_task,
                 ensure_ecr_task("mitodl/hashicorp-release-resource"),
-                configure_ecr_repository_task("mitodl/hashicorp-release-resource"),
+                configure_ecr_repository_task(
+                    "mitodl/hashicorp-release-resource", keep_last_n_images=10
+                ),
                 PutStep(
                     put=hashicorp_release_image.name,
                     params={

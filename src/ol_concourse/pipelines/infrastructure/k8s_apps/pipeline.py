@@ -355,10 +355,15 @@ def _ensure_ecr_repository_step(
                 ),
             ),
         ),
-        # keep_last_n_images made explicit here rather than left as the
-        # function's default -- so the actual retention count is visible in
-        # a diff of this call site, not only inside ecr.py.
-        configure_ecr_repository_task(repo_name, keep_last_n_images=10),
+        # expire_after_days, not keep_last_n_images: this repo is shared by
+        # independent CI (every main-branch commit) and release build jobs
+        # (see the registry_image() calls above/below using the same
+        # image_repository) -- a count-based policy would let CI churn
+        # push the still-deployed release image out of the "N most
+        # recent" window and delete it. Age-based means CI volume can't
+        # threaten a release image redeployed within any reasonable
+        # window. Flagged by Copilot review on PR #5728.
+        configure_ecr_repository_task(repo_name, expire_after_days=180),
     ]
 
 

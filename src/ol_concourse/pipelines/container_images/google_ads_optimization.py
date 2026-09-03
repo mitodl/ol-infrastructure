@@ -55,7 +55,7 @@ docker_pipeline = Pipeline(
                 GetStep(get=ad_opt_repository.name, trigger=True),
                 build_task,
                 ensure_ecr_task("mitodl/ad-opt"),
-                configure_ecr_repository_task("mitodl/ad-opt"),
+                configure_ecr_repository_task("mitodl/ad-opt", keep_last_n_images=10),
                 PutStep(
                     put=ad_opt_release_image.name,
                     params={
