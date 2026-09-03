@@ -655,7 +655,8 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     # MITXONLINE B2B [START]
     # This client is used by MITx Online for B2B operations via the Keycloak
     # Admin API. It requires service account roles to view realms, users, and
-    # organizations.
+    # organizations, and to manage the identity providers organizations are
+    # linked to.
     olapps_mitxonline_b2b_client = keycloak.openid.Client(
         "olapps-mitxonline-b2b-client",
         name="mitxonline-b2b-client",
@@ -681,11 +682,26 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     # Assign required service account roles for Keycloak Admin API access
     # These roles allow the client to list/view realms, users, and organizations
     # Refactored repetitive role assignments into a loop for maintainability
+    #
+    # manage-realm covers Organizations but NOT identity providers. IdP
+    # create/update/delete, identity-provider/import-config, and org<->IdP linking
+    # all route through requireManageIdentityProviders(), which RealmPermissions
+    # resolves to the manage-identity-providers role alone; manage-realm is a
+    # distinct, non-composite role and does not satisfy it. Without these two the
+    # client cannot even list an organization's IdPs.
     for resource_name, role in [
         ("olapps-mitxonline-b2b-client-view-realm-role", "view-realm"),
         ("olapps-mitxonline-b2b-client-view-users-role", "view-users"),
         ("olapps-mitxonline-b2b-client-query-users-role", "query-users"),
         ("olapps-mitxonline-b2b-client-manage-realm-role", "manage-realm"),
+        (
+            "olapps-mitxonline-b2b-client-view-identity-providers-role",
+            "view-identity-providers",
+        ),
+        (
+            "olapps-mitxonline-b2b-client-manage-identity-providers-role",
+            "manage-identity-providers",
+        ),
     ]:
         keycloak.openid.ClientServiceAccountRole(
             resource_name,
