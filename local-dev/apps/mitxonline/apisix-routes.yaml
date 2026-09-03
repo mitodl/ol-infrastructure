@@ -25,6 +25,17 @@ spec:
       headers:
         set:
           Referrer-Policy: "origin"
+          # Mirrors response_rewrite_plugin_config in
+          # src/ol_infrastructure/applications/mitxonline/__main__.py.  Without
+          # it local-dev silently permits framing that production refuses, so a
+          # logout fan-out would pass here and fail in production.
+          #
+          # lms.mit.dev frames our /logout?no_redirect=1 during its own logout
+          # fan-out; api.learn.mit.dev is above it in the chain once Learn's
+          # logout interstitial frames lms (hq#12763), and frame-ancestors is
+          # checked against every ancestor, not just the immediate parent.
+          Content-Security-Policy: >-
+            frame-ancestors 'self' https://lms.mit.dev https://api.learn.mit.dev
   - name: prometheus
     enable: true
 ---
@@ -89,9 +100,17 @@ spec:
         post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
         session:
           secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
-          cookie:
-            domain: ".mitxonline.mit.dev"
-            lifetime: 1209600
+          # Flat keys, matching OLApisixOIDCConfig.  lua-resty-session 4.x on
+          # APISIX 3.17+ reads only these; the nested `cookie:` form this used to
+          # use is silently ignored, which left the cookie host-only and gave
+          # mitxonline.mit.dev and api.mitxonline.mit.dev separate sessions.
+          cookie_domain: ".mitxonline.mit.dev"
+          # Named as in production so the two gateway sessions are telling apart
+          # in devtools rather than both showing as "session".
+          cookie_name: "mitxonline_apisix_session"
+          absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         session_contents:
           access_token: true
           enc_id_token: true
@@ -148,15 +167,71 @@ spec:
         post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
         session:
           secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
-          cookie:
-            domain: ".mitxonline.mit.dev"
-            lifetime: 1209600
+          # Flat keys, matching OLApisixOIDCConfig.  lua-resty-session 4.x on
+          # APISIX 3.17+ reads only these; the nested `cookie:` form this used to
+          # use is silently ignored, which left the cookie host-only and gave
+          # mitxonline.mit.dev and api.mitxonline.mit.dev separate sessions.
+          cookie_domain: ".mitxonline.mit.dev"
+          # Named as in production so the two gateway sessions are telling apart
+          # in devtools rather than both showing as "session".
+          cookie_name: "mitxonline_apisix_session"
+          absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         session_contents:
           access_token: true
           enc_id_token: true
           id_token: true
           user: true
         unauth_action: auth
+
+  # Session reset for hand-offs from MIT Learn (hq#12763).  Mirrors the
+  # "switch-session" route in
+  # src/ol_infrastructure/applications/mitxonline/__main__.py.
+  #
+  # No openid-connect plugin on purpose: it would validate, and possibly
+  # refresh, the very session this route exists to discard.  The
+  # serverless-post-function expires the gateway session cookie on the way out,
+  # so the redirect Django issues lands on "cart" below with no session, runs a
+  # fresh authorization-code flow, and comes back as whoever currently holds the
+  # Keycloak SSO session.
+  - name: switch-session
+    priority: 20
+    match:
+      hosts:
+      - "mitxonline.mit.dev"
+      - "api.mitxonline.mit.dev"
+      paths:
+      - "/switch-session"
+      - "/switch-session/"
+    backends:
+    - serviceName: mitxonline-webapp
+      servicePort: 8010
+    plugin_config_name: mitxonline-shared-plugins
+    plugins:
+    - name: serverless-post-function
+      enable: true
+      config:
+        # header_filter, not the default log phase: response headers are still
+        # mutable there.
+        phase: header_filter
+        functions:
+        - |
+          return function(conf, ctx)
+              local cookie = ngx.var.http_cookie
+              if not cookie then
+                  return
+              end
+              local core = require("apisix.core")
+              for pair in cookie:gmatch("[^;]+") do
+                  local name = pair:match("^%s*([^=%s]+)=")
+                  if name and (name == "mitxonline_apisix_session"
+                               or name:match("^mitxonline_apisix_session_%d+$")) then
+                      core.response.add_header("Set-Cookie", name .. "=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax")
+                      core.response.add_header("Set-Cookie", name .. "=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax; Domain=.mitxonline.mit.dev")
+                  end
+              end
+          end
 
   - name: cart
     priority: 20
@@ -188,9 +263,17 @@ spec:
         post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
         session:
           secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
-          cookie:
-            domain: ".mitxonline.mit.dev"
-            lifetime: 1209600
+          # Flat keys, matching OLApisixOIDCConfig.  lua-resty-session 4.x on
+          # APISIX 3.17+ reads only these; the nested `cookie:` form this used to
+          # use is silently ignored, which left the cookie host-only and gave
+          # mitxonline.mit.dev and api.mitxonline.mit.dev separate sessions.
+          cookie_domain: ".mitxonline.mit.dev"
+          # Named as in production so the two gateway sessions are telling apart
+          # in devtools rather than both showing as "session".
+          cookie_name: "mitxonline_apisix_session"
+          absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         session_contents:
           access_token: true
           enc_id_token: true
@@ -244,8 +327,12 @@ spec:
         scope: "openid profile email ol-profile"
         ssl_verify: false
         renew_access_token_on_expiry: true
-        # No cookie name/domain override → default name "session" on host
-        # api.learn.mit.dev, matching the learn route that issued the cookie.
+        # Must match the learn route that issued the cookie, exactly -- a
+        # mismatch turns this unauth_action=pass route anonymous.
         session:
           secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
+          cookie_name: "mitlearn_apisix_session"
+          absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         unauth_action: pass

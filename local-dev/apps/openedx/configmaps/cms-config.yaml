@@ -1,0 +1,56 @@
+---
+# Studio configuration for the ol-infrastructure local-dev integration.
+#
+# Full replacement for lehrer's local-dev/manifests/platform/configmap-cms.yaml
+# -- see the header of lms-config.yaml in this directory for why these are
+# copies rather than overlays, and keep the two in sync.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cms-config
+  namespace: openedx
+data:
+  MYSQL_HOST: "mysql.openedx.svc.cluster.local"
+  MYSQL_PORT: "3306"
+  MYSQL_DB_NAME: "edxapp"
+  MYSQL_USER: "edxapp"
+
+  # Shared Valkey in local-infra, per the Tiltfile's redis_host.
+  CELERY_BROKER_TRANSPORT: "redis"
+  CELERY_BROKER_HOSTNAME: "valkey-primary.local-infra.svc.cluster.local"
+  CELERY_BROKER_USER: ""
+  CELERY_BROKER_PASSWORD: ""
+  CELERY_BROKER_VHOST: ""
+
+  MONGODB_HOST: "mongodb-svc.openedx.svc.cluster.local"
+  MONGODB_PORT: "27017"
+  MONGODB_USER: "edxapp"
+  MONGODB_DB: "edxapp"
+  MONGODB_REPLICASET: "mongodb"
+  MONGODB_AUTH_SOURCE: "admin"
+
+  # Shared OpenSearch in local-infra, per the Tiltfile's opensearch_host.
+  ELASTIC_SEARCH_HOST: "opensearch-master.local-infra.svc.cluster.local"
+  ELASTIC_SEARCH_PORT: "9200"
+
+  LMS_BASE_URL: "https://lms.mit.dev"
+  CMS_BASE_URL: "https://studio.mit.dev"
+
+  STATIC_ROOT_BASE: "/openedx/staticfiles"
+
+  LOG_DIR: "/openedx/data/var/log/edx"
+  LOGGING_ENV: "sandbox"
+  LOCAL_LOGLEVEL: "INFO"
+
+  DEBUG: "true"
+  ALLOWED_HOSTS: '["*"]'
+  HTTPS: "off"
+
+  OL_SETTINGS_DIR: ""
+
+  SERVICE_VARIANT: "cms"
+
+  # Studio is one of the IDAs the LMS's logout page frames, so it needs the same
+  # framing treatment -- see the cms-logout route in apisix-routes.yaml and the
+  # matching comment in edxapp/k8s_resources.py.  Same value production serves.
+  X_FRAME_OPTIONS: "ALLOW-FROM canvas.mit.edu"

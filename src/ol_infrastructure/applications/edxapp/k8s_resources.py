@@ -35,6 +35,7 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSTrustRoleConfig,
 )
 from ol_infrastructure.components.services.apisix import (
+    OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
@@ -2076,11 +2077,70 @@ def create_k8s_resources(  # noqa: C901
         ),
     )
 
+    # MIT Learn renders its own logout interstitial and frames this page inside
+    # it, so that the browser stays on Learn while openedx fans the logout out
+    # to every IDA in IDA_LOGOUT_URI_LIST (hq#12763).
+    #
+    # This deployment currently sends X_FRAME_OPTIONS = "ALLOW-FROM
+    # canvas.mit.edu" (config_builder.py, inside the "mitxonline" overrides,
+    # which beats the "DENY" in build_base_general_config).  Verified live:
+    #
+    #   $ curl -sI https://courses.learn.mit.edu/logout | grep -i x-frame
+    #   x-frame-options: ALLOW-FROM CANVAS.MIT.EDU
+    #
+    # ALLOW-FROM was only ever implemented by IE and old Firefox.  No current
+    # browser recognises the directive, so whether that header restricts framing
+    # at all is left to each UA -- most ignore an unrecognised value outright.
+    # Rather than rest the logout fan-out on that, drop the header for this one
+    # path and state the policy in CSP, which browsers do implement.  Scoped to
+    # /logout, so Canvas framing courseware elsewhere is unaffected either way.
+    #
+    # frame-ancestors is evaluated against the whole ancestor chain, not just the
+    # immediate parent, so Learn's host has to appear here even though it frames
+    # this page directly, and again on any page this page frames in turn.
+    def logout_framing_plugin(*frame_ancestors: str) -> OLApisixPluginConfig:
+        """Allow the named origins to frame this app's /logout page."""
+        return OLApisixPluginConfig(
+            name="response-rewrite",
+            secretRef=None,
+            config={
+                "headers": {
+                    "remove": ["X-Frame-Options"],
+                    "set": {
+                        "Content-Security-Policy": " ".join(
+                            ["frame-ancestors", "'self'", *frame_ancestors]
+                        ),
+                    },
+                },
+            },
+        )
+
+    mit_learn_frame_ancestor = (
+        f"https://{edxapp_config.require('mit_learn_api_domain')}"
+    )
+    lms_frame_ancestor = f"https://{edxapp_config.require_object('domains')['lms']}"
+
     lms_apisixroute = OLApisixRoute(
         name=f"ol-{stack_info.env_prefix}-edxapp-lms-apisix-route-{stack_info.env_suffix}",
         k8s_namespace=namespace,
         k8s_labels=k8s_global_labels,
         route_configs=[
+            OLApisixRouteConfig(
+                route_name="lms-logout",
+                priority=10,
+                plugins=[logout_framing_plugin(mit_learn_frame_ancestor)],
+                shared_plugin_config_name=edxapp_shared_plugins.resource_name,
+                hosts=[
+                    edxapp_config.require("backend_lms_domain"),
+                    edxapp_config.require_object("domains")["lms"],
+                ],
+                paths=["/logout", "/logout/"],
+                timeout_connect="600s",
+                timeout_read="600s",
+                timeout_send="600s",
+                backend_service_name=lms_webapp_deployment_name,
+                backend_service_port="http",
+            ),
             OLApisixRouteConfig(
                 route_name="lms-default",
                 priority=0,
@@ -2105,6 +2165,28 @@ def create_k8s_resources(  # noqa: C901
         k8s_namespace=namespace,
         k8s_labels=k8s_global_labels,
         route_configs=[
+            # studio is one of the IDAs openedx's logout interstitial frames,
+            # and it serves the same ALLOW-FROM header as the LMS above
+            # (verified live on studio.courses.learn.mit.edu/logout).  Same
+            # reasoning: name the allowed ancestors explicitly instead of
+            # depending on how a browser handles an unrecognised directive.
+            # The LMS host is listed because it is the immediate parent, and
+            # Learn's because it sits above the LMS in the chain (hq#12763).
+            OLApisixRouteConfig(
+                route_name="cms-logout",
+                priority=10,
+                plugins=[
+                    logout_framing_plugin(lms_frame_ancestor, mit_learn_frame_ancestor)
+                ],
+                shared_plugin_config_name=edxapp_shared_plugins.resource_name,
+                hosts=[
+                    edxapp_config.require("backend_studio_domain"),
+                    edxapp_config.require_object("domains")["studio"],
+                ],
+                paths=["/logout", "/logout/"],
+                backend_service_name=cms_webapp_deployment_name,
+                backend_service_port="http",
+            ),
             OLApisixRouteConfig(
                 route_name="cms-default",
                 priority=0,

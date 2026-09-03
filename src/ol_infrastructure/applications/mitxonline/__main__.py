@@ -824,12 +824,24 @@ proxy_rewrite_plugin_config = OLApisixPluginConfig(
     },
 )
 
+# openedx's logout interstitial frames our /logout?no_redirect=1 so that we tear
+# down our own gateway session, hence OPENEDX_API_BASE_URL below.  MIT Learn's
+# API host is here for hq#12763: Learn renders its own logout interstitial and
+# frames openedx's inside it, making the chain Learn -> openedx -> MITx Online.
+# frame-ancestors is evaluated against every ancestor, not just the immediate
+# parent, so omitting Learn here would have openedx's frame load and ours
+# silently refuse -- a logout that looks like it worked but left this session
+# alive.
 response_rewrite_plugin_config = OLApisixPluginConfig(
     name="response-rewrite",
     config={
         "headers": {
             "set": {
-                "Content-Security-Policy": f"frame-ancestors 'self' {env_vars['OPENEDX_API_BASE_URL']}"
+                "Content-Security-Policy": (
+                    "frame-ancestors 'self' "
+                    f"{env_vars['OPENEDX_API_BASE_URL']} "
+                    f"https://{learn_backend_domain}"
+                )
             }
         }
     },
@@ -848,6 +860,21 @@ direct_stale_session_cleanup = stale_session_cookie_cleanup_plugin(
     cookie_domains=[api_domain.removeprefix("api")],
 )
 prefixed_stale_session_cleanup = stale_session_cookie_cleanup_plugin()
+
+# Discards the caller's *current* MITx Online gateway session, for the
+# /switch-session route below.  Mechanically the same as the stale-cookie
+# cleanups above -- expire the cookie on the way out -- so it reuses that helper
+# rather than adding a near-identical one; only the intent differs, and the
+# parameter takes any cookie name despite being named for that use case.  Scoped
+# to the cookie name and parent domain the direct OIDC resource issues, since a
+# deletion has to match (name, domain, path) to land.
+direct_session_reset = stale_session_cookie_cleanup_plugin(
+    cookie_domains=[api_domain.removeprefix("api")],
+    stale_cookie_name=apisix_oidc_session_cookie_name(
+        "mitxonline",
+        stack_info.env_suffix,
+    ),
+)
 
 mitxonline_apisix_route_direct = OLApisixRoute(
     name=f"mitxonline-apisix-route-direct-{stack_info.env_suffix}",
@@ -895,6 +922,34 @@ mitxonline_apisix_route_direct = OLApisixRoute(
                 ),
                 response_rewrite_plugin_config,
                 direct_stale_session_cleanup,
+            ],
+            shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
+            backend_service_name=mitxonline_k8s_app.application_lb_service_name,
+            backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
+        ),
+        # Entry point for hand-offs from MIT Learn (hq#12763).  Learn and
+        # MITx Online keep separate gateway sessions on separate parent
+        # domains, so a browser arriving here can still be carrying the
+        # session of whoever used this browser before -- Learn's own session
+        # having been replaced in the meantime.  This route drops that session
+        # and bounces to the wrapped path; because "cart" below is
+        # unauth_action="auth", the follow-on request has no session, runs a
+        # fresh authorization-code flow, and comes back as whoever currently
+        # holds the Keycloak SSO session.
+        #
+        # No openid-connect plugin here on purpose: it would validate and
+        # possibly refresh the very session this route exists to discard.  The
+        # request still reaches Django, which owns validating `next` -- doing
+        # the redirect at the gateway with a regex would turn
+        # /switch-session//evil.example into a protocol-relative open redirect.
+        OLApisixRouteConfig(
+            route_name="switch-session",
+            priority=20,
+            hosts=[api_domain, frontend_domain],
+            paths=["/switch-session", "/switch-session/"],
+            plugins=[
+                response_rewrite_plugin_config,
+                direct_session_reset,
             ],
             shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
