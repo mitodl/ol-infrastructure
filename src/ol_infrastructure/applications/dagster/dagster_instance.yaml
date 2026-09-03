@@ -145,6 +145,32 @@ run_launcher:
   class: K8sRunLauncher
   config:
     run_k8s_config:
+      container_config:
+        env:
+        # Keep the OpenTelemetry auto-instrumentation agent off run workers.
+        #
+        # The user-deployments chart copies each code location's whole `env`
+        # list into DAGSTER_CLI_API_GRPC_CONTAINER_CONTEXT, and K8sRunLauncher
+        # applies that context to every run worker pod -- so the PYTHONPATH that
+        # switches the agent on for the ten code servers (see dagster_otel_env
+        # in __main__.py) would otherwise reach the run workers too. There is no
+        # chart lever that grants a code location container env a run worker
+        # does not inherit; `env_config_maps` and `env_secrets` propagate the
+        # same way.
+        #
+        # Empty is the off switch, not a placeholder: CPython contributes no
+        # sys.path entries for an empty PYTHONPATH, so site never finds the
+        # agent's sitecustomize.py and the SDK is never initialised. This entry
+        # is last in the container's env list (dagster_k8s/job.py builds it as
+        # [*env, *job_config.env, *user_defined_env_vars], and run_k8s_config
+        # supplies the third), and kubelet resolves duplicate names by last
+        # assignment (kubelet_pods.go, makeEnvironmentVariables).
+        #
+        # Run workers stay excluded until their span volume has a sampling
+        # decision: they live 7-9 seconds, so an 8s process depends entirely on
+        # BatchSpanProcessor's at-exit flush, and a SIGKILL loses the spans.
+        - name: PYTHONPATH
+          value: ""
       pod_template_spec_metadata:
         annotations:
           karpenter.sh/do-not-disrupt: "true"
