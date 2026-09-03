@@ -13,8 +13,7 @@ config:
     OPENTELEMETRY_SERVICE_NAME: ol-analytics-api
     OTEL_EXPORTER_OTLP_ENDPOINT: http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318
     OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
-    OTEL_TRACES_SAMPLER: parentbased_traceidratio
-    OTEL_TRACES_SAMPLER_ARG: "0.25"
+    OTEL_TRACES_SAMPLER: "parentbased_always_on"
     OTEL_PROPAGATORS: tracecontext,baggage
     OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"
     OTEL_RESOURCE_ATTRIBUTES: service.namespace=ol-analytics
