@@ -10,6 +10,7 @@ from ol_infrastructure.substructure.keycloak.oidc_helpers import (
 )
 from ol_infrastructure.substructure.keycloak.saml_helpers import (
     SAML_FRIENDLY_NAMES,
+    SamlMetadataError,
     extract_saml_metadata,
     generate_pulumi_args_dict,
     get_saml_attribute_mappers,
@@ -126,7 +127,7 @@ def create_org_for_learn(org_config: OrgConfig) -> keycloak.Organization:
     )
 
 
-def onboard_saml_org(  # noqa: C901, PLR0912
+def onboard_saml_org(  # noqa: C901
     saml_config: SamlIdpConfig,
     org: OrgConfig | keycloak.Organization,
 ) -> None:
@@ -149,15 +150,9 @@ def onboard_saml_org(  # noqa: C901, PLR0912
         saml_config.org_saml_metadata_xml or saml_config.org_saml_metadata_url
     )
     if metadata_source is None:  # Type guard, should not happen due to validation
-        pulumi.log.error(f"No metadata source configured for {saml_config.idp_alias}")
-        return
+        msg = f"No metadata source configured for {saml_config.idp_alias}"
+        raise SamlMetadataError(msg)
     saml_metadata = extract_saml_metadata(metadata_source)
-    if not saml_metadata:
-        pulumi.log.warn(
-            f"Skipping SAML IdP creation for {saml_config.idp_alias} due to "
-            f"inaccessible metadata source"
-        )
-        return
     saml_args = generate_pulumi_args_dict(saml_metadata)
 
     # Apply overrides if provided
@@ -263,16 +258,10 @@ def onboard_saml_idp(saml_config: SamlIdpConfig) -> None:  # noqa: C901
     metadata_source = (
         saml_config.org_saml_metadata_xml or saml_config.org_saml_metadata_url
     )
-    if metadata_source is None:
-        pulumi.log.error(f"No metadata source configured for {saml_config.idp_alias}")
-        return
+    if metadata_source is None:  # Type guard, should not happen due to validation
+        msg = f"No metadata source configured for {saml_config.idp_alias}"
+        raise SamlMetadataError(msg)
     saml_metadata = extract_saml_metadata(metadata_source)
-    if not saml_metadata:
-        pulumi.log.warn(
-            f"Skipping SAML IdP creation for {saml_config.idp_alias} due to "
-            f"inaccessible metadata source"
-        )
-        return
     saml_args = generate_pulumi_args_dict(saml_metadata)
 
     if saml_config.single_sign_on_service_url is not None:
@@ -393,12 +382,6 @@ def onboard_oidc_org(
         oidc_config.org_oidc_metadata_url,
         client_secret=oidc_config.client_secret,
     )
-    if oidc_idp_arg_map is None:
-        pulumi.log.warn(
-            f"Skipping OIDC IdP creation for {oidc_config.idp_alias} due to "
-            f"inaccessible metadata URL"
-        )
-        return
     oidc_idp_arg_map["extra_config"] = {
         "jwtX509HeadersEnabled": True,
     } | oidc_idp_arg_map.get("extra_config", {})
