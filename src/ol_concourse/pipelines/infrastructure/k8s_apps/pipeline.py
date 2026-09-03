@@ -363,7 +363,7 @@ def _ensure_ecr_repository_step(
         # recent" window and delete it. Age-based means CI volume can't
         # threaten a release image redeployed within any reasonable
         # window. Flagged by Copilot review on PR #5728.
-        configure_ecr_repository_task(repo_name, expire_after_days=180),
+        configure_ecr_repository_task(repo_name, expire_after_days=90),
     ]
 
 
