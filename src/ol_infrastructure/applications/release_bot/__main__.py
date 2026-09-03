@@ -121,6 +121,11 @@ bot_secret = kubernetes.core.v1.Secret(
         namespace=namespace,
     ),
     string_data={
+        # The bot token needs "users:read.email" on top of the usual
+        # chat/commands scopes: slack_users.py resolves each commit author's
+        # email to a Slack id so release notifications @-mention real people
+        # instead of pasting addresses. Without the scope the bot logs one
+        # error and degrades to plain-text names.
         "slack-bot-token": bot_secrets["slack-bot-token"],
         "slack-app-token": bot_secrets["slack-app-token"],
         "concourse-user": bot_secrets["concourse-username"],

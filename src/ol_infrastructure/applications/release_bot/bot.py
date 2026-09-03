@@ -10,6 +10,7 @@ from typing import Any
 import bot_config as config
 import concourse_client as concourse
 import github_client as github
+import slack_users
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from slack_bolt.async_app import AsyncApp
 
@@ -21,6 +22,14 @@ log = logging.getLogger(__name__)
 # A module global is safe here: Socket Mode connections are not multiplexed,
 # so this process runs exactly one AsyncApp (see __main__.py's replicas=1).
 _slack_app: AsyncApp | None = None
+
+
+# app name -> Slack user id of whoever last ran `/doof release` for it, so the
+# ready-to-promote notification can ping the person who owns the release
+# rather than posting into the channel addressed to no one (Doof pinged "the
+# Merginator" there). Process-local and deliberately not persisted: a bot
+# restart costs one mention, and the message is still posted either way.
+_release_requesters: dict[str, str] = {}
 
 
 _USAGE = (
@@ -48,7 +57,7 @@ def _describe_in_flight(in_flight: dict[str, Any]) -> str:
     return f"<{in_flight['url']}|{in_flight['version']}>{when}"
 
 
-async def _cmd_release(repos, ack, respond, command, _context):
+async def _cmd_release(repos, ack, respond, command, context):
     await ack()
     app_name = command["text"].strip()
     if app_name not in repos:
@@ -92,6 +101,10 @@ async def _cmd_release(repos, ack, respond, command, _context):
         log.exception("Failed to trigger release for %s", app_name)
         await respond(f"❌ Failed to trigger release for `{app_name}`. Check logs.")
         return
+
+    requester = (context or {}).get("user_id")
+    if requester:
+        _release_requesters[app_name] = requester
 
     message = f"🚀 Release triggered for `{app_name}`. Build: {build_url}"
     if in_flight:
@@ -233,6 +246,7 @@ async def _cmd_promote(repos, ack, respond, command, context):
         await concourse.check_resource(cfg.pipeline, f"{app_name}-release-gate")
     except Exception:
         log.exception("Failed to force release-gate check for %s", app_name)
+    _release_requesters.pop(app_name, None)
     await respond(
         f"✅ `{app_name}` {issues[0]['title']} promoted. Production deploy triggered."
     )
@@ -269,6 +283,7 @@ async def _cmd_abandon(repos, ack, respond, command, _context):
         log.exception("Failed to trigger abandon for %s", app_name)
         await respond(f"❌ Failed to trigger release abandon for `{app_name}`.")
         return
+    _release_requesters.pop(app_name, None)
     await respond(f"🗑️ Release abandon triggered for `{app_name}`. Build: {build_url}")
 
 
@@ -309,6 +324,7 @@ async def _handle_promote_button(repos, ack, body, say):
         await concourse.check_resource(cfg.pipeline, f"{app_name}-release-gate")
     except Exception:
         log.exception("Failed to force release-gate check for %s", app_name)
+    _release_requesters.pop(app_name, None)
     await say(
         f"🚀 <@{user_id}> promoted `{app_name}` `{version}` to Production. "
         "Concourse deploy triggered."
@@ -321,10 +337,6 @@ _CHECKBOX_POLL_SECONDS = 60
 # `/doof wait-for-checkboxes` for the same app doesn't start a duplicate loop
 # posting every progress message twice.
 _checkbox_watchers: set[str] = set()
-
-
-def _format_authors(authors) -> str:
-    return ", ".join(sorted(authors))
 
 
 async def _watch_checkboxes(app, app_name, cfg, channel) -> None:
@@ -390,7 +402,7 @@ async def _watch_checkboxes(app, app_name, cfg, channel) -> None:
                     channel=channel,
                     text=(
                         f"Thanks for checking off your boxes, "
-                        f"{_format_authors(newly_done)}!"
+                        f"{await slack_users.format_authors(app.client, newly_done)}!"
                     ),
                 )
     finally:
@@ -398,34 +410,41 @@ async def _watch_checkboxes(app, app_name, cfg, channel) -> None:
 
 
 def _checkbox_watch_preflight(repos, app_name):
-    """Return (channel, None) if a watcher can start, else (None, error message)."""
+    """Return (app, channel, None) if a watcher can start, else (None, None, error).
+
+    The app is handed back rather than re-read from the module global by the
+    caller, so the `_slack_app is None` check below is what narrows the type
+    for everything downstream.
+    """
     if app_name not in repos:
-        return None, f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}"
+        return None, None, f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}"
     channel = repos[app_name].channel or os.environ.get("RELEASE_ANNOUNCE_CHANNEL")
     if not channel:
-        return None, (
+        return (
+            None,
+            None,
             f"No Slack channel configured for `{app_name}`, so there is nowhere "
-            "to post checklist progress."
+            "to post checklist progress.",
         )
     if _slack_app is None:
-        return None, "Bot is still starting up; try again in a moment."
+        return None, None, "Bot is still starting up; try again in a moment."
     if app_name in _checkbox_watchers:
-        return None, f"Already watching `{app_name}`'s release checklist."
+        return None, None, f"Already watching `{app_name}`'s release checklist."
     # Reserve the slot here rather than after the GitHub lookup below. Nothing
     # awaits between this check and the add, so it is atomic on the event loop;
     # claiming it later would let two concurrent invocations both pass this
     # check, interleave at open_release_issues, and start duplicate watchers
     # that post every progress message twice.
     _checkbox_watchers.add(app_name)
-    return channel, None
+    return _slack_app, channel, None
 
 
 async def _cmd_wait_for_checkboxes(repos, ack, respond, command, _context):
     """Watch a release checklist and report who is still outstanding."""
     await ack()
     app_name = command["text"].strip()
-    channel, error = _checkbox_watch_preflight(repos, app_name)
-    if error:
+    app, channel, error = _checkbox_watch_preflight(repos, app_name)
+    if error or app is None:
         await respond(error)
         return
     cfg = repos[app_name]
@@ -454,12 +473,13 @@ async def _cmd_wait_for_checkboxes(repos, ack, respond, command, _context):
         return
 
     asyncio.create_task(  # noqa: RUF006
-        _watch_checkboxes(_slack_app, app_name, cfg, channel)
+        _watch_checkboxes(app, app_name, cfg, channel)
     )
     await respond(
         f"👀 Watching `{app_name}`'s <{issue['url']}|release checklist> "
         f"({checked}/{total} checked).\n"
-        f"Still waiting on: {_format_authors(outstanding)}"
+        f"Still waiting on: "
+        f"{await slack_users.format_authors(app.client, outstanding)}"
     )
 
 
@@ -516,8 +536,9 @@ _READY_TO_PROMOTE_POLL_SECONDS = 120
 
 
 def _ready_to_promote_blocks(
-    app_name: str, version: str, issue_url: str
+    app_name: str, version: str, issue_url: str, requester: str | None = None
 ) -> list[dict[str, object]]:
+    cc = f" cc <@{requester}>" if requester else ""
     return [
         {
             "type": "section",
@@ -525,7 +546,8 @@ def _ready_to_promote_blocks(
                 "type": "mrkdwn",
                 "text": (
                     f"✅ *`{app_name}` {version}* — all checklist items are "
-                    f"checked off. <{issue_url}|Release issue> ready for promotion."
+                    f"checked off. <{issue_url}|Release issue> ready for "
+                    f"promotion.{cc}"
                 ),
             },
         },
@@ -583,13 +605,24 @@ async def _notify_ready_to_promote(app, repos) -> None:
                 await app.client.chat_postMessage(
                     channel=channel,
                     text=f"✅ `{app_name}` {version} is ready to promote.",
-                    blocks=_ready_to_promote_blocks(app_name, version, issue["url"]),
+                    blocks=_ready_to_promote_blocks(
+                        app_name,
+                        version,
+                        issue["url"],
+                        _release_requesters.get(app_name),
+                    ),
                 )
             except Exception:
                 log.exception(
                     "Failed to send ready-to-promote notification for %s", app_name
                 )
                 continue
+            # The mention has been delivered. Dropping it here keeps a failed
+            # add_issue_label below -- which leaves the issue eligible on
+            # every 120s poll -- from re-pinging the same person on each
+            # repeat; the duplicate message is a nuisance, a repeating
+            # notification is not.
+            _release_requesters.pop(app_name, None)
             try:
                 await github.add_issue_label(
                     cfg.repo, issue["number"], github.PROMOTE_READY_LABEL
