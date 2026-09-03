@@ -12,6 +12,7 @@
   meilisearch:memory_request: "4Gi"
   meilisearch:memory_limit: "4Gi"
   meilisearch:max_indexing_memory: "2Gi" # optional, see Sizing below
+  meilisearch:volume_attributes_class: "" # optional, see Volume throughput below
 ```
 
 The difference between `deploy` and `enabled`. Deploy means "deploy the helm chart" whereas enabled means "enable meilisearch integration in the Open edX platform". You can deploy the chart but not enable it in Open edX if you want to test things out first.
@@ -44,6 +45,44 @@ the OS, so rewriting documents in place inflates `indexSize` permanently. Only a
 rebuild through the temp-index-and-swap path (a non-incremental
 `./manage.py cms reindex_studio`) reclaims it — `--incremental` writes in place
 and does not.
+
+## Volume throughput
+
+Whatever cannot be held in page cache is re-read from EBS, so once the index
+outgrows the pod's cgroup the volume's throughput becomes the real ceiling on
+indexing. `ebs-gp3-sc` provisions gp3 at the AWS default of 125 MB/s, and a
+starved instance will sit against that number indefinitely. Over fifteen
+consecutive minutes on 2026-09-03, mitxonline production averaged 110 MB/s and
+peaked at 122 MB/s — 98% of the ceiling — while peak IOPS reached 1,904/s, only
+38% of the 5,000 already provisioned. It read 91.8 GiB in that window against a
+12.02 GiB index, so it re-read the whole thing 7.6 times over. Throughput bound
+it; IOPS did not. Check both before assuming which one is short.
+
+StorageClass parameters apply at provisioning time only, so raising them does
+nothing for a volume that already exists. `volume_attributes_class` names a
+`VolumeAttributesClass` instead, which drives `ec2:ModifyVolume` against the live
+volume: online, no pod restart, and no rebind — which matters because this PVC
+is zone-locked and its pod is pinned to a core node, so anything that forces a
+reschedule risks leaving `meilisearch-0` `Pending`.
+
+`ebs-gp3-throughput-500` is declared for every cluster in
+`infrastructure/aws/eks/__main__.py` and costs nothing until a PVC names it. The
+EKS stack has to be applied before the stack that references it, or the PVC will
+name a class that does not exist yet.
+
+EBS allows one modification per volume per six hours, so a mistake here is slow
+to walk back. Confirm the result against the volume rather than the PVC:
+
+```bash
+kubectl get pvc meilisearch -n <namespace> \
+  -o jsonpath='{.status.currentVolumeAttributesClassName}{"\n"}'
+aws ec2 describe-volumes --volume-ids <vol-id> \
+  --query 'Volumes[0].[Iops,Throughput]' --output text
+```
+
+This raises a ceiling; it does not reduce the amount of re-reading. Sizing the
+memory limit so the working set fits is the durable fix, and the two are
+complementary rather than alternatives.
 
 ## SOPS secrets
 

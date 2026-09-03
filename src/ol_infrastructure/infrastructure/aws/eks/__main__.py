@@ -842,6 +842,41 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             depends_on=[ebs_csi_driver_role, *node_groups],
         ),
     )
+    # gp3 volumes provisioned by the storageclass above get 125 MB/s, the AWS
+    # default. That is a throughput ceiling, not a starting point: a volume whose
+    # working set does not fit in its consumer's page cache re-reads from EBS
+    # continuously and saturates it. Over fifteen consecutive minutes on 2026-09-03,
+    # mitxonline production Meilisearch averaged 110 MB/s against that ceiling and
+    # peaked at 122 MB/s (98% of it), while peak IOPS reached 1,904/s -- 38% of the
+    # 5,000 the storageclass had already provisioned. Throughput bound it; IOPS did
+    # not. Mean read size was 77 KiB, which is why.
+    #
+    # StorageClass parameters only apply at provisioning time, so they cannot fix an
+    # existing volume. A VolumeAttributesClass can: setting it on a live PVC drives
+    # ec2:ModifyVolume in place, with no pod restart and no rebind. This is declared
+    # for every cluster because it costs nothing until a PVC references it by name.
+    #
+    # iops is pinned to 5,000 rather than omitted so the class states the full target
+    # geometry instead of silently inheriting whatever the volume happens to carry.
+    # That matches what `iopsPerGB: 50` yields for the 100Gi volumes this is aimed at.
+    kubernetes.storage.v1.VolumeAttributesClass(
+        resource_name=f"{cluster_name}-ebs-gp3-throughput-500-volumeattributesclass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="ebs-gp3-throughput-500",
+            labels=k8s_global_labels,
+        ),
+        driver_name="ebs.csi.aws.com",
+        # ref: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/modify-volume.md
+        parameters={
+            "type": "gp3",
+            "iops": "5000",
+            "throughput": "500",
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[ebs_csi_driver_role, *node_groups],
+        ),
+    )
     aws_ebs_cni_driver_addon = eks.Addon(
         f"{cluster_name}-eks-addon-ebs-cni-driver-addon",
         cluster=cluster,
