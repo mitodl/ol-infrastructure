@@ -122,10 +122,10 @@ def run_probe(server_addr: str, graph_id: str, token: str) -> dict[str, Any]:
             f"({body[:200]!r}): {exc}"
         )
         raise ProbeError(msg) from exc
-    if not isinstance(parsed, dict) or "rows" not in parsed:
+    if not isinstance(parsed, dict) or not isinstance(parsed.get("rows"), list):
         msg = (
             f"POST {url} returned HTTP {status} with an unexpected body shape "
-            f"(no 'rows' key): {parsed!r}"
+            f"('rows' missing or not a list): {parsed!r}"
         )
         raise ProbeError(msg)
     return parsed

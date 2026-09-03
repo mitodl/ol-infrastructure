@@ -124,6 +124,26 @@ def test_run_probe_rejects_a_2xx_body_missing_rows(stub_server):
         run_probe(base, "council", "t")  # pragma: allowlist secret
 
 
+@pytest.mark.parametrize(
+    "malformed_rows",
+    [
+        None,  # {"rows": null, ...} — a present-but-empty key
+        "ok",  # {"rows": "ok", ...} — present, wrong type
+    ],
+)
+def test_run_probe_rejects_rows_that_is_not_a_list(stub_server, malformed_rows):
+    """`rows` present but the wrong shape must fail the same as a missing
+    key — a presence-only check would let a proxy-shaped 2xx through.
+    """
+    _, base = stub_server
+    _StubHandler.routes = {
+        "/graphs/council/query": (200, {"rows": malformed_rows, "row_count": 1})
+    }
+
+    with pytest.raises(ProbeError, match="unexpected body shape"):
+        run_probe(base, "council", "t")  # pragma: allowlist secret
+
+
 def test_run_probe_raises_when_the_server_is_unreachable():
     with pytest.raises(ProbeError, match="failed"):
         run_probe(

@@ -108,10 +108,13 @@ def create_council_probe(  # noqa: PLR0913
         ),
         spec=kubernetes.core.v1.PodSpecArgs(
             restart_policy="Never",
-            # No ServiceAccount token needed — see the module docstring. The
-            # default SA is left mounted at its usual read-only Kubernetes-API
-            # scope, which this pod never calls; explicitly disabling it would
-            # save nothing this pod can leak, since it makes zero K8s API calls.
+            # This pod makes zero Kubernetes API calls, but a mounted default
+            # SA token is a live credential regardless of whether the app
+            # ever uses it: a compromised container could exfiltrate it
+            # alongside the probe's own bearer token. Same posture as every
+            # other non-Kubernetes-API caller in this stack
+            # (view_reaper.py, ci_indexer.py).
+            automount_service_account_token=False,
             containers=[
                 kubernetes.core.v1.ContainerArgs(
                     name="check-council-health",
