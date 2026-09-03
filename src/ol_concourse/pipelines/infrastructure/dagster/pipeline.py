@@ -39,7 +39,7 @@ def build_dagster_docker_pipeline() -> Pipeline:
         {"name": "data_platform", "module": "data_platform.definitions"},
         {"name": "edxorg", "module": "edxorg.definitions"},
         {"name": "lakehouse", "module": "lakehouse.definitions"},
-        {"name": "learning_resources", "module": "learning_resources.definitions"},
+        {"name": "delivery", "module": "delivery.definitions"},
         {"name": "legacy_openedx", "module": "legacy_openedx.definitions"},
         {"name": "openedx", "module": "openedx.definitions"},
         {"name": "b2b_organization", "module": "b2b_organization.definitions"},

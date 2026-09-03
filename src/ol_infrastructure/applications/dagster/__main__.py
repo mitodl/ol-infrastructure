@@ -2136,11 +2136,7 @@ code_locations: list[dict[str, str | int]] = [
     {"name": "data_platform", "module": "data_platform.definitions", "port": 4001},
     {"name": "edxorg", "module": "edxorg.definitions", "port": 4002},
     {"name": "lakehouse", "module": "lakehouse.definitions", "port": 4003},
-    {
-        "name": "learning_resources",
-        "module": "learning_resources.definitions",
-        "port": 4004,
-    },
+    {"name": "delivery", "module": "delivery.definitions", "port": 4004},
     {"name": "legacy_openedx", "module": "legacy_openedx.definitions", "port": 4005},
     {"name": "openedx", "module": "openedx.definitions", "port": 4006},
     {
