@@ -273,36 +273,62 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                     views=["admin", "user"], edits=["admin", "user"]
                 ),
             ),
-            # Populated via IdP-broker attribute mappers, not user input, so
-            # these are admin-only and never required -- most users have no
-            # value here at all. Per Apply7 (the current source of both
-            # claims): "customer" means whichever of *their* downstream
-            # customers -- a school or institution using Apply7's platform
-            # -- this Apply7-authenticated user is attributed to, i.e. the
-            # school/institution attribution blarghmatey asked about, not
-            # Apply7 itself and not an MIT Learn concept. If a future OIDC
-            # partner sends similarly-named claims with different semantics,
-            # give them their own attribute(s) rather than reusing these --
-            # the definitions below are Apply7-specific.
+            # customerId/customerName: the contract for B2B-partner "which
+            # of the partner's own downstream customers does this user
+            # belong to" attribution claims (what blarghmatey originally
+            # asked about). Populated via IdP-broker attribute mappers, not
+            # user input, so these are admin-only and never required --
+            # most users have no value here at all. Accepted shape, and the
+            # `length` validators below enforcing it:
+            #   customerId:   non-empty string, <=255 chars. An opaque
+            #                 identifier owned by the partner (may be a
+            #                 UUID, a slug, a database key, etc.) -- no
+            #                 character-set constraint, since we don't
+            #                 control its format. Matches the 255-char
+            #                 bound already used for email/username above.
+            #   customerName: string, <=512 chars, human-readable (e.g.
+            #                 "Springfield High School"). Matches the
+            #                 512-char bound already used for fullName
+            #                 above.
+            # Per Apply7 (the current source of both claims): "customer"
+            # means one of *their* downstream customers -- a school or
+            # institution using Apply7's platform -- not Apply7 itself and
+            # not an MIT Learn concept.
             #
-            # customerId: a unique and stable identifier, assigned by
-            # Apply7, for that customer.
+            # This is the standard contract for this kind of claim: any
+            # future OIDC/SAML partner sending an equivalent attribution
+            # claim should populate these same two attributes in this same
+            # shape, rather than each partner inventing its own. Only add a
+            # new, separately-named attribute if a partner's claim doesn't
+            # actually fit this shape (e.g. a structured/non-string value,
+            # or a genuinely different concept than "which downstream
+            # customer of the partner").
             keycloak.RealmUserProfileAttributeArgs(
                 name="customerId",
                 display_name="${customerId}",
                 group="user-metadata",
                 required_for_roles=[],
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="length",
+                        config={"max": "255"},
+                    ),
+                ],
                 permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                     views=["admin"], edits=["admin"]
                 ),
             ),
-            # customerName: that same customer's human-readable display
-            # name (e.g. "Springfield High School"), also as sent by Apply7.
             keycloak.RealmUserProfileAttributeArgs(
                 name="customerName",
                 display_name="${customerName}",
                 group="user-metadata",
                 required_for_roles=[],
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="length",
+                        config={"max": "512"},
+                    ),
+                ],
                 permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                     views=["admin"], edits=["admin"]
                 ),
