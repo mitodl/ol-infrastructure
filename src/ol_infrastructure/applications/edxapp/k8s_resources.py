@@ -213,10 +213,17 @@ def create_k8s_resources(  # noqa: C901
     # Look up what what release to deploy for this stack
     release_info = OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
 
-    opensearch_stack = make_stack_reference(
-        projects.OPENSEARCH, f"{stack_info.env_prefix}.{stack_info.name}"
-    )
-    opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
+    # Environments that have retired their OpenSearch domain set
+    # edxapp:elasticsearch_enabled to false. The stack reference has to be
+    # skipped entirely, not just left unused, or the require_output below keeps
+    # the destroyed opensearch stack alive as a dependency.
+    if edxapp_config.get_bool("elasticsearch_enabled", default=True):
+        opensearch_stack = make_stack_reference(
+            projects.OPENSEARCH, f"{stack_info.env_prefix}.{stack_info.name}"
+        )
+        opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
+    else:
+        opensearch_hostname = None
 
     # Configure reusable global labels
     ou = BusinessUnit(edxapp_config.require("business_unit"))

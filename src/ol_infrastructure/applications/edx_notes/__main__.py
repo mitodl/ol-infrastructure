@@ -68,9 +68,15 @@ edxapp_stack = make_stack_reference(
 
 cluster_name = notes_config.get("cluster") or "applications"
 cluster_stack = make_stack_reference(projects.EKS, f"{cluster_name}.{stack_info.name}")
-opensearch_stack = make_stack_reference(
-    projects.OPENSEARCH, f"{stack_info.env_prefix}.{stack_info.name}"
-)
+# Environments that have retired their OpenSearch domain set
+# edxnotes:elasticsearch_enabled to false. edx-notes-api then runs with
+# ES_DISABLED, which falls back to querying the Note model in MySQL directly
+# (notesapi/v1/views.py NotesViewSet.is_es_disabled) rather than losing search.
+elasticsearch_enabled = notes_config.get_bool("elasticsearch_enabled", default=True)
+if elasticsearch_enabled:
+    opensearch_stack = make_stack_reference(
+        projects.OPENSEARCH, f"{stack_info.env_prefix}.{stack_info.name}"
+    )
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 target_vpc_name = notes_config.get("target_vpc")
@@ -143,8 +149,13 @@ notes_app_security_group = ec2.SecurityGroup(
 )
 
 # Get service URLs from stack references (as Output objects)
-opensearch_cluster = opensearch_stack.require_output("cluster")
-opensearch_endpoint = opensearch_cluster["endpoint"]
+if elasticsearch_enabled:
+    opensearch_endpoint = opensearch_stack.require_output("cluster")["endpoint"]
+else:
+    # lehrer's env_config.py lists ELASTICSEARCH_DSL_HOST in REQUIRED_ENV_VARS
+    # unconditionally and only reads it when ES_DISABLED is false, so the
+    # variable has to be present but its value is never used.
+    opensearch_endpoint = Output.from_input("elasticsearch-disabled")
 edxapp_output = edxapp_stack.require_output("edxapp")
 edxapp_db_address = edxapp_output["mariadb"]
 
@@ -157,6 +168,7 @@ APP_PORT = 8000
 # Application configuration (non-sensitive, static values only)
 application_config = {
     "APP_PORT": str(APP_PORT),
+    "ELASTICSEARCH_DSL_DISABLED": str(not elasticsearch_enabled).lower(),
     "ELASTICSEARCH_DSL_PORT": "443",
     "ELASTICSEARCH_DSL_USE_SSL": "true",
     "ELASTICSEARCH_DSL_VERIFY_CERTS": "false",
@@ -255,8 +267,14 @@ db_creds_secret = OLVaultK8SSecret(
 # Pre-deploy commands for migrations and Elasticsearch index
 pre_deploy_commands = [
     ("migrate", ["python", "manage.py", "migrate", "--noinput"]),
-    ("es-index", ["python", "manage.py", "search_index", "--rebuild", "-f"]),
 ]
+if elasticsearch_enabled:
+    # search_index ships with django_elasticsearch_dsl, which notesserver's
+    # common.py only adds to INSTALLED_APPS when ES_DISABLED is false, so the
+    # command does not exist at all in the disabled case.
+    pre_deploy_commands.append(
+        ("es-index", ["python", "manage.py", "search_index", "--rebuild", "-f"])
+    )
 
 # Build OLApplicationK8s config
 ol_app_k8s_config = OLApplicationK8sConfig(
