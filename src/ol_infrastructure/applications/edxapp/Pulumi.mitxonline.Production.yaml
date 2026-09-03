@@ -187,6 +187,7 @@ config:
   meilisearch:memory_request: "1Gi"
   meilisearch:memory_limit: "4Gi"
   meilisearch:max_indexing_memory: "2Gi"
+  meilisearch:volume_attributes_class: ebs-gp3-throughput-500
   typesense:deploy: "true"
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
