@@ -5,6 +5,7 @@ can be driven directly with async stubs -- no Slack app or socket needed.
 """
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import bot
@@ -766,3 +767,320 @@ async def test_a_failed_post_keeps_the_requester_for_the_next_poll(repos, monkey
     await bot._notify_ready_to_promote(app, repos)
 
     assert bot._release_requesters["my-app"] == "UDANA"
+
+
+# ---------------------------------------------------------------------------
+# Deploy milestone announcements
+# ---------------------------------------------------------------------------
+
+
+def _deployment(deployment_id: int, version: str, environment: str) -> dict[str, Any]:
+    return {
+        "id": deployment_id,
+        "version": version,
+        "sha": "abc123",
+        "environment": environment,
+        "deployed_at": datetime.now(tz=UTC),
+        "url": "",
+    }
+
+
+@pytest.fixture
+def slack_app():
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+    return app
+
+
+@pytest.fixture
+def _no_release_issue(monkeypatch):
+    monkeypatch.setattr(
+        bot.github, "release_issue_for_version", AsyncMock(return_value=None)
+    )
+
+
+def _deployments_by_environment(mapping: dict[str, dict[str, Any] | None]):
+    async def _lookup(_repo, environment):
+        return mapping.get(environment)
+
+    return _lookup
+
+
+@pytest.mark.usefixtures("_no_release_issue")
+async def test_first_poll_seeds_instead_of_announcing(repos, slack_app, monkeypatch):
+    """A restart must not replay whatever is already deployed into the channel.
+
+    The watcher reports transitions, so its first observation of an app is a
+    baseline, not news -- otherwise every bot deploy would re-announce every
+    app's current RC and production release.
+    """
+    monkeypatch.setattr(
+        bot.github,
+        "latest_successful_deployment",
+        _deployments_by_environment(
+            {
+                bot.github.RC_ENVIRONMENT: _deployment(1, "2026.9.2.1", "RC"),
+                bot.github.PRODUCTION_ENVIRONMENT: _deployment(
+                    2, "2026.9.1.1", "Production"
+                ),
+            }
+        ),
+    )
+    state = bot.ReleaseProgressState()
+
+    await bot._announce_deployments(slack_app, repos, state)
+
+    slack_app.client.chat_postMessage.assert_not_called()
+    assert state.last_deployment[("my-app", "RC")] == 1
+    assert state.last_deployment[("my-app", "Production")] == 2
+
+
+async def test_new_rc_deployment_announces_version_and_release_issue(
+    repos, slack_app, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.github,
+        "latest_successful_deployment",
+        _deployments_by_environment(
+            {bot.github.RC_ENVIRONMENT: _deployment(7, "2026.9.2.1", "RC")}
+        ),
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "release_issue_for_version",
+        AsyncMock(
+            return_value={
+                "number": 12,
+                "url": "https://github.com/mitodl/my-app/issues/12",
+                "title": "Release my-app 2026.9.2.1",
+            }
+        ),
+    )
+    state = bot.ReleaseProgressState(last_deployment={("my-app", "RC"): 6})
+
+    await bot._announce_deployments(slack_app, repos, state)
+
+    text = slack_app.client.chat_postMessage.call_args.kwargs["text"]
+    assert "2026.9.2.1" in text
+    assert "RC" in text
+    # The link is the whole point: it is what makes "what is in this release"
+    # one click away, which is what the kubewatch notifications lack.
+    assert "https://github.com/mitodl/my-app/issues/12" in text
+
+
+@pytest.mark.usefixtures("_no_release_issue")
+async def test_production_deployment_announces_separately(
+    repos, slack_app, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.github,
+        "latest_successful_deployment",
+        _deployments_by_environment(
+            {
+                bot.github.PRODUCTION_ENVIRONMENT: _deployment(
+                    9, "2026.9.2.1", "Production"
+                )
+            }
+        ),
+    )
+    state = bot.ReleaseProgressState(last_deployment={("my-app", "Production"): 8})
+
+    await bot._announce_deployments(slack_app, repos, state)
+
+    text = slack_app.client.chat_postMessage.call_args.kwargs["text"]
+    assert "production" in text.lower()
+    assert "2026.9.2.1" in text
+
+
+@pytest.mark.usefixtures("_no_release_issue")
+async def test_unchanged_deployment_is_not_re_announced(repos, slack_app, monkeypatch):
+    monkeypatch.setattr(
+        bot.github,
+        "latest_successful_deployment",
+        _deployments_by_environment(
+            {bot.github.RC_ENVIRONMENT: _deployment(7, "2026.9.2.1", "RC")}
+        ),
+    )
+    state = bot.ReleaseProgressState()
+
+    await bot._announce_deployments(slack_app, repos, state)
+    await bot._announce_deployments(slack_app, repos, state)
+    await bot._announce_deployments(slack_app, repos, state)
+
+    slack_app.client.chat_postMessage.assert_not_called()
+
+
+@pytest.mark.usefixtures("_no_release_issue")
+async def test_a_brand_new_apps_first_ever_deployment_is_announced(
+    repos, slack_app, monkeypatch
+):
+    """A never-deployed app's first real deployment is news, not a restart-seed.
+
+    Regression: collapsing "never polled this (app, environment)" and "polled
+    it and found nothing yet" both looked like `.get(key) is None`, so the
+    first real deployment for a brand-new app was silently swallowed as if it
+    were an already-known deployment observed right after a bot restart.
+    """
+    rc_calls = {"n": 0}
+
+    async def _lookup(_repo, environment):
+        # Production never has a deployment in this test; only RC's polls
+        # progress, so the assertions below can inspect a single message.
+        if environment != bot.github.RC_ENVIRONMENT:
+            return None
+        rc_calls["n"] += 1
+        return None if rc_calls["n"] == 1 else _deployment(7, "2026.9.2.1", "RC")
+
+    monkeypatch.setattr(bot.github, "latest_successful_deployment", _lookup)
+    state = bot.ReleaseProgressState()
+
+    await bot._announce_deployments(slack_app, repos, state)
+    slack_app.client.chat_postMessage.assert_not_called()
+    assert state.last_deployment[("my-app", "RC")] is None
+
+    await bot._announce_deployments(slack_app, repos, state)
+
+    slack_app.client.chat_postMessage.assert_called_once()
+    text = slack_app.client.chat_postMessage.call_args.kwargs["text"]
+    assert "2026.9.2.1" in text
+    assert state.last_deployment[("my-app", "RC")] == 7
+
+
+@pytest.mark.usefixtures("_no_release_issue")
+async def test_a_failed_post_is_retried_on_the_next_poll(repos, slack_app, monkeypatch):
+    """Recording a milestone as announced when the post failed loses it forever."""
+    monkeypatch.setattr(
+        bot.github,
+        "latest_successful_deployment",
+        _deployments_by_environment(
+            {bot.github.RC_ENVIRONMENT: _deployment(7, "2026.9.2.1", "RC")}
+        ),
+    )
+    slack_app.client.chat_postMessage = AsyncMock(
+        side_effect=RuntimeError("slack down")
+    )
+    state = bot.ReleaseProgressState(last_deployment={("my-app", "RC"): 6})
+
+    await bot._announce_deployments(slack_app, repos, state)
+
+    assert state.last_deployment[("my-app", "RC")] == 6
+    slack_app.client.chat_postMessage = AsyncMock()
+    await bot._announce_deployments(slack_app, repos, state)
+    slack_app.client.chat_postMessage.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Stuck-release reporting
+# ---------------------------------------------------------------------------
+
+
+def _in_flight(version: str, age: timedelta) -> dict[str, Any]:
+    return {
+        "version": version,
+        "branch": f"releases/{version}",
+        "url": f"https://github.com/mitodl/my-app/tree/releases/{version}",
+        "cut_at": datetime.now(tz=UTC) - age,
+    }
+
+
+async def test_a_young_release_is_not_reported_as_stuck(repos, slack_app, monkeypatch):
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.9.2.1", timedelta(hours=2))),
+    )
+
+    await bot._nag_stuck_releases(slack_app, repos, bot.ReleaseProgressState())
+
+    slack_app.client.chat_postMessage.assert_not_called()
+
+
+async def test_a_release_deployed_to_production_but_unfinished_is_called_out(
+    repos, slack_app, monkeypatch
+):
+    """The ol-analytics-api failure: shipped, branch never merged, nothing red.
+
+    This has to read differently from "waiting to be promoted" -- the branch
+    outliving its production deploy is what freezes the calver counter, so the
+    next release collides with this version.
+    """
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.8.3.1", timedelta(days=30))),
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "latest_successful_deployment",
+        _deployments_by_environment(
+            {
+                bot.github.RC_ENVIRONMENT: _deployment(1, "2026.8.3.1", "RC"),
+                bot.github.PRODUCTION_ENVIRONMENT: _deployment(
+                    2, "2026.8.3.1", "Production"
+                ),
+            }
+        ),
+    )
+    state = bot.ReleaseProgressState()
+
+    await bot._nag_stuck_releases(slack_app, repos, state)
+
+    text = slack_app.client.chat_postMessage.call_args.kwargs["text"]
+    assert "2026.8.3.1" in text
+    assert "30d" in text
+    assert "never finished" in text
+    assert "releases/2026.8.3.1" in text
+    assert state.nagged_at[("my-app", "2026.8.3.1")] is not None
+
+
+async def test_a_release_that_never_reached_rc_says_so(repos, slack_app, monkeypatch):
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.9.1.1", timedelta(days=2))),
+    )
+    monkeypatch.setattr(
+        bot.github, "latest_successful_deployment", _deployments_by_environment({})
+    )
+
+    await bot._nag_stuck_releases(slack_app, repos, bot.ReleaseProgressState())
+
+    text = slack_app.client.chat_postMessage.call_args.kwargs["text"]
+    assert "has not reached RC" in text
+
+
+async def test_a_stuck_release_is_not_re_reported_every_poll(
+    repos, slack_app, monkeypatch
+):
+    """Doof re-nagged every 24h, not every poll cycle."""
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.9.1.1", timedelta(days=2))),
+    )
+    monkeypatch.setattr(
+        bot.github, "latest_successful_deployment", _deployments_by_environment({})
+    )
+    state = bot.ReleaseProgressState()
+
+    await bot._nag_stuck_releases(slack_app, repos, state)
+    await bot._nag_stuck_releases(slack_app, repos, state)
+    await bot._nag_stuck_releases(slack_app, repos, state)
+
+    slack_app.client.chat_postMessage.assert_called_once()
+
+
+async def test_the_stuck_threshold_is_configurable(repos, slack_app, monkeypatch):
+    monkeypatch.setenv("RELEASE_STUCK_AFTER_HOURS", "1")
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.9.2.1", timedelta(hours=2))),
+    )
+    monkeypatch.setattr(
+        bot.github, "latest_successful_deployment", _deployments_by_environment({})
+    )
+
+    await bot._nag_stuck_releases(slack_app, repos, bot.ReleaseProgressState())
+
+    slack_app.client.chat_postMessage.assert_called_once()
