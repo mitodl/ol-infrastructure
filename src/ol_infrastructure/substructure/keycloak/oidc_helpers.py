@@ -39,8 +39,13 @@ def oidc_identity_provider_args_from_discovery_url(
         authentication method we require.
     """
     try:
-        oidc_provider_metadata = httpx.get(discovery_url, timeout=10).json()
-    except (httpx.RequestError, ValueError) as e:
+        response = httpx.get(discovery_url, timeout=10)
+        # An error response with a JSON body parses fine, so without this an
+        # IdP-not-found page would be read as discovery metadata. HTTPError is
+        # the base of both RequestError and the HTTPStatusError this raises.
+        response.raise_for_status()
+        oidc_provider_metadata = response.json()
+    except (httpx.HTTPError, ValueError) as e:
         msg = f"Unable to fetch OIDC discovery document from {discovery_url}: {e}"
         raise OidcDiscoveryError(msg) from e
     keycloak_arg_map = {

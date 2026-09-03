@@ -5,12 +5,12 @@ identity-provider resource from the Pulumi program. Pulumi reads that as a delet
 and removes the partner's working SSO integration.
 """
 
-import urllib.request
 from urllib.error import URLError
 
 import httpx
 import pytest
 
+from ol_infrastructure.substructure.keycloak import oidc_helpers, saml_helpers
 from ol_infrastructure.substructure.keycloak.oidc_helpers import (
     OidcDiscoveryError,
     oidc_identity_provider_args_from_discovery_url,
@@ -26,6 +26,11 @@ METADATA_URL = "https://idp.example.com/metadata.xml"
 REFUSED = "connection refused"
 
 
+# Both helper modules bind their fetch function at import time
+# (`from urllib.request import urlopen`, `import httpx` then `httpx.get`), so
+# every patch here targets the helper module's own attribute. Patching
+# urllib.request.urlopen instead leaves saml_helpers.urlopen pointing at the
+# original and the test makes a real network call.
 @pytest.fixture
 def unreachable_saml_endpoint(monkeypatch):
     """Make every SAML metadata fetch fail the way an offline partner IdP does."""
@@ -33,7 +38,7 @@ def unreachable_saml_endpoint(monkeypatch):
     def _raise(*args, **kwargs):  # noqa: ARG001
         raise URLError(REFUSED)
 
-    monkeypatch.setattr(urllib.request, "urlopen", _raise)
+    monkeypatch.setattr(saml_helpers, "urlopen", _raise)
 
 
 @pytest.fixture
@@ -43,18 +48,33 @@ def unreachable_oidc_endpoint(monkeypatch):
     def _raise(*args, **kwargs):  # noqa: ARG001
         raise httpx.ConnectError(REFUSED)
 
-    monkeypatch.setattr(httpx, "get", _raise)
+    monkeypatch.setattr(oidc_helpers.httpx, "get", _raise)
+
+
+def _patch_discovery_response(monkeypatch, status, body):
+    """Serve one canned discovery response.
+
+    The request has to be attached: raise_for_status() reads it before it looks
+    at the status code, and errors out on a response built without one.
+    """
+
+    def _respond(*args, **kwargs):  # noqa: ARG001
+        return httpx.Response(
+            status, json=body, request=httpx.Request("GET", DISCOVERY_URL)
+        )
+
+    monkeypatch.setattr(oidc_helpers.httpx, "get", _respond)
 
 
 @pytest.mark.usefixtures("unreachable_saml_endpoint")
 def test_saml_metadata_fetch_failure_raises():
-    with pytest.raises(SamlMetadataError, match="Unable to fetch or parse"):
+    with pytest.raises(SamlMetadataError, match=f"Unable to fetch or parse.*{REFUSED}"):
         extract_saml_metadata(METADATA_URL)
 
 
 @pytest.mark.usefixtures("unreachable_saml_endpoint")
 def test_saml_attribute_mappers_fetch_failure_raises():
-    with pytest.raises(SamlMetadataError, match="Unable to fetch or parse"):
+    with pytest.raises(SamlMetadataError, match=f"Unable to fetch or parse.*{REFUSED}"):
         get_saml_attribute_mappers(METADATA_URL, "example")
 
 
@@ -70,7 +90,7 @@ def test_unparseable_saml_metadata_xml_raises():
 
 @pytest.mark.usefixtures("unreachable_oidc_endpoint")
 def test_oidc_discovery_fetch_failure_raises():
-    with pytest.raises(OidcDiscoveryError, match="Unable to fetch"):
+    with pytest.raises(OidcDiscoveryError, match=f"Unable to fetch.*{REFUSED}"):
         oidc_identity_provider_args_from_discovery_url(DISCOVERY_URL)
 
 
@@ -104,11 +124,25 @@ def test_oidc_discovery_fetch_failure_raises():
     ],
 )
 def test_unusable_oidc_provider_raises(monkeypatch, metadata, client_secret, expected):
-    def _respond(*args, **kwargs):  # noqa: ARG001
-        return httpx.Response(200, json=metadata)
-
-    monkeypatch.setattr(httpx, "get", _respond)
+    _patch_discovery_response(monkeypatch, 200, metadata)
     with pytest.raises(OidcDiscoveryError, match=expected):
         oidc_identity_provider_args_from_discovery_url(
             DISCOVERY_URL, client_secret=client_secret
+        )
+
+
+@pytest.mark.parametrize("status", [401, 404, 500])
+def test_oidc_error_response_with_json_body_raises(monkeypatch, status):
+    """An error page that happens to be JSON must not be read as metadata.
+
+    Without a status check this parses cleanly, and a body carrying neither
+    endpoints nor token_endpoint_auth_methods_supported takes the same path as a
+    provider that legitimately defaults to client_secret_basic - yielding an IdP
+    with no authorization or token URL.
+    """
+    _patch_discovery_response(monkeypatch, status, {"error": "not found"})
+    with pytest.raises(OidcDiscoveryError, match="Unable to fetch"):
+        oidc_identity_provider_args_from_discovery_url(
+            DISCOVERY_URL,
+            client_secret="a-secret",  # pragma: allowlist secret
         )
