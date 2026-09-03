@@ -41,6 +41,8 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -1065,11 +1067,30 @@ cert_manager_certificate = OLCertManagerCert(
     ),
 )
 
+# Shared plugin config.  None of the routes below referenced one, so micromasters
+# was invisible to per-route gateway metrics and traces and served every response
+# uncompressed -- through Fastly, which means the uncompressed body was also what
+# the CDN fetched and stored.  cors is kept (unlike the internal tools that pass
+# enable_cors=False) because this host is public and the `static` route below was
+# already hand-rolling an Access-Control-Allow-Origin header for exactly that
+# reason.  http_to_https is safe here: Fastly reaches the origin over TLS
+# (use_ssl=True on the backend below).
+micromasters_shared_plugins = OLApisixSharedPlugins(
+    f"micromasters-{stack_info.env_suffix}-ol-shared-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="micromasters",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=micromasters_namespace,
+        k8s_labels=k8s_global_labels,
+    ),
+)
+
 micromasters_apisix_httproute = OLApisixRoute(
     f"micromasters-apisix-httproute-{stack_info.env_suffix}",
     route_configs=[
         OLApisixRouteConfig(
             route_name="passthrough",
+            shared_plugin_config_name=micromasters_shared_plugins.resource_name,
             hosts=[backend_domain, *fastly_domains],
             paths=["/*"],
             backend_service_name=micromasters_k8s_app.application_lb_service_name,
@@ -1087,6 +1108,7 @@ micromasters_apisix_httproute = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="static-hash",
             priority=20,
+            shared_plugin_config_name=micromasters_shared_plugins.resource_name,
             hosts=[backend_domain, *fastly_domains],
             paths=["/static/hash.txt"],
             backend_service_name=micromasters_k8s_app.application_lb_service_name,
@@ -1100,24 +1122,23 @@ micromasters_apisix_httproute = OLApisixRoute(
             ],
         ),
         # Granian serves static without a CORS header; the sidecar added a
-        # blanket one. micromasters has no shared plugin config supplying
-        # `cors`, so without this the header would silently disappear.
+        # blanket one, and this route hand-rolled it back because micromasters
+        # had no shared plugin config supplying `cors`.  It does now, and the
+        # shared `cors` plugin emits both the header and `Vary: Origin` (so
+        # Fastly keys the cached object on it).  Dropping the hand-rolled
+        # response-rewrite also stops it from displacing the shared
+        # `response-rewrite`, which is what sets `Referrer-Policy` -- a
+        # route-level plugin wholly overrides the shared entry of the same name
+        # rather than merging with it.
         OLApisixRouteConfig(
             route_name="static",
             priority=10,
+            shared_plugin_config_name=micromasters_shared_plugins.resource_name,
             hosts=[backend_domain, *fastly_domains],
             paths=["/static/*"],
             backend_service_name=micromasters_k8s_app.application_lb_service_name,
             backend_service_port=DEFAULT_WSGI_PORT,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="response-rewrite",
-                    secretRef=None,
-                    config={
-                        "headers": {"set": {"Access-Control-Allow-Origin": "*"}},
-                    },
-                ),
-            ],
+            plugins=[],
         ),
         # A 204 here is the EFF Do Not Track convention for "no policy
         # published". Kept as a mock so crawlers requesting it are answered
@@ -1126,6 +1147,7 @@ micromasters_apisix_httproute = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="dnt-policy",
             priority=10,
+            shared_plugin_config_name=micromasters_shared_plugins.resource_name,
             hosts=[backend_domain, *fastly_domains],
             paths=["/.well-known/dnt-policy.txt"],
             backend_service_name=micromasters_k8s_app.application_lb_service_name,

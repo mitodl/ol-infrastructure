@@ -35,6 +35,8 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -966,6 +968,26 @@ airbyte_basic_auth_consumer = kubernetes.apiextensions.CustomResource(
     ),
 )
 
+# Shared plugin config.  Both routes below predate OLApisixSharedPlugins and
+# referenced no plugin config at all, so neither emitted a prometheus series or
+# an OTLP span -- airbyte was simply absent from any gateway dashboard broken
+# down by route -- and both served every response uncompressed.
+#
+# enable_cors=False: airbyte is reached through its own two hosts, the web UI
+# behind an APISIX-managed session cookie and the API behind basic-auth for
+# Dagster.  Nothing calls either from another origin, so there is no reason to
+# take on the wildcard reflect-with-credentials CORS default.
+airbyte_shared_plugins = OLApisixSharedPlugins(
+    f"airbyte-{stack_info.env_suffix}-ol-shared-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="airbyte",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=airbyte_namespace,
+        k8s_labels=k8s_global_labels,
+        enable_cors=False,
+    ),
+)
+
 # APISix route configuration
 airbyte_apisix_route = OLApisixRoute(
     f"airbyte-apisix-route-{stack_info.env_suffix}",
@@ -974,6 +996,7 @@ airbyte_apisix_route = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="airbyte-web",
             priority=10,
+            shared_plugin_config_name=airbyte_shared_plugins.resource_name,
             hosts=[airbyte_web_domain],
             paths=["/*"],
             backend_service_name="airbyte-airbyte-server-svc",
@@ -990,6 +1013,7 @@ airbyte_apisix_route = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="airbyte-api",
             priority=10,
+            shared_plugin_config_name=airbyte_shared_plugins.resource_name,
             hosts=[airbyte_api_domain],
             paths=["/*"],
             backend_service_name="airbyte-airbyte-server-svc",
@@ -1012,6 +1036,7 @@ airbyte_apisix_route = OLApisixRoute(
             airbyte_helm_release,
             airbyte_oidc_resources,
             airbyte_basic_auth_consumer,
+            airbyte_shared_plugins,
         ]
     ),
 )

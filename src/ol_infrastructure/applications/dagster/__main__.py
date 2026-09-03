@@ -46,6 +46,8 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -2917,12 +2919,33 @@ cert_manager_certificate = OLCertManagerCert(
     ),
 )
 
+# Shared plugin config.  The single route below referenced no plugin config, so
+# the Dagster webserver emitted no prometheus series and no OTLP span, and every
+# response -- including the very large GraphQL payloads Dagit fetches for the
+# runs and asset-graph views -- went out uncompressed.
+#
+# enable_cors=False: Dagit is a same-origin SPA behind an APISIX-managed session
+# cookie.  The wildcard reflect-with-credentials CORS default would let any
+# origin read an authenticated GraphQL response using the operator's own
+# session, which is a grant nothing here needs.
+dagster_shared_plugins = OLApisixSharedPlugins(
+    f"dagster-{stack_info.env_suffix}-ol-shared-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="dagster",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=dagster_namespace,
+        k8s_labels=k8s_global_labels.model_dump(),
+        enable_cors=False,
+    ),
+)
+
 dagster_apisix_route = OLApisixRoute(
     f"dagster-apisix-route-{stack_info.env_suffix}",
     route_configs=[
         OLApisixRouteConfig(
             route_name="dagster",
             priority=10,
+            shared_plugin_config_name=dagster_shared_plugins.resource_name,
             hosts=[dagster_config.require("domain")],
             paths=["/*"],
             backend_service_name="dagster-dagster-webserver",
@@ -2943,6 +2966,7 @@ dagster_apisix_route = OLApisixRoute(
             dagster_helm_release,
             dagster_user_code_release,
             dagster_oidc_resources,
+            dagster_shared_plugins,
         ]
     ),
 )

@@ -1071,9 +1071,20 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
     k8s_labels=k8s_global_labels,
     route_configs=[
         # Protected route for canvas syllabus agent - requires canvas_token header
+        #
+        # Referenced no plugin config until now, unlike every sibling on this
+        # host, so it was the one learn-ai path emitting no prometheus series and
+        # no OTLP span.  Attaching the shared config is safe even though these
+        # are the streaming agent endpoints: the shared `gzip` deliberately
+        # leaves `text/event-stream` out of its `types` list, so an SSE response
+        # is not held in a compression buffer.  `passauth` below, which already
+        # references the same config, matches the rest of the same streaming
+        # prefix -- so this route was carrying the exception without benefiting
+        # from it.
         OLApisixRouteConfig(
             route_name="canvas_syllabus_agent",
             priority=20,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
                     name="key-auth",
@@ -1108,10 +1119,18 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         ),
-        # Strip trailing slash from logout redirect
+        # Strip trailing slash from logout redirect.
+        #
+        # The route-level `redirect` (uri) wholly overrides the shared
+        # `redirect` (http_to_https) rather than merging with it, so attaching
+        # the shared config leaves the rewrite intact -- the same arrangement
+        # mitxonline's and mit-learn's logout-redirect routes already run on --
+        # while restoring the prometheus/opentelemetry/gzip this route was
+        # missing.
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin,
                 OLApisixPluginConfig(
@@ -1192,9 +1211,20 @@ learn_ai_https_apisix_route = OLApisixRoute(
     k8s_labels=k8s_global_labels,
     route_configs=[
         # Protected route for canvas syllabus agent - requires canvas_token header
+        #
+        # Referenced no plugin config until now, unlike every sibling on this
+        # host, so it was the one learn-ai path emitting no prometheus series and
+        # no OTLP span.  Attaching the shared config is safe even though these
+        # are the streaming agent endpoints: the shared `gzip` deliberately
+        # leaves `text/event-stream` out of its `types` list, so an SSE response
+        # is not held in a compression buffer.  `passauth` below, which already
+        # references the same config, matches the rest of the same streaming
+        # prefix -- so this route was carrying the exception without benefiting
+        # from it.
         OLApisixRouteConfig(
             route_name="canvas_syllabus_agent",
             priority=20,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
                     name="key-auth",
@@ -1226,10 +1256,18 @@ learn_ai_https_apisix_route = OLApisixRoute(
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         ),
-        # Strip trailing slash from logout redirect
+        # Strip trailing slash from logout redirect.
+        #
+        # The route-level `redirect` (uri) wholly overrides the shared
+        # `redirect` (http_to_https) rather than merging with it, so attaching
+        # the shared config leaves the rewrite intact -- the same arrangement
+        # mitxonline's and mit-learn's logout-redirect routes already run on --
+        # while restoring the prometheus/opentelemetry/gzip this route was
+        # missing.
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
                     name="redirect",
@@ -1293,6 +1331,7 @@ learn_ai_https_apisix_route = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="dnt-policy",
             priority=10,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             hosts=[learn_ai_api_domain],
             paths=["/.well-known/dnt-policy.txt"],
             backend_service_name=learn_ai_app_k8s.application_lb_service_name,

@@ -44,6 +44,8 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -1083,6 +1085,29 @@ _YOUTUBE_COLLECTION_REDIRECTS: list[tuple[str, list[str], str, int]] = [
     ),
 ]
 
+# Shared plugin config.  No route below referenced one, so OVS emitted no
+# prometheus series and no OTLP span and served its Django templates and JSON
+# uncompressed.  cors is kept: this is a public site whose embedded player is
+# loaded from other MIT pages.
+#
+# The collection redirects also take it.  Their route-level `redirect` (uri +
+# 301) wholly overrides the shared `redirect` (http_to_https) rather than
+# merging with it -- the same arrangement mitxonline's and mit-learn's
+# logout-redirect routes have run on for months -- so the 301 to YouTube is
+# unchanged, and a plain-http hit now lands on the YouTube URL directly instead
+# of being upgraded first.  gzip is a no-op on a 301 body (well under
+# min_length), so the only thing these gain is the per-route metrics and traces
+# they were missing.
+ovs_shared_plugins = OLApisixSharedPlugins(
+    f"ovs-{stack_info.env_suffix}-ol-shared-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="odl-video-service",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=ovs_namespace,
+        k8s_labels=k8s_app_labels,
+    ),
+)
+
 ovs_apisix_httproute = OLApisixRoute(
     f"ovs-apisix-httproute-{stack_info.env_suffix}",
     route_configs=[
@@ -1090,6 +1115,7 @@ ovs_apisix_httproute = OLApisixRoute(
             OLApisixRouteConfig(
                 route_name=route_name,
                 priority=priority,
+                shared_plugin_config_name=ovs_shared_plugins.resource_name,
                 hosts=[default_domain],
                 paths=paths,
                 # The redirect plugin short-circuits in the rewrite phase, so
@@ -1109,6 +1135,7 @@ ovs_apisix_httproute = OLApisixRoute(
         ),
         OLApisixRouteConfig(
             route_name="passthrough",
+            shared_plugin_config_name=ovs_shared_plugins.resource_name,
             hosts=[default_domain],
             paths=["/*"],
             backend_service_name="ovs-webapp",
