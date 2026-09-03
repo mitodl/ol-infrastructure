@@ -1,17 +1,23 @@
 """Helpers for configuring Keycloak OIDC identity providers."""
 
-import logging
 from typing import Any
 
 import httpx
 
-logger = logging.getLogger(__name__)
+
+class OidcDiscoveryError(Exception):
+    """An OIDC provider's discovery document could not be fetched or used.
+
+    Raised instead of returning None so that an unreachable or unusable partner
+    endpoint fails the deploy. Returning None dropped the IdP resource from the
+    Pulumi program, which Pulumi then deleted along with the working integration.
+    """
 
 
 def oidc_identity_provider_args_from_discovery_url(
     discovery_url: str,
     client_secret: str | None = None,
-) -> dict[str, Any] | None:
+) -> dict[str, Any]:
     """Build a dictionary of arguments for a Keycloak OIDC Identity Provider.
 
     This helper function is used to simplify the process of registering an OIDC identity
@@ -25,20 +31,18 @@ def oidc_identity_provider_args_from_discovery_url(
     :type client_secret: str | None
 
     :return: A dictionary of arguments that can be passed to the constructor of a
-        keycloak.oidc.IdentityProvider Pulumi resource, or None if the metadata URL
-        is inaccessible.
-    :rtype: Dict[str, Any] | None
+        keycloak.oidc.IdentityProvider Pulumi resource.
+    :rtype: Dict[str, Any]
+
+    :raises OidcDiscoveryError: The discovery document could not be fetched or
+        parsed, or the provider does not support the scopes and client
+        authentication method we require.
     """
     try:
         oidc_provider_metadata = httpx.get(discovery_url, timeout=10).json()
     except (httpx.RequestError, ValueError) as e:
-        logger.warning(
-            "Unable to fetch OIDC discovery document from %s: %s. "
-            "Skipping this provider.",
-            discovery_url,
-            e,
-        )
-        return None
+        msg = f"Unable to fetch OIDC discovery document from {discovery_url}: {e}"
+        raise OidcDiscoveryError(msg) from e
     keycloak_arg_map = {
         "authorization_endpoint": "authorization_url",
         "token_endpoint": "token_url",
@@ -61,28 +65,24 @@ def oidc_identity_provider_args_from_discovery_url(
             scope for scope in required_scopes if scope not in supported_scopes
         ]
         if missing_scopes:
-            logger.warning(
-                "OIDC provider at %s does not support required scopes: %s. "
-                "Skipping this provider.",
-                discovery_url,
-                ", ".join(missing_scopes),
+            msg = (
+                f"OIDC provider at {discovery_url} does not support required "
+                f"scopes: {', '.join(missing_scopes)}"
             )
-            return None
-        oidc_idp_args["default_scopes"] = " ".join(required_scopes)
-    else:
-        oidc_idp_args["default_scopes"] = " ".join(required_scopes)
+            raise OidcDiscoveryError(msg)
+    oidc_idp_args["default_scopes"] = " ".join(required_scopes)
+
     if client_secret:
         if (
             "token_endpoint_auth_methods_supported" in oidc_provider_metadata
             and "client_secret_basic"
             not in oidc_provider_metadata["token_endpoint_auth_methods_supported"]
         ):
-            logger.warning(
-                "OIDC provider at %s does not support client_secret_basic client "
-                "auth method. Skipping this provider.",
-                discovery_url,
+            msg = (
+                f"OIDC provider at {discovery_url} does not support the "
+                "client_secret_basic client auth method"
             )
-            return None
+            raise OidcDiscoveryError(msg)
         oidc_idp_args["client_secret"] = client_secret
         oidc_idp_args["extra_config"] = {"clientAuthMethod": "client_secret_basic"}
     else:
@@ -91,12 +91,11 @@ def oidc_identity_provider_args_from_discovery_url(
             or "private_key_jwt"
             not in oidc_provider_metadata["token_endpoint_auth_methods_supported"]
         ):
-            logger.warning(
-                "OIDC provider at %s does not support private_key_jwt client auth "
-                "method. Skipping this provider.",
-                discovery_url,
+            msg = (
+                f"OIDC provider at {discovery_url} does not support the "
+                "private_key_jwt client auth method"
             )
-            return None
+            raise OidcDiscoveryError(msg)
         # pulumi-keycloak >=6.12.0 marks client_secret/client_secret_wo as
         # required even when Keycloak is configured for private_key_jwt client
         # authentication. Provide an explicit empty value to satisfy provider
