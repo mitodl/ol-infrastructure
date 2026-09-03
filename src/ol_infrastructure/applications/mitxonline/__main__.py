@@ -1315,11 +1315,9 @@ mitxonline_service = fastly.ServiceVcl(
               set obj.http.Location = req.http.x-redir-location;
               set obj.http.Cache-Control = "no-store";
               if (req.url.qs != "") {
-                if (obj.http.Location !~ "\\?") {
-                  set obj.http.Location = obj.http.Location "?" req.url.qs;
-                } else {
-                  set obj.http.Location = obj.http.Location "&" req.url.qs;
-                }
+                # 605's Location is a fixed URL with no query string, so a
+                # plain "?" append is always correct here.
+                set obj.http.Location = obj.http.Location "?" req.url.qs;
               }
               return(deliver);
             }"""),
