@@ -1191,6 +1191,37 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         onboard_saml_org(
             SamlIdpConfig(
+                idp_alias="RobCol",
+                idp_display_name="American Robert College of Istanbul",
+                org_saml_metadata_url="https://login.microsoftonline.com/d4bc61be-6893-44c0-8f85-a6e62e5bebee/federationmetadata/2007-06/federationmetadata.xml?appid=90601514-0347-4331-99cc-e2947959d287",
+                principal_type="SUBJECT",
+                principal_attribute="user.mail",
+                login_hint=False,
+                name_id_format=NameIdFormat.email,
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_name_map={
+                    "email": "user.mail",
+                    "firstName": "user.givenname",
+                    "lastName": "user.surname",
+                    "fullName": "user.displayname",
+                },
+                want_assertions_encrypted=False,
+                want_assertions_signed=False,
+            ),
+            org=OrgConfig(
+                org_domains=["robcol.k12.tr"],
+                org_name="American Robert College of Istanbul",
+                org_alias="RobCol",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        onboard_saml_org(
+            SamlIdpConfig(
                 idp_alias="UCV",
                 idp_display_name="Universidad Cesar Vallejo",
                 org_saml_metadata_xml=Path(__file__)
