@@ -538,6 +538,7 @@ def create(
             # adding it. Current inventory:
             #   0/5 * * * *  cron-deploy-pipelines, cron-reindex   -> fast
             #   17 * * * *   witan-token-sync                      -> fast
+            #   */15 * * * * witan-council-probe                   -> fast
             #   20 3 * * *   omnigraph-optimize                    -> slow
             #
             # omnigraph-optimize is NIGHTLY and the slow bucket is 15 days, so
@@ -550,6 +551,14 @@ def create(
             # there.
             #   20 4 * * 0   omnigraph-cleanup                     -> slow
             #   30 7 * * 0   cms-edxapp-reindex-courses            -> slow
+            #
+            # witan-council-probe is not deployed in every environment (it
+            # needs a minted svc-witan-probe token, applications/omnigraph
+            # __main__.py) -- membership here is unconditional anyway, since a
+            # CronJob that never exists in an environment just means no
+            # kube_cronjob_status_last_successful_time series there, which is
+            # NoData and stays silent under no_data_state=OK, same as any
+            # other unmanaged member of this list would.
             #
             # Two CronJobs are deliberately absent from both buckets:
             #
@@ -591,7 +600,7 @@ def create(
                 datas=rd(
                     "max by (cluster, namespace, cronjob) (time() - "
                     "(kube_cronjob_status_last_successful_time"
-                    '{cluster=~".*-(ci|qa)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync"} > 0)) > 21600'
+                    '{cluster=~".*-(ci|qa)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync|witan-council-probe"} > 0)) > 21600'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -607,7 +616,7 @@ def create(
                 datas=rd(
                     "max by (cluster, namespace, cronjob) (time() - "
                     "(kube_cronjob_status_last_successful_time"
-                    '{cluster=~".*-(production)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync"} > 0)) > 21600'
+                    '{cluster=~".*-(production)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync|witan-council-probe"} > 0)) > 21600'
                 ),
             ),
             alerting.RuleGroupRuleArgs(

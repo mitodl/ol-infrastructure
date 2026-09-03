@@ -58,6 +58,10 @@ from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.omnigraph.cluster_config import (
     COUNCIL_GRAPH_ID,
 )
+from ol_infrastructure.applications.omnigraph.council_probe import (
+    DEFAULT_PROBE_SCHEDULE,
+    create_council_probe,
+)
 from ol_infrastructure.applications.omnigraph.data_tier import (
     CLUSTER_CONFIGMAP_NAME,
     DEFAULT_PER_ACTOR_BYTES_MAX,
@@ -223,6 +227,9 @@ OPTIMIZE_SCHEDULE = (
     omnigraph_config.get("optimize_schedule") or DEFAULT_OPTIMIZE_SCHEDULE
 )
 CLEANUP_SCHEDULE = omnigraph_config.get("cleanup_schedule") or DEFAULT_CLEANUP_SCHEDULE
+COUNCIL_PROBE_SCHEDULE = (
+    omnigraph_config.get("council_probe_schedule") or DEFAULT_PROBE_SCHEDULE
+)
 CLEANUP_OLDER_THAN = (
     omnigraph_config.get("cleanup_older_than") or DEFAULT_CLEANUP_OLDER_THAN
 )
@@ -390,6 +397,20 @@ WITAN_ADMIN_ACTOR_ID = "svc-witan-admin"
 WITAN_SERVICE_TOKEN_VAULT_PATH = "secret-operations/witan/service-token"  # noqa: S105  # pragma: allowlist secret
 WITAN_SERVICE_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 WITAN_SERVICE_ACTOR_ID = "svc-witan"
+
+# The synthetic-monitoring principal (agent-kit
+# mcp/servers/witan/policy/memory.policy.yaml `witan-probe` group). Same shape
+# as admin_token: a raw single-actor token on its own Vault path, plus the
+# matching entry in the actor-tokens map, both from the one SOPS record.
+#
+# Optional, the same way admin_token is: an environment whose SOPS file
+# predates this simply has no council-health CronJob deployed, rather than one
+# that crash-loops on a missing Secret. Separate from every other identity —
+# it is read-only on the memory graph and nothing else, so a leaked probe
+# token is worth exactly that much.
+WITAN_PROBE_TOKEN_VAULT_PATH = "secret-operations/witan/probe-token"  # noqa: S105  # pragma: allowlist secret
+WITAN_PROBE_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+WITAN_PROBE_ACTOR_ID = "svc-witan-probe"
 
 ##############################################
 #   Vault secret source (SOPS -> Vault)       #
@@ -564,11 +585,68 @@ if (_BRIDGE_SECRETS_DIR / _witan_secrets_path).exists():
                 "shows them as separate groups."
             )
             raise ValueError(msg)
+
+    # svc-witan-probe, the council-health CronJob's identity. Optional and
+    # all-or-nothing, same shape as admin_token — see
+    # WITAN_PROBE_TOKEN_VAULT_PATH.
+    _witan_probe_token = _witan_secrets_source.get("probe_token")
+    _mapped_probe_token = _actor_tokens_map.get(WITAN_PROBE_ACTOR_ID)
+
+    for _label, _value in (
+        ("probe_token", _witan_probe_token),
+        (f"actor_tokens['{WITAN_PROBE_ACTOR_ID}']", _mapped_probe_token),
+    ):
+        if _value is not None and not str(_value).strip():
+            msg = (
+                f"omnigraph/secrets.{stack_info.env_suffix}.yaml: {_label} is "
+                "present but empty. Remove the key to leave this environment "
+                "with no council-health CronJob, or give it a real token — an "
+                "empty value is not the same as an absent one."
+            )
+            raise ValueError(msg)
+
+    if (_witan_probe_token is None) != (_mapped_probe_token is None):
+        msg = (
+            f"omnigraph/secrets.{stack_info.env_suffix}.yaml: 'probe_token' "
+            f"and actor_tokens['{WITAN_PROBE_ACTOR_ID}'] must be set together "
+            "or not at all — one without the other provisions a credential "
+            "that cannot authenticate."
+        )
+        raise ValueError(msg)
+    if _witan_probe_token is not None and _mapped_probe_token != _witan_probe_token:
+        msg = (
+            f"omnigraph/secrets.{stack_info.env_suffix}.yaml: probe_token must "
+            f"match actor_tokens['{WITAN_PROBE_ACTOR_ID}'] — they are the same "
+            "token exposed to two different consumers, exactly as ci_token and "
+            "admin_token are."
+        )
+        raise ValueError(msg)
+    for _other_label, _other_actor, _other in (
+        ("ci_token", WITAN_CI_ACTOR_ID, _witan_ci_token),
+        ("admin_token", WITAN_ADMIN_ACTOR_ID, _witan_admin_token),
+        ("service_token", WITAN_SERVICE_ACTOR_ID, _witan_service_token),
+    ):
+        if (
+            _witan_probe_token is not None
+            and _other is not None
+            and _witan_probe_token == _other
+        ):
+            msg = (
+                f"omnigraph/secrets.{stack_info.env_suffix}.yaml: probe_token "
+                f"must not equal {_other_label}. Cedar tells these principals "
+                f"apart by actor id alone, so a shared value makes "
+                f"{WITAN_PROBE_ACTOR_ID} and {_other_actor} one principal "
+                f"holding both sets of grants — the probe would gain "
+                f"everything {_other_actor} can do, while the bundle still "
+                "shows them as separate groups."
+            )
+            raise ValueError(msg)
 else:
     _actor_tokens_map = {}
     _witan_ci_token = None
     _witan_admin_token = None
     _witan_service_token = None
+    _witan_probe_token = None
 
 # A content fingerprint of the service-tokens map, independent of which of the
 # two writers below is active. Not secret — sha256 of the map's own JSON
@@ -682,6 +760,19 @@ if _witan_service_token is not None:
         path=WITAN_SERVICE_TOKEN_VAULT_PATH,
         data_json=Output.secret(
             json.dumps({WITAN_SERVICE_TOKEN_VAULT_KEY: _witan_service_token})
+        ),
+    )
+
+# The council-health probe's account. Consumed only by this stack's own
+# council-health CronJob below — unlike the other three, nothing outside this
+# program reads this path, so it needs no cross-stack StackReference.
+witan_probe_token_vault_secret = None
+if _witan_probe_token is not None:
+    witan_probe_token_vault_secret = vault.generic.Secret(
+        f"omnigraph-witan-probe-token-vault-secret-{stack_info.env_suffix}",
+        path=WITAN_PROBE_TOKEN_VAULT_PATH,
+        data_json=Output.secret(
+            json.dumps({WITAN_PROBE_TOKEN_VAULT_KEY: _witan_probe_token})
         ),
     )
 
@@ -924,8 +1015,71 @@ if MIGRATE_FROM_IMAGE:
     )
     export("storage_migration_job", storage_migration.job.metadata.name)
 
+##############################################
+#   Council-health synthetic probe            #
+##############################################
+# Entirely self-contained in this stack: unlike the admin/service tokens,
+# nothing outside this program consumes the probe's Vault path, so there is no
+# cross-stack StackReference to thread through — see WITAN_PROBE_TOKEN_VAULT_PATH.
+PROBE_TOKEN_SECRET_NAME = "witan-probe-token"  # noqa: S105  # pragma: allowlist secret
+PROBE_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+
+council_probe = None
+if witan_probe_token_vault_secret is not None:
+    probe_token_secret = OLVaultK8SSecret(
+        f"omnigraph-witan-probe-token-secret-{stack_info.env_suffix}",
+        resource_config=OLVaultK8SStaticSecretConfig(
+            name=PROBE_TOKEN_SECRET_NAME,
+            namespace=NAMESPACE,
+            labels=k8s_global_labels,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name=PROBE_TOKEN_SECRET_NAME,
+            dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path=WITAN_PROBE_TOKEN_VAULT_PATH,
+            exclude_raw=True,
+            excludes=[".*"],
+            templates={
+                PROBE_TOKEN_SECRET_KEY: (
+                    f'{{{{ get .Secrets "{WITAN_PROBE_TOKEN_VAULT_KEY}" }}}}'
+                )
+            },
+            refresh_after="1h",
+            # No restart target: each CronJob run is a brand-new pod that
+            # mounts the Secret fresh, unlike the always-running data-tier
+            # Deployment the actor-tokens sync has to bounce on a change.
+            vaultauth=omnigraph_auth_binding.vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[
+                omnigraph_auth_binding.vault_k8s_resources,
+                witan_probe_token_vault_secret,
+            ],
+        ),
+    )
+    council_probe = create_council_probe(
+        stack_info=stack_info,
+        namespace=NAMESPACE,
+        k8s_global_labels=k8s_global_labels,
+        omnigraph_server_addr=omnigraph_server_addr(NAMESPACE),
+        graph_id=COUNCIL_GRAPH_ID,
+        schedule=COUNCIL_PROBE_SCHEDULE,
+        probe_token_secret_name=PROBE_TOKEN_SECRET_NAME,
+        probe_token_secret_key=PROBE_TOKEN_SECRET_KEY,
+        probe_token_secret=probe_token_secret,
+    )
+
 export("namespace", NAMESPACE)
 export("omnigraph_server_addr", omnigraph_server_addr(NAMESPACE))
+# Whether this environment has a council-health CronJob deployed — mint
+# `probe_token` in omnigraph/secrets.<env>.yaml to turn it on (see
+# WITAN_PROBE_TOKEN_VAULT_PATH). ol-infrastructure's eks_general.py staleness
+# rule lists this CronJob by name unconditionally, so an environment that
+# never provisions it just has a rule that permanently no-ops (no series,
+# no_data_state=OK), not a false alert.
+export("council_probe_provisioned", council_probe is not None)
 # The Layer-1 graph id consumers must address (`--graph <id>`). Exported
 # rather than left to each consumer's own default so the witan stack asks
 # for exactly the graph declared in cluster.yaml here.
