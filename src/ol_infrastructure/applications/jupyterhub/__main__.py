@@ -190,9 +190,8 @@ COURSE_NAMES = [
     "supervised_learning_fundamentals",
     "introduction_to_data_analytics_and_machine_learning",
     "base_authoring_image",
-    "mitxt-6.3710.3x",
-    "mitxt-6.3710.4x",
-    "mitxt-6.3710.5x",
+    *[f"mitxt-6.3710.{module_num}x" for module_num in range(3, 6)],
+    *[f"mitxt-6.7960.{module_num}x" for module_num in range(1, 6)],
 ]
 COURSE_NAMES.extend(
     [
@@ -222,6 +221,7 @@ COURSE_NAMES.extend(
             "edm1",
             "scm1",
             "scm2",
+            "cls1",
         ]
     ]
 )
