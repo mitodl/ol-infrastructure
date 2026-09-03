@@ -519,9 +519,21 @@ def _build_image_job_legacy(
     version_args = {}
     additional_build_params = {}
     if build_target:
-        additional_build_params = {
-            "TARGET": build_target,
-        }
+        additional_build_params["TARGET"] = build_target
+    # OUTPUT_OCI preserves the DHI-hardened base's zstd layer labeling
+    # end-to-end (mitodl/ol-infrastructure#5714). oci-build-task's default
+    # (Docker-legacy) output format has no field to declare a layer as
+    # anything but gzip, so a layer carried through unchanged from a
+    # zstd-compressed base gets silently mislabeled as gzip -- which is what
+    # broke the original learn-ai canary build. Skipped when
+    # sentry_sourcemaps is set (mit-learn-nextjs only): oci-build-task's
+    # OCI-output loader (loadOciImages) never checks UNPACK_ROOTFS, unlike
+    # the legacy loader the sourcemap upload step depends on -- and
+    # mit-learn-nextjs doesn't build FROM mitodl/ol-python-base anyway
+    # (it's a Node/Next.js image), so it was never at risk from DHI's zstd
+    # layers in the first place.
+    if sentry_sourcemaps is None:
+        additional_build_params["OUTPUT_OCI"] = "true"
     if branch_type == "release_candidate":
         plan.extend(
             [
@@ -598,7 +610,9 @@ def _build_image_job_legacy(
     )
 
     put_params: dict[str, Any] = {
-        "image": "image/image.tar",
+        # Directory, not image.tar, whenever OUTPUT_OCI was set above --
+        # matches oci-build-task's documented output shape for that flag.
+        "image": "image/image" if sentry_sourcemaps is None else "image/image.tar",
         "additional_tags": f"./{git_repo_resource.name}/.git/short_ref",
     }
     if branch_type != "main":
