@@ -1118,6 +1118,20 @@ catalog_redirect_vcl = (
     f"}}"
 )
 
+# Home page redirects to MIT Learn's unit catalog view too - per hq#12506,
+# matches only the exact site root, not any deeper path, so /cms and
+# /staff-dashboard (and everything else) are unaffected by construction.
+# Applies to all requests regardless of login state - there's no distinct
+# logged-in experience at bare "/" today for this to disrupt. Uses a
+# distinct error code (605) from the catalog (604), course/program (603),
+# and UAI B2C (602) redirects above so this is fully additive.
+home_redirect_vcl = (
+    f'if (req.url.path == "/") {{\n'
+    f'  set req.http.x-redir-location = "https://{learn_frontend_domain}/c/unit/mitx";\n'
+    f"  error 605;\n"
+    f"}}"
+)
+
 gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
 for k, v in mimetypes.types_map.items():
     if k in (
@@ -1229,6 +1243,15 @@ mitxonline_service = fastly.ServiceVcl(
             type="recv",
         ),
         vcl_snippet(
+            content=home_redirect_vcl,
+            name="Redirect home page to MIT Learn",
+            # Exact match on "/" only, so it can't shadow /cms, /staff-dashboard,
+            # or any other path - ordering relative to the other recv snippets
+            # isn't load-bearing, placed after them for readability only.
+            priority=170,
+            type="recv",
+        ),
+        vcl_snippet(
             content=textwrap.dedent("""\
             if (obj.status == 602) {
               set obj.status = 301;
@@ -1282,6 +1305,23 @@ mitxonline_service = fastly.ServiceVcl(
               return(deliver);
             }"""),
             name="Handle catalog redirects to MIT Learn",
+            type="error",
+        ),
+        vcl_snippet(
+            content=textwrap.dedent("""\
+            if (obj.status == 605) {
+              set obj.status = 301;
+              set obj.response = "Moved Permanently";
+              set obj.http.Location = req.http.x-redir-location;
+              set obj.http.Cache-Control = "no-store";
+              if (req.url.qs != "") {
+                # 605's Location is a fixed URL with no query string, so a
+                # plain "?" append is always correct here.
+                set obj.http.Location = obj.http.Location "?" req.url.qs;
+              }
+              return(deliver);
+            }"""),
+            name="Handle home page redirects to MIT Learn",
             type="error",
         ),
         vcl_snippet(
