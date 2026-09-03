@@ -56,14 +56,14 @@ stayed under 460ms throughout.
                  intended catch, not noise -- see the apisix_edge.py "Slow"
                  tier for the same reasoning applied to error rate.
 
-Error ratio ran ~0.04% across both services in the same window (0% for
-learn-webapp, 0.0037% for mitxonline-webapp over 6h at measurement time), so
-apisix_edge.py's 5%/1% thresholds (calibrated against an edge host that spent
-weeks at 18-25%) would be far too loose here to catch anything short of a
-near-total outage.
+Error ratio ran well under 0.01% across both services in the same window (0%
+for learn-webapp, 0.0037% for mitxonline-webapp over 6h at measurement time),
+so apisix_edge.py's 5%/1% thresholds (calibrated against an edge host that
+spent weeks at 18-25%) would be far too loose here to catch anything short of
+a near-total outage.
 
-  Fast/critical: 5xx ratio > 2%, 10m window, confirmed 5m.  ~50x baseline.
-  Slow/warning:  5xx ratio > 0.5%, 6h window, confirmed 30m. ~12x baseline,
+  Fast/critical: 5xx ratio > 2%, 10m window, confirmed 5m.  >500x baseline.
+  Slow/warning:  5xx ratio > 0.5%, 6h window, confirmed 30m. >100x baseline,
                  over a long enough window that a brief blip can't trip it.
 
 Minimum-traffic gate
@@ -75,6 +75,15 @@ not excluded -- while still filtering out a service between deploys or a
 namespace with no real traffic. The gate is written as the left operand of
 `and` in every expression, matching the idiom documented at apisix_edge.py's
 "Gate clause first" and eks_general.py:108-116.
+
+exec_err_state on the critical tier
+------------------------------------
+`OTelServiceREDLatencyFast` and `OTelServiceREDErrorRateFast` (the
+`severity=critical` rules) use `exec_err_state="KeepLast"`, not `"OK"`,
+matching base.py's documented standard: a datasource blip should hold the
+rule's last known state, not resolve it silently through what may be an
+ongoing incident. The two `severity=warning` rules keep `"OK"` -- going
+silent during a transient error is an acceptable trade at that tier.
 
 Routing: Slack, not Rootly, until calibrated
 ----------------------------------------------
@@ -104,7 +113,14 @@ _DURATION = "http_server_duration_milliseconds"
 
 # Excludes readiness/startup probe traffic from both latency and error-rate
 # selectors. See the module docstring's "Health-check exclusion" section.
-_SELECTOR = 'service_name=~".+", http_target!~"^health.*"'
+# `http_target` carries the Django URL pattern verbatim, and a `re_path()`
+# route's pattern includes a literal leading `^` character (see
+# dashboards/service_red.py:46-50); a `path()` route's does not. A plain
+# `^health.*` PromQL anchor only matches the latter form -- against the
+# former, `!~"^health.*"` never matches, so the health traffic it's meant to
+# exclude just as never gets excluded. `\\^?` (a backslash-escaped, optional
+# literal caret) matches both route-registration styles.
+_SELECTOR = 'service_name=~".+", http_target!~"^\\^?health.*"'
 _5XX_SELECTOR = f'{_SELECTOR}, http_status_code=~"5.."'
 
 # Requests/sec a service must sustain over the same window as the ratio/quantile
@@ -170,7 +186,10 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
-                exec_err_state="OK",
+                # KeepLast, not OK, on the critical tier: see base.py's
+                # exec_err_state docstring -- a datasource blip should hold
+                # the rule's last known state, not resolve it silently.
+                exec_err_state="KeepLast",
                 labels={"severity": "critical", **routing},
                 annotations={
                     "summary": "{{ $labels.service_name }} p95 latency is over 2000ms",
@@ -206,11 +225,14 @@ def create(
                 condition="C",
                 for_="5m",
                 no_data_state="OK",
-                exec_err_state="OK",
+                # KeepLast, not OK, on the critical tier: see base.py's
+                # exec_err_state docstring -- a datasource blip should hold
+                # the rule's last known state, not resolve it silently.
+                exec_err_state="KeepLast",
                 labels={"severity": "critical", **routing},
                 annotations={
                     "summary": "{{ $labels.service_name }} is returning over 2% 5xx",
-                    "description": "More than 2% of {{ $labels.service_name }}'s requests (health-check traffic excluded) returned a 5xx status over the last 10 minutes, measured from the app's own MeterProvider rather than the APISIX edge or a sampled trace fraction. Baseline is ~0.04%.",
+                    "description": "More than 2% of {{ $labels.service_name }}'s requests (health-check traffic excluded) returned a 5xx status over the last 10 minutes, measured from the app's own MeterProvider rather than the APISIX edge or a sampled trace fraction. Baseline measured 2026-09-03 was under 0.01% for both instrumented services.",
                 },
                 datas=rd(_error_ratio_expr("10m", "0.02")),
             ),
