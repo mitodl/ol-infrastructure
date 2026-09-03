@@ -341,6 +341,51 @@ def setup_grafana(
                                         "threshold_ms": 5000,
                                     },
                                     {
+                                        # Keep every trace from every service
+                                        # EXCEPT the few whose volume would
+                                        # dominate the bill.  Policies are OR'd,
+                                        # so this runs alongside the
+                                        # probabilistic policy below rather than
+                                        # replacing it: the named services still
+                                        # get their 15% sample, everything else
+                                        # is kept whole.
+                                        #
+                                        # Written as an inverted match rather
+                                        # than a keep-list of small services on
+                                        # purpose.  The failure this fixes is a
+                                        # low-traffic service sampled into
+                                        # invisibility -- ol-analytics-api sees
+                                        # ~10 dashboard requests/day, which at
+                                        # 15% is under one trace/day -- and a
+                                        # keep-list only ever fixes it for
+                                        # services someone remembered to add.
+                                        # Inverted, a NEW service is complete by
+                                        # default and has to earn its way onto
+                                        # this list by getting large.
+                                        #
+                                        # Chosen from measured spans/6h on
+                                        # 2026-09-03; these three are ~82% of
+                                        # all span volume and sit an order of
+                                        # magnitude above the rest:
+                                        #   ...edxapp-lms-celery  13.8M
+                                        #   ...edxapp-lms         10.3M
+                                        #   apisix                 2.9M
+                                        # Next is learn-webapp at 1.4M, left OFF
+                                        # deliberately -- it is a first-party
+                                        # app whose traces we want complete.
+                                        # Revisit against the same query if the
+                                        # distribution shifts.
+                                        "name": "keep-all-but-the-highest-volume-services",
+                                        "type": "string_attribute",
+                                        "key": "service.name",
+                                        "values": [
+                                            "mitxonline-production-edxapp-lms-celery",
+                                            "mitxonline-production-edxapp-lms",
+                                            "apisix",
+                                        ],
+                                        "invert_match": True,
+                                    },
+                                    {
                                         "name": "sample-15pct-traces",
                                         "type": "probabilistic",
                                         "sampling_percentage": 15,
