@@ -26,6 +26,13 @@ path "secret-operations/witan/token-sync-oidc" {
   capabilities = ["read"]
 }
 
+# svc-witan-probe's bearer token, written by this stack's own
+# vault.generic.Secret (__main__.py) and synced by the VSO into the
+# witan-council-probe CronJob's Secret. Consumed only within this namespace.
+path "secret-operations/witan/probe-token" {
+  capabilities = ["read"]
+}
+
 path "sys/leases/renew" {
   capabilities = ["update"]
 }
