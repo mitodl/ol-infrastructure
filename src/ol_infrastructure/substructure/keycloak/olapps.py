@@ -311,7 +311,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 validators=[
                     keycloak.RealmUserProfileAttributeValidatorArgs(
                         name="length",
-                        config={"max": "255"},
+                        config={"min": "1", "max": "255"},
                     ),
                 ],
                 permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
