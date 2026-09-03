@@ -355,7 +355,10 @@ def _ensure_ecr_repository_step(
                 ),
             ),
         ),
-        configure_ecr_repository_task(repo_name),
+        # keep_last_n_images made explicit here rather than left as the
+        # function's default -- so the actual retention count is visible in
+        # a diff of this call site, not only inside ecr.py.
+        configure_ecr_repository_task(repo_name, keep_last_n_images=10),
     ]
 
 
