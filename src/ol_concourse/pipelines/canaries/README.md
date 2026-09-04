@@ -42,12 +42,60 @@ find a course?". Alerting for the two is kept separate on purpose.
 ## Layout
 
 ```
-playwright.config.ts   Shared config. Requires CANARY_BASE_URL.
+meta.py                The canary-meta pipeline. `canary_names` is the source of
+                       truth for which canaries are actually deployed.
+pipeline.py            CanaryParams + the renderer for one canary-<property>
+                       pipeline. `pipeline_params` is a superset of canary_names.
+playwright.config.ts   Shared config. Requires CANARY_BASE_URL. Declares one
+                       project per browser; CanaryParams.browsers selects.
 package.json           Pins @playwright/test. Single source of truth for the
                        container image tag the pipeline pulls.
 specs/<property>/      One directory per web property.
   mit-learn/
 ```
+
+## How these run in Concourse
+
+`canary-meta` manages the fleet and re-sets itself. Each managed pipeline is named
+`canary-<property>` and holds a single job that pulls the stock Playwright image,
+runs `npm ci`, and runs that property's specs on a `time` trigger.
+
+```bash
+cd src/ol_concourse/pipelines/canaries
+python meta.py && fly -t pr-inf sp -p canary-meta -c definition.json
+```
+
+After that first manual set, `canary-meta` updates itself and every canary pipeline
+from `main`.
+
+Onboarding a property is **two list edits**, the same shape as
+[`simple_pulumi`](../infrastructure/simple_pulumi/):
+
+1. a `CanaryParams` entry in `pipeline.py`, and
+2. its name in `canary_names` in `meta.py`.
+
+The registry is deliberately the wider of the two, so a canary can be added and
+reviewed before it starts running against a live property. **Adding a journey to a
+property that already has a canary needs neither edit** — `spec_paths` defaults to the
+whole `specs/<property>/` directory.
+
+## Which Concourse instance
+
+The production instance (`pr-inf`), and there is deliberately no `--env` switch of the
+kind [`simple_pulumi/meta.py`](../infrastructure/simple_pulumi/meta.py) carries.
+
+That switch exists there because some Pulumi stacks run `local.Command` resources
+needing VPC-level access to QA or CI infrastructure, so the pipeline has to run *inside*
+that network. A canary has the opposite requirement: it is meant to see the property the
+way a member of the public does. Every current target — including `rc.learn.mit.edu` — is
+publicly reachable, so driving them from one instance is both sufficient and more
+faithful to what the canary claims to measure.
+
+A canary against an internal-only endpoint would break that assumption and need the
+`--env` treatment: a `canary_names` split per instance and an `extra_args` passthrough on
+the self-update job, copied from `simple_pulumi`. Note that such a canary is also no
+longer measuring the public user journey, which is worth questioning before adding the
+machinery.
 
 ## Running a canary locally
 
