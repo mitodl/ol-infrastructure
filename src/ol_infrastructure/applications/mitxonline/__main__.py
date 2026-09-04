@@ -811,6 +811,17 @@ mitxonline_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=mitxonline_namespace,
         k8s_labels=k8s_app_labels,
         enable_defaults=True,
+        # The same origins Django is given as CORS_ALLOWED_ORIGINS: the gateway
+        # sets the Access-Control-* headers the browser enforces, so
+        # django-cors-headers' answer never reaches it.  This config is attached
+        # to routes on api.mitxonline.mit.edu, mitxonline.mit.edu *and* the
+        # /mitxonline/* paths on api.<env>.learn.mit.edu, so the list has to
+        # cover every frontend that calls any of them.
+        cors_allow_origins=[
+            origin.strip()
+            for origin in env_vars["CORS_ALLOWED_ORIGINS"].split(",")
+            if origin.strip()
+        ],
     ),
 )
 

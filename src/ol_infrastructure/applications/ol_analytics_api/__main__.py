@@ -582,6 +582,18 @@ ol_analytics_api_hosts = [ol_analytics_api_domain]
 if ol_analytics_api_learn_domain:
     ol_analytics_api_hosts.append(ol_analytics_api_learn_domain)
 
+# Origins allowed to read this API cross-origin, with credentials.  The
+# canonical host serves its own UI, so it needs nothing here for itself; the
+# Learn-scoped host exists precisely because the MIT Learn frontend calls it
+# with `fetch` from a different origin (see the second OIDC resource below), and
+# that call carries the shared session cookie, so it is a credentialed
+# cross-origin read and has to be named explicitly.
+ol_analytics_api_cors_allow_origins = [f"https://{ol_analytics_api_domain}"]
+if ol_analytics_api_learn_domain:
+    ol_analytics_api_cors_allow_origins.append(
+        f"https://{ol_analytics_api_learn_domain.removeprefix('analytics.')}"
+    )
+
 # Shared plugins (redirect http->https, cors, prometheus, opentelemetry, ...).
 ol_analytics_api_shared_plugins = OLApisixSharedPlugins(
     f"ol-analytics-api-{stack_info.env_suffix}-ol-shared-plugins",
@@ -591,6 +603,7 @@ ol_analytics_api_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=APPLICATION_NAMESPACE,
         k8s_labels=k8s_global_labels,
         enable_defaults=True,
+        cors_allow_origins=ol_analytics_api_cors_allow_origins,
     ),
     opts=ResourceOptions(delete_before_replace=True),
 )
