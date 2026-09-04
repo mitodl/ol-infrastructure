@@ -378,6 +378,11 @@ shared_plugins = OLApisixSharedPlugins(
     plugin_config=OLApisixSharedPluginsConfig(
         application_name="my-app",
         k8s_namespace="my-app-namespace",
+        # Required whenever enable_defaults is set: the origins allowed to read
+        # this app's responses cross-origin with credentials. Pass [] for a
+        # service with no cross-origin browser callers and no cors plugin is
+        # attached at all.
+        cors_allow_origins=["https://my-app.mit.edu"],
         plugins=[
             {"name": "ip-restriction", "config": {"whitelist": ["10.0.0.0/8"]}},
             {"name": "limit-req", "config": {"rate": 100, "burst": 50}},
