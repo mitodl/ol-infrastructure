@@ -518,8 +518,22 @@ def setup_grafana(
                     # `sampled`, so until it lands there is no direct view of
                     # which policy is deciding what; retention can only be
                     # inferred from receiver-vs-exporter span ratios.
-                    # count_spans_sampled is its span-weighted counterpart,
-                    # which is the unit Grafana Cloud bills on.
+                    #
+                    # Its span-weighted counterpart count_spans_sampled is
+                    # deliberately NOT listed, and listing it would do
+                    # nothing. Alloy v1.18.1 vendors tailsamplingprocessor
+                    # v0.153.0, where the only site that records it
+                    # (processor.go:519) sits behind the alpha, off-by-default
+                    # gate processor.tailsamplingprocessor.metricstatcount
+                    # spanssampled -- and Alloy's SetupOtelFeatureGates
+                    # (internal/util/otel_feature_gate.go) enables a hardcoded
+                    # list of exactly one gate, filelog.allowFileDeletion,
+                    # with no config or flag to add another. So the series is
+                    # not emitted and includeMetrics can only retain what is
+                    # already emitted. The line above it, count_traces_sampled
+                    # (processor.go:518), is ungated, as are
+                    # new_trace_id_received, sampling_trace_dropped_too_early
+                    # and sampling_policy_evaluation_error.
                     "alloy": {
                         "instances": [
                             {
@@ -539,7 +553,6 @@ def setup_grafana(
                                         "includeMetrics": [
                                             # Counters -- _total suffix required.
                                             "otelcol_processor_tail_sampling_count_traces_sampled_total",
-                                            "otelcol_processor_tail_sampling_count_spans_sampled_total",
                                             "otelcol_processor_tail_sampling_sampling_trace_dropped_too_early_total",
                                             "otelcol_processor_tail_sampling_new_trace_id_received_total",
                                             "otelcol_processor_tail_sampling_sampling_policy_evaluation_error_total",
