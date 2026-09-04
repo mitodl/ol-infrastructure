@@ -123,6 +123,12 @@ except KeyError as exc:
     msg = f"Unsupported MIT Learn Next.js environment: {stack_info.env_suffix}"
     raise ValueError(msg) from exc
 
+# Backs the lead form on /organizational-learning. Recycled from the Universal AI
+# landing page rather than newly created, and the same in every environment --
+# unlike stay_updated above, which points CI and QA at a non-production form.
+# HubSpot separates the two pages' leads by the pageUri it receives.
+org_learning_hubspot_form_id = "60a1983b-361a-4e80-a0db-d24ff636d7bf"
+
 raw_env_vars = {
     # Env vars available only on server
     "NODE_OPTIONS": f"--max-old-space-size={nextjs_max_old_space_size_mib}",
@@ -165,6 +171,7 @@ raw_env_vars = {
     ),
     "NEXT_PUBLIC_MITOL_AXIOS_WITH_CREDENTIALS": "true",
     "NEXT_PUBLIC_MITOL_SUPPORT_EMAIL": "mitlearn-support@mit.edu",
+    "NEXT_PUBLIC_ORG_LEARNING_HUBSPOT_FORM_ID": org_learning_hubspot_form_id,
     "NEXT_PUBLIC_ORIGIN": nextjs_config.require("origin"),
     "NEXT_PUBLIC_POSTHOG_API_HOST": nextjs_config.require("posthog_api_host"),
     "NEXT_PUBLIC_PODCASTS_FEATURED_LIST_LEARNINGPATH_ID": (
