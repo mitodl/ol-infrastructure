@@ -1070,11 +1070,18 @@ cert_manager_certificate = OLCertManagerCert(
 # Shared plugin config.  None of the routes below referenced one, so micromasters
 # was invisible to per-route gateway metrics and traces and served every response
 # uncompressed -- through Fastly, which means the uncompressed body was also what
-# the CDN fetched and stored.  cors is kept (unlike the internal tools that pass
-# enable_cors=False) because this host is public and the `static` route below was
-# already hand-rolling an Access-Control-Allow-Origin header for exactly that
-# reason.  http_to_https is safe here: Fastly reaches the origin over TLS
-# (use_ssl=True on the backend below).
+# the CDN fetched and stored.  http_to_https is safe here: Fastly reaches the
+# origin over TLS (use_ssl=True on the backend below).
+#
+# enable_cors=False: because there was no shared plugin config before this, the
+# only cross-origin grant micromasters has ever served is the credentialless
+# `Access-Control-Allow-Origin: *` on /static/* restored below.  Taking the
+# shared default instead would have swapped that for `allow_origins: "**"` with
+# `allow_credential: True` -- APISIX reflects the request Origin and the browser
+# then attaches cookies -- across every route including the `/*` catch-all that
+# serves authenticated pages and the API.  Django grants nothing cross-origin
+# either way (MICROMASTERS_CORS_ORIGIN_WHITELIST is [] in CI, QA and
+# Production), so a public host is not on its own a reason to widen this.
 micromasters_shared_plugins = OLApisixSharedPlugins(
     f"micromasters-{stack_info.env_suffix}-ol-shared-plugins",
     plugin_config=OLApisixSharedPluginsConfig(
@@ -1082,6 +1089,7 @@ micromasters_shared_plugins = OLApisixSharedPlugins(
         resource_suffix="ol-shared-plugins",
         k8s_namespace=micromasters_namespace,
         k8s_labels=k8s_global_labels,
+        enable_cors=False,
     ),
 )
 
@@ -1122,14 +1130,20 @@ micromasters_apisix_httproute = OLApisixRoute(
             ],
         ),
         # Granian serves static without a CORS header; the sidecar added a
-        # blanket one, and this route hand-rolled it back because micromasters
-        # had no shared plugin config supplying `cors`.  It does now, and the
-        # shared `cors` plugin emits both the header and `Vary: Origin` (so
-        # Fastly keys the cached object on it).  Dropping the hand-rolled
-        # response-rewrite also stops it from displacing the shared
-        # `response-rewrite`, which is what sets `Referrer-Policy` -- a
-        # route-level plugin wholly overrides the shared entry of the same name
-        # rather than merging with it.
+        # blanket one, and this route hand-rolled it back through
+        # `response-rewrite`.  Carried over as a route-local `cors` plugin
+        # instead, for two reasons.  A route-level plugin wholly overrides the
+        # shared entry of the same name rather than merging with it, so keeping
+        # this as `response-rewrite` would displace the shared one -- the entry
+        # that sets `Referrer-Policy`.  And `cors` emits `Vary: Origin`
+        # alongside the header, which the hand-rolled version never did, so
+        # Fastly keys the cached object on it instead of handing one variant to
+        # everyone.
+        #
+        # The grant is deliberately the literal `*` with allow_credential
+        # False, which browsers refuse to use with credentials: unchanged from
+        # what this route has always served, and scoped to static assets rather
+        # than the whole host.
         OLApisixRouteConfig(
             route_name="static",
             priority=10,
@@ -1138,7 +1152,18 @@ micromasters_apisix_httproute = OLApisixRoute(
             paths=["/static/*"],
             backend_service_name=micromasters_k8s_app.application_lb_service_name,
             backend_service_port=DEFAULT_WSGI_PORT,
-            plugins=[],
+            plugins=[
+                OLApisixPluginConfig(
+                    name="cors",
+                    secretRef=None,
+                    config={
+                        "allow_origins": "*",
+                        "allow_methods": "GET,HEAD,OPTIONS",
+                        "allow_headers": "*",
+                        "allow_credential": False,
+                    },
+                ),
+            ],
         ),
         # A 204 here is the EFF Do Not Track convention for "no policy
         # published". Kept as a mock so crawlers requesting it are answered

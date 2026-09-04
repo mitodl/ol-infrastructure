@@ -1087,8 +1087,17 @@ _YOUTUBE_COLLECTION_REDIRECTS: list[tuple[str, list[str], str, int]] = [
 
 # Shared plugin config.  No route below referenced one, so OVS emitted no
 # prometheus series and no OTLP span and served its Django templates and JSON
-# uncompressed.  cors is kept: this is a public site whose embedded player is
-# loaded from other MIT pages.
+# uncompressed.
+#
+# enable_cors=False: the embedded player is loaded from other MIT pages in an
+# iframe, which is not a cross-origin fetch and needs no CORS header at all,
+# and the media itself comes from CloudFront under a deliberately
+# credentialless GET/HEAD/OPTIONS policy (see the response headers policy in
+# cloudfront.py).  Taking the shared default would have put
+# `allow_origins: "**"` with `allow_credential: True` -- a reflected Origin
+# plus cookies -- on the Django catch-all that carries the Keycloak session,
+# which is both broader than that media policy and broader than anything OVS
+# has served before, since there was no shared plugin config here at all.
 #
 # The collection redirects also take it.  Their route-level `redirect` (uri +
 # 301) wholly overrides the shared `redirect` (http_to_https) rather than
@@ -1105,6 +1114,7 @@ ovs_shared_plugins = OLApisixSharedPlugins(
         resource_suffix="ol-shared-plugins",
         k8s_namespace=ovs_namespace,
         k8s_labels=k8s_app_labels,
+        enable_cors=False,
     ),
 )
 
