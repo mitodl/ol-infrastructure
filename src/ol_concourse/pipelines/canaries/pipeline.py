@@ -146,6 +146,9 @@ pipeline_params: dict[str, CanaryParams] = {
     "mit-learn": CanaryParams(
         canary_name="mit-learn",
         base_url="https://rc.learn.mit.edu",
+        # The Concourse credential's NAME, not a credential. Resolves from Vault at
+        # secret-concourse/infrastructure/canary_mit_learn for pr-inf pipelines.
+        credential_secret="canary_mit_learn",  # noqa: S106  # pragma: allowlist secret
     ),
 }
 

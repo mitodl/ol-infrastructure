@@ -104,6 +104,14 @@ downloads none.
 - **Web-first assertions only.** `expect(locator)` auto-retries; `expect(await
   locator.count())` does not, and is the most common source of canary flake.
 - **Never `waitForTimeout`.** Wait for the thing you actually need.
+- **Retry the action, not just the assertion, when interacting before hydration.**
+  Auto-waiting gets a locator that is present and enabled, which is not the same as
+  one the framework has attached a handler to yet — a keystroke into a
+  server-rendered search box is silently dropped. Wrap the action and its outcome in
+  `expect(async () => { … }).toPass()` rather than sleeping. `login-and-search.spec.ts`
+  does this; the race was caught only because the journey was run in WebKit, where the
+  page is slower to hydrate. Chromium passed it every time, which is what this class of
+  bug looks like right up until the target has a bad day.
 
 ## Failure artifacts
 
