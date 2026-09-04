@@ -37,12 +37,26 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
-    launchOptions: {
-      // Concourse gives a task container the 64MB default /dev/shm, which is
-      // where Chromium puts its renderer shared memory; without this it dies
-      // with a bare tab crash partway through a journey.
-      args: ["--disable-dev-shm-usage"],
-    },
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // One project per browser the image ships. `pipeline.py`'s CanaryParams.browsers
+  // selects between them with --project, and defaults to chromium alone: every
+  // extra browser multiplies the load a canary puts on a live property.
+  // A name added there must exist here.
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: {
+          // Concourse gives a task container the 64MB default /dev/shm, which
+          // is where Chromium puts its renderer shared memory; without this it
+          // dies with a bare tab crash partway through a journey. Chromium-only
+          // — Firefox and WebKit reject the flag.
+          args: ["--disable-dev-shm-usage"],
+        },
+      },
+    },
+    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
+    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+  ],
 })
