@@ -10,6 +10,7 @@ config:
     max: 2
     min: 1
   edxnotes:business_unit: mitxpro
+  edxnotes:elasticsearch_enabled: "false"
   edxnotes:dns_zone: xpro
   edxnotes:domain: xpro-notes-qa.xpro.mit.edu
   edxnotes:target_vpc: applications_vpc

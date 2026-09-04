@@ -52,6 +52,7 @@ config:
   edxapp:default_module_class: xmodule.hidden_block.HiddenBlock
   edxapp:web_instance_type: r7a.large
   edxapp:enable_courseware_index: "true"
+  edxapp:elasticsearch_enabled: "false"
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     admin_console: admin-console

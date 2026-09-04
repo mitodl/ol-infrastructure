@@ -122,28 +122,7 @@ def _build_interpolated_config_dict(
         "EDXMKTG_USER_INFO_COOKIE_NAME": f"{env_name}-edx-user-info",
         "EDXNOTES_INTERNAL_API": f"https://{runtime_config['notes_domain']}/api/v1",
         "EDXNOTES_PUBLIC_API": f"https://{runtime_config['notes_domain']}/api/v1",
-        "ELASTIC_SEARCH_CONFIG": [
-            {
-                "host": runtime_config["opensearch_hostname"],
-                "port": 443,
-                "use_ssl": True,
-            }
-        ],
-        "ELASTIC_SEARCH_CONFIG_ES7": [
-            {
-                "host": runtime_config["opensearch_hostname"],
-                "port": 443,
-                "use_ssl": True,
-            }
-        ],
         "FILE_UPLOAD_STORAGE_BUCKET_NAME": storage_bucket_name,
-        "FORUM_ELASTIC_SEARCH_CONFIG": [
-            {
-                "host": runtime_config["opensearch_hostname"],
-                "port": "443",
-                "use_ssl": True,
-            }
-        ],
         "FORUM_MONGODB_DATABASE": "forum",
         "GITHUB_REPO_ROOT": "/openedx/data",
         "GOOGLE_ANALYTICS_ACCOUNT": edxapp_config.require("google_analytics_id"),
@@ -265,6 +244,28 @@ def _build_interpolated_config_dict(
             "STUDIO_BASE_URL": f"https://{domains['studio']}/authoring",
         },
     }
+
+    # Emitted only where the environment still has an OpenSearch domain. The
+    # hostname is empty when edxapp:elasticsearch_enabled is false, in which
+    # case there is no domain to point at and these keys have to be absent
+    # rather than pointing at a destroyed endpoint.
+    if runtime_config["opensearch_hostname"]:
+        elasticsearch_hosts = [
+            {
+                "host": runtime_config["opensearch_hostname"],
+                "port": 443,
+                "use_ssl": True,
+            }
+        ]
+        config["ELASTIC_SEARCH_CONFIG"] = elasticsearch_hosts
+        config["ELASTIC_SEARCH_CONFIG_ES7"] = elasticsearch_hosts
+        config["FORUM_ELASTIC_SEARCH_CONFIG"] = [
+            {
+                "host": runtime_config["opensearch_hostname"],
+                "port": "443",
+                "use_ssl": True,
+            }
+        ]
 
     # Meilisearch is only enabled on the CMS side, but CORS_ORIGIN_WHITELIST is
     # shared across the CMS and LMS in this single interpolated config.
@@ -487,7 +488,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
     edxapp_config: Config,
     edxapp_cache: OLAmazonCache,
     notes_stack: StackReference,
-    opensearch_hostname: Output[str],
+    opensearch_hostname: Output[str] | None,
 ) -> EdxappConfigMaps:
     """Create all Kubernetes configmaps for EDXApp using dictionary-based configuration.
 
@@ -498,7 +499,8 @@ def create_k8s_configmaps(  # noqa: PLR0915
         edxapp_config: Pulumi config for edxapp
         edxapp_cache: Redis cache instance
         notes_stack: StackReference for notes service
-        opensearch_hostname: OpenSearch hostname
+        opensearch_hostname: OpenSearch hostname, or None where the
+            environment's OpenSearch domain has been retired
 
     Returns:
         EdxappConfigMaps dataclass containing all ConfigMap resources
@@ -539,7 +541,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
     interpolated_config_name = "60-interpolated-config-yaml"
     interpolated_config_map = Output.all(
         redis_hostname=edxapp_cache.address,
-        opensearch_hostname=opensearch_hostname,
+        opensearch_hostname=opensearch_hostname or Output.from_input(""),
         notes_domain=notes_stack.require_output("notes_domain"),
     ).apply(
         lambda runtime_config: kubernetes.core.v1.ConfigMap(

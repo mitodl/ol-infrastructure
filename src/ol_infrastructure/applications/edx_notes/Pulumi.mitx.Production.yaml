@@ -10,6 +10,7 @@ config:
     max: 3
     min: 1
   edxnotes:business_unit: residential
+  edxnotes:elasticsearch_enabled: "false"
   edxnotes:dns_zone: mitx
   edxnotes:domain: notes.mitx.mit.edu
   edxnotes:target_vpc: residential_mitx_vpc
