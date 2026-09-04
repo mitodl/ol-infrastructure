@@ -34,6 +34,16 @@ _slack_app: AsyncApp | None = None
 _release_requesters: dict[str, str] = {}
 
 
+# Publishable libraries, and the libraries Doof could publish that have no
+# Concourse pipeline. Set by create_app() from the environment. Module globals
+# for the same reason as _slack_app: one process, one AsyncApp. They are not
+# threaded through the handler signature because `publish` is the only
+# subcommand that has anything to do with libraries -- every other one is
+# about apps and takes `repos`.
+_libraries: dict[str, "config.LibraryConfig"] = {}
+_unpublishable_libraries: dict[str, str] = {}
+
+
 _USAGE = (
     "Usage:\n"
     "• `/doof release <app>` — cut a release\n"
@@ -44,7 +54,8 @@ _USAGE = (
     "• `/doof wait-for-checkboxes <app>` — watch a release checklist and "
     "report progress\n"
     "• `/doof promote <app>` — promote to production\n"
-    "• `/doof publish <app>` — publish a library\n"
+    "• `/doof publish <library> [package]` — publish a library to PyPI or npm "
+    "(no argument lists them)\n"
     "• `/doof abandon <app>` — abandon an in-progress release\n"
 )
 
@@ -254,20 +265,128 @@ async def _cmd_promote(repos, ack, respond, command, context):
     )
 
 
+def _known_libraries() -> str:
+    return ", ".join(f"`{name}`" for name in sorted(_libraries)) or "(none configured)"
+
+
+async def _monorepo_package_job(respond, library: str, cfg, package: str | None):
+    """Resolve a monorepo package to its publish job, or explain and return None.
+
+    The packages come from the pipeline's live job list rather than from the
+    registry: the publish pipelines discover them by walking the source
+    checkout at generation time, so anything written down separately goes
+    stale as soon as a package is added to the monorepo.
+    """
+    try:
+        jobs = await concourse.list_jobs(cfg.pipeline, cfg.team)
+    except Exception:
+        log.exception("Failed to list jobs for %s", cfg.pipeline)
+        await respond(
+            f"❌ Could not read `{cfg.pipeline}`'s packages from Concourse. Check logs."
+        )
+        return None
+
+    packages = sorted(
+        job.removeprefix(cfg.package_job_prefix)
+        for job in jobs
+        if job.startswith(cfg.package_job_prefix)
+    )
+    if not package:
+        await respond(
+            f"`{library}` is a monorepo — name the package to publish: "
+            f"`/doof publish {library} <package>`.\n"
+            f"Packages: {', '.join(f'`{p}`' for p in packages)}"
+        )
+        return None
+    if package not in packages:
+        await respond(
+            f"Unknown package `{package}` in `{library}`.\n"
+            f"Packages: {', '.join(f'`{p}`' for p in packages)}"
+        )
+        return None
+    return f"{cfg.package_job_prefix}{package}"
+
+
+async def _resolve_library(repos, respond, library: str):
+    """Return the LibraryConfig for *library*, or explain why there isn't one."""
+    if library in _libraries:
+        return _libraries[library]
+
+    if library in _unpublishable_libraries:
+        # Doof could publish these; Concourse cannot. Saying why beats
+        # "unknown", which reads as a typo.
+        await respond(
+            f"`{library}` is not published from Concourse: "
+            f"{_unpublishable_libraries[library]}"
+        )
+        return None
+
+    # Apps and libraries are separate registries and separate verbs; an app
+    # name here is a wrong-verb mistake, not an unknown name.
+    hint = (
+        f"`{library}` is an app, not a library — use `/doof release {library}`."
+        if library in repos
+        else f"Unknown library `{library}`."
+    )
+    await respond(f"{hint} Known libraries: {_known_libraries()}")
+    return None
+
+
 async def _cmd_publish(repos, ack, respond, command, _context):
     await ack()
-    library = command["text"].strip()
-    if library not in repos:
-        await respond(f"Unknown library `{library}`. Known apps: {', '.join(repos)}")
+    library, _, package = command["text"].strip().partition(" ")
+    package = package.strip() or None
+
+    if not library:
+        await respond(
+            f"Usage: `/doof publish <library> [package]`.\n"
+            f"Known libraries: {_known_libraries()}"
+        )
         return
-    cfg = repos[library]
+
+    cfg = await _resolve_library(repos, respond, library)
+    if cfg is None:
+        return
+
+    if cfg.package_job_prefix:
+        job = await _monorepo_package_job(respond, library, cfg, package)
+        if job is None:
+            return
+    else:
+        if package:
+            await respond(
+                f"`{library}` publishes a single artifact — drop the "
+                f"`{package}` argument."
+            )
+            return
+        job = cfg.publish_job
+
+    # A build triggered into a paused pipeline is created and then never
+    # scheduled, so reporting its URL would look like success and sit at
+    # "pending" forever. Say so instead of triggering.
     try:
-        build_url = await concourse.trigger_job(cfg.pipeline, "publish")
+        if await concourse.pipeline_is_paused(cfg.pipeline, cfg.team):
+            await respond(
+                f"⏸️ `{cfg.pipeline}` is paused, so a build would never run. "
+                f"Unpause it (`fly -t pr-main unpause-pipeline -p "
+                f"{cfg.pipeline}`) and try again."
+            )
+            return
     except Exception:
-        log.exception("Failed to trigger publish for %s", library)
-        await respond(f"❌ Failed to trigger publish for `{library}`.")
+        # Not worth blocking a publish on: worst case the user sees a build
+        # that never starts, which is where they were before this check.
+        log.exception("Failed to read paused state of %s", cfg.pipeline)
+
+    what = f"{library} {package}" if package else library
+    try:
+        build_url = await concourse.trigger_job(cfg.pipeline, job, cfg.team)
+    except Exception:
+        log.exception("Failed to trigger publish for %s", what)
+        await respond(f"❌ Failed to trigger publish for `{what}`. Check logs.")
         return
-    await respond(f"📦 Publish triggered for `{library}`. Build: {build_url}")
+    await respond(
+        f"📦 Publish to {cfg.registry} triggered for `{what}`. Build: {build_url}"
+    )
 
 
 async def _cmd_abandon(repos, ack, respond, command, _context):
@@ -527,6 +646,8 @@ async def _cmd_doof(repos, ack, respond, command, context):
 def create_app():
     global _slack_app  # noqa: PLW0603
     repos = config.load_repos_config()
+    _libraries.update(config.load_libraries_config())
+    _unpublishable_libraries.update(config.load_unpublishable_libraries())
     app = AsyncApp(token=os.environ["SLACK_BOT_TOKEN"])
     app.command("/doof")(partial(_cmd_doof, repos))
     app.action("promote_production")(partial(_handle_promote_button, repos))
