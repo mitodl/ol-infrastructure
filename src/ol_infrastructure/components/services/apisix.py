@@ -813,9 +813,13 @@ class OLApisixSharedPluginsConfig(BaseModel):
     rate_limit_concurrent_burst: NonNegativeInt = 50
 
     @model_validator(mode="after")
-    def require_explicit_cors_origins(self):
+    def require_explicit_cors_origins(self) -> "OLApisixSharedPluginsConfig":
         """Refuse to render the cors default plugin without an origin list."""
-        if self.enable_defaults and self.cors_allow_origins is None:
+        if (
+            self.enable_defaults
+            and self.enable_cors
+            and self.cors_allow_origins is None
+        ):
             msg = (
                 f"{self.application_name}: cors_allow_origins is required when "
                 "enable_defaults is set. Pass the application's own allowed "
