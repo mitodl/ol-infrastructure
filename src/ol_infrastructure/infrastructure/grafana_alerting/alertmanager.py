@@ -162,6 +162,15 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             # per rule -- and, once promoted past `channel=devops-warnings`,
             # one Rootly incident per rule instead of one per service.
             "service_name",
+            # Same reasoning once more for metric_rules/eks_general.py's
+            # WorkloadJobFailed*, which aggregate `sum by (cluster, namespace,
+            # workload)` -- `workload` is the owning CronJob for a scheduled Job
+            # and the Job's own name otherwise. That aggregation drops
+            # `job_name` (deliberately: it is the per-tick ordinal that made
+            # every run a separate alert), so without `workload` here two
+            # unrelated failing CronJobs in the same namespace would arrive as
+            # one grouped notification.
+            "workload",
         ],
         # "1m", not "60s" — Grafana normalizes durations to the largest unit and
         # a mismatched spelling shows as a perpetual diff on every preview.
