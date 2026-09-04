@@ -330,26 +330,62 @@ edxorg_program_credentials_role_assumption = {
 }
 
 # ml's LLMClientFactory (client_class="bedrock", production only -- see
-# dg_projects/ml/ml/resources/llm.py) authenticates via AnthropicBedrockMantle,
-# not the classic AnthropicBedrock client gwarek/learn_ai use. Mantle is a
-# distinct AWS service (prefix bedrock-mantle, not bedrock) that fronts models
-# under a "project" resource instead of foundation-model/inference-profile
-# ARNs, so the bedrock:InvokeModel* grants elsewhere in this repo don't cover
-# it. CreateInference is the only action messages.create() needs; Get*/List*
-# (which AWS's own AmazonBedrockMantleInferenceAccess managed policy pairs
-# with CreateInference) aren't exercised by this client and are left out.
-# No per-region scoping: unlike a Bedrock inference profile, a Mantle project
-# ARN doesn't fan out across a fixed region list.
+# dg_projects/ml/ml/resources/llm.py) needs IAM/IRSA auth to Bedrock, the
+# same as gwarek's LLM_BACKEND=bedrock path. Deliberately the classic
+# bedrock:InvokeModel* API, not Bedrock Mantle (bedrock-mantle:*, a
+# newer/separate AWS service) -- Mantle currently lacks Guardrails,
+# cross-Region inference, and intelligent prompt routing, and AWS's own
+# guidance is to default new work to bedrock-runtime.
 #
-# The Dagster IRSA role is shared by every code location's pods (all deploy
-# under the single "dagster-user-code" service account), so this grants
-# Bedrock Mantle access repo-wide, not just to ml -- there is currently no
-# per-code-location IAM scoping in this stack.
-dagster_bedrock_mantle_permissions = {
-    "Effect": "Allow",
-    "Action": "bedrock-mantle:CreateInference",
-    "Resource": f"arn:aws:bedrock-mantle:*:{aws_account.account_id}:project/*",
-}
+# Not scoped to Anthropic (contrast gwarek's identical statement, which
+# is anthropic.*-only): SUMMARY_MODEL_VERSION is an env var ml's summarize.py
+# reads at runtime, so switching model vendor for this asset is meant to be
+# a config change, not an infra one. Mirrors learn_ai's identical
+# unscoped-by-vendor foundation-model/inference-profile grant
+# (learn_ai/__main__.py) for the same reason.
+#
+# Claude Sonnet 5 (and other newer models) can't be invoked by bare
+# foundation-model ID on on-demand throughput -- Bedrock requires a
+# cross-Region inference profile ID/ARN instead. Per AWS's own docs,
+# granting an inference-profile resource ARN additionally requires
+# granting the underlying foundation-model ARN in *every* Region the
+# profile can route to -- a region wildcard covers that without
+# hardcoding any model's current destination list, which AWS can change.
+#
+# The Dagster IRSA role is shared by every code location's pods (all
+# deploy under the single "dagster-user-code" service account), so this
+# grants Bedrock access repo-wide, not just to ml -- there is currently
+# no per-code-location IAM scoping in this stack.
+dagster_bedrock_permissions = [
+    {
+        "Effect": "Allow",
+        "Action": [
+            "bedrock:InvokeModel",
+            "bedrock:InvokeModelWithResponseStream",
+        ],
+        "Resource": [
+            "arn:aws:bedrock:*::foundation-model/*",
+            f"arn:aws:bedrock:*:{aws_account.account_id}:inference-profile/*",
+        ],
+    },
+    {
+        # Invoking a Bedrock model backed by an AWS Marketplace product for
+        # the first time in an account makes Bedrock auto-initiate a
+        # subscription on the caller's behalf -- that auto-subscribe call
+        # fails with AccessDeniedException without these. No per-model
+        # resource scoping: aws-marketplace:ViewSubscriptions/Unsubscribe
+        # aren't ARN-scopable, and scoping Subscribe to a specific model's
+        # ProductId would defeat the point of the vendor-unscoped grant
+        # above -- an infra change every time a new model/vendor is picked.
+        "Effect": "Allow",
+        "Action": [
+            "aws-marketplace:Subscribe",
+            "aws-marketplace:Unsubscribe",
+            "aws-marketplace:ViewSubscriptions",
+        ],
+        "Resource": "*",
+    },
+]
 
 # Combine all IAM permissions for Kubernetes IRSA role
 dagster_iam_policy_document = {
@@ -358,13 +394,20 @@ dagster_iam_policy_document = {
         *dagster_s3_permissions,
         *athena_permissions,
         edxorg_program_credentials_role_assumption,
-        dagster_bedrock_mantle_permissions,
+        *dagster_bedrock_permissions,
     ],
 }
 
 parliament_config = {
     "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []},
     "CREDENTIALS_EXPOSURE": {"ignore_locations": [{"actions": "sts:assumeRole"}]},
+    # Parliament's RESOURCE_MISMATCH flags bedrock:InvokeModel* for not also
+    # covering every ARN type the action supports (e.g. custom-model-deployment,
+    # provisioned-model) -- those don't apply here; foundation-model and
+    # inference-profile are the only two actually invoked (see
+    # dagster_bedrock_permissions above). Mirrors gwarek's identical
+    # suppression for the same reason.
+    "RESOURCE_MISMATCH": {},
 }
 
 # Keep existing S3 buckets (they already exist and store important data)
