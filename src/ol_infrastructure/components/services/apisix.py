@@ -473,7 +473,7 @@ class OLApisixSharedPluginsConfig(BaseModel):
     plugins: list[dict[str, Any] | OLApisixPluginConfig] = []
 
     @model_validator(mode="after")
-    def require_explicit_cors_origins(self):
+    def require_explicit_cors_origins(self) -> "OLApisixSharedPluginsConfig":
         """Refuse to render the cors default plugin without an origin list."""
         if self.enable_defaults and self.cors_allow_origins is None:
             msg = (
