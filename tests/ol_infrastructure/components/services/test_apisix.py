@@ -528,3 +528,101 @@ def test_gzip_compression_level_stays_cheap():
         assert config["vary"] is True
 
     return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+# ─── enable_cors ───────────────────────────────────────────────────────────────
+
+# The other three defaults, which enable_cors=False must leave untouched.
+_NON_CORS_DEFAULTS = ("redirect", "response-rewrite", "prometheus")
+
+
+@pulumi.runtime.test
+def test_cors_is_attached_by_default():
+    """Documents what the default actually grants: allow_origins "**" with
+    allow_credential True is not the credentialless `Access-Control-Allow-Origin:
+    *` it reads like -- APISIX reflects the request Origin and the browser will
+    hand over cookies. Anything that narrows this default should have to change
+    this assertion on purpose.
+    """
+    plugins = shared_plugins("test-shared-plugins-cors-default")
+
+    def check(spec):
+        cors = plugin_named(spec["plugins"], "cors")
+        assert cors is not None
+        assert cors["enable"] is True
+        assert cors["config"]["allow_origins"] == "**"
+        assert cors["config"]["allow_credential"] is True
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_cors_can_be_disabled():
+    """An internal tool referencing this config for prometheus/otel/gzip must
+    not also pick up a browser-facing origin grant.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-cors-off",
+        enable_cors=False,
+    )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "cors") is None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_cors_disabled_removes_only_cors():
+    """The filter runs over the rendered list rather than lifting cors out of
+    __default_plugins, so a bad predicate would silently take the neighbouring
+    defaults with it -- and losing prometheus or response-rewrite this way
+    would show up as missing metrics, not as an error.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-cors-off-only-cors",
+        enable_cors=False,
+    )
+
+    def check(spec):
+        for name in _NON_CORS_DEFAULTS:
+            assert plugin_named(spec["plugins"], name) is not None, name
+        assert plugin_named(spec["plugins"], "gzip") is not None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_cors_reaches_the_gateway_api_plugin_config():
+    """v1alpha1 is rendered by its own comprehension over the same list, so the
+    Gateway API path needs its own assertion rather than inheriting the v2 one.
+    """
+    plugins = shared_plugins("test-shared-plugins-cors-gateway-api")
+
+    def check(spec):
+        cors = plugin_named(spec["plugins"], "cors")
+        assert cors is not None
+        # v1alpha1 accepts only name and config -- ``enable`` is v2-only.
+        assert set(cors) == {"name", "config"}
+        assert cors["config"]["allow_credential"] is True
+
+    return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_cors_disabled_reaches_the_gateway_api_plugin_config():
+    """The opt-out has to hold on both CRDs: an application that passes
+    enable_cors=False and is later moved from a legacy ApisixRoute to an
+    HTTPRoute would otherwise get the origin grant back on the way across.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-cors-off-gateway-api",
+        enable_cors=False,
+    )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "cors") is None
+        for name in _NON_CORS_DEFAULTS:
+            assert plugin_named(spec["plugins"], name) is not None, name
+
+    return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)

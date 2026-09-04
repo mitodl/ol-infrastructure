@@ -1952,6 +1952,12 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="dnt-policy",
             priority=10,
+            # Referenced no plugin config, unlike every sibling here, so
+            # this path emitted no prometheus series and no OTLP span. `mocking`
+            # short-circuits before the upstream but `prometheus` runs in the log
+            # phase, so the shared config still records it -- and cors/gzip are
+            # no-ops on an empty 204.
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             hosts=[mitlearn_api_domain],
             paths=["/.well-known/dnt-policy.txt"],
             backend_service_name=mitlearn_k8s_app.application_lb_service_name,

@@ -34,6 +34,8 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -969,6 +971,23 @@ gwarek_oidc_plugin = OLApisixPluginConfig(
     **gwarek_oidc_resources.get_full_oidc_plugin_config(unauth_action="auth")
 )
 
+# Shared plugin config.  Neither route below referenced one, so gwarek emitted
+# no prometheus series and no OTLP span, and its Next.js bundle and JSON API
+# responses were served uncompressed.
+#
+# enable_cors=False: both routes sit on one host, the web app calls /api/* on
+# its own origin, and the whole host is behind an APISIX-managed session cookie.
+gwarek_shared_plugins = OLApisixSharedPlugins(
+    f"gwarek-{stack_info.env_suffix}-ol-shared-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="gwarek",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=gwarek_namespace,
+        k8s_labels=application_labels,
+        enable_cors=False,
+    ),
+)
+
 gwarek_apisix_route = OLApisixRoute(
     name=f"gwarek-apisixroute-{stack_info.env_suffix}",
     k8s_namespace=gwarek_namespace,
@@ -977,6 +996,7 @@ gwarek_apisix_route = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="api",
             priority=10,
+            shared_plugin_config_name=gwarek_shared_plugins.resource_name,
             plugins=[gwarek_oidc_plugin],
             hosts=[gwarek_domain],
             paths=["/api/*", "/health"],
@@ -986,6 +1006,7 @@ gwarek_apisix_route = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="web",
             priority=0,
+            shared_plugin_config_name=gwarek_shared_plugins.resource_name,
             plugins=[gwarek_oidc_plugin],
             hosts=[gwarek_domain],
             paths=["/*"],
