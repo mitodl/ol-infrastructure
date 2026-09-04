@@ -80,10 +80,12 @@ LIBRARIES: dict[str, LibraryRegistration] = {
         package_job_prefix="build-",
         github_repo="mitodl/open-edx-plugins",
     ),
+    # The pipeline generator lives in ol-infrastructure; the packages it
+    # publishes do not.
     "jupyterhub-extensions": LibraryRegistration(
         pipeline="publish-jupyterhub-extensions-pypi",
         package_job_prefix="build-",
-        github_repo="mitodl/ol-infrastructure",
+        github_repo="mitodl/ol-notebook-extensions",
     ),
     # Single-artifact.
     "ol-concourse": LibraryRegistration(
