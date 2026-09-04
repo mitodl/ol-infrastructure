@@ -64,6 +64,25 @@ def rootly_imported_route_opts(route_id: str) -> ResourceOptions:
     return ResourceOptions.merge(rootly_opts, ResourceOptions(import_=route_id))
 
 
+def rootly_imported_escalation_path_opts(path_id: str) -> ResourceOptions:
+    """Adopt an escalation path that already exists in Rootly into this stack.
+
+    Same adoption mechanics and the same caveat as
+    `rootly_imported_route_opts`: `import_` takes ownership, it does not
+    assert equivalence. The declared bodies below were transcribed from
+    `GET /v1/escalation_policies/{id}/escalation_paths` on 2026-09-04 and
+    re-checked on 2026-09-16. The one remaining diff is
+    `time_restriction_time_zone`: live is null, and the provider fills its
+    first enum value, `International Date Line West`, as the three paths this
+    stack created already carry. Neither path has any `time_restrictions`, so
+    the zone does nothing. Check the diff before applying anyway, because a
+    mismatch rewrites live paging behaviour instead of failing.
+
+    Safe to drop back to `rootly_opts` once every stack has applied this.
+    """
+    return ResourceOptions.merge(rootly_opts, ResourceOptions(import_=path_id))
+
+
 # CloudWatch alarms for QA/CI resources (e.g. "mitlearn-redis-qa-003") route
 # through the same shared warning/critical SNS topics as production (see
 # src/ol_infrastructure/lib/aws/monitoring_helper.py) and would otherwise page
@@ -577,6 +596,59 @@ escalation_policy_exampledeleteme_escalationpolicy = rootly.EscalationPolicy(
     opts=rootly_opts,
 )
 
+# The two escalation paths on the Default Escalation Policy that predate this
+# stack. Both were built in the Rootly UI (2025-05-09 and 2025-05-10) and were
+# left unmanaged through the initial migration, so their levels were modeled
+# here while the paths holding those levels were not -- the ordering and the
+# urgency match rule that decide *which* path a page takes were editable in
+# the UI with nothing in this repo to notice. Adopted rather than recreated:
+# creating new ones would leave the live paths in place and the levels below
+# still attached to them.
+#
+# Escalation and deferral paths are positioned independently, so the escalation
+# ordering is Low Urgency (1) -> Medium urgency to #devops-warnings (2) ->
+# Default Escalation Path (3, and the `default` fallback), and the two deferral
+# paths carry their own 1/2.
+escalation_path_low_urgency = rootly.EscalationPath(
+    "low-urgency",
+    name="Low Urgency",
+    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    path_type="escalation",
+    match_mode="match-all-rules",
+    # Quiet selects which of each user's own notification rules fire, and those
+    # are per-user and owned outside this stack -- it does not mean "does not
+    # page". See the deferral path below for the measurement.
+    notification_type="quiet",
+    position=1,
+    repeat=False,
+    repeat_count=1,
+    initial_delay=0,
+    rules=[
+        {
+            "ruleType": "alert_urgency",
+            "urgencyIds": ["d7ed8e91-ffa9-4cc4-b524-729d14a4425b"],
+        },
+    ],
+    opts=rootly_imported_escalation_path_opts("67658f83-7fac-4a19-8e2a-0d8eee57f0a8"),
+)
+
+# The fallback path: no rules, so everything that no earlier path claimed lands
+# here, audible, repeating five times until acknowledged. This is what pages.
+escalation_path_default = rootly.EscalationPath(
+    "default-escalation-path",
+    name="Default Escalation Path",
+    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    default=True,
+    path_type="escalation",
+    match_mode="match-all-rules",
+    notification_type="audible",
+    position=3,
+    repeat=True,
+    repeat_count=5,
+    initial_delay=0,
+    opts=rootly_imported_escalation_path_opts("adc991bc-d498-4323-9d80-9d2dfa156b0c"),
+)
+
 # Adds an explicit Slack-channel notification target to this level, alongside
 # the existing schedule target, so #devops-alerts visibility for Production
 # no longer depends solely on the account-wide "default alerts channel" Slack
@@ -593,7 +665,7 @@ escalation_level_b94aa0a3_cda6_4ee6_bcb1_cddf33c69088 = rootly.EscalationLevel(
     "b94aa0a3-cda6-4ee6-bcb1-cddf33c69088",
     delay=5,
     escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
-    escalation_policy_path_id="adc991bc-d498-4323-9d80-9d2dfa156b0c",
+    escalation_policy_path_id=escalation_path_default.id,
     notification_target_params=[
         {
             "id": "fad27d50-f0e4-4d21-9b6d-57eb2dec648b",
@@ -615,7 +687,7 @@ escalation_level_r_4351b5b9_00d3_46ae_a044_05930cfbe0e2 = rootly.EscalationLevel
     "r-4351b5b9-00d3-46ae-a044-05930cfbe0e2",
     delay=5,
     escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
-    escalation_policy_path_id="adc991bc-d498-4323-9d80-9d2dfa156b0c",
+    escalation_policy_path_id=escalation_path_default.id,
     notification_target_params=[{"id": "99415", "teamMembers": "all", "type": "user"}],
     paging_strategy_configuration_schedule_strategy="on_call_only",
     paging_strategy_configuration_strategy="default",
@@ -623,8 +695,8 @@ escalation_level_r_4351b5b9_00d3_46ae_a044_05930cfbe0e2 = rootly.EscalationLevel
     opts=rootly_opts,
 )
 
-# The only level on the "Low Urgency" escalation path (which is unmanaged --
-# only this level is modeled here). Low urgency alerts used to notify the
+# The only level on the "Low Urgency" escalation path (adopted above). Low
+# urgency alerts used to notify the
 # on-call schedule here and post to #devops-alerts. The path is "quiet", so
 # those pages respected Do Not Disturb, but they were still pages, for the
 # least urgent tier we have -- Grafana severity=warning maps to Low. Both
@@ -637,7 +709,7 @@ escalation_level_r_75bc919c_824c_46a1_9589_0fc8b85e0d77 = rootly.EscalationLevel
     "r-75bc919c-824c-46a1-9589-0fc8b85e0d77",
     delay=5,
     escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
-    escalation_policy_path_id="67658f83-7fac-4a19-8e2a-0d8eee57f0a8",
+    escalation_policy_path_id=escalation_path_low_urgency.id,
     notification_target_params=[
         {
             "id": "C0BK6BHUCDP",  # #devops-warnings
@@ -656,7 +728,7 @@ escalation_level_r_8ee197b2_ffe5_4696_b4a0_760e5c84a343 = rootly.EscalationLevel
     "r-8ee197b2-ffe5-4696-b4a0-760e5c84a343",
     delay=10,
     escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
-    escalation_policy_path_id="adc991bc-d498-4323-9d80-9d2dfa156b0c",
+    escalation_policy_path_id=escalation_path_default.id,
     notification_target_params=[
         {
             "id": "fad27d50-f0e4-4d21-9b6d-57eb2dec648b",
@@ -672,8 +744,8 @@ escalation_level_r_8ee197b2_ffe5_4696_b4a0_760e5c84a343 = rootly.EscalationLevel
 
 # Medium-urgency alerts (see the alert_source_urgency_rules_attributes demotion
 # rules above) still paged on-call once even outside business hours, because
-# neither of the two existing (unmanaged, pre-dating this Pulumi migration)
-# escalation paths on the Default Escalation Policy actually holds/defers --
+# neither of the two escalation paths that pre-date this Pulumi migration
+# (adopted above) on the Default Escalation Policy actually holds/defers --
 # they only differ in how far they escalate if unacknowledged. This adds a
 # real Rootly "deferral path": Medium-urgency alerts arriving outside
 # Mon-Fri 9am-5pm ET are held (logged + visible in Rootly, no page) and
@@ -734,8 +806,8 @@ escalation_path_defer_medium_urgency_off_hours = rootly.EscalationPath(
 # Low urgency had NO deferral, which made it *less* protected overnight than
 # Medium -- an inversion nobody chose. Alerts demoted to Low (the production
 # Grafana source demotes `severity=warning` this way, see
-# alert_source_urgency_rules_attributes above) match the unmanaged `Low Urgency`
-# escalation path, which is `notification_type: quiet` and has no time
+# alert_source_urgency_rules_attributes above) match the `Low Urgency`
+# escalation path above, which is `notification_type: quiet` and has no time
 # restriction at all, so it fires at 3am like any other hour.
 #
 # "Quiet" is weaker than it sounds. It does not mean "does not page" -- it
