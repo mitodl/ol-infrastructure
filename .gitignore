@@ -24,6 +24,10 @@ pyinfra-debug.log
 # npx skills managed view (source lives in agents/skills/)
 .agents/skills/
 
+# Playwright canaries (src/ol_concourse/pipelines/canaries/)
+node_modules/
+canary-results/
+
 .pulumi
 local-dev/certs/
 tilt_config.json
