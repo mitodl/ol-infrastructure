@@ -201,6 +201,10 @@ tika_shared_plugins = OLApisixSharedPlugins(
         resource_suffix="shared-plugins",
         k8s_namespace=tika_namespace,
         k8s_labels=application_labels,
+        # Tika is called server-to-server with an X-Access-Token header (see the
+        # route below); no browser page ever fetches it, so it needs no
+        # Access-Control-* headers.  An empty list attaches no cors plugin.
+        cors_allow_origins=[],
         enable_defaults=True,
     ),
 )

@@ -1428,6 +1428,10 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        # The same list Django gets as CORS_ALLOWED_ORIGINS above.  The gateway
+        # sets the Access-Control-* headers the browser actually enforces, so
+        # the two have to agree or django-cors-headers' answer is irrelevant.
+        cors_allow_origins=cors_urls_list,
         # Explicit override, not the component's per-stack default (on
         # everywhere except Production pending a separate soak test): the
         # nginx sidecar this stage removes gzipped JSON responses

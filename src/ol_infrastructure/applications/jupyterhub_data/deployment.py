@@ -301,6 +301,10 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
             resource_suffix="ol-shared-plugins",
             k8s_namespace=namespace,
             k8s_labels=application_labels,
+            # JupyterHub serves its own UI, its API and every single-user server
+            # from this one host, so all of its browser traffic is same-origin.
+            # An empty list attaches no cors plugin at all.
+            cors_allow_origins=[],
             enable_defaults=True,
             plugins=[
                 {

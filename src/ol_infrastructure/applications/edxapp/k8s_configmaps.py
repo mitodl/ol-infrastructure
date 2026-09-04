@@ -22,6 +22,43 @@ from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
+def browser_origins(stack_info: StackInfo, edxapp_config: Config) -> list[str]:
+    """Return the page origins that call edxapp cross-origin from a browser.
+
+    Shared by two consumers that have to agree: Django's CORS_ORIGIN_WHITELIST
+    below, and the APISIX cors plugin in k8s_resources.py.  The gateway is what
+    actually emits the Access-Control-* headers the browser enforces, so if it
+    allows less than Django does the browser blocks the request before Django
+    ever sees it.
+
+    Deliberately excludes two entries the Django whitelist also carries: the
+    edxnotes domain (an API the LMS calls, never a page origin, and only
+    available as a Pulumi Output here) and the storage bucket's S3 origin.
+    Neither is a document origin, so neither can be the Origin on a request to
+    edxapp.
+    """
+    domains = edxapp_config.require_object("domains")
+    marketing_domain = (
+        edxapp_config.get("mitxonline_domain")
+        if stack_info.env_prefix == "mitxonline"
+        else edxapp_config.get("marketing_domain")
+    )
+    origins = [
+        f"https://{domains['lms']}",
+        f"https://{domains['studio']}",
+        f"https://{domains['preview']}",
+        f"https://{marketing_domain}",
+        f"https://{edxapp_config.require('learn_ai_frontend_domain')}",
+        f"https://{edxapp_config.require('mit_learn_domain')}",
+        "https://canvas.mit.edu",
+    ]
+    # Canvas LTI and MIT's Shibboleth IdP post back to the LMS on the
+    # deployments that integrate with them.
+    if stack_info.env_prefix in ["mitx", "mitx-staging", "mitxonline"]:
+        origins.append("https://idp.mit.edu")
+    return origins
+
+
 def _build_interpolated_config_dict(
     stack_info: StackInfo,
     edxapp_config: Config,
@@ -101,17 +138,14 @@ def _build_interpolated_config_dict(
         "CELERY_BROKER_HOSTNAME": runtime_config["redis_hostname"],
         "CMS_BASE": domains["studio"],
         "CONTACT_EMAIL": edxapp_config.require("sender_email_address"),
-        # Base CORS origins - canvas.mit.edu and idp.mit.edu added conditionally below
+        # Page origins come from browser_origins(), which the APISIX cors
+        # plugin in k8s_resources.py reads too so the two stay in step.  The two
+        # extra entries here are not document origins (see that function).
+        # meilisearch is appended conditionally below.
         "CORS_ORIGIN_WHITELIST": [
-            f"https://{domains['lms']}",
-            f"https://{domains['studio']}",
-            f"https://{domains['preview']}",
-            f"https://{marketing_domain}",
+            *browser_origins(stack_info, edxapp_config),
             f"https://{runtime_config['notes_domain']}",
-            f"https://{edxapp_config.require('learn_ai_frontend_domain')}",
-            f"https://{edxapp_config.require('mit_learn_domain')}",
             f"https://{env_name}-edxapp-storage.s3.amazonaws.com",
-            "https://canvas.mit.edu",
         ],
         "COURSE_IMPORT_EXPORT_BUCKET": course_bucket_name,
         "CROSS_DOMAIN_CSRF_COOKIE_DOMAIN": domains["lms"],
@@ -297,10 +331,6 @@ def _build_interpolated_config_dict(
 
     # Residential-specific configuration (mitx, mitx-staging)
     if stack_info.env_prefix in ["mitx", "mitx-staging"]:
-        # Add Canvas and MIT IDP to CORS whitelist for residential deployments
-        config["CORS_ORIGIN_WHITELIST"].append(
-            "https://idp.mit.edu",
-        )
         config["CSRF_TRUSTED_ORIGINS"] = [
             "https://canvas.mit.edu",
             f"https://{domains['lms']}",
@@ -382,7 +412,6 @@ def _build_interpolated_config_dict(
 
     # MITx Online-specific configuration
     elif stack_info.env_prefix == "mitxonline":
-        config["CORS_ORIGIN_WHITELIST"].append("https://idp.mit.edu")
         config["CSRF_TRUSTED_ORIGINS"] = [
             "https://canvas.mit.edu",
             f"https://{domains['lms']}",
