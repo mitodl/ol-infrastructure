@@ -1670,6 +1670,32 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             backend_service_name=mitlearn_k8s_app.application_lb_service_name,
             backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
         ),
+        # Credential metadata generation calls a frontier model once per
+        # Open Badges field (gpt-5 and Claude measure 25-46s each, run
+        # concurrently), so it does not fit the 60s read timeout every other
+        # route takes by default. It gets a route of its own rather than a
+        # raised timeout on `passauth`: that one matches every path, so
+        # lifting its ceiling would let any slow request anywhere in the
+        # application hold a connection three times as long. Django bounds
+        # the call itself at CREDENTIAL_METADATA_LLM_TIMEOUT (120s), below
+        # this, so a slow model is logged as a failed generation instead of
+        # surfacing here as a gateway timeout.
+        OLApisixRouteConfig(
+            route_name="credential-metadata",
+            priority=10,
+            timeout_read="180s",
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/api/v0/credential_metadata/"],
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
@@ -1724,6 +1750,32 @@ learn_external_service_apisix_route = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/learn/*"],
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        # Credential metadata generation calls a frontier model once per
+        # Open Badges field (gpt-5 and Claude measure 25-46s each, run
+        # concurrently), so it does not fit the 60s read timeout every other
+        # route takes by default. It gets a route of its own rather than a
+        # raised timeout on `passauth`: that one matches every path, so
+        # lifting its ceiling would let any slow request anywhere in the
+        # application hold a connection three times as long. Django bounds
+        # the call itself at CREDENTIAL_METADATA_LLM_TIMEOUT (120s), below
+        # this, so a slow model is logged as a failed generation instead of
+        # surfacing here as a gateway timeout.
+        OLApisixRouteConfig(
+            route_name="credential-metadata",
+            priority=10,
+            timeout_read="180s",
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/learn/api/v0/credential_metadata/"],
             backend_service_name=mitlearn_k8s_app.application_lb_service_name,
             backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
         ),

@@ -28,6 +28,26 @@ server {
         try_files $uri $uri/ /django_media/$1 /django_media/$1/ =404;
     }
 
+    # Credential metadata generation calls a frontier model once per Open
+    # Badges field and takes tens of seconds, past nginx's 60s default
+    # proxy_read_timeout. Scoped to this one path rather than raised on
+    # `location /`, which would hold connections open three times as long for
+    # all traffic during a backend problem. Kept in step with the 180s on the
+    # matching APISIX route (`credential-metadata`) in the mit_learn stack:
+    # whichever is lower is the ceiling, so lifting only one changes nothing.
+    location = /api/v0/credential_metadata/ {
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $host;
+
+        proxy_pass http://127.0.0.1:8073;  # DEFAULT_WSGI_PORT
+        proxy_pass_request_headers on;
+        proxy_pass_request_body on;
+        client_max_body_size 25M;
+
+        proxy_read_timeout 180s;
+    }
+
     location / {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
