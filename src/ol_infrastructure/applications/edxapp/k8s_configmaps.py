@@ -303,6 +303,7 @@ def _build_interpolated_config_dict(
         config["CSRF_TRUSTED_ORIGINS"] = [
             "https://canvas.mit.edu",
             f"https://{domains['lms']}",
+            f"https://{domains['studio']}",
         ]
         config.update(
             {
@@ -340,7 +341,10 @@ def _build_interpolated_config_dict(
 
     # xPro-specific configuration
     elif stack_info.env_prefix == "xpro":
-        config["CSRF_TRUSTED_ORIGINS"] = [f"https://{domains['lms']}"]
+        config["CSRF_TRUSTED_ORIGINS"] = [
+            f"https://{domains['lms']}",
+            f"https://{domains['studio']}",
+        ]
         config.update(
             {
                 "XPRO_BASE_URL": f"https://{marketing_domain}",
@@ -680,7 +684,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
         "OAUTH_EXPIRE_CONFIDENTIAL_CLIENT_DAYS": 365,
         "OAUTH_EXPIRE_PUBLIC_CLIENT_DAYS": 30,
         "OPTIMIZELY_PROJECT_ID": None,
-        "ORA_GRADING_MICROFRONTEND_URL": "/ora-grading",
+        "ORA_GRADING_MICROFRONTEND_URL": f"https://{edxapp_config.require_object('domains')['lms']}/ora-grading",
         "ORDER_HISTORY_MICROFRONTEND_URL": None,
         "ORGANIZATIONS_AUTOCREATE": True,
         "PAID_COURSE_REGISTRATION_CURRENCY": ["usd", "$"],
