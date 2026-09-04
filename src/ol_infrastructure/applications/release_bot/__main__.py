@@ -23,6 +23,7 @@ from bridge.settings.apps import APPS
 from bridge.settings.apps import github_repo as app_github_repo
 from bridge.settings.apps import repo_main_branch as app_repo_main_branch
 from bridge.settings.apps import slack_channel as app_slack_channel
+from bridge.settings.libraries import LIBRARIES, UNPUBLISHABLE_LIBRARIES
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.ol_types import AWSBase, BusinessUnit, Environment
@@ -97,6 +98,29 @@ default_repos_config = {
 }
 repos_config = bot_config.get_object("repos_config") or default_repos_config
 REPOS_CONFIG = json.dumps(repos_config)
+
+# Publishable libraries, from the registry that is their single source of
+# truth. Separate from repos_config because a library is published rather than
+# released: no RC/Production split, no release issue, no checklist gate -- and
+# critically, a different Concourse team (`main`, not the `infrastructure`
+# team CONCOURSE_TEAM names below), which is why `/doof publish` could not have
+# worked against an app-shaped config no matter what job it asked for.
+LIBRARIES_CONFIG = json.dumps(
+    {
+        name: {
+            "pipeline": lib.pipeline,
+            "team": lib.team,
+            "publish_job": lib.publish_job,
+            "package_job_prefix": lib.package_job_prefix,
+            "github_repo": lib.github_repo,
+            "registry": lib.registry,
+        }
+        for name, lib in LIBRARIES.items()
+    }
+)
+# Libraries Doof could publish that have no Concourse pipeline, mapped to why,
+# so the bot answers a request for one instead of calling it unknown.
+UNPUBLISHABLE_LIBRARIES_CONFIG = json.dumps(UNPUBLISHABLE_LIBRARIES)
 
 resource_name = "release-bot-production"
 namespace = "operations"
@@ -211,6 +235,14 @@ bot_deployment = kubernetes.apps.v1.Deployment(
                             kubernetes.core.v1.EnvVarArgs(
                                 name="REPOS_CONFIG",
                                 value=REPOS_CONFIG,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="LIBRARIES_CONFIG",
+                                value=LIBRARIES_CONFIG,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="UNPUBLISHABLE_LIBRARIES",
+                                value=UNPUBLISHABLE_LIBRARIES_CONFIG,
                             ),
                             *(
                                 [

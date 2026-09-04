@@ -1152,3 +1152,217 @@ async def test_startup_check_survives_a_slack_failure(repos, monkeypatch):
     )
 
     await bot._report_unreachable_channels(MagicMock(), repos)
+
+
+# ---------------------------------------------------------------------------
+# /doof publish
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def _libraries(monkeypatch):
+    """Install a monorepo and a single-artifact library, both in team `main`."""
+    monkeypatch.setattr(
+        bot,
+        "_libraries",
+        {
+            "ol-django": bot_config.LibraryConfig(
+                pipeline="publish-ol-django-pypi",
+                team="main",
+                package_job_prefix="build-",
+                github_repo="mitodl/ol-django",
+            ),
+            "mit-learn-api-client": bot_config.LibraryConfig(
+                pipeline="mit-learn-api-client",
+                team="main",
+                publish_job="publish",
+                registry="npm",
+            ),
+        },
+    )
+    monkeypatch.setattr(
+        bot,
+        "_unpublishable_libraries",
+        {"edx-api-client": "no publish pipeline yet -- still goes through Doof."},
+    )
+    monkeypatch.setattr(
+        bot.concourse, "pipeline_is_paused", AsyncMock(return_value=False)
+    )
+
+
+def _record_publish(calls: list[tuple[str, str, str]]):
+    """Record a (pipeline, job, team) trigger and return the reported build URL."""
+
+    def _trigger(pipeline, job, team):
+        calls.append((pipeline, job, team))
+        return "http://build/1"
+
+    return _trigger
+
+
+@pytest.mark.usefixtures("_libraries")
+async def test_publish_triggers_the_registered_job_on_the_registered_team(
+    repos, slack, monkeypatch
+):
+    """The whole bug in one assertion.
+
+    The old handler looked the name up in `repos` (apps), triggered a job
+    literally named `publish` in `<name>-pipeline`, and used the bot's ambient
+    `infrastructure` team. All three were wrong for every library.
+    """
+    calls: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(side_effect=_record_publish(calls))
+    )
+
+    await bot._cmd_publish(
+        repos, slack.ack, slack.respond, _command("mit-learn-api-client"), {}
+    )
+
+    assert calls == [("mit-learn-api-client", "publish", "main")]
+    assert "npm" in slack.said
+    assert "http://build/1" in slack.said
+
+
+@pytest.mark.usefixtures("_libraries")
+async def test_publish_resolves_a_monorepo_package_to_its_job(
+    repos, slack, monkeypatch
+):
+    calls: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        bot.concourse, "list_jobs", AsyncMock(return_value=["build-mail", "build-scim"])
+    )
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(side_effect=_record_publish(calls))
+    )
+
+    await bot._cmd_publish(
+        repos, slack.ack, slack.respond, _command("ol-django scim"), {}
+    )
+
+    assert calls == [("publish-ol-django-pypi", "build-scim", "main")]
+
+
+@pytest.mark.usefixtures("_libraries")
+async def test_publish_lists_a_monorepos_packages_when_none_is_named(
+    repos, slack, monkeypatch
+):
+    """Read off the live pipeline: a static list goes stale on the next package."""
+    monkeypatch.setattr(
+        bot.concourse, "list_jobs", AsyncMock(return_value=["build-mail", "build-scim"])
+    )
+    trigger = AsyncMock()
+    monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+
+    await bot._cmd_publish(repos, slack.ack, slack.respond, _command("ol-django"), {})
+
+    assert "mail" in slack.said
+    assert "scim" in slack.said
+    trigger.assert_not_awaited()
+
+
+@pytest.mark.usefixtures("_libraries")
+async def test_publish_rejects_a_package_the_pipeline_does_not_define(
+    repos, slack, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.concourse, "list_jobs", AsyncMock(return_value=["build-mail"])
+    )
+    trigger = AsyncMock()
+    monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+
+    await bot._cmd_publish(
+        repos, slack.ack, slack.respond, _command("ol-django nonesuch"), {}
+    )
+
+    assert "nonesuch" in slack.said
+    trigger.assert_not_awaited()
+
+
+@pytest.mark.usefixtures("_libraries")
+async def test_publish_refuses_a_paused_pipeline_rather_than_reporting_a_dead_build(
+    repos, slack, monkeypatch
+):
+    """A build in a paused pipeline is created and then never scheduled.
+
+    Reporting its URL reads as success while the build sits at "pending"
+    forever. publish-ol-django-pypi is paused today, so this is the first
+    thing a real publish of it would hit.
+    """
+    monkeypatch.setattr(
+        bot.concourse, "list_jobs", AsyncMock(return_value=["build-mail"])
+    )
+    monkeypatch.setattr(
+        bot.concourse, "pipeline_is_paused", AsyncMock(return_value=True)
+    )
+    trigger = AsyncMock()
+    monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+
+    await bot._cmd_publish(
+        repos, slack.ack, slack.respond, _command("ol-django mail"), {}
+    )
+
+    assert "paused" in slack.said
+    trigger.assert_not_awaited()
+
+
+@pytest.mark.usefixtures("_libraries")
+async def test_publish_still_triggers_when_the_paused_check_fails(
+    repos, slack, monkeypatch
+):
+    """The paused check is advisory; failing it must not block a publish."""
+    monkeypatch.setattr(
+        bot.concourse,
+        "pipeline_is_paused",
+        AsyncMock(side_effect=RuntimeError("Concourse is down")),
+    )
+    trigger = AsyncMock(return_value="http://build/1")
+    monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+
+    await bot._cmd_publish(
+        repos, slack.ack, slack.respond, _command("mit-learn-api-client"), {}
+    )
+
+    trigger.assert_awaited_once()
+
+
+@pytest.mark.usefixtures("_libraries")
+async def test_publish_explains_a_library_that_has_no_pipeline(
+    repos, slack, monkeypatch
+):
+    """Doof can publish these. Calling them "unknown" would read as a typo."""
+    trigger = AsyncMock()
+    monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+
+    await bot._cmd_publish(
+        repos, slack.ack, slack.respond, _command("edx-api-client"), {}
+    )
+
+    assert "still goes through Doof" in slack.said
+    trigger.assert_not_awaited()
+
+
+@pytest.mark.usefixtures("_libraries")
+async def test_publish_points_an_app_name_at_the_release_command(
+    repos, slack, monkeypatch
+):
+    """`my-app` is in the app registry; publish is the wrong verb for it."""
+    trigger = AsyncMock()
+    monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+
+    await bot._cmd_publish(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    assert "/doof release my-app" in slack.said
+    trigger.assert_not_awaited()
+
+
+@pytest.mark.usefixtures("_libraries")
+async def test_publish_with_no_argument_lists_the_libraries(repos, slack, monkeypatch):
+    trigger = AsyncMock()
+    monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+
+    await bot._cmd_publish(repos, slack.ack, slack.respond, _command(""), {})
+
+    assert "ol-django" in slack.said
+    assert "mit-learn-api-client" in slack.said
+    trigger.assert_not_awaited()
