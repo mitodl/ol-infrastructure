@@ -8,8 +8,26 @@
 
 | Spec | Journey | Status |
 |---|---|---|
-| `homepage.spec.ts` | Homepage renders in a real browser | Active |
-| _(pending)_ | Log in, then search for a course | Not yet written |
+| `homepage.spec.ts` | Homepage renders in a real browser, anonymously | Active |
+| `login-and-search.spec.ts` | Log in, reach the dashboard, then search for courses | Active |
+
+## Helpers
+
+| File | Purpose |
+|---|---|
+| `helpers/sign-in.ts` | Drives the real multi-screen Keycloak login from the homepage |
+| `helpers/signed-in-test.ts` | `test` whose `page` fixture is already signed in |
+
+A journey that needs a session imports `test` from `helpers/signed-in-test` and takes
+the ordinary `{ page }` fixture — do not call `signIn` yourself. The session is
+established once per worker and reused, so adding a third signed-in journey costs no
+extra logins. Journeys that must be anonymous, like `homepage.spec.ts`, keep importing
+`@playwright/test` directly.
+
+The session is held in memory and deliberately never written to disk: a `storageState`
+file carries live tokens and this project's failure artifacts are published. For the
+same reason the login context is not traced, so `sign-in.ts` puts the diagnosis in its
+error messages instead.
 
 ## Login flow
 
@@ -18,22 +36,39 @@ The flow is **identity-first** and measured as three screens:
 
 | Screen | Path | Form control |
 |---|---|---|
-| Email | `/protocol/openid-connect/auth` | `input[name="username"]`, `button[name="login"]` |
-| Password (existing account) | `/login-actions/authenticate` | `input[name="password"]`, `button[name="login"]` |
-| Signup (unknown account) | `/login-actions/registration` | **has a captcha** |
+| Email | `/protocol/openid-connect/auth` | label `Email`, button `Next` |
+| Password (account exists in the realm) | `/login-actions/authenticate` | label `Password`, button `Next` |
+| Signup (unknown non-MIT address) | `/login-actions/registration` | **has a captcha** |
+| Touchstone hand-off (unknown `@mit.edu` address) | `/broker/touchstone-idp/login` → `okta.mit.edu` | MIT credentials |
+
+There is **no captcha on the login path**, so the canary drives the real UI; no bypass,
+dedicated flow or injected `storageState` is needed.
 
 Credentials come from the environment (`CANARY_USER_EMAIL`, `CANARY_USER_PASSWORD`),
 sourced from Vault by the pipeline. Never commit them — see `../../AGENTS.md`.
 
 ### Two things a login journey here must do
 
-1. **Assert the flow reached `/login-actions/authenticate`, not `/login-actions/registration`.**
-   Because the flow is identity-first, an account that is missing, disabled or locked out
-   does not produce a login error — Keycloak silently routes to the signup form, which
-   *does* have a captcha. Without this assertion the symptom of "our stored password
-   drifted" reads as "a captcha now blocks login", which sends triage the wrong way.
+Both are implemented in `helpers/sign-in.ts`; they are recorded here because they are
+properties of the realm, not of the code, and the next property to authenticate against
+`olapps` will need them too.
+
+1. **Assert the password screen was reached, positively.** The flow is identity-first, so
+   an account that is missing, disabled or renamed never produces a login error —
+   Keycloak just sends the browser elsewhere, and *which* elsewhere depends on the email
+   domain. The canary account is `@mit.edu`, so its failure mode is a silent hand-off to
+   Touchstone; a non-MIT address instead lands on the captcha'd signup form. Testing for
+   those destinations one at a time is how you end up reporting "login now requires SSO"
+   or "a captcha now blocks login" when the truth is that the account is gone. Worse, a
+   flow that assumes it is on the password screen will type the canary's password into
+   whatever page is actually showing — including MIT's own IdP.
 2. **Never retry a *rejected* password.** See the lockout note below. Retrying a page that
-   failed to load is fine; retrying a refused credential is not.
+   failed to load is fine; retrying a refused credential is not. Playwright starts a
+   fresh worker process for a retry, so `sign-in.ts` records the refusal in a file under
+   `tmpdir` — per-container, so it covers the run and nothing beyond it. Note that the
+   realm's custom theme means Keycloak's stock alert markup is absent: the refusal is
+   detected by its visible text (`Invalid username or password.`), which is what a user
+   sees anyway.
 
 ## Canary account
 
@@ -87,7 +122,15 @@ that merely happens to exist in RC today is a future false page:
 
 | Journey | Requires | Guaranteed by |
 |---|---|---|
-| | | |
+| `login-and-search.spec.ts` | A search for `mathematics` returns at least one **course** | Nothing contractual — see below |
+
+That query is deliberately broad: MIT's catalogue not containing a single mathematics
+course is not a realistic content change, so the assertion is a real signal about search
+rather than a bet on one course's continued existence. It is still a content dependency,
+and the honest reading of a failure is "search returned nothing", which is a **failure
+worth paging on** — an emptied or half-rebuilt index looks exactly like this from a
+user's seat. Anything narrower, such as a named course or an exact result count, is a
+false page waiting for the next content sync.
 
 ## Prior art
 
