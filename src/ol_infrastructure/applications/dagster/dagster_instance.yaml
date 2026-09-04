@@ -145,6 +145,54 @@ run_launcher:
   class: K8sRunLauncher
   config:
     run_k8s_config:
+      container_config:
+        # Keep the OpenTelemetry auto-instrumentation agent off run workers.
+        #
+        # The user-deployments chart copies each code location's whole `env`
+        # list into DAGSTER_CLI_API_GRPC_CONTAINER_CONTEXT, and K8sRunLauncher
+        # applies that context to every run worker pod -- so the PYTHONPATH that
+        # switches the agent on for the ten code servers (see dagster_otel_env
+        # in __main__.py) reaches run workers too. There is no chart lever that
+        # grants a code location container env a run worker does not inherit;
+        # `env_config_maps` and `env_secrets` propagate the same way.
+        #
+        # THIS CANNOT BE FIXED BY SETTING PYTHONPATH BACK TO "" HERE, which is
+        # what the first version of this file did. K8sContainerContext.__new__
+        # folds a context's top-level `env` into its own run_k8s_config, and
+        # get_k8s_job_config carries no env at all, so BOTH values end up in
+        # job.py's `user_defined_env_vars` -- and create_for_run ends with
+        # `context.merge(user_defined_container_context)`, whose list merge is
+        # [*run_launcher, *code_location]. That puts the agent path last, and
+        # kubelet resolves duplicate names by last assignment, so the override
+        # loses. Caught in review on PR #5733 and reproduced in the image.
+        #
+        # `command` works where `env` cannot: the merge only copies keys the
+        # code-location context actually sets, and it sets no command, so this
+        # one survives. Kubernetes prepends it to the launcher's args, giving
+        # `env -u PYTHONPATH dagster api execute_run ...`. Unsetting rather than
+        # emptying means site never finds the agent's sitecustomize.py, so
+        # nothing is imported and no library is patched -- OTEL_SDK_DISABLED
+        # would not do this, it only makes TracerProvider hand out NoOp tracers
+        # (sdk/trace/__init__.py) after the agent has already loaded.
+        #
+        # Run workers stay excluded until the span-flush policy is decided, not
+        # because the data is uninteresting -- it is the most interesting, since
+        # 2026-08-10 was 178 run workers holding connections and their per-worker
+        # footprint is still unmeasured. The blocker is that they are preemptible
+        # by design (priority_class_name below), so a SIGKILL drops whatever
+        # BatchSpanProcessor has not flushed, and it drops it with a bias: the
+        # preempted runs are the ones from a capacity event. Measured
+        # 2026-09-03 on data-production, run duration is p50 17s / p90 32s -- three
+        # BSP cycles at the 5s default, not zero -- and arrivals are bursty
+        # (~2.2/s inside a burst against ~0.006/s outside), so the flush and
+        # sampling settings have to be sized against the burst rather than any
+        # runs/day average. Tracked in
+        # tk-extend-otel-auto-instrumentation-to-dagster-run--378bda; deleting
+        # this command block is the whole toggle.
+        command:
+        - env
+        - -u
+        - PYTHONPATH
       pod_template_spec_metadata:
         annotations:
           karpenter.sh/do-not-disrupt: "true"
