@@ -496,6 +496,44 @@ def setup_grafana(
                     # surfaced the tail-sampler sizing bug (traces evicted
                     # before a decision was made, buffer occupancy far past
                     # the old 100-trace cap) instead of it going unnoticed.
+                    #
+                    # The _total suffixes are load-bearing. includeMetrics
+                    # lands in prometheus.relabel's keep_metrics, which Alloy
+                    # anchors as ^(?:...)$, and the collector's internal
+                    # Prometheus rendering appends _total to every monotonic
+                    # counter. Written without the suffix, four of the five
+                    # entries below matched nothing: from #5381 on 2026-08-12
+                    # to 2026-09-04 the only tail-sampling series that ever
+                    # reached Grafana Cloud was sampling_traces_on_memory,
+                    # which is the one Gauge in the set. The same mismatch
+                    # cannot bite the chart's own defaults because they spell
+                    # counters out (otelcol_receiver_accepted_spans_total,
+                    # otelcol_processor_batch_timeout_trigger_send_total) --
+                    # and those do arrive, from these same collectors, which
+                    # is what pins the cause on the suffix rather than on the
+                    # scrape. Instrument types per the tailsamplingprocessor
+                    # documentation.md.
+                    #
+                    # count_traces_sampled is the one carrying `policy` and
+                    # `sampled`, so until it lands there is no direct view of
+                    # which policy is deciding what; retention can only be
+                    # inferred from receiver-vs-exporter span ratios.
+                    #
+                    # Its span-weighted counterpart count_spans_sampled is
+                    # deliberately NOT listed, and listing it would do
+                    # nothing. Alloy v1.18.1 vendors tailsamplingprocessor
+                    # v0.153.0, where the only site that records it
+                    # (processor.go:519) sits behind the alpha, off-by-default
+                    # gate processor.tailsamplingprocessor.metricstatcount
+                    # spanssampled -- and Alloy's SetupOtelFeatureGates
+                    # (internal/util/otel_feature_gate.go) enables a hardcoded
+                    # list of exactly one gate, filelog.allowFileDeletion,
+                    # with no config or flag to add another. So the series is
+                    # not emitted and includeMetrics can only retain what is
+                    # already emitted. The line above it, count_traces_sampled
+                    # (processor.go:518), is ungated, as are
+                    # new_trace_id_received, sampling_trace_dropped_too_early
+                    # and sampling_policy_evaluation_error.
                     "alloy": {
                         "instances": [
                             {
@@ -513,11 +551,13 @@ def setup_grafana(
                                 "metrics": {
                                     "tuning": {
                                         "includeMetrics": [
-                                            "otelcol_processor_tail_sampling_count_traces_sampled",
-                                            "otelcol_processor_tail_sampling_sampling_trace_dropped_too_early",
-                                            "otelcol_processor_tail_sampling_new_trace_id_received",
+                                            # Counters -- _total suffix required.
+                                            "otelcol_processor_tail_sampling_count_traces_sampled_total",
+                                            "otelcol_processor_tail_sampling_sampling_trace_dropped_too_early_total",
+                                            "otelcol_processor_tail_sampling_new_trace_id_received_total",
+                                            "otelcol_processor_tail_sampling_sampling_policy_evaluation_error_total",
+                                            # Gauge -- no suffix. Already arriving.
                                             "otelcol_processor_tail_sampling_sampling_traces_on_memory",
-                                            "otelcol_processor_tail_sampling_sampling_policy_evaluation_error",
                                         ],
                                     },
                                 },
