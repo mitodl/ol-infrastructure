@@ -57,6 +57,7 @@ config:
   - ["teams.enable_teams_app", "--create", "--superusers", "--staff"]
   - ["instructor.legacy_instructor_dashboard", "--deactivate"]
   - ["ol_openedx_feedback.feedback_enabled", "--create", "--everyone"]
+  edxapp:canvas_base_url: https://mit.test.instructure.com
   edxapp:use_extracted_html_block: "false"
   edxapp:business_unit: mitxonline
   edxapp:db_password:

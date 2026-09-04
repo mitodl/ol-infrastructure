@@ -377,12 +377,15 @@ def _build_interpolated_config_dict(
 
     # MITx Online-specific configuration
     elif stack_info.env_prefix == "mitxonline":
+        config["CORS_ORIGIN_WHITELIST"].append("https://idp.mit.edu")
         config["CSRF_TRUSTED_ORIGINS"] = [
+            "https://canvas.mit.edu",
             f"https://{domains['lms']}",
             f"https://{domains['studio']}",
         ]
         config.update(
             {
+                "CANVAS_BASE_URL": edxapp_config.require("canvas_base_url"),
                 "COURSE_ABOUT_VISIBILITY_PERMISSION": "see_about_page",
                 "MITXONLINE_BASE_URL": f"https://{marketing_domain}/",
                 "ENROLLMENT_WEBHOOK_URL": f"https://{marketing_domain}/api/openedx_webhook/enrollment/",
@@ -781,7 +784,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
     # with the LMS settings, so the entry must live in the LMS config and
     # route explicitly to the CMS worker queue. Excludes mitx-staging, which
     # has no CANVAS_ACCESS_TOKEN wired.
-    if stack_info.env_prefix == "mitx":
+    if stack_info.env_prefix in ("mitx", "mitxonline"):
         lms_general_config_content["CELERYBEAT_SCHEDULE"] = {
             "sync_canvas_due_dates": {
                 "task": "ol_openedx_canvas_integration.cms_tasks.sync_canvas_due_dates_for_all_courses",
