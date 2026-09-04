@@ -165,12 +165,12 @@ def create_k8s_resources(  # noqa: C901
     #
     # Neither can take one value across every install: measured p99 concurrency
     # demand differs by orders of magnitude. mitxonline LMS needed 17.7
-    # concurrently-busy blocking threads where mitx LMS needed 0.27; mitxonline CMS
-    # reaches 21.6 busy threads per pod with granian_blocking_queue 32 deep, where
-    # mitx CMS peaks at 1.24 over 9 days with a queue at zero for 99.95% of minutes.
-    # A single value is either unsafe for mitxonline or wasteful for mitx. This file
-    # is shared by every install, so the only place that distinction can live is
-    # per-stack config.
+    # concurrently-busy blocking threads where mitx LMS needed 0.27. Over the 9 days
+    # to 2026-09-04, mitxonline CMS peaked at 39.5 busy threads on its worst pod with
+    # granian_blocking_queue 24 deep, where mitx CMS peaked at 1.24 with the queue
+    # above zero in 6 of ~12,960 minutes. A single value is either unsafe for
+    # mitxonline or wasteful for mitx. This file is shared by every install, so the
+    # only place that distinction can live is per-stack config.
     #
     # Omitted (the default) means the pre-overhaul holding pins: 2 workers x 32
     # blocking threads, runtime-mode mt, runtime-threads 2 -- the values Granian
@@ -1179,9 +1179,9 @@ def create_k8s_resources(  # noqa: C901
                 no_ws=True,
                 # Concurrency is per-install; see cms_granian_concurrency above.
                 # The holding pins it defaults to are mitxonline's: that install has
-                # real thread demand (21.6 concurrently-busy blocking threads per pod,
-                # granian_blocking_queue 32 deep) and retuning it needs its own
-                # rollout window -- see
+                # real thread demand (39.5 concurrently-busy blocking threads on its
+                # worst pod, granian_blocking_queue 24 deep, 9d to 2026-09-04) and
+                # retuning it needs its own rollout window -- see
                 # tk-mitxonline-cms-needs-a-saturation-aware-scaling. mitx and
                 # mitx-staging opt out, having run the component defaults since
                 # 2026-08-24 with zero restarts and zero RSS respawns.
