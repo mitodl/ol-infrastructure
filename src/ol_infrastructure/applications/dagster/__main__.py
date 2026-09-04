@@ -329,6 +329,28 @@ edxorg_program_credentials_role_assumption = {
     "Resource": "arn:aws:iam::708756755355:role/mit-s3-edx-program-reports-access",
 }
 
+# ml's LLMClientFactory (client_class="bedrock", production only -- see
+# dg_projects/ml/ml/resources/llm.py) authenticates via AnthropicBedrockMantle,
+# not the classic AnthropicBedrock client gwarek/learn_ai use. Mantle is a
+# distinct AWS service (prefix bedrock-mantle, not bedrock) that fronts models
+# under a "project" resource instead of foundation-model/inference-profile
+# ARNs, so the bedrock:InvokeModel* grants elsewhere in this repo don't cover
+# it. CreateInference is the only action messages.create() needs; Get*/List*
+# (which AWS's own AmazonBedrockMantleInferenceAccess managed policy pairs
+# with CreateInference) aren't exercised by this client and are left out.
+# No per-region scoping: unlike a Bedrock inference profile, a Mantle project
+# ARN doesn't fan out across a fixed region list.
+#
+# The Dagster IRSA role is shared by every code location's pods (all deploy
+# under the single "dagster-user-code" service account), so this grants
+# Bedrock Mantle access repo-wide, not just to ml -- there is currently no
+# per-code-location IAM scoping in this stack.
+dagster_bedrock_mantle_permissions = {
+    "Effect": "Allow",
+    "Action": "bedrock-mantle:CreateInference",
+    "Resource": f"arn:aws:bedrock-mantle:*:{aws_account.account_id}:project/*",
+}
+
 # Combine all IAM permissions for Kubernetes IRSA role
 dagster_iam_policy_document = {
     "Version": IAM_POLICY_VERSION,
@@ -336,6 +358,7 @@ dagster_iam_policy_document = {
         *dagster_s3_permissions,
         *athena_permissions,
         edxorg_program_credentials_role_assumption,
+        dagster_bedrock_mantle_permissions,
     ],
 }
 
