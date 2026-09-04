@@ -502,8 +502,8 @@ def setup_grafana(
                     # anchors as ^(?:...)$, and the collector's internal
                     # Prometheus rendering appends _total to every monotonic
                     # counter. Written without the suffix, four of the five
-                    # entries below matched nothing: between 2026-08-10 and
-                    # 2026-09-04 the only tail-sampling series that ever
+                    # entries below matched nothing: from #5381 on 2026-08-12
+                    # to 2026-09-04 the only tail-sampling series that ever
                     # reached Grafana Cloud was sampling_traces_on_memory,
                     # which is the one Gauge in the set. The same mismatch
                     # cannot bite the chart's own defaults because they spell
