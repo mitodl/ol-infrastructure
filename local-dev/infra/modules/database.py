@@ -13,6 +13,8 @@ class DatabaseResources:
     credentials: k8s.core.v1.Secret
     cluster: k8s.apiextensions.CustomResource
     """The CNPG Cluster CR — pass as a dependency to workloads that need Postgres."""
+    host_access: k8s.core.v1.Service
+    """NodePort exposing the primary directly to the host — see its own comment."""
 
 
 def create_database(
@@ -98,8 +100,32 @@ def create_database(
         opts=_k8s(parent=local_infra_ns, depends_on=[cnpg_release, credentials]),
     )
 
+    # Separate NodePort Service (not a field on the Cluster CR itself) so CNPG's
+    # own reconciliation of local-pg-rw/-ro/-r is untouched. Host-run test suites
+    # (pytest invoked directly from a checkout, outside the cluster — see
+    # local-dev/scripts/test-db-env.sh) need a plain TCP path to the primary;
+    # in-cluster pods keep using local-pg-rw as before. Mapped to a host port by
+    # cluster/k3d-config.yaml's `ports:` entry, same recipe as APISIX's
+    # NodePort/host-port pair in ingress.py.
+    host_access = k8s.core.v1.Service(
+        "local-pg-host-access",
+        metadata={"name": "local-pg-host-access", "namespace": "local-infra"},
+        spec={
+            "type": "NodePort",
+            # Matches local-pg-rw's own selector so this always targets the
+            # current primary.
+            "selector": {
+                "cnpg.io/cluster": "local-pg",
+                "cnpg.io/instanceRole": "primary",
+            },
+            "ports": [{"port": 5432, "targetPort": 5432, "nodePort": 30432}],
+        },
+        opts=_k8s(parent=local_infra_ns, depends_on=[cluster]),
+    )
+
     return DatabaseResources(
         cnpg_release=cnpg_release,
         credentials=credentials,
         cluster=cluster,
+        host_access=host_access,
     )
