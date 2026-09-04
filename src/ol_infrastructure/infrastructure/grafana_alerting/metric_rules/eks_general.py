@@ -435,6 +435,31 @@ def create(
             #                       break. Remove this exclusion once that job is
             #                       fixed -- see tk-witan-ci-indexer-cronjob-fails-on
             #                       -nearly-every-r-4c1462.
+            #
+            # Grouped on the OWNING CronJob, not the Job. A CronJob's job_name
+            # carries the schedule ordinal (`witan-council-probe-29808780`), so
+            # keying on it makes every tick a new series -- a new alert instance,
+            # and a new Rootly alert that `deduplication_key_kind="payload"`
+            # cannot collapse because the payload differs. Measured 2026-09-04:
+            # a probe CronJob at */15 that stayed broken for ~19h produced 76 of
+            # the 99 Rootly alerts created in that window, burying the one
+            # unrelated critical in the same list. Nobody was paged 76 times
+            # (rootly/__main__.py demotes WorkloadJobFailedCritical to the
+            # non-paging urgency), but the volume is unbounded in the duration
+            # of the outage.
+            #
+            # `kube_job_owner` supplies the owner: CronJob-owned Jobs carry
+            # owner_kind="CronJob" and owner_name=<cronjob>, while a standalone
+            # Job (e.g. a Pulumi-created migration Job) has the series with
+            # those labels ABSENT -- so the `unless` arm below is what keeps
+            # non-CronJob Jobs covered, still keyed on their own name. Both arms
+            # verified against operations-production 2026-09-04: three failed
+            # witan-ci-indexer Jobs collapse to one `workload="witan-ci-indexer"`
+            # series, and witan-migrations-production-34bf072f keeps its own.
+            #
+            # The exclusion regex stays on `job_name` deliberately: it filters
+            # the raw kube_job_failed series before the join, so it matches the
+            # ordinal-suffixed Job names as it always did.
             alerting.RuleGroupRuleArgs(
                 name="WorkloadJobFailedWarning",
                 condition="C",
@@ -443,10 +468,22 @@ def create(
                 exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
-                    "description": "Job {{ $labels.job_name }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has failed."
+                    "description": "Job {{ $labels.workload }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has failed."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, job_name) (kube_job_failed{cluster=~".*-(ci|qa)", condition="true", namespace!="dagster", job_name!~"witan-ci-indexer.*"} == 1)'
+                    "sum by (cluster, namespace, workload) (\n"
+                    "  label_replace(\n"
+                    '    (kube_job_failed{cluster=~".*-(ci|qa)", condition="true", namespace!="dagster", job_name!~"witan-ci-indexer.*"} == 1)\n'
+                    "      * on (cluster, namespace, job_name) group_left(owner_name)\n"
+                    '      kube_job_owner{owner_kind="CronJob"},\n'
+                    '    "workload", "$1", "owner_name", "(.*)")\n'
+                    "  or\n"
+                    "  label_replace(\n"
+                    '    (kube_job_failed{cluster=~".*-(ci|qa)", condition="true", namespace!="dagster", job_name!~"witan-ci-indexer.*"} == 1)\n'
+                    "      unless on (cluster, namespace, job_name)\n"
+                    '      kube_job_owner{owner_kind="CronJob"},\n'
+                    '    "workload", "$1", "job_name", "(.*)")\n'
+                    ")"
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -457,10 +494,22 @@ def create(
                 exec_err_state="KeepLast",
                 labels={"severity": "critical"},
                 annotations={
-                    "description": "Job {{ $labels.job_name }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has failed."
+                    "description": "Job {{ $labels.workload }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has failed."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, job_name) (kube_job_failed{cluster=~".*-(production)", condition="true", namespace!="dagster", job_name!~"witan-ci-indexer.*"} == 1)'
+                    "sum by (cluster, namespace, workload) (\n"
+                    "  label_replace(\n"
+                    '    (kube_job_failed{cluster=~".*-(production)", condition="true", namespace!="dagster", job_name!~"witan-ci-indexer.*"} == 1)\n'
+                    "      * on (cluster, namespace, job_name) group_left(owner_name)\n"
+                    '      kube_job_owner{owner_kind="CronJob"},\n'
+                    '    "workload", "$1", "owner_name", "(.*)")\n'
+                    "  or\n"
+                    "  label_replace(\n"
+                    '    (kube_job_failed{cluster=~".*-(production)", condition="true", namespace!="dagster", job_name!~"witan-ci-indexer.*"} == 1)\n'
+                    "      unless on (cluster, namespace, job_name)\n"
+                    '      kube_job_owner{owner_kind="CronJob"},\n'
+                    '    "workload", "$1", "job_name", "(.*)")\n'
+                    ")"
                 ),
             ),
             # --- HPA at max replicas ---
