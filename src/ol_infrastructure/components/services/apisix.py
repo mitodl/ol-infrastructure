@@ -5,7 +5,14 @@ from typing import Any, Literal
 
 import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
-from pydantic import BaseModel, Field, NonNegativeInt, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    Field,
+    NonNegativeInt,
+    PositiveInt,
+    field_validator,
+    model_validator,
+)
 
 from bridge.lib.constants import DEFAULT_OIDC_SESSION_COOKIE_NAME
 from ol_infrastructure.components.services.vault import (
@@ -26,7 +33,7 @@ class OLApisixPluginConfig(BaseModel):
     name: str
     enable: bool = True
     secret_ref: str | None = Field(
-        None,
+        default=None,
         alias="secretRef",
     )
     config: dict[str, Any] = {}
@@ -109,7 +116,7 @@ class OLApisixRouteConfig(BaseModel):
     route_name: str
     priority: int = 0
     shared_plugin_config_name: str | None = None
-    plugins: list[OLApisixPluginConfig] = []
+    plugins: list[OLApisixPluginConfig | dict[str, Any]] = []
     hosts: list[str] = []
     paths: list[str] = []
     # Optional ApisixRoute ``match.exprs`` entries for matching on headers,
@@ -141,12 +148,16 @@ class OLApisixRouteConfig(BaseModel):
     @field_validator("plugins")
     @classmethod
     def ensure_request_id_plugin(
-        cls, v: list[OLApisixPluginConfig]
-    ) -> list[OLApisixPluginConfig]:
+        cls, v: list[OLApisixPluginConfig | dict[str, Any]]
+    ) -> list[OLApisixPluginConfig | dict[str, Any]]:
         """
         Ensure that the request-id plugin is always added to the plugins list
         """
-        if not any(plugin.name == "request-id" for plugin in v):
+        if not any(
+            (plugin.get("name") if isinstance(plugin, dict) else plugin.name)
+            == "request-id"
+            for plugin in v
+        ):
             v.append(
                 OLApisixPluginConfig(
                     name="request-id",
@@ -221,7 +232,9 @@ class OLApisixRoute(ComponentResource):
                 "name": route_config.route_name,
                 "priority": route_config.priority,
                 "plugins": [
-                    p.model_dump(by_alias=True, exclude_none=True)
+                    p
+                    if isinstance(p, dict)
+                    else p.model_dump(by_alias=True, exclude_none=True)
                     for p in route_config.plugins
                 ],
                 "match": {
@@ -455,6 +468,38 @@ class OLApisixSharedPluginsConfig(BaseModel):
     # Either raw CRD dicts or OLApisixPluginConfig objects; the component
     # normalises the latter to dicts before rendering.
     plugins: list[dict[str, Any] | OLApisixPluginConfig] = []
+    # Per-client-IP rate limiting as a DDoS backstop.  Opt-in (default off) so
+    # that enabling it on one application does not change the behaviour of the
+    # other services that share this component.  Both plugins default to their
+    # local (node-local shared memory) policy here, so the effective ceiling
+    # scales with the gateway replica count -- at 11 replicas a single IP
+    # spread across pods gets roughly 11x the per-pod rate before it is
+    # throttled.  This is intended to blunt single-source floods, not to
+    # replace edge/volumetric protection; a cluster-wide cap is available via
+    # each plugin's ``policy: redis``/``redis-cluster`` option (or
+    # limit-count), just not configured by this component today.
+    enable_rate_limiting: bool = False
+    # Key used to bucket requests.  ``remote_addr`` resolves to the real client
+    # IP because the gateway trusts Fastly's X-Forwarded-For (see trustedAddresses).
+    rate_limit_key: str = "remote_addr"
+    rate_limit_rejected_code: int = Field(default=429, ge=200, le=599)
+    # Thresholds are ~10x the observed worst-case single browser IP.  Measured
+    # from 30d of APISIX access logs for api.learn.mit.edu: the busiest
+    # legitimate browser client sustained ~5 req/s (304 requests in its peak
+    # minute) and accumulated 16.9 request-seconds in that minute, i.e. a mean
+    # concurrency of ~0.3.  The headroom is deliberate rather than measured:
+    # the browser population is identified by header heuristics, so quieter
+    # clients are undercounted, and a large shared-NAT egress point could
+    # plausibly exceed a single user by an order of magnitude.  These values
+    # target single-source flood abuse, not normal aggregated load.
+    # limit-req: leaky-bucket request rate (requests/second) plus burst slack.
+    rate_limit_requests_per_second: PositiveInt = 50
+    rate_limit_burst: NonNegativeInt = 25
+    # limit-conn: maximum concurrent in-flight requests plus burst slack.  Sized
+    # for an SPA page load multiplexed over HTTP/2 behind shared NAT, which can
+    # briefly hold far more requests open than the mean concurrency suggests.
+    rate_limit_max_concurrent: PositiveInt = 100
+    rate_limit_concurrent_burst: NonNegativeInt = 50
 
 
 class OLApisixSharedPlugins(ComponentResource):
@@ -593,6 +638,40 @@ class OLApisixSharedPlugins(ComponentResource):
             "config": {"sampler": {"name": "always_on"}},
         }
 
+        # limit-conn caps concurrent in-flight requests per client; limit-req
+        # applies a leaky-bucket request-rate ceiling.  Both set
+        # ``allow_degradation`` so that if the plugin's shared-memory store is
+        # unavailable the request is allowed through rather than failing closed
+        # — a rate-limiting backstop must never become its own outage.
+        __rate_limit_plugins: list[dict[str, Any]] = [
+            {
+                "name": "limit-conn",
+                "enable": True,
+                "config": {
+                    "conn": plugin_config.rate_limit_max_concurrent,
+                    "burst": plugin_config.rate_limit_concurrent_burst,
+                    "default_conn_delay": 0.1,
+                    "key_type": "var",
+                    "key": plugin_config.rate_limit_key,
+                    "rejected_code": plugin_config.rate_limit_rejected_code,
+                    "allow_degradation": True,
+                },
+            },
+            {
+                "name": "limit-req",
+                "enable": True,
+                "config": {
+                    "rate": plugin_config.rate_limit_requests_per_second,
+                    "burst": plugin_config.rate_limit_burst,
+                    "nodelay": True,
+                    "key_type": "var",
+                    "key": plugin_config.rate_limit_key,
+                    "rejected_code": plugin_config.rate_limit_rejected_code,
+                    "allow_degradation": True,
+                },
+            },
+        ]
+
         resource_options = ResourceOptions(parent=self).merge(opts)
 
         # Defaults first, then the caller's own plugins.  APISIX dispatches by
@@ -609,6 +688,8 @@ class OLApisixSharedPlugins(ComponentResource):
             else plugin
             for plugin in plugin_config.plugins
         )
+        if plugin_config.enable_rate_limiting:
+            plugins.extend(__rate_limit_plugins)
 
         # Gate on CI to match the cluster-level plugin enablement: APISIX does not
         # load the opentelemetry plugin on CI, so attaching it to a route there
