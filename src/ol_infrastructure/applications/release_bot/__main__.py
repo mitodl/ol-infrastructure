@@ -21,6 +21,9 @@ from pulumi import Config, export, log
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.apps import APPS
 from bridge.settings.apps import github_repo as app_github_repo
+from bridge.settings.apps import (
+    release_resource_workflow as app_release_resource_workflow,
+)
 from bridge.settings.apps import repo_main_branch as app_repo_main_branch
 from bridge.settings.apps import slack_channel as app_slack_channel
 from ol_infrastructure.lib import pulumi_projects as projects
@@ -87,6 +90,13 @@ default_repos_config = {
         "pipeline": f"{app_name}-pipeline",
         "repo": app_github_repo(app_name),
         "branch": app_repo_main_branch(app_name),
+        # Apps still on the legacy release-candidate/release pipeline are
+        # published here too, and the bot refuses their release commands
+        # rather than dropping them from its vocabulary: "still on the legacy
+        # pipeline" is the answer someone typing `/doof release <app>` needs,
+        # and it is also what makes the rollout a one-field change in
+        # bridge.settings.apps.
+        "release_workflow": app_release_resource_workflow(app_name),
         **(
             {"channel": app_slack_channel(app_name)}
             if app_slack_channel(app_name)

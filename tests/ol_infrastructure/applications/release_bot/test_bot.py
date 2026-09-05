@@ -22,8 +22,25 @@ def repos():
             repo="mitodl/my-app",
             branch="main",
             channel="C123",
+            release_workflow=True,
         )
     }
+
+
+@pytest.fixture
+def mixed_repos(repos):
+    """One migrated app alongside one still on the legacy pipeline."""
+    return dict(
+        repos,
+        **{
+            "legacy-app": bot_config.AppConfig(
+                pipeline="legacy-app-pipeline",
+                repo="mitodl/legacy-app",
+                branch="master",
+                channel="C456",
+            )
+        },
+    )
 
 
 @pytest.fixture
@@ -1152,3 +1169,157 @@ async def test_startup_check_survives_a_slack_failure(repos, monkeypatch):
     )
 
     await bot._report_unreachable_channels(MagicMock(), repos)
+
+
+async def test_release_refuses_an_app_still_on_the_legacy_pipeline(
+    mixed_repos, slack, monkeypatch
+):
+    """`build-<app>-release-image` does not exist in the legacy pipeline.
+
+    Triggering it 404s in Concourse with nothing in the message that explains
+    why, so the refusal has to happen before the call.
+    """
+    calls: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(side_effect=_record_trigger(calls))
+    )
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    await bot._cmd_release(
+        mixed_repos, slack.ack, slack.respond, _command("legacy-app"), {}
+    )
+
+    assert calls == []
+    assert "legacy" in slack.said
+    assert "Doof" in slack.said
+
+
+async def test_preview_refuses_a_legacy_app_rather_than_answering_wrongly(
+    mixed_repos, slack, monkeypatch
+):
+    """A repo with no calver tag reads as never-released.
+
+    `release_preview` would then report the whole commit history as the next
+    release's contents -- a confidently wrong answer, which is worse than the
+    404 the mutating commands get.
+    """
+    preview = AsyncMock()
+    monkeypatch.setattr(bot.github, "release_preview", preview)
+
+    await bot._cmd_preview(
+        mixed_repos, slack.ack, slack.respond, _command("legacy-app"), {}
+    )
+
+    preview.assert_not_awaited()
+    assert "legacy" in slack.said
+
+
+async def test_promote_refuses_a_legacy_app(mixed_repos, slack, monkeypatch):
+    """Closing a release issue is only half of promote; the gate is the rest."""
+    close = AsyncMock()
+    monkeypatch.setattr(bot.github, "open_release_issues", AsyncMock(return_value=[]))
+    monkeypatch.setattr(bot.github, "close_release_issue", close)
+
+    await bot._cmd_promote(
+        mixed_repos, slack.ack, slack.respond, _command("legacy-app"), {"user_id": "U1"}
+    )
+
+    close.assert_not_awaited()
+    assert "legacy" in slack.said
+
+
+async def test_abandon_refuses_a_legacy_app(mixed_repos, slack, monkeypatch):
+    calls: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(side_effect=_record_trigger(calls))
+    )
+
+    await bot._cmd_abandon(
+        mixed_repos, slack.ack, slack.respond, _command("legacy-app"), {}
+    )
+
+    assert calls == []
+    assert "legacy" in slack.said
+
+
+async def test_promote_button_refuses_a_legacy_app(mixed_repos, monkeypatch):
+    """The button carries an app name from a message, so it is not trusted."""
+    close = AsyncMock()
+    monkeypatch.setattr(bot.github, "open_release_issues", AsyncMock(return_value=[]))
+    monkeypatch.setattr(bot.github, "close_release_issue", close)
+    say = AsyncMock()
+
+    await bot._handle_promote_button(
+        mixed_repos,
+        AsyncMock(),
+        {"actions": [{"value": "legacy-app:2026.9.5.1"}], "user": {"id": "U1"}},
+        say,
+    )
+
+    close.assert_not_awaited()
+    assert "legacy" in str(say.call_args.args[0])
+
+
+async def test_wait_for_checkboxes_refuses_a_legacy_app(
+    mixed_repos, slack, monkeypatch
+):
+    """No release issue is ever created for a legacy app, so nothing to watch."""
+    monkeypatch.setattr(bot, "_slack_app", MagicMock())
+    issues = AsyncMock(return_value=[])
+    monkeypatch.setattr(bot.github, "open_release_issues", issues)
+
+    await bot._cmd_wait_for_checkboxes(
+        mixed_repos, slack.ack, slack.respond, _command("legacy-app"), {}
+    )
+
+    issues.assert_not_awaited()
+    assert "legacy-app" not in bot._checkbox_watchers
+    assert "legacy" in slack.said
+
+
+async def test_release_status_names_the_apps_it_left_out(
+    mixed_repos, slack, monkeypatch
+):
+    """A short list must not read as "everything is quiet" during the rollout."""
+    monkeypatch.setattr(bot.github, "open_release_issues", AsyncMock(return_value=[]))
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    await bot._cmd_release_status(
+        mixed_repos, slack.ack, slack.respond, _command(""), {}
+    )
+
+    said = slack.said
+    assert "my-app" in said
+    assert "legacy-app" in said
+    assert "legacy pipeline" in said
+
+
+async def test_release_status_queries_only_migrated_apps(
+    mixed_repos, slack, monkeypatch
+):
+    queried: list[str] = []
+
+    async def _issues(repo_slug):
+        queried.append(repo_slug)
+        return []
+
+    monkeypatch.setattr(bot.github, "open_release_issues", _issues)
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    await bot._cmd_release_status(
+        mixed_repos, slack.ack, slack.respond, _command(""), {}
+    )
+
+    assert queried == ["mitodl/my-app"]
+
+
+async def test_ready_to_promote_poll_skips_legacy_apps(mixed_repos):
+    """Polling a legacy repo every 120s is a guaranteed miss on rate limit.
+
+    `main()` is what narrows the polled set, so this asserts the filter the
+    two poll loops are handed rather than the loops themselves.
+    """
+    watched = bot_config.release_workflow_apps(mixed_repos)
+
+    assert list(watched) == ["my-app"]
