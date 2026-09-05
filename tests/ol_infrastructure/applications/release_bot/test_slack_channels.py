@@ -188,3 +188,40 @@ async def test_unresolvable_names_the_channels_that_cannot_be_reached():
     )
 
     assert missing == ["product-typo"]
+
+
+async def test_a_miss_names_the_closest_visible_channel(caplog):
+    """A typo and a missing invite produce the same miss.
+
+    During the 2026-09-03 outage all eight configured channels failed
+    identically, so the log gave no way to tell which cause to chase.
+    """
+    client = _FakeClient(pages=[[{"name": "product-ovs-eng", "id": "C1"}]])
+
+    with caplog.at_level("WARNING"):
+        assert await slack_channels.resolve(client, "product-ovs") == "product-ovs"
+
+    assert "closest visible: product-ovs-eng" in caplog.text
+    assert "of 1 it can see" in caplog.text
+
+
+async def test_a_miss_with_no_near_match_says_only_how_many_are_visible(caplog):
+    """No near match is itself the answer: the bot is not in that channel."""
+    client = _FakeClient(pages=[[{"name": "engineering", "id": "C1"}]])
+
+    with caplog.at_level("WARNING"):
+        await slack_channels.resolve(client, "product-ovs")
+
+    assert "of 1 it can see" in caplog.text
+    assert "closest visible" not in caplog.text
+
+
+async def test_a_miss_against_an_empty_listing_points_at_scopes(caplog):
+    """Seeing zero channels is a token problem, not a per-channel invite."""
+    client = _FakeClient(pages=[[]])
+
+    with caplog.at_level("WARNING"):
+        await slack_channels.resolve(client, "product-ovs")
+
+    assert "can see no channels at all" in caplog.text
+    assert "scopes" in caplog.text
