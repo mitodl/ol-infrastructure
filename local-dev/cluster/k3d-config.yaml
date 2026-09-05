@@ -11,7 +11,18 @@ metadata:
 servers: 1
 agents: 2
 
-image: docker.io/rancher/k3s:v1.31.4-k3s1
+# The node image fixes the containerd version, and containerd 2.x is required.
+# mitodl/ol-python-base is built on Docker Hardened Images whose base layers
+# are zstd-compressed, and Tilt's docker_build exports them with the media type
+# application/vnd.docker.image.rootfs.diff.tar.zstd. containerd 1.7 (k3s up to
+# v1.32) does not recognise that type as a layer, so it drops those layers and
+# rejects every app image with "number of layers and diffIDs don't match".
+# k3s v1.33 and later ship containerd 2.x. CI builds sidestep this with
+# OUTPUT_OCI=true on oci-build-task; docker_build has no equivalent.
+# Applies on cluster (re)create: teardown.sh + setup.sh. Recreating destroys
+# every PersistentVolume, so run local-dev/scripts/pg-backup.sh first and
+# pg-restore.sh after.
+image: docker.io/rancher/k3s:v1.35.8-k3s1
 
 # Local image registry — images built by Tilt are pushed here.
 # The registry container itself is created by setup.sh (`k3d registry create
