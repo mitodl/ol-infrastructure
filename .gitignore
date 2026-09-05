@@ -30,6 +30,8 @@ canary-results/
 
 .pulumi
 local-dev/certs/
+# Postgres dumps written by local-dev/scripts/pg-backup.sh
+local-dev/.backups/
 tilt_config.json
 # Per-developer local-dev overrides (see "Local Configuration Overrides" in
 # local-dev/README.md). Broad on purpose: never track a real secret anywhere
