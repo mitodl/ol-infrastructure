@@ -7,7 +7,7 @@ CONSUL_VERSION = "2.0.3"
 # renovate: datasource=github-releases depName=dagger packageName=dagger/dagger
 DAGGER_VERSION = "0.21.9"
 # renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
-JUPYTERHUB_VERSION = "5.5.1"
+JUPYTERHUB_VERSION = "6.0.0"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.7.2"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
