@@ -21,7 +21,7 @@ TRAEFIK_VERSION = "3.7.12"
 # renovate: datasource=docker depName=typesense packageName=typesense/typesense
 TYPESENSE_VERSION = "30.2"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
-VAULT_VERSION = "2.0.4"
+VAULT_VERSION = "2.1.0"
 # renovate: datasource=docker depName=vector packageName=timberio/vector
 VECTOR_VERSION = "0.40.1"
 
