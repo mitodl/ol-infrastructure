@@ -1,14 +1,33 @@
-"""Resolve configured Slack channel names to the IDs chat.postMessage needs.
+"""Resolve configured Slack channel names to the IDs chat.postMessage prefers.
 
 ``AppRegistration.slack_channel`` (src/bridge/settings/apps.py) and
 ``RELEASE_ANNOUNCE_CHANNEL`` are written as human-readable names --
 "product-mit-learn", "product-infrastructure". Slack's docs are explicit that
 ``chat.postMessage`` wants "an encoded ID" and to "always use channel-like IDs
-instead to make sure your message gets to where it's going"; a bare name gets
-``channel_not_found``. That is what silently broke every proactive message the
-bot sends -- ready-to-promote, checkbox progress, deploy milestones, stuck
-release nags -- while slash-command replies kept working, because those go
-through Bolt's ``respond`` URL rather than the Web API.
+instead to make sure your message gets to where it's going", so resolving them
+to ids here is worth doing.
+
+WHAT IT IS NOT IS THE REPAIR FOR THE OUTAGE IT WAS WRITTEN DURING. An earlier
+version of this docstring said a bare name gets ``channel_not_found`` and that
+this was what silently broke every proactive message the bot sends. Production
+logs disprove it. On 2026-09-03 at 20:38:44.146Z resolution missed for
+"product-infrastructure" -- so ``resolve`` returned the bare NAME -- and the
+``chat.postMessage`` that followed raised nothing and was delivered. At
+20:38:47.189Z the same code path missed for "product-ovs" and the post failed
+with ``channel_not_found`` 42ms later. Same call, same bare name, opposite
+outcomes; the variable was not the name.
+
+The variable was membership. That boot logged "Resolved 151 Slack channel(s)
+from conversations.list" and then "Cannot resolve 8 of 8 configured Slack
+channel(s) to an id" -- the listing worked and the scopes were fine, and none
+of the eight release channels were among the 151 the token could see.
+``channel_not_found`` means the calling token cannot see the conversation,
+which for a private channel means it was never invited.
+
+So: id resolution here is hardening against Slack's deprecated name handling.
+``unresolvable`` below is the part that actually diagnosed the outage, by
+naming all eight channels at boot instead of leaving them as failed posts
+buried in a poll loop.
 
 Names are resolved here through ``conversations.list`` and cached. Both public
 and private channels are requested, which needs ``channels:read`` and
@@ -22,6 +41,7 @@ token can reach, so a name that does not resolve means one of two things worth
 saying out loud: the bot is not in that channel, or the name is wrong.
 """
 
+import difflib
 import logging
 import os
 import re
@@ -149,8 +169,8 @@ async def _refresh(client: Any) -> bool:
             _listing_disabled = True
             log.error(
                 "Slack rejected conversations.list for lack of scope; the bot"
-                " cannot turn configured channel names into ids and every"
-                " proactive message will fail with channel_not_found."
+                " cannot turn configured channel names into ids, and it also"
+                " cannot tell which configured channels it is a member of."
                 " Grant groups:read (private channels) and channels:read"
                 " (public) on the bot token, or configure channel ids directly"
             )
@@ -191,12 +211,48 @@ async def resolve(client: Any, channel: str) -> str:
             return cached
 
     log.warning(
-        "No Slack channel named %r is visible to the bot. Private channels are"
-        " only listed once the bot is a member, so either invite it to the"
+        "No Slack channel named %r is visible to the bot%s. Private channels"
+        " are only listed once the bot is a member, so either invite it to the"
         " channel or correct the configured name",
         name,
+        _miss_context(name),
     )
     return channel
+
+
+def _miss_context(name: str) -> str:
+    """Return a clause telling a wrong name apart from a missing invite.
+
+    Both produce the same miss, and during the 2026-09-03 outage all eight
+    configured channels failed identically, so the log said nothing about
+    which cause to go chase.
+
+    Reports only what the module actually knows. An empty ``_name_to_id`` is
+    not evidence of a scope problem -- it is equally the state after a
+    ``ratelimited`` or otherwise failed listing, and after a listing that
+    succeeded and found the bot in nothing. Naming scopes in those cases
+    would be the same unevidenced diagnosis this module's docstring exists to
+    correct, so the flags are checked before the count is interpreted.
+    """
+    if _listing_disabled:
+        return (
+            " (conversations.list is refused for lack of scope, so the bot"
+            " cannot see any channel)"
+        )
+    if not _last_refresh_ok:
+        return (
+            " (the last conversations.list did not succeed, so what the bot"
+            " can see is unknown -- this may not be a channel problem)"
+        )
+    visible = len(_name_to_id)
+    if not visible:
+        return (
+            " (the listing succeeded and returned no channels at all, so the"
+            " bot is a member of none)"
+        )
+    close = difflib.get_close_matches(name, _name_to_id, n=3, cutoff=0.6)
+    suffix = f"; closest visible: {', '.join(sorted(close))}" if close else ""
+    return f" (of {visible} it can see{suffix})"
 
 
 class ListingError(RuntimeError):

@@ -188,3 +188,76 @@ async def test_unresolvable_names_the_channels_that_cannot_be_reached():
     )
 
     assert missing == ["product-typo"]
+
+
+async def test_a_miss_names_the_closest_visible_channel(caplog):
+    """A typo and a missing invite produce the same miss.
+
+    During the 2026-09-03 outage all eight configured channels failed
+    identically, so the log gave no way to tell which cause to chase.
+    """
+    client = _FakeClient(pages=[[{"name": "product-ovs-eng", "id": "C1"}]])
+
+    with caplog.at_level("WARNING"):
+        assert await slack_channels.resolve(client, "product-ovs") == "product-ovs"
+
+    assert "closest visible: product-ovs-eng" in caplog.text
+    assert "of 1 it can see" in caplog.text
+
+
+async def test_a_miss_with_no_near_match_says_only_how_many_are_visible(caplog):
+    """No near match is itself the answer: the bot is not in that channel."""
+    client = _FakeClient(pages=[[{"name": "engineering", "id": "C1"}]])
+
+    with caplog.at_level("WARNING"):
+        await slack_channels.resolve(client, "product-ovs")
+
+    assert "of 1 it can see" in caplog.text
+    assert "closest visible" not in caplog.text
+
+
+async def test_a_successful_empty_listing_is_reported_as_no_memberships(caplog):
+    """Zero channels from a SUCCESSFUL listing is a membership fact.
+
+    It is not evidence of a scope problem, and must not be reported as one.
+    """
+    client = _FakeClient(pages=[[]])
+
+    with caplog.at_level("WARNING"):
+        await slack_channels.resolve(client, "product-ovs")
+
+    assert "returned no channels at all" in caplog.text
+    assert "member of none" in caplog.text
+    assert "scope" not in caplog.text
+
+
+async def test_a_failed_listing_is_reported_as_unknown_not_as_scopes(caplog):
+    """A ratelimited listing leaves the map empty for a reason of its own.
+
+    Blaming scopes there is the same unevidenced diagnosis this module's
+    docstring was rewritten to remove.
+    """
+    client = _FakeClient(error="ratelimited")
+
+    with caplog.at_level("WARNING"):
+        await slack_channels.resolve(client, "product-ovs")
+
+    assert "did not succeed" in caplog.text
+    assert "unknown" in caplog.text
+    assert "scope" not in caplog.text
+
+
+async def test_a_miss_after_a_scope_shutoff_does_name_scopes(caplog):
+    """The one case where scopes ARE the evidenced answer.
+
+    `missing_scope` on the already-narrowed request sets `_listing_disabled`
+    inside the refresh, and the miss below falls through to the warning in
+    the same call.
+    """
+    client = _FakeClient(error=_MISSING_SCOPE)
+
+    with caplog.at_level("WARNING"):
+        await slack_channels.resolve(client, "product-ovs")
+
+    assert slack_channels._listing_disabled
+    assert "refused for lack of scope" in caplog.text
