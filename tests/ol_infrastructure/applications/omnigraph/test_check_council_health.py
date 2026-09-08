@@ -15,6 +15,7 @@ from typing import Any, ClassVar
 import pytest
 
 from ol_infrastructure.applications.omnigraph.scripts.check_council_health import (
+    SEARCH_PROBE_QUERY,
     ProbeError,
     main,
     run_probe,
@@ -170,8 +171,66 @@ def test_main_succeeds_end_to_end(stub_server, monkeypatch):
     monkeypatch.delenv("OMNIGRAPH_GRAPH_ID", raising=False)
 
     assert main() == 0
-    [seen] = _StubHandler.requests
-    assert seen["path"] == "/graphs/council/query"
+    # TWO calls, not one: the ordinary read and the full-text read are
+    # separate failure modes and the probe has to exercise both.
+    ordinary, search = _StubHandler.requests
+    assert ordinary["path"] == "/graphs/council/query"
+    assert search["path"] == "/graphs/council/query"
+    assert "search(" not in ordinary["body"]["query"]
+    assert search["body"]["query"] == SEARCH_PROBE_QUERY
+
+
+def test_main_fails_when_the_full_text_index_needs_a_rebuild(stub_server, monkeypatch):
+    """The regression this probe was extended for.
+
+    On 2026-09-08 CI served every ordinary read happily while refusing every
+    `search()` with HTTP 409 `full_text_index_rebuild_required`, because it had
+    been skipped in the Lance 11 analyzer rebuild. The old probe passed
+    throughout. A stub that answers the first call and refuses the second is
+    that exact shape, and it must now exit non-zero.
+    """
+    _, base = stub_server
+    calls = {"n": 0}
+    ok = (200, {"rows": [{"m.slug": "x"}], "row_count": 1})
+    refused = (
+        409,
+        {
+            "error": "full-text index 'content_idx' requires rebuild: "
+            "analyzer certificate is missing",
+            "code": "full_text_index_rebuild_required",
+        },
+    )
+
+    class _Routes(dict[str, Any]):
+        def get(self, key: str, default: Any = None) -> Any:
+            if key != "/graphs/council/query":
+                return default
+            calls["n"] += 1
+            return ok if calls["n"] == 1 else refused
+
+    _StubHandler.routes = _Routes()
+    monkeypatch.setenv("OMNIGRAPH_SERVER_ADDR", base)
+    monkeypatch.setenv("OMNIGRAPH_BEARER_TOKEN", "t")  # pragma: allowlist secret
+    monkeypatch.delenv("OMNIGRAPH_GRAPH_ID", raising=False)
+
+    assert main() == 1
+    assert calls["n"] == 2  # it really did reach the search call
+
+
+def test_search_probe_tolerates_zero_hits(stub_server, monkeypatch):
+    """An empty result is a legitimate answer, not a failure.
+
+    Asserting on hit count would fail forever on an empty or freshly-cut-over
+    graph. What the probe asserts is that the full-text path ANSWERS — the
+    failure mode is a refusal, not a wrong result.
+    """
+    _, base = stub_server
+    _StubHandler.routes = {"/graphs/council/query": (200, {"rows": [], "row_count": 0})}
+    monkeypatch.setenv("OMNIGRAPH_SERVER_ADDR", base)
+    monkeypatch.setenv("OMNIGRAPH_BEARER_TOKEN", "t")  # pragma: allowlist secret
+    monkeypatch.delenv("OMNIGRAPH_GRAPH_ID", raising=False)
+
+    assert main() == 0
 
 
 def test_main_fails_on_a_probe_failure(stub_server, monkeypatch):

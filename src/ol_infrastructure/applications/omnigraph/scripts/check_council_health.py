@@ -1,4 +1,9 @@
-"""Authenticated synthetic probe: prove `council` answers a real query.
+"""Authenticated synthetic probe: prove `council` answers real queries.
+
+It sends TWO queries, and the second one exists because the first cannot see
+what broke CI on 2026-09-08: an ordinary read and a full-text (`search()`)
+read fail independently, so a probe that only does the former reports healthy
+while every BM25 caller is being refused. See `SEARCH_PROBE_QUERY` below.
 
 Carved out of tk-observability-for-shared-witan-service-ad3dba item 1
 (tk-an-authenticated-synthetic-probe-for-council-to--e89d8f). Two alert rules
@@ -70,6 +75,38 @@ query council_probe() {
 }
 """
 
+# A second bounded read that goes through the FULL-TEXT path specifically.
+#
+# The plain query above cannot see a dead BM25 index, and on 2026-09-08 that
+# was not hypothetical: CI was skipped in the 2026-09-01 Lance 11 analyzer
+# rebuild, every `search()`/`bm25()` query there was refused with HTTP 409
+# `full_text_index_rebuild_required`, and this probe went on passing every 15
+# minutes because `match { $m: Memory }` is an ordinary read. The
+# rebuild-required guard is deliberately narrow — "ordinary reads remain
+# available; do not return a partial indexed result" — and that narrowness is
+# exactly what made the existing probe blind to it. `check_omnigraph_format.py`
+# stays green through an analyzer bump too, and correctly so: the on-disk
+# format does not move. Nothing else watches this.
+#
+# ★ IT DELIBERATELY DOES NOT ASSERT ON THE HIT COUNT. A search matching zero
+# rows is a legitimate answer — an empty or freshly-cut-over graph would fail
+# such an assertion forever, for no defect. What this probe asserts is that the
+# full-text path ANSWERS AT ALL, which is precisely the thing that breaks: the
+# failure mode is a refusal (HTTP 409), not a wrong result, so `run_probe`'s
+# existing non-2xx handling turns it into a non-zero exit with no new
+# machinery. Keep the literal inline rather than parameterising it, for the
+# same reason the query above takes no parameters.
+SEARCH_PROBE_QUERY = """
+query council_search_probe() {
+    match {
+        $m: Memory
+        search($m.content, "witan")
+    }
+    return { $m.slug }
+    limit 1
+}
+"""
+
 HTTP_TIMEOUT_SECONDS = 15
 
 
@@ -77,8 +114,10 @@ class ProbeError(Exception):
     """A condition that must exit the run non-zero."""
 
 
-def run_probe(server_addr: str, graph_id: str, token: str) -> dict[str, Any]:
-    """POST the probe query and return the decoded JSON body on success.
+def run_probe(
+    server_addr: str, graph_id: str, token: str, query: str = PROBE_QUERY
+) -> dict[str, Any]:
+    """POST a probe query and return the decoded JSON body on success.
 
     Raises :class:`ProbeError` for anything that means `council` did not
     answer: an unreachable server, a non-2xx response, or a 2xx body that
@@ -87,7 +126,7 @@ def run_probe(server_addr: str, graph_id: str, token: str) -> dict[str, Any]:
     proxy in front of the real server would otherwise read as success.
     """
     url = f"{server_addr.rstrip('/')}/graphs/{graph_id}/query"
-    payload = json.dumps({"query": PROBE_QUERY, "params": {}}).encode()
+    payload = json.dumps({"query": query, "params": {}}).encode()
     request = urllib.request.Request(  # noqa: S310 - server_addr is our own config
         url,
         method="POST",
@@ -156,6 +195,12 @@ def main() -> int:
         # enforcing twice, just a fact the type checker cannot see through
         # the comprehension above.
         result = run_probe(cast(str, server_addr), graph_id, cast(str, token))
+        search_result = run_probe(
+            cast(str, server_addr),
+            graph_id,
+            cast(str, token),
+            query=SEARCH_PROBE_QUERY,
+        )
     except ProbeError as exc:
         # Not `.exception()`: `exc` is already a fully-formatted, known
         # failure message (a classified HTTP/JSON condition), not an
@@ -164,9 +209,10 @@ def main() -> int:
         return 1
 
     LOG.info(
-        "council-health probe OK: graph=%s row_count=%s",
+        "council-health probe OK: graph=%s row_count=%s search_row_count=%s",
         graph_id,
         result.get("row_count", len(result.get("rows", []))),
+        search_result.get("row_count", len(search_result.get("rows", []))),
     )
     return 0
 
