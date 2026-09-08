@@ -274,15 +274,18 @@ inline-quotes = "double"
 # `from bridge...` / `from ol_infrastructure...` as a third-party import that
 # nobody declared, and raises DEP001 on each one.
 #
-# `security_groups` is a module sitting beside the Pulumi program that imports
-# it (infrastructure/aws/network/); Pulumi runs a program with its own
-# directory on sys.path, so the bare import is correct there.
+# `security_groups` and `modules` are local packages imported by bare name
+# rather than through one of the four above. Pulumi runs a program with its own
+# directory on sys.path, so `security_groups` resolves beside the program that
+# imports it (infrastructure/aws/network/), and local-dev's programs put
+# `local-dev/infra` on sys.path explicitly to reach `modules`.
 known_first_party = [
   "bridge",
   "ol_infrastructure",
   "bilder",
   "ol_concourse",
   "security_groups",
+  "modules",
 ]
 
 # Paths whose imports are not resolved against this project's dependencies.
@@ -306,13 +309,22 @@ extend_exclude = [
   "dockerfiles/",
   "scripts/helpers/",
   "scripts/openedx/",
-  # Standalone services: each ships its own requirements.txt and its own image,
-  # and imports its siblings by bare module name because it runs with its own
-  # directory on sys.path rather than as part of the ol_infrastructure package.
+  # Standalone services: the files below are the service runtime, built into
+  # their own image against their own requirements.txt, so they import things
+  # this project does not declare (flask, slack_bolt, aiohttp, github).
+  #
+  # Listed file by file on purpose. Each of these directories also holds a
+  # `__main__.py` that is the Pulumi stack deploying the service, and that one
+  # *does* run against our dependencies -- excluding the whole directory would
+  # hide dependency drift in the deployment code. A new file here is scanned by
+  # default, which is the right way round.
   "src/ol_infrastructure/applications/kubewatch_webhook_handler/webhook_handler\\.py",
-  "src/ol_infrastructure/applications/release_bot/",
-  # Separate Pulumi programs for the local dev stack, same sibling-import shape.
-  "local-dev/",
+  "src/ol_infrastructure/applications/release_bot/bot\\.py",
+  "src/ol_infrastructure/applications/release_bot/bot_config\\.py",
+  "src/ol_infrastructure/applications/release_bot/concourse_client\\.py",
+  "src/ol_infrastructure/applications/release_bot/github_client\\.py",
+  "src/ol_infrastructure/applications/release_bot/slack_channels\\.py",
+  "src/ol_infrastructure/applications/release_bot/slack_users\\.py",
   # testinfra suites executed against a booted AMI, not by our pytest run
   # (testpaths is `tests`). They take pytest and the testinfra `host` fixture
   # from the image under test, so DEP004 fires on them here for no reason.
