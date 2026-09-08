@@ -100,7 +100,7 @@ downloads none.
 - **Prefer a stable seeded fixture over live content.** If a journey must reference a
   specific course, it needs a course that exists in every target environment by
   contract. Note that dependency in the property's `README.md`; content that merely
-  happens to be there today is a future 3am page.
+  happens to be there today creates future false failures.
 - **Web-first assertions only.** `expect(locator)` auto-retries; `expect(await
   locator.count())` does not, and is the most common source of canary flake.
 - **Never `waitForTimeout`.** Wait for the thing you actually need.
@@ -113,7 +113,12 @@ downloads none.
   page is slower to hydrate. Chromium passed it every time, which is what this class of
   bug looks like right up until the target has a bad day.
 
-## Failure artifacts
+## Result and failure artifacts
+
+Concourse build status is the sole canary result: a passing journey makes the build
+green and a failed journey makes it red. Do not add metric pushes, Grafana alerts,
+Slack notifications, or Rootly incidents. This deliberately matches how most of our
+pipelines report success and failure.
 
 Traces, screenshots and video are retained on failure into `canary-results/`. The
 pipeline collects that directory into a task output and, **on failure only**, uploads it
