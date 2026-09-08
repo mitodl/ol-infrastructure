@@ -40,7 +40,7 @@ Gravitino ran with the Iceberg REST service as an **auxiliary service** and the
 | 1 | Per-user identity reaches the catalog through `security=JWT` | **PASS** |
 | 2 | The `groups` claim arrives and is parsed | **PASS** |
 | 3 | A role granted to a GROUP allows and denies correctly | **PASS** |
-| 4 | Credential vending, per-table scope, revalidation | **PARTIAL** — vending proven, STS downscoping not |
+| 4 | Credential vending, per-table scope, revalidation | **PASS** (against real AWS STS) |
 | 5 | End-user principal in an audit trail | **PASS** |
 
 ### Item 1 — identity delegation through StarRocks: PASS
@@ -157,7 +157,71 @@ Note the asymmetry: **denials log `UNKNOWN` as the operation and `null` as the o
 only the raw HTTP method and URI. Successes are fully structured, denials are not. Usable, but a
 denial-rate alert would have to parse URIs.
 
-### Item 4 — credential vending: PARTIAL
+### Item 4 — credential vending: PASS against real AWS STS
+
+Re-run against a throwaway S3 bucket and a real IAM role, after MinIO proved unable to stand in for
+STS. **The vending role was deliberately granted the WHOLE bucket**, so any narrowing observed can
+only have come from Gravitino's session policy.
+
+With `credential-providers=s3-token`, `alice` (authorized only through her Keycloak group) loading
+the table received:
+
+```json
+{ "prefix": "s3://gravitino-spike-<redacted>/wh/ns/t",
+  "config": {
+    "s3.access-key-id": "ASIA<redacted>",
+    "s3.session-token": "<redacted>",
+    "s3.session-token-expires-at-ms": "1788899639000",
+    "client.refresh-credentials-endpoint": "v1/awscat/namespaces/ns/tables/t/credentials" } }
+```
+
+A real temporary STS credential (`ASIA…` plus session token and expiry), not the static key.
+
+**The STS session is named for the end user.** `sts get-caller-identity` with the vended credential:
+
+```
+Arn: arn:aws:sts::<account>:assumed-role/gravitino-spike-vending/gravitino_alice
+```
+
+So CloudTrail attributes the S3 access to `alice`, not to a shared service identity. That is the
+property Polaris offers as an optional flag; here it is the default.
+
+**It is genuinely downscoped.** The role can read the whole bucket. The vended credential cannot:
+
+```
+POSITIVE  ls s3://<bucket>/wh/ns/t/          -> 00000-ab7c9980-….metadata.json   (allowed)
+NEGATIVE  cp s3://<bucket>/other/secret.txt  -> 403 Forbidden
+NEGATIVE  ls s3://<bucket>/                  -> AccessDenied ... is not authorized to perform:
+                                                s3:ListBucket ... because NO SESSION POLICY
+                                                allows the s3:ListBucket action
+CONTROL   the caller key CAN read other/secret.txt, so the object is readable in principle
+```
+
+AWS names the session policy as the reason, which is direct evidence the narrowing is Gravitino's
+doing rather than the role's.
+
+**Re-validation re-checks identity.** Hitting the advertised per-table refresh endpoint:
+
+```
+alice      [200]  prefix s3://…/wh/ns/t, ASIA… key
+bob        [403]  ForbiddenException, "not authorized to perform operation
+                  'getTableCredentials' on metadata 'lakehouse.awscat.ns.t'"
+no bearer  [401]  NotAuthorizedException
+```
+
+Two caveats worth carrying forward:
+
+- **Successive refreshes return the same credential** (identical key id), so it is cached until
+  expiry rather than a fresh AssumeRole per call. The credential is already scoped and
+  time-limited, so this is a performance choice, not a hole. But a revoked grant does not
+  invalidate an already-vended credential before its expiry.
+- **Gravitino's own catalog IO does not use the assumed role.** Table metadata is written with the
+  static `s3-access-key-id`/`s3-secret-access-key`; `credential-providers=s3-token` governs only
+  what is vended to clients. `createTable` failed with `s3:PutObject ... no identity-based policy
+  allows` until the service principal was given direct S3 access on the warehouse **in addition to**
+  `sts:AssumeRole`. In EKS that means the IRSA role needs both. Put it in the deployment spec.
+
+### Superseded first attempt — `s3-secret-key` (kept, because it is a trap)
 
 **The vending mechanism works, and authorization gates it.** `alice` loading an S3-backed table
 with `X-Iceberg-Access-Delegation: vended-credentials` got a `storage-credentials` block carrying a
