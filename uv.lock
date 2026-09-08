@@ -1501,6 +1501,7 @@ source = { editable = "." }
 dependencies = [
     { name = "bcrypt" },
     { name = "boto3" },
+    { name = "botocore" },
     { name = "certifi" },
     { name = "cyclopts" },
     { name = "httpx" },
@@ -1511,20 +1512,18 @@ dependencies = [
     { name = "packaging" },
     { name = "pulumi" },
     { name = "pulumi-aws" },
-    { name = "pulumi-aws-native" },
     { name = "pulumi-command" },
     { name = "pulumi-consul" },
-    { name = "pulumi-docker" },
     { name = "pulumi-eks" },
     { name = "pulumi-fastly" },
     { name = "pulumi-gcp" },
     { name = "pulumi-github" },
     { name = "pulumi-keycloak" },
+    { name = "pulumi-kubernetes" },
     { name = "pulumi-mailgun" },
     { name = "pulumi-mongodbatlas" },
     { name = "pulumi-qdrant-cloud" },
     { name = "pulumi-rootly" },
-    { name = "pulumi-terraform" },
     { name = "pulumi-tls" },
     { name = "pulumi-vault" },
     { name = "pulumiverse-grafana" },
@@ -1534,6 +1533,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyinfra" },
     { name = "pyjwt", extra = ["crypto"] },
+    { name = "pyyaml" },
     { name = "requests" },
     { name = "requests-aws4auth" },
 ]
@@ -1559,6 +1559,7 @@ dev = [
 requires-dist = [
     { name = "bcrypt", specifier = ">=5,<6" },
     { name = "boto3", specifier = "~=1.24" },
+    { name = "botocore", specifier = ">=1.24" },
     { name = "certifi", specifier = ">=2024.2.2" },
     { name = "cyclopts", specifier = ">=4.4.0" },
     { name = "httpx", specifier = ">=0.28.0,<0.29" },
@@ -1569,20 +1570,18 @@ requires-dist = [
     { name = "packaging", specifier = ">=24.2" },
     { name = "pulumi", specifier = ">=3.39.1,<4" },
     { name = "pulumi-aws", specifier = ">=7.1,<8" },
-    { name = "pulumi-aws-native", specifier = ">=1.25.0,<2" },
     { name = "pulumi-command", specifier = ">=1.0,<2" },
     { name = "pulumi-consul", specifier = ">=3.5.0,<4" },
-    { name = "pulumi-docker", specifier = ">=5,<6" },
     { name = "pulumi-eks", specifier = ">=4,<5" },
     { name = "pulumi-fastly", specifier = ">=12,<13" },
     { name = "pulumi-gcp", specifier = ">=9.34,<10" },
     { name = "pulumi-github", specifier = ">=6.0.0,<7" },
     { name = "pulumi-keycloak", specifier = ">=6.0.0,<7" },
+    { name = "pulumi-kubernetes", specifier = ">=4.34,<5" },
     { name = "pulumi-mailgun", specifier = ">=3.0.0,<4" },
     { name = "pulumi-mongodbatlas", specifier = ">=4,<5" },
     { name = "pulumi-qdrant-cloud", editable = "sdks/qdrant-cloud" },
     { name = "pulumi-rootly", editable = "sdks/rootly" },
-    { name = "pulumi-terraform", specifier = ">=6.0.1" },
     { name = "pulumi-tls", specifier = ">=5.0.0,<6" },
     { name = "pulumi-vault", specifier = ">=7,<8" },
     { name = "pulumiverse-grafana", specifier = ">=2.0.0,<3" },
@@ -1592,6 +1591,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.0.1,<3" },
     { name = "pyinfra", specifier = "~=3.0" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.9,<3" },
+    { name = "pyyaml", specifier = ">=6,<7" },
     { name = "requests", specifier = ">=2.32,<3" },
     { name = "requests-aws4auth", specifier = ">=1.3.1" },
 ]
@@ -1974,20 +1974,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pulumi-aws-native"
-version = "1.77.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "parver" },
-    { name = "pulumi" },
-    { name = "semver" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b7/8a/34edd5f6d90368410c1c069765165b87268ff329139e4c593b64c39b2855/pulumi_aws_native-1.77.0.tar.gz", hash = "sha256:176f8c7c13ba555ed63d1ec7ad003535b9254d4a8efb4c57b7b21e007e03e62b", size = 9517984, upload-time = "2026-08-31T06:38:15.874Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/62/b6/0f250fe93a9569554deeefca6c9ad225f916eaead7219b15876e864587f8/pulumi_aws_native-1.77.0-py3-none-any.whl", hash = "sha256:4f2a011d006f8a13ae3cbe745bd081587d3d55ec6d1836a5645e427e53b3bcd3", size = 13559530, upload-time = "2026-08-31T06:38:13.305Z" },
-]
-
-[[package]]
 name = "pulumi-command"
 version = "1.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2013,20 +1999,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/23/c9/a629aa31b3829361f8092abbe42545f2c6b5931782b686048826556ba06e/pulumi_consul-3.15.1.tar.gz", hash = "sha256:e3f39706aec799839f56083f03b1cd0ad22e7e23ba50685b24e1e73ae081c225", size = 141470, upload-time = "2026-07-22T18:55:40.687Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/54/63/9257bb7f3b3d087addee07b4172d449b8f3ccd3e5408fe1275fdf64543e5/pulumi_consul-3.15.1-py3-none-any.whl", hash = "sha256:c5b2eea88adfdce9dbb0e527d5570af251340989627eaf03b0663721dc61f721", size = 215071, upload-time = "2026-07-22T18:55:39.332Z" },
-]
-
-[[package]]
-name = "pulumi-docker"
-version = "5.1.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "parver" },
-    { name = "pulumi" },
-    { name = "semver" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/99/59/8bbbc7e9d5bafd16e3f925948f693a37e0d3e0e6f0347d9446d2ebfc8b99/pulumi_docker-5.1.1.tar.gz", hash = "sha256:45fd6ff39b41351e0bf10418fa7f693cd34f32b8a5c0293533badcce916e6dd3", size = 134646, upload-time = "2026-08-27T22:29:09.459Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/5b/9c/c66ebdb83e7ae1c6e79e1a213461204acaac1c021ae4c5e92dd76f49128c/pulumi_docker-5.1.1-py3-none-any.whl", hash = "sha256:0e6933ff4c68670b0ae8532528e0c003af659506b88ab28fc91c163c61091140", size = 155310, upload-time = "2026-08-27T22:29:07.977Z" },
 ]
 
 [[package]]
@@ -2178,20 +2150,6 @@ requires-dist = [
     { name = "pulumi", specifier = ">=3.247.0,<4.0.0" },
     { name = "semver", specifier = ">=2.8.1" },
     { name = "typing-extensions", marker = "python_full_version < '3.11'", specifier = ">=4.11,<5" },
-]
-
-[[package]]
-name = "pulumi-terraform"
-version = "6.1.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "parver" },
-    { name = "pulumi" },
-    { name = "semver" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/42/ea/945f94a55032f7ffc996d7f83b1095cddc499cb7de6906bbe8a18f889591/pulumi_terraform-6.1.0.tar.gz", hash = "sha256:8e0809b6ee6d168ce268f951e43ca120676b97da8bc4a0c09cbbb59246076e3f", size = 11250, upload-time = "2026-07-21T09:47:42.614Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/3d/19/d8eaa2ca891be5cb9852dc3d4a29d8b2967bc141dbb6caeedfca9a3e49cc/pulumi_terraform-6.1.0-py3-none-any.whl", hash = "sha256:964eec0b1e08837e57f0b931c93374fac69ff3a5e70021727b6b69cb0cd1bd3b", size = 16673, upload-time = "2026-07-21T09:47:41.586Z" },
 ]
 
 [[package]]
