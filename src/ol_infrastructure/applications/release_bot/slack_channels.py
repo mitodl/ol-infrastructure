@@ -225,13 +225,31 @@ def _miss_context(name: str) -> str:
 
     Both produce the same miss, and during the 2026-09-03 outage all eight
     configured channels failed identically, so the log said nothing about
-    which cause to go chase. The count and the near-matches separate them:
-    zero visible channels points at scopes, a close visible name points at a
-    typo, and neither points at an invite.
+    which cause to go chase.
+
+    Reports only what the module actually knows. An empty ``_name_to_id`` is
+    not evidence of a scope problem -- it is equally the state after a
+    ``ratelimited`` or otherwise failed listing, and after a listing that
+    succeeded and found the bot in nothing. Naming scopes in those cases
+    would be the same unevidenced diagnosis this module's docstring exists to
+    correct, so the flags are checked before the count is interpreted.
     """
+    if _listing_disabled:
+        return (
+            " (conversations.list is refused for lack of scope, so the bot"
+            " cannot see any channel)"
+        )
+    if not _last_refresh_ok:
+        return (
+            " (the last conversations.list did not succeed, so what the bot"
+            " can see is unknown -- this may not be a channel problem)"
+        )
     visible = len(_name_to_id)
     if not visible:
-        return " (it can see no channels at all, so check the token's scopes)"
+        return (
+            " (the listing succeeded and returned no channels at all, so the"
+            " bot is a member of none)"
+        )
     close = difflib.get_close_matches(name, _name_to_id, n=3, cutoff=0.6)
     suffix = f"; closest visible: {', '.join(sorted(close))}" if close else ""
     return f" (of {visible} it can see{suffix})"

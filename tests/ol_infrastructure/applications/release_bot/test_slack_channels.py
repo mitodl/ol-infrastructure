@@ -216,12 +216,48 @@ async def test_a_miss_with_no_near_match_says_only_how_many_are_visible(caplog):
     assert "closest visible" not in caplog.text
 
 
-async def test_a_miss_against_an_empty_listing_points_at_scopes(caplog):
-    """Seeing zero channels is a token problem, not a per-channel invite."""
+async def test_a_successful_empty_listing_is_reported_as_no_memberships(caplog):
+    """Zero channels from a SUCCESSFUL listing is a membership fact.
+
+    It is not evidence of a scope problem, and must not be reported as one.
+    """
     client = _FakeClient(pages=[[]])
 
     with caplog.at_level("WARNING"):
         await slack_channels.resolve(client, "product-ovs")
 
-    assert "can see no channels at all" in caplog.text
-    assert "scopes" in caplog.text
+    assert "returned no channels at all" in caplog.text
+    assert "member of none" in caplog.text
+    assert "scope" not in caplog.text
+
+
+async def test_a_failed_listing_is_reported_as_unknown_not_as_scopes(caplog):
+    """A ratelimited listing leaves the map empty for a reason of its own.
+
+    Blaming scopes there is the same unevidenced diagnosis this module's
+    docstring was rewritten to remove.
+    """
+    client = _FakeClient(error="ratelimited")
+
+    with caplog.at_level("WARNING"):
+        await slack_channels.resolve(client, "product-ovs")
+
+    assert "did not succeed" in caplog.text
+    assert "unknown" in caplog.text
+    assert "scope" not in caplog.text
+
+
+async def test_a_miss_after_a_scope_shutoff_does_name_scopes(caplog):
+    """The one case where scopes ARE the evidenced answer.
+
+    `missing_scope` on the already-narrowed request sets `_listing_disabled`
+    inside the refresh, and the miss below falls through to the warning in
+    the same call.
+    """
+    client = _FakeClient(error=_MISSING_SCOPE)
+
+    with caplog.at_level("WARNING"):
+        await slack_channels.resolve(client, "product-ovs")
+
+    assert slack_channels._listing_disabled
+    assert "refused for lack of scope" in caplog.text
