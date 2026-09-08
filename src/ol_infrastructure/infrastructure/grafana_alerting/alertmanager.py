@@ -178,14 +178,6 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             # erroring at once in the same namespace would collapse into one
             # notification group.
             "component_id",
-            # metric_rules/canaries.py's rules carry `canary` as their only
-            # resource-identifying label -- `CanaryNotReporting` ORs one
-            # `absent_over_time` per expected canary into a single rule, and the
-            # label comes from each selector's equality matcher. Without this,
-            # two properties breaking at once would arrive as one notification
-            # naming neither. Added while the fleet is still one canary, so that
-            # onboarding a second one needs no change here.
-            "canary",
         ],
         # "1m", not "60s" — Grafana normalizes durations to the largest unit and
         # a mismatched spelling shows as a perpetual diff on every preview.

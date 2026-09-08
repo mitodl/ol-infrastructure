@@ -147,53 +147,6 @@ Green runs collect their report into the output too, but nothing is uploaded. Do
 "fix" that by making the `put` unconditional: at a 10-minute cadence that is a
 few-hundred-KB HTML bundle 144 times a day per canary, and it buries the failures.
 
-## Alerting
-
-After every run the task pushes a **gauge** to Grafana Cloud over the Influx
-line-protocol endpoint:
-
-```
-canary_journey,canary=<name>,target=<host> success=<1|0>
-```
-
-Influx names a field `<measurement>_<field>` unless it is literally `value`, so that
-arrives in Mimir as `canary_journey_success{canary,target}`. Two rules in
-[`metric_rules/canaries.py`](../../../ol_infrastructure/infrastructure/grafana_alerting/metric_rules/canaries.py)
-read it: `CanaryJourneyFailing` (the journey broke) and `CanaryNotReporting` (the
-canary itself stopped running). Both go to Slack `#devops-warnings`, not to the Rootly
-paging path, because the only canary targets an RC environment.
-
-Things to know before touching any of that:
-
-- **A gauge, not a failure counter.** A counter only exists once incremented, so a
-  canary that has never failed has no series at all — and `increase()` cannot tell
-  that from a canary that stopped running, which is the one failure a canary must never
-  hide.
-- **Renaming the measurement or the field silently orphans the rules.** The metric just
-  stops existing, and an absent series is not an error PromQL can report. Change both
-  sides together.
-- **Adding a canary needs a third edit.** `CanaryNotReporting` asserts absence against a
-  *name* — `absent_over_time` returns no series to group by, so nothing can discover the
-  fleet from the data. Add the name to `EXPECTED_CANARIES` in `metric_rules/canaries.py`
-  as well as to `pipeline_params` and `canary_names`. A canary missing from that list is
-  monitored only while it is already running.
-- **Do not make the push fatal.** A Grafana outage must not turn a green canary red;
-  `CanaryNotReporting` is the backstop for a push that never lands.
-- **Concourse's own build metrics are not a shortcut.** `concourse_builds_latest_completed_build_status`
-  looks like exactly the right signal and is per-ATC-node state that never reconciles —
-  measured, nodes disagree permanently. See the `metric_rules/canaries.py` docstring.
-
-### Prerequisite: the `grafana` credential must exist for the pipeline's team
-
-Concourse resolves `((grafana.metrics_url))` as `secret-concourse/<team>/grafana`, then
-`secret-concourse/shared/grafana`. Today only `main/grafana` exists, and these pipelines
-run in the **`infrastructure`** team, so `src/bridge/secrets/concourse/operations.production.yaml`
-needs an `infrastructure/grafana` entry with `metrics_url`, `metrics_write_user` and
-`metrics_write_token` (the same three values as `main/grafana`).
-
-**An unresolved `((var))` fails the build before the task runs**, so the push cannot be
-guarded in bash and must not ship ahead of that entry.
-
 ## Validation
 
 Python tooling ignores this directory; `ruff` and `mypy` have nothing to say about it,

@@ -65,12 +65,6 @@ When a run fails, its traces, screenshots and video are uploaded to
 nothing. See [`AGENTS.md`](AGENTS.md) for how to read a trace and for what not to
 change about that step.
 
-Every run — pass or fail — pushes `canary_journey_success` to Grafana Cloud, which two
-Grafana rules alert on: one for a broken journey, one for a canary that has stopped
-reporting at all. Both reach Slack `#devops-warnings` rather than paging, since the
-only canary targets an RC environment. `AGENTS.md` covers the metric shape and the
-credential that has to exist first.
-
 ```bash
 cd src/ol_concourse/pipelines/canaries
 python meta.py && fly -t pr-inf sp -p canary-meta -c definition.json
@@ -84,12 +78,6 @@ Onboarding a property is **two list edits**, the same shape as
 
 1. a `CanaryParams` entry in `pipeline.py`, and
 2. its name in `canary_names` in `meta.py`.
-
-Plus one edit outside this directory, in a different Pulumi program: add the name to
-`EXPECTED_CANARIES` in
-[`metric_rules/canaries.py`](../../../ol_infrastructure/infrastructure/grafana_alerting/metric_rules/canaries.py)
-so that the canary going *silent* alerts, not just the journey failing. See
-[`AGENTS.md`](AGENTS.md) for why that one cannot be derived from the fleet list.
 
 The registry is deliberately the wider of the two, so a canary can be added and
 reviewed before it starts running against a live property. **Adding a journey to a

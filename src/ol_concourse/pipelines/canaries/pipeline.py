@@ -18,7 +18,6 @@ import sys
 import textwrap
 from pathlib import Path
 from typing import Any, Literal
-from urllib.parse import urlparse
 
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -62,19 +61,6 @@ ARTIFACT_PREFIX = "canary-results"
 # The task output the specs' traces, screenshots and video are collected into,
 # and the directory rclone uploads.
 ARTIFACT_OUTPUT = Identifier("canary-results")
-
-# Influx line-protocol measurement pushed to Grafana Cloud after every run. The
-# `success` field arrives in Mimir as `canary_journey_success` -- Influx names a
-# field `<measurement>_<field>` unless the field is literally `value` -- and that
-# is the series metric_rules/canaries.py alerts on. Renaming either half here
-# silently orphans those rules: the metric simply stops existing, and an absent
-# series is not an error PromQL can report.
-CANARY_MEASUREMENT = "canary_journey"
-# Team-scoped Concourse credential holding the Grafana Cloud metrics-write
-# endpoint and basic-auth pair. Concourse resolves `((grafana.x))` as
-# secret-concourse/<team>/grafana before falling back to shared/, so this only
-# resolves for a pipeline in a team that has the entry.
-GRAFANA_METRICS_SECRET = "grafana"  # noqa: S105  # pragma: allowlist secret
 
 
 def playwright_image_tag(canary_directory: Path = CANARY_DIRECTORY) -> str:
@@ -214,9 +200,6 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
         "CANARY_BASE_URL": params.base_url,
         "CANARY_TIMEOUT": str(params.timeout),
         "CANARY_EXPECT_TIMEOUT": str(params.expect_timeout),
-        "GRAFANA_METRICS_URL": f"(({GRAFANA_METRICS_SECRET}.metrics_url))",
-        "GRAFANA_METRICS_USER": f"(({GRAFANA_METRICS_SECRET}.metrics_write_user))",
-        "GRAFANA_METRICS_TOKEN": f"(({GRAFANA_METRICS_SECRET}.metrics_write_token))",
     }
     if params.credential_secret:
         # Resolved by Concourse's Vault credential manager at task start, so the
@@ -226,9 +209,6 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
 
     project_flags = " ".join(f"--project={browser}" for browser in params.browsers)
     spec_arguments = " ".join(params.spec_paths)
-    # Carried as a metric label so a dashboard or a fired alert names the
-    # environment, not just the canary.
-    target_host = urlparse(params.base_url).hostname or params.base_url
     run_canary = "\n".join(
         [
             "set -euo pipefail",
@@ -259,27 +239,6 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
             # exit status below is the whole report.
             "if [ -d canary-results ]; then",
             '  cp -R canary-results/. "$artifact_dir"/',
-            "fi",
-            # Reported as a gauge every run rather than as a failure counter. A
-            # counter only exists once incremented, so a canary that has never
-            # failed has no series at all and `increase()` cannot tell that from
-            # a canary that stopped running -- the one failure a canary must
-            # never hide. A 1/0 gauge makes both states visible, and its absence
-            # is then itself a signal (see metric_rules/canaries.py).
-            'if [ "$canary_status" -eq 0 ]; then success=1; else success=0; fi',
-            # Deliberately not fatal, and deliberately before the exit below: a
-            # Grafana outage must not turn a green canary red, and a push that
-            # never lands is caught by the absence rule rather than needing to
-            # fail here.
-            "if curl -sS --max-time 30"
-            ' -u "$GRAFANA_METRICS_USER:$GRAFANA_METRICS_TOKEN"'
-            f' --data-binary "{CANARY_MEASUREMENT}'
-            f",canary={params.canary_name}"
-            f',target={target_host} success=$success"'
-            ' "$GRAFANA_METRICS_URL"; then',
-            '  echo "Pushed canary_journey_success=$success"',
-            "else",
-            '  echo "WARNING: could not push the canary result to Grafana." >&2',
             "fi",
             'exit "$canary_status"',
         ]
