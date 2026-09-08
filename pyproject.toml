@@ -50,6 +50,16 @@ dependencies = [
   "pulumiverse-grafana>=2.0.0,<3",
   "pulumiverse-sentry==0.0.9",
   "pyjwt[crypto]>=2.9,<3",
+  # Imported directly throughout this project but, until now, only ever
+  # installed as somebody else's transitive dependency -- pulumi-kubernetes
+  # reached us solely through pulumi-eks, pyyaml through kubernetes and
+  # ol-parliament, botocore through boto3. Nothing pinned them on our behalf, so
+  # a bump that dropped or narrowed one of those edges would have broken 127
+  # import sites with no signal from this file. Declaring them changes nothing
+  # about what gets installed today; it just makes the dependency real.
+  "pulumi-kubernetes>=4,<5",
+  "pyyaml>=6,<7",
+  "botocore~=1.24",
 ]
 
 [project.urls]
@@ -330,12 +340,15 @@ extend_exclude = [
   "src/bilder/.*/test_.*\\.py",
 ]
 
-# PyPI name != import name for these two, and deptry cannot infer the mapping,
-# so it reports both as declared-but-unused (DEP002) while they are in fact
-# used -- pyjwt at lib/github_helper.py, ol-parliament at lib/aws/iam_helper.py.
+# PyPI name != import name for these, and deptry cannot infer the mapping, so
+# it reports each as declared-but-unused (DEP002) *and* raises DEP001 on the
+# module actually imported, while the package is in fact in use -- pyjwt at
+# lib/github_helper.py, ol-parliament at lib/aws/iam_helper.py, pyyaml across
+# ~23 sites.
 [tool.deptry.package_module_name_map]
 pyjwt = ["jwt"]
 ol-parliament = ["parliament"]
+pyyaml = ["yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
