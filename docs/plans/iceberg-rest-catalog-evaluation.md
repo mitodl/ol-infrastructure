@@ -536,8 +536,18 @@ system, not by this project alone.
 Superseding the earlier "run a Gravitino spike first" version of this section. The spike ran, and
 everything it was asked to prove, it proved.
 
-**On the evidence in hand, Gravitino has the balance — contingent on one question that this project
-cannot answer by itself.**
+**Gravitino. Not contingent any more — the contingency was resolved on 2026-09-08.**
+
+The earlier version of this section made the recommendation conditional on whether OL wants a
+general-purpose standalone authorization service, because that was the only argument capable of
+outweighing Gravitino. It has been answered: **OpenFGA is not a strong contender for OL**, and the
+`ol-analytics-api` → MITx Online dependency that the August analysis called "the ideal migration
+target" is a **workaround for an architectural problem already being resolved**, not a foundation to
+build shared infrastructure on. Building OpenFGA around a call that is being designed out would
+cement the workaround as a new tier-0 dependency.
+
+So the "OpenFGA generalizes and Gravitino's embedded authorization does not" argument is void. It
+was the load-bearing one for Lakekeeper.
 
 ### Why
 
@@ -582,31 +592,42 @@ Against those, Gravitino carries one live correctness defect Lakekeeper does not
 spurious deny. It fails closed, so it is a correctness and usability problem rather than a security
 one, but it should be filed upstream and ideally fixed before production.
 
-### The contingency
+### What the resolved contingency leaves behind
 
-**If OL decides it wants a general-purpose, standalone authorization service, the answer flips to
-Lakekeeper.** OpenFGA generalizes to two named consumers outside the catalog; Gravitino's embedded
-authorization generalizes to none. That is an estate-level decision involving `ol-analytics-api`
-and the feedback system, and it should be taken deliberately rather than inherited as a side effect
-of a catalog choice. Note that it is an argument for adopting *OpenFGA*, and Lakekeeper follows from
-it — not the other way round.
+With OpenFGA declined, Lakekeeper's case reduces to the three narrow items above: revocation
+latency, Kubernetes service-account authentication, and existence hiding on deny. Those are worth
+holding onto as requirements to satisfy in whatever is adopted, but individually and together they
+do not outweigh a role model that fits the designed ACL versus one that needs a synchroniser to
+approximate it.
+
+One thing does **not** get solved by this and should not be quietly filed away: the MIT-admin
+membership problem (role definition is Pulumi-managed, role membership has no owning system, plus
+the olapps/ol-data cross-realm bind). OpenFGA was one proposed answer to it. With OpenFGA off the
+table that problem needs a different answer, and it is unrelated to the catalog.
 
 ### Recommended next steps
 
-1. **Put the OpenFGA question to whoever owns the estate view.** It is the only thing standing
-   between here and a decision.
-2. **If the answer is "no" or "not now": adopt Gravitino**, scoped deliberately to its Iceberg REST
-   service and its authorization, with OpenMetadata left as the governance and discovery plane.
-3. File the cache-expiry defect upstream regardless.
-4. **Rank Polaris third and Unity Catalog out.** Polaris is dominated; Unity Catalog cannot accept a
+1. **Adopt Gravitino**, scoped deliberately to its Iceberg REST service and its authorization, with
+   OpenMetadata left as the governance and discovery plane.
+2. **Carry Lakekeeper's three advantages forward as requirements**, not as regrets. Decide
+   explicitly what revocation latency is acceptable given that a vended STS credential lives until
+   expiry; plan Keycloak service-account clients for the Dagster and Airbyte pods; and decide
+   whether existence disclosure on denied namespaces is acceptable.
+3. **File the cache-expiry spurious-deny defect upstream** before production.
+4. **Re-scope the dependent tasks.** The Cedar policy-set spec is void as written, and the
+   Lakekeeper EKS, Keycloak and implementation tasks need rewriting against Gravitino. The
+   catalog-independent parts of the Keycloak spec (audience mapper on both tokens, machine
+   service-account client, token-lifetime constraint) survive unchanged.
+5. **Rank Polaris third and Unity Catalog out.** Polaris is dominated; Unity Catalog cannot accept a
    forwarded external token at all.
-5. The Cedar quote is off the critical path either way. Both live options are Apache-2.0.
+6. Cedar pricing is moot. Both live options were Apache-2.0 and the enterprise arm is not needed.
 
 ### Confidence, and how to discount it
 
-Moderate-to-high on the technical comparison, which rests on measurements rather than documentation
-on both sides. Lower on the weighting, because the OpenFGA contingency is a judgement about OL's
-direction that I do not have standing to make.
+High on the technical comparison, which rests on measurements rather than documentation on both
+sides. The weighting is now also settled, because the one judgement I did not have standing to make
+— whether OL wants a standalone authorization service — has been made, and it went against the
+option that needed it.
 
 One bias worth naming: the Gravitino evidence was gathered in a single session by the same person
 writing this recommendation, while the Lakekeeper evidence accumulated over two earlier spikes. The
