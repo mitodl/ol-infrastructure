@@ -123,7 +123,7 @@ _OTEL_SDK_ENV: dict[str, str] = {
 
 
 def _config_map_contents(
-    config_map: kubernetes.core.v1.ConfigMap | Output,
+    config_map: kubernetes.core.v1.ConfigMap | Output[Any],
 ) -> Output[str]:
     """Serialize a ConfigMap's rendered data.
 
@@ -139,7 +139,7 @@ def _config_map_contents(
 
 
 def _pod_config_hash(
-    config_maps: dict[str, kubernetes.core.v1.ConfigMap | Output],
+    config_maps: dict[str, kubernetes.core.v1.ConfigMap | Output[Any]],
 ) -> Output[str]:
     """Digest of every ConfigMap a pod mounts, keyed by ConfigMap name.
 
@@ -726,7 +726,7 @@ def create_k8s_resources(  # noqa: C901
         lms_edxapp_secret_names.append(secrets.webhook_tokens_secret_name)
     if secrets.typesense:
         lms_edxapp_secret_names.append(secrets.typesense_secret_name)
-    lms_edxapp_config_maps = {
+    lms_edxapp_config_maps: dict[str, kubernetes.core.v1.ConfigMap | Output[Any]] = {
         configmaps.general_config_name: configmaps.general,
         configmaps.interpolated_config_name: configmaps.interpolated,
         configmaps.lms_general_config_name: configmaps.lms_general,
@@ -736,7 +736,13 @@ def create_k8s_resources(  # noqa: C901
         configmaps.settings_override_config_name: configmaps.settings_override,
     }
     lms_edxapp_configmap_names = list(lms_edxapp_config_maps)
-    lms_config_hash = _pod_config_hash(lms_edxapp_config_maps)
+    lms_config_hash = _pod_config_hash(
+        {
+            **lms_edxapp_config_maps,
+            configmaps.ssh_known_hosts_config_name: configmaps.ssh_known_hosts,
+            f"{env_name}-edxapp-vector-config": vector_configmap,
+        }
+    )
     lms_config_hash_annotations = {"ol.mit.edu/config-hash": lms_config_hash}
 
     lms_edxapp_volumes = [
@@ -1072,7 +1078,7 @@ def create_k8s_resources(  # noqa: C901
         cms_edxapp_secret_names.append(secrets.meilisearch_secret_name)
     if secrets.typesense:
         cms_edxapp_secret_names.append(secrets.typesense_secret_name)
-    cms_edxapp_config_maps = {
+    cms_edxapp_config_maps: dict[str, kubernetes.core.v1.ConfigMap | Output[Any]] = {
         configmaps.general_config_name: configmaps.general,
         configmaps.interpolated_config_name: configmaps.interpolated,
         configmaps.cms_general_config_name: configmaps.cms_general,
@@ -1081,7 +1087,13 @@ def create_k8s_resources(  # noqa: C901
         configmaps.settings_override_config_name: configmaps.settings_override,
     }
     cms_edxapp_configmap_names = list(cms_edxapp_config_maps)
-    cms_config_hash = _pod_config_hash(cms_edxapp_config_maps)
+    cms_config_hash = _pod_config_hash(
+        {
+            **cms_edxapp_config_maps,
+            configmaps.ssh_known_hosts_config_name: configmaps.ssh_known_hosts,
+            f"{env_name}-edxapp-vector-config": vector_configmap,
+        }
+    )
     cms_config_hash_annotations = {"ol.mit.edu/config-hash": cms_config_hash}
 
     cms_edxapp_volumes = [
