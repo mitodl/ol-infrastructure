@@ -1,6 +1,8 @@
 # ruff: noqa: F841, E501, PLR0912, PLR0913, PLR0915
 """Kubernetes resources for the edxapp application."""
 
+import hashlib
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -9,7 +11,7 @@ import pulumi
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import iam
 
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
@@ -118,6 +120,44 @@ _OTEL_SDK_ENV: dict[str, str] = {
     # discard whole traces. The Alloy tail sampler owns that (see lib/otel.py).
     "OTEL_TRACES_SAMPLER": "parentbased_always_on",
 }
+
+
+def _config_map_contents(
+    config_map: kubernetes.core.v1.ConfigMap | Output[Any],
+) -> Output[str]:
+    """Serialize a ConfigMap's rendered data.
+
+    `configmaps.interpolated` is an Output[ConfigMap] rather than a bare
+    ConfigMap because its content depends on runtime lookups, so both shapes
+    have to work here.
+    """
+    return (
+        Output.from_input(config_map)
+        .apply(lambda config_map_resource: config_map_resource.data)
+        .apply(lambda data: json.dumps(data, sort_keys=True))
+    )
+
+
+def _pod_config_hash(
+    config_maps: dict[str, kubernetes.core.v1.ConfigMap | Output[Any]],
+) -> Output[str]:
+    """Digest of every ConfigMap a pod mounts, keyed by ConfigMap name.
+
+    An init container concatenates these into lms.env.yml/cms.env.yml once, at
+    pod start, so their contents are only read at boot. Kubernetes rolls pods
+    when the pod template changes and a ConfigMap referenced by name is not part
+    of that template, which leaves a config-only change inert until something
+    else happens to restart the pod. Annotating the pod template with this hash
+    makes the template change whenever the config does.
+    """
+    names = sorted(config_maps)
+    return Output.all(
+        *(_config_map_contents(config_maps[name]) for name in names)
+    ).apply(
+        lambda contents: hashlib.sha256(
+            json.dumps(dict(zip(names, contents, strict=True)), sort_keys=True).encode()
+        ).hexdigest()
+    )
 
 
 def create_k8s_resources(  # noqa: C901
@@ -713,15 +753,24 @@ def create_k8s_resources(  # noqa: C901
         lms_edxapp_secret_names.append(secrets.webhook_tokens_secret_name)
     if secrets.typesense:
         lms_edxapp_secret_names.append(secrets.typesense_secret_name)
-    lms_edxapp_configmap_names = [
-        configmaps.general_config_name,
-        configmaps.interpolated_config_name,
-        configmaps.lms_general_config_name,
-        configmaps.lms_interpolated_config_name,
+    lms_edxapp_config_maps: dict[str, kubernetes.core.v1.ConfigMap | Output[Any]] = {
+        configmaps.general_config_name: configmaps.general,
+        configmaps.interpolated_config_name: configmaps.interpolated,
+        configmaps.lms_general_config_name: configmaps.lms_general,
+        configmaps.lms_interpolated_config_name: configmaps.lms_interpolated,
         # Volume only -- deliberately absent from lms_edxapp_config_sources, which the
         # init container cats into lms.env.yml. This is a Python module, not config.
-        configmaps.settings_override_config_name,
-    ]
+        configmaps.settings_override_config_name: configmaps.settings_override,
+    }
+    lms_edxapp_configmap_names = list(lms_edxapp_config_maps)
+    lms_config_hash = _pod_config_hash(
+        {
+            **lms_edxapp_config_maps,
+            configmaps.ssh_known_hosts_config_name: configmaps.ssh_known_hosts,
+            f"{env_name}-edxapp-vector-config": vector_configmap,
+        }
+    )
+    lms_config_hash_annotations = {"ol.mit.edu/config-hash": lms_config_hash}
 
     lms_edxapp_volumes = [
         kubernetes.core.v1.VolumeArgs(
@@ -924,6 +973,7 @@ def create_k8s_resources(  # noqa: C901
             extra_volumes=lms_edxapp_volumes,
             extra_volume_mounts=common_extra_volume_mounts,
             extra_init_volume_mounts=lms_edxapp_init_volume_mounts,
+            config_hash_inputs={"edxapp-config": lms_config_hash},
             extra_init_containers=[
                 export_course_repos_init_container,
                 lms_config_aggregator_init_container,
@@ -1055,14 +1105,23 @@ def create_k8s_resources(  # noqa: C901
         cms_edxapp_secret_names.append(secrets.meilisearch_secret_name)
     if secrets.typesense:
         cms_edxapp_secret_names.append(secrets.typesense_secret_name)
-    cms_edxapp_configmap_names = [
-        configmaps.general_config_name,
-        configmaps.interpolated_config_name,
-        configmaps.cms_general_config_name,
-        configmaps.cms_interpolated_config_name,
-        # Volume only -- see the note on lms_edxapp_configmap_names.
-        configmaps.settings_override_config_name,
-    ]
+    cms_edxapp_config_maps: dict[str, kubernetes.core.v1.ConfigMap | Output[Any]] = {
+        configmaps.general_config_name: configmaps.general,
+        configmaps.interpolated_config_name: configmaps.interpolated,
+        configmaps.cms_general_config_name: configmaps.cms_general,
+        configmaps.cms_interpolated_config_name: configmaps.cms_interpolated,
+        # Volume only -- see the note on lms_edxapp_config_maps.
+        configmaps.settings_override_config_name: configmaps.settings_override,
+    }
+    cms_edxapp_configmap_names = list(cms_edxapp_config_maps)
+    cms_config_hash = _pod_config_hash(
+        {
+            **cms_edxapp_config_maps,
+            configmaps.ssh_known_hosts_config_name: configmaps.ssh_known_hosts,
+            f"{env_name}-edxapp-vector-config": vector_configmap,
+        }
+    )
+    cms_config_hash_annotations = {"ol.mit.edu/config-hash": cms_config_hash}
 
     cms_edxapp_volumes = [
         kubernetes.core.v1.VolumeArgs(
@@ -1267,6 +1326,7 @@ def create_k8s_resources(  # noqa: C901
             extra_volumes=cms_edxapp_volumes,
             extra_volume_mounts=common_extra_volume_mounts,
             extra_init_volume_mounts=cms_edxapp_init_volume_mounts,
+            config_hash_inputs={"edxapp-config": cms_config_hash},
             extra_init_containers=[
                 export_course_repos_init_container,
                 cms_config_aggregator_init_container,
@@ -1341,7 +1401,10 @@ def create_k8s_resources(  # noqa: C901
                 match_labels=lms_celery_selector_labels
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_celery_labels),
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=lms_celery_labels,
+                    annotations=lms_config_hash_annotations,
+                ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     termination_grace_period_seconds=DEFAULT_CELERY_TERMINATION_GRACE_PERIOD_SECONDS,
                     affinity=kubernetes.core.v1.AffinityArgs(
@@ -1528,6 +1591,7 @@ def create_k8s_resources(  # noqa: C901
                         # node underneath a running report.
                         "karpenter.sh/do-not-disrupt": "true",
                         "cluster-autoscaler.kubernetes.io/safe-to-evict": "false",
+                        **lms_config_hash_annotations,
                     },
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
@@ -1692,7 +1756,10 @@ def create_k8s_resources(  # noqa: C901
                 match_labels=lms_beat_selector_labels
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_beat_labels),
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=lms_beat_labels,
+                    annotations=lms_config_hash_annotations,
+                ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     service_account_name=vault_k8s_resources.service_account_name,
                     security_context=pod_security_context,
@@ -1799,7 +1866,8 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_process_scheduled_emails_labels
+                    labels=lms_process_scheduled_emails_labels,
+                    annotations=lms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     affinity=kubernetes.core.v1.AffinityArgs(
@@ -1910,7 +1978,10 @@ def create_k8s_resources(  # noqa: C901
                 match_labels=cms_celery_selector_labels
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_celery_labels),
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=cms_celery_labels,
+                    annotations=cms_config_hash_annotations,
+                ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     termination_grace_period_seconds=DEFAULT_CELERY_TERMINATION_GRACE_PERIOD_SECONDS,
                     affinity=kubernetes.core.v1.AffinityArgs(
