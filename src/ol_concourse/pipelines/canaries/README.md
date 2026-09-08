@@ -21,9 +21,9 @@ pipeline that runs it, deliberately — see
 
 The distinction matters because the two have opposite failure economics. A PR test
 should be strict: any regression must block a merge. A canary should be *stable* —
-it wakes a human up, so it must fail only when something is genuinely wrong for
-users. A canary that asserts on CMS copy or a course price will page someone every
-time an editor changes a word.
+a failed journey makes its Concourse build red, so it must fail only when something
+is genuinely wrong for users. A canary that asserts on CMS copy or a course price
+would create a false failure every time an editor changes a word.
 
 **Assert on the journey completing, not on the content it finds along the way.**
 
@@ -37,7 +37,8 @@ Grafana Synthetic Monitoring
 ([`synthetic_monitoring.py`](../../../ol_infrastructure/infrastructure/grafana_alerting/metric_rules/synthetic_monitoring.py))
 already runs plain HTTP availability probes against these same properties. It answers
 "is the endpoint responding?". These canaries answer "can a person still log in and
-find a course?". Alerting for the two is kept separate on purpose.
+find a course?". The canaries do not emit metrics or add Grafana alerts; like most of
+our pipelines, their result is the green or red Concourse build status.
 
 ## Layout
 
@@ -59,6 +60,16 @@ specs/<property>/      One directory per web property.
 `canary-meta` manages the fleet and re-sets itself. Each managed pipeline is named
 `canary-<property>` and holds a single job that pulls the stock Playwright image,
 runs `npm ci`, and runs that property's specs on a `time` trigger.
+
+The job's success or failure is the canary result. There is deliberately no separate
+Grafana, Slack, or Rootly notification path: like most pipelines here, a passing run
+is green in Concourse and a failed journey is red.
+
+When a run fails, its traces, screenshots and video are uploaded to
+`s3://ol-eng-artifacts/canary-results/<pipeline>/<job>/<build>/`. Green runs upload
+nothing. These artifacts help diagnose a red build; they are not another result or
+notification channel. See [`AGENTS.md`](AGENTS.md) for how to read a trace and for
+what not to change about that step.
 
 ```bash
 cd src/ol_concourse/pipelines/canaries

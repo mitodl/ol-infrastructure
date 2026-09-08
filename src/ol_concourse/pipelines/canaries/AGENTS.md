@@ -100,7 +100,7 @@ downloads none.
 - **Prefer a stable seeded fixture over live content.** If a journey must reference a
   specific course, it needs a course that exists in every target environment by
   contract. Note that dependency in the property's `README.md`; content that merely
-  happens to be there today is a future 3am page.
+  happens to be there today creates future false failures.
 - **Web-first assertions only.** `expect(locator)` auto-retries; `expect(await
   locator.count())` does not, and is the most common source of canary flake.
 - **Never `waitForTimeout`.** Wait for the thing you actually need.
@@ -113,11 +113,44 @@ downloads none.
   page is slower to hydrate. Chromium passed it every time, which is what this class of
   bug looks like right up until the target has a bad day.
 
-## Failure artifacts
+## Result and failure artifacts
 
-Traces, screenshots and video are retained on failure into `canary-results/`, which the
-pipeline publishes. When triaging, the trace is almost always the fastest route — drop
-it into <https://trace.playwright.dev/>.
+Concourse build status is the sole canary result: a passing journey makes the build
+green and a failed journey makes it red. Do not add metric pushes, Grafana alerts,
+Slack notifications, or Rootly incidents. This deliberately matches how most of our
+pipelines report success and failure.
+
+Traces, screenshots and video are retained on failure into `canary-results/`. The
+pipeline collects that directory into a task output and, **on failure only**, uploads it
+to:
+
+```
+s3://ol-eng-artifacts/canary-results/<pipeline>/<job>/<build>/
+```
+
+When triaging, the trace is almost always the fastest route — pull down `trace.zip` and
+drop it into <https://trace.playwright.dev/>.
+
+Two things about that upload are load-bearing:
+
+- **The collection step runs after a failed test run, on purpose.** The artifacts worth
+  having exist only when the run fails, which is exactly when a non-zero exit under
+  `set -e` would skip collecting them. `pipeline.py` captures the status and re-raises it
+  after the copy. If you restructure that script, keep that ordering or the pipeline
+  silently publishes nothing for precisely the runs you need it for.
+- **The build is stamped into the directory path, not into the `put`.** A Concourse `put`
+  cannot interpolate build metadata, so the run script writes into
+  `$BUILD_PIPELINE_NAME/$BUILD_JOB_NAME/$BUILD_NAME` and rclone copies the tree wholesale.
+  Uploading to a flat prefix instead would have each failure overwrite the last.
+
+rclone uses `copy`, never `sync` — `sync` mirrors deletions, which against a
+build-stamped prefix would erase exactly the history this exists to keep. Credentials
+come from the worker instance role (`env_auth = true`); `ol-eng-artifacts` is already in
+the operations Concourse IAM policy, so no secret is involved and none should be added.
+
+Green runs collect their report into the output too, but nothing is uploaded. Do not
+"fix" that by making the `put` unconditional: at a 10-minute cadence that is a
+few-hundred-KB HTML bundle 144 times a day per canary, and it buries the failures.
 
 ## Validation
 
