@@ -171,6 +171,13 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             # unrelated failing CronJobs in the same namespace would arrive as
             # one grouped notification.
             "workload",
+            # metric_rules/vector_edxapp_tracking.py's EdxappTrackingLogS3Error
+            # aggregates `sum by (cluster, namespace, component_id)` -- two
+            # sinks (`ship_edx_tracking_logs_to_s3` and its `_legacy` twin)
+            # match the same component_id regex, so without this label both
+            # erroring at once in the same namespace would collapse into one
+            # notification group.
+            "component_id",
         ],
         # "1m", not "60s" — Grafana normalizes durations to the largest unit and
         # a mismatched spelling shows as a perpetual diff on every preview.
