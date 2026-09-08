@@ -27,42 +27,42 @@ spec:
         app: analytics-api
     spec:
       containers:
-        - name: analytics-api
-          image: python:3.13-slim
-          imagePullPolicy: IfNotPresent
-          command: ["python", "/app/stub_app.py"]
-          ports:
-            - containerPort: 8070
-              name: http
-          env:
-            - name: PORT
-              value: "8070"
-          resources:
-            requests:
-              cpu: 25m
-              memory: 32Mi
-            limits:
-              memory: 128Mi
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 8070
-            initialDelaySeconds: 3
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8070
-            initialDelaySeconds: 5
-            periodSeconds: 20
-          volumeMounts:
-            - name: stub-src
-              mountPath: /app
-              readOnly: true
-      volumes:
+      - name: analytics-api
+        image: python:3.13-slim
+        imagePullPolicy: IfNotPresent
+        command: ["python", "/app/stub_app.py"]
+        ports:
+        - containerPort: 8070
+          name: http
+        env:
+        - name: PORT
+          value: "8070"
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8070
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8070
+          initialDelaySeconds: 5
+          periodSeconds: 20
+        volumeMounts:
         - name: stub-src
-          configMap:
-            name: analytics-api-stub-src
+          mountPath: /app
+          readOnly: true
+      volumes:
+      - name: stub-src
+        configMap:
+          name: analytics-api-stub-src
 ---
 apiVersion: v1
 kind: Service
@@ -75,6 +75,6 @@ spec:
   selector:
     app: analytics-api
   ports:
-    - name: http
-      port: 8070
-      targetPort: http
+  - name: http
+    port: 8070
+    targetPort: http
