@@ -393,6 +393,90 @@ policy/tag subsystem could in principle close it in one system, which is an argu
 Gravitino rather than against; Lakekeeper cannot, and OpenMetadata's own policy engine governs
 OpenMetadata, not data access.
 
+### Authorization head-to-head: Lakekeeper + OpenFGA vs Gravitino built-in
+
+The two configurations actually on the table. Cedar is excluded (enterprise), Ranger is excluded
+(wrong stack, and catalog-independent anyway). Both columns are backed by a spike against
+StarRocks 4.1.3 and Keycloak 26.0.8; **bold** marks a measured result rather than a documented one.
+
+| Dimension | Lakekeeper + OpenFGA | Gravitino built-in |
+|---|---|---|
+| Paradigm | ReBAC — relationship tuples in an external engine | RBAC + ownership, embedded (jcasbin) |
+| Role membership source | **Explicit grants only.** The token's roles claim does not become a grantable principal | **The token.** Group claim drives role membership |
+| Grantable principals | Users, Lakekeeper-managed Roles, **k8s service accounts** | Users, Groups |
+| Role nesting | Yes, arbitrary | No — roles are flat sets of object+privilege |
+| Ownership model | Project/warehouse admin roles | First-class on 13 object types, incl. **group ownership** |
+| Object hierarchy | Project → Warehouse → Namespace → Table | Metalake → Catalog → Schema → Table |
+| Column-level grants | No | No |
+| Explicit DENY | **No** — positive assignments only | **Yes**, with hard precedence over ALLOW |
+| Inheritance | **Downward; warehouse-level grants are very broad** | Downward; DENY cannot be undone by a lower ALLOW |
+| Deny presentation | **404, hides existence** | **403, names operation and object** |
+| List filtering | **Filtered to what you can see** | Not measured |
+| Storage delegation | **Per-table remote signing; signer re-validates identity AND location per request** | **Per-table STS session policy; session named for the end user** |
+| Credential revocation | Signer re-checks every request | **Cached until expiry** — a revoked grant does not invalidate an issued credential |
+| Failure mode | **503 after a ~10s hang; `/health` lags** | In-process; no network hop |
+| Misconfiguration hazard | **Unsupported authorizer silently becomes allow-all, zero log lines** | **`authenticators` defaults to `simple` (unvalidated Basic) — fails open** |
+| Correctness defect found | None | **Cache-expiry miss resolves as DENY** — spurious 403 for an authorized user |
+| Audit | **Per-user `oidc~<sub>` on each operation** | **End-user principal, operation, FQ object, outcome**; denials less structured |
+| Reusable outside the catalog | **Yes** — OpenFGA is a standalone service | No — embedded, catalog-only |
+| Footprint per env | 2 services, 2 databases | 1 service, 1 database |
+
+#### The three differences that actually decide it
+
+**1. Where role membership comes from.** This is the whole ballgame, because the ACL model this
+project already designed is role-to-namespace with no per-user grants. Gravitino reads membership
+from the token, so that model is six groups and six roles and nothing else moves. Lakekeeper OSS
+cannot read it from the token, so the same model has to be projected onto every user by
+synchronisation code — the second vocabulary. Everything else on this table is secondary to that.
+
+**2. Gravitino can express DENY; Lakekeeper cannot.** Gravitino's DENY beats ALLOW regardless of
+which role it came from or where in the hierarchy it sits, and its docs are explicit that "denials
+cannot be circumvented by grants at lower levels". Lakekeeper's grant surface is positive
+assignment only — OpenFGA's `but not` exclusion exists when *authoring* an authorization model, but
+Lakekeeper owns that model, so an operator cannot write a deny rule. The practical consequence:
+"analysts can read gold, except this one table" is one grant in Gravitino and a restructuring
+exercise in Lakekeeper. Given that the measured Lakekeeper failure mode was *accidentally granting
+too much* via a warehouse-level assignment, this is not academic.
+
+**3. Lakekeeper's storage delegation is tighter, and revocation is the reason.** Both downscope per
+table. But Lakekeeper's remote signer re-validates identity *and* the requested location on every
+signing request — a signer URL is not a bearer of authority. Gravitino issues an STS credential and
+caches it until expiry, so revoking a grant does not invalidate a credential already vended. If the
+requirement is "revoke access and have it take effect now", Lakekeeper is materially better.
+Gravitino's counter is that its STS session is named for the end user, so CloudTrail attributes S3
+access to a human.
+
+#### Two hazards that are not symmetric
+
+Both fail open when misconfigured, but differently and with different odds of being caught.
+Lakekeeper's is worse in character: setting an unsupported authorizer leaves a **running, healthy,
+completely unauthorized catalog with no log line at all**, and only `/management/v1/info` reveals
+it. Gravitino's is a default rather than a silent downgrade — leaving `gravitino.authenticators`
+unset gives you `simple`, which trusts an unvalidated HTTP Basic header. Either way the deployment
+must **assert** its own security posture at startup and alert on it; neither can be trusted to
+complain.
+
+Gravitino carries a live correctness defect that Lakekeeper does not: the first authorization check
+after a cache entry expires denies an authorized user. It fails closed, so it is a usability and
+correctness problem rather than a security one, but through StarRocks it surfaces as a failed query
+and it should be filed upstream before adoption.
+
+#### What is equal, and should not be used to argue either way
+
+Neither supports column-level grants, so neither can enforce PII at column granularity without an
+external layer. Both are bypassed by the StarRocks FE metadata cache on repeated reads, so
+catalog-side authorization is not consulted on every user action under either, and StarRocks GRANTs
+remain the query-time filter regardless. Both require the bootstrap catalog-init principal to be
+provisioned explicitly. Both were proven to deliver per-user identity end to end through
+`security=JWT`.
+
+#### Not measured
+
+For Lakekeeper: STS-based vending (the spike used remote signing against RustFS, which has no STS),
+Cedar, and OpenFGA's `reconcile` maintenance path. For Gravitino: whether list operations are
+*filtered* to visible objects or simply refused — Lakekeeper's filtering is proven and Gravitino's
+is unknown, which matters for the discovery experience. For both: behaviour under real concurrency.
+
 ### The reframing
 
 The project's own artifacts favour **Gravitino on the thing this project is actually for** —
