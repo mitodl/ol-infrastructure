@@ -23,6 +23,7 @@ config:
     - "ci.learn.mit.edu"
     cors_urls:
     - "https://ci.learn.mit.edu"
+    - "https://courses.ci.learn.mit.edu"   # MITxOnline courseware MFE, same as csrf_domains below
     - "https://ocw-next.netlify.app"
     - "https://draft-ci.ocw.mit.edu"
     - "https://live-ci.ocw.mit.edu"

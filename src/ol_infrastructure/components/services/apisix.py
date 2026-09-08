@@ -434,6 +434,22 @@ class OLApisixSharedPluginsConfig(BaseModel):
     application_name: str
     resource_suffix: str = "shared-plugins"
     enable_defaults: bool = True
+    # Origins the cors default plugin will echo back with
+    # Access-Control-Allow-Credentials: true.  Required whenever
+    # ``enable_defaults`` is set -- there is deliberately no default.  This used
+    # to be the APISIX wildcard "**", which reflects whatever Origin the browser
+    # sent *and* allows credentials, so any origin a user's cookies were sent to
+    # could read authenticated JSON off every OIDC host.  Pass the same list the
+    # application declares to its own framework (Django's
+    # CORS_ALLOWED_ORIGINS / CSRF_ALLOWED_ORIGINS, Open edX's
+    # CORS_ORIGIN_WHITELIST) so the gateway and the app agree; the gateway's
+    # headers are what the browser actually enforces.
+    #
+    # An empty list omits the cors plugin entirely, which is the right answer
+    # for a service whose only callers are same-origin browsers or
+    # server-to-server clients: no Access-Control-Allow-Origin header at all
+    # means no cross-origin read is possible.
+    cors_allow_origins: list[str] | None = None
     # Attach the opentelemetry plugin (OTLP trace export) to every route that
     # references this shared plugin config.  Automatically disabled on CI, where
     # the plugin is not loaded into APISIX and the Grafana Alloy collector does
@@ -455,6 +471,20 @@ class OLApisixSharedPluginsConfig(BaseModel):
     # Either raw CRD dicts or OLApisixPluginConfig objects; the component
     # normalises the latter to dicts before rendering.
     plugins: list[dict[str, Any] | OLApisixPluginConfig] = []
+
+    @model_validator(mode="after")
+    def require_explicit_cors_origins(self) -> "OLApisixSharedPluginsConfig":
+        """Refuse to render the cors default plugin without an origin list."""
+        if self.enable_defaults and self.cors_allow_origins is None:
+            msg = (
+                f"{self.application_name}: cors_allow_origins is required when "
+                "enable_defaults is set. Pass the application's own allowed "
+                "origins (the list it gives Django's CORS_ALLOWED_ORIGINS or "
+                "equivalent), or [] to attach no cors plugin at all for a "
+                "service with no cross-origin browser callers."
+            )
+            raise ValueError(msg)
+        return self
 
 
 class OLApisixSharedPlugins(ComponentResource):
@@ -486,6 +516,29 @@ class OLApisixSharedPlugins(ComponentResource):
             "ol:infrastructure:services:k8s:OLApisixSharedPlugin", name, None, opts
         )
 
+        # APISIX matches the request Origin against this comma-separated list
+        # and echoes back only a member of it, so allow_credential stays safe.
+        # An empty ``cors_allow_origins`` renders no cors plugin at all -- see
+        # the field's comment on OLApisixSharedPluginsConfig.  allow_methods and
+        # allow_headers stay at "**": once the origin is pinned they only widen
+        # what an already-allowed origin may send.
+        __cors_plugins: list[dict[str, Any]] = (
+            [
+                {
+                    "name": "cors",
+                    "enable": True,
+                    "config": {
+                        "allow_origins": ",".join(plugin_config.cors_allow_origins),
+                        "allow_methods": "**",
+                        "allow_headers": "**",
+                        "allow_credential": True,
+                    },
+                }
+            ]
+            if plugin_config.cors_allow_origins
+            else []
+        )
+
         __default_plugins: list[dict[str, Any]] = [
             {
                 "name": "redirect",
@@ -494,16 +547,7 @@ class OLApisixSharedPlugins(ComponentResource):
                     "http_to_https": True,
                 },
             },
-            {
-                "name": "cors",
-                "enable": True,
-                "config": {
-                    "allow_origins": "**",
-                    "allow_methods": "**",
-                    "allow_headers": "**",
-                    "allow_credential": True,
-                },
-            },
+            *__cors_plugins,
             {
                 "name": "response-rewrite",
                 "enable": True,

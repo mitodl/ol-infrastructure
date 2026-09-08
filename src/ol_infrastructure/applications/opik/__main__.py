@@ -343,6 +343,11 @@ opik_shared_plugins = OLApisixSharedPlugins(
         resource_suffix="ol-shared-plugins",
         k8s_namespace=OPIK_NAMESPACE,
         k8s_labels=k8s_global_labels,
+        # Opik's UI and API are served from the one host behind OIDC, and the
+        # SDK posts traces server-side where CORS never applies, so no origin
+        # other than Opik's own is meant to read these responses.  An empty list
+        # attaches no cors plugin at all.
+        cors_allow_origins=[],
         enable_defaults=True,
     ),
 )

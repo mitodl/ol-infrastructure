@@ -21,6 +21,7 @@ from ol_infrastructure.applications.edxapp.k8s_autoscaling import (
     create_webapp_trigger_auth,
 )
 from ol_infrastructure.applications.edxapp.k8s_configmaps import (
+    browser_origins,
     create_k8s_configmaps,
 )
 from ol_infrastructure.applications.edxapp.k8s_secrets import create_k8s_secrets
@@ -2084,6 +2085,11 @@ def create_k8s_resources(  # noqa: C901
             k8s_namespace=namespace,
             k8s_labels=k8s_global_labels,
             enable_defaults=True,
+            # Same source as Django's CORS_ORIGIN_WHITELIST in
+            # k8s_configmaps.py.  The gateway emits the Access-Control-* headers
+            # the browser enforces, so Django's own list only takes effect if
+            # this one allows the origin first.
+            cors_allow_origins=browser_origins(stack_info, edxapp_config),
         ),
     )
 

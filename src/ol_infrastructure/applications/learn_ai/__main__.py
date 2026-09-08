@@ -920,6 +920,25 @@ learn_ai_deployment_envfrom = [
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_plugin_config/
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_pluginconfig_v2/
 
+# Origins allowed to read learn-ai responses cross-origin, with credentials.
+# This shared config is attached to routes on both of learn-ai's hosts (the
+# legacy api-learn-ai.ol.mit.edu and the /ai/* paths on
+# api.<env>.learn.mit.edu), so it has to cover every frontend that calls either
+# one: learn-ai's own UI, and mit-learn, which embeds the chat widget.
+#
+# Derived from the domains rather than read out of the stack's
+# CSRF_ALLOWED_ORIGINS -- that list names the same four origins on QA and
+# Production but omits the learn.mit.edu pair on CI, even though learn-ai serves
+# api.ci.learn.mit.edu there. The gateway's headers are what the browser
+# enforces, so a gap here silently breaks the widget rather than Django's CSRF
+# check.
+learn_ai_cors_allow_origins = [
+    f"https://{learn_ai_frontend_domain}",
+    f"https://{learn_ai_config.require('backend_domain')}",
+    f"https://{learn_ai_config.require('learn_backend_domain')}",
+    f"https://{learn_ai_config.require('learn_backend_domain').removeprefix('api.')}",
+]
+
 # Instantiate shared plugins component
 learn_ai_shared_plugins = OLApisixSharedPlugins(
     f"learn-ai-{stack_info.env_suffix}-ol-shared-plugins",
@@ -929,6 +948,7 @@ learn_ai_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=learn_ai_namespace,
         k8s_labels=k8s_global_labels,
         enable_defaults=True,
+        cors_allow_origins=learn_ai_cors_allow_origins,
         plugins=[
             # Both of learn-ai's OIDC resources have now moved off
             # lua-resty-session's default "session" name, so every current user

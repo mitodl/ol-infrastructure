@@ -8,6 +8,7 @@ from pulumi import Config, ResourceOptions
 
 from bridge.lib.versions import MEILISEARCH_CHART_VERSION, MEILISEARCH_VERSION
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.applications.edxapp.k8s_configmaps import browser_origins
 from ol_infrastructure.components.services.apisix import (
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
@@ -61,6 +62,10 @@ def create_meilisearch_resources(
             resource_suffix="ol-shared-plugins",
             k8s_namespace=namespace,
             k8s_labels=k8s_global_labels,
+            # Meilisearch is queried straight from the browser by Open edX's
+            # course-search MFE, which runs on the LMS and Studio origins, so it
+            # needs the same page-origin list edxapp itself allows.
+            cors_allow_origins=browser_origins(stack_info, Config("edxapp")),
             # OLApisixHTTPRoute attaches only the shared PluginConfig via
             # ExtensionRef when shared_plugin_config_name is set, ignoring the
             # route's own `plugins` list entirely -- including the request-id

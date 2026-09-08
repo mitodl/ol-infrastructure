@@ -20,6 +20,7 @@ config:
     cors_urls:
     - "https://api.learn.mit.edu"
     - "https://learn.mit.edu"
+    - "https://courses.learn.mit.edu"   # MITxOnline courseware MFE, same as csrf_domains below
     - "https://api.mitopen.odl.mit.edu"   # legacy
     - "https://mitopen.odl.mit.edu"   # legacy
     - "https://draft.ocw.mit.edu"
