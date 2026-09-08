@@ -228,6 +228,18 @@ APPS = [
             },
         ],
     },
+    {
+        # Stub for ol-analytics-api (B2B analytics gateway). No sibling repo /
+        # image — the Tiltfile runs a stdlib HTTP server serving fixture data.
+        # Lives in the mit-learn namespace (reuses its OIDC secret + CORS
+        # plugin config). No backend pod, so no seed commands.
+        "name": "analytics-api",
+        "dir": "analytics-api",
+        "namespace": "mit-learn",
+        "deploy_name": "analytics-api",
+        "tiltfile": "./local-dev/apps/analytics-api/Tiltfile",
+        "seed_commands": [],
+    },
 ]
 
 # ---------------------------------------------------------------------------
