@@ -115,9 +115,37 @@ downloads none.
 
 ## Failure artifacts
 
-Traces, screenshots and video are retained on failure into `canary-results/`, which the
-pipeline publishes. When triaging, the trace is almost always the fastest route — drop
-it into <https://trace.playwright.dev/>.
+Traces, screenshots and video are retained on failure into `canary-results/`. The
+pipeline collects that directory into a task output and, **on failure only**, uploads it
+to:
+
+```
+s3://ol-eng-artifacts/canary-results/<pipeline>/<job>/<build>/
+```
+
+When triaging, the trace is almost always the fastest route — pull down `trace.zip` and
+drop it into <https://trace.playwright.dev/>.
+
+Two things about that upload are load-bearing:
+
+- **The collection step runs after a failed test run, on purpose.** The artifacts worth
+  having exist only when the run fails, which is exactly when a non-zero exit under
+  `set -e` would skip collecting them. `pipeline.py` captures the status and re-raises it
+  after the copy. If you restructure that script, keep that ordering or the pipeline
+  silently publishes nothing for precisely the runs you need it for.
+- **The build is stamped into the directory path, not into the `put`.** A Concourse `put`
+  cannot interpolate build metadata, so the run script writes into
+  `$BUILD_PIPELINE_NAME/$BUILD_JOB_NAME/$BUILD_NAME` and rclone copies the tree wholesale.
+  Uploading to a flat prefix instead would have each failure overwrite the last.
+
+rclone uses `copy`, never `sync` — `sync` mirrors deletions, which against a
+build-stamped prefix would erase exactly the history this exists to keep. Credentials
+come from the worker instance role (`env_auth = true`); `ol-eng-artifacts` is already in
+the operations Concourse IAM policy, so no secret is involved and none should be added.
+
+Green runs collect their report into the output too, but nothing is uploaded. Do not
+"fix" that by making the `put` unconditional: at a 10-minute cadence that is a
+few-hundred-KB HTML bundle 144 times a day per canary, and it buries the failures.
 
 ## Validation
 

@@ -60,6 +60,11 @@ specs/<property>/      One directory per web property.
 `canary-<property>` and holds a single job that pulls the stock Playwright image,
 runs `npm ci`, and runs that property's specs on a `time` trigger.
 
+When a run fails, its traces, screenshots and video are uploaded to
+`s3://ol-eng-artifacts/canary-results/<pipeline>/<job>/<build>/`. Green runs upload
+nothing. See [`AGENTS.md`](AGENTS.md) for how to read a trace and for what not to
+change about that step.
+
 ```bash
 cd src/ol_concourse/pipelines/canaries
 python meta.py && fly -t pr-inf sp -p canary-meta -c definition.json

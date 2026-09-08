@@ -15,6 +15,7 @@ live next to this file.
 import json
 import re
 import sys
+import textwrap
 from pathlib import Path
 from typing import Any, Literal
 
@@ -25,11 +26,15 @@ from ol_concourse.lib.models.pipeline import (
     Identifier,
     Input,
     Job,
+    Output,
     Pipeline,
     Platform,
+    PutStep,
+    Resource,
     TaskConfig,
     TaskStep,
 )
+from ol_concourse.lib.resource_types import rclone
 from ol_concourse.lib.resources import git_repo, schedule
 from pydantic import BaseModel, model_validator
 
@@ -47,6 +52,15 @@ PLAYWRIGHT_IMAGE_REPOSITORY = "mcr.microsoft.com/playwright"
 # declares a project for. Adding one here without adding the project there
 # renders a pipeline that fails with "unknown project".
 Browser = Literal["chromium", "firefox", "webkit"]
+
+# Failure artifacts land here. Already writable by the operations Concourse
+# workers' instance role (see applications/concourse/iam_policies/operations.py),
+# which is why the rclone resource below can use env_auth and carry no keys.
+ARTIFACT_BUCKET = "ol-eng-artifacts"
+ARTIFACT_PREFIX = "canary-results"
+# The task output the specs' traces, screenshots and video are collected into,
+# and the directory rclone uploads.
+ARTIFACT_OUTPUT = Identifier("canary-results")
 
 
 def playwright_image_tag(canary_directory: Path = CANARY_DIRECTORY) -> str:
@@ -198,18 +212,60 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
     run_canary = "\n".join(
         [
             "set -euo pipefail",
+            # Resolved before the cd, not climbed back up to afterwards: Concourse
+            # lays outputs out as siblings of the task's working directory, while
+            # the specs have to run from inside the checkout. Stamping the build
+            # into the path is what keeps one run's artifacts from overwriting the
+            # last one's -- a `put` cannot interpolate build metadata itself, so
+            # the directory layout carries it instead.
+            f'artifact_dir="$PWD/{ARTIFACT_OUTPUT}/$BUILD_PIPELINE_NAME'
+            '/$BUILD_JOB_NAME/$BUILD_NAME"',
             f"cd canary-code/{CANARY_REPO_PATH}",
             # @playwright/test is not installed globally in the image, so this is
             # mandatory. It is also cheap -- 6 packages, no browser download,
             # because the browsers are already in the image -- which is why no
             # bespoke canary image is built. Keep it that way (see AGENTS.md).
             "npm ci",
+            # The artifacts worth having exist only when the run fails, which is
+            # precisely when a non-zero exit under `set -e` would skip collecting
+            # them. So the status is captured and re-raised at the end instead.
+            "set +e",
             f"npx playwright test {spec_arguments} {project_flags}",
+            "canary_status=$?",
+            "set -e",
+            'mkdir -p "$artifact_dir"',
+            # Absent when the failure came before any test ran -- a bad image, a
+            # failed npm ci -- in which case there is nothing to publish and the
+            # exit status below is the whole report.
+            "if [ -d canary-results ]; then",
+            '  cp -R canary-results/. "$artifact_dir"/',
+            "fi",
+            'exit "$canary_status"',
         ]
     )
 
+    # env_auth: the worker instance role already grants ol-eng-artifacts writes,
+    # so no credential is configured here or resolved from Vault.
+    artifact_store = Resource(
+        name=Identifier("canary-artifacts"),
+        type="rclone",
+        icon="bucket",
+        source={
+            "config": textwrap.dedent(
+                """\
+                [s3-remote]
+                type = s3
+                provider = AWS
+                env_auth = true
+                region = us-east-1
+                """
+            )
+        },
+    )
+
     return Pipeline(
-        resources=[canary_code, canary_schedule],
+        resource_types=[rclone()],
+        resources=[canary_code, canary_schedule, artifact_store],
         jobs=[
             Job(
                 name=Identifier(f"run-{params.canary_name}-canary"),
@@ -231,11 +287,35 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
                                 },
                             ),
                             inputs=[Input(name=canary_code.name)],
+                            outputs=[Output(name=ARTIFACT_OUTPUT)],
                             params=task_params,
                             run=Command(
                                 path="bash",
                                 args=["-c", run_canary],
                             ),
+                        ),
+                        # Only on failure. A green run's artifacts are a report
+                        # nobody reads, and at this cadence uploading them all
+                        # costs more storage than the failures it would bury.
+                        # `copy` rather than `sync`: sync mirrors deletions, which
+                        # against a build-stamped prefix would erase the history
+                        # this exists to keep.
+                        on_failure=PutStep(
+                            put=artifact_store.name,
+                            no_get=True,
+                            inputs=[ARTIFACT_OUTPUT],
+                            params={
+                                "source": str(ARTIFACT_OUTPUT),
+                                "destination": [
+                                    {
+                                        "command": "copy",
+                                        "dir": (
+                                            f"s3-remote:{ARTIFACT_BUCKET}"
+                                            f"/{ARTIFACT_PREFIX}/"
+                                        ),
+                                    }
+                                ],
+                            },
                         ),
                     ),
                 ],
