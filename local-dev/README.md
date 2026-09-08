@@ -541,7 +541,7 @@ Confirm the pod is on your tag, then log in again or trigger a password reset to
 kubectl -n local-infra get pod keycloak-0 -o jsonpath='{.spec.containers[0].image}'
 ```
 
-Emails land in [Mailpit](#inspect-emails-mailpit).
+Emails land in [Mailpit](#inspect-emails-mailpit); the olapps realm enables the `UPDATE_EMAIL` required action, so changing an email from the [account console](https://sso.ol.mit.dev/realms/olapps/account/) exercises the email-update confirmation template as well.
 
 Edit, re-run the script, and Keycloak rolls again. The tag is the checkout's short commit plus a hash of its uncommitted changes (tracked edits and untracked files; gitignored files don't count) and of the Dockerfile, so each distinct input gets its own tag and the operator, which only rolls when the image string changes, rolls once per change. The registry keeps the ten most recent tags per repository, so if `keycloak-0` ever fails to pull an old tag after many builds, re-run the script. To return to the published image:
 

@@ -144,7 +144,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     for alias, default in [
         ("CONFIGURE_TOTP", False),
         ("VERIFY_EMAIL", verify_email),
-        # UPDATE_EMAIL was removed in Keycloak 26 — omit to avoid validation error.
+        ("UPDATE_EMAIL", False),
         ("UPDATE_PASSWORD", False),
     ]:
         keycloak.RequiredAction(
