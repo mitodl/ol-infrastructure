@@ -411,7 +411,8 @@ StarRocks 4.1.3 and Keycloak 26.0.8; **bold** marks a measured result rather tha
 | Explicit DENY | **No** — positive assignments only | **Yes**, with hard precedence over ALLOW |
 | Inheritance | **Downward; warehouse-level grants are very broad** | Downward; DENY cannot be undone by a lower ALLOW |
 | Deny presentation | **404, hides existence** | **403, names operation and object** |
-| List filtering | **Filtered to what you can see** | Not measured |
+| List filtering | **Filtered to what you can see** | **Filtered inside a container you can reach; 403 if you cannot** |
+| Existence hiding on deny | **Yes — 404** | **No — 403 names the object** |
 | Storage delegation | **Per-table remote signing; signer re-validates identity AND location per request** | **Per-table STS session policy; session named for the end user** |
 | Credential revocation | Signer re-checks every request | **Cached until expiry** — a revoked grant does not invalidate an issued credential |
 | Failure mode | **503 after a ~10s hang; `/health` lags** | In-process; no network hop |
@@ -470,12 +471,47 @@ remain the query-time filter regardless. Both require the bootstrap catalog-init
 provisioned explicitly. Both were proven to deliver per-user identity end to end through
 `security=JWT`.
 
+#### List behaviour, measured 2026-09-08
+
+Gravitino does both, and which one you get depends on where you are in the hierarchy. Setup: one
+catalog `lf`, two sibling namespaces `gold` and `raw`, two tables in `gold`. alice was granted
+`USE_CATALOG` on `lf`, `USE_SCHEMA` on `lf.gold` and `SELECT_TABLE` on `lf.gold.t_gold` only —
+nothing on `raw`, nothing on `t_gold_secret`. bob got nothing at all.
+
+```
+admin  listNamespaces      -> [gold, raw]                    ground truth
+admin  listTables(gold)    -> [t_gold, t_gold_secret]        ground truth
+
+alice  listNamespaces      -> [gold]                  200    FILTERED, raw absent
+alice  listTables(gold)    -> [t_gold]                200    FILTERED, t_gold_secret absent
+alice  listTables(raw)     -> 403 ForbiddenException         REFUSED
+bob    listNamespaces      -> 403 ForbiddenException         REFUSED
+```
+
+**The rule: a privilege on the container is required to list it at all; once you can list it, the
+contents are filtered to what you may see.** Direct access matches — alice loads `gold.t_gold`
+(200) but not `gold.t_gold_secret` or `raw.t_raw` (403 each).
+
+The filtering half is equivalent to Lakekeeper. The refusal half is not, and the difference is
+**existence disclosure**. Lakekeeper deliberately answers an unauthorized namespace with `404
+NoSuchNamespaceException` ("Namespace not found or access denied") so a caller cannot distinguish
+absent from forbidden. Gravitino answers `403` and names the object: alice learns `lakehouse.lf.raw`
+exists, and bob learns the catalog does. Gravitino's errors also echo the internal authorization
+expression back to the caller — e.g. `ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA)` — which
+is a policy-internals leak in an end-user-visible error.
+
+None of this is severe, and Gravitino's messages are far better for debugging. But if hiding the
+existence of restricted datasets is a requirement, Lakekeeper does it by design and Gravitino does
+not.
+
+Not measured here: how this surfaces through StarRocks' `SHOW DATABASES`, which applies its own
+GRANT filter on top and is subject to the FE metadata cache. The catalog-level behaviour above is
+what the catalog itself does.
+
 #### Not measured
 
 For Lakekeeper: STS-based vending (the spike used remote signing against RustFS, which has no STS),
-Cedar, and OpenFGA's `reconcile` maintenance path. For Gravitino: whether list operations are
-*filtered* to visible objects or simply refused — Lakekeeper's filtering is proven and Gravitino's
-is unknown, which matters for the discovery experience. For both: behaviour under real concurrency.
+Cedar, and OpenFGA's `reconcile` maintenance path. For both: behaviour under real concurrency.
 
 ### The reframing
 
