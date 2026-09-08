@@ -42,7 +42,7 @@ class OpenLearningOpenEdxDeployment(Enum):
         deployment_name="xpro",
         env_release_map=[
             EnvRelease("CI", OpenEdxSupportedRelease["verawood"]),
-            EnvRelease("QA", OpenEdxSupportedRelease["ulmo"]),
+            EnvRelease("QA", OpenEdxSupportedRelease["verawood"]),
             EnvRelease("Production", OpenEdxSupportedRelease["ulmo"]),
         ],
     )
