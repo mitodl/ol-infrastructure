@@ -18,5 +18,7 @@
 
   "disk_buildcache_max_gb": "",
 
-  "log_retention_period": "168h"
+  "log_retention_period": "168h",
+
+  "keycloak_image": ""
 }

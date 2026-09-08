@@ -166,7 +166,9 @@ ol-infrastructure/
 │
 └── local-dev/
     ├── scripts/                 # setup.sh, start.sh, stop.sh, teardown.sh, seed.sh,
-    │                            # heal-exec.sh, prune-docker.sh (each described in its header)
+    │                            # heal-exec.sh, prune-docker.sh, kc-theme-image.sh
+    │                            # (each described in its header)
+    ├── keycloak/                # Dockerfile for testing an unreleased ol-keycloakify theme
     ├── cluster/                 # k3d cluster definition + registry retention config
     ├── certs/                   # mkcert output (gitignored)
     ├── infra/                   # Pulumi stacks: shared in-cluster infra (see EXTENDING.md)
@@ -349,6 +351,7 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 | `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
+| `keycloak_image` | published `mitodl/keycloak` digest | Keycloak server image for the core stack — see [Testing a local ol-keycloakify build](#testing-a-local-ol-keycloakify-build). |
 | `per_app_databases`, `openedx_mode` | — | Declared but not wired to anything yet; setting them has no effect. |
 
 The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags) go in `tilt_config.json`; anything that sets an **env var or secret value inside a workload** (API keys, feature flags, endpoints) goes in a gitignored `app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides).
@@ -395,6 +398,7 @@ The infrastructure is split across two Pulumi stacks:
 | `apisix_version` | `2.12.0` | APISIX Helm chart version |
 | `cnpg_version` | `0.23.0` | CloudNativePG operator Helm chart version |
 | `keycloak_operator_version` | `26.0.7` | Official Keycloak Operator version |
+| `keycloak_image` | published `mitodl/keycloak` digest | Keycloak server image. Leave unset here and use `tilt_config.json` instead — see [Testing a local ol-keycloakify build](#testing-a-local-ol-keycloakify-build). |
 | `observability_enabled` | `true` | Deploy Grafana + Loki + Alloy (~1.3GB). Set to `false` on a constrained Docker VM. |
 
 **`local-dev/infra/apps_infra/Pulumi.local-dev.apps-infra.Dev.yaml`** — Keycloak realm and OIDC clients:
@@ -519,6 +523,35 @@ If you prefer to run Ollama on your host machine to use GPU acceleration:
    ```bash
    ollama serve  # Listens on localhost:11434 by default
    ```
+
+### Testing a local ol-keycloakify build
+
+The login, account, and email themes in local Keycloak come from the [ol-keycloakify](https://github.com/mitodl/ol-keycloakify) release baked into the published `mitodl/keycloak` image. To see an unreleased branch of the theme, check it out next to this repo and run:
+
+```bash
+./local-dev/scripts/kc-theme-image.sh            # ../ol-keycloakify
+./local-dev/scripts/kc-theme-image.sh ~/src/ol-keycloakify   # or any checkout
+```
+
+The script builds the theme from the checkout's sources inside Docker (no Node, Yarn, Maven, or JDK needed on the host), bakes the jar into a Keycloak image based on the published one, pushes it to the k3d registry, and writes the image into `keycloak_image` in your gitignored `tilt_config.json`. A running `tilt up` picks that up on its own: `local-infra-core` re-applies and the operator rolls `keycloak-0`, which takes a minute or two and logs you out of every local app. A first build takes about three minutes, mostly downloading the theme's dependencies; later builds reuse them. If the build fails at `yarn install --immutable`, the checkout's `yarn.lock` is out of date: run `yarn install` there and commit it.
+
+Confirm the pod is on your tag, then log in again or trigger a password reset to see the login and email themes:
+
+```bash
+kubectl -n local-infra get pod keycloak-0 -o jsonpath='{.spec.containers[0].image}'
+```
+
+Emails land in [Mailpit](#inspect-emails-mailpit).
+
+Edit, re-run the script, and Keycloak rolls again. The tag is the checkout's short commit plus a hash of its uncommitted changes (tracked edits and untracked files; gitignored files don't count) and of the Dockerfile, so each distinct input gets its own tag and the operator, which only rolls when the image string changes, rolls once per change. The registry keeps the ten most recent tags per repository, so if `keycloak-0` ever fails to pull an old tag after many builds, re-run the script. To return to the published image:
+
+```bash
+./local-dev/scripts/kc-theme-image.sh --reset   # sets keycloak_image back to ""
+```
+
+The realm, clients, and seeded users live in Postgres and are untouched by the image swap. Under the hood, Tilt forwards `keycloak_image` to the core Pulumi stack as `LOCAL_DEV_KEYCLOAK_IMAGE`, so the same value works for a hand-run `pulumi up`.
+
+Why an image at all: Keycloak runs `--optimized`, and an optimized Keycloak refuses to start when a jar in `providers/` differs from the one it was built against, so the theme cannot be copied into the running pod. The Dockerfile (`local-dev/keycloak/Dockerfile`) starts from the same `mitodl/keycloak` digest the core stack defaults to (the script reads it from `local-dev/infra/core/__main__.py`) and reruns `kc.sh build` with the flags from `Dockerfile.hosted` in [ol-keycloak](https://github.com/mitodl/ol-keycloak); when bumping the digest, check those flags still match.
 
 ### Custom S3 Storage (MinIO / RustFS)
 

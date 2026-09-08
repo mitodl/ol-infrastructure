@@ -140,3 +140,6 @@ repos:
   rev: v2.15.1
   hooks:
   - id: hadolint-docker
+    # BuildKit reads <Dockerfile>.dockerignore beside a Dockerfile; it is not
+    # Dockerfile syntax.
+    exclude: \.dockerignore$
