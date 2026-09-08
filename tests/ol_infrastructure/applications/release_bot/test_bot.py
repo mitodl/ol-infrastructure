@@ -4,6 +4,7 @@ The handlers take their Slack callables (ack/respond) as arguments, so they
 can be driven directly with async stubs -- no Slack app or socket needed.
 """
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -1314,12 +1315,60 @@ async def test_release_status_queries_only_migrated_apps(
     assert queried == ["mitodl/my-app"]
 
 
-async def test_ready_to_promote_poll_skips_legacy_apps(mixed_repos):
+async def test_main_polls_only_migrated_apps(mixed_repos, monkeypatch):
     """Polling a legacy repo every 120s is a guaranteed miss on rate limit.
 
-    `main()` is what narrows the polled set, so this asserts the filter the
-    two poll loops are handed rather than the loops themselves.
+    Driven through `main()` rather than through the filter helper, because
+    the helper being correct proves nothing if `main()` hands either loop the
+    unfiltered mapping -- which is the wiring that would actually regress.
     """
-    watched = bot_config.release_workflow_apps(mixed_repos)
+    monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-test")
+    app = MagicMock()
+    monkeypatch.setattr(bot, "create_app", lambda: (app, mixed_repos))
+    monkeypatch.setattr(bot, "_report_unreachable_channels", AsyncMock())
 
-    assert list(watched) == ["my-app"]
+    polled: list[list[str]] = []
+
+    async def _loop(_app, repos):
+        polled.append(list(repos))
+
+    monkeypatch.setattr(bot, "_poll_ready_to_promote_loop", _loop)
+    monkeypatch.setattr(bot, "_poll_release_progress_loop", _loop)
+    handler = MagicMock()
+    handler.start_async = AsyncMock()
+    monkeypatch.setattr(bot, "AsyncSocketModeHandler", MagicMock(return_value=handler))
+
+    await bot.main()
+    # main() starts the loops with create_task and then blocks on the socket
+    # handler; yield once so both scheduled tasks actually run.
+    await asyncio.sleep(0)
+
+    assert polled == [["my-app"], ["my-app"]]
+    handler.start_async.assert_awaited_once()
+
+
+async def test_startup_channel_check_still_covers_legacy_apps(mixed_repos, monkeypatch):
+    """Narrowing the pollers must not narrow the boot-time channel check.
+
+    An unreachable channel is worth finding before an app is migrated, not on
+    its first release.
+    """
+    monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-test")
+    checked = AsyncMock()
+    monkeypatch.setattr(bot, "create_app", lambda: (MagicMock(), mixed_repos))
+    monkeypatch.setattr(bot, "_report_unreachable_channels", checked)
+
+    async def _loop(_app, _repos):
+        return
+
+    monkeypatch.setattr(bot, "_poll_ready_to_promote_loop", _loop)
+    monkeypatch.setattr(bot, "_poll_release_progress_loop", _loop)
+    handler = MagicMock()
+    handler.start_async = AsyncMock()
+    monkeypatch.setattr(bot, "AsyncSocketModeHandler", MagicMock(return_value=handler))
+
+    await bot.main()
+    await asyncio.sleep(0)
+
+    checked.assert_awaited_once()
+    assert list(checked.await_args_list[0].args[1]) == ["my-app", "legacy-app"]
