@@ -257,6 +257,15 @@ concurrency behavior aren't changed in the same rollout window.
   > waiting on threads. So CMS's `backpressure=64` pin is removed while its thread pins
   > (2 workers x 32) stay: the rollback conflated two limits and only one of them was the
   > cause, but the other is not absent. mitxonline LMS, for contrast, peaks at 5.4.
+  >
+  > **Re-measured 2026-09-04** over the preceding 9 days, same method: mitxonline CMS
+  > peaks at **39.5** busy threads on its worst pod against the 64 available, with
+  > `granian_blocking_queue` 24 deep. Demand is higher than the 7-day August window
+  > showed, not lower, so the conclusion this paragraph reaches is unchanged and better
+  > supported. The queue peak moved the other way (32 → 24) and no cause for that has
+  > been established — capacity was 2 x 32 in both windows, so it is not a pool-size
+  > effect; different windows and different traffic is the most it supports. Both
+  > figures show real queueing, which is the only load-bearing point here.
 
 ## Capacity math
 
@@ -555,6 +564,31 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   concurrency sizing that accounts for burst shape and backpressure, plus a scaling or
   alerting signal that detects connection saturation; CPU and request rate alone did not.
   LMS remains a separate per-install decision and does not make CMS unblocked.
+
+  > **Correction (2026-09-04, PR #5754).** "CMS must remain on its restored holding
+  > pins" was written as a decision about CMS and is only a decision about *mitxonline*
+  > CMS. It was implemented as a hardcoded value in `k8s_resources.py`, which every
+  > install shares, so it also re-pinned `mitx` and `mitx-staging` — two installs that
+  > had already deployed the component defaults on 2026-08-24 and have run them cleanly
+  > since. Because neither had deployed again, the damage was latent: their live spec
+  > still held the good config while the code held the pins, and the next Production
+  > deploy would have reverted them (`workers 1 → 2`, `+--runtime-mode mt`,
+  > `blocking-threads 8 → 32`) inside an otherwise-wanted change. Caught in the
+  > `mitx.Production` preview before deploying; recorded as
+  > `les-a-rollback-applied-in-shared-iac-silently-revert-70f002`.
+  >
+  > The pins now sit behind `edxapp:k8s_granian.cms`, the same per-install seam LMS
+  > already uses: omitted keeps them, so mitxonline and xpro are unchanged and this
+  > decision still holds for mitxonline exactly as written. `mitx` and `mitx-staging`
+  > opt out on their own evidence — over the 9 days to 2026-09-04, mitx CMS peaked at
+  > 1.24 concurrently-busy blocking threads of 8 available, with
+  > `granian_blocking_queue` above zero in 6 of ~12,960 minutes (p99.9 = 0), 0 container
+  > restarts and 0 `workers_max_rss` respawns.
+  >
+  > This does not discharge the rest of the paragraph. The saturation-aware scaling
+  > signal is still missing, and it is what gates mitxonline CMS specifically
+  > (`tk-mitxonline-cms-needs-a-saturation-aware-scaling--cf08a8`). Opting the two
+  > low-demand installs out is not the "another attempt" that requirement is about.
 - **Stage 4 — async apps.** `mit_learn`, `learn_ai`: `workers=2→1` for `mit_learn` and an
   explicit `backpressure` for both. No `blocking_threads` involvement. Lowest expected
   impact, sequenced last because it shares no evidence with the WSGI stages.
@@ -606,6 +640,12 @@ entirely in container args, so there is no data or schema migration to unwind.
    *was* binding at 64 on both workers continuously, is unpinned in the same change that
    raised the default.
 5. CMS thread sizing (2 workers x 32 blocking threads) is still unmeasured against a
-   target rather than merely against demand. Demand is now known -- 21.6 busy threads per
-   pod at peak -- so a one-worker shape needs at least ~24 threads, not the component's 8.
+   target rather than merely against demand. Demand is now known -- **39.5** busy threads
+   per pod at peak, re-measured over the 9 days to 2026-09-04 and superseding the 21.6
+   from the earlier 7-day window -- so a one-worker shape needs well above the
+   component's 8. This says nothing about *which* target: demand measured at a 64-thread
+   capacity is not the demand a smaller pool would see, which is the whole premise of
+   granian #663, so the number bounds the question rather than answering it. It applies
+   to mitxonline only; `mitx` and `mitx-staging` opted out per-install in PR #5754 on
+   their own much lower measurements.
    Tracked as `tk-mitxonline-cms-needs-a-saturation-aware-scaling--cf08a8`.
