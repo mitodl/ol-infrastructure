@@ -220,6 +220,137 @@ cadences. Lakekeeper is pre-1.0 at v0.13.3 and is a single-vendor project with a
 None of this is disqualifying on its own, but the governance difference is real: an ASF project
 cannot move a feature we depend on behind a licence.
 
+## What the rest of the project says (swept 2026-09-08, after the Gravitino spike)
+
+A pass over every task and memory in
+`wp-starrocks-iceberg-rest-catalog-jwt-identity-dele-13ccbe`, looking for evidence that tilts the
+choice. It does tilt, in both directions, and the net is a reframing rather than a winner.
+
+### First, a correction to this document's own premise
+
+An earlier section of this file said the project's "evaluate catalog options" step "was never
+done". **That was wrong.** `tk-evaluate-iceberg-rest-catalog-options-for-jwt-de-17d9c3` closed
+2026-06-25 having compared Nessie, Polaris, Lakekeeper and Unity Catalog OSS. The real gap was
+narrower: it never considered Gravitino, and Gravitino is the one that changes the answer.
+
+But that evaluation is not a reliable input any more, and this matters for how much weight the
+incumbent deserves. It recommended "Lakekeeper v0.12.4 with Cedar" on the grounds that Lakekeeper
+"maps `realm_access.roles` claim to per-table Cedar policies **without pre-registering
+principals**" and was "the only catalog that has both first-class StarRocks validation AND direct
+JWT-claim-driven RBAC". Since then:
+
+- Cedar turned out to be **Vakamo enterprise-only**, absent from the OSS build.
+- The roles claim **does not bind** in the OSS build; `/management/v1/role` stays empty.
+- Gravitino **also** has direct claim-driven RBAC, now measured, not documented.
+- The version pin (0.12.4) is two minors stale.
+
+So Lakekeeper's incumbency rests on an evaluation whose central differentiator did not survive
+contact with the software. That is not a reason to drop it, but it is a reason not to treat
+"we already chose Lakekeeper" as evidence.
+
+### Tilts toward Gravitino
+
+**1. The ACL model this project already designed is purely role-to-namespace.** This is the
+strongest single signal in the graph. `tk-design-per-user-acl-model-for-iceberg-rest-catal-ae239e`
+(closed) maps the six governance roles onto namespace-level grants:
+
+```
+ol_data_analyst:     SELECT on silver_analytics, gold_analytics, gold_operations
+ol_researcher:       SELECT on silver_analytics, gold_analytics
+ol_instructor:       SELECT on gold_analytics, gold_operations
+...
+```
+
+There is not a single per-user grant anywhere in it. That is precisely what Gravitino's group-claim
+model expresses natively: six groups, six roles, done, with membership arriving in the token. Under
+Lakekeeper OSS it is the awkward case, because the roles claim does not bind and each role has to
+be projected onto every user as explicit grants. **The design that already exists fits Gravitino
+and fights Lakekeeper.**
+
+**2. The second-vocabulary cost is already on record as a known pain, next to a live bug of the
+same shape.** `pf-openfga-operational-profile-measured-and-how-it--488b31` puts it plainly: grants
+"must be projected from Keycloak into Lakekeeper by more automation — a second thing shaped exactly
+like `keycloak_group_sync.py`, inheriting the same staleness and reload problems already open on
+that one". Those problems are not hypothetical:
+`tk-verify-first-then-fix-keycloak-group-sync-writes-c1bbf7` (p1, open) records that the existing
+sync "will deny all OIDC login the moment the path is used", and
+`tk-put-the-keycloak-starrocks-group-sync-on-a-sched-f660b3` records that a CronJob alone cannot fix
+it because the FE never reloads. Committing to build a second sync of that shape, while the first
+is broken, is a real strike.
+
+**3. Smaller operational footprint.** The house pattern is one RDS instance per application
+(`OLPostgresDBConfig`, `db.t4g.small`), and OpenFGA's vendor guidance says its datastore "should be
+used exclusively for OpenFGA". Lakekeeper+OpenFGA is two services and two databases per
+environment: **four RDS instances** across QA and Production. Gravitino is one service and one
+database: **two**.
+
+**4. End-user attribution in CloudTrail**, from the STS session naming measured in the spike. Not
+required by any task, but the project's stated motivation is precisely to stop "sharing the pod's
+IRSA service identity".
+
+### Tilts toward Lakekeeper
+
+**1. Kubernetes service-account authentication, which Gravitino does not have.** The closed
+dual-catalog design (`tk-resolve-lakekeeper-access-for-native-auth-no-jwt-daf21e`) explicitly
+depends on it: "enable `LAKEKEEPER__ENABLE_KUBERNETES_AUTHENTICATION=true` — pods authenticate via
+their K8s SA token as `k8s~namespace~sa-name` principals, **no separate Keycloak service accounts
+needed**". Lakekeeper's config confirms it (`enable_kubernetes_authentication`,
+`kubernetes_authentication_audience`). **Gravitino 1.3.0 has no Kubernetes authenticator** —
+`gravitino.authenticators` accepts only `simple`, `basic`, `oauth`, `kerberos` (verified against
+the 1.3.0 docs).
+
+Under Gravitino, the Dagster and Airbyte pods need Keycloak service-account clients and secrets in
+Vault instead. This touches two already-planned implementation tasks. Two counterweights: the repo
+provisions such clients routinely (`ol-marimo-app-client`, `ol-starrocks-client`, superset), so it
+is more of an existing pattern rather than a new capability; and it keeps machine identities in
+**one** vocabulary (Keycloak) instead of Lakekeeper's three (`oidc~sub`, `k8s~ns~sa`, and
+Lakekeeper-managed roles).
+
+**2. OpenFGA generalizes beyond the catalog; Gravitino's authorization does not.** This is the
+strongest pro-Lakekeeper argument in the graph, and it is an argument about the estate rather than
+about catalogs. `pf-openfga-candidate-use-cases-beyond-lakekeeper-an-654747` names two strong fits:
+`ol-analytics-api`'s `require_org_manager`, which today answers "is this user a manager of this
+org?" with a synchronous HTTP round-trip to MITx Online, and the unresolved MIT-admin membership
+problem where "role DEFINITION is Pulumi-managed while role MEMBERSHIP has NO OWNING SYSTEM".
+That memory's own verdict on Cedar — "an EMBEDDED authorizer ... NOT a standalone service other
+applications can query" — applies verbatim to Gravitino's built-in authorization.
+
+The counterweight is recorded in the same place: every extra consumer promotes OpenFGA from a
+Lakekeeper dependency to a **tier-0 cross-service dependency** that fails closed with a ~10s hang
+per request and a lagging `/health`.
+
+**3. Adopting Gravitino means running a second metadata system alongside OpenMetadata.** Not
+previously flagged anywhere in this project, and it deserves an explicit decision rather than a
+later discovery. Gravitino is a metadata lake and catalog-federation service, not narrowly an
+Iceberg catalog; OpenMetadata already runs in the same data cluster
+(`applications/open_metadata`), and the two overlap on cataloguing, lineage and tagging. Lakekeeper
+has no such overlap. Whoever takes the decision should say where the boundary sits, or scope
+Gravitino deliberately to its Iceberg REST service and nothing else.
+
+### Neutral
+
+The Glue migration path (`iceberg-catalog-migrator --target-catalog-type REST`), dbt-starrocks
+(unaffected, it reads through the StarRocks external catalog), the FE metadata-cache bypass
+(StarRocks-side, applies to both), and Helm-via-Pulumi deployment (established for both).
+
+### The reframing
+
+The project's own artifacts favour **Gravitino on the thing this project is actually for** —
+per-role catalog authorization driven by Keycloak, matching an ACL model that is already designed
+and contains no per-user grants — and favour **Lakekeeper on adjacent concerns**: machine
+authentication for in-cluster pods, and OpenFGA as reusable estate infrastructure.
+
+So the decision hinges on a question that is not about catalogs at all:
+
+> **Does OL want a general-purpose, standalone authorization service?**
+
+If yes, OpenFGA is worth its cost and Lakekeeper is the way in, with the second role vocabulary as
+the price of admission. If no, Gravitino serves the designed model with less machinery, and the
+k8s-auth gap is the price of admission instead.
+
+That question should be answered by someone with a view of `ol-analytics-api` and the feedback
+system, not by this project alone.
+
 ## Recommendation
 
 **Do not switch on documentation alone, and do not settle the OpenFGA-vs-Cedar fork yet.**
