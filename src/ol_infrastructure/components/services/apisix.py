@@ -450,6 +450,16 @@ class OLApisixSharedPluginsConfig(BaseModel):
     # application whose responses stream incrementally under a compressible
     # content type -- gzip buffering would delay their first byte.
     enable_gzip: bool = True
+    # Drop the ``cors`` entry from the defaults.  That default is
+    # ``allow_origins: "**"`` with ``allow_credential: True`` -- a browser-facing
+    # grant that only earns its place on an application a browser genuinely
+    # calls cross-origin.  An internal tool reached through one host and
+    # authenticated by an APISIX-managed session cookie (Dagster, Airbyte, Leek,
+    # gwarek) has no cross-origin caller to serve, so referencing this config to
+    # pick up prometheus/opentelemetry/gzip must not also widen its origin
+    # policy.  Applications that do need CORS keep the default and get a real
+    # origin list when the wildcard is replaced per-app.
+    enable_cors: bool = True
     k8s_labels: dict[str, str] = {}
     k8s_namespace: str
     # Either raw CRD dicts or OLApisixPluginConfig objects; the component
@@ -603,6 +613,12 @@ class OLApisixSharedPlugins(ComponentResource):
         plugins: list[dict[str, Any]] = (
             list(__default_plugins) if plugin_config.enable_defaults else []
         )
+        # Filtered out of the rendered list rather than lifted out of
+        # __default_plugins so the surviving defaults keep their indices for
+        # every application that does want cors -- see the note above about
+        # `pulumi preview` diffs.
+        if not plugin_config.enable_cors:
+            plugins = [p for p in plugins if p["name"] != "cors"]
         plugins.extend(
             plugin.model_dump(by_alias=True, exclude_none=True)
             if isinstance(plugin, OLApisixPluginConfig)

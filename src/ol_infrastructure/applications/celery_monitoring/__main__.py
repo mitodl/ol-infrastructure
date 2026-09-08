@@ -21,6 +21,8 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -506,6 +508,25 @@ oidc_plugin = OLApisixPluginConfig(
     **celery_monitoring_oidc_resources.get_full_oidc_plugin_config(unauth_action="auth")
 )
 
+# Shared plugin config.  Both routes below referenced no plugin config, so Leek
+# emitted no prometheus series and no OTLP span -- it was missing entirely from
+# any gateway dashboard grouped by route -- and its Angular bundle and JSON API
+# responses both went out uncompressed.
+#
+# enable_cors=False: Leek is a single-host UI whose SPA calls /v1/* on its own
+# origin, behind an APISIX-managed session cookie.  Nothing calls it
+# cross-origin, so it should not inherit the wildcard CORS default.
+leek_shared_plugins = OLApisixSharedPlugins(
+    f"celery-monitoring-{stack_info.env_suffix}-ol-shared-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="celery-monitoring",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=celery_monitoring_namespace,
+        k8s_labels=application_labels,
+        enable_cors=False,
+    ),
+)
+
 # Create ApisixRoute with embedded OIDC plugin configuration
 # Uses native APISIX CRD (apisix.apache.org/v2) instead of Gateway API HTTPRoute
 # Workaround for ingress controller 2.0.1 ExtensionRef limitations
@@ -517,6 +538,7 @@ leek_apisix_route = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="web",
             priority=10,
+            shared_plugin_config_name=leek_shared_plugins.resource_name,
             plugins=[
                 oidc_plugin,
             ],
@@ -528,6 +550,7 @@ leek_apisix_route = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="api",
             priority=0,
+            shared_plugin_config_name=leek_shared_plugins.resource_name,
             plugins=[
                 oidc_plugin,
             ],
