@@ -14,6 +14,22 @@ would have caught the root cause (Vector receiving no events) within 3.5h;
 
 Production only. All three rules filter to ``cluster=~".+-production"``, matching
 the original -- non-prod tracking-log gaps are not the incident this responds to.
+The environment boundary is really the *stack* boundary rather than that regex:
+this module is deployed to every stack, each querying its own Mimir tenant, so the
+CI and QA stacks' own edxapp deployments are excluded by tenant before the cluster
+filter is even consulted.
+
+Three namespaces match today -- ``mitxonline-openedx`` in
+``applications-production``, plus ``mitx-openedx`` and ``mitx-staging-openedx`` in
+``residential-production``. That last one is in scope despite the name, and
+deliberately so: ``mitx-staging`` is a peer deployment of ``mitx`` with its own
+VPC and its own CI/QA/Production stacks
+(``applications/edxapp/Pulumi.mitx-staging.Production.yaml``), serving residential
+course authors who write courses as XML, and it ships tracking logs to a
+production bucket of its own. Its firings are production signal and page like any
+other -- do not add a namespace filter to exclude it. Same conclusion
+apisix_edge.py reaches at the edge, under "Every host in the production stack is
+production".
 
 The `== 0`/silence trap
 ------------------------
@@ -32,6 +48,30 @@ an ``unless`` that strips it out whenever the real condition (some events/bytes
 did flow) also holds. What survives is the left side's own value -- the series
 count, always >= 1 -- rather than the filtered-through 0 a bare ``== 0`` would
 leave behind.
+
+Lazy vs eager metric registration
+----------------------------------
+That presence count only holds up if the metric exists *while* the bad thing is
+happening, and Vector is not consistent about this. It registers a component's
+``component_received_events_total`` at 0 when it builds the topology -- verified
+on ``ship_malformed_edx_tracking_logs_to_s3``, a sink that has never handled an
+event and still reports 0 in all three production namespaces -- but it creates
+``component_sent_bytes_total`` only on a component's first successful send, so
+that same sink has no ``sent_bytes_total`` series at all.
+
+So the presence side of both ``unless`` rules counts ``received_events_total``,
+never ``sent_bytes_total`` -- including ``EdxappTrackingLogNoS3Delivery``, whose
+``unless`` side measures sent bytes. Counting sent bytes for presence too would
+make that rule self-defeating: a Vector process that has never delivered emits no
+series at all, the expression evaluates to NoData, and ``no_data_state="OK"``
+(mandatory here -- see base.py's docstring for why it cannot be Alerting) clears
+it. An S3 outage outlasting a single pod roll -- an edxapp deploy, or one of the
+Vector OOMKills noted in ``applications/edxapp/k8s_resources.py`` -- would
+silently resolve the page and never re-fire, which is precisely the multi-day
+incident this module exists to catch. Measured over 30 days of *healthy*
+production, a sent_bytes presence count was already missing for 7-13 of 1440
+half-hourly samples per namespace; the received_events presence count was present
+for 1440 of 1440.
 
 ``EdxappTrackingLogS3Error`` needs none of this: an error rate is already positive
 exactly when the alert should fire, the same shape as witan.py's tool-call error
@@ -105,13 +145,27 @@ def _no_s3_delivery_expr() -> str:
     Same presence/``unless`` shape as ``_source_silent_expr`` -- 4h exceeds the
     sink's own 3600s batch timeout, so a healthy sink cannot go this long
     without a delivery.
+
+    The presence side counts the sink's ``received_events_total``, not the
+    ``sent_bytes_total`` the ``unless`` side measures, because Vector only creates
+    ``sent_bytes_total`` on a component's first successful send -- see the module
+    docstring's "Lazy vs eager metric registration" for why counting it here would
+    blind the rule exactly when it needs to fire.
+
+    ``> 0`` on the presence side scopes the rule to what its name promises: events
+    reached the sink but nothing left it. A sink that has been handed nothing at
+    all is the source-silence case, which ``EdxappTrackingLogSourceSilent`` owns,
+    and gating on it also keeps a freshly-created namespace from paging in the
+    hour before its first batch flush. The comparison is inside ``count()``, so
+    what reaches stage C is still the series count (always >= 1), not a
+    filtered-through counter value.
     """
     return (
         "count by (cluster, namespace) (\n"
-        "  vector_component_sent_bytes_total{\n"
+        "  vector_component_received_events_total{\n"
         '    component_id="ship_edx_tracking_logs_to_s3",\n'
         f'    cluster=~"{_PROD_CLUSTERS}"\n'
-        "  }\n"
+        "  } > 0\n"
         ")\n"
         "unless\n"
         "  sum by (cluster, namespace) (\n"
