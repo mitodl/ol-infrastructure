@@ -125,7 +125,7 @@ pipeline collects that directory into a task output and, **on failure only**, up
 to:
 
 ```
-s3://ol-eng-artifacts/canary-results/<pipeline>/<job>/<build>/
+s3://ol-eng-artifacts/canary-results/<pipeline>/<job>/<YYYYMMDDTHHMMSSZ>/
 ```
 
 When triaging, the trace is almost always the fastest route — pull down `trace.zip` and
@@ -138,13 +138,18 @@ Two things about that upload are load-bearing:
   `set -e` would skip collecting them. `pipeline.py` captures the status and re-raises it
   after the copy. If you restructure that script, keep that ordering or the pipeline
   silently publishes nothing for precisely the runs you need it for.
-- **The build is stamped into the directory path, not into the `put`.** A Concourse `put`
-  cannot interpolate build metadata, so the run script writes into
-  `$BUILD_PIPELINE_NAME/$BUILD_JOB_NAME/$BUILD_NAME` and rclone copies the tree wholesale.
-  Uploading to a flat prefix instead would have each failure overwrite the last.
+- **The run is stamped into the directory path, not into the `put`.** Uploading to a flat
+  prefix would have each failure overwrite the last, and neither end of the job can
+  supply a build number: **task containers on our Concourse get `ATC_EXTERNAL_URL` and no
+  `BUILD_*` variables**, verified with an `env` probe against cicd.odl.mit.edu, and a
+  script expanding `$BUILD_PIPELINE_NAME` therefore dies on `set -u` before any test
+  runs. The rclone `put` container does get `BUILD_*`, but a `put` cannot interpolate
+  them into its destination. So the pipeline name and job name are rendered in as
+  literals (`pipeline.py` knows both) and the task appends a UTC timestamp. Match an
+  artifact directory to a build by the build's start time.
 
 rclone uses `copy`, never `sync` — `sync` mirrors deletions, which against a
-build-stamped prefix would erase exactly the history this exists to keep. Credentials
+per-run prefix would erase exactly the history this exists to keep. Credentials
 come from the worker instance role (`env_auth = true`); `ol-eng-artifacts` is already in
 the operations Concourse IAM policy, so no secret is involved and none should be added.
 

@@ -209,17 +209,24 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
 
     project_flags = " ".join(f"--project={browser}" for browser in params.browsers)
     spec_arguments = " ".join(params.spec_paths)
+    canary_job = Identifier(f"run-{params.canary_name}-canary")
+    # Rendered in rather than read from the environment: task containers on our
+    # Concourse get ATC_EXTERNAL_URL and no BUILD_* metadata at all, so a script
+    # expanding $BUILD_PIPELINE_NAME dies on `set -u` before a single test runs.
+    # The put step's own container does have them, but a `put` cannot interpolate
+    # them into a destination, so neither end can supply the build number.
+    artifact_run_prefix = f"canary-{params.canary_name}/{canary_job}"
     run_canary = "\n".join(
         [
             "set -euo pipefail",
             # Resolved before the cd, not climbed back up to afterwards: Concourse
             # lays outputs out as siblings of the task's working directory, while
-            # the specs have to run from inside the checkout. Stamping the build
-            # into the path is what keeps one run's artifacts from overwriting the
-            # last one's -- a `put` cannot interpolate build metadata itself, so
-            # the directory layout carries it instead.
-            f'artifact_dir="$PWD/{ARTIFACT_OUTPUT}/$BUILD_PIPELINE_NAME'
-            '/$BUILD_JOB_NAME/$BUILD_NAME"',
+            # the specs have to run from inside the checkout. The start time is
+            # what keeps one failure's artifacts from overwriting the last one's,
+            # since no build number is reachable from here; match it to a build by
+            # the build's start time in Concourse.
+            f'artifact_dir="$PWD/{ARTIFACT_OUTPUT}/{artifact_run_prefix}'
+            '/$(date -u +%Y%m%dT%H%M%SZ)"',
             f"cd canary-code/{CANARY_REPO_PATH}",
             # @playwright/test is not installed globally in the image, so this is
             # mandatory. It is also cheap -- 6 packages, no browser download,
@@ -268,7 +275,7 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
         resources=[canary_code, canary_schedule, artifact_store],
         jobs=[
             Job(
-                name=Identifier(f"run-{params.canary_name}-canary"),
+                name=canary_job,
                 # A canary that piles up behind a slow run reports on a target it
                 # is also still loading, and the failures interleave.
                 max_in_flight=1,
