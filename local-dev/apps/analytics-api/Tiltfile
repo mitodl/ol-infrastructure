@@ -1,0 +1,37 @@
+# analytics-api (stub) Tiltfile
+#
+# Stands in for ol-analytics-api (the B2B analytics gateway) in local dev. There
+# is no sibling repo checkout and no published image: the "service" is a
+# zero-dependency stdlib HTTP server (stub_app.py) that returns fixture data for
+# the mit-learn b2b_dashboard endpoints. See stub_app.py for why it's a stub.
+#
+# The stub source is shipped as a ConfigMap generated here from stub_app.py, so
+# stub_app.py stays a normal, editable file and the two never drift. Editing
+# stub_app.py triggers Tilt to re-apply the ConfigMap; restart the deployment to
+# pick it up (Tilt does this automatically on ConfigMap change).
+
+load("../../tiltlib.star", "k8s_yaml_local")
+
+# Generate the ConfigMap holding the stub source from the .py file (single
+# source of truth — the deployment mounts it at /app/stub_app.py).
+stub_src = str(read_file("stub_app.py"))
+k8s_yaml(encode_yaml({
+    "apiVersion": "v1",
+    "kind": "ConfigMap",
+    "metadata": {
+        "name": "analytics-api-stub-src",
+        "namespace": "mit-learn",
+        "labels": {"app": "analytics-api"},
+    },
+    "data": {"stub_app.py": stub_src},
+}))
+
+# Route host (api.learn.mit.dev) is rewritten when LOCAL_DEV_ROOT_DOMAIN != mit.dev.
+k8s_yaml_local(["deployment.yaml", "apisix-routes.yaml"])
+
+k8s_resource(
+    "analytics-api",
+    port_forwards=["8070:8070"],
+    labels=["mit-learn"],
+    resource_deps=["local-infra-apps"],
+)
