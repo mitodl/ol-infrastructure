@@ -334,23 +334,8 @@ def _build_interpolated_config_dict(
                 "aboutUrl": f"https://{marketing_domain}/about-us",
                 "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
                 "copyrightText": "\u00a9 {year} MIT xPRO. All rights reserved.",
-                # xPRO's footer carries the xPRO logo linked to its marketing
-                # site, not an MIT mark -- the pairing the legacy footer used
-                # (LOGO_URL + MARKETING_SITE_BASE_URL in
-                # xpro/common-mfe-config.env.jsx). Left unset, the Site Project
-                # footer falls back to headerLogoImageUrl and renders it
-                # unlinked.
-                "footerLogoUrl": config["LOGO_URL"],
-                "footerLogoDestination": f"https://{marketing_domain}",
             }
         )
-        # Dashboard / Profile / Settings in the xPRO user menu are built as
-        # `${marketingSiteBaseUrl}/dashboard` etc. Unset, that yields a relative
-        # "/dashboard" against the LMS host instead of the marketing site. No
-        # trailing slash: the components append their own path segment.
-        config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolHeader"] = {
-            "marketingSiteBaseUrl": f"https://{marketing_domain}",
-        }
 
     # MITx Online-specific configuration
     elif stack_info.env_prefix == "mitxonline":
