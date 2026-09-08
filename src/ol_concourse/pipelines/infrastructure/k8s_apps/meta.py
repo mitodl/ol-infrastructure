@@ -74,6 +74,11 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
             "src/ol_concourse/pipelines/constants.py",
             "src/ol_concourse/pipelines/jobs.py",
             "src/ol_concourse/pipelines/secrets_map.py",
+            # build_app_pipeline reads AppRegistration.release_resource_workflow
+            # from here to choose the pipeline shape, so a registry-only edit
+            # has to regenerate. Without this the documented one-field rollout
+            # switch changes nothing that is deployed.
+            "src/bridge/settings/apps.py",
         ],
     )
     pipeline_jobs = [meta_job(app_name) for app_name in app_names]

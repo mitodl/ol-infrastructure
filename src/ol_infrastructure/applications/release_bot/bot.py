@@ -59,13 +59,39 @@ def _describe_in_flight(in_flight: dict[str, Any]) -> str:
     return f"<{in_flight['url']}|{in_flight['version']}>{when}"
 
 
+def _resolve_app(repos, app_name):
+    """Return (cfg, None) for an app this bot can drive, else (None, error).
+
+    Refusing a legacy-pipeline app here is the whole point. Every registered
+    app is offered in the command surface, but the jobs and artifacts these
+    handlers reach for -- `build-<app>-release-image`, `<app>-release-gate`,
+    the `releases/<version>` branch, the release issue, the calver tags
+    `release_preview` counts commits against -- exist only in the modernized
+    pipeline shape. Against a legacy app the mutating commands 404 in
+    Concourse with no hint as to why, and the read-only ones are worse: they
+    return confidently wrong answers, because a repo with no calver tag reads
+    as "never released" and `/doof preview` then reports the entire history as
+    the next release's contents.
+    """
+    if app_name not in repos:
+        return None, f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}"
+    cfg = repos[app_name]
+    if not cfg.release_workflow:
+        return None, (
+            f"`{app_name}` is still on the legacy release-candidate/release "
+            "pipeline, which this bot does not drive. Doof still owns its "
+            "releases until the pipeline is migrated."
+        )
+    return cfg, None
+
+
 async def _cmd_release(repos, ack, respond, command, context):
     await ack()
     app_name = command["text"].strip()
-    if app_name not in repos:
-        await respond(f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}")
+    cfg, error = _resolve_app(repos, app_name)
+    if cfg is None:
+        await respond(error)
         return
-    cfg = repos[app_name]
 
     # Report a release that was cut but never finished. Cutting a new one
     # supersedes it on action=create, so say so rather than letting a branch
@@ -125,10 +151,10 @@ async def _cmd_preview(repos, ack, respond, command, _context):
     """Show what the next release would contain, without triggering anything."""
     await ack()
     app_name = command["text"].strip()
-    if app_name not in repos:
-        await respond(f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}")
+    cfg, error = _resolve_app(repos, app_name)
+    if cfg is None:
+        await respond(error)
         return
-    cfg = repos[app_name]
     try:
         preview = await github.release_preview(cfg.repo)
     except Exception:
@@ -162,10 +188,10 @@ async def _cmd_preview(repos, ack, respond, command, _context):
 async def _cmd_release_notes(repos, ack, respond, command, _context):
     await ack()
     app_name = command["text"].strip()
-    if app_name not in repos:
-        await respond(f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}")
+    cfg, error = _resolve_app(repos, app_name)
+    if cfg is None:
+        await respond(error)
         return
-    cfg = repos[app_name]
     try:
         commits = await github.commits_since_last_tag(cfg.repo)
     except Exception:
@@ -184,10 +210,22 @@ async def _cmd_release_notes(repos, ack, respond, command, _context):
 async def _cmd_release_status(repos, ack, respond, command, _context):
     await ack()
     app_filter = command["text"].strip() or None
-    if app_filter and app_filter not in repos:
-        await respond(f"Unknown app `{app_filter}`. Known apps: {', '.join(repos)}")
+    if app_filter:
+        cfg, error = _resolve_app(repos, app_filter)
+        if cfg is None:
+            await respond(error)
+            return
+        targets = {app_filter: cfg}
+    else:
+        targets = config.release_workflow_apps(repos)
+    legacy = [name for name, cfg in repos.items() if not cfg.release_workflow]
+    if not targets:
+        await respond(
+            "No apps are on the release-resource workflow yet, so there is no "
+            f"release status to report. Still on the legacy pipeline: "
+            f"{', '.join(legacy)}."
+        )
         return
-    targets = {app_filter: repos[app_filter]} if app_filter else repos
     lines = []
     for name, cfg in targets.items():
         try:
@@ -212,16 +250,22 @@ async def _cmd_release_status(repos, ack, respond, command, _context):
         if in_flight:
             status += f" · 🚧 in flight: {_describe_in_flight(in_flight)}"
         lines.append(f"• *{name}*: {status}")
+    if legacy and not app_filter:
+        # Naming them keeps a silently short list from reading as "everything
+        # is quiet" during the rollout, when most apps are still on Doof.
+        lines.append(
+            f"_Not shown -- still on the legacy pipeline: {', '.join(legacy)}._"
+        )
     await respond("\n".join(lines))
 
 
 async def _cmd_promote(repos, ack, respond, command, context):
     await ack()
     app_name = command["text"].strip()
-    if app_name not in repos:
-        await respond(f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}")
+    cfg, error = _resolve_app(repos, app_name)
+    if cfg is None:
+        await respond(error)
         return
-    cfg = repos[app_name]
     try:
         issues = await github.open_release_issues(cfg.repo)
     except Exception:
@@ -273,10 +317,10 @@ async def _cmd_publish(repos, ack, respond, command, _context):
 async def _cmd_abandon(repos, ack, respond, command, _context):
     await ack()
     app_name = command["text"].strip()
-    if app_name not in repos:
-        await respond(f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}")
+    cfg, error = _resolve_app(repos, app_name)
+    if cfg is None:
+        await respond(error)
         return
-    cfg = repos[app_name]
     try:
         build_url = await concourse.trigger_job(
             cfg.pipeline, f"abandon-{app_name}-release"
@@ -293,10 +337,10 @@ async def _handle_promote_button(repos, ack, body, say):
     await ack()
     value = body["actions"][0]["value"]
     app_name, version = value.split(":", 1)
-    if app_name not in repos:
-        await say(f"⚠️ Unknown app `{app_name}`.")
+    cfg, error = _resolve_app(repos, app_name)
+    if cfg is None:
+        await say(f"⚠️ {error}")
         return
-    cfg = repos[app_name]
     user_id = body["user"]["id"]
     try:
         issues = await github.open_release_issues(cfg.repo)
@@ -418,9 +462,10 @@ def _checkbox_watch_preflight(repos, app_name):
     caller, so the `_slack_app is None` check below is what narrows the type
     for everything downstream.
     """
-    if app_name not in repos:
-        return None, None, f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}"
-    channel = repos[app_name].channel or os.environ.get("RELEASE_ANNOUNCE_CHANNEL")
+    cfg, error = _resolve_app(repos, app_name)
+    if cfg is None:
+        return None, None, error
+    channel = cfg.channel or os.environ.get("RELEASE_ANNOUNCE_CHANNEL")
     if not channel:
         return (
             None,
@@ -921,9 +966,19 @@ async def _report_unreachable_channels(app, repos) -> None:
 
 async def main():
     app, repos = create_app()
+    # Channel reachability is checked across every registered app, including
+    # the legacy ones: an unresolvable channel is the kind of thing you want
+    # to have found before the app is migrated, not on its first release.
     await _report_unreachable_channels(app, repos)
-    asyncio.create_task(_poll_ready_to_promote_loop(app, repos))  # noqa: RUF006
-    asyncio.create_task(_poll_release_progress_loop(app, repos))  # noqa: RUF006
+    watched = config.release_workflow_apps(repos)
+    log.info(
+        "Polling %s of %s registered app(s) on the release-resource workflow: %s",
+        len(watched),
+        len(repos),
+        ", ".join(watched) or "none",
+    )
+    asyncio.create_task(_poll_ready_to_promote_loop(app, watched))  # noqa: RUF006
+    asyncio.create_task(_poll_release_progress_loop(app, watched))  # noqa: RUF006
     handler = AsyncSocketModeHandler(app, os.environ["SLACK_APP_TOKEN"])
     await handler.start_async()
 

@@ -43,6 +43,9 @@ from ol_concourse.lib.tasks import bump_version_task
 from pydantic import BaseModel, model_validator
 
 from bridge.settings.apps import github_repo as app_github_repo
+from bridge.settings.apps import (
+    release_resource_workflow as app_release_resource_workflow,
+)
 from bridge.settings.apps import repo_main_branch as app_repo_main_branch
 from ol_concourse.pipelines.constants import (
     ECR_REGION,
@@ -108,10 +111,6 @@ class AppPipelineParams(BaseModel):
         github_repo (Optional[str]): The GitHub repository in ``owner/repo`` form used for release
             resources and GitHub Deployments. Defaults to ``mitodl/{repo_name}``. Only used by the
             release-resource workflow.
-        use_release_resource_workflow (bool): Opt an app into the modernized GitHub
-            Release/Deployment-based pipeline shape instead of the legacy release-candidate/
-            release git-branch pattern. Defaults to False so existing apps are unaffected;
-            flip per-app once each has been validated on the new shape.
         sentry_sourcemaps (Optional[SentrySourcemapsConfig]): When set, the app's
             image build unpacks its rootfs and a decoupled task uploads the built
             source maps to Sentry with an auth token -- the token never enters the
@@ -139,7 +138,6 @@ class AppPipelineParams(BaseModel):
     version_file: str | None = None
     enable_ci_deploy: bool = True
     github_repo: str | None = None
-    use_release_resource_workflow: bool = False
     sentry_sourcemaps: SentrySourcemapsConfig | None = None
     refresh_stack: bool = True
 
@@ -234,10 +232,7 @@ pipeline_params = {
         build_target="production",
         settings_dir="odl_video",
     ),
-    "ol-analytics-api": AppPipelineParams(
-        app_name="ol-analytics-api",
-        use_release_resource_workflow=True,
-    ),
+    "ol-analytics-api": AppPipelineParams(app_name="ol-analytics-api"),
 }
 
 
@@ -342,7 +337,8 @@ def _ensure_ecr_repository_step(ecr_registry_image_resource: Resource) -> TaskSt
 
 # ============================================================================
 # Legacy workflow: release-candidate/release git-branch pattern.
-# Used by every app except those with use_release_resource_workflow=True.
+# Used by every app whose bridge.settings.apps entry leaves
+# release_resource_workflow False.
 # ============================================================================
 
 
@@ -836,7 +832,9 @@ def _build_legacy_app_pipeline(
 
 # ============================================================================
 # Modernized workflow: GitHub Release resource + GitHub Deployments.
-# Opt in per-app via AppPipelineParams.use_release_resource_workflow.
+# Opt in per-app via AppRegistration.release_resource_workflow in
+# bridge.settings.apps -- the same field the release bot reads to decide
+# whether it will accept commands for the app.
 # ============================================================================
 
 
@@ -1503,13 +1501,17 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     """Generate the full Concourse pipeline for a given application.
 
     Dispatches to the modernized release-resource pipeline shape for apps that
-    have opted in via ``AppPipelineParams.use_release_resource_workflow``, and
-    to the legacy release-candidate/release-branch shape for everyone else.
+    have opted in via ``AppRegistration.release_resource_workflow`` in
+    ``bridge.settings.apps``, and to the legacy release-candidate/release-branch
+    shape for everyone else. The opt-in lives in the shared registry rather than
+    in ``pipeline_params`` because the release bot has to make the same call, and
+    a per-app flag duplicated across the two would let a pipeline be migrated
+    while the bot still refuses to drive it.
     """
     pipeline_parameters = pipeline_params.get(app_name) or AppPipelineParams(
         app_name=app_name
     )
-    if pipeline_parameters.use_release_resource_workflow:
+    if app_release_resource_workflow(app_name):
         return _build_release_resource_app_pipeline(app_name, pipeline_parameters)
     return _build_legacy_app_pipeline(app_name, pipeline_parameters)
 

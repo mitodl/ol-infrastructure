@@ -214,7 +214,7 @@ def _required_checks_bypass(
     never pushes to it.
 
     THAT SET IS WIDER THAN THE REPOS ACTUALLY ON THE NEW WORKFLOW, deliberately.
-    `AppPipelineParams.use_release_resource_workflow` is the real opt-in and today
+    `AppRegistration.release_resource_workflow` is the real opt-in and today
     only `ol-analytics-api` sets it, so `mit-learn` and `mitxonline` get a bypass here
     before the App releases them. `release_workflow_repos()` carries the reasoning and
     the conditions for narrowing it later; the short version is that pre-granting

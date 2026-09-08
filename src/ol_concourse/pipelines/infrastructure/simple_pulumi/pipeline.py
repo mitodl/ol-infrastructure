@@ -665,6 +665,18 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-infrastructure-release-bot",
         stages=["default"],
         topology="preview-gated",
+        # __main__.py builds REPOS_CONFIG out of bridge.settings.apps, so an
+        # edit there (an app's channel, or the release_resource_workflow flag
+        # that migrates it) has to redeploy the bot. Nothing else watched here
+        # covers it: the registry is outside PULUMI_WATCHED_PATHS and outside
+        # this app's own project path.
+        #
+        # This also re-triggers the image build, which does not need it -- the
+        # Dockerfile copies only release_bot/*.py, so the registry is not in
+        # the image. Accepted rather than adding a deploy-only path list for
+        # one app: the cost is one redundant build per registry edit, and the
+        # deploy that follows was going to happen anyway.
+        additional_watched_paths=["src/bridge/settings/apps.py"],
         # __main__.py is a singleton (stack "default") and always creates the
         # ECR repository named "release-bot-production" regardless of stage.
         docker_image=DockerImageConfig(
