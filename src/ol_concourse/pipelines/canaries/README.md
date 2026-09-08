@@ -66,7 +66,8 @@ Grafana, Slack, or Rootly notification path: like most pipelines here, a passing
 is green in Concourse and a failed journey is red.
 
 When a run fails, its traces, screenshots and video are uploaded to
-`s3://ol-eng-artifacts/canary-results/<pipeline>/<job>/<build>/`. Green runs upload
+`s3://ol-eng-artifacts/canary-results/<pipeline>/<job>/<YYYYMMDDTHHMMSSZ>/`, matched to a
+build by its start time. Green runs upload
 nothing. These artifacts help diagnose a red build; they are not another result or
 notification channel. See [`AGENTS.md`](AGENTS.md) for how to read a trace and for
 what not to change about that step.
