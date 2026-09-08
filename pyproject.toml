@@ -343,8 +343,8 @@ extend_exclude = [
 # PyPI name != import name for these, and deptry cannot infer the mapping, so
 # it reports each as declared-but-unused (DEP002) *and* raises DEP001 on the
 # module actually imported, while the package is in fact in use -- pyjwt at
-# lib/github_helper.py, ol-parliament at lib/aws/iam_helper.py, pyyaml across
-# ~23 sites.
+# src/ol_infrastructure/lib/github_helper.py, ol-parliament at
+# src/ol_infrastructure/lib/aws/iam_helper.py, pyyaml across ~23 sites.
 [tool.deptry.package_module_name_map]
 pyjwt = ["jwt"]
 ol-parliament = ["parliament"]
