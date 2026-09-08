@@ -160,9 +160,16 @@ edxapp_zone_id = edxapp_zone["id"]
 kms_ebs = kms_stack.require_output("kms_ec2_ebs_key")
 kms_s3_key = kms_stack.require_output("kms_s3_data_analytics_key")
 operations_vpc = network_stack.require_output("operations_vpc")
-mongodb_cluster_uri = mongodb_atlas_stack.require_output("atlas_cluster")[
-    "connection_strings"
-][0]
+# Read the mongodb_atlas stack's own `srv_record` export rather than indexing
+# into the provider's raw `connection_strings` list.  That list's keys are
+# serialized straight from the provider, and pulumi-mongodbatlas 4.15.0 renamed
+# them from snake_case to camelCase (`standard_srv` -> `standardSrv`), which
+# broke every edxapp deploy whose atlas stack had re-run since the bump.
+# `srv_record` is exported by our own code, carries the identical value, and
+# does not move when the provider changes its serialization.
+mongodb_cluster_srv_record = mongodb_atlas_stack.require_output("atlas_cluster")[
+    "srv_record"
+]
 
 if edxapp_config.get_bool("move_db") or False:
     rds_subnet = k8s_vpc["rds_subnet"]
@@ -742,12 +749,12 @@ vault.generic.Secret(
 vault.generic.Secret(
     "forum-mongodb-atlas-user-password",
     path=edxapp_vault_mount.path.apply("{}/mongodb-forum".format),
-    data_json=mongodb_cluster_uri.apply(
-        lambda uri: json.dumps(
+    data_json=mongodb_cluster_srv_record.apply(
+        lambda srv_record: json.dumps(
             {
                 "username": "forum",
                 "password": mongo_atlas_credentials["forum"],
-                "uri": uri["standard_srv"],  # This is used by Dagster
+                "uri": srv_record,  # This is used by Dagster
             }
         ),
     ),
