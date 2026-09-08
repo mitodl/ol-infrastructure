@@ -533,37 +533,86 @@ system, not by this project alone.
 
 ## Recommendation
 
-**Do not switch on documentation alone, and do not settle the OpenFGA-vs-Cedar fork yet.**
+Superseding the earlier "run a Gravitino spike first" version of this section. The spike ran, and
+everything it was asked to prove, it proved.
 
-Lakekeeper is the only candidate with measured end-to-end evidence against our exact StarRocks
-build, covering identity delivery, enforcement, and storage delegation. That evidence is worth
-real money and should not be discarded for a feature matrix.
+**On the evidence in hand, Gravitino has the balance — contingent on one question that this project
+cannot answer by itself.**
 
-But Gravitino's group-claim-driven role model dissolves the fork that is currently blocking the
-project's top-priority decision. The whole reason Cedar was attractive was one role model driving
-both StarRocks RBAC and catalog policy, and the whole reason it is a problem is that it costs
-money and we could not exercise it. Gravitino appears to offer that property in an Apache-2.0
-build. "Appears" is doing work in that sentence: it is documentation, not measurement, which is
-exactly the epistemic position that the Cedar option is in and that the project has already been
-burned by.
+### Why
 
-Concretely:
+**The criterion this project exists to satisfy is the one Gravitino wins outright.** The ACL model
+already designed here is role-to-namespace with no per-user grants anywhere in it. Gravitino reads
+role membership from the token, so that model is six groups and six roles and nothing else moves.
+Lakekeeper OSS structurally cannot read it from the token, so the same model has to be projected
+onto every user by synchronisation code — and the one piece of synchronisation code of that exact
+shape already in this estate is currently broken and unable to be fixed by a CronJob. This is not a
+feature-matrix point; it is the project's own design meeting the two products.
 
-1. **Run a Gravitino spike on the same harness as the two Lakekeeper spikes** (StarRocks 4.1.3,
-   Keycloak 26.x, local containers, two distinct end users). Prove or disprove, in order:
-   per-user identity reaches the catalog through `security=JWT`; the `groups` claim actually
-   drives role membership; a role granted to a group allows and denies correctly; credential
-   vending works. Same bar the Lakekeeper enforcement spike had to clear. This is a bounded piece
-   of work and it is the only thing that can responsibly settle the fork.
-2. **Rank Polaris third and do not pursue it** unless the Gravitino spike fails and the Cedar
-   price turns out to be unacceptable. It is dominated: more user-provisioning burden than
-   Lakekeeper, and no group-claim path to role assignment. Its OIDC role mapping does not do what
-   the docs imply.
-3. **Hold the Keycloak and EKS specs** at the parts that are catalog-independent. The audience
-   mapper, the machine service-account client, and the token-lifetime constraint apply to any of
-   the three; the specific environment-variable names do not.
-4. **Keep pricing discovery moving in parallel.** If Gravitino proves out, the Cedar quote stops
-   mattering. If it does not, the fork is back and the quote is on its critical path.
+**Gravitino now has measured parity on every advantage Lakekeeper was ever credited with.**
+Identity delegation through StarRocks, per-user allow and deny, per-table storage downscoping via
+real STS, an audit trail naming the end user, and list filtering — all measured, on the same
+harness, against the same StarRocks build. Nothing in the original case for Lakekeeper survives as
+a differentiator.
+
+**And it adds three things Lakekeeper does not have:** explicit DENY with hard precedence, STS
+sessions named for the end user so CloudTrail attributes S3 access to a human, and half the
+infrastructure (one service and one database per environment instead of two and two).
+
+**Lakekeeper's incumbency is not evidence.** It was chosen in June for "claim-driven RBAC without
+pre-registering principals", which is false for the OSS build, and by an evaluation that never
+considered Gravitino.
+
+### What genuinely still favours Lakekeeper
+
+Three things, in descending order of weight, and none of them is nothing:
+
+1. **Revocation latency.** Lakekeeper's remote signer re-validates identity and location on every
+   signing request. Gravitino issues an STS credential cached until expiry, so revoking a grant
+   does not invalidate a credential already vended. If "revoke and have it take effect now" is a
+   hard requirement, this is the one row where Lakekeeper is materially better and no amount of
+   configuration closes it.
+2. **Kubernetes service-account authentication**, which Gravitino has not got. Dagster and Airbyte
+   pods would need Keycloak service-account clients instead. A real cost, but an existing pattern
+   in this repo rather than new capability.
+3. **Existence hiding.** Lakekeeper's 404-on-deny conceals restricted datasets; Gravitino's 403
+   names them.
+
+Against those, Gravitino carries one live correctness defect Lakekeeper does not: the cache-expiry
+spurious deny. It fails closed, so it is a correctness and usability problem rather than a security
+one, but it should be filed upstream and ideally fixed before production.
+
+### The contingency
+
+**If OL decides it wants a general-purpose, standalone authorization service, the answer flips to
+Lakekeeper.** OpenFGA generalizes to two named consumers outside the catalog; Gravitino's embedded
+authorization generalizes to none. That is an estate-level decision involving `ol-analytics-api`
+and the feedback system, and it should be taken deliberately rather than inherited as a side effect
+of a catalog choice. Note that it is an argument for adopting *OpenFGA*, and Lakekeeper follows from
+it — not the other way round.
+
+### Recommended next steps
+
+1. **Put the OpenFGA question to whoever owns the estate view.** It is the only thing standing
+   between here and a decision.
+2. **If the answer is "no" or "not now": adopt Gravitino**, scoped deliberately to its Iceberg REST
+   service and its authorization, with OpenMetadata left as the governance and discovery plane.
+3. File the cache-expiry defect upstream regardless.
+4. **Rank Polaris third and Unity Catalog out.** Polaris is dominated; Unity Catalog cannot accept a
+   forwarded external token at all.
+5. The Cedar quote is off the critical path either way. Both live options are Apache-2.0.
+
+### Confidence, and how to discount it
+
+Moderate-to-high on the technical comparison, which rests on measurements rather than documentation
+on both sides. Lower on the weighting, because the OpenFGA contingency is a judgement about OL's
+direction that I do not have standing to make.
+
+One bias worth naming: the Gravitino evidence was gathered in a single session by the same person
+writing this recommendation, while the Lakekeeper evidence accumulated over two earlier spikes. The
+appropriate discount is for *recency and effort-justification*, not for correctness — both products
+were proven to work, and the thing that separates them is a structural fit between Gravitino's
+membership model and an ACL design that predates both spikes.
 
 ## What is true regardless of the choice
 
