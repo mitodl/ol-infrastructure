@@ -28,6 +28,25 @@
       // propose a version not offered for our Kubernetes version;
       // get_eks_addon_version() validates the pin and raises at preview time, so
       // that fails loudly in CI rather than reaching a cluster.
+      //
+      // CAVEAT -- this rule is necessary but not sufficient, and these pins are
+      // still not being updated automatically. The dependency dashboard reports
+      // `Failed to look up aws-eks-addon package {"addonName":"aws-ebs-csi-driver"}:
+      // no-result` (and the same for aws-efs-csi-driver). The override is working:
+      // the error echoes back well-formed JSON, and the datasource treats
+      // kubernetesVersion as optional. The most likely remaining cause is
+      // credentials -- the datasource calls eks:DescribeAddonVersions, which our
+      // Mend-hosted Renovate has no obvious way to be authorized for. That has not
+      // been confirmed against the Mend side, so it is a lead, not a diagnosis.
+      //
+      // So the original failure mode has recurred for a different reason: as of
+      // 2026-09-08 the pins had drifted to v1.63.0-eksbuild.1 (AWS offered
+      // v1.65.0-eksbuild.1) and v3.4.1-eksbuild.1 (AWS offered v3.4.2-eksbuild.1),
+      // and were bumped by hand. Until Renovate can authenticate to AWS, treat
+      // these two constants as manually maintained and check them with:
+      //   aws eks describe-addon-versions --addon-name aws-ebs-csi-driver \
+      //     --kubernetes-version "$(aws eks describe-cluster-versions --default-only \
+      //     --cluster-type eks --query 'clusterVersions[].clusterVersion' --output text)"
       matchDatasources: [
         'aws-eks-addon',
       ],
