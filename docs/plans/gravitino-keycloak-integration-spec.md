@@ -56,8 +56,9 @@ clientSessionMaxLifespan            = 0s
 session timeouts, so `accessTokenLifespan` is the Keycloak default and 5m is what is actually
 live.
 
-**M2. The ID token dies with the access token.** Keycloak 26.0.8,
-`services/src/main/java/org/keycloak/protocol/oidc/TokenManager.java:1277`:
+**M2. The ID token dies with the access token.** Keycloak 26.7.3 (the version this repo pins at
+`src/bridge/lib/versions.py:10`),
+`services/src/main/java/org/keycloak/protocol/oidc/TokenManager.java:1324`:
 
 ```java
 idToken.exp(accessToken.getExp());
@@ -67,7 +68,7 @@ The MySQL `authentication_openid_connect_client` plugin sends the **ID** token, 
 the token StarRocks stores and forwards.
 
 **M3. A client-level lifespan override wins, capped by the client session.** Same file,
-`getTokenExpiration`, lines 1063-1068:
+`getTokenExpiration`, lines 1077-1082:
 
 ```java
 String clientLifespan = client.getAttribute(OIDCConfigAttributes.ACCESS_TOKEN_LIFESPAN);
@@ -78,15 +79,15 @@ if (clientLifespan != null && !clientLifespan.trim().isEmpty()) {
 }
 ```
 
-and lines 1081-1085 clamp the result to `calculateClientSessionMaxLifespanTimestamp`, which with
+and lines 1098-1102 clamp the result to `calculateClientSessionMaxLifespanTimestamp`, which with
 `clientSessionMaxLifespan = 0` falls back to the realm's `ssoSessionMaxLifespan` of 24h. A
-lifespan of `-1` (lines 1072-1076) means "expire with the SSO session", i.e. 24h here.
+lifespan of `-1` (lines 1086-1090) means "expire with the SSO session", i.e. 24h here.
 
 **M4. The audience mapper appends, and reaches the ID token.**
 `services/src/main/java/org/keycloak/protocol/oidc/mappers/AudienceProtocolMapper.java:36`
 declares `implements OIDCAccessTokenMapper, OIDCIDTokenMapper, TokenIntrospectionTokenMapper`,
 and line 112 is `token.addAudience(audienceValue)`. Adding an audience does not replace
-`idToken.audience(client.getClientId())` set at `TokenManager.java:1270`.
+`idToken.audience(client.getClientId())` set at `TokenManager.java:1318`.
 
 **M5. Gravitino validates `aud` by at-least-one match.** Gravitino v1.3.0,
 `server-common/src/main/java/org/apache/gravitino/server/authentication/JwksTokenValidator.java:133-147`:
