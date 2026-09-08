@@ -319,19 +319,79 @@ The counterweight is recorded in the same place: every extra consumer promotes O
 Lakekeeper dependency to a **tier-0 cross-service dependency** that fails closed with a ~10s hang
 per request and a lagging `/health`.
 
-**3. Adopting Gravitino means running a second metadata system alongside OpenMetadata.** Not
-previously flagged anywhere in this project, and it deserves an explicit decision rather than a
-later discovery. Gravitino is a metadata lake and catalog-federation service, not narrowly an
-Iceberg catalog; OpenMetadata already runs in the same data cluster
-(`applications/open_metadata`), and the two overlap on cataloguing, lineage and tagging. Lakekeeper
-has no such overlap. Whoever takes the decision should say where the boundary sits, or scope
-Gravitino deliberately to its Iceberg REST service and nothing else.
+**3. Gravitino ships a metadata-platform surface that overlaps OpenMetadata; Lakekeeper does not.**
+This is real but narrower than it first looks — see the section below, which walks the actual
+overlap against the live OpenMetadata instance. It is a scope-discipline risk, not a technical
+blocker, and part of what I first counted here turned out to be symmetric between the two
+candidates.
 
 ### Neutral
 
 The Glue migration path (`iceberg-catalog-migrator --target-catalog-type REST`), dbt-starrocks
 (unaffected, it reads through the StarRocks external catalog), the FE metadata-cache bypass
 (StarRocks-side, applies to both), and Helm-via-Pulumi deployment (established for both).
+
+### Gravitino vs OpenMetadata: the actual overlap
+
+Measured against the live production OpenMetadata on 2026-09-08, because the first version of this
+section asserted an overlap without checking one.
+
+**What OpenMetadata actually holds today:**
+
+| | count |
+|---|---|
+| database services | 2 (Glue, Starburst Galaxy) |
+| tables | 3,465 (2,795 Trino, 670 Glue) |
+| PII classification tags | 1,951 (1,384 `pii.nonsensitive`, 567 `pii.sensitive`) |
+| data-quality test cases | 3,781, `testPlatforms: ["dbt"]` |
+| glossary terms | 0 |
+| owners / tiers / domains / certifications | 0 |
+
+So its live value is discovery over ~3.5k tables, **PII classification at scale**, and **dbt test
+results**. The governance features it also ships (glossary, ownership, tiering, domains) are
+deployed but unused.
+
+**Where the two genuinely overlap.** Gravitino is a metadata platform, not narrowly an Iceberg
+catalog: alongside its catalogs (Hive, Glue, Iceberg, Paimon, Hudi, Delta/Lance, seven JDBC
+flavours, Kafka, filesets, models) it ships `manage-tags-in-gravitino.md`,
+`manage-policies-in-gravitino.md`, `manage-statistics-in-gravitino.md` and a `lineage/` subsystem
+with server and Spark lineage. Four things are modelled by both: **a table inventory, tags,
+lineage, and access policy.**
+
+**Where they do not overlap at all.** OpenMetadata has PII auto-classification, data profiling,
+data-quality test ingestion, a business glossary and the discovery UI humans actually use.
+Gravitino has none of those. Note also that one of its apparent overlaps is a false positive:
+Gravitino's `glossary.md` is a documentation glossary of terms ("API", "AWS"), **not** a business
+glossary feature.
+
+**The distinction that matters is role, not features.** OpenMetadata is a *passive* plane: it reads
+metadata *about* systems and nothing queries data through it. Gravitino is an *active* plane:
+engines resolve tables through it and it vends the credentials they use. A table would be known to
+both, from opposite directions. That is duplication of a record, not of a function.
+
+**One thing I initially miscounted as a Gravitino risk is symmetric.** OpenMetadata ingests today
+from Glue and Trino. If any REST catalog becomes the catalog of record, the Glue source stops
+seeing those tables — and that is equally true of Lakekeeper. The already-planned mitigation covers
+both:
+`tk-replace-the-five-trino-openmetadata-cronomjobs-m-0bbe3f` moves those jobs to **StarRocks and
+Glue sources**, and a StarRocks source sees whatever StarRocks sees, external catalogs included. So
+ingestion survives either choice. This is a project-wide dependency, not a differentiator. (Whether
+OpenMetadata has a native connector for either catalog was not checked; the StarRocks path makes it
+moot.)
+
+**What is left as a genuine, Gravitino-specific risk** is narrow and is about discipline rather
+than capability: Gravitino would ship tags, policies, statistics and lineage that we intend not to
+use, and the drift risk is that someone starts using them and creates a split brain with
+OpenMetadata. The mitigation is a one-line scoping decision — adopt Gravitino's Iceberg REST
+service and its authorization, and declare OpenMetadata the governance and discovery plane.
+
+**And one real gap that exists under either catalog, worth naming while it is cheap.** PII
+classification lives in OpenMetadata (1,951 tables tagged) while access policy would live in the
+catalog, and nothing links them. Those tags are decorative today — nothing enforces on them. The
+moment anyone wants "deny access to `pii.sensitive`", they hit an unbridged gap. Gravitino's
+policy/tag subsystem could in principle close it in one system, which is an argument *for*
+Gravitino rather than against; Lakekeeper cannot, and OpenMetadata's own policy engine governs
+OpenMetadata, not data access.
 
 ### The reframing
 
