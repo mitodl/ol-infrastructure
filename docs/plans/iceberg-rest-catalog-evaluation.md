@@ -173,6 +173,46 @@ commercial licence whose price we still do not know.
 
 Helm charts exist for all three.
 
+## Unity Catalog: checked and disqualified
+
+Added 2026-09-08 after it was raised. Unity Catalog OSS (unitycatalog/unitycatalog, v0.6.0
+released 2026-08-20, LF AI & Data) **fails criterion A, and fails it harder than Polaris.**
+
+It does implement the Iceberg REST API, including writes, so criterion B is fine:
+`IcebergRestCatalogService` serves `/v1/config`, namespaces, and table create/update/delete. It
+also has a `StorageCredentialVendor`. The problem is authentication.
+
+`AuthDecorator.serve()` is installed as a global security decorator covering the Iceberg REST
+service (`UnityCatalogServer.addSecurityDecorators`), and it contains:
+
+```java
+if (!issuer.equals(INTERNAL)) {
+  throw new AuthorizationException(ErrorCode.PERMISSION_DENIED, "Invalid access token.");
+}
+```
+
+with `Issuers.INTERNAL = "internal"`. Every request on the data path must carry a **UC-minted**
+token. An external IdP token is accepted only at `POST /auth/tokens`, which exchanges it for a UC
+token.
+
+StarRocks under `iceberg.catalog.security=JWT` forwards the end user's Keycloak id_token verbatim
+and performs no token exchange. So the delegation chain this whole project rests on cannot work
+against Unity Catalog without upstream changes to StarRocks, to UC, or both. Polaris at least ships
+an `external` mode that validates a foreign OIDC token directly and merely requires the principal to
+pre-exist; UC has no equivalent for data-path requests.
+
+Two lesser points, both already familiar:
+
+- `AuthDecorator` resolves the principal with `userRepository.getUserByEmail(subject)` and rejects
+  an unknown or disabled user, so per-user pre-provisioning in UC's local database is required, as
+  in Polaris.
+- Security decorators are installed only `if (serverProperties.isAuthorizationEnabled())`, carrying
+  the comment `// TODO: eventually might want to make this secure-by-default.` So it fails open when
+  unconfigured, the same class of trap as Gravitino's `simple` authenticator default.
+
+Not worth a spike. It would re-enter consideration only if UC gained a direct external-issuer mode
+on the data path.
+
 ## Maturity
 
 Polaris (1.7.0) and Gravitino (1.3.0) are both graduated ASF projects on monthly-ish release
