@@ -18,11 +18,12 @@ This README covers getting up and running, day-to-day usage, and troubleshooting
 5. [Directory Structure](#directory-structure)
 6. [Working with Apps](#working-with-apps)
 7. [Seeding Data](#seeding-data)
-8. [Configuration Reference](#configuration-reference)
-9. [Disk Management](#disk-management)
-10. [Teardown](#teardown)
-11. [Customization & Advanced Setup](#customization--advanced-setup)
-12. [Troubleshooting](#troubleshooting)
+8. [Backing Up and Restoring Postgres](#backing-up-and-restoring-postgres)
+9. [Configuration Reference](#configuration-reference)
+10. [Disk Management](#disk-management)
+11. [Teardown](#teardown)
+12. [Customization & Advanced Setup](#customization--advanced-setup)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -310,6 +311,34 @@ tilt trigger seed-mit-learn-fixtures
 
 ---
 
+## Backing Up and Restoring Postgres
+
+Every PersistentVolume in the cluster lives inside the k3d node containers, so `k3d cluster delete` (what `teardown.sh` does, and what any `k3d-config.yaml` change to the node image needs) destroys all Postgres data. OpenSearch and Qdrant are rebuilt from Postgres by the `seed-mit-learn-opensearch` and `seed-mit-learn-qdrant` seeds; Postgres is the only store worth carrying across.
+
+```bash
+# 1. Before teardown: dump every app database to local-dev/.backups/<timestamp>/ (gitignored)
+./local-dev/scripts/pg-backup.sh
+
+# 2. Recreate the cluster
+./local-dev/scripts/teardown.sh
+./local-dev/scripts/setup.sh
+
+# 3. Start Tilt as usual and wait for local-infra-apps and kc-seed-users to go green
+./local-dev/scripts/start.sh
+
+# 4. In a second terminal: restore
+./local-dev/scripts/pg-restore.sh local-dev/.backups/<timestamp>
+
+# 5. Rebuild the derived stores
+tilt trigger seed-mit-learn-opensearch && tilt trigger seed-mit-learn-qdrant
+```
+
+`pg-restore.sh` prints its plan, asks for confirmation (`--yes` to skip the prompt), imports `keycloak-users.json` into the recreated realm, then replaces each database from its dump. The apps can stay running: each database is recreated with a connection limit that keeps the `app` role out until its archive has loaded, so an app pod that starts mid-restore is refused rather than allowed to run `migrate` against a half-loaded schema, and pods reconnect on their own once the limit lifts. If the dump predates your checkout's migrations, restart the app Deployments afterwards so `migrate` runs against the restored schema. `pg-backup.sh` records the realm's users alongside the database dumps; `pg-restore.sh` re-imports them under their original ids, so `users_user.global_id` in the restored data stays valid and hand-created users, passwords, and the admin role survive. A user that already exists in the new realm under the same email (the `kc-seed-users` trio, most often) is replaced by the backed-up one, keeping its old id and password.
+
+The `keycloak` database is deliberately never restored — Pulumi owns the realm, and restoring the old database underneath it is what causes the `404 Realm not found` failure described under [Teardown](#teardown). Both scripts run entirely through `kubectl exec` into the Postgres pod, so no Postgres client tools are needed on the host.
+
+---
+
 ## Configuration Reference
 
 `tilt_config.json` is your copy of [`tilt_config.json.example`](../tilt_config.json.example) — the example file is the canonical starting point (its image tags move over time; this doc doesn't repeat them). Keys:
@@ -429,6 +458,8 @@ One registry case zot cannot reclaim on its own is a repo left with no manifest 
 ```
 
 > **Note:** The teardown script calls `pulumi destroy` automatically to clean up Pulumi-managed resources before deleting the cluster, so no orphaned resources are left behind.
+
+> **Data:** deleting the cluster deletes every PersistentVolume, Postgres included. Run `./local-dev/scripts/pg-backup.sh` first if there is anything in the databases you want back — see [Backing Up and Restoring Postgres](#backing-up-and-restoring-postgres).
 
 Pulumi state must never outlive the cluster: everything these stacks manage
 lives inside the cluster, but the state lives in this checkout, so state that
@@ -570,6 +601,18 @@ mkcert -install   # Install the mkcert root CA into your OS trust store
 ```
 
 Then restart your browser. The cert was generated with the correct wildcard SANs but the root CA must be in your OS trust store.
+
+### App pods stuck in `ImagePullBackOff` with `number of layers and diffIDs don't match`
+
+```bash
+kubectl -n mit-learn describe pods | grep diffIDs
+# Failed to pull image "k3d-registry.localhost:5000/mitodl_mit-learn-app:tilt-...":
+#   ... number of layers and diffIDs don't match: 17 != 22
+```
+
+The cluster's nodes run a k3s image with containerd 1.7, which does not understand the zstd layer media type that Tilt's `docker_build` emits for images based on `mitodl/ol-python-base` (see the comment on `image:` in `local-dev/cluster/k3d-config.yaml`). Nothing about the registry or the build is wrong; the node image is too old. k3d cannot change a running cluster's node image, so recreate it: follow [Backing Up and Restoring Postgres](#backing-up-and-restoring-postgres), which covers the teardown, `setup.sh` picking up the new image, and carrying your Postgres data across.
+
+Already-pushed images pull fine on the new nodes without a rebuild — the registry volume is separate from the cluster and survives teardown.
 
 ### Docker image build fails (Next.js)
 
