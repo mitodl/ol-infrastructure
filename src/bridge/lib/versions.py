@@ -6,8 +6,6 @@ CONSUL_TEMPLATE_VERSION = "0.42.1"
 CONSUL_VERSION = "2.0.3"
 # renovate: datasource=github-releases depName=dagger packageName=dagger/dagger
 DAGGER_VERSION = "0.21.9"
-# renovate: datasource=pypi depName=jupyterhub packageName=jupyterhub
-JUPYTERHUB_VERSION = "5.5.1"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.7.3"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
@@ -43,9 +41,9 @@ CERT_MANAGER_CHART_VERSION = "v1.21.1"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
 DAGSTER_CHART_VERSION = "1.13.21"
 # renovate: datasource=aws-eks-addon depName=aws-ebs-csi-driver versioning=aws-eks-addon
-EBS_CSI_DRIVER_VERSION = "v1.63.0-eksbuild.1"
+EBS_CSI_DRIVER_VERSION = "v1.65.0-eksbuild.1"
 # renovate: datasource=aws-eks-addon depName=aws-efs-csi-driver versioning=aws-eks-addon
-EFS_CSI_DRIVER_VERSION = "v3.4.1-eksbuild.1"
+EFS_CSI_DRIVER_VERSION = "v3.4.2-eksbuild.1"
 # renovate: datasource=helm depName=external-dns packageName=external-dns registryUrl=https://kubernetes-sigs.github.io/external-dns/
 EXTERNAL_DNS_CHART_VERSION = "1.21.1"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
