@@ -235,11 +235,23 @@ run_launcher:
         #   the queue small enough that the shutdown drain is normally one
         #   batch. At p50 17s that is eight flushes per run instead of three.
         #
-        # Sampling stays at the control plane's parentbased_traceidratio 0.25
-        # for the pilot; run workers are launched by the daemon so most of their
-        # traces are parentless roots and the ratio applies. Resize it from the
-        # pilot's measured spans-per-run before opting in a busier location --
-        # openedx peaks at 13823 concurrent run workers against canvas's 106.
+        # Sampling is inherited from dagster_otel_env, which means
+        # parentbased_traceidratio at DEFAULT_TRACE_SAMPLING_RATE -- and that is
+        # "1.0" (lib/otel.py), not a fraction. Run workers are launched by the
+        # daemon, so most of their traces are parentless roots and the ratio is
+        # the one that applies: every canvas run worker trace is head-sampled in.
+        # Deliberate rather than overlooked. Alloy's tailSampling is what decides
+        # what to keep -- errors, slow traces, everything from services that are
+        # not high-volume -- and head sampling upstream of it only discards
+        # traces it never gets to judge, which is the reasoning recorded at that
+        # constant. A run-worker-specific fraction here would reintroduce exactly
+        # that.
+        #
+        # So the volume control for a busier location is the tail sampler, not
+        # this. Measure what canvas actually lands in Tempo before opting in
+        # openedx, which peaks at 13823 concurrent run workers against canvas's
+        # 106 -- two orders of magnitude, against a policy nobody has re-sized
+        # for run-worker traffic.
         #
         # Tracked in tk-extend-otel-auto-instrumentation-to-dagster-run--378bda.
         env:
