@@ -123,11 +123,17 @@ except KeyError as exc:
     msg = f"Unsupported MIT Learn Next.js environment: {stack_info.env_suffix}"
     raise ValueError(msg) from exc
 
-# Backs the lead form on /organizational-learning. Recycled from the Universal AI
-# landing page rather than newly created, and the same in every environment --
-# unlike stay_updated above, which points CI and QA at a non-production form.
-# HubSpot separates the two pages' leads by the pageUri it receives.
-org_learning_hubspot_form_id = "60a1983b-361a-4e80-a0db-d24ff636d7bf"
+org_learning_hubspot_form_ids = {
+    "ci": "e6910657-d832-4df8-be27-d8f6f9ecdfcc",
+    "qa": "e6910657-d832-4df8-be27-d8f6f9ecdfcc",
+    "production": "60a1983b-361a-4e80-a0db-d24ff636d7bf",
+}
+
+try:
+    org_learning_hubspot_form_id = org_learning_hubspot_form_ids[stack_info.env_suffix]
+except KeyError as exc:
+    msg = f"Unsupported MIT Learn Next.js environment: {stack_info.env_suffix}"
+    raise ValueError(msg) from exc
 
 raw_env_vars = {
     # Env vars available only on server
