@@ -2310,6 +2310,46 @@ def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, st
     ]
 
 
+# Code locations whose RUN WORKERS export traces, as opposed to only their code
+# server. dagster_instance.yaml's run launcher sets OTEL_SDK_DISABLED=true as
+# the fleet default for run workers; a name listed here has it set back to
+# "false" in its own env, which the run launcher -> code location env merge puts
+# last and kubelet therefore honours. Read the flush-policy comment in that file
+# before adding to this set.
+#
+# canvas is the pilot: 7 days of kube_job_labels on data-production put it at a
+# mean of 87 concurrent run-worker Jobs against a peak of 106 -- steady rather
+# than bursty, so its trace volume is predictable -- while openedx runs a mean
+# of 221 against a peak of 13823. Enough traffic to produce a real per-worker
+# connection footprint, two orders of magnitude less blast radius than the
+# location that would otherwise dominate the signal.
+#
+# Run workers inherit the code location's OTEL_SERVICE_NAME, so their spans
+# arrive as `production-dagster-code-canvas` alongside the code server's and
+# cannot be told apart by service.name -- the launcher cannot override it,
+# because the code location sets that key and the code location's value is the
+# one kubelet keeps. Separate them on `k8s.pod.name` (a run worker's is
+# `dagster-run-<run-id>`, the server's is the deployment's) or on
+# `service.instance.id`, which the SDK makes unique per process. Both are
+# already present on the spans #5733 is producing.
+OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS = {"canvas"}
+
+
+def dagster_run_worker_otel_env(location_name: str) -> list[dict[str, str]]:
+    """Opt one code location's run workers into exporting traces.
+
+    The value rides on the code location's own env, which the chart copies into
+    the container context every one of its run workers inherits.
+
+    :param location_name: the code location's unhyphenated name, e.g. ``canvas``.
+    """
+    if not ships_telemetry(stack_info):
+        return []
+    if location_name not in OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS:
+        return []
+    return [{"name": "OTEL_SDK_DISABLED", "value": "false"}]
+
+
 def grpc_health_check_command(port: int) -> list[str]:
     """Build the chart's code-location probe command, minus the OTel agent.
 
@@ -2475,6 +2515,7 @@ for location in code_locations:
             *dagster_otel_env(
                 f"dagster-code-{name.replace('_', '-')}", image_tag_or_digest
             ),
+            *dagster_run_worker_otel_env(name),
         ],
         "envSecrets": [
             {"name": "dagster-static-secrets"},
