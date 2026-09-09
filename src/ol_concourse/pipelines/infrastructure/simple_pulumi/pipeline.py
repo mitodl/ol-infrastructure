@@ -500,6 +500,13 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         additional_watched_paths=["sdks/rootly/"],
         stages=["default"],
         topology="preview-gated",
+        # The stack manages ~160 Rootly-API-backed resources. `pulumi refresh`
+        # fans out GETs for all of them at once, which blows past Rootly's
+        # per-account rate/concurrency limits and fails every read with an
+        # empty error message before `up` even runs. Same failure mode as
+        # the Sentry stack above; skipping refresh avoids the burst and lets
+        # `up` still diff/apply whatever actually changed.
+        refresh_stack=False,
     ),
     "sentry": SimplePulumiParams(
         app_name="sentry",
