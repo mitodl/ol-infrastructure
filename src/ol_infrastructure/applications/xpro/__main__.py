@@ -34,7 +34,11 @@ from ol_infrastructure.applications.xpro.k8s_secrets import (
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
-from ol_infrastructure.components.services.apisix import OLApisixPluginConfig
+from ol_infrastructure.components.services.apisix import (
+    OLApisixPluginConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -651,6 +655,22 @@ if k8s_deploy:
         ),
     )
 
+    # Shared plugin defaults for every route below: prometheus (per-route
+    # series), opentelemetry (OTLP spans), gzip (these routes served every
+    # response uncompressed), cors, the http->https redirect and
+    # Referrer-Policy. Each route also keeps its own plugins --
+    # OLApisixHTTPRoute merges the two lists, with the route's entries winning
+    # by name.
+    xpro_shared_plugins = OLApisixSharedPlugins(
+        f"xpro-{stack_info.env_suffix}-ol-shared-plugins",
+        plugin_config=OLApisixSharedPluginsConfig(
+            application_name="xpro",
+            resource_suffix="ol-shared-plugins",
+            k8s_namespace=xpro_namespace,
+            k8s_labels=k8s_app_labels,
+        ),
+    )
+
     # The `location` blocks that used to live in the nginx sidecar. HTTPRoute has
     # no priority field -- APISix resolves overlapping rules by longest matching
     # path prefix -- so /static/hash.txt outranks /static, which outranks /*,
@@ -679,6 +699,7 @@ if k8s_deploy:
             # this route's Cache-Control instead.
             OLApisixHTTPRouteConfig(
                 route_name="static-hash",
+                shared_plugins=xpro_shared_plugins,
                 hosts=[app_domain],
                 paths=["/static/hash.txt"],
                 path_match_type="Exact",
@@ -696,10 +717,14 @@ if k8s_deploy:
                 ],
             ),
             # Granian serves static without a CORS header; the sidecar added a
-            # blanket one. xpro has no shared plugin config supplying `cors`, so
-            # without this the header would silently disappear.
+            # blanket one. Kept even though the shared config now supplies
+            # `cors`: that plugin only answers requests carrying an Origin,
+            # while this header went out unconditionally, and static assets are
+            # exactly what a cross-origin font or stylesheet load fetches
+            # without one.
             OLApisixHTTPRouteConfig(
                 route_name="static",
+                shared_plugins=xpro_shared_plugins,
                 hosts=[app_domain],
                 paths=["/static/*"],
                 backend_service_name=xpro_k8s_app.application_lb_service_name,
@@ -721,6 +746,7 @@ if k8s_deploy:
             # Django 404.
             OLApisixHTTPRouteConfig(
                 route_name="dnt-policy",
+                shared_plugins=xpro_shared_plugins,
                 hosts=[app_domain],
                 paths=["/.well-known/dnt-policy.txt"],
                 path_match_type="Exact",
@@ -742,6 +768,7 @@ if k8s_deploy:
             ),
             OLApisixHTTPRouteConfig(
                 route_name="passthrough",
+                shared_plugins=xpro_shared_plugins,
                 hosts=[app_domain],
                 paths=["/*"],
                 backend_service_name=xpro_k8s_app.application_lb_service_name,
