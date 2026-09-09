@@ -956,6 +956,16 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             statement="var.is_ocw_request",
             type="REQUEST",
         ),
+        # Gates the Surrogate-Key header below. Only the OCW content bucket sets
+        # x-amz-meta-site-id, so this is false for NextJS_Frontend responses --
+        # which matters because an unconditional `set` would clobber any
+        # Surrogate-Key the Next.js origin emits (the k8s_apps pipeline purges
+        # mit-learn-nextjs with fastly_purge_scope="html-pages").
+        fastly.ServiceVclConditionArgs(
+            name="S3 response has a site id",
+            statement="beresp.http.x-amz-meta-site-id",
+            type="CACHE",
+        ),
     ],
     dictionaries=[
         fastly.ServiceVclDictionaryArgs(name="path_redirects"),  # exact path redirects
@@ -974,6 +984,20 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         ),
     ],
     headers=[
+        # OCW course objects carry their publishing site as S3 user metadata.
+        # Promoting it to Surrogate-Key at fetch time tags the cached object so a
+        # single course can be purged (POST /service/<id>/purge/<site-id>) without
+        # flushing the rest of the cache. ocw_site does the same thing against the
+        # same bucket, so the two services share one purge key.
+        fastly.ServiceVclHeaderArgs(
+            action="set",
+            cache_condition="S3 response has a site id",
+            destination="http.Surrogate-Key",
+            name="S3 Cache Surrogate Keys",
+            priority=10,
+            source="beresp.http.x-amz-meta-site-id",
+            type="cache",
+        ),
         fastly.ServiceVclHeaderArgs(
             action="set",
             destination="http.Strict-Transport-Security",
