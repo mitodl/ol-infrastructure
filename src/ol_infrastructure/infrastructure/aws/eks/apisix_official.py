@@ -604,7 +604,16 @@ def setup_apisix(
                             "request_length=$request_length "
                             "request_method=$request_method "
                             "request_time=$request_time "
-                            "request_uri=$request_uri "
+                            # Quoted because Loki's logfmt parser silently
+                            # DROPS a key whose unquoted value contains "=":
+                            # every URI with a query string ("?limit=12")
+                            # parsed to an empty request_uri, with no
+                            # __error__ raised to make the loss visible.  The
+                            # already-quoted $request on the same line kept
+                            # its full URI, which is what this mirrors.  Safe
+                            # with accessLogFormatEscape "default": nginx
+                            # escapes any literal quote in the URI as \".
+                            'request_uri="$request_uri" '
                             "status=$status "
                             "upstream_addr=$upstream_addr "
                             "upstream_connect_time=$upstream_connect_time "
