@@ -285,8 +285,10 @@ class OLApisixHTTPRoute(ComponentResource):
         resource_options = ResourceOptions(parent=self).merge(opts)
 
         # One PluginConfig per route, holding that route's shared defaults
-        # merged with its own plugins.
-        plugin_configs = self._create_plugin_configs(
+        # merged with its own plugins.  Kept on the component so callers (and
+        # tests) can see what was actually created rather than recomputing the
+        # hashed names.
+        self.plugin_config_resources = self._create_plugin_configs(
             name, route_configs, k8s_namespace, k8s_labels, resource_options
         )
 
@@ -333,7 +335,7 @@ class OLApisixHTTPRoute(ComponentResource):
                     # the route first, leaving it pointed at a name that does
                     # not exist yet -- which APISIX resolves by serving the
                     # route with no plugins at all rather than by failing.
-                    depends_on=list(plugin_configs.values()),
+                    depends_on=list(self.plugin_config_resources.values()),
                 )
             ),
         )

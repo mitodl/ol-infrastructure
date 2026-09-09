@@ -27,20 +27,8 @@ except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
 
-PLUGIN_CONFIG_TYPE = "kubernetes:apisix.apache.org/v1alpha1:PluginConfig"
-
-# Every resource the mocks are asked to create, as (type token, metadata.name).
-# Recorded so a test can assert against the PluginConfigs the component
-# actually registered rather than against names recomputed from the same
-# helper the component used -- which would pass even if it created nothing.
-REGISTERED: list[tuple[str, str]] = []
-
-
 class K8sMocks(pulumi.runtime.Mocks):
     def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-        REGISTERED.append(
-            (args.typ, (args.inputs.get("metadata") or {}).get("name", ""))
-        )
         return [args.name + "_id", args.inputs]
 
     def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
@@ -48,11 +36,6 @@ class K8sMocks(pulumi.runtime.Mocks):
 
 
 pulumi.runtime.set_mocks(K8sMocks())
-
-
-def registered_plugin_config_names() -> set[str]:
-    """metadata.name of every v1alpha1 PluginConfig the mocks have created."""
-    return {name for typ, name in REGISTERED if typ == PLUGIN_CONFIG_TYPE and name}
 
 
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
@@ -213,11 +196,12 @@ def test_rule_extension_ref_names_the_created_plugin_config():
     PluginConfig that was never created -- which APISIX resolves by serving the
     route with no plugins at all rather than by failing.
 
-    The created names are read back off the mocks rather than recomputed with
-    the component's own naming helper: recomputing them would compare the
-    component against itself and still pass if it registered nothing.
+    The created names are read off the PluginConfig resources the component
+    registered -- their own ``metadata.name``, the value that would reach the
+    cluster -- rather than recomputed with the component's naming helper:
+    recomputing them would compare the component against itself and still pass
+    if it registered nothing at all.
     """
-    REGISTERED.clear()
     plugins = shared_plugins("merge-render")
     route_configs = [
         route(
@@ -240,21 +224,22 @@ def test_rule_extension_ref_names_the_created_plugin_config():
         k8s_labels={"app": "myapp"},
     )
 
-    def check(spec):
-        # The HTTPRoute depends_on its PluginConfigs, so every one of them has
-        # been registered by the time this spec resolves.
-        created = registered_plugin_config_names()
+    created = pulumi.Output.all(
+        *[resource.metadata for resource in component.plugin_config_resources.values()]
+    ).apply(lambda metadatas: {metadata["name"] for metadata in metadatas})
+
+    def check(args):
+        spec, created_names = args
         referenced = [
             rule["filters"][0]["extensionRef"]["name"] for rule in spec["rules"]
         ]
         assert len(referenced) == len(route_configs)
         # Every rule points at a PluginConfig that actually exists...
-        assert set(referenced) <= created, set(referenced) - created
+        assert set(referenced) <= created_names, set(referenced) - created_names
         # ...a distinct one per route, since the two routes' merged lists differ
         assert len(set(referenced)) == len(route_configs)
-        # ...and not at the shared config itself, which is what the route
+        # ...and not at the shared config itself, which is what a route
         # referenced before the merge moved into this component.
-        assert plugins.resource_name in created
         assert plugins.resource_name not in referenced
 
         for rule in spec["rules"]:
@@ -264,4 +249,4 @@ def test_rule_extension_ref_names_the_created_plugin_config():
             assert extension_ref["kind"] == "PluginConfig"
             assert extension_ref["group"] == "apisix.apache.org"
 
-    return component.http_route_resource.spec.apply(check)
+    return pulumi.Output.all(component.http_route_resource.spec, created).apply(check)
