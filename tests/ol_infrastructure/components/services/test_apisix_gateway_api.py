@@ -27,8 +27,20 @@ except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
 
+PLUGIN_CONFIG_TYPE = "kubernetes:apisix.apache.org/v1alpha1:PluginConfig"
+
+# Every resource the mocks are asked to create, as (type token, metadata.name).
+# Recorded so a test can assert against the PluginConfigs the component
+# actually registered rather than against names recomputed from the same
+# helper the component used -- which would pass even if it created nothing.
+REGISTERED: list[tuple[str, str]] = []
+
+
 class K8sMocks(pulumi.runtime.Mocks):
     def new_resource(self, args: pulumi.runtime.MockResourceArgs):
+        REGISTERED.append(
+            (args.typ, (args.inputs.get("metadata") or {}).get("name", ""))
+        )
         return [args.name + "_id", args.inputs]
 
     def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
@@ -36,6 +48,12 @@ class K8sMocks(pulumi.runtime.Mocks):
 
 
 pulumi.runtime.set_mocks(K8sMocks())
+
+
+def registered_plugin_config_names() -> set[str]:
+    """metadata.name of every v1alpha1 PluginConfig the mocks have created."""
+    return {name for typ, name in REGISTERED if typ == PLUGIN_CONFIG_TYPE and name}
+
 
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixPluginConfig,
@@ -190,11 +208,16 @@ def test_route_without_shared_plugins_keeps_its_own():
 
 @pulumi.runtime.test
 def test_rule_extension_ref_names_the_created_plugin_config():
-    """The ExtensionRef name is recomputed from the merged list rather than
-    stored, so a mismatch between the referenced name and the PluginConfig that
-    was created would leave the route pointing at a resource that does not
-    exist -- and APISIX silently serves the route with no plugins at all.
+    """The ExtensionRef name is a hash of the merged plugin list, recomputed at
+    render time rather than stored, so a route can end up pointing at a
+    PluginConfig that was never created -- which APISIX resolves by serving the
+    route with no plugins at all rather than by failing.
+
+    The created names are read back off the mocks rather than recomputed with
+    the component's own naming helper: recomputing them would compare the
+    component against itself and still pass if it registered nothing.
     """
+    REGISTERED.clear()
     plugins = shared_plugins("merge-render")
     route_configs = [
         route(
@@ -210,31 +233,30 @@ def test_rule_extension_ref_names_the_created_plugin_config():
         ),
         route(route_name="passthrough", shared_plugins=plugins),
     ]
-    httproute_name = "merge-render-httproute"
     component = OLApisixHTTPRoute(
-        httproute_name,
+        "merge-render-httproute",
         route_configs=route_configs,
         k8s_namespace="myapp-ns",
         k8s_labels={"app": "myapp"},
     )
 
-    created = {
-        component._generate_plugin_config_name(
-            httproute_name,
-            route_config.route_name,
-            component._active_plugins(component._merged_plugins(route_config)),
-        )
-        for route_config in route_configs
-    }
-    # Distinct plugin sets hash to distinct PluginConfigs, one per route.
-    assert len(created) == len(route_configs)
-
     def check(spec):
+        # The HTTPRoute depends_on its PluginConfigs, so every one of them has
+        # been registered by the time this spec resolves.
+        created = registered_plugin_config_names()
         referenced = [
             rule["filters"][0]["extensionRef"]["name"] for rule in spec["rules"]
         ]
         assert len(referenced) == len(route_configs)
-        assert set(referenced) == created
+        # Every rule points at a PluginConfig that actually exists...
+        assert set(referenced) <= created, set(referenced) - created
+        # ...a distinct one per route, since the two routes' merged lists differ
+        assert len(set(referenced)) == len(route_configs)
+        # ...and not at the shared config itself, which is what the route
+        # referenced before the merge moved into this component.
+        assert plugins.resource_name in created
+        assert plugins.resource_name not in referenced
+
         for rule in spec["rules"]:
             extension_ref = rule["filters"][0]["extensionRef"]
             # v1alpha1 PluginConfig -- the v2 ApisixPluginConfig kind is
