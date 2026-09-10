@@ -424,3 +424,60 @@ async def release_issue_for_version(
 ) -> dict[str, Any] | None:
     """Return the release issue whose checklist header names *version*, or None."""
     return await asyncio.to_thread(_release_issue_for_version_sync, repo_slug, version)
+
+
+# A hotfix is requested with a `hotfix/<full sha>` tag. The release resource's
+# check offers it as the next version, and its create deletes the tag by that
+# exact name, so anything else under this prefix would never be consumed.
+HOTFIX_TAG_PREFIX = "hotfix/"
+
+
+def _resolve_commit_sync(repo_slug: str, ref: str) -> str:
+    return _get_client().get_repo(repo_slug).get_commit(ref).sha
+
+
+async def resolve_commit(repo_slug: str, ref: str) -> str:
+    """Return the full SHA of *ref*, a short or full commit SHA, in *repo_slug*."""
+    return await asyncio.to_thread(_resolve_commit_sync, repo_slug, ref)
+
+
+def _hotfix_refs(repo: Any) -> list[Any]:
+    return list(repo.get_git_matching_refs(f"tags/{HOTFIX_TAG_PREFIX}"))
+
+
+def _hotfix_sha(ref: Any) -> str:
+    return ref.ref.removeprefix(f"refs/tags/{HOTFIX_TAG_PREFIX}")
+
+
+def _pending_hotfix_requests_sync(repo_slug: str) -> list[str]:
+    repo = _get_client().get_repo(repo_slug)
+    return [_hotfix_sha(ref) for ref in _hotfix_refs(repo)]
+
+
+async def pending_hotfix_requests(repo_slug: str) -> list[str]:
+    """Return the commit SHAs of hotfixes requested but not yet cut."""
+    return await asyncio.to_thread(_pending_hotfix_requests_sync, repo_slug)
+
+
+def _request_hotfix_sync(repo_slug: str, sha: str) -> None:
+    repo = _get_client().get_repo(repo_slug)
+    repo.create_git_ref(f"refs/tags/{HOTFIX_TAG_PREFIX}{sha}", sha)
+
+
+async def request_hotfix(repo_slug: str, sha: str) -> None:
+    """Request a hotfix of the full commit *sha* for the release resource to cut."""
+    await asyncio.to_thread(_request_hotfix_sync, repo_slug, sha)
+
+
+def _cancel_hotfix_requests_sync(repo_slug: str) -> list[str]:
+    repo = _get_client().get_repo(repo_slug)
+    cancelled = []
+    for ref in _hotfix_refs(repo):
+        ref.delete()
+        cancelled.append(_hotfix_sha(ref))
+    return cancelled
+
+
+async def cancel_hotfix_requests(repo_slug: str) -> list[str]:
+    """Delete every pending hotfix request and return the SHAs cancelled."""
+    return await asyncio.to_thread(_cancel_hotfix_requests_sync, repo_slug)

@@ -39,7 +39,7 @@ from ol_concourse.lib.resources import (
     registry_image,
     release_resource,
 )
-from ol_concourse.lib.tasks import bump_version_task
+from ol_concourse.lib.tasks import TASK_IMAGE, bump_version_task
 from pydantic import BaseModel, model_validator
 
 from bridge.settings.apps import github_repo as app_github_repo
@@ -1087,6 +1087,39 @@ def _build_image_job(
     return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
 
 
+def _checkout_release_task(main_repo: Resource, output: Identifier) -> TaskStep:
+    """Check the cut `releases/<version>` branch out into *output*.
+
+    Also records the commit the version tag points at in
+    ``<output>/.git/release_ref``, which is what the image is stamped with.
+    The app repositories are public, as is ``main_repo``'s unauthenticated
+    https URI, so the fetch needs no credentials.
+    """
+    script = "\n".join(
+        [
+            f'cp -a "$REPO/." {output}/',
+            f"cd {output}",
+            "git fetch --quiet origin"
+            ' "+refs/heads/releases/$VERSION:refs/remotes/origin/releases/$VERSION"'
+            ' "+refs/tags/$VERSION:refs/tags/$VERSION"',
+            'git checkout --quiet --force --detach "origin/releases/$VERSION"',
+            "git clean --quiet -fdx",
+            'git rev-list -n1 "$VERSION" > .git/release_ref',
+        ]
+    )
+    return TaskStep(
+        task=Identifier("checkout-release"),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[Input(name=main_repo.name)],
+            outputs=[Output(name=output)],
+            params={"REPO": str(main_repo.name), "VERSION": "((.:release_version))"},
+            run=Command(path="sh", args=["-euc", script]),
+        ),
+    )
+
+
 def _build_release_image_job(
     app_name: str,
     dockerfile_path: str,
@@ -1124,6 +1157,7 @@ def _build_release_image_job(
         "additional_tags": f"{release_res.name}/version",
     }
 
+    release_source = Identifier("release-source")
     plan = [
         GetStep(get=release_res.name, trigger=True),
         GetStep(get=main_repo.name, trigger=False),
@@ -1132,17 +1166,13 @@ def _build_release_image_job(
             file=f"{release_res.name}/version",
             reveal=True,
         ),
-        # The release resource's "create" out-action tags the pre-bumpver HEAD SHA
-        # as the release (see ol-concourse resources/release/README.md): it records
-        # main_repo's current HEAD *before* running bump_version_task, then commits
-        # the version bump separately. Capture git_ref from main_repo here -- before
-        # bump_version_task mutates the checkout -- so the built image is stamped
-        # with the exact commit the release tag points to. The release resource
-        # itself never writes a .git/ref file (only version/commits.json/
-        # checklist.md/changelog_entry.md), so loading it from there would fail.
+        # The commit a hotfix cherry-picks onto production, or empty for a
+        # normal release. The release resource's check sets it while a
+        # `hotfix/<sha>` request tag is pending, which is how `/doof hotfix`
+        # gets a SHA to a job whose trigger carries no parameters.
         LoadVarStep(
-            load_var="git_ref",
-            file=f"{main_repo.name}/.git/ref",
+            load_var="hotfix",
+            file=f"{release_res.name}/hotfix",
             reveal=True,
         ),
         bump_version_task(
@@ -1155,13 +1185,29 @@ def _build_release_image_job(
                 "action": "create",
                 "repo_dir": str(main_repo.name),
                 "version_file": f"{release_res.name}/version",
+                "commit_hash": "((.:hotfix))",
             },
         ),
+        # Build from the cut release, not from main_repo. A hotfix is
+        # production plus one commit, which main_repo does not hold, and
+        # Concourse does not document a put writing back to its inputs, so the
+        # put's checkout is not something later steps can rely on. For a normal
+        # release, releases/<version> is the tree main_repo holds after
+        # bump_version_task, unless main moved between the get and the put, in
+        # which case the branch is what was actually tagged.
+        _checkout_release_task(main_repo, release_source),
+        # The commit the version tag points at: the pre-bump HEAD for a normal
+        # release, the cherry-picked commit for a hotfix.
+        LoadVarStep(
+            load_var="git_ref",
+            file=f"{release_source}/.git/release_ref",
+            reveal=True,
+        ),
         container_build_task(
-            inputs=[Input(name=main_repo.name)],
+            inputs=[Input(name=release_source)],
             build_parameters={
-                "CONTEXT": main_repo.name,
-                "DOCKERFILE": f"{main_repo.name}/{dockerfile_path}",
+                "CONTEXT": str(release_source),
+                "DOCKERFILE": f"{release_source}/{dockerfile_path}",
                 "BUILD_ARG_GIT_REF": "((.:git_ref))",
                 # Some Dockerfiles (e.g. ol-analytics-api) declare ARG GIT_SHA
                 # instead of the GIT_REF convention above; pass both so either
