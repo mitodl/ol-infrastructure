@@ -329,14 +329,24 @@ def _build_interpolated_config_dict(
                 },
             }
         )
+        # Match the legacy MITx (residential) footer: only Terms of Service +
+        # Accessibility (accessibilityUrl is set in the base config above), the
+        # trademark logo ("MIT Open Learning" = mit-ol-logo.svg, which the legacy
+        # footer uses \u2014 NOT the header's logo.svg), and the legacy copyright text.
+        # Other links are omitted so the MFE footer matches the legacy footer.
         config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
             {
-                "privacyPolicyUrl": f"https://{marketing_domain}/privacy",
-                "termsOfServiceUrl": f"https://{marketing_domain}/terms",
-                "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
-                "aboutUrl": f"https://{marketing_domain}/about",
-                "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
-                "copyrightText": "\u00a9 MIT Open Learning. All rights reserved except where noted.",
+                "termsOfServiceUrl": f"https://{marketing_domain}/tos",
+                "footerLogoUrl": (
+                    f"https://{domains['lms']}/static/"
+                    f"{stack_info.env_prefix}/images/mit-ol-logo.svg"
+                ),
+                "copyrightText": "\u00a9 {year} MITx Residential. All rights reserved.",
+                # The legacy MITx footer links its trademark logo to MIT Open
+                # Learning (LOGO_TRADEMARK_URL + MIT_OPEN_LEARNING_SITE_LINK in
+                # mitx/common-mfe-config.env.jsx). Without this the Site Project
+                # footer renders the logo as a bare image.
+                "footerLogoDestination": "https://openlearning.mit.edu",
             }
         )
 
@@ -376,9 +386,21 @@ def _build_interpolated_config_dict(
                 "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
                 "aboutUrl": f"https://{marketing_domain}/about-us",
                 "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
-                "copyrightText": "\u00a9 MIT xPRO. All rights reserved except where noted.",
+                "copyrightText": "\u00a9 {year} MIT xPRO. All rights reserved.",
+                # The xPRO logo linked to the marketing site, as the legacy
+                # footer had it (LOGO_URL + MARKETING_SITE_BASE_URL in
+                # xpro/common-mfe-config.env.jsx). Note xPRO uses LOGO_URL, not
+                # the trademark mark mitx and mitxonline use.
+                "footerLogoUrl": config["LOGO_URL"],
+                "footerLogoDestination": f"https://{marketing_domain}",
             }
         )
+        # The xPRO user menu builds `${marketingSiteBaseUrl}/dashboard` etc, so
+        # without this those resolved to relative paths on the LMS host. No
+        # trailing slash: the components append their own segment.
+        config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolHeader"] = {
+            "marketingSiteBaseUrl": f"https://{marketing_domain}",
+        }
 
     # MITx Online-specific configuration
     elif stack_info.env_prefix == "mitxonline":
@@ -445,13 +467,37 @@ def _build_interpolated_config_dict(
         config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
             {
                 "privacyPolicyUrl": f"https://{marketing_domain}/privacy-policy/",
-                "termsOfServiceUrl": f"https://{marketing_domain}/terms-of-service/",
+                "termsOfServiceUrl": (
+                    f"https://{edxapp_config.require('mit_learn_domain')}/terms"
+                ),
                 "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
-                "aboutUrl": f"https://{marketing_domain}/about-us/",
-                "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
-                "copyrightText": "\u00a9 MIT Open Learning. All rights reserved except where noted.",
+                "aboutUrl": (
+                    f"https://{edxapp_config.require('mit_learn_domain')}/about"
+                ),
+                "supportUrl": "https://support.learn.mit.edu/",
+                "copyrightText": "\u00a9 {year} Massachusetts Institute of Technology",
+                # Footer uses the plain "MIT" mark (mit-logo.svg), not the header
+                # logo.svg, to match the legacy MITxOnline footer.
+                "footerLogoUrl": (
+                    f"https://{domains['lms']}/static/"
+                    f"{stack_info.env_prefix}/images/mit-logo.svg"
+                ),
+                # The legacy learning MFE footer links that mark to web.mit.edu
+                # (LOGO_TRADEMARK_URL + MIT_BASE_URL in
+                # mitxonline/common-mfe-config.env.jsx).
+                "footerLogoDestination": "https://web.mit.edu",
             }
         )
+        # Header destinations for the Site Project MFEs. The components fall back
+        # to the production learn.mit.edu and to lmsBaseUrl when these are
+        # absent, so on RC the instructor dashboard's Dashboard button points at
+        # production MIT Learn and Profile / Settings at the LMS rather than the
+        # marketing site. No trailing slash: the components append their own
+        # path segment.
+        config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolHeader"] = {
+            "mitLearnBaseUrl": f"https://{edxapp_config.require('mit_learn_domain')}",
+            "marketingSiteBaseUrl": f"https://{marketing_domain}",
+        }
 
     return config
 
