@@ -1372,6 +1372,8 @@ async def test_startup_channel_check_still_covers_legacy_apps(mixed_repos, monke
 
     checked.assert_awaited_once()
     assert list(checked.await_args_list[0].args[1]) == ["my-app", "legacy-app"]
+
+
 # ---------------------------------------------------------------------------
 # /doof publish
 # ---------------------------------------------------------------------------
