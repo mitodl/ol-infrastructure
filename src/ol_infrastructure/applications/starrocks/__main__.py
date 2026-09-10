@@ -80,6 +80,9 @@ vault_stack = make_stack_reference(
 )
 mit_learn_stack = make_stack_reference(projects.MIT_LEARN, stack_info.name)
 concourse_stack = make_stack_reference(projects.CONCOURSE, stack_info.name)
+applications_cluster_stack = make_stack_reference(
+    projects.EKS, f"applications.{stack_info.name}"
+)
 
 starrocks_env = f"data-{stack_info.env_suffix}"
 aws_config = AWSBase(tags={"OU": "data", "Environment": starrocks_env})
@@ -1059,11 +1062,20 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
 # Internal NLB exposing the StarRocks FE MySQL port (9030) to the data VPC so that
 # Vault — running on EC2 in the operations VPC, which is peered with the data VPC —
 # can reach StarRocks to manage dynamic database credentials. Also admits MIT
-# Learn's application pods (applications VPC) and Concourse workers (operations
-# VPC, which run the Vault DB-role SQL setup Command resources in
-# substructure/starrocks) as explicit sources — supplying this SG via the LBC
-# annotation below means it becomes the sole authority on the NLB's ingress, so
-# every legitimate caller must be listed here.
+# Learn (applications VPC) and Concourse workers (operations VPC, which run the
+# Vault DB-role SQL setup Command resources in substructure/starrocks) as
+# explicit sources — supplying this SG via the LBC annotation below means it
+# becomes the sole authority on the NLB's ingress, so every legitimate caller
+# must be listed here.
+#
+# MIT Learn's pod SG alone does not match its traffic. The applications cluster
+# runs security groups for pods in "standard" enforcing mode with in-node SNAT,
+# so a pod's connection to a peered VPC leaves from its node's primary ENI and
+# carries the node group SG instead. With only the pod SG listed, the NLB's
+# SecurityGroupBlockedFlowCount_Inbound_TCP metric recorded a burst of dropped
+# flows at every failed MIT Learn warehouse sync. Listing the node group SG
+# means any pod on those nodes can reach this port; StarRocks authentication is
+# what gates access.
 FE_MYSQL_PORT = 9030
 
 # Stable name for the FE MySQL endpoint, published by external-dns from the
@@ -1088,14 +1100,17 @@ fe_mysql_nlb_security_group = ec2.SecurityGroup(
             security_groups=[
                 vault_stack.require_output("vault_server")["security_group"],
                 mit_learn_stack.require_output("mit_learn")["app_security_group_id"],
+                applications_cluster_stack.require_output(
+                    "node_group_security_group_id"
+                ),
                 concourse_stack.require_output("worker_security_group"),
             ],
             protocol="tcp",
             from_port=FE_MYSQL_PORT,
             to_port=FE_MYSQL_PORT,
             description=(
-                "Allow Vault, MIT Learn application pods, and Concourse workers "
-                "to reach the StarRocks FE MySQL protocol port."
+                "Allow Vault, MIT Learn, applications cluster nodes, and "
+                "Concourse workers to reach the StarRocks FE MySQL protocol port."
             ),
         ),
     ],
