@@ -146,53 +146,121 @@ run_launcher:
   config:
     run_k8s_config:
       container_config:
-        # Keep the OpenTelemetry auto-instrumentation agent off run workers.
+        # OpenTelemetry on run workers: agent loaded everywhere, exporting only
+        # where a code location opts in.
         #
         # The user-deployments chart copies each code location's whole `env`
         # list into DAGSTER_CLI_API_GRPC_CONTAINER_CONTEXT, and K8sRunLauncher
         # applies that context to every run worker pod -- so the PYTHONPATH that
-        # switches the agent on for the ten code servers (see dagster_otel_env
-        # in __main__.py) reaches run workers too. There is no chart lever that
+        # switches the agent on for the code servers (see dagster_otel_env in
+        # __main__.py) reaches run workers too. There is no chart lever that
         # grants a code location container env a run worker does not inherit;
         # `env_config_maps` and `env_secrets` propagate the same way.
         #
-        # THIS CANNOT BE FIXED BY SETTING PYTHONPATH BACK TO "" HERE, which is
-        # what the first version of this file did. K8sContainerContext.__new__
-        # folds a context's top-level `env` into its own run_k8s_config, and
-        # get_k8s_job_config carries no env at all, so BOTH values end up in
-        # job.py's `user_defined_env_vars` -- and create_for_run ends with
-        # `context.merge(user_defined_container_context)`, whose list merge is
-        # [*run_launcher, *code_location]. That puts the agent path last, and
-        # kubelet resolves duplicate names by last assignment, so the override
-        # loses. Caught in review on PR #5733 and reproduced in the image.
+        # That inheritance is what makes a per-location pilot expressible at
+        # all. `_deep_merge_k8s_config` appends env lists as
+        # [*run_launcher, *code_location] (container_context.py), kubelet
+        # resolves duplicate names by last assignment, and DEEP is the default
+        # merge_behavior (job.py). So OTEL_SDK_DISABLED=true set here is the
+        # fleet default for run workers, and a code location that sets it to
+        # "false" in its own env wins for its run workers. It cannot be done the
+        # other way round -- `command` is in ALWAYS_SHALLOW_MERGE_LIST_FIELDS
+        # and is only settable on the run launcher, and the chart's
+        # per-deployment container context emits no container_config at all
+        # (charts/dagster-user-deployments/templates/helpers/_helpers.tpl), so
+        # no code location can opt itself out of a command set here.
         #
-        # `command` works where `env` cannot: the merge only copies keys the
-        # code-location context actually sets, and it sets no command, so this
-        # one survives. Kubernetes prepends it to the launcher's args, giving
-        # `env -u PYTHONPATH dagster api execute_run ...`. Unsetting rather than
-        # emptying means site never finds the agent's sitecustomize.py, so
-        # nothing is imported and no library is patched -- OTEL_SDK_DISABLED
-        # would not do this, it only makes TracerProvider hand out NoOp tracers
-        # (sdk/trace/__init__.py) after the agent has already loaded.
+        # Setting OTEL_SDK_DISABLED on a code location's own env is NOT the same
+        # thing: that env reaches its code server too, and would switch off the
+        # server instrumentation #5733 just deployed. Only the run launcher can
+        # name a default that applies to run workers alone.
         #
-        # Run workers stay excluded until the span-flush policy is decided, not
-        # because the data is uninteresting -- it is the most interesting, since
-        # 2026-08-10 was 178 run workers holding connections and their per-worker
-        # footprint is still unmeasured. The blocker is that they are preemptible
-        # by design (priority_class_name below), so a SIGKILL drops whatever
-        # BatchSpanProcessor has not flushed, and it drops it with a bias: the
-        # preempted runs are the ones from a capacity event. Measured
-        # 2026-09-03 on data-production, run duration is p50 17s / p90 32s -- three
-        # BSP cycles at the 5s default, not zero -- and arrivals are bursty
-        # (~2.2/s inside a burst against ~0.006/s outside), so the flush and
-        # sampling settings have to be sized against the burst rather than any
-        # runs/day average. Tracked in
-        # tk-extend-otel-auto-instrumentation-to-dagster-run--378bda; deleting
-        # this command block is the whole toggle.
-        command:
-        - env
-        - -u
-        - PYTHONPATH
+        # The agent is loaded on every run worker, opted in or not, and
+        # OTEL_SDK_DISABLED does not avoid that -- it makes TracerProvider hand
+        # out NoOp tracers (sdk/trace/__init__.py) after sitecustomize.py has
+        # already imported and patched. Measured cost of that import is ~200ms
+        # of interpreter startup (locally, against the same package set the
+        # image installs -- not measured in the image), or ~1% of a p50 17s run.
+        # That cost is unavoidable in the end state where every location is
+        # instrumented, so the pilot pays it early rather than adding a lever to
+        # defer it.
+        #
+        # === FLUSH POLICY UNDER PREEMPTION ===
+        #
+        # Run workers are preemptible by design (priority_class_name below).
+        # The concern this file previously recorded -- that a SIGKILL drops
+        # whatever BatchSpanProcessor has not flushed, biased towards the runs
+        # from a capacity event -- does not apply to ordinary preemption:
+        #
+        #   1. Preemption deletes the pod with a grace period, so the process
+        #      gets SIGTERM first. dagster maps SIGTERM onto the SIGINT handler
+        #      (_utils/interrupts.py setup_interrupt_handlers) and
+        #      raise_execution_interrupts turns it into
+        #      DagsterExecutionInterruptedError, so the process unwinds and
+        #      exits normally rather than dying where it stands.
+        #   2. A normal exit flushes everything. TracerProvider registers
+        #      atexit.register(self.shutdown); shutdown reaches
+        #      BatchProcessor.shutdown, which wakes the worker thread, and the
+        #      worker's loop exits into a final EXPORT_ALL that drains the whole
+        #      queue (sdk/_shared_internal/__init__.py).
+        #
+        # So BatchSpanProcessor is kept. SimpleSpanProcessor would pay a
+        # synchronous HTTP round trip per span on every one of these short-lived
+        # processes to close a window that only exists under a hard kill (node
+        # loss, OOMKill, grace-period expiry).
+        #
+        # What does need bounding is the shutdown itself, and not with the knob
+        # the obvious reading suggests. In opentelemetry-sdk 1.44.0
+        # OTEL_BSP_EXPORT_TIMEOUT is inert: BatchProcessor stores
+        # _export_timeout_millis and nothing ever reads it, and
+        # BatchSpanProcessor.shutdown() takes no timeout, so the worker join
+        # runs at its hardcoded 30000ms default. The real bound is the
+        # exporter's own deadline. Left at defaults, an unreachable Alloy can
+        # therefore burn the entire 30s grace period and get the pod SIGKILLed
+        # mid-teardown -- which loses dagster's own run-failure events and the
+        # compute-log upload, a worse outcome than losing spans.
+        #
+        #   OTEL_EXPORTER_OTLP_TIMEOUT bounds each export attempt including
+        #   retries (deadline_sec = time() + self._timeout, and the retry loop
+        #   stops once the next backoff would cross it). NOTE: the Python HTTP
+        #   exporter reads this in SECONDS -- DEFAULT_TIMEOUT = 10 "# in
+        #   seconds" -- not the milliseconds the OTel spec defines. At 2s a full
+        #   2048-span queue drains in at most four 512-span batches, so ~8s
+        #   worst case, leaving 20s+ of the grace period for dagster's teardown.
+        #   The grace period is deliberately NOT raised: preemption relief speed
+        #   is the reason these pods are preemptible at all.
+        #
+        #   OTEL_BSP_SCHEDULE_DELAY at 2000ms rather than the 5000ms default
+        #   caps what a genuine hard kill can lose at ~2s of spans, and keeps
+        #   the queue small enough that the shutdown drain is normally one
+        #   batch. At p50 17s that is eight flushes per run instead of three.
+        #
+        # Sampling is inherited from dagster_otel_env, which means
+        # parentbased_traceidratio at DEFAULT_TRACE_SAMPLING_RATE -- and that is
+        # "1.0" (lib/otel.py), not a fraction. Run workers are launched by the
+        # daemon, so most of their traces are parentless roots and the ratio is
+        # the one that applies: every canvas run worker trace is head-sampled in.
+        # Deliberate rather than overlooked. Alloy's tailSampling is what decides
+        # what to keep -- errors, slow traces, everything from services that are
+        # not high-volume -- and head sampling upstream of it only discards
+        # traces it never gets to judge, which is the reasoning recorded at that
+        # constant. A run-worker-specific fraction here would reintroduce exactly
+        # that.
+        #
+        # So the volume control for a busier location is the tail sampler, not
+        # this. Measure what canvas actually lands in Tempo before opting in
+        # openedx, which peaks at 13823 concurrent run workers against canvas's
+        # 106 -- two orders of magnitude, against a policy nobody has re-sized
+        # for run-worker traffic.
+        #
+        # Tracked in tk-extend-otel-auto-instrumentation-to-dagster-run--378bda.
+        env:
+        - name: OTEL_SDK_DISABLED
+          value: "true"
+        - name: OTEL_BSP_SCHEDULE_DELAY
+          value: "2000"
+        - name: OTEL_EXPORTER_OTLP_TIMEOUT
+          value: "2"
       pod_template_spec_metadata:
         annotations:
           karpenter.sh/do-not-disrupt: "true"

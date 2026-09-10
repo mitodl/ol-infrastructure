@@ -2201,7 +2201,7 @@ edxorg_gcp_secret = OLVaultK8SSecret(
     opts=ResourceOptions(depends_on=[dagster_auth_binding]),
 )
 
-# ── OpenTelemetry auto-instrumentation, control plane only ──
+# ── OpenTelemetry auto-instrumentation: control plane, plus opted-in run workers ──
 #
 # ol-data-platform bakes the auto-instrumentation agent into every Dagster image
 # and symlinks it to the stable path below (dg_deployments/Dockerfile.dagster-k8s
@@ -2227,21 +2227,20 @@ edxorg_gcp_secret = OLVaultK8SSecret(
 # put a distribution behind DAGSTER_GRPC_TIMEOUT_SECONDS and
 # DAGSTER_CODE_SERVER_TIMEOUT_SECONDS, both of which are currently guesses.
 #
-# RUN WORKERS ARE DELIBERATELY EXCLUDED, and excluding them takes explicit work.
-# Not because their data is uninteresting -- it is the most interesting part, and
-# tk-extend-otel-auto-instrumentation-to-dagster-run--378bda tracks turning them
-# on. The open question is the span-flush policy: they are preemptible by design,
-# so a SIGKILL drops whatever BatchSpanProcessor has not flushed, biased towards
-# the runs killed during a capacity event. But the user-deployments
-# chart copies each deployment's whole `env` list into
-# DAGSTER_CLI_API_GRPC_CONTAINER_CONTEXT, and K8sRunLauncher applies that to
-# every run worker pod, so PYTHONPATH set here reaches them by default -- and it
-# cannot be taken back by naming PYTHONPATH again on the run launcher, because
-# both values land in the same merged list with the code location's last and
-# kubelet resolves duplicates by last assignment. dagster_instance.yaml strips it
-# with a container `command` of `env -u PYTHONPATH` instead, which the merge does
-# not touch; see the comment there. The remaining OTEL_* variables ride along to
-# run workers and are inert once the agent is off the path.
+# RUN WORKERS REACH THE AGENT TOO, and that is now deliberate. The
+# user-deployments chart copies each deployment's whole `env` list into
+# DAGSTER_CLI_API_GRPC_CONTAINER_CONTEXT and K8sRunLauncher applies that to every
+# run worker pod, so the PYTHONPATH set here has always reached them; it used to
+# be taken back by a `command` of `env -u PYTHONPATH` on the run launcher, which
+# survived the merge where a second PYTHONPATH entry would not have.
+#
+# That strip is gone. Run workers now load the agent and are silenced by
+# OTEL_SDK_DISABLED instead, defaulted true on the run launcher and set back to
+# "false" per code location by OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS below.
+# dagster_instance.yaml carries the reasoning: why the flush policy holds under
+# preemption, why the export is bounded by OTEL_EXPORTER_OTLP_TIMEOUT rather than
+# the inert OTEL_BSP_EXPORT_TIMEOUT, and why the scoping has to work in the
+# enable direction rather than the disable one. Read it before widening the set.
 OTEL_AGENT_PYTHONPATH = "/opt/otel/auto_instrumentation"
 
 
@@ -2308,6 +2307,46 @@ def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, st
         # sqlalchemy and every query gets two spans for the one statement.
         {"name": "OTEL_PYTHON_DISABLED_INSTRUMENTATIONS", "value": "psycopg2"},
     ]
+
+
+# Code locations whose RUN WORKERS export traces, as opposed to only their code
+# server. dagster_instance.yaml's run launcher sets OTEL_SDK_DISABLED=true as
+# the fleet default for run workers; a name listed here has it set back to
+# "false" in its own env, which the run launcher -> code location env merge puts
+# last and kubelet therefore honours. Read the flush-policy comment in that file
+# before adding to this set.
+#
+# canvas is the pilot: 7 days of kube_job_labels on data-production put it at a
+# mean of 87 concurrent run-worker Jobs against a peak of 106 -- steady rather
+# than bursty, so its trace volume is predictable -- while openedx runs a mean
+# of 221 against a peak of 13823. Enough traffic to produce a real per-worker
+# connection footprint, two orders of magnitude less blast radius than the
+# location that would otherwise dominate the signal.
+#
+# Run workers inherit the code location's OTEL_SERVICE_NAME, so their spans
+# arrive as `production-dagster-code-canvas` alongside the code server's and
+# cannot be told apart by service.name -- the launcher cannot override it,
+# because the code location sets that key and the code location's value is the
+# one kubelet keeps. Separate them on `k8s.pod.name` (a run worker's is
+# `dagster-run-<run-id>`, the server's is the deployment's) or on
+# `service.instance.id`, which the SDK makes unique per process. Both are
+# already present on the spans #5733 is producing.
+OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS = {"canvas"}
+
+
+def dagster_run_worker_otel_env(location_name: str) -> list[dict[str, str]]:
+    """Opt one code location's run workers into exporting traces.
+
+    The value rides on the code location's own env, which the chart copies into
+    the container context every one of its run workers inherits.
+
+    :param location_name: the code location's unhyphenated name, e.g. ``canvas``.
+    """
+    if not ships_telemetry(stack_info):
+        return []
+    if location_name not in OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS:
+        return []
+    return [{"name": "OTEL_SDK_DISABLED", "value": "false"}]
 
 
 def grpc_health_check_command(port: int) -> list[str]:
@@ -2475,6 +2514,7 @@ for location in code_locations:
             *dagster_otel_env(
                 f"dagster-code-{name.replace('_', '-')}", image_tag_or_digest
             ),
+            *dagster_run_worker_otel_env(name),
         ],
         "envSecrets": [
             {"name": "dagster-static-secrets"},
