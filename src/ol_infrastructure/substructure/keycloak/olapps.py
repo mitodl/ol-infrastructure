@@ -273,6 +273,66 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                     views=["admin", "user"], edits=["admin", "user"]
                 ),
             ),
+            # customerId/customerName: the contract for B2B-partner "which
+            # of the partner's own downstream customers does this user
+            # belong to" attribution claims (what blarghmatey originally
+            # asked about). Populated via IdP-broker attribute mappers, not
+            # user input, so these are admin-only and never required --
+            # most users have no value here at all. Accepted shape, and the
+            # `length` validators below enforcing it:
+            #   customerId:   non-empty string, <=255 chars. An opaque
+            #                 identifier owned by the partner (may be a
+            #                 UUID, a slug, a database key, etc.) -- no
+            #                 character-set constraint, since we don't
+            #                 control its format. Matches the 255-char
+            #                 bound already used for email/username above.
+            #   customerName: string, <=512 chars, human-readable (e.g.
+            #                 "Springfield High School"). Matches the
+            #                 512-char bound already used for fullName
+            #                 above.
+            # Per Apply7 (the current source of both claims): "customer"
+            # means one of *their* downstream customers -- a school or
+            # institution using Apply7's platform -- not Apply7 itself and
+            # not an MIT Learn concept.
+            #
+            # This is the standard contract for this kind of claim: any
+            # future OIDC/SAML partner sending an equivalent attribution
+            # claim should populate these same two attributes in this same
+            # shape, rather than each partner inventing its own. Only add a
+            # new, separately-named attribute if a partner's claim doesn't
+            # actually fit this shape (e.g. a structured/non-string value,
+            # or a genuinely different concept than "which downstream
+            # customer of the partner").
+            keycloak.RealmUserProfileAttributeArgs(
+                name="customerId",
+                display_name="${customerId}",
+                group="user-metadata",
+                required_for_roles=[],
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="length",
+                        config={"min": "1", "max": "255"},
+                    ),
+                ],
+                permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                    views=["admin"], edits=["admin"]
+                ),
+            ),
+            keycloak.RealmUserProfileAttributeArgs(
+                name="customerName",
+                display_name="${customerName}",
+                group="user-metadata",
+                required_for_roles=[],
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="length",
+                        config={"max": "512"},
+                    ),
+                ],
+                permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                    views=["admin"], edits=["admin"]
+                ),
+            ),
         ],
         groups=[
             keycloak.RealmUserProfileGroupArgs(
@@ -1552,6 +1612,59 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             ),
         )
         # MASAI SCHOOL [END]
+
+        apply7_oidc_identity_provider = onboard_oidc_org(
+            OIDCIdpConfig(
+                idp_alias="APPLY7",
+                idp_display_name="Apply7",
+                org_oidc_metadata_url="https://keycloak.apply7.cn/realms/mit-learn/.well-known/openid-configuration",
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="mit-learn",
+            ),
+            org=OrgConfig(
+                # Same as upGrad/Masai School: Apply7 users log in via a
+                # direct kc_idp_hint link, not domain-based home-realm
+                # discovery, so no domain is needed to gate access.
+                org_domains=[],
+                org_name="Apply7",
+                org_alias="APPLY7",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        # customer_id/customer_name claims identifying which of Apply7's
+        # own downstream customers (a school/institution on their platform)
+        # a given user belongs to -- see the customerId/customerName
+        # attribute definitions above for the full explanation of what
+        # "customer" means here. Requires customerId/customerName to be
+        # declared (admin-only) on the realm's user profile above --
+        # otherwise Keycloak silently drops attribute-importer writes to
+        # undeclared ("unmanaged") user attributes.
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-apply7-oidc-customer-id-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="customer_id",
+            identity_provider_alias=apply7_oidc_identity_provider.alias,
+            user_attribute="customerId",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-apply7-oidc-customer-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="customer_name",
+            identity_provider_alias=apply7_oidc_identity_provider.alias,
+            user_attribute="customerName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
 
     # B2B Organizations [END]
 
