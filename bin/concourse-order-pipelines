@@ -239,8 +239,18 @@ def load_order(order_file: Path | None) -> dict[str, dict[str, list[str]]]:
         order, source = PIPELINE_ORDER, "built-in ordering"
     else:
         order, source = yaml.safe_load(order_file.read_text()), str(order_file)
+        if not isinstance(order, dict):
+            sys.exit(
+                f"{source}: expected a mapping of team -> cluster -> pipeline list, "
+                f"got {type(order).__name__}"
+            )
 
     for team, clusters in order.items():
+        if not isinstance(clusters, dict):
+            sys.exit(
+                f"{source}: team {team!r} must map cluster names to pipeline lists, "
+                f"got {type(clusters).__name__}"
+            )
         placement: dict[str, list[str]] = {}
         for cluster, names in clusters.items():
             for name in names:
