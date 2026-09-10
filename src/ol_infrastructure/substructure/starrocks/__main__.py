@@ -410,8 +410,7 @@ if enable_data_lake:
 # LIMITATION: these GRANTs are additive.  If enable_data_lake_integration is
 # later set to false the Iceberg catalog grants already on the roles are NOT
 # automatically revoked.  A manual REVOKE USAGE ON CATALOG + REVOKE on tables
-# is required to remove them (or DROP + recreate the roles via pulumi destroy
-# followed by pulumi up).
+# is required to remove them.
 _base_roles_sql = """\
 -- Machine-access roles assigned to Vault-issued ephemeral service accounts.
 -- These are referenced by the vault.database.SecretBackendRole resources above.
@@ -499,13 +498,6 @@ GRANT SELECT ON ALL MATERIALIZED VIEWS IN ALL DATABASES TO ROLE ol_business_anal
 _roles_sql = _base_roles_sql + _iceberg_roles_sql
 _role_deps: list[pulumi.Resource] = [starrocks_db_connection, *catalog_setups]
 
-_roles_drop_sql = (
-    "DROP ROLE IF EXISTS readonly; DROP ROLE IF EXISTS app; DROP ROLE IF EXISTS admin;"
-    " DROP ROLE IF EXISTS ol_platform_admin; DROP ROLE IF EXISTS ol_data_engineer;"
-    " DROP ROLE IF EXISTS ol_data_analyst; DROP ROLE IF EXISTS ol_researcher;"
-    " DROP ROLE IF EXISTS ol_instructor; DROP ROLE IF EXISTS ol_business_analyst;"
-)
-
 # Valid Keycloak ol-starrocks-client role names.  These match StarRocks role
 # names 1:1 so no translation is needed when creating OIDC user accounts.
 _GOVERNANCE_ROLES: frozenset[str] = frozenset(
@@ -526,18 +518,23 @@ _GOVERNANCE_ROLES: frozenset[str] = frozenset(
 # generated CREATE USER / GRANT statements.
 _OIDC_USERNAME_RE = re.compile(r"^[A-Za-z0-9._%+@-]+$")
 
+# No delete step. Dropping a StarRocks role revokes it from every user that
+# holds it, and nothing re-grants roles to Vault-issued users that already
+# exist. This resource is replaced whenever _roles_sql changes (Production
+# recorded replacements on 2026-08-12 and 2026-09-03); each replacement ran a
+# DROP ROLE delete step and left the Superset and MIT Learn credentials with
+# no role at all. The roles therefore outlive this resource and must be
+# dropped by hand if that is ever wanted.
 roles_setup_cmd = command.local.Command(
     f"starrocks-{stack_info.env_suffix}-roles-setup",
     create=_exec_sql,
     update=_exec_sql,
-    delete=_exec_delete_sql,
     environment={
         **_mysql_env,
         "STARROCKS_SQL": _roles_sql,
-        "STARROCKS_DELETE_SQL": _roles_drop_sql,
     },
     triggers=[hashlib.sha256(_roles_sql.encode()).hexdigest()],
-    opts=ResourceOptions(delete_before_replace=True, depends_on=_role_deps),
+    opts=ResourceOptions(depends_on=_role_deps),
 )
 
 # --- b2b_analytics database ---------------------------------------------
