@@ -1116,6 +1116,8 @@ def test_command_prefix_prepended_for_explicit_command():
         assert container["command"] == ["opentelemetry-instrument", "celery"]
 
     return app.application_deployment.spec.template.spec.containers.apply(check)
+
+
 # ─── celery --max-memory-per-child ────────────────────────────────────────────
 
 
