@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# ruff: noqa: T201
 """Apply a curated, semantic display order to Concourse dashboard tiles.
 
 Concourse 8.2.4 has no folder/tag/grouping primitive for distinct pipelines
