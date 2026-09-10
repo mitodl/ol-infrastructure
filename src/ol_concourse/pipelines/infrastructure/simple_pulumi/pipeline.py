@@ -400,6 +400,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-saas-github-repositories",
         stages=["default"],
         topology="preview-gated",
+        # rulesets.py grants the release bot its required-checks bypass from
+        # bridge.settings.apps, so flipping an app's release_resource_workflow
+        # has to re-run this stack. The registry is outside PULUMI_WATCHED_PATHS
+        # and this project's path.
+        additional_watched_paths=["src/bridge/settings/apps.py"],
     ),
     "grafana-alerting": SimplePulumiParams(
         app_name="grafana-alerting",
