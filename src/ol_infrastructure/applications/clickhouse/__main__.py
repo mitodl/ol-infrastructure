@@ -1049,9 +1049,11 @@ clickhouse_network_policy = kubernetes.networking.v1.NetworkPolicy(
 ############################################################
 # Monitoring — ServiceMonitor for Prometheus Operator
 #
-# ClickHouse exposes Prometheus metrics at /metrics on the HTTP port (8123).
-# The ServiceMonitor targets the stable ``clickhouse`` ClusterIP Service
-# created above, so Prometheus scrapes all replicas through it.
+# ClickHouse serves Prometheus metrics at /metrics on CLICKHOUSE_METRICS_PORT
+# (9363), and only because the CHI's prometheus/* settings turn it on. It does
+# not serve them on the HTTP port (8123); a ServiceMonitor pointed there
+# scraped up=0. The ServiceMonitor selects the ``clickhouse`` Service, and
+# Prometheus scrapes each replica's endpoint behind it individually.
 # Requires the Prometheus Operator (monitoring.coreos.com/v1 CRDs) to be
 # installed in the cluster (already present per EKS infrastructure stack).
 ############################################################
@@ -1116,6 +1118,10 @@ keeper_service_monitor = kubernetes.apiextensions.CustomResource(
                 "scrapeTimeout": "10s",
                 # pod_name, container_name and app are the labels Altinity's
                 # Keeper dashboard (grafana_alerting/dashboards) filters on.
+                # container_name is a constant rather than taken from
+                # __meta_kubernetes_pod_container_name: that meta label is only
+                # set when the scraped port is a declared container port, and
+                # the operator's Keeper pod declares only 2181 and 9444.
                 "relabelings": [
                     {
                         "sourceLabels": ["__meta_kubernetes_pod_name"],
@@ -1126,8 +1132,8 @@ keeper_service_monitor = kubernetes.apiextensions.CustomResource(
                         "targetLabel": "pod_name",
                     },
                     {
-                        "sourceLabels": ["__meta_kubernetes_pod_container_name"],
                         "targetLabel": "container_name",
+                        "replacement": "clickhouse-keeper",
                     },
                     {"targetLabel": "app", "replacement": "clickhouse-keeper"},
                 ],

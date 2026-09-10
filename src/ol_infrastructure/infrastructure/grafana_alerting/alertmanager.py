@@ -162,6 +162,13 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             # per rule -- and, once promoted past `channel=devops-warnings`,
             # one Rootly incident per rule instead of one per service.
             "service_name",
+            # And for metric_rules/clickhouse.py, whose server rules aggregate
+            # `by (cluster, namespace, hostname)` off the operator exporter.
+            # Every replica shares one namespace, and those series are scraped
+            # from the single exporter pod, so `hostname` is the only label
+            # that tells replicas apart. Without it, two replicas going
+            # read-only at once would arrive as a single notification.
+            "hostname",
             # Same reasoning once more for metric_rules/eks_general.py's
             # WorkloadJobFailed*, which aggregate `sum by (cluster, namespace,
             # workload)` -- `workload` is the owning CronJob for a scheduled Job
