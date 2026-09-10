@@ -11,9 +11,11 @@ Two scrape targets feed these rules, and they name things differently.
   read off the live exporter in data-production on 2026-09-10.
 - Keeper's own Prometheus endpoint, ``ClickHouse*_Keeper*`` (ServiceMonitor in
   applications/clickhouse). Keeper has no SQL interface for the exporter to
-  query. These names come from Altinity's prometheus-alert-rules-chkeeper.yaml
-  at release-0.26.0 and could not be read live before the endpoint existed:
-  confirm them on the first environment this reaches.
+  query. These names were read off /metrics on the deployed image
+  (clickhouse/clickhouse-keeper:26.7-alpine, run locally with the same
+  prometheus settings) on 2026-09-10. ClickHouseKeeperMetricsMissing fires if
+  a later Keeper version drops them, since every Keeper rule here would
+  otherwise fall silent under no_data_state="OK".
 
 Series that only exist once non-zero
 ------------------------------------
@@ -108,12 +110,26 @@ def _keeper_lost_quorum() -> str:
     # Keeper, which is a leader with zero synced followers by construction and
     # would satisfy this permanently. Add QA once its canary ensemble has three
     # members.
+    #
+    # Two ways to lose quorum, one arm each. Keeper emits KeeperIsLeader and
+    # KeeperSyncedFollowers on every node, 0 on followers
+    # (src/Coordination/KeeperAsynchronousMetrics.cpp at v26.7.6.57), so:
+    #   - a leader that has lost its followers reports IsLeader 1 with
+    #     SyncedFollowers 0;
+    #   - an ensemble with no leader at all (a partition, or two of three
+    #     members gone) reports IsLeader 0 on every node that is still up, and
+    #     the first arm alone would never fire for it. The second arm's value
+    #     is the number of nodes still reporting, so it is positive whenever
+    #     it matches.
+    keeper = f'{{cluster=~"{_PROD_CLUSTERS}"}}'
     return (
-        f"max by ({_BY_KEEPER}) (ClickHouseAsyncMetrics_KeeperIsLeader"
-        f'{{cluster=~"{_PROD_CLUSTERS}"}}) == 1\n'
+        f"(max by ({_BY_KEEPER}) (ClickHouseAsyncMetrics_KeeperIsLeader{keeper}) == 1\n"
         f"and on ({_BY_KEEPER})\n"
-        f"max by ({_BY_KEEPER}) (ClickHouseAsyncMetrics_KeeperSyncedFollowers"
-        f'{{cluster=~"{_PROD_CLUSTERS}"}}) < 1'
+        f"max by ({_BY_KEEPER}) (ClickHouseAsyncMetrics_KeeperSyncedFollowers{keeper}) < 1)\n"
+        "or\n"
+        f"(count by (cluster, namespace) (ClickHouseAsyncMetrics_KeeperIsLeader{keeper})\n"
+        "unless on (cluster, namespace)\n"
+        f"(sum by (cluster, namespace) (ClickHouseAsyncMetrics_KeeperIsLeader{keeper}) > 0))"
     )
 
 
@@ -126,12 +142,14 @@ def _backup_stale(clusters: str) -> str:
     )
 
 
-def _backup_never_succeeded() -> str:
+def _backup_never_succeeded(clusters: str) -> str:
     # eks_general.py's staleness rules cannot see a CronJob that has never
     # succeeded (kube-state-metrics omits last_successful_time until the first
     # success). Same shape as witan.py's _never_succeeded_expr: the age term
     # leads so that its positive value is what reaches the threshold.
-    selector = 'namespace="clickhouse", cronjob="clickhouse-backup"'
+    selector = (
+        f'cluster=~"{clusters}", namespace="clickhouse", cronjob="clickhouse-backup"'
+    )
     return (
         "(\n"
         "  (\n"
@@ -251,6 +269,13 @@ def create(
                 "The clickhouse-backup CronJob in cluster {{ $labels.cluster }} has not succeeded in over 26 hours. AWS Backup EBS snapshots are the only recovery layer until it does.",
                 rd,
             ),
+            *_paired(
+                "ClickHouseBackupNeverSucceeded",
+                _backup_never_succeeded,
+                "15m",
+                "The clickhouse-backup CronJob in cluster {{ $labels.cluster }} was created {{ $value | humanizeDuration }} ago and has never succeeded. AWS Backup EBS snapshots are the only recovery layer until it does.",
+                rd,
+            ),
             alerting.RuleGroupRuleArgs(
                 name="ClickHouseKeeperLostQuorumCritical",
                 condition="C",
@@ -259,18 +284,11 @@ def create(
                 exec_err_state="KeepLast",
                 labels={**_LABELS, "severity": "critical"},
                 annotations={
-                    "description": "ClickHouse Keeper leader {{ $labels.pod }} in cluster {{ $labels.cluster }} has no synced followers. Keeper cannot commit, so every replicated table is read-only."
+                    "description": "ClickHouse Keeper in cluster {{ $labels.cluster }} has lost quorum: either the leader has no synced followers, or no member is leader at all. Keeper cannot commit, so every replicated table is read-only."
                 },
                 datas=rd(_keeper_lost_quorum()),
             ),
             # --- Degradation ---
-            _warning(
-                "ClickHouseBackupNeverSucceeded",
-                _backup_never_succeeded(),
-                "15m",
-                "The clickhouse-backup CronJob in cluster {{ $labels.cluster }} was created {{ $value | humanizeDuration }} ago and has never succeeded.",
-                rd,
-            ),
             _warning(
                 "ClickHouseReplicationDelay",
                 f"max by ({_BY_HOST}) (chi_clickhouse_metric_ReplicasMaxAbsoluteDelay) > 300",
@@ -338,6 +356,20 @@ def create(
                 f"max by ({_BY_KEEPER}) (1 - up{{{_KEEPER_JOB}}}) > 0",
                 "5m",
                 "ClickHouse Keeper pod {{ $labels.pod }} in cluster {{ $labels.cluster }} is not answering its metrics endpoint.",
+                rd,
+            ),
+            _warning(
+                # Guards every Keeper rule above against a metric rename. Those
+                # rules use no_data_state="OK", so if a Keeper upgrade renamed
+                # KeeperIsLeader they would go quiet rather than fail. Keeper
+                # emits it on every node (0 on followers), so a pod that
+                # scrapes fine without it means the names moved.
+                "ClickHouseKeeperMetricsMissing",
+                f"max by ({_BY_KEEPER}) (up{{{_KEEPER_JOB}}} == 1)\n"
+                f"unless on ({_BY_KEEPER})\n"
+                f"max by ({_BY_KEEPER}) (ClickHouseAsyncMetrics_KeeperIsLeader)",
+                "15m",
+                "ClickHouse Keeper pod {{ $labels.pod }} in cluster {{ $labels.cluster }} is being scraped but reports no ClickHouseAsyncMetrics_KeeperIsLeader. The Keeper alert rules cannot fire until metric_rules/clickhouse.py matches the new metric names.",
                 rd,
             ),
             _warning(
