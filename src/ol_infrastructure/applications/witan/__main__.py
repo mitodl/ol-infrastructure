@@ -908,6 +908,7 @@ witan_serving_tier = create_serving_tier(
     council_graph_id=council_graph_id,
     oidc_issuer=KEYCLOAK_ISSUER,
     oidc_audience=WITAN_OIDC_AUDIENCE,
+    oidc_resource_url=f"https://{WITAN_DOMAIN}",
     actor_tokens_secret_name=ACTOR_TOKENS_SECRET_NAME,
     actor_tokens_secret=actor_tokens_secret,
     witan_ci_token_secret_name=WITAN_CI_TOKEN_SECRET_NAME,
