@@ -300,9 +300,11 @@ The second set is O(number of governance roles), stable, and changes only when t
 changes. The first is per-user but is a single idempotent "add user" with no privilege decisions in
 it, unlike Lakekeeper's per-user grants or Polaris's per-user grants *plus* pre-created principals.
 
-**Still unknown:** whether `s3-token` genuinely downscopes (item 4), and how the FE metadata cache interacts with this
-(the cached-read bypass established for Lakekeeper is a StarRocks-side behaviour and applies here
-too, so StarRocks GRANTs remain the query-time filter regardless).
+**Still unknown:** how the FE metadata cache interacts with this. The cached-read bypass
+established for Lakekeeper is a StarRocks-side behaviour and applies here too, so StarRocks GRANTs
+remain the query-time filter regardless. (`s3-token` downscoping was the other open item and is no
+longer unknown: item 4 above re-ran against real AWS STS with the vending role deliberately granted
+the whole bucket, so the narrowing observed can only have come from Gravitino's session policy.)
 
 ## Non-negotiables from the prior spikes, re-checked
 

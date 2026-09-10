@@ -1,15 +1,19 @@
 # Iceberg REST catalog evaluation: Lakekeeper vs Apache Polaris vs Apache Gravitino
 
-Status: evaluation complete, recommendation pending one spike
+Status: evaluation complete, Gravitino recommended (the contingency was resolved 2026-09-08)
 Date: 2026-09-08
 Project: `wp-starrocks-iceberg-rest-catalog-jwt-identity-dele-13ccbe`
 Task: `tk-evaluate-iceberg-rest-catalog-options-lakekeeper-2e4ed9`
 
 ## Why this exists
 
-The project's stated scope includes "evaluating Iceberg REST catalog options". That step was
-skipped. Two spikes and every dependent spec assumed Lakekeeper. Before the Keycloak and EKS
-specs encode Lakekeeper-specific configuration, and before the open p0 fork
+The project's stated scope includes "evaluating Iceberg REST catalog options", and that step was
+done: `tk-evaluate-iceberg-rest-catalog-options-for-jwt-de-17d9c3` closed 2026-06-25 having
+compared Nessie, Polaris, Lakekeeper and Unity Catalog OSS. The gap is narrower than "never
+evaluated". It never considered Gravitino, and its central reason for choosing Lakekeeper did not
+survive contact with the software (see "how much weight the incumbent deserves" below). Two spikes
+and every dependent spec have assumed Lakekeeper since. Before the Keycloak and EKS specs encode
+Lakekeeper-specific configuration, and before the open p0 fork
 (`tk-decision-openfga-oss-second-role-vocabulary-vs-c-1497cb`) is settled, the alternatives get
 the same scrutiny.
 
@@ -40,7 +44,7 @@ These come from what the two spikes proved actually matters, not from a generic 
 | C. Principal provisioning | **Self-registers on first touch** | **Must pre-exist; auth fails otherwise** | Must be added to metalake |
 | C. Role vocabulary | Second vocabulary, own sync | Second vocabulary, own sync, roles only *select* existing grants | **Group claim drives role membership** |
 | D. Credential vending | Yes, **measured** (per-table, identity + location revalidated) | Yes, optional principal in STS session name | Yes (S3, GCS, OSS, ADLS) |
-| E. End-user audit | Yes, **measured** | Not verified | Not verified |
+| E. End-user audit | Yes, **measured** | Not verified | Yes, **measured** |
 | F. Licensing | Apache-2.0 core, **Cedar authorizer is enterprise** | Apache-2.0, ASF top-level | Apache-2.0, ASF top-level |
 | G. Footprint | Service + Postgres, plus OpenFGA + its own Postgres | Service + Postgres (+ OPA if used, beta) | Service + backend DB (+ Ranger if pushdown wanted) |
 
@@ -147,7 +151,12 @@ defeat credential caching.
 
 ### Criterion E: end-user audit
 
-Measured only for Lakekeeper. Unverified for the other two. Do not assume it.
+Measured for Lakekeeper and, in the 2026-09-08 spike, for Gravitino: once `gravitino.audit.enabled`
+is turned on (it defaults to false and the server logs "Audit log is not enabled" at startup),
+entries carry the end-user principal, the operation, the fully-qualified object and the outcome.
+Unverified for Polaris. Do not assume it there.
+
+Not a discriminator between the two live options.
 
 ### Criterion F: licensing
 
@@ -226,14 +235,10 @@ A pass over every task and memory in
 `wp-starrocks-iceberg-rest-catalog-jwt-identity-dele-13ccbe`, looking for evidence that tilts the
 choice. It does tilt, in both directions, and the net is a reframing rather than a winner.
 
-### First, a correction to this document's own premise
+### How much weight the incumbent deserves
 
-An earlier section of this file said the project's "evaluate catalog options" step "was never
-done". **That was wrong.** `tk-evaluate-iceberg-rest-catalog-options-for-jwt-de-17d9c3` closed
-2026-06-25 having compared Nessie, Polaris, Lakekeeper and Unity Catalog OSS. The real gap was
-narrower: it never considered Gravitino, and Gravitino is the one that changes the answer.
-
-But that evaluation is not a reliable input any more, and this matters for how much weight the
+The June evaluation (`tk-evaluate-iceberg-rest-catalog-options-for-jwt-de-17d9c3`, closed
+2026-06-25) is not a reliable input any more, and this matters for how much weight the
 incumbent deserves. It recommended "Lakekeeper v0.12.4 with Cedar" on the grounds that Lakekeeper
 "maps `realm_access.roles` claim to per-table Cedar policies **without pre-registering
 principals**" and was "the only catalog that has both first-class StarRocks validation AND direct

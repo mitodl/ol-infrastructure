@@ -318,8 +318,17 @@ deployment to complain.
 Minimum check, run post-deploy and on a schedule:
 
 1. An unauthenticated `GET` against the Iceberg REST `/v1/config` endpoint returns 401.
-2. A request bearing a token from a different realm returns 401 (proves D6 is in force).
+2. The rendered `gravitino.authenticator.oauth.authority` in the running config is non-empty and
+   equals the expected issuer for the environment.
 3. Alert on either failing.
+
+Check 2 is a configuration assertion rather than a behavioural one, deliberately. A token from
+another realm is signed by that realm's own key, which is absent from this realm's JWKS, so it is
+rejected at signature verification and returns 401 even with `authority` blank. A foreign-realm
+token therefore proves nothing about D6. Proving the issuer check behaviourally needs a token this
+realm's JWKS *will* verify carrying a foreign `iss`, which Keycloak will not mint. The equivalent
+test in a throwaway environment is to point `jwksUri` at one realm and `authority` at another and
+confirm the first realm's token is rejected.
 
 ## Pulumi changes
 
@@ -405,10 +414,15 @@ keycloak.openid.UserClientRoleProtocolMapper(
 # GRAVITINO [END]
 ```
 
-Plus, on both existing StarRocks client resources (D3, pending sign-off):
+Plus one keyword argument on each of the two existing StarRocks client resources,
+`ol_data_platform_starrocks_client` and `ol_data_platform_starrocks_cli_client` (D3, pending
+sign-off on the value):
 
 ```python
-access_token_lifespan = ("3600",)
+keycloak.openid.Client(
+    ...,
+    access_token_lifespan="3600",
+)
 ```
 
 `keycloak_url` is already a parameter of `create_ol_data_platform_realm`
