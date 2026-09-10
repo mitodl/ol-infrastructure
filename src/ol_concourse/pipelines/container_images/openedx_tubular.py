@@ -55,7 +55,9 @@ docker_pipeline = Pipeline(
                 GetStep(get=tubular_repository.name, trigger=True),
                 build_task,
                 ensure_ecr_task("mitodl/openedx-tubular"),
-                configure_ecr_repository_task("mitodl/openedx-tubular"),
+                configure_ecr_repository_task(
+                    "mitodl/openedx-tubular", keep_last_n_images=10
+                ),
                 PutStep(
                     put=tubular_image.name,
                     params={

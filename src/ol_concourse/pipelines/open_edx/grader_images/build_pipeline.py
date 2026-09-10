@@ -181,7 +181,7 @@ def grader_image_pipeline(config: GraderPipelineConfig) -> Pipeline:
                 ),
             ),
             ensure_ecr_task(config.ecr_repo_name),
-            configure_ecr_repository_task(config.ecr_repo_name),
+            configure_ecr_repository_task(config.ecr_repo_name, keep_last_n_images=10),
             PutStep(
                 put=grader_ecr_image.name,
                 params={

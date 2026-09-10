@@ -24,28 +24,58 @@ from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 
 
 def configure_ecr_repository_task(
-    repo_name: str, *, keep_last_n_images: int = 10
+    repo_name: str,
+    *,
+    keep_last_n_images: int | None = None,
+    expire_after_days: int | None = None,
 ) -> TaskStep:
-    """Return a TaskStep applying scan-on-push + an image-count lifecycle policy.
+    """Return a TaskStep applying scan-on-push + a lifecycle policy.
 
     Safe to run on every pipeline execution: both
     ``put-image-scanning-configuration`` and ``put-lifecycle-policy`` are
     idempotent -- each call just (re)applies the same configuration.
 
+    Exactly one of ``keep_last_n_images``/``expire_after_days`` must be set.
+    ``keep_last_n_images`` (count-based, ``tagStatus: any``) is only safe
+    for a repository written to by a single build job/branch. For a
+    repository shared by independent CI and release build jobs (this
+    module's own docstring already flags that pattern), a burst of CI
+    commits can push the still-deployed release image out of the "N most
+    recent" window and delete it -- breaking any future pod/node image
+    pull. Use ``expire_after_days`` there instead: CI churn volume no
+    longer matters, only genuine staleness does, so a release image
+    redeployed within any reasonable window is never at risk. Flagged by
+    Copilot review on PR #5728 against exactly this shared-repo case.
+
     :param repo_name: The ECR repository name, e.g. ``"witan"``.
     :param keep_last_n_images: Expire all but the most recent N images.
+    :param expire_after_days: Expire images not pushed within the last N days.
     """
+    if (keep_last_n_images is None) == (expire_after_days is None):
+        msg = "Exactly one of keep_last_n_images or expire_after_days must be set"
+        raise ValueError(msg)
+    if keep_last_n_images is not None:
+        selection = {
+            "tagStatus": "any",
+            "countType": "imageCountMoreThan",
+            "countNumber": keep_last_n_images,
+        }
+        description = f"Keep last {keep_last_n_images} images"
+    else:
+        selection = {
+            "tagStatus": "any",
+            "countType": "sinceImagePushed",
+            "countUnit": "days",
+            "countNumber": expire_after_days,
+        }
+        description = f"Expire images older than {expire_after_days} days"
     lifecycle_policy = json.dumps(
         {
             "rules": [
                 {
                     "rulePriority": 1,
-                    "description": f"Keep last {keep_last_n_images} images",
-                    "selection": {
-                        "tagStatus": "any",
-                        "countType": "imageCountMoreThan",
-                        "countNumber": keep_last_n_images,
-                    },
+                    "description": description,
+                    "selection": selection,
                     "action": {"type": "expire"},
                 }
             ]

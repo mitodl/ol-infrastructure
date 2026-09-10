@@ -59,7 +59,9 @@ docker_pipeline = Pipeline(
                 GetStep(get=concourse_npm_resource_repository.name, trigger=True),
                 build_task,
                 ensure_ecr_task("mitodl/concourse-npm-resource"),
-                configure_ecr_repository_task("mitodl/concourse-npm-resource"),
+                configure_ecr_repository_task(
+                    "mitodl/concourse-npm-resource", keep_last_n_images=10
+                ),
                 PutStep(
                     put=concourse_npm_resource_image.name,
                     params={
