@@ -253,6 +253,15 @@ def load_order(order_file: Path | None) -> dict[str, dict[str, list[str]]]:
             )
         placement: dict[str, list[str]] = {}
         for cluster, names in clusters.items():
+            # A bare string would otherwise iterate character by character and
+            # "order" one-letter pipeline names without any error.
+            if not isinstance(names, list) or not all(
+                isinstance(n, str) for n in names
+            ):
+                sys.exit(
+                    f"{source}: team {team!r}, cluster {cluster!r} must be a list of "
+                    f"pipeline names, got {names!r}"
+                )
             for name in names:
                 placement.setdefault(name, []).append(cluster)
         duplicated = {n: c for n, c in placement.items() if len(c) > 1}
