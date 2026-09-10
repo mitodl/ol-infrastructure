@@ -218,6 +218,10 @@ tika_apisix_route = OLApisixRoute(
             priority=10,
             shared_plugin_config_name=tika_shared_plugins.resource_name,
             timeout_send="300s",  # Tika can take a while to process large files
+            # A slow parse hits the read timeout, not the send timeout. Left at
+            # the 60s default, the gateway answers 504 long before the client's
+            # own 300s timeout.
+            timeout_read="300s",
             plugins=[
                 # Use serverless-pre-function to validate X-Access-Token header
                 # This is simpler than request-validation and more flexible
