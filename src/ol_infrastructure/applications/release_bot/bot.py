@@ -355,8 +355,9 @@ async def _cmd_abandon(repos, ack, respond, command, _context):
     lines = [f"Cancelled the pending hotfix of `{sha[:7]}`." for sha in cancelled]
     if not in_flight:
         # The abandon job deletes the branch and tag of whatever version the
-        # release resource last reported. With nothing in flight that is the
-        # release production is running, and its tag is the only record of it.
+        # release resource last reported. With nothing in flight and no new
+        # commits, that is the release production is running, and its tag is
+        # the only record of what it runs.
         lines.append(f"No release is in flight for `{app_name}`; nothing to abandon.")
         await respond("\n".join(lines))
         return
