@@ -379,11 +379,13 @@ def _clear_watchers(monkeypatch):
     monkeypatch.setattr(bot, "_slack_app", app)
     bot._checkbox_watchers.clear()
     bot._release_requesters.clear()
+    bot._app_locks.clear()
     slack_users._cache.clear()
     slack_users._lookups_disabled = False
     yield
     bot._checkbox_watchers.clear()
     bot._release_requesters.clear()
+    bot._app_locks.clear()
     slack_users._cache.clear()
     slack_users._lookups_disabled = False
 
@@ -1547,3 +1549,48 @@ async def test_abandon_triggers_the_job_for_an_in_flight_release(
 
     assert calls == [("trigger", "my-app-pipeline", "abandon-my-app-release")]
     assert "Abandoning" in slack.said
+
+
+async def test_abandon_cancels_nothing_when_it_cannot_read_release_state(
+    repos, slack, monkeypatch
+):
+    """Deleting requests and then reporting "nothing abandoned" would hide it."""
+    cancel = AsyncMock()
+    monkeypatch.setattr(bot.github, "cancel_hotfix_requests", cancel)
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(side_effect=RuntimeError("github down")),
+    )
+
+    await bot._cmd_abandon(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    cancel.assert_not_awaited()
+    assert "Nothing abandoned" in slack.said
+
+
+async def test_concurrent_hotfixes_for_one_app_cannot_both_be_requested(
+    repos, slack, hotfix_api
+):
+    """Without the per-app lock both read "nothing pending" before either writes."""
+    pending: list[str] = []
+
+    async def _request(_repo, sha):
+        await asyncio.sleep(0)  # where a racing command could slip in
+        pending.append(sha)
+
+    hotfix_api.resolve_commit.side_effect = lambda _repo, ref: ref[0] * 40
+    hotfix_api.pending_hotfix_requests.side_effect = lambda _repo: list(pending)
+    hotfix_api.request_hotfix.side_effect = _request
+
+    await asyncio.gather(
+        bot._cmd_hotfix(
+            repos, slack.ack, slack.respond, _command("my-app aaaaaaa"), {}
+        ),
+        bot._cmd_hotfix(
+            repos, slack.ack, slack.respond, _command("my-app bbbbbbb"), {}
+        ),
+    )
+
+    assert pending == ["a" * 40]
+    assert "`aaaaaaa` is already pending" in slack.said

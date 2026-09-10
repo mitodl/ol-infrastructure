@@ -441,8 +441,18 @@ async def resolve_commit(repo_slug: str, ref: str) -> str:
     return await asyncio.to_thread(_resolve_commit_sync, repo_slug, ref)
 
 
+# Only a tag named for a full SHA is a request. The release resource offers no
+# other and deletes a request by that exact name, so anything else under the
+# prefix would block releases here while never being cut or consumed there.
+_HOTFIX_REQUEST_RE = re.compile(r"^refs/tags/hotfix/[0-9a-f]{40}$")
+
+
 def _hotfix_refs(repo: Any) -> list[Any]:
-    return list(repo.get_git_matching_refs(f"tags/{HOTFIX_TAG_PREFIX}"))
+    return [
+        ref
+        for ref in repo.get_git_matching_refs(f"tags/{HOTFIX_TAG_PREFIX}")
+        if _HOTFIX_REQUEST_RE.match(ref.ref)
+    ]
 
 
 def _hotfix_sha(ref: Any) -> str:

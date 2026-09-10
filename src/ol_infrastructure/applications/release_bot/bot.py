@@ -35,6 +35,18 @@ _slack_app: AsyncApp | None = None
 _release_requesters: dict[str, str] = {}
 
 
+# app name -> lock held across a command's check-then-act sequence. Slack
+# handlers run concurrently on one event loop, so without it two commands can
+# each read "nothing pending" before either writes: two hotfix requests for
+# one app, or a release triggered while a hotfix is being requested.
+# Process-local is enough because the bot runs one replica (see _slack_app).
+_app_locks: dict[str, asyncio.Lock] = {}
+
+
+def _app_lock(app_name: str) -> asyncio.Lock:
+    return _app_locks.setdefault(app_name, asyncio.Lock())
+
+
 _USAGE = (
     "Usage:\n"
     "• `/doof release <app>` — cut a release\n"
@@ -94,7 +106,11 @@ async def _cmd_release(repos, ack, respond, command, context):
     if cfg is None:
         await respond(error)
         return
+    async with _app_lock(app_name):
+        await _release(respond, app_name, cfg, context)
 
+
+async def _release(respond, app_name, cfg, context):
     # While a hotfix request is pending the release resource offers that
     # hotfix, not the tracked branch, so this build would cut it instead.
     try:
@@ -343,13 +359,29 @@ async def _cmd_abandon(repos, ack, respond, command, _context):
     if cfg is None:
         await respond(error)
         return
+    async with _app_lock(app_name):
+        await _abandon(respond, app_name, cfg)
+
+
+async def _abandon(respond, app_name, cfg):
+    # Read before mutating: a lookup that failed after the cancel would report
+    # "nothing abandoned" with the requests already deleted.
     try:
-        cancelled = await github.cancel_hotfix_requests(cfg.repo)
         in_flight = await github.in_flight_release(cfg.repo)
     except Exception:
         log.exception("Failed to check release state for %s", app_name)
         await respond(
-            f"❌ Could not check `{app_name}`'s release state. Nothing abandoned."
+            f"❌ Could not check `{app_name}`'s release state. Nothing abandoned "
+            "or cancelled."
+        )
+        return
+    try:
+        cancelled = await github.cancel_hotfix_requests(cfg.repo)
+    except Exception:
+        log.exception("Failed to cancel hotfix requests for %s", app_name)
+        await respond(
+            f"❌ Failed while cancelling `{app_name}`'s pending hotfix requests; "
+            "some may already be gone. Nothing abandoned."
         )
         return
     lines = [f"Cancelled the pending hotfix of `{sha[:7]}`." for sha in cancelled]
@@ -638,7 +670,11 @@ async def _cmd_hotfix(repos, ack, respond, command, context):
     if cfg is None:
         await respond(error)
         return
+    async with _app_lock(app_name):
+        await _hotfix(respond, app_name, cfg, ref, context)
 
+
+async def _hotfix(respond, app_name, cfg, ref, context):
     sha, error = await _request_hotfix(cfg, app_name, ref)
     if sha is None:
         await respond(error)

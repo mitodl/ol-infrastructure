@@ -598,6 +598,16 @@ def test_cancel_hotfix_requests_deletes_only_requests(fake_repo):
     assert [r.ref for r in repo.refs] == ["refs/tags/2026.9.1.1"]
 
 
+def test_hotfix_tags_not_named_for_a_full_sha_are_not_requests(fake_repo):
+    """The release resource ignores these, so they must not block releases here."""
+    repo = fake_repo(
+        _RefsRepo("refs/tags/hotfix/test", f"refs/tags/hotfix/{_HOTFIX_SHA[:7]}")
+    )
+    assert github._pending_hotfix_requests_sync("mitodl/thing") == []
+    assert github._cancel_hotfix_requests_sync("mitodl/thing") == []
+    assert len(repo.refs) == 2
+
+
 # ---------------------------------------------------------------------------
 # In-flight release detection
 # ---------------------------------------------------------------------------
