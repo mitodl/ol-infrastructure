@@ -2177,6 +2177,89 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
                 ),
             ],
         ),
+        # browser-*/fastly-* twins of the two priority-10 routes above that have
+        # no other copy. browser-passauth (40) and fastly-passauth (20) match /*
+        # for nearly all real traffic, so without these they win first: credential
+        # metadata falls back to the default 60s read timeout, and the DNT probe
+        # is proxied through to Django instead of answered with a 204.
+        OLApisixRouteConfig(
+            route_name="fastly-credential-metadata",
+            priority=30,
+            timeout_read="180s",
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/api/v0/credential_metadata/"],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-credential-metadata",
+            priority=50,
+            timeout_read="180s",
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/api/v0/credential_metadata/"],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="fastly-dnt-policy",
+            priority=30,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            hosts=[mitlearn_api_domain],
+            paths=["/.well-known/dnt-policy.txt"],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="mocking",
+                    secretRef=None,
+                    config={
+                        "response_status": 204,
+                        "response_example": "",
+                        "content_type": "text/plain",
+                        "with_mock_header": False,
+                    },
+                ),
+            ],
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-dnt-policy",
+            priority=50,
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            hosts=[mitlearn_api_domain],
+            paths=["/.well-known/dnt-policy.txt"],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="mocking",
+                    secretRef=None,
+                    config={
+                        "response_status": 204,
+                        "response_example": "",
+                        "content_type": "text/plain",
+                        "with_mock_header": False,
+                    },
+                ),
+            ],
+        ),
     ],
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -2369,6 +2452,42 @@ learn_external_service_apisix_route = OLApisixRoute(
                 "/learn/login",
                 "/learn/login/*",
             ],
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        # browser-*/fastly-* twins of credential-metadata, for the same reason
+        # as on the no-prefix route set above.
+        OLApisixRouteConfig(
+            route_name="fastly-credential-metadata",
+            priority=30,
+            timeout_read="180s",
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/learn/api/v0/credential_metadata/"],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-credential-metadata",
+            priority=50,
+            timeout_read="180s",
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/learn/api/v0/credential_metadata/"],
+            exprs=browser_api_match_exprs,
             backend_service_name=mitlearn_k8s_app.application_lb_service_name,
             backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
         ),
