@@ -1033,7 +1033,15 @@ clickhouse_backup_cron_job = kubernetes.batch.v1.CronJob(
         successful_jobs_history_limit=3,
         failed_jobs_history_limit=3,
         job_template=kubernetes.batch.v1.JobTemplateSpecArgs(
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=k8s_global_labels),
+            # On the Job as well as its pods, so `kubectl get jobs -l
+            # app.kubernetes.io/name=clickhouse-backup` (the runbook's check)
+            # finds the runs.
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels={
+                    **k8s_global_labels,
+                    "app.kubernetes.io/name": "clickhouse-backup",
+                },
+            ),
             spec=kubernetes.batch.v1.JobSpecArgs(
                 # No retry: the server keeps running an ASYNC backup after the
                 # client pod dies, so a retry could start a second one beside

@@ -276,14 +276,19 @@ the server that ran them.
 
 ### Restore
 
-Restore a single table next to the live one, then compare or swap:
+**Never restore into the cluster the backup came from while its tables still
+exist, not even under a new table name.** Opik's replicated tables hardcode
+their Keeper path in the engine definition, e.g.
+`ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/opik_db/spans',
+'{replica}', ...)`. `RESTORE ... AS opik_db.spans_restored` keeps that
+definition, so the restored table registers under the live table's Keeper path
+and replica name instead of becoming an independent copy.
 
-```sql
-RESTORE TABLE opik_db.spans AS opik_db.spans_restored
-FROM Disk('backups', '<UTC timestamp>');
-```
-
-Restore a whole database into a cluster where it does not exist yet:
+Restore into a cluster with its own Keeper ensemble instead: a scratch
+ClickHouseInstallation and ClickHouseKeeperInstallation, or a rebuilt cluster
+after a total loss. Its IRSA role needs read access to the source environment's
+backup bucket, and its `backups` disk must point at that bucket. Run the
+restore on replica 0 of the target:
 
 ```sql
 RESTORE DATABASE opik_db FROM Disk('backups', '<UTC timestamp>');
@@ -291,10 +296,9 @@ RESTORE TABLE default.DATABASECHANGELOG, TABLE default.DATABASECHANGELOGLOCK
 FROM Disk('backups', '<UTC timestamp>');
 ```
 
-Run the restore on replica 0. Replicated tables are recreated under their
-original ZooKeeper paths, so restore a whole database only into a cluster that
-does not already have those tables; for the live cluster, restore under a new
-table name as above.
+To recover individual rows into the live cluster, restore into the scratch
+cluster first, then copy across with `INSERT INTO opik_db.<table> SELECT ...
+FROM remote('<scratch host>', opik_db.<table>, ...)`.
 
 ---
 
