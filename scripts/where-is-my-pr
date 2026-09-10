@@ -33,26 +33,38 @@ or shared infrastructure code (``PULUMI_WATCHED_PATHS`` -- consumed by every
 app's ``ol-infra-{app}`` pipeline resource) it touches, and each affected
 app pipeline's stages are checked for whether they've picked up this commit.
 
-Concourse ``concourse/operations.<env>.yaml`` and global Vault
-``vault/secrets.<env>.yaml`` files under ``src/bridge/secrets/`` are routed to
-``packer-pulumi-concourse`` and ``packer-pulumi-vault`` respectively. Only the
-file's environment is checked, using successful deploy builds (never previews).
-This reports pipeline evidence, not a read-back of secret values from Vault.
+SOPS files under ``src/bridge/secrets/`` are mapped to candidate Pulumi consumers
+using ``PROJECT_SECRETS`` (including shared files and provider-credential
+exceptions). Live Concourse configurations supply the actual project, stack,
+deploy job and git input, without hard-coded pipeline names. Environment and
+stack-group names in filenames narrow the checks; shared files check all matching
+stacks. Registry watches can cover entire directories: successful build ancestry
+is pipeline evidence, not proof a particular key was written to Vault. No SOPS
+decryption or Vault read-back is performed.
 """
 
 import json
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, replace
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote, urlencode
 
 import cyclopts
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from bridge.settings.apps import APPS, github_repo, repo_main_branch
 from ol_concourse.pipelines.constants import PULUMI_WATCHED_PATHS
+from ol_concourse.pipelines.secrets_map import (
+    DEPLOY_CREDENTIAL_SECRETS,
+    PROJECT_SECRETS,
+    SECRETS_ROOT,
+)
 
 app = cyclopts.App(
     help="Show which ol-infrastructure deployment pipeline stages a GitHub PR has reached."
@@ -77,39 +89,27 @@ PR_URL_RE = re.compile(
 
 @dataclass(frozen=True)
 class SecretsRoute:
-    """A known SOPS file family and the Pulumi job that writes it into Vault."""
+    """A deployed Pulumi update and the checkout supplying its source directory."""
 
-    file_prefix: str
     pipeline: str
     project: str
-    job_suffix: str
+    stack: str
+    job: str
     resource: str
-    vault_mount: str
+    input_name: str
+    previews: tuple[str, ...] = ()
+    instance_query: str = ""
+
+    def job_url(self, job: str, build: str | None = None) -> str:
+        """Return a link, including the pipeline instance selector when present."""
+        tail = f"/jobs/{quote(job, safe='')}"
+        if build is not None:
+            tail += f"/builds/{quote(build, safe='')}"
+        path = _pipeline_path(self.pipeline, tail)
+        return f"{CONCOURSE_URL}{path}{self.instance_query}"
 
 
-# Keep these explicit: not every SOPS file is Vault content. Some are only
-# provider credentials, and other applications manage their own secret mounts.
-# Sources: infrastructure/{concourse,vault}/pipeline.py and the two Pulumi
-# entrypoints below. tests/test_where_is_my_pr.py checks generated job names.
-SECRETS_ROUTES = (
-    SecretsRoute(
-        file_prefix="src/bridge/secrets/concourse/operations",
-        pipeline="packer-pulumi-concourse",
-        project="applications/concourse",
-        job_suffix="ol-infrastructure-concourse-application",
-        resource="ol-infrastructure-pulumi",
-        vault_mount="secret-concourse",
-    ),
-    SecretsRoute(
-        file_prefix="src/bridge/secrets/vault/secrets",
-        pipeline="packer-pulumi-vault",
-        project="substructure/vault/secrets",
-        job_suffix="ol-substructure-vault-secrets-operations",
-        resource="ol-infrastructure-pulumi-substructure",
-        vault_mount="secret-global",
-    ),
-)
-SECRETS_ENVIRONMENTS = {"ci": "CI", "qa": "QA", "production": "Production"}
+SECRETS_ENV_RE = re.compile(r"[.-](ci|qa|production)\.(yaml|yml|json|env)$")
 
 
 @dataclass
@@ -211,6 +211,7 @@ def _fly_curl(path: str) -> Any | None:
         )
         return json.loads(result.stdout)
     except (
+        OSError,
         subprocess.CalledProcessError,
         subprocess.TimeoutExpired,
         json.JSONDecodeError,
@@ -218,10 +219,17 @@ def _fly_curl(path: str) -> Any | None:
         return None
 
 
-def _latest_successful_build(pipeline: str, job: str) -> dict[str, Any] | None:
-    builds = _fly_curl(
-        f"/api/v1/teams/{CONCOURSE_TEAM}/pipelines/{pipeline}/jobs/{job}/builds?limit=10"
-    )
+def _pipeline_path(pipeline: str, tail: str = "") -> str:
+    """Construct a Concourse pipeline path shared by API and UI URLs."""
+    return f"/teams/{CONCOURSE_TEAM}/pipelines/{quote(pipeline, safe='')}{tail}"
+
+
+def _latest_successful_build(
+    pipeline: str, job: str, instance_query: str = ""
+) -> dict[str, Any] | None:
+    path = _pipeline_path(pipeline, f"/jobs/{quote(job, safe='')}/builds")
+    query = f"{instance_query}&limit=10" if instance_query else "?limit=10"
+    builds = _fly_curl(f"/api/v1{path}{query}")
     if not builds:
         return None
     return next((b for b in builds if b.get("status") == "succeeded"), None)
@@ -254,9 +262,13 @@ class LiveStage:
 
 
 def _live_stage(
-    pr: PullRequest, pipeline: str, job: str, candidate_resources: list[str]
+    pr: PullRequest,
+    pipeline: str,
+    job: str,
+    candidate_resources: list[str],
+    instance_query: str = "",
 ) -> LiveStage | None:
-    build = _latest_successful_build(pipeline, job)
+    build = _latest_successful_build(pipeline, job, instance_query)
     if build is None:
         return None
     commit = _build_resource_commit(build["id"], candidate_resources)
@@ -338,8 +350,10 @@ def _matching_deployments(owner: str, repo: str, commit: str) -> list[dict[str, 
 
 
 def _changed_files(owner: str, repo: str, number: int) -> list[str]:
-    files = _gh_json("api", "--paginate", f"repos/{owner}/{repo}/pulls/{number}/files")
-    return [f["filename"] for f in files]
+    pages = _gh_json(
+        "api", "--paginate", "--slurp", f"repos/{owner}/{repo}/pulls/{number}/files"
+    )
+    return [f["filename"] for page in pages for f in page]
 
 
 def _impacted_apps(paths: list[str]) -> tuple[set[str], bool, list[str]]:
@@ -400,48 +414,211 @@ def _report_ol_infra_app(pr: PullRequest, app_name: str) -> None:
         )
 
 
-def _matching_secrets_route(path: str) -> tuple[SecretsRoute, str] | None:
-    """Match only known content-bearing files, without reading secret values."""
-    for route in SECRETS_ROUTES:
-        for env in SECRETS_ENVIRONMENTS:
-            if path == f"{route.file_prefix}.{env}.yaml":
-                return route, env
-    return None
+def _is_secrets_file(path: str) -> bool:
+    """Recognize secret data paths, not the Python helpers alongside them."""
+    return path.startswith(f"{SECRETS_ROOT}/") and Path(path).suffix in {
+        ".yaml",
+        ".yml",
+        ".json",
+        ".env",
+    }
 
 
-def _report_vault_secrets(
-    pr: PullRequest, path: str, route: SecretsRoute, env: str
-) -> None:
-    """Explain a SOPS-to-Vault route and check its environment's deploy build."""
-    pipeline_url = f"{CONCOURSE_URL}/teams/{CONCOURSE_TEAM}/pipelines/{route.pipeline}"
-    deploy_job = f"deploy-{route.job_suffix}-{env}"
-    print(f"\n=== Vault secrets: {SECRETS_ENVIRONMENTS[env]} ({route.pipeline}) ===")
-    print(f"    {path}")
-    print(f"    -> Pulumi src/ol_infrastructure/{route.project}/")
-    print(f"    -> Vault {route.vault_mount} ({SECRETS_ENVIRONMENTS[env]})")
-    print(f"    Deploy: {pipeline_url}/jobs/{deploy_job}")
-    if env == "ci":
-        print("    CI deploys automatically when its pipeline inputs are ready.")
-    else:
-        preview_job = f"preview-{route.job_suffix}-{env}"
-        print(f"    Preview: {pipeline_url}/jobs/{preview_job}")
-        print(
-            "    QA/Production require a manual deploy after preview; preview does not write secrets."
-        )
-    print(
-        "    Successful deploy ancestry is pipeline evidence, not a Vault value read-back."
+def _secret_entry_matches(relative: str, entry: str) -> bool:
+    """Match registry directories, exact files or path-segment-local globs."""
+    if entry.endswith("/"):
+        return relative.startswith(entry)
+    parts, patterns = relative.split("/"), entry.split("/")
+    return len(parts) == len(patterns) and all(
+        fnmatchcase(part, pattern) for part, pattern in zip(parts, patterns)
     )
 
-    if not _fly_ready():
-        print(
-            "    ?  fly not logged in to 'infrastructure' -- can't verify live builds"
-        )
-        print(
-            f"    Log in: fly -t {CONCOURSE_TEAM} login -c {CONCOURSE_URL} -n {CONCOURSE_TEAM}"
-        )
-        return
 
-    live = _live_stage(pr, route.pipeline, deploy_job, [route.resource])
+def _secret_projects(path: str) -> set[str]:
+    """Reverse the audited watched-path registry, including credential overrides."""
+    relative = path.removeprefix(f"{SECRETS_ROOT}/")
+    return {
+        project
+        for project, entries in PROJECT_SECRETS.items()
+        if any(_secret_entry_matches(relative, entry) for entry in entries)
+    }
+
+
+def _plan_steps(plan: Any) -> Iterator[dict[str, Any]]:
+    """Walk required plan steps, never optional/error hooks or try wrappers.
+
+    A successful job does not prove that an update inside ``try`` or an error
+    hook succeeded. Only normal steps can provide deployment evidence.
+    """
+    if isinstance(plan, list):
+        for step in plan:
+            yield from _plan_steps(step)
+    elif isinstance(plan, dict):
+        yield plan
+        for key in ("do", "aggregate", "in_parallel"):
+            nested = plan.get(key, [])
+            if isinstance(nested, dict):
+                nested = nested.get("steps", [])
+            yield from _plan_steps(nested)
+
+
+def _routes_from_config(
+    pipeline: str, config: dict[str, Any], instance_query: str = ""
+) -> list[SecretsRoute]:
+    """Read Pulumi project/stack/input identities from actual pipeline config."""
+    resources = {r["name"]: r for r in config.get("resources", [])}
+    updates: list[SecretsRoute] = []
+    previews: set[str] = set()
+    dependencies: dict[str, set[str]] = {}
+    for job in config.get("jobs", []):
+        steps = list(_plan_steps(job.get("plan", [])))
+        gets = {s["get"]: s for s in steps if "get" in s}
+        dependencies[job["name"]] = {
+            name for step in gets.values() for name in step.get("passed", [])
+        }
+        for step in steps:
+            if "put" not in step:
+                continue
+            resource = resources.get(step.get("resource", step["put"]), {})
+            if resource.get("type") != "pulumi-provisioner":
+                continue
+            params = {**resource.get("source", {}), **step.get("params", {})}
+            # The resource's source_dir points to an input *alias*, not
+            # necessarily the resource name (get: checkout, resource: infra).
+            checkout, separator, project = str(params.get("source_dir", "")).partition(
+                "/src/ol_infrastructure/"
+            )
+            project = project.rstrip("/") + "/"
+            stack = params.get("stack_name")
+            if (
+                not separator
+                or project not in PROJECT_SECRETS
+                or not isinstance(stack, str)
+            ):
+                continue
+            git_get = gets.get(checkout.removeprefix("./"), {})
+            git_resource = resources.get(
+                git_get.get("resource", git_get.get("get")), {}
+            )
+            uri = (
+                git_resource.get("source", {})
+                .get("uri", "")
+                .removesuffix(".git")
+                .rstrip("/")
+            )
+            if git_resource.get("type") != "git" or uri not in {
+                f"https://github.com/{OL_INFRA_REPO}",
+                f"git@github.com:{OL_INFRA_REPO}",
+                f"ssh://git@github.com/{OL_INFRA_REPO}",
+            }:
+                continue
+            if params.get("preview") is True or params.get("action") == "preview":
+                previews.add(job["name"])
+            elif (
+                params.get("action") == "update"
+                and params.get("preview", False) is False
+            ):
+                updates.append(
+                    SecretsRoute(
+                        pipeline=pipeline,
+                        project=project,
+                        stack=stack,
+                        job=job["name"],
+                        resource=git_resource["name"],
+                        input_name=git_get["get"],
+                        instance_query=instance_query,
+                    )
+                )
+    return [
+        replace(route, previews=tuple(sorted(dependencies[route.job] & previews)))
+        for route in updates
+    ]
+
+
+def _read_pipeline_routes(
+    pipeline: dict[str, Any],
+) -> tuple[list[SecretsRoute], str | None]:
+    """Fetch one pipeline, retaining only non-secret routing metadata."""
+    query = urlencode(
+        {
+            f"vars.{key}": json.dumps(value)
+            for key, value in sorted((pipeline.get("instance_vars") or {}).items())
+        }
+    )
+    query = f"?{query}" if query else ""
+    path = _pipeline_path(pipeline["name"], "/config")
+    data = _fly_curl(f"/api/v1{path}{query}")
+    if not isinstance(data, dict) or not isinstance(data.get("config"), dict):
+        return [], f"{pipeline['name']}{query}"
+    return _routes_from_config(pipeline["name"], data["config"], query), None
+
+
+def _discover_secret_routes() -> tuple[list[SecretsRoute], list[str]]:
+    """Discover all visible pipelines once, with bounded concurrent API reads."""
+    pipelines = _fly_curl(f"/api/v1/teams/{CONCOURSE_TEAM}/pipelines")
+    if not isinstance(pipelines, list):
+        return [], ["pipeline list unavailable"]
+    routes: list[SecretsRoute] = []
+    failures: list[str] = []
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for found, failure in pool.map(_read_pipeline_routes, pipelines):
+            routes.extend(found)
+            if failure:
+                failures.append(failure)
+    return routes, failures
+
+
+def _routes_for_secret(path: str, routes: list[SecretsRoute]) -> list[SecretsRoute]:
+    """Narrow candidate consumers by environment and known stack-group tokens."""
+    projects = _secret_projects(path)
+    env = SECRETS_ENV_RE.search(path)
+    candidates = [
+        r
+        for r in routes
+        if r.project in projects
+        and (not env or r.stack.rsplit(".", 1)[-1].lower() == env[1])
+    ]
+    selected: list[SecretsRoute] = []
+    for project in sorted(projects):
+        project_routes = [r for r in candidates if r.project == project]
+        # Only infer a group if an existing stack prefix occurs in the path.
+        # Longest wins: mitx-staging must not accidentally also select mitx.
+        # Include groups with no deploy in the requested environment, rather
+        # than falling back to a shorter group which happens to have one.
+        groups = {
+            r.stack.rpartition(".")[0].lower() for r in routes if r.project == project
+        } - {""}
+        matches = [
+            g
+            for g in groups
+            if re.search(rf"(?:^|[/.-]){re.escape(g)}(?=[/.-]|$)", path)
+        ]
+        group = max(matches, key=len) if matches else None
+        selected.extend(
+            r
+            for r in project_routes
+            if group is None or r.stack.rpartition(".")[0].lower() == group
+        )
+    return selected
+
+
+def _report_secret_deploy(
+    pr: PullRequest, route: SecretsRoute, paths: list[str]
+) -> None:
+    """Report one candidate deploy once, even when it consumes several files."""
+    print(f"\n=== SOPS consumer: {route.project} {route.stack} ({route.pipeline}) ===")
+    for path in paths:
+        print(f"    {path}")
+    print(f"    -> Pulumi src/ol_infrastructure/{route.project} (stack {route.stack})")
+    print(f"    Deploy: {route.job_url(route.job)}")
+    for preview in route.previews:
+        print(f"    Preview: {route.job_url(preview)}")
+    if route.previews:
+        print(
+            "    Deploy is gated on preview; check its approval inputs. Preview does not write secrets."
+        )
+    inputs = list(dict.fromkeys((route.input_name, route.resource)))
+    live = _live_stage(pr, route.pipeline, route.job, inputs, route.instance_query)
     if live is None:
         print(
             "    ?  Could not verify a successful deploy build/input (API unavailable or no usable build in the last 10)."
@@ -449,19 +626,73 @@ def _report_vault_secrets(
         return
     print(
         _format_stage(
-            "Vault deploy",
+            "Deploy",
             live.reached,
             f"build #{live.build_name} used ol-infra {live.deployed_commit[:8]}",
         )
     )
-    print(f"    Build: {pipeline_url}/jobs/{deploy_job}/builds/{live.build_name}")
+    print(f"    Build: {route.job_url(route.job, live.build_name)}")
+
+
+def _report_sops_secrets(pr: PullRequest, paths: list[str]) -> None:
+    """Explain every SOPS path, including credentials and missing deployment routes."""
+    print(
+        "\nSOPS routing uses PROJECT_SECRETS candidate consumers (directory-level watches)."
+    )
+    print(
+        "Successful deploy ancestry is pipeline evidence, not proof a key was written to Vault."
+    )
+    consumers = {path: _secret_projects(path) for path in paths}
+    for path, projects in consumers.items():
+        print(f"    {path}")
+        if projects:
+            print(f"      Candidate projects: {', '.join(sorted(projects))}")
+        else:
+            relative = path.removeprefix(f"{SECRETS_ROOT}/")
+            reasons = {
+                reason
+                for pattern, reason in DEPLOY_CREDENTIAL_SECRETS.items()
+                if _secret_entry_matches(relative, pattern)
+            }
+            if reasons:
+                print(
+                    f"      Provider credentials only: {'; '.join(sorted(reasons))}; no content deploy expected."
+                )
+            else:
+                print(
+                    "      ?  No registered Pulumi consumer; deployment route unknown."
+                )
+    if not any(consumers.values()):
+        return
+    if not _fly_ready():
+        print(
+            "    ?  fly not logged in to 'infrastructure' -- can't discover pipelines or verify builds"
+        )
+        print(
+            f"    Log in: fly -t {CONCOURSE_TEAM} login -c {CONCOURSE_URL} -n {CONCOURSE_TEAM}"
+        )
+        return
+    routes, failures = _discover_secret_routes()
+    for failure in failures:
+        print(f"    ?  Could not inspect {failure}; discovery is incomplete.")
+    grouped: dict[SecretsRoute, list[str]] = {}
+    for path, projects in consumers.items():
+        matches = _routes_for_secret(path, routes)
+        for project in sorted(projects - {r.project for r in matches}):
+            print(
+                f"    ?  {path}: no matching deploy discovered for {project} in this file's scope."
+            )
+        for route in set(matches):
+            grouped.setdefault(route, []).append(path)
+    for route in sorted(
+        grouped, key=lambda r: (r.project, r.pipeline, r.instance_query, r.stack, r.job)
+    ):
+        _report_secret_deploy(pr, route, grouped[route])
 
 
 def _report_ol_infrastructure_pr(pr: PullRequest) -> None:
     paths = _changed_files(pr.owner, pr.repo, pr.number)
-    secret_paths = {
-        path: match for path in paths if (match := _matching_secrets_route(path))
-    }
+    secret_paths = [path for path in paths if _is_secrets_file(path)]
     direct, shared_hit, other = _impacted_apps(
         [path for path in paths if path not in secret_paths]
     )
@@ -475,8 +706,8 @@ def _report_ol_infrastructure_pr(pr: PullRequest) -> None:
             f"{', '.join(PULUMI_WATCHED_PATHS)}) -- every app pipeline's "
             "ol-infra-{app} resource picks this up."
         )
-    for path, (route, env) in sorted(secret_paths.items()):
-        _report_vault_secrets(pr, path, route, env)
+    if secret_paths:
+        _report_sops_secrets(pr, secret_paths)
 
     if not impacted and not secret_paths:
         print("\nNo changed files map to a known deployment pipeline.")
