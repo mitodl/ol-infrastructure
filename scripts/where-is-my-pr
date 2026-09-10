@@ -32,6 +32,12 @@ find which apps' Pulumi code (``src/ol_infrastructure/applications/{app}/``)
 or shared infrastructure code (``PULUMI_WATCHED_PATHS`` -- consumed by every
 app's ``ol-infra-{app}`` pipeline resource) it touches, and each affected
 app pipeline's stages are checked for whether they've picked up this commit.
+
+Concourse ``concourse/operations.<env>.yaml`` and global Vault
+``vault/secrets.<env>.yaml`` files under ``src/bridge/secrets/`` are routed to
+``packer-pulumi-concourse`` and ``packer-pulumi-vault`` respectively. Only the
+file's environment is checked, using successful deploy builds (never previews).
+This reports pipeline evidence, not a read-back of secret values from Vault.
 """
 
 import json
@@ -67,6 +73,43 @@ APPLICATIONS_DIR_RE = re.compile(r"^src/ol_infrastructure/applications/([^/]+)/"
 PR_URL_RE = re.compile(
     r"github\.com/(?P<owner>[^/]+)/(?P<repo>[^/]+)/pull/(?P<number>\d+)"
 )
+
+
+@dataclass(frozen=True)
+class SecretsRoute:
+    """A known SOPS file family and the Pulumi job that writes it into Vault."""
+
+    file_prefix: str
+    pipeline: str
+    project: str
+    job_suffix: str
+    resource: str
+    vault_mount: str
+
+
+# Keep these explicit: not every SOPS file is Vault content. Some are only
+# provider credentials, and other applications manage their own secret mounts.
+# Sources: infrastructure/{concourse,vault}/pipeline.py and the two Pulumi
+# entrypoints below. tests/test_where_is_my_pr.py checks generated job names.
+SECRETS_ROUTES = (
+    SecretsRoute(
+        file_prefix="src/bridge/secrets/concourse/operations",
+        pipeline="packer-pulumi-concourse",
+        project="applications/concourse",
+        job_suffix="ol-infrastructure-concourse-application",
+        resource="ol-infrastructure-pulumi",
+        vault_mount="secret-concourse",
+    ),
+    SecretsRoute(
+        file_prefix="src/bridge/secrets/vault/secrets",
+        pipeline="packer-pulumi-vault",
+        project="substructure/vault/secrets",
+        job_suffix="ol-substructure-vault-secrets-operations",
+        resource="ol-infrastructure-pulumi-substructure",
+        vault_mount="secret-global",
+    ),
+)
+SECRETS_ENVIRONMENTS = {"ci": "CI", "qa": "QA", "production": "Production"}
 
 
 @dataclass
@@ -357,9 +400,71 @@ def _report_ol_infra_app(pr: PullRequest, app_name: str) -> None:
         )
 
 
+def _matching_secrets_route(path: str) -> tuple[SecretsRoute, str] | None:
+    """Match only known content-bearing files, without reading secret values."""
+    for route in SECRETS_ROUTES:
+        for env in SECRETS_ENVIRONMENTS:
+            if path == f"{route.file_prefix}.{env}.yaml":
+                return route, env
+    return None
+
+
+def _report_vault_secrets(
+    pr: PullRequest, path: str, route: SecretsRoute, env: str
+) -> None:
+    """Explain a SOPS-to-Vault route and check its environment's deploy build."""
+    pipeline_url = f"{CONCOURSE_URL}/teams/{CONCOURSE_TEAM}/pipelines/{route.pipeline}"
+    deploy_job = f"deploy-{route.job_suffix}-{env}"
+    print(f"\n=== Vault secrets: {SECRETS_ENVIRONMENTS[env]} ({route.pipeline}) ===")
+    print(f"    {path}")
+    print(f"    -> Pulumi src/ol_infrastructure/{route.project}/")
+    print(f"    -> Vault {route.vault_mount} ({SECRETS_ENVIRONMENTS[env]})")
+    print(f"    Deploy: {pipeline_url}/jobs/{deploy_job}")
+    if env == "ci":
+        print("    CI deploys automatically when its pipeline inputs are ready.")
+    else:
+        preview_job = f"preview-{route.job_suffix}-{env}"
+        print(f"    Preview: {pipeline_url}/jobs/{preview_job}")
+        print(
+            "    QA/Production require a manual deploy after preview; preview does not write secrets."
+        )
+    print(
+        "    Successful deploy ancestry is pipeline evidence, not a Vault value read-back."
+    )
+
+    if not _fly_ready():
+        print(
+            "    ?  fly not logged in to 'infrastructure' -- can't verify live builds"
+        )
+        print(
+            f"    Log in: fly -t {CONCOURSE_TEAM} login -c {CONCOURSE_URL} -n {CONCOURSE_TEAM}"
+        )
+        return
+
+    live = _live_stage(pr, route.pipeline, deploy_job, [route.resource])
+    if live is None:
+        print(
+            "    ?  Could not verify a successful deploy build/input (API unavailable or no usable build in the last 10)."
+        )
+        return
+    print(
+        _format_stage(
+            "Vault deploy",
+            live.reached,
+            f"build #{live.build_name} used ol-infra {live.deployed_commit[:8]}",
+        )
+    )
+    print(f"    Build: {pipeline_url}/jobs/{deploy_job}/builds/{live.build_name}")
+
+
 def _report_ol_infrastructure_pr(pr: PullRequest) -> None:
     paths = _changed_files(pr.owner, pr.repo, pr.number)
-    direct, shared_hit, other = _impacted_apps(paths)
+    secret_paths = {
+        path: match for path in paths if (match := _matching_secrets_route(path))
+    }
+    direct, shared_hit, other = _impacted_apps(
+        [path for path in paths if path not in secret_paths]
+    )
     impacted = direct | (set(APPS) if shared_hit else set())
 
     if direct:
@@ -370,14 +475,17 @@ def _report_ol_infrastructure_pr(pr: PullRequest) -> None:
             f"{', '.join(PULUMI_WATCHED_PATHS)}) -- every app pipeline's "
             "ol-infra-{app} resource picks this up."
         )
-    if not impacted:
-        print("\nNo changed files map to a known app pipeline.")
+    for path, (route, env) in sorted(secret_paths.items()):
+        _report_vault_secrets(pr, path, route, env)
+
+    if not impacted and not secret_paths:
+        print("\nNo changed files map to a known deployment pipeline.")
 
     for app_name in sorted(impacted):
         _report_ol_infra_app(pr, app_name)
 
     if other:
-        print("\nOther changed files (no known app pipeline mapping):")
+        print("\nOther changed files (no known deployment pipeline mapping):")
         for path in other:
             print(f"    {path}")
 
