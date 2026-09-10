@@ -626,6 +626,8 @@ def test_cors_disabled_reaches_the_gateway_api_plugin_config():
             assert plugin_named(spec["plugins"], name) is not None, name
 
     return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
 # ─── Rate limiting ──────────────────────────────────────────────────────────────
 
 
