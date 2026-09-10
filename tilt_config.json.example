@@ -3,8 +3,6 @@
 
   "per_app_databases": false,
 
-  "openedx_mode": "qa",
-
   "prebuilt_tags": [
     "mit-learn=0.62.0",
     "mit-learn-nextjs=0.62.0",

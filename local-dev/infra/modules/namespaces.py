@@ -5,7 +5,7 @@ from collections.abc import Callable
 import pulumi_kubernetes as k8s
 from pulumi import ResourceOptions
 
-APP_NAMESPACES = ("mit-learn", "learn-ai", "mitxonline", "odl-video-service")
+APP_NAMESPACES = ("mit-learn", "learn-ai", "mitxonline", "odl-video-service", "openedx")
 
 
 def create_namespaces(
