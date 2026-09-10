@@ -1,5 +1,6 @@
 """Pulumi program for deploying the MIT Learn Next.js application to Kubernetes."""
 
+import pulumi
 import pulumi_kubernetes as kubernetes
 from kubernetes.utils.quantity import parse_quantity
 from pulumi import Config, ResourceOptions, export
@@ -117,11 +118,14 @@ stay_updated_hubspot_form_ids = {
     "production": "a5d18493-dcdb-4482-ad10-16ab66a35526",
 }
 
-try:
-    stay_updated_hubspot_form_id = stay_updated_hubspot_form_ids[stack_info.env_suffix]
-except KeyError as exc:
-    msg = f"Unsupported MIT Learn Next.js environment: {stack_info.env_suffix}"
-    raise ValueError(msg) from exc
+stay_updated_hubspot_form_id = stay_updated_hubspot_form_ids.get(
+    stack_info.env_suffix, ""
+)
+if not stay_updated_hubspot_form_id:
+    pulumi.log.warn(
+        "No stay updated HubSpot form ID for environment "
+        f"{stack_info.env_suffix}; the form will render its unavailable fallback."
+    )
 
 org_learning_hubspot_form_ids = {
     "ci": "e6910657-d832-4df8-be27-d8f6f9ecdfcc",
@@ -129,11 +133,14 @@ org_learning_hubspot_form_ids = {
     "production": "60a1983b-361a-4e80-a0db-d24ff636d7bf",
 }
 
-try:
-    org_learning_hubspot_form_id = org_learning_hubspot_form_ids[stack_info.env_suffix]
-except KeyError as exc:
-    msg = f"Unsupported MIT Learn Next.js environment: {stack_info.env_suffix}"
-    raise ValueError(msg) from exc
+org_learning_hubspot_form_id = org_learning_hubspot_form_ids.get(
+    stack_info.env_suffix, ""
+)
+if not org_learning_hubspot_form_id:
+    pulumi.log.warn(
+        "No org learning HubSpot form ID for environment "
+        f"{stack_info.env_suffix}; the form will render its unavailable fallback."
+    )
 
 raw_env_vars = {
     # Env vars available only on server
