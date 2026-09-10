@@ -819,6 +819,21 @@ service_catchall = rootly.Service(
     opts=rootly_opts,
 )
 
+# Created here rather than imported. Shared LLMOps storage behind Opik (and any
+# future LLMOps tenant), so it is not named after one application: Opik's own
+# service should list this one in its service_ids when it is created, the way
+# the MIT Learn Postgres and Redis services list their webapps.
+service_llmops_clickhouse = rootly.Service(
+    "llmops-clickhouse",
+    color="#F5D9C4",
+    description="Shared ClickHouse cluster on data EKS (namespace clickhouse)",
+    environment_ids=["afe3e34e-62e7-4534-bb4c-de57d24e6a59"],
+    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    name="LLMOps - ClickHouse",
+    owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
+    opts=rootly_opts,
+)
+
 service_mit_learn_ai_celery = rootly.Service(
     "mit-learn-ai-celery",
     alerts_email_address="service-606c580534e94d6abeecf1c0ed65165f@email.rootly.com",
@@ -4114,6 +4129,33 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             "name": "openedx service label to MITx Online Open edX LMS Webapp",
             "position": 9,
         },
+        # Every rule in grafana_alerting/metric_rules/clickhouse.py carries
+        # service="clickhouse". No rule above matches that value, so position
+        # does not matter beyond sitting ahead of the fallback.
+        {
+            "conditionGroups": [
+                {
+                    "conditions": [
+                        {
+                            "propertyFieldConditionType": "contains",
+                            "propertyFieldName": "$.commonLabels.service",
+                            "propertyFieldType": "payload",
+                            "propertyFieldValue": "clickhouse",
+                        },
+                    ],
+                    "position": 1,
+                },
+            ],
+            "destinations": [
+                {
+                    "targetId": service_llmops_clickhouse.id,
+                    "targetType": "Service",
+                },
+            ],
+            "fallbackRule": False,
+            "name": "clickhouse service label to LLMOps - ClickHouse",
+            "position": 10,
+        },
         {
             "destinations": [
                 {
@@ -4123,7 +4165,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Grafana Production Service Route",
-            "position": 10,
+            "position": 11,
         },
     ],
     opts=rootly_imported_route_opts("e7b002f8-e13f-4b63-b0df-af1c78aee890"),

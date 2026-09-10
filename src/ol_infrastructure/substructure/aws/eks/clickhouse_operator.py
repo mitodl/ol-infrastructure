@@ -21,6 +21,10 @@ CLICKHOUSE_OPERATOR_MANIFEST_URL = (
     f"{CLICKHOUSE_OPERATOR_VERSION}/deploy/operator/clickhouse-operator-install-bundle.yaml"
 )
 CLICKHOUSE_OPERATOR_NAMESPACE = "clickhouse-operator"
+# Where the install bundle actually puts the operator Deployment and its
+# metrics Service. The bundle hardcodes kube-system; nothing is deployed into
+# CLICKHOUSE_OPERATOR_NAMESPACE, which is only checked for existence.
+CLICKHOUSE_OPERATOR_BUNDLE_NAMESPACE = "kube-system"
 
 
 def _fetch_operator_manifests() -> list[dict[str, Any]]:
@@ -70,7 +74,7 @@ def setup_clickhouse_operator(
         lambda ns: check_cluster_namespace(CLICKHOUSE_OPERATOR_NAMESPACE, ns)
     )
 
-    return kubernetes.yaml.v2.ConfigGroup(
+    operator = kubernetes.yaml.v2.ConfigGroup(
         f"{cluster_name}-clickhouse-operator",
         objs=_fetch_operator_manifests(),
         opts=ResourceOptions(
@@ -78,3 +82,47 @@ def setup_clickhouse_operator(
             delete_before_replace=True,
         ),
     )
+
+    # The bundle ships the metrics exporter and its Service but no
+    # ServiceMonitor, so its chi_clickhouse_* series (replication, parts,
+    # disks, per-table sizes for every CHI host) were served and never
+    # scraped. ch-metrics sets its own `namespace` label to the CHI's
+    # namespace; honorLabels keeps that instead of overwriting it with
+    # kube-system, which is what lets alerts on these series route by the
+    # namespace ClickHouse actually runs in.
+    kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-clickhouse-operator-metrics",
+        api_version="monitoring.coreos.com/v1",
+        kind="ServiceMonitor",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="clickhouse-operator-metrics",
+            namespace=CLICKHOUSE_OPERATOR_BUNDLE_NAMESPACE,
+            labels={"release": "prometheus"},
+        ),
+        spec={
+            "selector": {"matchLabels": {"app": "clickhouse-operator"}},
+            "namespaceSelector": {"matchNames": [CLICKHOUSE_OPERATOR_BUNDLE_NAMESPACE]},
+            "endpoints": [
+                {
+                    "port": "ch-metrics",
+                    "interval": "30s",
+                    "scrapeTimeout": "20s",
+                    "honorLabels": True,
+                },
+                {
+                    "port": "op-metrics",
+                    "interval": "60s",
+                    # Altinity's operator dashboard selects on app.
+                    "relabelings": [
+                        {
+                            "sourceLabels": ["__meta_kubernetes_service_label_app"],
+                            "targetLabel": "app",
+                        }
+                    ],
+                },
+            ],
+        },
+        opts=ResourceOptions(provider=k8s_provider, depends_on=[operator]),
+    )
+
+    return operator

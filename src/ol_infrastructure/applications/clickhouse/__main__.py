@@ -101,6 +101,8 @@ k8s_labels = K8sGlobalLabels(
 
 setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
 CLICKHOUSE_NAMESPACE = "clickhouse"
+# ClickHouse's conventional Prometheus port, used for both server and Keeper.
+CLICKHOUSE_METRICS_PORT = 9363
 
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(CLICKHOUSE_NAMESPACE, ns)
@@ -272,6 +274,16 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                         "keeper_server/coordination_settings/operation_timeout_ms": "10000",
                         "keeper_server/coordination_settings/session_timeout_ms": "30000",
                         "listen_host": "0.0.0.0",  # noqa: S104
+                        # Keeper has no SQL interface for the operator's
+                        # exporter to query, so its own endpoint is the only
+                        # source of Keeper metrics (leader, synced followers,
+                        # latency, outstanding requests).
+                        "prometheus/endpoint": "/metrics",
+                        "prometheus/port": str(CLICKHOUSE_METRICS_PORT),
+                        "prometheus/metrics": "true",
+                        "prometheus/events": "true",
+                        "prometheus/asynchronous_metrics": "true",
+                        "logger/level": "information",
                     },
                 },
                 "templates": {
@@ -558,6 +570,24 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     },
                     "settings": {
                         "default_storage_policy": "tiered",
+                        # Built-in Prometheus endpoint. Without a <prometheus>
+                        # section ClickHouse serves no metrics at all; the old
+                        # ServiceMonitor on 8123/metrics scraped up=0 on every
+                        # replica. The operator's own exporter (kube-system,
+                        # clickhouse-operator-metrics:8888) covers replication
+                        # and table state; this adds the server's full
+                        # metrics/events/asynchronous_metrics/errors.
+                        "prometheus/endpoint": "/metrics",
+                        "prometheus/port": str(CLICKHOUSE_METRICS_PORT),
+                        "prometheus/metrics": "true",
+                        "prometheus/events": "true",
+                        "prometheus/asynchronous_metrics": "true",
+                        "prometheus/errors": "true",
+                        # Debug by default: ~1.7M lines/day per cluster to
+                        # Loki (12.08M over the 7 days to 2026-09-10 in
+                        # data-production). The operator applies logger
+                        # changes without a restart.
+                        "logger/level": "information",
                     },
                     # Users, profiles, and quotas are managed by the operator
                     # (merged into its generated usersd configmap) rather than
@@ -906,6 +936,35 @@ clickhouse_client_service = kubernetes.core.v1.Service(
                 port=9000,
                 target_port=9000,
             ),
+            kubernetes.core.v1.ServicePortArgs(
+                name="metrics",
+                port=CLICKHOUSE_METRICS_PORT,
+                target_port=CLICKHOUSE_METRICS_PORT,
+            ),
+        ],
+    ),
+)
+
+# The operator's keeper-clickhouse Service exposes only 2181 and the raft port,
+# so Keeper's metrics port needs a Service of its own for a ServiceMonitor to
+# select. Headless because Prometheus scrapes each pod's endpoint, never the
+# Service address.
+keeper_metrics_service = kubernetes.core.v1.Service(
+    f"clickhouse-keeper-metrics-service-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="clickhouse-keeper-metrics",
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels={**k8s_global_labels, "app": "clickhouse-keeper"},
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        cluster_ip="None",
+        selector={"clickhouse-keeper.altinity.com/chk": "clickhouse"},
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                name="metrics",
+                port=CLICKHOUSE_METRICS_PORT,
+                target_port=CLICKHOUSE_METRICS_PORT,
+            ),
         ],
     ),
 )
@@ -961,17 +1020,26 @@ clickhouse_network_policy = kubernetes.networking.v1.NetworkPolicy(
                     kubernetes.networking.v1.NetworkPolicyPortArgs(port=9000),
                 ],
             ),
-            # Allow Prometheus scraping from monitoring namespace
+            # Allow Prometheus scraping from Alloy, which runs in the `grafana`
+            # namespace (this used to name `monitoring`, where nothing runs).
+            #
+            # NetworkPolicy is not enforced on the data clusters today
+            # (amazon-vpc-cni enable-network-policy-controller: "false"), so
+            # none of these rules restrict anything yet. They are kept
+            # accurate so that turning enforcement on does not cut off
+            # scraping or clients.
             kubernetes.networking.v1.NetworkPolicyIngressRuleArgs(
                 from_=[
                     kubernetes.networking.v1.NetworkPolicyPeerArgs(
                         namespace_selector=kubernetes.meta.v1.LabelSelectorArgs(
-                            match_labels={"kubernetes.io/metadata.name": "monitoring"},
+                            match_labels={"kubernetes.io/metadata.name": "grafana"},
                         )
                     )
                 ],
                 ports=[
-                    kubernetes.networking.v1.NetworkPolicyPortArgs(port=8123),
+                    kubernetes.networking.v1.NetworkPolicyPortArgs(
+                        port=CLICKHOUSE_METRICS_PORT
+                    ),
                 ],
             ),
         ],
@@ -1007,7 +1075,7 @@ clickhouse_service_monitor = kubernetes.apiextensions.CustomResource(
         "namespaceSelector": {"matchNames": [CLICKHOUSE_NAMESPACE]},
         "endpoints": [
             {
-                "port": "http",
+                "port": "metrics",
                 "path": "/metrics",
                 "scheme": "http",
                 "interval": "30s",
@@ -1026,6 +1094,47 @@ clickhouse_service_monitor = kubernetes.apiextensions.CustomResource(
         ],
     },
     opts=ResourceOptions(depends_on=[clickhouse_client_service]),
+)
+
+keeper_service_monitor = kubernetes.apiextensions.CustomResource(
+    f"clickhouse-keeper-service-monitor-{stack_info.env_suffix}",
+    api_version="monitoring.coreos.com/v1",
+    kind="ServiceMonitor",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="clickhouse-keeper",
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels={**k8s_global_labels, "release": "prometheus"},
+    ),
+    spec={
+        "selector": {"matchLabels": {"app": "clickhouse-keeper"}},
+        "namespaceSelector": {"matchNames": [CLICKHOUSE_NAMESPACE]},
+        "endpoints": [
+            {
+                "port": "metrics",
+                "path": "/metrics",
+                "interval": "30s",
+                "scrapeTimeout": "10s",
+                # pod_name, container_name and app are the labels Altinity's
+                # Keeper dashboard (grafana_alerting/dashboards) filters on.
+                "relabelings": [
+                    {
+                        "sourceLabels": ["__meta_kubernetes_pod_name"],
+                        "targetLabel": "pod",
+                    },
+                    {
+                        "sourceLabels": ["__meta_kubernetes_pod_name"],
+                        "targetLabel": "pod_name",
+                    },
+                    {
+                        "sourceLabels": ["__meta_kubernetes_pod_container_name"],
+                        "targetLabel": "container_name",
+                    },
+                    {"targetLabel": "app", "replacement": "clickhouse-keeper"},
+                ],
+            }
+        ],
+    },
+    opts=ResourceOptions(depends_on=[keeper_metrics_service]),
 )
 
 export("clickhouse_namespace", CLICKHOUSE_NAMESPACE)
