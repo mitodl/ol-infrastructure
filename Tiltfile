@@ -14,6 +14,7 @@ config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides p
 config.define_string("disk_keep_tags", usage="Newest tilt-built image tags kept per repo by the disk janitor (default: 3). Overrides LOCAL_DEV_DISK_KEEP_TAGS env var.")
 config.define_string("disk_buildcache_max_gb", usage="Docker build-cache size cap in GB (default: 10% of total disk; 0 disables). Overrides LOCAL_DEV_BUILDCACHE_MAX_GB env var.")
 config.define_string("log_retention_period", usage="How long Grafana/Loki keeps local-dev logs, as a whole number of days, e.g. 72h or 3d (default: 168h). Overrides LOCAL_DEV_LOG_RETENTION env var.")
+config.define_string("keycloak_image", usage="Keycloak server image for the core stack (default: the published mitodl/keycloak digest). Set and cleared by local-dev/scripts/kc-theme-image.sh to test an unreleased ol-keycloakify theme. Overrides LOCAL_DEV_KEYCLOAK_IMAGE env var.")
 cfg = config.parse()
 
 enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
@@ -54,6 +55,12 @@ prebuilt_tags = {
 # not pinned in Pulumi.local-dev.core.Dev.yaml, since Pulumi config would win
 # over the environment and silently override this.
 log_retention_period = cfg.get("log_retention_period") or os.environ.get("LOCAL_DEV_LOG_RETENTION", "")
+
+# Keycloak server image. Empty means the Pulumi program's own default (the
+# published mitodl/keycloak digest). Set it to a locally built image to test an
+# unreleased ol-keycloakify theme -- see "Testing a local ol-keycloakify build"
+# in local-dev/README.md. Same not-pinned-in-Pulumi-config caveat as above.
+keycloak_image = cfg.get("keycloak_image") or os.environ.get("LOCAL_DEV_KEYCLOAK_IMAGE", "")
 
 # Workspace root: directory that contains ol-infrastructure and sibling app repos.
 # Override with MITOL_WORKSPACE_ROOT environment variable.
@@ -245,6 +252,7 @@ local_resource(
     env={
         "LOCAL_DEV_ROOT_DOMAIN": root_domain,
         "LOCAL_DEV_LOG_RETENTION": log_retention_period,
+        "LOCAL_DEV_KEYCLOAK_IMAGE": keycloak_image,
         "PULUMI_CONFIG_PASSPHRASE": "",
     },
     dir="./local-dev/infra/core",

@@ -1,0 +1,12 @@
+# Applied to the ol-keycloakify checkout used as build context (BuildKit reads
+# the <Dockerfile>.dockerignore beside the Dockerfile). Everything the build
+# produces itself is excluded so host state cannot leak in and the context
+# stays small; node_modules alone is over a gigabyte.
+.git
+node_modules
+dist
+dist_keycloak
+build
+storybook-static
+.keycloakify
+.yarn/install-state.gz
