@@ -41,6 +41,12 @@ Add `"my-app"` to the `APP_NAMESPACES` tuple in `local-dev/infra/modules/namespa
 
 In `local-dev/infra/modules/keycloak.py`, add a new client and call `_make_oidc_secret()` to create the OIDC credentials Secret in the app namespace.
 
+The client secret itself lives in three places that must be kept in sync by hand — there is no output plumbing between the Pulumi stacks and the app manifests:
+
+1. `local-dev/infra/apps_infra/Pulumi.local-dev.apps-infra.Dev.yaml` — the plaintext local-only value
+2. `local-dev/infra/apps_infra/__main__.py` — `config.require_secret(...)`, passed into `create_olapps_dev_realm()`
+3. the app's `secrets.yaml` — the same literal, under whatever env var the app reads
+
 ### 5. Register in the root Tiltfile
 
 In `Tiltfile`, add an entry to the `APPS` list:

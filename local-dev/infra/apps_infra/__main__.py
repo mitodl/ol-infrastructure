@@ -46,6 +46,7 @@ if verify_email is None:
 
 # Client secrets for OIDC configuration
 mitlearn_client_secret = config.require_secret("mitlearn_client_secret")
+mitlearn_account_client_secret = config.require_secret("mitlearn_account_client_secret")
 learn_ai_client_secret = config.require_secret("learn_ai_client_secret")
 mitxonline_client_secret = config.require_secret("mitxonline_client_secret")
 unified_ecommerce_client_secret = config.require_secret(
@@ -93,6 +94,7 @@ create_olapps_dev_realm(
     keycloak_url=keycloak_url,
     k8s_provider=k8s_provider,
     mitlearn_client_secret=mitlearn_client_secret,
+    mitlearn_account_client_secret=mitlearn_account_client_secret,
     learn_ai_client_secret=learn_ai_client_secret,
     mitxonline_client_secret=mitxonline_client_secret,
     unified_ecommerce_client_secret=unified_ecommerce_client_secret,
