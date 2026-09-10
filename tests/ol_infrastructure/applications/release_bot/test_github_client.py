@@ -548,6 +548,57 @@ def test_commits_since_last_tag_keeps_lookalike_subjects(fake_repo):
 
 
 # ---------------------------------------------------------------------------
+# Hotfix requests
+# ---------------------------------------------------------------------------
+
+
+class _FakeRef:
+    def __init__(self, repo, ref):
+        self._repo = repo
+        self.ref = ref
+
+    def delete(self):
+        self._repo.refs.remove(self)
+
+
+class _RefsRepo:
+    """Just the git-refs slice of the API that hotfix requests use."""
+
+    def __init__(self, *names):
+        self.refs = [_FakeRef(self, name) for name in names]
+
+    def get_git_matching_refs(self, ref):
+        return [r for r in self.refs if r.ref.startswith(f"refs/{ref}")]
+
+    def create_git_ref(self, ref, sha):
+        assert ref == f"refs/tags/hotfix/{sha}"
+        self.refs.append(_FakeRef(self, ref))
+
+
+_HOTFIX_SHA = "a" * 40
+
+
+def test_pending_hotfix_requests_lists_the_requested_shas(fake_repo):
+    fake_repo(_RefsRepo(f"refs/tags/hotfix/{_HOTFIX_SHA}", "refs/tags/2026.9.1.1"))
+    assert github._pending_hotfix_requests_sync("mitodl/thing") == [_HOTFIX_SHA]
+
+
+def test_request_hotfix_names_the_tag_after_the_full_sha(fake_repo):
+    """The release resource deletes a request by exactly this name."""
+    repo = fake_repo(_RefsRepo())
+    github._request_hotfix_sync("mitodl/thing", _HOTFIX_SHA)
+    assert [r.ref for r in repo.refs] == [f"refs/tags/hotfix/{_HOTFIX_SHA}"]
+
+
+def test_cancel_hotfix_requests_deletes_only_requests(fake_repo):
+    repo = fake_repo(
+        _RefsRepo(f"refs/tags/hotfix/{_HOTFIX_SHA}", "refs/tags/2026.9.1.1")
+    )
+    assert github._cancel_hotfix_requests_sync("mitodl/thing") == [_HOTFIX_SHA]
+    assert [r.ref for r in repo.refs] == ["refs/tags/2026.9.1.1"]
+
+
+# ---------------------------------------------------------------------------
 # In-flight release detection
 # ---------------------------------------------------------------------------
 
