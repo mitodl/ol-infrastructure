@@ -369,7 +369,7 @@ def test_discovery_and_instance_urls(
         ]
     )
     monkeypatch.setattr(script, "_fly_curl", api)
-    routes, failures = script._discover_secret_routes()
+    routes, failures = script._discover_pulumi_routes()
     assert not failures
     assert len(routes) == 1
     route = routes[0]
@@ -390,7 +390,7 @@ def test_discovery_failures_are_explicit(
 ) -> None:
     """An unavailable API must not be confused with absence of consumers."""
     monkeypatch.setattr(script, "_fly_curl", Mock(return_value=response))
-    routes, failures = script._discover_secret_routes()
+    routes, failures = script._discover_pulumi_routes()
     assert not routes
     assert failures == ["pipeline list unavailable"]
     routes, failure = script._read_pipeline_routes({"name": "unavailable"})
@@ -411,7 +411,7 @@ def test_report_uses_live_deploy_evidence(  # noqa: PLR0913
     """Reuse successful-build ancestry and report a shared deploy just once."""
     routes = script._routes_from_config("app", config)
     monkeypatch.setattr(
-        script, "_discover_secret_routes", Mock(return_value=(routes, []))
+        script, "_discover_pulumi_routes", Mock(return_value=(routes, []))
     )
     live = Mock(return_value=script.LiveStage(reached, "42", None, "b" * 40))
     monkeypatch.setattr(script, "_live_stage", live)
@@ -435,6 +435,55 @@ def test_report_uses_live_deploy_evidence(  # noqa: PLR0913
         if reached
         else "not yet reached"
     ) in output
+
+
+def test_credential_diagnostics_do_not_echo_registry_values(
+    script: ModuleType,
+    pr: object,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Use registry membership for classification, not its values for output."""
+    monkeypatch.setattr(
+        script,
+        "DEPLOY_CREDENTIAL_SECRETS",
+        {
+            "pulumi/vault.*.*.yaml": "do-not-echo-description",
+        },
+    )
+    script._report_sops_secrets(
+        pr, ["src/bridge/secrets/pulumi/vault.operations.qa.yaml"]
+    )
+    output = capsys.readouterr().out
+    assert "Provider credentials only" in output
+    assert "do-not-echo-description" not in output
+
+
+def test_failed_discovery_does_not_echo_instance_values(
+    script: ModuleType,
+    pr: object,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Keep instance values in the API request, not in failure diagnostics."""
+    api = Mock(
+        side_effect=[
+            [
+                {
+                    "name": "unavailable",
+                    "instance_vars": {"branch": "do-not-log-selector"},
+                }
+            ],
+            None,
+        ]
+    )
+    monkeypatch.setattr(script, "_fly_curl", api)
+    script._report_sops_secrets(pr, ["src/bridge/secrets/mitxonline/secrets.qa.yaml"])
+    output = capsys.readouterr().out
+    assert "do-not-log-selector" in api.call_args.args[0]
+    assert "Could not inspect unavailable" in output
+    assert "discovery is incomplete" in output
+    assert "do-not-log-selector" not in output
 
 
 def test_credentials_unknown_and_logged_out(
@@ -472,7 +521,7 @@ def test_missing_build_and_discovery_are_unknown(
     routes = script._routes_from_config("app", config)
     monkeypatch.setattr(
         script,
-        "_discover_secret_routes",
+        "_discover_pulumi_routes",
         Mock(return_value=(routes, ["unavailable-pipeline"])),
     )
     monkeypatch.setattr(script, "_live_stage", Mock(return_value=None))

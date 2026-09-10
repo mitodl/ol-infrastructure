@@ -549,12 +549,14 @@ def _read_pipeline_routes(
     path = _pipeline_path(pipeline["name"], "/config")
     data = _fly_curl(f"/api/v1{path}{query}")
     if not isinstance(data, dict) or not isinstance(data.get("config"), dict):
-        return [], f"{pipeline['name']}{query}"
+        # The selector is needed for the request, but not for diagnostics.
+        # Do not echo arbitrary instance-variable values on an error path.
+        return [], str(pipeline["name"])
     return _routes_from_config(pipeline["name"], data["config"], query), None
 
 
-def _discover_secret_routes() -> tuple[list[SecretsRoute], list[str]]:
-    """Discover all visible pipelines once, with bounded concurrent API reads."""
+def _discover_pulumi_routes() -> tuple[list[SecretsRoute], list[str]]:
+    """Discover Pulumi routing metadata, not secret values, with bounded API reads."""
     pipelines = _fly_curl(f"/api/v1/teams/{CONCOURSE_TEAM}/pipelines")
     if not isinstance(pipelines, list):
         return [], ["pipeline list unavailable"]
@@ -649,15 +651,12 @@ def _report_sops_secrets(pr: PullRequest, paths: list[str]) -> None:
             print(f"      Candidate projects: {', '.join(sorted(projects))}")
         else:
             relative = path.removeprefix(f"{SECRETS_ROOT}/")
-            reasons = {
-                reason
-                for pattern, reason in DEPLOY_CREDENTIAL_SECRETS.items()
-                if _secret_entry_matches(relative, pattern)
-            }
-            if reasons:
-                print(
-                    f"      Provider credentials only: {'; '.join(sorted(reasons))}; no content deploy expected."
-                )
+            credential_only = any(
+                _secret_entry_matches(relative, pattern)
+                for pattern in DEPLOY_CREDENTIAL_SECRETS
+            )
+            if credential_only:
+                print("      Provider credentials only; no content deploy expected.")
             else:
                 print(
                     "      ?  No registered Pulumi consumer; deployment route unknown."
@@ -672,7 +671,7 @@ def _report_sops_secrets(pr: PullRequest, paths: list[str]) -> None:
             f"    Log in: fly -t {CONCOURSE_TEAM} login -c {CONCOURSE_URL} -n {CONCOURSE_TEAM}"
         )
         return
-    routes, failures = _discover_secret_routes()
+    routes, failures = _discover_pulumi_routes()
     for failure in failures:
         print(f"    ?  Could not inspect {failure}; discovery is incomplete.")
     grouped: dict[SecretsRoute, list[str]] = {}
