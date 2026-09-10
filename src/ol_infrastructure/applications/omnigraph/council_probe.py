@@ -35,6 +35,9 @@ from pathlib import Path
 import pulumi_kubernetes as kubernetes
 from pulumi import Output, Resource, ResourceOptions
 
+from ol_infrastructure.applications.omnigraph.scripts.check_council_health import (
+    PROBE_ACTIVE_DEADLINE_SECONDS,
+)
 from ol_infrastructure.lib.aws.eks_helper import cached_image_uri
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -45,20 +48,22 @@ SCRIPT_MOUNT_PATH = "/opt/witan-council-probe"
 SCRIPT_FILENAME = "check_council_health.py"
 
 # Every 15 minutes. The window this closes is bounded by cadence, not by the
-# request itself (one query, ~15s ceiling below) — 15m keeps the worst-case
-# "council is down and nobody has restarted a pod or made a call" detection
+# requests themselves (see PROBE_ACTIVE_DEADLINE_SECONDS) — 15m keeps the
+# worst-case "council is down and nobody has restarted a pod or made a call"
+# detection
 # window well inside the existing staleness rule's 6h fast-bucket threshold
 # (eks_general.py), so a genuinely stuck CronJob controller is caught by that
 # rule long before a single missed run would be.
 DEFAULT_PROBE_SCHEDULE = "*/15 * * * *"
 
-# One HTTP call with its own 15s client-side timeout (script module docstring).
-# A run that has not finished in a minute is wedged on something the client
-# timeout should already have caught.
-PROBE_ACTIVE_DEADLINE_SECONDS = 60
+# The deadline is DERIVED from the script's own query list and client
+# timeout, and is imported rather than restated here so the two cannot drift
+# — see PROBE_ACTIVE_DEADLINE_SECONDS in check_council_health.py for the
+# arithmetic and why it is not a literal.
 
-# The script is a single idempotent read; a retry is always safe, and two of
-# them ride out one dropped connection without waiting for the next tick.
+# Every query the script runs is an idempotent read, so a retry is always
+# safe, and two of them ride out one dropped connection without waiting for
+# the next tick.
 PROBE_BACKOFF_LIMIT = 1
 
 
@@ -149,9 +154,9 @@ def create_council_probe(  # noqa: PLR0913
                         run_as_user=1000,
                         run_as_group=1000,
                     ),
-                    # One HTTP call. The limits are here to make it
-                    # evictable-last rather than because it is anywhere near
-                    # them.
+                    # A couple of small HTTP calls. The limits are here to
+                    # make it evictable-last rather than because it is
+                    # anywhere near them.
                     resources=kubernetes.core.v1.ResourceRequirementsArgs(
                         requests={"cpu": "25m", "memory": "32Mi"},
                         limits={"cpu": "250m", "memory": "128Mi"},

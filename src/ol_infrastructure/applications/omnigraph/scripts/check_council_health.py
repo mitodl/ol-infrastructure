@@ -107,7 +107,40 @@ query council_search_probe() {
 }
 """
 
+#: Every query one run makes, in order — the ordinary read first, then the
+#: full-text read.
+#:
+#: This tuple, not a hand-kept number, is what says how many HTTP calls a run
+#: costs: ``council_probe.py`` derives the CronJob's
+#: ``activeDeadlineSeconds`` from ``len(PROBE_QUERIES) * HTTP_TIMEOUT_SECONDS``
+#: plus a startup budget. Adding a third probe here therefore widens that
+#: deadline automatically instead of quietly eating into the headroom the pod
+#: needs to be scheduled and start an interpreter — which is exactly what
+#: adding the second one did, when the deadline was a literal 60.
+PROBE_QUERIES: tuple[tuple[str, str], ...] = (
+    ("ordinary", PROBE_QUERY),
+    ("search", SEARCH_PROBE_QUERY),
+)
+
 HTTP_TIMEOUT_SECONDS = 15
+
+#: Budget for everything in a run that is not an HTTP call: pod scheduling,
+#: image pull, interpreter start. Generous on purpose — the deadline below is
+#: a backstop for a wedged run, not a policy on slow nodes.
+PROBE_STARTUP_BUDGET_SECONDS = 30
+
+#: What `council_probe.py` sets as the CronJob's `activeDeadlineSeconds`.
+#:
+#: DERIVED, and that is the point. It lives here, beside the two inputs it is
+#: a function of, because here is where drift starts: when this script grew
+#: its second query, a literal 60 in the deployment would have silently
+#: halved the startup headroom instead of widening the deadline. Adding a
+#: third probe to PROBE_QUERIES now moves this on its own.
+#:
+#: Currently 2 * 15 + 30 = 60, the value it has always had.
+PROBE_ACTIVE_DEADLINE_SECONDS = (
+    len(PROBE_QUERIES) * HTTP_TIMEOUT_SECONDS + PROBE_STARTUP_BUDGET_SECONDS
+)
 
 
 class ProbeError(Exception):
@@ -170,6 +203,11 @@ def run_probe(
     return parsed
 
 
+def _row_count(result: dict[str, Any]) -> int:
+    """Rows a query returned, preferring the server's own count."""
+    return int(result.get("row_count", len(result.get("rows", []))))
+
+
 def main() -> int:
     """Run the probe once and exit non-zero on any failure to answer."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -194,13 +232,14 @@ def main() -> int:
         # cast rather than assert since this is not a runtime invariant worth
         # enforcing twice, just a fact the type checker cannot see through
         # the comprehension above.
-        result = run_probe(cast(str, server_addr), graph_id, cast(str, token))
-        search_result = run_probe(
-            cast(str, server_addr),
-            graph_id,
-            cast(str, token),
-            query=SEARCH_PROBE_QUERY,
-        )
+        counts = {
+            label: _row_count(
+                run_probe(
+                    cast(str, server_addr), graph_id, cast(str, token), query=query
+                )
+            )
+            for label, query in PROBE_QUERIES
+        }
     except ProbeError as exc:
         # Not `.exception()`: `exc` is already a fully-formatted, known
         # failure message (a classified HTTP/JSON condition), not an
@@ -209,10 +248,9 @@ def main() -> int:
         return 1
 
     LOG.info(
-        "council-health probe OK: graph=%s row_count=%s search_row_count=%s",
+        "council-health probe OK: graph=%s %s",
         graph_id,
-        result.get("row_count", len(result.get("rows", []))),
-        search_result.get("row_count", len(search_result.get("rows", []))),
+        " ".join(f"{label}_row_count={count}" for label, count in counts.items()),
     )
     return 0
 

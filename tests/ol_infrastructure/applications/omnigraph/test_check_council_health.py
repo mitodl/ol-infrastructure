@@ -15,6 +15,10 @@ from typing import Any, ClassVar
 import pytest
 
 from ol_infrastructure.applications.omnigraph.scripts.check_council_health import (
+    HTTP_TIMEOUT_SECONDS,
+    PROBE_ACTIVE_DEADLINE_SECONDS,
+    PROBE_QUERIES,
+    PROBE_STARTUP_BUDGET_SECONDS,
     SEARCH_PROBE_QUERY,
     ProbeError,
     main,
@@ -240,3 +244,30 @@ def test_main_fails_on_a_probe_failure(stub_server, monkeypatch):
     monkeypatch.setenv("OMNIGRAPH_BEARER_TOKEN", "t")  # pragma: allowlist secret
 
     assert main() == 1
+
+
+def test_active_deadline_is_derived_from_the_probe_query_list():
+    """The deadline must track the number of queries, not sit at a literal.
+
+    This is the regression Copilot caught on #5801: adding the search probe
+    doubled worst-case client time (15s -> 30s) against a hardcoded
+    `activeDeadlineSeconds = 60`, silently halving the headroom left for pod
+    scheduling and interpreter start. Deriving it means a third probe widens
+    the deadline instead of eating that headroom.
+    """
+    assert (
+        len(PROBE_QUERIES) * HTTP_TIMEOUT_SECONDS + PROBE_STARTUP_BUDGET_SECONDS
+    ) == PROBE_ACTIVE_DEADLINE_SECONDS
+    # The startup budget has to survive the worst case, or the backstop fires
+    # on a slow node instead of on a wedged run.
+    assert PROBE_STARTUP_BUDGET_SECONDS > 0
+    assert len(PROBE_QUERIES) * HTTP_TIMEOUT_SECONDS < PROBE_ACTIVE_DEADLINE_SECONDS
+
+
+def test_probe_queries_covers_both_read_paths():
+    """Ordinary and full-text reads fail independently; both must be probed."""
+    labels = [label for label, _ in PROBE_QUERIES]
+    assert labels == ["ordinary", "search"]
+    ordinary, search = (query for _, query in PROBE_QUERIES)
+    assert "search(" not in ordinary
+    assert "search(" in search
