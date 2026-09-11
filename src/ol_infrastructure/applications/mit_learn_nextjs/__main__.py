@@ -112,21 +112,6 @@ nextjs_max_old_space_size_mib = (
 # Kept at request + 512Mi as the request grew, preserving that absorption margin.
 nextjs_memory_limit = "2Gi"
 
-stay_updated_hubspot_form_ids = {
-    "ci": "f201f3af-c2c0-4b7d-b297-ddbb75912cc1",
-    "qa": "f201f3af-c2c0-4b7d-b297-ddbb75912cc1",
-    "production": "a5d18493-dcdb-4482-ad10-16ab66a35526",
-}
-
-stay_updated_hubspot_form_id = stay_updated_hubspot_form_ids.get(
-    stack_info.env_suffix, ""
-)
-if not stay_updated_hubspot_form_id:
-    pulumi.log.warn(
-        "No stay updated HubSpot form ID for environment "
-        f"{stack_info.env_suffix}; the form will render its unavailable fallback."
-    )
-
 org_learning_hubspot_form_ids = {
     "ci": "e6910657-d832-4df8-be27-d8f6f9ecdfcc",
     "qa": "e6910657-d832-4df8-be27-d8f6f9ecdfcc",
@@ -214,7 +199,6 @@ raw_env_vars = {
     "NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE": "0.25",
     "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "0.001",
     "NEXT_PUBLIC_SITE_NAME": "MIT Learn",
-    "NEXT_PUBLIC_STAY_UPDATED_HUBSPOT_FORM_ID": stay_updated_hubspot_form_id,
     "NEXT_PUBLIC_VERSION": MIT_LEARN_NEXTJS_DOCKER_TAG,
     "NEXT_PUBLIC_FEATURE_product_page_courses": "false",
     "NEXT_PUBLIC_FEATURE_article_viewer": "true",
