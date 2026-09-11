@@ -22,6 +22,10 @@ https://docs.stacklok.com/toolhive/guides-vmcp/authentication:
   Grafana Cloud MCP endpoint is not proxied instead), also joined to the group,
 - the per-stack optional ``context7``, ``sentry`` and ``aws`` ``MCPServer``s, each
   gated behind a ``toolhive_swe:<name>_enabled`` boolean (see mcp_servers.py),
+- the per-stack optional ``vantage`` ``MCPRemoteProxy`` — a proxy to Vantage's
+  hosted MCP server rather than a workload we run, gated the same way
+  (see mcp_servers.py for why it is a proxy and why its credential rides
+  ``headerForward`` instead of an ``MCPExternalAuthConfig``),
 - an ``MCPOIDCConfig`` (``swe-vmcp-oidc``) used to validate the JWTs Keycloak issues
   directly to MCP clients, and
 - a ``VirtualMCPServer`` (``swe-vmcp``) that aggregates every backend in the group

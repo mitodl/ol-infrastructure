@@ -9,12 +9,19 @@ in-cluster (e.g. ``http://mcp-fetch-proxy.<namespace>.svc.cluster.local:8080/mcp
 This is the module that grows as new tools are added to the SWE group: define
 each backend ``MCPServer`` here and append it to the ``servers`` list returned
 by :func:`create_mcp_servers` so the vMCP's ``depends_on`` wiring picks it up.
+
+A backend does not have to be a container we run. ``MCPRemoteProxy`` is the
+other member kind the vMCP's group discovery understands
+(``pkg/vmcp/workloads/k8s.go`` lists ``MCPServer``, ``MCPRemoteProxy`` and
+``MCPServerEntry``); the operator reconciles it into a proxy Deployment +
+Service exactly like an ``MCPServer``, except the workload it fronts lives at
+someone else's URL. The ``vantage`` backend below is the first of those.
 """
 
 from typing import NamedTuple
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, Resource, ResourceOptions, StackReference
+from pulumi import Config, Output, Resource, ResourceOptions, StackReference
 
 from bridge.lib.versions import (
     MCP_CONTEXT7_VERSION,
@@ -87,6 +94,16 @@ SENTRY_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 # and injected into the context7 MCPServer the same way as the Grafana token.
 CONTEXT7_TOKEN_SECRET_NAME = "toolhive-swe-context7-token"  # noqa: S105  # pragma: allowlist secret
 CONTEXT7_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+
+# Vantage's hosted (remote) MCP server. Unlike every other backend here this is
+# NOT a workload we run — see the ``vantage`` block in ``create_mcp_servers``.
+VANTAGE_MCP_ENDPOINT = "https://mcp.vantage.sh/mcp"
+
+# K8s Secret holding the FULL ``Authorization`` header value for the Vantage
+# endpoint — i.e. ``Bearer <api token>``, not the bare token. ToolHive's
+# headerForward injects the value verbatim, so the scheme has to be part of it.
+VANTAGE_TOKEN_SECRET_NAME = "toolhive-swe-vantage-token"  # noqa: S105  # pragma: allowlist secret
+VANTAGE_TOKEN_SECRET_KEY = "authorization"  # noqa: S105  # pragma: allowlist secret
 
 
 class ToolhiveSWEMCPServers(NamedTuple):
@@ -526,6 +543,129 @@ def create_mcp_servers(  # noqa: PLR0913
             ),
         )
         servers.append(aws_mcpserver)
+
+    # Vantage backend: a PROXY to Vantage's hosted MCP server
+    # (https://mcp.vantage.sh/mcp), not a copy of it we run. Hence
+    # ``MCPRemoteProxy`` rather than ``MCPServer`` — the operator reconciles it
+    # into the same proxy Deployment + Service shape, and the vMCP's group
+    # discovery treats it as an ordinary backend
+    # (``pkg/vmcp/workloads/k8s.go``), so it aggregates and prefixes
+    # (``vantage_*``) like the rest.
+    #
+    # Self-hosting was the other option and was rejected on packaging: the
+    # self-hosted server ships only as the ``vantage-mcp-server`` npm package,
+    # there is no image for it in ToolHive's dockyard (verified against
+    # ghcr.io/stacklok/dockyard/npx) and none from Vantage, and the operator has
+    # no ``npx://`` protocol-scheme support — ``spec.image`` is a container image
+    # and nothing else. Taking that route means WE build and keep republishing a
+    # container around someone else's npm package. Proxying costs one CR and
+    # Vantage ships their own upgrades; the hosted and self-hosted servers are
+    # the same codebase either way.
+    #
+    # Unlike the hosted Grafana Cloud MCP endpoint (see the grafana note above),
+    # this one does not force a second browser login: OAuth 2.1 is its default
+    # but it also accepts a Vantage API token as a plain bearer credential
+    # (https://docs.vantage.sh/vantage_mcp). So user auth stays single-hop
+    # through the vMCP's Keycloak flow, and — exactly as with grafana and sentry
+    # — every user acts as the one API token, so scope it least-privilege.
+    #
+    # Auth mechanism is ``headerForward``, NOT ``externalAuthConfigRef``, even
+    # though a ``bearerToken``-typed ``MCPExternalAuthConfig`` looks like the
+    # purpose-built answer. That type has no converter registered in the vMCP's
+    # runtime registry (``pkg/vmcp/auth/converters``: tokenExchange,
+    # headerInjection, unauthenticated, upstreamInject, awsSts, obo, xaa — no
+    # bearerToken), and the vMCP resolves a backend's external-auth ref during
+    # discovery and DROPS the backend when resolution fails. The proxy pod would
+    # authenticate to Vantage correctly and the aggregate would still show no
+    # vantage tools. ``headerForward`` is applied by the proxy pod itself and
+    # carries no such ref. ``Authorization`` is deliberately permitted there —
+    # it is absent from ``middleware.RestrictedHeaders`` and the middleware logs
+    # a warning rather than refusing it — and the injection runs closer to the
+    # backend than strip-auth, so it overwrites rather than races with anything
+    # the vMCP forwarded inbound.
+    #
+    # No ``oidcConfigRef``: the proxy is a ClusterIP reachable only through the
+    # vMCP, which is where incoming auth is enforced. Same posture as every
+    # MCPServer backend here, which are likewise unauthenticated in-cluster.
+    #
+    # Audit is on, and that is a decision rather than a default — see the
+    # ``toolhive_mcpserver_audit`` docstring, which requires the backend's SDK
+    # error path to be checked before enabling it. Vantage is
+    # ``@modelcontextprotocol/sdk`` 1.29.0, whose CallTool handler catches EVERY
+    # error (including its own ``McpError`` input-validation failures) and
+    # returns ``{content, isError: true}``; the one exception it rethrows is the
+    # ``UrlElicitationRequired`` control signal, which carries no payload text.
+    # Vantage's own ``registerTool`` wrapper catches ``MCPUserError`` — the class
+    # that carries Vantage API error bodies — before that and likewise returns an
+    # ``isError`` result. So no top-level JSON-RPC error is reachable and
+    # ``jsonrpc_error_message`` captures nothing.
+    #
+    # Gated per-stack like sentry/context7 (currently Production only):
+    #   pulumi config set --secret toolhive_swe:vantage_api_key -- <token>
+    #   pulumi config set toolhive_swe:vantage_enabled true
+    if toolhive_swe_config.get_bool("vantage_enabled"):
+        vantage_token_secret = kubernetes.core.v1.Secret(
+            f"toolhive-swe-vantage-token-secret-{stack_info.env_suffix}",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=VANTAGE_TOKEN_SECRET_NAME,
+                namespace=namespace,
+                labels=k8s_global_labels,
+            ),
+            type="Opaque",
+            string_data={
+                # Stored pre-prefixed because headerForward injects the Secret
+                # value as the whole header, with no scheme of its own. Config
+                # holds the bare token so it can be rotated by pasting exactly
+                # what the Vantage console hands out.
+                VANTAGE_TOKEN_SECRET_KEY: Output.concat(
+                    "Bearer ", toolhive_swe_config.require_secret("vantage_api_key")
+                ),
+            },
+            opts=ResourceOptions(),
+        )
+        vantage_remoteproxy = kubernetes.apiextensions.CustomResource(
+            f"toolhive-swe-vantage-remoteproxy-{stack_info.env_suffix}",
+            api_version="toolhive.stacklok.dev/v1beta1",
+            kind="MCPRemoteProxy",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="vantage",
+                namespace=namespace,
+                labels=k8s_global_labels,
+            ),
+            spec={
+                "remoteUrl": VANTAGE_MCP_ENDPOINT,
+                "transport": "streamable-http",
+                "proxyPort": 8080,
+                "groupRef": {"name": MCP_GROUP_NAME},
+                **_observability(stack_info, "vantage"),
+                "headerForward": {
+                    "addHeadersFromSecret": [
+                        {
+                            "headerName": "Authorization",
+                            "valueSecretRef": {
+                                "name": VANTAGE_TOKEN_SECRET_NAME,
+                                "key": VANTAGE_TOKEN_SECRET_KEY,
+                            },
+                        }
+                    ],
+                },
+                # There is no permissionProfile here: MCPRemoteProxy has no such
+                # field. Egress to mcp.vantage.sh is the entire point of the
+                # workload rather than a capability granted to one.
+                "resources": {
+                    "requests": {"cpu": "50m", "memory": "128Mi"},
+                    "limits": {"cpu": "200m", "memory": "256Mi"},
+                },
+            },
+            opts=ResourceOptions(
+                depends_on=[
+                    swe_mcpgroup,
+                    vantage_token_secret,
+                    telemetry_config,
+                ]
+            ),
+        )
+        servers.append(vantage_remoteproxy)
 
     return ToolhiveSWEMCPServers(
         group=swe_mcpgroup,
