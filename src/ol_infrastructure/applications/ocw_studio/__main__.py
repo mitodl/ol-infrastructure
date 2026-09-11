@@ -37,7 +37,11 @@ from ol_infrastructure.components.aws.mediaconvert import (
     OLMediaConvert,
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
-from ol_infrastructure.components.services.apisix import OLApisixPluginConfig
+from ol_infrastructure.components.services.apisix import (
+    OLApisixPluginConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -704,6 +708,21 @@ cert_manager_certificate = OLCertManagerCert(
     ),
 )
 
+# Shared plugin defaults for every route below: prometheus (per-route series),
+# opentelemetry (OTLP spans), gzip (these routes served every response
+# uncompressed), cors, the http->https redirect and Referrer-Policy. Each route
+# also keeps its own plugins -- OLApisixHTTPRoute merges the two lists, with the
+# route's entries winning by name.
+ocw_studio_shared_plugins = OLApisixSharedPlugins(
+    f"ocw-studio-{stack_info.env_suffix}-ol-shared-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="ocw-studio",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=ocw_studio_namespace,
+        k8s_labels=k8s_app_labels,
+    ),
+)
+
 # The `location` blocks that used to live in the nginx sidecar. HTTPRoute has no
 # priority field -- APISix resolves overlapping rules by longest matching path
 # prefix -- so /static/hash.txt outranks /static, which outranks /*, which is the
@@ -726,6 +745,7 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
         # is the closer translation.
         OLApisixHTTPRouteConfig(
             route_name="static-hash",
+            shared_plugins=ocw_studio_shared_plugins,
             hosts=[app_domain],
             paths=["/static/hash.txt"],
             backend_service_name=ocw_studio_k8s_app.application_lb_service_name,
@@ -740,12 +760,13 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
             ],
         ),
         # Granian serves static without a CORS header; the sidecar added a
-        # blanket one. Preserved rather than dropped because this app has no
-        # shared plugin config supplying `cors`, so removing the sidecar would
-        # otherwise silently take the header away from cross-origin font and
-        # asset loads.
+        # blanket one. Kept even though the shared config now supplies `cors`:
+        # that plugin only answers requests that carry an Origin, while this
+        # header went out unconditionally, and static assets are exactly the
+        # thing a cross-origin font or stylesheet load fetches without one.
         OLApisixHTTPRouteConfig(
             route_name="static",
+            shared_plugins=ocw_studio_shared_plugins,
             hosts=[app_domain],
             paths=["/static/*"],
             backend_service_name=ocw_studio_k8s_app.application_lb_service_name,
@@ -776,6 +797,7 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
         # route never serves anything.
         OLApisixHTTPRouteConfig(
             route_name="dnt-policy",
+            shared_plugins=ocw_studio_shared_plugins,
             hosts=[app_domain],
             paths=["/.well-known/dnt-policy.txt"],
             path_match_type="Exact",
@@ -797,6 +819,7 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
         ),
         OLApisixHTTPRouteConfig(
             route_name="passthrough",
+            shared_plugins=ocw_studio_shared_plugins,
             hosts=[app_domain],
             paths=["/*"],
             backend_service_name=ocw_studio_k8s_app.application_lb_service_name,

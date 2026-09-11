@@ -13,12 +13,16 @@ import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, ResourceOptions
 from pydantic import (
     BaseModel,
+    ConfigDict,
     NonNegativeInt,
     field_validator,
     model_validator,
 )
 
-from ol_infrastructure.components.services.apisix import OLApisixPluginConfig
+from ol_infrastructure.components.services.apisix import (
+    OLApisixPluginConfig,
+    OLApisixSharedPlugins,
+)
 
 
 class OLApisixHTTPRouteConfig(BaseModel):
@@ -71,9 +75,36 @@ class OLApisixHTTPRouteConfig(BaseModel):
         field is retained for compatibility but has NO effect on HTTPRoute generation.
     """
 
+    model_config = ConfigDict(
+        # Holds an OLApisixSharedPlugins component resource, which pydantic
+        # cannot generate a schema for.
+        arbitrary_types_allowed=True,
+        # Pydantic skips field validators for fields left at their default, so
+        # without this a route that passes no ``plugins`` at all silently loses
+        # the request-id plugin ensure_request_id_plugin exists to guarantee --
+        # while an otherwise identical route that spells out ``plugins=[]``
+        # keeps it.
+        validate_default=True,
+    )
+
     route_name: str
     priority: int = 0  # NOT used in Gateway API HTTPRoute - see class docstring
-    shared_plugin_config_name: str | None = None
+    shared_plugins: OLApisixSharedPlugins | None = None
+    """Shared plugin defaults (cors, prometheus, opentelemetry, gzip, ...) to
+    apply to this route, merged with ``plugins`` below.
+
+    The component itself is passed rather than its ``resource_name`` because the
+    merge happens in Pulumi: a Gateway API HTTPRoute rule accepts exactly one
+    ExtensionRef filter, so unlike a legacy ``ApisixRoute`` -- which names a
+    shared ApisixPluginConfig *and* carries its own plugins, leaving APISIX to
+    combine them -- this component has to read the shared list and write a
+    single merged PluginConfig per route.
+
+    An entry in ``plugins`` replaces the same-named shared entry outright,
+    matching what APISIX does for the legacy path.  That also makes
+    ``OLApisixPluginConfig(name="gzip", enable=False)`` the way to opt one route
+    out of a shared plugin, since disabled plugins are dropped from the rendered
+    v1alpha1 PluginConfig."""
     plugins: list[OLApisixPluginConfig] = []
     hosts: list[str] = []
     paths: list[str] = []
@@ -114,15 +145,19 @@ class OLApisixHTTPRouteConfig(BaseModel):
         cls, v: list[OLApisixPluginConfig]
     ) -> list[OLApisixPluginConfig]:
         """Ensure that the request-id plugin is always added to the plugins list."""
-        if not any(plugin.name == "request-id" for plugin in v):
-            v.append(
-                OLApisixPluginConfig(
-                    name="request-id",
-                    secretRef=None,
-                    config={"include_in_response": True},
-                )
-            )
-        return v
+        if any(plugin.name == "request-id" for plugin in v):
+            return v
+        # A new list rather than an append: with validate_default=True this also
+        # runs against the field's default, and mutating that in place would
+        # grow the class-level list on every instantiation.
+        return [
+            *v,
+            OLApisixPluginConfig(
+                name="request-id",
+                secretRef=None,
+                config={"include_in_response": True},
+            ),
+        ]
 
     @model_validator(mode="after")
     def check_backend_or_upstream(self) -> "OLApisixHTTPRouteConfig":
@@ -205,10 +240,20 @@ class OLApisixHTTPRoute(ComponentResource):
       This component uses this kind exclusively.
 
     The component automatically:
-    - Creates PluginConfig (v1alpha1) resources for unique plugin combinations
+    - Creates one PluginConfig (v1alpha1) per route, holding that route's shared
+      plugin defaults merged with its own plugin list
     - Converts APISIX path patterns to Gateway API PathPrefix matches
     - Links routes to plugins via ExtensionRef filters
     - Supports both service backends and upstreams
+
+    NOTE ON PLUGIN MERGING
+    ----------------------
+    A legacy ``ApisixRoute`` can name a shared ApisixPluginConfig *and* carry its
+    own plugins, and APISIX combines the two.  A Gateway API HTTPRoute rule
+    accepts only one ExtensionRef filter, so that is not expressible in the CRD.
+    This component therefore merges ``shared_plugins.plugin_list`` with the
+    route's ``plugins`` itself and writes the result as a single per-route
+    PluginConfig -- see ``_merged_plugins``.
     """
 
     def __init__(  # noqa: PLR0913
@@ -239,8 +284,11 @@ class OLApisixHTTPRoute(ComponentResource):
 
         resource_options = ResourceOptions(parent=self).merge(opts)
 
-        # Create PluginConfig resources for unique plugin combinations
-        self._create_plugin_configs(
+        # One PluginConfig per route, holding that route's shared defaults
+        # merged with its own plugins.  Kept on the component so callers (and
+        # tests) can see what was actually created rather than recomputing the
+        # hashed names.
+        self.plugin_config_resources = self._create_plugin_configs(
             name, route_configs, k8s_namespace, k8s_labels, resource_options
         )
 
@@ -278,7 +326,18 @@ class OLApisixHTTPRoute(ComponentResource):
                 namespace=k8s_namespace,
             ),
             spec=spec,
-            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+            opts=resource_options.merge(
+                ResourceOptions(
+                    delete_before_replace=True,
+                    # A PluginConfig's name is a hash of its contents, so any
+                    # plugin change renames it and the HTTPRoute's ExtensionRef
+                    # has to follow.  Without this edge Pulumi is free to update
+                    # the route first, leaving it pointed at a name that does
+                    # not exist yet -- which APISIX resolves by serving the
+                    # route with no plugins at all rather than by failing.
+                    depends_on=list(self.plugin_config_resources.values()),
+                )
+            ),
         )
 
     def _extract_unique_hostnames(
@@ -309,6 +368,32 @@ class OLApisixHTTPRoute(ComponentResource):
         sanitized_httproute_name = httproute_name.replace("_", "-").lower()
         sanitized_route_name = route_name.replace("_", "-").lower()
         return f"{sanitized_httproute_name}-{sanitized_route_name}-{plugin_hash}"
+
+    @staticmethod
+    def _merged_plugins(
+        route_config: OLApisixHTTPRouteConfig,
+    ) -> list[OLApisixPluginConfig]:
+        """Combine a route's shared plugin defaults with its own plugin list.
+
+        Shared entries come first, then the route's own; a route entry replaces
+        the same-named shared entry wholesale rather than merging their
+        ``config`` dicts, which is what APISIX itself does when a legacy
+        ApisixRoute names a shared ApisixPluginConfig and also carries a plugin
+        of the same name (verified in production on mitxonline's static-hash
+        route, where the route's Cache-Control response-rewrite wins over the
+        shared Referrer-Policy one).
+
+        Doing it here is not a stylistic choice: a single HTTPRoute rule takes
+        one ExtensionRef filter, so there is no way to point a Gateway API route
+        at two PluginConfigs and let APISIX do the combining.
+        """
+        merged: dict[str, OLApisixPluginConfig] = {}
+        if route_config.shared_plugins:
+            for plugin in route_config.shared_plugins.plugin_list:
+                merged[plugin.name] = plugin
+        for plugin in route_config.plugins:
+            merged[plugin.name] = plugin
+        return list(merged.values())
 
     @staticmethod
     def _active_plugins(
@@ -356,16 +441,11 @@ class OLApisixHTTPRoute(ComponentResource):
         plugin_configs = {}
 
         for route_config in route_configs:
-            # Skip if using shared plugin config
-            if route_config.shared_plugin_config_name:
-                continue
-
-            # Skip if no plugins (shouldn't happen due to validator adding request-id)
-            if not route_config.plugins:
-                continue
-
+            # One PluginConfig per route holding the shared defaults merged with
+            # the route's own plugins -- see _merged_plugins for why the merge
+            # cannot be left to APISIX here.
             # Only enabled plugins are written to v1alpha1 PluginConfig.
-            active = self._active_plugins(route_config.plugins)
+            active = self._active_plugins(self._merged_plugins(route_config))
             if not active:
                 continue
 
@@ -549,39 +629,28 @@ class OLApisixHTTPRoute(ComponentResource):
                 "backendRefs": backend_refs,
             }
 
-            # Add plugin config via ExtensionRef filter if plugins are configured.
-            # Both paths use kind=PluginConfig (apisix.apache.org/v1alpha1) — the
-            # type the APISIX HTTPRoute reconciler actually processes.  The legacy
+            # Point the rule at the per-route PluginConfig built above.  Uses
+            # kind=PluginConfig (apisix.apache.org/v1alpha1) — the type the
+            # APISIX HTTPRoute reconciler actually processes.  The legacy
             # v2/ApisixPluginConfig kind is silently ignored by the reconciler.
-            if route_config.shared_plugin_config_name:
+            #
+            # The same merged, enabled-plugin subset is recomputed here so the
+            # referenced name always matches the resource that was created.
+            active = self._active_plugins(self._merged_plugins(route_config))
+            if active:
+                config_name = self._generate_plugin_config_name(
+                    httproute_name, route_config.route_name, active
+                )
                 rule["filters"] = [
                     {
                         "type": "ExtensionRef",
                         "extensionRef": {
                             "group": "apisix.apache.org",
                             "kind": "PluginConfig",
-                            "name": route_config.shared_plugin_config_name,
+                            "name": config_name,
                         },
                     }
                 ]
-            elif route_config.plugins:
-                # Use the same enabled-plugin subset that was used to create
-                # the PluginConfig resource so the name always matches.
-                active = self._active_plugins(route_config.plugins)
-                if active:
-                    config_name = self._generate_plugin_config_name(
-                        httproute_name, route_config.route_name, active
-                    )
-                    rule["filters"] = [
-                        {
-                            "type": "ExtensionRef",
-                            "extensionRef": {
-                                "group": "apisix.apache.org",
-                                "kind": "PluginConfig",
-                                "name": config_name,
-                            },
-                        }
-                    ]
 
             rules.append(rule)
 
