@@ -3,12 +3,10 @@
 
 import hashlib
 import json
-from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
 import pulumi_kubernetes as kubernetes
-import pulumiverse_time as pulumi_time
 from kubernetes.utils.quantity import parse_quantity
 from pulumi import Alias, ComponentResource, CustomTimeouts, Output, ResourceOptions
 from pydantic import (
@@ -712,8 +710,10 @@ class OLApplicationK8sConfig(BaseModel):
             "will crash-loop on a missing executable."
         ),
     )
-    deployment_notifications: bool = False
-    slack_channel: str | None = None  # Slack channel for deployment notifications
+    # Sets the ol.mit.edu/slack-channel label, which the kubewatch webhook
+    # handler reads to route that workload's notifications to a specific
+    # channel instead of the default one.
+    slack_channel: str | None = None
     vault_k8s_resource_auth_name: str
     registry: Literal["dockerhub", "ecr"] = "ecr"
     image_pull_policy: str = "IfNotPresent"
@@ -1535,10 +1535,6 @@ class OLApplicationK8s(ComponentResource):
             ),
         }
 
-        # Add deployment notification label if enabled
-        if ol_app_k8s_config.deployment_notifications:
-            application_labels["ol.mit.edu/notify-deployments"] = "true"
-
         # Add Slack channel label if specified
         if ol_app_k8s_config.slack_channel:
             application_labels["ol.mit.edu/slack-channel"] = (
@@ -1680,41 +1676,6 @@ class OLApplicationK8s(ComponentResource):
             deployment_options = deployment_options.merge(
                 ResourceOptions(depends_on=[_pre_deploy_job])
             )
-
-            if ol_app_k8s_config.deployment_notifications:
-                _application_pre_deployment_event_name = truncate_k8s_metanames(
-                    f"{ol_app_k8s_config.application_name}-predeploy"
-                )
-                # Create pre-deployment event
-                _now = datetime.now(tz=UTC)
-                _pre_deployment_event = kubernetes.events.v1.Event(
-                    f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-event",
-                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                        name=_application_pre_deployment_event_name,
-                        namespace=ol_app_k8s_config.application_namespace,
-                        labels=application_labels,
-                        deletion_timestamp=(_now + timedelta(seconds=30)).isoformat(),
-                    ),
-                    event_time=pulumi_time.Static(
-                        f"{_application_pre_deployment_event_name}-time",
-                        triggers={"pre_deploy_job_id": _pre_deploy_job.id},
-                    ),
-                    regarding=kubernetes.core.v1.ObjectReferenceArgs(
-                        api_version="batch/v1",
-                        kind="Job",
-                        name=_application_pre_deployment_event_name,
-                        namespace=ol_app_k8s_config.application_namespace,
-                    ),
-                    action="PreDeployJobStarted",
-                    reason="PreDeployJobStarted",
-                    note=f"Pre-deployment job started for {_application_deployment_name}",
-                    type="Normal",
-                    reporting_controller="ol-infrastructure",
-                    reporting_instance=f"{ol_app_k8s_config.application_name}-controller",
-                    opts=ResourceOptions(delete_before_replace=True).merge(
-                        resource_options
-                    ),
-                )
 
         app_containers.append(
             # Actual application run with uwsgi
@@ -1930,100 +1891,6 @@ class OLApplicationK8s(ComponentResource):
                     ResourceOptions(depends_on=[_application_deployment])
                 ),
             )
-
-            if ol_app_k8s_config.deployment_notifications:
-                # Create post-deployment event
-                _application_post_deployment_event_name = truncate_k8s_metanames(
-                    f"{ol_app_k8s_config.application_name}-postdeploy"
-                )
-
-                # Use the job's status to determine success/failure for the event
-                def create_post_deploy_event_note(job_status):
-                    """Create event note based on job completion status."""
-                    if job_status is None:
-                        return f"Post-deployment job started for {_application_deployment_name}"
-
-                    succeeded = job_status.get("succeeded", 0)
-                    failed = job_status.get("failed", 0)
-
-                    if succeeded > 0:
-                        return f"Post-deployment job completed successfully for {_application_deployment_name}"
-                    elif failed > 0:
-                        return f"Post-deployment job failed for {_application_deployment_name}"
-                    else:
-                        return f"Post-deployment job in progress for {_application_deployment_name}"
-
-                def create_post_deploy_event_type(job_status):
-                    """Determine event type based on job completion status."""
-                    if job_status is None:
-                        return "Normal"
-
-                    failed = job_status.get("failed", 0)
-                    return "Warning" if failed > 0 else "Normal"
-
-                def create_post_deploy_event_action(job_status):
-                    """Determine event action based on job completion status."""
-                    if job_status is None:
-                        return "PostDeployJobStarted"
-
-                    succeeded = job_status.get("succeeded", 0)
-                    failed = job_status.get("failed", 0)
-
-                    if succeeded > 0:
-                        return "PostDeployJobCompleted"
-                    elif failed > 0:
-                        return "PostDeployJobFailed"
-                    else:
-                        return "PostDeployJobInProgress"
-
-                def create_post_deploy_event_reason(job_status):
-                    """Determine event reason based on job completion status."""
-                    if job_status is None:
-                        return "PostDeployJobStarted"
-
-                    succeeded = job_status.get("succeeded", 0)
-                    failed = job_status.get("failed", 0)
-
-                    if succeeded > 0:
-                        return "PostDeployJobSucceeded"
-                    elif failed > 0:
-                        return "PostDeployJobFailed"
-                    else:
-                        return "PostDeployJobRunning"
-
-                _now = datetime.now(tz=UTC)
-                _post_deployment_event = kubernetes.events.v1.Event(
-                    f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-post-deploy-event",
-                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                        name=_application_post_deployment_event_name,
-                        namespace=ol_app_k8s_config.application_namespace,
-                        labels=application_labels,
-                        deletion_timestamp=(_now + timedelta(seconds=30)).isoformat(),
-                    ),
-                    event_time=pulumi_time.Static(
-                        f"{_application_post_deployment_event_name}-time",
-                        triggers={"post_deploy_job_id": _post_deploy_job.id},
-                    ),
-                    regarding=kubernetes.core.v1.ObjectReferenceArgs(
-                        api_version="batch/v1",
-                        kind="Job",
-                        name=f"{_application_deployment_name}-post-deploy",
-                        namespace=ol_app_k8s_config.application_namespace,
-                    ),
-                    action=_post_deploy_job.status.apply(
-                        create_post_deploy_event_action
-                    ),
-                    reason=_post_deploy_job.status.apply(
-                        create_post_deploy_event_reason
-                    ),
-                    note=_post_deploy_job.status.apply(create_post_deploy_event_note),
-                    type=_post_deploy_job.status.apply(create_post_deploy_event_type),
-                    reporting_controller="ol-infrastructure",
-                    reporting_instance=f"{ol_app_k8s_config.application_name}-controller",
-                    opts=resource_options.merge(
-                        ResourceOptions(depends_on=[_post_deploy_job])
-                    ),
-                )
 
         # Pod Disruption Budget to ensure at least one web application pod is available.
         _application_pdb = kubernetes.policy.v1.PodDisruptionBudget(
@@ -2342,17 +2209,7 @@ class OLApplicationK8s(ComponentResource):
                                         "--concurrency=2",  # Don't try to use all cores on node
                                         "--prefetch-multiplier=1",
                                     ],
-                                    env=[
-                                        kubernetes.core.v1.EnvVarArgs(
-                                            name="CELERY_TASK_ACKS_LATE",
-                                            value="True",
-                                        ),
-                                        kubernetes.core.v1.EnvVarArgs(
-                                            name="CELERY_TASK_REJECT_ON_WORKER_LOST",
-                                            value="True",
-                                        ),
-                                        *application_deployment_env_vars,
-                                    ],
+                                    env=application_deployment_env_vars,
                                     env_from=application_deployment_envfrom,
                                     resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                         requests=celery_worker_config.resource_requests,

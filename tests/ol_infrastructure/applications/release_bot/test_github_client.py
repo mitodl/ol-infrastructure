@@ -212,15 +212,50 @@ class _FakeIssue:
             self.state = kwargs["state"]
 
 
+class _FakeDeploymentStatus:
+    def __init__(self, state, target_url=None):
+        self.state = state
+        self.created_at = datetime(2026, 9, 2, 12, 0, tzinfo=UTC)
+        self.target_url = target_url
+
+
+class _FakeDeployment:
+    def __init__(self, deployment_id, ref, environment, statuses, sha="deadbeef"):
+        self.id = deployment_id
+        self.ref = ref
+        self.sha = sha
+        self.environment = environment
+        self._statuses = statuses
+
+    def get_statuses(self):
+        return list(self._statuses)
+
+
 class _FakeRepo:
     default_branch = "main"
 
-    def __init__(self, tags=(), comparison=None, commits=(), issues=(), branches=()):
+    def __init__(  # noqa: PLR0913
+        self,
+        tags=(),
+        comparison=None,
+        commits=(),
+        issues=(),
+        branches=(),
+        deployments=(),
+    ):
         self._tags = tags
         self._comparison = comparison
         self._commits = commits
         self._branches = branches
+        self._deployments = deployments
         self._issues = {issue.number: issue for issue in issues}
+
+    def get_deployments(self, environment=None, **_kwargs):
+        return [
+            deployment
+            for deployment in self._deployments
+            if environment in (None, deployment.environment)
+        ]
 
     def get_tags(self):
         return list(self._tags)
@@ -236,10 +271,13 @@ class _FakeRepo:
     def get_commits(self):
         return list(self._commits)
 
-    def get_issues(self, state=None, labels=None):
-        assert state == "open"
+    def get_issues(self, state=None, labels=None, sort=None, direction=None):  # noqa: ARG002
+        assert state in {"open", "all"}
         assert labels == ["release"]
-        return list(self._issues.values())
+        issues = list(self._issues.values())
+        if state == "open":
+            issues = [issue for issue in issues if issue.state == "open"]
+        return issues
 
     def get_issue(self, number):
         return self._issues[number]
@@ -611,3 +649,133 @@ def test_release_tags_warns_when_the_scan_cap_is_reached(
     with caplog.at_level("WARNING"):
         github._release_tags(repo)
     assert "Stopped scanning tags" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# GitHub Deployments
+# ---------------------------------------------------------------------------
+
+
+def test_latest_successful_deployment_reports_the_version_from_the_ref(fake_repo):
+    """The pipeline starts each deployment with ref=<calver>, which is the point.
+
+    A Kubernetes rollout event carries an image tag; this carries the release
+    version, which is what ties the announcement to a release issue.
+    """
+    fake_repo(
+        _FakeRepo(
+            deployments=[
+                _FakeDeployment(
+                    31, "2026.9.2.1", "RC", [_FakeDeploymentStatus("success")]
+                )
+            ]
+        )
+    )
+    deployment = github._latest_successful_deployment_sync("mitodl/thing", "RC")
+    assert deployment["id"] == 31
+    assert deployment["version"] == "2026.9.2.1"
+
+
+def test_latest_successful_deployment_skips_a_failed_newer_deployment(fake_repo):
+    """A failed deploy sits above the last good one, so first-is-newest is wrong."""
+    fake_repo(
+        _FakeRepo(
+            deployments=[
+                _FakeDeployment(
+                    32, "2026.9.2.2", "RC", [_FakeDeploymentStatus("failure")]
+                ),
+                _FakeDeployment(
+                    31, "2026.9.2.1", "RC", [_FakeDeploymentStatus("success")]
+                ),
+            ]
+        )
+    )
+    deployment = github._latest_successful_deployment_sync("mitodl/thing", "RC")
+    assert deployment["version"] == "2026.9.2.1"
+
+
+def test_latest_successful_deployment_reads_only_the_newest_status(fake_repo):
+    """A deploy that failed and was re-run to success counts as successful."""
+    fake_repo(
+        _FakeRepo(
+            deployments=[
+                _FakeDeployment(
+                    31,
+                    "2026.9.2.1",
+                    "RC",
+                    [
+                        _FakeDeploymentStatus("success"),
+                        _FakeDeploymentStatus("failure"),
+                    ],
+                )
+            ]
+        )
+    )
+    assert (
+        github._latest_successful_deployment_sync("mitodl/thing", "RC")["version"]
+        == "2026.9.2.1"
+    )
+
+
+def test_latest_successful_deployment_ignores_other_environments(fake_repo):
+    fake_repo(
+        _FakeRepo(
+            deployments=[
+                _FakeDeployment(
+                    40, "2026.9.2.1", "Production", [_FakeDeploymentStatus("success")]
+                )
+            ]
+        )
+    )
+    assert github._latest_successful_deployment_sync("mitodl/thing", "RC") is None
+
+
+def test_latest_successful_deployment_is_none_when_nothing_succeeded(fake_repo):
+    fake_repo(
+        _FakeRepo(
+            deployments=[
+                _FakeDeployment(
+                    31, "2026.9.2.1", "RC", [_FakeDeploymentStatus("in_progress")]
+                )
+            ]
+        )
+    )
+    assert github._latest_successful_deployment_sync("mitodl/thing", "RC") is None
+
+
+# ---------------------------------------------------------------------------
+# Locating a release issue by version
+# ---------------------------------------------------------------------------
+
+
+def test_release_issue_for_version_matches_the_checklist_header(fake_repo):
+    fake_repo(
+        _FakeRepo(
+            issues=[
+                _FakeIssue(7, "Release app 2026.9.1.1", "## Release 2026.9.1.1", []),
+                _FakeIssue(8, "Release app 2026.9.2.1", CHECKLIST_BODY, []),
+            ]
+        )
+    )
+    issue = github._release_issue_for_version_sync("mitodl/thing", "2026.7.22.1")
+    assert issue["number"] == 8
+
+
+def test_release_issue_for_version_finds_a_closed_issue(fake_repo):
+    """The production milestone fires after the issue was closed to promote.
+
+    An open-only search would find nothing for exactly the announcement that
+    most needs the link.
+    """
+    closed = _FakeIssue(9, "Release app 2026.9.2.1", "## Release 2026.9.2.1", [])
+    closed.edit(state="closed")
+    fake_repo(_FakeRepo(issues=[closed]))
+    issue = github._release_issue_for_version_sync("mitodl/thing", "2026.9.2.1")
+    assert issue["number"] == 9
+
+
+def test_release_issue_for_version_is_none_when_no_issue_matches(fake_repo):
+    fake_repo(
+        _FakeRepo(issues=[_FakeIssue(7, "Release app", "## Release 2026.9.1.1", [])])
+    )
+    assert github._release_issue_for_version_sync("mitodl/thing", "2026.9.9.9") is None

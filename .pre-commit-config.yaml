@@ -97,7 +97,7 @@ repos:
     - src/ol_infrastructure/saas/github/repositories/data/
 - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-  rev: "v0.16.5"
+  rev: "v0.16.6"
   hooks:
   - id: ruff-format
   - id: ruff-check
@@ -140,3 +140,6 @@ repos:
   rev: v2.15.1
   hooks:
   - id: hadolint-docker
+    # BuildKit reads <Dockerfile>.dockerignore beside a Dockerfile; it is not
+    # Dockerfile syntax.
+    exclude: \.dockerignore$

@@ -1,0 +1,4 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+config:
+  azure_openai:location: eastus

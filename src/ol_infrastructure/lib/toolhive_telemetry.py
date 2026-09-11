@@ -66,13 +66,15 @@ def toolhive_trace_sampling_rate(stack_info: StackInfo) -> str:
 
     ★ THIS IS THE ROOT SAMPLING DECISION FOR THE WHOLE REQUEST. ToolHive
     receives the request first, so it starts the trace; a downstream workload
-    running ``parentbased_traceidratio`` honours that decision rather than
-    re-rolling it. So this value — not the workload's own sampler argument —
-    sets what fraction of end-to-end traces exist.
+    running ``parentbased_*`` honours that decision rather than re-rolling it.
+    So this value — not the workload's own sampler argument — sets what fraction
+    of end-to-end traces exist.
 
-    Production keeps the rate the other services use. Raising it there would
-    change span cost against real traffic, which is a billing decision and not
-    this module's to make.
+    Which is why it is now 1.0 everywhere: that billing decision has been made
+    deliberately, in favour of letting the Alloy tail sampler judge whole traces
+    instead of discarding them at the root (see lib/otel.py). This function
+    stays rather than being inlined, because the moment production wants a rate
+    again this is the one place it belongs.
     """
     if stack_info.env_suffix.lower() in _FULL_SAMPLE_ENVS:
         return "1.0"

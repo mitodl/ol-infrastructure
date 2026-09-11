@@ -49,6 +49,16 @@ def rootly_imported_route_opts(route_id: str) -> ResourceOptions:
     Diff the preview before applying; the rule bodies were generated from
     `GET /v1/alert_routes` precisely so the declared state starts out matching.
 
+    Any change to a route's `rules` disables every rule on it. The provider
+    resends the whole list, Rootly destroys the existing rules and creates new
+    ones with `enabled=false`, and neither this SDK nor the upstream provider
+    (checked through v5.21.0) has a per-rule `enabled` field -- so Pulumi can
+    neither set it nor see the drift. That is how #5494's apply on 2026-08-18
+    turned off all ten rules on the Grafana Production Service Route. After an
+    apply that touches `rules`, re-enable them in Rootly and confirm with
+    `GET /v1/alert_routes` -> `.rules[].enabled`. Deleting a whole route does
+    not trigger this.
+
     Safe to drop back to `rootly_opts` once every stack has applied this.
     """
     return ResourceOptions.merge(rootly_opts, ResourceOptions(import_=route_id))
@@ -2983,8 +2993,9 @@ alerts_source_cloudwatch_warning = rootly.AlertsSource(
 # Inert. Fed only by the three MIT Learn synthetic monitoring rules, via a
 # `notification_settings.receiver="Rootly"` override pointing at a UI-created
 # contact point (eel3rjpiwahoge) that bypassed the policy tree. PR #5400 removed
-# that override, so nothing has delivered here since; its "Grafana Service Route"
-# is being retired below. Kept rather than destroyed -- deleting the source
+# that override, so nothing has delivered here since, and that contact point no
+# longer exists in production. Its "Grafana Service Route" has been deleted, so
+# this source has no route at all. Kept rather than destroyed -- deleting the source
 # discards its webhook secret, and the field-mapping attributes below are the
 # only worked example of a grafana-type source in this file. Do not point
 # anything at it without giving it a route again.
@@ -3750,110 +3761,6 @@ alert_route_cloudwatch_service_route = rootly.AlertRoute(
     opts=rootly_imported_route_opts("61d2fb04-f85f-4d9c-a1bc-1a6afad7ca0f"),
 )
 
-# Slated for deletion; this apply only clears the `protect` flag so the next one
-# can remove it.
-#
-# The route is inert. It is bound to alert source `grafana` (f4d836c0), which was
-# fed only by the three MIT Learn synthetic monitoring rules through a
-# `notification_settings.receiver="Rootly"` override. PR #5400 removed that
-# override and routed them through alertmanager.py's policy tree instead, so
-# nothing has delivered here since. Verified 2026-08-18 against production
-# `/api/v1/provisioning/alert-rules`: all six SM rules carry `receiver: null`.
-#
-# Its two live rules (`service=mitlearn` + `component=api|nextjs`) have moved to
-# the Grafana Production Service Route below, where the SM alerts actually land.
-# The two that remain are dead and stay dead: nothing emits `service=learn-ai`.
-# The Synthetic Monitoring plugin's own `sm-*` rules carry only `__grafana_origin`
-# and `namespace=synthetic_monitoring` -- check labels are not propagated to them
-# -- so pingdom_checks.py's `service: learn-ai` never reaches Rootly.
-#
-# Why this is two applies rather than one: every resource in this stack is
-# `protect=True`, and Pulumi refuses to delete a protected resource. Deleting the
-# declaration outright makes `pulumi up` fail in the simple_pulumi pipeline until
-# someone runs `pulumi state unprotect` by hand against production. Clearing the
-# flag in code first is the path Pulumi's own error message recommends, and it
-# keeps the whole operation inside the pipeline.
-alert_route_grafana_service_route = rootly.AlertRoute(
-    "grafana-service-route",
-    alerts_source_ids=[alerts_source_grafana.id],
-    enabled=True,
-    name="Grafana Service Route",
-    owning_team_ids=[
-        "9f00e9f1-2f13-470e-a856-50ab5003f260",
-    ],
-    rules=[
-        {
-            "conditionGroups": [
-                {
-                    "conditions": [
-                        {
-                            "propertyFieldConditionType": "contains",
-                            "propertyFieldName": "$.commonLabels.service",
-                            "propertyFieldType": "payload",
-                            "propertyFieldValue": "learn-ai",
-                        },
-                        {
-                            "propertyFieldConditionType": "contains",
-                            "propertyFieldName": "$.commonLabels.component",
-                            "propertyFieldType": "payload",
-                            "propertyFieldValue": "api",
-                        },
-                    ],
-                    "position": 1,
-                },
-            ],
-            "destinations": [
-                {
-                    "targetId": "2c92b8b0-df02-4369-a876-72a895524773",
-                    "targetType": "Service",
-                },
-            ],
-            "fallbackRule": False,
-            "name": "MIT Learn AI API to MIT Learn AI - API Service",
-            "position": 1,
-        },
-        {
-            "conditionGroups": [
-                {
-                    "conditions": [
-                        {
-                            "propertyFieldConditionType": "contains",
-                            "propertyFieldName": "$.commonLabels.service",
-                            "propertyFieldType": "payload",
-                            "propertyFieldValue": "learn-ai",
-                        },
-                    ],
-                    "position": 1,
-                },
-            ],
-            "destinations": [
-                {
-                    "targetId": "dfc02e84-e281-43a6-b340-0e7cadd62036",
-                    "targetType": "Service",
-                },
-            ],
-            "fallbackRule": False,
-            "name": "MIT Learn AI to MIT Learn AI - Django Webapp Service",
-            "position": 2,
-        },
-        {
-            "destinations": [
-                {
-                    "targetId": "96629210-cc41-4e57-b059-b182a0f01c5b",
-                    "targetType": "EscalationPolicy",
-                },
-            ],
-            "fallbackRule": True,
-            "name": "Fallback Rule for Grafana Service Route",
-            "position": 3,
-        },
-    ],
-    opts=ResourceOptions.merge(
-        rootly_imported_route_opts("c1e812d2-e14b-4233-a368-c240e9a03d17"),
-        ResourceOptions(protect=False),
-    ),
-)
-
 alert_route_grafana_production_service_route = rootly.AlertRoute(
     "grafana-production-service-route",
     alerts_source_ids=[alerts_source_grafana_prometheus_production.id],
@@ -3863,13 +3770,14 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
         "9f00e9f1-2f13-470e-a856-50ab5003f260",
     ],
     rules=[
-        # Moved off the Grafana Service Route above, which is bound to an alert
-        # source nothing feeds any more. The MIT Learn synthetic monitoring
-        # rules route through alertmanager.py's policy tree to this source
-        # instead, and they emit exactly the `service`/`ol_component` pair
-        # these two match on -- so both reach their service from here. Until
-        # this move they matched nothing and MIT Learn - API and
-        # MIT Learn - NextJS were among the Rootly services no rule targeted.
+        # Moved off the retired Grafana Service Route, whose alert source
+        # nothing feeds any more. The MIT Learn synthetic monitoring rules
+        # route through alertmanager.py's policy tree to this source instead,
+        # and they emit exactly the `service`/`ol_component` pair these two
+        # match on. Before the move they matched nothing and MIT Learn - API
+        # and MIT Learn - NextJS were among the Rootly services no rule
+        # targeted. The apply that added them also left every rule on this
+        # route disabled; see `rootly_imported_route_opts`.
         #
         # These sit ahead of the `namespace`-keyed rules below because
         # conditions are `contains` and the first match wins: a narrow rule

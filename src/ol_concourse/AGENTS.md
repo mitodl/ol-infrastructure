@@ -24,7 +24,15 @@ pipelines/
   jobs.py                 # Top-level job factories (packer_jobs, pulumi_jobs_chain, pulumi_job)
   infrastructure/         # Platform infra pipelines (consul, vault, eks, dagster, etc.)
   applications/           # Application deployment pipelines
+  canaries/               # Playwright user-journey canaries. Has its own AGENTS.md.
 ```
+
+`pipelines/canaries/` is unlike everything else here: it holds the only
+JavaScript/TypeScript in this repository, as a self-contained Playwright project whose
+`package.json` is also the source of truth for the container image tag its pipeline
+pulls. **Read [`pipelines/canaries/AGENTS.md`](pipelines/canaries/AGENTS.md) before
+changing anything under it** — the rules there about credentials, version pinning, and
+not adding dependencies are not inferable from the Python conventions on this page.
 
 The `ol_concourse.lib` modules (models, resources, resource_types, containers) are provided
 by the `ol-concourse` pip package (installed into the venv). Browse them under

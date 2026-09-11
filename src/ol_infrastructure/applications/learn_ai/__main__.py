@@ -73,6 +73,12 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.azure_workload_identity import (
+    azure_identity_env,
+    azure_identity_token_mount,
+    azure_identity_token_volume,
+    azure_openai_env,
+)
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -714,6 +720,32 @@ opik_keycloak_secret = OLVaultK8SSecret(
 
 env_vars = dict(learn_ai_config.require_object("env_vars") or {})
 
+# Azure OpenAI, additive alongside the existing OPENAI_API_KEY wiring, which is not
+# touched. Nothing here is secret: the managed identity is reached by exchanging the
+# projected ServiceAccount token mounted below, so the client id is an identifier
+# rather than a credential and there is nothing to rotate.
+#
+# A StackReference to a stack that does not exist fails the whole preview, so this is
+# a config switch that gets flipped per environment once infrastructure/azure/openai
+# has been deployed there.
+if learn_ai_config.get_bool("enable_azure_openai"):
+    azure_openai_stack = make_stack_reference(projects.AZURE_OPENAI, stack_info.name)
+    env_vars.update(azure_identity_env(azure_openai_stack, "learn-ai"))
+    env_vars.update(
+        azure_openai_env(
+            azure_openai_stack,
+            "learn-ai",
+            api_version=learn_ai_config.get("azure_openai_api_version") or "2024-10-21",
+            default_deployment=learn_ai_config.get("azure_openai_default_deployment")
+            or "gpt-4o",
+        )
+    )
+    azure_identity_volumes = [azure_identity_token_volume()]
+    azure_identity_volume_mounts = [azure_identity_token_mount()]
+else:
+    azure_identity_volumes = []
+    azure_identity_volume_mounts = []
+
 # Opik instrumentation (non-secret settings). OPIK_URL_OVERRIDE is derived from
 # the opik application stack's exported URL so it tracks the deployed instance
 # per environment; the workspace/project are static for our OSS install. The
@@ -784,6 +816,8 @@ learn_ai_app_k8s = OLApplicationK8s(
         # Use the fixed name used in the SecurityGroupPolicy spec
         application_security_group_name=Output.from_input("learn-ai-app"),
         application_service_account_name=learn_ai_service_account.metadata.name,
+        extra_volumes=azure_identity_volumes,
+        extra_volume_mounts=azure_identity_volume_mounts,
         application_image_repository="mitodl/learn-ai-app",
         **docker_image_config_kwargs("LEARN_AI"),
         application_min_replicas=learn_ai_config.get("min_replicas") or 2,
@@ -1071,9 +1105,20 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
     k8s_labels=k8s_global_labels,
     route_configs=[
         # Protected route for canvas syllabus agent - requires canvas_token header
+        #
+        # Referenced no plugin config until now, unlike every sibling on this
+        # host, so it was the one learn-ai path emitting no prometheus series and
+        # no OTLP span.  Attaching the shared config is safe even though these
+        # are the streaming agent endpoints: the shared `gzip` deliberately
+        # leaves `text/event-stream` out of its `types` list, so an SSE response
+        # is not held in a compression buffer.  `passauth` below, which already
+        # references the same config, matches the rest of the same streaming
+        # prefix -- so this route was carrying the exception without benefiting
+        # from it.
         OLApisixRouteConfig(
             route_name="canvas_syllabus_agent",
             priority=20,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
                     name="key-auth",
@@ -1108,10 +1153,18 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         ),
-        # Strip trailing slash from logout redirect
+        # Strip trailing slash from logout redirect.
+        #
+        # The route-level `redirect` (uri) wholly overrides the shared
+        # `redirect` (http_to_https) rather than merging with it, so attaching
+        # the shared config leaves the rewrite intact -- the same arrangement
+        # mitxonline's and mit-learn's logout-redirect routes already run on --
+        # while restoring the prometheus/opentelemetry/gzip this route was
+        # missing.
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 proxy_rewrite_plugin,
                 OLApisixPluginConfig(
@@ -1192,9 +1245,20 @@ learn_ai_https_apisix_route = OLApisixRoute(
     k8s_labels=k8s_global_labels,
     route_configs=[
         # Protected route for canvas syllabus agent - requires canvas_token header
+        #
+        # Referenced no plugin config until now, unlike every sibling on this
+        # host, so it was the one learn-ai path emitting no prometheus series and
+        # no OTLP span.  Attaching the shared config is safe even though these
+        # are the streaming agent endpoints: the shared `gzip` deliberately
+        # leaves `text/event-stream` out of its `types` list, so an SSE response
+        # is not held in a compression buffer.  `passauth` below, which already
+        # references the same config, matches the rest of the same streaming
+        # prefix -- so this route was carrying the exception without benefiting
+        # from it.
         OLApisixRouteConfig(
             route_name="canvas_syllabus_agent",
             priority=20,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
                     name="key-auth",
@@ -1226,10 +1290,18 @@ learn_ai_https_apisix_route = OLApisixRoute(
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         ),
-        # Strip trailing slash from logout redirect
+        # Strip trailing slash from logout redirect.
+        #
+        # The route-level `redirect` (uri) wholly overrides the shared
+        # `redirect` (http_to_https) rather than merging with it, so attaching
+        # the shared config leaves the rewrite intact -- the same arrangement
+        # mitxonline's and mit-learn's logout-redirect routes already run on --
+        # while restoring the prometheus/opentelemetry/gzip this route was
+        # missing.
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
                     name="redirect",
@@ -1293,6 +1365,7 @@ learn_ai_https_apisix_route = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="dnt-policy",
             priority=10,
+            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             hosts=[learn_ai_api_domain],
             paths=["/.well-known/dnt-policy.txt"],
             backend_service_name=learn_ai_app_k8s.application_lb_service_name,

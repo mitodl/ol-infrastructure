@@ -349,3 +349,78 @@ async def close_release_issue(repo_slug: str, issue_number: int, comment: str) -
     Concourse's github-issues resource polls for closed issues.
     """
     await asyncio.to_thread(_close_release_issue_sync, repo_slug, issue_number, comment)
+
+
+# Environments the release pipeline creates GitHub Deployments for (see
+# _define_release_resources in
+# src/ol_concourse/pipelines/infrastructure/k8s_apps/pipeline.py). Each
+# deployment's `ref` is the calver version, because the pipeline starts it
+# with `ref: ((.:image_tag))` loaded from the release resource's version file.
+RC_ENVIRONMENT = "RC"
+PRODUCTION_ENVIRONMENT = "Production"
+
+# How far back to look for a successful deployment. A deployment whose Pulumi
+# job failed leaves a non-success status behind and the next release's
+# deployment is created above it, so the newest *successful* one can sit a few
+# entries down rather than always being first.
+_DEPLOYMENT_SCAN_LIMIT = 10
+# Release issues are created one per release, newest first, so the issue for a
+# just-deployed version is always near the top of the listing.
+_RELEASE_ISSUE_SCAN_LIMIT = 30
+
+
+def _latest_successful_deployment_sync(
+    repo_slug: str, environment: str
+) -> dict[str, Any] | None:
+    repo = _get_client().get_repo(repo_slug)
+    deployments = itertools.islice(
+        repo.get_deployments(environment=environment), _DEPLOYMENT_SCAN_LIMIT
+    )
+    for deployment in deployments:
+        # get_statuses() is newest-first, and only the newest counts: a
+        # deployment that failed and was re-run to success carries both.
+        latest_status = next(iter(itertools.islice(deployment.get_statuses(), 1)), None)
+        if latest_status is not None and latest_status.state == "success":
+            return {
+                "id": deployment.id,
+                "version": deployment.ref,
+                "sha": deployment.sha,
+                "environment": deployment.environment,
+                "deployed_at": latest_status.created_at,
+                # The github-deployments resource points this at the Concourse
+                # build that finished the deployment, when it supplies one.
+                "url": latest_status.target_url or "",
+            }
+    return None
+
+
+async def latest_successful_deployment(
+    repo_slug: str, environment: str
+) -> dict[str, Any] | None:
+    """Return the newest GitHub Deployment in *environment* that reached success."""
+    return await asyncio.to_thread(
+        _latest_successful_deployment_sync, repo_slug, environment
+    )
+
+
+def _release_issue_for_version_sync(
+    repo_slug: str, version: str
+) -> dict[str, Any] | None:
+    repo = _get_client().get_repo(repo_slug)
+    # state="all": the production milestone fires *after* the release issue was
+    # closed to open the promotion gate, so an open-only search would find
+    # nothing for exactly the announcement that most needs the link.
+    issues = repo.get_issues(
+        state="all", labels=["release"], sort="created", direction="desc"
+    )
+    for issue in itertools.islice(issues, _RELEASE_ISSUE_SCAN_LIMIT):
+        if extract_version(issue.body or "") == version:
+            return {"number": issue.number, "url": issue.html_url, "title": issue.title}
+    return None
+
+
+async def release_issue_for_version(
+    repo_slug: str, version: str
+) -> dict[str, Any] | None:
+    """Return the release issue whose checklist header names *version*, or None."""
+    return await asyncio.to_thread(_release_issue_for_version_sync, repo_slug, version)

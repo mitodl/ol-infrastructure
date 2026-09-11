@@ -273,6 +273,66 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
                     views=["admin", "user"], edits=["admin", "user"]
                 ),
             ),
+            # customerId/customerName: the contract for B2B-partner "which
+            # of the partner's own downstream customers does this user
+            # belong to" attribution claims (what blarghmatey originally
+            # asked about). Populated via IdP-broker attribute mappers, not
+            # user input, so these are admin-only and never required --
+            # most users have no value here at all. Accepted shape, and the
+            # `length` validators below enforcing it:
+            #   customerId:   non-empty string, <=255 chars. An opaque
+            #                 identifier owned by the partner (may be a
+            #                 UUID, a slug, a database key, etc.) -- no
+            #                 character-set constraint, since we don't
+            #                 control its format. Matches the 255-char
+            #                 bound already used for email/username above.
+            #   customerName: string, <=512 chars, human-readable (e.g.
+            #                 "Springfield High School"). Matches the
+            #                 512-char bound already used for fullName
+            #                 above.
+            # Per Apply7 (the current source of both claims): "customer"
+            # means one of *their* downstream customers -- a school or
+            # institution using Apply7's platform -- not Apply7 itself and
+            # not an MIT Learn concept.
+            #
+            # This is the standard contract for this kind of claim: any
+            # future OIDC/SAML partner sending an equivalent attribution
+            # claim should populate these same two attributes in this same
+            # shape, rather than each partner inventing its own. Only add a
+            # new, separately-named attribute if a partner's claim doesn't
+            # actually fit this shape (e.g. a structured/non-string value,
+            # or a genuinely different concept than "which downstream
+            # customer of the partner").
+            keycloak.RealmUserProfileAttributeArgs(
+                name="customerId",
+                display_name="${customerId}",
+                group="user-metadata",
+                required_for_roles=[],
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="length",
+                        config={"min": "1", "max": "255"},
+                    ),
+                ],
+                permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                    views=["admin"], edits=["admin"]
+                ),
+            ),
+            keycloak.RealmUserProfileAttributeArgs(
+                name="customerName",
+                display_name="${customerName}",
+                group="user-metadata",
+                required_for_roles=[],
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="length",
+                        config={"max": "512"},
+                    ),
+                ],
+                permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                    views=["admin"], edits=["admin"]
+                ),
+            ),
         ],
         groups=[
             keycloak.RealmUserProfileGroupArgs(
@@ -655,7 +715,8 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     # MITXONLINE B2B [START]
     # This client is used by MITx Online for B2B operations via the Keycloak
     # Admin API. It requires service account roles to view realms, users, and
-    # organizations.
+    # organizations, to manage organization membership, and to manage the
+    # identity providers organizations are linked to.
     olapps_mitxonline_b2b_client = keycloak.openid.Client(
         "olapps-mitxonline-b2b-client",
         name="mitxonline-b2b-client",
@@ -681,11 +742,45 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
     # Assign required service account roles for Keycloak Admin API access
     # These roles allow the client to list/view realms, users, and organizations
     # Refactored repetitive role assignments into a loop for maintainability
+    #
+    # manage-realm covers Organizations but NOT identity providers. IdP
+    # create/update/delete, identity-provider/import-config, and org<->IdP linking
+    # all route through requireManageIdentityProviders(), which RealmPermissions
+    # resolves to the manage-identity-providers role alone; manage-realm is a
+    # distinct, non-composite role and does not satisfy it. Reads go through
+    # requireViewIdentityProviders(), which accepts EITHER identity-provider role,
+    # so view-identity-providers is redundant with manage granted -- it is listed
+    # anyway so the account's read scope is visible here rather than inferred,
+    # matching how view-realm is listed alongside manage-realm above.
+    #
+    # manage-users is required for the same reason, on a different endpoint:
+    # OrganizationMemberResource.addMember() requires BOTH
+    # auth.orgs().requireManage(organization) (satisfied by manage-realm) AND
+    # auth.users().requireManage(user), which only accepts the manage-users role
+    # (UserPermissions.canManage() checks AdminRoles.MANAGE_USERS specifically --
+    # manage-realm is not in its role list, unlike OrganizationPermissions.canManage()
+    # which explicitly accepts manage-realm as an alternative to manage-organizations).
+    # Without it, adding a user to an organization 403s even though the client can
+    # already view/manage the organization itself. This realm does not run Fine-Grained
+    # Admin Permissions (no `features` set on the Keycloak CR), so there is no way to
+    # scope this to just organization members; UserPermissions.canManageByGroup() only
+    # applies when FGAP's AuthorizationProvider is wired up, which it is not here --
+    # the grant is realm-wide, matching the existing mitlearn-admin-client precedent
+    # above.
     for resource_name, role in [
         ("olapps-mitxonline-b2b-client-view-realm-role", "view-realm"),
         ("olapps-mitxonline-b2b-client-view-users-role", "view-users"),
         ("olapps-mitxonline-b2b-client-query-users-role", "query-users"),
         ("olapps-mitxonline-b2b-client-manage-realm-role", "manage-realm"),
+        ("olapps-mitxonline-b2b-client-manage-users-role", "manage-users"),
+        (
+            "olapps-mitxonline-b2b-client-view-identity-providers-role",
+            "view-identity-providers",
+        ),
+        (
+            "olapps-mitxonline-b2b-client-manage-identity-providers-role",
+            "manage-identity-providers",
+        ),
     ]:
         keycloak.openid.ClientServiceAccountRole(
             resource_name,
@@ -1191,6 +1286,37 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
         )
         onboard_saml_org(
             SamlIdpConfig(
+                idp_alias="RobCol",
+                idp_display_name="American Robert College of Istanbul",
+                org_saml_metadata_url="https://login.microsoftonline.com/d4bc61be-6893-44c0-8f85-a6e62e5bebee/federationmetadata/2007-06/federationmetadata.xml?appid=90601514-0347-4331-99cc-e2947959d287",
+                principal_type="SUBJECT",
+                principal_attribute="user.mail",
+                login_hint=False,
+                name_id_format=NameIdFormat.email,
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_name_map={
+                    "email": "user.mail",
+                    "firstName": "user.givenname",
+                    "lastName": "user.surname",
+                    "fullName": "user.displayname",
+                },
+                want_assertions_encrypted=False,
+                want_assertions_signed=False,
+            ),
+            org=OrgConfig(
+                org_domains=["robcol.k12.tr"],
+                org_name="American Robert College of Istanbul",
+                org_alias="RobCol",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        onboard_saml_org(
+            SamlIdpConfig(
                 idp_alias="UCV",
                 idp_display_name="Universidad Cesar Vallejo",
                 org_saml_metadata_xml=Path(__file__)
@@ -1486,6 +1612,59 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             ),
         )
         # MASAI SCHOOL [END]
+
+        apply7_oidc_identity_provider = onboard_oidc_org(
+            OIDCIdpConfig(
+                idp_alias="APPLY7",
+                idp_display_name="Apply7",
+                org_oidc_metadata_url="https://keycloak.apply7.cn/realms/mit-learn/.well-known/openid-configuration",
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="mit-learn",
+            ),
+            org=OrgConfig(
+                # Same as upGrad/Masai School: Apply7 users log in via a
+                # direct kc_idp_hint link, not domain-based home-realm
+                # discovery, so no domain is needed to gate access.
+                org_domains=[],
+                org_name="Apply7",
+                org_alias="APPLY7",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        # customer_id/customer_name claims identifying which of Apply7's
+        # own downstream customers (a school/institution on their platform)
+        # a given user belongs to -- see the customerId/customerName
+        # attribute definitions above for the full explanation of what
+        # "customer" means here. Requires customerId/customerName to be
+        # declared (admin-only) on the realm's user profile above --
+        # otherwise Keycloak silently drops attribute-importer writes to
+        # undeclared ("unmanaged") user attributes.
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-apply7-oidc-customer-id-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="customer_id",
+            identity_provider_alias=apply7_oidc_identity_provider.alias,
+            user_attribute="customerId",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-apply7-oidc-customer-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="customer_name",
+            identity_provider_alias=apply7_oidc_identity_provider.alias,
+            user_attribute="customerName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
 
     # B2B Organizations [END]
 

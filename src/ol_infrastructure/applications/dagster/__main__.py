@@ -46,6 +46,8 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -77,6 +79,11 @@ from ol_infrastructure.lib.ol_types import (
     K8sAppLabels,
     Product,
     Services,
+)
+from ol_infrastructure.lib.otel import (
+    DEFAULT_TRACE_SAMPLING_RATE,
+    OTLP_ENDPOINT,
+    ships_telemetry,
 )
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
@@ -329,6 +336,64 @@ edxorg_program_credentials_role_assumption = {
     "Resource": "arn:aws:iam::708756755355:role/mit-s3-edx-program-reports-access",
 }
 
+# ml's LLMClientFactory (client_class="bedrock", production only -- see
+# dg_projects/ml/ml/resources/llm.py) needs IAM/IRSA auth to Bedrock, the
+# same as gwarek's LLM_BACKEND=bedrock path. Deliberately the classic
+# bedrock:InvokeModel* API, not Bedrock Mantle (bedrock-mantle:*, a
+# newer/separate AWS service) -- Mantle currently lacks Guardrails,
+# cross-Region inference, and intelligent prompt routing, and AWS's own
+# guidance is to default new work to bedrock-runtime.
+#
+# Not scoped to Anthropic (contrast gwarek's identical statement, which
+# is anthropic.*-only): SUMMARY_MODEL_VERSION is an env var ml's summarize.py
+# reads at runtime, so switching model vendor for this asset is meant to be
+# a config change, not an infra one. Mirrors learn_ai's identical
+# unscoped-by-vendor foundation-model/inference-profile grant
+# (learn_ai/__main__.py) for the same reason.
+#
+# Claude Sonnet 5 (and other newer models) can't be invoked by bare
+# foundation-model ID on on-demand throughput -- Bedrock requires a
+# cross-Region inference profile ID/ARN instead. Per AWS's own docs,
+# granting an inference-profile resource ARN additionally requires
+# granting the underlying foundation-model ARN in *every* Region the
+# profile can route to -- a region wildcard covers that without
+# hardcoding any model's current destination list, which AWS can change.
+#
+# The Dagster IRSA role is shared by every code location's pods (all
+# deploy under the single "dagster-user-code" service account), so this
+# grants Bedrock access repo-wide, not just to ml -- there is currently
+# no per-code-location IAM scoping in this stack.
+dagster_bedrock_permissions = [
+    {
+        "Effect": "Allow",
+        "Action": [
+            "bedrock:InvokeModel",
+            "bedrock:InvokeModelWithResponseStream",
+        ],
+        "Resource": [
+            "arn:aws:bedrock:*::foundation-model/*",
+            f"arn:aws:bedrock:*:{aws_account.account_id}:inference-profile/*",
+        ],
+    },
+    {
+        # Invoking a Bedrock model backed by an AWS Marketplace product for
+        # the first time in an account makes Bedrock auto-initiate a
+        # subscription on the caller's behalf -- that auto-subscribe call
+        # fails with AccessDeniedException without these. No per-model
+        # resource scoping: aws-marketplace:ViewSubscriptions/Unsubscribe
+        # aren't ARN-scopable, and scoping Subscribe to a specific model's
+        # ProductId would defeat the point of the vendor-unscoped grant
+        # above -- an infra change every time a new model/vendor is picked.
+        "Effect": "Allow",
+        "Action": [
+            "aws-marketplace:Subscribe",
+            "aws-marketplace:Unsubscribe",
+            "aws-marketplace:ViewSubscriptions",
+        ],
+        "Resource": "*",
+    },
+]
+
 # Combine all IAM permissions for Kubernetes IRSA role
 dagster_iam_policy_document = {
     "Version": IAM_POLICY_VERSION,
@@ -336,12 +401,20 @@ dagster_iam_policy_document = {
         *dagster_s3_permissions,
         *athena_permissions,
         edxorg_program_credentials_role_assumption,
+        *dagster_bedrock_permissions,
     ],
 }
 
 parliament_config = {
     "RESOURCE_EFFECTIVELY_STAR": {"ignore_locations": []},
     "CREDENTIALS_EXPOSURE": {"ignore_locations": [{"actions": "sts:assumeRole"}]},
+    # Parliament's RESOURCE_MISMATCH flags bedrock:InvokeModel* for not also
+    # covering every ARN type the action supports (e.g. custom-model-deployment,
+    # provisioned-model) -- those don't apply here; foundation-model and
+    # inference-profile are the only two actually invoked (see
+    # dagster_bedrock_permissions above). Mirrors gwarek's identical
+    # suppression for the same reason.
+    "RESOURCE_MISMATCH": {},
 }
 
 # Keep existing S3 buckets (they already exist and store important data)
@@ -2128,6 +2201,175 @@ edxorg_gcp_secret = OLVaultK8SSecret(
     opts=ResourceOptions(depends_on=[dagster_auth_binding]),
 )
 
+# ── OpenTelemetry auto-instrumentation: control plane, plus opted-in run workers ──
+#
+# ol-data-platform bakes the auto-instrumentation agent into every Dagster image
+# and symlinks it to the stable path below (dg_deployments/Dockerfile.dagster-k8s
+# and dg_projects/*/Dockerfile). Putting that path on PYTHONPATH imports its
+# sitecustomize.py, which is the whole of what `opentelemetry-instrument` does:
+# the console script prepends the same directory and execs the command
+# (opentelemetry/instrumentation/auto_instrumentation/__init__.py). PYTHONPATH is
+# the lever rather than an ENTRYPOINT because the Dagster chart hardcodes
+# `command: ["/bin/bash", "-c", ...]` for both the webserver and the daemon, so
+# an ENTRYPOINT would never run for either.
+#
+# WHAT IT BUYS: opentelemetry-instrumentation-sqlalchemy wraps Engine.connect and
+# emits a CLIENT span named "connect" (its engine.py) alongside the per-statement
+# span. Stock dagster_postgres builds every engine as create_engine(url,
+# isolation_level="AUTOCOMMIT", poolclass=NullPool), where that span would price a
+# TCP+SCRAM handshake per query -- but dagster_instance.yaml replaces all three
+# storages with ol_orchestrate's QueuePool-backed classes, so here the same span
+# times a pool CHECKOUT: near-zero on a hit, a real handshake on a miss. That
+# distribution is the client-side half this project has never had. Every pool
+# number in this stack was set against PgBouncer's view alone, and
+# pool_size/max_overflow (15/15, and EVENT_LOG_POOL_SIZE) were never validated
+# against how often a checkout actually falls through. The gRPC spans separately
+# put a distribution behind DAGSTER_GRPC_TIMEOUT_SECONDS and
+# DAGSTER_CODE_SERVER_TIMEOUT_SECONDS, both of which are currently guesses.
+#
+# RUN WORKERS REACH THE AGENT TOO, and that is now deliberate. The
+# user-deployments chart copies each deployment's whole `env` list into
+# DAGSTER_CLI_API_GRPC_CONTAINER_CONTEXT and K8sRunLauncher applies that to every
+# run worker pod, so the PYTHONPATH set here has always reached them; it used to
+# be taken back by a `command` of `env -u PYTHONPATH` on the run launcher, which
+# survived the merge where a second PYTHONPATH entry would not have.
+#
+# That strip is gone. Run workers now load the agent and are silenced by
+# OTEL_SDK_DISABLED instead, defaulted true on the run launcher and set back to
+# "false" per code location by OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS below.
+# dagster_instance.yaml carries the reasoning: why the flush policy holds under
+# preemption, why the export is bounded by OTEL_EXPORTER_OTLP_TIMEOUT rather than
+# the inert OTEL_BSP_EXPORT_TIMEOUT, and why the scoping has to work in the
+# enable direction rather than the disable one. Read it before widening the set.
+OTEL_AGENT_PYTHONPATH = "/opt/otel/auto_instrumentation"
+
+
+def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, str]]:
+    """Build the OTEL_* + PYTHONPATH block for one long-lived Dagster process.
+
+    Empty where there is no collector to export to, which leaves PYTHONPATH
+    unset and the agent inert -- operations-ci runs no Alloy, so setting the
+    endpoint there would buy a connection failure per batch forever in the one
+    environment nobody is watching.
+
+    :param service_name: unprefixed, e.g. ``"dagster-daemon"``; the environment
+        is prepended to match the ``<env>-<service>`` convention edxapp,
+        mit_learn and witan already use.
+    :param image_version: the tag or digest this workload runs, so a span can be
+        attributed to the image it came from.
+    """
+    if not ships_telemetry(stack_info):
+        return []
+    return [
+        {"name": "PYTHONPATH", "value": OTEL_AGENT_PYTHONPATH},
+        {
+            "name": "OTEL_SERVICE_NAME",
+            "value": f"{stack_info.env_suffix}-{service_name}",
+        },
+        {"name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": OTLP_ENDPOINT},
+        {"name": "OTEL_EXPORTER_OTLP_PROTOCOL", "value": "http/protobuf"},
+        # dagster-azure pulls in azure-monitor-opentelemetry, which registers a
+        # second `opentelemetry_distro` and `opentelemetry_configurator` entry
+        # point in the dagster-k8s image. _load_distro/_load_configurator take
+        # "the first to come up" when nothing is pinned, so without these two the
+        # agent could configure Azure Monitor exporters instead of ours,
+        # depending on entry-point iteration order. `distro` and `configurator`
+        # are the names opentelemetry-distro registers.
+        {"name": "OTEL_PYTHON_DISTRO", "value": "distro"},
+        {"name": "OTEL_PYTHON_CONFIGURATOR", "value": "configurator"},
+        # Only the HTTP OTLP exporter is installed in the images; the SDK default
+        # "otlp" resolves to the gRPC exporter, which is absent. An unresolvable
+        # exporter aborts SDK initialisation outright -- traces included -- which
+        # is why metrics and logs are named off rather than left at their
+        # defaults. Same reasoning as edxapp/k8s_resources.py's _OTEL_SDK_ENV.
+        {"name": "OTEL_TRACES_EXPORTER", "value": "otlp_proto_http"},
+        {"name": "OTEL_METRICS_EXPORTER", "value": "none"},
+        {"name": "OTEL_LOGS_EXPORTER", "value": "none"},
+        # The mit_learn/learn_ai ratio, so a trace crossing from one of those
+        # services is sampled once rather than decided twice. Alloy's
+        # tailSampling filters again on top.
+        {"name": "OTEL_TRACES_SAMPLER", "value": "parentbased_traceidratio"},
+        {"name": "OTEL_TRACES_SAMPLER_ARG", "value": DEFAULT_TRACE_SAMPLING_RATE},
+        {"name": "OTEL_PROPAGATORS", "value": "tracecontext,baggage"},
+        {
+            "name": "OTEL_RESOURCE_ATTRIBUTES",
+            "value": ",".join(
+                [
+                    f"deployment.environment={stack_info.env_suffix}",
+                    "service.namespace=dagster",
+                    f"service.version={image_version}",
+                ]
+            ),
+        },
+        # A guard, not a live setting: the images install an explicit
+        # instrumentation list that omits psycopg2. If that ever moves to
+        # opentelemetry-bootstrap, bootstrap selects psycopg2 alongside
+        # sqlalchemy and every query gets two spans for the one statement.
+        {"name": "OTEL_PYTHON_DISABLED_INSTRUMENTATIONS", "value": "psycopg2"},
+    ]
+
+
+# Code locations whose RUN WORKERS export traces, as opposed to only their code
+# server. dagster_instance.yaml's run launcher sets OTEL_SDK_DISABLED=true as
+# the fleet default for run workers; a name listed here has it set back to
+# "false" in its own env, which the run launcher -> code location env merge puts
+# last and kubelet therefore honours. Read the flush-policy comment in that file
+# before adding to this set.
+#
+# canvas is the pilot: 7 days of kube_job_labels on data-production put it at a
+# mean of 87 concurrent run-worker Jobs against a peak of 106 -- steady rather
+# than bursty, so its trace volume is predictable -- while openedx runs a mean
+# of 221 against a peak of 13823. Enough traffic to produce a real per-worker
+# connection footprint, two orders of magnitude less blast radius than the
+# location that would otherwise dominate the signal.
+#
+# Run workers inherit the code location's OTEL_SERVICE_NAME, so their spans
+# arrive as `production-dagster-code-canvas` alongside the code server's and
+# cannot be told apart by service.name -- the launcher cannot override it,
+# because the code location sets that key and the code location's value is the
+# one kubelet keeps. Separate them on `k8s.pod.name` (a run worker's is
+# `dagster-run-<run-id>`, the server's is the deployment's) or on
+# `service.instance.id`, which the SDK makes unique per process. Both are
+# already present on the spans #5733 is producing.
+OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS = {"canvas"}
+
+
+def dagster_run_worker_otel_env(location_name: str) -> list[dict[str, str]]:
+    """Opt one code location's run workers into exporting traces.
+
+    The value rides on the code location's own env, which the chart copies into
+    the container context every one of its run workers inherits.
+
+    :param location_name: the code location's unhyphenated name, e.g. ``canvas``.
+    """
+    if not ships_telemetry(stack_info):
+        return []
+    if location_name not in OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS:
+        return []
+    return [{"name": "OTEL_SDK_DISABLED", "value": "false"}]
+
+
+def grpc_health_check_command(port: int) -> list[str]:
+    """Build the chart's code-location probe command, minus the OTel agent.
+
+    Exec probes inherit the container environment, so PYTHONPATH would make each
+    one pay a full SDK initialisation and emit a span for its own health check --
+    five extra interpreter startups a minute per pod, on top of a `dagster api
+    grpc-health-check` that already costs ~1.5s. ``env -u`` drops the variable
+    for the probe process alone, and is a no-op where it was never set.
+    """
+    return [
+        "env",
+        "-u",
+        "PYTHONPATH",
+        "dagster",
+        "api",
+        "grpc-health-check",
+        "-p",
+        str(port),
+    ]
+
+
 # Define the user code deployments before the main helm chart so they can be referenced
 # Define all code locations based on ol-data-platform structure
 code_locations: list[dict[str, str | int]] = [
@@ -2196,8 +2438,13 @@ for location in code_locations:
             module,
         ],
         "port": port,
+        # Each probe states the exec command the chart would otherwise generate
+        # for it, so that grpc_health_check_command can strip the OTel agent off
+        # the probe process. Supplying `exec` also makes the chart emit the probe
+        # dict verbatim rather than assembling it key by key.
         "startupProbe": {
             "enabled": True,
+            "exec": {"command": grpc_health_check_command(port)},
             "periodSeconds": 10,
             "timeoutSeconds": 10,
             "failureThreshold": 60,
@@ -2206,6 +2453,7 @@ for location in code_locations:
         },
         "readinessProbe": {
             "enabled": True,
+            "exec": {"command": grpc_health_check_command(port)},
             "periodSeconds": 20,
             "timeoutSeconds": 10,
             "failureThreshold": 3,
@@ -2213,6 +2461,7 @@ for location in code_locations:
         },
         "livenessProbe": {
             "enabled": True,
+            "exec": {"command": grpc_health_check_command(port)},
             "periodSeconds": 30,
             "timeoutSeconds": 10,
             "failureThreshold": 3,
@@ -2262,6 +2511,10 @@ for location in code_locations:
             # Ties each Sentry issue to the image it came from. Same git
             # short-ref the Concourse pipeline tagged the image with.
             {"name": "SENTRY_RELEASE", "value": image_tag_or_digest},
+            *dagster_otel_env(
+                f"dagster-code-{name.replace('_', '-')}", image_tag_or_digest
+            ),
+            *dagster_run_worker_otel_env(name),
         ],
         "envSecrets": [
             {"name": "dagster-static-secrets"},
@@ -2307,6 +2560,7 @@ for location in code_locations:
         # to connect before the code location has finished initializing.
         deployment["startupProbe"] = {
             "enabled": True,
+            "exec": {"command": grpc_health_check_command(port)},
             "periodSeconds": 10,
             # Allow longer timeout for health check response
             "timeoutSeconds": 10,
@@ -2317,6 +2571,7 @@ for location in code_locations:
         }
         deployment["readinessProbe"] = {
             "enabled": True,
+            "exec": {"command": grpc_health_check_command(port)},
             # Less aggressive after startup
             "periodSeconds": 20,
             "timeoutSeconds": 10,
@@ -2614,6 +2869,7 @@ dagster_helm_values = {
                 "value": "120",
             },
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
+            *dagster_otel_env("dagster-webserver", dagster_k8s_image_tag_or_digest),
         ],
         "envSecrets": [
             {"name": "dagster-static-secrets"},
@@ -2684,6 +2940,7 @@ dagster_helm_values = {
                 "value": "25",
             },
             {"name": "AWS_DEFAULT_REGION", "value": "us-east-1"},
+            *dagster_otel_env("dagster-daemon", dagster_k8s_image_tag_or_digest),
         ],
         "envSecrets": [
             {"name": "dagster-static-secrets"},
@@ -2917,12 +3174,33 @@ cert_manager_certificate = OLCertManagerCert(
     ),
 )
 
+# Shared plugin config.  The single route below referenced no plugin config, so
+# the Dagster webserver emitted no prometheus series and no OTLP span, and every
+# response -- including the very large GraphQL payloads Dagit fetches for the
+# runs and asset-graph views -- went out uncompressed.
+#
+# enable_cors=False: Dagit is a same-origin SPA behind an APISIX-managed session
+# cookie.  The wildcard reflect-with-credentials CORS default would let any
+# origin read an authenticated GraphQL response using the operator's own
+# session, which is a grant nothing here needs.
+dagster_shared_plugins = OLApisixSharedPlugins(
+    f"dagster-{stack_info.env_suffix}-ol-shared-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="dagster",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=dagster_namespace,
+        k8s_labels=k8s_global_labels.model_dump(),
+        enable_cors=False,
+    ),
+)
+
 dagster_apisix_route = OLApisixRoute(
     f"dagster-apisix-route-{stack_info.env_suffix}",
     route_configs=[
         OLApisixRouteConfig(
             route_name="dagster",
             priority=10,
+            shared_plugin_config_name=dagster_shared_plugins.resource_name,
             hosts=[dagster_config.require("domain")],
             paths=["/*"],
             backend_service_name="dagster-dagster-webserver",
@@ -2943,6 +3221,7 @@ dagster_apisix_route = OLApisixRoute(
             dagster_helm_release,
             dagster_user_code_release,
             dagster_oidc_resources,
+            dagster_shared_plugins,
         ]
     ),
 )

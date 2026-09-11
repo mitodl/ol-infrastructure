@@ -6,10 +6,6 @@ path "mariadb-mitx-staging/creds/edxapp-csmh" {
   capabilities = ["read"]
 }
 
-path "mariadb-mitx-staging/creds/xqueue" {
-  capabilities = ["read"]
-}
-
 path "sys/leases/renew" {
   capabilities = [ "update" ]
 }

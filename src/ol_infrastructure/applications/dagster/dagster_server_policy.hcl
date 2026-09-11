@@ -134,6 +134,18 @@ path "secret-xpro/mongodb-forum" {
 path "secret-operations/data/institutional-research-bigquery-service-account" {
   capabilities = ["read"]
 }
+# X-Access-Token for the Tika service, needed by the openedx code location's
+# course_document_text asset. This flat path is the canonical one: the tika
+# stack writes it from the same `x_access_token` SOPS value it inlines as
+# `expected` in the APISIX serverless-pre-function guarding
+# tika-production.ol.mit.edu, so a token read here always matches the gateway.
+# Do not point a consumer at secret-operations/{production,rc}-apps/tika/
+# access-token -- tika_server_policy.hcl still grants those legacy env-scoped
+# paths, but applications/tika/__main__.py stopped writing them, so a reader
+# there gets a stale token and a 401 from APISIX.
+path "secret-operations/tika/access-token" {
+  capabilities = ["read"]
+}
 path "sys/leases/renew" {
   capabilities = ["update"]
 }

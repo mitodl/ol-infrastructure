@@ -10,6 +10,7 @@ config:
     max: 3
     min: 1
   edxnotes:business_unit: mitxonline
+  edxnotes:elasticsearch_enabled: "false"
   edxnotes:dns_zone: learn
   edxnotes:domain: notes.learn.mit.edu
   edxnotes:target_vpc: applications_vpc

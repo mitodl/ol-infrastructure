@@ -66,7 +66,13 @@ from ol_infrastructure.lib.aws.iam_helper import (
     lint_iam_policy,
 )
 from ol_infrastructure.lib.fastly import get_fastly_provider
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    AWSBase,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
@@ -842,6 +848,65 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             depends_on=[ebs_csi_driver_role, *node_groups],
         ),
     )
+    # gp3 volumes provisioned by the storageclass above get 125 MB/s, the AWS
+    # default. That is a throughput ceiling, not a starting point: a volume whose
+    # working set does not fit in its consumer's page cache re-reads from EBS
+    # continuously and saturates it. Over fifteen consecutive minutes on 2026-09-03,
+    # mitxonline production Meilisearch averaged 110 MB/s against that ceiling and
+    # peaked at 122 MB/s (98% of it), while peak IOPS reached 1,904/s -- 38% of the
+    # 5,000 the storageclass had already provisioned. Throughput bound it; IOPS did
+    # not. Mean read size was 77 KiB, which is why.
+    #
+    # StorageClass parameters only apply at provisioning time, so they cannot fix an
+    # existing volume. A VolumeAttributesClass can: setting it on a live PVC drives
+    # ec2:ModifyVolume in place, with no pod restart and no rebind. This is declared
+    # for every cluster because it costs nothing until a PVC references it by name.
+    #
+    # iops is pinned to 5,000 rather than omitted so the class states the full target
+    # geometry instead of silently inheriting whatever the volume happens to carry.
+    # That matches what `iopsPerGB: 50` yields for the 100Gi volumes this is aimed at.
+    kubernetes.storage.v1.VolumeAttributesClass(
+        resource_name=f"{cluster_name}-ebs-gp3-throughput-500-volumeattributesclass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="ebs-gp3-throughput-500",
+            labels=k8s_global_labels,
+        ),
+        driver_name="ebs.csi.aws.com",
+        # ref: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/modify-volume.md
+        parameters={
+            "type": "gp3",
+            "iops": "5000",
+            "throughput": "500",
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[ebs_csi_driver_role, *node_groups],
+        ),
+    )
+    # Rollback target for the class above, and the only way back. Clearing
+    # volumeAttributesClassName on a PVC means "no class applies" -- it does not call
+    # ec2:ModifyVolume, so it leaves the volume at whatever geometry it was last given.
+    # Reverting the commit that set the class would therefore strand a volume at 500
+    # MB/s with nothing left in the repo describing how to undo it. Rolling back means
+    # pointing the PVC at this class and waiting for the modification to apply, then
+    # removing the reference.
+    kubernetes.storage.v1.VolumeAttributesClass(
+        resource_name=f"{cluster_name}-ebs-gp3-throughput-125-volumeattributesclass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="ebs-gp3-throughput-125",
+            labels=k8s_global_labels,
+        ),
+        driver_name="ebs.csi.aws.com",
+        parameters={
+            "type": "gp3",
+            "iops": "5000",
+            "throughput": "125",
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[ebs_csi_driver_role, *node_groups],
+        ),
+    )
     aws_ebs_cni_driver_addon = eks.Addon(
         f"{cluster_name}-eks-addon-ebs-cni-driver-addon",
         cluster=cluster,
@@ -1001,6 +1066,7 @@ setup_vault_secrets_operator(
 )
 
 setup_external_dns(
+    stack_info=stack_info,
     cluster_name=cluster_name,
     cluster=cluster,
     aws_account=aws_account,
@@ -1015,6 +1081,7 @@ setup_external_dns(
 )
 
 cert_manager_release = setup_cert_manager(
+    stack_info=stack_info,
     cluster_name=cluster_name,
     cluster=cluster,
     aws_account=aws_account,
@@ -1045,6 +1112,7 @@ fastly_provider = cast(Any, get_fastly_provider(wrap_in_pulumi_options=False))
 # AWS Load Balancer Controller, AWS Node Termination Handler
 ############################################################
 lb_controller = setup_aws_integrations(
+    stack_info=stack_info,
     aws_account=aws_account,
     cluster_name=cluster_name,
     cluster=cluster,
@@ -1063,6 +1131,7 @@ lb_controller = setup_aws_integrations(
 # configured with vertical autoscaling
 ############################################################
 vpa_release = setup_vpa(
+    stack_info=stack_info,
     cluster_name=cluster_name,
     cluster=cluster,
     k8s_provider=k8s_provider,
@@ -1113,6 +1182,15 @@ setup_apisix(
 ############################################################
 # Install and configure metrics-server
 ############################################################
+metrics_server_labels = cluster_addon_labels(
+    base_labels=k8s_global_labels,
+    stack_info=stack_info,
+    service=Services.metrics_server,
+    component=Component.api,
+    # Every HPA in the cluster goes blind without it, but nothing scales
+    # down or sheds traffic on its own while it is gone.
+    alert_tier=AlertTier.notify,
+)
 metrics_server_release = kubernetes.helm.v3.Release(
     f"{cluster_name}-metrics-server-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
@@ -1125,7 +1203,8 @@ metrics_server_release = kubernetes.helm.v3.Release(
         cleanup_on_fail=True,
         skip_await=False,
         values={
-            "commonLabels": k8s_global_labels,
+            "commonLabels": metrics_server_labels,
+            "podLabels": metrics_server_labels,
             "tolerations": operations_tolerations,
             # Every HPA in the cluster depends on metrics-server for resource
             # metrics. A single replica means any restart or node drain leaves

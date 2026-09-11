@@ -1,6 +1,5 @@
 """Helper functions for managing Keycloak SAML integrations."""
 
-import logging
 import ssl
 import xml.etree.ElementTree as ET
 from typing import Any
@@ -9,7 +8,15 @@ from urllib.request import Request, urlopen
 
 import certifi
 
-logger = logging.getLogger(__name__)
+
+class SamlMetadataError(Exception):
+    """A SAML IdP's metadata could not be fetched or parsed.
+
+    Raised instead of returning empty metadata so that an unreachable partner
+    endpoint fails the deploy. Returning empty dropped the IdP resource from the
+    Pulumi program, which Pulumi then deleted along with the working integration.
+    """
+
 
 # Some standalone/pyenv-managed Python builds (e.g. on macOS) don't reliably
 # pick up the system trust store via ssl.create_default_context(), causing
@@ -66,21 +73,23 @@ SAML_FRIENDLY_NAMES = {
 }
 
 
-def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element | None:
+def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element:
     """Fetch and parse SAML metadata from a URL.
 
     Args:
         metadata_url: The URL of the SAML IdP metadata XML file.
 
     Returns:
-        The root ElementTree element of the parsed XML, or None if parsing fails.
+        The root ElementTree element of the parsed XML.
+
+    Raises:
+        SamlMetadataError: The URL is not HTTPS, the fetch failed, the body
+            exceeded the size limit, or the payload was not parseable XML.
     """
     parsed_url = urlparse(metadata_url)
     if parsed_url.scheme != "https":
-        logger.warning(
-            "SAML metadata URL must use HTTPS, got %s. Skipping.", metadata_url
-        )
-        return None
+        msg = f"SAML metadata URL must use HTTPS, got {metadata_url}"
+        raise SamlMetadataError(msg)
     try:
         # Set timeout and limit response size
         MAX_METADATA_SIZE = 10 * 1024 * 1024  # 10MB
@@ -95,34 +104,34 @@ def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element | None:
         with urlopen(request, timeout=10, context=_SSL_CONTEXT) as metadata_file:  # noqa: S310
             metadata_bytes = metadata_file.read(MAX_METADATA_SIZE + 1)
             if len(metadata_bytes) > MAX_METADATA_SIZE:
-                logger.warning(
-                    "SAML metadata from %s exceeds maximum size. Skipping.",
-                    metadata_url,
+                msg = (
+                    f"SAML metadata from {metadata_url} exceeds the "
+                    f"{MAX_METADATA_SIZE} byte maximum"
                 )
-                return None
+                raise SamlMetadataError(msg)
             return ET.fromstring(metadata_bytes)  # noqa: S314
     except (OSError, ET.ParseError) as e:
-        logger.warning(
-            "Unable to fetch or parse SAML metadata from %s: %s. Skipping.",
-            metadata_url,
-            e,
-        )
-        return None
+        msg = f"Unable to fetch or parse SAML metadata from {metadata_url}: {e}"
+        raise SamlMetadataError(msg) from e
 
 
-def _parse_saml_metadata_string(metadata_xml: str) -> ET.Element | None:
+def _parse_saml_metadata_string(metadata_xml: str) -> ET.Element:
     """Parse SAML metadata from an XML string.
 
     Args:
         metadata_xml: The SAML IdP metadata as an XML string.
 
     Returns:
-        The root ElementTree element of the parsed XML, or None if parsing fails.
+        The root ElementTree element of the parsed XML.
+
+    Raises:
+        SamlMetadataError: The string was not parseable XML.
     """
     try:
         return ET.fromstring(metadata_xml)  # noqa: S314
-    except ET.ParseError:
-        return None
+    except ET.ParseError as e:
+        msg = f"Unable to parse the supplied SAML metadata XML: {e}"
+        raise SamlMetadataError(msg) from e
 
 
 def extract_saml_metadata(metadata_source: str) -> dict[str, str | None]:
@@ -134,8 +143,10 @@ def extract_saml_metadata(metadata_source: str) -> dict[str, str | None]:
                                or the XML string itself.
 
     Returns:
-        dict: A dictionary containing the extracted metadata attributes,
-              or an empty dictionary if parsing fails.
+        dict: A dictionary containing the extracted metadata attributes.
+
+    Raises:
+        SamlMetadataError: The metadata could not be fetched or parsed.
     """
     # Determine if this is a URL or XML string
     if metadata_source.strip().startswith(
@@ -144,9 +155,6 @@ def extract_saml_metadata(metadata_source: str) -> dict[str, str | None]:
         root = _parse_saml_metadata_string(metadata_source)
     else:
         root = _fetch_and_parse_saml_metadata(metadata_source)
-
-    if root is None:
-        return {}
 
     # Define namespaces
     namespaces = {
@@ -197,13 +205,10 @@ def generate_pulumi_args_dict(metadata: dict[str, str | None]) -> dict[str, str]
     Args:
         metadata (dict): Dictionary containing extracted IdP metadata.
 
-    Returns: dict: A dictionary of arguments suitable for Pulumi, or empty dict if
-        metadata is missing required fields.
+    Returns: dict: A dictionary of arguments suitable for Pulumi. Keys absent from
+        the metadata are omitted so that a caller's explicit override still applies.
 
     """
-    if not metadata:
-        return {}
-
     args_dict: dict[str, str] = {}
 
     sso_url = metadata.get("single_sign_on_service_url")
@@ -246,6 +251,9 @@ def get_saml_attribute_mappers(  # noqa: C901, PLR0912
     Returns:
         A dictionary of attribute mapper configurations suitable for Pulumi.
 
+    Raises:
+        SamlMetadataError: The metadata could not be fetched or parsed.
+
     """
     # Determine if this is a URL or XML string
     if metadata_source.strip().startswith(
@@ -254,9 +262,6 @@ def get_saml_attribute_mappers(  # noqa: C901, PLR0912
         root = _parse_saml_metadata_string(metadata_source)
     else:
         root = _fetch_and_parse_saml_metadata(metadata_source)
-
-    if root is None:
-        return {}
 
     namespaces = {
         "md": "urn:oasis:names:tc:SAML:2.0:metadata",

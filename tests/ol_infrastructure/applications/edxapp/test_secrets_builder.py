@@ -140,11 +140,11 @@ class TestBuildBaseGeneralSecretsDict:
             lms_domain="mitxonline.example.com",
         )
 
-        # mitxonline should have github and deepl
+        # mitxonline should have github, deepl, canvas, and youtube
         assert "GITHUB_ACCESS_TOKEN" in secrets
         assert "DEEPL_API_KEY" in secrets
-        # But not canvas (mitx-only)
-        assert "CANVAS_ACCESS_TOKEN" not in secrets
+        assert "CANVAS_ACCESS_TOKEN" in secrets
+        assert "YOUTUBE_API_KEY" in secrets
 
     def test_xpro_specific_secrets(self, mock_stack_info_xpro):
         """Test xpro-specific configuration."""

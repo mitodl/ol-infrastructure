@@ -13,8 +13,24 @@ their own ``ApisixRoute`` resources that reference the shared OIDC config
 (``marimo_oidc``) and shared plugin config (``marimo_shared_plugins``) from
 this stack.
 
-Published apps use the ol-marimo-app-client service account (client credentials
-flow) for Trino access, so they are not tied to a specific user session.
+Published apps have no user session, so the interactive Galaxy OAuth2 flow the
+JupyterHub templates use is unavailable to them -- there is nobody to click a
+login link.  They therefore need a non-interactive warehouse credential.
+
+``ol-marimo-app-client`` is NOT that credential.  It is a Keycloak
+service-account client, and the client-credentials flow returns a
+Keycloak-issued JWT.  Starburst Galaxy does not accept externally-issued JWTs;
+customer-JWKS JWT auth is a Starburst Enterprise feature.  Galaxy accepts a
+Galaxy username/password over HTTP Basic, or its own OAuth2 flow.  Pointing a
+published app's Trino client at these credentials produces the same
+``401 Authentication required`` the JupyterHub template hit before #5700.
+
+What is needed is a GALAXY service account, in the shape OpenMetadata already
+uses -- ``login_email``/``password`` synced from Vault, see
+``applications/open_metadata/__main__.py`` and ``OM_TRINO_USERNAME`` /
+``OM_TRINO_PASSWORD``.  That account does not exist yet, and nothing consumes
+the secret below, so nothing is broken today; it breaks the moment someone
+publishes a notebook that queries the warehouse.
 
 The JupyterHub development environment is managed by the separate
 ``applications.jupyterhub_data`` stack.
@@ -82,8 +98,9 @@ application_labels = k8s_global_labels | {
 
 apps_domain = marimo_data_config.require("apps_domain")
 
-# Vault policy for marimo published-app pods to read the service-account
-# Trino client credentials (ol-marimo-app-client).
+# Vault policy for marimo published-app pods to read the ol-marimo-app-client
+# service-account credentials.  These are Keycloak credentials and are not
+# usable against Galaxy -- see the module docstring.
 marimo_vault_policy_hcl = """
 path "secret-operations/data/sso/marimo-app" {
   capabilities = ["read"]
@@ -123,7 +140,9 @@ marimo_vault_k8s_resources = OLVaultK8SResources(
     ),
 )
 
-# VaultStaticSecret: syncs ol-marimo-app-client credentials for published apps
+# VaultStaticSecret: syncs ol-marimo-app-client credentials for published apps.
+# Nothing mounts this secret yet.  It is not a warehouse credential; a Galaxy
+# service account is still required for that.
 marimo_app_trino_secret = OLVaultK8SSecret(
     f"marimo-app-trino-secret-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(

@@ -6,11 +6,20 @@ from bridge.lib.versions import (
     NVIDIA_DCGM_EXPORTER_CHART_VERSION,
     NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION,
 )
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
+from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
-def setup_nvidia(
+def setup_nvidia(  # noqa: PLR0913
     cluster_name: str,
     k8s_provider: kubernetes.Provider,
+    k8s_global_labels: dict[str, str],
+    stack_info: StackInfo,
     nvidia_dcgm_exporter_version: str = NVIDIA_DCGM_EXPORTER_CHART_VERSION,
     nvidia_k8s_device_plugin_version: str = NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION,
 ):
@@ -21,6 +30,8 @@ def setup_nvidia(
     Args:
         cluster_name: The name of the EKS cluster.
         k8s_provider: The Pulumi Kubernetes provider instance.
+        k8s_global_labels: The program's shared label dict.
+        stack_info: Information about the current Pulumi stack.
         nvidia_dcgm_exporter_version: The version of the NVIDIA DCGM exporter chart.
         nvidia_k8s_device_plugin_version: The version of the NVIDIA k8s device plugin chart.
     """
@@ -164,6 +175,14 @@ def setup_nvidia(
                 "nodeSelector": {
                     "ol.mit.edu/gpu_node": "true",
                 },
+                "podLabels": cluster_addon_labels(
+                    base_labels=k8s_global_labels,
+                    stack_info=stack_info,
+                    service=Services.dcgm_exporter,
+                    component=Component.exporter,
+                    # GPU telemetry. Nothing user-facing depends on it.
+                    alert_tier=AlertTier.ticket,
+                ),
                 "serviceMonitor": {
                     "enabled": False,
                 },

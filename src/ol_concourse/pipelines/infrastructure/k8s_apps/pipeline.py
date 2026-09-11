@@ -43,12 +43,16 @@ from ol_concourse.lib.tasks import bump_version_task
 from pydantic import BaseModel, model_validator
 
 from bridge.settings.apps import github_repo as app_github_repo
+from bridge.settings.apps import (
+    release_resource_workflow as app_release_resource_workflow,
+)
 from bridge.settings.apps import repo_main_branch as app_repo_main_branch
 from ol_concourse.pipelines.constants import (
     ECR_REGION,
     PULUMI_WATCHED_PATHS,
     dockerhub_ecr_image_uri,
 )
+from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
@@ -108,10 +112,6 @@ class AppPipelineParams(BaseModel):
         github_repo (Optional[str]): The GitHub repository in ``owner/repo`` form used for release
             resources and GitHub Deployments. Defaults to ``mitodl/{repo_name}``. Only used by the
             release-resource workflow.
-        use_release_resource_workflow (bool): Opt an app into the modernized GitHub
-            Release/Deployment-based pipeline shape instead of the legacy release-candidate/
-            release git-branch pattern. Defaults to False so existing apps are unaffected;
-            flip per-app once each has been validated on the new shape.
         sentry_sourcemaps (Optional[SentrySourcemapsConfig]): When set, the app's
             image build unpacks its rootfs and a decoupled task uploads the built
             source maps to Sentry with an auth token -- the token never enters the
@@ -139,7 +139,6 @@ class AppPipelineParams(BaseModel):
     version_file: str | None = None
     enable_ci_deploy: bool = True
     github_repo: str | None = None
-    use_release_resource_workflow: bool = False
     sentry_sourcemaps: SentrySourcemapsConfig | None = None
     refresh_stack: bool = True
 
@@ -234,10 +233,7 @@ pipeline_params = {
         build_target="production",
         settings_dir="odl_video",
     ),
-    "ol-analytics-api": AppPipelineParams(
-        app_name="ol-analytics-api",
-        use_release_resource_workflow=True,
-    ),
+    "ol-analytics-api": AppPipelineParams(app_name="ol-analytics-api"),
 }
 
 
@@ -311,38 +307,65 @@ def _fastly_purge_params(purge_scope: str) -> dict[str, str]:
     return {"mode": "surrogate_key", "surrogate_key": purge_scope}
 
 
-def _ensure_ecr_repository_step(ecr_registry_image_resource: Resource) -> TaskStep:
-    """Return the shared 'create the ECR repo if it does not exist yet' step."""
-    return TaskStep(
-        task=Identifier("ensure-ecr-repository"),
-        config=TaskConfig(
-            platform=Platform.linux,
-            image_resource=AnonymousResource(
-                type="registry-image",
-                source={
-                    "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
-                    "tag": "latest",
-                    "aws_region": ECR_REGION,
+def _ensure_ecr_repository_step(
+    ecr_registry_image_resource: Resource,
+) -> list[TaskStep]:
+    """Return steps to create the ECR repo if missing, then apply its
+    scan-on-push + lifecycle-policy configuration.
+
+    Without the second step, every build permanently accumulates as its own
+    image in ECR -- Inspector re-scans and re-reports the same CVEs against
+    every old, unused build forever. Other pipeline generators
+    (witan, omnigraph, superset, ...) already pair ensure_ecr_task with
+    configure_ecr_repository_task; this generator's apps (mit-learn,
+    mitxonline, xpro, odl-video-service, and others sharing this step) were
+    missing the second half of that pairing, confirmed live via
+    `aws ecr describe-images` -- mit-learn-app alone had 1,204 accumulated
+    images, each carrying its own full copy of the same ~1,900 CVEs.
+    """
+    repo_name = ecr_registry_image_resource.source["repository"]
+    return [
+        TaskStep(
+            task=Identifier("ensure-ecr-repository"),
+            config=TaskConfig(
+                platform=Platform.linux,
+                image_resource=AnonymousResource(
+                    type="registry-image",
+                    source={
+                        "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
+                        "tag": "latest",
+                        "aws_region": ECR_REGION,
+                    },
+                ),
+                params={
+                    "REPO_NAME": repo_name,
+                    "AWS_PAGER": "cat",
                 },
-            ),
-            params={
-                "REPO_NAME": ecr_registry_image_resource.source["repository"],
-                "AWS_PAGER": "cat",
-            },
-            run=Command(
-                path="sh",
-                args=[
-                    "-exc",
-                    "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",
-                ],
+                run=Command(
+                    path="sh",
+                    args=[
+                        "-exc",
+                        "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",
+                    ],
+                ),
             ),
         ),
-    )
+        # expire_after_days, not keep_last_n_images: this repo is shared by
+        # independent CI (every main-branch commit) and release build jobs
+        # (see the registry_image() calls above/below using the same
+        # image_repository) -- a count-based policy would let CI churn
+        # push the still-deployed release image out of the "N most
+        # recent" window and delete it. Age-based means CI volume can't
+        # threaten a release image redeployed within any reasonable
+        # window. Flagged by Copilot review on PR #5728.
+        configure_ecr_repository_task(repo_name, expire_after_days=90),
+    ]
 
 
 # ============================================================================
 # Legacy workflow: release-candidate/release git-branch pattern.
-# Used by every app except those with use_release_resource_workflow=True.
+# Used by every app whose bridge.settings.apps entry leaves
+# release_resource_workflow False.
 # ============================================================================
 
 
@@ -519,9 +542,21 @@ def _build_image_job_legacy(
     version_args = {}
     additional_build_params = {}
     if build_target:
-        additional_build_params = {
-            "TARGET": build_target,
-        }
+        additional_build_params["TARGET"] = build_target
+    # OUTPUT_OCI preserves the DHI-hardened base's zstd layer labeling
+    # end-to-end (mitodl/ol-infrastructure#5714). oci-build-task's default
+    # (Docker-legacy) output format has no field to declare a layer as
+    # anything but gzip, so a layer carried through unchanged from a
+    # zstd-compressed base gets silently mislabeled as gzip -- which is what
+    # broke the original learn-ai canary build. Skipped when
+    # sentry_sourcemaps is set (mit-learn-nextjs only): oci-build-task's
+    # OCI-output loader (loadOciImages) never checks UNPACK_ROOTFS, unlike
+    # the legacy loader the sourcemap upload step depends on -- and
+    # mit-learn-nextjs doesn't build FROM mitodl/ol-python-base anyway
+    # (it's a Node/Next.js image), so it was never at risk from DHI's zstd
+    # layers in the first place.
+    if sentry_sourcemaps is None:
+        additional_build_params["OUTPUT_OCI"] = "true"
     if branch_type == "release_candidate":
         plan.extend(
             [
@@ -598,14 +633,16 @@ def _build_image_job_legacy(
     )
 
     put_params: dict[str, Any] = {
-        "image": "image/image.tar",
+        # Directory, not image.tar, whenever OUTPUT_OCI was set above --
+        # matches oci-build-task's documented output shape for that flag.
+        "image": "image/image" if sentry_sourcemaps is None else "image/image.tar",
         "additional_tags": f"./{git_repo_resource.name}/.git/short_ref",
     }
     if branch_type != "main":
         put_params["version"] = f"((.:{version_var}))"
         put_params["bump_aliases"] = True
 
-    plan.append(_ensure_ecr_repository_step(ecr_registry_image_resource))
+    plan.extend(_ensure_ecr_repository_step(ecr_registry_image_resource))
     plan.append(PutStep(put=dockerhub_registry_image_resource.name, params=put_params))
     plan.append(PutStep(put=ecr_registry_image_resource.name, params=put_params))
 
@@ -822,7 +859,9 @@ def _build_legacy_app_pipeline(
 
 # ============================================================================
 # Modernized workflow: GitHub Release resource + GitHub Deployments.
-# Opt in per-app via AppPipelineParams.use_release_resource_workflow.
+# Opt in per-app via AppRegistration.release_resource_workflow in
+# bridge.settings.apps -- the same field the release bot reads to decide
+# whether it will accept commands for the app.
 # ============================================================================
 
 
@@ -1028,7 +1067,7 @@ def _build_image_job(
             },
             build_args=[],
         ),
-        _ensure_ecr_repository_step(ecr_registry_image_resource),
+        *_ensure_ecr_repository_step(ecr_registry_image_resource),
         PutStep(
             put=dockerhub_registry_image_resource.name,
             params={
@@ -1135,7 +1174,7 @@ def _build_release_image_job(
             },
             build_args=[],
         ),
-        _ensure_ecr_repository_step(ecr_registry_image_resource),
+        *_ensure_ecr_repository_step(ecr_registry_image_resource),
         PutStep(put=dockerhub_registry_image_resource.name, params=put_params),
         PutStep(put=ecr_registry_image_resource.name, params=put_params),
     ]
@@ -1489,13 +1528,17 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     """Generate the full Concourse pipeline for a given application.
 
     Dispatches to the modernized release-resource pipeline shape for apps that
-    have opted in via ``AppPipelineParams.use_release_resource_workflow``, and
-    to the legacy release-candidate/release-branch shape for everyone else.
+    have opted in via ``AppRegistration.release_resource_workflow`` in
+    ``bridge.settings.apps``, and to the legacy release-candidate/release-branch
+    shape for everyone else. The opt-in lives in the shared registry rather than
+    in ``pipeline_params`` because the release bot has to make the same call, and
+    a per-app flag duplicated across the two would let a pipeline be migrated
+    while the bot still refuses to drive it.
     """
     pipeline_parameters = pipeline_params.get(app_name) or AppPipelineParams(
         app_name=app_name
     )
-    if pipeline_parameters.use_release_resource_workflow:
+    if app_release_resource_workflow(app_name):
         return _build_release_resource_app_pipeline(app_name, pipeline_parameters)
     return _build_legacy_app_pipeline(app_name, pipeline_parameters)
 

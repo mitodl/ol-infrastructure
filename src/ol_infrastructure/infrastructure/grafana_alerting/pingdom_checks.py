@@ -343,7 +343,10 @@ _CHECKS: list[_SMCheck] = [
     _SMCheck(
         resource_name="mitxonline-production-http",
         job="MITx Online Production",
-        target="https://mitxonline.mit.edu/",
+        # Bare "/" is answered with a synthetic 301 to MIT Learn at the Fastly
+        # edge, so it no longer exercises the origin - probe a health endpoint
+        # served by the app instead.
+        target="https://mitxonline.mit.edu/health/readiness/",
         frequency=60000,
         alert_sensitivity="high",
         labels={"env": "production", "service": "mitxonline"},
@@ -351,7 +354,7 @@ _CHECKS: list[_SMCheck] = [
     _SMCheck(
         resource_name="mitxonline-rc-http",
         job="MITx Online RC",
-        target="https://rc.mitxonline.mit.edu/",
+        target="https://rc.mitxonline.mit.edu/health/readiness/",
         frequency=60000,
         alert_sensitivity="low",
         labels={"env": "rc", "service": "mitxonline"},

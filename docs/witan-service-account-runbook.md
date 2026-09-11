@@ -248,6 +248,8 @@ especially soon after a rotation.
 
 - `docs/witan-admin-break-glass-runbook.md` — `svc-witan-admin`, same shape,
   opt-in rather than required.
+- `docs/witan-council-probe-runbook.md` — `svc-witan-probe`, also opt-in,
+  for synthetic monitoring rather than maintenance.
 - `docs/witan-token-sync-runbook.md` — how service tokens reach `actor-tokens`.
 - agent-kit `mcp/servers/witan/policy/` — the Cedar bundles and the boot-time
   membership renderer.

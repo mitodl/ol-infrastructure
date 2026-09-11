@@ -155,6 +155,29 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             # without `cronjob` here every stalled schedule in a cluster would
             # arrive as a single grouped notification.
             "cronjob",
+            # Same reasoning again for metric_rules/otel_service_red.py, which
+            # aggregates `sum by (service_name)` for both its latency and
+            # error-rate rules. Without this, simultaneous firings for
+            # different services would collapse into one notification group
+            # per rule -- and, once promoted past `channel=devops-warnings`,
+            # one Rootly incident per rule instead of one per service.
+            "service_name",
+            # Same reasoning once more for metric_rules/eks_general.py's
+            # WorkloadJobFailed*, which aggregate `sum by (cluster, namespace,
+            # workload)` -- `workload` is the owning CronJob for a scheduled Job
+            # and the Job's own name otherwise. That aggregation drops
+            # `job_name` (deliberately: it is the per-tick ordinal that made
+            # every run a separate alert), so without `workload` here two
+            # unrelated failing CronJobs in the same namespace would arrive as
+            # one grouped notification.
+            "workload",
+            # metric_rules/vector_edxapp_tracking.py's EdxappTrackingLogS3Error
+            # aggregates `sum by (cluster, namespace, component_id)` -- two
+            # sinks (`ship_edx_tracking_logs_to_s3` and its `_legacy` twin)
+            # match the same component_id regex, so without this label both
+            # erroring at once in the same namespace would collapse into one
+            # notification group.
+            "component_id",
         ],
         # "1m", not "60s" — Grafana normalizes durations to the largest unit and
         # a mismatched spelling shows as a perpetual diff on every preview.

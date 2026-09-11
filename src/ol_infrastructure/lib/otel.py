@@ -18,10 +18,20 @@ OTLP_ENDPOINT = (
     "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318"
 )
 
-# Matched to the mit_learn/learn_ai precedent rather than chosen fresh, so a
-# trace crossing from one of those services is sampled consistently instead of
-# being decided twice.
-DEFAULT_TRACE_SAMPLING_RATE = "0.25"
+# No head sampling anywhere. Every service that starts or forwards a request is
+# a root for something downstream -- APISIX and ToolHive literally so, edxapp
+# and Keycloak for anything they call -- and `parentbased_*` means a downstream
+# service honours the root's decision rather than re-rolling it. So a fractional
+# rate here is not "sample this service", it is "discard that fraction of every
+# end-to-end trace in the system", taken at the point with the least information
+# about whether the trace turned out to be interesting.
+#
+# The Grafana Alloy tail sampler is the only thing that sees a whole trace, so
+# it owns the decision: keep errors, keep slow traces, keep everything from
+# services that are not high-volume, and sample the remainder (see
+# substructure/aws/eks/grafana.py). Head sampling upstream of it only removes
+# traces it never gets to judge.
+DEFAULT_TRACE_SAMPLING_RATE = "1.0"
 
 
 def ships_telemetry(stack_info: StackInfo) -> bool:

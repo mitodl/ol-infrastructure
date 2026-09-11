@@ -164,7 +164,7 @@ def create_meilisearch_resources(
             max_indexing_memory
         )
 
-    return kubernetes.helm.v3.Release(
+    meilisearch_release = kubernetes.helm.v3.Release(
         f"ol-{stack_info.env_prefix}-edxapp-meilisearch-helm-release-{stack_info.env_suffix}",
         kubernetes.helm.v3.ReleaseArgs(
             name="meilisearch",
@@ -180,3 +180,31 @@ def create_meilisearch_resources(
         ),
         opts=ResourceOptions(delete_before_replace=True),
     )
+
+    # Raise the throughput of an already-provisioned volume. The storageclass sets
+    # gp3 throughput at provisioning time and cannot revise it afterwards, so a
+    # volume whose index has outgrown the pod's page cache stays pinned at whatever
+    # ceiling it was born with. Pointing the PVC at a VolumeAttributesClass drives
+    # ec2:ModifyVolume against the live volume instead -- online, no pod restart, no
+    # rebind, so it does not disturb the zone-locked PVC.
+    #
+    # The chart's PVC template has no field for this (meilisearch-kubernetes 0.38.0),
+    # hence a patch against the Helm-created claim rather than a values entry.
+    # Emitted only where configured, so the stacks that have not been sized for it
+    # render unchanged.
+    if volume_attributes_class := meilisearch_config.get("volume_attributes_class"):
+        kubernetes.core.v1.PersistentVolumeClaimPatch(
+            f"ol-{stack_info.env_prefix}-edxapp-meilisearch-pvc-attributes-{stack_info.env_suffix}",
+            metadata=kubernetes.meta.v1.ObjectMetaPatchArgs(
+                name="meilisearch",
+                namespace=namespace,
+                labels=k8s_global_labels,
+                annotations={"pulumi.com/patchForce": "true"},
+            ),
+            spec=kubernetes.core.v1.PersistentVolumeClaimSpecPatchArgs(
+                volume_attributes_class_name=volume_attributes_class,
+            ),
+            opts=ResourceOptions(depends_on=[meilisearch_release]),
+        )
+
+    return meilisearch_release

@@ -51,6 +51,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    oidc_gateway_pre_function_plugin,
     stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
@@ -811,6 +812,18 @@ mitxonline_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=mitxonline_namespace,
         k8s_labels=k8s_app_labels,
         enable_defaults=True,
+        plugins=[
+            # 285 callbacks a day on mitxonline.mit.edu come back from Keycloak
+            # with error=temporarily_unavailable instead of a code, and the
+            # openid-connect plugin serves each one a 500.  Unlike the cookie
+            # cleanup below, this is safe to attach here rather than per route
+            # group: it derives its redirect target from the request URI and
+            # its guard cookie is host-only, so neither depends on which parent
+            # domain a group's session cookie was scoped to.  Ditto the
+            # canonical-origin redirect it also carries, which is derived from
+            # the request's own host.
+            oidc_gateway_pre_function_plugin(),
+        ],
     ),
 )
 
@@ -949,6 +962,12 @@ mitxonline_apisix_route_direct = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="dnt-policy",
             priority=10,
+            # Referenced no plugin config, unlike every sibling here, so
+            # this path emitted no prometheus series and no OTLP span. `mocking`
+            # short-circuits before the upstream but `prometheus` runs in the log
+            # phase, so the shared config still records it -- and cors/gzip are
+            # no-ops on an empty 204.
+            shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
             hosts=[api_domain, frontend_domain],
             paths=["/.well-known/dnt-policy.txt"],
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
@@ -1118,6 +1137,20 @@ catalog_redirect_vcl = (
     f"}}"
 )
 
+# Home page redirects to MIT Learn's unit catalog view too - per hq#12506,
+# matches only the exact site root, not any deeper path, so /cms and
+# /staff-dashboard (and everything else) are unaffected by construction.
+# Applies to all requests regardless of login state - there's no distinct
+# logged-in experience at bare "/" today for this to disrupt. Uses a
+# distinct error code (605) from the catalog (604), course/program (603),
+# and UAI B2C (602) redirects above so this is fully additive.
+home_redirect_vcl = (
+    f'if (req.url.path == "/") {{\n'
+    f'  set req.http.x-redir-location = "https://{learn_frontend_domain}/c/unit/mitx";\n'
+    f"  error 605;\n"
+    f"}}"
+)
+
 gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
 for k, v in mimetypes.types_map.items():
     if k in (
@@ -1229,6 +1262,15 @@ mitxonline_service = fastly.ServiceVcl(
             type="recv",
         ),
         vcl_snippet(
+            content=home_redirect_vcl,
+            name="Redirect home page to MIT Learn",
+            # Exact match on "/" only, so it can't shadow /cms, /staff-dashboard,
+            # or any other path - ordering relative to the other recv snippets
+            # isn't load-bearing, placed after them for readability only.
+            priority=170,
+            type="recv",
+        ),
+        vcl_snippet(
             content=textwrap.dedent("""\
             if (obj.status == 602) {
               set obj.status = 301;
@@ -1282,6 +1324,23 @@ mitxonline_service = fastly.ServiceVcl(
               return(deliver);
             }"""),
             name="Handle catalog redirects to MIT Learn",
+            type="error",
+        ),
+        vcl_snippet(
+            content=textwrap.dedent("""\
+            if (obj.status == 605) {
+              set obj.status = 301;
+              set obj.response = "Moved Permanently";
+              set obj.http.Location = req.http.x-redir-location;
+              set obj.http.Cache-Control = "no-store";
+              if (req.url.qs != "") {
+                # 605's Location is a fixed URL with no query string, so a
+                # plain "?" append is always correct here.
+                set obj.http.Location = obj.http.Location "?" req.url.qs;
+              }
+              return(deliver);
+            }"""),
+            name="Handle home page redirects to MIT Learn",
             type="error",
         ),
         vcl_snippet(

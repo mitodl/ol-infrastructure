@@ -1,6 +1,8 @@
 # ruff: noqa: F841, E501, PLR0912, PLR0913, PLR0915
 """Kubernetes resources for the edxapp application."""
 
+import hashlib
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -9,7 +11,7 @@ import pulumi
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, ResourceOptions, StackReference, export
+from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import iam
 
 from bridge.settings.openedx.types import OpenEdxSupportedRelease
@@ -63,6 +65,11 @@ from ol_infrastructure.lib.aws.eks_helper import (
     default_psg_egress_args,
     get_default_psg_ingress_args,
 )
+from ol_infrastructure.lib.azure_workload_identity import (
+    azure_identity_env,
+    azure_identity_token_mount,
+    azure_identity_token_volume,
+)
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -113,7 +120,49 @@ _OTEL_SDK_ENV: dict[str, str] = {
     "OTEL_METRICS_EXPORTER": "none",
     "OTEL_LOGS_EXPORTER": "none",
     "OTEL_LOG_LEVEL": "info",
+    # Explicit rather than relying on the SDK default being parentbased_always_on:
+    # edxapp is upstream of everything it calls, so a head sample here would
+    # discard whole traces. The Alloy tail sampler owns that (see lib/otel.py).
+    "OTEL_TRACES_SAMPLER": "parentbased_always_on",
 }
+
+
+def _config_map_contents(
+    config_map: kubernetes.core.v1.ConfigMap | Output[Any],
+) -> Output[str]:
+    """Serialize a ConfigMap's rendered data.
+
+    `configmaps.interpolated` is an Output[ConfigMap] rather than a bare
+    ConfigMap because its content depends on runtime lookups, so both shapes
+    have to work here.
+    """
+    return (
+        Output.from_input(config_map)
+        .apply(lambda config_map_resource: config_map_resource.data)
+        .apply(lambda data: json.dumps(data, sort_keys=True))
+    )
+
+
+def _pod_config_hash(
+    config_maps: dict[str, kubernetes.core.v1.ConfigMap | Output[Any]],
+) -> Output[str]:
+    """Digest of every ConfigMap a pod mounts, keyed by ConfigMap name.
+
+    An init container concatenates these into lms.env.yml/cms.env.yml once, at
+    pod start, so their contents are only read at boot. Kubernetes rolls pods
+    when the pod template changes and a ConfigMap referenced by name is not part
+    of that template, which leaves a config-only change inert until something
+    else happens to restart the pod. Annotating the pod template with this hash
+    makes the template change whenever the config does.
+    """
+    names = sorted(config_maps)
+    return Output.all(
+        *(_config_map_contents(config_maps[name]) for name in names)
+    ).apply(
+        lambda contents: hashlib.sha256(
+            json.dumps(dict(zip(names, contents, strict=True)), sort_keys=True).encode()
+        ).hexdigest()
+    )
 
 
 def create_k8s_resources(  # noqa: C901
@@ -129,6 +178,7 @@ def create_k8s_resources(  # noqa: C901
     stack_info: StackInfo,
     vault_config: Config,
     vault_policy: vault.Policy,
+    azure_openai_stack: StackReference | None = None,
 ) -> dict[str, Any]:
     """Create all Kubernetes resources for the edxapp LMS and CMS deployments."""
     env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
@@ -157,20 +207,27 @@ def create_k8s_resources(  # noqa: C901
     replicas_dict = edxapp_config.require_object("k8s_replicas")
     resources_dict = edxapp_config.require_object("k8s_resources")
 
-    # Per-install Granian concurrency for the LMS webapp.
+    # Per-install Granian concurrency for the LMS and CMS webapps.
     #
-    # CMS took the component defaults everywhere in stage 3, but LMS cannot: the
-    # measured p99 concurrency demand differs by ~65x across installs (mitxonline
-    # LMS needs 17.7 concurrently-busy blocking threads, mitx LMS needs 0.27), so a
-    # single value is either unsafe for one or wasteful for the other. This file is
-    # shared by every install, so the only place that distinction can live is
-    # per-stack config.
+    # Neither can take one value across every install: measured p99 concurrency
+    # demand differs by orders of magnitude. mitxonline LMS needed 17.7
+    # concurrently-busy blocking threads where mitx LMS needed 0.27. Over the 9 days
+    # to 2026-09-04, mitxonline CMS peaked at 39.5 busy threads on its worst pod with
+    # granian_blocking_queue 24 deep, where mitx CMS peaked at 1.24 with the queue
+    # above zero in 6 of ~12,960 minutes. A single value is either unsafe for
+    # mitxonline or wasteful for mitx. This file is shared by every install, so the
+    # only place that distinction can live is per-stack config.
     #
     # Omitted (the default) means the pre-overhaul holding pins: 2 workers x 32
-    # blocking threads, backpressure 64, runtime-mode mt, runtime-threads 2 -- the
-    # values Granian derived from backlog=128 before the overhaul. An install opts
-    # in by setting edxapp:k8s_granian.lms in its stack config; setting it to an
-    # empty mapping opts in to the component defaults with no overrides.
+    # blocking threads, runtime-mode mt, runtime-threads 2 -- the values Granian
+    # derived from backlog=128 before the overhaul. An install opts in by setting
+    # edxapp:k8s_granian.{lms,cms} in its stack config; setting it to an empty
+    # mapping opts in to the component defaults with no overrides.
+    #
+    # backpressure is pinned for LMS but not CMS. PR #5694 established that CMS's
+    # 2026-08-26 saturation was the connection ceiling, not the thread pool: idle
+    # APISIX keepalives consume backpressure while doing no work, so CMS takes
+    # DEFAULT_WSGI_BACKPRESSURE and only its threads stay pinned.
     #
     # See docs/plans/granian-configuration-overhaul.md stage 3.
     LMS_GRANIAN_HOLDING_PINS = {
@@ -180,15 +237,28 @@ def create_k8s_resources(  # noqa: C901
         "blocking_threads": 32,
         "backpressure": 64,
     }
+    CMS_GRANIAN_HOLDING_PINS = {
+        "workers": 2,
+        "runtime_mode": "mt",
+        "runtime_threads": 2,
+        "blocking_threads": 32,
+    }
     # `is None` rather than a falsy check: an explicitly configured empty mapping
     # means "take the component defaults with no per-install overrides", which is a
     # real thing for a stack to want and is not the same request as omitting the key.
     # `or` would collapse the two and silently re-pin such a stack to the old values.
-    _lms_granian_override = (edxapp_config.get_object("k8s_granian") or {}).get("lms")
+    _granian_overrides = edxapp_config.get_object("k8s_granian") or {}
+    _lms_granian_override = _granian_overrides.get("lms")
     lms_granian_concurrency = (
         LMS_GRANIAN_HOLDING_PINS
         if _lms_granian_override is None
         else _lms_granian_override
+    )
+    _cms_granian_override = _granian_overrides.get("cms")
+    cms_granian_concurrency = (
+        CMS_GRANIAN_HOLDING_PINS
+        if _cms_granian_override is None
+        else _cms_granian_override
     )
 
     # Get various VPC / network configuration information
@@ -213,10 +283,17 @@ def create_k8s_resources(  # noqa: C901
     # Look up what what release to deploy for this stack
     release_info = OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
 
-    opensearch_stack = make_stack_reference(
-        projects.OPENSEARCH, f"{stack_info.env_prefix}.{stack_info.name}"
-    )
-    opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
+    # Environments that have retired their OpenSearch domain set
+    # edxapp:elasticsearch_enabled to false. The stack reference has to be
+    # skipped entirely, not just left unused, or the require_output below keeps
+    # the destroyed opensearch stack alive as a dependency.
+    if edxapp_config.get_bool("elasticsearch_enabled", default=True):
+        opensearch_stack = make_stack_reference(
+            projects.OPENSEARCH, f"{stack_info.env_prefix}.{stack_info.name}"
+        )
+        opensearch_hostname = opensearch_stack.require_output("cluster")["endpoint"]
+    else:
+        opensearch_hostname = None
 
     # Configure reusable global labels
     ou = BusinessUnit(edxapp_config.require("business_unit"))
@@ -359,6 +436,7 @@ def create_k8s_resources(  # noqa: C901
         edxapp_cache=edxapp_cache,
         notes_stack=notes_stack,
         opensearch_hostname=opensearch_hostname,
+        azure_openai_stack=azure_openai_stack,
     )
 
     openedx_data_pvc = kubernetes.core.v1.PersistentVolumeClaim(
@@ -400,9 +478,34 @@ def create_k8s_resources(  # noqa: C901
         command=["/bin/sh", "-c", "mkdir -p /openedx/data/export_course_repos"],
     )
 
+    # Azure OpenAI workload identity federation, mitxonline only. Every LMS and CMS
+    # workload including the CronJobs runs under vault_k8s_resources.service_account_name
+    # (see edxapp_service_account_name above), which is the single subject the federated
+    # credential in infrastructure/azure/openai trusts.
+    #
+    # AZURE_CLIENT_ID and AZURE_TENANT_ID also appear as Django settings in the
+    # 18-azure-openai config source; the copies here are what DefaultAzureCredential
+    # itself reads out of the process environment, with no application code involved.
+    azure_identity_volumes = (
+        [azure_identity_token_volume()] if azure_openai_stack else []
+    )
+    azure_identity_volume_mounts = (
+        [azure_identity_token_mount()] if azure_openai_stack else []
+    )
+    azure_identity_config: dict[str, Any] = (
+        azure_identity_env(azure_openai_stack, "mitxonline")
+        if azure_openai_stack
+        else {}
+    )
+    azure_identity_env_vars = [
+        kubernetes.core.v1.EnvVarArgs(name=name, value=value)
+        for name, value in azure_identity_config.items()
+    ]
+
     # Common volume mounts for main application containers (both webapp and celery).
     # These are injected by the component into all containers via extra_volume_mounts.
     common_extra_volume_mounts = [
+        *azure_identity_volume_mounts,
         kubernetes.core.v1.VolumeMountArgs(
             name="edxapp-config",
             mount_path="/openedx/config",
@@ -682,15 +785,32 @@ def create_k8s_resources(  # noqa: C901
         lms_edxapp_secret_names.append(secrets.webhook_tokens_secret_name)
     if secrets.typesense:
         lms_edxapp_secret_names.append(secrets.typesense_secret_name)
-    lms_edxapp_configmap_names = [
-        configmaps.general_config_name,
-        configmaps.interpolated_config_name,
-        configmaps.lms_general_config_name,
-        configmaps.lms_interpolated_config_name,
+    if configmaps.azure_openai:
+        lms_edxapp_config_sources[configmaps.azure_openai_config_name] = (
+            configmaps.azure_openai
+        )
+    lms_edxapp_config_maps: dict[str, kubernetes.core.v1.ConfigMap | Output[Any]] = {
+        configmaps.general_config_name: configmaps.general,
+        configmaps.interpolated_config_name: configmaps.interpolated,
+        configmaps.lms_general_config_name: configmaps.lms_general,
+        configmaps.lms_interpolated_config_name: configmaps.lms_interpolated,
         # Volume only -- deliberately absent from lms_edxapp_config_sources, which the
         # init container cats into lms.env.yml. This is a Python module, not config.
-        configmaps.settings_override_config_name,
-    ]
+        configmaps.settings_override_config_name: configmaps.settings_override,
+    }
+    if configmaps.azure_openai:
+        lms_edxapp_config_maps[configmaps.azure_openai_config_name] = (
+            configmaps.azure_openai
+        )
+    lms_edxapp_configmap_names = list(lms_edxapp_config_maps)
+    lms_config_hash = _pod_config_hash(
+        {
+            **lms_edxapp_config_maps,
+            configmaps.ssh_known_hosts_config_name: configmaps.ssh_known_hosts,
+            f"{env_name}-edxapp-vector-config": vector_configmap,
+        }
+    )
+    lms_config_hash_annotations = {"ol.mit.edu/config-hash": lms_config_hash}
 
     lms_edxapp_volumes = [
         kubernetes.core.v1.VolumeArgs(
@@ -755,6 +875,7 @@ def create_k8s_resources(  # noqa: C901
             ),
         ]
     )
+    lms_edxapp_volumes.extend(azure_identity_volumes)
 
     # Mounts injected into init containers only: the config source paths that
     # the config-aggregator uses to concatenate config YAMLs.
@@ -788,6 +909,7 @@ def create_k8s_resources(  # noqa: C901
                 "DJANGO_SETTINGS_MODULE": "lms.envs.mitol.production",
                 "OTEL_SERVICE_NAME": f"{env_name}-edxapp-lms",
                 **_OTEL_SDK_ENV,
+                **azure_identity_config,
             },
             application_lb_service_name=lms_webapp_deployment_name,
             application_lb_service_port_name="http",
@@ -893,6 +1015,7 @@ def create_k8s_resources(  # noqa: C901
             extra_volumes=lms_edxapp_volumes,
             extra_volume_mounts=common_extra_volume_mounts,
             extra_init_volume_mounts=lms_edxapp_init_volume_mounts,
+            config_hash_inputs={"edxapp-config": lms_config_hash},
             extra_init_containers=[
                 export_course_repos_init_container,
                 lms_config_aggregator_init_container,
@@ -1024,14 +1147,31 @@ def create_k8s_resources(  # noqa: C901
         cms_edxapp_secret_names.append(secrets.meilisearch_secret_name)
     if secrets.typesense:
         cms_edxapp_secret_names.append(secrets.typesense_secret_name)
-    cms_edxapp_configmap_names = [
-        configmaps.general_config_name,
-        configmaps.interpolated_config_name,
-        configmaps.cms_general_config_name,
-        configmaps.cms_interpolated_config_name,
-        # Volume only -- see the note on lms_edxapp_configmap_names.
-        configmaps.settings_override_config_name,
-    ]
+    if configmaps.azure_openai:
+        cms_edxapp_config_sources[configmaps.azure_openai_config_name] = (
+            configmaps.azure_openai
+        )
+    cms_edxapp_config_maps: dict[str, kubernetes.core.v1.ConfigMap | Output[Any]] = {
+        configmaps.general_config_name: configmaps.general,
+        configmaps.interpolated_config_name: configmaps.interpolated,
+        configmaps.cms_general_config_name: configmaps.cms_general,
+        configmaps.cms_interpolated_config_name: configmaps.cms_interpolated,
+        # Volume only -- see the note on lms_edxapp_config_maps.
+        configmaps.settings_override_config_name: configmaps.settings_override,
+    }
+    if configmaps.azure_openai:
+        cms_edxapp_config_maps[configmaps.azure_openai_config_name] = (
+            configmaps.azure_openai
+        )
+    cms_edxapp_configmap_names = list(cms_edxapp_config_maps)
+    cms_config_hash = _pod_config_hash(
+        {
+            **cms_edxapp_config_maps,
+            configmaps.ssh_known_hosts_config_name: configmaps.ssh_known_hosts,
+            f"{env_name}-edxapp-vector-config": vector_configmap,
+        }
+    )
+    cms_config_hash_annotations = {"ol.mit.edu/config-hash": cms_config_hash}
 
     cms_edxapp_volumes = [
         kubernetes.core.v1.VolumeArgs(
@@ -1096,6 +1236,7 @@ def create_k8s_resources(  # noqa: C901
             ),
         ]
     )
+    cms_edxapp_volumes.extend(azure_identity_volumes)
 
     cms_edxapp_init_volume_mounts = [
         kubernetes.core.v1.VolumeMountArgs(
@@ -1125,6 +1266,7 @@ def create_k8s_resources(  # noqa: C901
                 "DJANGO_SETTINGS_MODULE": "cms.envs.mitol.production",
                 "OTEL_SERVICE_NAME": f"{env_name}-edxapp-cms",
                 **_OTEL_SDK_ENV,
+                **azure_identity_config,
             },
             application_lb_service_name=cms_webapp_deployment_name,
             application_lb_service_port_name="http",
@@ -1153,30 +1295,15 @@ def create_k8s_resources(  # noqa: C901
                 application_module="cms.wsgi:application",
                 port=8000,
                 no_ws=True,
-                # Thread pins restored after the 2026-08-26 mitxonline production
-                # rollout, when the component defaults (1 worker, 8 blocking threads,
-                # backpressure 16) left every CMS pod saturated at 16 active
-                # connections with HTTP readiness at 1/3 and APISIX p95/p99 latency at
-                # 60s while Django spans stayed around 0.2-1.1s.
-                #
-                # That rollback conflated two limits, and only one of them was the
-                # cause. Saturating at exactly 2 * blocking_threads is the connection
-                # ceiling, not the thread pool -- backpressure caps connections, and
-                # idle APISIX keepalives spend it doing no work. So backpressure is
-                # unpinned here and takes DEFAULT_WSGI_BACKPRESSURE.
-                #
-                # The thread pins stay, because unlike every other app CMS does have
-                # real thread demand: measured over 7 days its concurrently-busy
-                # blocking threads reach 21.6 per pod (p99 17.2), and
-                # granian_blocking_queue reaches 32 deep on individual workers. 8
-                # threads would queue on every busy pod. Retuning these is a separate
-                # exercise from the connection fix and needs its own rollout window --
-                # see tk-mitxonline-cms-needs-a-saturation-aware-scaling and
-                # docs/plans/granian-configuration-overhaul.md stage 3.
-                workers=2,
-                runtime_mode="mt",
-                runtime_threads=2,
-                blocking_threads=32,
+                # Concurrency is per-install; see cms_granian_concurrency above.
+                # The holding pins it defaults to are mitxonline's: that install has
+                # real thread demand (39.5 concurrently-busy blocking threads on its
+                # worst pod, granian_blocking_queue 24 deep, 9d to 2026-09-04) and
+                # retuning it needs its own rollout window -- see
+                # tk-mitxonline-cms-needs-a-saturation-aware-scaling. mitx and
+                # mitx-staging opt out, having run the component defaults since
+                # 2026-08-24 with zero restarts and zero RSS respawns.
+                **cms_granian_concurrency,
                 respawn_failed_workers=True,
                 backlog=128,
                 static_path_mounts=["/openedx/staticfiles"],
@@ -1251,6 +1378,7 @@ def create_k8s_resources(  # noqa: C901
             extra_volumes=cms_edxapp_volumes,
             extra_volume_mounts=common_extra_volume_mounts,
             extra_init_volume_mounts=cms_edxapp_init_volume_mounts,
+            config_hash_inputs={"edxapp-config": cms_config_hash},
             extra_init_containers=[
                 export_course_repos_init_container,
                 cms_config_aggregator_init_container,
@@ -1325,7 +1453,10 @@ def create_k8s_resources(  # noqa: C901
                 match_labels=lms_celery_selector_labels
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_celery_labels),
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=lms_celery_labels,
+                    annotations=lms_config_hash_annotations,
+                ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     termination_grace_period_seconds=DEFAULT_CELERY_TERMINATION_GRACE_PERIOD_SECONDS,
                     affinity=kubernetes.core.v1.AffinityArgs(
@@ -1419,6 +1550,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
@@ -1512,6 +1644,7 @@ def create_k8s_resources(  # noqa: C901
                         # node underneath a running report.
                         "karpenter.sh/do-not-disrupt": "true",
                         "cluster-autoscaler.kubernetes.io/safe-to-evict": "false",
+                        **lms_config_hash_annotations,
                     },
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
@@ -1605,6 +1738,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
@@ -1676,7 +1810,10 @@ def create_k8s_resources(  # noqa: C901
                 match_labels=lms_beat_selector_labels
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=lms_beat_labels),
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=lms_beat_labels,
+                    annotations=lms_config_hash_annotations,
+                ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     service_account_name=vault_k8s_resources.service_account_name,
                     security_context=pod_security_context,
@@ -1742,6 +1879,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={"cpu": "100m", "memory": "512Mi"},
@@ -1783,7 +1921,8 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_process_scheduled_emails_labels
+                    labels=lms_process_scheduled_emails_labels,
+                    annotations=lms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     affinity=kubernetes.core.v1.AffinityArgs(
@@ -1860,6 +1999,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             volume_mounts=celery_volume_mounts,
                         ),
@@ -1894,7 +2034,10 @@ def create_k8s_resources(  # noqa: C901
                 match_labels=cms_celery_selector_labels
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=cms_celery_labels),
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels=cms_celery_labels,
+                    annotations=cms_config_hash_annotations,
+                ),
                 spec=kubernetes.core.v1.PodSpecArgs(
                     termination_grace_period_seconds=DEFAULT_CELERY_TERMINATION_GRACE_PERIOD_SECONDS,
                     affinity=kubernetes.core.v1.AffinityArgs(
@@ -1984,6 +2127,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={

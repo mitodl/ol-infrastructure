@@ -7,7 +7,14 @@ from pulumi_eks import Cluster
 
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    AWSBase,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
+from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
 def setup_external_dns(
@@ -22,6 +29,7 @@ def setup_external_dns(
     operations_tolerations: list[dict[str, str]],
     versions: dict[str, str],
     eks_config: Config,
+    stack_info: StackInfo,
 ):
     """
     Configure and install external-dns.
@@ -37,7 +45,17 @@ def setup_external_dns(
     :param operations_tolerations: A list of tolerations for scheduling on operations nodes.
     :param versions: A dictionary of component versions.
     :param eks_config: The EKS configuration object.
+    :param stack_info: Information about the current Pulumi stack.
     """
+    external_dns_labels = cluster_addon_labels(
+        base_labels=k8s_global_labels,
+        stack_info=stack_info,
+        service=Services.external_dns,
+        component=Component.controller,
+        # Records already published keep resolving while it is down; only
+        # new or changed hostnames stall.
+        alert_tier=AlertTier.notify,
+    )
     # Ref: https://github.com/kubernetes-sigs/external-dns
     # Ref: https://github.com/kubernetes-sigs/external-dns/blob/master/docs/tutorials/aws.md
     # Ref: https://github.com/kubernetes-sigs/external-dns/blob/master/docs/sources/traefik-proxy.md
@@ -120,8 +138,8 @@ def setup_external_dns(
                 "image": {
                     "pullPolicy": "Always",
                 },
-                "commonLabels": k8s_global_labels,
-                "podLabels": k8s_global_labels,
+                "commonLabels": external_dns_labels,
+                "podLabels": external_dns_labels,
                 "tolerations": operations_tolerations,
                 "serviceAccount": {
                     "create": True,

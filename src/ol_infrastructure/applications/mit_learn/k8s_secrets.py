@@ -20,6 +20,7 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SResources,
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -86,6 +87,7 @@ def _create_dynamic_secret(
     templates: dict[str, str | Output[str]],
     vaultauth: str,
     opts: ResourceOptions | None = None,
+    restart_targets: list[OLVaultRestartTarget] | None = None,
 ) -> tuple[str, OLVaultK8SSecret]:
     """
     Create an OLVaultK8SSecret resource for a dynamic Vault secret.
@@ -100,6 +102,9 @@ def _create_dynamic_secret(
         templates: Dictionary defining how Vault data maps to Kubernetes secret keys.
         vaultauth: Name of the Vault Kubernetes auth backend role.
         opts: Optional Pulumi resource options.
+        restart_targets: Deployments to rolling-restart when this secret's
+            contents change. Required for anything consumed via envFrom, whose
+            values are fixed at pod start.
 
     Returns:
         A tuple containing the generated Kubernetes secret name and the resource object.
@@ -119,6 +124,7 @@ def _create_dynamic_secret(
             exclude_raw=True,
             templates=templates,
             vaultauth=vaultauth,
+            restart_targets=restart_targets,
         ),
         opts=opts,
     )
@@ -134,6 +140,8 @@ def create_mitlearn_k8s_secrets(
     db_config: OLVaultDatabaseBackend,
     redis_password: str,
     redis_cache: OLAmazonCache,
+    starrocks_vault_mount_path: str | None = None,
+    starrocks_restart_targets: list[OLVaultRestartTarget] | None = None,
 ) -> tuple[list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
     """
     Create all Kubernetes secrets required by the mitlearn application.
@@ -148,6 +156,12 @@ def create_mitlearn_k8s_secrets(
         vault_k8s_resources: Vault Kubernetes auth backend resources.
         mitlearn_vault_mount: The Vault mount resource for mitlearn secrets.
         db_config: Configuration for the Vault dynamic PostgreSQL database backend.
+        starrocks_vault_mount_path: Vault mount serving dynamic StarRocks
+            credentials, or None to skip them. None for any stack that has no
+            STARROCKS_HOST configured -- see the caller.
+        starrocks_restart_targets: Deployments to roll when Vault rotates the
+            StarRocks lease. Without these the rotated credential lands in the
+            Secret while running pods keep authenticating as the revoked user.
 
     Returns:
         A list of the names of the created Kubernetes secrets.
@@ -355,7 +369,28 @@ def create_mitlearn_k8s_secrets(
     secret_names.append(database_url_secret_name)
     secret_resources.append(database_url_secret)
 
-    # 7. A normal, k8s secret for redis credentials
+    # 7. Dynamic StarRocks credentials for the warehouse-pull catalog ETL
+    # Read by learning_resources.lib.warehouse to query the integrations__learn__*
+    # views. Skipped where the mount does not exist (CI).
+    if starrocks_vault_mount_path:
+        starrocks_secret_name, starrocks_secret = _create_dynamic_secret(
+            stack_info=stack_info,
+            secret_base_name="starrocks-secrets",  # StarRocks credentials  # pragma: allowlist secret  # noqa: S106
+            namespace=mitlearn_namespace,
+            labels=k8s_global_labels,
+            mount=starrocks_vault_mount_path,
+            path="creds/readonly",
+            templates={
+                "STARROCKS_USER": '{{ get .Secrets "username" }}',
+                "STARROCKS_PASSWORD": '{{ get .Secrets "password" }}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+            restart_targets=starrocks_restart_targets,
+        )
+        secret_names.append(starrocks_secret_name)
+        secret_resources.append(starrocks_secret)
+
+    # 8. A normal, k8s secret for redis credentials
     # Vault is not needed for these.
     redis_creds_secret_name = "redis-creds"  # noqa: S105  # pragma: allowlist secret
     redis_creds = kubernetes.core.v1.Secret(

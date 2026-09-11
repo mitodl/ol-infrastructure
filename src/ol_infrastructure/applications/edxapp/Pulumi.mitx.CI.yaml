@@ -66,6 +66,7 @@ config:
     secure: v1:ovK3uwt1RjhV81YB:Uw63YPpyTVNXV4jX9LnlMf/TqtnNjk+Ro0rynUf+ulEaZzot+bOCAqMlDyn5Xu7/nUx3iGwJEHVTrOnrMNlXiHCqOiYFpfFv8NIqc/x6+Q8+eJFGjcLxhqYidyQkUAZIfz9mRVCVgEjC423yfAMi+tMee05xKI6ylAy4aO7AjjfE0s8RMt1/toGhW6DF1MIDZw==
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_courseware_index: "true"
+  edxapp:elasticsearch_enabled: "false"
   edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     admin_console: admin-console
@@ -100,6 +101,10 @@ config:
   # measured p99 concurrency is 0.27 busy threads against this ceiling of 8, where
   # mitxonline LMS needs 17.7. See docs/plans/granian-configuration-overhaul.md.
   edxapp:k8s_granian:
+    cms:
+      workers: 1
+      runtime_threads: 1
+      blocking_threads: 8
     lms:
       workers: 1
       runtime_threads: 1
@@ -150,7 +155,7 @@ config:
   typesense:deploy: "true"
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
-  typesense:forum_search_enabled: "false"
+  typesense:forum_search_enabled: "true"
   edxapp:site_project:
     deployment: mitx
     mfe_apps:

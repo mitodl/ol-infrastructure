@@ -105,6 +105,10 @@ config:
   # measured p99 concurrency is 0.27 busy threads against this ceiling of 8, where
   # mitxonline LMS needs 17.7. See docs/plans/granian-configuration-overhaul.md.
   edxapp:k8s_granian:
+    cms:
+      workers: 1
+      runtime_threads: 1
+      blocking_threads: 8
     lms:
       workers: 1
       runtime_threads: 1

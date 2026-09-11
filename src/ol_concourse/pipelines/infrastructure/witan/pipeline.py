@@ -118,7 +118,7 @@ def build_witan_pipeline() -> PipelineFragment:
                 },
             ),
             ensure_ecr_task(IMAGE_NAME),
-            configure_ecr_repository_task(IMAGE_NAME),
+            configure_ecr_repository_task(IMAGE_NAME, keep_last_n_images=10),
             PutStep(
                 put=image_resource.name,
                 params={

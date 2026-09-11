@@ -495,6 +495,7 @@ def create_serving_tier(  # noqa: PLR0913
     council_graph_id: str | Output[str],
     oidc_issuer: str,
     oidc_audience: str,
+    oidc_resource_url: str,
     actor_tokens_secret_name: str,
     actor_tokens_secret: Resource,
     witan_ci_token_secret_name: str,
@@ -686,6 +687,18 @@ def create_serving_tier(  # noqa: PLR0913
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="WITAN_OIDC_AUDIENCE", value=oidc_audience
+                                ),
+                                # witan's own public base URL (no path), so the
+                                # RemoteAuthProvider it builds from these can
+                                # advertise RFC 9728 protected-resource
+                                # metadata and a WWW-Authenticate header
+                                # pointing an MCP client at oidc_issuer's real
+                                # authorization endpoint, instead of the
+                                # client guessing one on witan's own origin
+                                # (agent-kit ADR-0004, 2026-09-10 addendum).
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="WITAN_OIDC_RESOURCE_URL",
+                                    value=oidc_resource_url,
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="WITAN_ACTOR_TOKENS_FILE",

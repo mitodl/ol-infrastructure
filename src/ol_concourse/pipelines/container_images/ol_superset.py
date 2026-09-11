@@ -61,7 +61,9 @@ docker_pipeline = Pipeline(
                     },
                 ),
                 ensure_ecr_task("mitodl/ol-superset"),
-                configure_ecr_repository_task("mitodl/ol-superset"),
+                configure_ecr_repository_task(
+                    "mitodl/ol-superset", keep_last_n_images=10
+                ),
                 PutStep(
                     put=ol_superset_image.name,
                     params={"image": "image/image.tar"},

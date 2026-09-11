@@ -539,6 +539,61 @@ full `K8sAppLabels` and then never passes it to a resource; `pulumi preview` on 
 stack reports zero changes. The §3.4 gate is written against rendered resources for
 exactly this reason.
 
+#### 3.3.1 [2026-08-28] `operations-production` is Helm charts, and the values key is per chart
+
+Every workload in P2.C's step 1 is installed from a third-party chart, so none of them
+constructs a label model and the §3.4 gate cannot reach them. What a chart accepts is
+the whole problem, and it varies: the key has to land on the **pod template** (that is
+what `kube_pod_labels` reads) and must not land in `spec.selector`, which is immutable
+on a Deployment — a label that reaches the selector forces a delete-and-recreate of the
+addon rather than a rolling restart.
+
+Verified by rendering each chart at its pinned version with a sentinel label under each
+candidate key, then by `pulumi preview` against `operations.Production` (10 updates,
+0 replacements; the two non-Helm diffs are pre-existing AMI drift):
+
+| Chart (pinned version) | Key that reaches the pod | Also on the workload object |
+|---|---|---|
+| `cert-manager` v1.21.1 | `global.commonLabels` | same key |
+| `external-dns` 1.21.1 | `podLabels` | `commonLabels` |
+| `traefik` 41.4.0 | `commonLabels` | same key |
+| `vault-secrets-operator` 1.5.1 | `controller.extraLabels` | — |
+| `vertical-pod-autoscaler` 0.11.0 | `<component>.podLabels` | `commonLabels` |
+| `aws-load-balancer-controller` 3.5.0 | `podLabels` | `additionalLabels` |
+| `metrics-server` 3.13.x | `podLabels` | `commonLabels` |
+| `aws-node-termination-handler` 0.27.2 | `podLabels` | `customLabels` |
+| `karpenter` 1.14.1 | `podLabels` | `additionalLabels` |
+| `keda` 2.20.2 | `podLabels.<component>` | `additionalLabels` (one set for all three) |
+| `vantage-kubernetes-agent` 1.9.5 | `podLabels` | `appLabels` |
+| `dcgm-exporter` 4.8.3 | `podLabels` | — |
+
+**Three findings from doing it.**
+
+1. **The vault-secrets-operator release was labeling nothing.** It passed the shared
+   label dict to a top-level `extraLabels`, and the chart has no such key — only
+   `controller.extraLabels`. Helm does not error on an unrecognized value, so the
+   labels were silently dropped for as long as that line has existed. Any chart wired
+   by analogy rather than against its `values.yaml` can be wrong the same way, and
+   nothing in the pipeline says so.
+2. **Two addons cannot be labeled through their charts at all.** `apisix` 2.16.1
+   exposes only `service.labelsOverride`, which *replaces* `apisix.selectorLabels` —
+   used for the selector and the pod template both, so any label added there rewrites
+   the immutable selector. `nvidia-device-plugin` 0.20.0 has only
+   `selectorLabelsOverride`, the same trap. APISIX is the single widest-blast-radius
+   workload in the estate, so it needs the `DeploymentPatch` route (the pattern
+   already in `core_dns.py`) rather than a chart value.
+3. **EKS-managed addons are not Helm releases.** `aws-node`, `kube-proxy`, `coredns`,
+   the EBS/EFS CSI drivers and the GuardDuty agent are installed by the EKS addon
+   controller. They can only be labeled by patching, and a patch may be reverted on
+   addon upgrade — untested.
+
+Coverage that leaves `operations-production` at: 18 of 66 workloads carrying all three
+of `service`, `component` and `alert_tier` (`alert_tier` was at zero), against 7
+carrying `service` alone before. The remaining 48 are APISIX (2), the Grafana
+`k8s-monitoring` subcharts (9), EKS-managed addons (9), NVIDIA (6), ToolHive (13),
+Keycloak (2) and the 7 already-`service`-labeled application workloads, which need
+`component` and `alert_tier` added at their own call sites.
+
 Also backfill CI/QA clusters, which the analysis explicitly did not measure. Coverage
 there does not affect paging (CI/QA alerts go Slack-only per §8.1) but an unlabeled QA
 workload routes as untier-ed, so the QA stack stops being a rehearsal for the

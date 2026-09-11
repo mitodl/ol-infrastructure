@@ -8,6 +8,7 @@ from pathlib import Path
 from string import Template
 
 import pulumi_fastly as fastly
+import pulumi_kubernetes as kubernetes
 import pulumi_qdrant_cloud as qdrant_cloud
 import pulumi_vault as vault
 from pulumi import (
@@ -55,6 +56,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    oidc_gateway_pre_function_plugin,
     stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
@@ -67,12 +69,14 @@ from ol_infrastructure.components.services.k8s import (
     OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
+    application_deployment_names,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SResources,
     OLVaultK8SResourcesConfig,
     OLVaultPostgresDatabaseConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -82,6 +86,12 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.azure_workload_identity import (
+    azure_identity_env,
+    azure_identity_token_mount,
+    azure_identity_token_volume,
+    azure_openai_env,
+)
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -463,6 +473,21 @@ vault_k8s_resources = OLVaultK8SResources(
 )
 
 ### End vault resources
+
+# Dedicated ServiceAccount for the mitlearn workloads. Until this existed they ran
+# under the namespace's `default` ServiceAccount, which is not something an Azure
+# federated identity credential can be scoped to usefully: its subject is an exact
+# string with no wildcards, so trusting `default` would trust anything that ever runs
+# in this namespace. Named to match the existing `mitlearn-app` security group.
+mitlearn_service_account = kubernetes.core.v1.ServiceAccount(
+    f"mitlearn-service-account-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="mitlearn-app",
+        namespace=learn_namespace,
+        labels=k8s_app_labels,
+    ),
+)
+
 # Create a security group for the application pods
 mitlearn_app_security_group = ec2.SecurityGroup(
     f"mitlearn-app-sg-{stack_info.env_suffix}",
@@ -954,6 +979,16 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             statement="var.is_ocw_request",
             type="REQUEST",
         ),
+        # Gates the Surrogate-Key header below. Only the OCW content bucket sets
+        # x-amz-meta-site-id, so this is false for NextJS_Frontend responses --
+        # which matters because an unconditional `set` would clobber any
+        # Surrogate-Key the Next.js origin emits (the k8s_apps pipeline purges
+        # mit-learn-nextjs with fastly_purge_scope="html-pages").
+        fastly.ServiceVclConditionArgs(
+            name="S3 response has a site id",
+            statement="beresp.http.x-amz-meta-site-id",
+            type="CACHE",
+        ),
     ],
     dictionaries=[
         fastly.ServiceVclDictionaryArgs(name="path_redirects"),  # exact path redirects
@@ -972,6 +1007,20 @@ mitlearn_fastly_service = fastly.ServiceVcl(
         ),
     ],
     headers=[
+        # OCW course objects carry their publishing site as S3 user metadata.
+        # Promoting it to Surrogate-Key at fetch time tags the cached object so a
+        # single course can be purged (POST /service/<id>/purge/<site-id>) without
+        # flushing the rest of the cache. ocw_site does the same thing against the
+        # same bucket, so the two services share one purge key.
+        fastly.ServiceVclHeaderArgs(
+            action="set",
+            cache_condition="S3 response has a site id",
+            destination="http.Surrogate-Key",
+            name="S3 Cache Surrogate Keys",
+            priority=10,
+            source="beresp.http.x-amz-meta-site-id",
+            type="cache",
+        ),
         fastly.ServiceVclHeaderArgs(
             action="set",
             destination="http.Strict-Transport-Security",
@@ -1371,6 +1420,32 @@ interpolated_vars = {
 env_vars.update(**interpolated_vars)
 env_vars.update(**mitlearn_config.get_object("vars"))
 
+# Azure OpenAI, additive alongside the existing OPENAI_API_KEY wiring, which is not
+# touched. Nothing here is secret: the managed identity is reached by exchanging the
+# projected ServiceAccount token mounted below, so the client id is an identifier
+# rather than a credential and there is nothing to rotate.
+#
+# A StackReference to a stack that does not exist fails the whole preview, so this is
+# a config switch that gets flipped per environment once infrastructure/azure/openai
+# has been deployed there.
+if mitlearn_config.get_bool("enable_azure_openai"):
+    azure_openai_stack = make_stack_reference(projects.AZURE_OPENAI, stack_info.name)
+    env_vars.update(azure_identity_env(azure_openai_stack, "mitlearn"))
+    env_vars.update(
+        azure_openai_env(
+            azure_openai_stack,
+            "mitlearn",
+            api_version=mitlearn_config.get("azure_openai_api_version") or "2024-10-21",
+            default_deployment=mitlearn_config.get("azure_openai_default_deployment")
+            or "gpt-4o",
+        )
+    )
+    azure_identity_volumes = [azure_identity_token_volume()]
+    azure_identity_volume_mounts = [azure_identity_token_mount()]
+else:
+    azure_identity_volumes = []
+    azure_identity_volume_mounts = []
+
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
 # carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_app_labels)
@@ -1450,6 +1525,16 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
             stale_session_cookie_cleanup_plugin(
                 cookie_domains=[mitlearn_api_domain.removeprefix("api")],
             ),
+            # 327 callbacks a day on api.learn.mit.edu come back from Keycloak
+            # with error=temporarily_unavailable instead of a code, and the
+            # openid-connect plugin serves each one a 500.  Both route groups
+            # on this host need it, and the plugin derives its redirect target
+            # from the request URI, so the /login and /learn/login prefixes are
+            # handled from this one attachment.  The same attachment also
+            # canonicalises the origin: `curl http://api.learn.mit.edu/login`
+            # currently sends Keycloak an http:// redirect_uri, and answers with
+            # an OIDC session cookie over cleartext.
+            oidc_gateway_pre_function_plugin(),
         ],
     ),
 )
@@ -1527,18 +1612,6 @@ redis_cache = OLAmazonCache(
             )
         ]
     ),
-)
-
-# Create all Kubernetes secrets needed by the application
-secret_names, secret_resources = create_mitlearn_k8s_secrets(
-    stack_info=stack_info,
-    mitlearn_namespace=learn_namespace,
-    k8s_global_labels=k8s_app_labels,
-    vault_k8s_resources=vault_k8s_resources,
-    mitlearn_vault_mount=mitlearn_vault_mount,
-    db_config=mitlearn_vault_backend,  # Use the original DB config object
-    redis_password=redis_config.require("password"),
-    redis_cache=redis_cache,
 )
 
 # KEDA webapp autoscaling: scale on APISIX request-rate + p95 latency
@@ -1625,6 +1698,87 @@ celery_beat_resource_limits = _resource_config(
     "celery_beat_resource_limits", {"memory": "1536Mi"}
 )
 
+# Celery topology is declared here rather than inline in the OLApplicationK8s
+# config below, because the secrets need the resulting Deployment names before
+# the component exists -- see the restart targets below.
+mitlearn_celery_worker_configs = [
+    OLApplicationK8sCeleryWorkerConfig(
+        queue_name="default",
+        max_replicas=20,
+        redis_host=redis_cache.address,
+        redis_password=redis_config.require("password"),
+        resource_requests=celery_default_resource_requests,
+        resource_limits=celery_default_resource_limits,
+    ),
+    OLApplicationK8sCeleryWorkerConfig(
+        queue_name="edx_content",
+        redis_host=redis_cache.address,
+        redis_password=redis_config.require("password"),
+        resource_requests=celery_edx_content_resource_requests,
+        resource_limits=celery_edx_content_resource_limits,
+    ),
+    OLApplicationK8sCeleryWorkerConfig(
+        queue_name="embeddings",
+        max_replicas=30,
+        redis_host=redis_cache.address,
+        redis_password=redis_config.require("password"),
+        resource_requests=celery_embeddings_resource_requests,
+        resource_limits=celery_embeddings_resource_limits,
+    ),
+]
+mitlearn_celery_beat_config = OLApplicationK8sCeleryBeatConfig(
+    resource_requests=celery_beat_resource_requests,
+    resource_limits=celery_beat_resource_limits,
+)
+
+# Dynamic StarRocks credentials for the warehouse-pull catalog ETL, minted per
+# environment from Vault's `database-starrocks` mount. The mount name is not
+# environment-qualified because QA and Production each run their own separate
+# Vault server, and that is what scopes the environment.
+#
+# STARROCKS_HOST is the single switch for the whole feature. Setting it in a
+# stack's `mitlearn:vars` is what makes mit-learn register the warehouse-pull
+# beat entries (it requires STARROCKS_HOST and STARROCKS_USER together), so
+# minting credentials for a stack that has no host would rotate a StarRocks
+# user on every refresh for nothing. Only CI lacks a StarRocks cluster
+# entirely; QA has one but is held back for the reason recorded in
+# Pulumi.QA.yaml.
+starrocks_vault_mount_path = (
+    "database-starrocks" if env_vars.get("STARROCKS_HOST") else None
+)
+
+# The StarRocks credential reaches the app through env_from_secret_names, i.e.
+# envFrom, so its values become pod environment variables fixed at pod start.
+# Re-rendering the Kubernetes Secret does not touch a running pod. Vault
+# rotates this lease on its own (the StarRocks role's max TTL is six months),
+# so without these restart targets the rotation lands in the Secret, Vault
+# revokes the old StarRocks user with DROP USER, and beat keeps authenticating
+# as a user that no longer exists -- the sync stops until something unrelated
+# rolls the pods. That failure is silent in exactly the way the missing
+# configuration this PR fixes was.
+starrocks_secret_restart_targets = [
+    OLVaultRestartTarget(kind="Deployment", name=deployment_name)
+    for deployment_name in application_deployment_names(
+        application_name="mitlearn",
+        celery_worker_configs=mitlearn_celery_worker_configs,
+        celery_beat_config=mitlearn_celery_beat_config,
+    )
+]
+
+# Create all Kubernetes secrets needed by the application
+secret_names, secret_resources = create_mitlearn_k8s_secrets(
+    stack_info=stack_info,
+    mitlearn_namespace=learn_namespace,
+    k8s_global_labels=k8s_app_labels,
+    vault_k8s_resources=vault_k8s_resources,
+    mitlearn_vault_mount=mitlearn_vault_mount,
+    db_config=mitlearn_vault_backend,  # Use the original DB config object
+    redis_password=redis_config.require("password"),
+    redis_cache=redis_cache,
+    starrocks_vault_mount_path=starrocks_vault_mount_path,
+    starrocks_restart_targets=starrocks_secret_restart_targets,
+)
+
 # Configure and deploy the mitlearn application using OLApplicationK8s
 mitlearn_k8s_app = OLApplicationK8s(
     ol_app_k8s_config=OLApplicationK8sConfig(
@@ -1641,6 +1795,9 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_max_replicas=mitlearn_config.get_int("max_replicas") or 10,
         application_security_group_id=mitlearn_app_security_group.id,
         application_security_group_name=mitlearn_app_security_group.name,
+        application_service_account_name=mitlearn_service_account.metadata.name,
+        extra_volumes=azure_identity_volumes,
+        extra_volume_mounts=azure_identity_volume_mounts,
         application_image_repository="mitodl/mit-learn-app",
         **docker_image_config_kwargs("MIT_LEARN"),
         application_cmd_array=["uwsgi"],
@@ -1722,35 +1879,8 @@ mitlearn_k8s_app = OLApplicationK8s(
         init_migrations=False,
         init_collectstatic=True,  # Assuming Django app needs collectstatic
         pre_deploy_commands=[("migrate", ["scripts/heroku-release-phase.sh"])],
-        celery_worker_configs=[
-            OLApplicationK8sCeleryWorkerConfig(
-                queue_name="default",
-                max_replicas=20,
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
-                resource_requests=celery_default_resource_requests,
-                resource_limits=celery_default_resource_limits,
-            ),
-            OLApplicationK8sCeleryWorkerConfig(
-                queue_name="edx_content",
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
-                resource_requests=celery_edx_content_resource_requests,
-                resource_limits=celery_edx_content_resource_limits,
-            ),
-            OLApplicationK8sCeleryWorkerConfig(
-                queue_name="embeddings",
-                max_replicas=30,
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
-                resource_requests=celery_embeddings_resource_requests,
-                resource_limits=celery_embeddings_resource_limits,
-            ),
-        ],
-        celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-            resource_requests=celery_beat_resource_requests,
-            resource_limits=celery_beat_resource_limits,
-        ),
+        celery_worker_configs=mitlearn_celery_worker_configs,
+        celery_beat_config=mitlearn_celery_beat_config,
         resource_requests=webapp_resource_requests,
         resource_limits=webapp_resource_limits,
         # The component would default this floor to resource_requests["memory"],
@@ -1866,6 +1996,35 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             backend_service_name=mitlearn_k8s_app.application_lb_service_name,
             backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
         ),
+        # Credential metadata generation calls a frontier model once per Open
+        # Badges field (gpt-5 and Claude measure 25-46s each, generated
+        # concurrently), so it does not fit the 60s read timeout every route
+        # takes by default. Since the nginx sidecar was dropped and APISIX
+        # proxies to Granian directly this route's timeout is the only ceiling
+        # in front of the request -- see docs/plans/remove-nginx-sidecar.md.
+        #
+        # A route of its own rather than a raised timeout on "passauth": that
+        # one matches every path, so lifting its ceiling would let any slow
+        # request in the application hold a connection three times as long.
+        # Django bounds the model call itself at CREDENTIAL_METADATA_LLM_TIMEOUT
+        # (120s), below this, so a slow model is recorded as a failed
+        # generation rather than surfacing here as a gateway timeout.
+        OLApisixRouteConfig(
+            route_name="credential-metadata",
+            priority=10,
+            timeout_read="180s",
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/api/v0/credential_metadata/"],
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
@@ -1908,6 +2067,12 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="dnt-policy",
             priority=10,
+            # Referenced no plugin config, unlike every sibling here, so
+            # this path emitted no prometheus series and no OTLP span. `mocking`
+            # short-circuits before the upstream but `prometheus` runs in the log
+            # phase, so the shared config still records it -- and cors/gzip are
+            # no-ops on an empty 204.
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             hosts=[mitlearn_api_domain],
             paths=["/.well-known/dnt-policy.txt"],
             backend_service_name=mitlearn_k8s_app.application_lb_service_name,
@@ -1948,6 +2113,35 @@ learn_external_service_apisix_route = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/learn/*"],
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        # Credential metadata generation calls a frontier model once per Open
+        # Badges field (gpt-5 and Claude measure 25-46s each, generated
+        # concurrently), so it does not fit the 60s read timeout every route
+        # takes by default. Since the nginx sidecar was dropped and APISIX
+        # proxies to Granian directly this route's timeout is the only ceiling
+        # in front of the request -- see docs/plans/remove-nginx-sidecar.md.
+        #
+        # A route of its own rather than a raised timeout on "passauth": that
+        # one matches every path, so lifting its ceiling would let any slow
+        # request in the application hold a connection three times as long.
+        # Django bounds the model call itself at CREDENTIAL_METADATA_LLM_TIMEOUT
+        # (120s), below this, so a slow model is recorded as a failed
+        # generation rather than surfacing here as a gateway timeout.
+        OLApisixRouteConfig(
+            route_name="credential-metadata",
+            priority=10,
+            timeout_read="180s",
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/learn/api/v0/credential_metadata/"],
             backend_service_name=mitlearn_k8s_app.application_lb_service_name,
             backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
         ),

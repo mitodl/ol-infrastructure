@@ -24,6 +24,8 @@ from ol_infrastructure.components.applications.eks import (
 from ol_infrastructure.components.services.apisix import (
     OLApisixRoute,
     OLApisixRouteConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -459,6 +461,24 @@ issuer_coordinator_cert = OLCertManagerCert(
 # APISix Ingress Route
 ################################################
 
+# Shared plugin config.  The route below referenced none, so the issuer
+# coordinator emitted no prometheus series and no OTLP span -- and it is the one
+# service here where a per-route latency series is worth having, since a signing
+# request fans out to the signing service behind it.
+#
+# enable_cors=False: this is a machine-to-machine credential-issuance API called
+# server-side, not from a browser.
+issuer_coordinator_shared_plugins = OLApisixSharedPlugins(
+    f"issuer-coordinator-{stack_info.env_suffix}-ol-shared-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="issuer-coordinator",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=dcc_namespace,
+        k8s_labels=k8s_global_labels,
+        enable_cors=False,
+    ),
+)
+
 # Create APISix route with key-auth authentication
 issuer_coordinator_apisix_route = OLApisixRoute(
     f"issuer-coordinator-{stack_info.env_suffix}-apisix-route",
@@ -468,6 +488,7 @@ issuer_coordinator_apisix_route = OLApisixRoute(
         OLApisixRouteConfig(
             route_name="issuer-coordinator-protected",
             priority=10,
+            shared_plugin_config_name=issuer_coordinator_shared_plugins.resource_name,
             hosts=[issuer_coordinator_domain],
             paths=["/*"],
             backend_service_name=issuer_coordinator_service_name,
@@ -476,7 +497,11 @@ issuer_coordinator_apisix_route = OLApisixRoute(
         ),
     ],
     opts=ResourceOptions(
-        depends_on=[issuer_coordinator_service, issuer_coordinator_cert]
+        depends_on=[
+            issuer_coordinator_service,
+            issuer_coordinator_cert,
+            issuer_coordinator_shared_plugins,
+        ]
     ),
 )
 

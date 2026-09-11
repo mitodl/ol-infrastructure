@@ -483,6 +483,83 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         add_to_id_token=False,
         opts=resource_options,
     )
+
+    # The client web/desktop MCP apps (Claude Desktop, the ChatGPT/Codex
+    # desktop app, ...) authenticate as, so a human can add witan as a
+    # *remote* MCP connector from a GUI app that has no CLI and no device-code
+    # support. Deliberately scoped to that case only: a terminal tool (Codex
+    # CLI, Gemini CLI, `witan` itself) already has a working path through
+    # `witan-cli`'s device grant, which works over SSH with no browser of its
+    # own — nothing here duplicates that.
+    #
+    # What every app actually in scope has in common: each brokers its OAuth
+    # redirect through its OWN vendor backend (claude.ai, chatgpt.com), not a
+    # loopback listener on the user's machine. That is what makes a *fixed*,
+    # Pulumi-managed `valid_redirect_uris` entry per app workable at all —
+    # unlike a CLI's loopback callback, these values are stable and
+    # documented by the vendor rather than negotiated per-install.
+    #
+    # A single shared PUBLIC client, not one per app — same reasoning as
+    # `toolhive-swe-cli` above: no secret to distribute, so there is nothing
+    # gained by minting a separate client_id per vendor. What differs per app
+    # is only the redirect URI, so `valid_redirect_uris` is the one list that
+    # grows as more desktop clients are added; every entry below is
+    # documented in docs/witan-desktop-mcp-auth-runbook.md against the app it
+    # belongs to.
+    #
+    # NOT Dynamic Client Registration and NOT CIMD (Client ID Metadata
+    # Document) — same DCR reasoning as the TOOLHIVE block above applies
+    # here too. CIMD is additionally not viable yet regardless of that
+    # tradeoff: it needs RFC 8707 resource indicators to stamp `aud: witan`
+    # onto a token minted for a client Keycloak provisions on the fly, and
+    # that combination is tracked as unshipped, target milestone 26.8.0
+    # (keycloak/keycloak#51413) — not available as of KEYCLOAK_VERSION
+    # 26.7.2. Revisit once that lands; until then a static client is the
+    # only way to get `aud: witan` onto a desktop app's token at all.
+    ol_platform_engineering_witan_desktop_client = keycloak.openid.Client(
+        "ol-platform-engineering-witan-desktop-client",
+        name="ol-platform-engineering-witan-desktop-client",
+        realm_id="ol-platform-engineering",
+        client_id="witan-desktop",
+        enabled=True,
+        access_type="PUBLIC",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=False,
+        # Same PKCE reasoning as `toolhive-swe-cli` and
+        # `ol-platform-engineering-grafana-client`: a PUBLIC client has no
+        # other proof of possession, so it must be server-enforced.
+        pkce_code_challenge_method="S256",
+        valid_redirect_uris=[
+            # Claude Desktop / claude.ai custom connectors: the fixed
+            # callback documented at
+            # support.claude.com/en/articles/11175166, brokered through
+            # Anthropic's own backend.
+            "https://claude.ai/api/mcp/auth_callback",
+            # ChatGPT/Codex desktop app: connector setup happens against the
+            # ChatGPT web app first (the desktop app reuses that connection),
+            # so this is chatgpt.com's callback, not a loopback address —
+            # candidate redirect targets for MCP connector OAuth sourced from
+            # web search, NOT verified against an OpenAI spec or an
+            # end-to-end login; revisit if the callback fails at login time.
+            "https://chatgpt.com/oauth/callback",
+            "https://chatgpt.com/connector_platform_oauth_redirect",
+            "https://chat.openai.com/oauth/callback",
+        ],
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    keycloak.openid.AudienceProtocolMapper(
+        "ol-platform-engineering-witan-desktop-audience-mapper",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_witan_desktop_client.id,
+        name="witan-audience",
+        included_custom_audience="witan",
+        add_to_access_token=True,
+        add_to_id_token=False,
+        opts=resource_options,
+    )
     # WITAN [END] # noqa: ERA001
 
     # JUPYTERHUB [START] # noqa: ERA001

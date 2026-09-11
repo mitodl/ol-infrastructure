@@ -45,7 +45,7 @@ config:
     OCW_STUDIO_LIVE_URL: https://live-qa.ocw.mit.edu/
     OCW_STUDIO_LOG_LEVEL: INFO
     OCW_STUDIO_SUPPORT_EMAIL: 'ocw-studio-rc-support@mit.edu'
-    OPENTELEMETRY_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318/v1/traces"
+    OTEL_EXPORTER_OTLP_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318"
     OTEL_RESOURCE_ATTRIBUTES: "service.namespace=ocw-studio,service.instance.id=$(KUBERNETES_POD_NAME)"
     OTEL_SERVICE_NAME: "ocw-studio-webapp"
     OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"

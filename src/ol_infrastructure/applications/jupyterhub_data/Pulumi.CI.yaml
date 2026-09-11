@@ -6,6 +6,7 @@ config:
   jupyterhub_data:keycloak_base_url: https://sso-ci.ol.mit.edu
   jupyterhub_data:keycloak_realm: ol-data-platform
   jupyterhub_data:trino_host: mitol-ol-data-lake-production.trino.galaxy.starburst.io
+  jupyterhub_data:trino_catalog: ol_data_lake_production
   aws:region: us-east-1
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci

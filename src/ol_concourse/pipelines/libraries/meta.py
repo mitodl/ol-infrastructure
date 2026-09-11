@@ -17,6 +17,7 @@ from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 from ol_concourse.pipelines.libraries.configuration import PIPELINE_CONFIGS
+from ol_concourse.pipelines.versions_map import version_pin_paths
 
 # Resource for the ol-concourse code itself
 ol_concourse_repo = git_repo(
@@ -26,6 +27,9 @@ ol_concourse_repo = git_repo(
     paths=[
         "src/ol_concourse/pipelines/libraries/",
         "pyproject.toml",
+        # The generator tag is baked in when these jobs render the API-client
+        # pipelines, so a Renovate bump has to re-trigger them.
+        *version_pin_paths("OPENAPI_GENERATOR_VERSION"),
     ],
 )
 

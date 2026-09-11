@@ -6,7 +6,14 @@ from pulumi import Output, ResourceOptions, StackReference, export
 from bridge.lib.magic_numbers import DEFAULT_HTTPS_PORT, DEFAULT_KEDA_PORT
 from bridge.lib.versions import KEDA_CHART_VERSION
 from ol_infrastructure.lib.aws.eks_helper import default_psg_egress_args
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    AWSBase,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
+from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
 def setup_keda(
@@ -16,6 +23,7 @@ def setup_keda(
     aws_config: AWSBase,
     k8s_provider: kubernetes.Provider,
     k8s_global_labels: dict[str, str],
+    stack_info: StackInfo,
 ):
     """
     Set up KEDA (Kubernetes Event Driven Autoscaling) resources including security group,
@@ -28,7 +36,19 @@ def setup_keda(
         aws_config: The AWS configuration object containing tags.
         k8s_provider: The Pulumi Kubernetes provider instance.
         k8s_global_labels: A dictionary of global labels to apply to Kubernetes resources.
+        stack_info: Information about the current Pulumi stack.
     """
+
+    def keda_labels(component: Component | None = None) -> dict[str, str]:
+        return cluster_addon_labels(
+            base_labels=k8s_global_labels,
+            stack_info=stack_info,
+            service=Services.keda,
+            component=component,
+            # Autoscaling stops; replica counts hold where they are.
+            alert_tier=AlertTier.notify,
+        )
+
     keda_security_group = aws.ec2.SecurityGroup(
         f"{cluster_name}-keda-security-group",
         description="Security group for KEDA operator",
@@ -82,16 +102,22 @@ def setup_keda(
             cleanup_on_fail=True,
             skip_await=True,
             values={
+                # additionalLabels is the chart's only workload-object key,
+                # and one map covers all three Deployments -- so it carries the
+                # service and the tier, which they share, and no component,
+                # which they do not. Without it the Deployment-level rules
+                # (DeploymentReplicasMissing, DeploymentUnavailable) would join
+                # against nothing for KEDA.
+                "additionalLabels": keda_labels(),
+                # The chart keys podLabels by component, so each of the three
+                # pods can carry the role it actually plays.
                 "podLabels": {
-                    "keda": {
-                        "ol.mit.edu/pod-security-group": keda_security_group.id,
-                    },
-                    "metricsAdapter": {
-                        "ol.mit.edu/pod-security-group": keda_security_group.id,
-                    },
-                    "webhooks": {
-                        "ol.mit.edu/pod-security-group": keda_security_group.id,
-                    },
+                    "keda": keda_labels(Component.controller)
+                    | {"ol.mit.edu/pod-security-group": keda_security_group.id},
+                    "metricsAdapter": keda_labels(Component.api)
+                    | {"ol.mit.edu/pod-security-group": keda_security_group.id},
+                    "webhooks": keda_labels(Component.webhook)
+                    | {"ol.mit.edu/pod-security-group": keda_security_group.id},
                 },
                 "resources": {
                     # The operator's informer caches scale with total cluster

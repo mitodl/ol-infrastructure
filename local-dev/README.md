@@ -18,11 +18,12 @@ This README covers getting up and running, day-to-day usage, and troubleshooting
 5. [Directory Structure](#directory-structure)
 6. [Working with Apps](#working-with-apps)
 7. [Seeding Data](#seeding-data)
-8. [Configuration Reference](#configuration-reference)
-9. [Disk Management](#disk-management)
-10. [Teardown](#teardown)
-11. [Customization & Advanced Setup](#customization--advanced-setup)
-12. [Troubleshooting](#troubleshooting)
+8. [Backing Up and Restoring Postgres](#backing-up-and-restoring-postgres)
+9. [Configuration Reference](#configuration-reference)
+10. [Disk Management](#disk-management)
+11. [Teardown](#teardown)
+12. [Customization & Advanced Setup](#customization--advanced-setup)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -165,7 +166,9 @@ ol-infrastructure/
 │
 └── local-dev/
     ├── scripts/                 # setup.sh, start.sh, stop.sh, teardown.sh, seed.sh,
-    │                            # heal-exec.sh, prune-docker.sh (each described in its header)
+    │                            # heal-exec.sh, prune-docker.sh, kc-theme-image.sh
+    │                            # (each described in its header)
+    ├── keycloak/                # Dockerfile for testing an unreleased ol-keycloakify theme
     ├── cluster/                 # k3d cluster definition + registry retention config
     ├── certs/                   # mkcert output (gitignored)
     ├── infra/                   # Pulumi stacks: shared in-cluster infra (see EXTENDING.md)
@@ -310,6 +313,34 @@ tilt trigger seed-mit-learn-fixtures
 
 ---
 
+## Backing Up and Restoring Postgres
+
+Every PersistentVolume in the cluster lives inside the k3d node containers, so `k3d cluster delete` (what `teardown.sh` does, and what any `k3d-config.yaml` change to the node image needs) destroys all Postgres data. OpenSearch and Qdrant are rebuilt from Postgres by the `seed-mit-learn-opensearch` and `seed-mit-learn-qdrant` seeds; Postgres is the only store worth carrying across.
+
+```bash
+# 1. Before teardown: dump every app database to local-dev/.backups/<timestamp>/ (gitignored)
+./local-dev/scripts/pg-backup.sh
+
+# 2. Recreate the cluster
+./local-dev/scripts/teardown.sh
+./local-dev/scripts/setup.sh
+
+# 3. Start Tilt as usual and wait for local-infra-apps and kc-seed-users to go green
+./local-dev/scripts/start.sh
+
+# 4. In a second terminal: restore
+./local-dev/scripts/pg-restore.sh local-dev/.backups/<timestamp>
+
+# 5. Rebuild the derived stores
+tilt trigger seed-mit-learn-opensearch && tilt trigger seed-mit-learn-qdrant
+```
+
+`pg-restore.sh` prints its plan, asks for confirmation (`--yes` to skip the prompt), imports `keycloak-users.json` into the recreated realm, then replaces each database from its dump. The apps can stay running: each database is recreated with a connection limit that keeps the `app` role out until its archive has loaded, so an app pod that starts mid-restore is refused rather than allowed to run `migrate` against a half-loaded schema, and pods reconnect on their own once the limit lifts. If the dump predates your checkout's migrations, restart the app Deployments afterwards so `migrate` runs against the restored schema. `pg-backup.sh` records the realm's users alongside the database dumps; `pg-restore.sh` re-imports them under their original ids, so `users_user.global_id` in the restored data stays valid and hand-created users, passwords, and the admin role survive. A user that already exists in the new realm under the same email (the `kc-seed-users` trio, most often) is replaced by the backed-up one, keeping its old id and password.
+
+The `keycloak` database is deliberately never restored — Pulumi owns the realm, and restoring the old database underneath it is what causes the `404 Realm not found` failure described under [Teardown](#teardown). Both scripts run entirely through `kubectl exec` into the Postgres pod, so no Postgres client tools are needed on the host.
+
+---
+
 ## Configuration Reference
 
 `tilt_config.json` is your copy of [`tilt_config.json.example`](../tilt_config.json.example) — the example file is the canonical starting point (its image tags move over time; this doc doesn't repeat them). Keys:
@@ -320,6 +351,7 @@ tilt trigger seed-mit-learn-fixtures
 | `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
+| `keycloak_image` | published `mitodl/keycloak` digest | Keycloak server image for the core stack — see [Testing a local ol-keycloakify build](#testing-a-local-ol-keycloakify-build). |
 | `per_app_databases`, `openedx_mode` | — | Declared but not wired to anything yet; setting them has no effect. |
 
 The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags) go in `tilt_config.json`; anything that sets an **env var or secret value inside a workload** (API keys, feature flags, endpoints) goes in a gitignored `app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides).
@@ -366,6 +398,7 @@ The infrastructure is split across two Pulumi stacks:
 | `apisix_version` | `2.12.0` | APISIX Helm chart version |
 | `cnpg_version` | `0.23.0` | CloudNativePG operator Helm chart version |
 | `keycloak_operator_version` | `26.0.7` | Official Keycloak Operator version |
+| `keycloak_image` | published `mitodl/keycloak` digest | Keycloak server image. Leave unset here and use `tilt_config.json` instead — see [Testing a local ol-keycloakify build](#testing-a-local-ol-keycloakify-build). |
 | `observability_enabled` | `true` | Deploy Grafana + Loki + Alloy (~1.3GB). Set to `false` on a constrained Docker VM. |
 
 **`local-dev/infra/apps_infra/Pulumi.local-dev.apps-infra.Dev.yaml`** — Keycloak realm and OIDC clients:
@@ -430,6 +463,8 @@ One registry case zot cannot reclaim on its own is a repo left with no manifest 
 
 > **Note:** The teardown script calls `pulumi destroy` automatically to clean up Pulumi-managed resources before deleting the cluster, so no orphaned resources are left behind.
 
+> **Data:** deleting the cluster deletes every PersistentVolume, Postgres included. Run `./local-dev/scripts/pg-backup.sh` first if there is anything in the databases you want back — see [Backing Up and Restoring Postgres](#backing-up-and-restoring-postgres).
+
 Pulumi state must never outlive the cluster: everything these stacks manage
 lives inside the cluster, but the state lives in this checkout, so state that
 survives makes the next `pulumi up` skip resources that no longer exist (that
@@ -488,6 +523,35 @@ If you prefer to run Ollama on your host machine to use GPU acceleration:
    ```bash
    ollama serve  # Listens on localhost:11434 by default
    ```
+
+### Testing a local ol-keycloakify build
+
+The login, account, and email themes in local Keycloak come from the [ol-keycloakify](https://github.com/mitodl/ol-keycloakify) release baked into the published `mitodl/keycloak` image. To see an unreleased branch of the theme, check it out next to this repo and run:
+
+```bash
+./local-dev/scripts/kc-theme-image.sh            # ../ol-keycloakify
+./local-dev/scripts/kc-theme-image.sh ~/src/ol-keycloakify   # or any checkout
+```
+
+The script builds the theme from the checkout's sources inside Docker (no Node, Yarn, Maven, or JDK needed on the host), bakes the jar into a Keycloak image based on the published one, pushes it to the k3d registry, and writes the image into `keycloak_image` in your gitignored `tilt_config.json`. A running `tilt up` picks that up on its own: `local-infra-core` re-applies and the operator rolls `keycloak-0`, which takes a minute or two and logs you out of every local app. A first build takes about three minutes, mostly downloading the theme's dependencies; later builds reuse them. If the build fails at `yarn install --immutable`, the checkout's `yarn.lock` is out of date: run `yarn install` there and commit it.
+
+Confirm the pod is on your tag, then log in again or trigger a password reset to see the login and email themes:
+
+```bash
+kubectl -n local-infra get pod keycloak-0 -o jsonpath='{.spec.containers[0].image}'
+```
+
+Emails land in [Mailpit](#inspect-emails-mailpit); the olapps realm enables the `UPDATE_EMAIL` required action, so changing an email from the [account console](https://sso.ol.mit.dev/realms/olapps/account/) exercises the email-update confirmation template as well.
+
+Edit, re-run the script, and Keycloak rolls again. The tag is the checkout's short commit plus a hash of its uncommitted changes (tracked edits and untracked files; gitignored files don't count) and of the Dockerfile, so each distinct input gets its own tag and the operator, which only rolls when the image string changes, rolls once per change. The registry keeps the ten most recent tags per repository, so if `keycloak-0` ever fails to pull an old tag after many builds, re-run the script. To return to the published image:
+
+```bash
+./local-dev/scripts/kc-theme-image.sh --reset   # sets keycloak_image back to ""
+```
+
+The realm, clients, and seeded users live in Postgres and are untouched by the image swap. Under the hood, Tilt forwards `keycloak_image` to the core Pulumi stack as `LOCAL_DEV_KEYCLOAK_IMAGE`, so the same value works for a hand-run `pulumi up`.
+
+Why an image at all: Keycloak runs `--optimized`, and an optimized Keycloak refuses to start when a jar in `providers/` differs from the one it was built against, so the theme cannot be copied into the running pod. The Dockerfile (`local-dev/keycloak/Dockerfile`) starts from the same `mitodl/keycloak` digest the core stack defaults to (the script reads it from `local-dev/infra/core/__main__.py`) and reruns `kc.sh build` with the flags from `Dockerfile.hosted` in [ol-keycloak](https://github.com/mitodl/ol-keycloak); when bumping the digest, check those flags still match.
 
 ### Custom S3 Storage (MinIO / RustFS)
 
@@ -570,6 +634,18 @@ mkcert -install   # Install the mkcert root CA into your OS trust store
 ```
 
 Then restart your browser. The cert was generated with the correct wildcard SANs but the root CA must be in your OS trust store.
+
+### App pods stuck in `ImagePullBackOff` with `number of layers and diffIDs don't match`
+
+```bash
+kubectl -n mit-learn describe pods | grep diffIDs
+# Failed to pull image "k3d-registry.localhost:5000/mitodl_mit-learn-app:tilt-...":
+#   ... number of layers and diffIDs don't match: 17 != 22
+```
+
+The cluster's nodes run a k3s image with containerd 1.7, which does not understand the zstd layer media type that Tilt's `docker_build` emits for images based on `mitodl/ol-python-base` (see the comment on `image:` in `local-dev/cluster/k3d-config.yaml`). Nothing about the registry or the build is wrong; the node image is too old. k3d cannot change a running cluster's node image, so recreate it: follow [Backing Up and Restoring Postgres](#backing-up-and-restoring-postgres), which covers the teardown, `setup.sh` picking up the new image, and carrying your Postgres data across.
+
+Already-pushed images pull fine on the new nodes without a rebuild — the registry volume is separate from the cluster and survives teardown.
 
 ### Docker image build fails (Next.js)
 

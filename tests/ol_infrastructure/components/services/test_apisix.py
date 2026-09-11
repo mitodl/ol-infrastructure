@@ -52,6 +52,7 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixSharedPluginsConfig,
     OLApisixUpstream,
     OLApisixUpstreamConfig,
+    oidc_gateway_pre_function_plugin,
     stale_session_cookie_cleanup_plugin,
 )
 
@@ -347,6 +348,139 @@ def test_cleanup_plugin_honours_a_custom_stale_name():
     assert 'name == "mitlearn_apisix_session"' in lua
 
 
+# ─── OIDC error callback recovery ──────────────────────────────────────────────
+
+
+def test_recovery_plugin_runs_in_rewrite_before_openid_connect():
+    """openid-connect runs in rewrite; the access phase would be too late."""
+    plugin = oidc_gateway_pre_function_plugin()
+
+    assert plugin.name == "serverless-pre-function"
+    assert plugin.config["phase"] == "rewrite"
+
+
+def test_recovery_plugin_defaults_to_the_only_error_production_emits():
+    """access_denied means the user pressed Cancel -- restarting the flow there
+    would bounce the browser between the gateway and Keycloak.
+    """
+    options = oidc_gateway_pre_function_plugin().config["oidc_error_recovery"]
+
+    assert options["recoverable_errors"] == ["temporarily_unavailable"]
+
+
+def test_recovery_plugin_honours_a_custom_error_list():
+    options = oidc_gateway_pre_function_plugin(
+        recoverable_errors=["temporarily_unavailable", "server_error"],
+    ).config["oidc_error_recovery"]
+
+    assert options["recoverable_errors"] == ["temporarily_unavailable", "server_error"]
+
+
+def test_recovery_plugin_honours_an_explicit_empty_error_list():
+    """An empty list means "recover nothing" -- the way to make the plugin a
+    no-op without detaching it from every route on a shared config.
+    """
+    options = oidc_gateway_pre_function_plugin(
+        recoverable_errors=[],
+    ).config["oidc_error_recovery"]
+
+    assert options["recoverable_errors"] == []
+
+
+def test_recovery_plugin_passes_guard_settings_as_config():
+    """Tunables travel on the plugin config and are read off ``conf`` in Lua,
+    so nothing is interpolated into the shipped source.
+    """
+    options = oidc_gateway_pre_function_plugin(
+        guard_cookie_name="custom_guard",
+        guard_max_age=90,
+    ).config["oidc_error_recovery"]
+
+    assert options["guard_cookie_name"] == "custom_guard"
+    assert options["guard_max_age"] == 90
+
+
+def test_recovery_plugin_ships_the_lua_files_verbatim():
+    """The function bodies are the checked-in .lua files, not generated strings --
+    no configuration is interpolated into either.
+    """
+    sources = oidc_gateway_pre_function_plugin(
+        guard_cookie_name="custom_guard",
+        recoverable_errors=["server_error"],
+        canonical_redirect_status=301,
+    ).config["functions"]
+
+    assert sources == [
+        apisix_module.CANONICAL_HTTPS_REDIRECT_LUA,
+        apisix_module.OIDC_ERROR_RECOVERY_LUA,
+    ]
+    for source in sources:
+        assert "custom_guard" not in source
+        assert "server_error" not in source
+
+
+def test_canonical_redirect_runs_before_error_recovery():
+    """serverless/init.lua stops at the first function returning a code, so the
+    origin has to be canonical before the recovery function can redirect back
+    into a login flow -- otherwise recovery would target an http:// origin.
+    """
+    sources = oidc_gateway_pre_function_plugin().config["functions"]
+
+    assert "canonical_https_redirect" in sources[0]
+    assert "oidc_error_recovery" in sources[1]
+
+
+def test_canonical_redirect_status_reaches_the_config_block():
+    config = oidc_gateway_pre_function_plugin(canonical_redirect_status=301).config
+
+    assert config["canonical_https_redirect"]["status"] == 301
+
+
+@pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+def test_every_status_ngx_redirect_accepts_is_allowed(status):
+    config = oidc_gateway_pre_function_plugin(canonical_redirect_status=status).config
+
+    assert config["canonical_https_redirect"]["status"] == status
+
+
+@pytest.mark.parametrize("status", [200, 304, 305, 418, 500])
+def test_a_status_ngx_redirect_rejects_fails_at_preview(status):
+    """ngx.redirect raises a Lua error outside {301,302,303,307,308}, and the
+    config block carrying this is not in serverless-pre-function's schema, so
+    APISIX would not reject it either -- an unchecked value would first surface
+    as a 500 on live traffic.  This has to fail while the stack is being built.
+    """
+    with pytest.raises(ValueError, match=r"ngx\.redirect rejects anything else"):
+        oidc_gateway_pre_function_plugin(canonical_redirect_status=status)
+
+
+def test_canonical_redirect_can_be_disabled():
+    """A host that must keep answering on plain HTTP drops the function without
+    losing the error-callback recovery it necessarily shares a plugin with.
+    """
+    config = oidc_gateway_pre_function_plugin(canonical_https_redirect=False).config
+
+    assert config["functions"] == [apisix_module.OIDC_ERROR_RECOVERY_LUA]
+
+
+def test_canonical_redirect_lua_reads_its_settings_off_conf():
+    """Guards the contract between the .lua file and the config block above."""
+    source = apisix_module.CANONICAL_HTTPS_REDIRECT_LUA
+
+    assert "conf.canonical_https_redirect" in source
+    assert "opts.status" in source
+
+
+def test_recovery_lua_reads_its_settings_off_conf():
+    """Guards the contract between the .lua file and the config block above."""
+    source = apisix_module.OIDC_ERROR_RECOVERY_LUA
+
+    assert "conf.oidc_error_recovery" in source
+    assert "opts.recoverable_errors" in source
+    assert "opts.guard_cookie_name" in source
+    assert "opts.guard_max_age" in source
+
+
 # ─── Shared plugin defaults ────────────────────────────────────────────────────
 
 
@@ -492,6 +626,53 @@ def test_gzip_reaches_the_gateway_api_plugin_config():
 
 
 @pulumi.runtime.test
+def test_recovery_plugin_renders_into_the_v2_plugin_config():
+    """The applications attach this to a host's shared plugin config rather
+    than per route, so it has to survive that normalisation.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-oidc-recovery-v2",
+        plugins=[oidc_gateway_pre_function_plugin()],
+    )
+
+    def check(spec):
+        recovery = plugin_named(spec["plugins"], "serverless-pre-function")
+        assert recovery is not None
+        assert recovery["config"]["phase"] == "rewrite"
+        # The settings block is not part of serverless-pre-function's schema.
+        # It reaches the gateway because the CRD marks config
+        # x-kubernetes-preserve-unknown-fields, the controller holds it as raw
+        # apiextensionsv1.JSON, ADC as map[string]any, and APISIX's serverless
+        # schema does not set additionalProperties.  If a future version
+        # tightens any of those, this is the assertion that should fail first.
+        assert recovery["config"]["oidc_error_recovery"] == {
+            "recoverable_errors": ["temporarily_unavailable"],
+            "guard_cookie_name": "apisix_oidc_recovery",
+            "guard_max_age": 60,
+        }
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_recovery_plugin_reaches_the_gateway_api_plugin_config():
+    """v1alpha1 drops secretRef, which this plugin sets to None -- a shape the
+    other shared plugins do not exercise.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-oidc-recovery-gateway-api",
+        plugins=[oidc_gateway_pre_function_plugin()],
+    )
+
+    def check(spec):
+        recovery = plugin_named(spec["plugins"], "serverless-pre-function")
+        assert recovery is not None
+        assert set(recovery) == {"name", "config"}
+
+    return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
 def test_gzip_does_not_compress_streaming_or_precompressed_types():
     """text/event-stream is excluded so SSE responses are not held back by the
     compression buffers, and already-compressed formats are excluded so they
@@ -528,3 +709,101 @@ def test_gzip_compression_level_stays_cheap():
         assert config["vary"] is True
 
     return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+# ─── enable_cors ───────────────────────────────────────────────────────────────
+
+# The other three defaults, which enable_cors=False must leave untouched.
+_NON_CORS_DEFAULTS = ("redirect", "response-rewrite", "prometheus")
+
+
+@pulumi.runtime.test
+def test_cors_is_attached_by_default():
+    """Documents what the default actually grants: allow_origins "**" with
+    allow_credential True is not the credentialless `Access-Control-Allow-Origin:
+    *` it reads like -- APISIX reflects the request Origin and the browser will
+    hand over cookies. Anything that narrows this default should have to change
+    this assertion on purpose.
+    """
+    plugins = shared_plugins("test-shared-plugins-cors-default")
+
+    def check(spec):
+        cors = plugin_named(spec["plugins"], "cors")
+        assert cors is not None
+        assert cors["enable"] is True
+        assert cors["config"]["allow_origins"] == "**"
+        assert cors["config"]["allow_credential"] is True
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_cors_can_be_disabled():
+    """An internal tool referencing this config for prometheus/otel/gzip must
+    not also pick up a browser-facing origin grant.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-cors-off",
+        enable_cors=False,
+    )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "cors") is None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_cors_disabled_removes_only_cors():
+    """The filter runs over the rendered list rather than lifting cors out of
+    __default_plugins, so a bad predicate would silently take the neighbouring
+    defaults with it -- and losing prometheus or response-rewrite this way
+    would show up as missing metrics, not as an error.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-cors-off-only-cors",
+        enable_cors=False,
+    )
+
+    def check(spec):
+        for name in _NON_CORS_DEFAULTS:
+            assert plugin_named(spec["plugins"], name) is not None, name
+        assert plugin_named(spec["plugins"], "gzip") is not None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_cors_reaches_the_gateway_api_plugin_config():
+    """v1alpha1 is rendered by its own comprehension over the same list, so the
+    Gateway API path needs its own assertion rather than inheriting the v2 one.
+    """
+    plugins = shared_plugins("test-shared-plugins-cors-gateway-api")
+
+    def check(spec):
+        cors = plugin_named(spec["plugins"], "cors")
+        assert cors is not None
+        # v1alpha1 accepts only name and config -- ``enable`` is v2-only.
+        assert set(cors) == {"name", "config"}
+        assert cors["config"]["allow_credential"] is True
+
+    return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_cors_disabled_reaches_the_gateway_api_plugin_config():
+    """The opt-out has to hold on both CRDs: an application that passes
+    enable_cors=False and is later moved from a legacy ApisixRoute to an
+    HTTPRoute would otherwise get the origin grant back on the way across.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-cors-off-gateway-api",
+        enable_cors=False,
+    )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "cors") is None
+        for name in _NON_CORS_DEFAULTS:
+            assert plugin_named(spec["plugins"], name) is not None, name
+
+    return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)

@@ -28,14 +28,29 @@ class AppRegistration:
         when unset -- only set this when the repo name differs from the app
         name (e.g. app ``xpro`` lives in repo ``mitodl/mitxpro``).
     :param repo_main_branch: The repo's default branch.
-    :param slack_channel: Slack channel ID for release-bot notifications
-        (e.g. "ready to promote"). Unset means notifications are skipped for
+    :param slack_channel: Slack channel for release-bot notifications (e.g.
+        "ready to promote"), as either a channel id or a channel name. Slack's
+        Web API only accepts ids, so a name is resolved through
+        conversations.list at runtime (release_bot/slack_channels.py) -- which
+        needs groups:read on the bot token and, for a private channel, the bot
+        to have been invited to it. Unset means notifications are skipped for
         this app unless RELEASE_ANNOUNCE_CHANNEL provides a fallback.
+    :param release_resource_workflow: Whether this app runs the modernized
+        release-resource pipeline (calver tags, ``releases/<version>`` branch,
+        release issue, GitHub Deployments) rather than the legacy
+        release-candidate/release branch pattern Doof drives. THE ROLLOUT
+        SWITCH: flipping this one field is what migrates an app, because both
+        control surfaces read it. The pipeline generator emits
+        ``_build_release_resource_app_pipeline`` instead of the legacy shape,
+        and the release bot starts accepting commands for the app -- until
+        then it refuses them, since every command it offers targets a job or
+        an artifact only the modernized pipeline produces.
     """
 
     github_repo: str | None = None
     repo_main_branch: str = "main"
     slack_channel: str | None = None
+    release_resource_workflow: bool = False
 
 
 APPS: dict[str, AppRegistration] = {
@@ -61,7 +76,7 @@ APPS: dict[str, AppRegistration] = {
         repo_main_branch="master", slack_channel="product-ovs"
     ),
     # No app-specific channel given -- falls back to RELEASE_ANNOUNCE_CHANNEL.
-    "ol-analytics-api": AppRegistration(),
+    "ol-analytics-api": AppRegistration(release_resource_workflow=True),
     "xpro": AppRegistration(
         github_repo="mitodl/mitxpro",
         repo_main_branch="master",
@@ -85,9 +100,15 @@ def repo_main_branch(app_name: str) -> str:
 
 
 def slack_channel(app_name: str) -> str | None:
-    """Return the configured Slack channel ID for release notifications, if any."""
+    """Return the configured Slack channel for release notifications, if any."""
     entry = APPS.get(app_name)
     return entry.slack_channel if entry else None
+
+
+def release_resource_workflow(app_name: str) -> bool:
+    """Return whether the given app runs the modernized release-resource pipeline."""
+    entry = APPS.get(app_name)
+    return bool(entry and entry.release_resource_workflow)
 
 
 #: GitHub App id for `ol-release-bot`, the identity the Concourse `release`,
@@ -109,8 +130,7 @@ def release_workflow_repos() -> frozenset[str]:
 
     EVERY REGISTERED APP, NOT ONLY THE ONES ALREADY RUNNING THE NEW WORKFLOW. That
     is deliberate and it over-grants on purpose (decision: Tobias, 2026-09-01). The
-    actual opt-in is ``AppPipelineParams.use_release_resource_workflow`` in
-    ``src/ol_concourse/pipelines/infrastructure/k8s_apps/pipeline.py``, which
+    actual opt-in is ``AppRegistration.release_resource_workflow`` above, which
     defaults to ``False`` and today is set on ``ol-analytics-api`` alone -- so the
     consumer below grants a bypass on ``mit-learn`` and ``mitxonline`` for an App
     that does not yet finish their releases.

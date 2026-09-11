@@ -83,6 +83,21 @@ cnpg_version = config.get("cnpg_version") or "0.23.0"
 apisix_version = config.get("apisix_version") or "2.13.0"
 keycloak_operator_version = config.get("keycloak_operator_version") or "26.0.7"
 
+# Keycloak server image. The default is the published image the hosted
+# environments run, pinned by digest; local-dev/scripts/kc-theme-image.sh reads
+# that digest as the base for a locally built theme image and writes the result
+# into the gitignored tilt_config.json, which the Tiltfile forwards as
+# LOCAL_DEV_KEYCLOAK_IMAGE. Not pinned in Pulumi.local-dev.core.Dev.yaml for
+# the same reason as log_retention_period.
+keycloak_image = (
+    config.get("keycloak_image")
+    or os.environ.get("LOCAL_DEV_KEYCLOAK_IMAGE")
+    or (
+        "mitodl/keycloak"
+        "@sha256:bac56d272e02121668a3d339b55585820525db248ce83aa58618f5e4f89ec9e0"
+    )
+)
+
 _infra_dir = Path(__file__).parent.parent
 _repo_root = _infra_dir.parent.parent
 _cert_path = _repo_root / tls_cert_path
@@ -206,6 +221,7 @@ identity = create_identity_core(
     apisix_release=ingress.apisix,
     tls_secret=tls.tls_secret,
     keycloak_operator_version=keycloak_operator_version,
+    keycloak_image=keycloak_image,
     keycloak_hostname=keycloak_hostname,
     keycloak_url=keycloak_url,
     root_domain=root_domain,

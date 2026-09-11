@@ -142,6 +142,21 @@ if not org_learning_hubspot_form_id:
         f"{stack_info.env_suffix}; the form will render its unavailable fallback."
     )
 
+# HubSpot tracking portal: xprodev for dev/RC, xPRO prod for production
+# (mitodl/hq#10735). Public value (in the js.hs-scripts.com URL), not a secret.
+hubspot_portal_ids = {
+    "ci": "23128026",
+    "qa": "23128026",
+    "production": "4994459",
+}
+
+hubspot_portal_id = hubspot_portal_ids.get(stack_info.env_suffix, "")
+if not hubspot_portal_id:
+    pulumi.log.warn(
+        "No HubSpot portal ID for environment "
+        f"{stack_info.env_suffix}; the tracking script will not render."
+    )
+
 raw_env_vars = {
     # Env vars available only on server
     "NODE_OPTIONS": f"--max-old-space-size={nextjs_max_old_space_size_mib}",
@@ -167,6 +182,7 @@ raw_env_vars = {
     or "",
     "NEXT_PUBLIC_CSRF_COOKIE_NAME": nextjs_config.require("csrf_cookie_name"),
     "NEXT_PUBLIC_EMBEDLY_KEY": nextjs_config.require("embedly_key"),
+    "NEXT_PUBLIC_HUBSPOT_PORTAL_ID": hubspot_portal_id,
     "NEXT_PUBLIC_LEARN_AI_CSRF_COOKIE_NAME": f"learn_ai_{stack_info.env_suffix}_csrftoken".replace(  # noqa: E501
         "production_", ""
     ),

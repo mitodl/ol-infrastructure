@@ -500,6 +500,13 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         additional_watched_paths=["sdks/rootly/"],
         stages=["default"],
         topology="preview-gated",
+        # The stack manages ~160 Rootly-API-backed resources. `pulumi refresh`
+        # fans out GETs for all of them at once, which blows past Rootly's
+        # per-account rate/concurrency limits and fails every read with an
+        # empty error message before `up` even runs. Same failure mode as
+        # the Sentry stack above; skipping refresh avoids the burst and lets
+        # `up` still diff/apply whatever actually changed.
+        refresh_stack=False,
     ),
     "sentry": SimplePulumiParams(
         app_name="sentry",
@@ -665,6 +672,18 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-infrastructure-release-bot",
         stages=["default"],
         topology="preview-gated",
+        # __main__.py builds REPOS_CONFIG out of bridge.settings.apps, so an
+        # edit there (an app's channel, or the release_resource_workflow flag
+        # that migrates it) has to redeploy the bot. Nothing else watched here
+        # covers it: the registry is outside PULUMI_WATCHED_PATHS and outside
+        # this app's own project path.
+        #
+        # This also re-triggers the image build, which does not need it -- the
+        # Dockerfile copies only release_bot/*.py, so the registry is not in
+        # the image. Accepted rather than adding a deploy-only path list for
+        # one app: the cost is one redundant build per registry edit, and the
+        # deploy that follows was going to happen anyway.
+        additional_watched_paths=["src/bridge/settings/apps.py"],
         # __main__.py is a singleton (stack "default") and always creates the
         # ECR repository named "release-bot-production" regardless of stage.
         docker_image=DockerImageConfig(

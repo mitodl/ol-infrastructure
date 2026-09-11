@@ -108,6 +108,8 @@ def _apply_deployment_secret_overrides(
     # mitxonline-specific configuration
     if env_prefix == "mitxonline":
         secrets["DEEPL_API_KEY"] = '{{ get .Secrets "deepl_api_key" }}'
+        secrets["CANVAS_ACCESS_TOKEN"] = '{{ get .Secrets "canvas_access_token" }}'
+        secrets["YOUTUBE_API_KEY"] = '{{ get .Secrets "youtube_api_key" }}'
 
     # xpro and mitx share email configuration
     if env_prefix in ("xpro", "mitx"):

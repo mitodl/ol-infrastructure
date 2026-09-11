@@ -6,7 +6,13 @@ from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
 from ol_infrastructure.lib.aws.eks_helper import ECR_DOCKERHUB_REGISTRY
-from ol_infrastructure.lib.ol_types import AWSBase
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    AWSBase,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 from ol_infrastructure.lib.toolhive_telemetry import ships_telemetry
 
@@ -103,7 +109,17 @@ def setup_traefik(
                     "pullPolicy": "Always",
                     "registry": f"{ECR_DOCKERHUB_REGISTRY}/library",
                 },
-                "commonLabels": k8s_global_labels,
+                # commonLabels reaches both the workload and the pod template
+                # in chart 41.x, and neither selector.
+                "commonLabels": cluster_addon_labels(
+                    base_labels=k8s_global_labels,
+                    stack_info=stack_info,
+                    service=Services.traefik,
+                    component=Component.gateway,
+                    # The shared ingress. Everything behind it is unreachable
+                    # while it is down.
+                    alert_tier=AlertTier.page,
+                ),
                 "tolerations": operations_tolerations,
                 "deployment": {
                     "kind": "Deployment",

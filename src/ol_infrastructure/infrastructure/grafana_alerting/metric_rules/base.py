@@ -76,6 +76,18 @@ Sub-modules
                  document and deliberately leave open. Pairs with
                  log_rules/witan.py, which catches the same quarantine at boot
                  without needing traffic.
+  otel_service_red
+               — New in 2026-09. Whole-service p95 latency and 5xx-ratio
+                 alerting on http_server_duration_milliseconds, the app's own
+                 MeterProvider metric rather than trace-derived spanmetrics or
+                 an edge/blackbox view. Pairs with
+                 dashboards/service_red.py -- see that module and this one's
+                 own docstring for why metrics rather than traces.
+  vector_edxapp_tracking
+               — New in 2026-09. Source: grafana-alerts#9, recreated here rather
+                 than merged there. edxapp tracking-log delivery off the Vector
+                 sidecar's own metrics (PodMonitor added in #4822): source
+                 silence, S3 sink errors, and no-bytes-delivered.
 """
 
 import json
@@ -90,7 +102,9 @@ from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
     dagster_pgbouncer,
     eks_general,
     linux_host,
+    otel_service_red,
     synthetic_monitoring,
+    vector_edxapp_tracking,
     witan,
 )
 
@@ -195,6 +209,8 @@ def create(resource_opts: ResourceOptions) -> None:
     dagster_pgbouncer.create(alerts_folder.uid, rd, resource_opts)
     dagster_control_plane.create(alerts_folder.uid, rd, resource_opts)
     witan.create(alerts_folder.uid, rd, resource_opts)
+    otel_service_red.create(alerts_folder.uid, rd, resource_opts)
+    vector_edxapp_tracking.create(alerts_folder.uid, rd, resource_opts)
     # No folder_uid: these rules live in the Synthetic Monitoring plugin's own
     # folder rather than the one created above. See the module docstring.
     synthetic_monitoring.create(rd, resource_opts)

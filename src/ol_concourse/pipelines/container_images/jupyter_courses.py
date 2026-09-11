@@ -162,21 +162,14 @@ courses = [
         repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.15-1T2026.git",
         image_name="uai_source-uai.15",
     ),
-    CourseImageInfo(
-        course_name="mitxt-6.3710.3x",
-        repo_uri="git@github.mit.edu:ol-notebooks/MITxT-6.3710.3x-2T2026.git",
-        image_name="mitxt-6.3710.3x",
-    ),
-    CourseImageInfo(
-        course_name="mitxt-6.3710.4x",
-        repo_uri="git@github.mit.edu:ol-notebooks/MITxT-6.3710.4x-2T2026.git",
-        image_name="mitxt-6.3710.4x",
-    ),
-    CourseImageInfo(
-        course_name="mitxt-6.3710.5x",
-        repo_uri="git@github.mit.edu:ol-notebooks/MITxT-6.3710.5x-2T2026.git",
-        image_name="mitxt-6.3710.5x",
-    ),
+    *[
+        CourseImageInfo(
+            course_name=f"mitxt-6.3710.{module_num}x",
+            repo_uri=f"git@github.mit.edu:ol-notebooks/MITxT-6.3710.{module_num}x-2T2026.git",
+            image_name=f"mitxt-6.3710.{module_num}x",
+        )
+        for module_num in range(3, 6)
+    ],
     CourseImageInfo(
         course_name="uai_source-uai.scm1",
         repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.SCM.1-1T2026.git",
@@ -187,6 +180,19 @@ courses = [
         repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.SCM.2-1T2026.git",
         image_name="uai_source-uai.scm2",
     ),
+    CourseImageInfo(
+        course_name="uai_source-uai.cls1",
+        repo_uri="git@github.mit.edu:ol-notebooks/UAI_SOURCE-UAI.CLS.1-1T2026.git",
+        image_name="uai_source-uai.cls1",
+    ),
+    *[
+        CourseImageInfo(
+            course_name=f"mitxt-6.7960.{module_num}x",
+            repo_uri=f"git@github.mit.edu:ol-notebooks/MITxT-6.7960.{module_num}x-2T2026.git",
+            image_name=f"mitxt-6.7960.{module_num}x",
+        )
+        for module_num in range(1, 6)
+    ],
 ]
 
 # This infers the ECR url from the AWS account,

@@ -21,6 +21,9 @@ from pulumi import Config, export, log
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.apps import APPS
 from bridge.settings.apps import github_repo as app_github_repo
+from bridge.settings.apps import (
+    release_resource_workflow as app_release_resource_workflow,
+)
 from bridge.settings.apps import repo_main_branch as app_repo_main_branch
 from bridge.settings.apps import slack_channel as app_slack_channel
 from ol_infrastructure.lib import pulumi_projects as projects
@@ -73,6 +76,9 @@ concourse_url = bot_config.get("concourse_url") or "https://cicd.odl.mit.edu"
 release_announce_channel = (
     bot_config.get("release_announce_channel") or "product-infrastructure"
 )
+# How long a release may sit cut-but-unfinished before the bot reports it in
+# Slack. Left unset the bot uses 24h, matching the cadence Doof nagged at.
+release_stuck_after_hours = bot_config.get("release_stuck_after_hours")
 
 # Derived from bridge.settings.apps -- the shared app registry also used by
 # the Concourse pipeline generator (k8s_apps/pipeline.py) -- so an app's repo,
@@ -84,6 +90,13 @@ default_repos_config = {
         "pipeline": f"{app_name}-pipeline",
         "repo": app_github_repo(app_name),
         "branch": app_repo_main_branch(app_name),
+        # Apps still on the legacy release-candidate/release pipeline are
+        # published here too, and the bot refuses their release commands
+        # rather than dropping them from its vocabulary: "still on the legacy
+        # pipeline" is the answer someone typing `/doof release <app>` needs,
+        # and it is also what makes the rollout a one-field change in
+        # bridge.settings.apps.
+        "release_workflow": app_release_resource_workflow(app_name),
         **(
             {"channel": app_slack_channel(app_name)}
             if app_slack_channel(app_name)
@@ -121,6 +134,11 @@ bot_secret = kubernetes.core.v1.Secret(
         namespace=namespace,
     ),
     string_data={
+        # The bot token needs "users:read.email" on top of the usual
+        # chat/commands scopes: slack_users.py resolves each commit author's
+        # email to a Slack id so release notifications @-mention real people
+        # instead of pasting addresses. Without the scope the bot logs one
+        # error and degrades to plain-text names.
         "slack-bot-token": bot_secrets["slack-bot-token"],
         "slack-app-token": bot_secrets["slack-app-token"],
         "concourse-user": bot_secrets["concourse-username"],
@@ -212,6 +230,16 @@ bot_deployment = kubernetes.apps.v1.Deployment(
                                     )
                                 ]
                                 if release_announce_channel
+                                else []
+                            ),
+                            *(
+                                [
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name="RELEASE_STUCK_AFTER_HOURS",
+                                        value=release_stuck_after_hours,
+                                    )
+                                ]
+                                if release_stuck_after_hours
                                 else []
                             ),
                         ],
