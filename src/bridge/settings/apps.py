@@ -54,7 +54,9 @@ class AppRegistration:
 
 
 APPS: dict[str, AppRegistration] = {
-    "learn-ai": AppRegistration(slack_channel="product-learn-ai"),
+    "learn-ai": AppRegistration(
+        slack_channel="product-learn-ai", release_resource_workflow=True
+    ),
     "micromasters": AppRegistration(
         repo_main_branch="master", slack_channel="product-micromasters"
     ),
