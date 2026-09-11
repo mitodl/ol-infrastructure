@@ -130,6 +130,14 @@ mitxonline_stack = (
     if stack_info.env_suffix in ("ci", "qa", "production")
     else None
 )
+# Opik is also deployed to CI/QA/Production only. The ml code location traces its
+# LLM calls there; on the Dev stack OPIK_URL_OVERRIDE stays unset and the ml
+# code's tracing is a no-op.
+opik_stack = (
+    make_stack_reference(projects.OPIK, stack_info.name)
+    if stack_info.env_suffix in ("ci", "qa", "production")
+    else None
+)
 
 # VPC and network configuration
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
@@ -2627,6 +2635,25 @@ for location in code_locations:
                 "name": "MITXONLINE_APP_DB_HOST",
                 "value": mitxonline_stack.require_output("mitxonline")["rds_host"],
             }
+        )
+
+    # ml's Opik tracing and Prompt Library. Only the non-secret settings live
+    # here: the code reads the Keycloak client-credentials from Vault at
+    # secret-operations/sso/opik itself (dagster_server_policy.hcl), the same
+    # secret learn_ai syncs. No OPIK_API_KEY -- the Keycloak auth hook owns the
+    # Authorization header (see the opik stack's OPIK_SDK_KEYCLOAK_AUTH.md).
+    if name == "ml" and opik_stack is not None:
+        deployment["env"].extend(
+            [
+                {
+                    "name": "OPIK_URL_OVERRIDE",
+                    "value": opik_stack.require_output("opik_url").apply(
+                        lambda url: f"{url}/api/"
+                    ),
+                },
+                {"name": "OPIK_WORKSPACE", "value": "default"},
+                {"name": "OPIK_PROJECT_NAME", "value": "dagster-ml"},
+            ]
         )
 
     # Add higher resources for lakehouse deployment (runs dbt)
