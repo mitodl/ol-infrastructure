@@ -198,6 +198,8 @@ Only the listed apps will be deployed. Shared infrastructure always runs.
 
 Log in at any app (or `https://sso.ol.mit.dev` directly) with the seeded Keycloak users: `admin@odl.local`, `student@odl.local`, `prof@odl.local` — password `localdev123` for all three.  <!-- pragma: allowlist secret -->
 
+odl-video-service derives Django permissions from Keycloak group membership: `admin@odl.local` is in the realm's `Admin` group, so it becomes a Django superuser on first login; the other two are plain users.
+
 ### Editing code
 
 With an app repo checked out next to `ol-infrastructure`, Tilt live-syncs your edits into the running containers — no rebuild. (Curious how? See [Two transports](ARCHITECTURE.md#two-transports-how-your-code-reaches-a-pod) in ARCHITECTURE.md.) What to expect:
