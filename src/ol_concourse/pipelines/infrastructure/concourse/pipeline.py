@@ -1,3 +1,10 @@
+"""Deploy the Concourse application across CI, QA, and Production.
+
+This stack takes a StackReference on applications/mit_learn for the Fastly service
+ID behind the ocw/fastly_learn credential, so that project must have deployed in an
+environment before this one can provision the credential there.
+"""
+
 import sys
 
 from ol_concourse.lib.models.fragment import PipelineFragment
