@@ -577,6 +577,37 @@ command.local.Command(
     ),
 )
 
+# --- b2b_learner_records database -------------------------------------------
+# Individually identifying learner records for ol-analytics-api's
+# b2b_learner_records tenant (ol-data-platform models/b2b_learner_records).
+# Kept out of b2b_analytics so these PII-bearing MVs can be granted to that
+# tenant's role on their own once per-tenant StarRocks users with
+# schema-scoped grants land; until then the catalog-wide SELECT grants above
+# still reach them. Same privilege shape as b2b_analytics (see there).
+_b2b_learner_records_db_sql = """\
+CREATE DATABASE IF NOT EXISTS b2b_learner_records;
+GRANT CREATE TABLE ON DATABASE b2b_learner_records TO ROLE app;
+GRANT CREATE MATERIALIZED VIEW ON DATABASE b2b_learner_records TO ROLE app;"""
+
+_b2b_learner_records_db_drop_sql = "DROP DATABASE IF EXISTS b2b_learner_records;"
+
+command.local.Command(
+    f"starrocks-{stack_info.env_suffix}-b2b-learner-records-database-setup",
+    create=_exec_sql,
+    update=_exec_sql,
+    delete=_exec_delete_sql,
+    environment={
+        **_mysql_env,
+        "STARROCKS_SQL": _b2b_learner_records_db_sql,
+        "STARROCKS_DELETE_SQL": _b2b_learner_records_db_drop_sql,
+    },
+    triggers=[hashlib.sha256(_b2b_learner_records_db_sql.encode()).hexdigest()],
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[roles_setup_cmd],
+    ),
+)
+
 # --- OIDC / OAuth2 authentication via Keycloak ------------------------------
 # StarRocks v3.5+ uses a "security integration" (SQL object) to hold OAuth2
 # provider settings rather than fe.conf env vars.  The integration name goes
