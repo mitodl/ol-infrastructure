@@ -524,13 +524,15 @@ policy_definition = {
             # truncated to IAM_ROLE_NAME_PREFIX_MAX_LENGTH=32) for any DB with
             # enhanced_monitoring_interval set, and blue/green updates pass it
             # to RDS -- confirmed by a live AccessDenied on
-            # keycloak-production's CreateBlueGreenDeployment. The 32-char
-            # truncation can eat "-monitoring-" entirely (as it did for
-            # keycloak-production) but always leaves "-rds-enh", so that's
-            # the resource match rather than the full name_prefix text.
+            # keycloak-production's CreateBlueGreenDeployment. No name-suffix
+            # marker survives truncation reliably: instance names >=30 chars
+            # (edxapp-db-mitxonline-production, xpro-db-applications-production,
+            # ocw-studio-db-applications-production) truncate before any "-rds"
+            # text is left at all, so a resource-name wildcard can't scope this
+            # safely. The real boundary is the service it can be passed to.
             "Effect": "Allow",
             "Action": ["iam:PassRole"],
-            "Resource": "arn:aws:iam::*:role/*-rds-enh*",
+            "Resource": "*",
             "Condition": {
                 "StringEquals": {"iam:PassedToService": "monitoring.rds.amazonaws.com"}
             },
