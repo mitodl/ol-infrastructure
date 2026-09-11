@@ -192,8 +192,9 @@ ensure_admin_group_membership() {
         "${KC_URL}/admin/realms/${REALM}/groups?search=Admin" 2>/dev/null \
         | jq -r '.[] | select(.name=="Admin") | .id' 2>/dev/null | head -1 || true)
     if [ -z "${user_id}" ] || [ -z "${group_id}" ]; then
-        echo "[kc-seed-users] Admin group membership skipped (user or group not found yet)."
-        return 0
+        echo "[kc-seed-users] ERROR: could not resolve ${email} ('${user_id}') or the Admin group ('${group_id}')." >&2
+        echo "[kc-seed-users] The group comes from local-infra-apps; re-run that resource, then this one." >&2
+        exit 1
     fi
     echo "[kc-seed-users] Ensuring ${email} is in the 'Admin' group ..."
     # PUT is idempotent: a second call on an existing membership is a no-op.
