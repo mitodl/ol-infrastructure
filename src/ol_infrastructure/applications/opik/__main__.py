@@ -221,6 +221,17 @@ opik_helm_release = kubernetes.helm.v3.Release(
             # Fresh install — there is nothing to migrate from the legacy
             # Bitnami-based subcharts.
             "chartMigration": {"enabled": False},
+            # Polls system.parts (the opik user is granted SELECT on it in
+            # ol-application-clickhouse) every 5m for per-partition part counts
+            # and lightweight-delete masks on traces/spans; a distributed lock
+            # keeps it to one backend instance.
+            #
+            # clickhouse.sharding.enabled (which would also turn on the
+            # ANALYTICS_DB_CLUSTER_HEALTH_CHECK_ENABLED readiness check) stays
+            # off: opik's config.yml says to leave that check false for
+            # single-shard, non-Distributed deployments, and it is `critical`,
+            # so enabling it here would pull every backend out of rotation.
+            "partitionMetrics": {"enabled": True},
             "component": {
                 "backend": {
                     # Gate backend startup on the external ClickHouse being
