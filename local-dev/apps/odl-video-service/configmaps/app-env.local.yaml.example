@@ -14,3 +14,30 @@ metadata:
   namespace: odl-video-service
 data:
   # VIDEO_S3_BUCKET: "my-test-bucket"
+  #
+  # OVS refuses to start (ui.apps: "The following settings are missing")
+  # unless every entry in settings.MANDATORY_SETTINGS has a value, and most
+  # of them are third-party credentials the tracked config can't ship. Fill
+  # these in from your own accounts / the odl-video-service compose .env:
+  # AWS_ACCOUNT_ID: ""
+  # AWS_ROLE_NAME: ""
+  # CLOUDFRONT_KEY_ID: ""
+  # CLOUDFRONT_PRIVATE_KEY: ""
+  # DROPBOX_KEY: ""
+  # DROPBOX_SECRET: ""
+  # DROPBOX_REFRESH_TOKEN: ""
+  # GA_DIMENSION_CAMERA: ""
+  # GA_KEYFILE_JSON: ""
+  # GA_VIEW_ID: ""
+  # LECTURE_CAPTURE_USER: ""
+  # MAILGUN_KEY: ""
+  # MAILGUN_URL: ""
+  # VIDEO_CLOUDFRONT_DIST: ""
+  # VIDEO_CDN_DISTRIBUTION_ID: ""
+  # YT_ACCESS_TOKEN: ""
+  # YT_REFRESH_TOKEN: ""
+  # YT_CLIENT_ID: ""
+  # YT_CLIENT_SECRET: ""
+  # If your local database already has rows written with a different
+  # FIELD_ENCRYPTION_KEY, set it here too; this file wins over secrets.yaml.
+  # FIELD_ENCRYPTION_KEY: ""
