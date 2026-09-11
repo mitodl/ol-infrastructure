@@ -25,7 +25,7 @@ from pulumi import (
     export,
 )
 from pulumi.config import get_config
-from pulumi_aws import ec2, get_caller_identity
+from pulumi_aws import ec2, get_caller_identity, iam, s3
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import (
@@ -201,8 +201,12 @@ mitlearn_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
 ]
 mitlearn_app_buckets = [f"ol-mitlearn-app-storage-{mitlearn_env_suffix}"]
 b2b_export_buckets = [f"ol-b2b-partners-storage-{stack_info.env_suffix}"]
+irx_export_bucket_name = f"ol-irx-partners-storage-{stack_info.env_suffix}"
 dagster_pipeline_buckets = (
-    s3_tracking_logs_buckets + mitlearn_app_buckets + b2b_export_buckets
+    s3_tracking_logs_buckets
+    + mitlearn_app_buckets
+    + b2b_export_buckets
+    + [irx_export_bucket_name]
 )
 dagster_s3_permissions: list[dict[str, str | list[str]]] = [
     {
@@ -486,6 +490,88 @@ edxorg_courses_bucket = OLBucket(
         ]
     ),
 )
+
+# Nightly drop for MIT Institutional Research (IRx), replacing the three legacy
+# mitx-etl-* buckets, laid out as {deployment}/{YYYYMMDD}/. Every night is a full
+# re-export, so drops expire instead of accumulating the way they do in the
+# legacy buckets, none of which expires anything (54-87 TB each as of 2026-08-30).
+irx_export_bucket = OLBucket(
+    "irx-export",
+    config=S3BucketConfig(
+        bucket_name=irx_export_bucket_name,
+        versioning_enabled=False,
+        server_side_encryption_enabled=True,
+        # Objects expire at 90 days, which is when tiering would first move them.
+        intelligent_tiering_enabled=False,
+        lifecycle_rules=[
+            s3.BucketLifecycleConfigurationRuleArgs(
+                id="expire-nightly-drops",
+                status="Enabled",
+                filter=s3.BucketLifecycleConfigurationRuleFilterArgs(prefix=""),
+                expiration=s3.BucketLifecycleConfigurationRuleExpirationArgs(days=90),
+            )
+        ],
+        tags=aws_config.tags,
+    ),
+)
+
+# IRx reads with the static key of an IAM user created by hand in 2022, which is
+# what Simeon is configured with. Its read policy and attachment were made in the
+# console too and are imported here so the grant lives in code. An import only
+# succeeds when the declared resource matches the live one, so this document is
+# the live one verbatim (Sids included); the IRx bucket is added once the import
+# has been applied.
+if stack_info.env_suffix == "production":
+    irx_user_name = "institutional-research-edx-data-exports-access"
+    irx_read_policy_arn = (
+        f"arn:aws:iam::{aws_account.account_id}:policy/edx-data-extracts-read-only"
+    )
+    irx_read_policy = iam.Policy(
+        "irx-edx-data-extracts-read-only",
+        name="edx-data-extracts-read-only",
+        path="/",
+        policy=json.dumps(
+            {
+                "Version": IAM_POLICY_VERSION,
+                "Statement": [
+                    {
+                        "Sid": "VisualEditor0",
+                        "Effect": "Allow",
+                        "Action": [
+                            "s3:GetObjectAcl",
+                            "s3:GetObject",
+                            "s3:GetObjectVersionTagging",
+                            "s3:GetObjectVersionAcl",
+                            "s3:GetObjectTagging",
+                            "s3:GetObjectVersion",
+                        ],
+                        "Resource": [
+                            "arn:aws:s3:::mitx-etl-*/*",
+                            "arn:aws:s3:::*production-edxapp-tracking/*",
+                        ],
+                    },
+                    {
+                        "Sid": "VisualEditor1",
+                        "Effect": "Allow",
+                        "Action": ["s3:ListBucketVersions", "s3:ListBucket"],
+                        "Resource": [
+                            "arn:aws:s3:::mitx-etl-*",
+                            "arn:aws:s3:::*production-edxapp-tracking",
+                        ],
+                    },
+                ],
+            }
+        ),
+        opts=ResourceOptions(import_=irx_read_policy_arn, protect=True),
+    )
+    iam.UserPolicyAttachment(
+        "irx-edx-data-extracts-read-only-attachment",
+        user=irx_user_name,
+        policy_arn=irx_read_policy.arn,
+        opts=ResourceOptions(
+            import_=f"{irx_user_name}/{irx_read_policy_arn}", protect=True
+        ),
+    )
 
 
 # Security group for RDS database - updated to allow Kubernetes pod access
@@ -3246,3 +3332,4 @@ export(
         "s3_prefix": "openmetadata/dbt-artifacts",
     },
 )
+export("irx_export_bucket", irx_export_bucket.bucket_v2.bucket)
