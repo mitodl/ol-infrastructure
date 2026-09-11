@@ -90,6 +90,22 @@ CLOUDWATCH_NON_PROD_URGENCY_RULES = [
     },
 ]
 
+# Dagster's metadata database. Its alarms are worth seeing but not worth waking
+# anyone for: Dagster retries and backfills, so a degraded control plane costs
+# pipeline latency, not user-facing availability. DiskQueueDepth in particular
+# is expected to breach and self-clear about weekly (see the RDS comment in
+# applications/dagster/__main__.py), and paged on-call at High on 2026-09-11.
+# Medium routes to #devops-warnings only; see the Medium urgency paths below.
+CLOUDWATCH_DAGSTER_DB_URGENCY_RULES = [
+    {
+        "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
+        "jsonPath": "$.Message.AlarmName",
+        "kind": "payload",
+        "operator": "contains",
+        "value": "ol-etl-db-production",
+    },
+]
+
 # Deliberately no CUSTOM deduplication-key or resolution-rule config on the two
 # CloudWatch sources below -- deduplicate_alerts_by_key is switched off so that
 # Rootly's native cloud_watch behaviour handles both, keyed on something better
@@ -2957,7 +2973,10 @@ alerts_source_cloudwatch_critical = rootly.AlertsSource(
         {"alertFieldId": "4a3add3c-5611-4dd9-ba65-4fb60b7f4fc6"},
         {"alertFieldId": "45a09cf3-b0f2-43cf-b596-34aaab9279dc"},
     ],
-    alert_source_urgency_rules_attributes=CLOUDWATCH_NON_PROD_URGENCY_RULES,
+    alert_source_urgency_rules_attributes=[
+        *CLOUDWATCH_NON_PROD_URGENCY_RULES,
+        *CLOUDWATCH_DAGSTER_DB_URGENCY_RULES,
+    ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplicate_alerts_by_key=False,
     deduplication_key_kind="payload",
@@ -2977,7 +2996,10 @@ alerts_source_cloudwatch_warning = rootly.AlertsSource(
         {"alertFieldId": "4a3add3c-5611-4dd9-ba65-4fb60b7f4fc6"},
         {"alertFieldId": "45a09cf3-b0f2-43cf-b596-34aaab9279dc"},
     ],
-    alert_source_urgency_rules_attributes=CLOUDWATCH_NON_PROD_URGENCY_RULES,
+    alert_source_urgency_rules_attributes=[
+        *CLOUDWATCH_NON_PROD_URGENCY_RULES,
+        *CLOUDWATCH_DAGSTER_DB_URGENCY_RULES,
+    ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplicate_alerts_by_key=False,
     deduplication_key_kind="payload",
@@ -3112,6 +3134,20 @@ alerts_source_grafana_prometheus_production = rootly.AlertsSource(
                 "HPAAtMaxReplicasCritical",
             ]
         ],
+        # Every Dagster rule (metric_rules/dagster_*.py, log_rules/dagster_*.py).
+        # Their production *Critical twins arrived at High and paged:
+        # DagsterQueuedRunStuckCritical and DagsterRunFailureRateCritical on
+        # 2026-09-10 around 20:45 ET. A stalled or failing Dagster delays data
+        # pipelines by hours; nothing user-facing is down, so it can wait for
+        # business hours. `contains` rather than an alertname list so a new or
+        # renamed Dagster rule cannot bypass this and page.
+        {
+            "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
+            "jsonPath": "$.commonLabels.alertname",
+            "kind": "payload",
+            "operator": "contains",
+            "value": "Dagster",
+        },
     ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
@@ -3298,7 +3334,16 @@ alerts_source_pingdom = rootly.AlertsSource(
             "kind": "payload",
             "operator": "is",
             "value": "LOW",
-        }
+        },
+        # Same reasoning as the Dagster rule on the Grafana Production source.
+        # Matches the "Dagster Checks to Dagster Webapp" route's condition.
+        {
+            "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
+            "jsonPath": "$.check_name",
+            "kind": "payload",
+            "operator": "contains",
+            "value": "Dagster",
+        },
     ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
