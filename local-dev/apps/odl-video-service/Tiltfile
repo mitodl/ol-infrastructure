@@ -33,7 +33,9 @@ k8s_yaml_local([
 
 k8s_resource(
     DEPLOY_NAME,
-    port_forwards=['8088:8088'],
+    # granian listens on 8089 (deployment.yaml); keep the host side on 8088 so
+    # it doesn't collide with the docker-compose nginx on 8089.
+    port_forwards=['8088:8089'],
     labels=['odl-video-service'],
     resource_deps=['local-infra-apps'],
 )
