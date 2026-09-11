@@ -623,9 +623,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         string_data=Output.all(
             client_id=ovs_client.client_id,
             client_secret=ovs_client_secret,
-            realm_url=ovs_client.realm_id.apply(
-                lambda rid: f"{keycloak_url}/realms/{rid}"
-            ),
             public_key=realm_keys.keys.apply(lambda keys: keys[0].public_key),
         ).apply(
             lambda a: {
@@ -633,10 +630,10 @@ def create_olapps_dev_realm(  # noqa: PLR0913
                 "SOCIAL_AUTH_KEYCLOAK_SECRET": a["client_secret"],
                 "SOCIAL_AUTH_KEYCLOAK_PUBLIC_KEY": a["public_key"],
                 "SOCIAL_AUTH_KEYCLOAK_AUTHORIZATION_URL": (
-                    f"{a['realm_url']}/protocol/openid-connect/auth"
+                    f"{keycloak_url}/realms/olapps/protocol/openid-connect/auth"
                 ),
                 "SOCIAL_AUTH_KEYCLOAK_ACCESS_TOKEN_URL": (
-                    f"{a['realm_url']}/protocol/openid-connect/token"
+                    f"{keycloak_url}/realms/olapps/protocol/openid-connect/token"
                 ),
                 # Admin API credentials for group lookups (ui/keycloak_utils.py);
                 # settings.py derives KEYCLOAK_SERVER_URL/REALM from the token URL.
