@@ -62,22 +62,22 @@ spec:
         image: mitodl/odl-video-service-app:latest
         imagePullPolicy: IfNotPresent
         command:
-        - granian
-        - --interface
-        - wsgi
-        - --host
-        - 0.0.0.0
-        - --port
-        - "8089"
-        - --workers
-        - "2"
-        # Matches production (PR #5281): serve /static/* from Granian's Rust
-        # layer instead of a sidecar. STATIC_ROOT is /src/staticfiles, the
-        # same emptyDir collectstatic populates, and STATIC_URL is the
-        # default /static route.
-        - --static-path-mount
-        - /src/staticfiles
-        - odl_video.wsgi:application
+        - sh
+        - -c
+        # Auto-reload on Tilt live-update syncs, but only when the image has
+        # watchfiles (the Tilt-built local-dev target does; the production
+        # target and the prebuilt DockerHub image don't). Watches /src; the
+        # ignored dirs churn without affecting Python.
+        # --static-path-mount matches production (PR #5281): serve /static/*
+        # from Granian's Rust layer. STATIC_ROOT is /src/staticfiles, the same
+        # emptyDir collectstatic populates.
+        - |
+          if python -c 'import watchfiles' 2>/dev/null; then
+            # --workers-kill-timeout: force-kill workers whose app threads
+            # keep them from stopping gracefully, so reloads don't hang.
+            RELOAD_ARGS="--reload --reload-ignore-dirs static --reload-ignore-dirs staticfiles --reload-ignore-dirs node_modules --reload-ignore-dirs htmlcov --workers-kill-timeout 1"
+          fi
+          exec granian --interface wsgi --host 0.0.0.0 --port 8089 --workers 2 --static-path-mount /src/staticfiles $RELOAD_ARGS odl_video.wsgi:application
         ports:
         - containerPort: 8089
           name: http-wsgi
