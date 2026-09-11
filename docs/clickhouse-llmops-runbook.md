@@ -250,29 +250,55 @@ histogram_quantile(0.99, rate(clickhouse_query_duration_milliseconds_bucket[5m])
 
 ## Backup and Restore
 
-### Cold S3 data (automatic)
+There are two recovery layers. Neither covers the other's case.
 
-Data moved to `cold_s3` disk is stored in S3 (`ol-data-clickhouse-cold-<env>`).
-S3 Intelligent-Tiering provides durability (11 nines). No separate backup needed
-for cold data.
+| Layer | What | Schedule / retention | Use it for |
+|---|---|---|---|
+| AWS Backup | EBS snapshot of every CH and Keeper PVC (`<cluster>-eks-backup-plan`, `infrastructure/aws/eks/aws_backup.py`) | Daily 05:00 UTC, 14 days | A lost or corrupted PVC. Crash-consistent and per volume, not coordinated across replicas. |
+| SQL `BACKUP` | `clickhouse-backup` CronJob: every database except `system` / `INFORMATION_SCHEMA`, to `s3://ol-data-clickhouse-backup-<env>/backups/<UTC timestamp>/` | Daily 03:30 UTC, 14 days (`clickhouse:backup_retention_days`); overwritten or deleted objects kept 7 more days as noncurrent versions | Restoring tables or whole databases, into this cluster or another one at the same or a newer server version. |
 
-### Hot data snapshot
+The SQL backup runs on replica 0 (`chi-clickhouse-default-0-0`) because Opik's
+Liquibase ledger (`default.DATABASECHANGELOG*`) exists only there. The target is
+the `backups` disk (`s3_plain`), the only disk `backups.allowed_disk` permits.
+The cold-tier bucket is not a backup: once tiering is active it holds live
+parts.
 
-ClickHouse's built-in `BACKUP` command can snapshot hot data to the cold S3 bucket:
+### Check the latest backup
 
-```sql
-BACKUP DATABASE tensorzero_db
-TO S3('https://ol-data-clickhouse-cold-production.s3.amazonaws.com/backups/tensorzero_db/', '<irsa-credentials-auto-provided>')
-SETTINGS compression_method='lz4';
+```bash
+kubectl -n clickhouse get jobs -l app.kubernetes.io/name=clickhouse-backup
+kubectl -n clickhouse logs job/<job-name>
+aws s3 ls s3://ol-data-clickhouse-backup-<env>/backups/
 ```
 
-### Restore from backup
+`system.backups` only lists runs since that server last restarted, and only on
+the server that ran them.
+
+### Restore
+
+**Never restore into the cluster the backup came from while its tables still
+exist, not even under a new table name.** Opik's replicated tables hardcode
+their Keeper path in the engine definition, e.g.
+`ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/opik_db/spans',
+'{replica}', ...)`. `RESTORE ... AS opik_db.spans_restored` keeps that
+definition, so the restored table registers under the live table's Keeper path
+and replica name instead of becoming an independent copy.
+
+Restore into a cluster with its own Keeper ensemble instead: a scratch
+ClickHouseInstallation and ClickHouseKeeperInstallation, or a rebuilt cluster
+after a total loss. Its IRSA role needs read access to the source environment's
+backup bucket, and its `backups` disk must point at that bucket. Run the
+restore on replica 0 of the target:
 
 ```sql
-RESTORE DATABASE tensorzero_db
-FROM S3('https://ol-data-clickhouse-cold-production.s3.amazonaws.com/backups/tensorzero_db/')
-SETTINGS allow_non_empty_tables=true;
+RESTORE DATABASE opik_db FROM Disk('backups', '<UTC timestamp>');
+RESTORE TABLE default.DATABASECHANGELOG, TABLE default.DATABASECHANGELOGLOCK
+FROM Disk('backups', '<UTC timestamp>');
 ```
+
+To recover individual rows into the live cluster, restore into the scratch
+cluster first, then copy across with `INSERT INTO opik_db.<table> SELECT ...
+FROM remote('<scratch host>', opik_db.<table>, ...)`.
 
 ---
 
