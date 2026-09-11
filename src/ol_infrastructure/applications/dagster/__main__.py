@@ -517,15 +517,11 @@ irx_export_bucket = OLBucket(
 
 # IRx reads with the static key of an IAM user created by hand in 2022, which is
 # what Simeon is configured with. Its read policy and attachment were made in the
-# console too and are imported here so the grant lives in code. An import only
-# succeeds when the declared resource matches the live one, so this document is
-# the live one verbatim (Sids included); the IRx bucket is added once the import
-# has been applied.
+# console too and were adopted into this stack by import (#5822). The user itself
+# stays unmanaged. The mitx-etl-* grants cover the legacy_openedx drop, which is
+# the only delivery path to IRx until the facade's parallel run passes.
 if stack_info.env_suffix == "production":
     irx_user_name = "institutional-research-edx-data-exports-access"
-    irx_read_policy_arn = (
-        f"arn:aws:iam::{aws_account.account_id}:policy/edx-data-extracts-read-only"
-    )
     irx_read_policy = iam.Policy(
         "irx-edx-data-extracts-read-only",
         name="edx-data-extracts-read-only",
@@ -548,6 +544,7 @@ if stack_info.env_suffix == "production":
                         "Resource": [
                             "arn:aws:s3:::mitx-etl-*/*",
                             "arn:aws:s3:::*production-edxapp-tracking/*",
+                            f"arn:aws:s3:::{irx_export_bucket_name}/*",
                         ],
                     },
                     {
@@ -557,20 +554,19 @@ if stack_info.env_suffix == "production":
                         "Resource": [
                             "arn:aws:s3:::mitx-etl-*",
                             "arn:aws:s3:::*production-edxapp-tracking",
+                            f"arn:aws:s3:::{irx_export_bucket_name}",
                         ],
                     },
                 ],
             }
         ),
-        opts=ResourceOptions(import_=irx_read_policy_arn, protect=True),
+        opts=ResourceOptions(protect=True),
     )
     iam.UserPolicyAttachment(
         "irx-edx-data-extracts-read-only-attachment",
         user=irx_user_name,
         policy_arn=irx_read_policy.arn,
-        opts=ResourceOptions(
-            import_=f"{irx_user_name}/{irx_read_policy_arn}", protect=True
-        ),
+        opts=ResourceOptions(protect=True),
     )
 
 
