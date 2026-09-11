@@ -280,6 +280,47 @@ async def test_preview_flags_an_in_flight_release(repos, slack, monkeypatch):
     assert "supersedes it" in slack.said
 
 
+async def test_preview_reports_a_pending_hotfix_instead_of_the_normal_next_version(
+    repos, slack, monkeypatch
+):
+    """A pending hotfix is what the resource would actually offer next.
+
+    Without this, preview reports the calver-next version and every commit
+    on the default branch -- contradicting what `/doof release` would cut
+    (and refuse to), since the release resource offers the hotfix instead.
+    """
+    release_preview = AsyncMock()
+    monkeypatch.setattr(bot.github, "release_preview", release_preview)
+    monkeypatch.setattr(
+        bot.github, "pending_hotfix_requests", AsyncMock(return_value=[_SHA])
+    )
+
+    await bot._cmd_preview(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    release_preview.assert_not_awaited()
+    said = slack.said
+    assert "a hotfix of `aaaaaaa` is pending" in said
+    assert "not a normal release" in said
+    assert "/doof hotfix my-app aaaaaaa" in said
+
+
+async def test_preview_fails_closed_when_the_pending_hotfix_check_errors(
+    repos, slack, monkeypatch
+):
+    release_preview = AsyncMock()
+    monkeypatch.setattr(bot.github, "release_preview", release_preview)
+    monkeypatch.setattr(
+        bot.github,
+        "pending_hotfix_requests",
+        AsyncMock(side_effect=RuntimeError("github down")),
+    )
+
+    await bot._cmd_preview(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    release_preview.assert_not_awaited()
+    assert "Could not check" in slack.said
+
+
 # ---------------------------------------------------------------------------
 # /doof release-status
 # ---------------------------------------------------------------------------
@@ -1548,7 +1589,13 @@ async def test_abandon_triggers_the_job_for_an_in_flight_release(
     await bot._cmd_abandon(repos, slack.ack, slack.respond, _command("my-app"), {})
 
     assert calls == [("trigger", "my-app-pipeline", "abandon-my-app-release")]
-    assert "Abandoning" in slack.said
+    said = slack.said
+    # Not "Abandoning <version>": the job deletes whatever version the
+    # release resource's last `check` recorded, which can diverge from what
+    # in_flight_release reads fresh from GitHub branches.
+    assert "abandon triggered" in said
+    assert "last seen in flight" in said
+    assert "2026.9.9.1" in said
 
 
 async def test_abandon_cancels_nothing_when_it_cannot_read_release_state(

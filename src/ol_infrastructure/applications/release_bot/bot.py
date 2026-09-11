@@ -193,6 +193,26 @@ async def _cmd_preview(repos, ack, respond, command, _context):
     if cfg is None:
         await respond(error)
         return
+    # While a hotfix request is pending the release resource offers that
+    # hotfix, not the tracked branch's calver-next version -- same check
+    # `_release` uses, so the preview doesn't contradict what `/doof release`
+    # would actually cut.
+    try:
+        pending = await github.pending_hotfix_requests(cfg.repo)
+    except Exception:
+        log.exception("Failed to check pending hotfixes for %s", app_name)
+        await respond(f"❌ Could not check `{app_name}` for a pending hotfix.")
+        return
+    if pending:
+        short = pending[0][:7]
+        await respond(
+            f"*Release preview for `{app_name}`* — a hotfix of `{short}` is "
+            "pending, so the next cut would be that hotfix (what production "
+            "runs plus that commit), not a normal release.\n"
+            f"`/doof hotfix {app_name} {short}` continues it; "
+            f"`/doof abandon {app_name}` cancels it."
+        )
+        return
     try:
         preview = await github.release_preview(cfg.repo)
     except Exception:
@@ -402,10 +422,15 @@ async def _abandon(respond, app_name, cfg):
         await respond(f"❌ Failed to trigger release abandon for `{app_name}`.")
         return
     _release_requesters.pop(app_name, None)
+    # The job deletes whatever version the release resource's last `check`
+    # recorded, which can diverge from `in_flight` (read fresh from GitHub
+    # branches here) if a `check` ran without a cut in between. Report the
+    # trigger, not a specific deletion, and let the build's own output say
+    # what it removed.
     lines.insert(
         0,
-        f"🗑️ Abandoning {_describe_in_flight(in_flight)} for `{app_name}`. "
-        f"Build: {build_url}",
+        f"🗑️ Release abandon triggered for `{app_name}` (last seen in flight: "
+        f"{_describe_in_flight(in_flight)}). Build: {build_url}",
     )
     await respond("\n".join(lines))
 
