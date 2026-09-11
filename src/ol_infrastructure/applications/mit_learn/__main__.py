@@ -2248,5 +2248,6 @@ export(
             mitlearn_vault_iam_role.backend, mitlearn_vault_iam_role.name
         ).apply(lambda role: f"{role[0]}/roles/{role[1]}"),
         "app_security_group_id": mitlearn_app_security_group.id,
+        "fastly_service_id": mitlearn_fastly_service.id,
     },
 )

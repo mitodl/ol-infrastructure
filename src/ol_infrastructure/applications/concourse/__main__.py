@@ -352,14 +352,26 @@ vault.generic.Secret(
         ]
     ).apply(json.dumps),
 )
-for pipeline_var_path, secret_data in read_yaml_secrets(
+pipeline_secrets = read_yaml_secrets(
     Path(f"concourse/operations.{stack_info.env_suffix}.yaml")
-)["pipelines"].items():
+)["pipelines"]
+# The OCW publish pipelines purge the MIT Learn Fastly service by surrogate key,
+# which needs that service's ID alongside a purge token. Both halves are derived
+# rather than transcribed: the token is the shared purge key that already covers
+# every service in the account, and the ID is read from the stack that owns the
+# service, so no opaque service ID is ever hand-entered.
+if "shared/fastly" in pipeline_secrets:
+    mitlearn_stack = make_stack_reference(projects.MIT_LEARN, stack_info.name)
+    pipeline_secrets["ocw/fastly_learn"] = {
+        "api_token": pipeline_secrets["shared/fastly"]["api_token"],
+        "service_id": mitlearn_stack.require_output("mit_learn")["fastly_service_id"],
+    }
+for pipeline_var_path, secret_data in pipeline_secrets.items():
     secret_path = partial("{1}/{0}".format, pipeline_var_path)
     vault.generic.Secret(
         f"concourse-pipeline-credentials-{pipeline_var_path}",
         path=concourse_secrets_mount.path.apply(secret_path),
-        data_json=json.dumps(secret_data),
+        data_json=Output.json_dumps(secret_data),
     )
 
 # Vault policy definition
