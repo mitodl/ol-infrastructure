@@ -49,15 +49,15 @@ def rootly_imported_route_opts(route_id: str) -> ResourceOptions:
     Diff the preview before applying; the rule bodies were generated from
     `GET /v1/alert_routes` precisely so the declared state starts out matching.
 
-    Any change to a route's `rules` disables every rule on it. The provider
-    resends the whole list, Rootly destroys the existing rules and creates new
-    ones with `enabled=false`, and neither this SDK nor the upstream provider
-    (checked through v5.21.0) has a per-rule `enabled` field -- so Pulumi can
-    neither set it nor see the drift. That is how #5494's apply on 2026-08-18
-    turned off all ten rules on the Grafana Production Service Route. After an
-    apply that touches `rules`, re-enable them in Rootly and confirm with
-    `GET /v1/alert_routes` -> `.rules[].enabled`. Deleting a whole route does
-    not trigger this.
+    Any change to a route's `rules` resends the whole list, and Rootly destroys
+    the existing rules and creates new ones. The new rules read `enabled=false`
+    in `GET /v1/alert_routes`; neither this SDK nor the upstream provider
+    (checked at v5.21.0) has a per-rule `enabled` field. That flag does not stop
+    a rule matching under Advanced Alert Routing, and the Rootly UI has no
+    per-rule toggle. After #5494's apply recreated the Grafana Production
+    Service Route's rules on 2026-08-18, alerts from `mitxonline-openedx` that
+    day and `mitlearn` the next were still attributed to the services those
+    rules target. Don't read `enabled=false` on these routes as a dead rule.
 
     Safe to drop back to `rootly_opts` once every stack has applied this.
     """
@@ -3776,8 +3776,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
         # and they emit exactly the `service`/`ol_component` pair these two
         # match on. Before the move they matched nothing and MIT Learn - API
         # and MIT Learn - NextJS were among the Rootly services no rule
-        # targeted. The apply that added them also left every rule on this
-        # route disabled; see `rootly_imported_route_opts`.
+        # targeted.
         #
         # These sit ahead of the `namespace`-keyed rules below because
         # conditions are `contains` and the first match wins: a narrow rule
