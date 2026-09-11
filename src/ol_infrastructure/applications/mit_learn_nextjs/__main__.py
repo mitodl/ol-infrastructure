@@ -117,8 +117,17 @@ stay_updated_hubspot_form_ids = {
     "production": "a5d18493-dcdb-4482-ad10-16ab66a35526",
 }
 
+# HubSpot tracking portal: xprodev for dev/RC, xPRO prod for production
+# (mitodl/hq#10735). Public value (in the js.hs-scripts.com URL), not a secret.
+hubspot_portal_ids = {
+    "ci": "23128026",
+    "qa": "23128026",
+    "production": "4994459",
+}
+
 try:
     stay_updated_hubspot_form_id = stay_updated_hubspot_form_ids[stack_info.env_suffix]
+    hubspot_portal_id = hubspot_portal_ids[stack_info.env_suffix]
 except KeyError as exc:
     msg = f"Unsupported MIT Learn Next.js environment: {stack_info.env_suffix}"
     raise ValueError(msg) from exc
@@ -178,6 +187,7 @@ raw_env_vars = {
     "NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE": "0.25",
     "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "0.001",
     "NEXT_PUBLIC_SITE_NAME": "MIT Learn",
+    "NEXT_PUBLIC_HUBSPOT_PORTAL_ID": hubspot_portal_id,
     "NEXT_PUBLIC_STAY_UPDATED_HUBSPOT_FORM_ID": stay_updated_hubspot_form_id,
     "NEXT_PUBLIC_VERSION": MIT_LEARN_NEXTJS_DOCKER_TAG,
     "NEXT_PUBLIC_FEATURE_product_page_courses": "false",
