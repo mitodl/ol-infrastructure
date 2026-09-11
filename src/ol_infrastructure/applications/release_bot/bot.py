@@ -419,7 +419,12 @@ async def _abandon(respond, app_name, cfg):
         )
     except Exception:
         log.exception("Failed to trigger abandon for %s", app_name)
-        await respond(f"❌ Failed to trigger release abandon for `{app_name}`.")
+        # Any cancelled-hotfix lines already collected are a real state
+        # change that happened before this failure; dropping them would tell
+        # the user nothing was abandoned when their hotfix requests are
+        # already gone.
+        lines.append(f"❌ Failed to trigger release abandon for `{app_name}`.")
+        await respond("\n".join(lines))
         return
     _release_requesters.pop(app_name, None)
     # The job deletes whatever version the release resource's last `check`

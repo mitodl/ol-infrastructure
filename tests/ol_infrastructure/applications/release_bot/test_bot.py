@@ -1598,6 +1598,29 @@ async def test_abandon_triggers_the_job_for_an_in_flight_release(
     assert "2026.9.9.1" in said
 
 
+async def test_abandon_reports_cancelled_hotfixes_when_the_trigger_fails(
+    repos, slack, monkeypatch
+):
+    """A failed trigger must not hide that hotfix requests were already cancelled."""
+    monkeypatch.setattr(
+        bot.github, "cancel_hotfix_requests", AsyncMock(return_value=[_SHA])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.9.9.1", timedelta(days=1))),
+    )
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(side_effect=RuntimeError("boom"))
+    )
+
+    await bot._cmd_abandon(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    said = slack.said
+    assert "Cancelled the pending hotfix of `aaaaaaa`" in said
+    assert "Failed to trigger release abandon" in said
+
+
 async def test_abandon_cancels_nothing_when_it_cannot_read_release_state(
     repos, slack, monkeypatch
 ):
