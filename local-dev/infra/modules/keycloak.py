@@ -543,10 +543,32 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
-        service_accounts_enabled=False,
+        # OVS validates "moira list" names against Keycloak groups through the
+        # Admin API with a client_credentials grant on this client.
+        service_accounts_enabled=True,
         valid_redirect_uris=[f"https://video.odl.{root_domain}/*"],
         opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
     )
+    ovs_realm_management = keycloak.openid.get_client_output(
+        realm_id=realm.realm,
+        client_id="realm-management",
+        opts=InvokeOptions(provider=keycloak_provider),
+    )
+    # Same grants as the prod ol-mit OVS client (substructure/keycloak/ol_mit.py).
+    for resource_name, role in [
+        ("olapps-ovs-sa-manage-users", "manage-users"),
+        ("olapps-ovs-sa-view-users", "view-users"),
+        ("olapps-ovs-sa-query-users", "query-users"),
+        ("olapps-ovs-sa-query-groups", "query-groups"),
+    ]:
+        keycloak.openid.ClientServiceAccountRole(
+            resource_name,
+            realm_id=realm.realm,
+            service_account_user_id=ovs_client.service_account_user_id,
+            client_id=ovs_realm_management.id,
+            role=role,
+            opts=kc_opts,
+        )
     keycloak.openid.ClientDefaultScopes(
         "olapps-ovs-default-scopes",
         realm_id=realm.realm,
@@ -616,6 +638,10 @@ def create_olapps_dev_realm(  # noqa: PLR0913
                 "SOCIAL_AUTH_KEYCLOAK_ACCESS_TOKEN_URL": (
                     f"{a['realm_url']}/protocol/openid-connect/token"
                 ),
+                # Admin API credentials for group lookups (ui/keycloak_utils.py);
+                # settings.py derives KEYCLOAK_SERVER_URL/REALM from the token URL.
+                "KEYCLOAK_SVC_ADMIN": a["client_id"],
+                "KEYCLOAK_SVC_ADMIN_PASSWORD": a["client_secret"],
             }
         ),
         opts=k8s_opts,
