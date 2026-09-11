@@ -23,6 +23,9 @@ data:
   # AWS_ROLE_NAME: ""
   # CLOUDFRONT_KEY_ID: ""
   # CLOUDFRONT_PRIVATE_KEY: ""
+  # The Dropbox app behind DROPBOX_KEY must list video.odl.mit.dev under
+  # "Chooser / Saver / Embedder domains" in the Dropbox App Console, or the
+  # "Add Videos from Dropbox" chooser fails with "App is misconfigured".
   # DROPBOX_KEY: ""
   # DROPBOX_SECRET: ""
   # DROPBOX_REFRESH_TOKEN: ""
