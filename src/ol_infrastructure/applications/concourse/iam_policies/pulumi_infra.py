@@ -292,6 +292,12 @@ policy_definition = {
                 "iam:GetUser",
                 "iam:ListAccessKeys",
                 "iam:ListAttachedRolePolicies",
+                # Refresh reads every aws:iam/user:User's attached managed
+                # policies the same way it reads a role's -- confirmed by a
+                # live AccessDenied on institutional-research-edx-data-exports-access's
+                # edx-data-extracts-read-only attachment. Only the role variant
+                # was granted above.
+                "iam:ListAttachedUserPolicies",
                 "iam:ListEntitiesForPolicy",
                 "iam:ListGroupsForUser",
                 "iam:ListPolicyTags",
@@ -511,6 +517,23 @@ policy_definition = {
                     for env in ("ci", "qa", "production")
                 ],
             ],
+        },
+        {
+            # components/aws/database.py creates a
+            # "{instance_name}-rds-enhanced-monitoring-" role (name_prefix
+            # truncated to IAM_ROLE_NAME_PREFIX_MAX_LENGTH=32) for any DB with
+            # enhanced_monitoring_interval set, and blue/green updates pass it
+            # to RDS -- confirmed by a live AccessDenied on
+            # keycloak-production's CreateBlueGreenDeployment. The 32-char
+            # truncation can eat "-monitoring-" entirely (as it did for
+            # keycloak-production) but always leaves "-rds-enh", so that's
+            # the resource match rather than the full name_prefix text.
+            "Effect": "Allow",
+            "Action": ["iam:PassRole"],
+            "Resource": "arn:aws:iam::*:role/*-rds-enh*",
+            "Condition": {
+                "StringEquals": {"iam:PassedToService": "monitoring.rds.amazonaws.com"}
+            },
         },
     ],
 }
