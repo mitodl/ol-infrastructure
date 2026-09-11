@@ -86,6 +86,12 @@ spec:
             name: odlvideo-env
         - secretRef:
             name: odlvideo-secrets
+        # SOCIAL_AUTH_KEYCLOAK_* for the local olapps realm, written by the
+        # local-infra-apps Pulumi stack (local-dev/infra/modules/keycloak.py).
+        # Optional so the pod still starts before that stack has run.
+        - secretRef:
+            name: ol-ovs-oidc
+            optional: true
         # Gitignored per-developer overrides; must stay LAST so its keys win
         # over both sources above. See "Local Configuration Overrides" in
         # local-dev/README.md.
@@ -166,6 +172,11 @@ spec:
             name: odlvideo-env
         - secretRef:
             name: odlvideo-secrets
+        # mail/tasks.py resolves Keycloak groups for notifications, so the
+        # worker needs the same Admin API credentials as the webapp.
+        - secretRef:
+            name: ol-ovs-oidc
+            optional: true
         # Gitignored per-developer overrides; must stay LAST so its keys win
         # over both sources above. See "Local Configuration Overrides" in
         # local-dev/README.md.

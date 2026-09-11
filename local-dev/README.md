@@ -118,7 +118,7 @@ For per-developer app env vars and secrets (API keys, feature flags), don't edit
 
 This will:
 1. Validate that `setup.sh` has been run (cluster exists, kubeconfig configured, certs present)
-2. Restart the k3d cluster if it was paused by `stop.sh`
+2. Restart the k3d cluster if it was paused by `stop.sh`, and the image registry if it was stopped
 3. Heal any wedged kubelet exec/streaming (see [Troubleshooting](#kubectl-exec-fails-with-a-502-wedged-kubelet-streaming)) — a no-op when healthy
 4. Sync Python dependencies via `uv`
 5. Start Tilt
@@ -198,11 +198,13 @@ Only the listed apps will be deployed. Shared infrastructure always runs.
 
 Log in at any app (or `https://sso.ol.mit.dev` directly) with the seeded Keycloak users: `admin@odl.local`, `student@odl.local`, `prof@odl.local` — password `localdev123` for all three.  <!-- pragma: allowlist secret -->
 
+odl-video-service derives Django permissions from Keycloak group membership: `admin@odl.local` is in the realm's `Admin` group, so it becomes a Django superuser on first login; the other two are plain users.
+
 ### Editing code
 
 With an app repo checked out next to `ol-infrastructure`, Tilt live-syncs your edits into the running containers — no rebuild. (Curious how? See [Two transports](ARCHITECTURE.md#two-transports-how-your-code-reaches-a-pod) in ARCHITECTURE.md.) What to expect:
 
-- **Django apps:** granian runs with `--reload` and restarts its workers on each change — the new code serves once Django finishes re-importing (roughly 10–30 s depending on the app). Watch for `Changes detected, reloading workers..` in the app logs. Celery workers and beat don't auto-reload — restart those resources from the Tilt UI after changing task code. When `pyproject.toml` or `uv.lock` changes, Tilt runs `uv sync` inside the container first.
+- **Django apps:** granian runs with `--reload` and restarts its workers on each change — the new code serves once Django finishes re-importing (roughly 10–30 s depending on the app). Watch for `Changes detected, reloading workers..` in the app logs. Celery workers and beat don't auto-reload — restart those resources from the Tilt UI after changing task code. When `pyproject.toml` or `uv.lock` changes, Tilt runs `uv sync` inside the container first. Exception: odl-video-service rebuilds its image on every change for now; hot reload for it lands with [#5834](https://github.com/mitodl/ol-infrastructure/pull/5834).
 - **Next.js frontend:** Tilt builds the `local-dev` stage of `Dockerfile.web`, which runs `next dev` (Turbopack). Changes under `frontends/` hot-reload in roughly a second (the first request to each page after a pod start pays a one-time on-demand compile). HMR websockets are proxied through apisix, so the browser hot-updates on `https://learn.mit.dev` too. `NEXT_PUBLIC_*` values are runtime env vars (see its `configmaps/app-env.yaml`), not build args, so changing them needs no rebuild. When `yarn.lock` changes, Tilt runs `yarn install` inside the container.
 - **No checkout:** Tilt deploys the pre-built Docker Hub image (`mitodl/<app>-app`) at the tag listed in `tilt_config.json` under `prebuilt_tags`. It works, but does not hot-reload — you can work on mit-learn without having learn-ai checked out.
 
@@ -774,6 +776,21 @@ cp ~/kube-backup.yaml ~/.kube/config 2>/dev/null || true
 k3d kubeconfig merge local-dev --kubeconfig-merge-default
 kubectl config get-contexts local-dev   # Should now succeed
 ```
+
+### WSL2: every image build fails with `error getting credentials`
+
+```
+Build Failed: docker push: ... authInfo#RetrieveAuthTokenFromImage: error getting credentials - err: exit status 1, out: ``
+```
+
+Docker Desktop sets `"credsStore": "desktop.exe"` in `~/.docker/config.json`, and Tilt asks that Windows binary for credentials before every push and pull. When WSL's interop channel to Windows is unhealthy the helper fails with no output, and unlike `docker push`, Tilt treats that as fatal. Confirm it with:
+
+```bash
+echo localhost:5001 | docker-credential-desktop.exe get
+# <3>WSL (...) ERROR: UtilAcceptVsock:271: accept4 failed 110
+```
+
+Either reset the interop channel from Windows PowerShell with `wsl --shutdown` and start again, or remove the `credsStore` key from `~/.docker/config.json` so Tilt never calls the helper (Docker Desktop re-adds it on restart). The local registry needs no credentials, so anonymous pushes work. See [mitodl/hq#13310](https://github.com/mitodl/hq/issues/13310).
 
 ### `/etc/hosts` entries disappear after WSL restart
 

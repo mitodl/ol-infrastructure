@@ -54,6 +54,18 @@ else
 	ok "Cluster '${CLUSTER_NAME}' is running."
 fi
 
+# The registry is not a cluster node (no k3d.cluster label), so 'k3d cluster
+# start' never touches it, and its unless-stopped policy will not revive it
+# after an explicit stop (Docker Desktop dashboard, docker stop, a failed
+# prune). Nothing else brings it back, and every image push then times out.
+REGISTRY_STATE="$(docker inspect -f '{{.State.Running}}' k3d-registry.localhost 2>/dev/null)" ||
+	err "Registry 'k3d-registry.localhost' not found. Run ./local-dev/scripts/setup.sh first."
+if [[ "${REGISTRY_STATE}" != "true" ]]; then
+	log "Registry 'k3d-registry.localhost' is stopped. Starting it..."
+	docker start k3d-registry.localhost >/dev/null || err "Failed to start registry. Try 'docker start k3d-registry.localhost' manually."
+fi
+ok "Registry 'k3d-registry.localhost' is running."
+
 # Check that kubeconfig context exists
 if ! kubectl config get-contexts "local-dev" &>/dev/null; then
 	err "kubectl context 'local-dev' not found. Run ./local-dev/scripts/setup.sh first."
