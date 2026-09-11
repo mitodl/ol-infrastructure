@@ -9,6 +9,7 @@
 | Spec | Journey | Status |
 |---|---|---|
 | `homepage.spec.ts` | Homepage renders in a real browser, anonymously | Active |
+| `hubspot-tracking.spec.ts` | HubSpot tracking script loads on the homepage, anonymously | Active |
 | `login-and-search.spec.ts` | Log in, reach the dashboard, then search for courses | Active |
 
 ## Helpers
