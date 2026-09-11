@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from functools import partial
@@ -34,9 +35,22 @@ _slack_app: AsyncApp | None = None
 _release_requesters: dict[str, str] = {}
 
 
+# app name -> lock held across a command's check-then-act sequence. Slack
+# handlers run concurrently on one event loop, so without it two commands can
+# each read "nothing pending" before either writes: two hotfix requests for
+# one app, or a release triggered while a hotfix is being requested.
+# Process-local is enough because the bot runs one replica (see _slack_app).
+_app_locks: dict[str, asyncio.Lock] = {}
+
+
+def _app_lock(app_name: str) -> asyncio.Lock:
+    return _app_locks.setdefault(app_name, asyncio.Lock())
+
+
 _USAGE = (
     "Usage:\n"
     "• `/doof release <app>` — cut a release\n"
+    "• `/doof hotfix <app> <sha>` — cut what production runs plus one commit\n"
     "• `/doof preview <app>` — show what the next release would contain "
     "(changes nothing)\n"
     "• `/doof release-notes <app>` — show unreleased commits\n"
@@ -91,6 +105,30 @@ async def _cmd_release(repos, ack, respond, command, context):
     cfg, error = _resolve_app(repos, app_name)
     if cfg is None:
         await respond(error)
+        return
+    async with _app_lock(app_name):
+        await _release(respond, app_name, cfg, context)
+
+
+async def _release(respond, app_name, cfg, context):
+    # While a hotfix request is pending the release resource offers that
+    # hotfix, not the tracked branch, so this build would cut it instead.
+    try:
+        pending = await github.pending_hotfix_requests(cfg.repo)
+    except Exception:
+        log.exception("Failed to check pending hotfixes for %s", app_name)
+        await respond(
+            f"❌ Could not check `{app_name}` for a pending hotfix. Refusing to "
+            "trigger — a pending one would be cut instead of this release."
+        )
+        return
+    if pending:
+        short = pending[0][:7]
+        await respond(
+            f"A hotfix of `{short}` is pending for `{app_name}`, so a release "
+            f"now would cut that hotfix instead. `/doof hotfix {app_name} {short}` "
+            f"continues it; `/doof abandon {app_name}` cancels it."
+        )
         return
 
     # Report a release that was cut but never finished. Cutting a new one
@@ -154,6 +192,26 @@ async def _cmd_preview(repos, ack, respond, command, _context):
     cfg, error = _resolve_app(repos, app_name)
     if cfg is None:
         await respond(error)
+        return
+    # While a hotfix request is pending the release resource offers that
+    # hotfix, not the tracked branch's calver-next version -- same check
+    # `_release` uses, so the preview doesn't contradict what `/doof release`
+    # would actually cut.
+    try:
+        pending = await github.pending_hotfix_requests(cfg.repo)
+    except Exception:
+        log.exception("Failed to check pending hotfixes for %s", app_name)
+        await respond(f"❌ Could not check `{app_name}` for a pending hotfix.")
+        return
+    if pending:
+        short = pending[0][:7]
+        await respond(
+            f"*Release preview for `{app_name}`* — a hotfix of `{short}` is "
+            "pending, so the next cut would be that hotfix (what production "
+            "runs plus that commit), not a normal release.\n"
+            f"`/doof hotfix {app_name} {short}` continues it; "
+            f"`/doof abandon {app_name}` cancels it."
+        )
         return
     try:
         preview = await github.release_preview(cfg.repo)
@@ -321,16 +379,65 @@ async def _cmd_abandon(repos, ack, respond, command, _context):
     if cfg is None:
         await respond(error)
         return
+    async with _app_lock(app_name):
+        await _abandon(respond, app_name, cfg)
+
+
+async def _abandon(respond, app_name, cfg):
+    # Read before mutating: a lookup that failed after the cancel would report
+    # "nothing abandoned" with the requests already deleted.
+    try:
+        in_flight = await github.in_flight_release(cfg.repo)
+    except Exception:
+        log.exception("Failed to check release state for %s", app_name)
+        await respond(
+            f"❌ Could not check `{app_name}`'s release state. Nothing abandoned "
+            "or cancelled."
+        )
+        return
+    try:
+        cancelled = await github.cancel_hotfix_requests(cfg.repo)
+    except Exception:
+        log.exception("Failed to cancel hotfix requests for %s", app_name)
+        await respond(
+            f"❌ Failed while cancelling `{app_name}`'s pending hotfix requests; "
+            "some may already be gone. Nothing abandoned."
+        )
+        return
+    lines = [f"Cancelled the pending hotfix of `{sha[:7]}`." for sha in cancelled]
+    if not in_flight:
+        # The abandon job deletes the branch and tag of whatever version the
+        # release resource last reported. With nothing in flight and no new
+        # commits, that is the release production is running, and its tag is
+        # the only record of what it runs.
+        lines.append(f"No release is in flight for `{app_name}`; nothing to abandon.")
+        await respond("\n".join(lines))
+        return
     try:
         build_url = await concourse.trigger_job(
             cfg.pipeline, f"abandon-{app_name}-release"
         )
     except Exception:
         log.exception("Failed to trigger abandon for %s", app_name)
-        await respond(f"❌ Failed to trigger release abandon for `{app_name}`.")
+        # Any cancelled-hotfix lines already collected are a real state
+        # change that happened before this failure; dropping them would tell
+        # the user nothing was abandoned when their hotfix requests are
+        # already gone.
+        lines.append(f"❌ Failed to trigger release abandon for `{app_name}`.")
+        await respond("\n".join(lines))
         return
     _release_requesters.pop(app_name, None)
-    await respond(f"🗑️ Release abandon triggered for `{app_name}`. Build: {build_url}")
+    # The job deletes whatever version the release resource's last `check`
+    # recorded, which can diverge from `in_flight` (read fresh from GitHub
+    # branches here) if a `check` ran without a cut in between. Report the
+    # trigger, not a specific deletion, and let the build's own output say
+    # what it removed.
+    lines.insert(
+        0,
+        f"🗑️ Release abandon triggered for `{app_name}` (last seen in flight: "
+        f"{_describe_in_flight(in_flight)}). Build: {build_url}",
+    )
+    await respond("\n".join(lines))
 
 
 async def _handle_promote_button(repos, ack, body, say):
@@ -530,8 +637,107 @@ async def _cmd_wait_for_checkboxes(repos, ack, respond, command, _context):
     )
 
 
+_COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{7,40}$")
+
+
+async def _request_hotfix(cfg, app_name, ref):
+    """Request a hotfix of *ref*; return (full sha, None) or (None, error).
+
+    The release resource refuses an in-flight release too, but only once the
+    build is running, so it is checked here first. A request already pending
+    for the same commit is reused, which is what makes `/doof hotfix` safe to
+    re-run after a failed trigger.
+    """
+    try:
+        sha = await github.resolve_commit(cfg.repo, ref)
+    except Exception:
+        log.exception("Failed to resolve %s in %s", ref, cfg.repo)
+        return None, f"❌ Could not find commit `{ref}` in `{cfg.repo}`."
+    try:
+        in_flight = await github.in_flight_release(cfg.repo)
+        pending = await github.pending_hotfix_requests(cfg.repo)
+    except Exception:
+        log.exception("Failed to check release state for %s", app_name)
+        return None, (
+            f"❌ Could not check `{app_name}`'s release state. Not requesting a hotfix."
+        )
+    if in_flight:
+        return None, (
+            f"Release {_describe_in_flight(in_flight)} is in flight for "
+            f"`{app_name}`. Promote it or `/doof abandon {app_name}` before "
+            "cutting a hotfix."
+        )
+    others = [p for p in pending if p != sha]
+    if others:
+        return None, (
+            f"A hotfix of `{others[0][:7]}` is already pending for `{app_name}`. "
+            f"`/doof abandon {app_name}` cancels it."
+        )
+    if sha not in pending:
+        try:
+            await github.request_hotfix(cfg.repo, sha)
+        except Exception:
+            log.exception("Failed to request hotfix of %s for %s", sha, app_name)
+            return None, f"❌ Failed to request a hotfix of `{sha[:7]}`."
+    return sha, None
+
+
+async def _cmd_hotfix(repos, ack, respond, command, context):
+    """Cut a hotfix: what production runs plus one commit.
+
+    The SHA reaches the release job through a `hotfix/<sha>` tag, because
+    triggering a Concourse job carries no parameters. The release resource's
+    check sees the tag and hands the job a hotfix version; cutting it deletes
+    the tag, whether or not the cut succeeds.
+    """
+    await ack()
+    app_name, _, ref = command["text"].strip().partition(" ")
+    ref = ref.strip().lower()
+    if not app_name or not _COMMIT_SHA_RE.match(ref):
+        await respond("Usage: `/doof hotfix <app> <commit sha>`")
+        return
+    cfg, error = _resolve_app(repos, app_name)
+    if cfg is None:
+        await respond(error)
+        return
+    async with _app_lock(app_name):
+        await _hotfix(respond, app_name, cfg, ref, context)
+
+
+async def _hotfix(respond, app_name, cfg, ref, context):
+    sha, error = await _request_hotfix(cfg, app_name, ref)
+    if sha is None:
+        await respond(error)
+        return
+
+    retry = (
+        f"The hotfix is requested but not started: `/doof hotfix {app_name} "
+        f"{sha[:7]}` retries, `/doof abandon {app_name}` cancels."
+    )
+    try:
+        # Same reason as /doof release: without a check, the job binds the
+        # version Concourse last recorded, which knows nothing of the request.
+        await concourse.check_resource(cfg.pipeline, f"{app_name}-release")
+        build_url = await concourse.trigger_job(
+            cfg.pipeline, f"build-{app_name}-release-image"
+        )
+    except Exception:
+        log.exception("Failed to trigger hotfix for %s", app_name)
+        await respond(f"❌ Failed to trigger the hotfix build. {retry}")
+        return
+
+    requester = (context or {}).get("user_id")
+    if requester:
+        _release_requesters[app_name] = requester
+    await respond(
+        f"🚑 Hotfix of `{sha[:7]}` triggered for `{app_name}`: what production "
+        f"runs plus that commit. Build: {build_url}"
+    )
+
+
 _SUBCOMMANDS = {
     "release": _cmd_release,
+    "hotfix": _cmd_hotfix,
     "preview": _cmd_preview,
     "release-notes": _cmd_release_notes,
     "release-status": _cmd_release_status,
