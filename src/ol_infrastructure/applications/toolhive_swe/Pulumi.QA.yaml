@@ -11,3 +11,4 @@ config:
   toolhive_swe:sentry_enabled: "false"
   toolhive_swe:context7_enabled: "false"
   toolhive_swe:aws_mcp_enabled: "false"
+  toolhive_swe:vantage_enabled: "false"

@@ -16,3 +16,6 @@ config:
     secure: v1:+EHQSAypsSet/IkB:wNtFOo5pAO1dUtlJFZqWOo93F0r4EOgUA8kV1whv66c0Y54Sbeczbv2W97eek2JphIhJilcRLl4P78g=
   # The `aws` backend needs no secret config: it authenticates with IRSA.
   toolhive_swe:aws_mcp_enabled: "true"
+  toolhive_swe:vantage_enabled: "true"
+  toolhive_swe:vantage_api_key:
+    secure: v1:ugx8LRZvE5WL7sbS:6K+Jg/ZjZ2qc8nDXvslQJhyJ+biH6tuhGfKl0zGsGqeX9BU4D57H/GiLpBHhUUes55EI61oAXTCGfaGOekiGqxc=
