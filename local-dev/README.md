@@ -118,7 +118,7 @@ For per-developer app env vars and secrets (API keys, feature flags), don't edit
 
 This will:
 1. Validate that `setup.sh` has been run (cluster exists, kubeconfig configured, certs present)
-2. Restart the k3d cluster if it was paused by `stop.sh`
+2. Restart the k3d cluster if it was paused by `stop.sh`, and the image registry if it was stopped
 3. Heal any wedged kubelet exec/streaming (see [Troubleshooting](#kubectl-exec-fails-with-a-502-wedged-kubelet-streaming)) — a no-op when healthy
 4. Sync Python dependencies via `uv`
 5. Start Tilt
@@ -774,6 +774,21 @@ cp ~/kube-backup.yaml ~/.kube/config 2>/dev/null || true
 k3d kubeconfig merge local-dev --kubeconfig-merge-default
 kubectl config get-contexts local-dev   # Should now succeed
 ```
+
+### WSL2: every image build fails with `error getting credentials`
+
+```
+Build Failed: docker push: ... authInfo#RetrieveAuthTokenFromImage: error getting credentials - err: exit status 1, out: ``
+```
+
+Docker Desktop sets `"credsStore": "desktop.exe"` in `~/.docker/config.json`, and Tilt asks that Windows binary for credentials before every push and pull. When WSL's interop channel to Windows is unhealthy the helper fails with no output, and unlike `docker push`, Tilt treats that as fatal. Confirm it with:
+
+```bash
+echo localhost:5001 | docker-credential-desktop.exe get
+# <3>WSL (...) ERROR: UtilAcceptVsock:271: accept4 failed 110
+```
+
+Either reset the interop channel from Windows PowerShell with `wsl --shutdown` and start again, or remove the `credsStore` key from `~/.docker/config.json` so Tilt never calls the helper (Docker Desktop re-adds it on restart). The local registry needs no credentials, so anonymous pushes work. See [mitodl/hq#13310](https://github.com/mitodl/hq/issues/13310).
 
 ### `/etc/hosts` entries disappear after WSL restart
 
