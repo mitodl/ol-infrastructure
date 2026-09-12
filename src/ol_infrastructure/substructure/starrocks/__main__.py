@@ -558,21 +558,23 @@ CREATE DATABASE IF NOT EXISTS b2b_analytics;
 GRANT CREATE TABLE ON DATABASE b2b_analytics TO ROLE app;
 GRANT CREATE MATERIALIZED VIEW ON DATABASE b2b_analytics TO ROLE app;"""
 
-_b2b_analytics_db_drop_sql = "DROP DATABASE IF EXISTS b2b_analytics;"
-
+# No delete step and no delete_before_replace. The database is persistent
+# infrastructure holding every b2b_analytics MV, and `triggers` replaces this
+# command whenever the SQL changes -- so with a DROP DATABASE delete, adding a
+# grant would destroy the tables and MVs before recreating an empty database,
+# and a stack teardown would do the same. CREATE DATABASE IF NOT EXISTS is
+# idempotent, so a replacement simply re-runs it. Same reasoning as
+# roles_setup_cmd above: dropping the database is a deliberate manual act.
 command.local.Command(
     f"starrocks-{stack_info.env_suffix}-b2b-analytics-database-setup",
     create=_exec_sql,
     update=_exec_sql,
-    delete=_exec_delete_sql,
     environment={
         **_mysql_env,
         "STARROCKS_SQL": _b2b_analytics_db_sql,
-        "STARROCKS_DELETE_SQL": _b2b_analytics_db_drop_sql,
     },
     triggers=[hashlib.sha256(_b2b_analytics_db_sql.encode()).hexdigest()],
     opts=ResourceOptions(
-        delete_before_replace=True,
         depends_on=[roles_setup_cmd],
     ),
 )
@@ -589,21 +591,18 @@ CREATE DATABASE IF NOT EXISTS b2b_learner_records;
 GRANT CREATE TABLE ON DATABASE b2b_learner_records TO ROLE app;
 GRANT CREATE MATERIALIZED VIEW ON DATABASE b2b_learner_records TO ROLE app;"""
 
-_b2b_learner_records_db_drop_sql = "DROP DATABASE IF EXISTS b2b_learner_records;"
-
+# No delete step, for the same reason as b2b_analytics above -- more so here,
+# since this database holds individually identifying learner records.
 command.local.Command(
     f"starrocks-{stack_info.env_suffix}-b2b-learner-records-database-setup",
     create=_exec_sql,
     update=_exec_sql,
-    delete=_exec_delete_sql,
     environment={
         **_mysql_env,
         "STARROCKS_SQL": _b2b_learner_records_db_sql,
-        "STARROCKS_DELETE_SQL": _b2b_learner_records_db_drop_sql,
     },
     triggers=[hashlib.sha256(_b2b_learner_records_db_sql.encode()).hexdigest()],
     opts=ResourceOptions(
-        delete_before_replace=True,
         depends_on=[roles_setup_cmd],
     ),
 )
