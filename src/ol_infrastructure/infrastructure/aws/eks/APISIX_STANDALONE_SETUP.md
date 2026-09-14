@@ -230,7 +230,9 @@ The gateway service is configured as type `LoadBalancer` to provision an AWS NLB
     "service": {  # Changed from "gateway" to "service" (correct helm chart key)
         "type": "LoadBalancer",
         "annotations": {
+            # Both prefixes on purpose -- see "Annotation prefix" below.
             "external-dns.alpha.kubernetes.io/hostname": "<comma-separated-domains>",
+            "external-dns.kubernetes.io/hostname": "<comma-separated-domains>",
             "service.beta.kubernetes.io/aws-load-balancer-name": "applications-ci-apisix",
             "service.beta.kubernetes.io/aws-load-balancer-type": "external",
             "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
@@ -486,7 +488,41 @@ The external-dns controller automatically creates DNS records for all domains li
 
 ```yaml
 external-dns.alpha.kubernetes.io/hostname: "domain1.com,domain2.com,..."
+external-dns.kubernetes.io/hostname: "domain1.com,domain2.com,..."
 ```
+
+Both prefixes are set deliberately -- see [Annotation prefix](#annotation-prefix-set-both) below.
+
+#### Annotation prefix (set both)
+
+⚠️ **Always write the hostname/target annotation with BOTH prefixes.** external-dns
+v0.22.0 changed the default annotation prefix from `external-dns.alpha.kubernetes.io/`
+to `external-dns.kubernetes.io/` **with no fallback**. Upstream's own release note for
+that version says the change "can _delete_ **all** your DNS records."
+
+Each version reads only its own prefix and ignores the other:
+
+| external-dns | Prefix it reads |
+|---|---|
+| <= v0.21.0 | `external-dns.alpha.kubernetes.io/` |
+| >= v0.22.0 | `external-dns.kubernetes.io/` |
+
+We run `--policy=sync`, which means external-dns deletes records it owns once they
+leave the desired set. So if the annotation carries only the prefix the *running*
+version does not read, external-dns matches nothing, computes an **empty** desired
+set, and plans to delete every record it owns. Writing both prefixes is what makes
+crossing the v0.22.0 boundary -- in either direction -- a no-op.
+
+This is not hypothetical. On 2026-09-14 the chart bump to 1.22.0 (app v0.22.0) put
+8 of 12 clusters into exactly this state: zero successful syncs, and a queued plan of
+440+ pure deletions per cluster including production Open edX hostnames. Nothing was
+actually destroyed only by luck -- an unrelated `InvalidChangeBatch` error on the
+`a-`/`cname-` ownership-TXT migration made every Route53 batch invalid, so the
+deletions never executed.
+
+Corollary for the eventual cleanup: do **not** drop the alpha key until every cluster
+is past v0.22.0, and do not drop the GA key to "simplify" while any cluster is still
+on v0.21.0. Removing either one early reintroduces the same failure.
 
 **Expected Domains (CI environment):**
 - `api-pay-ci.ol.mit.edu`
@@ -706,6 +742,7 @@ Before deploying or when troubleshooting, verify these critical settings:
         "service.beta.kubernetes.io/aws-load-balancer-type": "external",
         "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
         "external-dns.alpha.kubernetes.io/hostname": "<domains>",
+        "external-dns.kubernetes.io/hostname": "<domains>",  # both, on purpose
         # ... other AWS annotations
     },
 }

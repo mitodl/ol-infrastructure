@@ -478,9 +478,20 @@ def setup_apisix(
                 "service": {
                     "type": "LoadBalancer",
                     "annotations": {
+                        # Both prefixes are set on purpose. external-dns v0.22.0
+                        # moved the default annotation prefix from the "alpha" form
+                        # to the GA one with NO fallback, so each version reads
+                        # exactly one of these and ignores the other: <=v0.21.0 the
+                        # alpha key, >=v0.22.0 the GA key. Carrying both is what
+                        # makes the upgrade (and a rollback) a no-op rather than an
+                        # outage -- under --policy=sync a version that matches no
+                        # annotation sees an empty desired state and plans to delete
+                        # every record it owns. Drop the alpha key only once every
+                        # cluster is past v0.22.0.
                         "external-dns.alpha.kubernetes.io/hostname": ",".join(
                             apisix_domains
                         ),
+                        "external-dns.kubernetes.io/hostname": ",".join(apisix_domains),
                         "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-apache-apisix"[
                             :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
                         ],
@@ -1097,7 +1108,10 @@ def setup_apisix(
                 "namespace": "operations",
                 "annotations": {
                     "pulumi.com/patchForce": "true",
+                    # Both prefixes on purpose -- see the gateway Service
+                    # annotations above for why.
                     "external-dns.alpha.kubernetes.io/target": hostname,
+                    "external-dns.kubernetes.io/target": hostname,
                 },
             }
         ),
