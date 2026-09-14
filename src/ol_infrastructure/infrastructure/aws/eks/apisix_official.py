@@ -741,6 +741,21 @@ def setup_apisix(
                     },
                 },
                 # --- Etcd Configuration ---
+                # APISIX runs standalone (role_traditional.config_provider: yaml, set
+                # above); the ingress controller pushes config over the Admin API, so
+                # there is no etcd StatefulSet in any cluster.
+                #
+                # Disabling the subchart does NOT stop the chart emitting etcd
+                # scaffolding: the rendered config.yaml still carries an `etcd:` block
+                # (with upstream's `http://etcd.host:2379` placeholder), the chart still
+                # creates the `etcd-apache-apisix` Secret, and the Deployment still gets
+                # an APISIX_ETCD_PASSWORD env var bound to it. All three are inert --
+                # and all three must stay, since the Deployment's secretKeyRef will fail
+                # to start pods without the Secret.
+                #
+                # Do not read that block as a live endpoint. Doing so once already
+                # produced a cleanup ticket built on a false premise; see the
+                # "Vestigial etcd Artifacts" section of APISIX_STANDALONE_SETUP.md.
                 "etcd": {
                     "enabled": False,
                 },
