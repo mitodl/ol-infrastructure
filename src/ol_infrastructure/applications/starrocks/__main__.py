@@ -1150,7 +1150,18 @@ fe_mysql_nlb_service = kubernetes.core.v1.Service(
             # internal, so the record resolves to VPC-private addresses; it is
             # reachable only from the peered VPCs the security group above
             # admits.
+            #
+            # Both prefixes are set on purpose. external-dns v0.22.0 moved the
+            # default annotation prefix from the "alpha" form to the GA one with
+            # NO fallback, so each version reads exactly one of these and ignores
+            # the other: <=v0.21.0 the alpha key, >=v0.22.0 the GA key. Carrying
+            # both is what makes the upgrade (and a rollback) a no-op rather than
+            # an outage -- under --policy=sync a version that matches no
+            # annotation sees an empty desired state and plans to delete every
+            # record it owns. Drop the alpha key only once every cluster is past
+            # v0.22.0.
             "external-dns.alpha.kubernetes.io/hostname": fe_mysql_domain,
+            "external-dns.kubernetes.io/hostname": fe_mysql_domain,
         },
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
