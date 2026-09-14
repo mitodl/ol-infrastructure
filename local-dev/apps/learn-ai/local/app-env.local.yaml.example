@@ -1,11 +1,12 @@
 # Per-developer overrides for learn-ai (gitignored when copied).
 #
-# Copy to app-env.local.yaml and add entries under data: — because this
+# Copy to app-env.local.yaml and add entries under data:. Because this
 # ConfigMap is referenced LAST in every envFrom list in deployment.yaml, its
 # keys override both the tracked app-env ConfigMap AND the tracked Secret
-# (secret values are fine here: the file never leaves your machine). Pods
-# roll automatically when you edit it. See "Local Configuration Overrides"
-# in local-dev/README.md.
+# (secret values are fine here: the file never leaves your machine). Pods roll
+# automatically when you edit it. The file reaches the cluster as a resource
+# of kustomization.yaml in this directory, so copy that .example too. See
+# "Local Configuration Overrides" in local-dev/README.md.
 ---
 apiVersion: v1
 kind: ConfigMap

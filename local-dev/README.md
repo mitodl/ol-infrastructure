@@ -176,9 +176,9 @@ ol-infrastructure/
         ├── base/                # Tracked manifests (deployment, configmaps, secrets,
         │                        # routes) + the kustomization.yaml that lists them
         └── local/               # Yours, gitignored; committed *.example templates alongside
-            ├── app-env.local.yaml   # env var / secret overrides
-            └── kustomization.yaml   # kustomize overlay for anything else — see
-                                     # Local Configuration Overrides below
+            ├── kustomization.yaml   # kustomize overlay Tilt builds instead of base/
+            └── app-env.local.yaml   # env var / secret overrides, a resource of the
+                                     # overlay — see Local Configuration Overrides below
 ```
 
 ---
@@ -360,7 +360,7 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 | `pg_memory_limit` | `512Mi` | Memory limit of the shared Postgres pod — see [Pulumi-managed infrastructure](#pulumi-managed-infrastructure) under Local Configuration Overrides. |
 | `per_app_databases`, `openedx_mode` | — | Declared but not wired to anything yet; setting them has no effect. |
 
-The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags) or tune **Pulumi-managed infrastructure** go in `tilt_config.json`; anything that sets an **env var or secret value inside an app** goes in its gitignored `local/app-env.local.yaml`; anything else about an **app's manifests** (memory limits, probes, replicas) goes in its gitignored `local/kustomization.yaml` — see [Local Configuration Overrides](#local-configuration-overrides).
+The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags) or tune **Pulumi-managed infrastructure** go in `tilt_config.json`; anything about an **app** — an env var or secret value, a memory limit, a probe, replicas — goes in its gitignored `local/` overlay (env vars in `app-env.local.yaml`, the rest as kustomize patches) — see [Local Configuration Overrides](#local-configuration-overrides).
 
 ### Root domain
 
@@ -487,48 +487,47 @@ it prints the exact `pulumi stack rm` to run; do that and re-run teardown.
 
 ### Local Configuration Overrides
 
-Everything tracked for an app lives in `local-dev/apps/<app>/base/`; everything that is yours lives in `local-dev/apps/<app>/local/`, which is gitignored. Two files go there, each with a committed `.example` template beside it:
+Everything tracked for an app lives in `local-dev/apps/<app>/base/`; everything that is yours lives in `local-dev/apps/<app>/local/`, which is gitignored. It is a [kustomize](https://kubectl.docs.kubernetes.io/references/kustomize/) overlay of `base/`, and two files go there, each with a committed `.example` template beside it:
 
-| You want to change… | File | Mechanism |
-|---|---|---|
-| An env var or secret value inside the app | `local/app-env.local.yaml` | Optional ConfigMap, referenced last in every container's `envFrom` |
-| Anything else in a tracked manifest (memory limits, probes, replicas, image) | `local/kustomization.yaml` | kustomize overlay built instead of `base/` |
+| File | Purpose |
+|---|---|
+| `local/kustomization.yaml` | The overlay itself. Copy the template once; whenever it exists, Tilt builds it instead of `base/`. Add `patches:` here for anything in a tracked manifest other than env vars (memory limits, probes, replicas, image). |
+| `local/app-env.local.yaml` | A ConfigMap the overlay lists as a resource. Your env var and secret-value overrides go under its `data:`. This is the file you edit day to day. |
 
-Shared infrastructure (Postgres, Keycloak, …) is Pulumi-managed and has its own knobs — see [Pulumi-managed infrastructure](#pulumi-managed-infrastructure) below.
+Shared infrastructure (Postgres, Keycloak, …) is Pulumi-managed and the overlay does not reach it — see [Pulumi-managed infrastructure](#pulumi-managed-infrastructure) below.
 
-#### Env vars and secret values: `app-env.local.yaml`
+#### Setting up
 
 ```bash
-cp local-dev/apps/mitxonline/local/app-env.local.yaml.example \
-   local-dev/apps/mitxonline/local/app-env.local.yaml
-# then add your overrides under data:, e.g.
+cd local-dev/apps/mitxonline/local
+cp kustomization.yaml.example kustomization.yaml
+cp app-env.local.yaml.example app-env.local.yaml
+# then add env overrides under data: in app-env.local.yaml, e.g.
 #   FEATURE_IGNORE_EDX_FAILURES: "True"
 ```
 
-How it works — plain Kubernetes, visible in each app's `base/deployment.yaml`: every container's `envFrom` list references the override ConfigMap (`mitxonline-env-local` etc.) **last** and with `optional: true`. Kubernetes resolves duplicate `envFrom` keys by letting the last source win, so your overrides beat both the tracked ConfigMap *and* the tracked Secret — secret values are fine in this file, it never leaves your machine. `optional: true` means no file → no ConfigMap → no-op for everyone else.
+Both files are needed: the overlay lists `app-env.local.yaml` under `resources:`, so kustomize fails if it is missing, and an `app-env.local.yaml` without the overlay is not applied at all (Tilt fails the Tiltfile with a pointer here rather than silently ignoring it). Untouched copies of the templates change nothing, so setting up is a no-op until you edit something.
+
+#### Env vars and secret values: `app-env.local.yaml`
+
+How it works — plain Kubernetes, visible in each app's `base/deployment.yaml`: every container's `envFrom` list references the override ConfigMap (`mitxonline-env-local` etc.) **last** and with `optional: true`. Kubernetes resolves duplicate `envFrom` keys by letting the last source win, so your overrides beat both the tracked ConfigMap *and* the tracked Secret — you never need to know which of the two a key lives in, and secret values are fine in this file, it never leaves your machine. `optional: true` means no overlay → no ConfigMap → no-op for everyone else.
 
 Day-to-day behavior:
 
-- Creating or editing the file mid-session re-applies it — no Tilt restart. Pods roll automatically so new values actually take effect: because Kubernetes does not restart pods on ConfigMap/Secret changes, `tiltlib.star` stamps a fingerprint of every applied ConfigMap's and Secret's data onto each Deployment's pod template (the `ol.mit.edu/config-hash` annotation) — this covers edits to the tracked `app-env.yaml`/`secrets.yaml` too, not just this override file — which is also the idiomatic production pattern (cf. Helm `checksum/config` annotations).
-- Overridden key **names** (never values) are printed in the **Tiltfile resource's log** in the Tilt UI, and your full delta is inspectable in-cluster at any time: `kubectl get cm -n mitxonline mitxonline-env-local -o yaml`
-- Gotchas: the ConfigMap's `metadata.name` must match what `deployment.yaml` references (`<app>-env-local` — copy the example, don't type it), and all `data:` values must be YAML **strings** (quote things like `"True"` and `"8080"`). A typo'd key is applied but ignored by the app. If you *delete* the file mid-session, prefer emptying `data:` instead — the already-applied ConfigMap can linger in-cluster until `tilt down`.
+- Editing the file mid-session re-applies it — no Tilt restart (Tilt watches the files a kustomization lists as `resources`, and this is one). Pods roll automatically so new values actually take effect: because Kubernetes does not restart pods on ConfigMap/Secret changes, `tiltlib.star` stamps a fingerprint of every applied ConfigMap's and Secret's data onto each Deployment's pod template (the `ol.mit.edu/config-hash` annotation) — this covers edits to the tracked `app-env.yaml`/`secrets.yaml` too, not just this override file — which is also the idiomatic production pattern (cf. Helm `checksum/config` annotations).
+- Your full delta is inspectable in-cluster at any time: `kubectl get cm -n mitxonline mitxonline-env-local -o yaml`
+- Gotchas: the ConfigMap's `metadata.name` must match what `deployment.yaml` references (`<app>-env-local` — copy the example, don't type it), and all `data:` values must be YAML **strings** (quote things like `"True"` and `"8080"`). A typo'd key is applied but ignored by the app. To drop all overrides, empty `data:` rather than deleting the file (the overlay lists it).
 
 Every app supports this, including **mit-learn-nextjs** (e.g. per-developer PostHog credentials — see its `app-env.local.yaml.example`).
 
-#### Everything else: `kustomization.yaml`
+#### Everything else: patches in `kustomization.yaml`
 
-```bash
-cp local-dev/apps/mitxonline/local/kustomization.yaml.example \
-   local-dev/apps/mitxonline/local/kustomization.yaml
-# the example raises the web container's memory limit; edit the patch to taste
-```
-
-How it works — plain [kustomize](https://kubectl.docs.kubernetes.io/references/kustomize/), which ships inside `kubectl` (Tilt uses a standalone `kustomize` binary if you have one, otherwise `kubectl kustomize`). The tracked `base/kustomization.yaml` lists the app's manifests; your overlay declares `resources: [../base]` plus `patches:`. Whenever `local/kustomization.yaml` exists, the app's Tiltfile (through `k8s_yaml_app` in `tiltlib.star`) builds the overlay instead of `base/`; otherwise it builds `base/` directly, so the file's absence is a no-op for everyone else. Root-domain substitution and the config-hash pod roll apply to the overlay's output the same way.
+The tracked `base/kustomization.yaml` lists the app's manifests; your overlay declares `resources: [../base, app-env.local.yaml]` plus `patches:`. The template ships with a commented-out strategic merge patch that raises the web container's memory limit; uncomment and edit it to taste. kustomize ships inside `kubectl` (Tilt uses a standalone `kustomize` binary if you have one, otherwise `kubectl kustomize`). Root-domain substitution and the config-hash pod roll apply to the overlay's output the same way as to `base/`.
 
 Day-to-day behavior:
 
 - Creating, editing, or deleting the file mid-session re-evaluates the Tiltfile — no Tilt restart. A changed pod template rolls the pods on its own.
-- Anything kustomize can express works: `replicas: 0` to switch a worker off, a different `image:`, a longer probe timeout, an extra volume. Env vars *can* be patched this way too, but `app-env.local.yaml` is shorter.
+- Anything kustomize can express works: `replicas: 0` to switch a worker off, a different `image:`, a longer probe timeout, an extra volume. Patch files next to the kustomization are gitignored too, and edits to them re-run the Tiltfile. Tilt only watches the inputs its own parser knows about — `resources`, patch files, `crds`, and `configMapGenerator` `files` — so if you add a `secretGenerator` or a `configMapGenerator` `envs:` file, edits to *that* file need a manual Tiltfile trigger in the Tilt UI.
 - Gotchas: a strategic merge patch must name the target's `namespace` (the tracked Deployments set one, and a patch without it matches nothing — kustomize fails with `no resource matches strategic merge patch`), and containers are matched by `name`. Build errors show in the **Tiltfile resource's log** in the Tilt UI.
 
 #### Pulumi-managed infrastructure

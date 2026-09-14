@@ -27,7 +27,7 @@ local-dev/apps/<app-name>/
     └── kustomization.yaml.example   # Template for per-dev manifest overlay
 ```
 
-Use an existing app (e.g., `learn-ai/`) as a template. In particular, copy the `envFrom` pattern from an existing `base/deployment.yaml`: every container lists the tracked ConfigMap, the tracked Secret, then the optional `<app>-env-local` override ConfigMap **last** (see [Local Configuration Overrides](README.md#local-configuration-overrides) in the README). In the Tiltfile, call `k8s_yaml_app(<path to local-dev/apps/<app-name>>)` from `tiltlib.star`: it kustomize-builds `base/` (or the developer's `local/` overlay) and applies the optional `local/app-env.local.yaml`. Both `.example` files under `local/` are copies of another app's with the Deployment name, namespace, and ConfigMap name changed.
+Use an existing app (e.g., `learn-ai/`) as a template. In particular, copy the `envFrom` pattern from an existing `base/deployment.yaml`: every container lists the tracked ConfigMap, the tracked Secret, then the optional `<app>-env-local` override ConfigMap **last** (see [Local Configuration Overrides](README.md#local-configuration-overrides) in the README). In the Tiltfile, call `k8s_yaml_app(<path to local-dev/apps/<app-name>>)` from `tiltlib.star`: it kustomize-builds `base/`, or the developer's `local/` overlay when that exists (the overlay lists `local/app-env.local.yaml`, the override ConfigMap, as a resource). Both `.example` files under `local/` are copies of another app's with the Deployment name, namespace, container name, and ConfigMap name changed.
 
 ### 2. Add the app database to the CNPG cluster
 

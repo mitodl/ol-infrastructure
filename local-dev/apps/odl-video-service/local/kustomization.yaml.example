@@ -5,27 +5,32 @@
 # replicas, an image tag. See "Local Configuration Overrides" in
 # local-dev/README.md.
 #
-# Env vars are simpler through app-env.local.yaml next to this file; use this
-# overlay for everything else.
+# Copy app-env.local.yaml.example beside this file to app-env.local.yaml as
+# well: it is listed under resources below, and kustomize fails if it is
+# missing. Env vars and secret values go there; patches cover everything else.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../base
-patches:
-  # A strategic merge patch: only the fields listed here change. The
-  # namespace is required because the tracked Deployments set one, and a patch
-  # without it matches nothing. Containers are matched by name.
-  - patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: odlvideo-webapp
-        namespace: odl-video-service
-      spec:
-        template:
-          spec:
-            containers:
-              - name: app
-                resources:
-                  limits:
-                    memory: 4Gi
+  # The env-override ConfigMap: referenced last in every container's envFrom,
+  # so its keys win over the tracked ConfigMap and Secret.
+  - app-env.local.yaml
+# Uncomment to change anything else in a tracked manifest. This is a strategic
+# merge patch: only the fields listed change. The namespace is required because
+# the tracked Deployments set one, and a patch without it matches nothing.
+# Containers are matched by name.
+# patches:
+#   - patch: |-
+#       apiVersion: apps/v1
+#       kind: Deployment
+#       metadata:
+#         name: odlvideo-webapp
+#         namespace: odl-video-service
+#       spec:
+#         template:
+#           spec:
+#             containers:
+#               - name: app
+#                 resources:
+#                   limits:
+#                     memory: 4Gi
