@@ -83,6 +83,11 @@ Sub-modules
                  an edge/blackbox view. Pairs with
                  dashboards/service_red.py -- see that module and this one's
                  own docstring for why metrics rather than traces.
+  clickhouse   — New in 2026-09. The shared LLMOps ClickHouse cluster behind
+                 Opik: server and Keeper health, replication, insert pressure,
+                 disk, and the daily SQL backup's staleness. Off the Altinity
+                 operator's exporter plus Keeper's own endpoint; see the
+                 module docstring for which names were verified live.
   vector_edxapp_tracking
                — New in 2026-09. Source: grafana-alerts#9, recreated here rather
                  than merged there. edxapp tracking-log delivery off the Vector
@@ -98,6 +103,7 @@ from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
     apisix_edge,
+    clickhouse,
     dagster_control_plane,
     dagster_pgbouncer,
     eks_general,
@@ -209,6 +215,7 @@ def create(resource_opts: ResourceOptions) -> None:
     dagster_pgbouncer.create(alerts_folder.uid, rd, resource_opts)
     dagster_control_plane.create(alerts_folder.uid, rd, resource_opts)
     witan.create(alerts_folder.uid, rd, resource_opts)
+    clickhouse.create(alerts_folder.uid, rd, resource_opts)
     otel_service_red.create(alerts_folder.uid, rd, resource_opts)
     vector_edxapp_tracking.create(alerts_folder.uid, rd, resource_opts)
     # No folder_uid: these rules live in the Synthetic Monitoring plugin's own

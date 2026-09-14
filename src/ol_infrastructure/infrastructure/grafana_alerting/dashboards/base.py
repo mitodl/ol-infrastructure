@@ -17,8 +17,10 @@ Sub-modules
   service_red — Rate/errors/duration for the OTel-instrumented Django
     services, read from each app's own MeterProvider rather than from
     Tempo-derived spanmetrics.
+  clickhouse_altinity — Altinity's operator and Keeper dashboards for the
+    shared LLMOps ClickHouse cluster, vendored as upstream JSON in vendor/.
 
-Dashboards live in per-subject folders (Keycloak, Application Performance)
+Dashboards live in per-subject folders (Keycloak, Application Performance, ClickHouse)
 so an unrelated dashboard is not filed under a service it has nothing to do
 with; add a new Folder in `create()` rather than widening an existing one.
 """
@@ -31,6 +33,7 @@ from pulumiverse_grafana.oss.dashboard import Dashboard
 from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards import (
+    clickhouse_altinity,
     keycloak_incident_lookup,
     keycloak_olapps_realm,
     keycloak_overview,
@@ -487,6 +490,19 @@ def create(resource_opts: ResourceOptions) -> None:
         _stat_panel,
         _table_panel,
         _row_panel,
+        _create_dashboard,
+        resource_opts,
+    )
+
+    clickhouse_folder = Folder(
+        "clickhouse-dashboards-folder",
+        title="ClickHouse",
+        uid="clickhouse-dashboards",
+        opts=resource_opts,
+    )
+
+    clickhouse_altinity.create(
+        clickhouse_folder.uid,
         _create_dashboard,
         resource_opts,
     )
