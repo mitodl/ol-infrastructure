@@ -242,9 +242,12 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
                         "applications/edxapp",
                     ),
                     dependencies=[
+                        # preview-gated honours this trigger on the auto-deploy CI
+                        # stage and QA/Production previews, and strips it from the
+                        # gated deploys.
                         GetStep(
                             get=edx_registry_image_resource.name,
-                            trigger=False,
+                            trigger=True,
                             passed=[edxapp_build_job.name],
                             params={"skip_download": True},
                         ),
