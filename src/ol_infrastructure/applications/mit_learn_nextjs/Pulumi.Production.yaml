@@ -18,6 +18,7 @@ config:
   nextjs:mitol_noindex: "false"
   nextjs:mitxonline_base_url: "https://api.learn.mit.edu/mitxonline"
   nextjs:mitxonline_legacy_base_url: "https://mitxonline.mit.edu"
+  nextjs:org_learning_hubspot_form_id: "60a1983b-361a-4e80-a0db-d24ff636d7bf"
   nextjs:origin: "https://learn.mit.edu"
   nextjs:pod_count: 5
   nextjs:posthog_api_host: "https://ph.ol.mit.edu"
