@@ -144,9 +144,11 @@ def build_notes_pipeline(
                     trigger=True,
                     passed=[container_fragment.jobs[-1].name],
                 ),
+                # preview-gated honours this trigger on the auto-deploy CI stage
+                # and QA/Production previews, and strips it from the gated deploys.
                 GetStep(
                     get=notes_registry_image.name,
-                    trigger=False,
+                    trigger=True,
                     passed=[image_build_job.name],
                 ),
             ],
