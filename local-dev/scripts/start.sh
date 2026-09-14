@@ -3,8 +3,10 @@
 #
 # What this script does:
 #   1. Validates that setup.sh has been run (cluster exists, kubeconfig configured)
-#   2. Syncs Python dependencies via uv
-#   3. Starts the Tilt development server
+#   2. Offers to move override files left in a pre-rename location
+#      (migrate-local-overrides.sh, which says when it can be deleted)
+#   3. Syncs Python dependencies via uv
+#   4. Starts the Tilt development server
 #
 # Prerequisites: setup.sh must be run first.
 #
@@ -92,6 +94,14 @@ ok "TLS certificates found."
 log "Checking kubelet exec/streaming health..."
 if ! "${SCRIPT_DIR}/heal-exec.sh"; then
 	warn "Exec heal reported problems; continuing to start Tilt anyway."
+fi
+
+# ---------------------------------------------------------------------------
+# Offer to migrate per-developer override files (see the script's header for
+# when this block can be deleted)
+# ---------------------------------------------------------------------------
+if ! "${SCRIPT_DIR}/migrate-local-overrides.sh"; then
+	warn "Override-file migration reported problems; continuing to start Tilt anyway."
 fi
 
 # ---------------------------------------------------------------------------

@@ -101,6 +101,19 @@ def k8s_yaml_app(app_dir):
 
     base_dir = os.path.join(app_dir, "base")
     overlay_dir = os.path.join(app_dir, "local")
+
+    # DELETE ANYTIME AFTER 2026-11-14, together with
+    # local-dev/scripts/migrate-local-overrides.sh. The env-override ConfigMap
+    # used to live in <app_dir>/configmaps/; nothing reads it there, so without
+    # this a developer's overrides would vanish silently on checkout.
+    legacy_env_overrides = os.path.join(app_dir, "configmaps", "app-env.local.yaml")
+    if str(read_file(legacy_env_overrides, default="")).strip():
+        fail(
+            "%s is no longer applied; it belongs in %s/. Run "
+            % (legacy_env_overrides, overlay_dir)
+            + "local-dev/scripts/start.sh (or local-dev/scripts/migrate-local-overrides.sh) "
+            + "to move it and create the overlay beside it."
+        )
     overlay_kustomization = os.path.join(overlay_dir, "kustomization.yaml")
     env_overrides = os.path.join(overlay_dir, "app-env.local.yaml")
 
