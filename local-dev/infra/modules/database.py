@@ -19,12 +19,18 @@ def create_database(
     _k8s: Callable[..., ResourceOptions],
     local_infra_ns: k8s.core.v1.Namespace,
     cnpg_version: str,
+    memory_limit: str,
 ) -> DatabaseResources:
     """Deploy the CloudNativePG operator and a shared PostgreSQL cluster.
 
     A single CNPG cluster hosts all app databases.  A fixed-password credential
     Secret is used so app DATABASE_URLs are predictable and don't require reading
     a CNPG-generated random password at deploy time.
+
+    memory_limit caps the Postgres pod. Every pytest-django xdist worker
+    creates and migrates its own test database against this one shared
+    cluster, so developers running `pytest -n 4` may need more than the
+    default; it is per-developer via tilt_config.json (pg_memory_limit).
     """
     cnpg_release = k8s.helm.v3.Release(
         "cnpg-operator",
@@ -92,7 +98,7 @@ def create_database(
                 "parameters": {"max_connections": "100"},
             },
             "resources": {
-                "limits": {"memory": "512Mi"},
+                "limits": {"memory": memory_limit},
             },
         },
         opts=_k8s(parent=local_infra_ns, depends_on=[cnpg_release, credentials]),

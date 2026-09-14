@@ -14,6 +14,7 @@ config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides p
 config.define_string("disk_keep_tags", usage="Newest tilt-built image tags kept per repo by the disk janitor (default: 3). Overrides LOCAL_DEV_DISK_KEEP_TAGS env var.")
 config.define_string("disk_buildcache_max_gb", usage="Docker build-cache size cap in GB (default: 10% of total disk; 0 disables). Overrides LOCAL_DEV_BUILDCACHE_MAX_GB env var.")
 config.define_string("log_retention_period", usage="How long Grafana/Loki keeps local-dev logs, as a whole number of days, e.g. 72h or 3d (default: 168h). Overrides LOCAL_DEV_LOG_RETENTION env var.")
+config.define_string("pg_memory_limit", usage="Memory limit of the shared local-infra Postgres pod, e.g. 2Gi (default: the Pulumi program's 512Mi). Overrides LOCAL_DEV_PG_MEMORY_LIMIT env var.")
 config.define_string("keycloak_image", usage="Keycloak server image for the core stack (default: the published mitodl/keycloak digest). Set and cleared by local-dev/scripts/kc-theme-image.sh to test an unreleased ol-keycloakify theme. Overrides LOCAL_DEV_KEYCLOAK_IMAGE env var.")
 cfg = config.parse()
 
@@ -61,6 +62,12 @@ log_retention_period = cfg.get("log_retention_period") or os.environ.get("LOCAL_
 # unreleased ol-keycloakify theme -- see "Testing a local ol-keycloakify build"
 # in local-dev/README.md. Same not-pinned-in-Pulumi-config caveat as above.
 keycloak_image = cfg.get("keycloak_image") or os.environ.get("LOCAL_DEV_KEYCLOAK_IMAGE", "")
+
+# Memory limit of the shared Postgres pod. Empty means the Pulumi program's own
+# default (512Mi). Raise it per-developer when running `pytest -n N` inside an
+# app container, since each xdist worker migrates its own test database here.
+# Same not-pinned-in-Pulumi-config caveat as above.
+pg_memory_limit = cfg.get("pg_memory_limit") or os.environ.get("LOCAL_DEV_PG_MEMORY_LIMIT", "")
 
 # Workspace root: directory that contains ol-infrastructure and sibling app repos.
 # Override with MITOL_WORKSPACE_ROOT environment variable.
@@ -253,6 +260,7 @@ local_resource(
         "LOCAL_DEV_ROOT_DOMAIN": root_domain,
         "LOCAL_DEV_LOG_RETENTION": log_retention_period,
         "LOCAL_DEV_KEYCLOAK_IMAGE": keycloak_image,
+        "LOCAL_DEV_PG_MEMORY_LIMIT": pg_memory_limit,
         "PULUMI_CONFIG_PASSPHRASE": "",
     },
     dir="./local-dev/infra/core",

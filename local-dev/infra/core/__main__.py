@@ -78,6 +78,16 @@ log_retention_period = (
     or "168h"
 )
 
+# Memory limit of the shared Postgres pod. Per-developer via the gitignored
+# tilt_config.json (pg_memory_limit), forwarded as LOCAL_DEV_PG_MEMORY_LIMIT.
+# Not pinned in Pulumi.local-dev.core.Dev.yaml for the same reason as
+# log_retention_period.
+pg_memory_limit = (
+    config.get("pg_memory_limit")
+    or os.environ.get("LOCAL_DEV_PG_MEMORY_LIMIT")
+    or "512Mi"
+)
+
 cert_manager_version = config.get("cert_manager_version") or "v1.16.2"
 cnpg_version = config.get("cnpg_version") or "0.23.0"
 apisix_version = config.get("apisix_version") or "2.13.0"
@@ -209,7 +219,9 @@ if observability_enabled:
     )
 
 # Create database cluster (needed by Keycloak, LiteLLM)
-db = create_database(_k8s, namespaces["local-infra"], cnpg_version)
+db = create_database(
+    _k8s, namespaces["local-infra"], cnpg_version, memory_limit=pg_memory_limit
+)
 
 create_ai_services(_k8s, namespaces["local-infra"], db.cluster, _infra_dir)
 

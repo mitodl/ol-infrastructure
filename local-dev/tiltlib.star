@@ -1,24 +1,32 @@
 # Shared Tilt helpers for local-dev.
 #
-# Load in any Tiltfile with:
-#   load("../../tiltlib.star", "k8s_yaml_local")  # from apps/<app>/
-#   load("./local-dev/tiltlib.star", "k8s_yaml_local")  # from repo root
+# Load in any app Tiltfile with:
+#   load("../../tiltlib.star", "k8s_yaml_app")
 #
-# k8s_yaml_local applies manifests with two local-dev conveniences:
+# k8s_yaml_app(app_dir) applies an app's manifests with three local-dev
+# conveniences (all described under "Local Configuration Overrides" in
+# local-dev/README.md):
 #
-# 1. Root-domain substitution. The LOCAL_DEV_ROOT_DOMAIN environment variable
+# 1. kustomize build with an optional per-developer overlay. The tracked
+#    manifests live in <app_dir>/base/ with a kustomization.yaml listing them.
+#    When the gitignored <app_dir>/local/kustomization.yaml exists, that
+#    overlay is built instead of base/, so any field of any tracked manifest
+#    (a memory limit, a probe, an image tag) can be changed without editing
+#    tracked files. Tilt shells out to `kustomize`, or to `kubectl kustomize`
+#    when the standalone binary is not installed.
+#
+# 2. Root-domain substitution. The LOCAL_DEV_ROOT_DOMAIN environment variable
 #    (default: mit.dev) replaces every 'mit.dev' occurrence so hostnames,
 #    URLs, and cookie-domain references update consistently:
 #      export LOCAL_DEV_ROOT_DOMAIN=mycompany.dev && tilt up
 #
-# 2. Config-change rollouts. Kubernetes does not restart pods when a
-#    ConfigMap/Secret they reference changes, so every Deployment applied in
-#    the same call gets a pod-template annotation fingerprinting the combined
-#    data/stringData of every ConfigMap and Secret passed in — editing any of
-#    them (the tracked app-env.yaml/secrets.yaml, or an optional gitignored
-#    local_overrides ConfigMap passed for per-developer overrides — see
-#    "Local Configuration Overrides" in local-dev/README.md) rolls the pods
-#    so new values actually take effect.
+# 3. Config-change rollouts. Kubernetes does not restart pods when a
+#    ConfigMap/Secret they reference changes, so every applied Deployment gets
+#    a pod-template annotation fingerprinting the combined data/stringData of
+#    every applied ConfigMap and Secret — editing any of them (the tracked
+#    app-env.yaml/secrets.yaml, or the optional gitignored
+#    <app_dir>/local/app-env.local.yaml override ConfigMap) rolls the pods so
+#    new values actually take effect.
 
 _ROOT_DOMAIN_DEFAULT = "mit.dev"
 _CONFIG_HASH_ANNOTATION = "ol.mit.edu/config-hash"
@@ -78,36 +86,40 @@ def _stamp_deployments(content, fingerprint):
         return None
     return encode_yaml_stream(docs)
 
-def k8s_yaml_local(paths, local_overrides=None):
-    """Apply k8s YAML with root-domain substitution and a pod-template
-    fingerprint annotation covering every applied ConfigMap/Secret, including
-    an optional gitignored ConfigMap of per-developer overrides (see module
-    docstring)."""
+def k8s_yaml_app(app_dir):
+    """Apply an app's manifests: a kustomize build of <app_dir>/local/ when
+    the developer has created its kustomization.yaml, else of <app_dir>/base/;
+    plus the optional gitignored <app_dir>/local/app-env.local.yaml override
+    ConfigMap; with root-domain substitution and the config-fingerprint
+    pod-template annotation (see module docstring)."""
     rd = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", _ROOT_DOMAIN_DEFAULT)
 
-    # read_file(default=...) also registers a watch on the override path —
-    # including its creation — so adding or editing it mid-session re-runs
-    # the Tiltfile.
-    overrides_text = ""
-    if local_overrides:
-        overrides_text = str(read_file(local_overrides, default=""))
-        if overrides_text.strip():
-            docs = [d for d in decode_yaml_stream(overrides_text) if d != None]
-            if len(docs) != 1 or docs[0].get("kind") != "ConfigMap":
-                fail("%s: expected a single ConfigMap manifest" % local_overrides)
-            keys = sorted((docs[0].get("data", {}) or {}).keys())
-            print("[%s] local overrides active: %s" % (local_overrides, ", ".join(keys) if keys else "(none)"))
+    base_dir = os.path.join(app_dir, "base")
+    overlay_dir = os.path.join(app_dir, "local")
+    overlay_kustomization = os.path.join(overlay_dir, "kustomization.yaml")
+    local_overrides = os.path.join(overlay_dir, "app-env.local.yaml")
 
-    all_paths = list(paths)
+    # read_file(default=...) registers a watch on a path that does not exist
+    # yet, so creating either gitignored file mid-session re-runs the
+    # Tiltfile. os.path.exists() would not.
+    if str(read_file(overlay_kustomization, default="")).strip():
+        print("[%s] local kustomize overlay active" % overlay_kustomization)
+        manifests_dir = overlay_dir
+    else:
+        manifests_dir = base_dir
+    contents = [(manifests_dir, str(kustomize(manifests_dir)))]
+
+    overrides_text = str(read_file(local_overrides, default=""))
     if overrides_text.strip():
-        all_paths.append(local_overrides)
+        docs = [d for d in decode_yaml_stream(overrides_text) if d != None]
+        if len(docs) != 1 or docs[0].get("kind") != "ConfigMap":
+            fail("%s: expected a single ConfigMap manifest" % local_overrides)
+        keys = sorted((docs[0].get("data", {}) or {}).keys())
+        print("[%s] local overrides active: %s" % (local_overrides, ", ".join(keys) if keys else "(none)"))
+        contents.append((local_overrides, overrides_text))
 
-    contents = []
-    for p in all_paths:
-        content = str(read_file(p))
-        if rd != _ROOT_DOMAIN_DEFAULT:
-            content = content.replace(_ROOT_DOMAIN_DEFAULT, rd)
-        contents.append((p, content))
+    if rd != _ROOT_DOMAIN_DEFAULT:
+        contents = [(p, content.replace(_ROOT_DOMAIN_DEFAULT, rd)) for p, content in contents]
 
     fingerprint = _config_fingerprint(contents)
 

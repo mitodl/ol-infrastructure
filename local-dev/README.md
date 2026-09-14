@@ -108,7 +108,7 @@ cp tilt_config.json.example tilt_config.json
 
 At minimum, review `enabled_apps` to enable only the services you need.
 
-For per-developer app env vars and secrets (API keys, feature flags), don't edit the tracked manifests — drop a gitignored `app-env.local.yaml` ConfigMap next to the app's tracked one instead. See [Local Configuration Overrides](#local-configuration-overrides).
+For per-developer tweaks (API keys, feature flags, memory limits), don't edit the tracked manifests — each app has a gitignored `local/` directory for them. See [Local Configuration Overrides](#local-configuration-overrides).
 
 ### 3. Start the environment
 
@@ -172,9 +172,12 @@ ol-infrastructure/
     ├── cluster/                 # k3d cluster definition + registry retention config
     ├── certs/                   # mkcert output (gitignored)
     ├── infra/                   # Pulumi stacks: shared in-cluster infra (see EXTENDING.md)
-    └── apps/<app>/              # Per-app k8s manifests + Tiltfile
-        └── configmaps/
-            └── app-env.local.yaml   # (optional, gitignored) your env overrides — see
+    └── apps/<app>/              # Per-app Tiltfile + k8s manifests
+        ├── base/                # Tracked manifests (deployment, configmaps, secrets,
+        │                        # routes) + the kustomization.yaml that lists them
+        └── local/               # Yours, gitignored; committed *.example templates alongside
+            ├── app-env.local.yaml   # env var / secret overrides
+            └── kustomization.yaml   # kustomize overlay for anything else — see
                                      # Local Configuration Overrides below
 ```
 
@@ -205,7 +208,7 @@ odl-video-service derives Django permissions from Keycloak group membership: `ad
 With an app repo checked out next to `ol-infrastructure`, Tilt live-syncs your edits into the running containers — no rebuild. (Curious how? See [Two transports](ARCHITECTURE.md#two-transports-how-your-code-reaches-a-pod) in ARCHITECTURE.md.) What to expect:
 
 - **Django apps:** granian runs with `--reload` and restarts its workers on each change — the new code serves once Django finishes re-importing (roughly 10–30 s depending on the app). Watch for `Changes detected, reloading workers..` in the app logs. Celery workers and beat don't auto-reload — restart those resources from the Tilt UI after changing task code. When `pyproject.toml` or `uv.lock` changes, Tilt runs `uv sync` inside the container first.
-- **Next.js frontend:** Tilt builds the `local-dev` stage of `Dockerfile.web`, which runs `next dev` (Turbopack). Changes under `frontends/` hot-reload in roughly a second (the first request to each page after a pod start pays a one-time on-demand compile). HMR websockets are proxied through apisix, so the browser hot-updates on `https://learn.mit.dev` too. `NEXT_PUBLIC_*` values are runtime env vars (see its `configmaps/app-env.yaml`), not build args, so changing them needs no rebuild. When `yarn.lock` changes, Tilt runs `yarn install` inside the container.
+- **Next.js frontend:** Tilt builds the `local-dev` stage of `Dockerfile.web`, which runs `next dev` (Turbopack). Changes under `frontends/` hot-reload in roughly a second (the first request to each page after a pod start pays a one-time on-demand compile). HMR websockets are proxied through apisix, so the browser hot-updates on `https://learn.mit.dev` too. `NEXT_PUBLIC_*` values are runtime env vars (see its `base/configmaps/app-env.yaml`), not build args, so changing them needs no rebuild. When `yarn.lock` changes, Tilt runs `yarn install` inside the container.
 - **No checkout:** Tilt deploys the pre-built Docker Hub image (`mitodl/<app>-app`) at the tag listed in `tilt_config.json` under `prebuilt_tags`. It works, but does not hot-reload — you can work on mit-learn without having learn-ai checked out.
 
 ### Access logs
@@ -354,9 +357,10 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
 | `keycloak_image` | published `mitodl/keycloak` digest | Keycloak server image for the core stack — see [Testing a local ol-keycloakify build](#testing-a-local-ol-keycloakify-build). |
+| `pg_memory_limit` | `512Mi` | Memory limit of the shared Postgres pod — see [Pulumi-managed infrastructure](#pulumi-managed-infrastructure) under Local Configuration Overrides. |
 | `per_app_databases`, `openedx_mode` | — | Declared but not wired to anything yet; setting them has no effect. |
 
-The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags) go in `tilt_config.json`; anything that sets an **env var or secret value inside a workload** (API keys, feature flags, endpoints) goes in a gitignored `app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides).
+The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags) or tune **Pulumi-managed infrastructure** go in `tilt_config.json`; anything that sets an **env var or secret value inside an app** goes in its gitignored `local/app-env.local.yaml`; anything else about an **app's manifests** (memory limits, probes, replicas) goes in its gitignored `local/kustomization.yaml` — see [Local Configuration Overrides](#local-configuration-overrides).
 
 ### Root domain
 
@@ -483,16 +487,25 @@ it prints the exact `pulumi stack rm` to run; do that and re-run teardown.
 
 ### Local Configuration Overrides
 
-The ConfigMaps and Secrets are tracked by the repository. For per-developer customizations (API keys, feature flags, custom endpoints), each app has an optional, gitignored override ConfigMap:
+Everything tracked for an app lives in `local-dev/apps/<app>/base/`; everything that is yours lives in `local-dev/apps/<app>/local/`, which is gitignored. Two files go there, each with a committed `.example` template beside it:
+
+| You want to change… | File | Mechanism |
+|---|---|---|
+| An env var or secret value inside the app | `local/app-env.local.yaml` | Optional ConfigMap, referenced last in every container's `envFrom` |
+| Anything else in a tracked manifest (memory limits, probes, replicas, image) | `local/kustomization.yaml` | kustomize overlay built instead of `base/` |
+
+Shared infrastructure (Postgres, Keycloak, …) is Pulumi-managed and has its own knobs — see [Pulumi-managed infrastructure](#pulumi-managed-infrastructure) below.
+
+#### Env vars and secret values: `app-env.local.yaml`
 
 ```bash
-cp local-dev/apps/mitxonline/configmaps/app-env.local.yaml.example \
-   local-dev/apps/mitxonline/configmaps/app-env.local.yaml
+cp local-dev/apps/mitxonline/local/app-env.local.yaml.example \
+   local-dev/apps/mitxonline/local/app-env.local.yaml
 # then add your overrides under data:, e.g.
 #   FEATURE_IGNORE_EDX_FAILURES: "True"
 ```
 
-How it works — plain Kubernetes, visible in each app's `deployment.yaml`: every container's `envFrom` list references the override ConfigMap (`mitxonline-env-local` etc.) **last** and with `optional: true`. Kubernetes resolves duplicate `envFrom` keys by letting the last source win, so your overrides beat both the tracked ConfigMap *and* the tracked Secret — secret values are fine in this file, it never leaves your machine. `optional: true` means no file → no ConfigMap → no-op for everyone else.
+How it works — plain Kubernetes, visible in each app's `base/deployment.yaml`: every container's `envFrom` list references the override ConfigMap (`mitxonline-env-local` etc.) **last** and with `optional: true`. Kubernetes resolves duplicate `envFrom` keys by letting the last source win, so your overrides beat both the tracked ConfigMap *and* the tracked Secret — secret values are fine in this file, it never leaves your machine. `optional: true` means no file → no ConfigMap → no-op for everyone else.
 
 Day-to-day behavior:
 
@@ -501,6 +514,28 @@ Day-to-day behavior:
 - Gotchas: the ConfigMap's `metadata.name` must match what `deployment.yaml` references (`<app>-env-local` — copy the example, don't type it), and all `data:` values must be YAML **strings** (quote things like `"True"` and `"8080"`). A typo'd key is applied but ignored by the app. If you *delete* the file mid-session, prefer emptying `data:` instead — the already-applied ConfigMap can linger in-cluster until `tilt down`.
 
 Every app supports this, including **mit-learn-nextjs** (e.g. per-developer PostHog credentials — see its `app-env.local.yaml.example`).
+
+#### Everything else: `kustomization.yaml`
+
+```bash
+cp local-dev/apps/mitxonline/local/kustomization.yaml.example \
+   local-dev/apps/mitxonline/local/kustomization.yaml
+# the example raises the web container's memory limit; edit the patch to taste
+```
+
+How it works — plain [kustomize](https://kubectl.docs.kubernetes.io/references/kustomize/), which ships inside `kubectl` (Tilt uses a standalone `kustomize` binary if you have one, otherwise `kubectl kustomize`). The tracked `base/kustomization.yaml` lists the app's manifests; your overlay declares `resources: [../base]` plus `patches:`. Whenever `local/kustomization.yaml` exists, the app's Tiltfile (through `k8s_yaml_app` in `tiltlib.star`) builds the overlay instead of `base/`; otherwise it builds `base/` directly, so the file's absence is a no-op for everyone else. Root-domain substitution and the config-hash pod roll apply to the overlay's output the same way.
+
+Day-to-day behavior:
+
+- Creating, editing, or deleting the file mid-session re-evaluates the Tiltfile — no Tilt restart. A changed pod template rolls the pods on its own.
+- Anything kustomize can express works: `replicas: 0` to switch a worker off, a different `image:`, a longer probe timeout, an extra volume. Env vars *can* be patched this way too, but `app-env.local.yaml` is shorter.
+- Gotchas: a strategic merge patch must name the target's `namespace` (the tracked Deployments set one, and a patch without it matches nothing — kustomize fails with `no resource matches strategic merge patch`), and containers are matched by `name`. Build errors show in the **Tiltfile resource's log** in the Tilt UI.
+
+#### Pulumi-managed infrastructure
+
+Postgres, Keycloak, OpenSearch, and the rest of `local-infra` are deployed by Pulumi, not by app Tiltfiles, so the overlay does not reach them. Knobs there are exposed one at a time through `tilt_config.json` and forwarded to the core Pulumi stack as `LOCAL_DEV_*` environment variables, the same way as [log retention](#log-retention). Currently:
+
+- `pg_memory_limit` — memory limit of the shared Postgres pod (default `512Mi`). Each pytest-django xdist worker creates and migrates its own test database against this one cluster, so running `pytest -n 4` inside an app container wants something like `"2Gi"`.
 
 Scope notes:
 

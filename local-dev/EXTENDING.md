@@ -14,16 +14,20 @@ How to add a new app to the stack or change the shared in-cluster infrastructure
 ```
 local-dev/apps/<app-name>/
 ├── Tiltfile
-├── deployment.yaml       # Deployment(s) + Service
-├── secrets.yaml          # Placeholder k8s Secrets
-├── apisix-routes.yaml    # ApisixTls + ApisixRoute
-└── configmaps/
-    ├── app-env.yaml      # Non-secret env vars
-    ├── app-env.local.yaml.example  # Template for per-dev overrides
-    └── nginx.yaml        # (if using nginx sidecar)
+├── base/
+│   ├── kustomization.yaml    # Lists every manifest below
+│   ├── deployment.yaml       # Deployment(s) + Service
+│   ├── secrets.yaml          # Placeholder k8s Secrets
+│   ├── apisix-routes.yaml    # ApisixTls + ApisixRoute
+│   └── configmaps/
+│       ├── app-env.yaml      # Non-secret env vars
+│       └── nginx.yaml        # (if using nginx sidecar)
+└── local/
+    ├── app-env.local.yaml.example   # Template for per-dev env overrides
+    └── kustomization.yaml.example   # Template for per-dev manifest overlay
 ```
 
-Use an existing app (e.g., `learn-ai/`) as a template. In particular, copy the `envFrom` pattern from an existing `deployment.yaml`: every container lists the tracked ConfigMap, the tracked Secret, then the optional `<app>-env-local` override ConfigMap **last** (see [Local Configuration Overrides](README.md#local-configuration-overrides) in the README), and pass `local_overrides='configmaps/app-env.local.yaml'` to `k8s_yaml_local` in the Tiltfile.
+Use an existing app (e.g., `learn-ai/`) as a template. In particular, copy the `envFrom` pattern from an existing `base/deployment.yaml`: every container lists the tracked ConfigMap, the tracked Secret, then the optional `<app>-env-local` override ConfigMap **last** (see [Local Configuration Overrides](README.md#local-configuration-overrides) in the README). In the Tiltfile, call `k8s_yaml_app(<path to local-dev/apps/<app-name>>)` from `tiltlib.star`: it kustomize-builds `base/` (or the developer's `local/` overlay) and applies the optional `local/app-env.local.yaml`. Both `.example` files under `local/` are copies of another app's with the Deployment name, namespace, and ConfigMap name changed.
 
 ### 2. Add the app database to the CNPG cluster
 

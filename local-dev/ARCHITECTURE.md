@@ -282,9 +282,9 @@ Then, for each enabled app (apps deploy independently of each other):
 
 ```
 ├── docker build (if source repo present, else pull prebuilt image)
-├── kubectl apply configmaps/ secrets.yaml deployment.yaml
-│     initContainer: migrate + collectstatic + data-specific seeds
-└── kubectl apply apisix-routes.yaml
+├── kustomize build base/ (or your gitignored local/ overlay) → kubectl apply
+│     ConfigMaps, Secrets, Deployments (initContainer: migrate + collectstatic),
+│     Services, ApisixRoute/ApisixTls
       APISIX picks up new routes → app reachable at its .dev URL
 ```
 
@@ -305,4 +305,4 @@ Tilt collapses all of that into a file-watch + in-container sync, and shows the 
 - [README.md](README.md) — setup and day-to-day usage
 - [EXTENDING.md](EXTENDING.md) — adding a new app, modifying shared infrastructure
 - `local-dev/apps/*/Tiltfile` — per-app build + live_update config
-- `local-dev/apps/*/deployment.yaml` — per-app k8s manifests
+- `local-dev/apps/*/base/deployment.yaml` — per-app k8s manifests

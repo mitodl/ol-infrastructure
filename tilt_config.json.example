@@ -20,5 +20,7 @@
 
   "log_retention_period": "168h",
 
+  "pg_memory_limit": "",
+
   "keycloak_image": ""
 }
