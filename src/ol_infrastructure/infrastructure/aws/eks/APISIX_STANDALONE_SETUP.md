@@ -587,6 +587,40 @@ Current configuration:
 
 Adjust based on traffic patterns and number of routes.
 
+### Vestigial etcd Artifacts (do not delete, do not read as live config)
+
+⚠️ **The chart still emits etcd scaffolding even though `etcd.enabled: False`.** None of it is
+wired to a real etcd — APISIX runs `role_traditional.config_provider: yaml` and never reads these
+values — but all three artifacts are present in every cluster and are Helm-managed:
+
+| Artifact | What it looks like | Why it is there |
+|---|---|---|
+| `etcd:` block in the `apache-apisix` ConfigMap | `host: - "http://etcd.host:2379"`, `user: "root"`, `password: "${{ APISIX_ETCD_PASSWORD }}"` | Chart templates the full `config.yaml` unconditionally. `etcd.host` is the upstream **placeholder default**, not an endpoint we ever ran. |
+| `etcd-apache-apisix` Secret (key `etcd-root-password`) | `app.kubernetes.io/managed-by: Helm` | Created by the chart alongside the release. |
+| `APISIX_ETCD_PASSWORD` env var on the `apache-apisix` Deployment | `secretKeyRef` -> the Secret above | Templated by the chart regardless of `etcd.enabled`. |
+
+**Do not delete the Secret.** The Deployment references it via `secretKeyRef`, so removing it puts
+new pods into `CreateContainerConfigError` on the next restart or rollout. The env var and the
+ConfigMap block are equally untouchable without overriding the chart's own templates.
+
+**Do not read the `etcd:` block as evidence of a live etcd.** There is no etcd StatefulSet, Service,
+or pod in any cluster. In September 2026 this block was misread as a live endpoint, producing a
+cleanup ticket whose stated premise ("APISIX etcd migrated from `ebs-gp3-sc` to `efs-sc`") was wrong
+— etcd was never migrated, it was removed outright in the October 2025 standalone cutover. The
+`data-apisix-etcd-{0,1,2}` PVCs left behind in `operations` across five clusters were leftovers of
+the pre-cutover StatefulSet and were deleted in September 2026.
+
+To confirm the current state rather than trusting the ConfigMap:
+
+```bash
+# Expect: no resources
+kubectl --context $CTX -n operations get sts,svc,pods | grep -i etcd
+
+# Expect: yaml
+kubectl --context $CTX -n operations get cm apache-apisix \
+  -o jsonpath='{.data.config\.yaml}' | grep -A2 role_traditional
+```
+
 ### Blue-Green Migration
 
 This deployment supports separate domains via `apisix_official_domains` config key, allowing gradual migration from the Bitnami chart deployment.
