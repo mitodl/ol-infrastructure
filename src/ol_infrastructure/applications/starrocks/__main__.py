@@ -15,6 +15,10 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBindingConfig,
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.apisix import (
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -1019,11 +1023,31 @@ cert_manager_certificate = OLCertManagerCert(
     ),
 )
 
+# The OAuth2 callback below referenced no plugin config at all, so it emitted
+# no prometheus series and no OTLP span -- the one internet-facing path of a
+# query engine, invisible on every dashboard.
+#
+# enable_cors=False: the only client is a JDBC driver completing a token
+# exchange, not a browser making a cross-origin call, so referencing this config
+# for prometheus/opentelemetry/gzip must not also hand the host a wildcard
+# origin grant.
+starrocks_shared_plugins = OLApisixSharedPlugins(
+    f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-ol-shared-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name=f"{stack_info.env_prefix}-starrocks",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=namespace,
+        k8s_labels=k8s_app_labels.model_dump(),
+        enable_cors=False,
+    ),
+)
+
 starrocks_apisix_httproute = OLApisixHTTPRoute(
     f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-apisix-httproute",
     route_configs=[
         OLApisixHTTPRouteConfig(
             route_name=f"{stack_info.env_prefix}-starrocks",
+            shared_plugins=starrocks_shared_plugins,
             hosts=[starrocks_config.require("domain")],
             # Publish ONLY the OAuth2 callback. The JDBC OAuth2 flow completes
             # its token exchange at this path, and nothing else on the FE's HTTP

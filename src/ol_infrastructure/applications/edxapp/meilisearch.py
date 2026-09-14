@@ -61,18 +61,6 @@ def create_meilisearch_resources(
             resource_suffix="ol-shared-plugins",
             k8s_namespace=namespace,
             k8s_labels=k8s_global_labels,
-            # OLApisixHTTPRoute attaches only the shared PluginConfig via
-            # ExtensionRef when shared_plugin_config_name is set, ignoring the
-            # route's own `plugins` list entirely -- including the request-id
-            # plugin OLApisixHTTPRouteConfig's validator would otherwise add.
-            # Include it here explicitly so tracing/correlation still works.
-            plugins=[
-                {
-                    "name": "request-id",
-                    "enable": True,
-                    "config": {"include_in_response": True},
-                },
-            ],
         ),
     )
 
@@ -87,8 +75,7 @@ def create_meilisearch_resources(
                 paths=["/*"],
                 backend_service_name="meilisearch",
                 backend_service_port=7700,
-                shared_plugin_config_name=meilisearch_shared_plugins.resource_name,
-                plugins=[],
+                shared_plugins=meilisearch_shared_plugins,
             ),
         ],
     )

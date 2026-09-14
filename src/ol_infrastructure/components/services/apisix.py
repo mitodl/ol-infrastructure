@@ -657,8 +657,12 @@ class OLApisixSharedPlugins(ComponentResource):
       The v1alpha1 schema only accepts ``name`` and ``config`` per plugin;
       ``enable: false`` plugins are omitted entirely and ``secretRef`` is dropped.
 
-    Callers can use ``self.resource_name`` in both ``OLApisixRouteConfig`` (legacy)
-    and ``OLApisixHTTPRouteConfig`` (Gateway API) without any distinction.
+    Legacy callers pass ``self.resource_name`` to ``OLApisixRouteConfig``;
+    Gateway API callers pass the component itself to
+    ``OLApisixHTTPRouteConfig(shared_plugins=...)``, which reads
+    ``self.plugin_list`` to merge these defaults into each route's own plugins
+    (HTTPRoute allows only one ExtensionRef per rule, so the merge has to happen
+    here rather than in APISIX).
     """
 
     def __init__(
@@ -820,6 +824,14 @@ class OLApisixSharedPlugins(ComponentResource):
         self.resource_name = (
             f"{plugin_config.application_name}-{plugin_config.resource_suffix}"
         )
+        # The rendered plugin list, exposed so OLApisixHTTPRoute can merge these
+        # defaults into a route's own plugins.  A single HTTPRoute rule accepts
+        # only one ExtensionRef filter, so a Gateway API route cannot reference
+        # this config *and* its own PluginConfig the way a legacy ApisixRoute
+        # can -- the two lists have to be combined before the CRD is written.
+        self.plugin_list: list[OLApisixPluginConfig] = [
+            OLApisixPluginConfig(**p) for p in plugins
+        ]
         # v2/ApisixPluginConfig — consumed by legacy ApisixRoute/Ingress resources
         # via ``plugin_config_name`` in the route spec.
         self.shared_plugin_apisix_pluginconfig_resource = (
