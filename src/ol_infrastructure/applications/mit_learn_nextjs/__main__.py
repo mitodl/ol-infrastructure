@@ -1,6 +1,5 @@
 """Pulumi program for deploying the MIT Learn Next.js application to Kubernetes."""
 
-import pulumi
 import pulumi_kubernetes as kubernetes
 from kubernetes.utils.quantity import parse_quantity
 from pulumi import Config, ResourceOptions, export
@@ -112,21 +111,6 @@ nextjs_max_old_space_size_mib = (
 # Kept at request + 512Mi as the request grew, preserving that absorption margin.
 nextjs_memory_limit = "2Gi"
 
-org_learning_hubspot_form_ids = {
-    "ci": "e6910657-d832-4df8-be27-d8f6f9ecdfcc",
-    "qa": "e6910657-d832-4df8-be27-d8f6f9ecdfcc",
-    "production": "60a1983b-361a-4e80-a0db-d24ff636d7bf",
-}
-
-org_learning_hubspot_form_id = org_learning_hubspot_form_ids.get(
-    stack_info.env_suffix, ""
-)
-if not org_learning_hubspot_form_id:
-    pulumi.log.warn(
-        "No org learning HubSpot form ID for environment "
-        f"{stack_info.env_suffix}; the form will render its unavailable fallback."
-    )
-
 # HubSpot tracking portal: xprodev for dev/RC, xPRO prod for production
 # (mitodl/hq#10735). Public value (in the js.hs-scripts.com URL), not a secret.
 hubspot_portal_ids = {
@@ -136,11 +120,6 @@ hubspot_portal_ids = {
 }
 
 hubspot_portal_id = hubspot_portal_ids.get(stack_info.env_suffix, "")
-if not hubspot_portal_id:
-    pulumi.log.warn(
-        "No HubSpot portal ID for environment "
-        f"{stack_info.env_suffix}; the tracking script will not render."
-    )
 
 raw_env_vars = {
     # Env vars available only on server
@@ -185,7 +164,12 @@ raw_env_vars = {
     ),
     "NEXT_PUBLIC_MITOL_AXIOS_WITH_CREDENTIALS": "true",
     "NEXT_PUBLIC_MITOL_SUPPORT_EMAIL": "mitlearn-support@mit.edu",
-    "NEXT_PUBLIC_ORG_LEARNING_HUBSPOT_FORM_ID": org_learning_hubspot_form_id,
+    # Optional: the app's yup schema treats it as optional and the lead form
+    # reports itself unavailable rather than erroring when unset.
+    "NEXT_PUBLIC_ORG_LEARNING_HUBSPOT_FORM_ID": nextjs_config.get(
+        "org_learning_hubspot_form_id"
+    )
+    or "",
     "NEXT_PUBLIC_ORIGIN": nextjs_config.require("origin"),
     "NEXT_PUBLIC_POSTHOG_API_HOST": nextjs_config.require("posthog_api_host"),
     "NEXT_PUBLIC_PODCASTS_FEATURED_LIST_LEARNINGPATH_ID": (
