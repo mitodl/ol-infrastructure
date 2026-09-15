@@ -61,14 +61,24 @@ k8s_resource(
 
 k8s_resource('ocwstudio-celery', labels=['ocw-studio'], resource_deps=['local-infra-apps'])
 
+# objects= is explicit on purpose. Left to its own devices Tilt groups every
+# ConfigMap in the applied YAML onto the first workload that references one,
+# which put the site-host nginx config behind the Studio image build -- so the
+# published sites stayed down until an unrelated build finished. Naming them
+# here keeps the two lifecycles genuinely independent.
 k8s_resource(
     'ocwstudio-sitehost',
+    objects=[
+        'ocwstudio-sitehost-conf:configmap',
+        'ocwstudio-sites-route:apisixroute',
+    ],
     labels=['ocw-studio'],
     resource_deps=['local-infra-core'],
 )
 
 k8s_resource(
     'ocwstudio-concourse',
+    objects=['ocwstudio-concourse-route:apisixroute'],
     port_forwards=['8080:8080'],
     labels=['ocw-studio'],
     resource_deps=['local-infra-core'],
