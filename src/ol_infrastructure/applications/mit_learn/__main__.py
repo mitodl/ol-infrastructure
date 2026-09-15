@@ -270,10 +270,10 @@ s3.BucketPolicy(
 
 mitlearn_app_storage_bucket_name = f"ol-mitlearn-app-storage-{app_env_suffix}"
 
-# CI is piloting SigV4-signed Fastly->S3 requests (see the IAM user/Vault secret
-# below and the signing VCL on the media-storage backend) so it can go fully
-# private. QA/Production stay on the pre-existing public-read policy until the
-# pilot is validated -- see PR description for the manual verification steps.
+# CI pilots SigV4-signed Fastly->S3 requests (see the IAM user/Vault secret
+# below and the signing VCL on the media-storage backend), validated live
+# on 2026-09-15 -- see the PR description for how. QA/Production stay on the
+# pre-existing public-read policy until this is rolled out to them too.
 _mitlearn_bucket_is_sigv4_piloted = stack_info.env_suffix == "ci"
 
 mitlearn_application_storage_bucket_config = S3BucketConfig(
@@ -1024,6 +1024,16 @@ def _mitlearn_s3_sigv4_signing_body(
     bereq.http.host by the time a "miss" snippet runs, so signing against
     whatever bereq.http.host already held signed the wrong Host and produced
     SignatureDoesNotMatch (confirmed live).
+
+    The canonical query string is hardcoded empty below, so any query string
+    on the actual request must also be stripped before it goes out to S3 --
+    "Route media requests to S3" (the recv-stage snippet that sets
+    is_media_request) never removes it, unlike the OCW backend's own recv
+    snippet, which explicitly calls querystring.remove(req.url) before its S3
+    fetch for exactly this reason. Without the querystring.remove(bereq.url)
+    call below, any /media/...?... request would sign against an empty query
+    string while actually sending the real one, and S3 would reject it with
+    SignatureDoesNotMatch.
     """
     return textwrap.dedent(
         f"""\
@@ -1042,6 +1052,8 @@ def _mitlearn_s3_sigv4_signing_body(
 
         set var.aws_access_key_id = "{access_key_id}";
         set var.aws_secret_access_key = "{secret_access_key}";
+
+        set bereq.url = querystring.remove(bereq.url);
 
         set var.date_stamp = strftime({{"%Y%m%d"}}, now);
         set var.amz_date = strftime({{"%Y%m%dT%H%M%SZ"}}, now);
