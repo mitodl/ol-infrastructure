@@ -341,6 +341,11 @@ policy_definition = {
                 "rds:DeleteBlueGreenDeployment",
                 "rds:DeleteDBInstance",
                 "rds:DeleteDBParameterGroup",
+                # Not in AWS's documented lifecycle list, but the provider polls
+                # it to wait for the green environment and for deletion. Without
+                # it the apply dies after CreateBlueGreenDeployment succeeds and
+                # leaves the deployment behind (keycloak-production build #33).
+                "rds:DescribeBlueGreenDeployments",
                 "rds:DescribeDBEngineVersions",
                 "rds:DescribeDBInstances",
                 "rds:DescribeDBParameterGroups",
