@@ -40,7 +40,7 @@ def _first_public_key(keys) -> str:
     return getattr(key, "public_key", "")
 
 
-def create_olapps_dev_realm(  # noqa: PLR0913
+def create_olapps_dev_realm(  # noqa: PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     k8s_provider: k8s.Provider,
@@ -834,6 +834,22 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             realm_id=realm.realm,
             client_id=ocw_studio_client.id,
             default_scopes=DEFAULT_SCOPES,
+            opts=kc_opts,
+        )
+        # social-core's KeycloakOAuth2 decodes the access token with
+        # audience == client_id (its audience() is hardcoded to the client key,
+        # with no setting to override), and Keycloak puts the client in `azp`
+        # rather than `aud` unless a mapper adds it -- so the callback died with
+        # InvalidAudienceError. Same mapper the prod ol-mit ocw-studio client
+        # and the local-dev OVS client above carry, for the same reason.
+        keycloak.openid.AudienceProtocolMapper(
+            "olapps-ocw-studio-audience-mapper",
+            realm_id=realm.realm,
+            client_id=ocw_studio_client.id,
+            name="audience",
+            included_client_audience=ocw_studio_client.client_id,
+            add_to_id_token=True,
+            add_to_access_token=True,
             opts=kc_opts,
         )
 
