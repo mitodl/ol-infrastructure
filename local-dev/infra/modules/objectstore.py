@@ -185,9 +185,15 @@ def create_object_store(
                                 "periodSeconds": 30,
                                 "failureThreshold": 6,
                             },
+                            # 1Gi was not enough: RustFS sits around 850Mi
+                            # idle, so it was OOMKilled the moment a mass build
+                            # put concurrent reads through it. Hugo's instructor
+                            # fetches then stalled and its 30s partial timeout
+                            # failed the builds. Headroom matters more than
+                            # thrift here; the node has plenty spare.
                             "resources": {
-                                "requests": {"cpu": "50m", "memory": "128Mi"},
-                                "limits": {"memory": "1Gi"},
+                                "requests": {"cpu": "200m", "memory": "512Mi"},
+                                "limits": {"memory": "4Gi"},
                             },
                         }
                     ],

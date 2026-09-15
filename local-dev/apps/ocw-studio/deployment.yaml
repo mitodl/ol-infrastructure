@@ -344,12 +344,15 @@ spec:
         - name: sitehost-config
           mountPath: /etc/nginx/conf.d/default.conf
           subPath: default.conf
+        # Every Hugo build in a mass build fetches instructor JSON through
+        # here, so it sees the full fan-out. Memory is not the constraint
+        # (~18Mi in practice); CPU scheduling under contention is.
         resources:
           requests:
-            cpu: 50m
+            cpu: 200m
             memory: 64Mi
           limits:
-            memory: 256Mi
+            memory: 512Mi
       volumes:
       - name: sitehost-config
         configMap:
