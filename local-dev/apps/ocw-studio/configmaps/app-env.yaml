@@ -84,6 +84,10 @@ data:
   # botocore reads AWS_ENDPOINT_URL straight from the environment, which
   # catches any client built without going through main/s3_utils.py.
   AWS_ENDPOINT_URL: "http://rustfs.local-infra.svc.cluster.local:9000"
+  # Also what gets baked into pipeline definitions as the `aws --endpoint-url`
+  # for tasks running on the Concourse worker. Verified reachable from inside a
+  # task container; the compose default (a static Minio IP) is not, and hung
+  # the theme assets upload.
   # Required against RustFS (and MinIO): virtual-host addressing would put the
   # bucket in a hostname nothing resolves.
   AWS_S3_ADDRESSING_STYLE: "path"
@@ -142,6 +146,11 @@ data:
   CONCOURSE_URL: "https://concourse.ocw.mit.dev"
   CONCOURSE_TEAM: "main"
   CONCOURSE_IS_PRIVATE_REPO: "False"
+  # How a pipeline task reaches Studio to report status back. Not the in-cluster
+  # Service: task containers resolve the public hostnames through the CoreDNS
+  # override, and the compose fallback for this is an nginx container IP that
+  # does not exist here.
+  OCW_STUDIO_PIPELINE_API_URL: "https://studio.ocw.mit.dev"
 
   # ── Celery ────────────────────────────────────────────────────────────────
   CELERY_TASK_ALWAYS_EAGER: "False"
