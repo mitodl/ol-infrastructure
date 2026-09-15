@@ -36,6 +36,7 @@ from modules.identity_core import create_identity_core
 from modules.ingress import create_ingress
 from modules.messaging import create_messaging
 from modules.namespaces import create_namespaces
+from modules.objectstore import OBJECT_STORE_APPS, create_object_store
 from modules.observability import create_observability
 from modules.search import create_search
 from modules.tls import create_tls_resources
@@ -76,6 +77,20 @@ log_retention_period = (
     config.get("log_retention_period")
     or os.environ.get("LOCAL_DEV_LOG_RETENTION")
     or "168h"
+)
+
+# Which apps the developer has switched on, forwarded by the Tiltfile from
+# tilt_config.json's enabled_apps. Only the app-specific resources added since
+# per-app gating existed consult this -- the four original apps' namespaces and
+# databases are still provisioned unconditionally, so an existing stack does
+# not churn when this is set. Same not-pinned-in-Pulumi-config caveat as
+# log_retention_period below.
+enabled_apps = tuple(
+    app.strip()
+    for app in (
+        config.get("enabled_apps") or os.environ.get("LOCAL_DEV_ENABLED_APPS", "")
+    ).split(",")
+    if app.strip()
 )
 
 cert_manager_version = config.get("cert_manager_version") or "v1.16.2"
@@ -119,7 +134,7 @@ _k8s = make_resource_opts(k8s_provider)
 # Orchestration
 # ---------------------------------------------------------------------------
 
-namespaces = create_namespaces(_k8s)
+namespaces = create_namespaces(_k8s, enabled_apps=enabled_apps)
 
 tls = create_tls_resources(
     _k8s,
@@ -127,6 +142,7 @@ tls = create_tls_resources(
     cert_path=_cert_path,
     key_path=_key_path,
     ca_cert_path=_ca_cert_path,
+    enabled_apps=enabled_apps,
 )
 
 ingress = create_ingress(
@@ -212,6 +228,18 @@ if observability_enabled:
 db = create_database(_k8s, namespaces["local-infra"], cnpg_version)
 
 create_ai_services(_k8s, namespaces["local-infra"], db.cluster, _infra_dir)
+
+# S3-compatible object storage (RustFS). Roughly a 1GB workload with a 20Gi
+# volume, and only ocw-studio uses it today, so it is deployed on demand
+# rather than as unconditional shared infrastructure.
+if set(enabled_apps) & set(OBJECT_STORE_APPS):
+    create_object_store(
+        _k8s,
+        namespaces["local-infra"],
+        apisix_release=ingress.apisix,
+        tls_secret=tls.tls_secret,
+        s3_hostname=f"s3.{root_domain}",
+    )
 
 # Deploy Keycloak operator and instance (but not realm — that's in apps-infra)
 identity = create_identity_core(
