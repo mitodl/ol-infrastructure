@@ -58,6 +58,13 @@ peaked at 122 MB/s — 98% of the ceiling — while peak IOPS reached 1,904/s, o
 12.02 GiB index, so it re-read the whole thing 7.6 times over. Throughput bound
 it; IOPS did not. Check both before assuming which one is short.
 
+That ordering flipped once the ceiling moved. With `ebs-gp3-throughput-500`
+applied, the same volume peaked at 266 MB/s and 4,626 IOPS over the fourteen
+days to 2026-09-15 — 93% of the 5,000 provisioned, against 38% before. Lifting
+the throughput ceiling is what let IOPS become the binding constraint, so this
+volume now has little IOPS headroom left. It is also why `ebs-gp3-sc` keeps
+`iopsPerGB: 50` in production while CI and QA drop to 30.
+
 StorageClass parameters apply at provisioning time only, so raising them does
 nothing for a volume that already exists. `volume_attributes_class` names a
 `VolumeAttributesClass` instead, which drives `ec2:ModifyVolume` against the live
