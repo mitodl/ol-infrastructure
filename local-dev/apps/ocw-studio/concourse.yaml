@@ -150,7 +150,7 @@ spec:
             cpu: 100m
             memory: 512Mi
           limits:
-            memory: 2Gi
+            memory: 4Gi
         readinessProbe:
           httpGet:
             path: /api/v1/info
@@ -203,12 +203,20 @@ spec:
           mountPath: /concourse-keys
         - name: worker-state
           mountPath: /worker-state
+        # Sized for the configured build concurrency, not for an idle
+        # worker. Every pipeline task runs in this one pod's containerd, so
+        # OCW_MASS_BUILD_MAX_IN_FLIGHT parallel Hugo builds all draw on this
+        # single limit -- at the default of 40, a few hundred MB each adds up
+        # well past a handful of GB. The host this targets has far more to
+        # spare than the old 4Gi cap assumed, and an under-sized cap here shows
+        # up as builds failing on template timeouts rather than as an obvious
+        # OOM, so it is worth being generous.
         resources:
           requests:
-            cpu: 250m
-            memory: 1Gi
+            cpu: "2"
+            memory: 2Gi
           limits:
-            memory: 4Gi
+            memory: 24Gi
 
       volumes:
       - name: concourse-keys
