@@ -1001,13 +1001,29 @@ CACHE_KEY_QUERY_PARAM_WHITELIST = [
 _SHA256_EMPTY_STRING = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"  # pragma: allowlist secret
 
 
-def _mitlearn_s3_sigv4_signing_body(access_key_id: str, secret_access_key: str) -> str:
+def _mitlearn_s3_sigv4_signing_body(
+    access_key_id: str, secret_access_key: str, bucket_host: str
+) -> str:
     """VCL to sign a backend request to the mit-learn media bucket with SigV4.
 
-    NOT YET VALIDATED against a live Fastly service -- there is no way to
-    execute VCL in this environment. Verify by deploying to CI and confirming
-    a real media asset request against the CI domain returns 200 (not 403)
-    before treating this pattern as proven. See the PR description.
+    Validated live against CI on 2026-09-15: a test object uploaded to
+    media/sigv4-pilot-test.txt (then deleted) round-tripped through Fastly
+    with a 200, confirming the signature is accepted by S3 with the bucket
+    fully private. Three real bugs were found and fixed along the way -- see
+    the notes below and the PR description for the full story.
+
+    Note: %0A (Fastly VCL's %xx hex-byte escape) is used for newlines below
+    instead of \\n, which Fastly parses as a literal backslash + "n", not a
+    newline byte, inside a plain double-quoted string. Deliberately no VCL
+    `#` comments inside the returned body either -- a `#` comment containing
+    an embedded double-quote character breaks Fastly's parser (confirmed by
+    hitting exactly that live).
+
+    bereq.http.host is explicitly set to bucket_host rather than trusted --
+    the backend's own override_host doesn't appear to be reflected in
+    bereq.http.host by the time a "miss" snippet runs, so signing against
+    whatever bereq.http.host already held signed the wrong Host and produced
+    SignatureDoesNotMatch (confirmed live).
     """
     return textwrap.dedent(
         f"""\
@@ -1027,23 +1043,23 @@ def _mitlearn_s3_sigv4_signing_body(access_key_id: str, secret_access_key: str) 
         set var.aws_access_key_id = "{access_key_id}";
         set var.aws_secret_access_key = "{secret_access_key}";
 
-        set var.date_stamp = strftime("%Y%m%d", now);
-        set var.amz_date = strftime("%Y%m%dT%H%M%SZ", now);
-        # SHA256("") -- these are GET requests with no body.
+        set var.date_stamp = strftime({{"%Y%m%d"}}, now);
+        set var.amz_date = strftime({{"%Y%m%dT%H%M%SZ"}}, now);
         set var.payload_hash = "{_SHA256_EMPTY_STRING}";
 
+        set bereq.http.host = "{bucket_host}";
         unset bereq.http.Authorization;
         set bereq.http.x-amz-date = var.amz_date;
         set bereq.http.x-amz-content-sha256 = var.payload_hash;
 
         set var.signed_headers = "host;x-amz-content-sha256;x-amz-date";
-        set var.canonical_headers = "host:" + bereq.http.host + "\\n" + "x-amz-content-sha256:" + var.payload_hash + "\\n" + "x-amz-date:" + var.amz_date + "\\n";
+        set var.canonical_headers = "host:" + bereq.http.host + "%0A" + "x-amz-content-sha256:" + var.payload_hash + "%0A" + "x-amz-date:" + var.amz_date + "%0A";
 
-        set var.canonical_request = "GET" + "\\n" + bereq.url.path + "\\n" + "" + "\\n" + var.canonical_headers + "\\n" + var.signed_headers + "\\n" + var.payload_hash;
+        set var.canonical_request = "GET" + "%0A" + bereq.url.path + "%0A" + "" + "%0A" + var.canonical_headers + "%0A" + var.signed_headers + "%0A" + var.payload_hash;
         set var.hashed_canonical_request = digest.hash_sha256(var.canonical_request);
 
         set var.credential_scope = var.date_stamp + "/us-east-1/s3/aws4_request";
-        set var.string_to_sign = "AWS4-HMAC-SHA256" + "\\n" + var.amz_date + "\\n" + var.credential_scope + "\\n" + var.hashed_canonical_request;
+        set var.string_to_sign = "AWS4-HMAC-SHA256" + "%0A" + var.amz_date + "%0A" + var.credential_scope + "%0A" + var.hashed_canonical_request;
 
         set var.signature = digest.awsv4_hmac(var.aws_secret_access_key, var.date_stamp, "us-east-1", "s3", var.string_to_sign);
 
@@ -1061,7 +1077,9 @@ if _mitlearn_bucket_is_sigv4_piloted and mitlearn_fastly_s3_signer_access_key:
             f"if (req.backend == F_{bucket_backend_name.replace(' ', '_')}) {{\n"
             + textwrap.indent(
                 _mitlearn_s3_sigv4_signing_body(
-                    args["access_key_id"], args["secret_access_key"]
+                    args["access_key_id"],
+                    args["secret_access_key"],
+                    f"{mitlearn_app_storage_bucket_name}.s3.us-east-1.amazonaws.com",
                 ),
                 "  ",
             )
