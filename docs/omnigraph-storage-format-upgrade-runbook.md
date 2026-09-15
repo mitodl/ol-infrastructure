@@ -702,9 +702,13 @@ for g in $(cat /tmp/graph-ids.txt); do
   echo "== $g"
   kubectl -n omnigraph exec deploy/omnigraph-server -- \
     omnigraph snapshot --store "$NEW_ROOT/graphs/$g.omni" \
-    | grep -E 'rows=|internal_schema'
+    | grep -E 'entities=|internal_schema'
 done | tee /tmp/after.txt
 ```
+
+`snapshot` prints per-table counts as `entities=N` from omnigraph 0.9 onward.
+`rows=` was the 0.8 spelling and matches nothing now, so a baseline taken with
+it is silently empty and the diff below passes against nothing.
 
 Two comparisons against the step 2 baseline, and they expect **opposite**
 answers — which is why this is not one plain `diff`:
