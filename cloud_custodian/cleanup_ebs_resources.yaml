@@ -21,3 +21,25 @@ policies:
     op: deregister
   actions:
   - deregister
+
+- name: delete-marked-ebs-volumes
+  resource: aws.ebs
+  description: |
+    Delete unattached EBS volumes whose cleanup mark has matured.
+
+    The `available` re-check is not redundant with the mark: a volume can be
+    attached again between being marked and the mark coming due, and the
+    `marked-for-op` filter only reads the tag. Without this the policy would
+    attempt to delete a volume that is back in service. `delete` is used
+    without `force` on purpose -- force detaches the volume first, which would
+    turn that race into data loss instead of a skipped resource.
+  filters:
+  - and:
+    - type: marked-for-op
+      tag: "custodian_cleanup"
+      op: delete
+    - type: value
+      key: State
+      value: available
+  actions:
+  - delete
