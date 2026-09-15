@@ -368,6 +368,41 @@ def _edge_rank(data: object, position: int) -> tuple[int, bool, float, int]:
     )
 
 
+def _collapse_plan(
+    export: Path, keyed_edges: set[str]
+) -> tuple[set[int], Counter[str], Counter[str]]:
+    """Pass 1 of the collapse: which keyed-edge rows win, and how many there are.
+
+    Keeps ONE rank per distinct keyed pair and nothing else — never a row body
+    — so memory scales with the number of pairs rather than with the export.
+    Returns the winning line numbers, the rows seen per keyed table, and the
+    survivors per keyed table (``normalize_export`` subtracts one from the
+    other to report what the collapse removed).
+    """
+    winners: dict[tuple[str, str, str], tuple[int, bool, float, int]] = {}
+    seen: Counter[str] = Counter()
+    with export.open() as fh:
+        for position, line in enumerate(fh):
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            edge = record.get("edge")
+            if edge not in keyed_edges:
+                continue
+            seen[edge] += 1
+            pair = (edge, record["from"], record["to"])
+            rank = _edge_rank(record.get("data"), position)
+            if pair not in winners or rank > winners[pair]:
+                winners[pair] = rank
+    # `_edge_rank` carries the line number last, so the winning positions fall
+    # out of the ranks themselves rather than needing a second mapping.
+    return (
+        {rank[-1] for rank in winners.values()},
+        seen,
+        Counter(edge for edge, _, _ in winners),
+    )
+
+
 def normalize_export(
     export: Path, keyed_edges: set[str]
 ) -> tuple[Path, dict[str, int]]:
@@ -392,36 +427,36 @@ def normalize_export(
     also why this runs before ``chunk_export`` splits anything. Returns the
     rewritten file and, per keyed edge table, how many rows the collapse
     removed, which ``verify`` subtracts from the 0.10 baseline.
+
+    ★ TWO PASSES, BECAUSE THE WHOLE FILE IS NOT THE WHOLE FILE IN MEMORY.
+    Needing every row to pick a winner does not mean holding every row: pass 1
+    keeps one rank and one line number per DISTINCT keyed pair, and pass 2
+    re-reads the export and streams each surviving row straight out. Buffering
+    the rewritten rows — or joining them into one string to write — scales with
+    the export instead, and this runs in a container capped at 4Gi
+    (``storage_migration.py``), so a large but otherwise valid export would OOM
+    here before ``chunk_export`` could bound anything. Peak memory is now the
+    number of distinct keyed pairs, not the export's size.
     """
-    kept: list[tuple[int, str]] = []
-    winners: dict[tuple[str, str, str], tuple[tuple[int, bool, float, int], str]]
-    winners = {}
-    seen: Counter[str] = Counter()
-    with export.open() as fh:
+    surviving, seen, survivors = _collapse_plan(export, keyed_edges)
+
+    target = export.with_name(f"{export.stem}.normalized.jsonl")
+    with export.open() as fh, target.open("w") as out:
         for position, line in enumerate(fh):
             if not line.strip():
                 continue
             record = json.loads(line)
             data = record.get("data")
-            edge = record.get("edge")
-            if edge in keyed_edges:
+            if record.get("edge") in keyed_edges:
+                if position not in surviving:
+                    continue
                 record.pop("id", None)
                 if isinstance(data, dict):
                     data.pop("id", None)
-                seen[edge] += 1
-                pair = (edge, record["from"], record["to"])
-                rank = _edge_rank(data, position)
-                if pair not in winners or rank > winners[pair][0]:
-                    winners[pair] = (rank, json.dumps(record))
-                continue
-            if "id" not in record and isinstance(data, dict) and "id" in data:
+            elif "id" not in record and isinstance(data, dict) and "id" in data:
                 record["id"] = data.pop("id")
-            kept.append((position, json.dumps(record)))
-    kept.extend((rank[-1], row) for rank, row in winners.values())
-    kept.sort()
-    target = export.with_name(f"{export.stem}.normalized.jsonl")
-    target.write_text("".join(f"{row}\n" for _, row in kept))
-    survivors = Counter(edge for edge, _, _ in winners)
+            out.write(f"{json.dumps(record)}\n")
+
     removed = {table: seen[table] - survivors[table] for table in seen}
     return target, {table: count for table, count in removed.items() if count}
 
@@ -606,11 +641,12 @@ def rebuild(  # noqa: PLR0913
         if collapsed[graph]:
             LOG.info("     collapsed duplicate keyed edges: %s", collapsed[graph])
         store = f"{new_root}/graphs/{graph}.omni"
+        batches = chunk_export(normalized)
         # `merge` into a freshly-created empty graph is a full load and is the
         # safe choice: `overwrite` is destructive and buys nothing against an
         # empty table. `--yes` because a non-local destructive write refuses
         # without a TTY, and there is none here.
-        for batch, path in enumerate(chunk_export(normalized)):
+        for batch, path in enumerate(batches):
             if batch:
                 LOG.info("     batch %d", batch + 1)
             run(
@@ -626,6 +662,16 @@ def rebuild(  # noqa: PLR0913
                     "--yes",
                 ]
             )
+        # RECLAIM THIS GRAPH'S COPIES, AND ONLY AFTER ITS LOADS SUCCEEDED. The
+        # raw export, its normalized rewrite and any batch files are three
+        # copies of one graph's rows; carrying all three for every graph to the
+        # end of the loop roughly doubles peak disk against a volume sized for
+        # one copy of each export, and can evict the Job even when the exports
+        # themselves fit. Ordering matters as much as the deletion: `run`
+        # raises on a failed load, so a failure leaves every file in place for
+        # the operator, which the no-retry contract depends on.
+        for spent in {export_dir / f"{graph}.jsonl", normalized, *batches}:
+            spent.unlink(missing_ok=True)
     return collapsed
 
 

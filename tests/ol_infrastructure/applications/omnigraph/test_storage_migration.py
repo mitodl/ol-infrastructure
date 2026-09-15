@@ -354,6 +354,34 @@ def test_an_exact_tie_keeps_the_later_row(tmp_path: Path) -> None:
     assert [r["data"]["role"] for r in _read_jsonl(normalized)] == ["c"]
 
 
+def test_a_tie_holds_across_a_long_gap_between_duplicates(tmp_path: Path) -> None:
+    """Duplicates sit anywhere in the export, which is why the collapse takes
+    two passes over the file rather than one pass buffering rewritten rows: the
+    rank is decided in pass 1 and the survivor streamed out in pass 2. Rank ties
+    still keep the later row, and the rows in between still pass through.
+    """
+    filler: list[dict[str, object]] = [
+        {"type": "Memory", "data": {"id": f"m{n}", "slug": f"m{n}"}} for n in range(300)
+    ]
+    export = _write_jsonl(
+        tmp_path / "g.jsonl",
+        [
+            _tagged("01A", role="first"),
+            *filler,
+            _tagged("01B", role="middle"),
+            *filler,
+            _tagged("01C", role="last"),
+        ],
+    )
+
+    normalized, collapsed = migrate.normalize_export(export, {"Tagged"})
+
+    rows = _read_jsonl(normalized)
+    assert [r["data"]["role"] for r in rows if r.get("edge") == "Tagged"] == ["last"]
+    assert len([r for r in rows if r.get("type") == "Memory"]) == 600
+    assert collapsed == {"Tagged": 2}
+
+
 def test_verify_expects_the_collapsed_edge_counts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

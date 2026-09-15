@@ -429,7 +429,7 @@ silently dropped a table:
 ```shell
 for g in $(cat /tmp/graph-ids.txt); do
   echo "== $g"
-  omnigraph snapshot --store "$OLD_ROOT/graphs/$g.omni" | grep -E 'rows=|internal_schema'
+  omnigraph snapshot --store "$OLD_ROOT/graphs/$g.omni" | grep -E 'entities=|internal_schema'
 done | tee /tmp/baseline.txt
 ```
 
@@ -715,8 +715,8 @@ answers — which is why this is not one plain `diff`:
 
 ```shell
 # 1. Row counts must be identical. Empty output = pass.
-diff <(grep -E '^==|rows=' /tmp/baseline.txt) \
-     <(grep -E '^==|rows=' /tmp/after.txt) && echo "row counts match"
+diff <(grep -E '^==|entities=' /tmp/baseline.txt) \
+     <(grep -E '^==|entities=' /tmp/after.txt) && echo "row counts match"
 
 # 2. The format version must have MOVED, uniformly, on every graph.
 grep internal_schema /tmp/after.txt | sort -u
