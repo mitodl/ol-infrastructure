@@ -888,8 +888,14 @@ learn_ai_app_k8s = OLApplicationK8s(
         ],
         celery_beat_config=OLApplicationK8sCeleryBeatConfig(
             scheduler="celery.beat.PersistentScheduler",
-            resource_requests={"cpu": "10m", "memory": "384Mi"},
-            resource_limits={"memory": "384Mi"},
+            # learn-ai's main.apps.MainConfig.ready() unconditionally imports
+            # litellm (added in 0.36.2 to fix a separate memory leak), which
+            # beat now pays for at boot despite never executing LLM code --
+            # 384Mi no longer covers that baseline import cost and beat
+            # OOMKilled on every startup. Match the other three containers in
+            # this app (webapp, both celery workers), which are all 1000Mi.
+            resource_requests={"cpu": "10m", "memory": "1000Mi"},
+            resource_limits={"memory": "1000Mi"},
         ),
         # hpa_scaling_metrics is left at the component default. It is unused here:
         # the component builds a KEDA ScaledObject instead of a native HPA when
