@@ -825,6 +825,37 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         opts=ResourceOptions(parent=ebs_csi_driver_role),
     )
 
+    # iopsPerGB is the ratio the EBS CSI driver multiplies requested size by to
+    # derive provisioned IOPS, clamped up to gp3's included 3,000 baseline. Every
+    # IOPS above that baseline bills at $0.005/month, so on a large volume the
+    # ratio, not the size, is what dominates the bill: at 50, a 100 GiB volume is
+    # $8 of storage and $10 of IOPS.
+    #
+    # Production keeps 50 because production measurably uses it. Over the fourteen
+    # days to 2026-09-15, mitxonline production Meilisearch peaked at 4,626 IOPS
+    # against the 5,000 that ratio provisions -- 93% of it. The 38% figure in the
+    # comment below predates the 500 MB/s VolumeAttributesClass; raising the
+    # throughput ceiling is what let IOPS become the binding constraint instead.
+    #
+    # CI and QA get 30, the ratio at which a 100 GiB volume -- the default size for
+    # typesense, starrocks FE and clickhouse -- lands exactly on the free 3,000
+    # baseline. Measured over the same fourteen days, the busiest non-prod volume
+    # above that baseline peaked at 639 IOPS (data-ci clickhouse), leaving 4.7x
+    # headroom, and the 24 non-prod typesense volumes peaked under 60 each.
+    # Volumes larger than 100 GiB still scale proportionally (200 GiB -> 6,000,
+    # 500 GiB -> 15,000), so this is a lower ratio rather than a flat cap.
+    #
+    # Editing this replaces the StorageClass instead of updating it -- parameters
+    # are immutable -- so the class is deleted and recreated, leaving the cluster
+    # without a default class for the fraction of a second in between. Preview
+    # reports `storageclasses.storage.k8s.io "ebs-gp3-sc" already exists` against
+    # the replacement; that is the provider dry-running the create while the old
+    # object is still there, not a plan that will fail. Verified against a k3d
+    # cluster: the delete is ordered first and the apply succeeds. Existing
+    # volumes are untouched regardless -- parameters apply at provisioning time
+    # only, and changing a live volume needs a VolumeAttributesClass.
+    ebs_iops_per_gb = "50" if stack_info.env_suffix == "production" else "30"
+
     # Default storageclass configured for nominal performance
     kubernetes.storage.v1.StorageClass(
         resource_name=f"{cluster_name}-ebs-gp3-storageclass",
@@ -839,7 +870,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         parameters={
             "csi.storage.k8s.io/fstype": "xfs",
             "type": "gp3",
-            "iopsPerGB": "50",
+            "iopsPerGB": ebs_iops_per_gb,
             "throughput": "125",
             "encrypted": "true",
         },
