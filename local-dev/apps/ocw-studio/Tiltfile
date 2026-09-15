@@ -45,9 +45,16 @@ k8s_yaml_local([
     'configmaps/nginx.yaml',
     'secrets.yaml',
     'deployment.yaml',
-    'concourse.yaml',
     'apisix-routes.yaml',
 ], local_overrides='configmaps/app-env.local.yaml')
+
+# Concourse is applied on its own, deliberately. k8s_yaml_local stamps every
+# Deployment in a call with a fingerprint of every ConfigMap and Secret in that
+# same call, so bundling it with the app meant each app config edit rolled
+# Concourse too -- and since it is a Recreate deployment, that is a hard outage
+# that kills running builds and 503s the UI. It reads none of those ConfigMaps;
+# all of its env is inline below, so nothing is lost by isolating it.
+k8s_yaml_local(['concourse.yaml'])
 
 k8s_resource(
     DEPLOY_NAME,
