@@ -56,9 +56,14 @@ data:
   RESOURCE_BASE_URL_DRAFT: "https://draft.ocw.mit.dev/"
   RESOURCE_BASE_URL_LIVE: "https://live.ocw.mit.dev/"
   OCW_STUDIO_TEST_URL: "https://test.ocw.mit.dev/"
-  STATIC_API_BASE_URL_DRAFT: "https://draft.ocw.mit.dev"
-  STATIC_API_BASE_URL_LIVE: "https://live.ocw.mit.dev"
-  STATIC_API_BASE_URL_TEST: "https://test.ocw.mit.dev/"
+  # http, not https, and the only reason is certificate trust: Hugo fetches
+  # these from inside a Concourse task container, which carries public CAs only
+  # and cannot verify the local mkcert cert. The hostnames are the same ones a
+  # browser uses, so a URL that ends up in built output is still valid; the
+  # site routes serve both schemes (see apisix-routes.yaml).
+  STATIC_API_BASE_URL_DRAFT: "http://draft.ocw.mit.dev"
+  STATIC_API_BASE_URL_LIVE: "http://live.ocw.mit.dev"
+  STATIC_API_BASE_URL_TEST: "http://test.ocw.mit.dev/"
   STATIC_API_BASE_URL: "https://live-qa.odl.mit.edu/"
   SITEMAP_DOMAIN: "live.ocw.mit.dev"
 
@@ -146,11 +151,17 @@ data:
   CONCOURSE_URL: "https://concourse.ocw.mit.dev"
   CONCOURSE_TEAM: "main"
   CONCOURSE_IS_PRIVATE_REPO: "False"
-  # How a pipeline task reaches Studio to report status back. Not the in-cluster
-  # Service: task containers resolve the public hostnames through the CoreDNS
-  # override, and the compose fallback for this is an nginx container IP that
-  # does not exist here.
-  OCW_STUDIO_PIPELINE_API_URL: "https://studio.ocw.mit.dev"
+  # How a pipeline task reaches Studio: to report build status, and for the
+  # Hugo templates that fetch the course list and sitemap from the API.
+  #
+  # The in-cluster Service over plain HTTP, not the public hostname. Task
+  # containers can resolve the public name through the CoreDNS override, but
+  # they carry only public CAs and do not trust the local mkcert root, so the
+  # Hugo build died on "certificate signed by unknown authority". Injecting the
+  # CA into every build image is the alternative; not terminating TLS at all
+  # for an in-cluster hop is simpler. The compose fallback for this setting is
+  # an nginx container IP that does not exist here either.
+  OCW_STUDIO_PIPELINE_API_URL: "http://ocwstudio-webapp.ocw-studio.svc.cluster.local:8043"
 
   # ── Celery ────────────────────────────────────────────────────────────────
   CELERY_TASK_ALWAYS_EAGER: "False"
