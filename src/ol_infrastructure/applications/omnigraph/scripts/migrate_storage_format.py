@@ -642,6 +642,12 @@ def verify(
     ``normalize_export`` removed; that baseline counts every duplicate, so
     strict equality with it would fail each graph that had any. Every other
     table must still match the baseline exactly.
+
+    A table the rebuild schema declares but the old graph never had is
+    expected EMPTY rather than absent: the export cannot contain rows for it,
+    and a schema that grew a type since the graph was created (a local store
+    that predates `TaskComment`, found by the 2026-09-15 dry run on a real
+    store) would otherwise fail a rebuild whose every row matched.
     """
     LOG.info("=== 3/3 verify (per-table row counts)")
     report: dict[str, GraphReport] = {}
@@ -653,6 +659,8 @@ def verify(
         expected = {
             table: rows - removed.get(table, 0) for table, rows in before.items()
         }
+        new_tables = sorted(set(after) - set(expected))
+        expected |= dict.fromkeys(new_tables, 0)
         ok = after == expected
         report[graph] = {
             "ok": ok,
@@ -660,6 +668,7 @@ def verify(
             "collapsed_duplicates": removed,
             "expected": expected,
             "after": after,
+            "new_tables": new_tables,
             "missing_tables": sorted(set(expected) - set(after)),
             "changed_tables": sorted(
                 t for t in set(expected) & set(after) if expected[t] != after[t]

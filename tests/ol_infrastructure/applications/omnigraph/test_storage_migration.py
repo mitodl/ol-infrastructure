@@ -395,6 +395,43 @@ def test_verify_still_fails_a_short_rebuild(monkeypatch: pytest.MonkeyPatch) -> 
     assert report["council"]["changed_tables"] == ["Memory"]
 
 
+def test_verify_accepts_an_empty_table_the_new_schema_added(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A graph created before its schema grew a type has no baseline row for
+    that table, and the rebuild creates it empty. Found on a real local store
+    that predates TaskComment.
+    """
+    monkeypatch.setattr(
+        migrate, "snapshot_tables", lambda *_: {"Memory": 2, "TaskComment": 0}
+    )
+
+    report, mismatched = migrate.verify(
+        "omnigraph", "file:///new", ["council"], {"council": {"Memory": 2}}, {}
+    )
+
+    assert mismatched == []
+    assert report["council"]["new_tables"] == ["TaskComment"]
+
+
+def test_verify_fails_a_new_table_that_has_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No export can put rows in a table the old graph lacked, so rows there
+    mean the rebuild loaded something the baseline never counted.
+    """
+    monkeypatch.setattr(
+        migrate, "snapshot_tables", lambda *_: {"Memory": 2, "TaskComment": 3}
+    )
+
+    report, mismatched = migrate.verify(
+        "omnigraph", "file:///new", ["council"], {"council": {"Memory": 2}}, {}
+    )
+
+    assert mismatched == ["council"]
+    assert report["council"]["changed_tables"] == ["TaskComment"]
+
+
 def test_cutover_instructions_set_both_paired_config_values() -> None:
     """omnigraph:internal_schema_version is required alongside storage_prefix
     (ol-infrastructure's storage.py::validate_internal_schema_version) — the
