@@ -516,6 +516,13 @@ policy_definition = {
                     f"arn:aws:iam::*:user/mitopen-gh-workflow-{env}"
                     for env in ("ci", "qa", "production")
                 ],
+                # applications/dagster/__main__.py imports
+                # edx-data-extracts-read-only, a policy hand-created in the
+                # console in 2022 at the default "/" path -- confirmed by a
+                # live AccessDenied on the dagster production stack's
+                # CreatePolicyVersion when its content drifts from the
+                # imported document.
+                "arn:aws:iam::*:policy/edx-data-extracts-read-only",
             ],
         },
         {
