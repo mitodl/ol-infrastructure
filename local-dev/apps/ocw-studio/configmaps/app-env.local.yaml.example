@@ -1,0 +1,47 @@
+---
+# Per-developer overrides for ocw-studio. Copy to app-env.local.yaml (which is
+# gitignored) and edit; keys here win over both app-env.yaml and the tracked
+# secrets, because the deployment lists this ConfigMap last in every envFrom.
+#
+# See "Local Configuration Overrides" in local-dev/README.md.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocwstudio-env-local
+  namespace: ocw-studio
+data:
+  # ── A git backend you can actually push to ────────────────────────────────
+  # Studio needs a real git host: publishing commits site content and then asks
+  # Concourse to build from it. Point it at an org/group you own.
+  #
+  # GitHub:
+  # GIT_ORGANIZATION: "my-github-org"
+  # GIT_TOKEN: "ghp_..."
+  #
+  # GitLab (needs CONTENT_SYNC_BACKEND switched over too):
+  # CONTENT_SYNC_BACKEND: "content_sync.backends.gitlab.GitlabBackend"
+  # GIT_DOMAIN: "gitlab.com"
+  # GIT_API_URL: "https://gitlab.com"
+  # GIT_ORGANIZATION: "my-group"
+  # GIT_TOKEN: "glpat-..."
+
+  # ── Turn publishing off ───────────────────────────────────────────────────
+  # Empty disables the publish pipeline entirely, so Studio still edits content
+  # but never talks to Concourse. Useful if Concourse is misbehaving.
+  # CONTENT_SYNC_PIPELINE_BACKEND: ""
+
+  # ── Google Drive sync ─────────────────────────────────────────────────────
+  # DRIVE_S3_UPLOAD_PREFIX: "gdrive_uploads"
+  # DRIVE_SERVICE_ACCOUNT_CREDS: '{"type": "service_account", ...}'
+  # DRIVE_SHARED_ID: "..."
+  # DRIVE_UPLOADS_PARENT_FOLDER_ID: "..."
+
+  # ── YouTube upload ────────────────────────────────────────────────────────
+  # YT_CLIENT_ID: "..."
+  # YT_CLIENT_SECRET: "..."
+  # YT_REFRESH_TOKEN: "..."
+  # YT_PROJECT_ID: "..."
+
+  # ── Noisier logs ──────────────────────────────────────────────────────────
+  # OCW_STUDIO_LOG_LEVEL: "DEBUG"
+  # LOG_LEVEL: "DEBUG"

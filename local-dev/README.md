@@ -375,7 +375,7 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. An app whose infrastructure is heavyweight may be left out of the default and have to be added explicitly. |
+| `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). |
 | `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
@@ -628,6 +628,55 @@ AWS_ACCESS_KEY_ID: "minioadmin"  # pragma: allowlist secret
 AWS_SECRET_ACCESS_KEY: "minioadmin"  # pragma: allowlist secret
 ```
 
+### OCW Studio
+
+OCW Studio is the CMS behind OCW: authors edit course content in it, and publishing
+commits that content to git and hands Concourse a pipeline that builds the site and
+writes the result into an S3 bucket. Reproducing that locally needs more moving parts
+than the other apps, which is why it is opt-in:
+
+```json
+{
+  "enabled_apps": ["mit-learn", "ocw-studio"]
+}
+```
+
+Enabling it deploys the object store described above, a Concourse install (web plus a
+privileged worker), the Studio app and its celery worker, and an nginx deployment that
+serves published sites out of the buckets.
+
+| Hostname | What it serves |
+|----------|----------------|
+| `studio.ocw.mit.dev` | Studio itself |
+| `draft.ocw.mit.dev` | the preview bucket — what "Publish draft" writes |
+| `live.ocw.mit.dev` | the publish bucket — what "Publish live" writes |
+| `test.ocw.mit.dev` | the test bucket the pipeline's smoke-test step reads |
+| `concourse.ocw.mit.dev` | the Concourse UI (log in as `test` / `test`) |
+
+Re-run `./local-dev/scripts/setup.sh` after enabling it: those hostnames need
+`/etc/hosts` entries and the TLS cert needs a `*.ocw.<domain>` wildcard, neither of
+which an existing setup has.
+
+**Before publishing anything**, run the `seed-ocw-studio-*` resources from the Tilt UI,
+and give Studio a git host it can push to. There is no usable default: publishing
+commits site content to a real repo, so set `GIT_ORGANIZATION` and `GIT_TOKEN` in
+`local-dev/apps/ocw-studio/configmaps/app-env.local.yaml` (the tracked
+`app-env.local.yaml.example` has the shape for both GitHub and GitLab). To work on
+Studio without publishing at all, set `CONTENT_SYNC_PIPELINE_BACKEND: ""` there —
+editing then works and Concourse is never contacted.
+
+Two things that differ from the other apps:
+
+- **Frontend changes need an image rebuild.** There is no webpack dev server: it needs
+  node, and the app image is Python-only, so there is nothing for Tilt to live-sync JS
+  into. Django reads the bundles baked in by the Dockerfile's `node_builder` stage,
+  which is why this app builds the `production` target. Tilt rebuilds automatically
+  when JS or SCSS changes; it is just slower than a hot reload.
+- **Python changes need a resource restart.** ocw-studio depends on plain `granian`
+  rather than `granian[reload]`, so the app container cannot run with `--reload`. Tilt
+  syncs the code; restart `ocwstudio-webapp` from the Tilt UI to pick it up, the same
+  as the celery workers.
+
 ---
 
 ## Troubleshooting
@@ -635,6 +684,33 @@ AWS_SECRET_ACCESS_KEY: "minioadmin"  # pragma: allowlist secret
 ### `tilt up` fails with `specified unknown setting name 'openedx_mode'`
 
 `config.parse()` rejects any key in `tilt_config.json` that the Tiltfile does not declare, so the whole Tiltfile fails to load. `openedx_mode` was never wired to anything and has been removed — delete the key from your `tilt_config.json`. See [Open edX](#open-edx) for where that stack lives now.
+
+### OCW Studio pipelines never start a build
+
+The Concourse worker runs its own containerd to execute pipeline tasks, which means a
+container runtime nested inside the k3s node container. It is the only privileged
+workload in local-dev and the first thing to suspect when builds sit pending.
+
+Check the worker registered at all:
+
+```bash
+kubectl -n ocw-studio logs deploy/ocwstudio-concourse -c worker | grep beacon.registered
+```
+
+Then confirm the web half agrees, from the Concourse UI's workers page or:
+
+```bash
+kubectl -n ocw-studio logs deploy/ocwstudio-concourse -c web | grep forward-worker | tail -1
+```
+
+If the worker registers but tasks fail to start, the baggageclaim driver is the usual
+cause. It is set to `naive` in `concourse.yaml` precisely because the worker's
+filesystem is already an overlay and stacking another overlay mount on it is not
+supported everywhere — `naive` copies instead, which is slower but portable. Switching
+it back to `overlay` is a reasonable thing to try on a machine where it works.
+
+Restarting the `ocwstudio-concourse` resource is safe: the TSA keypair is regenerated
+on every pod start and is only ever used inside that pod.
 
 ### `tilt up` fails on `local-infra` (Pulumi errors)
 
