@@ -270,14 +270,20 @@ s3.BucketPolicy(
 
 mitlearn_app_storage_bucket_name = f"ol-mitlearn-app-storage-{app_env_suffix}"
 
+# CI pilots SigV4-signed Fastly->S3 requests (see the IAM user/Vault secret
+# below and the signing VCL on the media-storage backend), validated live
+# on 2026-09-15 -- see the PR description for how. QA/Production stay on the
+# pre-existing public-read policy until this is rolled out to them too.
+_mitlearn_bucket_is_sigv4_piloted = stack_info.env_suffix == "ci"
+
 mitlearn_application_storage_bucket_config = S3BucketConfig(
     bucket_name=mitlearn_app_storage_bucket_name,
     versioning_enabled=True,
     ownership_controls="BucketOwnerPreferred",
-    block_public_acls=False,
-    block_public_policy=False,
-    ignore_public_acls=False,
-    restrict_public_buckets=False,
+    block_public_acls=_mitlearn_bucket_is_sigv4_piloted,
+    block_public_policy=_mitlearn_bucket_is_sigv4_piloted,
+    ignore_public_acls=_mitlearn_bucket_is_sigv4_piloted,
+    restrict_public_buckets=_mitlearn_bucket_is_sigv4_piloted,
     intelligent_tiering_archive_access_days=None,  # Fastly backend
     intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
@@ -308,10 +314,62 @@ mitlearn_application_storage_bucket = OLBucket(
     ),
 )
 
-s3.BucketPolicy(
-    "ol-mitlearn-bucket-policy",
-    bucket=mitlearn_application_storage_bucket.bucket_v2.id,
-    policy=json.dumps(
+mitlearn_fastly_s3_signer_access_key = None
+if _mitlearn_bucket_is_sigv4_piloted:
+    # Dedicated identity for Fastly to authenticate to S3 with (SigV4), so the
+    # bucket can be fully private instead of Principal:"*". Scoped to GetObject
+    # on just this bucket.
+    mitlearn_fastly_s3_signer_user = iam.User(
+        "ol-mitlearn-ci-fastly-s3-signer",
+        name=f"ol-mitlearn-{stack_info.env_suffix}-fastly-s3-signer",
+        tags=aws_config.tags,
+    )
+    mitlearn_fastly_s3_signer_policy = iam.UserPolicy(
+        "ol-mitlearn-ci-fastly-s3-signer-policy",
+        user=mitlearn_fastly_s3_signer_user.name,
+        policy=json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": ["s3:GetObject"],
+                        "Resource": [
+                            f"arn:aws:s3:::{mitlearn_app_storage_bucket_name}/*"
+                        ],
+                    }
+                ],
+            }
+        ),
+    )
+    mitlearn_fastly_s3_signer_access_key = iam.AccessKey(
+        "ol-mitlearn-ci-fastly-s3-signer-access-key",
+        user=mitlearn_fastly_s3_signer_user.name,
+        opts=ResourceOptions(depends_on=[mitlearn_fastly_s3_signer_policy]),
+    )
+    # The durable Vault copy of this key (for visibility/rotation tooling
+    # outside of Pulumi state) is created further down, once the mit-learn
+    # Vault KV mount is available -- search for "fastly-s3-signer-vault-secret".
+    mitlearn_bucket_policy_document = mitlearn_fastly_s3_signer_user.arn.apply(
+        lambda arn: json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "FastlySigV4Read",
+                        "Effect": "Allow",
+                        "Principal": {"AWS": arn},
+                        "Action": ["s3:GetObject"],
+                        "Resource": [
+                            f"arn:aws:s3:::{mitlearn_app_storage_bucket_name}/*"
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+else:
+    mitlearn_bucket_policy_document = json.dumps(
         {
             "Version": "2012-10-17",
             "Statement": [
@@ -324,7 +382,12 @@ s3.BucketPolicy(
                 }
             ],
         }
-    ),
+    )
+
+s3.BucketPolicy(
+    "ol-mitlearn-bucket-policy",
+    bucket=mitlearn_application_storage_bucket.bucket_v2.id,
+    policy=mitlearn_bucket_policy_document,
 )
 
 parliament_config = {
@@ -437,6 +500,20 @@ mitlearn_vault_static_secrets = vault.generic.Secret(
         )
     ),
 )
+
+if _mitlearn_bucket_is_sigv4_piloted and mitlearn_fastly_s3_signer_access_key:
+    # Durable copy in Vault for visibility/rotation tooling outside of Pulumi
+    # state. Pulumi (via the iam.AccessKey resource above) is still the source
+    # of truth -- rotating means replacing that resource, which updates this
+    # secret in the same apply.
+    vault.generic.Secret(
+        "ol-mitlearn-ci-fastly-s3-signer-vault-secret",
+        path=mitlearn_vault_mount.path.apply("{}/fastly-s3-signer".format),
+        data_json=Output.all(
+            access_key_id=mitlearn_fastly_s3_signer_access_key.id,
+            secret_access_key=mitlearn_fastly_s3_signer_access_key.secret,
+        ).apply(json.dumps),
+    )
 
 # The policy has been updated to allow for reading from the old or
 # the new mount.
@@ -916,6 +993,119 @@ CACHE_KEY_QUERY_PARAM_WHITELIST = [
     "syllabus_only",
     "recommender",
 ]
+
+
+# The SHA256 hash of an empty string -- a fixed, public constant (not a
+# secret), used as the payload hash for unsigned-body GET requests in AWS
+# SigV4 signing.
+_SHA256_EMPTY_STRING = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"  # pragma: allowlist secret
+
+
+def _mitlearn_s3_sigv4_signing_body(
+    access_key_id: str, secret_access_key: str, bucket_host: str
+) -> str:
+    """VCL to sign a backend request to the mit-learn media bucket with SigV4.
+
+    Validated live against CI on 2026-09-15: a test object uploaded to
+    media/sigv4-pilot-test.txt (then deleted) round-tripped through Fastly
+    with a 200, confirming the signature is accepted by S3 with the bucket
+    fully private. Three real bugs were found and fixed along the way -- see
+    the notes below and the PR description for the full story.
+
+    Note: %0A (Fastly VCL's %xx hex-byte escape) is used for newlines below
+    instead of \\n, which Fastly parses as a literal backslash + "n", not a
+    newline byte, inside a plain double-quoted string. Deliberately no VCL
+    `#` comments inside the returned body either -- a `#` comment containing
+    an embedded double-quote character breaks Fastly's parser (confirmed by
+    hitting exactly that live).
+
+    bereq.http.host is explicitly set to bucket_host rather than trusted --
+    the backend's own override_host doesn't appear to be reflected in
+    bereq.http.host by the time a "miss" snippet runs, so signing against
+    whatever bereq.http.host already held signed the wrong Host and produced
+    SignatureDoesNotMatch (confirmed live).
+
+    The canonical query string is hardcoded empty below, so any query string
+    on the actual request must also be stripped before it goes out to S3 --
+    "Route media requests to S3" (the recv-stage snippet that sets
+    is_media_request) never removes it, unlike the OCW backend's own recv
+    snippet, which explicitly calls querystring.remove(req.url) before its S3
+    fetch for exactly this reason. Without the querystring.remove(bereq.url)
+    call below, any /media/...?... request would sign against an empty query
+    string while actually sending the real one, and S3 would reject it with
+    SignatureDoesNotMatch.
+    """
+    return textwrap.dedent(
+        f"""\
+        declare local var.aws_access_key_id STRING;
+        declare local var.aws_secret_access_key STRING;
+        declare local var.date_stamp STRING;
+        declare local var.amz_date STRING;
+        declare local var.payload_hash STRING;
+        declare local var.canonical_headers STRING;
+        declare local var.signed_headers STRING;
+        declare local var.canonical_request STRING;
+        declare local var.hashed_canonical_request STRING;
+        declare local var.credential_scope STRING;
+        declare local var.string_to_sign STRING;
+        declare local var.signature STRING;
+
+        set var.aws_access_key_id = "{access_key_id}";
+        set var.aws_secret_access_key = "{secret_access_key}";
+
+        set bereq.url = querystring.remove(bereq.url);
+
+        set var.date_stamp = strftime({{"%Y%m%d"}}, now);
+        set var.amz_date = strftime({{"%Y%m%dT%H%M%SZ"}}, now);
+        set var.payload_hash = "{_SHA256_EMPTY_STRING}";
+
+        set bereq.http.host = "{bucket_host}";
+        unset bereq.http.Authorization;
+        set bereq.http.x-amz-date = var.amz_date;
+        set bereq.http.x-amz-content-sha256 = var.payload_hash;
+
+        set var.signed_headers = "host;x-amz-content-sha256;x-amz-date";
+        set var.canonical_headers = "host:" + bereq.http.host + "%0A" + "x-amz-content-sha256:" + var.payload_hash + "%0A" + "x-amz-date:" + var.amz_date + "%0A";
+
+        set var.canonical_request = "GET" + "%0A" + bereq.url.path + "%0A" + "" + "%0A" + var.canonical_headers + "%0A" + var.signed_headers + "%0A" + var.payload_hash;
+        set var.hashed_canonical_request = digest.hash_sha256(var.canonical_request);
+
+        set var.credential_scope = var.date_stamp + "/us-east-1/s3/aws4_request";
+        set var.string_to_sign = "AWS4-HMAC-SHA256" + "%0A" + var.amz_date + "%0A" + var.credential_scope + "%0A" + var.hashed_canonical_request;
+
+        set var.signature = digest.awsv4_hmac(var.aws_secret_access_key, var.date_stamp, "us-east-1", "s3", var.string_to_sign);
+
+        set bereq.http.Authorization = "AWS4-HMAC-SHA256 Credential=" + var.aws_access_key_id + "/" + var.credential_scope + ", SignedHeaders=" + var.signed_headers + ", Signature=" + var.signature;
+        """
+    )
+
+
+if _mitlearn_bucket_is_sigv4_piloted and mitlearn_fastly_s3_signer_access_key:
+    mitlearn_s3_backend_auth_vcl = Output.all(
+        access_key_id=mitlearn_fastly_s3_signer_access_key.id,
+        secret_access_key=mitlearn_fastly_s3_signer_access_key.secret,
+    ).apply(
+        lambda args: (
+            f"if (req.backend == F_{bucket_backend_name.replace(' ', '_')}) {{\n"
+            + textwrap.indent(
+                _mitlearn_s3_sigv4_signing_body(
+                    args["access_key_id"],
+                    args["secret_access_key"],
+                    f"{mitlearn_app_storage_bucket_name}.s3.us-east-1.amazonaws.com",
+                ),
+                "  ",
+            )
+            + "}"
+        )
+    )
+else:
+    mitlearn_s3_backend_auth_vcl = textwrap.dedent(
+        f"""\
+    if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
+      unset bereq.http.Authorization;
+    }}"""
+    )
+
 mitlearn_fastly_service = fastly.ServiceVcl(
     f"fastly-mit_learn-{stack_info.env_suffix}",
     name=f"MIT Learn {stack_info.env_suffix}",
@@ -1122,12 +1312,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             type="pass",
         ),
         vcl_snippet(
-            content=textwrap.dedent(
-                f"""\
-            if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
-              unset bereq.http.Authorization;
-            }}"""
-            ),
+            content=mitlearn_s3_backend_auth_vcl,
             name="Strip auth headers in S3 miss requests",
             type="miss",
         ),
@@ -1142,12 +1327,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             type="miss",
         ),
         vcl_snippet(
-            content=textwrap.dedent(
-                f"""\
-            if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
-              unset bereq.http.Authorization;
-            }}"""
-            ),
+            content=mitlearn_s3_backend_auth_vcl,
             name="Strip auth headers in S3 pass requests",
             type="pass",
         ),
