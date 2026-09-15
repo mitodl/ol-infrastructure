@@ -53,6 +53,8 @@ OCW_STUDIO_BUCKETS = (
     "ocw-content-offline-live-local",
     "ocw-content-offline-test",
     "ol-eng-artifacts-local",
+    # Source bucket for the storage import/sync pipeline.
+    "ol-ocw-studio-app-import-local",
 )
 
 # Concourse resource versioning reads this bucket's object versions, so it
