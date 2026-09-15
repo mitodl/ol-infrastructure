@@ -286,7 +286,14 @@ def create_object_store(
                 },
             },
         },
-        opts=_k8s(parent=stateful_set, depends_on=[service]),
+        # delete_before_replace because a Job's spec is immutable: changing
+        # the bucket list makes Pulumi replace it, and without this it
+        # tries to create the new one first and fails with "already
+        # exists", leaving the stack wedged until the Job is deleted by
+        # hand.
+        opts=_k8s(
+            parent=stateful_set, depends_on=[service], delete_before_replace=True
+        ),
     )
 
     k8s.core.v1.ConfigMap(
