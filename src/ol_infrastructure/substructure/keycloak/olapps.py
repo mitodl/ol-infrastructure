@@ -23,7 +23,7 @@ from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
 )
 
 
-def create_olapps_realm(  # noqa: PLR0913, PLR0915
+def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -974,6 +974,31 @@ def create_olapps_realm(  # noqa: PLR0913, PLR0915
             resource_options=resource_options,
         )
     )
+
+    # A fake partner with the same Organization -> SAML IdP -> mappers shape as
+    # the production onboardings below, so the move of per-org resources out of
+    # Pulumi state can be rehearsed somewhere other than production partner SSO.
+    # Delete once the rehearsal runbook is written up.
+    if stack_info.env_suffix == "qa":
+        onboard_saml_org(
+            SamlIdpConfig(
+                idp_alias="handover-rehearsal",
+                idp_display_name="Handover Rehearsal (QA only)",
+                org_saml_metadata_url="https://sso.ol.mit.edu/realms/olapps/protocol/saml/descriptor",
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+            ),
+            org=OrgConfig(
+                org_domains=["handover-rehearsal.mit.edu"],
+                org_name="Handover Rehearsal",
+                org_alias="handover-rehearsal",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
 
     if stack_info.env_suffix == "production":
         onboard_saml_org(
