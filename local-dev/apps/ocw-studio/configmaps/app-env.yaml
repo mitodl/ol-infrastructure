@@ -33,6 +33,8 @@ data:
   OCW_STUDIO_SECURE_SSL_REDIRECT: "False"
   OCW_STUDIO_DB_DISABLE_SSL: "True"
   OCW_STUDIO_LOG_LEVEL: "INFO"
+  SENTRY_LOG_LEVEL: "INFO"
+  ENV_NAME: "local-dev"
   DJANGO_LOG_LEVEL: "INFO"
   LOG_LEVEL: "INFO"
   USE_X_FORWARDED_HOST: "True"
@@ -53,8 +55,22 @@ data:
   OCW_STUDIO_LIVE_URL: "https://live.ocw.mit.dev/"
   RESOURCE_BASE_URL_DRAFT: "https://draft.ocw.mit.dev/"
   RESOURCE_BASE_URL_LIVE: "https://live.ocw.mit.dev/"
+  OCW_STUDIO_TEST_URL: "https://test.ocw.mit.dev/"
+  STATIC_API_BASE_URL_DRAFT: "https://draft.ocw.mit.dev"
+  STATIC_API_BASE_URL_LIVE: "https://live.ocw.mit.dev"
   STATIC_API_BASE_URL_TEST: "https://test.ocw.mit.dev/"
   STATIC_API_BASE_URL: "https://live-qa.odl.mit.edu/"
+  SITEMAP_DOMAIN: "live.ocw.mit.dev"
+
+  # ── MIT Learn, as seen from a built site ──────────────────────────────────
+  # Deliberately api.learn, not apigateway.learn: the apigateway host is the
+  # dead compose-era gateway that several repo env files still point at.
+  MIT_LEARN_BASE_URL: "https://learn.mit.dev"
+  MIT_LEARN_API_BASE_URL: "https://api.learn.mit.dev"
+  SEARCH_API_URL: "https://api.learn.mit.dev/api/v0/search/"
+  COURSE_SEARCH_API_URL: "https://api.learn.mit.dev/api/v1/learning_resources_search/"
+  CONTENT_FILE_SEARCH_API_URL: "https://api.learn.mit.dev/api/v1/content_file_search/"
+  LEARN_AI_SYLLABUS_ENDPOINT: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
 
   # ── Object storage (RustFS) ───────────────────────────────────────────────
   # Two addresses on purpose: pod-side boto3 calls go to the in-cluster
@@ -65,6 +81,13 @@ data:
   AWS_QUERYSTRING_AUTH: "False"
   AWS_REGION: "us-east-1"
   AWS_DEFAULT_REGION: "us-east-1"
+  # botocore reads AWS_ENDPOINT_URL straight from the environment, which
+  # catches any client built without going through main/s3_utils.py.
+  AWS_ENDPOINT_URL: "http://rustfs.local-infra.svc.cluster.local:9000"
+  # Required against RustFS (and MinIO): virtual-host addressing would put the
+  # bucket in a hostname nothing resolves.
+  AWS_S3_ADDRESSING_STYLE: "path"
+  AWS_MAX_CONCURRENT_CONNECTIONS: "100"
   OCW_STUDIO_USE_S3: "true"
   # Bucket names mirror .env.example so they match what the RustFS bootstrap
   # Job creates (local-dev/infra/modules/objectstore.py).
@@ -76,6 +99,7 @@ data:
   AWS_OFFLINE_PUBLISH_BUCKET_NAME: "ocw-content-offline-live-local"
   AWS_OFFLINE_TEST_BUCKET_NAME: "ocw-content-offline-test"
   AWS_ARTIFACTS_BUCKET_NAME: "ol-eng-artifacts-local"
+  AWS_IMPORT_STORAGE_BUCKET_NAME: "ol-ocw-studio-app-import-local"
 
   # ── Content sync + publishing ─────────────────────────────────────────────
   # GitHub by default, matching .env.example. Point CONTENT_SYNC_BACKEND at
@@ -88,17 +112,34 @@ data:
   GIT_DOMAIN: "github.com"
   GIT_API_URL: "https://api.github.com"
   GITHUB_RATE_LIMIT_CHECK: "True"
+  GITHUB_TIMEOUT: "60"
   GITHUB_WEBHOOK_BRANCH: "main"
   OCW_HUGO_THEMES_BRANCH: "main"
   OCW_HUGO_PROJECTS_BRANCH: "main"
   USE_LOCAL_STARTERS: "false"
+  OCW_IMPORT_STARTER_SLUG: "ocw-course-v3"
+  OCW_COURSE_STARTER_SLUG: "ocw-course-v3"
+  OCW_DEFAULT_COURSE_THEME: "ocw-course-v3"
+  OCW_MASS_BUILD_BATCH_SIZE: "80"
+  OCW_MASS_BUILD_MAX_IN_FLIGHT: "40"
+  OCW_STUDIO_DELETABLE_CONTENT_TYPES: "external-resource,instructor,page,course-collection"
+  PREPUBLISH_ACTIONS: "content_sync.tasks.update_website_in_root_website"
   TEST_ROOT_WEBSITE_NAME: "ocw-ci-test-www"
   OCW_TEST_SITE_SLUGS: '["ocw-ci-test-www","ocw-ci-test-course"]'
 
   # ── Concourse ─────────────────────────────────────────────────────────────
   # Studio pushes pipeline definitions here; the pipelines then clone content
   # from git and write built sites into the buckets above.
-  CONCOURSE_URL: "http://ocwstudio-concourse:8080"
+  #
+  # The external hostname, not the in-cluster Service, even though Studio is
+  # talking to it from inside the cluster. Concourse's login redirects to
+  # CONCOURSE_EXTERNAL_URL for /sky/callback, and the state cookie set at the
+  # start of that flow is only sent back if the client stayed on one host --
+  # starting at the Service address made the callback fail with a 400. compose
+  # had the same constraint, defaulting CONCOURSE_EXTERNAL_URL to CONCOURSE_URL.
+  # In-cluster this resolves through the CoreDNS override to APISIX, and the
+  # pod trusts the mkcert CA (see REQUESTS_CA_BUNDLE above).
+  CONCOURSE_URL: "https://concourse.ocw.mit.dev"
   CONCOURSE_TEAM: "main"
   CONCOURSE_IS_PRIVATE_REPO: "False"
 
@@ -132,3 +173,14 @@ data:
   # Google Drive, YouTube, Wayback and the open-catalog webhooks all need real
   # third-party credentials. Add them in app-env.local.yaml if you need them.
   ENABLE_WAYBACK_TASKS: "false"
+  # PostHog is off because the tracked config carries no project keys. The
+  # theme pipeline reads all four of these, so they need to be present.
+  POSTHOG_ENABLED: "false"
+  PUBLISH_POSTHOG_ENABLED: "false"
+  PUBLISH_POSTHOG_API_HOST: "https://app.posthog.com"
+  PUBLISH_POSTHOG_UI_HOST: "https://app.posthog.com"
+  # Read by the theme pipeline; empty means the built site reports nowhere.
+  OCW_HUGO_THEMES_SENTRY_DSN: ""
+  DRIVE_S3_UPLOAD_PREFIX: "gdrive_uploads"
+  OCW_GTM_ACCOUNT_ID: "test"
+  SOCIAL_AUTH_SAML_LOGIN_URL: "fake.example.com/login/saml/"
