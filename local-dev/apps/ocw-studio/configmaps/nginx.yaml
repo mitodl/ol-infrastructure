@@ -23,8 +23,15 @@ data:
             return 204;
         }
 
+        # Not compose's `try_files /static/images/favicon.ico /favicon.ico;`:
+        # that worked only because compose bind-mounts the whole repo at /src,
+        # so /src/static existed. Here the nginx container has just the
+        # collected /src/staticfiles, the first path always missed, and the
+        # /favicon.ico fallback re-entered this same exact-match location --
+        # nginx died with "rewrite or internal redirection cycle" and every
+        # favicon request returned 500. Terminate on =404 instead of looping.
         location = /favicon.ico {
-            try_files /static/images/favicon.ico /favicon.ico;
+            try_files /staticfiles/images/favicon.ico =404;
         }
 
         location ~* /static/(.*$) {
