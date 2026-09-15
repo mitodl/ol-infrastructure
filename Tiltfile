@@ -260,6 +260,10 @@ local_resource(
         "LOCAL_DEV_ROOT_DOMAIN": root_domain,
         "LOCAL_DEV_LOG_RETENTION": log_retention_period,
         "LOCAL_DEV_KEYCLOAK_IMAGE": keycloak_image,
+        # Gates the per-app resources added since enabled_apps existed
+        # (currently the RustFS object store). The four original apps are
+        # still provisioned unconditionally.
+        "LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps),
         "PULUMI_CONFIG_PASSPHRASE": "",
     },
     dir="./local-dev/infra/core",

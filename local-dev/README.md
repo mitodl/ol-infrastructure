@@ -192,7 +192,11 @@ Edit `tilt_config.json`:
 }
 ```
 
-Only the listed apps will be deployed. Shared infrastructure always runs.
+Only the listed apps will be deployed. Shared infrastructure always runs, with one
+exception: the RustFS object store is deployed only when an app that needs it is
+enabled, because it is too heavy to run for developers who have no use for it. The
+Tiltfile forwards `enabled_apps` to both Pulumi stacks as `LOCAL_DEV_ENABLED_APPS`
+so they can make that call.
 
 ### Open edX
 
@@ -371,7 +375,7 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `enabled_apps` | all four | Apps to deploy. Omit any to skip it entirely. |
+| `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. An app whose infrastructure is heavyweight may be left out of the default and have to be added explicitly. |
 | `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
@@ -577,19 +581,52 @@ The realm, clients, and seeded users live in Postgres and are untouched by the i
 
 Why an image at all: Keycloak runs `--optimized`, and an optimized Keycloak refuses to start when a jar in `providers/` differs from the one it was built against, so the theme cannot be copied into the running pod. The Dockerfile (`local-dev/keycloak/Dockerfile`) starts from the same `mitodl/keycloak` digest the core stack defaults to (the script reads it from `local-dev/infra/core/__main__.py`) and reruns `kc.sh build` with the flags from `Dockerfile.hosted` in [ol-keycloak](https://github.com/mitodl/ol-keycloak); when bumping the digest, check those flags still match.
 
-### Custom S3 Storage (MinIO / RustFS)
+### S3 Storage (RustFS)
 
-The local-dev stack doesn't include S3 storage by default. To add it:
+The stack runs [RustFS](https://rustfs.com), an S3-compatible object store, as the
+local stand-in for AWS S3. It is the maintained replacement for MinIO, whose community
+server is effectively frozen.
 
-**Option 1: Use external MinIO instance** — Run MinIO on your host and point apps at it via their gitignored `app-env.local.yaml` (see [Local Configuration Overrides](#local-configuration-overrides)):
+It is **not** deployed by default. The core Pulumi stack brings it up only when
+`enabled_apps` contains an app listed in `OBJECT_STORE_APPS`
+(`local-dev/infra/modules/objectstore.py`), which today means `ocw-studio`.
+
+Two addresses, and apps generally need both:
+
+| From | Address |
+|------|---------|
+| Inside the cluster (boto3, the site-host nginx) | `http://rustfs.local-infra.svc.cluster.local:9000` |
+| A browser (media URLs, presigned links) | `https://s3.mit.dev` |
+
+Credentials are the fixed local-dev pair `localdevaccess` / `localdevsecret123`,
+defined in `objectstore.py` and repeated in each app's `secrets.yaml`.
+
+A bootstrap Job creates the buckets and grants each one anonymous read with a bucket
+policy. The policy matters: RustFS does not implement S3 ACLs, so the canned
+`public-read` header boto3 sends is accepted and ignored, and a bucket policy is the
+only grant that actually takes effect. Published sites are served with no credentials,
+so without it every page would 403.
+
+To add buckets for another app, extend `OCW_STUDIO_BUCKETS` (or pass your own
+`buckets` tuple) and add the app to `OBJECT_STORE_APPS`.
+
+Removing the last such app from `enabled_apps` tears the object store back down on the
+next reconcile, **including everything stored in it**. The StatefulSet's
+`data-rustfs-0` PVC is not garbage collected with it, so delete that too if you want
+the disk back:
+
+```bash
+kubectl -n local-infra delete pvc data-rustfs-0
+```
+
+**Using an external MinIO instead** — run it on your host and point an app at it via
+its gitignored `app-env.local.yaml` (see [Local Configuration Overrides](#local-configuration-overrides)):
+
 ```yaml
-AWS_ENDPOINT_URL: "http://host.docker.internal:9000"
+AWS_S3_ENDPOINT_URL: "http://172.17.0.1:9000"
 AWS_ACCESS_KEY_ID: "minioadmin"  # pragma: allowlist secret
 AWS_SECRET_ACCESS_KEY: "minioadmin"  # pragma: allowlist secret
 ```
-(Docker Desktop; on Linux use `http://172.17.0.1:9000`.)
-
-**Option 2: Deploy MinIO in-cluster** — Add a MinIO module to the `core` Pulumi stack and patch the ConfigMaps accordingly (see [EXTENDING.md](EXTENDING.md#modifying-shared-infrastructure)).
 
 ---
 
