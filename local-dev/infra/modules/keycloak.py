@@ -14,6 +14,8 @@ automatically (the "kc-seed-users" resource) after this realm is applied.
 """
 
 import json
+from collections.abc import Sequence
+from typing import Any
 
 import pulumi_keycloak as keycloak
 import pulumi_kubernetes as k8s
@@ -25,7 +27,7 @@ from ol_infrastructure.substructure.keycloak.org_flows import (
 )
 
 
-def _first_public_key(keys) -> str:
+def _first_public_key(keys: Sequence[Any]) -> str:
     """Return the base64 body of the first realm signing key.
 
     get_realm_keys_output resolves to typed objects, but passing it through

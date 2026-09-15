@@ -252,6 +252,11 @@ APPS = [
         "namespace": "ocw-studio",
         "deploy_name": "ocwstudio-webapp",
         "image_backend": "mitodl/ocw-studio-app",
+        # Nothing consumes prebuilt_tag_backend yet -- every app's
+        # deployment.yaml pins :latest -- so this is metadata for when that
+        # is wired up. Note 0.199.0 predates the ocw-studio change that makes
+        # the S3 and pipeline endpoints configurable, so the no-checkout path
+        # needs a release containing it before it will work here.
         "prebuilt_tag_backend": prebuilt_tags.get("ocw-studio", "0.199.0"),
         "tiltfile": "./local-dev/apps/ocw-studio/Tiltfile",
         "seed_commands": [
