@@ -87,4 +87,18 @@ else:
         "settings_ns":     "mitol",
     })
 
+    # manage_infra=False means lehrer's own infra_deps never includes "redis"
+    # or "opensearch" (lehrer-core.star only adds those when it owns them);
+    # nothing otherwise stops edxapp-migrate/notes-migrate — both
+    # backoffLimit: 0 Jobs — from racing this cluster's shared OpenSearch on a
+    # fresh `tilt up`. Every other resource here (LMS/CMS/workers/notes)
+    # already depends on one of these two Jobs, so gating just these two on
+    # "local-infra-apps" — the same resource every sibling app Tiltfile in
+    # this repo waits on — orders the whole stack behind it. Tilt merges
+    # resource_deps across repeated k8s_resource() calls rather than
+    # replacing them, so this adds to lehrer's own resource_deps for these
+    # Jobs instead of dropping them.
+    k8s_resource("edxapp-migrate", resource_deps=["local-infra-apps"])
+    k8s_resource("notes-migrate", resource_deps=["local-infra-apps"])
+
     k8s_yaml_local(["apisix-routes.yaml"])

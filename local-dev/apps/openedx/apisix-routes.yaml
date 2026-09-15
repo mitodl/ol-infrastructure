@@ -92,5 +92,3 @@ spec:
     - serviceName: notes
       servicePort: 8000
     plugin_config_name: openedx-shared-plugins
----
-...
