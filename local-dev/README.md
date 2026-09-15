@@ -589,9 +589,10 @@ To add buckets for another app, extend `OCW_STUDIO_BUCKETS` (or pass your own
 `buckets` tuple) and add the app to `OBJECT_STORE_APPS`.
 
 Removing the last such app from `enabled_apps` tears the object store back down on the
-next reconcile, **including everything stored in it**. The StatefulSet's
-`data-rustfs-0` PVC is not garbage collected with it, so delete that too if you want
-the disk back:
+next reconcile. The objects survive: the StatefulSet's `data-rustfs-0` PVC is not
+garbage collected with it, so re-enabling the app reattaches the same volume and the
+buckets are still there. Delete the PVC as well if you actually want the disk back,
+and note that this does discard the objects:
 
 ```bash
 kubectl -n local-infra delete pvc data-rustfs-0
@@ -600,8 +601,16 @@ kubectl -n local-infra delete pvc data-rustfs-0
 **Using an external MinIO instead** — run it on your host and point an app at it via
 its gitignored `app-env.local.yaml` (see [Local Configuration Overrides](#local-configuration-overrides)):
 
+All three endpoint settings have to move together, or uploads land in one store while
+reads and browser URLs still point at the other:
+
 ```yaml
+# boto3 and django-storages
 AWS_S3_ENDPOINT_URL: "http://172.17.0.1:9000"
+# generic botocore clients, and the `aws` CLI inside pipeline tasks
+AWS_ENDPOINT_URL: "http://172.17.0.1:9000"
+# what the browser is handed for media URLs, so it must be reachable from there
+AWS_S3_CUSTOM_DOMAIN: "172.17.0.1:9000/ol-ocw-studio-app-local"
 AWS_ACCESS_KEY_ID: "minioadmin"  # pragma: allowlist secret
 AWS_SECRET_ACCESS_KEY: "minioadmin"  # pragma: allowlist secret
 ```
