@@ -221,6 +221,12 @@ class OLLaunchTemplateConfig(AWSBase):
     user_data: str | pulumi.Output[str] | None
     use_spot_instances: bool = False
     spot_options: SpotInstanceOptions | None = None
+    # IMDSv2. "required" rejects token-less instance metadata calls, which closes
+    # off the SSRF-to-credentials path that IMDSv1 leaves open. Default to it so
+    # new stacks are secure without having to remember this, and opt an
+    # individual launch template down to "optional" only while something on
+    # those instances is still making IMDSv1 calls.
+    http_tokens: Literal["required", "optional"] = "required"
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @field_validator("instance_type")
@@ -483,7 +489,7 @@ class OLAutoScaling(pulumi.ComponentResource):
             "vpc_security_group_ids": lt_config.security_groups,
             "metadata_options": LaunchTemplateMetadataOptionsArgs(
                 http_endpoint="enabled",
-                http_tokens="optional",
+                http_tokens=lt_config.http_tokens,
                 http_put_response_hop_limit=5,
                 instance_metadata_tags="enabled",
             ),
