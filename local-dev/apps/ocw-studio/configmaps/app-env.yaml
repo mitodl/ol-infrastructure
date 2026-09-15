@@ -1,0 +1,134 @@
+---
+# Application environment ConfigMap for ocw-studio.
+# Non-secret configuration only. Secret values live in ocwstudio-secrets and
+# ol-ocw-studio-oidc (the latter written by the apps-infra Pulumi stack).
+#
+# Derived from ocw-studio's docker-compose.yml and .env.example, with the
+# compose-era addresses replaced by in-cluster ones:
+#   minio at 10.1.0.100:9000 -> rustfs.local-infra.svc.cluster.local:9000
+#   nginx bucket proxies on :8044/:8045/:8046 -> the draft/live/test hostnames
+#   concourse:8080 -> the in-namespace Concourse service
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocwstudio-env
+  namespace: ocw-studio
+data:
+  # ── Django ────────────────────────────────────────────────────────────────
+  DJANGO_SETTINGS_MODULE: "main.settings"
+  PYTHONPATH: "."
+  ALLOWED_HOSTS: '["*"]'
+  # False, matching mitxonline's local-dev config. Not just convention: DEBUG
+  # switches on the nplusone profiler, which is a dev-group dependency and is
+  # therefore absent from the production image target this app deploys. Static
+  # files are served by the nginx sidecar from collectstatic output, so nothing
+  # here depends on Django's debug static handling.
+  DEBUG: "False"
+  DEV_ENV: "True"
+  NODE_ENV: "development"
+  PORT: "8041"
+  # "dev" is load-bearing beyond logging: main/s3_utils.py branches on it to
+  # talk to a local S3 endpoint instead of AWS.
+  OCW_STUDIO_ENVIRONMENT: "dev"
+  OCW_STUDIO_SECURE_SSL_REDIRECT: "False"
+  OCW_STUDIO_DB_DISABLE_SSL: "True"
+  OCW_STUDIO_LOG_LEVEL: "INFO"
+  DJANGO_LOG_LEVEL: "INFO"
+  LOG_LEVEL: "INFO"
+  USE_X_FORWARDED_HOST: "True"
+  USE_X_FORWARDED_PORT: "True"
+
+  # mkcert root CA — lets the pod trust local HTTPS endpoints (Keycloak token
+  # exchange, and the s3/draft/live hostnames when reached over ingress).
+  REQUESTS_CA_BUNDLE: "/etc/ssl/local-dev/rootCA.pem"
+  SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
+
+  # ── Site URLs ─────────────────────────────────────────────────────────────
+  # studio  — the Studio CMS itself
+  # draft   — preview bucket, what "Publish draft" writes to
+  # live    — publish bucket, what "Publish live" writes to
+  # test    — test bucket, used by the pipeline's smoke-test step
+  OCW_STUDIO_BASE_URL: "https://studio.ocw.mit.dev/"
+  OCW_STUDIO_DRAFT_URL: "https://draft.ocw.mit.dev/"
+  OCW_STUDIO_LIVE_URL: "https://live.ocw.mit.dev/"
+  RESOURCE_BASE_URL_DRAFT: "https://draft.ocw.mit.dev/"
+  RESOURCE_BASE_URL_LIVE: "https://live.ocw.mit.dev/"
+  STATIC_API_BASE_URL_TEST: "https://test.ocw.mit.dev/"
+  STATIC_API_BASE_URL: "https://live-qa.odl.mit.edu/"
+
+  # ── Object storage (RustFS) ───────────────────────────────────────────────
+  # Two addresses on purpose: pod-side boto3 calls go to the in-cluster
+  # Service, while URLs handed to a browser have to use a name the browser can
+  # resolve. Both settings are read by main/s3_utils.py and django-storages.
+  AWS_S3_ENDPOINT_URL: "http://rustfs.local-infra.svc.cluster.local:9000"
+  AWS_S3_CUSTOM_DOMAIN: "s3.mit.dev/ol-ocw-studio-app-local"
+  AWS_QUERYSTRING_AUTH: "False"
+  AWS_REGION: "us-east-1"
+  AWS_DEFAULT_REGION: "us-east-1"
+  OCW_STUDIO_USE_S3: "true"
+  # Bucket names mirror .env.example so they match what the RustFS bootstrap
+  # Job creates (local-dev/infra/modules/objectstore.py).
+  AWS_STORAGE_BUCKET_NAME: "ol-ocw-studio-app-local"
+  AWS_PREVIEW_BUCKET_NAME: "ocw-content-draft-local"
+  AWS_PUBLISH_BUCKET_NAME: "ocw-content-live-local"
+  AWS_TEST_BUCKET_NAME: "ocw-content-test"
+  AWS_OFFLINE_PREVIEW_BUCKET_NAME: "ocw-content-offline-draft-local"
+  AWS_OFFLINE_PUBLISH_BUCKET_NAME: "ocw-content-offline-live-local"
+  AWS_OFFLINE_TEST_BUCKET_NAME: "ocw-content-offline-test"
+  AWS_ARTIFACTS_BUCKET_NAME: "ol-eng-artifacts-local"
+
+  # ── Content sync + publishing ─────────────────────────────────────────────
+  # GitHub by default, matching .env.example. Point CONTENT_SYNC_BACKEND at
+  # content_sync.backends.gitlab.GitlabBackend in your app-env.local.yaml to
+  # exercise the GitLab backend instead.
+  CONTENT_SYNC_BACKEND: "content_sync.backends.github.GithubBackend"
+  CONTENT_SYNC_PIPELINE: "content_sync.pipelines.concourse.ConcourseGithubPipeline"
+  CONTENT_SYNC_THEME_PIPELINE: "content_sync.pipelines.concourse.ThemeAssetsPipeline"
+  CONTENT_SYNC_PIPELINE_BACKEND: "concourse"
+  GIT_DOMAIN: "github.com"
+  GIT_API_URL: "https://api.github.com"
+  GITHUB_RATE_LIMIT_CHECK: "True"
+  GITHUB_WEBHOOK_BRANCH: "main"
+  OCW_HUGO_THEMES_BRANCH: "main"
+  OCW_HUGO_PROJECTS_BRANCH: "main"
+  USE_LOCAL_STARTERS: "false"
+  TEST_ROOT_WEBSITE_NAME: "ocw-ci-test-www"
+  OCW_TEST_SITE_SLUGS: '["ocw-ci-test-www","ocw-ci-test-course"]'
+
+  # ── Concourse ─────────────────────────────────────────────────────────────
+  # Studio pushes pipeline definitions here; the pipelines then clone content
+  # from git and write built sites into the buckets above.
+  CONCOURSE_URL: "http://ocwstudio-concourse:8080"
+  CONCOURSE_TEAM: "main"
+  CONCOURSE_IS_PRIVATE_REPO: "False"
+
+  # ── Celery ────────────────────────────────────────────────────────────────
+  CELERY_TASK_ALWAYS_EAGER: "False"
+
+  # ── Frontend assets ───────────────────────────────────────────────────────
+  # No webpack dev server in-cluster: it needs node, and the app image is
+  # Python-only, so there is nothing for Tilt to live-sync JS into. Django
+  # reads the webpack-stats.json baked into the image by the Dockerfile's
+  # node_builder stage instead, which means JS/SCSS edits need an image
+  # rebuild. Tilt triggers one automatically when those files change.
+  WEBPACK_USE_DEV_SERVER: "False"
+
+  # ── Keycloak (python-social-auth KeycloakOAuth2) ──────────────────────────
+  # Key, secret and realm public key come from the ol-ocw-studio-oidc Secret.
+  SOCIAL_AUTH_KEYCLOAK_AUTHORIZATION_URL: "https://sso.ol.mit.dev/realms/olapps/protocol/openid-connect/auth"  # pragma: allowlist secret
+  SOCIAL_AUTH_KEYCLOAK_ACCESS_TOKEN_URL: "https://sso.ol.mit.dev/realms/olapps/protocol/openid-connect/token"  # pragma: allowlist secret
+
+  # ── Email (captured by Mailpit, browsable at https://mail.mit.dev) ────────
+  OCW_STUDIO_EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+  OCW_STUDIO_EMAIL_HOST: "mailpit.local-infra.svc.cluster.local"
+  OCW_STUDIO_EMAIL_PORT: "1025"
+  OCW_STUDIO_EMAIL_TLS: "False"
+  OCW_STUDIO_FROM_EMAIL: "OCW Studio <noreply@ocw.mit.dev>"
+  # Required settings; nothing is actually delivered through Mailgun locally.
+  MAILGUN_SENDER_DOMAIN: "ocw.mit.dev"
+  MAILGUN_KEY: "local-dev-unused"
+
+  # ── Integrations left off locally ─────────────────────────────────────────
+  # Google Drive, YouTube, Wayback and the open-catalog webhooks all need real
+  # third-party credentials. Add them in app-env.local.yaml if you need them.
+  ENABLE_WAYBACK_TASKS: "false"

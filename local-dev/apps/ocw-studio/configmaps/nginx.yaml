@@ -1,0 +1,155 @@
+---
+# nginx config for the Studio web pod: serves static files and forwards
+# everything else to granian.
+#
+# There is no webpack dev server here, unlike compose. The bundles are the
+# ones baked into the image by the Dockerfile's node_builder stage, so JS
+# and SCSS changes need a Tilt image rebuild rather than hot-reloading.
+# See the ocw-studio section of local-dev/README.md.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocwstudio-nginx-conf
+  namespace: ocw-studio
+data:
+  default.conf: |
+    server {
+        listen 8043 default_server;
+        root /src;
+
+        client_max_body_size 25M;
+
+        location = /.well-known/dnt-policy.txt {
+            return 204;
+        }
+
+        location = /favicon.ico {
+            try_files /static/images/favicon.ico /favicon.ico;
+        }
+
+        location ~* /static/(.*$) {
+            expires max;
+            add_header Access-Control-Allow-Origin *;
+            try_files $uri $uri/ /staticfiles/$1 /staticfiles/$1/ =404;
+        }
+
+        location / {
+            proxy_pass http://127.0.0.1:8041;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+---
+# nginx config for the site-host pod: serves published static sites straight
+# out of the object store, one listener per bucket.
+#
+# This is a port of the :8044/:8045/:8046 server blocks in ocw-studio's
+# config/nginx.conf. The rewrites are what make a bucket behave like a web
+# server — without them a request for /courses/foo/ returns the bucket's XML
+# listing instead of the page — so they are reproduced as-is. The only change
+# is the upstream: the compose Minio container became the shared RustFS
+# service, and the bucket names are inlined rather than substituted from env.
+#
+# No credentials are sent. The buckets are anonymously readable by bucket
+# policy, applied by the RustFS bootstrap Job.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocwstudio-sitehost-conf
+  namespace: ocw-studio
+data:
+  default.conf: |
+    server {
+        listen 8044 default_server;
+        index index.html;
+
+        ignore_invalid_headers off;
+        client_max_body_size 0;
+        proxy_buffering off;
+
+        location / {
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host $http_host;
+
+            proxy_redirect off;
+            proxy_connect_timeout 300;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            chunked_transfer_encoding off;
+
+            location ~ ^/courses/.*/static_shared/.* {
+                rewrite ^/courses/.*/static_shared/(.*)$ /static_shared/$1 last;
+            }
+
+            rewrite ^([^.]*[^/])$ $1/ permanent;
+            rewrite /$ ${uri}index.html?${args} last;
+
+            proxy_pass http://rustfs.local-infra.svc.cluster.local:9000/ocw-content-draft-local/;
+        }
+    }
+
+    server {
+        listen 8045 default_server;
+        index index.html;
+
+        ignore_invalid_headers off;
+        client_max_body_size 0;
+        proxy_buffering off;
+
+        location / {
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host $http_host;
+
+            proxy_redirect off;
+            proxy_connect_timeout 300;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            chunked_transfer_encoding off;
+
+            location ~ ^/courses/.*/static_shared/.* {
+                rewrite ^/courses/.*/static_shared/(.*)$ /static_shared/$1 last;
+            }
+
+            rewrite ^([^.]*[^/])$ $1/ permanent;
+            rewrite /$ ${uri}index.html?${args} last;
+
+            proxy_pass http://rustfs.local-infra.svc.cluster.local:9000/ocw-content-live-local/;
+        }
+    }
+
+    server {
+        listen 8046 default_server;
+        index index.html;
+
+        ignore_invalid_headers off;
+        client_max_body_size 0;
+        proxy_buffering off;
+
+        location / {
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Host $http_host;
+
+            proxy_redirect off;
+            proxy_connect_timeout 300;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+            chunked_transfer_encoding off;
+
+            location ~ ^/courses/.*/static_shared/.* {
+                rewrite ^/courses/.*/static_shared/(.*)$ /static_shared/$1 last;
+            }
+
+            rewrite ^([^.]*[^/])$ $1/ permanent;
+            rewrite /$ ${uri}index.html?${args} last;
+
+            proxy_pass http://rustfs.local-infra.svc.cluster.local:9000/ocw-content-test/;
+        }
+    }
