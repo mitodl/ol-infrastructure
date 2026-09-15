@@ -148,7 +148,10 @@ def setup_starrocks(
     starrocks_operator_crd = kubernetes.yaml.v2.ConfigGroup(
         f"{cluster_name}-starrocks-operator-crds",
         objs=_fetch_starrocks_crd(),
-        opts=ResourceOptions(provider=starrocks_crd_provider),
+        opts=ResourceOptions(
+            provider=starrocks_crd_provider,
+            retain_on_delete=True,
+        ),
     )
 
     # skip_await=False (the default) makes this resource block until Helm confirms
