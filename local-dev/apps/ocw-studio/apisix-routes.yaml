@@ -14,6 +14,28 @@ spec:
   - name: prometheus
     enable: true
 ---
+# Same as the shared config above, minus the HTTP->HTTPS redirect, for the
+# published-site hosts.
+#
+# Concourse task containers build those sites and fetch the static JSON API
+# back out of them over HTTP. They carry only public CAs, so they cannot verify
+# the local mkcert cert, and forcing them to HTTPS made every instructor fetch
+# fail with "certificate signed by unknown authority". The redirect also
+# pointed at :9443, which is not exposed, so following it just timed out.
+#
+# Serving these hosts over plain HTTP as well keeps the hostname identical to
+# what a browser uses, so a URL baked into built output stays valid either way.
+# HTTPS still works for browsers; it is simply no longer mandatory.
+apiVersion: apisix.apache.org/v2
+kind: ApisixPluginConfig
+metadata:
+  name: ocwstudio-site-plugins
+  namespace: ocw-studio
+spec:
+  plugins:
+  - name: prometheus
+    enable: true
+---
 # TLS for every ocw-studio hostname. All are covered by the *.ocw.<domain>
 # wildcard that setup.sh adds to the mkcert cert.
 apiVersion: apisix.apache.org/v2
@@ -91,7 +113,7 @@ spec:
     backends:
     - serviceName: ocwstudio-sitehost
       servicePort: 8044
-    plugin_config_name: ocwstudio-shared-plugins
+    plugin_config_name: ocwstudio-site-plugins
 
   - name: live
     priority: 0
@@ -103,7 +125,7 @@ spec:
     backends:
     - serviceName: ocwstudio-sitehost
       servicePort: 8045
-    plugin_config_name: ocwstudio-shared-plugins
+    plugin_config_name: ocwstudio-site-plugins
 
   - name: test
     priority: 0
@@ -115,7 +137,7 @@ spec:
     backends:
     - serviceName: ocwstudio-sitehost
       servicePort: 8046
-    plugin_config_name: ocwstudio-shared-plugins
+    plugin_config_name: ocwstudio-site-plugins
 ---
 # Concourse web UI. Studio links build pages here and embeds them, so the
 # hostname has to match CONCOURSE_EXTERNAL_URL in concourse.yaml.
