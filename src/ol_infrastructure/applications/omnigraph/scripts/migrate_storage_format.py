@@ -42,6 +42,7 @@ import shutil
 import subprocess
 import sys
 from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 
 # `s3://<bucket>/fmt<N>`, where N is the NEW internal-schema number. Anchored
@@ -51,11 +52,17 @@ from pathlib import Path
 # `load` reporting success on top of it.
 NEW_ROOT_RE = re.compile(r"^s3://[a-z0-9.-]+/fmt[0-9]+$")
 
-# `rows=` counts out of `omnigraph snapshot`, e.g.
-# `node:Memory v2 branch=main rows=41`. Compared PER TABLE between old and new:
-# a total-row check would pass a rebuild that put every row in the wrong table,
-# and a whole-store check would pass one that silently dropped an empty one.
-SNAPSHOT_ROW_RE = re.compile(r"^(?P<table>\S+)\s+.*\brows=(?P<rows>\d+)", re.MULTILINE)
+# `entities=` counts out of `omnigraph snapshot`, e.g.
+# `node type 'Memory' published_dataset_version=2 native_dataset_branch=main
+# entities=41` (one line), as printed by both 0.10 and 0.11. 0.8 printed
+# `node:Memory v2 branch=main rows=41`, and matching only that shape made the
+# Job stop at its first graph against a 0.10 root. Compared PER TABLE between
+# old and new: a total-row check would pass a rebuild that put every row in
+# the wrong table, and a whole-store check would pass one that silently
+# dropped an empty one.
+SNAPSHOT_ROW_RE = re.compile(
+    r"^(?:node|edge) type '(?P<table>[^']+)'.*\bentities=(?P<rows>\d+)", re.MULTILINE
+)
 SNAPSHOT_SCHEMA_RE = re.compile(r"^internal_schema_version:\s*(\d+)", re.MULTILINE)
 
 VERDICT_PATH = Path("/tmp/migration-verdict.json")  # noqa: S108
@@ -268,6 +275,157 @@ def chunk_export(export: Path) -> list[Path]:
     return batches
 
 
+# `edge Name: From -> To` with an optional `{ ... }` body. omnigraph 0.11 only
+# accepts a key inside the body, so a bodiless edge is never keyed.
+EDGE_DECL_RE = re.compile(
+    r"\bedge\s+(?P<name>\w+)\s*:\s*\w+\s*->\s*\w+\s*(?:\{(?P<body>[^}]*)\})?"
+)
+EDGE_KEY_RE = re.compile(r"@key\(\s*(?P<parts>[^)]*)\)")
+ENDPOINT_KEY = ["@dst", "@src"]
+CONFIDENCE_RANK = {"asserted": 2, "inferred": 1}
+
+
+def schema_files_by_graph(cluster_yaml: Path) -> dict[str, str]:
+    """Return each declared graph's ``schema:`` file, as cluster.yaml names it.
+
+    The same indentation-aware scan as ``graph_ids_from_cluster_config``, for
+    the same reason. Which edge types are keyed is a property of each graph's
+    own schema, so council's keys must never be applied to a code graph.
+    """
+    schemas: dict[str, str] = {}
+    in_graphs = False
+    current: str | None = None
+    for raw in cluster_yaml.read_text().splitlines():
+        line = raw.rstrip()
+        if not line or line.lstrip().startswith("#"):
+            continue
+        if not line[:1].isspace():
+            in_graphs = line.startswith("graphs:")
+            current = None
+            continue
+        if not in_graphs:
+            continue
+        if re.fullmatch(r"  [A-Za-z0-9][A-Za-z0-9._-]*:", line):
+            current = line.strip().rstrip(":")
+        elif current and (match := re.fullmatch(r"\s{3,}schema:\s*(\S+)", line)):
+            schemas[current] = match.group(1).strip("'\"")
+    return schemas
+
+
+def keyed_edge_types(schema: Path) -> set[str]:
+    """Return the edge types ``schema`` keys on their endpoint pair.
+
+    omnigraph 0.11 derives a keyed edge's id from ``@key(@src, @dst)``, which
+    changes what a 0.10 export must look like before it loads (see
+    ``normalize_export``). Only a key of exactly the two endpoints is handled:
+    a wider key keeps apart rows that a pair-wise collapse would merge, so it
+    stops the migration rather than guessing.
+    """
+    text = re.sub(r"//[^\n]*", "", schema.read_text())
+    keyed: set[str] = set()
+    for edge in EDGE_DECL_RE.finditer(text):
+        for key in EDGE_KEY_RE.finditer(edge["body"] or ""):
+            parts = sorted(part.strip() for part in key["parts"].split(","))
+            if parts != ENDPOINT_KEY:
+                sys.exit(
+                    f"!!! edge {edge['name']} in {schema} is keyed on "
+                    f"{key['parts']!r}; this migration only collapses keys on "
+                    "(@src, @dst)"
+                )
+            keyed.add(edge["name"])
+    return keyed
+
+
+def _instant(value: object) -> float | None:
+    """Return an exported DateTime as epoch seconds, or ``None`` when unset.
+
+    0.10 exports DateTime as epoch milliseconds and 0.11 as an ISO string with
+    no zone, which omnigraph means as UTC.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        return value / 1000
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError:
+            return None
+        return parsed.replace(tzinfo=parsed.tzinfo or UTC).timestamp()
+    return None
+
+
+def _edge_rank(data: object, position: int) -> tuple[int, bool, float, int]:
+    """Order the duplicate rows of one keyed edge; the highest survives."""
+    fields = data if isinstance(data, dict) else {}
+    instant = _instant(fields.get("created_at"))
+    confidence = fields.get("confidence")
+    return (
+        CONFIDENCE_RANK.get(confidence, 0) if isinstance(confidence, str) else 0,
+        instant is not None,
+        instant or 0.0,
+        position,
+    )
+
+
+def normalize_export(
+    export: Path, keyed_edges: set[str]
+) -> tuple[Path, dict[str, int]]:
+    """Rewrite a 0.10 export into rows omnigraph 0.11 will load.
+
+    Three changes, each checked against the 0.11.0 binary:
+
+    - A node row's ``data.id`` moves to a top-level ``id``. 0.11 refuses
+      ``data.id`` ("move data.id to the top-level 'id' field"). An unkeyed
+      edge's id moves the same way.
+    - A keyed edge row loses its id entirely. 0.10 gave every edge a ULID, and
+      0.11 refuses one that does not match the id its key derives.
+    - Duplicate rows of a keyed edge collapse to one. 0.10 appended a row on
+      every re-link, and two rows for one key in a load fail the WHOLE load
+      ("@unique violation"). The survivor is one whole existing row, never a
+      composite: highest confidence (asserted, then inferred, then unset), then
+      newest ``created_at`` (unset oldest), then the later row in the export.
+      agent-kit's witan_core export normalisation applies the same rule, so a
+      graph rebuilt here and a local store migrated there keep the same edge.
+
+    Collapse needs the whole file, since duplicates are not adjacent, which is
+    also why this runs before ``chunk_export`` splits anything. Returns the
+    rewritten file and, per keyed edge table, how many rows the collapse
+    removed, which ``verify`` subtracts from the 0.10 baseline.
+    """
+    kept: list[tuple[int, str]] = []
+    winners: dict[tuple[str, str, str], tuple[tuple[int, bool, float, int], str]]
+    winners = {}
+    seen: Counter[str] = Counter()
+    with export.open() as fh:
+        for position, line in enumerate(fh):
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            data = record.get("data")
+            edge = record.get("edge")
+            if edge in keyed_edges:
+                record.pop("id", None)
+                if isinstance(data, dict):
+                    data.pop("id", None)
+                seen[edge] += 1
+                pair = (edge, record["from"], record["to"])
+                rank = _edge_rank(data, position)
+                if pair not in winners or rank > winners[pair][0]:
+                    winners[pair] = (rank, json.dumps(record))
+                continue
+            if "id" not in record and isinstance(data, dict) and "id" in data:
+                record["id"] = data.pop("id")
+            kept.append((position, json.dumps(record)))
+    kept.extend((rank[-1], row) for rank, row in winners.values())
+    kept.sort()
+    target = export.with_name(f"{export.stem}.normalized.jsonl")
+    target.write_text("".join(f"{row}\n" for _, row in kept))
+    survivors = Counter(edge for edge, _, _ in winners)
+    removed = {table: seen[table] - survivors[table] for table in seen}
+    return target, {table: count for table, count in removed.items() if count}
+
+
 def graph_ids_from_cluster_config(cluster_yaml: Path) -> list[str]:
     """Return the graph ids the live cluster declares.
 
@@ -399,8 +557,13 @@ def rebuild(  # noqa: PLR0913
     cluster_yaml: Path,
     schema_dir: Path,
     actor: str,
-) -> None:
-    """Create the graphs at ``new_root`` and load every export into them."""
+) -> dict[str, dict[str, int]]:
+    """Create the graphs at ``new_root`` and load every export into them.
+
+    Returns, per graph, how many rows ``normalize_export`` collapsed away from
+    each keyed edge table, which ``verify`` needs to know what the rebuilt
+    counts should be.
+    """
     LOG.info("=== 2/3 rebuild (new binary)")
     config = build_rebuild_config(cluster_yaml, rebuild_dir, schema_dir, new_root)
     LOG.info("  staged %s -> storage: %s", config, new_root)
@@ -424,14 +587,30 @@ def rebuild(  # noqa: PLR0913
     run([new_binary, "cluster", "import", "--config", str(rebuild_dir)])
     run([new_binary, "cluster", "apply", "--config", str(rebuild_dir), "--as", actor])
 
+    # Keyed edge types come from the schema each graph is rebuilt WITH, as
+    # staged beside the config, not from the export: only the new schema can
+    # say which edges 0.11 derives ids for.
+    schemas = schema_files_by_graph(config)
+    collapsed: dict[str, dict[str, int]] = {}
     for graph in graphs:
         LOG.info("  -- %s", graph)
+        if graph not in schemas:
+            sys.exit(
+                f"!!! {graph} declares no schema: in {config}, so its keyed edge "
+                "types are unknown and its export cannot be normalised"
+            )
+        normalized, collapsed[graph] = normalize_export(
+            export_dir / f"{graph}.jsonl",
+            keyed_edge_types(rebuild_dir / schemas[graph]),
+        )
+        if collapsed[graph]:
+            LOG.info("     collapsed duplicate keyed edges: %s", collapsed[graph])
         store = f"{new_root}/graphs/{graph}.omni"
         # `merge` into a freshly-created empty graph is a full load and is the
         # safe choice: `overwrite` is destructive and buys nothing against an
         # empty table. `--yes` because a non-local destructive write refuses
         # without a TTY, and there is none here.
-        for batch, path in enumerate(chunk_export(export_dir / f"{graph}.jsonl")):
+        for batch, path in enumerate(chunk_export(normalized)):
             if batch:
                 LOG.info("     batch %d", batch + 1)
             run(
@@ -447,6 +626,7 @@ def rebuild(  # noqa: PLR0913
                     "--yes",
                 ]
             )
+    return collapsed
 
 
 def verify(
@@ -454,22 +634,35 @@ def verify(
     new_root: str,
     graphs: list[str],
     baseline: dict[str, dict[str, int]],
+    collapsed: dict[str, dict[str, int]],
 ) -> tuple[dict[str, GraphReport], list[str]]:
-    """Compare per-table row counts at the new root against the baseline."""
+    """Compare per-table row counts at the new root against what was loaded.
+
+    Expected is the old baseline minus the duplicate keyed-edge rows
+    ``normalize_export`` removed; that baseline counts every duplicate, so
+    strict equality with it would fail each graph that had any. Every other
+    table must still match the baseline exactly.
+    """
     LOG.info("=== 3/3 verify (per-table row counts)")
     report: dict[str, GraphReport] = {}
     mismatched: list[str] = []
     for graph in graphs:
         after = snapshot_tables(new_binary, f"{new_root}/graphs/{graph}.omni")
         before = baseline[graph]
-        ok = after == before
+        removed = collapsed.get(graph, {})
+        expected = {
+            table: rows - removed.get(table, 0) for table, rows in before.items()
+        }
+        ok = after == expected
         report[graph] = {
             "ok": ok,
             "before": before,
+            "collapsed_duplicates": removed,
+            "expected": expected,
             "after": after,
-            "missing_tables": sorted(set(before) - set(after)),
+            "missing_tables": sorted(set(expected) - set(after)),
             "changed_tables": sorted(
-                t for t in set(before) & set(after) if before[t] != after[t]
+                t for t in set(expected) & set(after) if expected[t] != after[t]
             ),
         }
         if not ok:
@@ -530,7 +723,7 @@ def main() -> int:
     LOG.info("%d graph(s) to rebuild: %s", len(graphs), ", ".join(graphs))
 
     baseline = baseline_and_export(old_binary, old_root, graphs, export_dir)
-    rebuild(
+    collapsed = rebuild(
         new_binary,
         new_root,
         graphs,
@@ -540,7 +733,7 @@ def main() -> int:
         schema_dir,
         actor,
     )
-    report, mismatched = verify(new_binary, new_root, graphs, baseline)
+    report, mismatched = verify(new_binary, new_root, graphs, baseline, collapsed)
 
     # THE FORMAT MUST HAVE ACTUALLY MOVED, on EVERY graph. Recording one
     # graph's version and never comparing it — which is what this did — lets
