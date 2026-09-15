@@ -176,4 +176,34 @@ for USERNAME in admin student prof; do
     fi
 done
 
+# odl-video-service derives Django superuser/staff from Keycloak group
+# membership (the OVS client's user_groups claim; see odl_video/pipeline.py).
+# The Admin group is provisioned by local-dev/infra/modules/keycloak.py. This
+# runs for existing users too, so it fixes up realms seeded before the group.
+ensure_admin_group_membership() {
+    local email="admin@odl.local"
+    local user_id group_id
+    user_id=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
+        -H "Authorization: Bearer ${TOKEN}" \
+        "${KC_URL}/admin/realms/${REALM}/users?email=${email}&exact=true" 2>/dev/null \
+        | jq -r '.[0].id // empty' 2>/dev/null || true)
+    group_id=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
+        -H "Authorization: Bearer ${TOKEN}" \
+        "${KC_URL}/admin/realms/${REALM}/groups?search=Admin" 2>/dev/null \
+        | jq -r '.[] | select(.name=="Admin") | .id' 2>/dev/null | head -1 || true)
+    if [ -z "${user_id}" ] || [ -z "${group_id}" ]; then
+        echo "[kc-seed-users] ERROR: could not resolve ${email} ('${user_id}') or the Admin group ('${group_id}')." >&2
+        echo "[kc-seed-users] The group comes from local-infra-apps; re-run that resource, then this one." >&2
+        exit 1
+    fi
+    echo "[kc-seed-users] Ensuring ${email} is in the 'Admin' group ..."
+    # PUT is idempotent: a second call on an existing membership is a no-op.
+    curl -sf --cacert "${KC_CACERT}" --max-time 10 \
+        -X PUT \
+        -H "Authorization: Bearer ${TOKEN}" \
+        "${KC_URL}/admin/realms/${REALM}/users/${user_id}/groups/${group_id}" \
+        -o /dev/null
+}
+ensure_admin_group_membership
+
 echo "[kc-seed-users] Done."

@@ -16,13 +16,12 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         IMAGE,
         context=APP_DIR,
         dockerfile=APP_DIR + '/Dockerfile',
-        live_update=[
-            sync(APP_DIR + '/odl_video', '/src/odl_video'),
-            run(
-                'cd /src && pip install -r requirements.txt',
-                trigger=[APP_DIR + '/requirements.txt'],
-            ),
-        ],
+        # The Dockerfile's final `development` stage never copies the source
+        # tree, so an untargeted build ships an image with no manage.py.
+        # No live_update: production runs granian without --reload, so a
+        # sync would make Tilt skip the rebuild and edits would never land.
+        # Restore it once OVS has a local-dev stage (mitodl/hq#13309).
+        target='production',
     )
 
 k8s_yaml_local([
@@ -34,7 +33,9 @@ k8s_yaml_local([
 
 k8s_resource(
     DEPLOY_NAME,
-    port_forwards=['8088:8088'],
+    # granian listens on 8089 (deployment.yaml); keep the host side on 8088 so
+    # it doesn't collide with the docker-compose nginx on 8089.
+    port_forwards=['8088:8089'],
     labels=['odl-video-service'],
     resource_deps=['local-infra-apps'],
 )

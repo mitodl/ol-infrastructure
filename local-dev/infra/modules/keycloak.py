@@ -33,6 +33,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     learn_ai_client_secret: Output,
     mitxonline_client_secret: Output,
     unified_ecommerce_client_secret: Output,
+    ovs_client_secret: Output,
     *,
     root_domain: str,
     verify_email: bool = True,
@@ -525,6 +526,122 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         "ol-mitxonline-oidc",
         mitxonline_client,
         mitxonline_client_secret,
+    )
+
+    # --- ODL Video Service ---
+    # OVS does OIDC inside Django (social-auth) rather than at APISIX, so its
+    # Secret carries the SOCIAL_AUTH_KEYCLOAK_* env names directly and includes
+    # the realm's RS256 public key that social-core verifies ID tokens with
+    # (prod gets the same key from Vault as realm_public_key).
+    ovs_client = keycloak.openid.Client(
+        "olapps-ovs-client",
+        name="ol-ovs-client",
+        realm_id=realm.realm,
+        client_id="ol-ovs-client",
+        client_secret=ovs_client_secret,
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        # OVS validates "moira list" names against Keycloak groups through the
+        # Admin API with a client_credentials grant on this client.
+        service_accounts_enabled=True,
+        valid_redirect_uris=[f"https://video.odl.{root_domain}/*"],
+        opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    ovs_realm_management = keycloak.openid.get_client_output(
+        realm_id=realm.realm,
+        client_id="realm-management",
+        opts=InvokeOptions(provider=keycloak_provider),
+    )
+    # Same grants as the prod ol-mit OVS client (substructure/keycloak/ol_mit.py).
+    for resource_name, role in [
+        ("olapps-ovs-sa-manage-users", "manage-users"),
+        ("olapps-ovs-sa-view-users", "view-users"),
+        ("olapps-ovs-sa-query-users", "query-users"),
+        ("olapps-ovs-sa-query-groups", "query-groups"),
+    ]:
+        keycloak.openid.ClientServiceAccountRole(
+            resource_name,
+            realm_id=realm.realm,
+            service_account_user_id=ovs_client.service_account_user_id,
+            client_id=ovs_realm_management.id,
+            role=role,
+            opts=kc_opts,
+        )
+    keycloak.openid.ClientDefaultScopes(
+        "olapps-ovs-default-scopes",
+        realm_id=realm.realm,
+        client_id=ovs_client.id,
+        default_scopes=DEFAULT_SCOPES,
+        opts=kc_opts,
+    )
+    # OVS maps the token's `user_groups` claim to Django flags: /Admin ->
+    # superuser, /Staff -> staff (odl_video/pipeline.py). kc-seed-users.sh
+    # puts admin@odl.local in Admin.
+    for group_name in ("Admin", "Staff"):
+        keycloak.Group(
+            f"olapps-ovs-group-{group_name.lower()}",
+            realm_id=realm.realm,
+            name=group_name,
+            opts=kc_opts,
+        )
+    keycloak.openid.GroupMembershipProtocolMapper(
+        "olapps-ovs-user-groups-mapper",
+        realm_id=realm.realm,
+        client_id=ovs_client.id,
+        name="user_groups",
+        claim_name="user_groups",
+        full_path=True,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
+        opts=kc_opts,
+    )
+    # social-core decodes the access token with audience == client_id, and
+    # Keycloak omits the client from `aud` unless a mapper adds it (same as
+    # the prod ol-mit OVS client; see KEYCLOAK-6638).
+    keycloak.openid.AudienceProtocolMapper(
+        "olapps-ovs-audience-mapper",
+        realm_id=realm.realm,
+        client_id=ovs_client.id,
+        name="audience",
+        included_client_audience=ovs_client.client_id,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        opts=kc_opts,
+    )
+    realm_keys = keycloak.get_realm_keys_output(
+        realm_id=realm.realm,
+        algorithms=["RS256"],
+        statuses=["ACTIVE"],
+        opts=InvokeOptions(provider=keycloak_provider),
+    )
+    k8s.core.v1.Secret(
+        "oidc-secret-ovs",
+        metadata={"name": "ol-ovs-oidc", "namespace": "odl-video-service"},
+        string_data=Output.all(
+            client_id=ovs_client.client_id,
+            client_secret=ovs_client_secret,
+            public_key=realm_keys.keys.apply(lambda keys: keys[0].public_key),
+        ).apply(
+            lambda a: {
+                "SOCIAL_AUTH_KEYCLOAK_KEY": a["client_id"],
+                "SOCIAL_AUTH_KEYCLOAK_SECRET": a["client_secret"],
+                "SOCIAL_AUTH_KEYCLOAK_PUBLIC_KEY": a["public_key"],
+                "SOCIAL_AUTH_KEYCLOAK_AUTHORIZATION_URL": (
+                    f"{keycloak_url}/realms/olapps/protocol/openid-connect/auth"
+                ),
+                "SOCIAL_AUTH_KEYCLOAK_ACCESS_TOKEN_URL": (
+                    f"{keycloak_url}/realms/olapps/protocol/openid-connect/token"
+                ),
+                # Admin API credentials for group lookups (ui/keycloak_utils.py);
+                # settings.py derives KEYCLOAK_SERVER_URL/REALM from the token URL.
+                "KEYCLOAK_SVC_ADMIN": a["client_id"],
+                "KEYCLOAK_SVC_ADMIN_PASSWORD": a["client_secret"],
+            }
+        ),
+        opts=k8s_opts,
     )
 
     # --- MITx Online B2B (service account client for Keycloak Admin API) ---
