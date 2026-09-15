@@ -12,16 +12,28 @@ NAMESPACE = 'odl-video-service'
 DEPLOY_NAME = 'odlvideo-webapp'
 
 if os.path.exists(os.path.join(APP_DIR, '.git')):
+    # `local-dev` (production + dev deps + watchfiles, so granian can --reload;
+    # see deployment.yaml) exists from odl-video-service#1593 on. Older
+    # checkouts only have `production`. Never build untargeted: the last stage,
+    # `development`, has no source tree and no manage.py. read_file() also
+    # makes Tilt re-evaluate this when the Dockerfile changes.
+    has_local_dev = 'AS local-dev' in str(read_file(APP_DIR + '/Dockerfile'))
     docker_build(
         IMAGE,
         context=APP_DIR,
         dockerfile=APP_DIR + '/Dockerfile',
-        # The Dockerfile's final `development` stage never copies the source
-        # tree, so an untargeted build ships an image with no manage.py.
-        # No live_update: production runs granian without --reload, so a
-        # sync would make Tilt skip the rebuild and edits would never land.
-        # Restore it once OVS has a local-dev stage (mitodl/hq#13309).
-        target='production',
+        target='local-dev' if has_local_dev else 'production',
+        # Sync the whole repo (Django apps are top-level dirs: ui, cloudsync,
+        # techtv2ovs, ...); granian's --reload-ignore-dirs filters the churn.
+        # Only with the local-dev target: without --reload a sync makes Tilt
+        # skip the rebuild and edits never land.
+        live_update=[
+            sync(APP_DIR, '/src'),
+            run(
+                'cd /src && uv sync --frozen',
+                trigger=[APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock'],
+            ),
+        ] if has_local_dev else [],
     )
 
 k8s_yaml_local([
