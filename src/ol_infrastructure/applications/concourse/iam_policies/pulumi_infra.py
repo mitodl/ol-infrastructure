@@ -537,11 +537,25 @@ policy_definition = {
             # ocw-studio-db-applications-production) truncate before any "-rds"
             # text is left at all, so a resource-name wildcard can't scope this
             # safely. The real boundary is the service it can be passed to.
+            #
+            # monitoring.rds.amazonaws.com alone was not enough: with it live,
+            # CreateBlueGreenDeployment kept failing with "no identity-based
+            # policy allows the iam:PassRole action", while
+            # simulate-principal-policy allows that exact role with
+            # PassedToService=monitoring.rds.amazonaws.com and denies it with
+            # rds.amazonaws.com. The condition is the only thing that can fail,
+            # so blue/green must report a different service; rds.amazonaws.com
+            # is the likely one (inferred, not documented by AWS).
             "Effect": "Allow",
             "Action": ["iam:PassRole"],
             "Resource": "*",
             "Condition": {
-                "StringEquals": {"iam:PassedToService": "monitoring.rds.amazonaws.com"}
+                "StringEquals": {
+                    "iam:PassedToService": [
+                        "monitoring.rds.amazonaws.com",
+                        "rds.amazonaws.com",
+                    ]
+                }
             },
         },
     ],
