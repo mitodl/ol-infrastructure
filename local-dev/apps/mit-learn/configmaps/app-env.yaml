@@ -37,8 +37,23 @@ data:
   SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
 
   # ── Domain / CORS / CSRF ───────────────────────────────────────────────────
-  CSRF_COOKIE_DOMAIN: ".mit.dev"
-  SESSION_COOKIE_DOMAIN: ".mit.dev"
+  # Scoped to .learn, not the whole root domain. These cookies use Django's
+  # default names, so at .mit.dev the browser sent mit-learn's csrftoken and
+  # sessionid to every sibling app -- each of which sets its own cookie of the
+  # same name. Two same-named cookies reach the app, and the two sides read
+  # different ones: JS that walks document.cookie takes the first match, while
+  # Django's request.COOKIES dict keeps the last. ocw-studio's publish and
+  # logout POSTs failed CSRF intermittently because of exactly that.
+  #
+  # .learn still covers both of mit-learn's own hosts, learn and api.learn
+  # (and ai.learn, as before), which are also its only CSRF_TRUSTED_ORIGINS.
+  # Nothing needs these at mitxonline: that integration is served under
+  # api.learn.mit.dev/mitxonline/* and keeps its session on the learn host.
+  #
+  # MITOL_COOKIE_DOMAIN below is deliberately left alone -- it carries a
+  # distinctly named cookie (mitlearn-auth), so it collides with nothing.
+  CSRF_COOKIE_DOMAIN: ".learn.mit.dev"
+  SESSION_COOKIE_DOMAIN: ".learn.mit.dev"
   MITOL_COOKIE_NAME: "mitlearn-auth"
   MITOL_COOKIE_DOMAIN: ".mit.dev"
   CSRF_TRUSTED_ORIGINS: '["https://learn.mit.dev","https://api.learn.mit.dev"]'
