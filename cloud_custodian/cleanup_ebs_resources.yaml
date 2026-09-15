@@ -27,12 +27,20 @@ policies:
   description: |
     Delete unattached EBS volumes whose cleanup mark has matured.
 
-    The `available` re-check is not redundant with the mark: a volume can be
-    attached again between being marked and the mark coming due, and the
-    `marked-for-op` filter only reads the tag. Without this the policy would
-    attempt to delete a volume that is back in service. `delete` is used
-    without `force` on purpose -- force detaches the volume first, which would
-    turn that race into data loss instead of a skipped resource.
+    Every exclusion from find-and-mark-orphaned-ebs-volumes is reapplied here,
+    the same way perform-packer-sg-cleanup re-checks its discovery conditions.
+    The mark is 30 days old by the time this fires and `marked-for-op` only
+    reads the tag, so anything that changed in between -- the volume being
+    attached again, or gaining an ownership tag that would have excluded it
+    from marking -- has to be caught at this point or not at all. These are
+    safety invariants, not just discovery criteria.
+
+    Volume age is deliberately not re-checked: it only ever increases, so a
+    volume that was old enough to mark is still old enough to delete.
+
+    `delete` is used without `force` on purpose -- force detaches the volume
+    first, which would turn the reattachment race into data loss instead of a
+    skipped resource.
   filters:
   - and:
     - type: marked-for-op
@@ -41,5 +49,18 @@ policies:
     - type: value
       key: State
       value: available
+    - type: value
+      key: 'tag:OU'
+      op: ne
+      value: 'ike'
+    - type: value
+      key: 'tag:KubernetesCluster'
+      value: absent
+    - type: value
+      key: 'tag:ebs.csi.aws.com/cluster'
+      value: absent
+    - type: value
+      key: 'tag:pulumi_managed'
+      value: absent
   actions:
   - delete
