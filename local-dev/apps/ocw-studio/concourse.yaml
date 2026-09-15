@@ -1,0 +1,243 @@
+---
+# ─────────────────────────────────────────────────────────────
+# Concourse (web + worker)
+#
+# ocw-studio pushes pipeline definitions here; the pipelines clone site content
+# from git, build it with the OCW hugo themes, and write the result into the
+# preview/publish buckets. Without Concourse, Studio edits content but can
+# never publish, so it is part of the app rather than optional extra.
+#
+# Web and worker share a pod on purpose. Concourse's TSA authenticates workers
+# with an SSH keypair that both halves must agree on, and compose generated it
+# into a shared volume. A single pod gives the same shared emptyDir plus a
+# loopback TSA connection, without needing a Job with RBAC to mint a Secret.
+#
+# The worker is the one privileged workload in local-dev. It runs its own
+# containerd to execute pipeline task containers, which means nesting a
+# container runtime inside the k3s node container. If pipeline tasks fail to
+# start, that nesting is the first thing to suspect — see the ocw-studio
+# troubleshooting notes in local-dev/README.md.
+# ─────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocwstudio-concourse
+  namespace: ocw-studio
+  labels:
+    app: ocwstudio
+    component: concourse
+spec:
+  replicas: 1
+  # The worker owns local state on disk that a second copy would fight over.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ocwstudio
+      component: concourse
+  template:
+    metadata:
+      labels:
+        app: ocwstudio
+        component: concourse
+    spec:
+      initContainers:
+        # Same keys.sh the compose stack ran, inlined. Regenerated on every
+        # pod start: they authenticate the worker to the web in this pod only,
+        # and nothing outside it ever sees them.
+      - name: concourse-keys
+        image: gotechnies/alpine-ssh:latest
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          set -eu
+          cd /concourse-keys
+          for key in session_signing_key tsa_host_key worker_key; do
+            ssh-keygen -t rsa -b 4096 -m PEM -f "${key}" -q -N ""
+          done
+          cp worker_key.pub authorized_worker_keys
+          chmod 600 authorized_worker_keys
+          echo "concourse keys generated"
+        volumeMounts:
+        - name: concourse-keys
+          mountPath: /concourse-keys
+
+        # Creates its own database rather than waiting for the Studio pod to
+        # do it. The CNPG cluster's postInitSQL only runs when the cluster is
+        # first bootstrapped, so on any existing cluster nothing else will have
+        # created it -- and making Concourse wait on another pod's init
+        # container would be an ordering dependency Kubernetes does not express.
+        # Idempotent, so both pods racing here is fine.
+      - name: create-database
+        image: postgres:18-alpine
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          set -eu
+          export PGPASSWORD=localdev  # pragma: allowlist secret
+          PSQL="psql -h local-pg-rw.local-infra.svc.cluster.local -U app -d postgres -tAc"
+          until $PSQL "SELECT 1" >/dev/null 2>&1; do
+            echo "waiting for postgres..."
+            sleep 2
+          done
+          if [ "$($PSQL "SELECT 1 FROM pg_database WHERE datname='concourse'")" = "1" ]; then
+            echo "concourse database exists"
+          else
+            echo "creating concourse database"
+            $PSQL "CREATE DATABASE concourse OWNER app" || true
+          fi
+
+      containers:
+      - name: web
+        image: concourse/concourse:7.14
+        args: ["web"]
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 2222
+          name: tsa
+        env:
+        - name: CONCOURSE_SESSION_SIGNING_KEY
+          value: /concourse-keys/session_signing_key
+        - name: CONCOURSE_TSA_AUTHORIZED_KEYS
+          value: /concourse-keys/authorized_worker_keys
+        - name: CONCOURSE_TSA_HOST_KEY
+          value: /concourse-keys/tsa_host_key
+        - name: CONCOURSE_POSTGRES_HOST
+          value: local-pg-rw.local-infra.svc.cluster.local
+        - name: CONCOURSE_POSTGRES_USER
+          value: app
+        - name: CONCOURSE_POSTGRES_PASSWORD
+          value: localdev  # pragma: allowlist secret
+        - name: CONCOURSE_POSTGRES_DATABASE
+          value: concourse
+        - name: CONCOURSE_POSTGRES_SSLMODE
+          value: disable
+        # Must match what Studio puts in pipeline definitions and what the
+        # browser uses, or build links in the UI point nowhere.
+        - name: CONCOURSE_EXTERNAL_URL
+          value: https://concourse.ocw.mit.dev
+        - name: CONCOURSE_ADD_LOCAL_USER
+          value: test:test  # pragma: allowlist secret
+        - name: CONCOURSE_MAIN_TEAM_LOCAL_USER
+          value: test
+        - name: CONCOURSE_CLUSTER_NAME
+          value: ocw-local-dev
+        # Studio embeds build pages in an iframe.
+        - name: CONCOURSE_X_FRAME_OPTIONS
+          value: allow
+        - name: CONCOURSE_CONTENT_SECURITY_POLICY
+          value: "*"
+        - name: CONCOURSE_ENABLE_PIPELINE_INSTANCES
+          value: "true"
+        - name: CONCOURSE_ENABLE_ACROSS_STEP
+          value: "true"
+        # Short grace periods: local disk is scarce and nobody is forensically
+        # examining a failed local build hours later.
+        - name: CONCOURSE_GC_ONE_OFF_GRACE_PERIOD
+          value: 5m
+        - name: CONCOURSE_GC_FAILED_GRACE_PERIOD
+          value: 5m
+        - name: CONCOURSE_GC_MISSING_GRACE_PERIOD
+          value: 5m
+        - name: CONCOURSE_GC_HIJACK_GRACE_PERIOD
+          value: 5m
+        volumeMounts:
+        - name: concourse-keys
+          mountPath: /concourse-keys
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 4Gi
+        readinessProbe:
+          httpGet:
+            path: /api/v1/info
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          failureThreshold: 12
+
+      - name: worker
+        image: concourse/concourse:7.14
+        args: ["worker"]
+        # Concourse's worker starts containerd and creates containers; there is
+        # no unprivileged way to do that.
+        securityContext:
+          privileged: true
+        # SIGUSR2 asks the worker to retire rather than drop its containers on
+        # the floor, matching the compose stop_signal.
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "kill -USR2 1 || true"]
+        env:
+        # Loopback: the web container's TSA is in this same pod.
+        - name: CONCOURSE_TSA_HOST
+          value: 127.0.0.1:2222
+        - name: CONCOURSE_TSA_PUBLIC_KEY
+          value: /concourse-keys/tsa_host_key.pub
+        - name: CONCOURSE_TSA_WORKER_PRIVATE_KEY
+          value: /concourse-keys/worker_key
+        - name: CONCOURSE_RUNTIME
+          value: containerd
+        - name: CONCOURSE_WORK_DIR
+          value: /worker-state
+        # naive rather than overlay: the worker's filesystem is already an
+        # overlay (container on k3s node container on the host), and stacking
+        # another overlay mount on top of that is not supported everywhere.
+        # naive copies instead of layering — slower, but it works anywhere.
+        - name: CONCOURSE_BAGGAGECLAIM_DRIVER
+          value: naive
+        - name: CONCOURSE_CONTAINERD_MAX_CONTAINERS
+          value: "0"
+        # Pipeline task containers need to reach the object store and the
+        # Studio API by cluster DNS.
+        - name: CONCOURSE_CONTAINERD_ALLOW_HOST_ACCESS
+          value: "true"
+        - name: CONCOURSE_CONTAINERD_DNS_PROXY_ENABLE
+          value: "true"
+        volumeMounts:
+        - name: concourse-keys
+          mountPath: /concourse-keys
+        - name: worker-state
+          mountPath: /worker-state
+        # Sized for the configured build concurrency, not for an idle
+        # worker. Every pipeline task runs in this one pod's containerd, so
+        # OCW_MASS_BUILD_MAX_IN_FLIGHT parallel Hugo builds all draw on this
+        # single limit -- at the default of 40, a few hundred MB each adds up
+        # well past a handful of GB. The host this targets has far more to
+        # spare than the old 4Gi cap assumed, and an under-sized cap here shows
+        # up as builds failing on template timeouts rather than as an obvious
+        # OOM, so it is worth being generous.
+        resources:
+          requests:
+            cpu: "2"
+            memory: 2Gi
+          limits:
+            memory: 24Gi
+
+      volumes:
+      - name: concourse-keys
+        emptyDir: {}
+      - name: worker-state
+        emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ocwstudio-concourse
+  namespace: ocw-studio
+  labels:
+    app: ocwstudio
+    component: concourse
+spec:
+  selector:
+    app: ocwstudio
+    component: concourse
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http

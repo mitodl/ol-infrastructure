@@ -1,0 +1,79 @@
+---
+# Per-developer overrides for ocw-studio. Copy to app-env.local.yaml (which is
+# gitignored) and fill in what you need; keys here win over app-env.yaml and
+# the tracked Secret, because the deployment lists this ConfigMap last in
+# every envFrom.
+#
+# Migrating from the docker-compose setup? Most of your .env carries over, but
+# leave behind the bucket names, AWS/MinIO credentials, CONCOURSE_* and the
+# *_URL settings: the tracked config already has values correct for the
+# cluster, and the compose ones point at localhost and the old static IPs.
+#
+# See "Local Configuration Overrides" in local-dev/README.md.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocwstudio-env-local
+  namespace: ocw-studio
+data:
+  # ── A git host you can actually push to ───────────────────────────────────
+  # Required before anything can publish: publishing commits site content to a
+  # real repo, then asks Concourse to build from it.
+  #
+  # GitHub:
+  # GIT_ORGANIZATION: "my-github-org"
+  # GIT_TOKEN: "ghp_..."
+  # GITHUB_APP_ID: "123456"
+  # GITHUB_APP_PRIVATE_KEY: |
+  #   -----BEGIN RSA PRIVATE KEY-----  # pragma: allowlist secret
+  #   ...
+  # GITHUB_WEBHOOK_KEY: "..."
+  #
+  # GitLab (needs CONTENT_SYNC_BACKEND switched over too):
+  # CONTENT_SYNC_BACKEND: "content_sync.backends.gitlab.GitlabBackend"
+  # GIT_DOMAIN: "gitlab.com"
+  # GIT_API_URL: "https://gitlab.com"
+  # GIT_ORGANIZATION: "my-group"
+  # GIT_TOKEN: "glpat-..."
+
+  # ── Turn publishing off ───────────────────────────────────────────────────
+  # Empty disables the publish pipeline, so Studio edits content but never
+  # contacts Concourse.
+  # CONTENT_SYNC_PIPELINE_BACKEND: ""
+
+  # ── Google Drive sync ─────────────────────────────────────────────────────
+  # DRIVE_SERVICE_ACCOUNT_CREDS: '{"type": "service_account", ...}'
+  # DRIVE_SHARED_ID: "..."
+  # DRIVE_UPLOADS_PARENT_FOLDER_ID: "..."
+  # DRIVE_VIDEO_UPLOADS_PARENT_FOLDER_ID: "..."
+
+  # ── 3Play captions / transcripts ──────────────────────────────────────────
+  # THREEPLAY_API_KEY: "..."
+  # THREEPLAY_CALLBACK_KEY: "..."
+  # THREEPLAY_PROJECT_ID: "2"
+
+  # ── PostHog ───────────────────────────────────────────────────────────────
+  # Off in the tracked config because it carries no project keys. PUBLISH_* is
+  # the one baked into built sites by the theme pipeline.
+  # POSTHOG_ENABLED: "true"
+  # POSTHOG_PROJECT_API_KEY: "phc_..."  # pragma: allowlist secret
+  # PUBLISH_POSTHOG_ENABLED: "true"
+  # PUBLISH_POSTHOG_PROJECT_API_KEY: "phc_..."  # pragma: allowlist secret
+
+  # ── Open catalog webhooks (back into MIT Learn) ───────────────────────────
+  # OPEN_CATALOG_URLS: "https://api.learn.mit.dev/api/v1/ocw_next_webhook/"
+  # OPEN_CATALOG_WEBHOOK_KEY: "..."
+
+  # ── YouTube upload ────────────────────────────────────────────────────────
+  # YT_CLIENT_ID: "..."
+  # YT_CLIENT_SECRET: "..."
+  # YT_REFRESH_TOKEN: "..."
+  # YT_PROJECT_ID: "..."
+
+  # ── Error reporting ───────────────────────────────────────────────────────
+  # SENTRY_DSN: "https://...@sentry.io/..."
+  # OCW_HUGO_THEMES_SENTRY_DSN: "https://...@sentry.io/..."
+
+  # ── Noisier logs ──────────────────────────────────────────────────────────
+  # OCW_STUDIO_LOG_LEVEL: "DEBUG"
+  # LOG_LEVEL: "DEBUG"

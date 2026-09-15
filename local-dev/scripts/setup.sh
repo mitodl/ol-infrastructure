@@ -42,6 +42,17 @@ HOSTS=(
     "mitxonline.${ROOT_DOMAIN}"
     # odl-video-service
     "video.odl.${ROOT_DOMAIN}"
+    # ocw-studio: the CMS, the draft/live/test published-site hosts, and
+    # Concourse. Added unconditionally -- a hosts entry for an app you have
+    # not enabled costs nothing, and the Tiltfile's startup DNS probe only
+    # checks sso.ol.
+    "studio.ocw.${ROOT_DOMAIN}"
+    "draft.ocw.${ROOT_DOMAIN}"
+    "live.ocw.${ROOT_DOMAIN}"
+    "test.ocw.${ROOT_DOMAIN}"
+    "concourse.ocw.${ROOT_DOMAIN}"
+    # Shared S3-compatible object store (RustFS), deployed with ocw-studio
+    "s3.${ROOT_DOMAIN}"
     # Keycloak SSO
     "sso.ol.${ROOT_DOMAIN}"
     # Mailpit (captured outbound email)
@@ -65,6 +76,7 @@ MKCERT_DOMAINS=(
     "*.mitxonline.${ROOT_DOMAIN}"
     "*.ol.${ROOT_DOMAIN}"             # sso.ol.*
     "*.odl.${ROOT_DOMAIN}"            # video.odl.*
+    "*.ocw.${ROOT_DOMAIN}"            # studio.ocw.*, draft.ocw.*
 )
 
 # Output cert files (mkcert names them from the first domain, replacing * with _)

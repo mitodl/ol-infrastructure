@@ -192,7 +192,11 @@ Edit `tilt_config.json`:
 }
 ```
 
-Only the listed apps will be deployed. Shared infrastructure always runs.
+Only the listed apps will be deployed. Shared infrastructure always runs, with one
+exception: the RustFS object store is deployed only when an app that needs it is
+enabled, because it is too heavy to run for developers who have no use for it. The
+Tiltfile forwards `enabled_apps` to both Pulumi stacks as `LOCAL_DEV_ENABLED_APPS`
+so they can make that call.
 
 ### Test accounts
 
@@ -349,7 +353,7 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `enabled_apps` | all four | Apps to deploy. Omit any to skip it entirely. |
+| `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). |
 | `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
@@ -555,23 +559,141 @@ The realm, clients, and seeded users live in Postgres and are untouched by the i
 
 Why an image at all: Keycloak runs `--optimized`, and an optimized Keycloak refuses to start when a jar in `providers/` differs from the one it was built against, so the theme cannot be copied into the running pod. The Dockerfile (`local-dev/keycloak/Dockerfile`) starts from the same `mitodl/keycloak` digest the core stack defaults to (the script reads it from `local-dev/infra/core/__main__.py`) and reruns `kc.sh build` with the flags from `Dockerfile.hosted` in [ol-keycloak](https://github.com/mitodl/ol-keycloak); when bumping the digest, check those flags still match.
 
-### Custom S3 Storage (MinIO / RustFS)
+### S3 Storage (RustFS)
 
-The local-dev stack doesn't include S3 storage by default. To add it:
+The stack runs [RustFS](https://rustfs.com), an S3-compatible object store, as the
+local stand-in for AWS S3. It is the maintained replacement for MinIO, whose community
+server is effectively frozen.
 
-**Option 1: Use external MinIO instance** — Run MinIO on your host and point apps at it via their gitignored `app-env.local.yaml` (see [Local Configuration Overrides](#local-configuration-overrides)):
+It is **not** deployed by default. The core Pulumi stack brings it up only when
+`enabled_apps` contains an app listed in `OBJECT_STORE_APPS`
+(`local-dev/infra/modules/objectstore.py`), which today means `ocw-studio`.
+
+Two addresses, and apps generally need both:
+
+| From | Address |
+|------|---------|
+| Inside the cluster (boto3, the site-host nginx) | `http://rustfs.local-infra.svc.cluster.local:9000` |
+| A browser (media URLs, presigned links) | `https://s3.mit.dev` |
+
+Credentials are the fixed local-dev pair `localdevaccess` / `localdevsecret123`,
+defined in `objectstore.py` and repeated in each app's `secrets.yaml`.
+
+A bootstrap Job creates the buckets and grants each one anonymous read with a bucket
+policy. The policy matters: RustFS does not implement S3 ACLs, so the canned
+`public-read` header boto3 sends is accepted and ignored, and a bucket policy is the
+only grant that actually takes effect. Published sites are served with no credentials,
+so without it every page would 403.
+
+To add buckets for another app, extend `OCW_STUDIO_BUCKETS` (or pass your own
+`buckets` tuple) and add the app to `OBJECT_STORE_APPS`.
+
+Removing the last such app from `enabled_apps` tears the object store back down on the
+next reconcile. The objects survive: the StatefulSet's `data-rustfs-0` PVC is not
+garbage collected with it, so re-enabling the app reattaches the same volume and the
+buckets are still there. Delete the PVC as well if you actually want the disk back,
+and note that this does discard the objects:
+
+```bash
+kubectl -n local-infra delete pvc data-rustfs-0
+```
+
+**Using an external MinIO instead** — run it on your host and point an app at it via
+its gitignored `app-env.local.yaml` (see [Local Configuration Overrides](#local-configuration-overrides)):
+
+All three endpoint settings have to move together, or uploads land in one store while
+reads and browser URLs still point at the other:
+
 ```yaml
-AWS_ENDPOINT_URL: "http://host.docker.internal:9000"
+# boto3 and django-storages
+AWS_S3_ENDPOINT_URL: "http://172.17.0.1:9000"
+# generic botocore clients, and the `aws` CLI inside pipeline tasks
+AWS_ENDPOINT_URL: "http://172.17.0.1:9000"
+# what the browser is handed for media URLs, so it must be reachable from there
+AWS_S3_CUSTOM_DOMAIN: "172.17.0.1:9000/ol-ocw-studio-app-local"
 AWS_ACCESS_KEY_ID: "minioadmin"  # pragma: allowlist secret
 AWS_SECRET_ACCESS_KEY: "minioadmin"  # pragma: allowlist secret
 ```
-(Docker Desktop; on Linux use `http://172.17.0.1:9000`.)
 
-**Option 2: Deploy MinIO in-cluster** — Add a MinIO module to the `core` Pulumi stack and patch the ConfigMaps accordingly (see [EXTENDING.md](EXTENDING.md#modifying-shared-infrastructure)).
+### OCW Studio
+
+OCW Studio is the CMS behind OCW: authors edit course content in it, and publishing
+commits that content to git and hands Concourse a pipeline that builds the site and
+writes the result into an S3 bucket. Reproducing that locally needs more moving parts
+than the other apps, which is why it is opt-in:
+
+```json
+{
+  "enabled_apps": ["mit-learn", "ocw-studio"]
+}
+```
+
+Enabling it deploys the object store described above, a Concourse install (web plus a
+privileged worker), the Studio app and its celery worker, and an nginx deployment that
+serves published sites out of the buckets.
+
+| Hostname | What it serves |
+|----------|----------------|
+| `studio.ocw.mit.dev` | Studio itself |
+| `draft.ocw.mit.dev` | the preview bucket — what "Publish draft" writes |
+| `live.ocw.mit.dev` | the publish bucket — what "Publish live" writes |
+| `test.ocw.mit.dev` | the test bucket the pipeline's smoke-test step reads |
+| `concourse.ocw.mit.dev` | the Concourse UI (log in as `test` / `test`) |
+
+Re-run `./local-dev/scripts/setup.sh` after enabling it: those hostnames need
+`/etc/hosts` entries and the TLS cert needs a `*.ocw.<domain>` wildcard, neither of
+which an existing setup has.
+
+**Before publishing anything**, run the `seed-ocw-studio-*` resources from the Tilt UI,
+and give Studio a git host it can push to. There is no usable default: publishing
+commits site content to a real repo, so set `GIT_ORGANIZATION` and `GIT_TOKEN` in
+`local-dev/apps/ocw-studio/configmaps/app-env.local.yaml` (the tracked
+`app-env.local.yaml.example` has the shape for both GitHub and GitLab). To work on
+Studio without publishing at all, set `CONTENT_SYNC_PIPELINE_BACKEND: ""` there —
+editing then works and Concourse is never contacted.
+
+Two things that differ from the other apps:
+
+- **Frontend changes need an image rebuild.** There is no webpack dev server: it needs
+  node, and the app image is Python-only, so there is nothing for Tilt to live-sync JS
+  into. Django reads the bundles baked in by the Dockerfile's `node_builder` stage,
+  which is why this app builds the `production` target. Tilt rebuilds automatically
+  when JS or SCSS changes; it is just slower than a hot reload.
+- **Python changes need a resource restart.** ocw-studio depends on plain `granian`
+  rather than `granian[reload]`, so the app container cannot run with `--reload`. Tilt
+  syncs the code; restart `ocwstudio-webapp` from the Tilt UI to pick it up, the same
+  as the celery workers.
 
 ---
 
 ## Troubleshooting
+
+### OCW Studio pipelines never start a build
+
+The Concourse worker runs its own containerd to execute pipeline tasks, which means a
+container runtime nested inside the k3s node container. It is the only privileged
+workload in local-dev and the first thing to suspect when builds sit pending.
+
+Check the worker registered at all:
+
+```bash
+kubectl -n ocw-studio logs deploy/ocwstudio-concourse -c worker | grep beacon.registered
+```
+
+Then confirm the web half agrees, from the Concourse UI's workers page or:
+
+```bash
+kubectl -n ocw-studio logs deploy/ocwstudio-concourse -c web | grep forward-worker | tail -1
+```
+
+If the worker registers but tasks fail to start, the baggageclaim driver is the usual
+cause. It is set to `naive` in `concourse.yaml` precisely because the worker's
+filesystem is already an overlay and stacking another overlay mount on it is not
+supported everywhere — `naive` copies instead, which is slower but portable. Switching
+it back to `overlay` is a reasonable thing to try on a machine where it works.
+
+Restarting the `ocwstudio-concourse` resource is safe: the TSA keypair is regenerated
+on every pod start and is only ever used inside that pod.
 
 ### `tilt up` fails on `local-infra` (Pulumi errors)
 

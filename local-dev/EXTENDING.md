@@ -35,7 +35,14 @@ In `local-dev/infra/modules/database.py`, add to the `postInitSQL` list:
 
 ### 3. Register the namespace (TLS secret comes with it)
 
-Add `"my-app"` to the `APP_NAMESPACES` tuple in `local-dev/infra/modules/namespaces.py`, and to the matching `app_namespaces` tuple in `local-dev/infra/modules/tls.py` — the latter's loops then create the `local-dev-tls` Secret and mkcert CA ConfigMap in the new namespace automatically.
+Add `"my-app"` to the `APP_NAMESPACES` tuple in `local-dev/infra/modules/namespaces.py`. `tls.py` reads the same list through `app_namespaces_for()`, so the `local-dev-tls` Secret and mkcert CA ConfigMap appear in the new namespace automatically.
+
+If the app brings heavyweight infrastructure with it — an object store, a CI system, anything a developer who is not working on that app should not be paying for — put its name in `OPTIONAL_APP_NAMESPACES` instead. Namespaces listed there are only created when the app appears in `enabled_apps`, which the Tiltfile forwards to both Pulumi stacks as `LOCAL_DEV_ENABLED_APPS`. Gate the expensive resources on the same value; `ocw-studio` and the RustFS object store are the worked example.
+
+Two things not to do:
+
+- Don't add the app's database to the CNPG cluster's `postInitSQL` (step 2) if the app is optional. That block only runs when initdb bootstraps an empty data directory, so it does nothing for anyone who already has a cluster, while still producing a spec diff Pulumi will try to apply to an immutable `initdb` section. Create the database from an init container instead — `local-dev/apps/ocw-studio/deployment.yaml` shows the idempotent pattern.
+- Don't retrofit gating onto the four original apps. Their namespaces and databases are provisioned unconditionally on purpose: changing that would churn Pulumi state on every existing developer's cluster to save a namespace and an empty database.
 
 ### 4. Add the Keycloak OIDC client (if needed)
 

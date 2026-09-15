@@ -74,6 +74,13 @@ def create_database(
                     "database": "app",
                     "owner": "app",
                     "secret": {"name": "pg-app-credentials"},
+                    # Deliberately not extended for optional apps. This block
+                    # only runs when initdb bootstraps an empty data directory,
+                    # so adding a database here would do nothing for anyone who
+                    # already has a cluster -- while still producing a spec diff
+                    # against an immutable initdb section. Apps added after this
+                    # point create their own databases from an init container
+                    # (see local-dev/apps/ocw-studio/deployment.yaml).
                     "postInitSQL": [
                         # Django test runners (and pytest-django) create and
                         # drop a throwaway test database, which requires the
