@@ -382,6 +382,49 @@ def test_a_tie_holds_across_a_long_gap_between_duplicates(tmp_path: Path) -> Non
     assert collapsed == {"Tagged": 2}
 
 
+def test_indexes_are_built_on_the_rebuilt_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`load` builds no indexes in 0.11, so optimize has to run against the new
+    store; anything it defers is surfaced rather than dropped.
+    """
+    calls: list[list[str]] = []
+    optimize_out = {
+        "datasets": [
+            {"type_key": "edge:WorksOn", "pending_indexes": []},
+            {
+                "type_key": "node:Memory",
+                "pending_indexes": [
+                    {
+                        "type_key": "node:Memory",
+                        "property": "embedding",
+                        "reason": "property has no non-null vectors to train on yet",
+                    }
+                ],
+            },
+        ]
+    }
+
+    def fake_run(argv: list[str], **_: Any) -> Any:
+        calls.append(argv)
+        return migrate.subprocess.CompletedProcess(argv, 0, json.dumps(optimize_out))
+
+    monkeypatch.setattr(migrate, "run", fake_run)
+
+    pending = migrate.build_indexes("omnigraph", "s3://b/fmt9/graphs/council.omni")
+
+    assert calls == [
+        [
+            "omnigraph",
+            "optimize",
+            "--store",
+            "s3://b/fmt9/graphs/council.omni",
+            "--json",
+        ]
+    ]
+    assert [p["property"] for p in pending] == ["embedding"]
+
+
 def test_verify_expects_the_collapsed_edge_counts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
