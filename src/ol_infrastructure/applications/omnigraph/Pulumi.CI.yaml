@@ -56,7 +56,7 @@ config:
   # deploy, which repoints the cluster at the old root while the server image
   # can only read the new format — every graph then fails to open and the
   # server crashloops. That is exactly what happened here for ~12h.
-  omnigraph:storage_prefix: fmt6
+  omnigraph:storage_prefix: fmt9
   # Cross-checked against storage_prefix at preview time
   # (validate_internal_schema_version, storage.py) — the two must agree, and
   # __main__.py fails the preview loudly if either is missing or they
@@ -64,6 +64,6 @@ config:
   # second, independently-set value precisely so a slip in one without the
   # other is caught here instead of reaching the cluster as a crash-looping
   # server, same incident this comment already describes above.
-  omnigraph:internal_schema_version: 6
+  omnigraph:internal_schema_version: 9
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagHdMkilOMMReBzl5ZFVAxo4AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMp4JVj0Zbv48c45+qAgEQgDt/KPJs42c+WEXeS2IPS6gVYHOCM2L51SVYdqGNpSII1XjPkxQgj6ypYwhz6wdA7GrvJjK9P89/US3Nww==
