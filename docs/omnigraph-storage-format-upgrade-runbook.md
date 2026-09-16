@@ -235,15 +235,45 @@ pulumi config set omnigraph:migrate_from_image <OLD-image-ref> --stack <CI|QA|Pr
 # Where the rebuild lands. Digits = the NEW internal-schema number.
 # Rejected at preview unless it matches fmt<N>, so a typo cannot arm an outage
 # for a Job that would refuse the root it was given.
-pulumi config set omnigraph:migrate_to_prefix fmt6 --stack <CI|QA|Production>
+pulumi config set omnigraph:migrate_to_prefix fmt<N> --stack <CI|QA|Production>
 
-pulumi up --stack <CI|QA|Production>     # creates the Job; suspends both sweeps
-kubectl -n omnigraph logs -f job/omnigraph-migrate-fmt6
+# ★ TARGETED, NOT A PLAIN `pulumi up` — see the warning below. And a LOCAL run
+# needs the image ref Concourse normally injects: without it the program raises
+# `Either OMNIGRAPH_DOCKER_TAG or OMNIGRAPH_DOCKER_SHA must be set`, and with
+# the wrong value the Job's main container runs the wrong binary. Use the NEW
+# image's digest; `migrate_from_image` above stays the OLD one.
+P=urn:pulumi:<CI|QA|Production>::ol-application-omnigraph
+OMNIGRAPH_DOCKER_SHA=sha256:<NEW-image-digest> pulumi up --stack <CI|QA|Production> \
+  --target "$P::kubernetes:core/v1:ConfigMap::omnigraph-storage-migration-script-<env>" \
+  --target "$P::kubernetes:batch/v1:Job::omnigraph-storage-migration-<env>" \
+  --target "$P::kubernetes:batch/v1:CronJob::omnigraph-cleanup-<env>" \
+  --target "$P::kubernetes:batch/v1:CronJob::omnigraph-optimize-<env>"
+kubectl -n omnigraph logs -f job/omnigraph-migrate-fmt<N>
 ```
 
 The Job is ordered behind the two CronJob suspensions, so it cannot start while
-maintenance is still schedulable. Scaling the Deployment down stays yours —
-Pulumi does not manage the replica count during a migration.
+maintenance is still schedulable. Scaling the Deployment down stays yours.
+
+★ **TARGET THE APPLY. A plain `pulumi up` here will undo your scale-down.**
+`data_tier.py` declares `replicas=1` with no `ignore_changes`, so an untargeted
+apply scales the tier back to 1 in the middle of the outage — starting a binary
+that reads only the NEW format against the OLD root, which is the mixed-writer
+case this whole procedure exists to prevent. (This section used to claim Pulumi
+does not manage the replica count during a migration. It does. Found during the
+CI cutover on 2026-09-16, by previewing before applying.) Targeting also steps
+around the `cluster-apply` Job, which runs the NEW image and fails against the
+old root until `storage_prefix` flips — the Deployment `depends_on` it, so an
+untargeted apply reports failure there anyway.
+
+★ **Pause `pulumi-witan` as well as `pulumi-omnigraph`, and suspend the two
+witan writers by hand.** `witan-ci-indexer` and `witan-view-reaper` live in the
+`witan` namespace, are not managed by this stack, and the witan pipeline
+un-suspends them:
+
+```shell
+kubectl -n witan patch cronjob witan-ci-indexer  -p '{"spec":{"suspend":true}}'
+kubectl -n witan patch cronjob witan-view-reaper -p '{"spec":{"suspend":true}}'
+```
 
 **Two config knobs, and the distinction is the point.**
 `migrate_to_prefix` is where the rebuild WRITES. `storage_prefix` is what the
@@ -619,6 +649,19 @@ Set the prefix — the same one `$NEW_ROOT` names, without the `s3://<bucket>/`
 cd src/ol_infrastructure/applications/omnigraph
 pulumi config set omnigraph:storage_prefix fmt5 --stack <CI|QA|Production>
 pulumi config set omnigraph:internal_schema_version 5 --stack <CI|QA|Production>
+```
+
+★ **Check the commit reached `origin/main`, and check it by reading the remote
+— not by the push's exit code.** A pre-commit hook (`yamlfmt`) can modify the
+stack file and abort the commit while `git push HEAD:main` still reports
+success, because it pushed the unchanged head. That leaves the old prefix on
+main with the new format live, which is the outage described above waiting for
+the next pipeline deploy. Also read the diff before committing: `pulumi config
+set` rewrites the value as a quoted string and re-indents unrelated blocks.
+
+```shell
+git show origin/main:src/ol_infrastructure/applications/omnigraph/Pulumi.<env>.yaml \
+  | grep -E 'storage_prefix|internal_schema_version'
 ```
 
 Both are required, both a `pulumi preview` fails loudly on if missing or if
