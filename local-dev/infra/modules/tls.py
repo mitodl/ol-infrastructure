@@ -73,7 +73,13 @@ def create_tls_resources(
         "local-dev-tls-operations", "operations", namespaces["operations"]
     )
 
-    app_namespaces = ("mit-learn", "learn-ai", "mitxonline", "odl-video-service")
+    app_namespaces = (
+        "mit-learn",
+        "learn-ai",
+        "mitxonline",
+        "odl-video-service",
+        "openedx",
+    )
     app_tls_secrets = {
         ns: _tls_secret(f"local-dev-tls-{ns}", ns, namespaces[ns])
         for ns in app_namespaces
