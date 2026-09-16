@@ -540,6 +540,26 @@ def test_every_node_precedes_every_edge_across_batches(tmp_path: Path) -> None:
     assert seen_edge
 
 
+def test_batch_numbering_continues_across_the_node_and_edge_groups(
+    tmp_path: Path,
+) -> None:
+    """The two groups are written by separate passes, so their numbering has to
+    share a counter: restarting it for the edges would have edge batches
+    reopening the node batch files and silently dropping every node row.
+    """
+    export = _export(
+        tmp_path, nodes=migrate.KEYED_ROW_CAP + 10, edges=migrate.KEYED_ROW_CAP + 10
+    )
+
+    batches = migrate.chunk_export(export)
+
+    assert len(batches) == len({b.name for b in batches}), "a batch file was reused"
+    total = sum(
+        len([ln for ln in b.read_text().splitlines() if ln.strip()]) for b in batches
+    )
+    assert total == 2 * (migrate.KEYED_ROW_CAP + 10)
+
+
 def test_a_format_that_did_not_move_is_reported() -> None:
     """Both images on one format means the outage bought nothing — or the wrong
     image was named as migrate_from_image.

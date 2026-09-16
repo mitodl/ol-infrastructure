@@ -42,6 +42,7 @@ import shutil
 import subprocess
 import sys
 from collections import Counter
+from collections.abc import Iterable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -245,18 +246,22 @@ def chunk_export(export: Path) -> list[Path]:
 
     Returns the original path unchanged when nothing needs splitting, so the
     common case stays a single load with no temporary files.
+
+    STREAMED, for the same reason ``normalize_export`` is: holding the rows
+    while deciding how to group them puts a whole graph's export in memory
+    inside a 4 GiB container, which is the failure this chunking exists to
+    prevent rather than one it should introduce. The first pass counts rows
+    per table and keeps no bodies; the two that follow re-read the file and
+    write each row straight into the batch it belongs to. Peak memory is one
+    line and the per-table counters, whatever the export weighs.
     """
-    nodes: list[str] = []
-    edges: list[str] = []
     per_table: Counter[str] = Counter()
     with export.open() as fh:
         for line in fh:
             if not line.strip():
                 continue
             record = json.loads(line)
-            table = record.get("type") or record.get("edge") or ""
-            per_table[table] += 1
-            (nodes if "type" in record else edges).append(line)
+            per_table[record.get("type") or record.get("edge") or ""] += 1
 
     if not per_table or max(per_table.values()) <= LOAD_ROW_BATCH:
         return [export]
@@ -267,12 +272,51 @@ def chunk_export(export: Path) -> list[Path]:
         KEYED_ROW_CAP,
     )
     batches: list[Path] = []
-    for group in (nodes, edges):
-        for start in range(0, len(group), LOAD_ROW_BATCH):
-            part = export.with_name(f"{export.stem}.{len(batches):03d}.jsonl")
-            part.write_text("".join(group[start : start + LOAD_ROW_BATCH]))
-            batches.append(part)
+    # Nodes first, then edges — two separate passes so the ordering above
+    # holds without either group being buffered to achieve it.
+    for nodes_wanted in (True, False):
+        _write_batches(_rows_of_kind(export, nodes=nodes_wanted), export, batches)
     return batches
+
+
+def _rows_of_kind(export: Path, *, nodes: bool) -> Iterator[str]:
+    """Yield the export's node rows (``nodes=True``) or its edge rows.
+
+    A node row is the one that carries a top-level ``type``; an edge row names
+    its type under ``edge``. Re-reading the file per group costs one extra
+    parse per line and saves holding either group.
+    """
+    with export.open() as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            if ("type" in json.loads(line)) is nodes:
+                yield line
+
+
+def _write_batches(rows: Iterable[str], export: Path, batches: list[Path]) -> None:
+    """Append ``rows`` to numbered batch files of ``LOAD_ROW_BATCH`` rows each.
+
+    ``batches`` is appended to rather than returned so the numbering continues
+    across both groups: the loader runs them in list order, and a restarted
+    count would have edge batches overwriting node ones.
+    """
+    handle = None
+    written = 0
+    try:
+        for line in rows:
+            if handle is None or written == LOAD_ROW_BATCH:
+                if handle is not None:
+                    handle.close()
+                part = export.with_name(f"{export.stem}.{len(batches):03d}.jsonl")
+                handle = part.open("w")
+                batches.append(part)
+                written = 0
+            handle.write(line)
+            written += 1
+    finally:
+        if handle is not None:
+            handle.close()
 
 
 # `edge Name: From -> To` with an optional `{ ... }` body. omnigraph 0.11 only
