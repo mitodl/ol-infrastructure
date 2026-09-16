@@ -1171,11 +1171,15 @@ edxapp_fastly_service = fastly.ServiceVcl(
             content=textwrap.dedent(
                 """\
                 if (req.url.path ~ "^/asset-v1:") {
-                  # Fetch snippets run ahead of the default Set-Cookie and
-                  # Cache-Control checks, so apply them before returning early.
-                  if (beresp.http.Set-Cookie || beresp.http.Cache-Control ~ "(?:private|no-store)") {
+                  # Fetch snippets run ahead of the default Cache-Control
+                  # checks, so apply them before returning early.
+                  if (beresp.http.Cache-Control ~ "(?:private|no-store)") {
                     return (pass);
                   }
+                  # The LMS attaches a session cookie to responses for new
+                  # visitors, which asset downloads don't need. Drop it so
+                  # public assets stay cacheable.
+                  unset beresp.http.Set-Cookie;
                   set beresp.ttl = 30s;
                   return (deliver);
                 }
