@@ -5,7 +5,7 @@ the cert+key into every namespace that needs TLS termination, and distributes
 the mkcert root CA so containers can trust local HTTPS endpoints (e.g. Keycloak).
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +13,7 @@ import pulumi_kubernetes as k8s
 from pulumi import ResourceOptions
 
 from .helpers import read_file_b64
+from .namespaces import app_namespaces_for
 
 
 @dataclass
@@ -33,6 +34,7 @@ def create_tls_resources(
     cert_path: Path,
     key_path: Path,
     ca_cert_path: Path,
+    enabled_apps: Iterable[str] = (),
 ) -> TlsResources:
     """Create TLS secrets and CA ConfigMaps in all required namespaces."""
     tls_cert_b64 = read_file_b64(cert_path)
@@ -73,7 +75,7 @@ def create_tls_resources(
         "local-dev-tls-operations", "operations", namespaces["operations"]
     )
 
-    app_namespaces = ("mit-learn", "learn-ai", "mitxonline", "odl-video-service")
+    app_namespaces = app_namespaces_for(enabled_apps)
     app_tls_secrets = {
         ns: _tls_secret(f"local-dev-tls-{ns}", ns, namespaces[ns])
         for ns in app_namespaces

@@ -26,6 +26,7 @@ declare -A APP_NAMESPACE=(
     [learn-ai]="learn-ai"
     [mitxonline]="mitxonline"
     [odl-video-service]="odl-video-service"
+    [ocw-studio]="ocw-studio"
 )
 
 declare -A APP_DEPLOY=(
@@ -33,6 +34,7 @@ declare -A APP_DEPLOY=(
     [learn-ai]="learnai-webapp"
     [mitxonline]="mitxonline-webapp"
     [odl-video-service]="odlvideo-webapp"
+    [ocw-studio]="ocwstudio-webapp"
 )
 
 # Default seed commands run when --app is given without --cmd.
@@ -55,6 +57,14 @@ python manage.py configure_instance"
 
     [odl-video-service]="python manage.py migrate --noinput
 python manage.py createpresets"
+
+    # No migrate: the ocw-studio deployment runs it in an init container.
+    # The superuser is what a Keycloak login associates to by email, so
+    # without it the first login lands as an unprivileged new user.
+    [ocw-studio]="python manage.py createsuperuser --noinput --username admin --email admin@odl.local --name Admin
+python manage.py backpopulate_groups
+python manage.py import_website_starters https://github.com/mitodl/ocw-hugo-projects
+python manage.py upsert_theme_assets_pipeline"
 )
 
 # ---------------------------------------------------------------------------

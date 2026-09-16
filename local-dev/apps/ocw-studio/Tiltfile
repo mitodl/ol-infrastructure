@@ -1,0 +1,92 @@
+# ocw-studio Tiltfile
+# When the sibling ocw-studio repo is not checked out, Tilt uses the prebuilt
+# DockerHub image (mitodl/ocw-studio-app) without attempting a local build.
+
+load("../../tiltlib.star", "k8s_yaml_local")
+
+workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
+APP_DIR = os.path.join(workspace_root, "ocw-studio")
+IMAGE = 'mitodl/ocw-studio-app'
+NAMESPACE = 'ocw-studio'
+DEPLOY_NAME = 'ocwstudio-webapp'
+
+if os.path.exists(os.path.join(APP_DIR, '.git')):
+    docker_build(
+        IMAGE,
+        context=APP_DIR,
+        dockerfile=APP_DIR + '/Dockerfile',
+        # The production target, not development: it is the only one that runs
+        # the node_builder stage, and without those bundles Studio renders an
+        # unstyled page with no JS. The cost is that JS/SCSS edits rebuild the
+        # image instead of hot-reloading — see the ocw-studio section of
+        # local-dev/README.md.
+        target='production',
+        live_update=[
+            sync(APP_DIR + '/main', '/src/main'),
+            sync(APP_DIR + '/content_sync', '/src/content_sync'),
+            sync(APP_DIR + '/websites', '/src/websites'),
+            sync(APP_DIR + '/users', '/src/users'),
+            sync(APP_DIR + '/videos', '/src/videos'),
+            sync(APP_DIR + '/gdrive_sync', '/src/gdrive_sync'),
+            sync(APP_DIR + '/news', '/src/news'),
+            sync(APP_DIR + '/localdev', '/src/localdev'),
+            sync(APP_DIR + '/external_resources', '/src/external_resources'),
+            sync(APP_DIR + '/ocw_import', '/src/ocw_import'),
+            sync(APP_DIR + '/templates', '/src/templates'),
+            run(
+                'cd /src && uv sync --frozen',
+                trigger=[APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock'],
+            ),
+        ],
+    )
+
+k8s_yaml_local([
+    'configmaps/app-env.yaml',
+    'configmaps/nginx.yaml',
+    'secrets.yaml',
+    'deployment.yaml',
+    'apisix-routes.yaml',
+], local_overrides='configmaps/app-env.local.yaml')
+
+# Concourse is applied on its own, deliberately. k8s_yaml_local stamps every
+# Deployment in a call with a fingerprint of every ConfigMap and Secret in that
+# same call, so bundling it with the app meant each app config edit rolled
+# Concourse too -- and since it is a Recreate deployment, that is a hard outage
+# that kills running builds and 503s the UI. It reads none of those ConfigMaps;
+# all of its env is inline below, so nothing is lost by isolating it.
+k8s_yaml_local(['concourse.yaml'])
+
+k8s_resource(
+    DEPLOY_NAME,
+    port_forwards=['8043:8043'],
+    labels=['ocw-studio'],
+    # local-infra-apps is what writes the ol-ocw-studio-oidc Secret this
+    # deployment mounts, so starting earlier just crash-loops on a missing
+    # secret.
+    resource_deps=['local-infra-apps'],
+)
+
+k8s_resource('ocwstudio-celery', labels=['ocw-studio'], resource_deps=['local-infra-apps'])
+
+# objects= is explicit on purpose. Left to its own devices Tilt groups every
+# ConfigMap in the applied YAML onto the first workload that references one,
+# which put the site-host nginx config behind the Studio image build -- so the
+# published sites stayed down until an unrelated build finished. Naming them
+# here keeps the two lifecycles genuinely independent.
+k8s_resource(
+    'ocwstudio-sitehost',
+    objects=[
+        'ocwstudio-sitehost-conf:configmap',
+        'ocwstudio-sites-route:apisixroute',
+    ],
+    labels=['ocw-studio'],
+    resource_deps=['local-infra-core'],
+)
+
+k8s_resource(
+    'ocwstudio-concourse',
+    objects=['ocwstudio-concourse-route:apisixroute'],
+    port_forwards=['8080:8080'],
+    labels=['ocw-studio'],
+    resource_deps=['local-infra-core'],
+)
