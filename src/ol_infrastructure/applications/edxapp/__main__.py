@@ -1171,6 +1171,11 @@ edxapp_fastly_service = fastly.ServiceVcl(
             content=textwrap.dedent(
                 """\
                 if (req.url.path ~ "^/asset-v1:") {
+                  # Fetch snippets run ahead of the default Set-Cookie and
+                  # Cache-Control checks, so apply them before returning early.
+                  if (beresp.http.Set-Cookie || beresp.http.Cache-Control ~ "(?:private|no-store)") {
+                    return (pass);
+                  }
                   set beresp.ttl = 30s;
                   return (deliver);
                 }
