@@ -317,6 +317,10 @@ It also **suspends `optimize` and `cleanup`** for the duration, because both
 write directly to the store and scaling the Deployment to zero does not stop
 them. Clearing `migrate_from_image` resumes them in the same `pulumi up`.
 
+After loading each graph it runs `optimize` against the new store, because
+`load` builds no indexes (see step 4). Anything optimize defers is logged as
+`indexes deferred by optimize`, not treated as a failure.
+
 It verifies two things before reporting success: per-table row counts match for
 every graph, and the storage format actually moved — to one version, the same
 across all of them. A format that did not change means either the two images
@@ -664,6 +668,34 @@ done
 and is the safe choice — `overwrite` is destructive and buys nothing here.
 `--yes` is required because a non-local destructive write refuses without a TTY.
 
+Then build the indexes. **`load` creates none**: from omnigraph 0.11 every write
+path defers index builds, and `optimize` is the only command that creates them.
+A rebuilt root without this serves correct results, but every traversal on a
+large enough edge table falls back to a full edge scan per hop. That is what
+Production's council did after the 2026-09-16 fmt9 cutover, logging
+`indexed traversal falls back to a full edge scan ... edge=WorksOn
+key_col="__src" reason=no BTREE index on '__src'` about 1.6 times a minute.
+The nightly `omnigraph-optimize` CronJob would eventually build them, but it is
+suspended for the migration and its next tick can be most of a day away.
+
+```shell
+for g in $(cat /tmp/graph-ids.txt); do
+  echo "== $g"
+  out=$(omnigraph optimize --store "$NEW_ROOT/graphs/$g.omni" --json) \
+    || { echo "!!! optimize FAILED for $g: do not cut over"; break; }
+  printf '%s\n' "$out" | grep -A3 '"pending_indexes": \[$'
+done
+```
+
+Optimize's exit status is checked before its output is filtered. Piped straight
+into `grep`, a failed optimize and one with nothing deferred both print nothing.
+Every edge table gets BTREEs on `__id`, `__src` and `__dst`, and node tables get
+their declared indexes. A graph whose header is followed by nothing had no
+deferred work; any output is a `pending_indexes` entry, which lists what it deferred
+(a vector property with no vectors yet, full-text coverage needing
+`rebuild-full-text-indexes`). Neither blocks the cutover. No `--as`: `optimize`
+is a direct command and rejects it (see `maintenance.py`).
+
 ### 5. Repoint the cluster and deploy the new image
 
 Set the prefix — the same one `$NEW_ROOT` names, without the `s3://<bucket>/`
@@ -794,6 +826,22 @@ The second must print exactly one line, carrying the new binary's
 rebuilt; the old number means you are still serving the old root — go back to
 step 5 and check the `pulumi preview --diff`.
 
+Neither comparison looks at indexes, and a root with every index missing passes
+both. Confirm step 4's `optimize` ran for every graph: the automated Job logs
+`$ omnigraph optimize --store ...` once per graph, and the manual loop printed
+one line per graph. Then, once real traffic has hit the server, check for the
+symptom:
+
+```shell
+kubectl -n omnigraph logs deploy/omnigraph-server --since=30m \
+  | grep -c 'falls back to a full edge scan'
+```
+
+Expect `0`. Treat it as a smoke check, not proof: the warning fires only when
+the planner picks an indexed traversal, which it does on a large edge table
+(Production's council) and may never do on a small one. A non-zero count with
+`reason=no BTREE index` means indexes are missing; see Troubleshooting.
+
 Finish by exercising a real client path (a `recall`, a `task_ready`) rather
 than trusting probes.
 
@@ -889,6 +937,22 @@ ConfigMap listing in *What gets rebuilt*.
 `/tmp/export/` on your workstation and the old root is intact — roll back and
 reconcile offline. A partial load is the one outcome worse than a failed one,
 because it looks like success.
+
+**Traversals log `falls back to a full edge scan ... reason=no BTREE index`
+after cutover.** The rebuilt root was never optimized, so it has no edge
+BTREEs. Results are correct and only latency suffers, so this does not need
+a rollback. `optimize` is safe against a serving fleet
+([store maintenance runbook](omnigraph-store-maintenance-runbook.md)); run
+the CronJob now instead of waiting for its nightly tick:
+
+```shell
+kubectl -n omnigraph create job --from=cronjob/omnigraph-optimize optimize-after-cutover
+kubectl -n omnigraph logs -f job/optimize-after-cutover
+```
+
+A different `reason`, such as `a fragment is missing physical_rows` or
+uncovered fragments, means the indexes exist but writes since the last optimize
+are not covered yet. The nightly run handles that.
 
 ## Not needed for
 

@@ -382,6 +382,111 @@ def test_a_tie_holds_across_a_long_gap_between_duplicates(tmp_path: Path) -> Non
     assert collapsed == {"Tagged": 2}
 
 
+def test_indexes_are_built_on_the_rebuilt_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`load` builds no indexes in 0.11, so optimize has to run against the new
+    store; anything it defers is surfaced rather than dropped.
+    """
+    calls: list[list[str]] = []
+    optimize_out = {
+        "datasets": [
+            {"type_key": "edge:WorksOn", "pending_indexes": []},
+            {
+                "type_key": "node:Memory",
+                "pending_indexes": [
+                    {
+                        "type_key": "node:Memory",
+                        "property": "embedding",
+                        "reason": "property has no non-null vectors to train on yet",
+                    }
+                ],
+            },
+        ]
+    }
+
+    def fake_run(argv: list[str], **_: Any) -> Any:
+        calls.append(argv)
+        return migrate.subprocess.CompletedProcess(argv, 0, json.dumps(optimize_out))
+
+    monkeypatch.setattr(migrate, "run", fake_run)
+
+    pending = migrate.build_indexes("omnigraph", "s3://b/fmt9/graphs/council.omni")
+
+    assert calls == [
+        [
+            "omnigraph",
+            "optimize",
+            "--store",
+            "s3://b/fmt9/graphs/council.omni",
+            "--json",
+        ]
+    ]
+    assert [p["property"] for p in pending] == ["embedding"]
+
+
+def test_rebuild_optimizes_each_graph_once_after_its_last_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Optimizing before a graph's final batch would leave that batch's
+    fragments uncovered, and a skipped graph serves with no indexes at all.
+    """
+    calls: list[list[str]] = []
+    pending = {"type_key": "node:Memory", "property": "embedding", "reason": "x"}
+
+    def fake_run(argv: list[str], **_: Any) -> Any:
+        calls.append(argv)
+        out = ""
+        if argv[1] == "optimize":
+            deferred = [pending] if "council" in argv[3] else []
+            out = json.dumps({"datasets": [{"pending_indexes": deferred}]})
+        return migrate.subprocess.CompletedProcess(argv, 0, out)
+
+    graphs = ["council", "code-bridge"]
+    monkeypatch.setattr(migrate, "run", fake_run)
+    monkeypatch.setattr(
+        migrate, "build_rebuild_config", lambda *_: tmp_path / "cluster.yaml"
+    )
+    monkeypatch.setattr(
+        migrate, "schema_files_by_graph", lambda _: dict.fromkeys(graphs, "s.pg")
+    )
+    monkeypatch.setattr(migrate, "keyed_edge_types", lambda _: set())
+    monkeypatch.setattr(migrate, "normalize_export", lambda path, _: (path, {}))
+    monkeypatch.setattr(
+        migrate,
+        "chunk_export",
+        lambda path: [path.with_suffix(".000.jsonl"), path.with_suffix(".001.jsonl")],
+    )
+
+    migrate.rebuild(
+        "omnigraph",
+        "s3://b/fmt9",
+        graphs,
+        tmp_path / "export",
+        tmp_path / "rebuild",
+        tmp_path / "cluster.yaml",
+        tmp_path / "schemas",
+        "svc-witan-admin",
+    )
+
+    per_graph = [
+        (argv[1], argv[3].rsplit("/", 1)[-1])
+        for argv in calls
+        if argv[1] in {"load", "optimize"}
+    ]
+    assert per_graph == [
+        ("load", "council.omni"),
+        ("load", "council.omni"),
+        ("optimize", "council.omni"),
+        ("load", "code-bridge.omni"),
+        ("load", "code-bridge.omni"),
+        ("optimize", "code-bridge.omni"),
+    ]
+    deferred_logs = [r for r in caplog.records if "indexes deferred" in r.message]
+    assert len(deferred_logs) == 1
+    assert "embedding" in deferred_logs[0].getMessage()
+
+
 def test_verify_expects_the_collapsed_edge_counts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
