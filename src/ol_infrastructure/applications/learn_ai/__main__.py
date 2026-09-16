@@ -864,10 +864,19 @@ learn_ai_app_k8s = OLApplicationK8s(
         import_nginx_config=not learn_ai_config.get_bool("use_granian"),
         # Nginx resources (defaults from component are fine)
         # App container resources
+        # Steady-state working set runs 600-630Mi; MainConfig.ready() eagerly
+        # imports litellm, so exec'ing a shell or running a management command
+        # in a live pod has no headroom against a 1000Mi limit. Keep the
+        # request where actual usage sits and raise the limit for burst room.
         resource_requests={"cpu": "100m", "memory": "1000Mi"},
-        resource_limits={"memory": "1000Mi"},
+        resource_limits={"memory": "1536Mi"},
         init_migrations=True,
         init_collectstatic=True,  # Assuming createcachetable is not needed or handled elsewhere
+        # Both queues run --concurrency=2 prefork (component default), so each
+        # forked child re-pays the litellm import cost -- steady-state working
+        # set already sits at 815-930Mi against the old 1000Mi limit (one
+        # queue has already been OOMKilled in production). Raise the limit to
+        # give the prefork children room without changing the pool model.
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="default",
@@ -875,7 +884,7 @@ learn_ai_app_k8s = OLApplicationK8s(
                 redis_database_index="1",
                 redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "100m", "memory": "1000Mi"},
-                resource_limits={"memory": "1000Mi"},
+                resource_limits={"memory": "1536Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="edx_content",
@@ -883,7 +892,7 @@ learn_ai_app_k8s = OLApplicationK8s(
                 redis_database_index="1",
                 redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "100m", "memory": "1000Mi"},
-                resource_limits={"memory": "1000Mi"},
+                resource_limits={"memory": "1536Mi"},
             ),
         ],
         celery_beat_config=OLApplicationK8sCeleryBeatConfig(
@@ -892,10 +901,12 @@ learn_ai_app_k8s = OLApplicationK8s(
             # litellm (added in 0.36.2 to fix a separate memory leak), which
             # beat now pays for at boot despite never executing LLM code --
             # 384Mi no longer covers that baseline import cost and beat
-            # OOMKilled on every startup. Match the other three containers in
-            # this app (webapp, both celery workers), which are all 1000Mi.
+            # OOMKilled on every startup. Matching the other three containers
+            # at 1000Mi/1000Mi (Guaranteed QoS, zero headroom) still wasn't
+            # enough -- prod shows ~25 beat restarts/week -- so give it the
+            # same limit bump as the rest of the app.
             resource_requests={"cpu": "10m", "memory": "1000Mi"},
-            resource_limits={"memory": "1000Mi"},
+            resource_limits={"memory": "1536Mi"},
         ),
         # hpa_scaling_metrics is left at the component default. It is unused here:
         # the component builds a KEDA ScaledObject instead of a native HPA when
