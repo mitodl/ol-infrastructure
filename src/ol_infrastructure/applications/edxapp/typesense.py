@@ -72,6 +72,19 @@ def create_typesense_resources(
                     "memory": typesense_config.get("memory_limit") or "512Mi",
                 },
             },
+            # Changing storage_size is NOT an in-place resize, and leaving the
+            # CR and the live StatefulSet disagreeing is actively harmful. The
+            # operator's shouldUpdateStatefulSet never compares
+            # volumeClaimTemplates, so a new size is ignored until the
+            # StatefulSet is recreated -- but updateStatefulSet does
+            # `sts.Spec = desired.Spec` then a MergeFrom patch, so the moment
+            # any *other* drift triggers an update, the patch carries a
+            # volumeClaimTemplates change, which the API server forbids on a
+            # StatefulSet. That rejects the whole patch and wedges every
+            # subsequent reconcile until the two sizes agree again.
+            # Pair any change here with the recreate: delete the StatefulSet,
+            # delete its PVCs, let the operator rebuild at the new size.
+            # Verified against typesense-operator 0.4.1 (2026-09-15 MAS).
             "storage": {
                 "size": typesense_config.get("storage_size") or "100Gi",
                 "storageClassName": typesense_config.get("storage_class_name")
