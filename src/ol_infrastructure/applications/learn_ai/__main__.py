@@ -902,7 +902,7 @@ learn_ai_app_k8s = OLApplicationK8s(
             # beat now pays for at boot despite never executing LLM code --
             # 384Mi no longer covers that baseline import cost and beat
             # OOMKilled on every startup. Matching the other three containers
-            # at 1000Mi/1000Mi (Guaranteed QoS, zero headroom) still wasn't
+            # at 1000Mi/1000Mi (zero memory headroom) still wasn't
             # enough -- prod shows ~25 beat restarts/week -- so give it the
             # same limit bump as the rest of the app.
             resource_requests={"cpu": "10m", "memory": "1000Mi"},
