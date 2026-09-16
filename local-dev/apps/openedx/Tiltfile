@@ -19,7 +19,7 @@
 #   - the local-infra-core and local-infra-apps Pulumi stacks applied, which is
 #     what creates the openedx namespace and replicates local-dev-tls into it
 
-load("../../tiltlib.star", "k8s_yaml_local")
+load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
 
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 lehrer_dir = os.path.join(workspace_root, "lehrer")
@@ -82,6 +82,13 @@ else:
             config.main_dir + "/local-dev/apps/openedx/configmaps/lms-config.yaml",
             config.main_dir + "/local-dev/apps/openedx/configmaps/cms-config.yaml",
         ],
+        # config_override_paths alone hashes those two files' raw, pre-render
+        # content, but k8s_yaml_local substitutes current_root_domain() for
+        # 'mit.dev' in them before applying — so a domain override changes the
+        # ConfigMaps without changing the checksum lehrer stamps on the pod
+        # template, and LMS/CMS/workers never roll onto the new URLs. Folding
+        # the same value in here (lehrer#238) fixes that.
+        "config_override_extra_hash_input": [current_root_domain()],
         "release_name":    "master",
         "deploy_name":     "mitxonline",
         "settings_ns":     "mitol",
