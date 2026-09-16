@@ -146,6 +146,32 @@ def fetch_helm_chart_crds(
     return sorted(crds, key=lambda crd: crd["metadata"]["name"])
 
 
+def _adoption_resource_options(
+    opts: ResourceOptions | None, crd_provider: kubernetes.Provider
+) -> ResourceOptions:
+    """Build the ConfigGroup's options, layering adoption settings over the caller's.
+
+    Split out from adopt_helm_chart_crds because neither Pulumi's mock resource
+    args nor the constructed resource retains resource options, so this is the
+    only seam at which they can be asserted.
+
+    Returns:
+        The caller's options with the scoped provider and CRD retention applied.
+    """
+    return ResourceOptions.merge(
+        opts,
+        ResourceOptions(
+            provider=crd_provider,
+            # Deleting a CRD cascades to every custom resource of that kind, so a
+            # destroy, a removed caller, or an include= change that drops a file
+            # must not take the CRD with it -- these objects predate Pulumi and
+            # are only adopted here. Propagates from the ConfigGroup to each child
+            # CRD, which was confirmed against the deployed starrocks stack.
+            retain_on_delete=True,
+        ),
+    )
+
+
 def adopt_helm_chart_crds(  # noqa: PLR0913
     resource_name: str,
     *,
@@ -186,5 +212,5 @@ def adopt_helm_chart_crds(  # noqa: PLR0913
     return kubernetes.yaml.v2.ConfigGroup(
         resource_name,
         objs=fetch_helm_chart_crds(repo, chart, version, include=include),
-        opts=ResourceOptions.merge(opts, ResourceOptions(provider=crd_provider)),
+        opts=_adoption_resource_options(opts, crd_provider),
     )

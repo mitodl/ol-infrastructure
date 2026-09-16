@@ -9,8 +9,11 @@ Gateway API CRDs would overwrite the experimental ones setup_traefik owns).
 import io
 import tarfile
 
+import pulumi
+import pulumi_kubernetes as kubernetes
 import pytest
 import yaml as pyyaml
+from pulumi import ResourceOptions
 
 from ol_infrastructure.lib import k8s_crds
 
@@ -139,3 +142,87 @@ def test_layout_change_that_matches_nothing_is_an_error():
         k8s_crds.fetch_helm_chart_crds(
             "https://charts.example.com", "demo", "1.0.0", include={"renamed.yaml"}
         )
+
+
+class _Mocks(pulumi.runtime.Mocks):
+    """Record every resource registration so the provider's inputs can be asserted."""
+
+    def __init__(self):
+        self.resources = {}
+
+    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
+        self.resources[args.name] = args
+        return f"{args.name}_id", args.inputs
+
+    def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
+        return {}
+
+
+CRD_OBJ = {
+    "apiVersion": "apiextensions.k8s.io/v1",
+    "kind": "CustomResourceDefinition",
+    "metadata": {"name": "widgets.example.com"},
+}
+
+
+@pulumi.runtime.test
+def test_scoped_provider_sets_upsert_existing_objects():
+    """Without it, adopting an already-Helm-created CRD fails "already exists"."""
+    mocks = _Mocks()
+    pulumi.runtime.set_mocks(mocks, preview=False)
+    original = k8s_crds.fetch_helm_chart_crds
+    k8s_crds.fetch_helm_chart_crds = lambda *a, **kw: [CRD_OBJ]  # noqa: ARG005
+    try:
+        config_group = k8s_crds.adopt_helm_chart_crds(
+            "demo-crds",
+            kubeconfig="fake-kubeconfig",
+            repo="https://charts.example.com",
+            chart="demo",
+            version="1.0.0",
+        )
+    finally:
+        k8s_crds.fetch_helm_chart_crds = original
+
+    def check(_):
+        provider = mocks.resources["demo-crds-provider"]
+        assert provider.typ == "pulumi:providers:kubernetes"
+        assert provider.inputs["upsertExistingObjects"] in (True, "true", "True")
+
+    return config_group.urn.apply(check)
+
+
+# Resource options reach the engine without being stored on the resource, and
+# Pulumi's MockResourceArgs carries none of them, so the merged options are
+# asserted at the one seam that exposes them.
+
+SENTINEL_PROVIDER = object()
+
+
+def _adoption_opts(caller_opts):
+    return k8s_crds._adoption_resource_options(caller_opts, SENTINEL_PROVIDER)
+
+
+def test_adopted_crds_are_retained_on_delete():
+    """Deleting a CRD cascades to every custom resource of that kind."""
+    assert _adoption_opts(None).retain_on_delete is True
+
+
+def test_scoped_provider_overrides_any_caller_provider():
+    """The upsert-capable provider is the point; a caller's must not win over it."""
+    assert (
+        _adoption_opts(ResourceOptions(provider=object())).provider is SENTINEL_PROVIDER
+    )
+
+
+@pulumi.runtime.test
+def test_caller_parent_and_depends_on_survive_the_merge():
+    """Ordering the caller asked for must not be dropped by the options merge."""
+    pulumi.runtime.set_mocks(_Mocks(), preview=False)
+    parent = kubernetes.core.v1.Namespace("parent-ns")
+    dependency = kubernetes.core.v1.Namespace("dependency-ns")
+
+    opts = _adoption_opts(ResourceOptions(parent=parent, depends_on=[dependency]))
+
+    assert opts.parent is parent
+    assert opts.depends_on == [dependency]
+    return parent.urn
