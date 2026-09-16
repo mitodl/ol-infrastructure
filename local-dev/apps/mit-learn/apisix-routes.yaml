@@ -15,8 +15,10 @@ spec:
   - name: cors
     enable: true
     config:
-      # ocw-dev is the OCW hugo dev server, which reads users/me cross-origin.
-      allow_origins: "https://learn.mit.dev,https://ocw-dev.mit.dev"
+      # ocw-dev is the OCW hugo dev server (see ocw-hugo-dev.yaml), which
+      # calls this API cross-origin. It has to sit inside .learn.mit.dev for
+      # the csrftoken cookie to be readable from it at all.
+      allow_origins: "https://learn.mit.dev,https://ocw-dev.learn.mit.dev"
       allow_methods: "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS"
       allow_headers: "Authorization,Content-Type,X-CSRFToken,X-Requested-With"
       expose_headers: "X-CSRFToken"
