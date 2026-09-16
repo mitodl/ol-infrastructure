@@ -20,6 +20,7 @@ from bridge.lib.magic_numbers import (
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
 )
+from ol_infrastructure.lib.k8s_crds import adopt_helm_chart_crds
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -316,6 +317,30 @@ def setup_apisix(
         ),
     )
 
+    # The apisix-ingress-controller subchart ships its CRDs in crds/, which Helm
+    # only ever writes on install, so they froze at whatever chart version first
+    # landed on each cluster while APISIX_CHART was upgraded repeatedly.
+    # backendtrafficpolicies was 30 schema properties behind on all 12 clusters and
+    # apisixupstreams 18 on most.
+    #
+    # Only apisixic-crds.yaml. The subchart also ships gwapi-crds.yaml, holding the
+    # Gateway API CRDs at channel "standard", bundle v1.6.0 -- the same
+    # cluster-scoped objects setup_traefik installs from the *experimental* bundle
+    # at GATEWAY_API_VERSION and owns. Adopting those here would force every
+    # gateway.networking.k8s.io CRD down from experimental to standard and leave
+    # two Pulumi resources overwriting each other on every up. skip_crds below
+    # keeps Helm from installing that copy on a fresh cluster too, which the
+    # release's existing depends_on gateway_api_crds already makes unnecessary.
+    apisix_crds = adopt_helm_chart_crds(
+        f"{cluster_name}-apisix-crds",
+        kubeconfig=cluster.kubeconfig,
+        repo="https://apache.github.io/apisix-helm-chart",
+        chart="apisix",
+        version=apisix_chart_version,
+        include={"apisixic-crds.yaml"},
+        opts=ResourceOptions(parent=operations_namespace, depends_on=[cluster]),
+    )
+
     apisix_helm_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-apisix-official-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
@@ -324,6 +349,9 @@ def setup_apisix(
             namespace="operations",
             cleanup_on_fail=True,
             chart="apisix",
+            # The CRDs are applied above as their own Pulumi resource. Helm would
+            # only write them on a fresh install anyway, which is the bug.
+            skip_crds=True,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://apache.github.io/apisix-helm-chart",
             ),
@@ -971,6 +999,7 @@ def setup_apisix(
                 *node_groups,
                 operations_namespace,
                 gateway_api_crds,
+                apisix_crds,
                 lb_controller,
                 error_pages_configmap,
             ],
