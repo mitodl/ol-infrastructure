@@ -4,8 +4,9 @@
 import hashlib
 import json
 import os
+from collections.abc import Awaitable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pulumi
 import pulumi_aws as aws
@@ -154,14 +155,28 @@ def _pod_config_hash(
     of that template, which leaves a config-only change inert until something
     else happens to restart the pod. Annotating the pod template with this hash
     makes the template change whenever the config does.
+
+    The returned Output deliberately carries no resource dependencies. These
+    ConfigMaps have fixed names, so a data change replaces them delete-first,
+    and Pulumi then replaces every resource with a recorded property dependency
+    on them -- also delete-first. Left in place, that edge turns any config
+    change into deleting every edxapp Deployment at once (2026-09-16, mitxonline
+    LMS dropped from 27 pods to 3). Without it, the Deployment sees only a
+    changed annotation and does a rolling update.
     """
     names = sorted(config_maps)
-    return Output.all(
+    config_hash = Output.all(
         *(_config_map_contents(config_maps[name]) for name in names)
     ).apply(
         lambda contents: hashlib.sha256(
             json.dumps(dict(zip(names, contents, strict=True)), sort_keys=True).encode()
         ).hexdigest()
+    )
+    return Output(
+        set(),
+        cast(Awaitable[str], config_hash.future()),
+        config_hash.is_known(),
+        config_hash.is_secret(),
     )
 
 
