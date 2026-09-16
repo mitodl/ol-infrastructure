@@ -11,6 +11,10 @@
 #    URLs, and cookie-domain references update consistently:
 #      export LOCAL_DEV_ROOT_DOMAIN=mycompany.dev && tilt up
 #
+#    The token __LOCAL_DEV_HOST_GATEWAY__ is likewise replaced with the IP the
+#    cluster uses to reach the host, for the rare manifest that has to route to
+#    a process running on the developer's machine rather than to a Service.
+#
 # 2. Config-change rollouts. Kubernetes does not restart pods when a
 #    ConfigMap/Secret they reference changes, so every Deployment applied in
 #    the same call gets a pod-template annotation fingerprinting the combined
@@ -22,6 +26,24 @@
 
 _ROOT_DOMAIN_DEFAULT = "mit.dev"
 _CONFIG_HASH_ANNOTATION = "ol.mit.edu/config-hash"
+_HOST_GATEWAY_TOKEN = "__LOCAL_DEV_HOST_GATEWAY__"
+_CLUSTER_NAME_DEFAULT = "local-dev"
+
+def _host_gateway():
+    """Return the IP the cluster uses to reach the host, i.e. the gateway of
+    the k3d docker bridge. k3d's own host.k3d.internal is not usable here:
+    it is absent from this cluster's CoreDNS NodeHosts, and an EndpointSlice
+    takes addresses rather than names regardless. Override with
+    LOCAL_DEV_HOST_GATEWAY if the bridge cannot be inspected."""
+    override = os.environ.get("LOCAL_DEV_HOST_GATEWAY", "")
+    if override:
+        return override
+    cluster = os.environ.get("LOCAL_DEV_CLUSTER_NAME", _CLUSTER_NAME_DEFAULT)
+    cmd = (
+        "docker network inspect k3d-%s " % cluster
+        + "-f '{{range .IPAM.Config}}{{.Gateway}}{{end}}'"
+    )
+    return str(local(cmd, quiet=True, echo_off=True)).strip()
 
 def current_root_domain():
     """Return the value k8s_yaml_local substitutes 'mit.dev' for, so a caller
@@ -114,6 +136,8 @@ def k8s_yaml_local(paths, local_overrides=None):
         content = str(read_file(p))
         if rd != _ROOT_DOMAIN_DEFAULT:
             content = content.replace(_ROOT_DOMAIN_DEFAULT, rd)
+        if _HOST_GATEWAY_TOKEN in content:
+            content = content.replace(_HOST_GATEWAY_TOKEN, _host_gateway())
         contents.append((p, content))
 
     fingerprint = _config_fingerprint(contents)
