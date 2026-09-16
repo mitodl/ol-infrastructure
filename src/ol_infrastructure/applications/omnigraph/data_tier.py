@@ -623,7 +623,25 @@ def create_data_tier(  # noqa: PLR0913
                     # treated the call as failed by the time the server
                     # would still be waiting, so there is nothing to gain by
                     # going higher, and real risk in going lower.
-                    termination_grace_period_seconds=30,
+                    #
+                    # 35, NOT 30, since omnigraph 0.11 bounds its own shutdown.
+                    # 0.11 holds in-flight requests after SIGTERM for
+                    # OMNIGRAPH_SHUTDOWN_GRACE_SECONDS (upstream default 25)
+                    # and exits 2 at that deadline; upstream says the
+                    # orchestrator's grace must be longer. The server's grace
+                    # is set to 30 below, the tool-call deadline above, which
+                    # covers the measured 15.54s write with the same margin
+                    # this value had. The pod gets 5s more so the process
+                    # exits on its own deadline rather than being SIGKILLed
+                    # at it. An idle server still exits within milliseconds
+                    # (measured locally on 0.11.0), so the extra 5s costs
+                    # nothing on a routine restart.
+                    #
+                    # No preStop sleep: one replica under `Recreate` has no
+                    # other endpoint to drain traffic to, so a sleep would
+                    # only lengthen the outage and spend from this same
+                    # budget.
+                    termination_grace_period_seconds=35,
                     containers=[
                         kubernetes.core.v1.ContainerArgs(
                             name="omnigraph-server",
@@ -659,6 +677,16 @@ def create_data_tier(  # noqa: PLR0913
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="OMNIGRAPH_PER_ACTOR_BYTES_MAX",
                                     value=str(per_actor_bytes_max),
+                                ),
+                                # See termination_grace_period_seconds above.
+                                # An env var, not `--shutdown-grace-seconds`:
+                                # the released 0.10.0 server exits 2 on that
+                                # flag ("unexpected argument"), but boots and
+                                # serves /healthz with this variable set, so
+                                # this can land before the 0.11 image.
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OMNIGRAPH_SHUTDOWN_GRACE_SECONDS",
+                                    value="30",
                                 ),
                             ],
                             ports=[
