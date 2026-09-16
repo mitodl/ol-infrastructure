@@ -41,10 +41,10 @@ config:
   aws:region: us-east-1
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
-  omnigraph:storage_prefix: fmt6
+  omnigraph:storage_prefix: fmt9
   # Cross-checked against storage_prefix at preview time — see the CI
   # config's comment on this same key for why.
-  omnigraph:internal_schema_version: 6
+  omnigraph:internal_schema_version: 9
   # ★★ THE EXPERIMENT THIS WAS RAISED FOR IS OVER, IT FAILED, AND THE VALUE
   # STAYS ANYWAY. Read this before "fixing" it.
   #
