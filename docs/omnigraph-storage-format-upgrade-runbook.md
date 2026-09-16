@@ -289,10 +289,12 @@ apply scales the tier back to 1 in the middle of the outage — starting a binar
 that reads only the NEW format against the OLD root, which is the mixed-writer
 case this whole procedure exists to prevent. (This section used to claim Pulumi
 does not manage the replica count during a migration. It does. Found during the
-CI cutover on 2026-09-16, by previewing before applying.) Targeting also steps
-around the `cluster-apply` Job, which runs the NEW image and fails against the
-old root until `storage_prefix` flips — the Deployment `depends_on` it, so an
-untargeted apply reports failure there anyway.
+CI cutover on 2026-09-16, by previewing before applying.)
+
+The `cluster-apply` Job is not part of this: while `migrate_from_image` is set
+the Job is not created at all and nothing depends on it, so there is nothing
+here for the target list to step around. It is created again at cutover, once
+`storage_prefix` names the new root, and converges the schemas against it.
 
 Freezing the writers is part of **Before you start**, not this step — by the
 time you are arming the migration it is already too late.

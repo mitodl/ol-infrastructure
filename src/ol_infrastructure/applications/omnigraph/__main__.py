@@ -949,6 +949,9 @@ data_tier = create_data_tier(
     # the same config that creates the Job so the two cannot drift: clearing
     # `migrate_from_image` resumes them in the same `pulumi up`.
     suspend_maintenance=bool(MIGRATE_FROM_IMAGE),
+    # Same switch, second effect: no cluster-apply Job while the migration
+    # is armed. See data_tier.py's cluster_apply_job for why.
+    migration_armed=bool(MIGRATE_FROM_IMAGE),
 )
 
 #########################################
