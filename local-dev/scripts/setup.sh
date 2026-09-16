@@ -38,6 +38,9 @@ HOSTS=(
     "learn.${ROOT_DOMAIN}"
     # learn-ai
     "ai.learn.${ROOT_DOMAIN}"
+    # ocw-hugo-themes dev server, run on the host and fronted by APISIX so it
+    # has an origin inside .learn.${ROOT_DOMAIN} (see apps/mit-learn/ocw-hugo-dev.yaml)
+    "ocw-dev.learn.${ROOT_DOMAIN}"
     # mitxonline
     "mitxonline.${ROOT_DOMAIN}"
     # odl-video-service

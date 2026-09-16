@@ -41,6 +41,7 @@ This environment runs the MIT Learn application stack as Kubernetes workloads in
 | Keycloak SSO | `https://sso.ol.mit.dev` | Identity provider (olapps realm) |
 | Mailpit | `https://mail.mit.dev` | Captured outbound email (web UI) |
 | Grafana | `https://grafana.mit.dev` | Logs from every service in the cluster (1-week retention) |
+| OCW theme dev server | `https://ocw-dev.learn.mit.dev` | The ocw-hugo-themes dev server, run on your machine (see below) |
 
 All hostnames use a `.dev` TLD that mirrors production (`.edu` → `.dev`), so URLs, CSRF cookies, and OIDC redirect URIs behave identically to deployed environments.
 
@@ -685,6 +686,34 @@ Two things that differ from the other apps:
   rather than `granian[reload]`, so the app container cannot run with `--reload`. Tilt
   syncs the code; restart `ocwstudio-webapp` from the Tilt UI to pick it up, the same
   as the celery workers.
+
+### OCW theme development (ocw-hugo-themes)
+
+Run the Hugo dev server the way you always have, on your own machine:
+
+```
+cd ocw-hugo-themes && yarn start
+```
+
+For ordinary frontend work, `http://localhost:3000` is fine and nothing here
+applies. Use `https://ocw-dev.learn.<root_domain>` instead when you need a
+logged-in session: bookmarks, the user menu, anything that calls the mit-learn
+API as a real user. That hostname is APISIX proxying to the dev server still
+running on port 3000 on your machine; no part of Hugo moves into the cluster,
+and the route simply 502s while the dev server is stopped.
+
+The reason localhost cannot do it is cookie scope, not CORS. mit-learn issues
+`csrftoken` with `Domain=.learn.<root_domain>`, and the theme reads that cookie
+out of `document.cookie` through axios (`xsrfCookieName`). A page on localhost
+cannot read another domain's cookie, so it never sends `X-CSRFToken` and every
+write fails; the APISIX session cookie is `SameSite=Lax` and host-only on
+`api.learn.<root_domain>`, so it is not sent from a cross-site origin either and
+the user reads as anonymous. An origin inside `.learn.<root_domain>` has neither
+problem.
+
+Re-run `./local-dev/scripts/setup.sh` if your `/etc/hosts` predates this: the
+hostname needs an entry. The TLS certificate already covers it through the
+`*.learn.<root_domain>` wildcard.
 
 ---
 

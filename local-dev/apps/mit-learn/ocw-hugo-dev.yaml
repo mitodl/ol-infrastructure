@@ -1,0 +1,102 @@
+---
+# Serves the ocw-hugo-themes dev server at ocw-dev.learn.mit.dev.
+#
+# The dev server itself stays on bare metal: a theme developer runs it exactly
+# as before (`yarn start`, port 3000) and nothing about it moves into the
+# cluster. All this does is put a hostname and TLS in front of the host
+# process, which is what the browser needs before login works.
+#
+# Why a hostname at all, when localhost:3000 is otherwise fine: mit-learn's
+# csrftoken cookie is issued with Domain=.learn.mit.dev, and the theme reads it
+# out of document.cookie via axios (xsrfCookieName, base-theme/assets/js/axios.ts).
+# A page on localhost cannot read another domain's cookie, so it can never send
+# X-CSRFToken and every write fails. The APISIX OIDC session cookie is
+# SameSite=Lax and host-only on api.learn.mit.dev, so it is not sent from a
+# cross-site origin either, and the user reads as anonymous. Both problems go
+# away for an origin inside .learn.mit.dev, and neither is fixable from
+# localhost without changing mit-learn and the theme. Widening
+# CSRF_COOKIE_DOMAIN back to .mit.dev is not the answer: that reintroduces the
+# csrftoken collision with ocw-studio.
+#
+# Only needed when testing login, bookmarks, or anything else that depends on
+# an authenticated session. localhost:3000 still works for everything else, and
+# these objects cost nothing when the dev server is not running -- the route
+# simply 502s.
+#
+# The hostname is covered by the existing wildcard certificate (setup.sh lists
+# *.learn.${ROOT_DOMAIN} as a SAN), so no certificate reissue is involved.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ocw-hugo-dev
+  namespace: mit-learn
+spec:
+  # No selector: the backend is a process on the developer's machine, not a
+  # pod, so the EndpointSlice below is maintained by hand rather than by the
+  # endpoints controller.
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: ocw-hugo-dev
+  namespace: mit-learn
+  labels:
+    kubernetes.io/service-name: ocw-hugo-dev
+addressType: IPv4
+ports:
+- name: http
+  port: 3000
+  protocol: TCP
+endpoints:
+# Substituted by tiltlib.star with the k3d bridge gateway, which is how the
+# cluster reaches the host. Set LOCAL_DEV_HOST_GATEWAY to override.
+- addresses:
+  - "__LOCAL_DEV_HOST_GATEWAY__"
+  conditions:
+    ready: true
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: ocw-hugo-dev-tls
+  namespace: mit-learn
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - ocw-dev.learn.mit.dev
+  secret:
+    name: local-dev-tls
+    namespace: mit-learn
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: ocw-hugo-dev-route
+  namespace: mit-learn
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: hugo-dev
+    priority: 0
+    match:
+      hosts:
+      - ocw-dev.learn.mit.dev
+      paths:
+      - "/*"
+    backends:
+    - serviceName: ocw-hugo-dev
+      servicePort: 3000
+    plugins:
+    # Hugo's live-reload uses a websocket, which needs the upstream connection
+    # left alone rather than buffered.
+    - name: proxy-rewrite
+      enable: true
+      config:
+        headers:
+          set:
+            X-Forwarded-Proto: https
