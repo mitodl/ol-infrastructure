@@ -681,11 +681,14 @@ suspended for the migration and its next tick can be most of a day away.
 ```shell
 for g in $(cat /tmp/graph-ids.txt); do
   echo "== $g"
-  omnigraph optimize --store "$NEW_ROOT/graphs/$g.omni" --json \
-    | grep -A3 '"pending_indexes": \[$'
+  out=$(omnigraph optimize --store "$NEW_ROOT/graphs/$g.omni" --json) \
+    || { echo "!!! optimize FAILED for $g: do not cut over"; break; }
+  printf '%s\n' "$out" | grep -A3 '"pending_indexes": \[$'
 done
 ```
 
+Optimize's exit status is checked before its output is filtered. Piped straight
+into `grep`, a failed optimize and one with nothing deferred both print nothing.
 Every edge table gets BTREEs on `__id`, `__src` and `__dst`, and node tables get
 their declared indexes. A graph whose header is followed by nothing had no
 deferred work; any output is a `pending_indexes` entry, which lists what it deferred
