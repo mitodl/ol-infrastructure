@@ -48,5 +48,7 @@ config:
   # Cross-checked against storage_prefix at preview time — see the CI
   # config's comment on this same key for why.
   omnigraph:internal_schema_version: 6
+  omnigraph:migrate_from_image: 610119931565.dkr.ecr.us-east-1.amazonaws.com/omnigraph-server@sha256:a55401eef65d538b354850ea756de5f6064875f89d163f95567d255d155729b5
+  omnigraph:migrate_to_prefix: fmt9
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwF51lHyFZBMipn03XTrTTsKAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMIK7o7DGmOomYnJtDAgEQgDuWNWhBp4MmY5g1IS5INjiOfMa0yZcKOzoHa0L7AjLfrw9rMSs/jELIM0qfIJguIuQsCYjLMpJoX7CgSQ==
