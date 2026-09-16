@@ -75,6 +75,15 @@ TTL_SECONDS_AFTER_FINISHED = 604800
 # requested so the scheduler places this pod somewhere that can hold them, and
 # capped so an overrun evicts this pod rather than the node.
 #
+# PEAK IS ONE COPY OF EVERY EXPORT, PLUS ONE GRAPH'S REWRITE. Step 1 exports
+# all graphs before any rebuild starts, so every raw export coexists. On top of
+# that, the graph being rebuilt right now also holds its normalized copy and,
+# when a table exceeds the keyed-write cap, its batch files — but `rebuild`
+# deletes all three as soon as that graph's loads succeed, so the extra is one
+# graph's worth at a time rather than the whole cluster's. Without that
+# reclaim the peak is roughly double, which is what this volume is NOT sized
+# for.
+#
 # 20Gi is a deliberate over-provision against a cluster whose graphs the
 # upgrade runbook records as effectively unpopulated as of 2026-08-05. It is
 # not a measurement, and it is the number to revisit first if the Job is ever

@@ -11,6 +11,7 @@ cluster, which is what the runbook rehearsal covers.
 import importlib.util
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -179,22 +180,284 @@ def test_a_config_with_no_storage_line_is_refused(tmp_path: Path) -> None:
 def test_row_counts_are_parsed_per_table() -> None:
     """Verification compares per table. A total-row check would pass a rebuild
     that put every row in the wrong table.
+
+    The shape is verbatim `snapshot` output from omnigraph 0.10.0, and 0.11.0
+    prints the same per-table lines. The 0.8 `rows=N` shape this regex used to
+    expect matched nothing on either, so the Job stopped at its first graph.
     """
     snapshot = (
-        "branch: main\n"
-        "manifest_version: 4\n"
+        "graph_branch: main\n"
+        "graph_manifest_version: 5\n"
         "internal_schema_version: 6\n"
-        "edge:Supersedes v1 branch=main rows=0\n"
-        "node:Memory v2 branch=main rows=41\n"
-        "node:Task v1 branch=main rows=7\n"
+        "edge type 'Supersedes' published_dataset_version=1 "
+        "native_dataset_branch=main entities=0\n"
+        "node type 'Memory' published_dataset_version=2 "
+        "native_dataset_branch=main entities=41\n"
+        "node type 'Task' published_dataset_version=1 "
+        "native_dataset_branch=main entities=7\n"
     )
 
     counts = {
         m["table"]: int(m["rows"]) for m in migrate.SNAPSHOT_ROW_RE.finditer(snapshot)
     }
 
-    assert counts == {"edge:Supersedes": 0, "node:Memory": 41, "node:Task": 7}
+    assert counts == {"Supersedes": 0, "Memory": 41, "Task": 7}
     assert migrate.SNAPSHOT_SCHEMA_RE.search(snapshot).group(1) == "6"
+
+
+_KEYED_SCHEMA = """\
+node Memory { slug: String @key }
+node Topic { slug: String @key }
+
+// edge Commented: Memory -> Memory { @key(@src, @dst) }
+edge Tagged: Memory -> Topic {
+    @key(@src, @dst)
+    confidence: enum(asserted, inferred)? @index
+    created_at: DateTime?
+}
+edge RelatedTo: Memory -> Memory { @key(@dst, @src) }
+edge Loose: Memory -> Memory {
+    role: String?
+}
+edge Bare: Memory -> Memory
+"""
+
+
+def test_keyed_edge_types_are_read_from_the_schema(tmp_path: Path) -> None:
+    """The export cannot say which edge types are keyed; only the schema the
+    rebuild creates can, and a commented-out declaration must not count.
+    """
+    schema = tmp_path / "schema.pg"
+    schema.write_text(_KEYED_SCHEMA)
+
+    assert migrate.keyed_edge_types(schema) == {"Tagged", "RelatedTo"}
+
+
+def test_a_key_beyond_the_endpoint_pair_is_refused(tmp_path: Path) -> None:
+    """Collapsing on (from, to) would merge rows a wider key keeps apart."""
+    schema = tmp_path / "schema.pg"
+    schema.write_text(
+        "node M { slug: String @key }\n"
+        "edge Wide: M -> M {\n    @key(@src, @dst, kind)\n    kind: String\n}\n"
+    )
+
+    with pytest.raises(SystemExit, match="Wide"):
+        migrate.keyed_edge_types(schema)
+
+
+def test_schema_files_are_mapped_per_graph(tmp_path: Path) -> None:
+    """Each graph's keyed types come from its own schema, not council's."""
+    mapping = migrate.schema_files_by_graph(_cluster_yaml(tmp_path))
+
+    assert set(mapping) == set(build_cluster_graphs(REPOS))
+    assert mapping["council"] == "schema.pg"
+    assert mapping["code-bridge"] == "bridge-schema.pg"
+
+
+def _write_jsonl(path: Path, records: list[dict[str, object]]) -> Path:
+    path.write_text("".join(json.dumps(record) + "\n" for record in records))
+    return path
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    return [json.loads(line) for line in path.read_text().splitlines() if line]
+
+
+def _tagged(row_id: str, **data: object) -> dict[str, object]:
+    return {"edge": "Tagged", "from": "m1", "to": "t1", "data": {"id": row_id, **data}}
+
+
+def test_normalize_relocates_node_ids_and_drops_keyed_edge_ids(tmp_path: Path) -> None:
+    """0.11 refuses `data.id` on load, and refuses a 0.10 ULID on a keyed edge
+    because it does not match the id the key derives. Unkeyed edges keep theirs.
+    """
+    export = _write_jsonl(
+        tmp_path / "g.jsonl",
+        [
+            {"type": "Memory", "data": {"id": "m1", "slug": "m1"}},
+            _tagged("01A", confidence="inferred"),
+            {"edge": "Loose", "from": "m1", "to": "m2", "data": {"id": "01B"}},
+        ],
+    )
+
+    normalized, collapsed = migrate.normalize_export(export, {"Tagged"})
+
+    rows = _read_jsonl(normalized)
+    memory = next(r for r in rows if r.get("type") == "Memory")
+    assert memory["id"] == "m1"
+    assert "id" not in memory["data"]
+    tagged = next(r for r in rows if r.get("edge") == "Tagged")
+    assert "id" not in tagged
+    assert "id" not in tagged["data"]
+    loose = next(r for r in rows if r.get("edge") == "Loose")
+    assert loose["id"] == "01B"
+    assert collapsed == {}
+
+
+def test_an_asserted_duplicate_outranks_a_newer_inferred_one(tmp_path: Path) -> None:
+    """Two rows for one keyed pair fail the whole load. The survivor is a whole
+    row, and a link someone named beats one witan derived, however recent.
+    """
+    export = _write_jsonl(
+        tmp_path / "g.jsonl",
+        [
+            _tagged(
+                "01A", confidence="asserted", role="named", created_at=1767225600000
+            ),
+            _tagged(
+                "01B",
+                confidence="inferred",
+                role="derived",
+                created_at="2026-06-01T00:00:00",
+            ),
+        ],
+    )
+
+    normalized, collapsed = migrate.normalize_export(export, {"Tagged"})
+
+    assert [r["data"]["role"] for r in _read_jsonl(normalized)] == ["named"]
+    assert collapsed == {"Tagged": 1}
+
+
+def test_the_newest_created_at_wins_across_timestamp_shapes(tmp_path: Path) -> None:
+    """0.10 exports DateTime as epoch milliseconds, 0.11 as a naive ISO string,
+    and edges written before 2026-09 have none, which ranks oldest.
+    """
+    export = _write_jsonl(
+        tmp_path / "g.jsonl",
+        [
+            _tagged("01A", role="unstamped", created_at=None),
+            _tagged("01B", role="january", created_at=1767225600000),
+            _tagged("01C", role="march", created_at="2026-03-01T00:00:00"),
+            _tagged("01D", role="february", created_at=1769904000000),
+        ],
+    )
+
+    normalized, collapsed = migrate.normalize_export(export, {"Tagged"})
+
+    assert [r["data"]["role"] for r in _read_jsonl(normalized)] == ["march"]
+    assert collapsed == {"Tagged": 3}
+
+
+def test_an_exact_tie_keeps_the_later_row(tmp_path: Path) -> None:
+    """Identical rank is the common 0.10 duplicate: the same unstamped edge
+    appended by every re-link. The later row in the export survives, which is
+    deterministic for a given export but is not necessarily the last write.
+    """
+    export = _write_jsonl(
+        tmp_path / "g.jsonl",
+        [_tagged("01A", role="a"), _tagged("01B", role="b"), _tagged("01C", role="c")],
+    )
+
+    normalized, _ = migrate.normalize_export(export, {"Tagged"})
+
+    assert [r["data"]["role"] for r in _read_jsonl(normalized)] == ["c"]
+
+
+def test_a_tie_holds_across_a_long_gap_between_duplicates(tmp_path: Path) -> None:
+    """Duplicates sit anywhere in the export, which is why the collapse takes
+    two passes over the file rather than one pass buffering rewritten rows: the
+    rank is decided in pass 1 and the survivor streamed out in pass 2. Rank ties
+    still keep the later row, and the rows in between still pass through.
+    """
+    filler: list[dict[str, object]] = [
+        {"type": "Memory", "data": {"id": f"m{n}", "slug": f"m{n}"}} for n in range(300)
+    ]
+    export = _write_jsonl(
+        tmp_path / "g.jsonl",
+        [
+            _tagged("01A", role="first"),
+            *filler,
+            _tagged("01B", role="middle"),
+            *filler,
+            _tagged("01C", role="last"),
+        ],
+    )
+
+    normalized, collapsed = migrate.normalize_export(export, {"Tagged"})
+
+    rows = _read_jsonl(normalized)
+    assert [r["data"]["role"] for r in rows if r.get("edge") == "Tagged"] == ["last"]
+    assert len([r for r in rows if r.get("type") == "Memory"]) == 600
+    assert collapsed == {"Tagged": 2}
+
+
+def test_verify_expects_the_collapsed_edge_counts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The 0.10 baseline counts duplicates the rebuild deliberately removed, so
+    strict equality with it would fail every graph that had any.
+    """
+    monkeypatch.setattr(
+        migrate, "snapshot_tables", lambda *_: {"Memory": 2, "Tagged": 1}
+    )
+
+    report, mismatched = migrate.verify(
+        "omnigraph",
+        "file:///new",
+        ["council"],
+        {"council": {"Memory": 2, "Tagged": 3}},
+        {"council": {"Tagged": 2}},
+    )
+
+    assert mismatched == []
+    assert report["council"]["expected"] == {"Memory": 2, "Tagged": 1}
+    assert report["council"]["collapsed_duplicates"] == {"Tagged": 2}
+
+
+def test_verify_still_fails_a_short_rebuild(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Collapse accounting must not excuse a table that lost rows it kept."""
+    monkeypatch.setattr(
+        migrate, "snapshot_tables", lambda *_: {"Memory": 1, "Tagged": 1}
+    )
+
+    report, mismatched = migrate.verify(
+        "omnigraph",
+        "file:///new",
+        ["council"],
+        {"council": {"Memory": 2, "Tagged": 3}},
+        {"council": {"Tagged": 2}},
+    )
+
+    assert mismatched == ["council"]
+    assert report["council"]["changed_tables"] == ["Memory"]
+
+
+def test_verify_accepts_an_empty_table_the_new_schema_added(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A graph created before its schema grew a type has no baseline row for
+    that table, and the rebuild creates it empty. Found on a real local store
+    that predates TaskComment.
+    """
+    monkeypatch.setattr(
+        migrate, "snapshot_tables", lambda *_: {"Memory": 2, "TaskComment": 0}
+    )
+
+    report, mismatched = migrate.verify(
+        "omnigraph", "file:///new", ["council"], {"council": {"Memory": 2}}, {}
+    )
+
+    assert mismatched == []
+    assert report["council"]["new_tables"] == ["TaskComment"]
+
+
+def test_verify_fails_a_new_table_that_has_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No export can put rows in a table the old graph lacked, so rows there
+    mean the rebuild loaded something the baseline never counted.
+    """
+    monkeypatch.setattr(
+        migrate, "snapshot_tables", lambda *_: {"Memory": 2, "TaskComment": 3}
+    )
+
+    report, mismatched = migrate.verify(
+        "omnigraph", "file:///new", ["council"], {"council": {"Memory": 2}}, {}
+    )
+
+    assert mismatched == ["council"]
+    assert report["council"]["changed_tables"] == ["TaskComment"]
 
 
 def test_cutover_instructions_set_both_paired_config_values() -> None:
@@ -275,6 +538,26 @@ def test_every_node_precedes_every_edge_across_batches(tmp_path: Path) -> None:
             else:
                 assert not seen_edge, "a node followed an edge across batches"
     assert seen_edge
+
+
+def test_batch_numbering_continues_across_the_node_and_edge_groups(
+    tmp_path: Path,
+) -> None:
+    """The two groups are written by separate passes, so their numbering has to
+    share a counter: restarting it for the edges would have edge batches
+    reopening the node batch files and silently dropping every node row.
+    """
+    export = _export(
+        tmp_path, nodes=migrate.KEYED_ROW_CAP + 10, edges=migrate.KEYED_ROW_CAP + 10
+    )
+
+    batches = migrate.chunk_export(export)
+
+    assert len(batches) == len({b.name for b in batches}), "a batch file was reused"
+    total = sum(
+        len([ln for ln in b.read_text().splitlines() if ln.strip()]) for b in batches
+    )
+    assert total == 2 * (migrate.KEYED_ROW_CAP + 10)
 
 
 def test_a_format_that_did_not_move_is_reported() -> None:
