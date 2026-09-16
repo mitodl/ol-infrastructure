@@ -98,6 +98,35 @@ number → continue.
   it keeps promoting a format-bumping image into the next environment while you
   are still migrating this one. Pause it before the build lands, or as soon as
   you see the failed CI deploy.
+- **Pause `pulumi-witan` too, and freeze the witan writers.** Pausing
+  `pulumi-omnigraph` is not enough: `witan-ci-indexer` and `witan-view-reaper`
+  live in the `witan` namespace, belong to the witan stack, and a witan deploy
+  reconciles them back to active. Both write to the graphs.
+
+  ```shell
+  fly -t <target> pause-pipeline -p pulumi-witan
+  kubectl -n witan patch cronjob witan-ci-indexer  -p '{"spec":{"suspend":true}}'
+  kubectl -n witan patch cronjob witan-view-reaper -p '{"spec":{"suspend":true}}'
+  ```
+
+  **`suspend` stops the next schedule, not the run in progress.** A Job created
+  a minute ago keeps writing through your export. Check for one and wait it out
+  (or delete it) before arming anything:
+
+  ```shell
+  # .status.active is the only field that means "a pod is running right now".
+  kubectl -n witan get cronjobs,jobs \
+    -o custom-columns='KIND:.kind,NAME:.metadata.name,ACTIVE:.status.active'
+  # Then, per active Job: wait for it, or stop it.
+  kubectl -n witan wait --for=condition=complete job/<name> --timeout=15m
+  kubectl -n witan delete job/<name>        # if it will not finish in the window
+  ```
+
+  Do NOT filter with `--field-selector status.successful!=1` or
+  `kubectl wait --for=condition=complete job --all`: both match long-dead
+  *failed* Jobs (this cluster carries indexer failures over a month old), so
+  they either report phantom work or block until timeout on corpses.
+
 - **CI, then QA, then Production**, each with a soak. This rebuilds every graph;
   do it once somewhere cheap first.
 - **Size the outage.** The data tier is down for the whole procedure — this is
@@ -265,15 +294,8 @@ around the `cluster-apply` Job, which runs the NEW image and fails against the
 old root until `storage_prefix` flips — the Deployment `depends_on` it, so an
 untargeted apply reports failure there anyway.
 
-★ **Pause `pulumi-witan` as well as `pulumi-omnigraph`, and suspend the two
-witan writers by hand.** `witan-ci-indexer` and `witan-view-reaper` live in the
-`witan` namespace, are not managed by this stack, and the witan pipeline
-un-suspends them:
-
-```shell
-kubectl -n witan patch cronjob witan-ci-indexer  -p '{"spec":{"suspend":true}}'
-kubectl -n witan patch cronjob witan-view-reaper -p '{"spec":{"suspend":true}}'
-```
+Freezing the writers is part of **Before you start**, not this step — by the
+time you are arming the migration it is already too late.
 
 **Two config knobs, and the distinction is the point.**
 `migrate_to_prefix` is where the rebuild WRITES. `storage_prefix` is what the
