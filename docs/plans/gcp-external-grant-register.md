@@ -1,7 +1,8 @@
 # GCP external-grant register
 
-Status: tooled; production and QA clusters probed 2026-08-24. Incomplete — the
-three Airbyte SOPS credentials and `ol-eng-library-platform@` are outstanding.
+Status: tooled; production and QA clusters probed 2026-08-24, Airbyte SOPS
+credentials probed 2026-09-17. Incomplete: the institutional-research SA
+(production Vault) and `ol-eng-library-platform@` (Heroku) are outstanding.
 The "edx.org grants" question is closed: the counterparty is IRx, not edx.org.
 Opened 2026-08-24 for task
 `tk-enumerate-external-google-product-grants-per-cre-070a83` (p0).
@@ -358,6 +359,49 @@ reads per-project monitoring and those projects are not ours.
 
 Probing them settles it: `client_email` names the owning project. All three are now
 in `probe-all`'s manifest, reached through a new `--sops FILE:FIELD` source.
+
+#### SOPS run, 2026-09-17
+
+| SOPS file : field | Identity | Home project | Result |
+|---|---|---|---|
+| `data.production.yaml:google_service_account_json` | `ol-data-platform-production@` | `ol-data-platform` (OL) | Same 3 IRx BigQuery projects as the Vault copy |
+| `data.qa.yaml:google_service_account_json` | `ol-data-platform-qa@` | `ol-data-platform` (OL) | Same identity as the QA Vault copy (not re-probed) |
+| `data.ci.yaml:google_service_account_json` | `ol-data-platform-ci@` | `ol-data-platform` (OL) | **Token exchange `invalid_grant`** |
+| `data.production.yaml:emeritus_google_service_account_json` | `mit-xpro-sis@` | **`emeritus-data-science`** (Emeritus) | **Token exchange `invalid_grant`** |
+| `data.production.yaml:global_alumni_google_service_account_json` | `mit-xpro-bigquery@` | **`global-alumni-365215`** (Global Alumni) | BigQuery on its own project: datasets `mit_xpro_api`, `_9ec9b669…` |
+
+What this settles:
+
+- **Both partner credentials were issued from the partners' own projects.** OL
+  cannot re-create them, and does not need to: they are not in OL's estate, so
+  consolidating into `mitol01` does not touch them. They drop out of the
+  migration's re-issue list. What they do need is an owner on the OL side who
+  knows to ask the partner when a key has to be rotated.
+- **The Emeritus key is dead.** `invalid_grant` on a well-formed key means the
+  key was deleted or disabled in `emeritus-data-science`, or the SA was. The
+  SOPS copy dates from 2024-11-21 (`7c080e607`). `lakehouse/definitions.py`
+  still schedules `emeritus_bigquery__s3_data_lake` every 24h. Not yet checked:
+  whether Airbyte holds a newer key entered by hand (the SOPS copy is then only
+  stale) or this one (the sync is then failing).
+- **The CI Airbyte secret is a hand-edited copy of QA's.** CI and QA carry the
+  same `private_key_id` but different `client_email`s. A key id belongs to exactly
+  one SA, so the CI secret pairs QA's private key with the CI SA's address, and
+  Google rejects the assertion. Replacing the CI secret with a real
+  `ol-data-platform-ci@` key (or with the QA one, unedited) is the fix. The
+  `invalid_grant` is confirmed; the edit as its cause is inferred from the key id.
+- **Airbyte's production credential is `ol-data-platform-production@`**, the same
+  identity as Vault `secret-data/pipelines/google-service-account`. The 30-day
+  traffic above shows the IRx BigQuery reads under `ol-data-platform-qa@`, not
+  `-production@`. Either QA Airbyte runs the IRx syncs, or production Airbyte's
+  connection was configured by hand with the QA key rather than from SOPS.
+  **Unresolved**, and it matters for cutover: the replacement SA has to go into
+  whichever Airbyte actually runs the sync.
+
+A tool fix forced by this run: a partner-issued key was vouching for its home
+project, so `global-alumni-365215` reported as OL's (`third_party: false`). The
+same rule would have added a partner's org folder to the owned-parent set, and
+laundered everything else in that org. Manifest entries marked `partner` now
+never vouch, and their home projects classify as third party.
 
 ### Dataset-level enumeration
 

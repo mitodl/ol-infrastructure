@@ -218,6 +218,38 @@ def test_owned_project_override_is_honoured(grants, monkeypatch):
     assert pinned.classify_project("mitx-pipeline-main-dc29") is False
 
 
+def test_a_partner_issued_key_does_not_vouch_for_its_project(grants, monkeypatch):
+    """Observed: Global Alumni's key lives in global-alumni-365215, their project.
+
+    Letting it vouch like our own keys reported the partner's project as OL's,
+    which would drop it from the list of grants needing the partner to re-issue.
+    """
+    monkeypatch.setattr(
+        grants,
+        "_project_parent",
+        lambda project_id, _cache: PARENTS.get(project_id, ""),
+    )
+    run = grants._ownership_for_run(
+        [{"project_id": "ol-data-platform"}],
+        (),
+        (),
+        [{"project_id": "global-alumni-365215"}],
+    )
+    assert run.classify_project("global-alumni-365215") is True
+    assert run.classify_project("ol-data-platform") is False
+
+
+def test_partner_entries_in_the_manifest_are_the_airbyte_partner_keys(grants):
+    """A partner key missing this flag silently vouches for the partner's project."""
+    partners = {entry["sops"] for entry in grants.ESTATE if "partner" in entry}
+    assert partners == {
+        "src/bridge/secrets/airbyte/data.production.yaml"
+        ":emeritus_google_service_account_json",
+        "src/bridge/secrets/airbyte/data.production.yaml"
+        ":global_alumni_google_service_account_json",
+    }
+
+
 def test_service_account_grantors_route_through_the_hierarchy(owner):
     """Every project's SAs share the gserviceaccount.com suffix, ours and theirs."""
     assert owner.classify_email("sa@ol-data-platform.iam.gserviceaccount.com") is False
@@ -442,3 +474,39 @@ def test_dataset_enumeration_paginates(grants, monkeypatch):
 
     monkeypatch.setattr(grants, "_get", fake_get)
     assert grants._datasets_in("token", "p") == ["one", "two"]
+
+
+class _Response:
+    def __init__(self, status_code, body):
+        self.status_code = status_code
+        self._body = body
+        self.ok = status_code < 400
+
+    def json(self):
+        if isinstance(self._body, Exception):
+            raise self._body
+        return self._body
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        (
+            {"error": "invalid_grant", "error_description": "eyJhbGciOi..."},
+            "token exchange failed: HTTP 400 invalid_grant",
+        ),
+        (ValueError("not json"), "token exchange failed: HTTP 400"),
+    ],
+)
+def test_token_failure_reports_the_oauth_code_and_nothing_else(
+    grants, monkeypatch, body, expected
+):
+    """Separate a deleted or disabled key from a scope refusal.
+
+    The description is dropped because Google can echo the assertion in it.
+    """
+    monkeypatch.setattr(grants.jwt, "encode", lambda *_a, **_k: "assertion")
+    monkeypatch.setattr(grants.requests, "post", lambda *_a, **_k: _Response(400, body))
+    with pytest.raises(grants.ProbeError) as raised:
+        grants._access_token(SA_KEY)
+    assert str(raised.value) == expected

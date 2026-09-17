@@ -315,8 +315,17 @@ def _access_token(key: dict[str, Any]) -> str:
         timeout=TIMEOUT,
     )
     if not response.ok:
-        # Google echoes the assertion back in some errors; report status only.
-        message = f"token exchange failed: HTTP {response.status_code}"
+        # Google echoes the assertion back in some errors, and the assertion can
+        # mint tokens until it expires, so only the OAuth error code is reported.
+        # That code is what separates a deleted or disabled key (invalid_grant)
+        # from a refused scope (unauthorized_client).
+        try:
+            code = str(response.json().get("error", ""))[:40]
+        except ValueError:
+            code = ""
+        message = f"token exchange failed: HTTP {response.status_code}" + (
+            f" {code}" if code else ""
+        )
         raise ProbeError(message)
     try:
         return str(response.json()["access_token"])
@@ -419,10 +428,12 @@ class Ownership:
         owned_parents: set[str],
         extra_projects: set[str],
         home_projects: set[str] | None = None,
+        partner_projects: set[str] | None = None,
     ) -> None:
         """Hold the parents treated as OL's, plus known-OL and pinned projects."""
         self.owned_parents = owned_parents
         self.home_projects = home_projects or set()
+        self.partner_projects = partner_projects or set()
         self.extra_projects = extra_projects
         self._cache: dict[str, str] = {}
 
@@ -432,6 +443,8 @@ class Ownership:
 
     def classify_project(self, project_id: str) -> bool | None:
         """Report True when third party, False when OL's, None when undecidable."""
+        if project_id in self.partner_projects:
+            return True
         if project_id in self.extra_projects or project_id in self.home_projects:
             # A project whose credential we hold in our own secret store is ours
             # by the strongest evidence available, whatever its parentage.
@@ -486,6 +499,7 @@ def _ownership_for_run(
     keys: list[dict[str, Any]],
     extra_parents: tuple[str, ...],
     extra_projects: tuple[str, ...],
+    partner_keys: list[dict[str, Any]] | None = None,
 ) -> Ownership:
     """Build one ownership model from every credential in this run.
 
@@ -496,6 +510,10 @@ def _ownership_for_run(
     a third party. Seeding from the credentials actually being probed keeps that
     correct without hardcoding a folder id, which is the stale-list failure this
     design already fell into once.
+
+    `partner_keys` are credentials a partner issued from their own project and
+    handed to us. Holding one in our secret store proves nothing about who owns
+    its project, so they never vouch; their home projects are third party.
     """
     cache: dict[str, str] = {}
     owned_parents = set(extra_parents)
@@ -511,7 +529,12 @@ def _ownership_for_run(
         # where "has no parent" is not.
         if parent and parent != UNKNOWN_PARENT:
             owned_parents.add(parent)
-    model = Ownership(owned_parents, set(extra_projects), home_projects)
+    partner_projects = {
+        key["project_id"] for key in partner_keys or () if key.get("project_id")
+    }
+    model = Ownership(
+        owned_parents, set(extra_projects), home_projects, partner_projects
+    )
     model._cache = cache  # noqa: SLF001
     return model
 
@@ -865,14 +888,16 @@ ESTATE: tuple[dict[str, str], ...] = (
         ":google_service_account_json",
     },
     {
-        "label": "Airbyte emeritus_google_service_account_json -- partner-held?",
+        "label": "Airbyte emeritus_google_service_account_json -- Emeritus-held",
         "sops": "src/bridge/secrets/airbyte/data.production.yaml"
         ":emeritus_google_service_account_json",
+        "partner": "issued from the partner's own GCP project",
     },
     {
-        "label": "Airbyte global_alumni_google_service_account_json -- partner-held?",
+        "label": "Airbyte global_alumni_google_service_account_json -- GA-held",
         "sops": "src/bridge/secrets/airbyte/data.production.yaml"
         ":global_alumni_google_service_account_json",
+        "partner": "issued from the partner's own GCP project",
     },
     {
         # Found via dagster_server_policy.hcl, not via any inventory pass. OL owns
@@ -1126,7 +1151,7 @@ def probe_all(
     print(f"# Vault: {vault_addr}", file=sys.stderr)
     print(f"# {len(ESTATE)} credentials queued\n", file=sys.stderr)
 
-    loaded: list[tuple[str, dict[str, Any]]] = []
+    loaded: list[tuple[dict[str, str], dict[str, Any]]] = []
     results: list[dict[str, Any]] = []
     for index, entry in enumerate(ESTATE, start=1):
         label = entry["label"]
@@ -1154,20 +1179,21 @@ def probe_all(
             )
             print(f"      load failed: {error}", file=sys.stderr)
             continue
-        loaded.append((label, key))
+        loaded.append((entry, key))
 
     # Ownership is built from every credential in the run, so a legacy-estate
     # credential and a mitol01 one do not each judge the other as third party.
     owner = _ownership_for_run(
-        [key for _, key in loaded],
+        [key for entry, key in loaded if "partner" not in entry],
         tuple(owned_parent or ()),
         tuple(owned_project or ()),
+        [key for entry, key in loaded if "partner" in entry],
     )
     _print_ownership_basis(owner)
 
-    for label, key in loaded:
+    for entry, key in loaded:
         result = _probe_one(key, owner)
-        result["source_label"] = label
+        result["source_label"] = entry["label"]
         results.append(result)
         print(
             f"      {result['credential']}: {len(result['grants'])} grant(s)",
