@@ -12,6 +12,7 @@ engine), and asserts the result matches the endpoint patterns and nothing else.
 """
 
 import re
+from typing import Any
 
 import pytest
 
@@ -76,7 +77,7 @@ def unescape_promql_string(literal: str) -> str:
 
 
 @pytest.mark.parametrize("target", REAL_TARGETS)
-def test_escaped_literal_survives_both_layers(target):
+def test_escaped_literal_survives_both_layers(target: str) -> None:
     """An escaped literal unescapes to a regex matching exactly itself."""
     regex = unescape_promql_string(_regex_escape(target))
     assert re.fullmatch(regex, target), (
@@ -84,7 +85,7 @@ def test_escaped_literal_survives_both_layers(target):
     )
 
 
-def test_escaped_alternation_matches_only_the_literals():
+def test_escaped_alternation_matches_only_the_literals() -> None:
     """The journey's alternation matches its endpoints and nothing adjacent."""
     journey = Journey(
         uid="test",
@@ -112,7 +113,7 @@ def test_escaped_alternation_matches_only_the_literals():
         assert not regex.match(near_miss), f"alternation wrongly matched {near_miss!r}"
 
 
-def test_backslash_escapes_to_four_not_three():
+def test_backslash_escapes_to_four_not_three() -> None:
     """A literal backslash needs four in the query text, not the obvious three.
 
     Three produces `\\` followed by a stray escape, which Mimir rejects with
@@ -123,7 +124,7 @@ def test_backslash_escapes_to_four_not_three():
     unescape_promql_string(_regex_escape(r"^logout\/?$"))  # must not raise
 
 
-def test_journey_rejects_duplicate_targets():
+def test_journey_rejects_duplicate_targets() -> None:
     """Two steps on one target would silently merge into one table row."""
     with pytest.raises(ValueError, match="distinct http_target"):
         Journey(
@@ -140,7 +141,7 @@ def test_journey_rejects_duplicate_targets():
         )
 
 
-def test_journey_rejects_focus_step_that_is_not_a_step():
+def test_journey_rejects_focus_step_that_is_not_a_step() -> None:
     """A typo'd focus_step would open the dashboard on an empty endpoint."""
     with pytest.raises(ValueError, match="not one of"):
         Journey(
@@ -154,7 +155,7 @@ def test_journey_rejects_focus_step_that_is_not_a_step():
         )
 
 
-def test_journey_rejects_a_backtick_in_a_target():
+def test_journey_rejects_a_backtick_in_a_target() -> None:
     """A backtick is the one character the trace panels' raw string cannot hold."""
     with pytest.raises(ValueError, match="backtick"):
         Journey(
@@ -168,7 +169,7 @@ def test_journey_rejects_a_backtick_in_a_target():
         )
 
 
-def test_trace_panels_use_a_raw_string_for_the_span_name():
+def test_trace_panels_use_a_raw_string_for_the_span_name() -> None:
     """Double-quoted TraceQL interprets escapes and breaks on a backslash.
 
     `^logout\\/?$` is a real http_target on mitxonline-webapp; querying it with
@@ -187,7 +188,7 @@ def test_trace_panels_use_a_raw_string_for_the_span_name():
         assert 'name="GET' not in query
 
 
-def test_layout_advances_by_the_tallest_panel_in_a_row():
+def test_layout_advances_by_the_tallest_panel_in_a_row() -> None:
     """Advancing by the last panel placed would overlap a taller neighbour."""
     layout = _Layout()
     tall = layout.place(width=12, height=10, x=0)
@@ -197,7 +198,7 @@ def test_layout_advances_by_the_tallest_panel_in_a_row():
     assert following["y"] == 10, "next row landed on top of the taller panel"
 
 
-def test_layout_closes_an_unfinished_row_before_a_divider():
+def test_layout_closes_an_unfinished_row_before_a_divider() -> None:
     """A half-width panel with no partner must not be drawn over."""
     layout = _Layout()
     orphan = layout.place(width=12, height=6, x=0)
@@ -205,13 +206,13 @@ def test_layout_closes_an_unfinished_row_before_a_divider():
     assert divider_y >= orphan["y"] + orphan["h"]
 
 
-def test_layout_rejects_a_panel_that_overflows_the_grid():
+def test_layout_rejects_a_panel_that_overflows_the_grid() -> None:
     with pytest.raises(ValueError, match="overflows"):
         _Layout().place(width=12, height=4, x=18)
 
 
 @pytest.mark.parametrize("journey", JOURNEYS, ids=lambda j: j.slug)
-def test_configured_journeys_have_no_overlapping_panels(journey):
+def test_configured_journeys_have_no_overlapping_panels(journey: Journey) -> None:
     """Every shipped dashboard lays out cleanly on Grafana's 24-column grid."""
     dashboard = render(journey)
     occupied: dict[tuple[int, int], str] = {}
@@ -226,7 +227,7 @@ def test_configured_journeys_have_no_overlapping_panels(journey):
                 occupied[(x, y)] = panel["title"]
 
 
-def render(journey):
+def render(journey: Journey) -> dict[str, Any]:
     """Render a journey through the real panel helpers."""
     return uj._dashboard_json(
         journey,
@@ -238,7 +239,7 @@ def render(journey):
     )
 
 
-def test_journey_filter_is_inlined_not_a_dashboard_variable():
+def test_journey_filter_is_inlined_not_a_dashboard_variable() -> None:
     """The endpoint regex must not travel through Grafana interpolation.
 
     Grafana's Prometheus datasource escapes interpolated variable values on the

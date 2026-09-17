@@ -114,8 +114,11 @@ MIT_LEARN_ORGANIZATION_DASHBOARD = Journey(
             target="api/v0/b2b/manager/organizations/$",
             note=(
                 "ContractContent calls this to decide whether to show the "
-                "contract admin link, so it runs for every viewer, not only "
-                "for managers."
+                "contract admin link. Gated: the query is enabled only when "
+                "the B2BContractManagerDashboard or B2BAnalyticsDashboard "
+                "PostHog flag is on, and then it runs for every viewer rather "
+                "than only for managers. With both flags off this step has no "
+                "traffic at all, which is correct rather than a broken panel."
             ),
         ),
     ],
