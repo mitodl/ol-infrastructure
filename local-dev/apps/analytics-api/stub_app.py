@@ -253,6 +253,90 @@ RESOURCES = {
     "content-engagement": CONTENT_ENGAGEMENT,
 }
 
+# learner-progress is handled separately from RESOURCES: it is the one
+# individual-learner endpoint (see mit-learn's LearnerProgress type), so it
+# takes its own filters (search, completion_status, consent) and its own
+# envelope field (outcomes_withheld_count) rather than the aggregate
+# resources' shared offset/limit-only handling.
+#
+# Course runs match ENROLLMENT_FUNNEL's two contract-1 rows so the frontend's
+# module filter — sourced from enrollment-funnel — actually narrows this data.
+_LEARNER_COURSERUNS = [
+    {
+        "courserun_readable_id": "course-v1:MITx+14.310x+2026_Spring",
+        "courserun_title": "Data Analysis for Social Scientists",
+        "courserun_start_on": "2026-01-05T00:00:00Z",
+        "courserun_end_on": "2026-05-15T00:00:00Z",
+    },
+    {
+        "courserun_readable_id": "course-v1:MITx+6.86x+2026_Spring",
+        "courserun_title": "Machine Learning with Python",
+        "courserun_start_on": "2026-01-05T00:00:00Z",
+        "courserun_end_on": "2026-05-15T00:00:00Z",
+    },
+]
+
+_LEARNER_FIRST_NAMES = [
+    "Anton", "Hugo", "Jordan", "Marcus", "Sam", "Nina", "Rohan", "Tobias",
+    "Zara", "Grace", "Amara", "Chiara", "Sofia", "Aisha", "Noah", "Yuki",
+    "Anja", "Luca", "Priya", "Mateo", "Elena", "Kwame", "Ines", "Felix",
+]
+_LEARNER_LAST_NAMES = [
+    "Petrov", "Bernard", "Brooks", "Reid", "Okafor", "Lang", "Malik",
+    "Nakamura", "Nwosu", "Bruno", "Rossi", "Rahman", "Weiss", "Tanaka",
+    "Kowalski", "Gupta", "Moreau", "Silva", "Haddad", "Novak", "Adeyemi",
+    "Cohen", "Dubois", "Park",
+]
+_LEARNER_STATUSES = ["not_started", "in_progress", "passed", "certified"]
+
+
+def _build_learner_progress():
+    """Deterministic so the stub's fixture is stable across pod restarts.
+
+    Roughly one enrollment in nine has withheld consent (outcomes_shared
+    False, every outcome field null) and one in twelve is deactivated, so
+    both the consent banner and `include_inactive` have something to show
+    without any per-request randomness.
+    """
+    rows = []
+    for i, first in enumerate(_LEARNER_FIRST_NAMES):
+        last = _LEARNER_LAST_NAMES[(i * 7) % len(_LEARNER_LAST_NAMES)]
+        for run_index, run in enumerate(_LEARNER_COURSERUNS):
+            n = i * len(_LEARNER_COURSERUNS) + run_index
+            shared = n % 9 != 0
+            status = _LEARNER_STATUSES[n % len(_LEARNER_STATUSES)]
+            certified = status == "certified"
+            rows.append(
+                {
+                    "learner_id": f"kc-{1000 + n}",
+                    "email": f"{first.lower()}.{last.lower()}@example.edu",
+                    "full_name": f"{first} {last}",
+                    "courserun_readable_id": run["courserun_readable_id"],
+                    "courserun_title": run["courserun_title"],
+                    "courserun_start_on": run["courserun_start_on"],
+                    "courserun_end_on": run["courserun_end_on"],
+                    "enrolled_on": "2026-01-12T00:00:00Z",
+                    "enrollment_is_active": n % 12 != 0,
+                    "enrollment_mode": "audit" if n % 4 == 0 else "verified",
+                    "outcomes_shared": shared,
+                    "completion_status": status if shared else None,
+                    "is_passing": (status in ("passed", "certified")) if shared else None,
+                    "grade": round((n % 10) / 10, 2) if shared else None,
+                    "letter_grade": None,
+                    "certificate_issued_on": "2026-06-01T00:00:00Z"
+                    if shared and certified
+                    else None,
+                    "certificate_is_revoked": False if shared and certified else None,
+                    # Null here too: real activity data doesn't exist yet
+                    # upstream either (mitodl/ol-data-platform#2672).
+                    "last_active_on": None,
+                }
+            )
+    return rows
+
+
+LEARNER_PROGRESS = _build_learner_progress()
+
 # Identity of "the" contract every contract-scoped request is treated as
 # viewing — the stub ignores which contract_id is actually in the path (same
 # policy as the org UUID) and always answers as contract "1".
@@ -299,6 +383,65 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    @staticmethod
+    def _parse_offset_limit(qs):
+        offset = int(qs.get("offset", ["0"])[0])
+        limit_raw = qs.get("limit", [None])[0]
+        limit = int(limit_raw) if limit_raw is not None else None
+        return offset, limit
+
+    def _handle_learner_progress(self, org, qs):
+        """learner-progress: filter, sort, then page — in that order, so
+        `total_count`/`outcomes_withheld_count` reflect the filtered set and
+        not the fixture's full 48 rows."""
+        search = (qs.get("search", [""])[0] or "").strip().lower()
+        statuses = qs.get("completion_status", [])
+        include_inactive = qs.get("include_inactive", ["false"])[0].lower() == "true"
+        courserun = qs.get("courserun_readable_id", [None])[0]
+        sort_key = qs.get("sort", ["full_name"])[0]
+        descending = qs.get("descending", ["false"])[0].lower() == "true"
+
+        rows = LEARNER_PROGRESS
+        if not include_inactive:
+            rows = [r for r in rows if r["enrollment_is_active"]]
+        if courserun:
+            rows = [r for r in rows if r["courserun_readable_id"] == courserun]
+        if search:
+            rows = [
+                r
+                for r in rows
+                if search in r["full_name"].lower() or search in r["email"].lower()
+            ]
+        if statuses:
+            rows = [
+                r
+                for r in rows
+                if (r["completion_status"] in statuses)
+                or (r["completion_status"] is None and "unknown" in statuses)
+            ]
+
+        if sort_key in ("full_name", "email", "enrolled_on", "courserun_readable_id"):
+            rows = sorted(rows, key=lambda r: r[sort_key], reverse=descending)
+
+        total_count = len(rows)
+        outcomes_withheld_count = sum(1 for r in rows if not r["outcomes_shared"])
+
+        offset, limit = self._parse_offset_limit(qs)
+        page = rows[offset:]
+        if limit is not None:
+            page = page[:limit]
+
+        self._send_json(
+            200,
+            {
+                "organization_id": org,
+                "as_of": AS_OF,
+                "total_count": total_count,
+                "outcomes_withheld_count": outcomes_withheld_count,
+                "data": page,
+            },
+        )
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
@@ -318,6 +461,20 @@ class Handler(BaseHTTPRequestHandler):
 
         org = match.group("org")
         resource = match.group("resource")
+        qs = parse_qs(parsed.query)
+
+        if resource == "learner-progress":
+            if not contract_scoped:
+                self._send_json(
+                    404, {"detail": "learner-progress is contract-scoped only"}
+                )
+                return
+            try:
+                self._handle_learner_progress(org, qs)
+            except ValueError:
+                self._send_json(422, {"detail": "limit/offset must be integers"})
+            return
+
         rows = _rows_for(resource, contract_scoped)
         if rows is None:
             self._send_json(
@@ -327,11 +484,8 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         # Honor LIMIT/OFFSET paging the way the real API does.
-        qs = parse_qs(parsed.query)
         try:
-            offset = int(qs.get("offset", ["0"])[0])
-            limit_raw = qs.get("limit", [None])[0]
-            limit = int(limit_raw) if limit_raw is not None else None
+            offset, limit = self._parse_offset_limit(qs)
         except ValueError:
             self._send_json(422, {"detail": "limit/offset must be integers"})
             return
