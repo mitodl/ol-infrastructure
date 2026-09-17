@@ -319,14 +319,22 @@ if _mitlearn_bucket_is_sigv4_piloted:
     # Dedicated identity for Fastly to authenticate to S3 with (SigV4), so the
     # bucket can be fully private instead of Principal:"*". Scoped to GetObject
     # on just this bucket.
+    # Concourse's deploy role can only manage IAM users/policies under the
+    # /ol-applications/* path (see
+    # applications/concourse/iam_policies/pulumi_infra.py), and only via
+    # managed policy attach/detach -- it has no iam:PutUserPolicy /
+    # iam:DeleteUserPolicy. A default-path user with an inline policy (the
+    # original shape here) is invisible to that grant and fails with
+    # AccessDenied the moment Concourse tries to apply it.
     mitlearn_fastly_s3_signer_user = iam.User(
         "ol-mitlearn-ci-fastly-s3-signer",
         name=f"ol-mitlearn-{stack_info.env_suffix}-fastly-s3-signer",
+        path="/ol-applications/",
         tags=aws_config.tags,
     )
-    mitlearn_fastly_s3_signer_policy = iam.UserPolicy(
+    mitlearn_fastly_s3_signer_policy = iam.Policy(
         "ol-mitlearn-ci-fastly-s3-signer-policy",
-        user=mitlearn_fastly_s3_signer_user.name,
+        path="/ol-applications/",
         policy=json.dumps(
             {
                 "Version": "2012-10-17",
@@ -342,10 +350,15 @@ if _mitlearn_bucket_is_sigv4_piloted:
             }
         ),
     )
+    mitlearn_fastly_s3_signer_policy_attachment = iam.UserPolicyAttachment(
+        "ol-mitlearn-ci-fastly-s3-signer-policy-attachment",
+        user=mitlearn_fastly_s3_signer_user.name,
+        policy_arn=mitlearn_fastly_s3_signer_policy.arn,
+    )
     mitlearn_fastly_s3_signer_access_key = iam.AccessKey(
         "ol-mitlearn-ci-fastly-s3-signer-access-key",
         user=mitlearn_fastly_s3_signer_user.name,
-        opts=ResourceOptions(depends_on=[mitlearn_fastly_s3_signer_policy]),
+        opts=ResourceOptions(depends_on=[mitlearn_fastly_s3_signer_policy_attachment]),
     )
     # The durable Vault copy of this key (for visibility/rotation tooling
     # outside of Pulumi state) is created further down, once the mit-learn
