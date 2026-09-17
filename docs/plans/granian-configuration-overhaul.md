@@ -444,7 +444,7 @@ Component change lands once; per-app behavior changes as each app's stack is dep
 
   **Unblocked 2026-09-17: `mitxonline` webapp moves to 1 worker × 16 blocking threads.**
   Both blockers above are closed and `granian_*` series arrive. Measured over the 14 days
-  to 2026-09-17 (up to 15 pods, ~13.7 rps):
+  to 2026-09-17 (up to 15 pods, 6.5 rps average):
 
   | signal | value |
   | --- | --- |

@@ -555,7 +555,7 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
 #
 # Production declares 2800Mi, just under that 2838MiB 14-day admission minimum, so it
 # reserves no more than the VPA was already granting and gives a 2520MiB cap with
-# ~280MiB for the Granian master and overshoot between RSS samples. CI and QA keep
+# ~280MiB for the Granian master and other overhead. CI and QA keep
 # 1200Mi: QA peaked at 988MiB working set over the same 14 days, across up to 13 pods.
 # See tk-stage-3-blocker-mitxonline-s-vpa-never-runs-at-t-cc6acf.
 mitxonline_web_memory_limit = mitxonline_config.get("web_memory_limit") or "1200Mi"
