@@ -2,9 +2,9 @@
 
 **Status:** stage 0 merged 2026-07-23 (#5083); stage 1 merged 2026-07-27 (#5135), validated
 in production 2026-08-07; stage 2 merged 2026-08-10 (#5344), validated in production
-2026-08-17; stage 3 `mitxonline` **blocked**, `edxapp` CMS rolled back and **blocked**
-pending retuning (see stage 3), LMS handled separately per install (`mitxonline` LMS
-opted in 2026-09-17 at 1 × 24); stage 4 pending
+2026-08-17; stage 3 `mitxonline` webapp in review 2026-09-17 (see stage 3), `edxapp` CMS
+rolled back and **blocked** pending retuning (see stage 3), LMS handled separately per
+install (`mitxonline` LMS opted in 2026-09-17 at 1 × 24); stage 4 pending
 **Project:** `wp-granian-configuration-overhaul-expose-blocking-t-3debc2`
 **Component:** `src/ol_infrastructure/components/services/k8s.py` — `GranianConfig`
 **Evidence:** witan lessons `les-granianconfig-never-exposes-blocking-threads-bac-874462`,
@@ -441,6 +441,28 @@ Component change lands once; per-app behavior changes as each app's stack is dep
      retargeted RSS cap thrashing. Confirm with
      `count by (namespace) (granian_workers_spawns)` and `up{namespace="mitxonline"}`
      after the production deploy.
+
+  **Unblocked 2026-09-17: `mitxonline` webapp moves to 1 worker × 16 blocking threads.**
+  Both blockers above are closed and `granian_*` series arrive. Measured over the 14 days
+  to 2026-09-17 (up to 15 pods, ~13.7 rps):
+
+  | signal | value |
+  | --- | --- |
+  | busy blocking threads, busiest pod, p99 | 0.78 |
+  | busy blocking threads, busiest pod, max | 11.7 (2026-09-16 14:09Z edxapp Deployment replacement) |
+  | same, outside that window | 6.8 (35-minute edX slowdown 2026-09-14, CPU < 0.13 cores/pod) |
+  | `granian_connections_active`, max per pod | 36 |
+  | RSS respawns / OOMKills | 404 / 11 |
+  | admitted memory limit, min / p5 | 2838 / 2991 MiB |
+
+  The respawn count retires the "`workers_max_rss` is aggregate-invariant" framing. At
+  `workers=2` the ceiling-derived cap fired per worker at 1408MiB, about 30 times a day.
+  At `workers=1` the same 2816MiB would sit 22MiB under the lowest admitted limit before
+  counting the master process, turning graceful respawns into OOMKills. Instead the
+  declared memory (and so the VPA's `minAllowed`) is per stack: Production `2800Mi`, just
+  under the 14-day admission minimum, so the component's default cap (2520MiB) sits
+  below every limit a pod can be admitted with. CI/QA stay at `1200Mi` (QA peaked at
+  988MiB). The ceiling-derived override and its constants are gone.
 
   **Resequenced 2026-08-17: `edxapp` CMS goes first, and LMS is pulled out of stage 3.**
   With `mitxonline` blocked and `edxapp` blocked by nothing, CMS went ahead. Measuring to

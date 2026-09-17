@@ -14,7 +14,6 @@ from pathlib import Path
 import pulumi
 import pulumi_fastly as fastly
 import pulumi_vault as vault
-from kubernetes.utils.quantity import parse_quantity
 from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
@@ -538,54 +537,29 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
 )
 
 # Webapp memory is owned by the VPA (see the VPA block at the end of this file), not
-# the HPA. `mitxonline_web_memory_limit` is what the Deployment template declares; the
-# VPA's admission controller rewrites requests and limits as each pod is admitted, so
-# most pods do not run with this value -- but some do. Measured in production,
-# kube_pod_container_resource_limits for mitxonline-app ranged 1200MiB-3072MiB over 30d,
-# sitting at exactly 1200Mi for ~30 hours. It is the VPA's minAllowed floor (defaulted
-# from resource_requests), and a pod admitted while the recommendation is low really is
-# admitted there.
-mitxonline_web_memory_limit = "1200Mi"
-mitxonline_web_memory_ceiling = "3Gi"
-
-# Granian's --workers-max-rss is resolved at Pulumi synth time, so it cannot be derived
-# from the container memory limit once the VPA starts moving that limit at runtime.
-# Deriving it from the VPA ceiling instead keeps the worker cap valid across the entire
-# range the VPA may resize into. Left to the component default
-# (limit / workers * 0.9) it would stay pinned to the 1200Mi starting budget, and
-# workers would recycle at ~540MiB forever without ever using the headroom the VPA
-# granted.
+# the HPA. `mitxonline_web_memory_limit` is what the Deployment template declares and,
+# because the component defaults the VPA's minAllowed to the memory request, also the
+# lowest limit any pod can be admitted with. The VPA may grow a pod from there up to
+# `mitxonline_web_memory_ceiling`.
 #
-# KNOWN GAP, deliberately left as-is -- this is not a safe cap, it is the least-bad one.
-# Both available synth-time answers are wrong for some pod:
-#   - Ceiling-derived (what this does): 2816MiB aggregate. Above the real cgroup limit
-#     for any pod admitted below that, which production shows happens routinely on
-#     scale-up -- the admitted limit was under 2816MiB for roughly 13 of the last 30
-#     days' samples. For those pods the RSS cap never fires and the kernel OOM killer
-#     gets there first, i.e. the safety net is off exactly when new pods arrive.
-#   - Floor-derived (the component default): 1080MiB. Below the p95 working set of
-#     ~2645MiB, so it would respawn the worker continuously under normal traffic.
-# Ceiling-derived is kept because it is correct for the steady-state majority and merely
-# absent for the rest, whereas floor-derived is actively harmful for all of them. Do not
-# read the choice as an endorsement, and do not "simplify" it to the component default.
+# Granian's --workers-max-rss is resolved at synth time from this declared value
+# (the component default, 90% of the limit for one worker). That is only safe when the
+# declared value really is the floor, so the floor is set per stack at the lowest limit
+# a pod actually needs, rather than pinning the cap to the VPA ceiling. The previous
+# ceiling-derived cap (2816MiB) sat above the admitted limit of any pod the VPA started
+# low. At workers=2 it fired per worker at 1408MiB, 404 times in production over the 14
+# days to 2026-09-17, alongside 11 OOMKills. At workers=1 a single worker would have had
+# to reach 2816MiB, 22MiB under the lowest limit admitted in that window (2838MiB),
+# before the master process is even counted, so those graceful respawns would have
+# become OOMKills.
 #
-# There is no synth-time value that closes this. The two real fixes are reading the
-# cgroup at runtime (tk-evaluate-runtime-cgroup-derived-workers-max-rss--1cd258) or
-# raising the VPA's minAllowed toward the ceiling so every admitted pod starts near it,
-# at the cost of a guaranteed per-pod reservation.
+# Production declares 2800Mi, just under that 2838MiB 14-day admission minimum, so it
+# reserves no more than the VPA was already granting and gives a 2520MiB cap with
+# ~280MiB for the Granian master and overshoot between RSS samples. CI and QA keep
+# 1200Mi: QA peaked at 988MiB working set over the same 14 days, across up to 13 pods.
 # See tk-stage-3-blocker-mitxonline-s-vpa-never-runs-at-t-cc6acf.
-#
-# The MiB value is parsed from `mitxonline_web_memory_ceiling` rather than restated as
-# a literal, so the ceiling has exactly one source of truth and changing its value or
-# units cannot silently mis-size the worker cap.
-MITXONLINE_GRANIAN_WORKERS = 2
-# Headroom for the Granian master process and interpreter overhead, which sit outside
-# the per-worker RSS budget but inside the container memory limit.
-GRANIAN_MASTER_OVERHEAD_MIB = 256
-mitxonline_granian_workers_max_rss = (
-    int(parse_quantity(mitxonline_web_memory_ceiling)) // (1024 * 1024)
-    - GRANIAN_MASTER_OVERHEAD_MIB
-) // MITXONLINE_GRANIAN_WORKERS
+mitxonline_web_memory_limit = mitxonline_config.get("web_memory_limit") or "1200Mi"
+mitxonline_web_memory_ceiling = "3Gi"
 
 # Horizontal scaling is KEDA-driven on APISIX request rate and p95 latency, with a
 # CPU trigger as a backstop, matching edxapp and mit-learn. CPU alone is a poor
@@ -634,26 +608,18 @@ mitxonline_k8s_app = OLApplicationK8s(
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
-            # Holding pins: preserve the pre-overhaul effective concurrency until
-            # this app's stage of the rollout. Granian derived backpressure=64
-            # (backlog=128 // workers=2) and blocking_threads=64 // 2 = 32.
-            # Delete all four (and revert workers to the default) to adopt the
-            # component defaults (1 worker, 8 blocking threads, and
-            # DEFAULT_WSGI_BACKPRESSURE connections). Note backpressure is no
-            # longer derived from blocking_threads: it caps connections, and the
-            # component default is well above this 64 (which is not binding here --
-            # this app peaks at 23 connections per worker).
+            # One worker, scaled with replicas, per the component defaults. Blocking
+            # threads are pinned above the component's 8: over the 14 days to
+            # 2026-09-17 the busiest pod peaked at 11.7 concurrently-busy threads
+            # (during the 2026-09-16 edxapp Deployment replacement, with requests
+            # stalled on edX) and 6.8 outside it (a 35-minute edX slowdown on
+            # 2026-09-14, CPU under 0.13 cores per pod). p99 of the busiest pod was
+            # 0.78. 16 covers both stalls. Backpressure takes the component default;
+            # peak connections were 36 per pod.
             # See docs/plans/granian-configuration-overhaul.md
-            workers=MITXONLINE_GRANIAN_WORKERS,
-            runtime_mode="mt",
-            runtime_threads=2,
-            blocking_threads=32,
-            backpressure=64,
+            blocking_threads=16,
             blocking_threads_idle_timeout=120,
             enable_metrics=True,
-            # Pinned to the VPA ceiling rather than the component's default
-            # limit-derived calculation. See the note above.
-            workers_max_rss=mitxonline_granian_workers_max_rss,
             # Serve /static/* from Granian's Rust layer instead of the sidecar
             # (docs/plans/remove-nginx-sidecar.md, stage 5), same shape as
             # ocw_studio/xpro. STATIC_ROOT is /src/staticfiles, the same
@@ -700,10 +666,9 @@ mitxonline_k8s_app = OLApplicationK8s(
         ),
         resource_requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
         resource_limits={"memory": mitxonline_web_memory_limit},
-        # Memory is managed vertically by the component's webapp VPA; the ceiling
-        # below is what `mitxonline_granian_workers_max_rss` is derived from, so keep
-        # the two in sync if either changes. Horizontal scaling is KEDA-driven (see
-        # above), so hpa_scaling_metrics is unused -- the component builds a
+        # Memory is managed vertically by the component's webapp VPA, between the
+        # declared limit above and the ceiling below. Horizontal scaling is KEDA-driven
+        # (see above), so hpa_scaling_metrics is unused -- the component builds a
         # ScaledObject instead of a native HPA when webapp_keda_config is set.
         webapp_vpa_max_allowed_memory=mitxonline_web_memory_ceiling,
         webapp_keda_config=mitxonline_webapp_keda_config,
