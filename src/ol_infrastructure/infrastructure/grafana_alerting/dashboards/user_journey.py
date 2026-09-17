@@ -21,17 +21,35 @@ mechanism is "stop issuing one query per row", the mechanism is visible as the
 count of Postgres child spans under the request span, which is a structural
 TraceQL query. Read the caveat on that row's panels -- traces are tail-sampled
 and the absolute number is biased, the change between releases is not.
+
+WHY THE JOURNEY FILTER IS INLINED RATHER THAN A DASHBOARD VARIABLE: the set of
+endpoints is fixed at deploy time, so it is baked into each expression instead
+of held in a `constant` variable. That is not a style choice. The endpoint
+patterns contain backslashes, and Grafana's Prometheus datasource runs
+interpolated variable values through its own escaping on the way out, which
+would double those backslashes again and turn `\\^api/...` into an unmatchable
+pattern -- silently, with every panel reading "No data" and no error anywhere.
+Inlining removes that layer, so the query text that ships is the query text that
+can be tested directly against the datasource.
 """
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
+
+from pulumi import Input, ResourceOptions
 
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources import (
     MIMIR_DATASOURCE_REF,
 )
+from ol_infrastructure.infrastructure.grafana_alerting.dashboards.promql import (
+    DURATION_METRIC,
+    ZERO,
+    quantile,
+    rate,
+)
 
-_DURATION = "http_server_duration_milliseconds"
+_GRID_WIDTH = 24
 
 # RE2's metacharacters. The endpoint patterns these dashboards filter on are
 # themselves Django URL regexes (`api/v2/courses/$`, `^api/v0/users/me/$`), so
@@ -41,27 +59,43 @@ _DURATION = "http_server_duration_milliseconds"
 _RE2_METACHARACTERS = r"\.+*?()|[]{}^$"
 
 
-def _promql_regex_escape(literal: str) -> str:
-    """Escape a literal so it matches only itself in a PromQL `=~` matcher.
+def _regex_escape(literal: str) -> str:
+    r"""Escape a literal so it matches only itself in a PromQL `=~` matcher.
 
     Two layers of escaping stack here, and getting only the inner one right
     fails loudly while getting neither right fails silently.
 
-    The inner layer is RE2, which needs `^` written as `\\^`. The outer layer is
-    PromQL's string literal, which follows Go's rules: `\\^` inside double
-    quotes is not a recognised escape sequence, and Mimir rejects the whole
-    query with `parse error: unknown escape sequence U+005E '^'`. Each
-    backslash therefore has to survive into the regex as a doubled backslash in
-    the query text, so a metacharacter `c` is emitted as `\\\\c`.
+    The inner layer is RE2, which needs `^` written as `\^`. The outer layer is
+    PromQL's string literal, which follows Go's rules: `\^` inside double quotes
+    is not a recognised escape sequence, and Mimir rejects the whole query with
+    `parse error: unknown escape sequence U+005E '^'`. Every backslash the regex
+    needs therefore has to be written twice in the query text.
 
-    Verified against the production stack on 2026-09-17 via /api/ds/query: the
-    single-backslash form returns HTTP 400 for every panel using it, the
-    doubled form returns all nine of this journey's endpoints.
+    So an ordinary metacharacter `c` is emitted as `\\c` (RE2 sees `\c`), and a
+    literal backslash is emitted as `\\\\` (RE2 sees `\\`, which matches one
+    backslash). Emitting three backslashes for the backslash case -- the obvious
+    off-by-one -- produces `\\` followed by a stray `\d`, which is again not a
+    valid Go escape and takes down every panel sharing the filter.
+
+    None of this journey's nine endpoints contain a backslash, but plenty of
+    real `http_target` values do (`^logout\/?$`, `documents/(\d+)/(.*)$`), so
+    the next journey appended to `journeys.py` is where it would have bitten.
+
+    The doubled form is verified against the datasource in
+    tests/ol_infrastructure/infrastructure/grafana_alerting/test_user_journey.py
+    and, on 2026-09-17, against the production stack via /api/ds/query: the
+    single-backslash form returns HTTP 400 for every query using it, the doubled
+    form returns all nine of this journey's endpoints.
     """
-    return "".join(
-        f"\\\\{character}" if character in _RE2_METACHARACTERS else character
-        for character in literal
-    )
+    escaped = []
+    for character in literal:
+        if character == "\\":
+            escaped.append("\\\\\\\\")
+        elif character in _RE2_METACHARACTERS:
+            escaped.append(f"\\\\{character}")
+        else:
+            escaped.append(character)
+    return "".join(escaped)
 
 
 @dataclass(frozen=True)
@@ -94,6 +128,8 @@ class Journey:
     :param steps: The journey's endpoints, in the order the browser calls them.
     :param known_gaps: What this dashboard cannot see, stated on the dashboard
         rather than left for a reader to discover by misreading a panel.
+    :raises ValueError: If two steps share a `target`, or `focus_step` is not
+        one of the steps.
     """
 
     uid: str
@@ -104,7 +140,27 @@ class Journey:
     focus_step: str
     steps: list[JourneyStep]
     known_gaps: str = ""
-    _services: list[str] = field(default_factory=list, init=False)
+
+    def __post_init__(self) -> None:
+        """Enforce the invariants the panel aggregations depend on."""
+        targets = [step.target for step in self.steps]
+        duplicates = {target for target in targets if targets.count(target) > 1}
+        if duplicates:
+            # The overview table aggregates `by (http_target)` and joins its
+            # columns on that one field, so two steps sharing a target would
+            # silently sum two services' traffic into a single row rather than
+            # failing. Rejecting it here is cheaper than defending every panel.
+            msg = (
+                f"{self.title}: steps must have distinct http_target values, "
+                f"got duplicates {sorted(duplicates)}"
+            )
+            raise ValueError(msg)
+        if self.focus_step not in targets:
+            msg = (
+                f"{self.title}: focus_step {self.focus_step!r} is not one of "
+                f"the journey's steps"
+            )
+            raise ValueError(msg)
 
     @property
     def services(self) -> list[str]:
@@ -112,9 +168,14 @@ class Journey:
         return list(dict.fromkeys(step.service for step in self.steps))
 
     @property
+    def service_regex(self) -> str:
+        """Alternation matching every service the journey touches."""
+        return "|".join(_regex_escape(service) for service in self.services)
+
+    @property
     def target_regex(self) -> str:
-        """PromQL-ready regex alternation matching exactly these endpoints."""
-        return "|".join(_promql_regex_escape(step.target) for step in self.steps)
+        """Alternation matching exactly this journey's endpoints."""
+        return "|".join(_regex_escape(step.target) for step in self.steps)
 
     @property
     def step_table(self) -> str:
@@ -132,75 +193,65 @@ class _Layout:
     """Running y-cursor for Grafana's 24-column grid.
 
     Hand-written gridPos coordinates go stale the moment a panel is inserted
-    above them, and Grafana silently overlaps panels rather than complaining.
+    above them, and Grafana repacks overlapping panels on load rather than
+    erroring, so the symptom of a mistake is a scrambled dashboard rather than a
+    failure anyone would notice in review.
     """
 
     def __init__(self) -> None:
         self.y = 0
+        self._row_height = 0
+
+    def _advance(self) -> None:
+        self.y += self._row_height
+        self._row_height = 0
 
     def row(self) -> int:
         """Reserve a full-width row divider (always 1 unit tall)."""
+        if self._row_height:
+            # A previous partial row never filled up; close it out rather than
+            # drawing the divider on top of it.
+            self._advance()
         y = self.y
         self.y += 1
         return y
 
     def place(self, *, width: int, height: int, x: int = 0) -> dict[str, int]:
-        """Place a panel at the cursor; advance only when the row is full."""
+        """Place a panel at the cursor; advance only when the row is full.
+
+        Tracks the tallest panel in the current row rather than the last one
+        placed: advancing by the last panel's height puts the next row on top of
+        a taller neighbour that is still occupying those cells.
+        """
+        if x + width > _GRID_WIDTH:
+            msg = (
+                f"panel at x={x} width={width} overflows the {_GRID_WIDTH}-column grid"
+            )
+            raise ValueError(msg)
         position = {"h": height, "w": width, "x": x, "y": self.y}
-        if x + width >= 24:  # noqa: PLR2004 - Grafana's grid is 24 wide
-            self.y += height
+        self._row_height = max(self._row_height, height)
+        if x + width == _GRID_WIDTH:
+            self._advance()
         return position
 
 
-def _rate(
-    selector: str, suffix: str = "count", window: str = "$__rate_interval"
-) -> str:
-    return f"rate({_DURATION}_{suffix}{{{selector}}}[{window}])"
-
-
-def _quantile(
-    quantile: float, selector: str, by: str = "", window: str = "$__rate_interval"
-) -> str:
-    grouping = f"le, {by}" if by else "le"
-    return (
-        f"histogram_quantile({quantile}, "
-        f"sum by ({grouping}) ({_rate(selector, 'bucket', window)}))"
-    )
-
-
 def _templating(journey: Journey) -> dict[str, Any]:
-    """Dashboard variables.
+    """Build the dashboard variables.
 
-    `steps` and `services` are constants rather than editable textboxes: they
-    are the definition of the journey, and a reader who edits them is looking
-    at a different journey. Everything a reader legitimately changes --- which
-    service, which two releases, which endpoint --- is a visible picker.
+    Only the things a reader legitimately changes are variables: which service,
+    which two releases, which endpoint. The journey's own endpoint set is not a
+    variable (see the module docstring on inlining).
 
-    `endpoint` is queried rather than hardcoded so that it follows `service`
-    and only ever offers endpoints that have data on the selected stack.
+    `endpoint` is queried rather than hardcoded so that it follows `service` and
+    only ever offers endpoints that have data on the stack being viewed.
     """
+    service_selector = f'service_name="$service", http_target=~"{journey.target_regex}"'
+    release_query = (
+        f'label_values({DURATION_METRIC}_count{{service_name="$service"}}, '
+        "service_version)"
+    )
     return {
         "list": [
-            {
-                "name": "steps",
-                "type": "constant",
-                "query": journey.target_regex,
-                "current": {
-                    "text": journey.target_regex,
-                    "value": journey.target_regex,
-                },
-                "hide": 2,
-            },
-            {
-                "name": "services",
-                "type": "constant",
-                "query": "|".join(journey.services),
-                "current": {
-                    "text": "|".join(journey.services),
-                    "value": "|".join(journey.services),
-                },
-                "hide": 2,
-            },
             {
                 "name": "service",
                 "label": "Service",
@@ -224,10 +275,7 @@ def _templating(journey: Journey) -> dict[str, Any]:
                 "label": "Release before",
                 "type": "query",
                 "datasource": MIMIR_DATASOURCE_REF,
-                "query": (
-                    f'label_values({_DURATION}_count{{service_name="$service"}}, '
-                    "service_version)"
-                ),
+                "query": release_query,
                 # Natural-order descending, so 1.166.10 sorts above 1.166.9
                 # rather than below it the way a plain string sort puts it.
                 "sort": 8,
@@ -238,10 +286,7 @@ def _templating(journey: Journey) -> dict[str, Any]:
                 "label": "Release after",
                 "type": "query",
                 "datasource": MIMIR_DATASOURCE_REF,
-                "query": (
-                    f'label_values({_DURATION}_count{{service_name="$service"}}, '
-                    "service_version)"
-                ),
+                "query": release_query,
                 "sort": 8,
                 "refresh": 2,
             },
@@ -250,11 +295,7 @@ def _templating(journey: Journey) -> dict[str, Any]:
                 "label": "Endpoint",
                 "type": "query",
                 "datasource": MIMIR_DATASOURCE_REF,
-                "query": (
-                    f"label_values({_DURATION}_count{{"
-                    'service_name="$service", http_target=~"$steps"}, '
-                    "http_target)"
-                ),
+                "query": f"label_values({DURATION_METRIC}_count{{{service_selector}}}, http_target)",
                 "current": {
                     "text": journey.focus_step,
                     "value": journey.focus_step,
@@ -266,14 +307,14 @@ def _templating(journey: Journey) -> dict[str, Any]:
 
 
 def _comparison_panels(
-    journey: Journey,  # noqa: ARG001 - kept for symmetry with the other sections
+    journey: Journey,
     layout: _Layout,
     timeseries_panel: Callable[..., dict[str, Any]],
     stat_panel: Callable[..., dict[str, Any]],
     table_panel: Callable[..., dict[str, Any]],
     row_panel: Callable[..., dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Before/after for one release pair, by `service_version`."""
+    """Build the before/after row for one release pair, by `service_version`."""
     endpoint = 'service_name="$service", http_target="$endpoint"'
     before = f'{endpoint}, service_version="$baseline"'
     after = f'{endpoint}, service_version="$candidate"'
@@ -283,30 +324,35 @@ def _comparison_panels(
     # a release that ended mid-range (the increase is spread over the full
     # window) but leaves the quantiles correct, because every histogram bucket
     # is deflated by the same factor.
-    journey_before = (
-        'service_name="$service", http_target=~"$steps", service_version="$baseline"'
+    journey_scope = f'service_name="$service", http_target=~"{journey.target_regex}"'
+    journey_before = f'{journey_scope}, service_version="$baseline"'
+    journey_after = f'{journey_scope}, service_version="$candidate"'
+    p95_before = quantile(0.95, journey_before, by="http_target", window="$__range")
+    p95_after = quantile(0.95, journey_after, by="http_target", window="$__range")
+    pick_two = (
+        "Reads exactly zero when the two release pickers are on the same "
+        "value, which is what they default to on first open. Set them to "
+        "different releases before reading anything on this row."
     )
-    journey_after = (
-        'service_name="$service", http_target=~"$steps", service_version="$candidate"'
-    )
-    p95_before = _quantile(0.95, journey_before, by="http_target", window="$__range")
-    p95_after = _quantile(0.95, journey_after, by="http_target", window="$__range")
 
     return [
         row_panel(
-            title="Release comparison - $service: $baseline vs $candidate",
+            title=(
+                "Release comparison - $service, $baseline vs $candidate "
+                "(set these to two different releases)"
+            ),
             y=layout.row(),
         ),
         stat_panel(
             title="p95 before - $endpoint",
-            expr=_quantile(0.95, before, window="$__range"),
+            expr=quantile(0.95, before, window="$__range"),
             grid_pos=layout.place(width=6, height=4, x=0),
             unit="ms",
             decimals=0,
         ),
         stat_panel(
             title="p95 after - $endpoint",
-            expr=_quantile(0.95, after, window="$__range"),
+            expr=quantile(0.95, after, window="$__range"),
             grid_pos=layout.place(width=6, height=4, x=6),
             unit="ms",
             decimals=0,
@@ -314,9 +360,9 @@ def _comparison_panels(
         stat_panel(
             title="Change in p95",
             expr=(
-                f"(({_quantile(0.95, after, window='$__range')}) - "
-                f"({_quantile(0.95, before, window='$__range')})) / "
-                f"({_quantile(0.95, before, window='$__range')})"
+                f"(({quantile(0.95, after, window='$__range')}) - "
+                f"({quantile(0.95, before, window='$__range')})) / "
+                f"({quantile(0.95, before, window='$__range')})"
             ),
             grid_pos=layout.place(width=6, height=4, x=12),
             unit="percentunit",
@@ -324,9 +370,15 @@ def _comparison_panels(
         ),
         stat_panel(
             title="Requests compared",
+            # `or vector(0)` on each term because these are label-less sums: a
+            # release that never served this endpoint yields an empty vector,
+            # and empty + anything is empty, so without it the panel reads "No
+            # data" instead of the release that does have traffic.
             expr=(
-                f"sum(increase({_DURATION}_count{{{before}}}[$__range])) + "
-                f"sum(increase({_DURATION}_count{{{after}}}[$__range]))"
+                f"(sum(increase({DURATION_METRIC}_count{{{before}}}[$__range])) "
+                f"{ZERO}) + "
+                f"(sum(increase({DURATION_METRIC}_count{{{after}}}[$__range])) "
+                f"{ZERO})"
             ),
             grid_pos=layout.place(width=6, height=4, x=18),
             unit="short",
@@ -336,14 +388,16 @@ def _comparison_panels(
             title="$endpoint latency by release",
             queries=[
                 {
-                    "expr": _quantile(
-                        quantile,
-                        'service_name="$service", http_target="$endpoint"',
+                    "expr": quantile(
+                        quantile_value,
+                        endpoint,
                         by="service_version",
                     ),
-                    "legend_format": f"p{int(quantile * 100)} {{{{service_version}}}}",
+                    "legend_format": (
+                        f"p{int(quantile_value * 100)} {{{{service_version}}}}"
+                    ),
                 }
-                for quantile in (0.50, 0.95, 0.99)
+                for quantile_value in (0.50, 0.95, 0.99)
             ],
             grid_pos=layout.place(width=12, height=8, x=0),
             unit="ms",
@@ -359,7 +413,7 @@ def _comparison_panels(
         ),
         timeseries_panel(
             title="$endpoint request rate by release",
-            expr=(f"sum by (service_version) ({_rate(endpoint)})"),
+            expr=f"sum by (service_version) ({rate(endpoint)})",
             legend_format="{{service_version}}",
             grid_pos=layout.place(width=12, height=8, x=12),
             unit="reqps",
@@ -371,7 +425,7 @@ def _comparison_panels(
             ),
         ),
         table_panel(
-            title="Per-endpoint before/after across the whole journey",
+            title="Per-endpoint before/after on $service",
             join_field="http_target",
             sort_by="p95 after (ms)",
             columns=[
@@ -390,7 +444,8 @@ def _comparison_panels(
                 {
                     "expr": (
                         "sum by (http_target) "
-                        f"(increase({_DURATION}_count{{{journey_after}}}[$__range]))"
+                        f"(increase({DURATION_METRIC}_count{{{journey_after}}}"
+                        "[$__range]))"
                     ),
                     "title": "Requests after",
                     "unit": "short",
@@ -399,12 +454,14 @@ def _comparison_panels(
             grid_pos=layout.place(width=24, height=10, x=0),
             description=(
                 "Whether the fix moved the endpoint it targeted, and whether "
-                "it moved anything else. The change columns subtract two "
-                "vectors matched on http_target, so an endpoint served by only "
-                "one of the two releases is dropped from the row set rather "
-                "than shown against a zero. Set the dashboard time range to "
-                "span both releases; each column aggregates over that whole "
-                "range and reads each release's own window out of it."
+                "it moved anything else. Covers this journey's steps on "
+                "$service only, so switching the Service picker changes which "
+                "steps appear. The change columns subtract two vectors matched "
+                "on http_target, so an endpoint served by only one of the two "
+                "releases is dropped from the row set rather than shown "
+                "against a zero. Set the dashboard time range to span both "
+                f"releases; each column aggregates over that whole range and "
+                f"reads each release's own window out of it. {pick_two}"
             ),
         ),
     ]
@@ -415,7 +472,7 @@ def _trace_panels(
     traceql_panel: Callable[..., dict[str, Any]],
     row_panel: Callable[..., dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Database work per request, from trace structure.
+    """Build the database-work row, read from trace structure.
 
     These two panels are meant to be read as a pair and divided by eye: the
     left over the right is queries per request. Grafana will not do that
@@ -457,9 +514,9 @@ def _trace_panels(
                 "queries per request; a fix that makes query count flat in "
                 "result-set size drops that ratio by an order of magnitude "
                 "while the panel on the right holds steady. Measured this way "
-                "on 2026-09-17, api/v2/courses/$ was running roughly 500 "
-                "Postgres queries per request on 1.166.3 through 1.166.5. "
-                f"{sampling_caveat}"
+                "on 2026-09-17, api/v2/courses/$ was running between roughly "
+                "500 and 700 Postgres queries per request depending on "
+                f"release. {sampling_caveat}"
             ),
         ),
         traceql_panel(
@@ -480,15 +537,25 @@ def _trace_panels(
 
 
 def _overview_panels(
+    journey: Journey,
     layout: _Layout,
     timeseries_panel: Callable[..., dict[str, Any]],
     table_panel: Callable[..., dict[str, Any]],
     row_panel: Callable[..., dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Show the journey as it stands now, independent of any release pair."""
-    journey = 'service_name=~"$services", http_target=~"$steps"'
-    errors_5xx = f'{journey}, http_status_code=~"5.."'
-    errors_4xx = f'{journey}, http_status_code=~"4.."'
+    """Build the whole-journey row, independent of any release pair."""
+    scope = (
+        f'service_name=~"{journey.service_regex}", '
+        f'http_target=~"{journey.target_regex}"'
+    )
+    errors_5xx = f'{scope}, http_status_code=~"5.."'
+    errors_4xx = f'{scope}, http_status_code=~"4.."'
+    # $__range, not $__rate_interval, for the table: several journey steps are
+    # low-traffic by design (variant runs fired 32 times in 7 days), and an
+    # instant query over a ~1 minute window leaves those rows blank almost
+    # always. The graphs below keep $__rate_interval because they plot shape
+    # over time rather than one summary number.
+    table_window = "$__range"
     return [
         row_panel(title="Journey overview - all steps, all releases", y=layout.row()),
         table_panel(
@@ -497,17 +564,23 @@ def _overview_panels(
             sort_by="p95 (ms)",
             columns=[
                 {
-                    "expr": f"sum by (http_target) ({_rate(journey)})",
+                    "expr": (
+                        f"sum by (http_target) ({rate(scope, window=table_window)})"
+                    ),
                     "title": "Requests/sec",
                     "unit": "reqps",
                 },
                 {
-                    "expr": _quantile(0.95, journey, by="http_target"),
+                    "expr": quantile(
+                        0.95, scope, by="http_target", window=table_window
+                    ),
                     "title": "p95 (ms)",
                     "unit": "ms",
                 },
                 {
-                    "expr": _quantile(0.99, journey, by="http_target"),
+                    "expr": quantile(
+                        0.99, scope, by="http_target", window=table_window
+                    ),
                     "title": "p99 (ms)",
                     "unit": "ms",
                 },
@@ -517,8 +590,10 @@ def _overview_panels(
                     # denominator. A step with no 5xx leaves the cell empty,
                     # which is honest, rather than joining onto every row.
                     "expr": (
-                        f"sum by (http_target) ({_rate(errors_5xx)}) / "
-                        f"sum by (http_target) ({_rate(journey)})"
+                        "sum by (http_target) "
+                        f"({rate(errors_5xx, window=table_window)}) / "
+                        "sum by (http_target) "
+                        f"({rate(scope, window=table_window)})"
                     ),
                     "title": "5xx ratio",
                     "unit": "percentunit",
@@ -526,25 +601,26 @@ def _overview_panels(
             ],
             grid_pos=layout.place(width=24, height=9, x=0),
             description=(
-                "One row per journey step. These are whole-service figures for "
-                "each endpoint, not only the requests this page made: nothing "
-                "on the metric distinguishes a call from the organization "
+                "One row per journey step, aggregated over the dashboard's "
+                "whole time range. These are whole-service figures for each "
+                "endpoint, not only the requests this page made: nothing on "
+                "the metric distinguishes a call from the organization "
                 "dashboard from the same endpoint called elsewhere. For steps "
                 "that only this journey calls the two are the same thing."
             ),
         ),
         timeseries_panel(
             title="p95 by step",
-            expr=_quantile(0.95, journey, by="http_target"),
-            legend_format="{{http_target}}",
+            expr=quantile(0.95, scope, by="service_name, http_target"),
+            legend_format="{{service_name}} {{http_target}}",
             grid_pos=layout.place(width=12, height=8, x=0),
             unit="ms",
             legend_calc="max",
         ),
         timeseries_panel(
             title="Request rate by step",
-            expr=f"sum by (http_target) ({_rate(journey)})",
-            legend_format="{{http_target}}",
+            expr=f"sum by (service_name, http_target) ({rate(scope)})",
+            legend_format="{{service_name}} {{http_target}}",
             grid_pos=layout.place(width=12, height=8, x=12),
             unit="reqps",
             legend_calc="mean",
@@ -559,11 +635,11 @@ def _overview_panels(
             title="Error rate by step",
             queries=[
                 {
-                    "expr": f"sum by (http_target) ({_rate(errors_5xx)})",
+                    "expr": f"sum by (http_target) ({rate(errors_5xx)})",
                     "legend_format": "5xx {{http_target}}",
                 },
                 {
-                    "expr": f"sum by (http_target) ({_rate(errors_4xx)})",
+                    "expr": f"sum by (http_target) ({rate(errors_4xx)})",
                     "legend_format": "4xx {{http_target}}",
                 },
             ],
@@ -611,21 +687,25 @@ def _dashboard_json(
                 journey, layout, timeseries_panel, stat_panel, table_panel, row_panel
             ),
             *_trace_panels(layout, traceql_panel, row_panel),
-            *_overview_panels(layout, timeseries_panel, table_panel, row_panel),
+            *_overview_panels(
+                journey, layout, timeseries_panel, table_panel, row_panel
+            ),
         ],
     }
 
 
 def create(
-    folder_uid: Any,
+    folder_uid: Input[str],
     journeys: list[Journey],
     timeseries_panel: Callable[..., dict[str, Any]],
     stat_panel: Callable[..., dict[str, Any]],
     table_panel: Callable[..., dict[str, Any]],
     traceql_panel: Callable[..., dict[str, Any]],
     row_panel: Callable[..., dict[str, Any]],
-    create_dashboard: Callable[..., None],
-    resource_opts: Any,
+    create_dashboard: Callable[
+        [str, Input[str], dict[str, Any], ResourceOptions], None
+    ],
+    resource_opts: ResourceOptions,
 ) -> None:
     """Create one dashboard per journey."""
     for journey in journeys:
