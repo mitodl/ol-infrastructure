@@ -940,6 +940,11 @@ data_tier = create_data_tier(
     cleanup_schedule=CLEANUP_SCHEDULE,
     cleanup_older_than=CLEANUP_OLDER_THAN,
     storage_prefix=STORAGE_PREFIX,
+    # Not used to build anything — these are what the DEPLOYING IMAGE's own
+    # declared storage format is cross-checked against, once data_tier has
+    # resolved the image reference. See validate_image_internal_schema.
+    internal_schema_version=INTERNAL_SCHEMA_VERSION,
+    migrate_to_prefix=MIGRATE_TO_PREFIX,
     per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     # Arming a migration suspends both maintenance sweeps for its duration.

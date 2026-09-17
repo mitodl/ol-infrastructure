@@ -725,11 +725,21 @@ they disagree (`storage.py::validate_internal_schema_version`) — a leftover
 `internal_schema_version` from the LAST migration, forgotten while
 `storage_prefix` moves to this one, is exactly the drift this exists to
 catch before it reaches the cluster as a crash-looping server rather than a
-preview failure. **This check does not verify either value against the
-image actually being deployed or the live store's own
-`internal_schema_version`** — it is a self-consistency check between two
-committed config values, not a substitute for `check_format_moved`'s
-verdict above or for following this runbook's ordering.
+preview failure. It is a self-consistency check between two committed config
+values, and it is still not a substitute for `check_format_moved`'s verdict
+above or for following this runbook's ordering. It does not read the live
+store's own `internal_schema_version`.
+
+The DEPLOYING IMAGE is checked separately, by
+`storage.py::validate_image_internal_schema` against the
+`edu.mit.ol.omnigraph.internal-schema` label agent-kit stamps onto it
+(agent-kit#358). While the migration is armed that comparison is against
+`migrate_to_prefix`, since the image and the served root are supposed to
+disagree during the rebuild; once the knobs clear it is against
+`internal_schema_version`, so a cutover committing the wrong digits fails the
+preview rather than the pod. An image carrying no readable label, which is
+every image built before agent-kit#358, warns and skips rather than blocking
+— that is what keeps a rollback deployable.
 
 **Took the automated path?** Clear the migration knobs in this SAME config
 change, not later at step 7:
