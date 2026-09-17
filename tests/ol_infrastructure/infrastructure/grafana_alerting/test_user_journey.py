@@ -154,6 +154,39 @@ def test_journey_rejects_focus_step_that_is_not_a_step():
         )
 
 
+def test_journey_rejects_a_backtick_in_a_target():
+    """A backtick is the one character the trace panels' raw string cannot hold."""
+    with pytest.raises(ValueError, match="backtick"):
+        Journey(
+            uid="test",
+            title="test",
+            slug="test",
+            description="",
+            primary_service="svc",
+            focus_step="api/v2/`courses`/$",
+            steps=[JourneyStep(label="a", service="one", target="api/v2/`courses`/$")],
+        )
+
+
+def test_trace_panels_use_a_raw_string_for_the_span_name():
+    """Double-quoted TraceQL interprets escapes and breaks on a backslash.
+
+    `^logout\\/?$` is a real http_target on mitxonline-webapp; querying it with
+    a double-quoted span name fails with `parse error: invalid char escape`.
+    """
+    dashboard = render(MIT_LEARN_ORGANIZATION_DASHBOARD)
+    trace_queries = [
+        target["query"]
+        for panel in dashboard["panels"]
+        for target in panel.get("targets", [])
+        if target.get("queryType") == "traceql"
+    ]
+    assert trace_queries, "no TraceQL panels rendered"
+    for query in trace_queries:
+        assert "name=`GET $endpoint`" in query
+        assert 'name="GET' not in query
+
+
 def test_layout_advances_by_the_tallest_panel_in_a_row():
     """Advancing by the last panel placed would overlap a taller neighbour."""
     layout = _Layout()

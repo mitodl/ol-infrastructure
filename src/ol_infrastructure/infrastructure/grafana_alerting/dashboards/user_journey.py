@@ -161,6 +161,19 @@ class Journey:
                 f"the journey's steps"
             )
             raise ValueError(msg)
+        backticked = [target for target in targets if "`" in target]
+        if backticked:
+            # The trace panels address spans as ``name=`GET <target>` `` so that
+            # a backslash in the pattern survives; a backtick is the one
+            # character that raw string cannot carry. No Django URL pattern has
+            # one, so this is a guard against a typo rather than a real
+            # restriction.
+            msg = (
+                f"{self.title}: http_target values cannot contain a backtick, "
+                f"which would break the trace panels' TraceQL string: "
+                f"{sorted(backticked)}"
+            )
+            raise ValueError(msg)
 
     @property
     def services(self) -> list[str]:
@@ -490,7 +503,22 @@ def _trace_panels(
     # spans and metric series alike. `>>` is the descendant operator, so this
     # counts the Postgres spans underneath *this endpoint's* request spans
     # rather than every Postgres span the service emits.
-    request_spans = '{resource.service.name="$service" && name="GET $endpoint"}'
+    # Backticks, not double quotes: TraceQL's double-quoted strings interpret
+    # escape sequences the same way PromQL's do, so an endpoint pattern holding
+    # a backslash (`^logout\/?$` is a real one on mitxonline-webapp) fails with
+    # `parse error: invalid char escape`. A backtick string is raw. Checked
+    # 2026-09-17 against the production stack: the double-quoted form errors on
+    # that span name, the backtick form matches its 114 spans.
+    #
+    # This is strictly safer rather than provably airtight. The value arrives
+    # through Grafana's variable interpolation, and whether the Tempo datasource
+    # escapes it on the way out is frontend behaviour with no server-side probe
+    # (the same layer that forced the journey regex to be inlined). Raw strings
+    # cannot be worse: the double-quoted form breaks on a backslash regardless,
+    # the raw form breaks only if Grafana escapes. `Journey` rejects a target
+    # containing a backtick, which is the one character a raw string cannot
+    # carry, and no URL pattern has one.
+    request_spans = '{resource.service.name="$service" && name=`GET $endpoint`}'
     postgres_under_request = f'{request_spans} >> {{span.db.system="postgresql"}}'
     sampling_caveat = (
         "Traces are tail-sampled, so both panels describe the sampled "
