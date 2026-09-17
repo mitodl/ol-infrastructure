@@ -612,7 +612,18 @@ def create_data_tier(  # noqa: PLR0913
             # and lists it under Don't; concurrent writers rely on a single
             # server's in-process CAS, not cross-process coordination. Do NOT add
             # an HPA or bump replicas without validating multi-writer safety.
-            replicas=1,
+            #
+            # ZERO WHILE A MIGRATION IS ARMED, which is what makes an armed
+            # window survive a plain `pulumi up`. Arming means the rebuild has
+            # not finished, so the served root is still the old format while
+            # this image can only read the new one — a running pod is a
+            # crashloop at best and a second writer against a root being
+            # rebuilt at worst. Declaring 1 unconditionally (with no
+            # ignore_changes) is why both the CI and QA cutovers needed
+            # `pulumi up --target` and a manual `kubectl scale`: an untargeted
+            # apply scaled the tier back up mid-migration. Clearing
+            # migrate_from_image at cutover scales it back to 1.
+            replicas=0 if migration_armed else 1,
             # Recreate, NOT the default RollingUpdate: storage is
             # strict-single-version ("a binary reads exactly one storage-format
             # version"; a mixed fleet writing one graph is unsupported), so a
