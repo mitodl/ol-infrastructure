@@ -3,7 +3,8 @@
 **Status:** stage 0 merged 2026-07-23 (#5083); stage 1 merged 2026-07-27 (#5135), validated
 in production 2026-08-07; stage 2 merged 2026-08-10 (#5344), validated in production
 2026-08-17; stage 3 `mitxonline` **blocked**, `edxapp` CMS rolled back and **blocked**
-pending retuning (see stage 3), LMS handled separately per install; stage 4 pending
+pending retuning (see stage 3), LMS handled separately per install (`mitxonline` LMS
+opted in 2026-09-17 at 1 × 24); stage 4 pending
 **Project:** `wp-granian-configuration-overhaul-expose-blocking-t-3debc2`
 **Component:** `src/ol_infrastructure/components/services/k8s.py` — `GranianConfig`
 **Evidence:** witan lessons `les-granianconfig-never-exposes-blocking-threads-bac-874462`,
@@ -470,6 +471,18 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   early, and it is tracked as
   `tk-edxapp-lms-needs-blocking-threads-sized-from-mea-317fe2`.
 
+  **Sized 2026-09-17: `mitxonline` LMS goes to 1 worker × 24 blocking threads, backpressure
+  at the component default.** Re-measured over the 14 days to 2026-09-16 14:00Z (stopping
+  before the delete-before-replace outage that followed). The 17.7 above did not
+  reproduce. Worst per-pod busy threads (5-minute mean) was 13.95, on 2026-09-09 ~01:15Z, and only 2 of
+  18 pods ran hot (9–11 for ~20 minutes) while the other 16 stayed under 3. That is skew
+  across pods, not aggregate demand.
+  `granian_blocking_queue` never went above 3 outside the outage. 24 is ~1.7× the worst
+  pod. The worst single worker held 24 connections against its 64 over 7 days, so
+  backpressure is not binding and takes 256 like `mitx` LMS. CPU is the other limit on one
+  worker: the busiest pod's p99 was 0.82 cores (max 1.44), and KEDA's CPU trigger fires
+  at 0.35 cores, so this is a watch item, not a blocker.
+
   Note what this says about the original ordering. "CMS first, it takes far less traffic
   than LMS" is true on traffic and wrong on risk: `mitxonline` CMS at 0.9 rps needs p99
   8.7 threads while `mitx` LMS at 4.4 rps needs 0.27. Concurrency is rate × service time,
@@ -491,6 +504,16 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   last 3**, once its VPA grew the pods past the declared 4Gi. LMS respawns, by contrast,
   are ongoing (8 and 10 over 14 days), which is a second independent reason to keep it at
   2 workers for now.
+
+  > **Superseded 2026-09-17 for `mitxonline` LMS.** The respawn argument above no longer
+  > holds. Over the 14 days to 2026-09-16 14:00Z, `granian_workers_spawns` rose above its
+  > starting value of 2 on only 3 of ~807 LMS pods (62 respawns in total). All three were
+  > the pods crash-looping on node `ip-10-13-153-180` on 2026-09-14, failing their startup
+  > probe with HTTP 500 from `/heartbeat`. Every other pod ran the whole window without a
+  > respawn. Count respawns as max minus min per pod: `increase()` over the counter reads
+  > 228, because each new pod's first scrape already shows its initial spawns. Peak
+  > container RSS was 2485MiB for both workers together, under the 2764MiB cap a single
+  > worker gets from the 3Gi limit. LMS moves to one worker on the 2026-09-17 sizing above.
 
   **Production rollback — 2026-08-26.** The judgment above was wrong because the
   busy-thread percentile hid the burst shape of a normal Studio authoring page load and
