@@ -18,7 +18,8 @@ config:
     AI_MIT_SEARCH_URL: "https://api.learn.mit.edu/api/v0/vector_learning_resources_search/"
     AI_PROMPT_CACHE_FUNCTION: "ai_chatbots.utils.get_django_cache"
     CANVAS_SYLLABUS_DEMO_READABLE_IDS: ["14566-kaleba:20211202", "34642-15.095_FA25"]
-    CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: ["14566-kaleba:20211202+canvas", "34642-15.095_FA25+canvas", "39673-21M.385 / 21M.585 / 6.4550+canvas"]
+    CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: ["14566-kaleba:20211202+canvas", "34642-15.095_FA25+canvas",
+      "39673-21M.385 / 21M.585 / 6.4550+canvas"]
     CELERY_TASK_ALWAYS_EAGER: "false"
     CSRF_COOKIE_NAME: learn_ai_csrftoken
     CSRF_COOKIE_DOMAIN: "learn.mit.edu"
