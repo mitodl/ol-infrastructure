@@ -250,8 +250,8 @@ def create_k8s_resources(  # noqa: C901
     # respawn_interval (default 3.5s) regardless, so at one worker a short interval
     # refuses connections until the import finishes. On 2026-09-17, mitxonline LMS
     # pods on warm nodes went Ready 18s after container start (the first probe). On a
-    # node that had just pulled the image, first starts exceeded the 60s startup probe
-    # and the restarts still refused connections 24s in. 60s covers the restart case;
+    # node that had just pulled the image, a first start exceeded the 60s startup probe
+    # and its restart still refused connections 24s in. 60s covers the restart case;
     # a respawn never runs on a node without the image. worker_startup_rss is the p95 container RSS
     # of pods 1-5 minutes old at one worker (mitxonline LMS 1075MiB over the first 80
     # minutes at workers=1; mitx and mitx-staging LMS and CMS 609-642MiB over 7 days),
