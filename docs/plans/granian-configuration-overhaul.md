@@ -206,6 +206,16 @@ Consequences:
   > `minAllowed`. Note this exposure already exists in the live `workers=2` config, whose
   > aggregate cap is the same 2816MiB — it is not introduced by stage 3.
 
+  > **Superseded 2026-09-17: the higher-`minAllowed` option above is the one taken.** The
+  > ceiling-derived override is removed, and so is the "aggregate cap is the same"
+  > argument, because the cap is checked per worker. At `workers=2` it fired at 1408MiB
+  > 404 times in 14 days. At `workers=1` a 2816MiB cap would leave 22MiB under the lowest
+  > admitted limit (2838MiB). Production now declares `2800Mi`, which is also the VPA's
+  > `minAllowed`, so the component's limit-derived cap (2520MiB) is below every limit a
+  > pod can be admitted with. The "Corrected action" above (retarget the override at one
+  > worker) is withdrawn too. See the stage 3 `mitxonline` note and lesson
+  > `les-granian-workers-max-rss-is-per-worker-so-a-cap-t-31dc80`.
+
 ### 5. Health probes — deferred, not dropped
 
 Splitting liveness to a TCP socket check while readiness stays HTTP (per #663) is the
