@@ -109,10 +109,14 @@ config:
       workers: 1
       runtime_threads: 1
       blocking_threads: 8
+      respawn_interval: 60
+      worker_startup_rss: 700
     lms:
       workers: 1
       runtime_threads: 1
       blocking_threads: 8
+      respawn_interval: 60
+      worker_startup_rss: 700
   edxapp:k8s_replicas:
     webapp:
       cms:

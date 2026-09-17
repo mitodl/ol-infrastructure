@@ -14,6 +14,7 @@ from pydantic import (
     ConfigDict,
     Field,
     NonNegativeInt,
+    PositiveFloat,
     PositiveInt,
     field_validator,
     model_validator,
@@ -330,8 +331,9 @@ class GranianConfig(BaseModel):
 
     The supported subset of granian CLI options is: interface, host, port, workers,
     runtime_mode, runtime_threads, blocking_threads, backpressure, no_ws,
-    workers_max_rss, blocking_threads_idle_timeout, respawn_failed_workers, backlog,
-    log_level, application_module, and metrics-related flags.
+    workers_max_rss, blocking_threads_idle_timeout, respawn_failed_workers,
+    respawn_interval, backlog, log_level, application_module, and metrics-related
+    flags.
 
     **Concurrency defaults:** ``workers``, ``runtime_threads`` and ``runtime_mode`` track
     Granian's own CLI defaults (1 / 1 / auto); scale horizontally with replicas rather
@@ -385,18 +387,42 @@ class GranianConfig(BaseModel):
     concurrent Python work."""
     no_ws: bool = True
     limit_workers_max_rss: bool = True
-    """When ``True`` (default), automatically cap each worker's RSS at 90 % of the
-    per-worker share of the container memory limit.  Set to ``False`` to disable the
-    ``--workers-max-rss`` flag entirely (e.g. for ASGI apps without a fixed memory
-    budget or when the limit is managed externally)."""
+    """When ``True`` (default), derive ``--workers-max-rss`` from the container memory
+    limit; see ``resolve_workers_max_rss``.  Set to ``False`` to disable the flag
+    entirely (e.g. for ASGI apps without a fixed memory budget or when the limit is
+    managed externally)."""
     workers_max_rss: PositiveInt | None = None
     """Explicit per-worker RSS cap in MiB.  When ``None`` and ``limit_workers_max_rss``
     is ``True``, the value is derived from the container ``resource_limits["memory"]``
-    via ``floor(memory_limit_bytes / workers * 0.9) MiB``.  Set explicitly only to
-    override the computed value."""
+    by ``resolve_workers_max_rss``.  Set explicitly only to override the computed
+    value."""
+    worker_startup_rss: PositiveInt | None = None
+    """RSS in MiB of a newly spawned worker shortly after it has imported the app,
+    measured per app. Subtracted from the memory budget before it is split into a
+    per-worker cap.
+
+    A planned respawn (RSS cap, lifetime) starts the replacement worker before stopping
+    the old one and keeps both for ``respawn_interval`` (granian/server/common.py
+    ``_respawn_workers``, v2.7.4 and v2.8.2). So the moment a cap trips, the container
+    holds every worker at up to the cap plus a new worker. Without this term, one worker
+    at 90% of the limit plus an app import exceeds the limit, and the graceful respawn
+    becomes the OOMKill the cap exists to prevent. ``None`` leaves it out of the
+    derivation, which is only safe where the cap never trips."""
     blocking_threads_idle_timeout: PositiveInt | None = None
     """Seconds before an idle blocking thread is retired (granian ``--blocking-threads-idle-timeout``). Omitted when ``None``."""
     respawn_failed_workers: bool = True
+    respawn_interval: PositiveFloat | None = None
+    """Seconds Granian keeps the old worker running after starting its replacement
+    during a planned respawn (granian ``--respawn-interval``, default 3.5). ``None``
+    takes Granian's default.
+
+    Granian 2.8.x has no listener in the main process: each worker binds its own
+    SO_REUSEPORT socket only after importing the app, and the old worker is stopped
+    once this interval elapses whether or not the new one is listening. At workers=1 an
+    interval shorter than the app's import time leaves the pod refusing connections for
+    the difference. Size it above the measured worker cold start. On 2.7.x the main
+    process holds the listener, so connections queue instead and this only sets how
+    long two workers overlap. Crash respawns do not wait for it either way."""
     backlog: PositiveInt | None = 128
     """Kernel listen backlog (granian ``--backlog``). Now that ``backpressure`` and
     ``blocking_threads`` are resolved explicitly this no longer feeds Granian's own
@@ -513,6 +539,48 @@ class GranianConfig(BaseModel):
             raise ValueError(msg)
         return self
 
+    @model_validator(mode="after")
+    def validate_worker_startup_rss(self) -> "GranianConfig":
+        """Reject a startup RSS that the cap derivation would never read."""
+        if self.worker_startup_rss is not None and (
+            self.workers_max_rss is not None or not self.limit_workers_max_rss
+        ):
+            msg = (
+                "granian_config.worker_startup_rss only feeds the derived "
+                "--workers-max-rss, but workers_max_rss is set explicitly or "
+                "limit_workers_max_rss is False. Remove it, or fold the headroom into "
+                "the explicit cap."
+            )
+            raise ValueError(msg)
+        return self
+
+    def resolve_workers_max_rss(self, memory_limit: str) -> "GranianConfig":
+        """Return a copy with ``workers_max_rss`` derived from a container memory limit.
+
+        ``floor((0.9 * limit_mib - worker_startup_rss) / workers)``: during a planned
+        respawn every worker can sit at the cap while the replacement imports, so that
+        total has to fit. The remaining 10% covers the Granian main process and growth
+        between RSS samples (``--rss-sample-interval``, 30s).
+
+        The limit is the one declared in the manifest. The kernel enforces the pod's
+        admitted limit, which a VPA can set lower, so size the declared limit as the
+        lowest one a pod can be admitted with.
+        """
+        if not self.limit_workers_max_rss or self.workers_max_rss is not None:
+            return self
+        budget_mib = int(parse_quantity(memory_limit)) * 0.9 / (1024 * 1024)
+        startup_rss = self.worker_startup_rss or 0
+        cap = int((budget_mib - startup_rss) // self.workers)
+        if cap <= startup_rss:
+            msg = (
+                f"A {memory_limit} memory limit leaves a {cap}MiB --workers-max-rss for "
+                f"{self.workers} worker(s) after reserving worker_startup_rss="
+                f"{startup_rss}MiB for a respawn. A cap at or below a fresh worker's RSS "
+                "respawns continuously. Raise the memory limit or lower workers."
+            )
+            raise ValueError(msg)
+        return self.model_copy(update={"workers_max_rss": cap})
+
     def build_args(self) -> list[str]:
         """Build the granian CLI argument list from this configuration."""
         args = [
@@ -534,6 +602,7 @@ class GranianConfig(BaseModel):
             ("--backpressure", self.backpressure),
             ("--workers-max-rss", self.workers_max_rss),
             ("--blocking-threads-idle-timeout", self.blocking_threads_idle_timeout),
+            ("--respawn-interval", self.respawn_interval),
         ):
             if value is not None:
                 args += [flag, str(value)]
@@ -1299,18 +1368,8 @@ class OLApplicationK8s(ComponentResource):
         effective_extra_ports = list(ol_app_k8s_config.extra_container_ports)
         if ol_app_k8s_config.granian_config is not None:
             gc = ol_app_k8s_config.granian_config
-            # Derive workers_max_rss from the container memory limit when not explicit.
-            # Formula: floor(memory_limit_bytes / workers * 0.9) MiB
-            if (
-                gc.limit_workers_max_rss
-                and gc.workers_max_rss is None
-                and (memory_str := ol_app_k8s_config.resource_limits.get("memory"))
-            ):
-                limit_bytes = int(parse_quantity(memory_str))
-                computed_rss = max(
-                    1, int(limit_bytes / gc.workers * 0.9) // (1024 * 1024)
-                )
-                gc = gc.model_copy(update={"workers_max_rss": computed_rss})
+            if memory_str := ol_app_k8s_config.resource_limits.get("memory"):
+                gc = gc.resolve_workers_max_rss(memory_str)
             effective_nginx_config_path = f"files/{gc.nginx_config_filename}"
             effective_cmd_array: list[str] | None = ["granian"]
             effective_arg_array: list[str] | None = gc.build_args()
