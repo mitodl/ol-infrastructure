@@ -276,3 +276,56 @@ def test_a_non_string_label_value_gets_the_actionable_message(patched) -> None:
     patched(client, {"config": {"Labels": {IMAGE_SCHEMA_LABEL: ["9"]}}})
     with pytest.raises(ValueError, match="not an integer storage-format"):
         read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+
+
+@pytest.mark.parametrize(
+    "index",
+    [
+        {"manifests": None},
+        {"manifests": "not-a-list"},
+        {"manifests": [None]},
+        {"manifests": [{"platform": None}]},
+        {"manifests": [{"platform": "linux/amd64"}]},
+    ],
+)
+def test_a_malformed_index_is_unavailable_not_fatal(
+    patched,
+    index: dict[str, Any],
+) -> None:
+    """JSON has no schema, so a key can hold the wrong type rather than nothing.
+
+    ``.get`` on a ``None`` raises AttributeError, and iterating one raises
+    TypeError; either would abort a preview that has nothing to do with a
+    storage-format migration.
+    """
+    client = _FakeEcr({_DIGEST: index})
+    patched(client, {})
+    with pytest.raises(ImageSchemaUnavailableError):
+        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+
+
+@pytest.mark.parametrize(
+    "manifest",
+    [{"config": None}, {"config": "sha256:abc"}, {}],
+)
+def test_a_manifest_without_a_usable_config_is_unavailable_not_fatal(
+    patched,
+    manifest: dict[str, Any],
+) -> None:
+    """No config blob to fetch, and no KeyError or TypeError out of the lookup."""
+    client = _FakeEcr({_DIGEST: manifest})
+    patched(client, {})
+    with pytest.raises(ImageSchemaUnavailableError, match="image config"):
+        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+
+
+@pytest.mark.parametrize("config_blob", [None, "a string", ["a", "list"]])
+def test_a_non_object_config_blob_is_unavailable_not_fatal(
+    patched,
+    config_blob: object,
+) -> None:
+    """A presigned URL that serves something other than an image config."""
+    client = _FakeEcr({_DIGEST: _image_manifest()})
+    patched(client, config_blob)
+    with pytest.raises(ImageSchemaUnavailableError, match="carries no"):
+        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")

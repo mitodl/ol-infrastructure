@@ -82,6 +82,22 @@ class ImageSchemaUnavailableError(Exception):
     """
 
 
+def _mapping(value: object) -> dict[str, Any]:
+    """Return ``value`` when it is a JSON object, else an empty mapping.
+
+    A registry document is untrusted input, and JSON has no schema: a key can
+    be present and ``null``, or hold a string where an object is expected.
+    Every traversal below goes through this, because ``.get`` on a ``None``
+    raises ``AttributeError`` and that would abort a preview rather than skip
+    the check — the one thing this module promises not to do.
+
+    :param value: A value pulled out of a parsed registry document.
+    :returns: The mapping, or ``{}``.
+    :rtype: dict[str, Any]
+    """
+    return value if isinstance(value, dict) else {}
+
+
 def _image_id(image_ref: str) -> dict[str, str]:
     """Turn a fully-qualified image reference into an ECR ``imageId``.
 
@@ -166,8 +182,16 @@ def read_image_internal_schema(
         # A manifest list/index. Pick the platform the cluster actually runs;
         # attestation entries in an index also appear here, with architecture
         # "unknown", which is why this matches rather than taking the first.
-        for entry in manifest["manifests"]:
-            platform = entry.get("platform", {})
+        entries = manifest["manifests"]
+        if not isinstance(entries, list):
+            msg = (
+                f"{image_ref}'s index has a non-list `manifests`, so there is "
+                "nothing to walk."
+            )
+            raise ImageSchemaUnavailableError(msg)
+        for raw_entry in entries:
+            entry = _mapping(raw_entry)
+            platform = _mapping(entry.get("platform"))
             if (platform.get("os"), platform.get("architecture")) == ("linux", "amd64"):
                 child = entry.get("digest")
                 if not child:
@@ -192,7 +216,7 @@ def read_image_internal_schema(
     try:
         download_url = client.get_download_url_for_layer(
             repositoryName=repository_name,
-            layerDigest=manifest["config"]["digest"],
+            layerDigest=_mapping(manifest.get("config"))["digest"],
         )["downloadUrl"]
         config = requests.get(download_url, timeout=_HTTP_TIMEOUT_SECONDS).json()
     except (
@@ -206,13 +230,9 @@ def read_image_internal_schema(
         raise ImageSchemaUnavailableError(msg) from exc
     # `config` is optional in the OCI image-config spec and `Labels` is null
     # rather than absent on an image that declares none, so neither is indexed
-    # directly: a blob shaped differently than expected has to skip the check,
-    # not raise a KeyError or a TypeError out of a preview.
-    if not isinstance(config, dict):
-        msg = f"the image config for {image_ref} is not an object"
-        raise ImageSchemaUnavailableError(msg)
-    labels = (config.get("config") or {}).get("Labels") or {}
-    declared = labels.get(IMAGE_SCHEMA_LABEL) if isinstance(labels, dict) else None
+    # directly.
+    labels = _mapping(_mapping(config).get("config")).get("Labels")
+    declared = _mapping(labels).get(IMAGE_SCHEMA_LABEL)
     if declared is None:
         msg = (
             f"{image_ref} carries no {IMAGE_SCHEMA_LABEL} label. Images built "

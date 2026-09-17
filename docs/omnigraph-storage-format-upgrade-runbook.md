@@ -913,6 +913,19 @@ instead of the served root. Clearing `migrate_from_image` is what returns the
 Deployment to one replica, resumes both sweeps and restores the cluster-apply
 Job, so a `kubectl scale --replicas=1` is undone by the next apply.
 
+★ **Pin that apply to the OLD digest.** Arming did not only scale the tier
+down, it also moved the Deployment's pod template to the new image. Clearing
+the knobs brings the tier back up, so an apply carrying the NEW digest starts a
+new-format binary against the old root. That is the failure the migration
+exists to avoid, reached by rolling back:
+
+```shell
+OMNIGRAPH_DOCKER_SHA=sha256:<OLD-image-digest> pulumi up --stack <CI|QA|Production>
+```
+
+With a labelled image the storage-format check refuses that apply at preview;
+with an image predating the label it warns and skips, so do not lean on it.
+
 On the manual path, where no config was armed, scaling to 1 is the way back.
 
 After step 5:
