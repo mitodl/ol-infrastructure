@@ -19,10 +19,17 @@ Sub-modules
     Tempo-derived spanmetrics.
   clickhouse_altinity — Altinity's operator and Keeper dashboards for the
     shared LLMOps ClickHouse cluster, vendored as upstream JSON in vendor/.
+  user_journey — Renders one dashboard per entry in `journeys`, scoped to a
+    single user-facing capability rather than to a service, and split by
+    `service_version` so a release can be compared against the one before it.
+  journeys — The journey definitions themselves (which endpoints a capability
+    calls, in call order). Adding a capability means appending a `Journey`
+    there; no change to `user_journey` or to this module is needed.
 
-Dashboards live in per-subject folders (Keycloak, Application Performance, ClickHouse)
-so an unrelated dashboard is not filed under a service it has nothing to do
-with; add a new Folder in `create()` rather than widening an existing one.
+Dashboards live in per-subject folders (Keycloak, Application Performance,
+ClickHouse, User Journeys) so an unrelated dashboard is not filed under a
+service it has nothing to do with; add a new Folder in `create()` rather than
+widening an existing one.
 """
 
 import json
@@ -34,14 +41,17 @@ from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards import (
     clickhouse_altinity,
+    journeys,
     keycloak_incident_lookup,
     keycloak_olapps_realm,
     keycloak_overview,
     service_red,
+    user_journey,
 )
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources import (
     LOKI_DATASOURCE_REF,
     MIMIR_DATASOURCE_REF,
+    TEMPO_DATASOURCE_REF,
 )
 
 
@@ -410,6 +420,77 @@ def _table_panel(
     }
 
 
+def _traceql_timeseries_panel(
+    *,
+    title: str,
+    queries: list[str],
+    grid_pos: dict[str, Any],
+    datasource_ref: dict[str, str] = TEMPO_DATASOURCE_REF,
+    unit: str = "short",
+    legend_calc: str = "mean",
+    description: str = "",
+) -> dict[str, Any]:
+    """Build a time-series panel from one or more TraceQL metrics queries.
+
+    Each entry in `queries` becomes a target lettered A, B, C... A TraceQL
+    metrics query (one ending in `rate()`, `count_over_time()` or a
+    `quantile_over_time()`) returns series rather than a trace list, which is
+    what makes it graphable; Grafana infers that from the query itself, so
+    `queryType` stays `traceql` either way.
+
+    Series are named by whatever the query's `by (...)` clause emits, so there
+    is no legendFormat to set, unlike the Prometheus panels above.
+
+    There is deliberately no hook here for combining targets through Grafana's
+    server-side expression engine. Tempo returns an `exemplar` frame alongside
+    every series frame, and the expression engine rejects the mixed frame set:
+    a `$A / $B` math node over two TraceQL metrics queries fails with
+    `sse.dependencyError` even though both queries return 200 on their own, and
+    setting `exemplars: 0` on the targets does not suppress the extra frames
+    (checked 2026-09-17 against the production stack via /api/ds/query). A
+    panel that needs a ratio of two TraceQL queries has to be two panels.
+    """
+    targets: list[dict[str, Any]] = [
+        {
+            "datasource": datasource_ref,
+            "query": query,
+            "queryType": "traceql",
+            "refId": chr(65 + i),
+        }
+        for i, query in enumerate(queries)
+    ]
+    return {
+        "title": title,
+        "description": description,
+        "type": "timeseries",
+        "datasource": datasource_ref,
+        "gridPos": grid_pos,
+        "fieldConfig": {
+            "defaults": {
+                "color": {"mode": "palette-classic"},
+                "custom": {
+                    "drawStyle": "line",
+                    "lineWidth": 2,
+                    "fillOpacity": 10,
+                    "pointSize": 5,
+                },
+                "unit": unit,
+                "min": 0,
+            },
+            "overrides": [],
+        },
+        "options": {
+            "legend": {
+                "displayMode": "list",
+                "placement": "bottom",
+                "calcs": [legend_calc],
+            },
+            "tooltip": {"mode": "multi"},
+        },
+        "targets": targets,
+    }
+
+
 def _row_panel(*, title: str, y: int) -> dict[str, Any]:
     """Build a row divider panel to visually group the panels beneath it."""
     return {
@@ -503,6 +584,29 @@ def create(resource_opts: ResourceOptions) -> None:
 
     clickhouse_altinity.create(
         clickhouse_folder.uid,
+        _create_dashboard,
+        resource_opts,
+    )
+
+    # Separate from "Application Performance" on purpose: these are scoped to
+    # one user-facing capability rather than to a service, so a reader looking
+    # for "is the organization dashboard slow" should not have to know which
+    # services it happens to be built out of.
+    journeys_folder = Folder(
+        "user-journey-dashboards-folder",
+        title="User Journeys",
+        uid="user-journey-dashboards",
+        opts=resource_opts,
+    )
+
+    user_journey.create(
+        journeys_folder.uid,
+        journeys.JOURNEYS,
+        _timeseries_panel,
+        _stat_panel,
+        _table_panel,
+        _traceql_timeseries_panel,
+        _row_panel,
         _create_dashboard,
         resource_opts,
     )

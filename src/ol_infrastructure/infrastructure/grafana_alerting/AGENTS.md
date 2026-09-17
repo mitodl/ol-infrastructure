@@ -97,7 +97,9 @@ Rootly). That path is independent of Grafana and is managed in
 | `log_rules/witan.py` | Cedar denial rate, and the graph count on omnigraph-server's boot line — the boot-time half of the quarantine signal, which unlike `metric_rules/witan.py` needs no traffic but only speaks when a pod starts. Compares the newest boot against the highest count of the past week, so it is self-calibrating and no declared-graph count is duplicated here. **Both rules parse with `decolorize` first**: omnigraph-server is a Rust `tracing` binary that writes ANSI escapes *between* a field name, its `=` and its value even off a tty, so `|= "allowed=false"` matches nothing and returns a confident zero rather than an error. |
 | `dashboards/` | Package. Grafana dashboards. |
 | `dashboards/base.py` | Shared panel-builder helpers, folder creation, delegates to sub-modules. |
-| `dashboards/datasources.py` | Mimir/Loki datasource ref constants, importable directly by sub-modules without a circular import through `base.py`. |
+| `dashboards/datasources.py` | Mimir/Loki/Tempo datasource ref constants, importable directly by sub-modules without a circular import through `base.py`. |
+| `dashboards/user_journey.py` | Generic renderer: one dashboard per user-facing capability, scoped to that capability's endpoints and split by `service_version` for before/after release comparison. Takes journeys as data, so it is not edited to add one. |
+| `dashboards/journeys.py` | The journey definitions (`Journey` / `JourneyStep`). Append here to cover another product capability. |
 | `dashboards/keycloak_overview.py` | General service-health overview across all realms: logins, JVM, HTTP, DB pool, GC, JDBC cache, plus raw error/warning log tails. |
 | `dashboards/keycloak_olapps_realm.py` | Holistic authentication-activity view for just the olapps realm -- logins, registrations, token flows, and a per-identity-provider breakdown (success + failure) from Loki. For devs/management, not hardware/JVM. |
 | `pingdom_checks.py` | Pingdom uptime checks via Pulumi dynamic provider. Runs in the production stack only. |
