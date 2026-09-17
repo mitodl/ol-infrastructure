@@ -377,12 +377,13 @@ What this settles:
   consolidating into `mitol01` does not touch them. They drop out of the
   migration's re-issue list. What they do need is an owner on the OL side who
   knows to ask the partner when a key has to be rotated.
-- **The Emeritus key is dead.** `invalid_grant` on a well-formed key means the
-  key was deleted or disabled in `emeritus-data-science`, or the SA was. The
-  SOPS copy dates from 2024-11-21 (`7c080e607`). `lakehouse/definitions.py`
-  still schedules `emeritus_bigquery__s3_data_lake` every 24h. Not yet checked:
-  whether Airbyte holds a newer key entered by hand (the SOPS copy is then only
-  stale) or this one (the sync is then failing).
+- **The Emeritus key in SOPS is dead, but the sync is not.** `invalid_grant` on a
+  well-formed key means the key was deleted or disabled in `emeritus-data-science`.
+  The SOPS copy dates from 2024-11-21 (`7c080e607`). Yet
+  `s3://ol-data-lake-raw-production/raw__emeritus__bigquery__api_enrollments/data/`
+  took a 3.5 MB file on 2026-09-16, so production Airbyte holds a newer, working
+  key that was entered by hand and never written back to SOPS. SOPS is not the
+  source of truth for this credential; the Airbyte connection config is.
 - **The CI Airbyte secret is a hand-edited copy of QA's.** CI and QA carry the
   same `private_key_id` but different `client_email`s. A key id belongs to exactly
   one SA, so the CI secret pairs QA's private key with the CI SA's address, and
