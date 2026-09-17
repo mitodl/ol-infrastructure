@@ -97,7 +97,9 @@ Rootly). That path is independent of Grafana and is managed in
 | `log_rules/witan.py` | Cedar denial rate, and the graph count on omnigraph-server's boot line — the boot-time half of the quarantine signal, which unlike `metric_rules/witan.py` needs no traffic but only speaks when a pod starts. Compares the newest boot against the highest count of the past week, so it is self-calibrating and no declared-graph count is duplicated here. **Both rules parse with `decolorize` first**: omnigraph-server is a Rust `tracing` binary that writes ANSI escapes *between* a field name, its `=` and its value even off a tty, so `|= "allowed=false"` matches nothing and returns a confident zero rather than an error. |
 | `dashboards/` | Package. Grafana dashboards. |
 | `dashboards/base.py` | Shared panel-builder helpers, folder creation, delegates to sub-modules. |
-| `dashboards/datasources.py` | Mimir/Loki datasource ref constants, importable directly by sub-modules without a circular import through `base.py`. |
+| `dashboards/datasources.py` | Mimir/Loki/Tempo datasource ref constants, importable directly by sub-modules without a circular import through `base.py`. |
+| `dashboards/user_journey.py` | Generic renderer: one dashboard per user-facing capability, scoped to that capability's endpoints and split by `service_version` for before/after release comparison. Takes journeys as data, so it is not edited to add one. |
+| `dashboards/journeys.py` | The journey definitions (`Journey` / `JourneyStep`). Append here to cover another product capability. |
 | `dashboards/keycloak_overview.py` | General service-health overview across all realms: logins, JVM, HTTP, DB pool, GC, JDBC cache, plus raw error/warning log tails. |
 | `dashboards/keycloak_olapps_realm.py` | Holistic authentication-activity view for just the olapps realm -- logins, registrations, token flows, and a per-identity-provider breakdown (success + failure) from Loki. For devs/management, not hardware/JVM. |
 | `pingdom_checks.py` | Pingdom uptime checks via Pulumi dynamic provider. Runs in the production stack only. |
@@ -310,15 +312,32 @@ number that matters), `"mean"` or `"last"` for others. When adding a new
 non-overlapping interval count (`sum` is fine) or a rate/gauge (pass
 `legend_calc`) before shipping it.
 
-No dashboard in this package queries Tempo -- an earlier version of
-`keycloak_activity.py` did, pairing a sampled TraceQL request count against
-an exhaustive Loki event count in one panel ("attempts vs errors"). That
-comparison was structurally misleading (Tempo only sees a sampled subset of
-requests; Loki sees every one) and was scrapped rather than fixed. Prefer
-Prometheus/Loki -- both are exhaustive -- over Tempo for any new
-request-volume panel; if a genuine trace-derived panel is needed later,
-re-derive the `query_key`/mixed-datasource support this package used to have
-from git history rather than assuming it's still there.
+Tempo is queried by exactly one dashboard: `user_journey`'s database-work row,
+via `_traceql_timeseries_panel` in `base.py` and `TEMPO_DATASOURCE_REF`.
+
+The reason it is only one is worth keeping. An earlier version of
+`keycloak_activity.py` also queried Tempo, pairing a sampled TraceQL request
+count against an exhaustive Loki event count in one panel ("attempts vs
+errors"). That comparison was structurally misleading -- Tempo only sees the
+tail-sampled subset, Loki sees every event -- and was scrapped rather than
+fixed. **Prefer Prometheus/Loki, both exhaustive, over Tempo for any
+request-volume panel.** Tempo earns its place only where the question is
+structural rather than volumetric: `user_journey` uses it to count Postgres
+child spans under a request span, which no metric exposes, and states the
+sampling bias on the panels rather than comparing a sampled count against an
+exhaustive one.
+
+Two Tempo constraints found the hard way (2026-09-17, production stack):
+
+- Its responses carry an `exemplar` frame beside every series frame, and
+  Grafana's server-side expression engine rejects the mixed frame set. A
+  `$A / $B` math node over two TraceQL metrics queries fails with
+  `sse.dependencyError` even though both return 200 alone, and `exemplars: 0`
+  does not suppress the extra frames. A panel needing a ratio of two TraceQL
+  queries has to be two panels.
+- TraceQL's double-quoted strings interpret escape sequences, so a span name
+  holding a backslash (`GET ^logout\/?$`) fails with `invalid char escape`.
+  Use a backtick (raw) string for any attribute carrying a URL pattern.
 
 ### Template variables
 
@@ -360,10 +379,19 @@ returns no data rather than erroring.
 3. Import the new sub-module in `base.py` and call its `create(...)` from
    `base.create(...)`, passing the shared folder UID and whichever helpers
    its signature declares.
-4. All dashboards in this package currently share one folder (`"Keycloak"`,
-   uid `keycloak-dashboards`). If a new dashboard belongs to an unrelated
-   system, create a second folder in `base.py` rather than dropping it into
-   the Keycloak one.
+4. Dashboards are filed in per-subject folders, created in `base.create()`:
+   `"Keycloak"` (`keycloak-dashboards`), `"Application Performance"`
+   (`application-performance-dashboards`), `"ClickHouse"`
+   (`clickhouse-dashboards`) and `"User Journeys"`
+   (`user-journey-dashboards`). If a new dashboard belongs to none of them,
+   add another `Folder` there rather than widening an existing one to hold
+   something it has nothing to do with.
+
+   "User Journeys" is scoped by user-facing capability rather than by system,
+   so a dashboard belongs there only if its subject is a product capability
+   whose cost spans several services. Adding one means appending a `Journey`
+   to `journeys.py`; `user_journey.py` renders whatever is in that list and
+   does not need editing.
 
 ---
 

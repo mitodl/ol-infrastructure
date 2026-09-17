@@ -64,30 +64,32 @@ from pulumi import Input, ResourceOptions
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources import (
     MIMIR_DATASOURCE_REF,
 )
+from ol_infrastructure.infrastructure.grafana_alerting.dashboards.promql import (
+    DURATION_METRIC,
+    ZERO,
+)
+from ol_infrastructure.infrastructure.grafana_alerting.dashboards.promql import (
+    quantile as quantile_expr,
+)
+from ol_infrastructure.infrastructure.grafana_alerting.dashboards.promql import (
+    rate as rate_expr,
+)
 
-_DURATION = "http_server_duration_milliseconds"
+_DURATION = DURATION_METRIC
 _SELECTOR = 'service_name=~"$service", http_target=~"$route"'
 _5XX = f'{_SELECTOR}, http_status_code=~"5.."'
 _4XX = f'{_SELECTOR}, http_status_code=~"4.."'
-
-# `sum(...) or vector(0)` keeps an error-ratio panel reading 0 rather than "No
-# data" during the (common, desirable) windows with no 5xx at all -- without it
-# the numerator is an empty vector and the whole division returns nothing.
-_ZERO = "or vector(0)"
+_ZERO = ZERO
 
 
 def _rate(
     selector: str, suffix: str = "count", window: str = "$__rate_interval"
 ) -> str:
-    return f"rate({_DURATION}_{suffix}{{{selector}}}[{window}])"
+    return rate_expr(selector, suffix, window)
 
 
 def _quantile(quantile: float, by: str = "") -> str:
-    grouping = f"le, {by}" if by else "le"
-    return (
-        f"histogram_quantile({quantile}, "
-        f"sum by ({grouping}) ({_rate(_SELECTOR, 'bucket')}))"
-    )
+    return quantile_expr(quantile, _SELECTOR, by=by)
 
 
 def _dashboard_json(
