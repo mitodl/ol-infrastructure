@@ -326,11 +326,14 @@ if _mitlearn_bucket_is_sigv4_piloted:
     # iam:DeleteUserPolicy. A default-path user with an inline policy (the
     # original shape here) is invisible to that grant and fails with
     # AccessDenied the moment Concourse tries to apply it.
+    # No tags= here: IAM requires iam:TagUser (separate from iam:CreateUser)
+    # to authorize tags supplied at creation time, and Concourse's deploy
+    # role grants iam:TagRole/TagPolicy but not iam:TagUser -- adding tags
+    # would fail the same AccessDenied way, one step later.
     mitlearn_fastly_s3_signer_user = iam.User(
         "ol-mitlearn-ci-fastly-s3-signer",
         name=f"ol-mitlearn-{stack_info.env_suffix}-fastly-s3-signer",
         path="/ol-applications/",
-        tags=aws_config.tags,
     )
     mitlearn_fastly_s3_signer_policy = iam.Policy(
         "ol-mitlearn-ci-fastly-s3-signer-policy",
