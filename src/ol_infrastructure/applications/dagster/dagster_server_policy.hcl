@@ -144,9 +144,6 @@ path "secret-xpro/mongodb-forum/*" {
 path "secret-xpro/mongodb-forum" {
   capabilities = ["read"]
 }
-path "secret-operations/data/institutional-research-bigquery-service-account" {
-  capabilities = ["read"]
-}
 # X-Access-Token for the Tika service, needed by the openedx code location's
 # course_document_text asset. This flat path is the canonical one: the tika
 # stack writes it from the same `x_access_token` SOPS value it inlines as
