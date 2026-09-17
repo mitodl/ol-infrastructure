@@ -61,7 +61,7 @@ consumer can be invisible here. Treat every "no traffic" row below as *unconfirm
 
 | Service account | Project | API traffic (30d) | Consumer | External grant |
 |---|---|---|---|---|
-| `ol-eng-library-platform@` | engineering-project-management | **591,993** Drive `Files.List` | Heroku apps `ol-eng-library`, `mit-open-library`, `mit-open-library-rc` (`GOOGLE_APPLICATION_JSON`) | Shared Drives `0AErNBMZMmOz3Uk9PVA` (ol-eng-library), `0AAx-gQtx1vVKUk9PVA` (mit-open-library) |
+| `ol-eng-library-platform@` | engineering-project-management | **591,993** Drive `Files.List` | Heroku apps `ol-eng-library`, `mit-open-library`, `mit-open-library-rc` (`GOOGLE_APPLICATION_JSON`) | Organizer on Shared Drives `0AAx-gQtx1vVKUk9PVA` "MIT Open", `0AErNBMZMmOz3Uk9PVA` "OL Engineering (ARCHIVED)", `0ADY3FaGtq2jvUk9PVA` "Open Learning Engineering" (probed 2026-09-17; same key in all three apps) |
 | `xpro-coupon-requests-productio@` | mitxpro | **1,057,708** Sheets `GetValues` + 282,101 `UpdateValues` + Drive `Files.Watch`/`Permissions.Create` | xPro coupon/refund/deferral sheets (`DRIVE_SERVICE_ACCOUNT_CREDS`, Vault `secret-xpro` → `google-sheets/service_account_creds`) | Sheet + Drive folder shares (`COUPON_REQUEST_SHEET_ID`, `DRIVE_OUTPUT_FOLDER_ID`) |
 | `xpro-coupon-requests-testing@` | mitxpro | 120,318 Sheets `UpdateValues` + 32,179 `GetValues` | same integration, non-prod | same |
 | `ocw-studio-production@` | ocw-studio-production | 6,316 Drive `Files.Get`, 276 `List`, 28 `Create` | ocw-studio (`DRIVE_SERVICE_ACCOUNT_CREDS` ← Vault `secret-ocw-studio` `google/drive_service_json`) | Shared Drive `DRIVE_SHARED_ID` = `0AIZerpz9jimTUk9PVA` (Production) |
@@ -72,6 +72,27 @@ consumer can be invisible here. Treat every "no traffic" row below as *unconfirm
 Note the inversion worth double-checking during migration: the **QA** SA carries the
 heavy BigQuery load and the **production** SA does Sheets. That is the opposite of the
 naming, and a reparenting plan that assumes otherwise will cut the wrong credential.
+
+Correction (2026-08-24, register): the BigQuery consumer of `ol-data-platform-qa@` is
+**Airbyte** (IRx projects), not the Dagster `edxorg` location, which only reads GCS.
+
+### Airbyte's SOPS credentials (added 2026-09-17)
+
+Missed by every earlier pass because they live in SOPS
+(`src/bridge/secrets/airbyte/data.<env>.yaml`), not Vault. Probed with
+`bin/gcp-external-grants`; details in `gcp-external-grant-register.md`.
+
+| SOPS file : field | Service account | Project | Consumer | State |
+|---|---|---|---|---|
+| `data.production.yaml:google_service_account_json` | `ol-data-platform-production@` | ol-data-platform | Airbyte production, IRx BigQuery sources | works; same 3 IRx projects as the Vault copy |
+| `data.qa.yaml:google_service_account_json` | `ol-data-platform-qa@` | ol-data-platform | Airbyte QA | same identity as QA Vault copy |
+| `data.ci.yaml:google_service_account_json` | `ol-data-platform-ci@` | ol-data-platform | Airbyte CI | **broken**: `invalid_grant`; shares QA's `private_key_id` under a different `client_email` |
+| `data.production.yaml:emeritus_google_service_account_json` | `mit-xpro-sis@` | **emeritus-data-science** (partner) | Airbyte `emeritus_bigquery__s3_data_lake` | SOPS copy dead (`invalid_grant`), but the sync landed data 2026-09-16: Airbyte holds an unrecorded newer key |
+| `data.production.yaml:global_alumni_google_service_account_json` | `mit-xpro-bigquery@` | **global-alumni-365215** (partner) | Airbyte Global Alumni BigQuery → S3 | works; datasets `mit_xpro_api` + one hashed |
+
+The two partner SAs belong to the partners' projects. They are outside the
+consolidation (nothing to re-create in `mitol01`) and outside our usage signal
+(`bin/gcp-credential-usage` reads OL projects only). Rotation needs the partner.
 
 ### Confirmed live, but NOT a service account
 
