@@ -106,6 +106,17 @@ config:
   edxapp:autoscaling_lms_cpu_threshold: "70"
   edxapp:autoscaling_cms_requests_threshold: "20"
   edxapp:autoscaling_cms_cpu_threshold: "70"
+  # LMS leaves the Granian holding pins (2 workers x 32 blocking threads, backpressure
+  # 64). Worst per-pod busy-thread demand over the 14d to 2026-09-16 14:00Z was 13.95,
+  # concentrated on 2 of 18 pods while the rest stayed under 3; 24 is ~1.7x that.
+  # backpressure takes the component default (256): the worst single worker
+  # held 24 connections over 7d. CMS stays on the pins until it has a
+  # saturation-aware scaling signal. See docs/plans/granian-configuration-overhaul.md.
+  edxapp:k8s_granian:
+    lms:
+      workers: 1
+      runtime_threads: 1
+      blocking_threads: 24
   edxapp:k8s_replicas:
     webapp:
       lms:
