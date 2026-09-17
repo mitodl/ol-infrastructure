@@ -37,6 +37,7 @@ from typing import Any
 
 import boto3
 import requests
+from botocore.config import Config as BotoConfig
 from botocore.exceptions import BotoCoreError, ClientError
 
 #: The OCI label agent-kit's docker/omnigraph-server.Dockerfile and
@@ -60,8 +61,17 @@ _ACCEPTED_MEDIA_TYPES = [
 
 #: The config blob is a few KB from a presigned S3 URL. Short on purpose: this
 #: runs inline in `pulumi preview`, and a hung registry should degrade to a
-#: skipped check rather than to a preview that never returns.
+#: skipped check rather than to a preview that crawls.
 _HTTP_TIMEOUT_SECONDS = 15
+
+#: Applied to the ECR calls for the same reason. botocore's defaults are 60s
+#: connect and 60s read with retries, so a blackholed endpoint would stall a
+#: preview for minutes before the check gave up and skipped — bounded, but not
+#: what the timeout above is there to promise. These are metadata reads of a
+#: few kilobytes against a regional endpoint.
+_ECR_CLIENT_CONFIG = BotoConfig(
+    connect_timeout=5, read_timeout=10, retries={"max_attempts": 2}
+)
 
 
 class ImageSchemaUnavailableError(Exception):
@@ -121,7 +131,18 @@ def _get_manifest(
         failures = response["failures"]
         msg = f"ECR returned no manifest for {repository_name} {image_id}: {failures}"
         raise ImageSchemaUnavailableError(msg)
-    return json.loads(response["images"][0]["imageManifest"])
+    # Inside a try because non-fatality here is absolute: a registry serving a
+    # manifest this cannot parse must skip the check, not abort an unrelated
+    # preview with a JSONDecodeError from three frames down.
+    try:
+        manifest = json.loads(response["images"][0]["imageManifest"])
+    except (ValueError, KeyError, IndexError) as exc:
+        msg = f"ECR returned an unparseable manifest for {image_id}: {exc}"
+        raise ImageSchemaUnavailableError(msg) from exc
+    if not isinstance(manifest, dict):
+        msg = f"ECR returned a non-object manifest for {image_id}: {type(manifest)}"
+        raise ImageSchemaUnavailableError(msg)
+    return manifest
 
 
 def read_image_internal_schema(
@@ -139,7 +160,7 @@ def read_image_internal_schema(
         an unparseable manifest, or an image carrying no such label. All of
         these are non-fatal — see this module's docstring.
     """
-    client = boto3.client("ecr", region_name=region)
+    client = boto3.client("ecr", region_name=region, config=_ECR_CLIENT_CONFIG)
     manifest = _get_manifest(client, repository_name, _image_id(image_ref))
     if "manifests" in manifest:
         # A manifest list/index. Pick the platform the cluster actually runs;
@@ -148,8 +169,15 @@ def read_image_internal_schema(
         for entry in manifest["manifests"]:
             platform = entry.get("platform", {})
             if (platform.get("os"), platform.get("architecture")) == ("linux", "amd64"):
+                child = entry.get("digest")
+                if not child:
+                    msg = (
+                        f"{image_ref}'s linux/amd64 index entry carries no "
+                        "digest, so there is no manifest to follow."
+                    )
+                    raise ImageSchemaUnavailableError(msg)
                 manifest = _get_manifest(
-                    client, repository_name, {"imageDigest": entry["digest"]}
+                    client, repository_name, {"imageDigest": child}
                 )
                 break
         else:
@@ -167,12 +195,24 @@ def read_image_internal_schema(
             layerDigest=manifest["config"]["digest"],
         )["downloadUrl"]
         config = requests.get(download_url, timeout=_HTTP_TIMEOUT_SECONDS).json()
-    except (BotoCoreError, ClientError, requests.RequestException, KeyError) as exc:
+    except (
+        BotoCoreError,
+        ClientError,
+        requests.RequestException,
+        ValueError,
+        KeyError,
+    ) as exc:
         msg = f"could not read the image config for {image_ref}: {exc}"
         raise ImageSchemaUnavailableError(msg) from exc
-    # `Labels` is null, not absent, on an image that declares none.
-    labels = config["config"].get("Labels") or {}
-    declared = labels.get(IMAGE_SCHEMA_LABEL)
+    # `config` is optional in the OCI image-config spec and `Labels` is null
+    # rather than absent on an image that declares none, so neither is indexed
+    # directly: a blob shaped differently than expected has to skip the check,
+    # not raise a KeyError or a TypeError out of a preview.
+    if not isinstance(config, dict):
+        msg = f"the image config for {image_ref} is not an object"
+        raise ImageSchemaUnavailableError(msg)
+    labels = (config.get("config") or {}).get("Labels") or {}
+    declared = labels.get(IMAGE_SCHEMA_LABEL) if isinstance(labels, dict) else None
     if declared is None:
         msg = (
             f"{image_ref} carries no {IMAGE_SCHEMA_LABEL} label. Images built "
@@ -182,7 +222,7 @@ def read_image_internal_schema(
         raise ImageSchemaUnavailableError(msg)
     try:
         return int(declared)
-    except ValueError as exc:
+    except (TypeError, ValueError) as exc:
         # NOT ImageSchemaUnavailableError, deliberately: absent means an older
         # image and is skipped, but present-and-unparseable means the build
         # that produced this image is broken. The empty string is the specific

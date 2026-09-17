@@ -978,6 +978,27 @@ data_tier = create_data_tier(
 #
 # The Job rebuilds and verifies per-table row counts, then stops — see
 # storage_migration.py and docs/omnigraph-storage-format-upgrade-runbook.md.
+# The two knobs arm DIFFERENT things — `migrate_from_image` arms the Job, the
+# suspensions and the scale-down; `migrate_to_prefix` is what the deploying
+# image's storage format is checked against — so a half-cleared config is not a
+# tidiness problem, it is a hole. Leaving `migrate_to_prefix` behind while
+# clearing `migrate_from_image` brings the tier back UP and simultaneously
+# points the image check at the rebuild target instead of the served root,
+# which is how a format-9 image passes preview against an fmt6 cluster: exactly
+# the 2026-09-16 incident. Clearing `migrate_from_image` alone is also the
+# normal way to scale the tier back up, so this is a state a hurried cutover
+# reaches easily. Refuse it here rather than discovering it as a crashloop.
+if MIGRATE_TO_PREFIX and not MIGRATE_FROM_IMAGE:
+    ORPHAN_TARGET_MSG = (
+        f"omnigraph:migrate_to_prefix is set to {MIGRATE_TO_PREFIX!r} but "
+        "omnigraph:migrate_from_image is not, so nothing is armed: there is no "
+        "migration Job, the sweeps are running and the data tier is serving. "
+        "The two are set together and cleared together. If the cutover is "
+        "done, clear migrate_to_prefix as well; if it has not started, set "
+        "migrate_from_image to the currently-deployed image ref."
+    )
+    raise ValueError(ORPHAN_TARGET_MSG)
+
 if MIGRATE_FROM_IMAGE:
     if not MIGRATE_TO_PREFIX:
         MIGRATION_MSG = (
@@ -1020,6 +1041,10 @@ if MIGRATE_FROM_IMAGE:
         cluster_configmap_name=CLUSTER_CONFIGMAP_NAME,
         service_account_name="omnigraph-server",
         maintenance=data_tier.maintenance,
+        # Arming takes the Deployment to zero, but only this edge stops Pulumi
+        # creating the Job alongside that update — the Job would otherwise
+        # baseline and export a root the server is still writing.
+        server_deployment=data_tier.deployment,
     )
     export("storage_migration_job", storage_migration.job.metadata.name)
 

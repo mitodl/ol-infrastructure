@@ -78,8 +78,11 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo, format_docker_image_r
 OMNIGRAPH_SERVER_SERVICE_NAME = "omnigraph-server"
 # The ECR repository the Concourse build pushes to, shared across all three
 # environments. Spelled the same as the service name but not derived from it:
-# one is a Kubernetes object name, the other a registry path, and the format
-# check below asks ECR about this one by name.
+# one is a Kubernetes object name, the other a registry path. Both the image
+# reference and the storage-format check read it from here, because a mismatch
+# between the two fails SILENTLY: ECR answers ImageNotFound, which the check
+# treats as a pre-label image and skips, turning the gate off with nothing
+# failing.
 OMNIGRAPH_SERVER_ECR_REPOSITORY = "omnigraph-server"
 OMNIGRAPH_SERVER_PORT = 8080
 OMNIGRAPH_SERVICE_ACCOUNT_NAME = "omnigraph-server"
@@ -368,7 +371,7 @@ def create_data_tier(  # noqa: PLR0913
     omnigraph_aws_account = aws.get_caller_identity()
     image_repository = (
         f"{omnigraph_aws_account.account_id}.dkr.ecr.{aws_config.region}"
-        ".amazonaws.com/omnigraph-server"
+        f".amazonaws.com/{OMNIGRAPH_SERVER_ECR_REPOSITORY}"
     )
     omnigraph_server_image = format_docker_image_ref(image_repository, "OMNIGRAPH")
 
@@ -389,7 +392,10 @@ def create_data_tier(  # noqa: PLR0913
         )
         image_internal_schema = None
     validate_image_internal_schema(
-        image_internal_schema, internal_schema_version, migrate_to_prefix
+        image_internal_schema,
+        internal_schema_version,
+        migrate_to_prefix,
+        migration_armed=migration_armed,
     )
 
     # cluster.yaml — the Layer-1 (memory/task/workflow) `council` graph,

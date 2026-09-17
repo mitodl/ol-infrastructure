@@ -28,10 +28,16 @@ _BY_DIGEST = f"{_REGISTRY}/{_REPOSITORY}@{_DIGEST}"
 
 
 class _FakeEcr:
-    """The two ECR calls the reader makes, answered from canned manifests."""
+    """The two ECR calls the reader makes, answered from canned manifests.
+
+    A manifest value may be a ``str``, which is returned verbatim, so a test
+    can hand the reader something that is not JSON at all.
+    """
 
     def __init__(
-        self, manifests: dict[str, dict[str, Any]], download_url: str = "https://blob"
+        self,
+        manifests: dict[str, dict[str, Any] | str],
+        download_url: str = "https://blob",
     ) -> None:
         self.manifests = manifests
         self.download_url = download_url
@@ -49,10 +55,9 @@ class _FakeEcr:
         key = next(iter(image_id.values()))
         if key not in self.manifests:
             return {"images": [], "failures": [{"failureCode": "ImageNotFound"}]}
-        return {
-            "images": [{"imageManifest": json.dumps(self.manifests[key])}],
-            "failures": [],
-        }
+        manifest = self.manifests[key]
+        raw = manifest if isinstance(manifest, str) else json.dumps(manifest)
+        return {"images": [{"imageManifest": raw}], "failures": []}
 
     def get_download_url_for_layer(
         self,
@@ -219,3 +224,55 @@ def test_a_present_but_unparseable_label_fails_the_preview(
     with pytest.raises(ValueError, match="not an integer storage-format") as caught:
         read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
     assert not isinstance(caught.value, ImageSchemaUnavailableError)
+
+
+# ── malformed registry data must skip, never abort an unrelated preview ──────
+# The non-fatality promise is absolute, so each of these is a path that used to
+# escape as JSONDecodeError, KeyError or TypeError from three frames down into
+# a `pulumi preview` that has nothing to do with a storage-format migration.
+
+
+def test_an_unparseable_manifest_is_unavailable_not_fatal(patched) -> None:
+    """A registry serving something that is not JSON."""
+    client = _FakeEcr({_DIGEST: "<html>502 Bad Gateway</html>"})
+    patched(client, {})
+    with pytest.raises(ImageSchemaUnavailableError, match="unparseable manifest"):
+        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+
+
+def test_an_index_entry_without_a_digest_is_unavailable_not_fatal(patched) -> None:
+    """Nothing to follow, and no KeyError out of the walk."""
+    index = {
+        "manifests": [{"platform": {"os": "linux", "architecture": "amd64"}}],
+    }
+    client = _FakeEcr({_DIGEST: index})
+    patched(client, {})
+    with pytest.raises(ImageSchemaUnavailableError, match=r"carries no\s+digest"):
+        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+
+
+@pytest.mark.parametrize(
+    "config_blob",
+    [
+        {},  # `config` is optional in the OCI image-config spec
+        {"config": None},
+        {"config": {"Labels": "not-a-mapping"}},
+    ],
+)
+def test_a_config_blob_of_an_unexpected_shape_is_unavailable_not_fatal(
+    patched,
+    config_blob: dict[str, Any],
+) -> None:
+    """Indexing straight into the blob would raise KeyError or TypeError."""
+    client = _FakeEcr({_DIGEST: _image_manifest()})
+    patched(client, config_blob)
+    with pytest.raises(ImageSchemaUnavailableError):
+        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")
+
+
+def test_a_non_string_label_value_gets_the_actionable_message(patched) -> None:
+    """``int(None)`` raises TypeError, which the ValueError-only catch missed."""
+    client = _FakeEcr({_DIGEST: _image_manifest()})
+    patched(client, {"config": {"Labels": {IMAGE_SCHEMA_LABEL: ["9"]}}})
+    with pytest.raises(ValueError, match="not an integer storage-format"):
+        read_image_internal_schema(_REPOSITORY, _BY_DIGEST, "us-east-1")

@@ -446,7 +446,11 @@ kubectl -n omnigraph get pods            # expect no omnigraph-server pod at all
 > A hand-patched CronJob is reverted by the next `pulumi up` for anything at
 > all, and a Production migration can span days. Prefer the config-driven
 > suspension even if you are otherwise working through this manually — set
-> `omnigraph:migrate_from_image` and the sweeps stay down until you clear it.
+> `omnigraph:migrate_from_image` **and** `omnigraph:migrate_to_prefix` and the
+> sweeps stay down until you clear them. Both, or the preview refuses: the two
+> knobs are set together and cleared together. Note that arming this way also
+> takes the Deployment to zero and skips the cluster-apply Job, which is what
+> you want here anyway.
 
 ### 2. Start the OLD-image workspace pod
 
@@ -894,8 +898,22 @@ the only fast rollback. Delete it, and the workstation copy of the exports in
 
 ## Rollback
 
-Before step 5 there is nothing to roll back: scale to 1 and you are on the old
-image against the old root.
+Before step 5 nothing is committed to roll back, but on the automated path the
+way back up is the config, not `kubectl`:
+
+```shell
+pulumi config rm omnigraph:migrate_from_image --stack <CI|QA|Production>
+pulumi config rm omnigraph:migrate_to_prefix --stack <CI|QA|Production>
+```
+
+Both, and in the same change: `__main__.py` refuses a preview with
+`migrate_to_prefix` set and `migrate_from_image` cleared, because that state
+brings the tier up while pointing the image format check at the rebuild target
+instead of the served root. Clearing `migrate_from_image` is what returns the
+Deployment to one replica, resumes both sweeps and restores the cluster-apply
+Job, so a `kubectl scale --replicas=1` is undone by the next apply.
+
+On the manual path, where no config was armed, scaling to 1 is the way back.
 
 After step 5:
 
