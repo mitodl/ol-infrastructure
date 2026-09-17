@@ -505,6 +505,16 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   are ongoing (8 and 10 over 14 days), which is a second independent reason to keep it at
   2 workers for now.
 
+  > **Superseded 2026-09-17 for `mitxonline` LMS.** The respawn argument above no longer
+  > holds. Over the 14 days to 2026-09-16 14:00Z, `granian_workers_spawns` rose above its
+  > starting value of 2 on only 3 of ~807 LMS pods (62 respawns in total). All three were
+  > the pods crash-looping on node `ip-10-13-153-180` on 2026-09-14, failing their startup
+  > probe with HTTP 500 from `/heartbeat`. Every other pod ran the whole window without a
+  > respawn. Count respawns as max minus min per pod: `increase()` over the counter reads
+  > 228, because each new pod's first scrape already shows its initial spawns. Peak
+  > container RSS was 2485MiB for both workers together, under the 2764MiB cap a single
+  > worker gets from the 3Gi limit. LMS moves to one worker on the 2026-09-17 sizing above.
+
   **Production rollback — 2026-08-26.** The judgment above was wrong because the
   busy-thread percentile hid the burst shape of a normal Studio authoring page load and
   the rollout reduced per-pod backpressure by 8×, from 2 workers × 64 to 1 × 16. After
