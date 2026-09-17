@@ -1134,6 +1134,25 @@ class OLApplicationK8sConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def validate_worker_startup_rss_has_memory_limit(
+        self,
+    ) -> "OLApplicationK8sConfig":
+        """Reject worker_startup_rss when there is no memory limit to derive a cap from."""
+        gc = self.granian_config
+        if (
+            gc is not None
+            and gc.worker_startup_rss is not None
+            and "memory" not in self.resource_limits
+        ):
+            msg = (
+                "granian_config.worker_startup_rss is set but resource_limits has no "
+                "'memory' entry, so --workers-max-rss is never derived and the "
+                "headroom is ignored. Set a memory limit or remove worker_startup_rss."
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
     def validate_memory_scaling_not_split(self) -> "OLApplicationK8sConfig":
         """Reject configs where memory is scaled both horizontally and vertically.
 
