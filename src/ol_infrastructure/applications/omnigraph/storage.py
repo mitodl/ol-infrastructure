@@ -174,3 +174,100 @@ def storage_uri_for(bucket: str, prefix: str) -> str:
     testable — an off-by-one slash here silently relocates every graph.
     """
     return f"s3://{bucket}/{prefix}" if prefix else f"s3://{bucket}"
+
+
+def validate_image_internal_schema(
+    image_internal_schema: int | None,
+    internal_schema_version: int | None,
+    migrate_to_prefix: str,
+    *,
+    migration_armed: bool,
+) -> None:
+    """Cross-check the DEPLOYING IMAGE's declared storage format against config.
+
+    This is the third party ``validate_internal_schema_version`` above says it
+    does not have. That one compares two committed config values to each other,
+    which catches a human editing one without the other but cannot catch the
+    case that actually happened: an image that reads a different format than
+    either of them. agent-kit's Dockerfiles now stamp
+    ``edu.mit.ol.omnigraph.internal-schema`` onto the image, so the digest in
+    ``OMNIGRAPH_DOCKER_SHA`` is no longer opaque and the comparison can be made
+    here, at ``pulumi preview``, instead of by a Job dying mid-deploy.
+
+    ``image_internal_schema`` is ``None`` when the label could not be read —
+    an image built before agent-kit#358, or a registry this run cannot reach.
+    That is NOT a failure: refusing would make a rollback to a pre-label image
+    impossible and would break any run without ECR read access. The caller
+    warns; this returns.
+
+    WHAT IS CHECKED DEPENDS ON WHETHER A MIGRATION IS ARMED, because the whole
+    point of the armed window is that the image and the served root disagree:
+
+    * Armed: the image must read the format the rebuild is TARGETING. An image
+      that does not is one whose migration Job would rebuild every graph into a
+      root its own binary then refuses. The served ``internal_schema_version``
+      is expected to differ and is not compared.
+    * Steady state: the image must read the format the cluster SERVES. This is
+      the check that would have refused the deploy on 2026-09-16 instead of
+      letting the cluster-apply Job discover it.
+
+    ``migration_armed`` IS PASSED IN RATHER THAN INFERRED FROM
+    ``migrate_to_prefix``, so this cannot disagree with the rest of the program
+    about which window it is in. Everything else keys off
+    ``migrate_from_image``; inferring armedness from the other knob here would
+    mean a leftover ``migrate_to_prefix`` relaxes this check while the tier is
+    up and serving the OLD root, which is the very deploy it exists to refuse.
+    ``__main__`` refuses that config outright, and this signature is the second
+    belt.
+
+    Raises ``ValueError`` on a disagreement, naming the remedy.
+    """
+    if image_internal_schema is None:
+        return
+    if migration_armed:
+        target = _PREFIX_SCHEMA_RE.fullmatch(migrate_to_prefix)
+        # validate_migration_target_prefix already enforced the fmt<N> shape
+        # and __main__ refuses an armed migration with no target at all, so a
+        # non-match here means one of those guards was bypassed, not that the
+        # prefix is legitimately free-form.
+        if target is None:
+            msg = (
+                f"omnigraph:migrate_to_prefix {migrate_to_prefix!r} is not "
+                "fmt<N>, so the deploying image's storage format cannot be "
+                "checked against it."
+            )
+            raise ValueError(msg)
+        target_version = int(target.group("version"))
+        if image_internal_schema != target_version:
+            msg = (
+                f"the deploying omnigraph image reads storage format "
+                f"{image_internal_schema}, but omnigraph:migrate_to_prefix "
+                f"{migrate_to_prefix!r} targets format {target_version}. The "
+                "migration Job runs this image to load the rebuilt graphs, so "
+                "it would rebuild every graph into a root its own binary then "
+                "refuses. Point migrate_to_prefix at fmt"
+                f"{image_internal_schema}, or deploy the image whose format "
+                "matches the target."
+            )
+            raise ValueError(msg)
+        return
+    if internal_schema_version is None:
+        # No fmt<N> served prefix, so there is no committed number to compare
+        # against — validate_internal_schema_version has already established
+        # that this pairing is self-consistent.
+        return
+    if image_internal_schema != internal_schema_version:
+        msg = (
+            f"the deploying omnigraph image reads storage format "
+            f"{image_internal_schema}, but this cluster serves format "
+            f"{internal_schema_version} (omnigraph:internal_schema_version, "
+            "fmt<N> in omnigraph:storage_prefix). The server would refuse "
+            "every graph. Arm the migration — set omnigraph:migrate_from_image "
+            "and omnigraph:migrate_to_prefix to fmt"
+            f"{image_internal_schema}, run the Job, read the verdict, then "
+            "move storage_prefix and internal_schema_version — see "
+            "docs/omnigraph-storage-format-upgrade-runbook.md. To roll back "
+            "instead, deploy the image that reads format "
+            f"{internal_schema_version}."
+        )
+        raise ValueError(msg)

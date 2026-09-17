@@ -243,16 +243,10 @@ middle needs picking apart by hand.
 **Do step 1 first.** The Job takes its baseline and exports by reading the old
 root directly, and it has no way to stop the server writing underneath it — a
 snapshot taken while the Deployment is still serving is a baseline of a moving
-target, and the export that follows can disagree with it. Scaling to zero is
-not optional just because the rest is automated:
+target, and the export that follows can disagree with it. The tier has to be at
+zero before the Job runs; arming is what puts it there.
 
-```shell
-kubectl -n omnigraph scale deploy/omnigraph-server --replicas=0
-kubectl -n omnigraph wait --for=delete pod \
-  -l app.kubernetes.io/name=omnigraph-server --timeout=120s
-```
-
-Then arm and run it:
+Arming and running it is one apply:
 
 ```shell
 cd src/ol_infrastructure/applications/omnigraph
@@ -266,35 +260,39 @@ pulumi config set omnigraph:migrate_from_image <OLD-image-ref> --stack <CI|QA|Pr
 # for a Job that would refuse the root it was given.
 pulumi config set omnigraph:migrate_to_prefix fmt<N> --stack <CI|QA|Production>
 
-# ★ TARGETED, NOT A PLAIN `pulumi up` — see the warning below. And a LOCAL run
-# needs the image ref Concourse normally injects: without it the program raises
-# `Either OMNIGRAPH_DOCKER_TAG or OMNIGRAPH_DOCKER_SHA must be set`, and with
-# the wrong value the Job's main container runs the wrong binary. Use the NEW
-# image's digest; `migrate_from_image` above stays the OLD one.
-P=urn:pulumi:<CI|QA|Production>::ol-application-omnigraph
-OMNIGRAPH_DOCKER_SHA=sha256:<NEW-image-digest> pulumi up --stack <CI|QA|Production> \
-  --target "$P::kubernetes:core/v1:ConfigMap::omnigraph-storage-migration-script-<env>" \
-  --target "$P::kubernetes:batch/v1:Job::omnigraph-storage-migration-<env>" \
-  --target "$P::kubernetes:batch/v1:CronJob::omnigraph-cleanup-<env>" \
-  --target "$P::kubernetes:batch/v1:CronJob::omnigraph-optimize-<env>"
+# A LOCAL run needs the image ref Concourse normally injects: without it the
+# program raises `Either OMNIGRAPH_DOCKER_TAG or OMNIGRAPH_DOCKER_SHA must be
+# set`, and with the wrong value the Job's main container runs the wrong
+# binary. Use the NEW image's digest; `migrate_from_image` above stays the OLD
+# one, and must be the FULL ECR ref, not a bare `sha256:...` — it is used
+# verbatim as the initContainer's `image:`.
+OMNIGRAPH_DOCKER_SHA=sha256:<NEW-image-digest> pulumi up --stack <CI|QA|Production>
 kubectl -n omnigraph logs -f job/omnigraph-migrate-fmt<N>
 ```
 
-The Job is ordered behind the two CronJob suspensions, so it cannot start while
-maintenance is still schedulable. Scaling the Deployment down stays yours.
+Read the preview before accepting it. One apply does all of this, in order: the
+two maintenance CronJobs are suspended, the Deployment goes to zero replicas,
+and the Job is created behind both. It cannot start while maintenance is still
+schedulable or the server is still serving.
 
-★ **TARGET THE APPLY. A plain `pulumi up` here will undo your scale-down.**
-`data_tier.py` declares `replicas=1` with no `ignore_changes`, so an untargeted
-apply scales the tier back to 1 in the middle of the outage — starting a binary
-that reads only the NEW format against the OLD root, which is the mixed-writer
-case this whole procedure exists to prevent. (This section used to claim Pulumi
-does not manage the replica count during a migration. It does. Found during the
-CI cutover on 2026-09-16, by previewing before applying.)
+**Arming is what scales the tier down, so there is nothing left to do by hand
+and no reason to `--target`.** `data_tier.py` declares
+`replicas=0 if migration_armed else 1`, so the scale-down and the scale-back-up
+are both consequences of the config knob rather than separate manual steps.
+Clearing `migrate_from_image` at cutover returns it to 1.
 
-The `cluster-apply` Job is not part of this: while `migrate_from_image` is set
-the Job is not created at all and nothing depends on it, so there is nothing
-here for the target list to step around. It is created again at cutover, once
-`storage_prefix` names the new root, and converges the schemas against it.
+This was not always true, and the CI and QA cutovers on 2026-09-16 were run the
+old way: `replicas=1` was unconditional, so a plain `pulumi up` scaled the tier
+back up mid-migration, which is why those runs needed `pulumi up --target` on
+just the migration ConfigMap, Job and the two CronJobs plus a manual
+`kubectl scale`. If `data_tier.py` in the checkout you are reading declares a
+bare `replicas=1`, you are on that older code: use the targeted procedure
+instead, and read `git log` on this file for it.
+
+The `cluster-apply` Job is not part of this either: while `migrate_from_image`
+is set it is not created at all and nothing depends on it. It is created again
+at cutover, once `storage_prefix` names the new root, and converges the schemas
+against it.
 
 Freezing the writers is part of **Before you start**, not this step — by the
 time you are arming the migration it is already too late.
@@ -448,7 +446,11 @@ kubectl -n omnigraph get pods            # expect no omnigraph-server pod at all
 > A hand-patched CronJob is reverted by the next `pulumi up` for anything at
 > all, and a Production migration can span days. Prefer the config-driven
 > suspension even if you are otherwise working through this manually — set
-> `omnigraph:migrate_from_image` and the sweeps stay down until you clear it.
+> `omnigraph:migrate_from_image` **and** `omnigraph:migrate_to_prefix` and the
+> sweeps stay down until you clear them. Both, or the preview refuses: the two
+> knobs are set together and cleared together. Note that arming this way also
+> takes the Deployment to zero and skips the cluster-apply Job, which is what
+> you want here anyway.
 
 ### 2. Start the OLD-image workspace pod
 
@@ -725,11 +727,21 @@ they disagree (`storage.py::validate_internal_schema_version`) — a leftover
 `internal_schema_version` from the LAST migration, forgotten while
 `storage_prefix` moves to this one, is exactly the drift this exists to
 catch before it reaches the cluster as a crash-looping server rather than a
-preview failure. **This check does not verify either value against the
-image actually being deployed or the live store's own
-`internal_schema_version`** — it is a self-consistency check between two
-committed config values, not a substitute for `check_format_moved`'s
-verdict above or for following this runbook's ordering.
+preview failure. It is a self-consistency check between two committed config
+values, and it is still not a substitute for `check_format_moved`'s verdict
+above or for following this runbook's ordering. It does not read the live
+store's own `internal_schema_version`.
+
+The DEPLOYING IMAGE is checked separately, by
+`storage.py::validate_image_internal_schema` against the
+`edu.mit.ol.omnigraph.internal-schema` label agent-kit stamps onto it
+(agent-kit#358). While the migration is armed that comparison is against
+`migrate_to_prefix`, since the image and the served root are supposed to
+disagree during the rebuild; once the knobs clear it is against
+`internal_schema_version`, so a cutover committing the wrong digits fails the
+preview rather than the pod. An image carrying no readable label, which is
+every image built before agent-kit#358, warns and skips rather than blocking
+— that is what keeps a rollback deployable.
 
 **Took the automated path?** Clear the migration knobs in this SAME config
 change, not later at step 7:
@@ -886,8 +898,35 @@ the only fast rollback. Delete it, and the workstation copy of the exports in
 
 ## Rollback
 
-Before step 5 there is nothing to roll back: scale to 1 and you are on the old
-image against the old root.
+Before step 5 nothing is committed to roll back, but on the automated path the
+way back up is the config, not `kubectl`:
+
+```shell
+pulumi config rm omnigraph:migrate_from_image --stack <CI|QA|Production>
+pulumi config rm omnigraph:migrate_to_prefix --stack <CI|QA|Production>
+```
+
+Both, and in the same change: `__main__.py` refuses a preview with
+`migrate_to_prefix` set and `migrate_from_image` cleared, because that state
+brings the tier up while pointing the image format check at the rebuild target
+instead of the served root. Clearing `migrate_from_image` is what returns the
+Deployment to one replica, resumes both sweeps and restores the cluster-apply
+Job, so a `kubectl scale --replicas=1` is undone by the next apply.
+
+★ **Pin that apply to the OLD digest.** Arming did not only scale the tier
+down, it also moved the Deployment's pod template to the new image. Clearing
+the knobs brings the tier back up, so an apply carrying the NEW digest starts a
+new-format binary against the old root. That is the failure the migration
+exists to avoid, reached by rolling back:
+
+```shell
+OMNIGRAPH_DOCKER_SHA=sha256:<OLD-image-digest> pulumi up --stack <CI|QA|Production>
+```
+
+With a labelled image the storage-format check refuses that apply at preview;
+with an image predating the label it warns and skips, so do not lean on it.
+
+On the manual path, where no config was armed, scaling to 1 is the way back.
 
 After step 5:
 

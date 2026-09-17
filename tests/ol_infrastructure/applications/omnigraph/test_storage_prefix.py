@@ -14,6 +14,7 @@ import pytest
 
 from ol_infrastructure.applications.omnigraph.storage import (
     storage_uri_for,
+    validate_image_internal_schema,
     validate_internal_schema_version,
     validate_migration_target_prefix,
     validate_storage_prefix,
@@ -156,3 +157,79 @@ def test_internal_schema_version_set_without_fmt_n_prefix_fails(prefix: str) -> 
     """Nothing to cross-check it against outside the fmt<N> convention."""
     with pytest.raises(ValueError, match="nothing to check it against"):
         validate_internal_schema_version(prefix, 6)
+
+
+# ── the deploying image's declared storage format ────────────────────────────
+# This is the check the two committed-config tests above cannot make. They
+# catch a human editing one of a pair; this catches the case that actually
+# happened on 2026-09-16, where both config values agreed with each other and
+# neither agreed with the image.
+
+
+def test_unknown_image_format_is_not_a_failure() -> None:
+    """An image with no readable label must not block a deploy.
+
+    Refusing here would make a rollback to any pre-label image impossible, and
+    would break every run without ECR read access.
+    """
+    validate_image_internal_schema(None, 6, "", migration_armed=False)
+    validate_image_internal_schema(None, 9, "fmt9", migration_armed=True)
+
+
+def test_image_must_read_the_format_the_cluster_serves() -> None:
+    """The steady-state check: the server would refuse every graph."""
+    with pytest.raises(ValueError, match="reads storage format 9"):
+        validate_image_internal_schema(9, 6, "", migration_armed=False)
+
+
+def test_image_agreeing_with_the_served_format_passes() -> None:
+    """The ordinary deploy, which must not be made noisier by this check."""
+    validate_image_internal_schema(9, 9, "", migration_armed=False)
+
+
+def test_no_committed_schema_leaves_nothing_to_check() -> None:
+    """A bucket-root (non-``fmt<N>``) prefix has no number to compare against.
+
+    ``validate_internal_schema_version`` has already established that pairing
+    is self-consistent, so this returns rather than inventing a comparison.
+    """
+    validate_image_internal_schema(9, None, "", migration_armed=False)
+
+
+def test_armed_migration_compares_against_the_target_not_the_served_root() -> None:
+    """The armed window exists BECAUSE the image and the served root disagree.
+
+    Comparing against ``internal_schema_version`` here would fail every
+    migration at the moment it is armed, which is the one time the
+    disagreement is correct.
+    """
+    validate_image_internal_schema(9, 6, "fmt9", migration_armed=True)
+
+
+def test_armed_migration_rejects_an_image_that_cannot_read_its_own_target() -> None:
+    """A Job that rebuilds into a root its own binary then refuses.
+
+    The new image is what ``load``s the rebuilt graphs, so an image reading
+    format 8 aimed at an fmt9 root writes an outage, not a migration.
+    """
+    with pytest.raises(ValueError, match="targets format 9"):
+        validate_image_internal_schema(8, 6, "fmt9", migration_armed=True)
+
+
+def test_armed_migration_needs_a_fmt_target_to_check_against() -> None:
+    """Only reachable if validate_migration_target_prefix was bypassed."""
+    with pytest.raises(ValueError, match="is not fmt<N>"):
+        validate_image_internal_schema(9, 6, "migration-2026-09", migration_armed=True)
+
+
+def test_a_leftover_migrate_target_does_not_relax_the_check() -> None:
+    """The asymmetry that would otherwise reopen the 2026-09-16 incident.
+
+    ``migrate_to_prefix`` alone does not arm anything — the tier is up and
+    serving the OLD root — so inferring the armed window from it would have a
+    format-9 image pass against an fmt6 cluster. ``__main__`` refuses that
+    config outright; this is the second belt, and it is why the flag is a
+    parameter rather than something this function works out for itself.
+    """
+    with pytest.raises(ValueError, match="reads storage format 9"):
+        validate_image_internal_schema(9, 6, "fmt9", migration_armed=False)
