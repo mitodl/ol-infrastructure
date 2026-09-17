@@ -181,6 +181,54 @@ MIGRATE_TO_PREFIX: str = validate_migration_target_prefix(
     omnigraph_config.get("migrate_to_prefix")
 )
 
+# ── The two migration knobs must agree with each other and with storage_prefix.
+# Every check here is pure config, so it runs BEFORE anything is constructed:
+# a half-cleared config would otherwise reach `create_data_tier` first and fail
+# on the image storage-format check instead, whose remedy ("arm the migration")
+# is the wrong advice for a config that already has a target set.
+#
+# The knobs arm DIFFERENT things — `migrate_from_image` arms the Job, the
+# suspensions and the scale-down; `migrate_to_prefix` is what the deploying
+# image's storage format is checked against — so a half-cleared config is not a
+# tidiness problem, it is a hole. Leaving `migrate_to_prefix` behind while
+# clearing `migrate_from_image` brings the tier back UP and simultaneously
+# points the image check at the rebuild target instead of the served root,
+# which is how a format-9 image passes preview against an fmt6 cluster: exactly
+# the 2026-09-16 incident. Clearing `migrate_from_image` alone is also the
+# normal way to scale the tier back up, so this is a state a hurried cutover
+# reaches easily. Refuse it here rather than discovering it as a crashloop.
+if MIGRATE_TO_PREFIX and not MIGRATE_FROM_IMAGE:
+    ORPHAN_TARGET_MSG = (
+        f"omnigraph:migrate_to_prefix is set to {MIGRATE_TO_PREFIX!r} but "
+        "omnigraph:migrate_from_image is not, so nothing is armed: there is no "
+        "migration Job, the sweeps are running and the data tier is serving. "
+        "The two are set together and cleared together. If the cutover is "
+        "done, clear migrate_to_prefix as well; if it has not started, set "
+        "migrate_from_image to the currently-deployed image ref."
+    )
+    raise ValueError(ORPHAN_TARGET_MSG)
+
+if MIGRATE_FROM_IMAGE and not MIGRATE_TO_PREFIX:
+    MIGRATION_MSG = (
+        "omnigraph:migrate_from_image is set but "
+        "omnigraph:migrate_to_prefix is not. The migration needs a target "
+        "root to rebuild into (fmt<N>, N being the NEW internal-schema "
+        "number) — without one the only root it could write is the one it "
+        "is migrating away from."
+    )
+    raise ValueError(MIGRATION_MSG)
+
+if MIGRATE_FROM_IMAGE and MIGRATE_TO_PREFIX == STORAGE_PREFIX:
+    CUTOVER_MSG = (
+        f"omnigraph:migrate_to_prefix and omnigraph:storage_prefix are "
+        f"both {MIGRATE_TO_PREFIX!r}, so the cluster is already serving "
+        "the root this migration would rebuild into — it would export "
+        "from the root it is writing to. If the cutover is done, clear "
+        "migrate_from_image/migrate_to_prefix; if it is not, clear "
+        "storage_prefix."
+    )
+    raise ValueError(CUTOVER_MSG)
+
 # Keycloak realm -> actor-token sync. Set `omnigraph:keycloak_url` for an
 # environment to turn it on; leaving it unset keeps that environment on the
 # SOPS-only behaviour, which is the right default until its `witan-token-sync`
@@ -978,47 +1026,7 @@ data_tier = create_data_tier(
 #
 # The Job rebuilds and verifies per-table row counts, then stops — see
 # storage_migration.py and docs/omnigraph-storage-format-upgrade-runbook.md.
-# The two knobs arm DIFFERENT things — `migrate_from_image` arms the Job, the
-# suspensions and the scale-down; `migrate_to_prefix` is what the deploying
-# image's storage format is checked against — so a half-cleared config is not a
-# tidiness problem, it is a hole. Leaving `migrate_to_prefix` behind while
-# clearing `migrate_from_image` brings the tier back UP and simultaneously
-# points the image check at the rebuild target instead of the served root,
-# which is how a format-9 image passes preview against an fmt6 cluster: exactly
-# the 2026-09-16 incident. Clearing `migrate_from_image` alone is also the
-# normal way to scale the tier back up, so this is a state a hurried cutover
-# reaches easily. Refuse it here rather than discovering it as a crashloop.
-if MIGRATE_TO_PREFIX and not MIGRATE_FROM_IMAGE:
-    ORPHAN_TARGET_MSG = (
-        f"omnigraph:migrate_to_prefix is set to {MIGRATE_TO_PREFIX!r} but "
-        "omnigraph:migrate_from_image is not, so nothing is armed: there is no "
-        "migration Job, the sweeps are running and the data tier is serving. "
-        "The two are set together and cleared together. If the cutover is "
-        "done, clear migrate_to_prefix as well; if it has not started, set "
-        "migrate_from_image to the currently-deployed image ref."
-    )
-    raise ValueError(ORPHAN_TARGET_MSG)
-
 if MIGRATE_FROM_IMAGE:
-    if not MIGRATE_TO_PREFIX:
-        MIGRATION_MSG = (
-            "omnigraph:migrate_from_image is set but "
-            "omnigraph:migrate_to_prefix is not. The migration needs a target "
-            "root to rebuild into (fmt<N>, N being the NEW internal-schema "
-            "number) — without one the only root it could write is the one it "
-            "is migrating away from."
-        )
-        raise ValueError(MIGRATION_MSG)
-    if MIGRATE_TO_PREFIX == STORAGE_PREFIX:
-        CUTOVER_MSG = (
-            f"omnigraph:migrate_to_prefix and omnigraph:storage_prefix are "
-            f"both {MIGRATE_TO_PREFIX!r}, so the cluster is already serving "
-            "the root this migration would rebuild into — it would export "
-            "from the root it is writing to. If the cutover is done, clear "
-            "migrate_from_image/migrate_to_prefix; if it is not, clear "
-            "storage_prefix."
-        )
-        raise ValueError(CUTOVER_MSG)
     storage_migration = create_storage_migration(
         stack_info=stack_info,
         namespace=NAMESPACE,
