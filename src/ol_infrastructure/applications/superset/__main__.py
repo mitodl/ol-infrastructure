@@ -718,12 +718,29 @@ superset_chart = kubernetes.helm.v3.Release(
                     "maxReplicas": 8,
                     "targetCPUUtilizationPercentage": "60",
                 },
-                # One gunicorn worker per pod grows to ~1.6GiB over its life
-                # (7d peak in production) and has OOMKilled at a 2Gi limit, so
-                # request what it actually holds and leave headroom in the limit.
+                # The single gunicorn worker per pod (chart default, gthread)
+                # never returns heap: its working set steps up on heavy
+                # dashboard/SQL Lab requests and only ever grows, reaching
+                # ~1.6GiB after a week and OOMKilling at the old 2Gi limit.
+                # run-server.sh in the pinned image passes these straight to
+                # `--max-requests` / `--max-requests-jitter`, so the worker is
+                # replaced after 10-12k requests. Probes alone are ~11.5k
+                # requests/day, so an idle pod still recycles about daily and
+                # a busy one more often. A replacement worker serves its first
+                # request ~17s after boot, inside one 15s readiness period, and
+                # the arbiter keeps the socket open, so requests queue rather
+                # than fail during the swap.
+                "env": {
+                    "WORKER_MAX_REQUESTS": "10000",
+                    "WORKER_MAX_REQUESTS_JITTER": "2000",
+                },
+                # With recycling, a pod's working set is bounded by what one
+                # worker accumulates in a day (7d peaks for pods under two days
+                # old: 300-920MiB). Keep the 3Gi limit as headroom against a
+                # burst of heavy requests inside one worker's life.
                 "resources": {
                     "limits": {"cpu": "2000m", "memory": "3Gi"},
-                    "requests": {"cpu": "500m", "memory": "1536Mi"},
+                    "requests": {"cpu": "500m", "memory": "1Gi"},
                 },
                 "podDisruptionBudget": {"enabled": True, "minAvailable": 1},
             },
@@ -890,10 +907,10 @@ _gateway = OLEKSGateway(
 # DNS is managed at the Gateway/ingress layer via cert-manager/external-dns
 
 # VPA objects for Superset workloads.
-# No webapp VPA: the HPA owns the cpu axis, and a memory-only VPA would just
-# chase the single gunicorn worker's monotonic growth up to maxAllowed until
-# the worker is recycled (gunicorn --max-requests); the memory request is
-# sized from measurement above instead.
+# No webapp VPA yet: the HPA owns the cpu axis, and a memory-only VPA is only
+# worth adding once WORKER_MAX_REQUESTS has been observed to bound the web
+# pods' working set over a week; until then it would chase the ramp up to
+# maxAllowed. The memory request is sized from measurement above instead.
 # Worker uses KEDA (Redis queue depth) so CPU+memory VPA is safe there.
 make_vpa(
     name="superset-worker-vpa",
