@@ -718,6 +718,10 @@ superset_chart = kubernetes.helm.v3.Release(
                     "maxReplicas": 8,
                     "targetCPUUtilizationPercentage": "60",
                 },
+                # One gunicorn worker per pod grows to ~1.6GiB over its life
+                # (7d peak in production) and has OOMKilled at a 2Gi limit, so
+                # request what it actually holds and leave headroom in the limit.
+                "resources": {
                     "limits": {"cpu": "2000m", "memory": "3Gi"},
                     "requests": {"cpu": "500m", "memory": "1536Mi"},
                 },
@@ -886,6 +890,10 @@ _gateway = OLEKSGateway(
 # DNS is managed at the Gateway/ingress layer via cert-manager/external-dns
 
 # VPA objects for Superset workloads.
+# No webapp VPA: the HPA owns the cpu axis, and a memory-only VPA would just
+# chase the single gunicorn worker's monotonic growth up to maxAllowed until
+# the worker is recycled (gunicorn --max-requests); the memory request is
+# sized from measurement above instead.
 # Worker uses KEDA (Redis queue depth) so CPU+memory VPA is safe there.
 make_vpa(
     name="superset-worker-vpa",
