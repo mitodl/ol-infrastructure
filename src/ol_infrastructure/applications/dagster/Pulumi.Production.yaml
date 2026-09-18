@@ -122,12 +122,10 @@ config:
   #
   # 50 is derived from measurement, not from halving 100. The arithmetic below
   # was done on 2026-08-19 against SIX replicas and is kept as it was performed;
-  # at the current four the PgBouncer floor term is 160 (40 x 4), not 240, which
-  # would leave ~200 of client retention rather than ~120 and make 50 more
-  # generous still. Re-derive here if the floor or the replica count moves again.
-  # The floor moved again on 2026-09-18 (min_pool_size 40 -> 20, so 80 at four
-  # replicas). A lower floor frees more of the cap for client retention, so 50
-  # only gets more generous and needs no change.
+  # as of 2026-09-18 (four replicas, min_pool_size 20) the PgBouncer floor term
+  # is 80 (20 x 4), not 240, which would leave ~280 of client retention rather
+  # than ~120 and make 50 more generous still. Re-derive here if the floor or the
+  # replica count moves again.
   #
   # Held connections across the whole pool have ranged 359-1577 over the week
   # since the pooled storages landed, against a 4248 aggregate cap -- so the
