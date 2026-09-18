@@ -707,15 +707,25 @@ superset_chart = kubernetes.helm.v3.Release(
             "supersetNode": {
                 "podLabels": k8s_global_labels,
                 "replicas": {"enabled": False},
+                # CPU is the only HPA metric. A gunicorn web pod's memory is a
+                # resident baseline that does not fall when replicas are added,
+                # so a memory Utilization target above that baseline can never
+                # be satisfied and the HPA ratchets to maxReplicas (production
+                # sat at 48 idle pods on a 768Mi request for a year).
                 "autoscaling": {
                     "enabled": True,
+                    "minReplicas": 2,
+                    "maxReplicas": 8,
                     "targetCPUUtilizationPercentage": "60",
-                    "targetMemoryUtilizationPercentage": "80",
                 },
+                # One gunicorn worker per pod grows to ~1.6GiB over its life
+                # (7d peak in production) and has OOMKilled at a 2Gi limit, so
+                # request what it actually holds and leave headroom in the limit.
                 "resources": {
-                    "limits": {"cpu": "2000m", "memory": "2Gi"},
-                    "requests": {"cpu": "500m", "memory": "768Mi"},
+                    "limits": {"cpu": "2000m", "memory": "3Gi"},
+                    "requests": {"cpu": "500m", "memory": "1536Mi"},
                 },
+                "podDisruptionBudget": {"enabled": True, "minAvailable": 1},
             },
             "supersetWorker": {
                 "podLabels": k8s_global_labels,
@@ -880,9 +890,10 @@ _gateway = OLEKSGateway(
 # DNS is managed at the Gateway/ingress layer via cert-manager/external-dns
 
 # VPA objects for Superset workloads.
-# No webapp VPA: the chart's supersetNode.autoscaling scales on both cpu (60%)
-# and memory (80%) Resource metrics, so there's no resource axis left for VPA
-# to safely control without fighting the HPA's utilization signal.
+# No webapp VPA: the HPA owns the cpu axis, and a memory-only VPA would just
+# chase the single gunicorn worker's monotonic growth up to maxAllowed until
+# the worker is recycled (gunicorn --max-requests); the memory request is
+# sized from measurement above instead.
 # Worker uses KEDA (Redis queue depth) so CPU+memory VPA is safe there.
 make_vpa(
     name="superset-worker-vpa",
