@@ -2,7 +2,7 @@
 
 ## Problem
 
-Today, every application stack (e.g., `applications.mit_learn.production`) owns its
+Today, every application stack (e.g., `ol-application-mit-learn/Production`) owns its
 own RDS instance, ElastiCache cluster, and related security groups in the same Pulumi
 project as the K8s workloads, Vault auth, APISIX routes, and DNS records. This means
 a slow RDS operation—blue/green upgrades, storage scaling, minor version patches—
@@ -17,7 +17,7 @@ stack becomes a pure deployment stack that consumes the data stack's outputs via
 
 ```
 Before:
-  applications.mit_learn.production
+  ol-application-mit-learn/Production
     ├── ec2.SecurityGroup  (app SG)
     ├── ec2.SecurityGroup  (db SG)
     ├── ec2.SecurityGroup  (cache SG)
@@ -30,7 +30,7 @@ Before:
     └── Route53 records
 
 After:
-  applications.mit_learn.data.production   ← slow release cycle
+  ol-infrastructure-mit-learn-data/Production   ← slow release cycle
     ├── ec2.SecurityGroup  (app SG)  ← moved here to avoid circular deps
     ├── ec2.SecurityGroup  (db SG)
     ├── ec2.SecurityGroup  (cache SG)
@@ -38,7 +38,7 @@ After:
     ├── OLAmazonCache
     └── OLVaultDatabaseBackend
 
-  applications.mit_learn.production        ← fast release cycle
+  ol-application-mit-learn/Production        ← fast release cycle
     ├── StackReference → data stack
     ├── K8s HelmReleases / Deployments
     ├── APISIX routes
@@ -87,9 +87,9 @@ src/ol_infrastructure/applications/<app>/
   data/
     __main__.py                            ← NEW
     Pulumi.yaml                            ← NEW
-    Pulumi.applications.<app>.data.CI.yaml
-    Pulumi.applications.<app>.data.QA.yaml
-    Pulumi.applications.<app>.data.Production.yaml
+    Pulumi.CI.yaml
+    Pulumi.QA.yaml
+    Pulumi.Production.yaml
   k8s_secrets.py                           ← updated to accept plain values
 ```
 
@@ -105,9 +105,17 @@ Existing application project names (the `name:` field in each app's `Pulumi.yaml
   `mit_learn`), which is already used in stack names and file paths.
 - This name is standardized for data stacks and is **not** derived from the
   application stack project's `Pulumi.yaml` `name:` value, which varies across apps.
-- Stack names: `applications.<app>.data.CI`, `applications.<app>.data.QA`,
-  `applications.<app>.data.Production`
-- Reference in code: `StackReference(f"applications.{app_slug}.data.{stack_info.name}")`
+- Stack names: `CI`, `QA`, `Production`. Stacks are scoped by project, so the
+  project name carries the app and data identity; the dotted
+  `applications.<app>.data.<env>` form is the pre-migration flat namespace and is
+  not used for new stacks.
+- Add a `<APP>_DATA = "ol-infrastructure-<app>-data"` constant to
+  `ol_infrastructure.lib.pulumi_projects` for each data stack.
+- Reference in code:
+  `make_stack_reference(projects.<APP>_DATA, stack_info.name)`, which resolves to
+  `organization/ol-infrastructure-<app>-data/<stack>`. New projects have no
+  `LEGACY_STACK_REF_PREFIXES` entry, so no legacy alias is emitted and the
+  reference resolves without one.
 
 ## Standard Data Stack Exports
 
@@ -143,7 +151,10 @@ stack.
 
 ```python
 # In the application __main__.py
-data_stack = StackReference(f"applications.mit_learn.data.{stack_info.name}")
+from ol_infrastructure.lib import pulumi_projects as projects
+from ol_infrastructure.lib.pulumi_helper import make_stack_reference
+
+data_stack = make_stack_reference(projects.MIT_LEARN_DATA, stack_info.name)
 data = data_stack.require_output("mitlearn_data")
 
 # Replace direct resource attribute access:
@@ -171,7 +182,7 @@ app stack config files).
 
 ```bash
 cd src/ol_infrastructure/applications/<app>/data
-pulumi stack init applications.<app>.data.Production
+pulumi stack init Production
 # Copy encrypted password config values from old stack config
 ```
 
@@ -192,8 +203,8 @@ pulumi stack --show-urns
 # Move RDS component (all children — parameter group, CW alarms, IAM role — follow automatically)
 # Replace <app-project-name> with the "name:" value from that app's Pulumi.yaml
 pulumi state move \
-  --source <org>/<app-project-name>/applications.<app>.Production \
-  --dest <org>/ol-infrastructure-<app>-data/applications.<app>.data.Production \
+  --source <org>/<app-project-name>/Production \
+  --dest <org>/ol-infrastructure-<app>-data/Production \
   'urn:pulumi:...::ol:infrastructure:aws:database:OLAmazonDB::<instance-name>'
 
 # Move ElastiCache component (if applicable)
