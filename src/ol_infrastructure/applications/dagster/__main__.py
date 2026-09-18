@@ -1044,6 +1044,21 @@ pgbouncer_ini_template = dagster_db.db_instance.address.apply(
             # warm, so nothing in normal operation waits on a connect, and drops the
             # parked total from 900 to 240.
             #
+            # 40 -> 20, re-measured under transaction mode over 14 days ending
+            # 2026-09-18 (clean history only; the event_logs autovacuum bug inflated
+            # query time until 2026-09-03):
+            #
+            #   peak server_active, busiest replica   8 production, 12 QA
+            #   held servers per replica              40 at every sample, both envs
+            #   maxwait                               0 at every sample, both envs
+            #
+            # Neither pool grew past its floor once, so how fast a pool grows from
+            # cold is still unmeasured. 20 does not depend on it: the floor only
+            # costs connect latency when a replica needs more backends than it
+            # holds, and 20 is still above every per-replica peak either
+            # environment recorded. Cold growth is paid only for demand above
+            # anything observed.
+            #
             # default_pool_size and reserve_pool_size were dead numbers: 800 + 2000
             # per pod against a derived cap of 708 means max_db_connections already
             # bound first, so neither value could take effect on production. Rather
@@ -1060,7 +1075,7 @@ pgbouncer_ini_template = dagster_db.db_instance.address.apply(
             # dead -- saturation would surface only as clients queueing, which is the
             # symptom the headroom rule exists to get ahead of.
             f"default_pool_size = {pgbouncer_max_db_connections}",
-            "min_pool_size = 40",
+            "min_pool_size = 20",
             "reserve_pool_size = 0",
             # The aggregate ceiling. See the derivation above; this is the
             # only setting here that bounds total backends across replicas,

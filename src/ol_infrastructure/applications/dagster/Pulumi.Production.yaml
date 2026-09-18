@@ -81,12 +81,11 @@ config:
   # Benign at a 0.003 utilisation ratio, but it is the same denominator trap as
   # les-a-ratio-alert-s-denominator-constrains-what-you.
   #
-  # min_pool_size stays at 40 deliberately. One lever per pass -- moving the
-  # floor and the divisor together would make the next measurement
+  # min_pool_size was deliberately left at 40 in this pass. One lever per pass --
+  # moving the floor and the divisor together would make the next measurement
   # unattributable, which is the failure mode this whole exercise exists to stop
-  # repeating. The floor is the obvious next candidate: 40 was sized for a
-  # session-mode per-replica peak of 35, and transaction mode has cut per-replica
-  # in-flight demand to 2-3.
+  # repeating. It moved 40 -> 20 in its own pass on 2026-09-18, after 14 days of
+  # clean history at 4 replicas; derivation in __main__.py next to the setting.
   dagster:pgbouncer_replica_count: 4
   # Down from the previous global 100. Production has never come close to
   # needing it: three days of 1-minute exporter samples peaked at 122 active
@@ -126,6 +125,9 @@ config:
   # at the current four the PgBouncer floor term is 160 (40 x 4), not 240, which
   # would leave ~200 of client retention rather than ~120 and make 50 more
   # generous still. Re-derive here if the floor or the replica count moves again.
+  # The floor moved again on 2026-09-18 (min_pool_size 40 -> 20, so 80 at four
+  # replicas). A lower floor frees more of the cap for client retention, so 50
+  # only gets more generous and needs no change.
   #
   # Held connections across the whole pool have ranged 359-1577 over the week
   # since the pooled storages landed, against a 4248 aggregate cap -- so the
