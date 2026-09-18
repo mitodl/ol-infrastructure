@@ -33,7 +33,7 @@ pgbouncer_databases_max_connections is PgBouncer reporting its own max_db_connec
 back from SHOW DATABASES, so the ratio stays correct without this file knowing anything
 about instance classes. That matters because the cap is derived per environment from
 postgres_max_connections(instance_size) / pgbouncer_replica_count in the dagster stack:
-production's db.r7g.2xlarge yields 708 per pod across 6 replicas (4248 aggregate),
+production's db.r7g.2xlarge yields 1062 per pod across 4 replicas (4248 aggregate),
 QA's db.m7g.large yields 382 across 2 (764). A literal 5000 in this file would be
 silently wrong on every stack but production, which is exactly the class of bug the
 cap itself was written to avoid.
@@ -45,12 +45,13 @@ from pulumi import Input, ResourceOptions
 from pulumiverse_grafana import alerting
 
 # Fraction of the aggregate max_db_connections cap at which the pool is considered
-# short of headroom. Production's floor is min_pool_size x 6 replicas, which the pool
-# re-tune cut from 900 to 240 against the same 4248 cap -- so the baseline ratio moved
-# from 0.21 to 0.06, and the week of 1-minute samples behind that re-tune never left
-# the floor (peak server_active 122, peak client_active 129). 0.75 therefore sits far
-# above anything observed while still leaving a quarter of the pool in reserve, which
-# at 6 replicas is over 1000 connections of runway to act in.
+# short of headroom. Production's floor is min_pool_size x replicas against the same
+# 4248 cap: 900 (150 x 6) before the first pool re-tune, 240 (40 x 6) after it, and 80
+# (20 x 4) after the second -- a baseline ratio of 0.21, then 0.06, now 0.019. The
+# week of 1-minute samples behind the first re-tune never left the floor (peak
+# server_active 122, peak client_active 129), and under transaction mode the fleet
+# peak is 15. 0.75 therefore sits far above anything observed while still leaving a
+# quarter of the pool in reserve, over 1000 connections of runway to act in.
 #
 # The denominator only means anything while max_db_connections is the pool's single
 # binding ceiling. It is, deliberately: default_pool_size is set equal to the cap and
