@@ -18,6 +18,7 @@ from ol_infrastructure.applications.omnigraph.storage import (
     validate_internal_schema_version,
     validate_migration_target_prefix,
     validate_storage_prefix,
+    validate_storage_prefix_progression,
 )
 
 
@@ -233,3 +234,92 @@ def test_a_leftover_migrate_target_does_not_relax_the_check() -> None:
     """
     with pytest.raises(ValueError, match="reads storage format 9"):
         validate_image_internal_schema(9, 6, "fmt9", migration_armed=False)
+
+
+# ── the served root must not move backwards ──────────────────────────────────
+# The stale-ref promotion from 2026-09-16: QA was cut over to fmt9, then a
+# pipeline deploy of an older ref planned storage_prefix fmt9 => fmt6. Both
+# config values in that ref agreed with each other, so only a comparison with
+# what the stack last deployed can see it.
+
+
+def test_stale_ref_moving_the_root_back_is_refused() -> None:
+    with pytest.raises(ValueError, match="last deployed 'fmt9'"):
+        validate_storage_prefix_progression("fmt9", "fmt6", "")
+
+
+@pytest.mark.parametrize("deployed", ["fmt6", "fmt0"])
+def test_moving_back_to_the_bucket_root_is_refused(deployed: str) -> None:
+    """The bucket root holds the pre-first-migration graphs, older than any fmt."""
+    with pytest.raises(ValueError, match="older root"):
+        validate_storage_prefix_progression(deployed, "", "")
+
+
+@pytest.mark.parametrize(
+    ("deployed", "new"),
+    [
+        (None, "fmt6"),
+        ("fmt9", "fmt9"),
+        ("fmt6", "fmt9"),
+        ("", "fmt6"),
+        ("fmt9", "fmt10"),
+    ],
+)
+def test_first_deploys_steady_state_and_cutovers_pass(
+    deployed: str | None, new: str
+) -> None:
+    validate_storage_prefix_progression(deployed, new, "")
+
+
+def test_format_numbers_compare_as_integers() -> None:
+    """fmt10 sorts before fmt9 as a string."""
+    with pytest.raises(ValueError, match="newer storage format"):
+        validate_storage_prefix_progression("fmt10", "fmt9", "")
+
+
+def test_rollback_naming_the_root_being_left_passes() -> None:
+    validate_storage_prefix_progression("fmt9", "fmt6", "fmt9")
+
+
+def test_rollback_override_for_a_different_root_is_refused() -> None:
+    with pytest.raises(ValueError, match="only applies to a deploy that moves"):
+        validate_storage_prefix_progression("fmt10", "fmt9", "fmt9")
+
+
+def test_leftover_override_is_refused_once_the_rollback_has_deployed() -> None:
+    """Otherwise it permits the incident again after a re-cutover to the same root.
+
+    QA rolls back fmt9 -> fmt6 and keeps ``storage_rollback_from: fmt9``. Once
+    fmt9 is cut over again, a stale ref carrying fmt6 would match it and pass.
+    Refusing on the first deploy after the rollback forces it out before then.
+    """
+    with pytest.raises(ValueError, match="only applies to a deploy that moves"):
+        validate_storage_prefix_progression("fmt6", "fmt6", "fmt9")
+
+
+def test_free_form_prefixes_have_no_ordering_to_check() -> None:
+    validate_storage_prefix_progression("migration-2026-08", "fmt6", "")
+    validate_storage_prefix_progression("fmt9", "migration-2026-08", "")
+
+
+def test_rollback_from_errors_name_their_own_key() -> None:
+    with pytest.raises(ValueError, match="omnigraph:storage_rollback_from must"):
+        validate_storage_prefix("fmt<N>", key="storage_rollback_from")
+
+
+@pytest.mark.parametrize(
+    ("deployed", "new"),
+    [("fmt9", "fmt9"), ("fmt6", "fmt9"), (None, "fmt9"), ("fmt9", "v2.1")],
+)
+def test_rollback_override_outside_a_rollback_is_refused(
+    deployed: str | None, new: str
+) -> None:
+    """Set ahead of time, it would pre-authorize a later stale ref moving back."""
+    with pytest.raises(ValueError, match="only applies to a deploy that moves"):
+        validate_storage_prefix_progression(deployed, new, "fmt9")
+
+
+def test_mistyped_rollback_override_says_what_to_set_it_to() -> None:
+    """A typo on a real rollback must not read as "delete the override"."""
+    with pytest.raises(ValueError, match="storage_rollback_from to 'fmt9'"):
+        validate_storage_prefix_progression("fmt9", "fmt6", "fmt8")
