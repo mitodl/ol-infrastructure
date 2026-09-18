@@ -55,8 +55,8 @@ config:
     aws_tags:
       OU: operations
     concourse_team: infrastructure
-    disk_size_gb: 300
-    disk_throughput: 300
+    disk_size_gb: 1000
+    disk_throughput: 600
     disk_iops: 4000
     iam_policies:
     - base
