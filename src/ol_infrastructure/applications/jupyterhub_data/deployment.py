@@ -11,6 +11,8 @@ Key differences from the existing jupyterhub/deployment.py:
 - The singleuser postStart hook seeds every notebook template baked into the
   image into each user's persistent home directory, without clobbering edits
 - Uses EFS dynamic storage (efs-sc) for per-user home directories
+- Mounts one RWX EFS volume at ~/shared in every user pod so notebooks can be
+  shared by link (see _SHARED_NOTEBOOKS_MOUNT_PATH)
 - No course image pre-puller
 """
 
@@ -50,6 +52,19 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.jupyterhub_config import get_authenticator_config
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 from ol_infrastructure.lib.vault import postgres_role_statements
+
+# Team notebook sharing. Every user pod mounts the same RWX EFS volume here, so
+# a notebook saved under it can be shared as
+#   https://<domain>/hub/user-redirect/marimo/?file=shared/<user>/<notebook>.py
+# user-redirect sends each viewer to their OWN server, so the notebook runs as
+# the viewer: their Galaxy OAuth login, their profile, and their per-user
+# JupyterHub auth state, never the author's. marimo resolves `file` against
+# the Jupyter server's working directory (/home/jovyan).
+#
+# The efs-sc access point enforces a single POSIX identity for every client, so
+# every user can write anywhere under this path, including other users' files.
+# The per-user subdirectory is a convention, not an access control.
+_SHARED_NOTEBOOKS_MOUNT_PATH = "/home/jovyan/shared"
 
 # KubeSpawner profile list: currently defines Standard and Large CPU/memory tiers.
 _PROFILE_LIST = f"""
@@ -367,6 +382,26 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         opts=ResourceOptions(delete_before_replace=True),
     )
 
+    shared_notebooks_pvc = kubernetes.core.v1.PersistentVolumeClaim(
+        f"{base_name}-shared-notebooks-pvc-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{base_name}-shared-notebooks",
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        spec=kubernetes.core.v1.PersistentVolumeClaimSpecArgs(
+            access_modes=["ReadWriteMany"],
+            storage_class_name="efs-sc",
+            # EFS does not enforce the requested size; the field is required.
+            resources=kubernetes.core.v1.VolumeResourceRequirementsArgs(
+                requests={"storage": "50Gi"}
+            ),
+        ),
+        # efs-sc reclaims with Delete, so replacing or deleting this claim
+        # deletes every shared notebook.
+        opts=ResourceOptions(protect=True),
+    )
+
     # Kubernetes ServiceAccount annotated with the IRSA role ARN so that
     # single-user pods can read S3 and Glue without long-lived credentials.
     kubernetes.core.v1.ServiceAccount(
@@ -523,6 +558,10 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     # `|| true` guards the container: a postStart hook that exits
                     # non-zero kills it, and the glob fails if the templates
                     # directory is ever empty.
+                    #
+                    # It also creates the user's own folder on the shared volume,
+                    # so the share link convention (shared/<user>/...) has
+                    # somewhere to point before anyone thinks to create it.
                     "lifecycleHooks": {
                         "postStart": {
                             "exec": {
@@ -531,7 +570,10 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                                     "-c",
                                     "mkdir -p /home/jovyan/notebooks && "
                                     "cp -n /usr/local/share/marimo/templates/* "
-                                    "/home/jovyan/notebooks/ || true",
+                                    "/home/jovyan/notebooks/ || true; "
+                                    "mkdir -p "
+                                    f'"{_SHARED_NOTEBOOKS_MOUNT_PATH}/$JUPYTERHUB_USER"'
+                                    " || true",
                                 ]
                             }
                         }
@@ -586,6 +628,20 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         "dynamic": {
                             "storageClass": "efs-sc",
                         },
+                        "extraVolumes": [
+                            {
+                                "name": "shared-notebooks",
+                                "persistentVolumeClaim": {
+                                    "claimName": shared_notebooks_pvc.metadata.name,
+                                },
+                            },
+                        ],
+                        "extraVolumeMounts": [
+                            {
+                                "name": "shared-notebooks",
+                                "mountPath": _SHARED_NOTEBOOKS_MOUNT_PATH,
+                            },
+                        ],
                     },
                     "cloudMetadata": {"blockWithIptables": False},
                     # Resource defaults; overridden per-user by KubeSpawner profile_list
@@ -602,6 +658,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                 oidc_static_secret,
                 crypt_key_static_secret,
                 ghcr_pull_secret,
+                shared_notebooks_pvc,
             ],
         ),
     )
