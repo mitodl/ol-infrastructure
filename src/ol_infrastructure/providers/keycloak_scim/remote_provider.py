@@ -164,16 +164,25 @@ def _find_by_name(
 ) -> dict[str, Any] | None:
     # The list endpoint returns providers from every realm the caller is
     # authorized for, and names are not unique, so match on realm as well.
-    response = session.get(
-        _endpoint(props),
-        params={"count": LIST_PAGE_SIZE},
-        timeout=REQUEST_TIMEOUT_SECONDS,
-    )
-    _raise_for_status(response)
+    resources: list[dict[str, Any]] = []
+    total_results = 1
+    while len(resources) < total_results:
+        response = session.get(
+            _endpoint(props),
+            params={"count": LIST_PAGE_SIZE, "startIndex": len(resources) + 1},
+            timeout=REQUEST_TIMEOUT_SECONDS,
+        )
+        _raise_for_status(response)
+        page = response.json()
+        page_resources = page.get("Resources", [])
+        if not page_resources:
+            break
+        resources.extend(page_resources)
+        total_results = page["totalResults"]
     name = props["spec"]["name"]
     matches = [
         resource
-        for resource in response.json().get("Resources", [])
+        for resource in resources
         if resource["name"] == name
         and (resource.get("assignedRealm") or {}).get("realmName") == props["realm"]
     ]
@@ -207,16 +216,24 @@ def _overlay(live: Any, declared: Any) -> Any:
 
 
 def _project(live: Any, declared: Any) -> Any:
-    """Reduce a live resource to the shape of the declared attributes."""
+    """Reduce a live resource to the shape of the declared attributes.
+
+    Unmanaged (``None``) values stay unmanaged rather than pulling live values
+    (and credentials) into state. Declared keys missing from the live resource
+    are omitted, and list lengths follow the live side, so both show as drift.
+    """
+    if declared is None:
+        return None
     if isinstance(live, dict) and isinstance(declared, dict):
         return {
-            key: _project(live[key], value) if key in live else value
+            key: _project(live[key], value)
             for key, value in declared.items()
+            if key in live
         }
     if isinstance(live, list) and isinstance(declared, list):
         return [
-            _project(live[index], value) if index < len(live) else value
-            for index, value in enumerate(declared)
+            _project(entry, declared[index]) if index < len(declared) else entry
+            for index, entry in enumerate(live)
         ]
     return live
 

@@ -85,7 +85,11 @@ def create_scim_resources(
         DEFAULT_SCIM_REALMS | {provider.realm for provider in remote_providers}
     )
     role_grants = []
-    for admin_client_id in ["master-realm", *(f"{r}-realm" for r in scim_realms)]:
+    # A provider in the master realm would repeat master-realm.
+    admin_client_ids = dict.fromkeys(
+        ["master-realm", *(f"{realm}-realm" for realm in scim_realms)]
+    )
+    for admin_client_id in admin_client_ids:
         admin_client = keycloak.openid.get_client(
             realm_id="master", client_id=admin_client_id, opts=invoke_options
         )
