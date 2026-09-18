@@ -327,7 +327,7 @@ child spans under a request span, which no metric exposes, and states the
 sampling bias on the panels rather than comparing a sampled count against an
 exhaustive one.
 
-Two Tempo constraints found the hard way (2026-09-17, production stack):
+Three Tempo constraints found the hard way (2026-09-17/18, production stack):
 
 - Its responses carry an `exemplar` frame beside every series frame, and
   Grafana's server-side expression engine rejects the mixed frame set. A
@@ -338,6 +338,16 @@ Two Tempo constraints found the hard way (2026-09-17, production stack):
 - TraceQL's double-quoted strings interpret escape sequences, so a span name
   holding a backslash (`GET ^logout\/?$`) fails with `invalid char escape`.
   Use a backtick (raw) string for any attribute carrying a URL pattern.
+- A TraceQL *metrics* query is capped at 25 hours: `metrics query time range
+  exceeds the maximum allowed duration of 25h0m0s`. A panel inheriting a wider
+  dashboard range renders blank, with the error reachable only by inspecting
+  the panel, so keep the dashboard default under the cap. Do **not** reach for
+  a panel-level `timeFrom` to escape it: the override resolves to
+  `now-24h`..`now` wherever the dashboard's window sits, so on a past range it
+  renders a populated panel answering a different question, and Grafana ignores
+  it entirely when the dashboard range is absolute -- which is what zoom-out,
+  drag-select and (with "Lock time range" on) shared links produce. Blank is
+  the better failure here.
 
 ### Template variables
 

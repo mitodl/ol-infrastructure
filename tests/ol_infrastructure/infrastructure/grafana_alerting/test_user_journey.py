@@ -25,6 +25,8 @@ from ol_infrastructure.infrastructure.grafana_alerting.dashboards.journeys impor
     MIT_LEARN_ORGANIZATION_DASHBOARD,
 )
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards.user_journey import (
+    _DEFAULT_RANGE_HOURS,
+    _TEMPO_METRICS_MAX_HOURS,
     Journey,
     JourneyStep,
     _Layout,
@@ -45,6 +47,20 @@ REAL_TARGETS = [
     r"health/readiness\/?",
     "api/v0/b2b/manager/organizations/(?P<parent_lookup_organization>[^/.]+)/",
 ]
+
+
+# Grafana accepts m/h/d/w suffixes on a relative range, so the default-range
+# assertion converts rather than assuming hours: a default of "now-2d" is the
+# bug that test exists to catch, and slicing an "h" off it would raise
+# ValueError instead of failing with a readable message.
+_RANGE_UNIT_HOURS = {"m": 1 / 60, "h": 1, "d": 24, "w": 24 * 7}
+
+
+def _relative_range_hours(raw: str) -> float:
+    """Convert a Grafana relative range like "now-24h" to hours."""
+    match = re.fullmatch(r"now-(\d+)([mhdw])", raw)
+    assert match, f"unrecognised relative range {raw!r}"
+    return int(match.group(1)) * _RANGE_UNIT_HOURS[match.group(2)]
 
 
 def unescape_promql_string(literal: str) -> str:
@@ -186,6 +202,60 @@ def test_trace_panels_use_a_raw_string_for_the_span_name() -> None:
     for query in trace_queries:
         assert "name=`GET $endpoint`" in query
         assert 'name="GET' not in query
+
+
+def test_default_range_lets_the_trace_row_render() -> None:
+    """Tempo rejects a metrics query past 25h, so the default must sit under it.
+
+    This is the bug the dashboard shipped with: the default was 48h, both
+    TraceQL panels exceeded the cap, and they rendered blank with the error
+    reachable only by inspecting the panel.
+    """
+    assert _DEFAULT_RANGE_HOURS < _TEMPO_METRICS_MAX_HOURS
+    dashboard = render(MIT_LEARN_ORGANIZATION_DASHBOARD)
+    time_range = dashboard["time"]
+    assert time_range["to"] == "now"
+    hours = _relative_range_hours(time_range["from"])
+    assert hours < _TEMPO_METRICS_MAX_HOURS, (
+        f"default range of {time_range['from']} exceeds Tempo's metrics cap"
+    )
+
+
+def test_traceql_panels_follow_the_dashboard_range() -> None:
+    """No panel-level time override on the trace panels, deliberately.
+
+    A `timeFrom` pin resolves to now-24h..now wherever the dashboard's window
+    sits, so on a past range it renders a populated panel answering a different
+    question. It is also inert when the dashboard range is absolute, which is
+    the case it would have been added to rescue. Following the dashboard means
+    these panels either show the selected range or show Tempo's error, and
+    never wrong data. See _traceql_timeseries_panel in base.py.
+    """
+    dashboard = render(MIT_LEARN_ORGANIZATION_DASHBOARD)
+
+    def walk(panels: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        # A collapsed row nests its children under row["panels"], so a flat
+        # scan would stop seeing the trace row the moment it was collapsed.
+        found = []
+        for panel in panels:
+            found.append(panel)
+            found.extend(walk(panel.get("panels", [])))
+        return found
+
+    traceql_panels = [
+        panel
+        for panel in walk(dashboard["panels"])
+        if any(t.get("queryType") == "traceql" for t in panel.get("targets", []))
+    ]
+    # Without this the test passes vacuously the moment the trace panels move
+    # or stop tagging queryType, which is exactly when it needs to fail.
+    assert traceql_panels, "found no TraceQL panels to check"
+    for panel in traceql_panels:
+        assert "timeFrom" not in panel, (
+            f"{panel['title']!r} pins its own window; it would show the "
+            "last 24h while the rest of the dashboard shows another range"
+        )
+        assert "timeShift" not in panel
 
 
 def test_layout_advances_by_the_tallest_panel_in_a_row() -> None:
