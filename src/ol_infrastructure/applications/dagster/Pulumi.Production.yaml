@@ -92,8 +92,8 @@ config:
   # server connections against an aggregate cap of 4248, and the pool sat on
   # its min_pool_size floor of 900 the entire time. Both of those figures are
   # HISTORICAL -- they were taken before #5464 cut min_pool_size 150 -> 40 and
-  # before pool_mode went session -> transaction, and the equivalents now are a
-  # 13 active peak against a 160 floor. The conclusion is unaffected and gets
+  # before pool_mode went session -> transaction. As of 2026-09-18 the
+  # equivalents are a 15 active peak (14 days) against an 80 floor. The conclusion is unaffected and gets
   # stronger, which is why the number is not being moved again here. 80 trims
   # the worst case
   # without touching anything observed. Note the aggregate cap overstates real
