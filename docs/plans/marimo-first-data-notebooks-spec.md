@@ -39,9 +39,9 @@ out of the latter.
 | D4 | Public notebooks query StarRocks as a new, restricted `notebook_public` role. Gated notebooks use the existing `readonly` role. |
 | D5 | The publisher is registered as a JupyterHub service and authenticates callers with hub tokens or hub OAuth. It never reads `X-Userinfo`. |
 | D6 | The MarimoNotebook and ApisixRoute CRs are the publisher's only state. There is no database. |
-| D7 | Published apps keep marimo token auth (`auth.password`, a per-app Secret). APISIX injects the token upstream with `proxy-rewrite`, so APISIX is the only way in. The token matters because NetworkPolicy is not enforced on the data cluster (F16). |
+| D7 | Published apps keep marimo token auth (`auth.password`, a per-app Secret). APISIX injects the token upstream with `proxy-rewrite`, so APISIX is the only entry point for viewers. Inside the cluster, anything that holds an app's token can still reach that app's Service directly: the app itself, the publisher, and APISIX. The token matters because NetworkPolicy is not enforced on the data cluster (F16). |
 | D8 | Warehouse credentials reach published pods as mounted files, not env vars. |
-| D9 | Published routes never forward viewer credentials. The OIDC plugin sets `set_access_token_header`, `set_id_token_header`, and `set_userinfo_header` to `false`, and `proxy-rewrite` strips `Cookie` (F17). |
+| D9 | Published routes never forward viewer credentials. The OIDC plugin sets `set_access_token_header`, `set_id_token_header`, and `set_userinfo_header` to `false` (F17). Turning those off only stops APISIX from adding the headers, and a client can still send its own, so `proxy-rewrite` also removes `Cookie`, `X-Access-Token`, `X-ID-Token`, and `X-Userinfo`, and overwrites `Authorization` with the app token. Notebook code must not use any of these headers for identity. |
 | D10 | Approving (pass 2) is gated on a Keycloak role, synced into JupyterHub groups (`manage_groups`, `auth_state_groups_key`). The publisher checks group membership through the hub API with its service token (F18). |
 | D11 | The first implementation pass ships Keycloak-gated apps only. The `notebook_public` role, the public route shape, and the approval workflow are deferred to pass 2. |
 | D12 | In pass 1, anyone who can log in to the hub may publish. The publisher checks only that the caller holds a valid hub token. |
@@ -195,20 +195,23 @@ annotation. Target the first marimo release that contains #10821 and #10822 (F3)
 `--sandbox` stays.
 
 **A3. A pre-warmed uv cache off EFS.** Build a uv cache into the image with the template
-dependency set (from `uv sync --script` on each template). At runtime, point `UV_CACHE_DIR` at an
-emptyDir seeded from the image cache, or at the image path directly if A1 shows the hardlink
-fallback to copy is cheap enough. Per F4, the notebook venvs move off EFS with it. The cost is
+dependency set (from `uv sync --script` on each template). At runtime, point `UV_CACHE_DIR` at a
+writable emptyDir seeded from the image cache. It can't be the image path itself: uv writes each
+script environment into the cache (F4), so a read-only cache fails on any dependency the image
+doesn't carry. A1 measures whether seeding (a copy, since the image layer and the emptyDir are
+separate filesystems) costs less than the EFS writes it replaces. Per F4, the notebook venvs move
+off EFS with it. The cost is
 that non-template dependencies download again after each pod restart. A1 decides whether that
 beats NFS writes.
 
 **A4. marimo as the default viewer.** Add an `extraFiles` entry that mounts
 `/opt/conda/share/jupyter/lab/settings/overrides.json` (path to be confirmed against the pinned
 base image) with `{"@jupyterlab/docmanager-extension:plugin": {"defaultViewers": {"python":
-"marimo"}}}` (F1). Set `singleuser.defaultUrl` to `/lab/tree/notebooks/getting_started.py`.
+"marimo"}}}` (F1). Set `singleuser.defaultUrl` to the generated landing notebook from A8,
+`/lab/tree/notebooks/welcome.py`.
 The extension already adds a marimo "New notebook" tile to the launcher's Notebook category
 (`index.ts:944-949`), next to the ipykernel tile. Leaving the ipykernel tile in place needs no
-work. Hiding it is a UX call for this task. `getting_started.py` is the one file A8 rewrites on
-every start, so `defaultUrl` always lands on the current version.
+work. Hiding it is a UX call for this task.
 
 **A5. Startup progress.** Most of this is A2 picking up marimo#10821/#10822 (F3). What remains
 here is raising whichever timeout A1 shows users hitting, and a follow-up upstream only if the
@@ -221,15 +224,17 @@ install-UX pattern in witan once it is settled.
 App user-to-server token stored in the EFS home. It only reaches repos where the App is
 installed, while a `gh auth login` device-flow token reaches every repo the user can. Repository
 convention: see Q2. The client sends the notebook's git remote and HEAD commit with a publish
-request, and the publisher records them as provenance labels. They are asserted by the client and
+request, and the publisher records them as provenance annotations (a remote contains `:` and
+`/` and can exceed 63 characters, so it can't be a label value). They are asserted by the client and
 not verified. The published `content` is what runs and what B8 reviews, and it can differ from
 HEAD.
 
 **A8. Template updates reach existing users.** `cp -n` never overwrites, so template fixes never
 reach anyone who already has a copy. Seed into a versioned `~/notebooks/templates/<version>/`
-directory, and overwrite `~/notebooks/getting_started.py` from the image on every start. It is a
-landing page that links to the newest template directory, not a file users are expected to edit.
-Users' edited copies elsewhere are left alone.
+directory. Write a new, generated `~/notebooks/welcome.py` on every start that links to the
+newest template directory. Its header marks it as generated, so users don't treat it as theirs.
+Existing `getting_started.py` copies stay user-owned and are never overwritten, as the current
+postStart hook promises (`jupyterhub_data/deployment.py:554-574`).
 
 ### Part B: publishing (`marimo_data`, marimo-operator, publisher service)
 
@@ -279,35 +284,54 @@ under `hub.services` (D5).
 
 - API: `publish`, `update`, `list` (mine), `status` (phase, recent events, pod logs), and
   `unpublish`.
-- Authorization: any caller with a valid hub token (D12).
-- Validation: a PEP 723 header, `marimo check` passes, content under 1 MiB (the ConfigMap
-  limit), and a DNS-label name that is unique or already owned by the caller.
+- Authorization: any caller with a valid hub token may `publish` a new name (D12). `update`,
+  `status`, and `unpublish` act only on apps whose owner label matches the caller. Pass 1 has no
+  admin override, and a platform admin uses `kubectl`.
+- Validation: a PEP 723 header, `marimo check` passes, and content under 900 KiB. The 1 MiB
+  limit applies to the whole ConfigMap object, so the key and metadata need headroom. The name
+  must be a DNS label that is unique or already owned by the caller, and not a reserved gateway
+  path. Reserve at least `logout`, because the shared OIDC plugin uses `/logout/oidc`
+  (`marimo_data/__main__.py:179`), and an app named `logout` would capture it.
 - Renders a MarimoNotebook with `mode: run`, inline `content`, `auth.password` pointing at a
   per-app token Secret (D7), the B3 image, the F7 args override, the F8 content hash env, the B4
-  credential volume, a restricted-PSA `securityContext`, and resource caps. It never renders
-  `sidecars` or `mounts`. Also renders an `ApisixRoute` at `/<name>/*` carrying D7 and D9. Labels
-  and annotations record the owner, an access level (always `keycloak` in pass 1, so pass 2 can
-  add `public` without relabeling), and git provenance (A7).
-- After each write, reads back the reconciled Pod and fails the request if its args, volumes, or
-  ServiceAccount don't match (F7).
+  credential volume and mount, a restricted-PSA `securityContext`, and resource caps. The
+  publisher adds only that fixed credential volume. It never accepts user-supplied `sidecars`,
+  `mounts`, volumes, or podOverrides, and the B6 admission policy enforces the same allowlist.
+  Labels hold bounded values only: an owner identifier and an access level (always `keycloak` in
+  pass 1, so pass 2 can add `public` without relabeling). The unverified git remote and commit
+  go in annotations (A7). The token Secret carries an ownerReference to its MarimoNotebook, so
+  deleting the CR garbage-collects it.
+- Rollout is asynchronous. The publisher waits for a Pod whose F8 content-hash env matches the
+  request, verifies its args, volumes, and ServiceAccount (F7), and waits for it to be Ready.
+  Only then does it create or update the ApisixRoute. On timeout or mismatch it deletes what it
+  created for a new app, or restores the previous CR for an update, and returns an error.
 - State lives only in the CRs (D6).
 
 **B6. Publisher infrastructure.** In `marimo_data`:
 
 - the publisher Deployment and ServiceAccount;
-- a Role in `marimo` scoped to `marimonotebooks`, `apisixroutes`, and `secrets` (the per-app
-  token Secrets), plus read-only `pods`, `pods/log`, and `events`. RBAC can't scope `secrets`
-  by label, and Secret volumes must be in the pod's namespace, so the publisher can also read
-  the B4 warehouse credential Secrets. It is service code we run, and that exposure is accepted.
-  Tokens must be per app, not shared: every author can read their own app's token file, and a
-  shared token would let one author reach every other app's Service directly;
+- a Role in `marimo` scoped to `marimonotebooks` and `apisixroutes`, plus read-only `pods`,
+  `pods/log`, and `events`. On `secrets` it gets only `create`, `patch`, and `delete`, never
+  `get`, `list`, or `watch`. The publisher writes each app token once, and APISIX reads it through
+  the plugin `secretRef`, so the publisher can't read any Secret in `marimo`, including the B4
+  warehouse credential. Tokens are per app, not shared: every author can read their own app's
+  token file, and a shared token would let one author reach every other app's Service directly;
+- a `ValidatingAdmissionPolicy` (GA since Kubernetes 1.30; the data clusters run 1.36) on
+  `marimonotebooks` in `marimo`. It rejects any `sidecars` or `mounts`, any podOverrides volume
+  other than the app's own token Secret and the B4 credential Secret, and any ServiceAccount
+  other than `marimo-published`. That closes the indirect path where a compromised publisher
+  renders a pod that mounts another app's Secret;
 - the `hub.services` entry and its API token. Group sync for the approver role (D10) comes
   with pass 2;
 - Pod Security Admission `restricted` enforced on `marimo`. With the publisher never rendering
   sidecars, write access to `marimonotebooks` can't become a privileged pod;
 - a `ResourceQuota` and `LimitRange` on `marimo`;
 - the image tag through `versions.py` and Renovate;
-- Concourse wiring through the existing `marimo-data` `simple_pulumi` entry.
+- Concourse wiring through the existing `marimo-data` `simple_pulumi` entry. `jupyterhub_data`
+  and `marimo_data` deploy through separate pipelines, so the order is explicit.
+  `jupyterhub_data` applies first, registering the hub service and writing its API token to
+  Vault. `marimo_data` applies second, and the publisher reads that token through VSO. Without
+  the token the publisher fails closed, because it can't validate any caller.
 
 **B7. Front ends.** An `ol-notebook publish <file> --name <n>` CLI in the image (pass 2 adds
 `--access public`), plus a JupyterLab "Publish notebook…" context-menu and command-palette entry. Both call the
@@ -328,21 +352,36 @@ None of this ships in the first pass. It is kept here so pass 1 leaves room for 
 **B8. Approval to go public.** A `--access public` request publishes as gated with
 `requested-access=public` and posts to Slack. An approver, a member of the approver group synced
 from a Keycloak role in the `ol-data-platform` realm (D10; name: see Q3), reviews the notebook
-source and data level in the publisher UI, then approves or rejects. Approval re-renders the
-route without the OIDC plugin and swaps the credential volume to `notebook_public`. Any later
-`update` to a public app drops it back to gated, pending re-approval, so reviewed code can't be
-swapped after the fact. Decisions are recorded as CR annotations and Kubernetes Events.
+source and data level in the publisher UI, then approves or rejects. Decisions are recorded as
+CR annotations and Kubernetes Events.
+
+Requested and effective access are separate fields. An approval names the content hash it
+reviewed, and applies only while the CR still carries that hash, so an `update` that races an
+approval invalidates it. Order matters in both directions:
+
+- Going public: swap the credential to `notebook_public`, wait for the Pod with the approved
+  hash and the new credential to be Ready and verified, and only then remove the OIDC plugin
+  from the route.
+- `update` to a public app: first restore the OIDC plugin and wait for APISIX to reconcile it,
+  then change content or credentials. The app then waits for re-approval.
 
 Pass 2 also needs:
 
 - a native `notebook_public` StarRocks role (grants: see Q1), a Vault role for it (F14), and a
   second `VaultDynamicSecret`;
-- publisher validation that requires every PEP 723 dependency of a public app to be pinned with `==`, because
-  `marimo run --sandbox` resolves dependencies again on every pod start (F10). Otherwise approved
-  code could change when an unpinned dependency releases;
+- a reproducible dependency set for public apps. `marimo run --sandbox` resolves dependencies
+  again on every pod start (F10), and `==` pins on direct PEP 723 dependencies leave transitive
+  and URL/VCS dependencies free to change after approval. Pass 2 needs a complete, hash-verified
+  lock that the sandbox consumes, or an immutable image built per approved revision. Which of the
+  two is decided in pass 2;
 - `limit-count` on public routes;
-- approve and reject endpoints on the publisher, restricted to the approver group (D10). That
-  needs hub service scopes to read users and groups, `manage_groups=True` and
+- review endpoints on the publisher, restricted to the approver group (D10):
+  - list pending requests;
+  - fetch the exact source and data level for a content hash;
+  - approve or reject a content hash. Repeating a decision on the same hash is a no-op, and a
+    decision on a stale hash is refused.
+
+  That needs hub service scopes to read users and groups, `manage_groups=True` and
   `auth_state_groups_key` in `jupyterhub_data`, and a Keycloak mapper that puts the role in
   the token.
 
