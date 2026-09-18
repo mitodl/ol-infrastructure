@@ -26,7 +26,7 @@ production hardening guidance, so the hardening here is ours.
 | P2 | Namespace `gravitino`, one Gravitino deployment per environment. QA and Production first; CI when something in CI needs it. |
 | P3 | Dedicated RDS Postgres per environment, pinned to major version 16, with a Vault database mount at `postgres-gravitino`. |
 | P4 | No new bucket. Tables stay where they are in `ol-data-lake-<stage>-<env>`. |
-| P5 | Catalog backend is decided by a spike first: Iceberg `GlueCatalog` as a `CUSTOM` backend if it works, `JDBC` in the same RDS instance if it does not. |
+| P5 | Iceberg `GlueCatalog` as a `CUSTOM` backend over the existing Glue tables. The spike passed (`gravitino-glue-backend-spike-results.md`). `JDBC` stays the fallback. |
 | P6 | `credential-providers=aws-irsa`, not `s3-token`, vending from a dedicated S3-only role named in `s3-role-arn`. No static AWS keys anywhere. |
 | P7 | In-cluster only, no HTTPRoute or NLB. The management API requires a client certificate (mTLS) from a namespace-local CA. The Iceberg REST port serves HTTPS. |
 | P8 | Official Helm chart `oci://registry-1.docker.io/apache/gravitino-helm`, version `1.3.11` (appVersion `1.3.0`). There is no operator. |
@@ -116,7 +116,16 @@ than 41 characters makes the STS call fail. Kerberos short names are well under 
 service-account principal (`service-account-<client-id>`) can exceed it, so machine client ids that
 reach the catalog must stay short.
 
-## P5: catalog backend, and why this is a spike and not a decision
+## P5: catalog backend
+
+Decided: Option A. The spike (`gravitino-glue-backend-spike-results.md`) answered all four unverified
+items below against real Glue. The backend loads from the stock image because the entrypoint links
+`iceberg-bundles/` into both lib directories. `table-metadata-cache-impl` is optional. Grants on
+pre-existing Glue objects need no import. Gravitino's `UpdateTable` carries the Glue `versionId`, and
+a race between Gravitino-path and direct-Glue appends lost no commit. `uri` is required by the
+catalog property validator and ignored by `GlueCatalog`, so it takes a placeholder. Do not set
+`lock-impl`: it disables the `versionId` guard. The rest of this section is the reasoning that
+preceded the spike.
 
 The dynamic config provider only serves catalogs whose provider is `lakehouse-iceberg`
 (`DynamicIcebergConfigProvider.java:103-105`). Gravitino's separate `glue` catalog provider
@@ -431,9 +440,9 @@ credential-providers = aws-irsa
 s3-role-arn = <dedicated vending role, P6>
 s3-region = us-east-1
 s3-token-expire-in-secs = 3600
-# Option A only:
 catalog-backend = custom
 catalog-backend-impl = org.apache.iceberg.aws.glue.GlueCatalog
+uri = https://glue.us-east-1.amazonaws.com
 table-metadata-cache-impl =
 ```
 
@@ -511,7 +520,8 @@ certificate.
 
 ## Verification before this is called done
 
-1. The P5 spike, with each of its four unverified items answered. The spec's shape depends on it.
+1. Done: the P5 spike passed (`gravitino-glue-backend-spike-results.md`). Re-run its item 4 race on
+   every Gravitino upgrade, since `custom` is not an upstream-documented production backend.
 2. In QA, a vended `aws-irsa` credential for one table can read that table's objects, and gets 403
    on a sibling table's prefix and on `ListBucket` at the bucket root. That is the spike's `s3-token`
    result repeated for the provider we actually run.

@@ -188,12 +188,17 @@ a schema-level grant plus a table-level `DENY` (A10) come in.
 
 | Principal | Needs | How |
 |---|---|---|
-| `ol-gravitino-catalog` (bootstrap, Keycloak spec D2) | Authenticate to `GET /v1/config` at StarRocks catalog creation | Nothing. The spike showed `/v1/config` requires authentication only. Not added to the metalake. |
+| `ol-gravitino-catalog` (bootstrap, Keycloak spec D2) | Authenticate to `GET /v1/config` at StarRocks catalog creation | Nothing. The spike showed `/v1/config` requires authentication only. Not added to the metalake, and never granted anything: StarRocks commits every `INSERT` as this principal, not as the user (`gravitino-glue-backend-spike-results.md`, item 2), so a grant here is a write grant for every StarRocks user. |
 | `ol-gravitino-admin` (reconciler) | Create the metalake, catalog, groups, roles, grants; add users | `gravitino.authorization.serviceAdmins`. It creates the metalake and so owns it. The only workload holding the management API's client certificate (deployment spec P7). Owning the metalake makes it able to run job templates, i.e. code execution in the Gravitino pod (deployment spec P8). |
 | Pipeline writers | Write any layer | Only under deployment Option B (they then talk to the catalog). A Keycloak service-account client per writer, holding the `ol_data_engineer` client role through `ClientServiceAccountRole` (Keycloak spec M15), so it arrives as group `ol_data_engineer`. Added to the metalake like a human. |
 
 Under deployment Option A the pipeline writers keep writing to Glue directly, and there are no
 pipeline principals in Gravitino at all.
+
+Writes through StarRocks are not part of this model. StarRocks 4.1.3 plans an `INSERT` as the user but
+commits it with the catalog's bootstrap credential, so with the bootstrap principal holding nothing,
+every StarRocks write to the Gravitino catalog fails. That is the intended outcome until StarRocks
+commits with the user's session.
 
 `ol-gravitino-admin` is a new Keycloak client beyond what the Keycloak spec provisions: CONFIDENTIAL,
 service accounts only, secret at `secret-operations/sso/gravitino-admin`. It needs:
