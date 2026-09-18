@@ -21,13 +21,26 @@ on MITx Online and that is a privilege grant nobody has approved yet. The choice
 granting `is_staff` to the existing mit-learn canary account (it already signs in to
 RC MITx Online, through the same `olapps` realm and `ol-mitlearn-client` client) or
 provisioning a dedicated account. Either way the account must be staff and not
-superuser. To schedule it, drop `spec_paths` and set `credential_secret`.
+superuser. Sharing the mit-learn account has a cost: each pipeline keeps its own
+rejected-credential marker, so a drifted password is submitted by both, twice the
+failures toward the realm's permanent lockout (see `../mit-learn/README.md`), and a
+rotation has to update both credential secrets at once. To schedule it, drop
+`spec_paths` and set `credential_secret`.
+
+While `spec_paths` is narrowed, a new journey added to this directory does **not**
+run until it is added to that list too.
 
 Both journeys are read-only. The signed-in one navigates but never clicks Create,
 Save or a status change, and there are no discount journeys: those need superuser,
-which a canary must not hold. It also runs with traces, screenshots and video off,
-because the Flexible Pricing list shows learners' names, email addresses and
-incomes, and failure artifacts are published to S3.
+which a canary must not hold.
+
+The Flexible Pricing list shows learners' names, email addresses and incomes, and
+failure artifacts are published to S3, so the signed-in journey keeps the page out
+of them. Trace, screenshot and video are off, and that is not enough: Playwright
+also writes an ARIA snapshot of the page into `error-context.md` on any failure. The
+spec suppresses both sources of that snapshot and reports each failed step by name
+only; the comment at the top of the spec says how. Any new journey that renders
+learner data needs the same treatment.
 
 ## Helpers
 
