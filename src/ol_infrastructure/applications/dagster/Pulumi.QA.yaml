@@ -31,6 +31,11 @@ config:
   # Revisit once the pgbouncer exporter has enough history to show what a run
   # worker really holds outside a deadlock.
   dagster:max_concurrent_runs: 20
+  # Exports OTel metrics (db.client.connections.usage, the client-side
+  # QueuePool occupancy) from the control plane and canvas run workers. QA
+  # only until its series count is measured; see dagster_otel_metrics_enabled
+  # in __main__.py.
+  dagster:otel_metrics_enabled: "true"
   # event_log_storage's QueuePool. QA was left on the 10+10 fallback when
   # Production was sized on 2026-08-18, on the stated grounds that it had not
   # shown the failure mode. It had: the daemon logged "QueuePool limit of size
