@@ -7,6 +7,10 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.learner_records import (
+    create_learner_records_clients,
+    parse_learner_records_clients,
+)
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_browser_flows,
     create_organization_first_broker_login_flows,
@@ -448,7 +452,18 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     # defines olapps-ol-analytics-api-client-secret/-redirect-uris. Without
     # this guard, `pulumi up` against the CI keycloak stack would create a
     # CONFIDENTIAL client with a null secret and null valid_redirect_uris.
-    if keycloak_realm_config.get("olapps-ol-analytics-api-client-secret"):
+    learner_records_clients = parse_learner_records_clients(
+        keycloak_realm_config.get_object("olapps-learner-records-clients")
+    )
+    if not keycloak_realm_config.get("olapps-ol-analytics-api-client-secret"):
+        if learner_records_clients:
+            msg = (
+                "olapps-learner-records-clients is set but "
+                "olapps-ol-analytics-api-client-secret is not, so those clients "
+                "would silently not be created"
+            )
+            raise ValueError(msg)
+    else:
         olapps_ol_analytics_api_client = keycloak.openid.Client(
             "olapps-ol-analytics-api-client",
             name="ol-analytics-api-client",
@@ -500,6 +515,16 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                     fetch_realm_public_key_partial
                 ),
             ).apply(json.dumps),
+        )
+        # Machine-to-machine clients for the learner-records tenant, one per
+        # contracted integration. See learner_records.py.
+        create_learner_records_clients(
+            realm_id=ol_apps_realm.id,
+            realm_name="olapps",
+            api_client_id=olapps_ol_analytics_api_client.client_id,
+            clients=learner_records_clients,
+            keycloak_url=keycloak_url,
+            opts=resource_options,
         )
     # OL ANALYTICS API [END]
 

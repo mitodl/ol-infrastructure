@@ -687,12 +687,50 @@ ol_analytics_api_cert = OLCertManagerCert(
     ),
 )
 
+# The learner-records tenant has no browser users. Partners call it with a
+# client-credentials token from the per-contract clients in
+# substructure/keycloak/learner_records.py, so its prefix gets a bearer-only
+# rule that answers 401 instead of redirecting. It reuses the canonical host's
+# OIDC resource only for the discovery URL and the client_id the audience is
+# checked against.
+_learner_records_bearer_plugin = (
+    ol_analytics_api_oidc_resources.get_full_oidc_plugin_config(unauth_action="deny")
+)
+_learner_records_bearer_plugin["config"].update(
+    {
+        "bearer_only": True,
+        # Verify the JWT against Keycloak's JWKS. Introspection reports
+        # client-credentials tokens as active: false (same as Opik's SDK route).
+        "use_jwks": True,
+        "required_scopes": ["learner-records:read"],
+        # Every olapps token is signed by the same realm key. Requiring
+        # ol-analytics-api-client in `aud`, which the learner-records:read scope
+        # adds, keeps tokens minted for other olapps clients out.
+        "claim_validator": {
+            "audience": {"required": True, "match_with_client_id": True}
+        },
+    }
+)
+
 # Route every path to the service behind the openid-connect plugin so APISIX
 # authenticates the Keycloak session and forwards X-Userinfo.  The canonical
 # host uses unauth_action "auth" (redirects unauthenticated browsers to
 # Keycloak); the Learn-scoped host uses "pass" against the shared mit-learn
 # session instead (see ol_analytics_api_learn_oidc_resources above for why).
+# The learner-records rule outranks both on every host, so a browser session
+# can't reach that tenant through either catch-all.
 _ol_analytics_api_route_configs = [
+    OLApisixRouteConfig(
+        route_name="ol-analytics-api-learner-records",
+        priority=20,
+        shared_plugin_config_name=ol_analytics_api_shared_plugins.resource_name,
+        plugins=[OLApisixPluginConfig(**_learner_records_bearer_plugin)],
+        hosts=ol_analytics_api_hosts,
+        paths=["/api/v1/learner-records", "/api/v1/learner-records/*"],
+        backend_service_name=ol_analytics_api_k8s.application_lb_service_name,
+        backend_service_port=ol_analytics_api_k8s.application_lb_service_port_name,
+        backend_resolve_granularity="service",
+    ),
     OLApisixRouteConfig(
         route_name="ol-analytics-api",
         priority=10,
@@ -709,7 +747,7 @@ _ol_analytics_api_route_configs = [
         backend_service_name=ol_analytics_api_k8s.application_lb_service_name,
         backend_service_port=ol_analytics_api_k8s.application_lb_service_port_name,
         backend_resolve_granularity="service",
-    )
+    ),
 ]
 if ol_analytics_api_learn_oidc_resources is not None:
     _ol_analytics_api_route_configs.append(
