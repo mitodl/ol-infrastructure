@@ -67,7 +67,6 @@ config:
   edxapp:edx_xqueue_secrets:
     secure: v1:MSer6cBbKNVi/Pas:v5XAeVblUaT5pyxdhhk9wn9cVjadZcHscOWhN1nlPHBsCD8/HgEtsvAjtTOWnW/yVMYaMzlIjOxoKvEw0/qNESQj0M7bFKC7/dtfU+qlrWyI0PJEVVmiz9QPLAOvl4rA8In2hJTAmN+BAREDqSRFM9YiOKmdOuoDssTGv+fD1+oC5EcFz4BKPUnbZDQ1
   edxapp:enable_courseware_index: "true"
-  edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     admin_console: admin-console
     authoring: authoring
