@@ -57,7 +57,7 @@ KEDA_CHART_VERSION = "2.20.2"
 # renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
 KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
-MEILISEARCH_CHART_VERSION = "0.38.0"
+MEILISEARCH_CHART_VERSION = "0.39.0"
 # renovate: datasource=helm depName=opik packageName=opik registryUrl=https://comet-ml.github.io/opik
 OPIK_CHART_VERSION = "2.2.59"
 # renovate: datasource=helm depName=operator packageName=operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
