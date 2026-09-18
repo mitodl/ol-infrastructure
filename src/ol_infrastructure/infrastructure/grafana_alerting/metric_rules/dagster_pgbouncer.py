@@ -23,6 +23,24 @@ socket at all while the rules in this file read perfectly healthy. The 2026-08-1
 remediation then produced a second, unrelated hour of failures against the
 client's SQLAlchemy pool that nothing here saw either. Keep both files.
 
+There is deliberately no rule on pgbouncer_stats_totals_server_assignments_total.
+DagsterPgBouncerConnectionChurn{Warning,Critical} used it as the leading
+indicator for that port exhaustion, which worked under pool_mode = session,
+where the counter incremented once per client connect. Under transaction mode
+it increments once per transaction: over the 7 days to 2026-09-18 its rate
+tracked sql_transactions_pooled_total at a ratio of 0.997. A client that
+reuses its socket and one that reconnects for every query drive it the same
+way, so no threshold on it can tell them apart. Production's 14-day peak was
+2181/s with no client ever waiting, and the Critical rule sat permanently
+firing into `oblivion`.
+
+That leaves a gap, not a replacement. pgbouncer_exporter has no client-connect
+counter, so nothing here warns that a storage has regressed to connect-per-use
+before its pod runs out of ephemeral ports. DagsterDatabaseConnectionFailures in
+log_rules/dagster_database.py fires once connects start failing, which is later.
+The preventive guard is dagster_instance.yaml: every storage there must use the
+pooled ol_orchestrate.lib.postgres classes, never the stock NullPool ones.
+
 Warning rules filter cluster=~".*-(ci|qa)"      -- fire on CI and QA stacks.
 Critical rules filter cluster=~".*-(production)" -- fire on prod stack only.
 Rules with no matching data on a given stack stay silent (no_data_state=OK).
@@ -66,72 +84,6 @@ _HEADROOM_RATIO = 0.75
 # failed to drain for ten minutes, not a transient blip during a server_lifetime
 # recycle. Baseline in production is a flat 0.
 _MAXWAIT_SECONDS = 5
-
-# Client connections served per second, summed across replicas, above which the
-# pool is being used as a connect-per-query service rather than as a pool.
-#
-# Read the metric name carefully: despite "server" in it,
-# server_assignments_total counts *client* connections, not backends. PgBouncer's
-# total_server_assignment_count is "times a server was assigned to a client" and
-# the exporter's own help text is "Total number of client connections which have
-# been served since process start" -- an assignment hands out a pooled backend
-# that usually already exists, so this is not a rate of new PgBouncer-to-Postgres
-# connections. The distinction decides which side of the pool a responder looks
-# at, and the empirical check settles it: 415/s of genuinely new backends would
-# have blown the max_db_connections cap in seconds, and the cap never moved off
-# 40 of 708 throughout.
-#
-# That makes it a different quantity from everything above: those measure
-# concurrency -- how many connections exist at an instant -- while this measures
-# how fast clients arrive. Under pool_mode = session each client session takes an
-# assignment, so this is a direct count of the client-side connects that consume
-# the client pod's ephemeral ports. A client that opens and closes a connection
-# for every unit of work holds one at a time, so it registers as a nearly empty
-# pool on every concurrency rule in this file while burning through that port
-# space. Both readings are true at once; only this one is alarming.
-#
-# Measured, not guessed. data-production sat at 407-511/s continuously from
-# 2026-08-09 until the pooled storage classes rolled at ~16:40Z on 2026-08-18,
-# falling 415 -> 50.7 -> 0.7/s across the 16:37-16:47Z samples and settling at
-# 0.2-4.4/s with a single 22.9/s spike. data-qa ran a flat 59/s over the same
-# period and fell to 0.25/s in the same window. 50 is therefore below both
-# observed pathological levels and more than twice the largest post-fix spike --
-# but it rests on roughly an hour of healthy baseline, so revisit it once a week
-# of post-fix series exists. for_=15m means a sustained ~45,000 client connects
-# before it fires, which no burst of legitimate work produces.
-#
-# Know what this rule stops seeing at that point. The 16:40Z rollout ended the
-# port exhaustion but not the connection failures: for the next ~70 minutes the
-# daemon kept failing to get connections at ~30/min, now against its own
-# SQLAlchemy pool ("QueuePool limit of size 10 overflow 10 reached, connection
-# timed out"), with churn already down at 0.7/s. Client-side pool saturation is a
-# third axis that neither this rule nor the concurrency rules above can reach --
-# only DagsterDatabaseConnectionFailures in log_rules/dagster_database.py spans
-# all of it, because it matches Dagster's retry wrapper rather than any one error.
-# Treat this rule as the leading indicator for one failure mode, not as coverage.
-#
-# INVALIDATED by the pool_mode session -> transaction switch (__main__.py).
-# Everything above was measured and reasoned about under session mode, where
-# server_assignments_total increments once per client connect and therefore
-# tracks client-side socket churn. Under transaction mode PgBouncer assigns a
-# backend per transaction, not per client session, and every storage here runs
-# AUTOCOMMIT -- so this counter now increments roughly once per query, and its
-# rate becomes query throughput, not connection churn. Dagster's steady-state
-# query rate was never measured against this threshold because it was never the
-# quantity being watched, so 50/s is not known to be safe and is likely to fire
-# on ordinary load rather than the reconnect-storm failure mode this rule was
-# built for.
-#
-# No severity label below: routes to `oblivion` in alertmanager.py's route
-# tree (same mechanism documented at length in apisix_edge.py), so the rule
-# keeps evaluating and recording into grafanacloud-alert-state-history with
-# zero paging risk while a real post-transaction-mode threshold gets derived
-# from that history. Promote by adding labels={"severity": ...} once it does.
-# The failure mode this rule exists to catch -- a Dagster storage regressing
-# to a non-pooling connection class and reconnecting per query -- is now also
-# guarded independently by dagster_instance.yaml's QueuePool requirement, so
-# there is no coverage gap while this is unlabelled.
-_SERVER_ASSIGNMENTS_PER_SECOND = 50
 
 # The same ratio as _HEADROOM_RATIO, applied per pod instead of across the pool.
 #
@@ -311,54 +263,8 @@ def create(
                     f" > {_MAXWAIT_SECONDS}"
                 ),
             ),
-            # --- Client connection turnover ---
-            # Was the leading indicator for the client-side ephemeral-port
-            # exhaustion that log_rules/dagster_database.py alerts on after the
-            # fact. Unlabelled as of the pool_mode session -> transaction switch
-            # (__main__.py) -- see the long comment above _SERVER_ASSIGNMENTS_PER_SECOND
-            # for why server_assignments_total no longer approximates client
-            # connection churn under transaction mode, and routes to `oblivion`
-            # rather than paging until a real threshold is derived.
-            alerting.RuleGroupRuleArgs(
-                name="DagsterPgBouncerConnectionChurnWarning",
-                condition="C",
-                for_="15m",
-                no_data_state="OK",
-                exec_err_state="OK",
-                # No severity label: routes to `oblivion` while recalibrating.
-                labels={},
-                annotations={
-                    "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is recording {{ $value }} server assignments per second",
-                    "description": "server_assignments_total in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is rising fast enough to have tripped the old session-mode client-churn threshold. Under pool_mode = transaction this counter increments roughly once per transaction rather than once per client connect, so this is currently uncalibrated and may just be query throughput -- do not page on it. Check pgbouncer_pools_client_active_connections / client_waiting_connections for the actual client-socket picture, and confirm every Dagster storage in dagster_instance.yaml still uses a pooling connection class before assuming a reconnect storm.",
-                },
-                datas=rd(
-                    "sum by (cluster, namespace) "
-                    "(rate(pgbouncer_stats_totals_server_assignments_total"
-                    '{namespace="dagster", cluster=~".*-(ci|qa)"}[10m]))'
-                    f" > {_SERVER_ASSIGNMENTS_PER_SECOND}"
-                ),
-            ),
-            alerting.RuleGroupRuleArgs(
-                name="DagsterPgBouncerConnectionChurnCritical",
-                condition="C",
-                for_="15m",
-                no_data_state="OK",
-                exec_err_state="KeepLast",
-                # No severity label: routes to `oblivion` while recalibrating.
-                labels={},
-                annotations={
-                    "summary": "Dagster PgBouncer in cluster {{ $labels.cluster }} is recording {{ $value }} server assignments per second",
-                    "description": "server_assignments_total in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} is rising fast enough to have tripped the old session-mode client-churn threshold. Under pool_mode = transaction this counter increments roughly once per transaction rather than once per client connect, so this is currently uncalibrated and may just be query throughput -- do not page on it. Check pgbouncer_pools_client_active_connections / client_waiting_connections for the actual client-socket picture, and confirm every Dagster storage in dagster_instance.yaml still uses a pooling connection class before assuming a reconnect storm.",
-                },
-                datas=rd(
-                    "sum by (cluster, namespace) "
-                    "(rate(pgbouncer_stats_totals_server_assignments_total"
-                    '{namespace="dagster", cluster=~".*-(production)"}[10m]))'
-                    f" > {_SERVER_ASSIGNMENTS_PER_SECOND}"
-                ),
-            ),
             # --- Exporter health ---
-            # Both rules above use no_data_state=OK, which is right for a stack whose
+            # Every rule above uses no_data_state=OK, which is right for a stack whose
             # Mimir tenant simply has no Dagster clusters in it, but it also means an
             # exporter that stops answering takes the connection alerting silently
             # with it. pgbouncer_up is the exporter's own verdict on whether it could
