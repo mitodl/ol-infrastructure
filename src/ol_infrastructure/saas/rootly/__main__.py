@@ -901,7 +901,9 @@ escalation_level_medium_urgency_slack_only = rootly.EscalationLevel(
 # Policy with everything else, and were demoted to Medium so that a stalled
 # pipeline would not page the Platform Engineering on-call overnight. That left
 # no one clearly responsible for them at any hour. This gives them their own
-# schedule and policy, which only ever notifies during business hours.
+# schedule and policy. Alerts arriving outside business hours are held until
+# 9am; one arriving shortly before 17:00 can still escalate past it (see the
+# Platform Engineering level below).
 #
 # Business hours are enforced twice on purpose. The rotation is only active
 # 9-5 ET on weekdays, so the schedule shows exactly when someone is
