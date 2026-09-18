@@ -398,7 +398,9 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
             ),
         ),
         # efs-sc reclaims with Delete, so replacing or deleting this claim
-        # deletes every shared notebook.
+        # removes its access point and a new claim gets an empty one. The old
+        # notebooks are then unreachable from the hub (the EFS CSI driver only
+        # deletes the directory itself when deleteAccessPointRootDir is set).
         opts=ResourceOptions(protect=True),
     )
 
@@ -658,7 +660,6 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                 oidc_static_secret,
                 crypt_key_static_secret,
                 ghcr_pull_secret,
-                shared_notebooks_pvc,
             ],
         ),
     )
