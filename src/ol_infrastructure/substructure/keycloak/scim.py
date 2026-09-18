@@ -27,6 +27,7 @@ from typing import Any
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
+from pydantic import ValidationError
 
 from ol_infrastructure.providers.keycloak_scim import (
     ScimRemoteProvider,
@@ -39,13 +40,15 @@ SCIM_ADMIN_ROLE = "scim-admin"
 DEFAULT_SCIM_REALMS = frozenset({"olapps"})
 
 
-class RealmScimRemoteProvider(ScimRemoteProviderSpec):
-    """A remote SCIM provider declaration from stack config."""
-
-    realm: str
-
-    def to_scim(self) -> dict[str, Any]:
-        return self.model_dump(by_alias=True, exclude_none=True, exclude={"realm"})
+def _parse_remote_provider(entry: dict[str, Any]) -> ScimRemoteProviderSpec:
+    # Config.get_object returns decrypted secure: values, and a ValidationError
+    # message echoes the input, so it would print credentials into CI logs.
+    try:
+        return ScimRemoteProviderSpec.model_validate(entry)
+    except ValidationError as error:
+        errors = error.errors(include_input=False, include_url=False)
+        msg = f"Invalid keycloak_scim:remote_providers entry: {errors}"
+        raise ValueError(msg) from None
 
 
 def create_scim_resources(
@@ -56,7 +59,7 @@ def create_scim_resources(
     resource_options = ResourceOptions(provider=keycloak_provider)
     invoke_options = InvokeOptions(provider=keycloak_provider)
     remote_providers = [
-        RealmScimRemoteProvider.model_validate(entry)
+        _parse_remote_provider(entry)
         for entry in Config("keycloak_scim").get_object("remote_providers") or []
     ]
 
@@ -112,7 +115,6 @@ def create_scim_resources(
         ScimRemoteProvider(
             f"{provider.realm}-scim-remote-provider-{provider.name}",
             keycloak_url=keycloak_url,
-            realm=provider.realm,
             client_id=scim_client.client_id,
             client_secret=scim_client.client_secret,
             spec=provider,
