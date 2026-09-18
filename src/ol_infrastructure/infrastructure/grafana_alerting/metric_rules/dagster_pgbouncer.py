@@ -32,9 +32,14 @@ tracked sql_transactions_pooled_total at a ratio of 0.997. A client that
 reuses its socket and one that reconnects for every query drive it the same
 way, so no threshold on it can tell them apart. Production's 14-day peak was
 2181/s with no client ever waiting, and the Critical rule sat permanently
-firing into `oblivion`. pgbouncer_exporter has no client-connect counter to
-replace it with, so a connect-per-use regression is caught by
-DagsterDatabaseConnectionFailures in log_rules/dagster_database.py instead.
+firing into `oblivion`.
+
+That leaves a gap, not a replacement. pgbouncer_exporter has no client-connect
+counter, so nothing here warns that a storage has regressed to connect-per-use
+before its pod runs out of ephemeral ports. DagsterDatabaseConnectionFailures in
+log_rules/dagster_database.py fires once connects start failing, which is later.
+The preventive guard is dagster_instance.yaml: every storage there must use the
+pooled ol_orchestrate.lib.postgres classes, never the stock NullPool ones.
 
 Warning rules filter cluster=~".*-(ci|qa)"      -- fire on CI and QA stacks.
 Critical rules filter cluster=~".*-(production)" -- fire on prod stack only.
@@ -259,7 +264,7 @@ def create(
                 ),
             ),
             # --- Exporter health ---
-            # Both rules above use no_data_state=OK, which is right for a stack whose
+            # Every rule above uses no_data_state=OK, which is right for a stack whose
             # Mimir tenant simply has no Dagster clusters in it, but it also means an
             # exporter that stops answering takes the connection alerting silently
             # with it. pgbouncer_up is the exporter's own verdict on whether it could

@@ -26,8 +26,9 @@ DagsterPgBouncerConnectionChurn was added to that file alongside this module as
 the one pool-side series that saw the churn, earlier than this rule did. It was
 removed on 2026-09-18 because pool_mode = transaction turned its counter into a
 transaction count that no longer separates a pooled client from a reconnecting
-one (see that module's docstring). This rule is now the only coverage for a
-storage regressing to connect-per-use, so do not narrow it.
+one (see that module's docstring). Nothing replaced it as the earlier warning,
+so this rule is now the only alert for a storage regressing to connect-per-use,
+and it fires only once connects are already failing. Do not narrow it.
 
 Why a log rule rather than a metric
 ------------------------------------
