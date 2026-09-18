@@ -15,8 +15,8 @@
 
 | File | Purpose |
 |---|---|
-| `helpers/sign-in.ts` | Drives the real multi-screen Keycloak login from the homepage |
-| `helpers/signed-in-test.ts` | `test` whose `page` fixture is already signed in |
+| `helpers/sign-in.ts` | Starts the login from the homepage and hands off to `../shared/olapps-sign-in.ts` for the Keycloak screens |
+| `helpers/signed-in-test.ts` | `test` whose `page` fixture is already signed in, built by `../shared/signed-in-test.ts` |
 
 A journey that needs a session imports `test` from `helpers/signed-in-test` and takes
 the ordinary `{ page }` fixture — do not call `signIn` yourself. The session is
@@ -49,9 +49,9 @@ sourced from Vault by the pipeline. Never commit them — see `../../AGENTS.md`.
 
 ### Two things a login journey here must do
 
-Both are implemented in `helpers/sign-in.ts`; they are recorded here because they are
-properties of the realm, not of the code, and the next property to authenticate against
-`olapps` will need them too.
+Both are implemented in `../shared/olapps-sign-in.ts`, which every property that
+authenticates against `olapps` uses. They are recorded here
+because they are properties of the realm, not of the code.
 
 1. **Assert the password screen was reached, positively.** The flow is identity-first, so
    an account that is missing, disabled or renamed never produces a login error —
@@ -64,7 +64,7 @@ properties of the realm, not of the code, and the next property to authenticate 
    whatever page is actually showing — including MIT's own IdP.
 2. **Never retry a *rejected* password.** See the lockout note below. Retrying a page that
    failed to load is fine; retrying a refused credential is not. Playwright starts a
-   fresh worker process for a retry, so `sign-in.ts` records the refusal in a file under
+   fresh worker process for a retry, so the shared helper records the refusal in a file under
    `tmpdir` — per-container, so it covers the run and nothing beyond it. Note that the
    realm's custom theme means Keycloak's stock alert markup is absent: the refusal is
    detected by its visible text (`Invalid username or password.`), which is what a user
