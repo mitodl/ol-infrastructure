@@ -116,6 +116,7 @@ config:
       workers: 1
       runtime_threads: 1
       blocking_threads: 24
+      respawn_interval: 60
   edxapp:k8s_replicas:
     webapp:
       lms:
