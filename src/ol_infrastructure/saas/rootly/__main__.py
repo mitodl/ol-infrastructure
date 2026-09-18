@@ -71,11 +71,7 @@ def rootly_imported_escalation_path_opts(path_id: str) -> ResourceOptions:
     `rootly_imported_route_opts`: `import_` takes ownership, it does not
     assert equivalence. The declared bodies below were transcribed from
     `GET /v1/escalation_policies/{id}/escalation_paths` on 2026-09-04 and
-    re-checked on 2026-09-16. The one remaining diff is
-    `time_restriction_time_zone`: live is null, and the provider fills its
-    first enum value, `International Date Line West`, as the three paths this
-    stack created already carry. Neither path has any `time_restrictions`, so
-    the zone does nothing. Check the diff before applying anyway, because a
+    re-checked on 2026-09-16. Check the diff before applying anyway, because a
     mismatch rewrites live paging behaviour instead of failing.
 
     Safe to drop back to `rootly_opts` once every stack has applied this.
@@ -476,7 +472,10 @@ incident_role_commander = rootly.IncidentRole(
         "• Identifying and removing blockers"
     ),
     enabled=True,
-    name="Commander",
+    # Renamed from "Commander" outside this stack; kept as the live name so an
+    # apply doesn't revert it. The resource name stays "commander" because
+    # renaming it would replace the role.
+    name="Leader",
     position=1,
     summary=(
         "Responsible for the overall management of the incident from start "
@@ -538,6 +537,12 @@ escalation_policy_default_escalation_policy = rootly.EscalationPolicy(
     last_updated_by_user_id=99415,
     name="Default Escalation Policy",
     repeat_count=5,
+    # Membership is owned by each Service's `escalation_policy_id`, so this
+    # list is ignored after creation: applying a stale copy would detach any
+    # Service missing from it (as LLMOps - ClickHouse was on 2026-09-18). The
+    # API also reorders it when a member Service changes (MIT xPRO Django moved
+    # to the end after its 2026-07-22 edit), which previewed as a reorder.
+    # Listed as the API returned it on 2026-09-18, for reference only.
     service_ids=[
         "cdceaa06-6690-4351-a3af-dd36bfd6fb55",
         "6ee39557-47af-40e9-a4f7-eccee9406ecf",
@@ -547,7 +552,6 @@ escalation_policy_default_escalation_policy = rootly.EscalationPolicy(
         "503028e7-d65f-44b6-8968-b9795ccc41c2",
         "2c92b8b0-df02-4369-a876-72a895524773",
         "ffd3bdea-a4f6-4f4a-a12a-f59e71f29fe9",
-        "0d45ed4d-bd52-4488-9953-f739f18bbdaf",
         "3ad10823-4726-4207-9e99-0d81e87b0473",
         "b2389961-09be-4167-a304-a2ee1ef9af1b",
         "f42f1288-eca1-4bd4-b474-8a6bb96486fb",
@@ -576,8 +580,13 @@ escalation_policy_default_escalation_policy = rootly.EscalationPolicy(
         "dfc02e84-e281-43a6-b340-0e7cadd62036",
         "c144023f-00c1-48dd-9e38-ad4c302207e3",
         "2cc9bbde-ba8a-4c34-aa85-65f4d9c8aff4",
+        "0d45ed4d-bd52-4488-9953-f739f18bbdaf",
+        # service_llmops_clickhouse, which is declared further down.
+        "e15fc4a2-4c4e-44eb-a717-cd5d7ba3b219",
     ],
-    opts=rootly_opts,
+    opts=ResourceOptions.merge(
+        rootly_opts, ResourceOptions(ignore_changes=["service_ids"])
+    ),
 )
 
 escalation_policy_exampledeleteme_escalationpolicy = rootly.EscalationPolicy(
@@ -646,7 +655,15 @@ escalation_path_default = rootly.EscalationPath(
     repeat=True,
     repeat_count=5,
     initial_delay=0,
-    opts=rootly_imported_escalation_path_opts("adc991bc-d498-4323-9d80-9d2dfa156b0c"),
+    # Rootly does not persist a time zone on the default path: the provider
+    # sends its enum default and the API keeps returning null, so without this
+    # every refresh plans the same no-op update. There are no time restrictions
+    # on this path for the zone to apply to. Adding any means removing this
+    # ignore, or the zone set alongside them will be silently dropped.
+    opts=ResourceOptions.merge(
+        rootly_imported_escalation_path_opts("adc991bc-d498-4323-9d80-9d2dfa156b0c"),
+        ResourceOptions(ignore_changes=["time_restriction_time_zone"]),
+    ),
 )
 
 # Adds an explicit Slack-channel notification target to this level, alongside
@@ -3110,16 +3127,18 @@ alerts_source_cloudwatch_warning = rootly.AlertsSource(
 # anything at it without giving it a route again.
 alerts_source_grafana = rootly.AlertsSource(
     "grafana",
+    # Listed in the order the API returns them, which is not the order most
+    # other sources use; any other order plans an update rewriting all three.
     alert_source_fields_attributes=[
-        {
-            "alertFieldId": "39b50c54-efa8-47fc-acc6-90f1455a8834",
-            "templateBody": "{{ alert.data.title }}",
-        },
         {
             "alertFieldId": "4a3add3c-5611-4dd9-ba65-4fb60b7f4fc6",
             "templateBody": "{{ alert.description }}",
         },
         {"alertFieldId": "45a09cf3-b0f2-43cf-b596-34aaab9279dc"},
+        {
+            "alertFieldId": "39b50c54-efa8-47fc-acc6-90f1455a8834",
+            "templateBody": "{{ alert.data.title }}",
+        },
     ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
