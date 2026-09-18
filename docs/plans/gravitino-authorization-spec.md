@@ -24,7 +24,7 @@ come to hold those roles, and how the whole thing is applied and kept from drift
 | A4 | Desired state is one data structure in `ol_infrastructure`, consumed by both this catalog and the StarRocks `GRANT`s, so the two layers cannot disagree. |
 | A5 | DECISION REQUIRED: what `ol_researcher` and `ol_instructor` may read. Recommended default: nothing, until a data owner says what. |
 | A6 | DECISION REQUIRED: narrow the live StarRocks grants to the same layer map at the same time. Recommended: yes. |
-| A7 | Applied by a reconciler sidecar in the Gravitino pod, as the service admin, through the REST API on loopback. There is no policy file to mount. |
+| A7 | Applied by a reconciler CronJob, as the service admin, through the REST API over mTLS. There is no policy file to mount. |
 | A8 | The reconciler adds users to the metalake from Keycloak role membership. It never grants anything to a user. |
 | A9 | Schemas are owned by the `ol_data_engineer` group, not by whoever created them. |
 | A10 | `DENY` is reserved for named exceptions. None on day one. |
@@ -111,8 +111,14 @@ catalog ol_data_lake_<env>   USE_CATALOG, USE_SCHEMA, CREATE_SCHEMA,
                              SELECT_TABLE, MODIFY_TABLE, CREATE_TABLE
 ```
 
-Neither engineering role gets `MANAGE_GRANTS`, `MANAGE_USERS` or `MANAGE_GROUPS`. Grants change by
-editing the desired state (A4), not by hand. A hand-made grant gets reverted on the next reconcile.
+Neither engineering role gets `MANAGE_GRANTS`, `MANAGE_USERS`, `MANAGE_GROUPS` or `CREATE_ROLE`.
+Grants change by editing the desired state (A4), not by hand. A hand-made grant on a managed role
+gets reverted on the next reconcile.
+
+No role ever gets `REGISTER_JOB_TEMPLATE`, `RUN_JOB` or `USE_JOB_TEMPLATE`. Gravitino's job system
+runs shell job templates inside the server process by default, so those privileges are code execution
+in the Gravitino pod (deployment spec P8). The reconciler should refuse to apply desired state that
+contains any of them.
 
 Groups are the six `role_keys` values, which Gravitino reads through
 `groupsFields = role_keys` (Keycloak spec D5). Group objects in Gravitino hold no member list; the
@@ -157,8 +163,10 @@ DATABASES` on both `ol_data_lake_qa` and `ol_data_lake_production`, dev schemas 
 comment there defers database-level scoping "once the Glue catalog database naming is confirmed".
 It is confirmed above.
 
-This is a live over-grant only where `starrocks:enable_data_lake_integration` is true and a human
-actually holds one of those roles. Neither was checked for this spec. Recommend landing A4's
+`starrocks:enable_data_lake_integration` is `"true"` in both `Pulumi.lakehouse.QA.yaml` and
+`Pulumi.lakehouse.Production.yaml` (line 11 of each, in `substructure/starrocks`), so these grants are
+applied in both environments. Whether any human currently holds `ol_researcher` or `ol_instructor`
+was not checked, so how far the over-grant reaches in practice is unverified. Recommend landing A4's
 StarRocks half before, and independently of, Gravitino. It is useful on its own and it removes the
 disagreement before there is a second layer to disagree with.
 
@@ -181,7 +189,7 @@ a schema-level grant plus a table-level `DENY` (A10) come in.
 | Principal | Needs | How |
 |---|---|---|
 | `ol-gravitino-catalog` (bootstrap, Keycloak spec D2) | Authenticate to `GET /v1/config` at StarRocks catalog creation | Nothing. The spike showed `/v1/config` requires authentication only. Not added to the metalake. |
-| `ol-gravitino-admin` (reconciler) | Create the metalake, catalog, groups, roles, grants; add users | `gravitino.authorization.serviceAdmins`. It creates the metalake and so owns it. Reaches the management API only from inside the pod (deployment spec P7). |
+| `ol-gravitino-admin` (reconciler) | Create the metalake, catalog, groups, roles, grants; add users | `gravitino.authorization.serviceAdmins`. It creates the metalake and so owns it. The only workload holding the management API's client certificate (deployment spec P7). Owning the metalake makes it able to run job templates, i.e. code execution in the Gravitino pod (deployment spec P8). |
 | Pipeline writers | Write any layer | Only under deployment Option B (they then talk to the catalog). A Keycloak service-account client per writer, holding the `ol_data_engineer` client role through `ClientServiceAccountRole` (Keycloak spec M15), so it arrives as group `ol_data_engineer`. Added to the metalake like a human. |
 
 Under deployment Option A the pipeline writers keep writing to Glue directly, and there are no
@@ -202,11 +210,14 @@ fallback against a real token first, as the Keycloak spec already asks.
 ## A7: how it is applied
 
 Gravitino has no policy file. Everything above is REST API state in the entity store. The management
-API listens on loopback only (deployment spec P7), so it cannot be applied from a Pulumi run on a
-Concourse worker the way the StarRocks roles are, or from a separate pod.
+API requires a client certificate from a namespace-local CA (deployment spec P7) and has no route
+out of the cluster, so it cannot be applied from a Pulumi run on a Concourse worker the way the
+StarRocks roles are.
 
-A reconciler sidecar in the Gravitino pod, looping every 15 minutes, desired state mounted from a
-ConfigMap that Pulumi renders. Each run:
+`gravitino-reconcile`, a CronJob every 15 minutes in the `gravitino` namespace (deployment spec P10),
+with desired state mounted from a ConfigMap that Pulumi renders. It authenticates twice: the client
+certificate gets it through the TLS handshake, and the `ol-gravitino-admin` bearer token makes it the
+service admin. Each run:
 
 1. Ensures the metalake and catalog exist, with the catalog properties from the deployment spec.
 2. Ensures the six groups exist.
@@ -216,8 +227,8 @@ ConfigMap that Pulumi renders. Each run:
 4. Ensures each role is granted to its group, and to nothing else.
 5. Sets each existing `ol_warehouse_<env>_*` schema's owner to group `ol_data_engineer` (A9).
 6. Runs A8.
-7. Records a last-success timestamp only if every step succeeded. The deployment spec's P10 alert
-   fires when it is more than an hour old.
+7. Exits non-zero on any API error, so failures reach `WorkloadJobFailed*` and a job that stops
+   running trips the staleness rule.
 
 Step 3 is what makes the ConfigMap the source of truth. Without the revoke half, a grant removed
 from `GOVERNANCE_LAYER_ACCESS` would stay live forever.
@@ -266,13 +277,29 @@ of grants. Left alone, that means an engineer who creates a schema through StarR
 personally, and the ownership leaves with them.
 
 The reconciler sets the owner of every managed schema to group `ol_data_engineer`, which Gravitino
-supports. Table ownership stays with the creator. Engineers already hold write on the whole catalog,
+supports. The metalake owner may set the owner of any object (`JcasbinAuthorizer.hasSetOwnerPermission`,
+`JcasbinAuthorizer.java:415-445`), so this works even for schemas an engineer created. Table ownership
+stays with the creator.
+
+Group ownership carries more than drop and alter. An owner, group owners included, can grant and
+revoke privileges on the object and set its owner (`docs/security/access-control.md`, API table). So
+every data engineer can grant privileges on every layer schema, and can hand a schema's ownership to
+someone else. Their grants on the six managed roles are reverted on the next reconcile, and without
+`CREATE_ROLE` they cannot make a role to grant to. Ownership changes are not reverted; step 5
+reasserts group ownership each run, so a transfer lasts at most 15 minutes. Both are acceptable for
+the engineering role, but they are why that group's membership is the most sensitive one here. Engineers already hold write on the whole catalog,
 so creator ownership of a table adds nothing they do not have, but for the other roles it would.
 That is one more reason those roles get no `CREATE_TABLE`.
 
 ## A10: DENY
 
-Gravitino supports `DENY` with precedence over `ALLOW` at any level. Nothing needs it today. It is
+Gravitino supports `DENY` with precedence over `ALLOW` at any level. Nothing needs it today.
+
+`DENY` is per privilege and does not cascade between them: denying `SELECT_TABLE` does not stop a
+holder of `MODIFY_TABLE` from reading, and denying `MODIFY_TABLE` does not stop a holder of
+`SELECT_TABLE` (`docs/security/access-control.md`, "Table Privileges"). `MODIFY_TABLE` includes
+reading. An exception meant to hide a table has to deny both. The reconciler should emit them as a
+pair. It is
 how a future "analysts read `mart` except these tables" is expressed without restructuring roles.
 Add it to `GOVERNANCE_LAYER_ACCESS` as an explicit exception list, not as a hand-made grant.
 
