@@ -42,11 +42,17 @@ out of the latter.
 | D7 | Published apps keep marimo token auth (`auth.password`, a per-app Secret). APISIX injects the token upstream with `proxy-rewrite`, so APISIX is the only way in. The token matters because NetworkPolicy is not enforced on the data cluster (F16). |
 | D8 | Warehouse credentials reach published pods as mounted files, not env vars. |
 | D9 | Published routes never forward viewer credentials. The OIDC plugin sets `set_access_token_header`, `set_id_token_header`, and `set_userinfo_header` to `false`, and `proxy-rewrite` strips `Cookie` (F17). |
-| D10 | Publishing and approving are gated on Keycloak roles, synced into JupyterHub groups (`manage_groups`, `auth_state_groups_key`). The publisher checks group membership through the hub API with its service token (F18). |
+| D10 | Approving (pass 2) is gated on a Keycloak role, synced into JupyterHub groups (`manage_groups`, `auth_state_groups_key`). The publisher checks group membership through the hub API with its service token (F18). |
 | D11 | The first implementation pass ships Keycloak-gated apps only. The `notebook_public` role, the public route shape, and the approval workflow are deferred to pass 2. |
+| D12 | In pass 1, anyone who can log in to the hub may publish. The publisher checks only that the caller holds a valid hub token. |
 
-D1 through D4 and D11 are the owner's decisions from 2026-09-18. D5 through D10 follow from the
-facts below.
+D1 through D4, D11, and D12 are the owner's decisions from 2026-09-18. D5 through D10 follow from
+the facts below.
+
+D12 is an accepted risk. The hub admits every `ol-data-platform` realm user (F18), and a gated
+app's author can read the app's `readonly` credential (F14). In pass 1, then, any realm user can
+obtain `readonly` by publishing an app. Revisit this if hub access widens, or before pass 2 adds
+a second credential.
 
 ## Facts this rests on
 
@@ -273,7 +279,7 @@ under `hub.services` (D5).
 
 - API: `publish`, `update`, `list` (mine), `status` (phase, recent events, pod logs), and
   `unpublish`.
-- Authorization: the caller must be in the publisher group (D10, Q5).
+- Authorization: any caller with a valid hub token (D12).
 - Validation: a PEP 723 header, `marimo check` passes, content under 1 MiB (the ConfigMap
   limit), and a DNS-label name that is unique or already owned by the caller.
 - Renders a MarimoNotebook with `mode: run`, inline `content`, `auth.password` pointing at a
@@ -295,9 +301,8 @@ under `hub.services` (D5).
   the B4 warehouse credential Secrets. It is service code we run, and that exposure is accepted.
   Tokens must be per app, not shared: every author can read their own app's token file, and a
   shared token would let one author reach every other app's Service directly;
-- the `hub.services` entry, with scopes to read users and groups (D10), plus
-  `manage_groups=True` and `auth_state_groups_key` in `jupyterhub_data`, and the Keycloak
-  client mapper that puts the roles in the token;
+- the `hub.services` entry and its API token. Group sync for the approver role (D10) comes
+  with pass 2;
 - Pod Security Admission `restricted` enforced on `marimo`. With the publisher never rendering
   sidecars, write access to `marimonotebooks` can't become a privileged pod;
 - a `ResourceQuota` and `LimitRange` on `marimo`;
@@ -336,15 +341,17 @@ Pass 2 also needs:
   `marimo run --sandbox` resolves dependencies again on every pod start (F10). Otherwise approved
   code could change when an unpinned dependency releases;
 - `limit-count` on public routes;
-- approve and reject endpoints on the publisher, restricted to the approver group.
+- approve and reject endpoints on the publisher, restricted to the approver group (D10). That
+  needs hub service scopes to read users and groups, `manage_groups=True` and
+  `auth_state_groups_key` in `jupyterhub_data`, and a Keycloak mapper that puts the role in
+  the token.
 
 ## Sequencing
 
 A4 and A6 are independent and can ship first. A1 comes before A2, A3, and A5, and B3 builds on
 A2 and A3. B1 gates B5. B2 does not, once B1 has proven the stopgap. B5 needs B3 for its image
 and can't deploy without B6 (its ServiceAccount, Role, and hub service entry), so B5 and B6
-land together, followed by B7. B4 needs StarRocks E7 for connectivity. Q5 has to be answered
-before B5 goes live anywhere but CI. Pass 2 (B8) starts after pass 1 is in production, and needs
+land together, followed by B7. B4 needs StarRocks E7 for connectivity. Pass 2 (B8) starts after pass 1 is in production, and needs
 answers to Q1 and the approver half of Q3. The first real consumer is the
 feedback-clustering curation notebook (`tk-mvp-consumption-surfaces-superset-cluster-triage-ba37c2`).
 
@@ -356,17 +363,11 @@ feedback-clustering curation notebook (`tk-mvp-consumption-surfaces-superset-clu
   directory per user? I recommend the shared repo: provenance (and, in pass 2, public-app
   review) then happen in one place, and CODEOWNERS per directory keeps ownership clear. The cost is that every
   notebook author needs write access to it.
-- **Q3.** What are the role names? Pass 1 needs one Keycloak role in `ol-data-platform` for
-  publishers (e.g. `notebook_publisher`). Pass 2 adds one for approvers (e.g.
-  `notebook_publish_approver`).
+- **Q3.** What is the approver role called (pass 2)? One Keycloak role in `ol-data-platform`,
+  e.g. `notebook_publish_approver`.
 - **Q4.** What is the stale-app policy? For example, unpublish apps whose owner has left MIT, and
   flag apps with no requests in 90 days.
-- **Q5.** Who may publish a gated app? A gated app runs with the `readonly` credential, and its
-  author's code can read that file (F14, F18). Every realm user can use the hub today, so
-  without a publisher role, publishing turns any user's access into `readonly`. I recommend
-  granting `notebook_publisher` only to people already entitled to `readonly`. The alternative
-  is running gated apps as the viewer, which D9 rules out, because it means forwarding viewer
-  tokens to author code.
+- **Q5.** Who may publish a gated app? Resolved as D12: anyone with hub access.
 
 ## Verification
 
@@ -374,9 +375,9 @@ feedback-clustering curation notebook (`tk-mvp-consumption-surfaces-superset-clu
   after, from the A1 harness. A double-click on a `.py` opens marimo. A new user lands on the
   getting-started notebook.
 - Part B pass 1, in CI then QA: publish through the CLI, and confirm the gated URL requires a
-  Keycloak login, and that the app sees no viewer tokens or cookies (D9). Confirm that a caller
-  outside the publisher group is refused (D10), and that an in-cluster request without the
-  marimo token is refused (D7). Update the content, and confirm the new version serves (F8).
+  Keycloak login, and that the app sees no viewer tokens or cookies (D9). Confirm that a request
+  without a hub token is refused (D12), and that an in-cluster request without the marimo token
+  is refused (D7). Update the content, and confirm the new version serves (F8).
   Unpublish, and confirm the CR, route, ConfigMap, Secret, and Pod are gone.
 - Part B pass 2: request public, approve it as an approver, and load the URL unauthenticated.
   Confirm in the StarRocks audit log that queries run as `notebook_public`.
