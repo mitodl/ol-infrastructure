@@ -21,7 +21,6 @@ config:
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
   - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
-  - ["instructor.legacy_instructor_dashbaord", "--create", "--everyone"]
   - ["legacy_studio.advanced_settings", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
   - ["legacy_studio.configurations", "--deactivate"]
@@ -79,7 +78,6 @@ config:
     secure: v1:+8kgTH+x98kC+Lxc:bW03E5mk8wRB+FxZYtj06FPx/MEJuEiKO5ekaDTZKmqmfklisVhidp0fhX+So2Eygf/Aiyqp5L03RCzA8k7I4ZmlNss19//pdGgBDwa3HAbw
   edxapp:enable_courseware_index: "true"
   edxapp:elasticsearch_enabled: "false"
-  edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     admin_console: admin-console
     communications: communications
