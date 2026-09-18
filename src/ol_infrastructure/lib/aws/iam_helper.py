@@ -463,3 +463,67 @@ def cross_environment_glue_denial(env_suffix: str) -> list[dict[str, Any]]:
             ],
         }
     ]
+
+
+# Parliament's RESOURCE_MISMATCH flags bedrock:InvokeModel* for not also covering
+# every resource type the action accepts (custom-model-deployment,
+# provisioned-model, ...). Only foundation models and inference profiles are
+# invoked. It has to be a blanket suppression: RESOURCE_MISMATCH findings carry
+# no "actions" location, which _is_parliament_finding_filtered indexes.
+BEDROCK_PARLIAMENT_CONFIG: dict[str, Any] = {"RESOURCE_MISMATCH": {}}
+
+
+def bedrock_invoke_statements(
+    account_id: str, vendor: str | None = None
+) -> list[dict[str, Any]]:
+    """Statements that let a principal invoke Bedrock models on demand.
+
+    Newer models (e.g. Claude Sonnet 5) can only be invoked on demand through a
+    cross-Region inference profile, and granting a profile also requires the
+    underlying foundation model in every Region the profile routes to. The
+    Region wildcard covers that without pinning a destination list AWS can
+    change. The Converse and ConverseStream APIs authorize against these same
+    two InvokeModel actions.
+
+    No aws-marketplace permissions. Invoking a Marketplace-backed model (e.g.
+    Anthropic's) that the account hasn't enabled yet makes Bedrock start an
+    account-wide subscription in the background, which needs the caller's
+    aws-marketplace permissions. Without them the subscription fails, and calls
+    return AccessDeniedException once the up-to-15-minute setup window closes.
+    Calls can succeed during that window, so this is not a hard block on
+    first use. Blocking a model outright takes an explicit Deny on invoking it.
+    Once a model is enabled, invoking it needs no Marketplace permissions, so
+    enabling a new third-party model stays an administrator's one-time step.
+    Models not sold through Marketplace (Amazon, Meta, Mistral, ...) need no
+    enablement.
+    https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html
+
+    Lint the policy with ``BEDROCK_PARLIAMENT_CONFIG``.
+
+    :param account_id: The AWS account that owns the inference profiles.
+    :type account_id: str
+
+    :param vendor: Restrict to one model provider's models and profiles (e.g.
+        ``anthropic``). ``None`` allows every provider, so switching vendor is
+        a configuration change rather than an infrastructure one.
+    :type vendor: str | None
+
+    :returns: The invoke statement.
+
+    :rtype: list[dict[str, Any]]
+    """
+    model_glob = f"{vendor}.*" if vendor else "*"
+    profile_glob = f"*{vendor}*" if vendor else "*"
+    return [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "bedrock:InvokeModel",
+                "bedrock:InvokeModelWithResponseStream",
+            ],
+            "Resource": [
+                f"arn:aws:bedrock:*::foundation-model/{model_glob}",
+                f"arn:aws:bedrock:*:{account_id}:inference-profile/{profile_glob}",
+            ],
+        },
+    ]
