@@ -53,6 +53,9 @@ package.json           Pins @playwright/test. Single source of truth for the
                        container image tag the pipeline pulls.
 specs/<property>/      One directory per web property.
   mit-learn/
+  mitxonline/
+specs/shared/          Helpers used by more than one property, e.g. the olapps
+                       Keycloak sign-in.
 ```
 
 ## How these run in Concourse

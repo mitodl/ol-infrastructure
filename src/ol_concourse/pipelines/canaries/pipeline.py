@@ -164,6 +164,15 @@ pipeline_params: dict[str, CanaryParams] = {
         # secret-concourse/infrastructure/canary_mit_learn for pr-inf pipelines.
         credential_secret="canary_mit_learn",  # noqa: S106  # pragma: allowlist secret
     ),
+    "mitxonline": CanaryParams(
+        canary_name="mitxonline",
+        base_url="https://rc.mitxonline.mit.edu",
+        # Narrowed to the anonymous journeys, with no credential_secret, until an
+        # RC account with is_staff on MITx Online is approved for the canary. See
+        # specs/mitxonline/README.md. Once it is, drop spec_paths and set
+        # credential_secret; the signed-in journey is already written.
+        spec_paths=["specs/mitxonline/staff-dashboard-anonymous.spec.ts"],
+    ),
 }
 
 
