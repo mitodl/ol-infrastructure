@@ -26,6 +26,11 @@ config:
   - https://github.com/mitodl/learn-ai
   - https://github.com/mitodl/ocw-hugo-themes
   - https://github.com/mitodl/ol-django
+    # Added 2026-09-18 by the same cut, re-derived over the 90 days to
+    # 2026-09-18, for repos agents were already querying and getting
+    # ClusterGraphMissing on: ol-analytics-api (39), platform-engineering-site (36).
+  - https://github.com/mitodl/ol-analytics-api
+  - https://github.com/mitodl/platform-engineering-site
   # Turns actor-token sync on: the bootstrap Job and the hourly CronJob take
   # ownership of secret-operations/witan/actor-tokens, which Pulumi otherwise
   # writes directly. Safe only because the existing actor-tokens resource
