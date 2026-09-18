@@ -39,7 +39,7 @@ out of the latter.
 | D4 | Public notebooks query StarRocks as a new, restricted `notebook_public` role. Gated notebooks use the existing `readonly` role. |
 | D5 | The publisher is registered as a JupyterHub service and authenticates callers with hub tokens or hub OAuth. It never reads `X-Userinfo`. |
 | D6 | The MarimoNotebook and ApisixRoute CRs are the publisher's only state. There is no database. |
-| D7 | Published apps keep marimo token auth (`auth.password`, a per-app Secret). APISIX injects the token upstream with `proxy-rewrite`, so APISIX is the only entry point for viewers. Inside the cluster, anything that holds an app's token can still reach that app's Service directly: the app itself, the publisher, and APISIX. The token matters because NetworkPolicy is not enforced on the data cluster (F16). |
+| D7 | Published apps keep marimo token auth (`auth.password`, a per-app Secret). APISIX injects the token upstream with `proxy-rewrite`, so APISIX is the only entry point for viewers. Inside the cluster, anything that holds an app's token can still reach that app's Service directly: the app itself and APISIX. The token matters because NetworkPolicy is not enforced on the data cluster (F16). |
 | D8 | Warehouse credentials reach published pods as mounted files, not env vars. |
 | D9 | Published routes never forward viewer credentials. The OIDC plugin sets `set_access_token_header`, `set_id_token_header`, and `set_userinfo_header` to `false` (F17). Turning those off only stops APISIX from adding the headers, and a client can still send its own, so `proxy-rewrite` also removes `Cookie`, `X-Access-Token`, `X-ID-Token`, and `X-Userinfo`, and overwrites `Authorization` with the app token. Notebook code must not use any of these headers for identity. |
 | D10 | Approving (pass 2) is gated on a Keycloak role, synced into JupyterHub groups (`manage_groups`, `auth_state_groups_key`). The publisher checks group membership through the hub API with its service token (F18). |
@@ -248,7 +248,8 @@ D9 header flags off. The route uses `proxy-rewrite` to inject the marimo token a
 
 - the F7 args override serves correctly under the path prefix;
 - `mo.app_meta().request` in the gated app shows no `Authorization`, `X-Access-Token`,
-  `X-ID-Token`, `X-Userinfo`, or `Cookie` from the viewer (F17);
+  `X-ID-Token`, `X-Userinfo`, or `Cookie` from the viewer (F17), including when the viewer sends
+  those headers themselves (D9);
 - a request to the app Service from another pod, without the token, is refused (F16);
 - `proxy-rewrite` can take the token from the per-app Secret through the plugin `secretRef`,
   rather than holding it in plaintext in the ApisixRoute;
@@ -416,7 +417,9 @@ feedback-clustering curation notebook (`tk-mvp-consumption-surfaces-superset-clu
 - Part B pass 1, in CI then QA: publish through the CLI, and confirm the gated URL requires a
   Keycloak login, and that the app sees no viewer tokens or cookies (D9). Confirm that a request
   without a hub token is refused (D12), and that an in-cluster request without the marimo token
-  is refused (D7). Update the content, and confirm the new version serves (F8).
+  is refused (D7). Confirm that admission rejects a MarimoNotebook carrying an extra volume or
+  a sidecar (B6), and that another user's `update` or `unpublish` of the app is refused (B5).
+  Update the content, and confirm the new version serves (F8).
   Unpublish, and confirm the CR, route, ConfigMap, Secret, and Pod are gone.
 - Part B pass 2: request public, approve it as an approver, and load the URL unauthenticated.
   Confirm in the StarRocks audit log that queries run as `notebook_public`.
