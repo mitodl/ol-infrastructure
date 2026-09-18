@@ -271,3 +271,76 @@ def validate_image_internal_schema(
             f"{internal_schema_version}."
         )
         raise ValueError(msg)
+
+
+def _served_format(prefix: str) -> int | None:
+    """Storage format a served root holds, for ordering two roots.
+
+    The bucket root is where every graph lived before the first migration, so
+    it ranks below every ``fmt<N>``. A free-form prefix has no format this can
+    read and returns ``None``.
+
+    :param prefix: A normalized ``storage_prefix``.
+    :returns: The format number, ``0`` for the bucket root, or ``None``.
+    :rtype: int | None
+    """
+    if not prefix:
+        return 0
+    match = _PREFIX_SCHEMA_RE.fullmatch(prefix)
+    return int(match.group("version")) if match else None
+
+
+def validate_storage_prefix_progression(
+    deployed_prefix: str | None, storage_prefix: str, rollback_from: str
+) -> None:
+    """Refuse a deploy that moves the served root back to an older format.
+
+    ``deployed_prefix`` is the ``storage_prefix`` this stack last deployed (its
+    own exported output), and ``storage_prefix`` is what this deploy's
+    committed config asks for. A pipeline deploy takes the newest git ref that
+    passed preview, not the ref a human approved, so after a cutover it can
+    still be carrying the pre-cutover prefix. On 2026-09-16 that repointed QA's
+    cluster from fmt9 back at fmt6 four minutes after the cutover, and the
+    format-9 binary refused every graph under it. A hand-run ``pulumi up`` from
+    a stale checkout reaches the same state.
+
+    None of the other checks catch this on their own.
+    ``validate_internal_schema_version`` sees a stale ref that agrees with
+    itself, and ``validate_image_internal_schema`` skips when the image
+    predates the storage-format label.
+
+    A real rollback moves the root backwards on purpose. It is allowed only
+    when ``rollback_from`` names the root being left, so the override is
+    specific to one cutover and a stale ref from some other time is still
+    refused.
+
+    :param deployed_prefix: The last deployed ``storage_prefix``, or ``None``
+        when the stack has never exported one.
+    :param storage_prefix: The normalized ``storage_prefix`` being deployed.
+    :param rollback_from: The normalized ``omnigraph:storage_rollback_from``,
+        ``""`` when unset.
+    :raises ValueError: when the deploy moves to an older format without a
+        matching ``rollback_from``.
+    """
+    if deployed_prefix is None or deployed_prefix == storage_prefix:
+        return
+    deployed_format = _served_format(deployed_prefix)
+    new_format = _served_format(storage_prefix)
+    # A free-form prefix on either side has no ordering to check.
+    if deployed_format is None or new_format is None:
+        return
+    if new_format >= deployed_format:
+        return
+    if rollback_from == deployed_prefix:
+        return
+    msg = (
+        f"omnigraph:storage_prefix is {storage_prefix!r}, but this stack last "
+        f"deployed {deployed_prefix!r}, a newer storage format. Deploying this "
+        "would point the cluster back at an older root than the one it serves. "
+        "If this ref predates a cutover, it is stale: deploy the ref that "
+        f"carries {deployed_prefix!r}. If this is a deliberate rollback, set "
+        f"omnigraph:storage_rollback_from to {deployed_prefix!r} in the same "
+        "change and deploy the old image with it. See the Rollback section of "
+        "docs/omnigraph-storage-format-upgrade-runbook.md."
+    )
+    raise ValueError(msg)

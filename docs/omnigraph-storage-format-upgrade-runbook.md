@@ -928,25 +928,35 @@ with an image predating the label it warns and skips, so do not lean on it.
 
 On the manual path, where no config was armed, scaling to 1 is the way back.
 
-After step 5:
+After step 5, edit the stack file (not `pulumi config set`, which rewrites
+unrelated keys) to put back the root and format you are returning to, and name
+the root you are leaving:
 
-```shell
-pulumi config rm omnigraph:storage_prefix --stack <CI|QA|Production>
-pulumi config rm omnigraph:internal_schema_version --stack <CI|QA|Production>
+```yaml
+  omnigraph:storage_prefix: fmt<OLD>
+  omnigraph:internal_schema_version: <OLD>
+  omnigraph:storage_rollback_from: fmt<NEW>
 ```
 
-Both, not just the first: `validate_internal_schema_version` requires
-`internal_schema_version` to be unset whenever `storage_prefix` is (or does
-not follow `fmt<N>`), so leaving it behind fails the very preview this
-rollback is trying to run.
+All three in one change. `validate_internal_schema_version` requires the first
+two to agree. `validate_storage_prefix_progression` refuses any deploy that
+moves `storage_prefix` to an older format than the stack last deployed, which
+is what stops a stale ref from undoing a cutover (QA, 2026-09-16), and
+`storage_rollback_from` is the only way past it. It has to name the root being
+left, so an override left behind from an earlier rollback does not permit this
+one. If the old root is the bucket root, remove `storage_prefix` and
+`internal_schema_version` instead of setting them.
 
-then redeploy with `OMNIGRAPH_DOCKER_SHA` pinned to the **old** image digest.
+Then redeploy with `OMNIGRAPH_DOCKER_SHA` pinned to the **old** image digest.
 Confirm with the same `pulumi preview --diff` check that `storage:` is back to
 the derived root before applying.
 
 The old root was never written to, so this is a revert, not a restore. Writes
 that landed on the new root after step 5 are lost — which is the real reason
 step 6 happens before you tell anyone the service is back.
+
+Once the rollback has deployed, remove `storage_rollback_from`. Preview warns
+while it is set and no longer names the root the stack last deployed.
 
 ## Troubleshooting
 

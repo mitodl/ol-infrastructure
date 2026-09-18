@@ -18,6 +18,7 @@ from ol_infrastructure.applications.omnigraph.storage import (
     validate_internal_schema_version,
     validate_migration_target_prefix,
     validate_storage_prefix,
+    validate_storage_prefix_progression,
 )
 
 
@@ -233,3 +234,58 @@ def test_a_leftover_migrate_target_does_not_relax_the_check() -> None:
     """
     with pytest.raises(ValueError, match="reads storage format 9"):
         validate_image_internal_schema(9, 6, "fmt9", migration_armed=False)
+
+
+# ── the served root must not move backwards ──────────────────────────────────
+# The stale-ref promotion from 2026-09-16: QA was cut over to fmt9, then a
+# pipeline deploy of an older ref planned storage_prefix fmt9 => fmt6. Both
+# config values in that ref agreed with each other, so only a comparison with
+# what the stack last deployed can see it.
+
+
+def test_stale_ref_moving_the_root_back_is_refused() -> None:
+    with pytest.raises(ValueError, match="last deployed 'fmt9'"):
+        validate_storage_prefix_progression("fmt9", "fmt6", "")
+
+
+def test_moving_back_to_the_bucket_root_is_refused() -> None:
+    """The bucket root holds the pre-first-migration graphs, older than any fmt."""
+    with pytest.raises(ValueError, match="older root"):
+        validate_storage_prefix_progression("fmt6", "", "")
+
+
+@pytest.mark.parametrize(
+    ("deployed", "new"),
+    [
+        (None, "fmt6"),
+        ("fmt9", "fmt9"),
+        ("fmt6", "fmt9"),
+        ("", "fmt6"),
+        ("fmt9", "fmt10"),
+    ],
+)
+def test_first_deploys_steady_state_and_cutovers_pass(
+    deployed: str | None, new: str
+) -> None:
+    validate_storage_prefix_progression(deployed, new, "")
+
+
+def test_format_numbers_compare_as_integers() -> None:
+    """fmt10 sorts before fmt9 as a string."""
+    with pytest.raises(ValueError, match="newer storage format"):
+        validate_storage_prefix_progression("fmt10", "fmt9", "")
+
+
+def test_rollback_naming_the_root_being_left_passes() -> None:
+    validate_storage_prefix_progression("fmt9", "fmt6", "fmt9")
+
+
+def test_rollback_override_for_a_different_root_does_not_apply() -> None:
+    """A leftover override from an earlier rollback must not wave through a new one."""
+    with pytest.raises(ValueError, match="storage_rollback_from to 'fmt10'"):
+        validate_storage_prefix_progression("fmt10", "fmt9", "fmt9")
+
+
+def test_free_form_prefixes_have_no_ordering_to_check() -> None:
+    validate_storage_prefix_progression("migration-2026-08", "fmt6", "")
+    validate_storage_prefix_progression("fmt9", "migration-2026-08", "")

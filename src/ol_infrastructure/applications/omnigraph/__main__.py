@@ -51,7 +51,7 @@ from pathlib import Path
 from typing import Any
 
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions, export
+from pulumi import Config, Output, ResourceOptions, export, log
 
 from bridge.secrets import sops as _bridge_sops
 from bridge.secrets.sops import read_yaml_secrets
@@ -79,6 +79,7 @@ from ol_infrastructure.applications.omnigraph.storage import (
     validate_internal_schema_version,
     validate_migration_target_prefix,
     validate_storage_prefix,
+    validate_storage_prefix_progression,
 )
 from ol_infrastructure.applications.omnigraph.storage_migration import (
     create_storage_migration,
@@ -109,7 +110,11 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import make_stack_reference, parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    optional_stack_output_value,
+    parse_stack,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 # Resolve the bridge secrets directory once at module level using the sops
@@ -228,6 +233,29 @@ if MIGRATE_FROM_IMAGE and MIGRATE_TO_PREFIX == STORAGE_PREFIX:
         "storage_prefix."
     )
     raise ValueError(CUTOVER_MSG)
+
+# ── The served root must not move back to an older format by accident.
+# Compared against this stack's own last `storage_prefix` output rather than
+# anything in the ref being deployed, because the failure is a stale ref: the
+# pipeline deploys the newest ref that passed preview, which after a cutover
+# can still carry the old prefix (QA, 2026-09-16). Read before any resource is
+# declared so a refusal cannot land after the ConfigMap has already changed.
+# See validate_storage_prefix_progression.
+STORAGE_ROLLBACK_FROM: str = validate_storage_prefix(
+    omnigraph_config.get("storage_rollback_from")
+)
+DEPLOYED_STORAGE_PREFIX: str | None = optional_stack_output_value(
+    make_stack_reference(projects.OMNIGRAPH, stack_info.name), "storage_prefix"
+)
+validate_storage_prefix_progression(
+    DEPLOYED_STORAGE_PREFIX, STORAGE_PREFIX, STORAGE_ROLLBACK_FROM
+)
+if STORAGE_ROLLBACK_FROM and STORAGE_ROLLBACK_FROM != DEPLOYED_STORAGE_PREFIX:
+    log.warn(
+        f"omnigraph:storage_rollback_from is {STORAGE_ROLLBACK_FROM!r} but this "
+        f"stack last deployed {DEPLOYED_STORAGE_PREFIX!r}, so it permits "
+        "nothing. Clear it once the rollback it was set for has deployed."
+    )
 
 # Keycloak realm -> actor-token sync. Set `omnigraph:keycloak_url` for an
 # environment to turn it on; leaving it unset keeps that environment on the
