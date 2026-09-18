@@ -1,6 +1,7 @@
 """Management of Rootly incident management resources."""
 
 from pathlib import Path
+from typing import Any
 
 import pulumi_rootly as rootly
 from pulumi import Output, ResourceOptions
@@ -79,6 +80,18 @@ def rootly_imported_escalation_path_opts(path_id: str) -> ResourceOptions:
     return ResourceOptions.merge(rootly_opts, ResourceOptions(import_=path_id))
 
 
+def rootly_imported_service_opts(service_id: str) -> ResourceOptions:
+    """Adopt a service that already exists in Rootly into this stack.
+
+    Same adoption mechanics and caveat as `rootly_imported_route_opts`. The
+    declared bodies were transcribed from `GET /v1/services/{id}` on
+    2026-09-18.
+
+    Safe to drop back to `rootly_opts` once every stack has applied this.
+    """
+    return ResourceOptions.merge(rootly_opts, ResourceOptions(import_=service_id))
+
+
 # CloudWatch alarms for QA/CI resources (e.g. "mitlearn-redis-qa-003") route
 # through the same shared warning/critical SNS topics as production (see
 # src/ol_infrastructure/lib/aws/monitoring_helper.py) and would otherwise page
@@ -105,12 +118,16 @@ CLOUDWATCH_NON_PROD_URGENCY_RULES = [
     },
 ]
 
-# Dagster's metadata database. Its alarms are worth seeing but not worth waking
-# anyone for: Dagster retries and backfills, so a degraded control plane costs
+# Dagster's metadata database. Its alarms are worth seeing but not worth
+# paging for: Dagster retries and backfills, so a degraded control plane costs
 # pipeline latency, not user-facing availability. DiskQueueDepth in particular
 # is expected to breach and self-clear about weekly (see the RDS comment in
 # applications/dagster/__main__.py), and paged on-call at High on 2026-09-11.
-# Medium routes to #devops-warnings only; see the Medium urgency paths below.
+# These alarms route to the Data Platform Escalation Policy (see
+# DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES), whose Medium path posts to
+# #devops-warnings only. Kept after the Dagster demotions on the Grafana and
+# Pingdom sources were removed, because the weekly self-clearing breach would
+# page the data platform on-call during business hours for nothing.
 CLOUDWATCH_DAGSTER_DB_URGENCY_RULES = [
     {
         "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
@@ -307,6 +324,19 @@ team_platform_engineering = rootly.Team(
     name="Platform Engineering",
     position=1,
     user_ids=[99415, 100683, 103372, 103392],
+    opts=rootly_opts,
+)
+
+team_data_platform = rootly.Team(
+    "data-platform",
+    auto_add_members_when_attached=True,
+    color="#D7F5E1",
+    description=(
+        "Owns alerts from the data platform: everything on the data-production "
+        "EKS cluster and the databases behind it."
+    ),
+    name="Data Platform",
+    user_ids=[99415],
     opts=rootly_opts,
 )
 
@@ -862,6 +892,226 @@ escalation_level_medium_urgency_slack_only = rootly.EscalationLevel(
     opts=rootly_opts,
 )
 
+# Data platform on-call. Alerts from the data platform (anything on the
+# data-production EKS cluster, the RDS/ElastiCache instances behind it, and the
+# Dagster and Airbyte Pingdom checks) used to land on the Default Escalation
+# Policy with everything else, and were demoted to Medium so that a stalled
+# pipeline would not page the Platform Engineering on-call overnight. That left
+# no one clearly responsible for them at any hour. This gives them their own
+# schedule and policy, which only ever notifies during business hours.
+#
+# Business hours are enforced twice on purpose. The rotation is only active
+# 9-5 ET on weekdays, so the schedule shows exactly when someone is
+# responsible, and the policy's deferral path holds anything arriving outside
+# that window until 9am. Without the deferral, an off-hours alert would reach
+# a schedule with nobody on call and fall straight through to the Platform
+# Engineering escalation level, which is the overnight page this avoids.
+schedule_data_platform_on_call = rootly.Schedule(
+    "data-platform-on-call-schedule",
+    all_time_coverage=False,
+    description="Data Platform on-call, business hours only (Mon-Fri 9am-5pm ET)",
+    name="Data Platform On Call",
+    owner_group_ids=[team_data_platform.id],
+    owner_user_id=99415,
+    opts=rootly_opts,
+)
+
+schedule_rotation_data_platform = rootly.ScheduleRotation(
+    "data-platform-rotation",
+    active_all_week=False,
+    active_days=["M", "T", "W", "R", "F"],
+    active_time_type="custom",
+    active_time_attributes=[{"startTime": "09:00", "endTime": "17:00"}],
+    name="Data Platform Rotation",
+    position=1,
+    schedule_id=schedule_data_platform_on_call.id,
+    schedule_rotation_members=[
+        {"memberId": "99415", "memberType": "User", "position": 1},
+    ],
+    schedule_rotationable_attributes={"handoff_day": "M", "handoff_time": "09:00"},
+    schedule_rotationable_type="ScheduleWeeklyRotation",
+    time_zone="America/New_York",
+    opts=rootly_opts,
+)
+
+escalation_policy_data_platform = rootly.EscalationPolicy(
+    "data-platform-escalation-policy",
+    business_hours={
+        "days": ["F", "M", "R", "T", "W"],
+        "endTime": "17:00",
+        "startTime": "09:00",
+        "timeZone": "America/New_York",
+    },
+    description=(
+        "Data platform alerts. Business hours only: anything arriving outside "
+        "Mon-Fri 9am-5pm ET is held until the next business morning."
+    ),
+    group_ids=[team_data_platform.id],
+    name="Data Platform Escalation Policy",
+    repeat_count=3,
+    # No `service_ids`, for the same reason as the Default policy: each
+    # Service's `escalation_policy_id` owns the membership.
+    opts=rootly_opts,
+)
+
+# Holds every urgency, not only Medium and Low as on the Default policy,
+# because nothing on the data platform warrants a page outside business hours.
+# re_evaluate replays held alerts through the paths below at 9am, when the
+# rotation is active again.
+escalation_path_data_platform_defer_off_hours = rootly.EscalationPath(
+    "data-platform-defer-off-hours",
+    name="Defer all data platform alerts outside business hours",
+    escalation_policy_id=escalation_policy_data_platform.id,
+    path_type="deferral",
+    match_mode="match-all-rules",
+    after_deferral_behavior="re_evaluate",
+    rules=[OFF_HOURS_DEFERRAL_WINDOW],
+    opts=rootly_opts,
+)
+
+# Same ladder as the Default policy: Medium and Low are Slack-visible in
+# #devops-warnings and page nobody. High falls through to the default path.
+escalation_path_data_platform_non_paging = rootly.EscalationPath(
+    "data-platform-medium-low-urgency-slack-warnings",
+    name="Medium and Low urgency to #devops-warnings",
+    escalation_policy_id=escalation_policy_data_platform.id,
+    path_type="escalation",
+    match_mode="match-all-rules",
+    notification_type="quiet",
+    position=1,
+    repeat=False,
+    rules=[
+        {
+            "ruleType": "alert_urgency",
+            "urgencyIds": [
+                "fce5c971-6660-4ad9-90eb-e75122055f50",  # Medium
+                "d7ed8e91-ffa9-4cc4-b524-729d14a4425b",  # Low
+            ],
+        },
+    ],
+    opts=rootly_opts,
+)
+
+escalation_level_data_platform_non_paging = rootly.EscalationLevel(
+    "data-platform-medium-low-urgency-slack-warnings-escalation-level",
+    escalation_policy_id=escalation_policy_data_platform.id,
+    escalation_policy_path_id=escalation_path_data_platform_non_paging.id,
+    position=1,
+    notification_target_params=[
+        {
+            "type": "slack_channel",
+            "id": "C0BK6BHUCDP",  # #devops-warnings
+        },
+    ],
+    opts=rootly_opts,
+)
+
+# The two High urgency levels below have no escalation_policy_path_id, so they
+# attach to the default path Rootly creates with the policy (as the CI/QA
+# Slack Notifications level does). That path is not declared here.
+escalation_level_data_platform_on_call = rootly.EscalationLevel(
+    "data-platform-on-call-escalation-level",
+    delay=15,
+    escalation_policy_id=escalation_policy_data_platform.id,
+    notification_target_params=[
+        {
+            "id": schedule_data_platform_on_call.id,
+            "teamMembers": "all",
+            "type": "schedule",
+        },
+        {
+            "id": "GBDLJJX51",  # #devops-alerts
+            "type": "slack_channel",
+        },
+    ],
+    paging_strategy_configuration_schedule_strategy="on_call_only",
+    paging_strategy_configuration_strategy="default",
+    position=1,
+    opts=rootly_opts,
+)
+
+# Unacknowledged after 15 minutes, a data platform page goes to whoever holds
+# the Platform Engineering primary rotation. The deferral path above means this
+# can only happen during business hours.
+escalation_level_data_platform_platform_engineering = rootly.EscalationLevel(
+    "data-platform-platform-engineering-escalation-level",
+    escalation_policy_id=escalation_policy_data_platform.id,
+    notification_target_params=[
+        {
+            "id": "fad27d50-f0e4-4d21-9b6d-57eb2dec648b",  # Primary On Call Schedule
+            "teamMembers": "all",
+            "type": "schedule",
+        },
+    ],
+    paging_strategy_configuration_schedule_strategy="on_call_only",
+    paging_strategy_configuration_strategy="default",
+    position=2,
+    opts=rootly_opts,
+)
+
+# Production CloudWatch alarm names for the databases and caches behind the
+# data platform, as listed by `aws cloudwatch describe-alarms` on 2026-09-18.
+# The QA and CI instances are already demoted by CLOUDWATCH_NON_PROD_URGENCY_RULES.
+DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES = [
+    "ol-etl-db-production",  # Dagster
+    "airbyte-db-production",
+    "ol-superset-db-production",
+    "superset-redis-data-production",
+    "open-metadata-db-production",
+    "jupyterhub-data-db-production",
+]
+
+
+def data_platform_route_rules(
+    json_path: str, values: list[str], first_position: int
+) -> list[dict[str, Any]]:
+    """Build alert route rules that claim data platform alerts for its policy.
+
+    Every alert route attached to a source evaluates independently, so an
+    alert matching the Grafana Production Service Route also matches the
+    Grafana Production Catch-All Route (live alert i8kCWC on 2026-09-10 lists
+    both routes' fallback rules in `routing_rules`). Each of those routes needs
+    these rules ahead of its fallback, or the fallback still hands the alert
+    to the Default Escalation Policy and pages Platform Engineering.
+
+    One rule per value, rather than one rule with several condition groups,
+    because nothing in the provider documents whether condition groups are
+    ANDed or ORed.
+
+    :param json_path: The alert payload path to match against.
+    :param values: Substrings that mark an alert as data platform.
+    :param first_position: Route position of the first generated rule.
+    :returns: Alert route rule dicts targeting the data platform policy.
+    """
+    return [
+        {
+            "conditionGroups": [
+                {
+                    "conditions": [
+                        {
+                            "propertyFieldConditionType": "contains",
+                            "propertyFieldName": json_path,
+                            "propertyFieldType": "payload",
+                            "propertyFieldValue": value,
+                        },
+                    ],
+                    "position": 1,
+                },
+            ],
+            "destinations": [
+                {
+                    "targetId": escalation_policy_data_platform.id,
+                    "targetType": "EscalationPolicy",
+                },
+            ],
+            "fallbackRule": False,
+            "name": f"{value} to Data Platform Escalation Policy",
+            "position": first_position + offset,
+        }
+        for offset, value in enumerate(values)
+    ]
+
+
 # Services imported from the existing Rootly account.
 service_api_authentication = rootly.Service(
     "api-authentication",
@@ -900,10 +1150,42 @@ service_llmops_clickhouse = rootly.Service(
     color="#F5D9C4",
     description="Shared ClickHouse cluster on data EKS (namespace clickhouse)",
     environment_ids=["afe3e34e-62e7-4534-bb4c-de57d24e6a59"],
-    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    # Runs on data-production, so it pages the data platform on-call.
+    escalation_policy_id=escalation_policy_data_platform.id,
     name="LLMOps - ClickHouse",
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     opts=rootly_opts,
+)
+
+# Built in the Rootly UI and adopted here only to move them to the data
+# platform policy. The Pingdom Service Route below attributes the Dagster and
+# Airbyte checks to these two services.
+service_dagster_webapp = rootly.Service(
+    "dagster-webapp",
+    alerts_email_address="service-b4bc3a3e665d3d52226883e3abbc3954@email.rootly.com",
+    color="#D7F5E1",
+    description="The Dagster data orchestration service",
+    escalation_policy_id=escalation_policy_data_platform.id,
+    github_repository_branch="master",
+    gitlab_repository_branch="master",
+    name="Dagster - Webapp",
+    owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
+    position=36,
+    opts=rootly_imported_service_opts("e7f7e16e-a7e7-4666-b779-96b33bbf402b"),
+)
+
+service_airbyte_webapp = rootly.Service(
+    "airbyte-webapp",
+    alerts_email_address="service-38f9c21c597849fe97a500144c67c90f@email.rootly.com",
+    color="#D7F5E1",
+    description="The Airbyte data integration service",
+    escalation_policy_id=escalation_policy_data_platform.id,
+    github_repository_branch="master",
+    gitlab_repository_branch="master",
+    name="Airbyte - Webapp",
+    owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
+    position=35,
+    opts=rootly_imported_service_opts("5281c3c5-eb5e-4b7f-9407-950570d66261"),
 )
 
 service_mit_learn_ai_celery = rootly.Service(
@@ -3197,20 +3479,11 @@ alerts_source_grafana_prometheus_production = rootly.AlertsSource(
                 "HPAAtMaxReplicasCritical",
             ]
         ],
-        # Every Dagster rule (metric_rules/dagster_*.py, log_rules/dagster_*.py).
-        # Their production *Critical twins arrived at High and paged:
-        # DagsterQueuedRunStuckCritical and DagsterRunFailureRateCritical on
-        # 2026-09-10 around 20:45 ET. A stalled or failing Dagster delays data
-        # pipelines by hours; nothing user-facing is down, so it can wait for
-        # business hours. `contains` rather than an alertname list so a new or
-        # renamed Dagster rule cannot bypass this and page.
-        {
-            "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
-            "jsonPath": "$.commonLabels.alertname",
-            "kind": "payload",
-            "operator": "contains",
-            "value": "Dagster",
-        },
+        # No Dagster demotion. Dagster criticals paged Platform Engineering
+        # overnight on 2026-09-10 and were demoted to Medium for it; they now
+        # route to the Data Platform Escalation Policy, which defers everything
+        # outside business hours, so they keep High and page the data platform
+        # on-call during the day.
     ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
@@ -3398,15 +3671,6 @@ alerts_source_pingdom = rootly.AlertsSource(
             "operator": "is",
             "value": "LOW",
         },
-        # Same reasoning as the Dagster rule on the Grafana Production source.
-        # Matches the "Dagster Checks to Dagster Webapp" route's condition.
-        {
-            "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
-            "jsonPath": "$.check_name",
-            "kind": "payload",
-            "operator": "contains",
-            "value": "Dagster",
-        },
     ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
@@ -3473,6 +3737,9 @@ alert_route_cloudwatch_catch_all_route = rootly.AlertRoute(
     name="Cloudwatch Catch-All Route",
     owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     rules=[
+        *data_platform_route_rules(
+            "$.Message.AlarmName", DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES, 1
+        ),
         {
             "destinations": [
                 {
@@ -3482,8 +3749,8 @@ alert_route_cloudwatch_catch_all_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Cloudwatch Catch-All Route",
-            "position": 1,
-        }
+            "position": len(DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES) + 1,
+        },
     ],
     opts=rootly_opts,
 )
@@ -3495,6 +3762,9 @@ alert_route_grafana_production_catch_all_route = rootly.AlertRoute(
     name="Grafana Production Catch-All Route",
     owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     rules=[
+        # Every production metric and log rule groups by `cluster` (see
+        # grafana_alerting/alertmanager.py), so it is always in commonLabels.
+        *data_platform_route_rules("$.commonLabels.cluster", ["data-production"], 1),
         {
             "destinations": [
                 {
@@ -3504,8 +3774,8 @@ alert_route_grafana_production_catch_all_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Grafana Production Catch-All Route",
-            "position": 1,
-        }
+            "position": 2,
+        },
     ],
     opts=rootly_opts,
 )
@@ -3517,6 +3787,9 @@ alert_route_pingdom_catch_all_route = rootly.AlertRoute(
     name="Pingdom Catch-All Route",
     owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     rules=[
+        # Same match as the Pingdom Service Route's Dagster and Airbyte rules,
+        # which reach the data platform policy through those two services.
+        *data_platform_route_rules("$.check_name", ["Dagster", "Airbyte"], 1),
         {
             "destinations": [
                 {
@@ -3526,8 +3799,8 @@ alert_route_pingdom_catch_all_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Pingdom Catch-All Route",
-            "position": 1,
-        }
+            "position": 3,
+        },
     ],
     opts=rootly_opts,
 )
@@ -3854,6 +4127,10 @@ alert_route_cloudwatch_service_route = rootly.AlertRoute(
             "name": "mitx-qa elasticache AlarmName to MITx Online QA - Open edX - Redis",  # noqa: E501
             "position": 10,
         },
+        # None of the alarm names above contain these, so after them is safe.
+        *data_platform_route_rules(
+            "$.Message.AlarmName", DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES, 11
+        ),
         {
             "destinations": [
                 {
@@ -3863,7 +4140,7 @@ alert_route_cloudwatch_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Cloudwatch Service Route",
-            "position": 11,
+            "position": 11 + len(DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES),
         },
     ],
     opts=rootly_imported_route_opts("61d2fb04-f85f-4d9c-a1bc-1a6afad7ca0f"),
@@ -4156,6 +4433,13 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             "name": "clickhouse service label to LLMOps - ClickHouse",
             "position": 10,
         },
+        # Everything else on data-production. After the ClickHouse rule so
+        # ClickHouse alerts keep their service attribution (that service uses
+        # the same policy). No earlier rule matches a data-production
+        # namespace: they are airbyte, clickhouse, dagster, jupyter-data,
+        # marimo, ol-analytics, open-metadata, opik, qdrant, starrocks,
+        # superset, and cluster system namespaces as of 2026-09-18.
+        *data_platform_route_rules("$.commonLabels.cluster", ["data-production"], 11),
         {
             "destinations": [
                 {
@@ -4165,7 +4449,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Grafana Production Service Route",
-            "position": 11,
+            "position": 12,
         },
     ],
     opts=rootly_imported_route_opts("e7b002f8-e13f-4b63-b0df-af1c78aee890"),
