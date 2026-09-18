@@ -11,6 +11,8 @@ Key differences from the existing jupyterhub/deployment.py:
 - The singleuser postStart hook seeds every notebook template baked into the
   image into each user's persistent home directory, without clobbering edits
 - Uses EFS dynamic storage (efs-sc) for per-user home directories
+- Mounts one RWX EFS volume at ~/shared_nb in every user pod so notebooks can
+  be shared by link (see _SHARED_NOTEBOOKS_MOUNT_PATH)
 - No course image pre-puller
 """
 
@@ -50,6 +52,26 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.jupyterhub_config import get_authenticator_config
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 from ol_infrastructure.lib.vault import postgres_role_statements
+
+# Team notebook sharing. Every user pod mounts the same RWX EFS volume here, so
+# a notebook saved under it can be shared as
+#   https://<domain>/hub/user-redirect/marimo/?file=shared_nb/<user>/<nb>.py
+# user-redirect sends each viewer to their OWN server, so the notebook runs as
+# the viewer: their Galaxy OAuth login, their profile, and their per-user
+# JupyterHub auth state, never the author's. marimo resolves `file` against
+# the Jupyter server's working directory (/home/jovyan), so the mount has to
+# live under it.
+#
+# Because a shared link runs code as whoever opens it, only the owner may
+# change what is in their folder. The efs-sc access point gives every client
+# the same POSIX identity, so permissions can't enforce that. The mounts do
+# instead: the whole volume is read-only, and the user's own subdirectory is
+# mounted again read-write on top of it. <user> is KubeSpawner's safe slug of
+# the username, which is the username itself when it's a valid DNS label.
+_SHARED_NOTEBOOKS_MOUNT_PATH = "/home/jovyan/shared_nb"
+
+_MARIMO_AI_DEFAULTS_SCRIPT = "/etc/marimo/marimo_ai_defaults.py"
+_MARIMO_AI_DEFAULTS_JSON = "/etc/marimo/ai_defaults.json"
 
 # KubeSpawner profile list: currently defines Standard and Large CPU/memory tiers.
 _PROFILE_LIST = f"""
@@ -127,6 +149,16 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     trino_catalog = (
         jupyterhub_data_config.get("trino_catalog") or "ol_data_lake_production"
     )
+    aws_region = Config("aws").require("region")
+    # A cross-Region inference profile ID (e.g. us.anthropic.claude-sonnet-5);
+    # newer models can't be invoked on demand by bare foundation-model ID.
+    bedrock_model = f"bedrock/{jupyterhub_data_config.require('bedrock_chat_model')}"
+    marimo_ai_defaults = {
+        # edit_model falls back to chat_model, so one key covers both.
+        "ai": {
+            "models": {"chat_model": bedrock_model, "custom_models": [bedrock_model]}
+        }
+    }
 
     # Vault Policy
     vault_policy = vault.Policy(
@@ -367,6 +399,28 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         opts=ResourceOptions(delete_before_replace=True),
     )
 
+    shared_notebooks_pvc = kubernetes.core.v1.PersistentVolumeClaim(
+        f"{base_name}-shared-notebooks-pvc-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{base_name}-shared-notebooks",
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        spec=kubernetes.core.v1.PersistentVolumeClaimSpecArgs(
+            access_modes=["ReadWriteMany"],
+            storage_class_name="efs-sc",
+            # EFS does not enforce the requested size; the field is required.
+            resources=kubernetes.core.v1.VolumeResourceRequirementsArgs(
+                requests={"storage": "50Gi"}
+            ),
+        ),
+        # efs-sc reclaims with Delete, so replacing or deleting this claim
+        # removes its access point and a new claim gets an empty one. The old
+        # notebooks are then unreachable from the hub (the EFS CSI driver only
+        # deletes the directory itself when deleteAccessPointRootDir is set).
+        opts=ResourceOptions(protect=True),
+    )
+
     # Kubernetes ServiceAccount annotated with the IRSA role ARN so that
     # single-user pods can read S3 and Glue without long-lived credentials.
     kubernetes.core.v1.ServiceAccount(
@@ -523,6 +577,9 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     # `|| true` guards the container: a postStart hook that exits
                     # non-zero kills it, and the glob fails if the templates
                     # directory is ever empty.
+                    #
+                    # It then fills in the Bedrock assistant defaults for any key
+                    # the user hasn't set (see marimo_ai_defaults.py).
                     "lifecycleHooks": {
                         "postStart": {
                             "exec": {
@@ -531,28 +588,37 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                                     "-c",
                                     "mkdir -p /home/jovyan/notebooks && "
                                     "cp -n /usr/local/share/marimo/templates/* "
-                                    "/home/jovyan/notebooks/ || true",
+                                    "/home/jovyan/notebooks/ || true; "
+                                    f"python3 {_MARIMO_AI_DEFAULTS_SCRIPT} "
+                                    f"{_MARIMO_AI_DEFAULTS_JSON} || true",
                                 ]
                             }
                         }
                     },
-                    # Configure marimo-jupyter-extension to run each notebook in
-                    # an isolated uv virtual environment (sandbox mode). uvx reads
-                    # the `/// script` PEP 723 inline metadata header in each .py
-                    # file to install exactly the packages that notebook declares,
-                    # ensuring reproducibility. UV_CACHE_DIR points to the EFS home
-                    # volume so venvs persist across pod restarts and are not
-                    # recreated on every open. timeout=120 covers the first-open
-                    # cost of downloading and building the per-notebook venv.
+                    # The extension launches the image's own marimo rather than
+                    # `uvx marimo[sandbox]`. marimo's AI assistant runs in that
+                    # server process and needs pydantic-ai with its Bedrock extra,
+                    # which the image installs and an ad hoc uvx environment
+                    # doesn't have. --sandbox is still passed, so each notebook
+                    # still runs in its own uv environment built from its
+                    # `/// script` PEP 723 header. UV_CACHE_DIR points to the EFS
+                    # home volume so those environments persist across pod
+                    # restarts. timeout=120 covers building one on first open.
                     "extraFiles": {
                         "jupyter-server-config": {
                             "mountPath": "/etc/jupyter/jupyter_server_config.py",
-                            "stringData": (
-                                "c.MarimoProxyConfig.uvx_path"
-                                ' = "/usr/local/bin/uvx"\n'
-                                "c.MarimoProxyConfig.timeout = 120\n"
-                            ),
-                        }
+                            "stringData": "c.MarimoProxyConfig.timeout = 120\n",
+                        },
+                        "marimo-ai-defaults-script": {
+                            "mountPath": _MARIMO_AI_DEFAULTS_SCRIPT,
+                            "stringData": Path(__file__)
+                            .parent.joinpath("marimo_ai_defaults.py")
+                            .read_text(),
+                        },
+                        "marimo-ai-defaults": {
+                            "mountPath": _MARIMO_AI_DEFAULTS_JSON,
+                            "stringData": json.dumps(marimo_ai_defaults),
+                        },
                     },
                     # Endpoint only, no credential. Starburst Galaxy authenticates
                     # query clients itself: the notebook uses Galaxy's OAuth2
@@ -579,6 +645,11 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         ),
                         # uv cache on EFS so per-notebook venvs survive pod restarts
                         "UV_CACHE_DIR": "/home/jovyan/.cache/uv",
+                        # Bedrock via IRSA. boto3 in both the marimo assistant and
+                        # notebook kernels resolves the region from these, so
+                        # neither has to hardcode one.
+                        "AWS_REGION": aws_region,
+                        "AWS_DEFAULT_REGION": aws_region,
                     },
                     "storage": {
                         "type": "dynamic",
@@ -586,6 +657,30 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         "dynamic": {
                             "storageClass": "efs-sc",
                         },
+                        "extraVolumes": [
+                            {
+                                "name": "shared-notebooks",
+                                "persistentVolumeClaim": {
+                                    "claimName": shared_notebooks_pvc.metadata.name,
+                                },
+                            },
+                        ],
+                        # kubelet creates the subPath directory on first mount.
+                        # {username} is expanded by KubeSpawner, not Helm.
+                        "extraVolumeMounts": [
+                            {
+                                "name": "shared-notebooks",
+                                "mountPath": _SHARED_NOTEBOOKS_MOUNT_PATH,
+                                "readOnly": True,
+                            },
+                            {
+                                "name": "shared-notebooks",
+                                "mountPath": (
+                                    f"{_SHARED_NOTEBOOKS_MOUNT_PATH}/{{username}}"
+                                ),
+                                "subPath": "{username}",
+                            },
+                        ],
                     },
                     "cloudMetadata": {"blockWithIptables": False},
                     # Resource defaults; overridden per-user by KubeSpawner profile_list
