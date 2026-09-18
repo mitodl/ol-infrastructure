@@ -2357,12 +2357,15 @@ OTEL_AGENT_PYTHONPATH = "/opt/otel/auto_instrumentation"
 # Opt-in per stack rather than on everywhere, because enabling the metrics
 # exporter enables every installed instrumentation's metrics at once, not just
 # this one. requests and urllib3 each emit http.client.* duration and size
-# histograms. The control plane makes few HTTP calls, but the run workers
-# that inherit this env (canvas, see OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS)
-# make API calls throughout a run, and each one is a new process with its own
-# random service.instance.id. Production started ~475 canvas run-worker Jobs in
-# the day to 2026-09-18, each minting a fresh set of histogram series. Measure
-# the series count on QA before setting this in Production.
+# histograms. The canvas API client uses httpx2, which is not instrumented, but
+# S3 IO goes through botocore over urllib3 and Vault through hvac over
+# requests. The run workers that inherit this env (canvas, see
+# OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS) are short-lived processes, each with
+# its own random service.instance.id, and so is every step subprocess the
+# multiprocess executor spawns inside one. Production started ~440-475 canvas
+# run-worker Jobs a day in the week to 2026-09-18, each minting at least one
+# fresh set of series. Measure the series count on QA before setting this in
+# Production.
 dagster_otel_metrics_enabled = dagster_config.get_bool("otel_metrics_enabled") or False
 
 
