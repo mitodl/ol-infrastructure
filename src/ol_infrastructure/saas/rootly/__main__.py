@@ -537,56 +537,13 @@ escalation_policy_default_escalation_policy = rootly.EscalationPolicy(
     last_updated_by_user_id=99415,
     name="Default Escalation Policy",
     repeat_count=5,
-    # Membership is owned by each Service's `escalation_policy_id`, so this
-    # list is ignored after creation: applying a stale copy would detach any
-    # Service missing from it (as LLMOps - ClickHouse was on 2026-09-18). The
-    # API also reorders it when a member Service changes (MIT xPRO Django moved
-    # to the end after its 2026-07-22 edit), which previewed as a reorder.
-    # Listed as the API returned it on 2026-09-18, for reference only.
-    service_ids=[
-        "cdceaa06-6690-4351-a3af-dd36bfd6fb55",
-        "6ee39557-47af-40e9-a4f7-eccee9406ecf",
-        "24ef3748-0a12-4a55-9b4e-5eb94a08fe03",
-        "fa1c967f-d271-443f-b2bf-011cc78f5f20",
-        "aaede19c-4521-40cd-ab64-6a2d70dd783c",
-        "503028e7-d65f-44b6-8968-b9795ccc41c2",
-        "2c92b8b0-df02-4369-a876-72a895524773",
-        "ffd3bdea-a4f6-4f4a-a12a-f59e71f29fe9",
-        "3ad10823-4726-4207-9e99-0d81e87b0473",
-        "b2389961-09be-4167-a304-a2ee1ef9af1b",
-        "f42f1288-eca1-4bd4-b474-8a6bb96486fb",
-        "8be387cb-2c05-4688-8ea0-730328297d62",
-        "aa801b70-0496-4d9e-b889-e5ad99f2237b",
-        "e7f7e16e-a7e7-4666-b779-96b33bbf402b",
-        "5281c3c5-eb5e-4b7f-9407-950570d66261",
-        "dc51f8d3-56fb-4ee3-b921-c9fdda79ea9c",
-        "bdbf5e32-61dd-4184-9af6-f4c163e097d0",
-        "6f9bf7d9-d06c-4ac4-8105-f8def1dc91d2",
-        "e7b42ec2-216d-4e84-828e-97bd709b018b",
-        "9fc1b049-d60c-4a4c-b5d9-95ea8db3aae8",
-        "71bb3195-11a8-4a2d-b9b8-2b1dbbc5d6c2",
-        "7b46658d-cd59-4c49-970b-9e9dc8998a7e",
-        "0e8c091d-274d-4687-bb70-d85c5600e90b",
-        "24abd4d9-4aac-4ea0-afc6-eb2106cc52fd",
-        "ce09f262-1edf-475f-b145-3185d0da7241",
-        "0f046ecc-a5eb-4cdf-aba2-6922001ad774",
-        "145db75f-c893-444b-9564-85ff41d42c6a",
-        "3fa021bd-25ba-4732-b588-a304cb1a104f",
-        "aefc0e95-1376-41f2-b102-335a186e9eb7",
-        "964321a2-ebd8-46d4-bd9e-c582cb4e4e49",
-        "db3e4db5-fa3f-4239-a0f4-aa558847df66",
-        "70173c97-f29d-453f-93ea-da9321d5984d",
-        "defb1faa-e8a4-4fe5-8f03-4103667592f1",
-        "dfc02e84-e281-43a6-b340-0e7cadd62036",
-        "c144023f-00c1-48dd-9e38-ad4c302207e3",
-        "2cc9bbde-ba8a-4c34-aa85-65f4d9c8aff4",
-        "0d45ed4d-bd52-4488-9953-f739f18bbdaf",
-        # service_llmops_clickhouse, which is declared further down.
-        "e15fc4a2-4c4e-44eb-a717-cd5d7ba3b219",
-    ],
-    opts=ResourceOptions.merge(
-        rootly_opts, ResourceOptions(ignore_changes=["service_ids"])
-    ),
+    # No `service_ids`: membership is owned by each Service's
+    # `escalation_policy_id`. The provider sends this list whenever it differs
+    # from state, and this stack deploys without a refresh, so a declared copy
+    # goes stale as soon as a Service attaches itself (LLMOps - ClickHouse on
+    # 2026-09-16) and an update would detach whatever it is missing. Left
+    # undeclared, the optional+computed field is never sent.
+    opts=rootly_opts,
 )
 
 escalation_policy_exampledeleteme_escalationpolicy = rootly.EscalationPolicy(
