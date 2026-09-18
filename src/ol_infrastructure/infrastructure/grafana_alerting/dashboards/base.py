@@ -438,6 +438,37 @@ def _traceql_timeseries_panel(
     what makes it graphable; Grafana infers that from the query itself, so
     `queryType` stays `traceql` either way.
 
+    THE PANEL FOLLOWS THE DASHBOARD'S TIME RANGE, DELIBERATELY. Tempo rejects a
+    metrics query outright past 25 hours:
+
+        metrics query time range exceeds the maximum allowed duration of 25h0m0s
+
+    so a dashboard ranging wider than that renders every TraceQL panel empty,
+    with the error reachable only by inspecting the panel. The obvious fix is a
+    panel-level `timeFrom` override pinning a 24h window. Do not add one; it
+    was tried and dropped during the fix for this, because it trades a blank panel
+    for a populated one answering a different question:
+
+      - `timeFrom: "24h"` resolves to `now-24h`..`now` regardless of where the
+        dashboard's window sits (`describeTextRange` in grafana-data). Select
+        "Yesterday" and every Prometheus row shows yesterday while these panels
+        show the last 24 hours, split by releases that may not be the ones
+        under study.
+      - It is inert exactly where it would have helped. `getTimeOverride`
+        applies it only when the dashboard range is relative, so zoom-out,
+        drag-select and (with the default "Lock time range") shared links all
+        produce absolute ranges, and
+        blank as before.
+      - Grafana's time-override badge does not rescue either case. It marks
+        "an override is configured", so it shows even when the windows agree,
+        and it is absent in the absolute case where they silently diverge.
+
+    Following the dashboard means these panels either show data for the
+    selected range or show Tempo's error. Neither is wrong data. Callers keep
+    the dashboard default inside the cap (see `_TEMPO_METRICS_MAX_HOURS` in
+    user_journey.py) so
+    the common case works without anyone touching the picker.
+
     Series are named by whatever the query's `by (...)` clause emits, so there
     is no legendFormat to set, unlike the Prometheus panels above.
 

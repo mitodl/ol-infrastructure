@@ -51,6 +51,15 @@ from ol_infrastructure.infrastructure.grafana_alerting.dashboards.promql import 
 
 _GRID_WIDTH = 24
 
+# Tempo rejects a TraceQL metrics query spanning more than 25 hours:
+#   metrics query time range exceeds the maximum allowed duration of 25h0m0s
+# The trace row follows the dashboard's range (see _traceql_timeseries_panel in
+# base.py for why it is not pinned), so this default has to sit under the cap or
+# that row ships blank -- which is exactly how it shipped in #5920.
+_TEMPO_METRICS_MAX_HOURS = 25
+_DEFAULT_RANGE_HOURS = 24
+_DEFAULT_RANGE = f"now-{_DEFAULT_RANGE_HOURS}h"
+
 # RE2's metacharacters. The endpoint patterns these dashboards filter on are
 # themselves Django URL regexes (`api/v2/courses/$`, `^api/v0/users/me/$`), so
 # dropping them into a PromQL `=~` alternation unescaped silently matches the
@@ -523,8 +532,19 @@ def _trace_panels(
     sampling_caveat = (
         "Traces are tail-sampled, so both panels describe the sampled "
         "fraction rather than all traffic, and the sampler favours slow "
-        "requests, which are also the ones issuing the most queries. Take the "
-        "ratio's change between releases, not its absolute value."
+        "requests, which are also the ones issuing the most queries. Read the "
+        "ratio's change between releases rather than its absolute value, and "
+        "only when latency is comparable across the pair: the sampler picks "
+        "on latency, so a release that merely got faster shifts the sampled "
+        "population toward cheaper requests and drops this ratio on its own, "
+        "with no change in query count. That has already happened here once, "
+        "across a Granian worker-config change. "
+        f"Tempo rejects a metrics query spanning more than "
+        f"{_TEMPO_METRICS_MAX_HOURS}h, so this row is blank whenever the "
+        "dashboard's range is wider than that. It is blank rather than wrong. "
+        "Keep the range under that cap to read it, which in practice means "
+        "this row can only compare releases deployed within about a day of "
+        "each other."
     )
     return [
         row_panel(title="Database work per request (traces)", y=layout.row()),
@@ -539,12 +559,10 @@ def _trace_panels(
             description=(
                 "The mechanism a latency panel cannot show. Divide this "
                 "panel's mean by the mean on its right to get Postgres "
-                "queries per request; a fix that makes query count flat in "
-                "result-set size drops that ratio by an order of magnitude "
-                "while the panel on the right holds steady. Measured this way "
-                "on 2026-09-17, api/v2/courses/$ was running between roughly "
-                "500 and 700 Postgres queries per request depending on "
-                f"release. {sampling_caveat}"
+                "queries per request. A fix that makes query count flat in "
+                "result-set size drops that ratio sharply while the panel on "
+                "the right holds steady; that shape, not any particular "
+                f"number, is what to look for. {sampling_caveat}"
             ),
         ),
         traceql_panel(
@@ -705,9 +723,14 @@ def _dashboard_json(
         "schemaVersion": 39,
         "version": 1,
         "editable": True,
-        # Wide by default: a release comparison needs a window containing both
-        # releases, and our deploy cadence puts that at a day or more.
-        "time": {"from": "now-2d", "to": "now"},
+        # The widest default where every row works from one window (see
+        # _TEMPO_METRICS_MAX_HOURS). Widening it is fine and sometimes
+        # necessary, but costs two things worth knowing: the trace row goes
+        # blank past 25h, and the release pickers are `label_values` variables
+        # refreshed on time-range change, so they list only versions seen in
+        # the selected window. To study a release older than the default,
+        # narrow onto it rather than widening to reach back to it.
+        "time": {"from": _DEFAULT_RANGE, "to": "now"},
         "refresh": "5m",
         "templating": _templating(journey),
         "panels": [
