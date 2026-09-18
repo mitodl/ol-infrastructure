@@ -21,6 +21,17 @@ def test_statements_pass_lint_with_documented_config(vendor):
     lint_iam_policy(policy, parliament_config=BEDROCK_PARLIAMENT_CONFIG)
 
 
+def test_grants_no_marketplace_actions():
+    # Subscribing enables a third-party model, and accepts its EULA, for the
+    # whole account; that is an administrator's call, not a workload's.
+    actions = [
+        action
+        for statement in bedrock_invoke_statements(ACCOUNT_ID)
+        for action in statement["Action"]
+    ]
+    assert not [action for action in actions if action.startswith("aws-marketplace")]
+
+
 def test_unscoped_allows_every_vendor():
     invoke = bedrock_invoke_statements(ACCOUNT_ID)[0]
     assert invoke["Resource"] == [

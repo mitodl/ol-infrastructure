@@ -485,11 +485,13 @@ def bedrock_invoke_statements(
     change. The Converse and ConverseStream APIs authorize against these same
     two InvokeModel actions.
 
-    The first invocation of a Marketplace-backed model in an account makes
-    Bedrock subscribe on the caller's behalf, which fails with AccessDenied
-    without Subscribe and ViewSubscriptions. Those are not ARN-scopable.
-    Unsubscribe is deliberately absent: subscriptions are account-wide, and
-    invoking never needs it.
+    No aws-marketplace permissions. The first invocation of a Marketplace-backed
+    model (e.g. Anthropic's) in an account subscribes to it and accepts its EULA
+    for the whole account, and needs aws-marketplace:Subscribe to do so. Once a
+    model is enabled, invoking it needs no Marketplace permissions. So a new
+    third-party model is enabled once by an administrator, not by whichever
+    workload happens to call it first. Models not sold through Marketplace
+    (Amazon, Meta, Mistral, ...) need no enablement.
 
     Lint the policy with ``BEDROCK_PARLIAMENT_CONFIG``.
 
@@ -501,7 +503,7 @@ def bedrock_invoke_statements(
         a configuration change rather than an infrastructure one.
     :type vendor: str | None
 
-    :returns: The invoke statement followed by the Marketplace statement.
+    :returns: The invoke statement.
 
     :rtype: list[dict[str, Any]]
     """
@@ -518,13 +520,5 @@ def bedrock_invoke_statements(
                 f"arn:aws:bedrock:*::foundation-model/{model_glob}",
                 f"arn:aws:bedrock:*:{account_id}:inference-profile/{profile_glob}",
             ],
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "aws-marketplace:Subscribe",
-                "aws-marketplace:ViewSubscriptions",
-            ],
-            "Resource": "*",
         },
     ]
