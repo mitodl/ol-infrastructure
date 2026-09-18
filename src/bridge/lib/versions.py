@@ -59,7 +59,7 @@ KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
 MEILISEARCH_CHART_VERSION = "0.39.0"
 # renovate: datasource=helm depName=opik packageName=opik registryUrl=https://comet-ml.github.io/opik
-OPIK_CHART_VERSION = "2.2.59"
+OPIK_CHART_VERSION = "2.2.66"
 # renovate: datasource=helm depName=operator packageName=operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.7"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
@@ -129,7 +129,7 @@ TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.49.0"
 # renovate: datasource=docker depName=toolhive-operator packageName=ghcr.io/stacklok/toolhive/toolhive-operator
 TOOLHIVE_OPERATOR_CHART_VERSION = "0.49.0"
 # renovate: datasource=docker depName=mcp-grafana packageName=grafana/mcp-grafana
-MCP_GRAFANA_VERSION = "1.4.1"
+MCP_GRAFANA_VERSION = "1.4.2"
 # ToolHive-built npx wrapper image for the Sentry MCP server (getsentry/sentry-mcp
 # self-hosted stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
 # renovate: datasource=docker depName=sentry-mcp-server packageName=ghcr.io/stacklok/dockyard/npx/sentry-mcp-server
