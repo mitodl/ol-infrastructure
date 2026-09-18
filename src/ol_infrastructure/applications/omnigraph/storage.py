@@ -26,7 +26,7 @@ _MIGRATION_PREFIX_RE = re.compile(r"fmt[0-9]+")
 _PREFIX_SCHEMA_RE = re.compile(r"fmt(?P<version>[0-9]+)")
 
 
-def validate_storage_prefix(prefix: str | None) -> str:
+def validate_storage_prefix(prefix: str | None, key: str = "storage_prefix") -> str:
     """Normalize and check ``omnigraph:storage_prefix``; return "" when unset.
 
     The storage root is normally the bucket root; a prefix moves it to
@@ -45,19 +45,22 @@ def validate_storage_prefix(prefix: str | None) -> str:
     ``[A-Za-z0-9._-]`` segment. That last rule is what catches an
     unsubstituted ``fmt<N>`` copied out of the runbook: ``<`` and ``>`` are
     legal in S3 object keys, so it would otherwise become a real prefix.
+
+    ``key`` names the config key in the error, for the other keys that hold a
+    prefix (``storage_rollback_from``).
     """
     cleaned = (prefix or "").strip()
     if not cleaned:
         return ""
     if cleaned.startswith("/") or cleaned.endswith("/"):
         msg = (
-            f"omnigraph:storage_prefix must not start or end with '/': "
+            f"omnigraph:{key} must not start or end with '/': "
             f"{cleaned!r}. It is joined as s3://<bucket>/<prefix>."
         )
         raise ValueError(msg)
     if not _PREFIX_RE.fullmatch(cleaned):
         msg = (
-            f"omnigraph:storage_prefix must be a single path segment of "
+            f"omnigraph:{key} must be a single path segment of "
             f"[A-Za-z0-9._-] starting alphanumeric: {cleaned!r}. An "
             "unsubstituted placeholder such as 'fmt<N>' lands here."
         )
@@ -310,9 +313,11 @@ def validate_storage_prefix_progression(
     predates the storage-format label.
 
     A real rollback moves the root backwards on purpose. It is allowed only
-    when ``rollback_from`` names the root being left, so the override is
-    specific to one cutover and a stale ref from some other time is still
-    refused.
+    when ``rollback_from`` names the root being left. Once the rollback has
+    deployed, a ``rollback_from`` that no longer names the deployed root is
+    refused too, not left in place. Roots are always named ``fmt<N>``, so a
+    leftover ``rollback_from: fmt9`` would otherwise start permitting stale
+    refs again the moment the environment is cut over to fmt9 a second time.
 
     :param deployed_prefix: The last deployed ``storage_prefix``, or ``None``
         when the stack has never exported one.
@@ -320,8 +325,19 @@ def validate_storage_prefix_progression(
     :param rollback_from: The normalized ``omnigraph:storage_rollback_from``,
         ``""`` when unset.
     :raises ValueError: when the deploy moves to an older format without a
-        matching ``rollback_from``.
+        matching ``rollback_from``, or ``rollback_from`` is set and does not
+        name the deployed root.
     """
+    if rollback_from and rollback_from != deployed_prefix:
+        msg = (
+            f"omnigraph:storage_rollback_from is {rollback_from!r}, but this "
+            f"stack last deployed {deployed_prefix!r}. It only applies to the "
+            "deploy that leaves that root, so this is left over from a rollback "
+            "that has already deployed. Remove it: left in place, it would let "
+            f"a stale ref move the cluster off {rollback_from!r} again after the "
+            "next cutover to it."
+        )
+        raise ValueError(msg)
     if deployed_prefix is None or deployed_prefix == storage_prefix:
         return
     deployed_format = _served_format(deployed_prefix)

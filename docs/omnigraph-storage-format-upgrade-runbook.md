@@ -943,8 +943,7 @@ two to agree. `validate_storage_prefix_progression` refuses any deploy that
 moves `storage_prefix` to an older format than the stack last deployed, which
 is what stops a stale ref from undoing a cutover (QA, 2026-09-16), and
 `storage_rollback_from` is the only way past it. It has to name the root being
-left, so an override left behind from an earlier rollback does not permit this
-one. If the old root is the bucket root, remove `storage_prefix` and
+left. If the old root is the bucket root, remove `storage_prefix` and
 `internal_schema_version` instead of setting them.
 
 Then redeploy with `OMNIGRAPH_DOCKER_SHA` pinned to the **old** image digest.
@@ -955,8 +954,10 @@ The old root was never written to, so this is a revert, not a restore. Writes
 that landed on the new root after step 5 are lost — which is the real reason
 step 6 happens before you tell anyone the service is back.
 
-Once the rollback has deployed, remove `storage_rollback_from`. Preview warns
-while it is set and no longer names the root the stack last deployed.
+Once the rollback has deployed, remove `storage_rollback_from`. Every preview
+after that refuses while it is still set, because roots are always named
+`fmt<N>`: left in place, it would start permitting stale refs again the next
+time the environment is cut over to that same root.
 
 ## Troubleshooting
 

@@ -51,7 +51,7 @@ from pathlib import Path
 from typing import Any
 
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions, export, log
+from pulumi import Config, Output, ResourceOptions, export
 
 from bridge.secrets import sops as _bridge_sops
 from bridge.secrets.sops import read_yaml_secrets
@@ -242,7 +242,7 @@ if MIGRATE_FROM_IMAGE and MIGRATE_TO_PREFIX == STORAGE_PREFIX:
 # declared so a refusal cannot land after the ConfigMap has already changed.
 # See validate_storage_prefix_progression.
 STORAGE_ROLLBACK_FROM: str = validate_storage_prefix(
-    omnigraph_config.get("storage_rollback_from")
+    omnigraph_config.get("storage_rollback_from"), key="storage_rollback_from"
 )
 DEPLOYED_STORAGE_PREFIX: str | None = optional_stack_output_value(
     make_stack_reference(projects.OMNIGRAPH, stack_info.name), "storage_prefix"
@@ -250,12 +250,6 @@ DEPLOYED_STORAGE_PREFIX: str | None = optional_stack_output_value(
 validate_storage_prefix_progression(
     DEPLOYED_STORAGE_PREFIX, STORAGE_PREFIX, STORAGE_ROLLBACK_FROM
 )
-if STORAGE_ROLLBACK_FROM and STORAGE_ROLLBACK_FROM != DEPLOYED_STORAGE_PREFIX:
-    log.warn(
-        f"omnigraph:storage_rollback_from is {STORAGE_ROLLBACK_FROM!r} but this "
-        f"stack last deployed {DEPLOYED_STORAGE_PREFIX!r}, so it permits "
-        "nothing. Clear it once the rollback it was set for has deployed."
-    )
 
 # Keycloak realm -> actor-token sync. Set `omnigraph:keycloak_url` for an
 # environment to turn it on; leaving it unset keeps that environment on the

@@ -280,12 +280,27 @@ def test_rollback_naming_the_root_being_left_passes() -> None:
     validate_storage_prefix_progression("fmt9", "fmt6", "fmt9")
 
 
-def test_rollback_override_for_a_different_root_does_not_apply() -> None:
-    """A leftover override from an earlier rollback must not wave through a new one."""
-    with pytest.raises(ValueError, match="storage_rollback_from to 'fmt10'"):
+def test_rollback_override_for_a_different_root_is_refused() -> None:
+    with pytest.raises(ValueError, match="left over from a rollback"):
         validate_storage_prefix_progression("fmt10", "fmt9", "fmt9")
+
+
+def test_leftover_override_is_refused_once_the_rollback_has_deployed() -> None:
+    """Otherwise it permits the incident again after a re-cutover to the same root.
+
+    QA rolls back fmt9 -> fmt6 and keeps ``storage_rollback_from: fmt9``. Once
+    fmt9 is cut over again, a stale ref carrying fmt6 would match it and pass.
+    Refusing on the first deploy after the rollback forces it out before then.
+    """
+    with pytest.raises(ValueError, match="left over from a rollback"):
+        validate_storage_prefix_progression("fmt6", "fmt6", "fmt9")
 
 
 def test_free_form_prefixes_have_no_ordering_to_check() -> None:
     validate_storage_prefix_progression("migration-2026-08", "fmt6", "")
     validate_storage_prefix_progression("fmt9", "migration-2026-08", "")
+
+
+def test_rollback_from_errors_name_their_own_key() -> None:
+    with pytest.raises(ValueError, match="omnigraph:storage_rollback_from must"):
+        validate_storage_prefix("fmt<N>", key="storage_rollback_from")
