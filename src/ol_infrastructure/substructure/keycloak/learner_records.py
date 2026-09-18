@@ -71,9 +71,14 @@ class LearnerRecordsClient(BaseModel):
         return f"{CLIENT_ID_PREFIX}{self.name}"
 
     @property
+    def sorted_organizations(self) -> list[str]:
+        """Return the organizations as sorted, de-duplicated UUID strings."""
+        return sorted({str(org) for org in self.organizations})
+
+    @property
     def organizations_claim_value(self) -> str:
         """Return the organizations as the JSON array the claim must carry."""
-        return json.dumps(sorted({str(org) for org in self.organizations}))
+        return json.dumps(self.sorted_organizations)
 
 
 _client_list_adapter = TypeAdapter(list[LearnerRecordsClient])
@@ -167,7 +172,9 @@ def create_learner_records_clients(  # noqa: PLR0913
         )
         # Replaces the realm defaults Keycloak attaches to a new client, so the
         # token carries sub (basic) and the read scope and nothing about the
-        # service-account user.
+        # service-account user. That also drops the service_account scope and
+        # its client_id claim on purpose: azp carries the same value, and the
+        # API logs azp first.
         keycloak.openid.ClientDefaultScopes(
             f"olapps-{contract.client_id}-client-default-scopes",
             realm_id=realm_id,
@@ -224,7 +231,7 @@ def create_learner_records_clients(  # noqa: PLR0913
                         "issuer": issuer_url,
                         "token_url": f"{issuer_url}/protocol/openid-connect/token",
                         "scope": LEARNER_RECORDS_READ_SCOPE,
-                        "organizations": json.loads(contract.organizations_claim_value),
+                        "organizations": contract.sorted_organizations,
                         "contract_end_date": (
                             contract.contract_end_date.isoformat()
                             if contract.contract_end_date
