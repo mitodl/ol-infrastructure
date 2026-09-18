@@ -373,6 +373,7 @@ control_plane_log_group = aws.cloudwatch.LogGroup(
     name=f"/aws/eks/{cluster_name}/cluster",
     retention_in_days=90 if stack_info.env_suffix == "production" else 30,
     tags=aws_config.tags,
+    opts=ResourceOptions(retain_on_delete=True),
 )
 
 # Actually make the cluster
