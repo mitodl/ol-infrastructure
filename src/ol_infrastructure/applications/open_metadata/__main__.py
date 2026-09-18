@@ -799,12 +799,12 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # Not version-specific: the same sawtooth shows on 1.13.3, 1.13.4 and
             # (in QA) 2.0.0, while CI on 2.0.0 never restarts. It tracks OMJob volume,
             # so the busiest environment is the most exposed.
-            # The 254Mi peak is a CENSORED observation - the container is killed at the
-            # limit, so real demand is unknown and could be higher. 1Gi is deliberately
-            # generous to uncover the true plateau rather than to be a tight fit; once
-            # a few days of unclipped data exist, re-measure and set this from the
-            # observed ceiling. If the climb never plateaus it is a leak in
-            # omjob-operator and belongs upstream.
+            # That 254Mi peak was censored by the limit, so the limit was raised to
+            # 1Gi to find the real plateau. Unclipped, 2026-08-31 to 2026-09-18 in QA
+            # and production (2.0.0 and 2.0.1): the working set climbs for 2-3 days
+            # after a restart and then flattens at 315-353Mi, with zero restarts in
+            # either cluster. It is undersized, not leaking. The limit gives ~45%
+            # headroom over the 353Mi peak; the request matches the plateau.
             "omjobOperator": {
                 "enabled": True,
                 "image": {
@@ -812,8 +812,8 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "tag": OPEN_METADATA_VERSION,
                 },
                 "resources": {
-                    "requests": {"cpu": "100m", "memory": "256Mi"},
-                    "limits": {"cpu": "500m", "memory": "1Gi"},
+                    "requests": {"cpu": "100m", "memory": "384Mi"},
+                    "limits": {"cpu": "500m", "memory": "512Mi"},
                 },
             },
             "envFrom": [
