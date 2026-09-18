@@ -763,6 +763,17 @@ escalation_level_r_8ee197b2_ffe5_4696_b4a0_760e5c84a343 = rootly.EscalationLevel
 # "Low is never held less than Medium" -- if these ever drift apart, the lower
 # tier silently becomes the noisier one, which is the exact bug the Low path
 # below exists to fix. One definition makes that impossible.
+#
+# Rootly releases a deferred alert when the block it matched ends, and with
+# re_evaluate a release that lands inside another block is deferred again. So
+# the blocks must leave no gap. The weeknight block used to be 17:00-23:59,
+# which released everything at 23:59 into a minute no block covered: 5zNqx3,
+# deferred at 19:42 ET on 2026-09-15, posted to #devops-warnings at 23:59:01.
+# Chaining itself works: Ks2jH9, deferred Saturday 2026-09-12 at 18:42 ET, ran
+# at 09:00 ET Monday. The weeknight block now crosses midnight (Rootly derives
+# `ends_next_day` when the end is before the start) and ends at 09:00. Friday's
+# ends inside Saturday's all-day block, which chains through Sunday to Monday's
+# 00:00-09:00.
 OFF_HOURS_DEFERRAL_WINDOW = {
     "ruleType": "deferral_window",
     "timeZone": "America/New_York",
@@ -773,20 +784,12 @@ OFF_HOURS_DEFERRAL_WINDOW = {
             "wednesday": True,
             "thursday": True,
             "friday": True,
-            "startTime": "00:00",
-            "endTime": "09:00",
-        },
-        {
-            "monday": True,
-            "tuesday": True,
-            "wednesday": True,
-            "thursday": True,
-            "friday": True,
             "startTime": "17:00",
-            "endTime": "23:59",
+            "endTime": "09:00",
         },
         {"saturday": True, "allDay": True},
         {"sunday": True, "allDay": True},
+        {"monday": True, "startTime": "00:00", "endTime": "09:00"},
     ],
 }
 
