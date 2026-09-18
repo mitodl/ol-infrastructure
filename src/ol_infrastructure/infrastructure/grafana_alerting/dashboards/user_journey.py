@@ -19,8 +19,11 @@ as its own series rather than silently contaminating the "after" window.
 WHY A TRACE ROW: latency says whether a fix worked, not why. For a change whose
 mechanism is "stop issuing one query per row", the mechanism is visible as the
 count of Postgres child spans under the request span, which is a structural
-TraceQL query. Read the caveat on that row's panels -- traces are tail-sampled
-and the absolute number is biased, the change between releases is not.
+TraceQL query. Read the caveat on that row's panels -- traces are tail-sampled,
+so the absolute number is biased, and the change between releases is only
+trustworthy when latency is comparable across the pair. The sampler picks on
+latency, so a release that merely got faster drops the ratio with no change in
+query count; a genuine query-count fix is the much larger move to look for.
 
 WHY THE JOURNEY FILTER IS INLINED RATHER THAN A DASHBOARD VARIABLE: the set of
 endpoints is fixed at deploy time, so it is baked into each expression instead
