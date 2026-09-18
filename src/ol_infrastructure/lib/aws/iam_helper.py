@@ -485,13 +485,18 @@ def bedrock_invoke_statements(
     change. The Converse and ConverseStream APIs authorize against these same
     two InvokeModel actions.
 
-    No aws-marketplace permissions. The first invocation of a Marketplace-backed
-    model (e.g. Anthropic's) in an account subscribes to it and accepts its EULA
-    for the whole account, and needs aws-marketplace:Subscribe to do so. Once a
-    model is enabled, invoking it needs no Marketplace permissions. So a new
-    third-party model is enabled once by an administrator, not by whichever
-    workload happens to call it first. Models not sold through Marketplace
-    (Amazon, Meta, Mistral, ...) need no enablement.
+    No aws-marketplace permissions. Invoking a Marketplace-backed model (e.g.
+    Anthropic's) that the account hasn't enabled yet makes Bedrock start an
+    account-wide subscription in the background, which needs the caller's
+    aws-marketplace permissions. Without them the subscription fails, and calls
+    return AccessDeniedException once the up-to-15-minute setup window closes.
+    Calls can succeed during that window, so this is not a hard block on
+    first use. Blocking a model outright takes an explicit Deny on invoking it.
+    Once a model is enabled, invoking it needs no Marketplace permissions, so
+    enabling a new third-party model stays an administrator's one-time step.
+    Models not sold through Marketplace (Amazon, Meta, Mistral, ...) need no
+    enablement.
+    https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html
 
     Lint the policy with ``BEDROCK_PARLIAMENT_CONFIG``.
 
