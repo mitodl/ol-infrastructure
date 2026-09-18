@@ -24,7 +24,7 @@ come to hold those roles, and how the whole thing is applied and kept from drift
 | A4 | Desired state is one data structure in `ol_infrastructure`, consumed by both this catalog and the StarRocks `GRANT`s, so the two layers cannot disagree. |
 | A5 | DECISION REQUIRED: what `ol_researcher` and `ol_instructor` may read. Recommended default: nothing, until a data owner says what. |
 | A6 | DECISION REQUIRED: narrow the live StarRocks grants to the same layer map at the same time. Recommended: yes. |
-| A7 | Applied by an in-cluster reconciler CronJob, as the service admin, through the REST API. There is no policy file to mount. |
+| A7 | Applied by a reconciler sidecar in the Gravitino pod, as the service admin, through the REST API on loopback. There is no policy file to mount. |
 | A8 | The reconciler adds users to the metalake from Keycloak role membership. It never grants anything to a user. |
 | A9 | Schemas are owned by the `ol_data_engineer` group, not by whoever created them. |
 | A10 | `DENY` is reserved for named exceptions. None on day one. |
@@ -84,14 +84,14 @@ them, dropping the Trino-only roles (`read_only_production`, `reverse_etl`, `fin
 | mart | read | read | | |
 | reporting | read | read | | |
 | integrations | read | | | |
-| external | | | | |
+| external | read | read | | |
 
 `ol_platform_admin` and `ol_data_engineer` get read and write on the whole catalog, dev schemas
 included. The June model gave both "ALL on ALL namespaces", and data engineers need to reach their
 own dev schemas.
 
-`raw` and `external` get no analyst grant because dbt grants none on them. `raw` is Airbyte's
-landing layer, not a dbt model layer.
+`raw` gets no analyst grant because dbt grants none on it. It is Airbyte's landing layer, not a
+dbt model layer. `external` follows its dbt grant (`dbt_project.yml:205-210`).
 
 In Gravitino terms, "read" on a layer is a role whose securable objects are:
 
@@ -181,25 +181,32 @@ a schema-level grant plus a table-level `DENY` (A10) come in.
 | Principal | Needs | How |
 |---|---|---|
 | `ol-gravitino-catalog` (bootstrap, Keycloak spec D2) | Authenticate to `GET /v1/config` at StarRocks catalog creation | Nothing. The spike showed `/v1/config` requires authentication only. Not added to the metalake. |
-| `ol-gravitino-admin` (reconciler) | Create the metalake, catalog, groups, roles, grants; add users | `gravitino.authorization.serviceAdmins`. It creates the metalake and so owns it. |
+| `ol-gravitino-admin` (reconciler) | Create the metalake, catalog, groups, roles, grants; add users | `gravitino.authorization.serviceAdmins`. It creates the metalake and so owns it. Reaches the management API only from inside the pod (deployment spec P7). |
 | Pipeline writers | Write any layer | Only under deployment Option B (they then talk to the catalog). A Keycloak service-account client per writer, holding the `ol_data_engineer` client role through `ClientServiceAccountRole` (Keycloak spec M15), so it arrives as group `ol_data_engineer`. Added to the metalake like a human. |
 
 Under deployment Option A the pipeline writers keep writing to Glue directly, and there are no
 pipeline principals in Gravitino at all.
 
 `ol-gravitino-admin` is a new Keycloak client beyond what the Keycloak spec provisions: CONFIDENTIAL,
-service accounts only, secret at `secret-operations/sso/gravitino-admin`. Its service account also
-needs the `realm-management` client roles `view-users` and `view-clients` for A8. Its principal
-resolves to `service-account-ol-gravitino-admin` through the D4 `preferred_username` fallback.
-Verify that fallback against a real token first, as the Keycloak spec already asks.
+service accounts only, secret at `secret-operations/sso/gravitino-admin`. It needs:
+
+- An `AudienceProtocolMapper` for `ol-gravitino-catalog` with `add_to_access_token=True`, as a fourth
+  entry in the Keycloak spec's mapper loop. Gravitino accepts exactly one `serviceAudience`
+  (Keycloak spec M5), so without it every reconciler call is a 401.
+- The `realm-management` client roles `view-users` and `view-clients` on its service account, for A8.
+
+Its principal resolves to `service-account-ol-gravitino-admin` (34 characters, inside the STS
+session-name limit in deployment spec P6) through the D4 `preferred_username` fallback. Verify that
+fallback against a real token first, as the Keycloak spec already asks.
 
 ## A7: how it is applied
 
-Gravitino has no policy file. Everything above is REST API state in the entity store. It is reached
-only from inside the cluster (deployment spec P7), so it cannot be applied from a Pulumi run on a
-Concourse worker the way the StarRocks roles are.
+Gravitino has no policy file. Everything above is REST API state in the entity store. The management
+API listens on loopback only (deployment spec P7), so it cannot be applied from a Pulumi run on a
+Concourse worker the way the StarRocks roles are, or from a separate pod.
 
-`gravitino-reconcile` CronJob, every 15 minutes, on the deployment spec's P10 pattern. Each run:
+A reconciler sidecar in the Gravitino pod, looping every 15 minutes, desired state mounted from a
+ConfigMap that Pulumi renders. Each run:
 
 1. Ensures the metalake and catalog exist, with the catalog properties from the deployment spec.
 2. Ensures the six groups exist.
@@ -209,8 +216,8 @@ Concourse worker the way the StarRocks roles are.
 4. Ensures each role is granted to its group, and to nothing else.
 5. Sets each existing `ol_warehouse_<env>_*` schema's owner to group `ol_data_engineer` (A9).
 6. Runs A8.
-7. Exits non-zero on any API error, so failures reach `WorkloadJobFailed*` and a stuck job trips the
-   staleness rule.
+7. Records a last-success timestamp only if every step succeeded. The deployment spec's P10 alert
+   fires when it is more than an hour old.
 
 Step 3 is what makes the ConfigMap the source of truth. Without the revoke half, a grant removed
 from `GOVERNANCE_LAYER_ACCESS` would stay live forever.
@@ -225,10 +232,19 @@ A user who has not been added to the metalake is denied everything, even when th
 roles (`JcasbinAuthorizer.java:650-652`). Gravitino has no create-on-first-login option. So the
 per-user step does not go away, but it carries no privilege decision.
 
-The reconciler lists every user holding any of the six `ol-starrocks-client` client roles
-(`GET /admin/realms/ol-data-platform/clients/{id}/roles/{role}/users`), computes each principal
+The reconciler lists every user whose effective roles include any of the six `ol-starrocks-client`
+client roles, computes each principal
 exactly as D4 does (the `saml_uid` attribute if set, which is what `starrocks_username` is mapped
 from, else `username`), and `POST`s any missing ones to `/api/metalakes/ol_data_platform/users`.
+
+Effective, not direct. `GET /clients/{id}/roles/{role}/users` returns direct role mappings only, and
+the realm hands these client roles out mostly through the composite realm roles `ol-starrocks-analyst`,
+`ol-starrocks-engineer` and so on (`substructure/keycloak/ol_data_platform.py:532-610`). Users who
+hold a role that way would never be added. Walk the realm's users instead and read each one's
+effective client roles from `GET /users/{id}/role-mappings/clients/{client-id}/composite`, which
+expands composites and group membership. That is one request per realm user per run; check the
+realm's user count before settling on the 15-minute interval. `keycloak_group_sync.py:117` has the direct-only flaw today, which is one more reason not to
+share code with it.
 
 Properties that make this sync safe where `keycloak_group_sync.py` is not:
 
@@ -280,8 +296,8 @@ clearance.
 
 ## Verification before this is called done
 
-1. In QA, a user holding only `ol_data_analyst` lists the seven analyst layers and not `raw`,
-   `external` or any dev schema; `loadTable` on a `mart` table is 200 and on a `raw` table is 403.
+1. In QA, a user holding only `ol_data_analyst` lists the eight analyst layers and not `raw` or any
+   dev schema; `loadTable` on a `mart` table is 200 and on a `raw` table is 403.
 2. A user holding only `ol_business_analyst` gets 403 on `staging`.
 3. A user holding only `ol_researcher` gets 403 on `listNamespaces` (A5 default).
 4. Removing a privilege from `GOVERNANCE_LAYER_ACCESS` and redeploying makes it disappear from
@@ -289,8 +305,8 @@ clearance.
 5. A grant added by hand through the API is reverted by the next reconcile.
 6. The same user's StarRocks `SHOW DATABASES` on the external catalog matches (1), which is what A4
    buys.
-7. A new Keycloak user given `ol_data_analyst` is denied, then allowed after one reconcile, with no
-   other change.
+7. A new Keycloak user given `ol-starrocks-analyst` (the composite realm role, not the client role
+   directly) is denied, then allowed after one reconcile, with no other change.
 
 ## What this does not settle
 

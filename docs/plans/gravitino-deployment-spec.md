@@ -25,13 +25,14 @@ Repo facts are from `main` at `e615f6ed4`.
 | P3 | Dedicated RDS Postgres per environment, pinned to major version 16, with a Vault database mount at `postgres-gravitino`. |
 | P4 | No new bucket. Tables stay where they are in `ol-data-lake-<stage>-<env>`. |
 | P5 | Catalog backend is decided by a spike first: Iceberg `GlueCatalog` as a `CUSTOM` backend if it works, `JDBC` in the same RDS instance if it does not. |
-| P6 | `credential-providers=aws-irsa`, not `s3-token`. No static AWS keys anywhere. |
-| P7 | In-cluster only. `ClusterIP` Service, no HTTPRoute, no NLB. |
+| P6 | `credential-providers=aws-irsa`, not `s3-token`, vending from a dedicated S3-only role named in `s3-role-arn`. No static AWS keys anywhere. |
+| P7 | In-cluster only. `ClusterIP` Service for the Iceberg REST port (9001) alone. The management API (8090) binds to `127.0.0.1` and is reachable only from inside the pod. |
 | P8 | Official Helm chart `oci://registry-1.docker.io/apache/gravitino-helm`, version `1.3.11` (appVersion `1.3.0`). There is no operator. |
 | P9 | QA 1 replica, Production 2 with a PodDisruptionBudget. `gravitino.cache.enabled=false` whenever replicas > 1. |
-| P10 | Posture probe and grant reconciler run as CronJobs in the `gravitino` namespace. |
+| P10 | Grant reconciler runs as a sidecar in the Gravitino pod. Posture probe runs as a CronJob in the `gravitino` namespace. |
 
-P5 and P6 change earlier project conclusions and need reading before the rest.
+P5 and P6 change earlier project conclusions and need reading before the rest. P6 and P7 together
+close a hole that `aws-irsa` opens and `s3-token` does not.
 
 ## P6: `aws-irsa`, and why the earlier "must be `s3-token`" does not carry over
 
@@ -43,39 +44,71 @@ no fallback to the default credential chain, and `S3CredentialConfig.java:42-55`
 required. Using it would mean minting a long-lived IAM user key for a pod, which this repo does not
 do.
 
-`aws-irsa` is the provider built for EKS. `AwsIrsaCredentialGenerator.java:97-108, 344-376` calls
-`AssumeRoleWithWebIdentity` with the pod's projected service-account token and the same per-table
-session policy that `s3-token` attaches. Role ARN and token file fall back to the `AWS_ROLE_ARN` and
-`AWS_WEB_IDENTITY_TOKEN_FILE` variables that IRSA injects (`:331-342`,
-`webidentity/WebIdentityTokenSourceConfig.java:35`). The session is still named for the end user,
-as `gravitino_irsa_session_<user>` (`:371`), so CloudTrail attribution survives.
+`aws-irsa` is the provider built for EKS. For a table request,
+`AwsIrsaCredentialGenerator.java:97-108, 344-376` calls `AssumeRoleWithWebIdentity` with the pod's
+projected service-account token and the same per-table session policy that `s3-token` attaches. The
+token file falls back to `AWS_WEB_IDENTITY_TOKEN_FILE` (`FileWebIdentityTokenSource.java:43-58`) and
+the role to `s3-role-arn`, then `AWS_ROLE_ARN` (`AwsIrsaCredentialGenerator.java:331-342`). The
+session is still named for the end user, as `gravitino_irsa_session_<user>` (`:371`), so CloudTrail
+attribution survives.
 
-Leave `s3-role-arn` unset. The generator then re-assumes the pod's own IRSA role with the session
-policy applied, so there is one role, its trust policy is the one `OLEKSAuthBinding` already writes,
-and no `sts:AssumeRole` permission is needed.
+### The hole: `aws-irsa` hands out the whole role on a catalog-level request
 
-What the spike measured was `s3-token`. `aws-irsa` shares the session-policy code path but its
-downscoping is not measured. It is the first thing to check in QA (see Verification).
+For anything that is not a table path, `generate()` returns the role's credentials with no session
+policy (`AwsIrsaCredentialGenerator.java:83-84`, "basic mode"). Upstream documents it as "credentials
+with full permissions of the associated IAM role" (`docs/security/credential-vending.md:50`).
+`s3-token` returns `null` in the same case (`S3TokenGenerator.java:72-75`), which is why the spike
+never saw it.
 
-Two consequences for the role:
+One request reaches that path: `GET /api/metalakes/{m}/objects/catalog/{c}/credentials` on the
+management port. `MetadataObjectCredentialOperations.java:61-129` serves it for `CATALOG` objects,
+guarded only by `CAN_ACCESS_METADATA`, and `CredentialOperationDispatcher.getCredentialContexts`
+builds a `CatalogCredentialContext` for a catalog identifier. So any user holding `USE_CATALOG`,
+which is every read role in the authorization spec, can ask the management API for the vending
+role's unscoped credentials. Had the vending role been the pod role carrying the query-engine
+policy, that would be read, write and delete on every lake bucket, plus Glue and Bedrock. This is
+read from source, not tested.
 
-- Gravitino's own catalog IO (metadata writes) does not go through the vending provider. Iceberg
-  1.11's `AwsClientProperties` falls back to `DefaultCredentialsProvider` when no static key is set
-  (`IcebergPropertiesUtils.java:52-59` only forwards keys that are present), so it picks up IRSA.
-  That means the IRSA role itself needs direct S3 read/write on the warehouse, as the spike found.
-- The vended credential is the intersection of that role and the session policy, so the role must
-  be at least as broad as anything we want to vend.
+Two controls, both required:
 
-`data_lake_query_engine_iam_policy_arn` from the `data_warehouse` stack already grants S3
-Get/Put/Delete/List on every stage bucket plus Glue CRUD on the environment's databases
-(`infrastructure/aws/data_warehouse/__main__.py:225-332`). Attach it, plus the
-`data_lake_cross_environment_glue_denial_policy_arn` in non-production, exactly as
-`applications/starrocks/__main__.py:278-319` does. Unlike StarRocks, attach only the policy for the
-deployment's own environment (see P2).
+1. The management API binds to loopback (P7). No pod but Gravitino's own can reach port 8090.
+2. Vending uses a dedicated role through `s3-role-arn`, not the pod's role. It holds S3
+   Get/Put/Delete/List on the `ol-data-lake-<stage>-<env>` buckets and nothing else. No Glue, no
+   Bedrock, no `ListAllMyBuckets`. Its trust policy admits the data cluster's OIDC provider for
+   `system:serviceaccount:gravitino:gravitino` only, since `AssumeRoleWithWebIdentity` authenticates
+   with the pod's token rather than chaining from the pod role. If (1) ever regresses, the most a
+   basic-mode credential can reach is lake object storage.
 
-`irsa_max_session_duration` must be at least `s3-token-expire-in-secs` (default 3600). The
-`OLEKSAuthBinding` default is 3600, so the defaults agree. Raising the token lifetime means raising
-both.
+Neither control fixes the upstream behaviour. File it: basic mode should be opt-in, or refuse
+catalog-level requests when authorization is on.
+
+What the spike measured was `s3-token`. `aws-irsa` shares the session-policy code path for table
+requests, but its downscoping is not measured. It is the first thing to check in QA (see
+Verification).
+
+### The pod role
+
+Gravitino's own catalog IO (metadata writes) does not go through the vending provider. Iceberg 1.11's
+`AwsClientProperties` falls back to `DefaultCredentialsProvider` when no static key is set
+(`IcebergPropertiesUtils.java:52-59` only forwards keys that are present), so it uses the pod's IRSA
+role. That role needs S3 read/write on the lake buckets, as the spike found, plus Glue on the
+environment's databases under Option A only.
+
+Do not reuse `data_lake_query_engine_iam_policy_arn`. Besides S3 and Glue it grants
+`bedrock:InvokeModel`, `s3:ListAllMyBuckets` and `glue:TagResource` on `*`
+(`infrastructure/aws/data_warehouse/__main__.py:225-305`), none of which Gravitino uses. Write a
+dedicated policy in the Gravitino stack from the same helpers (`data_lake_glue_resources(env)` in
+`lib/aws/iam_helper.py:325-392`), scoped to the deployment's own environment only (see P2), and
+attach `data_lake_cross_environment_glue_denial_policy_arn` in non-production as
+`applications/starrocks/__main__.py:305-319` does.
+
+The vending role's `max_session_duration` must be at least `s3-token-expire-in-secs` (default 3600).
+Raising the vended credential lifetime means raising both.
+
+`gravitino_irsa_session_` is 23 characters and STS session names stop at 64, so a principal longer
+than 41 characters makes the STS call fail. Kerberos short names are well under that. A Keycloak
+service-account principal (`service-account-<client-id>`) can exceed it, so machine client ids that
+reach the catalog must stay short.
 
 ## P5: catalog backend, and why this is a spike and not a decision
 
@@ -114,8 +147,9 @@ migration and a cutover for every writer.
 
 A side effect of Option A: existing Glue schemas and tables are imported into Gravitino's entity
 store on first load (`SchemaOperationDispatcher.java:187-200`, `TableOperationDispatcher.java:138-151`),
-and a grant on a schema or table calls `loadSchema`/`loadTable` first (`MetadataObjectUtil.java:242-254`),
-which triggers that import. So grants on pre-existing schemas should not need a bulk sync. This
+and a grant on a schema or table first checks `schemaExists`/`tableExists`
+(`MetadataObjectUtil.java:242-254`), whose default implementations call `loadSchema`/`loadTable`
+(`SupportsSchemas.java:63-70`, `TableCatalog.java:84-90`) and so trigger that import. So grants on pre-existing schemas should not need a bulk sync. This
 follows from the call chain; the spike should confirm it.
 
 ## P1, P2: cluster and namespace
@@ -179,8 +213,9 @@ defaults (`dev/docker/gravitino/rewrite_gravitino_server_config.py:132-137`), wh
 config means authorization silently off.
 
 Credentials come from `OLVaultK8SDynamicSecretConfig(mount="postgres-gravitino", path="creds/app",
-restart_target_kind="Deployment")` as dagster and open_metadata do. Rotation restarts the pods,
-which re-runs the substitution.
+restart_targets=[OLVaultRestartTarget(kind="Deployment", name=...)])`, the non-deprecated form
+(`components/services/vault.py:633-637`, as `applications/omnigraph/__main__.py:942` uses it).
+Rotation restarts the pods, which re-runs the substitution.
 
 ## P4: storage
 
@@ -194,23 +229,37 @@ conditioned on `kms:ViaService=s3.us-east-1.amazonaws.com` and `kms:CallerAccoun
 `s3:*` actions and no `kms:*` (grep of `bundles/aws/src/main/java` for `kms` finds nothing). If a
 session policy limits what a wildcard-principal key policy grants, a vended credential can list and
 fetch objects but cannot decrypt them. The spike ran against an unencrypted bucket and did not
-exercise this. It is a QA verification item. If it fails, the fix is on our side: add the IRSA role
-ARN as a named principal in the key policy, or give the Gravitino role's session a KMS allowance
-through a different provider configuration. Do not work around it with `s3-secret-key`.
+exercise this. It is a QA verification item.
+
+If it fails, naming the vending role's ARN in the key policy does not help: a resource policy that
+names the role is still capped by the session policy, and only a policy naming the session ARN
+escapes that cap, which is per user here. The realistic fix is upstream: have the session policy
+include `kms:Decrypt` and `kms:GenerateDataKey` on the bucket's key, which is a small change to
+`createSessionPolicy`. Carrying a patched image until that merges is the fallback. Do not work
+around it with `s3-secret-key`, and do not move the lake buckets off SSE-KMS for it.
 
 ## P7: exposure
 
-`ClusterIP` Service `gravitino` exposing 8090 (management API) and 9001 (Iceberg REST, through the
-chart's `extraExposePorts`, `values.yaml:509-513`). StarRocks' catalog URI becomes
+`ClusterIP` Service `gravitino` exposing 9001 (Iceberg REST, through the chart's `extraExposePorts`,
+`values.yaml:509-513`) and nothing else. StarRocks' catalog URI becomes
 `http://gravitino.gravitino.svc.cluster.local:9001/iceberg`.
 
+The management API binds to loopback: chart value `webserver.host: 127.0.0.1`, rendered as
+`gravitino.server.webserver.host` (`dev/charts/gravitino/resources/config/gravitino.conf:24`). This
+is the first control in P6. It also keeps a management API that answers 403 with the name of the
+forbidden object off the pod network. Consequences:
+
+- Liveness and readiness probes use the Iceberg REST port, `/iceberg/health/live` and
+  `/iceberg/health/ready` (`docs/iceberg-rest-service.md:674-689`), because the kubelet cannot
+  reach loopback.
+- Metrics are scraped from `9001/prometheus/metrics`, which serves the same registry as 8090.
+- Anything that administers Gravitino runs inside the pod. That is the reconciler sidecar (P10).
+
 No HTTPRoute and no internal NLB. Every consumer is in-cluster, and neither Concourse nor humans
-need to reach it: grants are reconciled from inside the cluster (P10), and humans reach data through
-StarRocks. That also keeps a management API that answers 403 with the name of the forbidden object
-off the network.
+need to reach it: grants are reconciled inside the pod, and humans reach data through StarRocks.
 
 NetworkPolicy is not enforced on the data cluster (`applications/clickhouse/__main__.py:1246-1249`),
-so any pod in the cluster can reach both ports. Do not read "in-cluster only" as an authentication
+so any pod in the cluster can reach 9001. Do not read "in-cluster only" as an authentication
 control. The authenticator is the control, and P10's probe checks it. Adding an in-cluster TLS hop
 is out of scope here: bearer tokens cross the pod network in the clear, the same as every other
 in-cluster HTTP service in this repo.
@@ -228,10 +277,8 @@ Do not add a public route.
 GRAVITINO_CHART_VERSION = "1.3.11"
 ```
 
-The explanation sits above the marker because the Renovate regex requires the marker directly above
-the assignment.
-
-in `src/bridge/lib/versions.py`, deployed with `kubernetes.helm.v3.Release(chart="oci://registry-1.docker.io/apache/gravitino-helm", version=...)`
+That pin goes in `src/bridge/lib/versions.py`, with the explanation above the marker because the
+Renovate regex requires the marker directly above the assignment. Deploy it with `kubernetes.helm.v3.Release(chart="oci://registry-1.docker.io/apache/gravitino-helm", version=...)`
 as `applications/toolhive_operator/__main__.py:77-93` does for its OCI chart. The chart's appVersion
 is `1.3.0`, and Docker Hub has no `1.3.0` chart tag. Image `docker.io/apache/gravitino:1.3.0`.
 
@@ -239,10 +286,11 @@ Chart behaviour to override, all checked in `dev/charts/gravitino` at the tag:
 
 - It never creates a ServiceAccount; it takes a name only (`values.yaml:536`). Create the IRSA SA
   through `OLEKSAuthBinding(create_irsa_service_account=True)` and pass its name.
-- Default probes hit `/`. Use `/api/health/live` and `/api/health/ready`; `ready` checks the entity
-  store (`docs/gravitino-server-config.md:321-334`).
+- Default probes hit `/`. Use the Iceberg REST health endpoints (P7), since 8090 is on loopback.
 - `docker-entrypoint.sh:65` adds `-XX:-UseContainerSupport`, so the JVM ignores the cgroup limit.
-  Always set `GRAVITINO_MEM` explicitly. QA `-Xms1g -Xmx1g`, limit 2Gi. Production
+  Always set `GRAVITINO_MEM` explicitly, including `MaxMetaspaceSize`, because replacing the chart
+  default drops its `-XX:MaxMetaspaceSize=512m` and metaspace is then unbounded. QA
+  `-Xms1g -Xmx1g -XX:MaxMetaspaceSize=512m`, limit 2Gi. Production
   `-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g`, limit 6Gi, per the "moderate production" line in
   `docs/gravitino-server-config.md:376-385`.
 - Leave `icebergRest.s3` unset. Setting it renders `s3-access-key-id` even when blank
@@ -250,9 +298,15 @@ Chart behaviour to override, all checked in `dev/charts/gravitino` at the tag:
 - The chart's Postgres init container only runs for its bundled subchart (`deployment.yaml:128-180`),
   hence the schema Job in P3.
 
-Server configuration, through `additionalConfigItems` where the chart has no dedicated value:
+Server configuration. These are the effective settings. Set each through the chart's dedicated
+value where one exists (`auxService`, `icebergRest`, `authorization`, `audit`, `authenticators`,
+`webserver`), and through `additionalConfigItems` only for keys the chart does not render. The chart
+renders its own defaults for the dedicated ones (`authorization.enable: false`,
+`authenticators: simple`), so pushing the same key through `additionalConfigItems` leaves it in the
+file twice, and last-one-wins then decides whether the catalog is authenticated.
 
 ```properties
+gravitino.server.webserver.host = 127.0.0.1
 gravitino.auxService.names = iceberg-rest
 gravitino.iceberg-rest.httpPort = 9001
 gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
@@ -268,7 +322,8 @@ gravitino.audit.formatter.className = org.apache.gravitino.audit.JsonAuditFormat
 
 plus the `gravitino.authenticator.oauth.*` block from the Keycloak spec (D4 through D7). Standalone
 Iceberg REST deployments support no access control at all, which is why the auxiliary-service form
-is required.
+is required. P10's posture check asserts that each security key occurs exactly once in the rendered
+file.
 
 `serviceAdmins` names a second Keycloak machine client, `ol-gravitino-admin`, used only by the
 reconciler. It is separate from the bootstrap client in the Keycloak spec (D2) because a service
@@ -279,6 +334,7 @@ Catalog properties (set by the reconciler, not the server config):
 
 ```properties
 credential-providers = aws-irsa
+s3-role-arn = <dedicated vending role, P6>
 s3-region = us-east-1
 s3-token-expire-in-secs = 3600
 # Option A only:
@@ -295,7 +351,7 @@ separate, JSON-formatted stream to Loki. Remember that denials log `UNKNOWN` and
 (spike item 5), so a denial-rate alert has to match on HTTP status and URI.
 
 Metrics: both ports serve `/prometheus/metrics` from one registry (`JettyServer.java:171-181`).
-Scrape 8090 only, with a ServiceMonitor.
+Scrape 9001, since 8090 is on loopback, with a ServiceMonitor.
 
 ## P9: replicas
 
@@ -322,22 +378,33 @@ Production, as the evaluation already says.
 
 ## P10: jobs
 
-Two CronJobs in the `gravitino` namespace, both on the `applications/omnigraph/council_probe.py`
-pattern: a stdlib Python script in a ConfigMap on `python:3.12-slim`, credentials from
-`OLVaultK8SSecret`, a non-zero exit as the signal. Failures reach `WorkloadJobFailedWarning` /
+`gravitino-posture` is a CronJob in the `gravitino` namespace, every 15 minutes, on the
+`applications/omnigraph/council_probe.py` pattern: a stdlib Python script in a ConfigMap on
+`python:3.12-slim`, a non-zero exit as the signal. Failures reach `WorkloadJobFailedWarning` /
 `WorkloadJobFailedCritical` (`infrastructure/grafana_alerting/metric_rules/eks_general.py:464, 490`),
-and the job name goes into the staleness rule's regex (`:590-668`) so a job that stops running also
-alerts.
+and the job name goes into the staleness rule's regex (`:590-668`). That rule cannot see a CronJob
+that has never succeeded (its KNOWN GAP comment), so a posture job that fails from its first run
+alerts through `WorkloadJobFailed*` only. Checks:
 
-- `gravitino-posture`, every 15 minutes. Unauthenticated `GET :9001/iceberg/v1/config` must return
-  401, and so must `GET :8090/api/metalakes`. The rendered `gravitino.authenticator.oauth.authority`
-  in the ConfigMap must equal the environment's issuer, and `gravitino.authorization.enable` must be
-  `true`. This is D8 of the Keycloak spec, placed. No probe in this repo asserts a non-200 status
-  today, so this is new.
-- `gravitino-reconcile`, specified in the authorization spec.
+1. Unauthenticated `GET :9001/iceberg/v1/config` returns 401.
+2. A TCP connect to 8090 on each Gravitino pod IP is refused (P7's loopback binding held).
+3. In the rendered `gravitino.conf` ConfigMap, `gravitino.authenticators`,
+   `gravitino.authenticator.oauth.authority` and `gravitino.authorization.enable` each occur exactly
+   once, with values `oauth`, the environment's issuer, and `true`.
+
+This is D8 of the Keycloak spec, placed. No probe in this repo asserts a non-200 status today, so
+this is new. Unlike `council_probe`, which deliberately runs without a ServiceAccount, this job needs
+one, bound to a Role allowing `get` on that one ConfigMap (check 3) and `list` on pods in the
+namespace (check 2). Nothing else.
 
 Run posture once as a post-deploy Job too. A stack that deploys an unauthenticated catalog should
 fail its `pulumi up`, not wait up to 15 minutes to be noticed.
+
+The grant reconciler (authorization spec A7) runs as a sidecar container in the Gravitino pod,
+because the management API it drives is on loopback. With two replicas there are two reconcilers.
+Each run is idempotent and converges on the same desired state, so that is harmless. A sidecar has
+no job status for `WorkloadJobFailed*` to see, so it exposes a last-success timestamp as a metric,
+and an alert fires when that is older than an hour.
 
 ## Verification before this is called done
 
@@ -345,10 +412,14 @@ fail its `pulumi up`, not wait up to 15 minutes to be noticed.
 2. In QA, a vended `aws-irsa` credential for one table can read that table's objects, and gets 403
    on a sibling table's prefix and on `ListBucket` at the bucket root. That is the spike's `s3-token`
    result repeated for the provider we actually run.
-3. The same credential can decrypt an SSE-KMS object in `ol-data-lake-<stage>-qa` (P4).
-4. CloudTrail shows `gravitino_irsa_session_<user>` on those reads.
-5. With 2 replicas in QA: grant on replica A, `loadTable` through replica B returns 200 immediately.
-6. Posture job goes red when `gravitino.authenticators` is removed from a scratch deployment.
+3. From another pod, a TCP connect to 8090 on the Gravitino pod IP is refused. From inside the pod,
+   `GET /api/metalakes/ol_data_platform/objects/catalog/ol_data_lake_qa/credentials` with an
+   analyst's token returns vending-role credentials, confirming the P6 hole is real and that the
+   dedicated role is what it would expose.
+4. The same credential can decrypt an SSE-KMS object in `ol-data-lake-<stage>-qa` (P4).
+5. CloudTrail shows `gravitino_irsa_session_<user>` on those reads.
+6. With 2 replicas in QA: grant on replica A, `loadTable` through replica B returns 200 immediately.
+7. Posture job goes red when `gravitino.authenticators` is removed from a scratch deployment.
 
 ## What this does not settle
 
