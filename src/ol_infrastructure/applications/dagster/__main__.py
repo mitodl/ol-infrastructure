@@ -2348,6 +2348,23 @@ edxorg_gcp_secret = OLVaultK8SSecret(
 # enable direction rather than the disable one. Read it before widening the set.
 OTEL_AGENT_PYTHONPATH = "/opt/otel/auto_instrumentation"
 
+# Metrics export, for db.client.connections.usage: the sqlalchemy
+# instrumentation's count of each QueuePool's connections by state (idle/used).
+# PgBouncer's exporter measures the server end of every connection, so a
+# saturated client pool (the "QueuePool limit of size N overflow M reached"
+# failure) reads as a healthy PgBouncer. This is the only series that sees it.
+#
+# Opt-in per stack rather than on everywhere, because enabling the metrics
+# exporter enables every installed instrumentation's metrics at once, not just
+# this one. requests and urllib3 each emit http.client.* duration and size
+# histograms. The control plane makes few HTTP calls, but the run workers
+# that inherit this env (canvas, see OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS)
+# make API calls throughout a run, and each one is a new process with its own
+# random service.instance.id. Production started ~475 canvas run-worker Jobs in
+# the day to 2026-09-18, each minting a fresh set of histogram series. Measure
+# the series count on QA before setting this in Production.
+dagster_otel_metrics_enabled = dagster_config.get_bool("otel_metrics_enabled") or False
+
 
 def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, str]]:
     """Build the OTEL_* + PYTHONPATH block for one long-lived Dagster process.
@@ -2385,10 +2402,20 @@ def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, st
         # Only the HTTP OTLP exporter is installed in the images; the SDK default
         # "otlp" resolves to the gRPC exporter, which is absent. An unresolvable
         # exporter aborts SDK initialisation outright -- traces included -- which
-        # is why metrics and logs are named off rather than left at their
-        # defaults. Same reasoning as edxapp/k8s_resources.py's _OTEL_SDK_ENV.
+        # is why metrics and logs are named off or named explicitly rather than
+        # left at their defaults. Same reasoning as edxapp/k8s_resources.py's
+        # _OTEL_SDK_ENV. otlp_proto_http is registered for metrics by the same
+        # opentelemetry-exporter-otlp-proto-http package the traces use.
         {"name": "OTEL_TRACES_EXPORTER", "value": "otlp_proto_http"},
-        {"name": "OTEL_METRICS_EXPORTER", "value": "none"},
+        *(
+            [
+                {"name": "OTEL_METRICS_EXPORTER", "value": "otlp_proto_http"},
+                # The interval mit_learn, learn_ai and witan export at.
+                {"name": "OTEL_METRIC_EXPORT_INTERVAL", "value": "60000"},
+            ]
+            if dagster_otel_metrics_enabled
+            else [{"name": "OTEL_METRICS_EXPORTER", "value": "none"}]
+        ),
         {"name": "OTEL_LOGS_EXPORTER", "value": "none"},
         # The mit_learn/learn_ai ratio, so a trace crossing from one of those
         # services is sampled once rather than decided twice. Alloy's
