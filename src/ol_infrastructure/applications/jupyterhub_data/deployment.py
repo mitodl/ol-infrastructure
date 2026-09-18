@@ -72,7 +72,6 @@ _SHARED_NOTEBOOKS_MOUNT_PATH = "/home/jovyan/shared_nb"
 
 _MARIMO_AI_DEFAULTS_SCRIPT = "/etc/marimo/marimo_ai_defaults.py"
 _MARIMO_AI_DEFAULTS_JSON = "/etc/marimo/ai_defaults.json"
-
 # KubeSpawner profile list: currently defines Standard and Large CPU/memory tiers.
 _PROFILE_LIST = f"""
 c.KubeSpawner.profile_list = [
@@ -645,6 +644,23 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         ),
                         # uv cache on EFS so per-notebook venvs survive pod restarts
                         "UV_CACHE_DIR": "/home/jovyan/.cache/uv",
+                        # marimo writes a session cache (cell outputs) to a
+                        # __marimo__/ directory next to each notebook it opens.
+                        # A viewer's copy of someone else's shared_nb folder is
+                        # read-only, so opening their notebook failed with
+                        # EROFS. With a pycache prefix set, marimo mirrors
+                        # __marimo__/ under it instead (marimo _utils/paths.py
+                        # notebook_output_dir), so each viewer's cache, outputs
+                        # included, stays in their own home rather than
+                        # landing in the shared folder.
+                        "PYTHONPYCACHEPREFIX": "/home/jovyan/.cache/pycache",
+                        # The prefix would also take Python's bytecode, including
+                        # about 1.1k files per sandbox kernel whose /tmp venv is
+                        # thrown away, piling up on EFS for the pod's lifetime.
+                        # Not writing bytecode costs ~2s of imports per server
+                        # process start; kernels recompile on their fresh venvs
+                        # either way. marimo's session cache is unaffected.
+                        "PYTHONDONTWRITEBYTECODE": "1",
                         # Bedrock via IRSA. boto3 in both the marimo assistant and
                         # notebook kernels resolves the region from these, so
                         # neither has to hardcode one.
