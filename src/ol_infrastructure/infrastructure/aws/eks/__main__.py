@@ -365,6 +365,17 @@ cluster_creation_aws_provider = aws.Provider(
         )
     ],
 )
+# EKS creates this group itself with never-expire retention the moment
+# control-plane logging is enabled. Declaring it first means EKS adopts ours
+# and the retention actually applies.
+control_plane_log_group = aws.cloudwatch.LogGroup(
+    f"{cluster_name}-eks-control-plane-log-group",
+    name=f"/aws/eks/{cluster_name}/cluster",
+    retention_in_days=90 if stack_info.env_suffix == "production" else 30,
+    tags=aws_config.tags,
+    opts=ResourceOptions(retain_on_delete=True),
+)
+
 # Actually make the cluster
 cluster = eks.Cluster(
     f"{cluster_name}-eks-cluster",
@@ -410,7 +421,7 @@ cluster = eks.Cluster(
     opts=ResourceOptions(
         provider=cluster_creation_aws_provider,
         parent=cluster_role,
-        depends_on=[cluster_role, administrator_role],
+        depends_on=[cluster_role, administrator_role, control_plane_log_group],
     ),
 )
 
