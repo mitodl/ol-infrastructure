@@ -487,7 +487,9 @@ def bedrock_invoke_statements(
 
     The first invocation of a Marketplace-backed model in an account makes
     Bedrock subscribe on the caller's behalf, which fails with AccessDenied
-    without the aws-marketplace actions. Those are not ARN-scopable.
+    without Subscribe and ViewSubscriptions. Those are not ARN-scopable.
+    Unsubscribe is deliberately absent: subscriptions are account-wide, and
+    invoking never needs it.
 
     Lint the policy with ``BEDROCK_PARLIAMENT_CONFIG``.
 
@@ -521,7 +523,6 @@ def bedrock_invoke_statements(
             "Effect": "Allow",
             "Action": [
                 "aws-marketplace:Subscribe",
-                "aws-marketplace:Unsubscribe",
                 "aws-marketplace:ViewSubscriptions",
             ],
             "Resource": "*",

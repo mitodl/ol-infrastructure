@@ -4,18 +4,27 @@ Shipped into single-user pods and run from the postStart hook, not imported by
 the Pulumi program. marimo reads a single user config file from the persistent
 home volume and writes a full default one the first time it starts, so seeding
 a file with ``cp -n`` would never reach existing users. This fills in only the
-keys a user has not set, so choices made in Settings > AI survive restarts.
+keys a user has not set.
+
+Each version of the defaults is applied once, recorded by its hash in a marker
+file next to the config. Without that, a model the user removed from
+``custom_models`` would come back on every restart. When the defaults change,
+they're applied again, still without overriding a key the user has set.
 
 ``tomlkit`` is a marimo dependency, so it is present wherever marimo is.
 """
 
+import hashlib
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
 import tomlkit
+
+MARKER_NAME = ".ol-ai-defaults-applied"
 
 
 def user_config_path() -> Path:
@@ -58,22 +67,43 @@ def merge_missing(target: Any, defaults: dict[str, Any]) -> None:
             target[key].extend(item for item in value if item not in target[key])
 
 
+def write_atomically(path: Path, content: str) -> None:
+    """Replace ``path`` with ``content`` so a killed pod can't truncate it.
+
+    :param path: The file to write.
+    :type path: Path
+
+    :param content: The new file contents.
+    :type content: str
+    """
+    with tempfile.NamedTemporaryFile(
+        "w", dir=path.parent, prefix=f".{path.name}.", delete=False
+    ) as tmp:
+        tmp.write(content)
+    Path(tmp.name).replace(path)
+
+
 def main(defaults_path: Path) -> None:
     """Merge the defaults at ``defaults_path`` into the user's marimo config.
 
     :param defaults_path: A JSON file of marimo config defaults.
     :type defaults_path: Path
     """
-    defaults = json.loads(defaults_path.read_text())
+    raw_defaults = defaults_path.read_bytes()
+    defaults_hash = hashlib.sha256(raw_defaults).hexdigest()
     config_path = user_config_path()
+    marker = config_path.parent / MARKER_NAME
+    if marker.is_file() and marker.read_text().strip() == defaults_hash:
+        return
     config_path.parent.mkdir(parents=True, exist_ok=True)
     document = (
         tomlkit.parse(config_path.read_text())
         if config_path.exists()
         else tomlkit.document()
     )
-    merge_missing(document, defaults)
-    config_path.write_text(tomlkit.dumps(document))
+    merge_missing(document, json.loads(raw_defaults))
+    write_atomically(config_path, tomlkit.dumps(document))
+    write_atomically(marker, defaults_hash)
 
 
 if __name__ == "__main__":
