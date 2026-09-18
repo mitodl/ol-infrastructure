@@ -72,12 +72,6 @@ _SHARED_NOTEBOOKS_MOUNT_PATH = "/home/jovyan/shared_nb"
 
 _MARIMO_AI_DEFAULTS_SCRIPT = "/etc/marimo/marimo_ai_defaults.py"
 _MARIMO_AI_DEFAULTS_JSON = "/etc/marimo/ai_defaults.json"
-
-# See the PYTHONPYCACHEPREFIX comment on singleuser extraEnv. Python mirrors the
-# source tree under the prefix, so the sandbox kernels' /tmp venvs land here.
-_PYCACHE_PREFIX = "/home/jovyan/.cache/pycache"
-_SANDBOX_PYCACHE_DIR = Path(_PYCACHE_PREFIX, "tmp")
-
 # KubeSpawner profile list: currently defines Standard and Large CPU/memory tiers.
 _PROFILE_LIST = f"""
 c.KubeSpawner.profile_list = [
@@ -595,10 +589,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                                     "cp -n /usr/local/share/marimo/templates/* "
                                     "/home/jovyan/notebooks/ || true; "
                                     f"python3 {_MARIMO_AI_DEFAULTS_SCRIPT} "
-                                    f"{_MARIMO_AI_DEFAULTS_JSON} || true; "
-                                    # Bytecode compiled for the sandbox venvs
-                                    # in /tmp, which died with the last pod.
-                                    f"rm -rf {_SANDBOX_PYCACHE_DIR} || true",
+                                    f"{_MARIMO_AI_DEFAULTS_JSON} || true",
                                 ]
                             }
                         }
@@ -661,11 +652,15 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         # __marimo__/ under it instead (marimo _utils/paths.py
                         # notebook_output_dir), so each viewer's cache, outputs
                         # included, stays in their own home rather than
-                        # landing in the shared folder. Python bytecode caches
-                        # move there too, including those of each sandbox
-                        # kernel's throwaway /tmp venv (about 1.1k files per
-                        # kernel), which the postStart hook clears.
-                        "PYTHONPYCACHEPREFIX": _PYCACHE_PREFIX,
+                        # landing in the shared folder.
+                        "PYTHONPYCACHEPREFIX": "/home/jovyan/.cache/pycache",
+                        # The prefix would also take Python's bytecode, including
+                        # about 1.1k files per sandbox kernel whose /tmp venv is
+                        # thrown away, piling up on EFS for the pod's lifetime.
+                        # Not writing bytecode costs ~2s of imports per server
+                        # process start; kernels recompile on their fresh venvs
+                        # either way. marimo's session cache is unaffected.
+                        "PYTHONDONTWRITEBYTECODE": "1",
                         # Bedrock via IRSA. boto3 in both the marimo assistant and
                         # notebook kernels resolves the region from these, so
                         # neither has to hardcode one.
