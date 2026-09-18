@@ -248,10 +248,11 @@ def test_stale_ref_moving_the_root_back_is_refused() -> None:
         validate_storage_prefix_progression("fmt9", "fmt6", "")
 
 
-def test_moving_back_to_the_bucket_root_is_refused() -> None:
+@pytest.mark.parametrize("deployed", ["fmt6", "fmt0"])
+def test_moving_back_to_the_bucket_root_is_refused(deployed: str) -> None:
     """The bucket root holds the pre-first-migration graphs, older than any fmt."""
     with pytest.raises(ValueError, match="older root"):
-        validate_storage_prefix_progression("fmt6", "", "")
+        validate_storage_prefix_progression(deployed, "", "")
 
 
 @pytest.mark.parametrize(
@@ -281,7 +282,7 @@ def test_rollback_naming_the_root_being_left_passes() -> None:
 
 
 def test_rollback_override_for_a_different_root_is_refused() -> None:
-    with pytest.raises(ValueError, match="left over from a rollback"):
+    with pytest.raises(ValueError, match="only applies to a deploy that moves"):
         validate_storage_prefix_progression("fmt10", "fmt9", "fmt9")
 
 
@@ -292,7 +293,7 @@ def test_leftover_override_is_refused_once_the_rollback_has_deployed() -> None:
     fmt9 is cut over again, a stale ref carrying fmt6 would match it and pass.
     Refusing on the first deploy after the rollback forces it out before then.
     """
-    with pytest.raises(ValueError, match="left over from a rollback"):
+    with pytest.raises(ValueError, match="only applies to a deploy that moves"):
         validate_storage_prefix_progression("fmt6", "fmt6", "fmt9")
 
 
@@ -304,3 +305,21 @@ def test_free_form_prefixes_have_no_ordering_to_check() -> None:
 def test_rollback_from_errors_name_their_own_key() -> None:
     with pytest.raises(ValueError, match="omnigraph:storage_rollback_from must"):
         validate_storage_prefix("fmt<N>", key="storage_rollback_from")
+
+
+@pytest.mark.parametrize(
+    ("deployed", "new"),
+    [("fmt9", "fmt9"), ("fmt6", "fmt9"), (None, "fmt9"), ("fmt9", "v2.1")],
+)
+def test_rollback_override_outside_a_rollback_is_refused(
+    deployed: str | None, new: str
+) -> None:
+    """Set ahead of time, it would pre-authorize a later stale ref moving back."""
+    with pytest.raises(ValueError, match="only applies to a deploy that moves"):
+        validate_storage_prefix_progression(deployed, new, "fmt9")
+
+
+def test_mistyped_rollback_override_says_what_to_set_it_to() -> None:
+    """A typo on a real rollback must not read as "delete the override"."""
+    with pytest.raises(ValueError, match="storage_rollback_from to 'fmt9'"):
+        validate_storage_prefix_progression("fmt9", "fmt6", "fmt8")

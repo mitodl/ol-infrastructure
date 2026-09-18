@@ -200,8 +200,9 @@ recovery path anyone should be attempting under time pressure.
 
 Repointing is a config change: **`omnigraph:storage_prefix`**. Unset (the
 steady state) puts the graphs at the bucket root; set to `fmt5` they live at
-`s3://ol-data-witan-<env>/fmt5`. Step 5 sets it, rollback removes it, and no
-code is edited during the outage.
+`s3://ol-data-witan-<env>/fmt5`. Step 5 sets it, rollback sets it back to the
+root it had before (see [Rollback](#rollback), which also needs
+`storage_rollback_from`), and no code is edited during the outage.
 
 It is a *prefix inside the managed bucket*, not a free-form URI, on purpose:
 the bucket, its IAM policy and the IRSA grant are all keyed to the derived

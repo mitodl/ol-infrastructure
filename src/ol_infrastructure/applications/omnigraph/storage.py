@@ -276,6 +276,10 @@ def validate_image_internal_schema(
         raise ValueError(msg)
 
 
+#: Rank of the bucket root in _served_format: below every fmt<N>, fmt0 included.
+_BUCKET_ROOT_RANK = -1
+
+
 def _served_format(prefix: str) -> int | None:
     """Storage format a served root holds, for ordering two roots.
 
@@ -284,11 +288,12 @@ def _served_format(prefix: str) -> int | None:
     read and returns ``None``.
 
     :param prefix: A normalized ``storage_prefix``.
-    :returns: The format number, ``0`` for the bucket root, or ``None``.
+    :returns: The format number, ``_BUCKET_ROOT_RANK`` for the bucket root, or
+        ``None``.
     :rtype: int | None
     """
     if not prefix:
-        return 0
+        return _BUCKET_ROOT_RANK
     match = _PREFIX_SCHEMA_RE.fullmatch(prefix)
     return int(match.group("version")) if match else None
 
@@ -312,12 +317,12 @@ def validate_storage_prefix_progression(
     itself, and ``validate_image_internal_schema`` skips when the image
     predates the storage-format label.
 
-    A real rollback moves the root backwards on purpose. It is allowed only
-    when ``rollback_from`` names the root being left. Once the rollback has
-    deployed, a ``rollback_from`` that no longer names the deployed root is
-    refused too, not left in place. Roots are always named ``fmt<N>``, so a
-    leftover ``rollback_from: fmt9`` would otherwise start permitting stale
-    refs again the moment the environment is cut over to fmt9 a second time.
+    A real rollback moves the root backwards on purpose. ``rollback_from`` is
+    accepted only on that deploy: the one moving to an older format, and naming
+    the root being left. Anywhere else it is refused, including set ahead of
+    time and left behind afterwards. Roots are always named ``fmt<N>``, so an
+    override that outlived its rollback would start permitting stale refs
+    again the moment the environment is cut over to that root a second time.
 
     :param deployed_prefix: The last deployed ``storage_prefix``, or ``None``
         when the stack has never exported one.
@@ -325,29 +330,35 @@ def validate_storage_prefix_progression(
     :param rollback_from: The normalized ``omnigraph:storage_rollback_from``,
         ``""`` when unset.
     :raises ValueError: when the deploy moves to an older format without a
-        matching ``rollback_from``, or ``rollback_from`` is set and does not
-        name the deployed root.
+        matching ``rollback_from``, or ``rollback_from`` is set on any other
+        deploy.
     """
-    if rollback_from and rollback_from != deployed_prefix:
-        msg = (
-            f"omnigraph:storage_rollback_from is {rollback_from!r}, but this "
-            f"stack last deployed {deployed_prefix!r}. It only applies to the "
-            "deploy that leaves that root, so this is left over from a rollback "
-            "that has already deployed. Remove it: left in place, it would let "
-            f"a stale ref move the cluster off {rollback_from!r} again after the "
-            "next cutover to it."
-        )
-        raise ValueError(msg)
-    if deployed_prefix is None or deployed_prefix == storage_prefix:
-        return
-    deployed_format = _served_format(deployed_prefix)
+    deployed_format = (
+        None if deployed_prefix is None else _served_format(deployed_prefix)
+    )
     new_format = _served_format(storage_prefix)
     # A free-form prefix on either side has no ordering to check.
-    if deployed_format is None or new_format is None:
-        return
-    if new_format >= deployed_format:
-        return
-    if rollback_from == deployed_prefix:
+    moves_back = (
+        deployed_format is not None
+        and new_format is not None
+        and new_format < deployed_format
+    )
+    if rollback_from:
+        if moves_back and rollback_from == deployed_prefix:
+            return
+        msg = (
+            f"omnigraph:storage_rollback_from is {rollback_from!r}, but it only "
+            "applies to a deploy that moves storage_prefix to an older format "
+            f"than the root this stack last deployed ({deployed_prefix!r}), and "
+            f"must name that root. This deploy asks for {storage_prefix!r}. If "
+            "you are rolling back, set storage_prefix to the older root and "
+            f"storage_rollback_from to {deployed_prefix!r}. If the rollback has "
+            "already deployed, or none is intended, remove storage_rollback_from: "
+            "left in place, it would let a stale ref move the cluster off that "
+            "root again after the next cutover to it."
+        )
+        raise ValueError(msg)
+    if not moves_back:
         return
     msg = (
         f"omnigraph:storage_prefix is {storage_prefix!r}, but this stack last "
