@@ -645,6 +645,17 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         ),
                         # uv cache on EFS so per-notebook venvs survive pod restarts
                         "UV_CACHE_DIR": "/home/jovyan/.cache/uv",
+                        # marimo writes a session cache (cell outputs) to a
+                        # __marimo__/ directory next to each notebook it opens.
+                        # A viewer's copy of someone else's shared_nb folder is
+                        # read-only, so opening their notebook failed with
+                        # EROFS. With a pycache prefix set, marimo mirrors
+                        # __marimo__/ under it instead (marimo _utils/paths.py
+                        # notebook_output_dir), so each viewer's cache, outputs
+                        # included, stays in their own home rather than
+                        # landing in the shared folder. Python bytecode caches
+                        # move there too.
+                        "PYTHONPYCACHEPREFIX": "/home/jovyan/.cache/pycache",
                         # Bedrock via IRSA. boto3 in both the marimo assistant and
                         # notebook kernels resolves the region from these, so
                         # neither has to hardcode one.
