@@ -21,6 +21,9 @@ This spec covers two epics:
   on its own URL. Each app is either Keycloak-gated or public, and going public needs an
   approval.
 
+The first implementation pass ships Keycloak-gated apps only (D11). Public apps are still
+designed here, under "Pass 2: public apps", so that nothing in pass 1 rules them out.
+
 Out of scope: the StarRocks migration itself (`wp-trino-starburst-galaxy-starrocks-migration-decom-62b677`
 E7 owns warehouse connectivity), and the org-wide APISIX OIDC trust boundary
 (`wp-apisix-owned-oidc-trust-boundary-org-wide-securi-0409aa`). The publisher is designed to stay
@@ -40,9 +43,10 @@ out of the latter.
 | D8 | Warehouse credentials reach published pods as mounted files, not env vars. |
 | D9 | Published routes never forward viewer credentials. The OIDC plugin sets `set_access_token_header`, `set_id_token_header`, and `set_userinfo_header` to `false`, and `proxy-rewrite` strips `Cookie` (F17). |
 | D10 | Publishing and approving are gated on Keycloak roles, synced into JupyterHub groups (`manage_groups`, `auth_state_groups_key`). The publisher checks group membership through the hub API with its service token (F18). |
+| D11 | The first implementation pass ships Keycloak-gated apps only. The `notebook_public` role, the public route shape, and the approval workflow are deferred to pass 2. |
 
-D1 through D4 are the owner's decisions from 2026-09-18. D5 through D10 follow from the facts
-below.
+D1 through D4 and D11 are the owner's decisions from 2026-09-18. D5 through D10 follow from the
+facts below.
 
 ## Facts this rests on
 
@@ -226,10 +230,10 @@ Users' edited copies elsewhere are left alone.
 **B1. Apps host and a hand-applied prototype.** Set `marimo_data:apps_domain` to the D2 hosts
 (F12), add them to `eks:apisix_domains` in `infrastructure/aws/eks/Pulumi.data.<env>.yaml`, and
 add the redirect URI to the Keycloak client behind `ol-apisix-marimo-data-oidc-secrets`. In QA,
-hand-apply one MarimoNotebook (`mode: run`, inline `content`, `auth.password` from a Secret) and
-two `OLApisixRoute` shapes at `/<name>/*` with `websocket=True`: gated (`unauth_action="auth"`, the
-three D9 header flags off) and public (no OIDC plugin). Both use `proxy-rewrite` to inject the
-marimo token and strip `Cookie` (D7, D9). Check each of these on the live pod:
+hand-apply one MarimoNotebook (`mode: run`, inline `content`, `auth.password` from a Secret) and a
+gated `OLApisixRoute` at `/<name>/*` with `websocket=True`, `unauth_action="auth"`, and the three
+D9 header flags off. The route uses `proxy-rewrite` to inject the marimo token and strip `Cookie`
+(D7, D9). The public route shape waits for pass 2. Check each of these on the live pod:
 
 - the F7 args override serves correctly under the path prefix;
 - `mo.app_meta().request` in the gated app shows no `Authorization`, `X-Access-Token`,
@@ -252,13 +256,12 @@ Fall back to a pinned fork only if upstream refuses.
 operator runs `marimo run --sandbox`, so the environment is built once per pod start, from the
 image cache.
 
-**B4. Warehouse credentials by access level.** Add a native `notebook_public` role (grants: see
-Q1) and a Vault role for it (F14). A VSO `VaultDynamicSecret` in namespace `marimo` produces one
-Secret per level, `readonly` and `notebook_public`. The publisher mounts the Secret for the app's
-level as a file volume through `podOverrides` (D8). The operator creates bare Pods, which VSO's
+**B4. Warehouse credentials.** A VSO `VaultDynamicSecret` in namespace `marimo` produces a
+Secret from the existing `readonly` Vault role (F14). The publisher mounts it as a file volume
+through `podOverrides` (D8). The operator creates bare Pods, which VSO's
 rollout-restart cannot target, while a mounted Secret volume picks up rotation on its own.
 `ol_notebook.warehouse.connect()` returns the per-user Keycloak JWT credential when running
-interactively and reads the mounted file when published. Give both notebook Vault roles a
+interactively and reads the mounted file when published. Give the notebook credential a
 short `default_ttl` (hours, not the 3-month default in F14), since VSO renews dynamic secrets
 itself. Published pods share one `marimo-published` ServiceAccount with no IRSA annotation and
 `automountServiceAccountToken: false`, never the hub's IRSA role (`tk-notebook-pods-share-one-irsa-role-so-direct-s3-g-293885`).
@@ -270,19 +273,15 @@ under `hub.services` (D5).
 
 - API: `publish`, `update`, `list` (mine), `status` (phase, recent events, pod logs), and
   `unpublish`.
-- Authorization: the caller must be in the publisher group (D10, Q5). Approve and reject require
-  the approver group.
+- Authorization: the caller must be in the publisher group (D10, Q5).
 - Validation: a PEP 723 header, `marimo check` passes, content under 1 MiB (the ConfigMap
-  limit), a DNS-label name that is unique or already owned by the caller, and an access level
-  from `{keycloak, public}`. A public request also requires every PEP 723 dependency to be
-  pinned with `==`, because `marimo run --sandbox` resolves dependencies again on every pod
-  start (F10). Otherwise approved code could change when an unpinned dependency releases.
+  limit), and a DNS-label name that is unique or already owned by the caller.
 - Renders a MarimoNotebook with `mode: run`, inline `content`, `auth.password` pointing at a
   per-app token Secret (D7), the B3 image, the F7 args override, the F8 content hash env, the B4
   credential volume, a restricted-PSA `securityContext`, and resource caps. It never renders
-  `sidecars` or `mounts`. Also renders an `ApisixRoute` at `/<name>/*` carrying D7 and D9, plus
-  `limit-count` on public routes. Labels and annotations record the owner, the access level,
-  `requested-access`, and git provenance (A7).
+  `sidecars` or `mounts`. Also renders an `ApisixRoute` at `/<name>/*` carrying D7 and D9. Labels
+  and annotations record the owner, an access level (always `keycloak` in pass 1, so pass 2 can
+  add `public` without relabeling), and git provenance (A7).
 - After each write, reads back the reconciled Pod and fails the request if its args, volumes, or
   ServiceAccount don't match (F7).
 - State lives only in the CRs (D6).
@@ -305,45 +304,61 @@ under `hub.services` (D5).
 - the image tag through `versions.py` and Renovate;
 - Concourse wiring through the existing `marimo-data` `simple_pulumi` entry.
 
-**B7. Front ends.** An `ol-notebook publish <file> --name <n> --access keycloak|public` CLI in the
-image, plus a JupyterLab "Publish notebook…" context-menu and command-palette entry. Both call the
+**B7. Front ends.** An `ol-notebook publish <file> --name <n>` CLI in the image (pass 2 adds
+`--access public`), plus a JupyterLab "Publish notebook…" context-menu and command-palette entry. Both call the
 B5 API and show the resulting URL and status.
-
-**B8. Approval to go public.** A `--access public` request publishes as gated with
-`requested-access=public` and posts to Slack. An approver, a member of the approver group synced from a
-Keycloak role in the `ol-data-platform` realm (D10; name: see Q3), reviews the notebook source and data level in the
-publisher UI, then approves or rejects. Approval re-renders the route without OIDC and swaps the
-credential volume to `notebook_public`. Any later `update` to a public app drops it back to gated,
-pending re-approval, so reviewed code can't be swapped after the fact. Decisions are recorded as
-CR annotations and Kubernetes Events.
 
 **B9. Observability and lifecycle.** Alert on published pods stuck in Pending or Failed, or
 restarting, from kube-state-metrics pod phase and restart metrics. Add an owner-facing status view in
 the publisher. Stale-app policy: see Q4.
 
 **B10. Docs.** Update `platform-engineering-site/docs/application_specific_guides/jupyterhub/data_platform_notebooks.md`
-with the edit, version, publish, and approve flow, and update the template README.
+with the edit, version, and publish flow, and update the template README. The approve flow is
+added in pass 2.
+
+### Pass 2: public apps (deferred, D11)
+
+None of this ships in the first pass. It is kept here so pass 1 leaves room for it.
+
+**B8. Approval to go public.** A `--access public` request publishes as gated with
+`requested-access=public` and posts to Slack. An approver, a member of the approver group synced
+from a Keycloak role in the `ol-data-platform` realm (D10; name: see Q3), reviews the notebook
+source and data level in the publisher UI, then approves or rejects. Approval re-renders the
+route without the OIDC plugin and swaps the credential volume to `notebook_public`. Any later
+`update` to a public app drops it back to gated, pending re-approval, so reviewed code can't be
+swapped after the fact. Decisions are recorded as CR annotations and Kubernetes Events.
+
+Pass 2 also needs:
+
+- a native `notebook_public` StarRocks role (grants: see Q1), a Vault role for it (F14), and a
+  second `VaultDynamicSecret`;
+- publisher validation that requires every PEP 723 dependency of a public app to be pinned with `==`, because
+  `marimo run --sandbox` resolves dependencies again on every pod start (F10). Otherwise approved
+  code could change when an unpinned dependency releases;
+- `limit-count` on public routes;
+- approve and reject endpoints on the publisher, restricted to the approver group.
 
 ## Sequencing
 
 A4 and A6 are independent and can ship first. A1 comes before A2, A3, and A5, and B3 builds on
 A2 and A3. B1 gates B5. B2 does not, once B1 has proven the stopgap. B5 needs B3 for its image
 and can't deploy without B6 (its ServiceAccount, Role, and hub service entry), so B5 and B6
-land together, followed by B7. B8 needs B4, B5, and answers to Q1 and Q3. B4 needs StarRocks E7
-for connectivity. Q5 has to be answered before B5 goes live anywhere but CI. The first real consumer is the
+land together, followed by B7. B4 needs StarRocks E7 for connectivity. Q5 has to be answered
+before B5 goes live anywhere but CI. Pass 2 (B8) starts after pass 1 is in production, and needs
+answers to Q1 and the approver half of Q3. The first real consumer is the
 feedback-clustering curation notebook (`tk-mvp-consumption-surfaces-superset-cluster-triage-ba37c2`).
 
 ## Open questions
 
 - **Q1.** What does `notebook_public` grant? A dedicated reporting database or a named list of
-  marts is simplest to audit. Without an answer, B4 can't ship public apps. Gated apps don't
-  depend on it.
+  marts is simplest to audit. This blocks pass 2 only.
 - **Q2.** Should notebook repos be per user, or one shared `mitodl/ol-data-notebooks` with a
-  directory per user? I recommend the shared repo: provenance and public-app review then happen
-  in one place, and CODEOWNERS per directory keeps ownership clear. The cost is that every
+  directory per user? I recommend the shared repo: provenance (and, in pass 2, public-app
+  review) then happen in one place, and CODEOWNERS per directory keeps ownership clear. The cost is that every
   notebook author needs write access to it.
-- **Q3.** What are the role names? One Keycloak role in `ol-data-platform` for approvers (e.g.
-  `notebook_publish_approver`) and one for publishers (e.g. `notebook_publisher`).
+- **Q3.** What are the role names? Pass 1 needs one Keycloak role in `ol-data-platform` for
+  publishers (e.g. `notebook_publisher`). Pass 2 adds one for approvers (e.g.
+  `notebook_publish_approver`).
 - **Q4.** What is the stale-app policy? For example, unpublish apps whose owner has left MIT, and
   flag apps with no requests in 90 days.
 - **Q5.** Who may publish a gated app? A gated app runs with the `readonly` credential, and its
@@ -358,9 +373,10 @@ feedback-clustering curation notebook (`tk-mvp-consumption-surfaces-superset-clu
 - Part A: time-to-first-render of `getting_started.py` on a fresh and a restarted pod, before and
   after, from the A1 harness. A double-click on a `.py` opens marimo. A new user lands on the
   getting-started notebook.
-- Part B, in CI then QA: publish through the CLI, and confirm the gated URL requires a Keycloak
-  login, and that the app sees no viewer tokens or cookies (D9). Confirm that a caller outside
-  the publisher group is refused (D10), and that an in-cluster request without the marimo token
-  is refused (D7). Request public, approve it as an approver, and load the URL unauthenticated. Confirm in
-  the StarRocks audit log that queries run as `notebook_public`. Update the content, and confirm
-  the new version serves (F8). Unpublish, and confirm the CR, route, ConfigMap, and Pod are gone.
+- Part B pass 1, in CI then QA: publish through the CLI, and confirm the gated URL requires a
+  Keycloak login, and that the app sees no viewer tokens or cookies (D9). Confirm that a caller
+  outside the publisher group is refused (D10), and that an in-cluster request without the
+  marimo token is refused (D7). Update the content, and confirm the new version serves (F8).
+  Unpublish, and confirm the CR, route, ConfigMap, Secret, and Pod are gone.
+- Part B pass 2: request public, approve it as an approver, and load the URL unauthenticated.
+  Confirm in the StarRocks audit log that queries run as `notebook_public`.
