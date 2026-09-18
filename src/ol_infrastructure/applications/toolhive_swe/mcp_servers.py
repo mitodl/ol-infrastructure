@@ -260,8 +260,8 @@ def create_mcp_servers(  # noqa: PLR0913
             **_observability(stack_info, "grafana"),
             # mcp-grafana 1.5 added anonymous usage reporting to Grafana Labs.
             # It ships disabled, but upstream says the default flips to enabled
-            # in a later release (usagestats/mode.go), and a Renovate patch bump
-            # would turn it on without a config change here.
+            # in a later release (usagestats/mode.go), and a Renovate version
+            # bump would turn it on without a config change here.
             "env": [
                 {"name": "GRAFANA_URL", "value": grafana_url},
                 {"name": "GRAFANA_USAGE_STATS", "value": "disabled"},
