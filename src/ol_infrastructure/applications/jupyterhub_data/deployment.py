@@ -70,6 +70,9 @@ from ol_infrastructure.lib.vault import postgres_role_statements
 # the username, which is the username itself when it's a valid DNS label.
 _SHARED_NOTEBOOKS_MOUNT_PATH = "/home/jovyan/shared_nb"
 
+_MARIMO_AI_DEFAULTS_SCRIPT = "/etc/marimo/marimo_ai_defaults.py"
+_MARIMO_AI_DEFAULTS_JSON = "/etc/marimo/ai_defaults.json"
+
 # KubeSpawner profile list: currently defines Standard and Large CPU/memory tiers.
 _PROFILE_LIST = f"""
 c.KubeSpawner.profile_list = [
@@ -146,6 +149,16 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     trino_catalog = (
         jupyterhub_data_config.get("trino_catalog") or "ol_data_lake_production"
     )
+    aws_region = Config("aws").require("region")
+    # A cross-Region inference profile ID (e.g. us.anthropic.claude-sonnet-5);
+    # newer models can't be invoked on demand by bare foundation-model ID.
+    bedrock_model = f"bedrock/{jupyterhub_data_config.require('bedrock_chat_model')}"
+    marimo_ai_defaults = {
+        # edit_model falls back to chat_model, so one key covers both.
+        "ai": {
+            "models": {"chat_model": bedrock_model, "custom_models": [bedrock_model]}
+        }
+    }
 
     # Vault Policy
     vault_policy = vault.Policy(
@@ -564,6 +577,9 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     # `|| true` guards the container: a postStart hook that exits
                     # non-zero kills it, and the glob fails if the templates
                     # directory is ever empty.
+                    #
+                    # It then fills in the Bedrock assistant defaults for any key
+                    # the user hasn't set (see marimo_ai_defaults.py).
                     "lifecycleHooks": {
                         "postStart": {
                             "exec": {
@@ -572,28 +588,37 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                                     "-c",
                                     "mkdir -p /home/jovyan/notebooks && "
                                     "cp -n /usr/local/share/marimo/templates/* "
-                                    "/home/jovyan/notebooks/ || true",
+                                    "/home/jovyan/notebooks/ || true; "
+                                    f"python3 {_MARIMO_AI_DEFAULTS_SCRIPT} "
+                                    f"{_MARIMO_AI_DEFAULTS_JSON} || true",
                                 ]
                             }
                         }
                     },
-                    # Configure marimo-jupyter-extension to run each notebook in
-                    # an isolated uv virtual environment (sandbox mode). uvx reads
-                    # the `/// script` PEP 723 inline metadata header in each .py
-                    # file to install exactly the packages that notebook declares,
-                    # ensuring reproducibility. UV_CACHE_DIR points to the EFS home
-                    # volume so venvs persist across pod restarts and are not
-                    # recreated on every open. timeout=120 covers the first-open
-                    # cost of downloading and building the per-notebook venv.
+                    # The extension launches the image's own marimo rather than
+                    # `uvx marimo[sandbox]`. marimo's AI assistant runs in that
+                    # server process and needs pydantic-ai with its Bedrock extra,
+                    # which the image installs and an ad hoc uvx environment
+                    # doesn't have. --sandbox is still passed, so each notebook
+                    # still runs in its own uv environment built from its
+                    # `/// script` PEP 723 header. UV_CACHE_DIR points to the EFS
+                    # home volume so those environments persist across pod
+                    # restarts. timeout=120 covers building one on first open.
                     "extraFiles": {
                         "jupyter-server-config": {
                             "mountPath": "/etc/jupyter/jupyter_server_config.py",
-                            "stringData": (
-                                "c.MarimoProxyConfig.uvx_path"
-                                ' = "/usr/local/bin/uvx"\n'
-                                "c.MarimoProxyConfig.timeout = 120\n"
-                            ),
-                        }
+                            "stringData": "c.MarimoProxyConfig.timeout = 120\n",
+                        },
+                        "marimo-ai-defaults-script": {
+                            "mountPath": _MARIMO_AI_DEFAULTS_SCRIPT,
+                            "stringData": Path(__file__)
+                            .parent.joinpath("marimo_ai_defaults.py")
+                            .read_text(),
+                        },
+                        "marimo-ai-defaults": {
+                            "mountPath": _MARIMO_AI_DEFAULTS_JSON,
+                            "stringData": json.dumps(marimo_ai_defaults),
+                        },
                     },
                     # Endpoint only, no credential. Starburst Galaxy authenticates
                     # query clients itself: the notebook uses Galaxy's OAuth2
@@ -620,6 +645,11 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         ),
                         # uv cache on EFS so per-notebook venvs survive pod restarts
                         "UV_CACHE_DIR": "/home/jovyan/.cache/uv",
+                        # Bedrock via IRSA. boto3 in both the marimo assistant and
+                        # notebook kernels resolves the region from these, so
+                        # neither has to hardcode one.
+                        "AWS_REGION": aws_region,
+                        "AWS_DEFAULT_REGION": aws_region,
                     },
                     "storage": {
                         "type": "dynamic",
