@@ -923,7 +923,9 @@ schedule_rotation_data_platform = rootly.ScheduleRotation(
     "data-platform-rotation",
     active_all_week=False,
     active_days=["M", "T", "W", "R", "F"],
-    active_time_type="custom",
+    # same_time applies active_time_attributes to every active day; custom
+    # expects per-day ScheduleRotationActiveDay resources instead.
+    active_time_type="same_time",
     active_time_attributes=[{"startTime": "09:00", "endTime": "17:00"}],
     name="Data Platform Rotation",
     position=1,
@@ -1034,8 +1036,9 @@ escalation_level_data_platform_on_call = rootly.EscalationLevel(
 )
 
 # Unacknowledged after 15 minutes, a data platform page goes to whoever holds
-# the Platform Engineering primary rotation. The deferral path above means this
-# can only happen during business hours.
+# the Platform Engineering primary rotation. Deferral only applies when an
+# alert arrives, so an escalation that starts shortly before 17:00 keeps
+# running past it; nothing that arrives after 17:00 starts one.
 escalation_level_data_platform_platform_engineering = rootly.EscalationLevel(
     "data-platform-platform-engineering-escalation-level",
     escalation_policy_id=escalation_policy_data_platform.id,
@@ -1063,6 +1066,10 @@ DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES = [
     "open-metadata-db-production",
     "jupyterhub-data-db-production",
 ]
+DATA_PLATFORM_GRAFANA_CLUSTERS = ["data-production"]
+# Same match as the Pingdom Service Route's Dagster and Airbyte rules, which
+# reach the data platform policy through those two services.
+DATA_PLATFORM_PINGDOM_CHECKS = ["Dagster", "Airbyte"]
 
 
 def data_platform_route_rules(
@@ -3765,9 +3772,12 @@ alert_route_grafana_production_catch_all_route = rootly.AlertRoute(
     name="Grafana Production Catch-All Route",
     owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     rules=[
-        # Every production metric and log rule groups by `cluster` (see
-        # grafana_alerting/alertmanager.py), so it is always in commonLabels.
-        *data_platform_route_rules("$.commonLabels.cluster", ["data-production"], 1),
+        # `cluster` is a grouping label in grafana_alerting/alertmanager.py, so
+        # it reaches commonLabels for any rule that aggregates by it. Every
+        # data-production rule does (dagster_*, clickhouse, eks_general).
+        *data_platform_route_rules(
+            "$.commonLabels.cluster", DATA_PLATFORM_GRAFANA_CLUSTERS, 1
+        ),
         {
             "destinations": [
                 {
@@ -3777,7 +3787,7 @@ alert_route_grafana_production_catch_all_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Grafana Production Catch-All Route",
-            "position": 2,
+            "position": len(DATA_PLATFORM_GRAFANA_CLUSTERS) + 1,
         },
     ],
     opts=rootly_opts,
@@ -3790,9 +3800,7 @@ alert_route_pingdom_catch_all_route = rootly.AlertRoute(
     name="Pingdom Catch-All Route",
     owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     rules=[
-        # Same match as the Pingdom Service Route's Dagster and Airbyte rules,
-        # which reach the data platform policy through those two services.
-        *data_platform_route_rules("$.check_name", ["Dagster", "Airbyte"], 1),
+        *data_platform_route_rules("$.check_name", DATA_PLATFORM_PINGDOM_CHECKS, 1),
         {
             "destinations": [
                 {
@@ -3802,7 +3810,7 @@ alert_route_pingdom_catch_all_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Pingdom Catch-All Route",
-            "position": 3,
+            "position": len(DATA_PLATFORM_PINGDOM_CHECKS) + 1,
         },
     ],
     opts=rootly_opts,
@@ -4442,7 +4450,9 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
         # namespace: they are airbyte, clickhouse, dagster, jupyter-data,
         # marimo, ol-analytics, open-metadata, opik, qdrant, starrocks,
         # superset, and cluster system namespaces as of 2026-09-18.
-        *data_platform_route_rules("$.commonLabels.cluster", ["data-production"], 11),
+        *data_platform_route_rules(
+            "$.commonLabels.cluster", DATA_PLATFORM_GRAFANA_CLUSTERS, 11
+        ),
         {
             "destinations": [
                 {
@@ -4452,7 +4462,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Grafana Production Service Route",
-            "position": 12,
+            "position": 11 + len(DATA_PLATFORM_GRAFANA_CLUSTERS),
         },
     ],
     opts=rootly_imported_route_opts("e7b002f8-e13f-4b63-b0df-af1c78aee890"),
@@ -4963,7 +4973,7 @@ alert_route_pingdom_service_route = rootly.AlertRoute(
             ],
             "destinations": [
                 {
-                    "targetId": "5281c3c5-eb5e-4b7f-9407-950570d66261",
+                    "targetId": service_airbyte_webapp.id,
                     "targetType": "Service",
                 },
             ],
@@ -4987,7 +4997,7 @@ alert_route_pingdom_service_route = rootly.AlertRoute(
             ],
             "destinations": [
                 {
-                    "targetId": "e7f7e16e-a7e7-4666-b779-96b33bbf402b",
+                    "targetId": service_dagster_webapp.id,
                     "targetType": "Service",
                 },
             ],
