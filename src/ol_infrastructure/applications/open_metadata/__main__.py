@@ -804,7 +804,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # and production (2.0.0 and 2.0.1): the working set climbs for 2-3 days
             # after a restart and then flattens at 315-353Mi, with zero restarts in
             # either cluster. It is undersized, not leaking. The limit gives ~45%
-            # headroom over the 353Mi peak; the request matches the plateau.
+            # headroom over the 353Mi peak; the request sits just above the plateau.
             "omjobOperator": {
                 "enabled": True,
                 "image": {
