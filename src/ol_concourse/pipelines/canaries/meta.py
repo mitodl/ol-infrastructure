@@ -150,6 +150,7 @@ def meta_pipeline(canary_names: list[str]) -> Pipeline:
 # a CanaryParams entry in pipeline.py.
 canary_names = [
     "mit-learn",
+    "mitxonline",
 ]
 
 

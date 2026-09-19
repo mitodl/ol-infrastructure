@@ -70,11 +70,14 @@ downloads none.
 
 1. Add `specs/<property>/<journey>.spec.ts`.
 2. Reuse the property's helpers in `specs/<property>/helpers/`. Login flows in
-   particular are shared — do not re-derive a Keycloak flow per spec.
+   particular are shared — do not re-derive a Keycloak flow per spec. A property
+   that signs in through the `olapps` realm uses `specs/shared/olapps-sign-in.ts`
+   and supplies only the step that gets from its own pages to Keycloak.
 3. Run it locally against the real target (see `README.md`) **at least twice** in a
    row. A canary that passes once is not yet a canary.
 4. No pipeline change is needed. A property's pipeline runs every spec under its
-   directory.
+   directory, unless its `CanaryParams.spec_paths` is narrowed; then the new spec
+   has to be added to that list.
 
 ## Adding a new property
 

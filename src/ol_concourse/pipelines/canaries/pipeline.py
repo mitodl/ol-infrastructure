@@ -164,6 +164,15 @@ pipeline_params: dict[str, CanaryParams] = {
         # secret-concourse/infrastructure/canary_mit_learn for pr-inf pipelines.
         credential_secret="canary_mit_learn",  # noqa: S106  # pragma: allowlist secret
     ),
+    "mitxonline": CanaryParams(
+        canary_name="mitxonline",
+        base_url="https://rc.mitxonline.mit.edu",
+        # Deliberately the same account as mit-learn, granted is_staff (never
+        # superuser) on RC MITx Online. Sharing it doubles how fast a drifted
+        # password reaches the realm's permanent lockout; see
+        # specs/mitxonline/README.md before changing or rotating it.
+        credential_secret="canary_mit_learn",  # noqa: S106  # pragma: allowlist secret
+    ),
 }
 
 
