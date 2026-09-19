@@ -152,8 +152,8 @@ config:
   # about once per TRANSACTION, so it now measures query throughput: measured
   # 2026-08-25 over the six days since the switch, 75/s at rest and 2673/s at
   # peak, with zero clients ever waiting and maxwait flat at 0. Nothing is wrong;
-  # the counter means something else. Both churn rules are unlabelled and routed
-  # to `oblivion` for exactly this reason (see metric_rules/dagster_pgbouncer.py).
+  # the counter means something else. The churn rules built on it were deleted
+  # for exactly this reason (see metric_rules/dagster_pgbouncer.py).
   #
   # Use the client-side view instead -- pgbouncer_pools_client_waiting_connections
   # and client_maxwait_seconds -- plus the "QueuePool limit of size 50 overflow
