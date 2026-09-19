@@ -1,8 +1,7 @@
 import { expect, test } from "./helpers/signed-in-test"
 
-// NOT ON THE SCHEDULE YET. pipeline.py narrows this property's spec_paths to the
-// anonymous journeys, because this one needs an RC account with is_staff on MITx
-// Online and nobody has decided to grant one. See ../README.md.
+// Runs as the mit-learn canary account, which holds is_staff (not superuser) on
+// RC MITx Online. See ../README.md for why it is shared and what that costs.
 //
 // Read-only on purpose: it navigates and never clicks Create, Save or a status
 // change. A canary runs every 10 minutes against a shared environment and must

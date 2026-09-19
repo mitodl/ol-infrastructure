@@ -76,8 +76,8 @@ downloads none.
 3. Run it locally against the real target (see `README.md`) **at least twice** in a
    row. A canary that passes once is not yet a canary.
 4. No pipeline change is needed. A property's pipeline runs every spec under its
-   directory, unless its `CanaryParams.spec_paths` is narrowed (as `mitxonline`'s
-   is); then the new spec has to be added to that list.
+   directory, unless its `CanaryParams.spec_paths` is narrowed; then the new spec
+   has to be added to that list.
 
 ## Adding a new property
 

@@ -13,22 +13,41 @@ dashboard bundle or auth flow on RC, e.g. from the Refine 3 to Refine 4 upgrade.
 | Spec | Journey | Status |
 |---|---|---|
 | `staff-dashboard-anonymous.spec.ts` | `/staff-dashboard/` sends an anonymous visitor to sign in; a deep dashboard route loads the app, whose auth check does the same | Active |
-| `staff-dashboard-signed-in.spec.ts` | A staff user reaches the dashboard and the Flexible Pricing list | Written, not scheduled |
+| `staff-dashboard-signed-in.spec.ts` | A staff user reaches the dashboard and the Flexible Pricing list | Active |
 
-The signed-in journey is excluded by `spec_paths` in `../../pipeline.py`, and the
-property has no `credential_secret`, because it needs an RC account with `is_staff`
-on MITx Online and that is a privilege grant nobody has approved yet. The choices are
-granting `is_staff` to the existing mit-learn canary account (it already signs in to
-RC MITx Online, through the same `olapps` realm and `ol-mitlearn-client` client) or
-provisioning a dedicated account. Either way the account must be staff and not
-superuser. Sharing the mit-learn account has a cost: each pipeline keeps its own
-rejected-credential marker, so a drifted password is submitted by both, twice the
-failures toward the realm's permanent lockout (see `../mit-learn/README.md`), and a
-rotation has to update both credential secrets at once. To schedule it, drop
-`spec_paths` and set `credential_secret`.
+## Canary account
 
-While `spec_paths` is narrowed, a new journey added to this directory does **not**
-run until it is added to that list too.
+The signed-in journey uses the **mit-learn canary account**, not one of its own.
+Decided 2026-09-18: that account was granted `is_staff` on RC MITx Online, and
+`is_superuser` stays false. It already signed in to RC MITx Online, because both
+properties authenticate through the same `olapps` realm and `ol-mitlearn-client`
+client. So `credential_secret` is `canary_mit_learn` here too. The account's details,
+and the note on clearing first-login onboarding, are in `../mit-learn/README.md`.
+
+`is_staff` is set on the MITx Online user record in RC. It is not Keycloak or
+Pulumi state, so nothing here recreates it. If RC's database is restored or the user
+is recreated, this journey fails at the dashboard heading until the grant is re-run.
+The account must never be made superuser. A canary does not need it, and the
+discount journeys that would need it are deliberately not written.
+
+The accepted cost of sharing is lockout exposure. Both pipelines submit the same
+password every 10 minutes. The rejected-credential marker lives in each run's
+container, so it stops a retry within one run and does nothing across pipelines.
+A drifted password therefore reaches the realm's `failureFactor=10` twice as fast as
+with one pipeline: two rejected submissions per 10 minutes instead of one, so the
+"about two hours" to a permanent disable in `../mit-learn/README.md` becomes about
+one. Treat a red `canary-mit-learn` or `canary-mitxonline` build that
+names a rejected credential as urgent, and pause both pipelines before debugging.
+
+Rotation is still one update. Both pipelines are in the same Concourse team and read
+the same credential. `((canary_mit_learn.*))` resolves through Concourse's default
+lookup templates to `secret-concourse/infrastructure/canary_mit_learn`, with no
+pipeline-scoped copy, and `src/bridge/secrets/concourse/operations.production.yaml`
+has the single key `infrastructure/canary_mit_learn`. So a rotation changes Keycloak
+and that one SOPS value together, as `../mit-learn/README.md` already requires.
+Both pipelines pick the change up.
+
+## What the journeys may do
 
 Both journeys are read-only. The signed-in one navigates but never clicks Create,
 Save or a status change, and there are no discount journeys: those need superuser,

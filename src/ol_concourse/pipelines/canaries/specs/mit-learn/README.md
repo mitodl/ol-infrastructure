@@ -78,7 +78,12 @@ because they are properties of the realm, not of the code.
 | Realm | `olapps` on `sso-qa.ol.mit.edu` (what RC authenticates against) |
 | Credential | Vault `secret-concourse/infrastructure/canary_mit_learn`, keys `email` / `password` |
 | Source of truth | `src/bridge/secrets/concourse/operations.production.yaml` under `pipelines:`, applied by the `concourse` Pulumi project |
-| Referenced as | `CanaryParams.credential_secret` set to `canary_mit_learn` in `../../pipeline.py` |
+| Referenced as | `CanaryParams.credential_secret` set to `canary_mit_learn` in `../../pipeline.py`, by **both** the `mit-learn` and `mitxonline` entries |
+
+**Shared with the mitxonline canary.** Since 2026-09-18 this account also holds
+`is_staff` (not superuser) on RC MITx Online, and `canary-mitxonline` signs in with it.
+Two pipelines now submit this password, so a drifted credential reaches the lockout
+below twice as fast. See `../mitxonline/README.md`.
 
 The address is a plus-address on the devops list deliberately: the domain is one MIT
 controls, so a password-reset mail can never be received by anyone else, and anything the
