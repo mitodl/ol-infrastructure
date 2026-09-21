@@ -170,6 +170,15 @@ green and a failed journey makes it red. Do not add metric pushes, Grafana alert
 Slack notifications, or Rootly incidents. This deliberately matches how most of our
 pipelines report success and failure.
 
+Two things are published, on deliberately different conditions:
+
+| What | When | Where |
+|---|---|---|
+| Traces, screenshots, video, HTML report | **failure only** | `s3://ol-eng-artifacts/canary-results/…` |
+| `results.json` — Playwright's machine-readable report | **every run** | `s3://ol-eng-artifacts/canary-runs/…` |
+
+### The failure tree
+
 Traces, screenshots and video are retained on failure into `canary-results/`. The
 pipeline collects that directory into a task output and, **on failure only**, uploads it
 to:
@@ -203,9 +212,70 @@ per-run prefix would erase exactly the history this exists to keep. Credentials
 come from the worker instance role (`env_auth = true`); `ol-eng-artifacts` is already in
 the operations Concourse IAM policy, so no secret is involved and none should be added.
 
-Green runs collect their report into the output too, but nothing is uploaded. Do not
-"fix" that by making the `put` unconditional: at a 10-minute cadence that is a
-few-hundred-KB HTML bundle 144 times a day per canary, and it buries the failures.
+Green runs collect the tree into the output too, but none of it is uploaded. Do not
+"fix" that by making *that* `put` unconditional: at a 10-minute cadence it is a
+few-hundred-KB HTML bundle plus traces 144 times a day per canary, and it buries the
+failures. What a green run does publish is the small JSON record below.
+
+### The per-run record, and why a flake needs one
+
+`results.json` is uploaded on **every** run, green included, to a separate prefix:
+
+```
+s3://ol-eng-artifacts/canary-runs/canary-<property>/<job>/<YYYYMMDDTHHMMSSZ>.json
+```
+
+One flat object per run, named for the run, so the whole history is a single
+`aws s3 ls` returning one sortable line per run. It shares its timestamp with the
+failure tree, so a red build's two records can be matched to each other.
+
+This exists because **a flake is invisible in every other record we keep**. `retries`
+is 1, so a journey that fails its first attempt and passes on the second is reported
+`flaky` and the run exits **0** — verified directly, not assumed. The build is therefore
+green, the failure-only upload publishes nothing, and Playwright's `N flaky` line lives
+only in the task log, which Concourse reaps within a handful of builds. The upshot
+before this record existed: across 1,360 builds the hard-failure rate was exactly
+knowable (99.41% green) and the flake rate was not knowable **at all**.
+
+Build duration is not a usable proxy for it, and that was measured rather than assumed —
+`npm ci`, image pull and container setup dominate wall time, so a retry does not move a
+build out of the normal 30–60s band.
+
+`results.json` carries `stats.flaky` and the per-attempt status of every test
+(`results[].status` is `["failed", "passed"]` for a flake), which is what makes the
+question answerable:
+
+```bash
+# Runs that retried a journey, over the retained history.
+aws s3 ls --recursive s3://ol-eng-artifacts/canary-runs/canary-mit-learn/ \
+  | awk '{print $4}' \
+  | while read -r key; do
+      flaky=$(aws s3 cp "s3://ol-eng-artifacts/$key" - | jq '.stats.flaky')
+      [ "$flaky" -gt 0 ] && echo "$key flaky=$flaky"
+    done
+```
+
+Four things to keep about this step:
+
+- **It is evidence, not a second result signal.** Concourse build status remains the
+  only canary result. Do not grow a metric push, Grafana alert, Mimir series or Slack
+  notification off the back of this file — that is the standing decision the whole
+  design rests on, and a JSON blob in a bucket is not a crack in it.
+- **It runs under `ensure`, not as a following step.** A step placed after the task is
+  skipped when the task fails, which is exactly the run whose record matters most. On a
+  red build `ensure` and `on_failure` both fire, so the same ~6–20KB also lands inside
+  the failure tree; that duplication buys a run history that is uniform across green and
+  red, and it is worth the few KB.
+- **`inputs` on the `put` is load-bearing.** Without it Concourse streams every artifact
+  in the plan — the multi-megabyte failure tree and the repository checkout — into the
+  put container in order to upload one small file.
+- **Neither `put` can break the canary.** When the harness dies before any test runs (a
+  bad image, a failed `npm ci`) there is no `results.json` and no tree, and both outputs
+  stay empty. That is safe because Concourse pre-creates a declared output as an empty
+  directory, and an rclone copy from an empty directory is a no-op that exits 0 —
+  verified against rclone 1.75.1. A *missing* directory would be a different story: the
+  resource's `out` script runs `ls` on the source under `set -e`. So keep the `mkdir -p`
+  that creates both directories unconditionally, and keep both as declared `outputs`.
 
 ## Validation
 

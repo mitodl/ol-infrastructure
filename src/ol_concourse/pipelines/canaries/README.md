@@ -67,10 +67,17 @@ is green in Concourse and a failed journey is red.
 
 When a run fails, its traces, screenshots and video are uploaded to
 `s3://ol-eng-artifacts/canary-results/<pipeline>/<job>/<YYYYMMDDTHHMMSSZ>/`, matched to a
-build by its start time. Green runs upload
-nothing. These artifacts help diagnose a red build; they are not another result or
-notification channel. See [`AGENTS.md`](AGENTS.md) for how to read a trace and for
-what not to change about that step.
+build by its start time. These artifacts help diagnose a red build; they are not another
+result or notification channel.
+
+Every run — green included — additionally uploads Playwright's small `results.json` to
+`s3://ol-eng-artifacts/canary-runs/<pipeline>/<job>/<YYYYMMDDTHHMMSSZ>.json`. A journey
+that fails once and passes on the retry produces a **green** build, so that record is
+the only place the fleet's flake rate survives. It is retained evidence, not a second
+result signal.
+
+See [`AGENTS.md`](AGENTS.md) for how to read a trace, how to compute the flake rate from
+the bucket, and what not to change about either step.
 
 ```bash
 cd src/ol_concourse/pipelines/canaries
