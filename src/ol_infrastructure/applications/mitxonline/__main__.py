@@ -554,10 +554,15 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
 # become OOMKills.
 #
 # Production declares 2800Mi, just under that 2838MiB 14-day admission minimum, so it
-# reserves no more than the VPA was already granting and gives a 2520MiB cap with
-# ~280MiB for the Granian master and other overhead. CI and QA keep
+# reserves no more than the VPA was already granting. CI and QA keep
 # 1200Mi: QA peaked at 988MiB working set over the same 14 days, across up to 13 pods.
 # See tk-stage-3-blocker-mitxonline-s-vpa-never-runs-at-t-cc6acf.
+#
+# Production also reserves granian_worker_startup_rss (600MiB) out of that 90% for the
+# replacement worker a planned respawn runs alongside the old one, giving a 1920MiB cap.
+# A 2520MiB cap plus a fresh worker (~430MiB container RSS 10 minutes after the
+# 2026-09-17 move to one worker) would exceed the 2838MiB admission minimum above. CI
+# and QA leave it unset: 1200Mi cannot fit it, and the cap does not trip there.
 mitxonline_web_memory_limit = mitxonline_config.get("web_memory_limit") or "1200Mi"
 mitxonline_web_memory_ceiling = "3Gi"
 
@@ -619,6 +624,7 @@ mitxonline_k8s_app = OLApplicationK8s(
             # See docs/plans/granian-configuration-overhaul.md
             blocking_threads=16,
             blocking_threads_idle_timeout=120,
+            worker_startup_rss=mitxonline_config.get_int("granian_worker_startup_rss"),
             enable_metrics=True,
             # Serve /static/* from Granian's Rust layer instead of the sidecar
             # (docs/plans/remove-nginx-sidecar.md, stage 5), same shape as

@@ -287,6 +287,22 @@ def test_keda_webapp_config_custom_behavior():
 # ─── OLApplicationK8sConfig model fields ──────────────────────────────────────
 
 
+def test_worker_startup_rss_requires_a_memory_limit():
+    with pytest.raises(ValidationError, match="no 'memory' entry"):
+        _base_config(
+            resource_limits={"cpu": "1"},
+            granian_config=GranianConfig(worker_startup_rss=600),
+        )
+
+
+def test_worker_startup_rss_with_memory_limit_is_accepted():
+    cfg = _base_config(
+        resource_limits={"memory": "3Gi"},
+        granian_config=GranianConfig(worker_startup_rss=600),
+    )
+    assert cfg.granian_config.worker_startup_rss == 600
+
+
 def test_app_config_webapp_keda_config_field():
     cfg = _base_config(
         webapp_keda_config=OLApplicationK8sKedaWebappScalingConfig(

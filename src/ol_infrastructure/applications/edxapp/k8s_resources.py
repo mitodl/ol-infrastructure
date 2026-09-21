@@ -244,6 +244,21 @@ def create_k8s_resources(  # noqa: C901
     # APISIX keepalives consume backpressure while doing no work, so CMS takes
     # DEFAULT_WSGI_BACKPRESSURE and only its threads stay pinned.
     #
+    # Installs at workers=1 also set respawn_interval and, in production,
+    # worker_startup_rss. edxapp runs Granian 2.8.x, where a worker listens only after
+    # importing the app and a planned respawn stops the old worker after
+    # respawn_interval (default 3.5s) regardless, so at one worker a short interval
+    # refuses connections until the import finishes. On 2026-09-17, mitxonline LMS
+    # pods on warm nodes went Ready 18s after container start (the first probe). On a
+    # node that had just pulled the image, a first start exceeded the 60s startup probe
+    # and its restart still refused connections 24s in. 60s covers the restart case;
+    # a respawn never runs on a node without the image. worker_startup_rss is the p95 container RSS
+    # of pods 1-5 minutes old at one worker (mitxonline LMS 1075MiB over the first 80
+    # minutes at workers=1; mitx and mitx-staging LMS and CMS 609-642MiB over 7 days),
+    # rounded up. It reserves room for the replacement worker in the derived
+    # --workers-max-rss. Not set in CI/QA, whose 2Gi limit cannot fit mitxonline
+    # LMS's value and whose low traffic keeps the cap from tripping.
+    #
     # See docs/plans/granian-configuration-overhaul.md stage 3.
     LMS_GRANIAN_HOLDING_PINS = {
         "workers": 2,
