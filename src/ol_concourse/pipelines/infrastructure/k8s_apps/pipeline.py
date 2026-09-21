@@ -1159,7 +1159,29 @@ def _build_release_image_job(
 
     release_source = Identifier("release-source")
     plan = [
-        GetStep(get=release_res.name, trigger=True),
+        # Deliberately not `trigger: true`. A `put` publishes a version of the
+        # resource, and Concourse schedules on a version it has not seen
+        # before whether that version came from a check or from a put. This
+        # job's own `action: create` put, the `action: finish` put at the end
+        # of deploy-production, and the `action: abandon` put therefore all
+        # re-triggered this job, each carrying the version just released:
+        #
+        #   create   the cut no-ops against the matching tag, but the image is
+        #            still rebuilt and re-pushed, and a digest differing from
+        #            the first build carries it back through the deploy chain
+        #   finish   fails, because the release branch has been merged back and
+        #            the commit a re-cut would tag is now the merge commit
+        #            ("Tag X already exists at <sha>, which does not match the
+        #            commit being released")
+        #   abandon  deletes the branch and the tag, so the re-cut finds no tag,
+        #            succeeds, and resurrects the abandoned release
+        #
+        # Nothing is lost by dropping the trigger. The resource is
+        # `check_every: never` with no webhook, and the release bot starts a
+        # release by checking the resource over the API and then triggering
+        # this job explicitly (see release_bot.bot._release), so the trigger
+        # could only ever fire on a put or race the bot's own build.
+        GetStep(get=release_res.name, trigger=False),
         GetStep(get=main_repo.name, trigger=False),
         LoadVarStep(
             load_var="release_version",
