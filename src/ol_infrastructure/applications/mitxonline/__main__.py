@@ -757,7 +757,14 @@ mitxonline_prefixed_oidc_resources = OLApisixOIDCResources(
         k8s_labels=k8s_app_labels,
         k8s_namespace=mitxonline_namespace,
         oidc_logout_path=f"/{api_path_prefix}/logout/oidc",
-        oidc_post_logout_redirect_uri=f"https://{api_domain}/{api_path_prefix}/logout/",
+        # The MIT Learn host, not MITx Online's own: the prefixed path only
+        # exists on the host these routes are served from, so naming api_domain
+        # here pointed the tail of the logout at
+        # api.<env>.mitxonline.mit.edu/mitxonline/logout/, which the catch-all
+        # "passauth" route proxies through unrewritten and Django answers with a
+        # 404 (verified on CI) -- so every RP-initiated logout on this group
+        # ended on an error page.
+        oidc_post_logout_redirect_uri=f"https://{learn_backend_domain}/{api_path_prefix}/logout/",
         oidc_session_absolute_timeout=60 * 20160,
         # These routes are served from MIT Learn's own host
         # (api.<env>.learn.mit.edu, see learn_api_domain below) and are what the
@@ -997,13 +1004,25 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
             backend_service_name=mitxonline_k8s_app.application_lb_service_name,
             backend_service_port=mitxonline_k8s_app.application_lb_service_port_name,
         ),
+        # Strips the trailing slash onto this group's own logout path.  It named
+        # the unprefixed "/logout/oidc", which on this host is mit-learn's
+        # plugin: the shared cookie meant the session did get destroyed, but the
+        # post-logout redirect then came from mit-learn's resource, so a user
+        # logging out of MITx Online landed on a mit-learn page and never
+        # reached the Open edX logout fan-out their own logout view performs.
+        # Their MITx Online session cookie also outlived the logout, though
+        # ApisixUserMiddleware inherits force_logout_if_no_header from
+        # RemoteUserMiddleware and drops it on the next request.
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
             hosts=[learn_api_domain],
             paths=[f"/{api_path_prefix}/logout/oidc/*"],
             plugins=[
-                OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
+                OLApisixPluginConfig(
+                    name="redirect",
+                    config={"uri": f"/{api_path_prefix}/logout/oidc"},
+                ),
                 response_rewrite_plugin_config,
                 prefixed_stale_session_cleanup,
             ],
