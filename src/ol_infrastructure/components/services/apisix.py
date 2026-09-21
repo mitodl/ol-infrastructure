@@ -293,9 +293,10 @@ def identity_header_strip_plugin(
 ) -> OLApisixPluginConfig:
     """Clear the gateway's own identity headers when a client supplies them.
 
-    The openid-connect plugin sets X-Userinfo, X-ID-Token and X-Refresh-Token
-    from a verified session, and clears any inbound copy before it does -- but
-    only on the routes it is attached to.  Every other route on an OIDC host
+    The openid-connect plugin sets X-Userinfo, X-ID-Token, X-Raw-ID-Token and
+    X-Refresh-Token from a verified session, and clears any inbound copy before
+    it does -- but only on the routes it is attached to.  Every other route on
+    an OIDC host
     forwards the client's version untouched, and mitol-apigateway's middleware
     authenticates off X-Userinfo without asking whether the gateway or the
     caller wrote it.  Two such routes exist today: mitxonline's
@@ -324,6 +325,13 @@ def identity_header_strip_plugin(
     whether or not a rewrite was asked for, so putting it in a global rule
     would re-encode the URI of every request in the cluster before each
     route's own ``proxy-rewrite`` got to it.
+
+    Each name is cleared in both its dash and its underscore spelling.  APISIX
+    runs nginx with ``underscores_in_headers on``, so ``X_Userinfo`` is a
+    header in its own right that reaches the upstream, and Django folds it onto
+    the same ``HTTP_X_USERINFO`` the middleware reads.  Clearing only the dash
+    spelling would leave the hole open under a different name -- as upstream's
+    own clear in ``openid-connect.lua`` does.
 
     :param header_names: Headers to clear.  Defaults to
         ``GATEWAY_IDENTITY_HEADERS``, which deliberately omits X-Access-Token

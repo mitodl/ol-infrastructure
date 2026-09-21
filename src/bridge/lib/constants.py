@@ -33,15 +33,23 @@ DEFAULT_OIDC_SESSION_COOKIE_NAME = "session"  # pragma: allowlist secret
 # ol_infrastructure.components.services.apisix for the cluster-wide rule that
 # covers the rest.
 #
-# X-Access-Token is *not* in this list even though openid-connect can set it:
-# Tika's route uses that header name for a client-supplied shared secret
-# (applications/tika/__main__.py) which mit-learn sends on every extraction
-# request, and no application reads it as an identity claim.  Authorization is
-# out for the same reason, on a much larger scale -- it carries real API
-# credentials on most of the fleet.
+# This is openid-connect.lua's own clear-then-set list (3.18.0, lines 1174-1177
+# and 1482-1500) minus one entry.  X-Access-Token is *not* here even though the
+# plugin sets it: Tika's route uses that header name for a client-supplied
+# shared secret (applications/tika/__main__.py) which mit-learn sends on every
+# extraction request, and no application reads it as an identity claim.
+# Authorization is out for the same reason, on a much larger scale -- it carries
+# real API credentials on most of the fleet.
+#
+# Dash spellings only.  The underscore alias of each (``X_Userinfo``) has to be
+# cleared too -- APISIX runs nginx with ``underscores_in_headers on`` and Django
+# folds both spellings onto the same ``HTTP_X_USERINFO`` -- but that is a
+# transport alias of the same header rather than a header of its own, so the
+# Lua derives it instead of it being listed here twice.
 GATEWAY_IDENTITY_HEADERS = (
     "X-Userinfo",
     "X-ID-Token",
+    "X-Raw-ID-Token",
     "X-Refresh-Token",
 )
 
