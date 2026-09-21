@@ -63,6 +63,7 @@ from ol_infrastructure.components.services.k8s import (
     OLApplicationK8sCeleryBeatConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
+    OLApplicationK8sDevShellConfig,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
@@ -664,6 +665,13 @@ mitxonline_k8s_app = OLApplicationK8s(
             resource_requests={"cpu": "10m", "memory": "384Mi"},
             resource_limits={"memory": "384Mi"},
         ),
+        # A long-lived, unrouted pod in the app image for developers to run
+        # manage.py commands without being OOMKilled or scaled away. Off in CI and
+        # QA, where nothing needs a persistent shell and the memory is not free.
+        #   kubectl -n mitxonline exec -it deploy/mitxonline-dev-shell -- bash
+        dev_shell_config=OLApplicationK8sDevShellConfig()
+        if mitxonline_config.get_bool("dev_shell_enabled")
+        else None,
         resource_requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
         resource_limits={"memory": mitxonline_web_memory_limit},
         # Memory is managed vertically by the component's webapp VPA, between the
