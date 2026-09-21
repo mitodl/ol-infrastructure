@@ -1130,10 +1130,17 @@ def _build_release_image_job(
     build_target: str | None = None,
     sentry_sourcemaps: SentrySourcemapsConfig | None = None,
 ) -> Job:
-    """Generate an image build job triggered by the release resource.
+    """Generate the release image build job for an app.
+
+    Nothing schedules this job: the release bot checks the release resource
+    and then triggers the job explicitly, and a hotfix takes the same path
+    with the commit to cherry-pick carried in the resource's ``hotfix`` file,
+    since triggering a job carries no parameters.  Checking the resource does
+    not start a build, and neither does a `put` to it -- see the comment on
+    the first get for why that matters.
 
     This job:
-    1. Gets the release resource (trigger) and main repo source.
+    1. Gets the release resource and main repo source.
     2. Bumps the version in the app source using bumpver.
     3. Creates the release commit, branch, and tag via the release resource.
     4. Builds and pushes a versioned Docker image to DockerHub and ECR.
