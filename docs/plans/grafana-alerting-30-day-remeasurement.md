@@ -8,9 +8,12 @@ Sequence and workstream numbering: [grafana-alerting-remediation-spec.md](grafan
 
 The remediation spec gates the ML pilot (W7) on "W0-W4 landing and a 30-day clean
 measurement", and W6 asks for the analysis's measurement queries to be re-run 30 days
-after W3. W3 landed 2026-08-24, so that window has now closed. This is that measurement.
+after W3. W3 merged as [#5503](https://github.com/mitodl/ol-infrastructure/pull/5503) on
+2026-08-18, so that window has now closed. This is that measurement.
 
-All counts are measured. Sources: the production Grafana alert state history
+Counts are measured unless stated otherwise; the ML series footprint in §5 is the one
+figure that is a sample-based estimate, and it is labelled there. Sources: the production
+Grafana alert state history
 (`grafanacloud-alert-state-history`), the Rootly alert API, the production and QA
 `grafana-ml-app` job APIs, and the production ML metrics tenant.
 
@@ -48,13 +51,22 @@ page indices bracketing it at `page_size=1`. Binary-searching for the boundary d
 | Page | `created_at` |
 |---:|---|
 | 1 | 2026-09-21 |
+| 600 | 2026-08-24 |
 | 625 | 2026-08-22 |
+| 660 | 2026-08-18 |
+| 700 | 2026-08-17 |
+| 1100 | 2026-08-09 |
 | 1180 | 2026-08-07 |
 | 2629 | 2026-07-10 |
 
-Page 2629 − page 1180 = **1,449**, which reproduces the analysis's published baseline
-exactly, over the same window. The method is sound, so the 625 above can be trusted on
-the same footing as the number it is being compared against.
+Page 2629 − page 1180 = 1,449, which reproduces the analysis's published baseline
+exactly, over the same window. The method is sound, so the current figure can be trusted
+on the same footing as the number it is being compared against.
+
+Applying the same subtraction to the current window gives 625 − 1 = 624. The tables above
+say 625, which is the page index rather than the difference; the one-alert discrepancy is
+below the resolution of the boundary probes and changes nothing, but the two halves of
+the comparison should use the same convention and this one does not.
 
 ---
 
@@ -67,19 +79,25 @@ in that window.
 |---|---:|---:|---|
 | `PodOOMKilledCritical` | 195 | 43 | −78% |
 | `HPAAtMaxReplicasCritical` | 278 | 254 | −9% |
-| `PodCrashLoopingCritical` | 52 | **849** | **+1,533%** |
+| `PodCrashLoopingCritical` | 52 | 849 | _+1,533%_ |
 | `DeploymentUnavailableCritical` | 26 | 0 | gone |
 | `StatefulSetReplicasMissingCritical` | 22 | 7 | −68% |
-| `KubernetesJobFailedCritical` → `WorkloadJobFailedCritical` | 11 | 102 | renamed in W3 |
 | `HTTPRequestDurationTooHighAvg [5m]` | 1,168 | 480 | still plugin-owned, still dropped |
 | `ProbeFailedExecutionsTooHigh [5m]` | 55 | 7 | still dropped |
+
+`KubernetesJobFailedCritical` (11 at the baseline) is deliberately left out of that table.
+It became `WorkloadJobFailedCritical`, now at 102, but the rename was
+[#5457](https://github.com/mitodl/ol-infrastructure/pull/5457) rather than W3, and
+[#5496](https://github.com/mitodl/ol-infrastructure/pull/5496) re-keyed the expression
+onto `kube_job_failed` in place of a failed-pod count. A rule whose query changed cannot
+be put in a before/after firings table; 11 and 102 are not the same measurement.
 
 New since the baseline:
 
 | Rule | Now | Note |
 |---|---:|---|
 | `APISIXEdge5xxRateFast` | 476 | W4 coverage, working as designed |
-| `DagsterPgBouncerConnectionChurnCritical` | 458 | |
+| `DagsterPgBouncerConnectionChurnCritical` | 458 | rule deleted 2026-09-19 by #5945, two days before this measurement |
 | `DiskUsageCritical` | 148 | see §4 |
 | `APISIXOIDCCallbackFailureRateChronic` | 38 | |
 | `APISIXEdge5xxRateSlow` | 31 | |
@@ -91,8 +109,8 @@ is a broken workload rather than a rule that was missed.
 
 Firing counts are alert-instance state transitions, not Rootly
 deliveries: 849 `PodCrashLooping` transitions against 625 total Rootly alerts from all
-sources and all three stacks, so grouping is absorbing most of them. The two are
-different units and should not be subtracted from each other.
+sources and all three stacks, so most transitions cannot have become pages. The two are
+different units and should not be subtracted from or divided by each other.
 
 ---
 
@@ -114,10 +132,10 @@ Everything else on the stack accounts for the remaining 19, down from 52 at the 
 `superset-mcp` alone is 710 across four pod names and two ReplicaSets, and it is still
 crashlooping: 231 firings in the three days to 2026-09-21.
 
-It cannot have been a contributor at the baseline, because the entire rule fired 52 times
-in that window. So this is a workload that broke during the measurement period and has
-stayed broken for at least 30 days without anyone acting on it, which is a `superset-mcp`
-problem rather than an alerting one.
+Its baseline contribution is bounded at 52, since that is what the whole rule fired, and
+all four pod names and both ReplicaSets postdate that window, so none of these instances
+existed then. This is a workload that broke during the measurement period and has stayed
+broken since, which is a `superset-mcp` problem rather than an alerting one.
 
 W3 did treat this rule. [#5503](https://github.com/mitodl/ol-infrastructure/pull/5503)
 gave `PodOOMKilled*` and `PodCrashLooping*` the same `keep_firing_for="30m"` and
@@ -126,9 +144,11 @@ gave `PodOOMKilled*` and `PodCrashLooping*` the same `keep_firing_for="30m"` and
 namespace level with `group_interval=30m` / `repeat_interval=12h`. Both halves of the fix
 cover both rules.
 
-The grouping half is demonstrably working: 849 firings on this rule against 625 Rootly
-alerts from every source and all three stacks, so the great majority of these transitions
-never became a page.
+The grouping half is doing something: 849 firings on this rule against 625 Rootly alerts
+from every source and all three stacks, so most of these transitions cannot have become
+pages. That bounds the effect rather than isolating it to the new policy branch. Counting
+Rootly alerts carrying `alertname=PodCrashLoopingCritical` would settle it directly and
+has not been done.
 
 ### The open question
 
@@ -161,10 +181,9 @@ underlying device, so one worker filling up produces one alert per volume presen
 time. The underlying disk pressure is real and already tracked separately (PR #5933
 resizes the infra workers 300GB → 1000GB); the alerting shape is the defect here.
 
-Unlike §3, this one is a rule defect rather than a broken workload. `linux_host.py` was
-explicitly out of scope for W3, which was "scoped to `metric_rules/eks_general.py` only"
-per #5503's own commit message, so this rule has had none of the storm treatment applied
-to it.
+Unlike §3, this one is a rule defect rather than a broken workload. #5503 named
+`linux_host.py` among the files still needing the same treatment, and the file carries no
+`keep_firing_for` today, so this rule has had none of the storm work applied to it.
 
 ---
 
@@ -172,12 +191,12 @@ to it.
 
 | | Baseline | Now |
 |---|---:|---:|
-| Forecast jobs, production | 5 | **34** |
-| Forecast jobs, QA | 5 | **31** |
+| Forecast jobs, production | 5 | 34 |
+| Forecast jobs, QA | 5 | 31 |
 | Forecast jobs, CI | — | 0 |
-| Outlier detectors, anywhere | 0 | **0** |
-| Hand-created jobs of any kind | 0 | **0** |
-| Production firings, 30d | 2,812 | **10,138** |
+| Outlier detectors, anywhere | 0 | 0 |
+| Hand-created jobs of any kind | 0 | 0 |
+| Production firings, 30d | 2,812 | 10,138 |
 
 Every one of the 65 jobs was auto-created by the Adaptive Traces plugin, and every one
 carries identical untuned hyperparameters: `growth: flat`, `daily_seasonality: 10`,
@@ -193,9 +212,15 @@ longer even the worst. The plugin added 29 production jobs in six weeks without 
 asking it to, which is the strongest available argument for not letting the vendor decide
 what the ML surface is.
 
-None of this reaches a human, and the volume confirms it independently: 10,138 ML firings
-against 625 total Rootly alerts from every source. Routed as-is, ML would not triple page
-volume as the analysis estimated, it would multiply it by roughly sixteen.
+None of this reaches a human. The analysis estimated that routing ML unchanged would
+roughly triple page volume, on five jobs firing 2,812 times. At 10,138 firings the same
+arithmetic gives something closer to an order of magnitude. Do not read that as a ratio
+against the 625 Rootly alerts above: §2 says firings and deliveries are different units,
+and that applies here too. Grouping would absorb some unknown share of 10,138 exactly as
+it absorbs `PodCrashLooping`. The honest statement is that the untuned ML surface
+generates more than sixteen times as many firings as the entire human-facing alerting
+estate produces deliveries, and nobody has measured what fraction would survive grouping,
+because it has never been routed.
 
 ### Billable footprint, for the quote
 
@@ -221,11 +246,11 @@ needs 102 individual queries. For scale, the main metrics tenant bills 945,441 s
 
 ## 6. What this means for W7
 
-**The gate is met.** W0-W5 landed, volume is down 57%, the duplicate pipeline is gone,
+_The gate is met._ W0-W5 landed, volume is down 57%, the duplicate pipeline is gone,
 and the severity split is in place. There is a clean 30-day before/after.
 
-**The pilot as specified is now the wrong next action.** Both the analysis (§6.6) and the
-spec (W7) scope it as "add 2-3 forecast jobs, Slack only, 30 days". That was written when
+_The pilot as specified is now the wrong next action._ Both the analysis (§6, step 6) and
+the spec (W7) scope it as "add 2-3 forecast jobs, Slack only, 30 days". That was written when
 5 jobs existed. 65 exist. Adding three more to a surface nobody is managing does not
 answer the question the pilot was meant to answer, and it makes the surface worse.
 
@@ -244,12 +269,12 @@ confirmation window the auto-created ones lack, and it should be measured agains
 untuned Adaptive Traces jobs as the control group rather than against nothing.
 
 The hard caveat is unchanged and now has a second example. An anomaly model trained on
-`courses-backend` at 33% 5xx learns 33% as normal. A model trained on `superset-mcp`
+`courses-backend` learns three-requests-a-day as normal, per the spec's §0.6. A model trained on `superset-mcp`
 crashlooping for 30 continuous days learns crashlooping as normal. ML answers "did this
 change?", never "is this acceptable?" It supplements W4's absolute-level SLO alerting; it
 never replaces it.
 
-**Cost remains the blocker.** Still unquoted, and still the one thing that cannot be
+_Cost remains the blocker._ Still unquoted, and still the one thing that cannot be
 settled from inside the stack. §5 gives the footprint to quote against.
 
 ---
@@ -260,11 +285,11 @@ settled from inside the stack. §5 gives the footprint to quote against.
   This is the one with a live production impact.
 - `keep_firing_for="30m"` does not appear to be holding alerts across a churning pod the
   way #5503 intended. See §3; check it against a workload that is not also broken.
-- `DiskUsageCritical` needs a mountpoint predicate so one full Concourse worker is one
-  alert. `linux_host.py` was out of scope for W3 and has had none of the storm treatment.
-- The Rootly `noise` field is still unused. Every alert sampled in this window reads
-  `noise: null` or `not_noise`, so W6 has not started and the next tuning round will have
-  no data behind it again.
+- `DiskUsageCritical` needs to aggregate or regroup so one full Concourse worker is one
+  alert. A matcher alone will not do it; the 148 instances are distinct series. `linux_host.py` was out of scope for W3 and has had none of the storm treatment.
+- The Rootly `noise` field looks untouched. Every alert sampled in this window reads
+  `noise: null` or `not_noise`. That is a sample, not a census, but it is consistent with
+  W6 not having started.
 
 ## Appendix: queries used
 
