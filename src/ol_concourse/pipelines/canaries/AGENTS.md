@@ -240,8 +240,17 @@ docker run --rm -v /tmp/canary-run:/work -w /work \
 ```
 
 Copy the tree rather than mounting it, so the container's `npm ci` cannot overwrite the
-host `node_modules`. For a signed-in journey, pass credentials with `--env-file` rather
-than `-e`: a `-e` value is visible in the host process list.
+host `node_modules`.
+
+For a signed-in journey, export the credentials and forward the variable **names**:
+`-e CANARY_USER_EMAIL -e CANARY_USER_PASSWORD`, with no `=`. Docker copies the value
+from your environment, and `ps -eo args` shows only the name — verified both ways. Not
+`-e NAME=value`, which puts the secret in the command line and your shell history; and
+not `--env-file`, which keeps it out of `ps` only by writing it to disk in plaintext.
+
+Note that `specs/<property>` may include a signed-in journey, in which case omitting
+those two flags is not a reproduction of anything — `sign-in.ts` throws before the
+browser opens. Name an anonymous spec instead if that is all you need.
 
 WebKit is roughly twice Chromium's wall-clock on the `mit-learn` suite (6.4s against
 3.2s for the same three journeys), and that is the point — the extra time is hydration,
