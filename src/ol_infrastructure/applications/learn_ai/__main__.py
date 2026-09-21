@@ -1078,8 +1078,30 @@ learn_ai_mit_learn_oidc_resources = OLApisixOIDCResources(
         # adds organization:*, which mit-learn maps to users.User.organizations
         # via APISIX_USERDATA_MAP and reads to decide whether to skip onboarding.
         oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
-        oidc_logout_path="/logout",
-        oidc_post_logout_redirect_uri="/",
+        # Prefixed, because the openid-connect plugin matches logout_path
+        # against the un-rewritten request URI -- it runs ahead of
+        # proxy-rewrite in the rewrite phase -- and every request on this host
+        # arrives under /ai/.  An unprefixed "/logout" therefore never matched
+        # anything here, so the only logout this host could perform was the
+        # "logout-redirect" route's 302 into mit-learn's Django logout, which
+        # clears mit-learn's Django session and leaves the gateway session
+        # intact.  Same shape as mitxonline's prefixed resource.
+        oidc_logout_path="/ai/logout/oidc",
+        # mit-learn's own post-logout landing, not a learn-ai path: the session
+        # being destroyed is the shared MIT Learn one, and learn-ai has no
+        # logout view of its own (main/urls.py).  Its CustomLogoutView clears
+        # the mit-learn Django session -- which otherwise outlives the gateway
+        # session -- and sends the browser on to the Learn frontend.  Already
+        # registered on ol-mitlearn-client, since mit-learn's own resource
+        # passes the same URI.
+        oidc_post_logout_redirect_uri=f"https://{learn_api_domain}/logout/",
+        # 14 days, matching mit_learn/__main__.py.  Unset, lua-resty-session
+        # applies its compiled-in 86400 (resty/session.lua's
+        # DEFAULT_ABSOLUTE_TIMEOUT) -- and because the "reqauth" route below
+        # performs a real login that writes the *shared* cookie, a user who
+        # logged in through /ai/http/login/ got a one-day MIT Learn session
+        # while one who logged in through mit-learn got fourteen.
+        oidc_session_absolute_timeout=60 * 20160,
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
         oidc_session_cookie_domain=learn_api_domain.removeprefix("api"),
@@ -1178,21 +1200,27 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
         # mitxonline's and mit-learn's logout-redirect routes already run on --
         # while restoring the prometheus/opentelemetry/gzip this route was
         # missing.
+        #
+        # Narrowed to the plugin's logout path so only the trailing-slash
+        # variant is caught: /ai/logout/oidc itself falls through to "passauth",
+        # whose plugin holds the logout_path and performs the real logout.  No
+        # proxy-rewrite, since a matching request is answered with a 302 and
+        # never reaches the upstream -- mitxonline's and mit-learn's equivalents
+        # omit it for the same reason.
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
             shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
-                proxy_rewrite_plugin,
                 OLApisixPluginConfig(
                     name="redirect",
                     config={
-                        "uri": "/logout",  # Redirect within the rewritten path
+                        "uri": "/ai/logout/oidc",
                     },
                 ),
             ],
             hosts=[learn_api_domain],
-            paths=["/ai/logout/*"],
+            paths=["/ai/logout/oidc/*"],
             backend_service_name=learn_ai_app_k8s.application_lb_service_name,
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
