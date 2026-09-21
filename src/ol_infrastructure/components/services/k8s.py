@@ -342,16 +342,29 @@ class OLApplicationK8sScheduledJobConfig(BaseModel):
 class OLApplicationK8sDevShellConfig(BaseModel):
     """Configuration for a long-lived developer shell Deployment.
 
-    One pod running the application image with the webapp's env, secrets,
-    volumes, service account and security group, but doing nothing until a
-    developer ``kubectl exec``s into it to run ``manage.py`` commands, a Django
-    shell, or ad-hoc scripts. It exists because none of the other pods are a
-    safe place for that work: the webapp is autoscaled and VPA-evicted, celery
-    workers are KEDA-scaled to zero and sized for their task mix, and a
+    A Deployment of the application image with the webapp's env, secrets,
+    volumes, service account and security group, whose pod does nothing until
+    a developer ``kubectl exec``s into it to run ``manage.py`` commands, a
+    Django shell, or ad-hoc scripts. It exists because none of the other pods
+    are a safe place for that work: the webapp is autoscaled and VPA-evicted,
+    celery workers are KEDA-scaled to zero and sized for their task mix, and a
     pre-deploy Job is gated on the rollout. A session in any of them can be
     OOMKilled or scaled away mid-command.
 
-    What keeps a session alive here:
+    It is launch-on-request. The Deployment is created with zero replicas and
+    Pulumi ignores ``spec.replicas`` from then on, so a developer scales it up,
+    works, and scales it back down, and a deploy in between rolls the image
+    without resetting the count::
+
+        kubectl -n <ns> scale deploy/<app>-dev-shell --replicas=1
+        kubectl -n <ns> exec -it deploy/<app>-dev-shell -- bash
+        kubectl -n <ns> scale deploy/<app>-dev-shell --replicas=0
+
+    Nothing scales it down automatically. A forgotten shell holds its memory
+    request until someone notices, which is the accepted cost of not having a
+    reaper with RBAC over the Deployment.
+
+    What keeps a session alive once it is up:
 
     * Labels that match no other Deployment's selector, so no HPA, KEDA
       ScaledObject or VPA counts or resizes this pod. Do not create a VPA for
@@ -359,8 +372,8 @@ class OLApplicationK8sDevShellConfig(BaseModel):
     * No Service routes to it and it exposes no ports.
     * ``karpenter.sh/do-not-disrupt`` on the pod, so node consolidation does
       not evict it under someone.
-    * ``Recreate`` strategy and one replica, so a rollout never runs two shells
-      or waits on surge capacity.
+    * ``Recreate`` strategy, so a rollout never runs two shells or waits on
+      surge capacity.
 
     What does NOT keep a session alive, deliberately: the pod runs the same
     image as the webapp, so every application deploy rolls it. That is the
@@ -2618,7 +2631,7 @@ class OLApplicationK8s(ComponentResource):
                     labels=dev_shell_labels,
                 ),
                 spec=kubernetes.apps.v1.DeploymentSpecArgs(
-                    replicas=1,
+                    replicas=0,
                     strategy=kubernetes.apps.v1.DeploymentStrategyArgs(type="Recreate"),
                     selector=kubernetes.meta.v1.LabelSelectorArgs(
                         match_labels=dev_shell_labels,
@@ -2682,7 +2695,12 @@ class OLApplicationK8s(ComponentResource):
                         ),
                     ),
                 ),
-                opts=resource_options,
+                # replicas is the developer's knob (kubectl scale), not Pulumi's.
+                # Without this every deploy would scale a shell in use back to 0.
+                opts=ResourceOptions.merge(
+                    resource_options,
+                    ResourceOptions(ignore_changes=["spec.replicas"]),
+                ),
             )
 
         _application_pod_security_group_policy = (

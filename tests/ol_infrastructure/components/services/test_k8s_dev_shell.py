@@ -3,8 +3,9 @@
 The dev shell is a place to run manage.py commands that no autoscaler, VPA or
 node consolidation can interrupt, so these tests pin the properties that make
 it safe: it is off by default, it shares nothing with the webapp's selector,
-it is a single Recreate-strategy replica, it carries the do-not-disrupt
-annotation, and it runs the application image with the application's env.
+it is created at zero replicas with the Recreate strategy, it carries the
+do-not-disrupt annotation, and it runs the application image with the
+application's env.
 """
 
 from __future__ import annotations
@@ -109,7 +110,7 @@ def test_dev_shell_is_included_in_restart_targets():
 
 
 @pulumi.runtime.test
-def test_dev_shell_is_single_recreate_replica_no_one_else_selects():
+def test_dev_shell_starts_at_zero_recreate_no_one_else_selects():
     app = OLApplicationK8s(
         _base_config(
             application_name="shellsel",
@@ -120,7 +121,7 @@ def test_dev_shell_is_single_recreate_replica_no_one_else_selects():
 
     def check(args):
         spec, webapp_selector = args
-        assert spec["replicas"] == 1
+        assert spec["replicas"] == 0
         assert spec["strategy"]["type"] == "Recreate"
         shell_labels = spec["selector"]["match_labels"]
         assert shell_labels["ol.mit.edu/component"] == "dev-shell"

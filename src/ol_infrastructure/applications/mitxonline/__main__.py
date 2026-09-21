@@ -665,10 +665,13 @@ mitxonline_k8s_app = OLApplicationK8s(
             resource_requests={"cpu": "10m", "memory": "384Mi"},
             resource_limits={"memory": "384Mi"},
         ),
-        # A long-lived, unrouted pod in the app image for developers to run
-        # manage.py commands without being OOMKilled or scaled away. Off in CI and
-        # QA, where nothing needs a persistent shell and the memory is not free.
+        # An unrouted, launch-on-request pod in the app image for developers to
+        # run manage.py commands without being OOMKilled or scaled away. Created
+        # at 0 replicas; scale it up to use it and back down when done. Off in CI
+        # and QA, where nothing needs it.
+        #   kubectl -n mitxonline scale deploy/mitxonline-dev-shell --replicas=1
         #   kubectl -n mitxonline exec -it deploy/mitxonline-dev-shell -- bash
+        #   kubectl -n mitxonline scale deploy/mitxonline-dev-shell --replicas=0
         dev_shell_config=OLApplicationK8sDevShellConfig()
         if mitxonline_config.get_bool("dev_shell_enabled")
         else None,
