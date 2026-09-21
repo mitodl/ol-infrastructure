@@ -14,9 +14,11 @@ This module verifies:
 
 from __future__ import annotations
 
+import ast
 import asyncio
 from contextlib import contextmanager
 from dataclasses import replace
+from pathlib import Path
 
 import pulumi
 
@@ -50,9 +52,11 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixOIDCResources,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    OLApisixSharedPluginsVariant,
     OLApisixUpstream,
     OLApisixUpstreamConfig,
     oidc_gateway_pre_function_plugin,
+    ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
 )
 
@@ -931,3 +935,157 @@ def test_rate_limit_burst_fields_reject_negative(field):
             k8s_namespace="myapp-ns",
             **{field: -1},
         )
+
+
+# ─── Shared plugin variants ─────────────────────────────────────────────────────
+
+
+def learn_shaped_variants():
+    """Two variants on one host, shaped like api.learn.mit.edu's."""
+    return ol_apisix_shared_plugins_variants(
+        plugin_config=OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+            plugins=[oidc_gateway_pre_function_plugin()],
+        ),
+        variants=[
+            OLApisixSharedPluginsVariant(
+                name="test-variants-base",
+                resource_suffix="ol-shared-plugins",
+            ),
+            OLApisixSharedPluginsVariant(
+                name="test-variants-browser",
+                resource_suffix="ol-browser-shared-plugins",
+                enable_rate_limiting=True,
+            ),
+        ],
+    )
+
+
+@pulumi.runtime.test
+def test_variants_render_the_same_plugins_apart_from_rate_limiting():
+    """The whole point of the factory. Two hand-written configs on one host
+    diverge silently -- a plugin on only one of them changes behaviour by
+    request Origin, and it has shipped that way twice on api.learn. Rate
+    limiting is the one difference a variant is allowed to carry.
+    """
+    variants = learn_shaped_variants()
+    rate_limit_plugins = {"limit-conn", "limit-req"}
+
+    def check(specs):
+        base, browser = specs
+        base_names = [plugin["name"] for plugin in base["plugins"]]
+        browser_names = [
+            plugin["name"]
+            for plugin in browser["plugins"]
+            if plugin["name"] not in rate_limit_plugins
+        ]
+        assert base_names, "nothing was compared"
+        assert base_names == browser_names
+        assert rate_limit_plugins.isdisjoint(base_names)
+        assert rate_limit_plugins.issubset(
+            {plugin["name"] for plugin in browser["plugins"]}
+        )
+
+    return pulumi.Output.all(
+        variants["ol-shared-plugins"].shared_plugin_apisix_pluginconfig_resource.spec,
+        variants[
+            "ol-browser-shared-plugins"
+        ].shared_plugin_apisix_pluginconfig_resource.spec,
+    ).apply(check)
+
+
+@pulumi.runtime.test
+def test_variants_render_the_same_plugins_on_gateway_api_pluginconfig():
+    """The v1alpha1 PluginConfig is built by its own comprehension, so it needs
+    its own assertion rather than inheriting the v2 one.
+    """
+    variants = learn_shaped_variants()
+
+    def check(specs):
+        base, browser = specs
+        base_names = [plugin["name"] for plugin in base["plugins"]]
+        browser_names = [
+            plugin["name"]
+            for plugin in browser["plugins"]
+            if plugin["name"] not in {"limit-conn", "limit-req"}
+        ]
+        assert base_names, "nothing was compared"
+        assert base_names == browser_names
+
+    return pulumi.Output.all(
+        variants["ol-shared-plugins"].shared_plugin_pluginconfig_resource.spec,
+        variants["ol-browser-shared-plugins"].shared_plugin_pluginconfig_resource.spec,
+    ).apply(check)
+
+
+def test_variants_keep_distinct_crd_names():
+    """Routes reference a variant by the CRD metadata.name that
+    resource_suffix produces, so the suffix has to reach the component.
+    """
+    variants = learn_shaped_variants()
+    assert variants["ol-shared-plugins"].resource_name == "myapp-ol-shared-plugins"
+    assert (
+        variants["ol-browser-shared-plugins"].resource_name
+        == "myapp-ol-browser-shared-plugins"
+    )
+
+
+def test_variants_reject_a_duplicate_resource_suffix():
+    """Both CRDs would be created under one metadata.name and the second would
+    win, which is a silent swap of a host's plugin list.
+    """
+    with pytest.raises(ValueError, match="distinct resource_suffix"):
+        ol_apisix_shared_plugins_variants(
+            plugin_config=OLApisixSharedPluginsConfig(
+                application_name="myapp",
+                k8s_namespace="myapp-ns",
+            ),
+            variants=[
+                OLApisixSharedPluginsVariant(
+                    name="test-variants-dupe-a", resource_suffix="same"
+                ),
+                OLApisixSharedPluginsVariant(
+                    name="test-variants-dupe-b", resource_suffix="same"
+                ),
+            ],
+        )
+
+
+def test_variant_cannot_carry_its_own_plugin_list():
+    """``extra="forbid"`` is what makes the shared list structural: a
+    per-variant ``plugins`` is an error rather than a silently ignored field.
+    """
+    with pytest.raises(ValidationError):
+        OLApisixSharedPluginsVariant(
+            name="test-variant-own-plugins",
+            resource_suffix="ol-shared-plugins",
+            plugins=[oidc_gateway_pre_function_plugin()],
+        )
+
+
+def test_no_application_hand_writes_two_shared_plugin_configs():
+    """A host that needs a second shared plugin config has to go through
+    ol_apisix_shared_plugins_variants, so the plugin list is shared by
+    construction. Two direct instantiations in one program is the shape that
+    drifted twice on api.learn, and the component tests above cannot see it
+    because they only ever exercise one config at a time.
+    """
+    applications = Path(__file__).parents[4] / "src/ol_infrastructure/applications"
+    offenders = {}
+    for module in applications.rglob("*.py"):
+        tree = ast.parse(module.read_text())
+        count = sum(
+            1
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "OLApisixSharedPlugins"
+        )
+        if count > 1:
+            offenders[str(module.relative_to(applications))] = count
+    assert not offenders, (
+        "These programs build more than one OLApisixSharedPlugins directly, so "
+        "their plugin lists have to be kept in step by hand: "
+        f"{offenders}. Use ol_apisix_shared_plugins_variants instead."
+    )
