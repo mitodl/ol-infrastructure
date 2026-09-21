@@ -101,6 +101,9 @@ k8s_labels = K8sGlobalLabels(
 
 setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
 CLICKHOUSE_NAMESPACE = "clickhouse"
+# Declared for every cluster in infrastructure/aws/eks; must exist before a PVC
+# references it or the modification sits in Pending until it does.
+EBS_GP3_IOPS_3000_VAC = "ebs-gp3-iops-3000"
 # ClickHouse's conventional Prometheus port, used for both server and Keeper.
 CLICKHOUSE_METRICS_PORT = 9363
 
@@ -676,6 +679,18 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                             "spec": {
                                 "accessModes": ["ReadWriteOnce"],
                                 "storageClassName": storage_class,
+                                # ebs-gp3-sc derives IOPS from size (iopsPerGB), which
+                                # gave the 1500Gi production volumes 75,000 IOPS each
+                                # against a one-second peak under 2,000 ops/s. The class
+                                # pins them to gp3's free 3,000. The operator applies a
+                                # template VAC to existing PVCs on reconcile (0.26.0
+                                # storage-reconciler.go reconcileVolumeAttributeClass),
+                                # and the CSI driver modifies the EBS volume online.
+                                **(
+                                    {"volumeAttributesClassName": EBS_GP3_IOPS_3000_VAC}
+                                    if storage_class == "ebs-gp3-sc"
+                                    else {}
+                                ),
                                 "resources": {
                                     "requests": {
                                         "storage": hot_storage_size,

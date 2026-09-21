@@ -949,6 +949,38 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             depends_on=[ebs_csi_driver_role, *node_groups],
         ),
     )
+    # `iopsPerGB` is a ratio, so a volume large enough makes it run away: the
+    # three 1,500 GiB data-production ClickHouse volumes each carried 75,000
+    # provisioned IOPS ($360/mo apiece above the free 3,000). Over the fourteen
+    # days to 2026-09-21, ClickHouse's own one-second samples of the data device
+    # (system.asynchronous_metric_log BlockReadOps + BlockWriteOps) peaked at
+    # 1,983 ops/s combined, with p99.9 at 338 and a mean under 25; not one of the
+    # 1.28M seconds sampled exceeded 3,000. The ratio is right for the 100 GiB
+    # Meilisearch volumes it was measured against and 25x too generous for
+    # ClickHouse, whose MergeTree writes are large sequential merges, not small
+    # random I/O.
+    #
+    # This class pins a volume to gp3's included baseline regardless of size, so
+    # a workload can opt out of the ratio by name without lowering it for every
+    # other volume in the cluster. Throughput stays at the 125 MB/s default the
+    # StorageClass already provisions, so this changes only the IOPS billing line.
+    kubernetes.storage.v1.VolumeAttributesClass(
+        resource_name=f"{cluster_name}-ebs-gp3-iops-3000-volumeattributesclass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="ebs-gp3-iops-3000",
+            labels=k8s_global_labels,
+        ),
+        driver_name="ebs.csi.aws.com",
+        parameters={
+            "type": "gp3",
+            "iops": "3000",
+            "throughput": "125",
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[ebs_csi_driver_role, *node_groups],
+        ),
+    )
     aws_ebs_cni_driver_addon = eks.Addon(
         f"{cluster_name}-eks-addon-ebs-cni-driver-addon",
         cluster=cluster,
