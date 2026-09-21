@@ -141,9 +141,25 @@ TAG=v$(python3 -c "import json;print(json.load(open('package.json'))['devDepende
 docker run --rm -it --ipc=host \
   -v "$PWD":/specs -w /specs \
   -e CANARY_BASE_URL=https://rc.learn.mit.edu \
+  -e CANARY_USER_EMAIL -e CANARY_USER_PASSWORD \
   "mcr.microsoft.com/playwright:$TAG" \
-  bash -c 'npm ci && npx playwright test specs/mit-learn'
+  bash -c 'npm ci && npx playwright test specs/mit-learn --project=chromium'
 ```
+
+Two details that make this an actual reproduction rather than an approximate one:
+
+- **`--project=chromium`.** The pipeline runs Chromium alone — `CanaryParams.browsers`
+  defaults to `["chromium"]` and renders exactly one `--project` flag. The image bakes
+  in all three browsers, so omitting this runs Firefox and WebKit too: slower, and a
+  failure in a browser the canary never schedules.
+- **`-e NAME` with no `=`.** `specs/mit-learn` includes the signed-in journey, and
+  Docker does not inherit your shell's credentials on its own — without these,
+  `sign-in.ts` throws before the browser opens and you reproduce a credential error
+  rather than the pipeline failure. Export the two variables first (see the
+  [`run-canary-locally`](https://github.com/mitodl/agent-kit/blob/main/skills/process/run-canary-locally/SKILL.md)
+  skill for pulling them from SOPS). The bare form makes Docker copy the value from
+  your environment, so the secret reaches neither the process list nor a file on disk.
+  Drop both flags and name an anonymous spec instead if that is all you need.
 
 For an in-depth local workflow — credentials without risking the account lockout,
 reading a trace, running WebKit — use the
