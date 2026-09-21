@@ -1008,8 +1008,11 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
         # the unprefixed "/logout/oidc", which on this host is mit-learn's
         # plugin: the shared cookie meant the session did get destroyed, but the
         # post-logout redirect then came from mit-learn's resource, so a user
-        # logging out of MITx Online landed on a mit-learn page with the
-        # MITx Online Django session still in place.
+        # logging out of MITx Online landed on a mit-learn page and never
+        # reached the Open edX logout fan-out their own logout view performs.
+        # Their MITx Online session cookie also outlived the logout, though
+        # ApisixUserMiddleware inherits force_logout_if_no_header from
+        # RemoteUserMiddleware and drops it on the next request.
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,

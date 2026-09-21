@@ -1078,22 +1078,32 @@ learn_ai_mit_learn_oidc_resources = OLApisixOIDCResources(
         # adds organization:*, which mit-learn maps to users.User.organizations
         # via APISIX_USERDATA_MAP and reads to decide whether to skip onboarding.
         oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
-        # Prefixed, because the openid-connect plugin matches logout_path
-        # against the un-rewritten request URI -- it runs ahead of
-        # proxy-rewrite in the rewrite phase -- and every request on this host
-        # arrives under /ai/.  An unprefixed "/logout" therefore never matched
-        # anything here, so the only logout this host could perform was the
-        # "logout-redirect" route's 302 into mit-learn's Django logout, which
-        # clears mit-learn's Django session and leaves the gateway session
-        # intact.  Same shape as mitxonline's prefixed resource.
+        # Prefixed, because logout_path is compared against the un-rewritten
+        # request URI and every request on this host arrives under /ai/.  Both
+        # the plugin (openid-connect.lua reads ctx.var.request_uri) and
+        # lua-resty-openidc (ngx.var.request_uri) read the original URI, which
+        # proxy-rewrite never touches -- it sets upstream_uri -- so this holds
+        # regardless of the order the two plugins run in.  The comparison is
+        # exact string equality, which is what the "logout-redirect" route
+        # below exists to satisfy.
+        #
+        # An unprefixed "/logout" therefore never matched anything here, so
+        # learn-ai's plugin never performed a logout of its own.  What logged
+        # people out instead was a three-hop detour: "logout-redirect" 302'd to
+        # mit-learn's /logout, whose CustomLogoutView cleared the mit-learn
+        # Django session and -- seeing the gateway header still present --
+        # bounced to OIDC_LOGOUT_URL, which is mit-learn's own /logout/oidc.
+        # That did end the shared session, but by way of another application's
+        # views, and it left learn-ai's own post_logout_redirect_uri dead.
         oidc_logout_path="/ai/logout/oidc",
         # mit-learn's own post-logout landing, not a learn-ai path: the session
         # being destroyed is the shared MIT Learn one, and learn-ai has no
         # logout view of its own (main/urls.py).  Its CustomLogoutView clears
         # the mit-learn Django session -- which otherwise outlives the gateway
-        # session -- and sends the browser on to the Learn frontend.  Already
-        # registered on ol-mitlearn-client, since mit-learn's own resource
-        # passes the same URI.
+        # session -- and sends the browser on to the Learn frontend.  Keycloak
+        # accepts it: this is byte-identical to the URI mit-learn's own
+        # resource passes, and ol-mitlearn-client's end_session endpoint takes
+        # it in CI, RC and Production (an unregistered URI gets a 400 there).
         oidc_post_logout_redirect_uri=f"https://{learn_api_domain}/logout/",
         # 14 days, matching mit_learn/__main__.py.  Unset, lua-resty-session
         # applies its compiled-in 86400 (resty/session.lua's
@@ -1201,10 +1211,22 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
         # while restoring the prometheus/opentelemetry/gzip this route was
         # missing.
         #
-        # Narrowed to the plugin's logout path so only the trailing-slash
-        # variant is caught: /ai/logout/oidc itself falls through to "passauth",
-        # whose plugin holds the logout_path and performs the real logout.  No
-        # proxy-rewrite, since a matching request is answered with a 302 and
+        # Now feeds the plugin's own logout path instead of mit-learn's
+        # /logout.  Three patterns, all landing on /ai/logout/oidc: the two
+        # exact spellings a caller would use as the human-facing entry point
+        # (/ai/logout and /ai/logout/, which the old "/ai/logout/*" also
+        # covered), plus the trailing-slash variant of the plugin path itself.
+        # /ai/logout/oidc matches none of them -- a "/foo/*" pattern is a prefix
+        # match on "/foo/" and cannot match the shorter exact "/foo" -- so it
+        # falls through to "passauth", whose plugin holds the logout_path and
+        # performs the real logout.  Listing it here instead would 302 it to
+        # itself forever.
+        #
+        # Deeper paths under /ai/logout/ no longer trigger a logout, where
+        # "/ai/logout/*" swept them all in.  Deliberate: they are not endpoints,
+        # and nothing references them.
+        #
+        # No proxy-rewrite, since a matching request is answered with a 302 and
         # never reaches the upstream -- mitxonline's and mit-learn's equivalents
         # omit it for the same reason.
         OLApisixRouteConfig(
@@ -1220,7 +1242,7 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
                 ),
             ],
             hosts=[learn_api_domain],
-            paths=["/ai/logout/oidc/*"],
+            paths=["/ai/logout", "/ai/logout/", "/ai/logout/oidc/*"],
             backend_service_name=learn_ai_app_k8s.application_lb_service_name,
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
