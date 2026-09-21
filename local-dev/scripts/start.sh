@@ -109,8 +109,8 @@ elif [[ ! -f "${CLUSTER_ID_FILE}" ]]; then
 elif [[ "$(cat "${CLUSTER_ID_FILE}")" != "${live_cluster_id}" ]]; then
 	warn "This is not the cluster the Pulumi state was written against."
 	warn "  It was replaced without teardown.sh — deleted by hand, or swept up by"
-	warn "  'docker system prune', which removes stopped containers and then the"
-	warn "  anonymous volumes holding every node's data."
+	warn "  'docker system prune', which removes stopped containers and orphans"
+	warn "  the anonymous volumes holding every node's data."
 	warn "  The infra stacks will reconcile and rebuild what is missing, but the"
 	warn "  app databases in the new cluster are empty."
 	# Newest dump that is actually complete. pg-backup.sh creates its directory
