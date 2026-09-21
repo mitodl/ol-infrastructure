@@ -184,6 +184,7 @@ def create_k8s_resources(  # noqa: C901
     aws_config: AWSBase,
     cluster_stack: StackReference,
     edxapp_cache: OLAmazonCache,
+    celery_broker_cache: OLAmazonCache,
     edxapp_config: Config,
     edxapp_db: OLAmazonDB,
     edxapp_iam_policy: aws.iam.Policy,
@@ -464,6 +465,7 @@ def create_k8s_resources(  # noqa: C901
         k8s_global_labels=k8s_global_labels,
         edxapp_config=edxapp_config,
         edxapp_cache=edxapp_cache,
+        celery_broker_cache=celery_broker_cache,
         notes_stack=notes_stack,
         opensearch_hostname=opensearch_hostname,
         azure_openai_stack=azure_openai_stack,
@@ -2188,7 +2190,7 @@ def create_k8s_resources(  # noqa: C901
     # Create celery autoscaling resources (ScaledObjects for Redis-based scaling).
     # Webapp ScaledObjects are managed by the OLApplicationK8s component instances above.
     _autoscaling_resources = create_celery_autoscaling_resources(
-        edxapp_cache=edxapp_cache,
+        celery_broker_cache=celery_broker_cache,
         replicas_dict=replicas_dict,
         cms_celery_memory_request=resources_dict["celery"]["cms"]["memory_request"],
         namespace=namespace,

@@ -810,11 +810,12 @@ redis_defaults = defaults(stack_info)["redis"]
 redis_instance_type = (
     redis_config.get("instance_type") or redis_defaults["instance_type"]
 )
+redis_auth_token = read_yaml_secrets(
+    Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
+)["redis_auth_token"]
 redis_cache_config = OLAmazonRedisConfig(
     encrypt_transit=True,
-    auth_token=read_yaml_secrets(
-        Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
-    )["redis_auth_token"],
+    auth_token=redis_auth_token,
     cluster_mode_enabled=False,
     encrypted=True,
     engine="valkey",
@@ -839,6 +840,44 @@ edxapp_redis_cache = OLAmazonCache(
         aliases=[Alias(name=f"edxapp-redis-{env_name}-redis-elasticache-cluster")]
     ),
 )
+
+# The group above is the Django cache (db 0), the celery broker (db 1), and what KEDA
+# reads queue lengths from, all on one allkeys-lru instance. Under that policy celery's
+# queue lists, kombu's unacked hash and the _kombu.binding.* keys are eviction
+# candidates like any other key, so cache growth can silently delete queued work --
+# mitxonline production reached 82% of maxmemory on 2026-09-20 and is climbing ~0.38
+# GiB/day. A dedicated broker group takes db 1 off that instance and runs noeviction,
+# which fails a publish loudly rather than dropping a task.
+if edxapp_config.get_bool("dedicated_celery_broker"):
+    celery_broker_cache = OLAmazonCache(
+        OLAmazonRedisConfig(
+            encrypt_transit=True,
+            auth_token=redis_auth_token,
+            cluster_mode_enabled=False,
+            encrypted=True,
+            engine="valkey",
+            engine_version="7.2",
+            # Deliberately not redis:instance_type -- that key is sized for the cache's
+            # working set (cache.r7g.4xlarge on mitxonline production). The broker holds
+            # queue depth, which is orders of magnitude smaller.
+            instance_type=(
+                redis_config.get("broker_instance_type")
+                or redis_defaults["instance_type"]
+            ),
+            monitoring_profile_name=redis_defaults["monitoring_profile_name"],
+            num_instances=3,
+            shard_count=1,
+            auto_upgrade=True,
+            cluster_description="Redis cluster for edX platform celery broker",
+            cluster_name=f"edxapp-broker-{env_name}",
+            parameter_overrides={"maxmemory-policy": "noeviction"},
+            security_groups=[redis_cluster_security_group.id],
+            subnet_group=edxapp_vpc["elasticache_subnet"],
+            tags=aws_config.tags,
+        )
+    )
+else:
+    celery_broker_cache = edxapp_redis_cache
 
 ########################################
 # Create SES Service For edxapp Emails #
@@ -1318,6 +1357,7 @@ k8s_resources = create_k8s_resources(
     aws_config=aws_config,
     cluster_stack=cluster_stack,
     edxapp_cache=edxapp_redis_cache,
+    celery_broker_cache=celery_broker_cache,
     edxapp_config=edxapp_config,
     edxapp_db=edxapp_db,
     edxapp_iam_policy=edxapp_policy,
@@ -1334,6 +1374,7 @@ export_dict = {
     "mariadb": edxapp_db.db_instance.address,
     "redis": edxapp_redis_cache.address,
     "redis_token": edxapp_redis_cache.cache_cluster.auth_token,
+    "celery_broker": celery_broker_cache.address,
     "mfe_bucket": edxapp_mfe_bucket_name,
     "ses_configuration_set": edxapp_ses_configuration_set.name,
     "deployment": stack_info.env_prefix,

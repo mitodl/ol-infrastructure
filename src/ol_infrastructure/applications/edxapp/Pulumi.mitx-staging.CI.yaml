@@ -44,6 +44,7 @@ config:
   edxapp:canvas_base_url: https://mit.test.instructure.com
   edxapp:db_password:
     secure: "v1:ZB90id7gJ0z4NB/r:S3dGQ6OhdFOl1VdJ8cMOyLTc1L/T36F3ULUBvwMi5XOpyCbRDSyPhxb1DXZQ75DMS8R54Qa8pYE="
+  edxapp:dedicated_celery_broker: "true"
   edxapp:dns_zone: mitx
   edxapp:domains:
     lms: staging-ci.mitx.mit.edu

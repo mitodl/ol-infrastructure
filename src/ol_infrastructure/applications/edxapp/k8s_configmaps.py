@@ -98,7 +98,7 @@ def _build_interpolated_config_dict(
             edxapp_config.get("bulk_email_default_from_email")
             or edxapp_config.require("sender_email_address")
         ),
-        "CELERY_BROKER_HOSTNAME": runtime_config["redis_hostname"],
+        "CELERY_BROKER_HOSTNAME": runtime_config["celery_broker_hostname"],
         "CMS_BASE": domains["studio"],
         "CONTACT_EMAIL": edxapp_config.require("sender_email_address"),
         # Base CORS origins - canvas.mit.edu and idp.mit.edu added conditionally below
@@ -535,6 +535,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
     k8s_global_labels: dict[str, str],
     edxapp_config: Config,
     edxapp_cache: OLAmazonCache,
+    celery_broker_cache: OLAmazonCache,
     notes_stack: StackReference,
     opensearch_hostname: Output[str] | None,
     azure_openai_stack: StackReference | None = None,
@@ -547,6 +548,8 @@ def create_k8s_configmaps(  # noqa: PLR0915
         k8s_global_labels: Global Kubernetes labels
         edxapp_config: Pulumi config for edxapp
         edxapp_cache: Redis cache instance
+        celery_broker_cache: Redis instance backing the celery broker. The same
+            object as edxapp_cache unless edxapp:dedicated_celery_broker is set.
         notes_stack: StackReference for notes service
         opensearch_hostname: OpenSearch hostname, or None where the
             environment's OpenSearch domain has been retired
@@ -592,6 +595,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
     interpolated_config_name = "60-interpolated-config-yaml"
     interpolated_config_map = Output.all(
         redis_hostname=edxapp_cache.address,
+        celery_broker_hostname=celery_broker_cache.address,
         opensearch_hostname=opensearch_hostname or Output.from_input(""),
         notes_domain=notes_stack.require_output("notes_domain"),
     ).apply(

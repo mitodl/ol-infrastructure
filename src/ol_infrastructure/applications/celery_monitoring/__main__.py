@@ -72,7 +72,8 @@ setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 
 def build_broker_subscriptions(
-    project_outputs: list[tuple[str, Output[Any], int]],
+    # Runs inside Output.all(...).apply(), so the stack outputs arrive resolved.
+    project_outputs: list[tuple[str, dict[str, Any], int]],
 ) -> str:
     """Create a dict of Redis broker subscriptions for monitored Celery apps."""
     broker_subs = []
@@ -84,9 +85,17 @@ def build_broker_subscriptions(
         app_name = stack_to_app(stack)
         if app_name.endswith("mitx"):
             app_name += "live"
+        # edxapp exports celery_broker once it is deployed; it differs from `redis`
+        # only where edxapp:dedicated_celery_broker moved the broker to its own
+        # replication group. Monitoring has to follow it or it watches an empty db 1
+        # on the cache and reports no tasks. The other monitored apps (superset,
+        # ol-data-platform) export no celery_broker at all, and this stack can also
+        # run against an edxapp stack that has not deployed the new export yet, so
+        # `redis` stays the fallback.
+        broker_host = project_output.get("celery_broker") or project_output["redis"]
         broker_subs.append(
             {
-                "broker": f"rediss://default:{project_output['redis_token']}@{project_output['redis']}:6379/{redis_database_index}?ssl_cert_reqs=required",
+                "broker": f"rediss://default:{project_output['redis_token']}@{broker_host}:6379/{redis_database_index}?ssl_cert_reqs=required",
                 "broker_management_url": None,
                 "exchange": "celeryev",
                 "queue": "leek.fanout",

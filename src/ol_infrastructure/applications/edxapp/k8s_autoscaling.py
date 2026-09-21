@@ -142,7 +142,7 @@ def build_cms_webapp_keda_config(
 
 
 def create_celery_autoscaling_resources(
-    edxapp_cache: OLAmazonCache,
+    celery_broker_cache: OLAmazonCache,
     replicas_dict: dict[str, Any],
     cms_celery_memory_request: str,
     namespace: str,
@@ -201,12 +201,12 @@ def create_celery_autoscaling_resources(
                 {
                     "type": "redis",
                     "metadata": {
-                        "address": edxapp_cache.address.apply(
+                        "address": celery_broker_cache.address.apply(
                             lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
                         ),
                         "username": "default",
                         "databaseIndex": "1",
-                        "password": edxapp_cache.cache_cluster.auth_token,
+                        "password": celery_broker_cache.cache_cluster.auth_token,
                         "listName": "edx.lms.core.default",
                         "listLength": "10",
                         "enableTLS": "true",
@@ -268,12 +268,12 @@ def create_celery_autoscaling_resources(
                 {
                     "type": "redis",
                     "metadata": {
-                        "address": edxapp_cache.address.apply(
+                        "address": celery_broker_cache.address.apply(
                             lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
                         ),
                         "username": "default",
                         "databaseIndex": "1",
-                        "password": edxapp_cache.cache_cluster.auth_token,
+                        "password": celery_broker_cache.cache_cluster.auth_token,
                         "listName": "edx.lms.core.high_mem",
                         "listLength": "1",
                         "enableTLS": "true",
@@ -373,12 +373,12 @@ def create_celery_autoscaling_resources(
                 {
                     "type": "redis",
                     "metadata": {
-                        "address": edxapp_cache.address.apply(
+                        "address": celery_broker_cache.address.apply(
                             lambda addr: f"{addr}:{DEFAULT_REDIS_PORT}"
                         ),
                         "username": "default",
                         "databaseIndex": "1",
-                        "password": edxapp_cache.cache_cluster.auth_token,
+                        "password": celery_broker_cache.cache_cluster.auth_token,
                         "listName": "edx.cms.core.default",
                         "listLength": "10",
                         "enableTLS": "true",
