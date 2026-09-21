@@ -234,8 +234,12 @@ def create_mcp_servers(  # noqa: PLR0913
             # 0.0.0.0:8000``; these args are appended after it and Go stdlib flag
             # parsing lets the last occurrence win. Without the override the
             # container serves legacy SSE and the vMCP's streamable-http
-            # ``initialize`` POST fails with a 4xx. ``--endpoint-path`` defaults
-            # to ``/`` but the ToolHive proxy forwards ``/mcp`` verbatim.
+            # ``initialize`` POST fails with a 4xx. ``--endpoint-path`` is
+            # pinned rather than left to the default: the flag has defaulted to
+            # ``/mcp`` since it was added in 0.5.0, but upstream's README
+            # documented it as ``/`` as late as 0.17.0, which is where the wrong
+            # claim that used to sit here came from. Pinning it means a change
+            # to that default cannot move the endpoint out from under the proxy.
             #
             # ``--allowed-hosts *`` disables the Host-header (DNS-rebind) check
             # added in mcp-grafana 0.17.1 (upstream PR #957). That check defaults
