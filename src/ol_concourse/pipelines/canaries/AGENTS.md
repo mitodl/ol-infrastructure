@@ -230,6 +230,8 @@ pass was an artifact of the local machine:
 ```bash
 # Tag comes from package.json, the same derivation pipeline.py makes.
 TAG=v$(python3 -c "import json;print(json.load(open('package.json'))['devDependencies']['@playwright/test'])")-noble
+rm -rf /tmp/canary-run
+mkdir -p /tmp/canary-run
 rsync -a --exclude node_modules --exclude canary-results . /tmp/canary-run/
 docker run --rm -v /tmp/canary-run:/work -w /work \
   -e CANARY_BASE_URL=https://rc.learn.mit.edu \
