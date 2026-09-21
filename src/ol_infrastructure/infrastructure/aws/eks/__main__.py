@@ -981,6 +981,32 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             depends_on=[ebs_csi_driver_role, *node_groups],
         ),
     )
+    # Rollback targets for the class above, following the throughput-125 pattern:
+    # clearing volumeAttributesClassName never calls ec2:ModifyVolume, so the only
+    # way back to the geometry `iopsPerGB: 50` gave the ClickHouse data volumes is
+    # a class that states it. 75,000 is the 1,500 GiB data-production volumes;
+    # 25,000 is the 500 GiB data-qa volume. Rolling back means setting
+    # `clickhouse:data_volume_attributes_class` on that stack and applying; EBS
+    # accepts one modification per volume per six hours, so a rollback issued
+    # inside that window queues behind the change it reverts.
+    for rollback_iops in ("75000", "25000"):
+        kubernetes.storage.v1.VolumeAttributesClass(
+            resource_name=f"{cluster_name}-ebs-gp3-iops-{rollback_iops}-volumeattributesclass",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=f"ebs-gp3-iops-{rollback_iops}",
+                labels=k8s_global_labels,
+            ),
+            driver_name="ebs.csi.aws.com",
+            parameters={
+                "type": "gp3",
+                "iops": rollback_iops,
+                "throughput": "125",
+            },
+            opts=ResourceOptions(
+                provider=k8s_provider,
+                depends_on=[ebs_csi_driver_role, *node_groups],
+            ),
+        )
     aws_ebs_cni_driver_addon = eks.Addon(
         f"{cluster_name}-eks-addon-ebs-cni-driver-addon",
         cluster=cluster,
