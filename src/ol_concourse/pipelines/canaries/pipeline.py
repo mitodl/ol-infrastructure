@@ -33,6 +33,7 @@ from ol_concourse.lib.models.pipeline import (
     Resource,
     TaskConfig,
     TaskStep,
+    TryStep,
 )
 from ol_concourse.lib.resource_types import rclone
 from ol_concourse.lib.resources import git_repo, schedule
@@ -373,22 +374,40 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
                         # streams every artifact in the plan, including the
                         # failure tree and the repository checkout, into the put
                         # container to upload one small file.
-                        ensure=PutStep(
-                            put=artifact_store.name,
-                            no_get=True,
-                            inputs=[REPORT_OUTPUT],
-                            params={
-                                "source": str(REPORT_OUTPUT),
-                                "destination": [
-                                    {
-                                        "command": "copy",
-                                        "dir": (
-                                            f"s3-remote:{ARTIFACT_BUCKET}"
-                                            f"/{REPORT_PREFIX}/"
-                                        ),
-                                    }
-                                ],
-                            },
+                        #
+                        # Wrapped in `try` because Concourse propagates a hook
+                        # failure to its parent: "If the parent step succeeds
+                        # and the ensured step fails, the overall step fails."
+                        # Unwrapped, a transient rclone/S3/IAM failure uploading
+                        # this file would turn a canary that passed every
+                        # journey red -- the target would be fine and the build
+                        # would say it was not. This file is evidence, and
+                        # evidence must never be able to contradict the result
+                        # it is evidence about. Losing one run's record is the
+                        # cheaper failure by a wide margin.
+                        #
+                        # The on_failure put above is deliberately NOT wrapped:
+                        # it only runs on builds that are already red, so it
+                        # cannot change an outcome, and leaving it bare keeps a
+                        # broken artifact upload visible instead of silent.
+                        ensure=TryStep(
+                            try_=PutStep(
+                                put=artifact_store.name,
+                                no_get=True,
+                                inputs=[REPORT_OUTPUT],
+                                params={
+                                    "source": str(REPORT_OUTPUT),
+                                    "destination": [
+                                        {
+                                            "command": "copy",
+                                            "dir": (
+                                                f"s3-remote:{ARTIFACT_BUCKET}"
+                                                f"/{REPORT_PREFIX}/"
+                                            ),
+                                        }
+                                    ],
+                                },
+                            )
                         ),
                     ),
                 ],

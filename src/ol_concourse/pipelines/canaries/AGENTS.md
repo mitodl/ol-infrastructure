@@ -283,9 +283,23 @@ Four things to keep about this step:
 - **`inputs` on the `put` is load-bearing.** Without it Concourse streams every artifact
   in the plan — the multi-megabyte failure tree and the repository checkout — into the
   put container in order to upload one small file.
-- **Neither `put` can break the canary.** When the harness dies before any test runs (a
-  bad image, a failed `npm ci`) there is no `results.json` and no tree, and both outputs
-  stay empty. That is safe because Concourse pre-creates a declared output as an empty
+- **Neither `put` can break the canary — and the `ensure` one needs a `try` to keep it
+  that way.** Concourse propagates a hook failure to its parent: *"If the parent step
+  succeeds and the ensured step fails, the overall step fails"*
+  ([ensure hook docs](https://concourse-ci.org/ensure-step-hook.html)). So a bare
+  `ensure: put` would let a transient rclone/S3/IAM error turn a canary that passed
+  every journey **red** — the property fine, the build claiming otherwise. That is the
+  precise false positive this whole directory is organised against, so the `ensure` put
+  is wrapped in `try`, the same way the Sentry sourcemap upload in
+  [`../infrastructure/k8s_apps/pipeline.py`](../infrastructure/k8s_apps/pipeline.py) is.
+  Losing one run's evidence is far cheaper than evidence that can contradict the result
+  it is evidence about. **Do not unwrap it**, and do not "fix" a missing record by doing
+  so. The `on_failure` put is deliberately left bare: it only runs on builds that are
+  already red, so it cannot change an outcome, and leaving it unwrapped keeps a broken
+  artifact upload visible rather than silent.
+- **An empty output is also safe, for a different reason.** When the harness dies before
+  any test runs (a bad image, a failed `npm ci`) there is no `results.json` and no tree,
+  and both outputs stay empty. Concourse pre-creates a declared output as an empty
   directory, and an rclone copy from an empty directory is a no-op that exits 0 —
   verified against rclone 1.75.1. A *missing* directory would be a different story: the
   resource's `out` script runs `ls` on the source under `set -e`. So keep the `mkdir -p`
