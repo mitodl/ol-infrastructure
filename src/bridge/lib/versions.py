@@ -43,7 +43,7 @@ CERT_MANAGER_CHART_VERSION = "v1.21.2"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
 DAGSTER_CHART_VERSION = "1.13.23"
 # renovate: datasource=aws-eks-addon depName=aws-ebs-csi-driver versioning=aws-eks-addon
-EBS_CSI_DRIVER_VERSION = "v1.65.0-eksbuild.1"
+EBS_CSI_DRIVER_VERSION = "v1.66.0-eksbuild.1"
 # renovate: datasource=aws-eks-addon depName=aws-efs-csi-driver versioning=aws-eks-addon
 EFS_CSI_DRIVER_VERSION = "v3.4.2-eksbuild.1"
 # renovate: datasource=helm depName=external-dns packageName=external-dns registryUrl=https://kubernetes-sigs.github.io/external-dns/
