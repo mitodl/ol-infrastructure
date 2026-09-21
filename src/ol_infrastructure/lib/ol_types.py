@@ -151,7 +151,6 @@ class Services(StrEnum):
     witan = "witan"
     vector_log_proxy = "vector-log-proxy"
     xpro = "xpro"
-    xqueue = "xqueue"
     xqwatcher = "xqwatcher"
 
 
@@ -199,7 +198,6 @@ class Application(StrEnum):
     witan = "witan"
     vector_log_proxy = "vector-log-proxy"
     xpro = "xpro"
-    xqueue = "xqueue"
     xqwatcher = "xqwatcher"
 
 

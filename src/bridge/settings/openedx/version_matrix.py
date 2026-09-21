@@ -187,11 +187,6 @@ ReleaseMap: dict[
                 release="verawood",
             ),
             OpenEdxApplicationVersion(
-                application="xqueue",
-                application_type="IDA",
-                release="verawood",
-            ),
-            OpenEdxApplicationVersion(
                 application="xqwatcher",
                 application_type="IDA",
                 branch_override="master",
@@ -260,11 +255,6 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="ora-grading",
                 application_type="MFE",
-                release="verawood",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqueue",
-                application_type="IDA",
                 release="verawood",
             ),
             OpenEdxApplicationVersion(
@@ -398,11 +388,6 @@ ReleaseMap: dict[
                 release="master",
             ),
             OpenEdxApplicationVersion(
-                application="xqueue",
-                application_type="IDA",
-                release="master",
-            ),
-            OpenEdxApplicationVersion(
                 application="xqwatcher",
                 application_type="IDA",
                 release="master",
@@ -472,11 +457,6 @@ ReleaseMap: dict[
                 release="master",
             ),
             OpenEdxApplicationVersion(
-                application="xqueue",
-                application_type="IDA",
-                release="master",
-            ),
-            OpenEdxApplicationVersion(
                 application="xqwatcher",
                 application_type="IDA",
                 release="master",
@@ -543,11 +523,6 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="ora-grading",
                 application_type="MFE",
-                release="master",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqueue",
-                application_type="IDA",
                 release="master",
             ),
             OpenEdxApplicationVersion(
