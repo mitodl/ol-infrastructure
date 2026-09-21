@@ -84,6 +84,52 @@ fi
 ok "TLS certificates found."
 
 # ---------------------------------------------------------------------------
+# Is this the cluster the Pulumi state was written against?
+# ---------------------------------------------------------------------------
+# The stacks' state lives in this checkout and survives anything that happens
+# to Docker, so a cluster replaced without teardown.sh — deleted by hand, swept
+# up by `docker system prune`, lost to a WSL reset — leaves Pulumi describing a
+# cluster that no longer exists. The stacks recover on their own (both run
+# `pulumi refresh` before applying), but every database in the new cluster is
+# empty, and without a word here that reads as data quietly disappearing.
+#
+# kube-system's UID is assigned when the cluster is bootstrapped, so it changes
+# whenever the cluster does. It is stored beside the state it describes: wiping
+# .pulumi takes the recorded id with it, which is right — state that no longer
+# exists makes no claim about which cluster it belonged to.
+CLUSTER_ID_FILE="${REPO_ROOT}/local-dev/infra/.pulumi/cluster-id"
+live_cluster_id="$(kubectl get namespace kube-system -o jsonpath='{.metadata.uid}' 2>/dev/null)" || true
+
+if [[ -z "${live_cluster_id}" ]]; then
+	warn "Could not read the cluster's identity; skipping the replaced-cluster check."
+elif [[ ! -f "${CLUSTER_ID_FILE}" ]]; then
+	mkdir -p "$(dirname "${CLUSTER_ID_FILE}")"
+	echo "${live_cluster_id}" >"${CLUSTER_ID_FILE}"
+	ok "Recorded this cluster's identity."
+elif [[ "$(cat "${CLUSTER_ID_FILE}")" != "${live_cluster_id}" ]]; then
+	warn "This is not the cluster the Pulumi state was written against."
+	warn "  It was replaced without teardown.sh — deleted by hand, or swept up by"
+	warn "  'docker system prune', which removes stopped containers and then the"
+	warn "  anonymous volumes holding every node's data."
+	warn "  The infra stacks will reconcile and rebuild what is missing, but the"
+	warn "  app databases in the new cluster are empty."
+	# `|| true`: no .backups directory is the common case, and pipefail would
+	# otherwise make find's exit status abort the script mid-warning.
+	newest_backup="$(find "${REPO_ROOT}/local-dev/.backups" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort | tail -1 || true)"
+	if [[ -n "${newest_backup}" ]]; then
+		warn "  Newest dump is ${newest_backup##*/} — load it with:"
+		warn "    ./local-dev/scripts/pg-restore.sh local-dev/.backups/${newest_backup##*/}"
+	else
+		warn "  There is no dump to restore from: pg-backup.sh only runs when you"
+		warn "  run it, and a prune is never 'before' anything. Worth running"
+		warn "  ./local-dev/scripts/pg-backup.sh once there is data worth keeping."
+	fi
+	echo "${live_cluster_id}" >"${CLUSTER_ID_FILE}"
+else
+	ok "Pulumi state matches this cluster."
+fi
+
+# ---------------------------------------------------------------------------
 # Heal wedged kubelet exec/streaming (post-sleep recovery)
 # ---------------------------------------------------------------------------
 # After a Docker VM pause on Mac sleep (OrbStack or Docker Desktop), a node's kubelet exec/streaming server
