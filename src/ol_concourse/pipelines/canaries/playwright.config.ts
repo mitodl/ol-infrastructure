@@ -10,8 +10,20 @@ if (!baseURL) {
   )
 }
 
+// Which release this run was checking. The pipeline sets it from the deploy
+// marker that triggered the run (or that was current when the schedule fired);
+// a local run leaves it unset. It is recorded below rather than asserted on —
+// nothing here should branch on the release.
+const releaseRef = process.env.CANARY_RELEASE_REF || "unknown"
+
 export default defineConfig({
   testDir: "./specs",
+  // Lands in results.json as `config.metadata`, which is uploaded on every run
+  // — so the retained per-run record says which release it covered, and a flake
+  // found later can be attributed to a deploy. Concourse's build page shows the
+  // same version as the deploy-marker resource, but the build is reaped long
+  // before the bucket is.
+  metadata: { releaseRef },
   // Real networks and real logins against a live property, not a local stub.
   timeout: Number(process.env.CANARY_TIMEOUT) || 90_000,
   expect: { timeout: Number(process.env.CANARY_EXPECT_TIMEOUT) || 15_000 },

@@ -59,7 +59,20 @@ specs/<property>/      One directory per web property.
 
 `canary-meta` manages the fleet and re-sets itself. Each managed pipeline is named
 `canary-<property>` and holds a single job that pulls the stock Playwright image,
-runs `npm ci`, and runs that property's specs on a `time` trigger.
+runs `npm ci`, and runs that property's specs.
+
+That job has **two triggers**: a `time` schedule (every 10 minutes by default) and,
+where `CanaryParams.deploy_trigger` is set, a deploy to the environment it points at.
+The deploy half works through a small marker object the deploy pipeline writes to
+`s3://ol-eng-artifacts/deploy-markers/<app>/RC/<version>.json`; the version in that key
+becomes the Concourse resource version, so a canary build names the release it tested.
+See [`AGENTS.md`](AGENTS.md) for why it is a marker rather than a GitHub Deployment or a
+`passed` constraint, and [`../deploy_markers.py`](../deploy_markers.py) for the layout
+both ends share.
+
+Enabling it for a property is two edits in two files — `deploy_trigger` here and
+`publish_rc_deploy_marker=True` on the app in
+[`../infrastructure/k8s_apps/pipeline.py`](../infrastructure/k8s_apps/pipeline.py).
 
 The job's success or failure is the canary result. There is deliberately no separate
 Grafana, Slack, or Rootly notification path: like most pipelines here, a passing run

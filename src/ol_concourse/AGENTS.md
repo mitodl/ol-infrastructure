@@ -21,11 +21,32 @@ Do not redirect stdout to a file — that would mix the JSON with the fly comman
 ```
 pipelines/
   constants.py            # Pipeline-level constants (ECR_REGION, PULUMI_WATCHED_PATHS, etc.)
+  deploy_markers.py       # Cross-pipeline "a deploy finished" contract (see below)
   jobs.py                 # Top-level job factories (packer_jobs, pulumi_jobs_chain, pulumi_job)
   infrastructure/         # Platform infra pipelines (consul, vault, eks, dagster, etc.)
   applications/           # Application deployment pipelines
   canaries/               # Playwright user-journey canaries. Has its own AGENTS.md.
 ```
+
+## Making one pipeline react to another
+
+Concourse's `passed` constraint is **pipeline-local**. A job in pipeline A cannot be
+gated on a job in pipeline B, and there is no trigger-another-pipeline step. The only
+mechanism is a resource both pipelines declare.
+
+[`pipelines/deploy_markers.py`](pipelines/deploy_markers.py) is that mechanism for
+"a deploy to environment X finished": the deploying job writes a small S3 object whose
+**key contains the release version**, and the reacting pipeline watches the prefix with
+an `s3` resource. Because the s3 resource takes its version from the key, the release
+version becomes the resource version — so the triggered build names, in its own inputs,
+which release it was reacting to.
+
+If you need this, call `deploy_marker_resource()` from both ends rather than spelling
+the key layout out twice, and add `deploy_markers.py` to the watch list of both meta
+pipelines. A producer writing keys the consumer's `regexp` does not match is a silent
+failure at both ends. Today's participants are `infrastructure/k8s_apps/` (producer,
+opt-in via `AppPipelineParams.publish_rc_deploy_marker`) and `canaries/` (consumer,
+opt-in via `CanaryParams.deploy_trigger`).
 
 `pipelines/canaries/` is unlike everything else here: it holds the only
 JavaScript/TypeScript in this repository, as a self-contained Playwright project whose

@@ -52,6 +52,11 @@ from ol_concourse.pipelines.constants import (
     PULUMI_WATCHED_PATHS,
     dockerhub_ecr_image_uri,
 )
+from ol_concourse.pipelines.deploy_markers import (
+    RC_ENVIRONMENT,
+    deploy_marker_filename,
+    deploy_marker_resource,
+)
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
@@ -122,6 +127,14 @@ class AppPipelineParams(BaseModel):
             provisions Fastly resources while the Fastly API token is being
             rotated -- refresh calls the Fastly API with the old token and fails
             the whole job.
+        publish_rc_deploy_marker (bool): Whether the RC (``QA`` stack) deploy job
+            records a deploy marker in S3 once the deploy succeeds. Defaults to
+            False. Turn it on for an app whose deployed environment something
+            else needs to react to -- today that means a Playwright canary, which
+            has no other way to observe a deploy in this pipeline (Concourse's
+            ``passed`` is pipeline-local). See
+            :mod:`ol_concourse.pipelines.deploy_markers`. Costs two steps at the
+            end of one job and nothing at all when left off.
     """
 
     app_name: str
@@ -141,6 +154,7 @@ class AppPipelineParams(BaseModel):
     github_repo: str | None = None
     sentry_sourcemaps: SentrySourcemapsConfig | None = None
     refresh_stack: bool = True
+    publish_rc_deploy_marker: bool = False
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -221,7 +235,15 @@ pipeline_params = {
         refresh_stack=False,
     ),
     "learn-ai": AppPipelineParams(app_name="learn-ai", refresh_stack=False),
-    "mit-learn": AppPipelineParams(app_name="mit-learn", refresh_stack=False),
+    "mit-learn": AppPipelineParams(
+        app_name="mit-learn",
+        refresh_stack=False,
+        # Feeds the canary-mit-learn pipeline's deploy trigger, so a release to
+        # rc.learn.mit.edu runs the Playwright journeys against it immediately
+        # instead of at the next 10-minute tick. See
+        # src/ol_concourse/pipelines/canaries/AGENTS.md.
+        publish_rc_deploy_marker=True,
+    ),
     "ocw-studio": AppPipelineParams(
         app_name="ocw-studio",
         repo_main_branch=app_repo_main_branch("ocw-studio"),
@@ -305,6 +327,102 @@ def _fastly_purge_params(purge_scope: str) -> dict[str, str]:
     if purge_scope == "purge_all":
         return {"mode": "purge_all"}
     return {"mode": "surrogate_key", "surrogate_key": purge_scope}
+
+
+def _rc_deploy_marker_steps(
+    app_name: str, marker_resource: Resource
+) -> list[GetStep | PutStep | TaskStep]:
+    """Return the post-deploy steps that record an RC deploy marker.
+
+    Appended to the **QA** stage's ``additional_post_steps``, so they run after
+    the ``pulumi up`` put and only when it succeeded -- an aborted or failed
+    deploy records nothing, which is what makes a marker mean "this version is
+    serving on RC" rather than "this version was attempted".
+
+    The release version comes from ``((.:image_tag))``, which both pipeline
+    shapes already load into the QA job: the legacy shape from the RC image's
+    ``tag`` file, the release-resource shape from the release resource's
+    ``version`` file. Either way it is the authoritative calver for the release,
+    which is the identity the consumer needs.
+
+    Two steps rather than one because an ``s3`` ``put`` uploads a file that must
+    already exist and must already be *named* for the version -- the resource
+    derives the object key from the file name, and there is no way to
+    interpolate a var into a ``put`` destination.
+
+    :param app_name: Application name, recorded in the marker body.
+    :param marker_resource: The resource from
+        :func:`~ol_concourse.pipelines.deploy_markers.deploy_marker_resource`.
+    :returns: A task that writes the marker and a put that uploads it.
+    """
+    # Deliberately NOT the resource's own name. A `put` step and a task output
+    # share one artifact namespace in a build plan, and `inputs` on the put
+    # below refers to the artifact -- giving both the same name works only
+    # because `no_get` happens to suppress the implicit get, which is a
+    # coincidence to not depend on. One marker resource exists per pipeline, so
+    # an unqualified name is unambiguous.
+    marker_output = Identifier("rc-deploy-marker-file")
+    # $RELEASE_VERSION rather than a rendered literal: the version is only known
+    # at build time. The emptiness check is not defensive padding -- an
+    # unresolved var would otherwise write a file named ".json", which the
+    # consumer's regexp does not match, so the marker would upload cleanly and
+    # trigger nothing, with a green build at both ends.
+    write_marker = "\n".join(
+        [
+            "set -eu",
+            'if [ -z "${RELEASE_VERSION:-}" ]; then',
+            '  echo "RELEASE_VERSION is empty; refusing to write an unversioned '
+            'deploy marker." >&2',
+            "  exit 1",
+            "fi",
+            f'marker="{marker_output}/${{RELEASE_VERSION}}.json"',
+            # Body is for a human reading the object; the version that actually
+            # drives anything is the one in the key. Kept deliberately small and
+            # free of BUILD_* metadata, which task containers on this Concourse
+            # do not get (verified against cicd.odl.mit.edu).
+            'cat > "$marker" <<EOF',
+            "{",
+            f'  "app": "{app_name}",',
+            f'  "environment": "{RC_ENVIRONMENT}",',
+            '  "version": "$RELEASE_VERSION",',
+            '  "deployed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"',
+            "}",
+            "EOF",
+            'cat "$marker"',
+        ]
+    )
+    return [
+        TaskStep(
+            task=Identifier(f"write-{app_name}-rc-deploy-marker"),
+            config=TaskConfig(
+                platform=Platform.linux,
+                # Plain alpine through the ECR pull-through cache, matching
+                # _ensure_ecr_repository_step: this needs `sh` and `date` and
+                # nothing else, and routing it through the cache keeps it off
+                # Docker Hub's anonymous pull limit.
+                image_resource=AnonymousResource(
+                    type=REGISTRY_IMAGE,
+                    source={
+                        "repository": dockerhub_ecr_image_uri("alpine"),
+                        "tag": "latest",
+                        "aws_region": ECR_REGION,
+                    },
+                ),
+                outputs=[Output(name=marker_output)],
+                params={"RELEASE_VERSION": "((.:image_tag))"},
+                run=Command(path="sh", args=["-c", write_marker]),
+            ),
+        ),
+        PutStep(
+            put=marker_resource.name,
+            no_get=True,
+            # Without this the whole plan -- the ol-infrastructure checkout and
+            # every image artifact -- is streamed into the put container to
+            # upload a 150-byte file.
+            inputs=[marker_output],
+            params={"file": f"{marker_output}/{deploy_marker_filename('*')}"},
+        ),
+    ]
 
 
 def _ensure_ecr_repository_step(
@@ -773,6 +891,21 @@ def _build_legacy_app_pipeline(
         )
         additional_post_steps = {0: qa_purge_steps, 1: prod_purge_steps}
 
+    # Index 0 is the QA stack, which is the RC environment. Appended after any
+    # Fastly purge above on purpose: the marker announces "RC is serving this
+    # version", and a canary that reacts to it before the edge cache has been
+    # purged would be testing the previous release through Fastly.
+    rc_deploy_marker: Resource | None = None
+    if pipeline_parameters.publish_rc_deploy_marker:
+        rc_deploy_marker = deploy_marker_resource(
+            name=Identifier(f"{app_name}-rc-deploy-marker"),
+            app_name=app_name,
+            environment=RC_ENVIRONMENT,
+        )
+        additional_post_steps.setdefault(0, []).extend(
+            _rc_deploy_marker_steps(app_name, rc_deploy_marker)
+        )
+
     qa_and_production_fragment = pulumi_jobs_chain(
         refresh_stack=pipeline_parameters.refresh_stack,
         pulumi_code=ol_infra_repo,
@@ -829,6 +962,7 @@ def _build_legacy_app_pipeline(
         app_rc_image,  # Needed for QA/Prod deployment trigger
         docker_ci_image,
         docker_rc_image,
+        *([rc_deploy_marker] if rc_deploy_marker is not None else []),
         *(
             [fastly_ci, fastly_qa, fastly_prod]
             if fastly_ci is not None
@@ -1447,6 +1581,23 @@ def _build_release_resource_app_pipeline(
             PutStep(put=fastly_prod.name, params=purge_params, no_get=True)
         )
 
+    # Same wiring as the legacy shape above, kept in step deliberately. No app
+    # on this shape publishes a marker today (only ol-analytics-api is on it,
+    # and it has no canary), but the flag is per-app and the migration path is
+    # per-app, so an app that gets migrated while publishing markers must not
+    # silently stop publishing them -- the canary would simply never
+    # deploy-trigger again and stay green on its schedule.
+    rc_deploy_marker: Resource | None = None
+    if pipeline_parameters.publish_rc_deploy_marker:
+        rc_deploy_marker = deploy_marker_resource(
+            name=Identifier(f"{app_name}-rc-deploy-marker"),
+            app_name=app_name,
+            environment=RC_ENVIRONMENT,
+        )
+        additional_post_steps[0].extend(
+            _rc_deploy_marker_steps(app_name, rc_deploy_marker)
+        )
+
     # QA and Production Deployments
     qa_and_production_fragment = pulumi_jobs_chain(
         refresh_stack=pipeline_parameters.refresh_stack,
@@ -1542,6 +1693,7 @@ def _build_release_resource_app_pipeline(
         app_rc_image,  # Needed for QA/Prod deployment trigger
         docker_ci_image,
         docker_rc_image,
+        *([rc_deploy_marker] if rc_deploy_marker is not None else []),
         *(
             [fastly_ci, fastly_qa, fastly_prod]
             if fastly_ci is not None

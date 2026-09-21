@@ -26,6 +26,7 @@ from ol_concourse.lib.models.pipeline import (
     Identifier,
     Input,
     Job,
+    LoadVarStep,
     Output,
     Pipeline,
     Platform,
@@ -38,6 +39,11 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resource_types import rclone
 from ol_concourse.lib.resources import git_repo, schedule
 from pydantic import BaseModel, model_validator
+
+from ol_concourse.pipelines.deploy_markers import (
+    RC_ENVIRONMENT,
+    deploy_marker_resource,
+)
 
 CANARY_DIRECTORY = Path(__file__).parent
 # Where this directory sits in a checkout, for the git resource's watched paths.
@@ -81,6 +87,12 @@ ARTIFACT_OUTPUT = Identifier("canary-results")
 REPORT_PREFIX = "canary-runs"
 REPORT_OUTPUT = Identifier("canary-report")
 
+# Surfaced to the specs and recorded into results.json via playwright.config.ts's
+# `metadata`. Exported unconditionally: a run with no deploy trigger configured
+# still names what it believes it tested, rather than leaving the field missing
+# and indistinguishable from a run that failed to resolve it.
+UNKNOWN_RELEASE_REF = "unknown"
+
 
 def playwright_image_tag(canary_directory: Path = CANARY_DIRECTORY) -> str:
     """Derive the Playwright image tag from ``package.json``'s pin.
@@ -119,6 +131,45 @@ def playwright_image_tag(canary_directory: Path = CANARY_DIRECTORY) -> str:
     return f"v{pin}-noble"
 
 
+class DeployTrigger(BaseModel):
+    """Run this property's canary when a deploy to its environment finishes.
+
+    A canary that only runs on a timer notices a bad release somewhere in the
+    next interval and cannot say which release it was testing. This adds the
+    deploy half of issue #5592's "after a new release to RC and also periodically
+    on a schedule" **without replacing the schedule** -- both feed the same job,
+    because breakage that no deploy caused is the other half of what a canary is
+    for.
+
+    The mechanism is the shared S3 deploy marker described in
+    :mod:`ol_concourse.pipelines.deploy_markers`. It is a marker rather than a
+    `passed` constraint because `passed` is pipeline-local and the deploy runs in
+    a different pipeline, and rather than the app's GitHub Deployment because the
+    ``github-deployments`` resource is put-only (``check_every: never``) and only
+    the release-resource pipeline shape creates one at all -- which ``mit-learn``,
+    on the legacy shape, does not.
+
+    The producing side is opt-in too: the app needs
+    ``AppPipelineParams.publish_rc_deploy_marker`` set in
+    ``infrastructure/k8s_apps/pipeline.py``. Setting this field without that one
+    yields a canary that keeps running on its schedule and reports
+    ``0.0.0.0`` as the release it tested -- degraded, but never stuck, which is
+    the whole reason the marker resource declares an initial version.
+
+    Attributes:
+        app_name: The application name as ``k8s_apps`` knows it, which is the
+            marker's path segment. Often but not always the canary name: a
+            property can be served by an app under a different name.
+        environment: Environment whose deploys trigger the canary. Must match the
+            environment the producer publishes under, and must be the one
+            ``CanaryParams.base_url`` points at -- a canary triggered by a
+            production deploy while pointed at RC reports on the wrong release.
+    """
+
+    app_name: str
+    environment: str = RC_ENVIRONMENT
+
+
 class CanaryParams(BaseModel):
     """One web property's canary pipeline.
 
@@ -151,6 +202,10 @@ class CanaryParams(BaseModel):
         schedule_start: Optional daily window start, ``HH:MM``.
         schedule_stop: Optional daily window end, ``HH:MM``.
         schedule_days: Optional days to run, e.g. ``["Monday"]``.
+        deploy_trigger: Optionally also run this canary when a deploy to its
+            environment finishes, in addition to the schedule. See
+            :class:`DeployTrigger`. Left unset, the canary is schedule-only and
+            nothing else about the pipeline changes.
         branch: Branch the specs are read from.
     """
 
@@ -165,6 +220,7 @@ class CanaryParams(BaseModel):
     schedule_start: str | None = None
     schedule_stop: str | None = None
     schedule_days: list[str] | None = None
+    deploy_trigger: DeployTrigger | None = None
     branch: str = "main"
 
     @model_validator(mode="after")
@@ -182,6 +238,11 @@ pipeline_params: dict[str, CanaryParams] = {
         # The Concourse credential's NAME, not a credential. Resolves from Vault at
         # secret-concourse/infrastructure/canary_mit_learn for pr-inf pipelines.
         credential_secret="canary_mit_learn",  # noqa: S106  # pragma: allowlist secret
+        # base_url above is rc.learn.mit.edu, so the trigger is RC deploys of the
+        # mit-learn app. Paired with publish_rc_deploy_marker=True on the
+        # "mit-learn" AppPipelineParams entry in
+        # infrastructure/k8s_apps/pipeline.py -- both halves are required.
+        deploy_trigger=DeployTrigger(app_name="mit-learn"),
     ),
 }
 
@@ -214,11 +275,25 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
         stop=params.schedule_stop,
         days=params.schedule_days,
     )
+    deploy_marker: Resource | None = None
+    if params.deploy_trigger:
+        deploy_marker = deploy_marker_resource(
+            name=Identifier("deploy-marker"),
+            app_name=params.deploy_trigger.app_name,
+            environment=params.deploy_trigger.environment,
+        )
 
     task_params: dict[str, Any] = {
         "CANARY_BASE_URL": params.base_url,
         "CANARY_TIMEOUT": str(params.timeout),
         "CANARY_EXPECT_TIMEOUT": str(params.expect_timeout),
+        # Recorded into results.json by playwright.config.ts, so the retained
+        # per-run record says which release it covered. Concourse's own build
+        # page shows the same thing as the deploy-marker resource version; this
+        # carries it into the artifact, which outlives the build.
+        "CANARY_RELEASE_REF": (
+            "((.:release_ref))" if deploy_marker else UNKNOWN_RELEASE_REF
+        ),
     }
     if params.credential_secret:
         # Resolved by Concourse's Vault credential manager at task start, so the
@@ -301,9 +376,44 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
         },
     )
 
+    # The deploy trigger is a second trigger on the *same* job, not a second
+    # job. Two jobs would need a serial_group to stop a deploy-triggered run and
+    # a scheduled run hitting the property at once, and would split the run
+    # history -- including the flake record -- across two places. One job with
+    # max_in_flight=1 already queues them, so a deploy landing mid-run runs the
+    # canary again straight afterwards rather than interleaving with it.
+    #
+    # This also means the marker is an input to *every* run, scheduled ones
+    # included, so each run names the release it found deployed. That is only
+    # safe because the marker resource declares an initial version: a plain
+    # `get` on a resource with no versions never becomes schedulable, which
+    # would have silently stopped the scheduled runs too.
+    trigger_steps: list[GetStep] = [
+        GetStep(get=canary_schedule.name, trigger=True),
+        GetStep(get=canary_code.name, trigger=True),
+    ]
+    release_ref_steps: list[LoadVarStep] = []
+    if deploy_marker:
+        trigger_steps.append(GetStep(get=deploy_marker.name, trigger=True))
+        release_ref_steps.append(
+            # `version` is written by the s3 resource's `in` and holds the
+            # version captured from the object key -- the release calver, or
+            # INITIAL_MARKER_VERSION before the app has ever published a marker.
+            LoadVarStep(
+                load_var="release_ref",
+                file=f"{deploy_marker.name}/version",
+                reveal=True,
+            )
+        )
+
     return Pipeline(
         resource_types=[rclone()],
-        resources=[canary_code, canary_schedule, artifact_store],
+        resources=[
+            canary_code,
+            canary_schedule,
+            artifact_store,
+            *([deploy_marker] if deploy_marker else []),
+        ],
         jobs=[
             Job(
                 name=canary_job,
@@ -311,8 +421,8 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
                 # is also still loading, and the failures interleave.
                 max_in_flight=1,
                 plan=[
-                    GetStep(get=canary_schedule.name, trigger=True),
-                    GetStep(get=canary_code.name, trigger=True),
+                    *trigger_steps,
+                    *release_ref_steps,
                     TaskStep(
                         task=Identifier(f"run-{params.canary_name}-journeys"),
                         config=TaskConfig(

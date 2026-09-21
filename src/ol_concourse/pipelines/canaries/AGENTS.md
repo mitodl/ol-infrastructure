@@ -177,6 +177,90 @@ downloads none.
   page is slower to hydrate. Chromium passed it every time, which is what this class of
   bug looks like right up until the target has a bad day.
 
+## What triggers a run
+
+Two things, feeding **one job**:
+
+| Trigger | Resource | Set by |
+|---|---|---|
+| Schedule | `canary-schedule` (`time`) | `CanaryParams.schedule_interval`, default 10m |
+| RC deploy | `deploy-marker` (`s3`) | `CanaryParams.deploy_trigger` |
+
+Issue #5592 asked for both — "after a new release to RC and also periodically on a
+schedule" — and they answer different questions. The schedule catches breakage no
+deploy caused (an expired certificate, an upstream outage, a Keycloak change). The
+deploy trigger catches a bad release *now* rather than up to ten minutes later, and
+is what lets a run be attributed to the release it tested.
+
+### Why a marker in S3 and not something better
+
+The canary runs in `canary-<property>`; the deploy runs in `<app>-pipeline`. Concourse's
+`passed` constraint is **pipeline-local**, and there is no trigger-another-pipeline
+primitive, so the only way one pipeline observes the other is a resource both can see.
+The alternatives were considered and rejected for concrete reasons, not taste:
+
+- **The app's GitHub Deployment.** The natural fit — it already records "version X is on
+  RC" — but `github_deployment()` is a **put-only** resource pinned to
+  `check_every: never`, so it emits no versions to trigger on. It is also only created
+  by the *release-resource* pipeline shape, which `mit-learn` is not on: as of this
+  writing only `ol-analytics-api` sets `AppRegistration.release_resource_workflow`.
+  There is no GitHub Deployment for mit-learn to watch.
+- **The `mitodl/mit-learn-app` registry image.** Triggers when the image is *built*,
+  which is before it is deployed. The canary would test the previous release and
+  attribute the result to the new one — worse than not triggering at all.
+- **A `fly trigger-job` task in the deploy pipeline.** Needs Concourse credentials in
+  the deploy pipeline and produces a build with no input identifying what it tested.
+
+So: the RC deploy job writes
+`s3://ol-eng-artifacts/deploy-markers/<app>/RC/<version>.json` and the canary watches
+that prefix. The **version is in the object key, not just the body**, because that is
+where Concourse's `s3` resource reads a version from — which makes the release calver
+the *resource version*, visible on the canary's build page and in its inputs. A marker
+carrying the version only in its body would trigger builds that could not be attributed
+to anything, which is precisely what the production-gating work downstream needs.
+
+The key layout lives in one place, [`../deploy_markers.py`](../deploy_markers.py), and
+both ends build the resource from `deploy_marker_resource()`. **Do not hand-roll either
+end.** A producer writing keys the consumer's `regexp` no longer matches fails silently
+at both ends: the deploy stays green, and the canary just quietly stops
+deploy-triggering while continuing to pass on its schedule. Both meta pipelines watch
+that file so a layout change re-renders them together.
+
+### Both halves are required
+
+Onboarding a deploy trigger is two edits in two files:
+
+1. `CanaryParams.deploy_trigger=DeployTrigger(app_name="<app>")` here, and
+2. `publish_rc_deploy_marker=True` on that app's `AppPipelineParams` in
+   [`../infrastructure/k8s_apps/pipeline.py`](../infrastructure/k8s_apps/pipeline.py).
+
+Setting only the first gives a canary that still runs on schedule and reports `0.0.0.0`
+as the release it tested. That is degraded but **not stuck**, which is deliberate: the
+marker resource declares an `initial_path`/`initial_version`, so it always has a version
+to resolve. Without that, a `get` on a resource that has never had a version never
+becomes schedulable — and because both triggers feed one job, that would have stopped
+the *scheduled* runs too. If you add a marker-backed trigger anywhere else, keep the
+initial version.
+
+### Concurrency
+
+One job with `max_in_flight=1`, not two jobs. A deploy landing mid-run queues a second
+run behind the first rather than interleaving with it, so the property never has two
+canaries on it at once and no `serial_group` is needed. Two jobs would have needed one,
+and would also have split the run history — including the flake record below — across
+two places.
+
+The marker is an input to *every* run, scheduled ones included, so each run names the
+release it found deployed rather than only deploy-triggered ones doing so.
+
+### Ordering against the Fastly purge
+
+The marker `put` is appended **after** any Fastly purge in the same job. A canary that
+woke up before the edge cache was purged would be testing the previous release through
+Fastly and reporting it against the new version. If you add another post-deploy step
+that has to complete before the property is really serving the new release, put it
+before the marker steps.
+
 ## Result and failure artifacts
 
 Concourse build status is the sole canary result: a passing journey makes the build
@@ -190,6 +274,20 @@ Two things are published, on deliberately different conditions:
 |---|---|---|
 | Traces, screenshots, video, HTML report | **failure only** | `s3://ol-eng-artifacts/canary-results/…` |
 | `results.json` — Playwright's machine-readable report | **every run** | `s3://ol-eng-artifacts/canary-runs/…` |
+
+The release under test is carried into `results.json` as `config.metadata.releaseRef`,
+set from `CANARY_RELEASE_REF` in `playwright.config.ts`. Concourse's build page shows
+the same version as the `deploy-marker` resource, but builds are reaped within a handful
+of runs and the bucket is not — so the retained record is the only place a flake found
+weeks later can still be attributed to a release:
+
+```bash
+aws s3 cp s3://ol-eng-artifacts/canary-runs/canary-mit-learn/run-mit-learn-canary/<stamp>.json - \
+  | jq '{release: .config.metadata.releaseRef, flaky: .stats.flaky}'
+```
+
+It reads `unknown` for a canary with no `deploy_trigger`, and `0.0.0.0` before the app
+has ever published a marker. Nothing in a spec should branch on it.
 
 ### The failure tree
 

@@ -74,6 +74,12 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
             "src/ol_concourse/pipelines/constants.py",
             "src/ol_concourse/pipelines/jobs.py",
             "src/ol_concourse/pipelines/secrets_map.py",
+            # The deploy-marker key layout is a contract shared with the canary
+            # meta pipeline, which watches this same file. A change to it has to
+            # re-render both sides together or the producer writes keys the
+            # consumer's regexp no longer matches -- a failure with no red build
+            # at either end.
+            "src/ol_concourse/pipelines/deploy_markers.py",
             # build_app_pipeline reads AppRegistration.release_resource_workflow
             # from here to choose the pipeline shape, so a registry-only edit
             # has to regenerate. Without this the documented one-field rollout

@@ -123,6 +123,12 @@ def meta_pipeline(canary_names: list[str]) -> Pipeline:
         paths=[
             f"{CANARY_REPO_PATH}/",
             "src/ol_concourse/pipelines/constants.py",
+            # The deploy-marker key layout, shared with the k8s_apps meta
+            # pipeline, which watches this same file. Both sides have to
+            # re-render together: a producer writing keys the consumer's regexp
+            # no longer matches fails silently at both ends -- the canary just
+            # stops deploy-triggering and keeps passing on its schedule.
+            "src/ol_concourse/pipelines/deploy_markers.py",
             "pyproject.toml",
         ],
     )
