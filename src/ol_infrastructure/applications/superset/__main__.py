@@ -912,7 +912,11 @@ export(
     {
         "deployment": "superset",
         "redis": superset_redis_cache.address,
-        "redis_token": redis_auth_token,
+        # The provider output, not the raw redis_auth_token string. pulumi_aws
+        # wraps ReplicationGroup.auth_token in Output.secret(), so this is masked
+        # in the Outputs: block and encrypted in state. Exporting the plain str
+        # printed the live token in every CI, QA and Production build.
+        "redis_token": superset_redis_cache.cache_cluster.auth_token,
         "db_host": superset_db.db_instance.address,
         "db_resource_id": superset_db.db_instance.resource_id,
         "url": Output.from_input(superset_domain).apply(lambda d: f"https://{d}"),
