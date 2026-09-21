@@ -113,16 +113,20 @@ elif [[ "$(cat "${CLUSTER_ID_FILE}")" != "${live_cluster_id}" ]]; then
 	warn "  anonymous volumes holding every node's data."
 	warn "  The infra stacks will reconcile and rebuild what is missing, but the"
 	warn "  app databases in the new cluster are empty."
-	# Newest dump that pg-restore.sh will actually accept. pg-backup.sh creates
-	# its directory up front and appends to manifest.txt per database, so an
-	# interrupted run leaves one behind that restore refuses; it checks the
-	# manifest's line count against the number of dumps, and so do we rather
-	# than naming a directory that cannot be restored.
+	# Newest dump that is actually complete. pg-backup.sh creates its directory
+	# up front, so an interrupted run leaves one behind. Two checks, because
+	# either alone lets a partial through: keycloak-users.json is the last
+	# artifact the script writes, so it stands in for "the dump loop finished"
+	# — the loop appends each manifest line only after mv-ing that database's
+	# .dump into place, which keeps the counts consistent on a prefix — and the
+	# manifest line count against the number of dumps is the same check
+	# pg-restore.sh makes before it will load anything.
 	# `|| true`: no .backups directory is the common case, and pipefail would
 	# otherwise make find's exit status abort the script mid-warning.
 	newest_backup=""
 	while read -r candidate; do
 		[[ -n "${candidate}" && -f "${candidate}/manifest.txt" ]] || continue
+		[[ -s "${candidate}/keycloak-users.json" ]] || continue
 		listed="$(wc -l <"${candidate}/manifest.txt" | tr -d ' ')"
 		dumps="$(find "${candidate}" -maxdepth 1 -name '*.dump' | wc -l | tr -d ' ')"
 		if [[ "${listed}" == "${dumps}" && "${dumps}" != "0" ]]; then
