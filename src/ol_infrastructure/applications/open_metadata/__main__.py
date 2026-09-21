@@ -656,7 +656,14 @@ open_metadata_application = kubernetes.helm.v3.Release(
                             # discoveryUri loaded from vault via OIDC_DISCOVERY_URI env var.  # noqa: E501
                             # How long before re-authentication is required (seconds).
                             "tokenValidity": "21600",  # 6 hours
-                            # Overall session length (seconds).
+                            # Overall session length (seconds). This renders
+                            # OIDC_SESSION_EXPIRY, which 2.0 marks "Deprecated fallback;
+                            # use AUTHENTICATION_SESSION_EXPIRY" (conf/openmetadata.yaml
+                            # line 502). Kept only so this value stays visible next to
+                            # tokenValidity; removing it would be harmless, since the
+                            # chart's own values.yaml defaults it to the same 604800
+                            # and Helm would supply that. AUTHENTICATION_SESSION_EXPIRY
+                            # in extraEnvs below is what actually governs.
                             "sessionExpiry": "604800",  # 7 days
                         },
                     },
@@ -789,6 +796,30 @@ open_metadata_application = kubernetes.helm.v3.Release(
                 {
                     "name": "JETTY_LOG_LEVEL",
                     "value": "INFO",
+                },
+                # Two auth settings 2.0 added that 1.13.3 did not have. Both are read
+                # from the top-level `authentication` block rather than from
+                # `oidcConfiguration`, so the chart's values have no field for them and
+                # they can only be set here. Verified against conf/openmetadata.yaml in
+                # the running 2.0.2 image, lines 477-478.
+                #
+                # Same 7 days as oidcConfiguration.sessionExpiry above. Set explicitly
+                # so the session length comes from the supported key instead of from
+                # the OIDC_SESSION_EXPIRY fallback that 2.0 marks deprecated.
+                {
+                    "name": "AUTHENTICATION_SESSION_EXPIRY",
+                    "value": "604800",
+                },
+                # Defaults to 5, counting every authorization, so browsers and MCP
+                # OAuth clients draw on the same allowance. Eviction is by
+                # lastAccessedAt ascending, so the least recently used session goes
+                # first: a polling MCP client is safe and an idle one is dropped. That
+                # failure is silent. Upstream logs only when the limit cannot be
+                # enforced, not when it revokes, which matches three weeks of QA logs
+                # on 2.0 containing no line naming the cap.
+                {
+                    "name": "AUTHENTICATION_MAX_ACTIVE_SESSIONS_PER_USER",
+                    "value": "10",
                 },
             ],
             "serviceAccount": {
