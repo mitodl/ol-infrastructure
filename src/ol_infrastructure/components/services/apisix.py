@@ -996,18 +996,35 @@ def ol_apisix_shared_plugins_variants(
     documented; they are inert on a variant that leaves
     ``enable_rate_limiting`` off.
 
-    :param plugin_config: the shared configuration.  Its own
-        ``resource_suffix`` and ``enable_rate_limiting`` are ignored — each
-        variant supplies those.
+    :param plugin_config: the shared configuration.  ``resource_suffix`` and
+        ``enable_rate_limiting`` belong to a variant, so setting either here
+        is an error rather than a value that is quietly discarded.
     :param variants: the per-route-group variations to render.
     :param opts: passed through to each component.
 
-    :raises ValueError: if two variants would render the same CRD name.
+    :raises ValueError: if the shared config sets a per-variant field, or if
+        two variants would render the same CRD name.
 
-    :returns: the rendered components, keyed by ``resource_suffix`` — the name
-        a route's ``shared_plugin_config_name`` refers to.
+    :returns: the rendered components, keyed by ``resource_suffix``. A route's
+        ``shared_plugin_config_name`` takes the component's ``resource_name``
+        (``<application_name>-<resource_suffix>``), not the bare key.
     :rtype: dict[str, OLApisixSharedPlugins]
     """
+    # Refuse rather than ignore. Converting a single-config application to this
+    # factory means moving enable_rate_limiting off the config and onto a
+    # variant; leaving it behind would otherwise drop rate limiting from every
+    # route on the host with nothing to show for it, which is the same class of
+    # silent divergence this factory exists to prevent.
+    misplaced = sorted(
+        {"resource_suffix", "enable_rate_limiting"} & plugin_config.model_fields_set
+    )
+    if misplaced:
+        msg = (
+            f"{misplaced} belong to a variant, not to the shared config passed "
+            "to ol_apisix_shared_plugins_variants; set them on each "
+            "OLApisixSharedPluginsVariant instead."
+        )
+        raise ValueError(msg)
     suffixes = [variant.resource_suffix for variant in variants]
     if len(set(suffixes)) != len(suffixes):
         msg = (
@@ -1019,6 +1036,13 @@ def ol_apisix_shared_plugins_variants(
     return {
         variant.resource_suffix: OLApisixSharedPlugins(
             variant.name,
+            # Shallow by design: every variant shares one ``plugins`` list
+            # object, which is the point. Safe because OLApisixSharedPlugins
+            # only reads that list -- it builds its own output list and
+            # model_dumps each entry. A caller that mutates plugin_config.plugins
+            # after this call would change every variant at once.
+            # ``update`` bypasses validation, so only values that have already
+            # been validated on OLApisixSharedPluginsVariant may go in it.
             plugin_config=plugin_config.model_copy(
                 update={
                     "resource_suffix": variant.resource_suffix,
