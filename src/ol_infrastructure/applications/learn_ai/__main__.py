@@ -1213,14 +1213,16 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
         #
         # Now feeds the plugin's own logout path instead of mit-learn's
         # /logout.  Three patterns, all landing on /ai/logout/oidc: the two
-        # exact spellings a caller would use as the human-facing entry point
-        # (/ai/logout and /ai/logout/, which the old "/ai/logout/*" also
-        # covered), plus the trailing-slash variant of the plugin path itself.
-        # /ai/logout/oidc matches none of them -- a "/foo/*" pattern is a prefix
-        # match on "/foo/" and cannot match the shorter exact "/foo" -- so it
-        # falls through to "passauth", whose plugin holds the logout_path and
-        # performs the real logout.  Listing it here instead would 302 it to
-        # itself forever.
+        # exact spellings a caller would use as the human-facing entry point,
+        # plus the trailing-slash variant of the plugin path itself.
+        #
+        # A "/foo/*" pattern is a prefix match on "/foo/" and cannot match the
+        # shorter exact "/foo", which cuts both ways here.  The old
+        # "/ai/logout/*" covered /ai/logout/ but not /ai/logout, so the
+        # slashless spelling 404s today and is new rather than retained.  And
+        # /ai/logout/oidc matches none of the three patterns below, so it falls
+        # through to "passauth", whose plugin holds the logout_path and performs
+        # the real logout -- listing it here would 302 it to itself forever.
         #
         # Deeper paths under /ai/logout/ no longer trigger a logout, where
         # "/ai/logout/*" swept them all in.  Deliberate: they are not endpoints,
