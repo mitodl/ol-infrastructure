@@ -61,10 +61,16 @@ def scheduled_job_name(application_name: str, job_name: str) -> str:
     return truncate_k8s_metanames(f"{application_name}-{job_name}".replace("_", "-"))
 
 
+def dev_shell_deployment_name(application_name: str) -> str:
+    """Name of the developer shell Deployment OLApplicationK8s creates."""
+    return truncate_k8s_metanames(f"{application_name}-dev-shell".replace("_", "-"))
+
+
 def application_deployment_names(
     application_name: str,
     celery_worker_configs: "list[OLApplicationK8sCeleryWorkerConfig] | None" = None,
     celery_beat_config: "OLApplicationK8sCeleryBeatConfig | None" = None,
+    dev_shell_config: "OLApplicationK8sDevShellConfig | None" = None,
 ) -> list[str]:
     """Deployment names OLApplicationK8s will create, without constructing it.
 
@@ -105,6 +111,8 @@ def application_deployment_names(
         )
     if celery_beat_config is not None:
         names.append(celery_beat_deployment_name(application_name))
+    if dev_shell_config is not None:
+        names.append(dev_shell_deployment_name(application_name))
     return names
 
 
@@ -329,6 +337,72 @@ class OLApplicationK8sScheduledJobConfig(BaseModel):
     suspend: bool = Field(
         default=False,
         description="Create the CronJob but do not schedule it. Useful for landing a job ahead of the environment being ready for it.",
+    )
+
+
+class OLApplicationK8sDevShellConfig(BaseModel):
+    """Configuration for a long-lived developer shell Deployment.
+
+    A Deployment of the application image with the webapp's env, secrets,
+    volumes, service account and security group, whose pod does nothing until
+    a developer ``kubectl exec``s into it to run ``manage.py`` commands, a
+    Django shell, or ad-hoc scripts. It exists because none of the other pods
+    are a safe place for that work: the webapp is autoscaled and VPA-evicted,
+    celery workers are KEDA-scaled to zero and sized for their task mix, and a
+    pre-deploy Job is gated on the rollout. A session in any of them can be
+    OOMKilled or scaled away mid-command.
+
+    It is launch-on-request. The Deployment is created with zero replicas and
+    Pulumi ignores ``spec.replicas`` from then on, so a developer scales it up,
+    works, and scales it back down, and a deploy in between rolls the image
+    without resetting the count::
+
+        kubectl -n <ns> scale deploy/<app>-dev-shell --replicas=1
+        kubectl -n <ns> exec -it deploy/<app>-dev-shell -- bash
+        kubectl -n <ns> scale deploy/<app>-dev-shell --replicas=0
+
+    Nothing scales it down automatically. A forgotten shell holds its memory
+    request until someone notices, which is the accepted cost of not having a
+    reaper with RBAC over the Deployment.
+
+    What keeps a session alive once it is up:
+
+    * Labels that match no other Deployment's selector, so no HPA, KEDA
+      ScaledObject or VPA counts or resizes this pod. Do not create a VPA for
+      it; its whole point is a fixed, generous memory limit.
+    * No Service routes to it and it exposes no ports.
+    * ``karpenter.sh/do-not-disrupt`` on the pod, so node consolidation does
+      not evict it under someone.
+    * ``Recreate`` strategy, so a rollout never runs two shells or waits on
+      surge capacity.
+
+    What does NOT keep a session alive, deliberately: the pod runs the same
+    image as the webapp, so every application deploy rolls it. That is the
+    right trade -- a shell running last week's code against a freshly migrated
+    database is worse than an interrupted session -- but it means long-running
+    commands should be started with the deploy schedule in mind. The rollout
+    sends SIGTERM to PID 1 (``sleep``), which ignores it, so an exec'd command
+    gets the pod's full termination grace period before SIGKILL.
+
+    The pod is included in ``all_deployment_names`` and so in Vault secret
+    ``restart_targets``: credential rotation restarts it, because a shell whose
+    database password has expired is not useful either.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    command: list[str] = Field(
+        default=["sleep", "infinity"],
+        description="Container entrypoint. Must block forever without using resources.",
+    )
+    resource_requests: dict[str, str] = Field(default={"cpu": "250m", "memory": "4Gi"})
+    resource_limits: dict[str, str] = Field(default={"memory": "4Gi"})
+    termination_grace_period_seconds: PositiveInt = Field(
+        default=60,
+        description=(
+            "How long an exec'd command gets to finish when a deploy rolls the pod. "
+            "With the Recreate strategy the deploy's rollout waits this long, so "
+            "keep it short enough not to stall a release."
+        ),
     )
 
 
@@ -922,6 +996,13 @@ class OLApplicationK8sConfig(BaseModel):
     scheduled_jobs: list[OLApplicationK8sScheduledJobConfig] = Field(
         default_factory=list,
         description="CronJobs to run in the application image on a wall-clock schedule.",
+    )
+    dev_shell_config: OLApplicationK8sDevShellConfig | None = Field(
+        default=None,
+        description=(
+            "Create a long-lived, unrouted developer shell Deployment in the "
+            "application image. None (the default) creates nothing."
+        ),
     )
 
     @model_validator(mode="after")
@@ -1680,6 +1761,8 @@ class OLApplicationK8s(ComponentResource):
         self.celery_deployment_names: list[str] = []
         self.celery_deployments: list[kubernetes.apps.v1.Deployment] = []
         self.beat_deployment_name: str | None = None
+        self.dev_shell_deployment_name: str | None = None
+        self.dev_shell_deployment: kubernetes.apps.v1.Deployment | None = None
         self.scheduled_job_names: list[str] = []
         self.scheduled_jobs: list[kubernetes.batch.v1.CronJob] = []
         self.webapp_pod_monitor: kubernetes.apiextensions.CustomResource | None = None
@@ -2596,6 +2679,108 @@ class OLApplicationK8s(ComponentResource):
             )
             self.scheduled_jobs.append(_scheduled_job)
 
+        if ol_app_k8s_config.dev_shell_config is not None:
+            dev_shell_config = ol_app_k8s_config.dev_shell_config
+            # Same reasoning as the scheduled jobs above: these must not be the
+            # webapp's selector labels or the webapp HPA/KEDA counts this pod, and
+            # they must not be a celery worker's or its KEDA ScaledObject and VPA
+            # adopt it. The pod-security-group label stays so the SecurityGroupPolicy
+            # below gives the shell the same RDS/Redis reachability as the webapp.
+            dev_shell_labels = ol_app_k8s_config.k8s_global_labels | {
+                "ol.mit.edu/component": "dev-shell",
+                "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
+                "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
+                    truncate_k8s_metanames
+                ),
+            }
+            if ol_app_k8s_config.slack_channel:
+                dev_shell_labels["ol.mit.edu/slack-channel"] = (
+                    ol_app_k8s_config.slack_channel
+                )
+            _dev_shell_deployment_name = dev_shell_deployment_name(
+                ol_app_k8s_config.application_name
+            )
+            self.dev_shell_deployment_name = _dev_shell_deployment_name
+            self.dev_shell_deployment = kubernetes.apps.v1.Deployment(
+                f"{ol_app_k8s_config.application_name}-dev-shell-{stack_info.env_suffix}",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=_dev_shell_deployment_name,
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=dev_shell_labels,
+                ),
+                spec=kubernetes.apps.v1.DeploymentSpecArgs(
+                    replicas=0,
+                    strategy=kubernetes.apps.v1.DeploymentStrategyArgs(type="Recreate"),
+                    selector=kubernetes.meta.v1.LabelSelectorArgs(
+                        match_labels=dev_shell_labels,
+                    ),
+                    template=kubernetes.core.v1.PodTemplateSpecArgs(
+                        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                            labels=dev_shell_labels,
+                            annotations={
+                                **pod_config_hash_annotations,
+                                "karpenter.sh/do-not-disrupt": "true",
+                                "kubectl.kubernetes.io/default-container": "dev-shell",
+                            },
+                        ),
+                        spec=kubernetes.core.v1.PodSpecArgs(
+                            service_account_name=ol_app_k8s_config.application_service_account_name,
+                            dns_policy="ClusterFirst",
+                            termination_grace_period_seconds=dev_shell_config.termination_grace_period_seconds,
+                            volumes=ol_app_k8s_config.extra_volumes or None,
+                            # Init containers build the application's runtime config
+                            # (see the scheduled jobs above); the collectstatic and
+                            # migration init steps are omitted because a shell needs
+                            # neither.
+                            init_containers=[
+                                *[
+                                    kubernetes.core.v1.ContainerArgs(
+                                        **{
+                                            k: v
+                                            for k, v in vars(c).items()
+                                            if k != "volume_mounts" and v is not None
+                                        },
+                                        volume_mounts=[
+                                            *(getattr(c, "volume_mounts", None) or []),
+                                            *ol_app_k8s_config.extra_volume_mounts,
+                                            *ol_app_k8s_config.extra_init_volume_mounts,
+                                        ],
+                                    )
+                                    for c in ol_app_k8s_config.extra_init_containers
+                                ]
+                            ]
+                            or None,
+                            # No sidecars: nothing routes here, so nginx has nothing to
+                            # proxy, and a log shipper would only ever see "sleep".
+                            containers=[
+                                kubernetes.core.v1.ContainerArgs(
+                                    name="dev-shell",
+                                    image=app_image,
+                                    command=dev_shell_config.command,
+                                    image_pull_policy=image_pull_policy,
+                                    env=application_deployment_env_vars,
+                                    env_from=application_deployment_envfrom,
+                                    resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                        requests=dev_shell_config.resource_requests,
+                                        limits=dev_shell_config.resource_limits,
+                                    ),
+                                    volume_mounts=ol_app_k8s_config.extra_volume_mounts
+                                    or None,
+                                    **app_container_security_context,
+                                ),
+                            ],
+                            **worker_pod_spec_args,
+                        ),
+                    ),
+                ),
+                # replicas is the developer's knob (kubectl scale), not Pulumi's.
+                # Without this every deploy would scale a shell in use back to 0.
+                opts=ResourceOptions.merge(
+                    resource_options,
+                    ResourceOptions(ignore_changes=["spec.replicas"]),
+                ),
+            )
+
         _application_pod_security_group_policy = (
             kubernetes.apiextensions.CustomResource(
                 f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-application-pod-security-group-policy",
@@ -2629,8 +2814,8 @@ class OLApplicationK8s(ComponentResource):
     def all_deployment_names(self) -> list[str]:
         """All Kubernetes Deployment names managed by this component.
 
-        Includes the webapp deployment, all celery worker deployments, and the
-        celery beat deployment (if configured).  Use this to populate
+        Includes the webapp deployment, all celery worker deployments, the
+        celery beat deployment and the developer shell (each if configured).  Use this to populate
         ``restart_targets`` on ``OLVaultK8SDynamicSecretConfig`` so that all
         pods restart when Vault dynamic credentials are rotated:
 
@@ -2649,4 +2834,6 @@ class OLApplicationK8s(ComponentResource):
         names.extend(self.celery_deployment_names)
         if self.beat_deployment_name:
             names.append(self.beat_deployment_name)
+        if self.dev_shell_deployment_name:
+            names.append(self.dev_shell_deployment_name)
         return names
