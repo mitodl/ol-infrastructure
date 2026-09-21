@@ -1728,6 +1728,16 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
             stale_session_cookie_cleanup_plugin(
                 cookie_domains=[mitlearn_api_domain.removeprefix("api")],
             ),
+            # 327 callbacks a day on api.learn.mit.edu come back from Keycloak
+            # with error=temporarily_unavailable instead of a code, and the
+            # openid-connect plugin serves each one a 500.  Both route groups
+            # on this host need it, and the plugin derives its redirect target
+            # from the request URI, so the /login and /learn/login prefixes are
+            # handled from this one attachment.  The same attachment also
+            # canonicalises the origin: `curl http://api.learn.mit.edu/login`
+            # currently sends Keycloak an http:// redirect_uri, and answers with
+            # an OIDC session cookie over cleartext.
+            oidc_gateway_pre_function_plugin(),
         ],
     ),
 )
@@ -1747,15 +1757,11 @@ learn_external_service_browser_shared_plugins = OLApisixSharedPlugins(
             stale_session_cookie_cleanup_plugin(
                 cookie_domains=[mitlearn_api_domain.removeprefix("api")],
             ),
-            # 327 callbacks a day on api.learn.mit.edu come back from Keycloak
-            # with error=temporarily_unavailable instead of a code, and the
-            # openid-connect plugin serves each one a 500.  Both route groups
-            # on this host need it, and the plugin derives its redirect target
-            # from the request URI, so the /login and /learn/login prefixes are
-            # handled from this one attachment.  The same attachment also
-            # canonicalises the origin: `curl http://api.learn.mit.edu/login`
-            # currently sends Keycloak an http:// redirect_uri, and answers with
-            # an OIDC session cookie over cleartext.
+            # Duplicated from the base config above rather than inherited:
+            # browser-reqauth carries /login/* for real browser traffic, so a
+            # login callback arriving with an Origin header lands here.  Without
+            # this attachment those callbacks keep 500ing while the identical
+            # request without an Origin header gets recovered.
             oidc_gateway_pre_function_plugin(),
         ],
         enable_rate_limiting=True,
