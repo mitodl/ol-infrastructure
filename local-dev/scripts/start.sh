@@ -113,14 +113,28 @@ elif [[ "$(cat "${CLUSTER_ID_FILE}")" != "${live_cluster_id}" ]]; then
 	warn "  anonymous volumes holding every node's data."
 	warn "  The infra stacks will reconcile and rebuild what is missing, but the"
 	warn "  app databases in the new cluster are empty."
+	# Newest dump that pg-restore.sh will actually accept. pg-backup.sh creates
+	# its directory up front and appends to manifest.txt per database, so an
+	# interrupted run leaves one behind that restore refuses; it checks the
+	# manifest's line count against the number of dumps, and so do we rather
+	# than naming a directory that cannot be restored.
 	# `|| true`: no .backups directory is the common case, and pipefail would
 	# otherwise make find's exit status abort the script mid-warning.
-	newest_backup="$(find "${REPO_ROOT}/local-dev/.backups" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort | tail -1 || true)"
+	newest_backup=""
+	while read -r candidate; do
+		[[ -n "${candidate}" && -f "${candidate}/manifest.txt" ]] || continue
+		listed="$(wc -l <"${candidate}/manifest.txt" | tr -d ' ')"
+		dumps="$(find "${candidate}" -maxdepth 1 -name '*.dump' | wc -l | tr -d ' ')"
+		if [[ "${listed}" == "${dumps}" && "${dumps}" != "0" ]]; then
+			newest_backup="${candidate}"
+			break
+		fi
+	done < <(find "${REPO_ROOT}/local-dev/.backups" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -r || true)
 	if [[ -n "${newest_backup}" ]]; then
 		warn "  Newest dump is ${newest_backup##*/} — load it with:"
 		warn "    ./local-dev/scripts/pg-restore.sh local-dev/.backups/${newest_backup##*/}"
 	else
-		warn "  There is no dump to restore from: pg-backup.sh only runs when you"
+		warn "  No complete dump to restore from: pg-backup.sh only runs when you"
 		warn "  run it, and a prune is never 'before' anything. Worth running"
 		warn "  ./local-dev/scripts/pg-backup.sh once there is data worth keeping."
 	fi
