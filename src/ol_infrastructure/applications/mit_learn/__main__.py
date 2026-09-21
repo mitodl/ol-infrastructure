@@ -50,6 +50,7 @@ from ol_infrastructure.components.aws.cache import (
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix import (
+    FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixPluginConfig,
@@ -57,6 +58,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPluginsConfig,
     OLApisixSharedPluginsVariant,
+    browser_traffic_match_exprs,
     oidc_gateway_pre_function_plugin,
     ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
@@ -2210,13 +2212,29 @@ proxy_rewrite_plugin_config = OLApisixPluginConfig(
         ],
     },
 )
-browser_api_match_exprs = [
-    {
-        "subject": {"scope": "Header", "name": "Origin"},
-        "op": "RegexMatch",
-        "value": r"^https://(ci\.|rc\.)?learn\.mit\.edu$",
-    }
-]
+# Why this host needs the User-Agent clause, not just the Origin match: the
+# Next.js SSR layer reaches api.learn as `axios/1.12.2`
+# (frontends/api/package.json) from four AWS egress addresses, and on
+# 2026-09-21 the busiest of them sustained 371-676 req/min -- 11.3 req/s
+# against the 50 req/s per-IP bucket the browser-* routes carry. It misses
+# these routes today only because Node axios sends no Origin header, which is
+# an accident of the HTTP client rather than a decision.
+#
+# Measured while choosing the clause: crawlers DO replay our Origin
+# (DuckDuckBot, DuckAssistBot, and an Amazon Bedrock knowledge base, the last
+# with a full cookie jar), so excluding every non-browser would exempt single
+# actors this limit should catch. Sec-Fetch-Site is not the discriminator it
+# looks like either: absent on 55% of Origin-carrying requests and present on
+# the Bedrock crawler.
+#
+# Note this is a knob any client can turn, not only a description of what
+# already happens: anything sending a matching User-Agent opts itself out.
+# Not a regression, since a non-browser caller could already opt out by
+# dropping Origin, which is easier than setting a header.
+browser_api_match_exprs = browser_traffic_match_exprs(
+    r"^https://(ci\.|rc\.)?learn\.mit\.edu$",
+    FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
+)
 fastly_api_match_exprs = [
     {
         "subject": {"scope": "Header", "name": "Fastly-Client-IP"},

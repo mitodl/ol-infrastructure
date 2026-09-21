@@ -953,6 +953,69 @@ class OLApisixSharedPlugins(ComponentResource):
         )
 
 
+# User-Agent prefix of the first-party server-side callers that must not be
+# treated as browsers.  ``axios/`` is what the mit-learn Next.js SSR layer
+# sends (frontends/api/package.json); it is a default the application does not
+# set deliberately, so this is a floor, not a guarantee -- see
+# browser_traffic_match_exprs.
+FIRST_PARTY_SERVICE_CLIENT_UA_REGEX = r"^axios/"
+
+
+def browser_traffic_match_exprs(
+    origin_regex: str,
+    service_client_ua_regex: str,
+) -> list[dict[str, Any]]:
+    """Build ``ApisixRoute`` match exprs that select real browser traffic.
+
+    For route groups that carry per-client-IP rate limiting.  That limit is
+    sized for one browser, so a first-party server-side caller is the wrong
+    shape for it: it aggregates every end user behind one address and a
+    browser-sized bucket throttles the whole population at once.
+
+    Matching on ``Origin`` alone excludes such a caller only by accident,
+    because the HTTP clients they use happen not to send that header.  The
+    negative User-Agent clause makes it the intent, so the exclusion survives a
+    server-side caller that does send an ``Origin``.
+
+    Deliberately narrow: it names first-party clients rather than excusing
+    every non-browser.  Crawlers do send a site's ``Origin`` and are single
+    actors that a per-IP limit should catch, so they stay in.
+
+    This adds a knob any client can turn, not just a description of existing
+    behaviour: anything that sends a matching User-Agent now opts itself out.
+    That is not a regression for a non-browser caller, which could already opt
+    out by omitting ``Origin`` -- dropping a header is easier than setting one
+    -- but it does mean the exclusion is only as trustworthy as the rate limit
+    it guards, which is a blast-radius control rather than an anti-abuse one.
+
+    ``service_client_ua_regex`` is required rather than defaulted so that each
+    host states its own first-party client next to the evidence for it.  A
+    shared default would silently exempt every stock-``axios`` integrator on
+    any host that adopted this helper.
+
+    :param origin_regex: anchored regex for the site's own ``Origin`` values.
+    :param service_client_ua_regex: anchored regex matching the User-Agent of
+        first-party server-side callers, which are excluded.  Anchor it:
+        APISIX matches with ``ngx.re.find``, a substring search, so an
+        unanchored value would exempt any User-Agent merely containing it.
+
+    :returns: exprs for ``OLApisixRouteConfig.exprs``.
+    :rtype: list[dict[str, Any]]
+    """
+    return [
+        {
+            "subject": {"scope": "Header", "name": "Origin"},
+            "op": "RegexMatch",
+            "value": origin_regex,
+        },
+        {
+            "subject": {"scope": "Header", "name": "User-Agent"},
+            "op": "RegexNotMatch",
+            "value": service_client_ua_regex,
+        },
+    ]
+
+
 class OLApisixSharedPluginsVariant(BaseModel):
     """One route-group variation on a host's single shared plugin list.
 
