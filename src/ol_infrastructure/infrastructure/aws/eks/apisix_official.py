@@ -326,8 +326,8 @@ def setup_apisix(
     # backendtrafficpolicies was 30 schema properties behind on all 12 clusters and
     # apisixupstreams 18 on most.
     #
-    # Only apisixic-crds.yaml. The subchart also ships gwapi-crds.yaml, holding the
-    # Gateway API CRDs at channel "standard", bundle v1.6.0 -- the same
+    # Only the apisix.apache.org group. The subchart also ships gwapi-crds.yaml,
+    # holding the Gateway API CRDs at channel "standard", bundle v1.6.0 -- the same
     # cluster-scoped objects setup_traefik installs from the *experimental* bundle
     # at GATEWAY_API_VERSION and owns. Adopting those here would force every
     # gateway.networking.k8s.io CRD down from experimental to standard and leave
@@ -340,7 +340,7 @@ def setup_apisix(
         repo="https://apache.github.io/apisix-helm-chart",
         chart="apisix",
         version=apisix_chart_version,
-        include={"apisixic-crds.yaml"},
+        groups={"apisix.apache.org"},
         opts=ResourceOptions(parent=operations_namespace, depends_on=[cluster]),
     )
 
