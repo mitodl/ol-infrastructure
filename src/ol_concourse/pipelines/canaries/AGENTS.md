@@ -3,6 +3,20 @@
 Playwright canaries for MIT Open Learning web properties. Read [`README.md`](README.md)
 first for what a canary is and what does not belong here.
 
+Two skills in [`mitodl/agent-kit`](https://github.com/mitodl/agent-kit) carry the
+step-by-step procedures, and this file carries the reasoning behind them:
+
+- [**`add-canary-journey`**](https://github.com/mitodl/agent-kit/blob/main/skills/process/add-canary-journey/SKILL.md)
+  — adding a journey to a property, or onboarding a new one.
+- [**`run-canary-locally`**](https://github.com/mitodl/agent-kit/blob/main/skills/process/run-canary-locally/SKILL.md)
+  — getting a passing local run, supplying credentials without locking the account
+  out, and reading a trace.
+
+They live in `agent-kit` rather than this repository's `agents/skills/` because that is
+where shared agent skills are maintained and distributed from. The cost of that split is
+that they can go stale without a failing build here: **if you change a rule in this file,
+check whether the matching skill repeats it.**
+
 This is the **only JavaScript/TypeScript in `ol-infrastructure`**. Keep it that way:
 this directory is a self-contained Playwright project and nothing outside it should
 grow a `package.json`.
@@ -41,7 +55,7 @@ grow a `package.json`.
 ## Version pinning
 
 `package.json`'s `@playwright/test` pin is the **single source of truth**. The pipeline
-derives the image tag from it — `1.62.1` → `mcr.microsoft.com/playwright:v1.62.1-noble`
+derives the image tag from it — `1.63.0` → `mcr.microsoft.com/playwright:v1.63.0-noble`
 — rather than carrying its own copy of the version. Keeping specs and pipeline in one
 repository is what makes that possible, and it is most of the reason they are here.
 
