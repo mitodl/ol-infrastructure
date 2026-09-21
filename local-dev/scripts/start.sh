@@ -86,17 +86,11 @@ ok "TLS certificates found."
 # ---------------------------------------------------------------------------
 # Is this the cluster the Pulumi state was written against?
 # ---------------------------------------------------------------------------
-# The stacks' state lives in this checkout and survives anything that happens
-# to Docker, so a cluster replaced without teardown.sh — deleted by hand, swept
-# up by `docker system prune`, lost to a WSL reset — leaves Pulumi describing a
-# cluster that no longer exists. The stacks recover on their own (both run
-# `pulumi refresh` before applying), but every database in the new cluster is
-# empty, and without a word here that reads as data quietly disappearing.
-#
-# kube-system's UID is assigned when the cluster is bootstrapped, so it changes
-# whenever the cluster does. It is stored beside the state it describes: wiping
-# .pulumi takes the recorded id with it, which is right — state that no longer
-# exists makes no claim about which cluster it belonged to.
+# State lives in this checkout and outlives the cluster. The stacks recover on
+# their own (both `pulumi refresh` before applying), but the databases in a
+# replaced cluster are empty, and unannounced that reads as data disappearing.
+# kube-system's UID is assigned at bootstrap, so it changes with the cluster.
+# The marker sits under .pulumi so wiping the state wipes the claim too.
 CLUSTER_ID_FILE="${REPO_ROOT}/local-dev/infra/.pulumi/cluster-id"
 live_cluster_id="$(kubectl get namespace kube-system -o jsonpath='{.metadata.uid}' 2>/dev/null)" || true
 
@@ -113,16 +107,11 @@ elif [[ "$(cat "${CLUSTER_ID_FILE}")" != "${live_cluster_id}" ]]; then
 	warn "  the anonymous volumes holding every node's data."
 	warn "  The infra stacks will reconcile and rebuild what is missing, but the"
 	warn "  app databases in the new cluster are empty."
-	# Newest dump that is actually complete. pg-backup.sh creates its directory
-	# up front, so an interrupted run leaves one behind. Two checks, because
-	# either alone lets a partial through: keycloak-users.json is the last
-	# artifact the script writes, so it stands in for "the dump loop finished"
-	# — the loop appends each manifest line only after mv-ing that database's
-	# .dump into place, which keeps the counts consistent on a prefix — and the
-	# manifest line count against the number of dumps is the same check
-	# pg-restore.sh makes before it will load anything.
-	# `|| true`: no .backups directory is the common case, and pipefail would
-	# otherwise make find's exit status abort the script mid-warning.
+	# Newest dump that is actually complete: pg-backup.sh makes its directory up
+	# front, so an interrupted run leaves one behind. keycloak-users.json is the
+	# last artifact it writes, and the manifest/dump counts are the same check
+	# pg-restore.sh makes. `|| true`: no .backups directory is the common case,
+	# and pipefail would otherwise abort the script mid-warning.
 	newest_backup=""
 	while read -r candidate; do
 		[[ -n "${candidate}" && -f "${candidate}/manifest.txt" ]] || continue
@@ -138,9 +127,8 @@ elif [[ "$(cat "${CLUSTER_ID_FILE}")" != "${live_cluster_id}" ]]; then
 		warn "  Newest dump is ${newest_backup##*/} — load it with:"
 		warn "    ./local-dev/scripts/pg-restore.sh local-dev/.backups/${newest_backup##*/}"
 	else
-		warn "  No complete dump to restore from: pg-backup.sh only runs when you"
-		warn "  run it, and a prune is never 'before' anything. Worth running"
-		warn "  ./local-dev/scripts/pg-backup.sh once there is data worth keeping."
+		warn "  No dump to restore from — worth running ./local-dev/scripts/pg-backup.sh"
+		warn "  once there is data worth keeping."
 	fi
 	echo "${live_cluster_id}" >"${CLUSTER_ID_FILE}"
 else

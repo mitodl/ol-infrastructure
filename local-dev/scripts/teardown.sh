@@ -219,10 +219,7 @@ else
     cd "${REPO_ROOT}"
 fi
 
-# The cluster is gone and its state went with it, by either branch above — any
-# failure path aborts before here. Drop start.sh's record of which cluster the
-# state belonged to as well, or the next start.sh compares against a cluster
-# that no longer exists and reports this teardown as an unplanned one.
+# start.sh's marker refers to the cluster we just deleted.
 rm -f "${REPO_ROOT}/local-dev/infra/.pulumi/cluster-id"
 
 # ---------------------------------------------------------------------------

@@ -362,15 +362,12 @@ local_resource(
 # ("context deadline exceeded"). The script below proves the admin API is
 # serving (admin token + authenticated GET /admin/realms) before we proceed.
 #
-# `--refresh` reconciles state against the live cluster before applying. The
-# stack's state lives in this checkout and outlives the cluster, so a cluster
-# replaced without teardown.sh (deleted by hand, `docker system prune`, a WSL
-# reset) leaves Pulumi believing the olapps realm exists. It then skips the
-# realm and fails on the first child that has to look one up in Keycloak,
-# reporting a missing `client_id` on an unrelated b2b client. Refresh was
-# dropped from this loop when it predated both mitigations below, on the same
-# concurrency grounds; with the readiness gate and `--parallel 1` it costs a
-# few seconds and it is what makes a rebuilt cluster recover on its own.
+# `--refresh` reconciles state against the live cluster before applying. State
+# lives in this checkout and outlives the cluster, so a cluster replaced without
+# teardown.sh leaves Pulumi believing the olapps realm exists; it then skips the
+# realm and fails on the first child that has to look one up, reporting a
+# missing `client_id` on an unrelated b2b client. Behind the readiness gate and
+# `--parallel 1` the refresh costs a few seconds.
 #
 # `--parallel 1` serialises the apply for the same reason. The Keycloak provider
 # talks to the admin API over the public ingress (host -> k3d LB -> APISIX ->
