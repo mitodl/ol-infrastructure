@@ -19,3 +19,5 @@ config:
   toolhive_swe:vantage_enabled: "true"
   toolhive_swe:vantage_api_key:
     secure: v1:ugx8LRZvE5WL7sbS:6K+Jg/ZjZ2qc8nDXvslQJhyJ+biH6tuhGfKl0zGsGqeX9BU4D57H/GiLpBHhUUes55EI61oAXTCGfaGOekiGqxc=
+  toolhive_swe:grafana_caller_token:
+    secure: v1:W9tkyuEi5S9eejZN:GzsUd+WFvtG1dNFebgxb2Zw8116uwA37z+q9U2JalkMCXsrECPXu2AOyWhB+seG+qX3TvjQG0YkfqA1Tjo/pi/iPWK+dHWoKb92rcjw3E90=

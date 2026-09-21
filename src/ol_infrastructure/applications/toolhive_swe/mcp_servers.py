@@ -95,6 +95,26 @@ AWS_MCP_ENDPOINT = "https://aws-mcp.us-east-1.api.aws/mcp"
 GRAFANA_TOKEN_SECRET_NAME = "toolhive-swe-grafana-token"  # noqa: S105  # pragma: allowlist secret
 GRAFANA_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 
+# K8s Secret holding the token CALLERS must present to the grafana workload. This
+# is a shared secret between the vMCP and mcp-grafana; it is unrelated to
+# GRAFANA_TOKEN_SECRET_NAME above, which is the credential mcp-grafana uses to
+# reach Grafana Cloud. It carries the same value under two keys because the two
+# consumers need different shapes of it:
+#   ``token``         - the bare token, injected into the workload as
+#                       MCP_GRAFANA_SERVER_TOKEN, which mcp-grafana compares
+#                       against the bearer credential a caller presents.
+#   ``authorization`` - the FULL header value (``Bearer <token>``), because the
+#                       vMCP's headerInjection writes the value verbatim, so the
+#                       scheme has to be part of it. Same reason as
+#                       VANTAGE_TOKEN_SECRET_KEY below.
+GRAFANA_CALLER_TOKEN_SECRET_NAME = "toolhive-swe-grafana-caller-token"  # noqa: S105  # pragma: allowlist secret
+GRAFANA_CALLER_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+GRAFANA_CALLER_AUTH_HEADER_KEY = "authorization"  # pragma: allowlist secret
+
+# MCPExternalAuthConfig telling the vMCP to present the caller token when it
+# calls the grafana backend. Named for the backend it fronts, not the mechanism.
+GRAFANA_CALLER_AUTH_CONFIG_NAME = "grafana-caller-auth"
+
 # K8s Secret holding the Sentry user auth token, materialised from encrypted stack
 # config and injected into the sentry MCPServer the same way as the Grafana token.
 SENTRY_TOKEN_SECRET_NAME = "toolhive-swe-sentry-token"  # noqa: S105  # pragma: allowlist secret
@@ -218,6 +238,94 @@ def create_mcp_servers(  # noqa: PLR0913
         },
         opts=ResourceOptions(),
     )
+    # Caller authentication for the grafana workload. mcp-grafana serves on
+    # 0.0.0.0:8000 (the image ENTRYPOINT's --address, which we cannot narrow: the
+    # ToolHive proxy runs in a separate pod and reaches the workload over the
+    # cluster network, so a loopback bind would make it unreachable). Without a
+    # caller token, 1.5.1 logs at ERROR on every start that it is "serving on a
+    # non-loopback address with NO caller authentication" and that "this will
+    # become a startup error in a future release" -- so a routine Renovate bump
+    # would crashloop the workload with no change on our side. Setting the token
+    # now makes that release a no-op for us.
+    #
+    # EXPECTED NOISE, first five minutes of each workload pod's life: the
+    # proxyrunner's startup readiness probe (``waitForInitializeSuccess``) POSTs
+    # an unauthenticated ``initialize`` to its own listener every two seconds,
+    # and the workload answers 401. It counts a 401 as ready only when
+    # ``authExpected`` -- which is ``r.Config.OIDCConfig != nil``, and this
+    # backend sets no oidcConfigRef -- so the probe never passes, gives up after
+    # five minutes, logs "initialize not successful, but continuing" and carries
+    # on. Nothing is broken by it: the MCPServer reports Ready throughout, the
+    # vMCP's own calls carry the header and succeed the whole time, and the 401s
+    # stop for good the moment the probe gives up. Giving the probe a token
+    # would mean putting an oidcConfigRef on this backend, which would then
+    # reject the vMCP's static bearer as well.
+    #
+    # ★ ROTATION TAKES TWO POD RESTARTS, AND THE GAP BETWEEN THEM IS AN OUTAGE.
+    # Both consumers read the Secret once and never re-read it, for different
+    # reasons: the workload holds the bare token as a secretKeyRef env var, and
+    # the vMCP's backend reconciler deliberately does not watch Secrets ("Auth
+    # updates will trigger via ExternalAuthConfig changes or pod restarts").
+    # After replacing the config value, restart both:
+    #   kubectl rollout restart statefulset/grafana deployment/swe-vmcp \
+    #     -n toolhive-swe
+    # Order does not matter, but grafana tools 401 until the second one lands.
+    #
+    #   pulumi config set --secret toolhive_swe:grafana_caller_token -- <token>
+    grafana_caller_token = toolhive_swe_config.require_secret("grafana_caller_token")
+    grafana_caller_token_secret = kubernetes.core.v1.Secret(
+        f"toolhive-swe-grafana-caller-token-secret-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=GRAFANA_CALLER_TOKEN_SECRET_NAME,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        type="Opaque",
+        string_data={
+            GRAFANA_CALLER_TOKEN_SECRET_KEY: grafana_caller_token,
+            GRAFANA_CALLER_AUTH_HEADER_KEY: Output.concat(
+                "Bearer ", grafana_caller_token
+            ),
+        },
+        opts=ResourceOptions(),
+    )
+    # ``headerInjection``, not ``bearerToken``. The bearerToken type has no
+    # converter in the vMCP's registry (``pkg/vmcp/auth/converters``:
+    # tokenExchange, headerInjection, unauthenticated, upstreamInject, awsSts,
+    # obo, xaa) -- the same trap documented at length in the vantage block below.
+    #
+    # The vMCP reads this ref off ``MCPServer.spec.externalAuthConfigRef`` in
+    # outgoingAuth DISCOVERED mode (the CRD default) and resolves the Secret
+    # itself at runtime through the Kubernetes API.
+    #
+    # It does nothing on the grafana proxy today: MCPServer turns an
+    # externalAuthConfigRef into token-exchange and OBO env vars only, and
+    # ToolHive's headerInjection arm for MCPServer (``addHeaderInjectionConfig``)
+    # is an explicit no-op placeholder as of 0.50.0. That is upstream's
+    # not-yet-implemented, not a guarantee -- if a later release implements it,
+    # this ref starts meaning something proxy-side too, so re-read that arm when
+    # the operator moves.
+    grafana_caller_auth_config = kubernetes.apiextensions.CustomResource(
+        f"toolhive-swe-grafana-caller-auth-{stack_info.env_suffix}",
+        api_version="toolhive.stacklok.dev/v1beta1",
+        kind="MCPExternalAuthConfig",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=GRAFANA_CALLER_AUTH_CONFIG_NAME,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        spec={
+            "type": "headerInjection",
+            "headerInjection": {
+                "headerName": "Authorization",
+                "valueSecretRef": {
+                    "name": GRAFANA_CALLER_TOKEN_SECRET_NAME,
+                    "key": GRAFANA_CALLER_AUTH_HEADER_KEY,
+                },
+            },
+        },
+        opts=ResourceOptions(depends_on=[grafana_caller_token_secret]),
+    )
     grafana_mcpserver = kubernetes.apiextensions.CustomResource(
         f"toolhive-swe-grafana-mcpserver-{stack_info.env_suffix}",
         api_version="toolhive.stacklok.dev/v1beta1",
@@ -271,8 +379,19 @@ def create_mcp_servers(  # noqa: PLR0913
                     "name": GRAFANA_TOKEN_SECRET_NAME,
                     "key": GRAFANA_TOKEN_SECRET_KEY,
                     "targetEnvName": "GRAFANA_SERVICE_ACCOUNT_TOKEN",
-                }
+                },
+                # The caller credential, checked against the Authorization
+                # header the vMCP injects. mcp-grafana strips the header once it
+                # validates, so this token never reaches Grafana Cloud.
+                {
+                    "name": GRAFANA_CALLER_TOKEN_SECRET_NAME,
+                    "key": GRAFANA_CALLER_TOKEN_SECRET_KEY,
+                    "targetEnvName": "MCP_GRAFANA_SERVER_TOKEN",
+                },
             ],
+            # Read by the vMCP, not by this server's own proxy -- see the
+            # MCPExternalAuthConfig above.
+            "externalAuthConfigRef": {"name": GRAFANA_CALLER_AUTH_CONFIG_NAME},
             # Needs outbound access to the Grafana Cloud stack. Tighten to an
             # allow-list profile (grafana_url host, port 443) once the builtin
             # profile proves out.
@@ -286,7 +405,14 @@ def create_mcp_servers(  # noqa: PLR0913
             },
         },
         opts=ResourceOptions(
-            depends_on=[swe_mcpgroup, grafana_token_secret, telemetry_config]
+            depends_on=[
+                swe_mcpgroup,
+                grafana_token_secret,
+                # The ref must resolve when the operator reconciles this
+                # MCPServer, or it goes Failed on a missing MCPExternalAuthConfig.
+                grafana_caller_auth_config,
+                telemetry_config,
+            ]
         ),
     )
 
