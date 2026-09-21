@@ -460,6 +460,8 @@ Each store is bounded by retention config owned by the component that enforces i
 | kubelet image GC | Node containerd stores | Thresholds in `local-dev/cluster/k3d-config.yaml` (applies at cluster creation; existing clusters keep the old 85/80 until you run `local-dev/scripts/migrate-kubelet-gc-thresholds.sh`) |
 | `prune-docker` (manual, break-glass) | Local daemon + registry, destructively (node stores only with `--sweep-nodes` — read the script header first; it orphans running containers) | Tilt UI button / `tilt trigger prune-docker`, or run `local-dev/scripts/prune-docker.sh` directly |
 
+Nothing in that table removes a container or a volume, and that is deliberate. Every node's data — the k3s datastore and every local-path PersistentVolume, Postgres included — lives in an anonymous Docker volume owned by its node container, spread across nodes (`local-pg` on one agent, OpenSearch on the server, and so on). `docker volume prune` is harmless while those containers exist, because a stopped container still counts as a user of its volumes. **`docker system prune` is not**: it removes stopped containers first, so a cluster paused by `stop.sh` loses its nodes, and their volumes are left dangling — the data is still on disk but nothing can reach it, since `k3d cluster create` makes fresh volumes and will not adopt the old ones. Add `--volumes` and they are deleted outright. Use `prune-docker.sh` instead; it is scoped to images, build cache, and the registry, and never touches containers or volumes.
+
 **Existing setups:** a registry container created before the zot swap (2026-07) still runs `registry:2`, which has no retention and will grow unbounded — the janitor warns about this each cycle until you migrate:
 
 ```bash
@@ -773,6 +775,26 @@ PULUMI_CONFIG_PASSPHRASE='' pulumi up --stack local-dev.apps-infra.Dev --logtost
 Common causes:
 - **kubeconfig not set:** Ensure `k3d kubeconfig merge local-dev --kubeconfig-merge-default` has been run. If your `~/.kube` directory is a symlink pointing to a Windows-side path (common in WSL2), see [WSL2: kubeconfig context not found](#wsl2-kubeconfig-context-not-found) below.
 - **Cert files missing:** Run `setup.sh --skip-hosts` to regenerate certs without touching `/etc/hosts`.
+
+### `local-infra-apps` fails with `Missing required argument "client_id"`
+
+```
+keycloak:openid/clientServiceAccountRole:ClientServiceAccountRole resource 'olapps-mitxonline-b2b-view-realm'
+has a problem: Missing required argument. The argument "client_id" is required, but no definition was found.
+```
+
+The b2b client the error names is not the problem. Keycloak is empty — `curl -sk https://sso.ol.mit.dev/admin/realms` with an admin token returns only `master` — while the apps-infra Pulumi state still describes the `olapps` realm, so Pulumi skips creating it and dies on the first resource that has to look something up inside it.
+
+That happens when the cluster is replaced without `teardown.sh`: deleted by hand, lost to a `docker system prune` (see [Disk Management](#disk-management)), or to a WSL reset. The state lives in this checkout and survives all of them.
+
+Both infra stacks now `pulumi refresh` before applying, so this repairs itself — refresh drops the resources that no longer exist and `up` rebuilds them, about 20 seconds. `start.sh` also compares the cluster's identity against the one the state was written against and says so on the way past, which is the earlier and more useful signal. If you hit the error anyway, run the refresh by hand:
+
+```bash
+cd local-dev/infra/apps_infra
+PULUMI_CONFIG_PASSPHRASE='' pulumi refresh --yes --parallel 1 --stack local-dev.apps-infra.Dev
+```
+
+The app databases in the new cluster are empty regardless: restore from a dump with [`pg-restore.sh`](#backing-up-and-restoring-postgres) if you have one. The previous cluster's volumes may still be on disk as dangling volumes, but there is no supported way to reattach them to a new k3d cluster — treat them as lost and reclaim the space with `docker volume prune`.
 
 ### App pod stuck in `Init:CrashLoopBackOff`
 
