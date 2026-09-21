@@ -27,7 +27,6 @@ class OpenEdxApplication(StrEnum):
     forum = ("forum", "https://github.com/openedx/cs_comments_service")
     notes = ("notes-api", "https://github.com/openedx/edx-notes-api")
     theme = ("edxapp_theme", "")
-    xqueue = ("xqueue", "https://github.com/openedx/xqueue")
     xqwatcher = ("xqwatcher", "https://github.com/openedx/xqueue-watcher")
 
 
