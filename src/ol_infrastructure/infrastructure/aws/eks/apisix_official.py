@@ -17,6 +17,9 @@ from bridge.lib.magic_numbers import (
     AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
     DEFAULT_HTTPS_PORT,
 )
+from ol_infrastructure.components.services.apisix import (
+    identity_header_strip_plugin,
+)
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
 )
@@ -1011,6 +1014,55 @@ def setup_apisix(
         opts=ResourceOptions(
             provider=k8s_provider,
             parent=operations_namespace,
+            depends_on=[apisix_helm_release],
+        ),
+    )
+
+    # Refuse the gateway's own identity headers from a client, on every route.
+    #
+    # The openid-connect plugin clears an inbound X-Userinfo / X-ID-Token /
+    # X-Refresh-Token before setting its own, but only where it is attached.
+    # Every other route on an OIDC host hands the client's copy straight to the
+    # application, and mitol-apigateway's middleware authenticates off
+    # X-Userinfo without asking who wrote it -- so one unprotected route on a
+    # host that has a login is enough to impersonate any account.
+    #
+    # A global rule rather than an entry in each application's shared plugin
+    # config: the routes at risk are the ones that reference no plugin config
+    # at all, and a route carrying its own serverless-pre-function (every OIDC
+    # route does) would override a shared one by plugin name instead of running
+    # both.  Global rules run after route matching but ahead of the matched
+    # route's rewrite phase, which is where openid-connect lives, so the strip
+    # lands before the real headers are set and after nothing.
+    #
+    # The ingress controller flattens every ApisixGlobalRule in the cluster
+    # into one plugin-name-keyed map (internal/adc/translator/globalrule.go),
+    # so this is the cluster's only global ``serverless-pre-function``: a
+    # second one anywhere would silently replace it rather than run alongside.
+    # Anything else that has to run globally before openid-connect belongs in
+    # ``strip_client_identity_headers.lua``'s ``functions`` list, the same way
+    # ``oidc_gateway_pre_function_plugin`` stacks its two.
+    kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-apisix-identity-header-strip-global-rule",
+        api_version="apisix.apache.org/v2",
+        kind="ApisixGlobalRule",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="identity-header-strip",
+            namespace="operations",
+            labels=k8s_global_labels,
+        ),
+        spec={
+            "ingressClassName": "apache-apisix",
+            "plugins": [
+                identity_header_strip_plugin().model_dump(
+                    by_alias=True, exclude_none=True
+                )
+            ],
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+            delete_before_replace=True,
             depends_on=[apisix_helm_release],
         ),
     )

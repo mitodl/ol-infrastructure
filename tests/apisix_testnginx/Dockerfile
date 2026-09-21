@@ -84,9 +84,11 @@ RUN set -eu; \
 # drift, and the suite would then pass against Lua the gateway never runs.
 COPY src/ol_infrastructure/components/services/files/oidc_error_callback_recovery.lua \
      src/ol_infrastructure/components/services/files/canonical_https_redirect.lua \
+     src/ol_infrastructure/components/services/files/strip_client_identity_headers.lua \
      apisix/plugins/ol/
 COPY tests/apisix_testnginx/oidc_error_callback_recovery.t \
      tests/apisix_testnginx/canonical_https_redirect.t \
+     tests/apisix_testnginx/strip_client_identity_headers.t \
      t/
 COPY tests/apisix_testnginx/run-tests.sh /usr/local/bin/run-tests.sh
 RUN chmod +x /usr/local/bin/run-tests.sh
