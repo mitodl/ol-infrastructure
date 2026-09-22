@@ -2518,7 +2518,6 @@ def grpc_health_check_command(port: int) -> list[str]:
 code_locations: list[dict[str, str | int]] = [
     {"name": "canvas", "module": "canvas.definitions", "port": 4000},
     {"name": "data_loading", "module": "data_loading.definitions", "port": 4000},
-    {"name": "data_platform", "module": "data_platform.definitions", "port": 4001},
     {"name": "edxorg", "module": "edxorg.definitions", "port": 4002},
     {"name": "lakehouse", "module": "lakehouse.definitions", "port": 4003},
     {"name": "delivery", "module": "delivery.definitions", "port": 4004},
