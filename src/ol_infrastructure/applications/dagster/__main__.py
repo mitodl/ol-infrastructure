@@ -2304,8 +2304,8 @@ ml_gcp_volume_mounts: list[dict[str, Any]] = []
 ml_gcp_configmaps: list[kubernetes.core.v1.ConfigMap] = []
 if gcp_stack is not None:
     wif_provider_name = gcp_stack.require_output("workload_identity_providers")[
-        f"eks-workloads/data-{stack_info.env_suffix}"
-    ]
+        VERTEX_PROJECT
+    ][f"eks-workloads/data-{stack_info.env_suffix}"]
     ml_gcp_service_account = gcp_stack.require_output("service_account_emails")[
         VERTEX_PROJECT
     ][f"dagster-ml-{stack_info.env_suffix}"]
