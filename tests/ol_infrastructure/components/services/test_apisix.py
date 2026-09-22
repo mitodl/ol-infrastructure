@@ -17,6 +17,7 @@ from __future__ import annotations
 import ast
 import asyncio
 import collections
+import re
 from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
@@ -49,6 +50,7 @@ from bridge.lib.constants import (  # noqa: E402
 )
 from ol_infrastructure.components.services import apisix as apisix_module  # noqa: E402
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
+    FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixSharedPlugins,
@@ -56,6 +58,7 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixSharedPluginsVariant,
     OLApisixUpstream,
     OLApisixUpstreamConfig,
+    browser_traffic_match_exprs,
     oidc_gateway_pre_function_plugin,
     ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
@@ -1197,3 +1200,94 @@ def test_no_application_hand_writes_two_shared_plugin_configs():
         f"in step by hand: {offenders}. Use ol_apisix_shared_plugins_variants "
         "instead."
     )
+
+
+# ─── Browser traffic match exprs ────────────────────────────────────────────────
+
+# User-Agent strings observed on api.learn.mit.edu, 2026-09-21. The crawlers all
+# send the site's own Origin, so the Origin match alone does not separate them
+# from a browser -- which is the whole reason the User-Agent clause exists.
+MIT_LEARN_SSR_UA = "axios/1.12.2"
+BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
+CRAWLER_UAS = [
+    "DuckDuckBot/1.0; (+http://duckduckgo.com/duckduckbot.html)",
+    "DuckAssistBot/1.2; (+http://duckduckgo.com/duckassistbot.html)",
+    "amazon-bedrock-knowledgebase-on-behalf-of-9b9b0185",
+]
+
+
+def expr_for_header(exprs, name):
+    """Return the single expr whose subject is the named header."""
+    matches = [e for e in exprs if e["subject"]["name"] == name]
+    assert len(matches) == 1, f"{name} appears {len(matches)} times"
+    return matches[0]
+
+
+def browser_exprs():
+    """Exprs shaped like api.learn's, for the assertions below."""
+    return browser_traffic_match_exprs(
+        r"^https://learn\.mit\.edu$", FIRST_PARTY_SERVICE_CLIENT_UA_REGEX
+    )
+
+
+def test_browser_traffic_match_exprs_requires_the_site_origin():
+    """Only the site's own Origin selects the rate-limited routes.
+
+    re.search, not re.match, throughout these tests: APISIX evaluates these
+    with ngx.re.find, which is a substring search, so re.match would silently
+    supply an anchor the real matcher does not have and hide an unanchored
+    value.
+    """
+    exprs = browser_exprs()
+    origin = expr_for_header(exprs, "Origin")
+    assert origin["op"] == "RegexMatch"
+    assert origin["subject"]["scope"] == "Header"
+    assert re.search(origin["value"], "https://learn.mit.edu")
+    assert not re.search(origin["value"], "https://evil.example.com")
+    assert not re.search(origin["value"], "https://learn.mit.edu.evil.com")
+
+
+def test_browser_traffic_match_exprs_excludes_the_first_party_ssr_client():
+    """The SSR layer aggregates every end user behind four egress addresses, so
+    a per-browser bucket would throttle the whole population at once. It is
+    kept out on purpose rather than by axios happening to send no Origin.
+    """
+    user_agent = expr_for_header(browser_exprs(), "User-Agent")
+    assert user_agent["op"] == "RegexNotMatch"
+    assert re.search(user_agent["value"], MIT_LEARN_SSR_UA), (
+        "the SSR User-Agent must match the RegexNotMatch value, which is what "
+        "excludes it from the rate-limited routes"
+    )
+
+
+@pytest.mark.parametrize("user_agent", [BROWSER_UA, *CRAWLER_UAS])
+def test_browser_traffic_match_exprs_keeps_browsers_and_crawlers_in(user_agent):
+    """A crawler is a single actor sending our Origin, which is exactly what a
+    per-client-IP limit is for. Excluding every non-browser would exempt them,
+    so the clause names the first-party client instead.
+    """
+    user_agent_expr = expr_for_header(browser_exprs(), "User-Agent")
+    assert not re.search(user_agent_expr["value"], user_agent)
+
+
+def test_browser_traffic_match_exprs_ua_regex_is_anchored():
+    """Unanchored, any User-Agent merely containing the token falls out of the
+    rate-limited routes, which is a one-header way for a flood to opt out.
+
+    This is the assertion that needs re.search to have any force: under
+    re.match it passes whether or not the value is anchored.
+    """
+    assert FIRST_PARTY_SERVICE_CLIENT_UA_REGEX.startswith("^")
+    user_agent = expr_for_header(browser_exprs(), "User-Agent")
+    assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {MIT_LEARN_SSR_UA}")
+
+
+def test_browser_traffic_match_exprs_requires_an_explicit_ua_regex():
+    """Not defaulted, so a second host cannot inherit mit-learn's first-party
+    client and silently exempt every stock-axios caller of its own.
+    """
+    with pytest.raises(TypeError):
+        browser_traffic_match_exprs(r"^https://learn\.mit\.edu$")
