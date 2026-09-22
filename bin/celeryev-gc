@@ -242,7 +242,9 @@ def main(
     if len(selected) > 25:
         print(f"... and {len(selected) - 25:,} more")
 
-    print(f"\n{len(orphans):,} orphaned, {alive:,} left alone (empty or draining)")
+    print(
+        f"\n{len(orphans):,} orphaned, {alive:,} left alone (draining or below --min-length)"
+    )
     if len(selected) != len(orphans):
         print(f"acting on {len(selected):,} of them this run (--limit)")
 
