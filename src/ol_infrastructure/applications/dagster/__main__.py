@@ -2301,6 +2301,7 @@ GCP_CREDENTIALS_DIR = "/etc/gcp"
 ml_gcp_env: list[dict[str, Any]] = []
 ml_gcp_volumes: list[dict[str, Any]] = []
 ml_gcp_volume_mounts: list[dict[str, Any]] = []
+ml_gcp_configmaps: list[kubernetes.core.v1.ConfigMap] = []
 if gcp_stack is not None:
     wif_provider_name = gcp_stack.require_output("workload_identity_providers")[
         f"eks-workloads/data-{stack_info.env_suffix}"
@@ -2335,6 +2336,7 @@ if gcp_stack is not None:
             ),
         },
     )
+    ml_gcp_configmaps.append(ml_gcp_credentials)
     ml_gcp_volumes = [
         {
             "name": "gcp-wif-token",
@@ -3397,6 +3399,7 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
             dagster_helm_release,
             aws_profile_configmap,
             edxorg_gcp_secret,
+            *ml_gcp_configmaps,
         ]
     ),
 )
