@@ -68,13 +68,16 @@ ol-superset promote \\
     --assets-dir ol-data-platform-repository/src/ol_superset/assets
 
 GOVERNANCE_JSON=ol-infrastructure-repository/src/ol_infrastructure/applications/superset/ol_governance_roles.json
+RLS_POLICY_FILE=ol-data-platform-repository/src/ol_superset/policies/ol_rls_policies.json
 
 ol-superset roles sync superset-production \\
     --yes \\
     --assets-dir ol-data-platform-repository/src/ol_superset/assets \\
     --governance-json "${GOVERNANCE_JSON}"
 
-ol-superset apply-rls superset-production --yes
+ol-superset apply-rls superset-production \\
+    --yes \\
+    --policy-file "${RLS_POLICY_FILE}"
 """
 
 deploy_pipeline = Pipeline(
