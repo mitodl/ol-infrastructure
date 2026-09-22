@@ -718,9 +718,23 @@ superset_chart = kubernetes.helm.v3.Release(
                     "maxReplicas": 8,
                     "targetCPUUtilizationPercentage": "60",
                 },
-                # One gunicorn worker per pod grows to ~1.6GiB over its life
-                # (7d peak in production) and has OOMKilled at a 2Gi limit, so
-                # request what it actually holds and leave headroom in the limit.
+                # The single gunicorn worker never returns heap: its working
+                # set steps up on heavy dashboard/SQL Lab requests and only
+                # grows, so recycle it before it reaches the limit. run-server.sh
+                # in the pinned 6.1.0 image maps these to gunicorn's
+                # --max-requests / --max-requests-jitter. Scoped to supersetNode
+                # so only the web Deployment recycles, not celery.
+                # Probes alone are 480 req/pod/hour (11.5k/day, measured), plus
+                # 330-2200 real req/hour, so a pod recycles a little under daily
+                # at idle and about twice daily under load.
+                "env": {
+                    "WORKER_MAX_REQUESTS": "10000",
+                    "WORKER_MAX_REQUESTS_JITTER": "2000",
+                },
+                # Sized to the un-recycled peak on purpose: 24h-old pods reached
+                # 1412MiB and 1885MiB working set on 2026-09-22, so the request
+                # stays until a week of post-recycling data says what the bounded
+                # peak actually is.
                 "resources": {
                     "limits": {"cpu": "2000m", "memory": "3Gi"},
                     "requests": {"cpu": "500m", "memory": "1536Mi"},
@@ -890,10 +904,9 @@ _gateway = OLEKSGateway(
 # DNS is managed at the Gateway/ingress layer via cert-manager/external-dns
 
 # VPA objects for Superset workloads.
-# No webapp VPA: the HPA owns the cpu axis, and a memory-only VPA would just
-# chase the single gunicorn worker's monotonic growth up to maxAllowed until
-# the worker is recycled (gunicorn --max-requests); the memory request is
-# sized from measurement above instead.
+# No webapp VPA yet: the HPA owns the cpu axis, and a memory-only VPA is only
+# safe once WORKER_MAX_REQUESTS has been observed to bound the worker's growth.
+# Until then it would chase that growth up to maxAllowed.
 # Worker uses KEDA (Redis queue depth) so CPU+memory VPA is safe there.
 make_vpa(
     name="superset-worker-vpa",
