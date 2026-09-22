@@ -87,7 +87,10 @@ deploy_pipeline = Pipeline(
             name=Identifier("deploy-superset-assets-to-production"),
             plan=[
                 GetStep(get=ol_data_platform_repo.name, trigger=True),
-                GetStep(get=ol_infrastructure_repo.name, trigger=True),
+                # Not a trigger: Concourse ORs multiple trigger=True get steps, so
+                # triggering on this too would force-promote QA assets to production
+                # on a governance-only change with no asset review involved.
+                GetStep(get=ol_infrastructure_repo.name),
                 TaskStep(
                     task=Identifier("promote-assets-and-sync-governance"),
                     config=TaskConfig(
