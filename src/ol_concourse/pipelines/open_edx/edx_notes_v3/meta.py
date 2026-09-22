@@ -104,7 +104,7 @@ if __name__ == "__main__":
                 "(`dagger-pulumi-edx-notes-{release}`) for every "
                 "`OpenEdxSupportedRelease`, plus this meta pipeline itself."
             ),
-            "team": "infrastructure",
+            "team": "main",
             "category": "meta",
         },
     )

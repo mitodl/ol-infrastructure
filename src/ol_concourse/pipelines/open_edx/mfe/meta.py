@@ -215,7 +215,7 @@ if __name__ == "__main__":
                 "re-generated from `pipeline.py` and `site_pipeline.py` "
                 "whenever this repo changes."
             ),
-            "team": "infrastructure",
+            "team": "main",
             "category": "meta",
         },
     )

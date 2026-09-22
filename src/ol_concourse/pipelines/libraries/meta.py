@@ -142,4 +142,11 @@ if __name__ == "__main__":
             },
         )
     )
-    print("\nfly -t <target> set-pipeline -p self -c <path/to/this/file>")  # noqa: T201
+    # This script's stdout is captured directly into a JSON file by
+    # set_self_job()'s `> {definition_path}` redirect, so the hint below must
+    # not go to stdout -- appending it there would make that file invalid
+    # JSON and fail the self-update SetPipelineStep.
+    print(  # noqa: T201
+        "\nfly -t <target> set-pipeline -p self -c <path/to/this/file>",
+        file=sys.stderr,
+    )

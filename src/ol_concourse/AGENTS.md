@@ -92,8 +92,12 @@ if __name__ == "__main__":
 
 ## Pipeline descriptions (`user_data`)
 
-Every `__main__` block should use `pipeline_json_with_user_data(pipeline, user_data={...})`
-in place of `pipeline.model_dump_json(indent=2)` when writing `definition.json` and stdout.
+Every `__main__` block in a production pipeline generator should use
+`pipeline_json_with_user_data(pipeline, user_data={...})` in place of
+`pipeline.model_dump_json(indent=2)` when writing `definition.json` and stdout.
+Exception: `pipelines/examples/hello.py` is a demo whose pipeline was destroyed
+off odl-prod (see `docs/plans/concourse-dashboard-reorganization.md` §3.6) and
+is deliberately left as a direct serializer -- don't wire it up or resurrect it.
 `user_data` is an opaque field Concourse already accepts and preserves through
 set-pipeline/get-pipeline (concourse/concourse#9489, shipped in our pinned
 `CONCOURSE_VERSION`), but the web UI doesn't render it until concourse/concourse#9661

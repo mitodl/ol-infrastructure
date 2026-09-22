@@ -104,7 +104,7 @@ if __name__ == "__main__":
                 "(`docker-pulumi-xqwatcher-{release}`) for every "
                 "`OpenEdxSupportedRelease`, plus this meta pipeline itself."
             ),
-            "team": "infrastructure",
+            "team": "main",
             "category": "meta",
         },
     )
