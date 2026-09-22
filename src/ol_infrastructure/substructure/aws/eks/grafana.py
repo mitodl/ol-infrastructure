@@ -431,6 +431,20 @@ def setup_grafana(
                 "podLogsViaLoki": {
                     "enabled": True,
                     "collector": "alloy-logs",
+                    # The chart default (True) renders `tail_from_end = true`
+                    # on loki.source.file, which seeks to EOF for any file with
+                    # no stored position -- including every newly created
+                    # container log. Whatever a container writes before
+                    # local.file_match notices its log file (sync_period
+                    # defaults to 10s) is then dropped, so startup output
+                    # survives or vanishes depending on where the container
+                    # lands in that window. The superset web pods lost their
+                    # first 4.2s on 2026-09-21, gunicorn's arbiter block
+                    # included, and kept it on 2026-09-18.
+                    # Safe to disable only alongside the host-storage preset
+                    # below, which is what makes positions survive a collector
+                    # restart.
+                    "onlyGatherNewLogLines": False,
                     "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config()
                     + _keycloak_olapps_idp_login_redact_alloy_config(),
                 },
@@ -652,7 +666,18 @@ def setup_grafana(
                         "presets": ["singleton"],
                     },
                     "alloy-logs": {
-                        "presets": ["filesystem-log-reader", "daemonset"],
+                        # host-storage moves Alloy's storage path off the
+                        # container filesystem (/tmp/alloy, discarded on every
+                        # pod restart) onto a /var/lib/alloy hostPath, so the
+                        # read positions outlive a collector restart. Without
+                        # it, onlyGatherNewLogLines=False above would re-read
+                        # every retained pod log on the node from byte 0 on each
+                        # restart (~60MB/node measured).
+                        "presets": [
+                            "filesystem-log-reader",
+                            "daemonset",
+                            "host-storage",
+                        ],
                     },
                     "alloy-receiver": {
                         "presets": ["deployment"],
