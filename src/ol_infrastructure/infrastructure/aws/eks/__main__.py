@@ -365,6 +365,17 @@ cluster_creation_aws_provider = aws.Provider(
         )
     ],
 )
+# EKS creates this group itself with never-expire retention the moment
+# control-plane logging is enabled. Declaring it first means EKS adopts ours
+# and the retention actually applies.
+control_plane_log_group = aws.cloudwatch.LogGroup(
+    f"{cluster_name}-eks-control-plane-log-group",
+    name=f"/aws/eks/{cluster_name}/cluster",
+    retention_in_days=90 if stack_info.env_suffix == "production" else 30,
+    tags=aws_config.tags,
+    opts=ResourceOptions(retain_on_delete=True),
+)
+
 # Actually make the cluster
 cluster = eks.Cluster(
     f"{cluster_name}-eks-cluster",
@@ -410,7 +421,7 @@ cluster = eks.Cluster(
     opts=ResourceOptions(
         provider=cluster_creation_aws_provider,
         parent=cluster_role,
-        depends_on=[cluster_role, administrator_role],
+        depends_on=[cluster_role, administrator_role, control_plane_log_group],
     ),
 )
 
@@ -938,6 +949,64 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             depends_on=[ebs_csi_driver_role, *node_groups],
         ),
     )
+    # `iopsPerGB` is a ratio, so a volume large enough makes it run away: the
+    # three 1,500 GiB data-production ClickHouse volumes each carried 75,000
+    # provisioned IOPS ($360/mo apiece above the free 3,000). Over the fourteen
+    # days to 2026-09-21, ClickHouse's own one-second samples of the data device
+    # (system.asynchronous_metric_log BlockReadOps + BlockWriteOps) peaked at
+    # 1,983 ops/s combined, with p99.9 at 338 and a mean under 25; not one of the
+    # 1.28M seconds sampled exceeded 3,000. The ratio is right for the 100 GiB
+    # Meilisearch volumes it was measured against and 25x too generous for
+    # ClickHouse, whose MergeTree writes are large sequential merges, not small
+    # random I/O.
+    #
+    # This class pins a volume to gp3's included baseline regardless of size, so
+    # a workload can opt out of the ratio by name without lowering it for every
+    # other volume in the cluster. Throughput stays at the 125 MB/s default the
+    # StorageClass already provisions, so this changes only the IOPS billing line.
+    kubernetes.storage.v1.VolumeAttributesClass(
+        resource_name=f"{cluster_name}-ebs-gp3-iops-3000-volumeattributesclass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="ebs-gp3-iops-3000",
+            labels=k8s_global_labels,
+        ),
+        driver_name="ebs.csi.aws.com",
+        parameters={
+            "type": "gp3",
+            "iops": "3000",
+            "throughput": "125",
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[ebs_csi_driver_role, *node_groups],
+        ),
+    )
+    # Rollback targets for the class above, following the throughput-125 pattern:
+    # clearing volumeAttributesClassName never calls ec2:ModifyVolume, so the only
+    # way back to the geometry `iopsPerGB: 50` gave the ClickHouse data volumes is
+    # a class that states it. 75,000 is the 1,500 GiB data-production volumes;
+    # 25,000 is the 500 GiB data-qa volume. Rolling back means setting
+    # `clickhouse:data_volume_attributes_class` on that stack and applying; EBS
+    # accepts one modification per volume per six hours, so a rollback issued
+    # inside that window queues behind the change it reverts.
+    for rollback_iops in ("75000", "25000"):
+        kubernetes.storage.v1.VolumeAttributesClass(
+            resource_name=f"{cluster_name}-ebs-gp3-iops-{rollback_iops}-volumeattributesclass",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=f"ebs-gp3-iops-{rollback_iops}",
+                labels=k8s_global_labels,
+            ),
+            driver_name="ebs.csi.aws.com",
+            parameters={
+                "type": "gp3",
+                "iops": rollback_iops,
+                "throughput": "125",
+            },
+            opts=ResourceOptions(
+                provider=k8s_provider,
+                depends_on=[ebs_csi_driver_role, *node_groups],
+            ),
+        )
     aws_ebs_cni_driver_addon = eks.Addon(
         f"{cluster_name}-eks-addon-ebs-cni-driver-addon",
         cluster=cluster,

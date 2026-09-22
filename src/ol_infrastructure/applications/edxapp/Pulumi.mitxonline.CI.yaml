@@ -21,7 +21,6 @@ config:
   - ["grades.enforce_freeze_grade_after_course_end", "--create", "--superusers", "--everyone"]
   - ["grades.rejected_exam_overrides_grade", "--create", "--superusers", "--everyone"]
   - ["grades.writable_gradebook", "--create", "--superusers", "--everyone"]
-  - ["instructor.legacy_instructor_dashbaord", "--create", "--everyone"]
   - ["legacy_studio.advanced_settings", "--deactivate"]
   - ["legacy_studio.certificates", "--create", "--everyone"]
   - ["legacy_studio.configurations", "--deactivate"]
@@ -79,7 +78,6 @@ config:
     secure: v1:+8kgTH+x98kC+Lxc:bW03E5mk8wRB+FxZYtj06FPx/MEJuEiKO5ekaDTZKmqmfklisVhidp0fhX+So2Eygf/Aiyqp5L03RCzA8k7I4ZmlNss19//pdGgBDwa3HAbw
   edxapp:enable_courseware_index: "true"
   edxapp:elasticsearch_enabled: "false"
-  edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     admin_console: admin-console
     communications: communications
@@ -93,7 +91,7 @@ config:
   edxapp:google_analytics_id: ""
   edxapp:elb_healthcheck_interval: '30'
   edxapp:mail_domain: edxapp-mail.ci.learn.mit.edu
-  edxapp:proctortrack_url: https://preproduction.verificient.com
+  edxapp:proctortrack_url: https://testing.verificient.com
   edxapp:sender_email_address: mitlearn-support+ci@mit.edu
   edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.ci.learn.mit.edu
   mongodb:admin_password:
@@ -107,6 +105,18 @@ config:
   edxapp:autoscaling_lms_cpu_threshold: "70"
   edxapp:autoscaling_cms_requests_threshold: "20"
   edxapp:autoscaling_cms_cpu_threshold: "70"
+  # LMS leaves the Granian holding pins (2 workers x 32 blocking threads, backpressure
+  # 64). Worst per-pod busy-thread demand over the 14d to 2026-09-16 14:00Z was 13.95,
+  # concentrated on 2 of 18 pods while the rest stayed under 3; 24 is ~1.7x that.
+  # backpressure takes the component default (256): the worst single worker
+  # held 24 connections over 7d. CMS stays on the pins until it has a
+  # saturation-aware scaling signal. See docs/plans/granian-configuration-overhaul.md.
+  edxapp:k8s_granian:
+    lms:
+      workers: 1
+      runtime_threads: 1
+      blocking_threads: 24
+      respawn_interval: 60
   edxapp:k8s_replicas:
     webapp:
       lms:

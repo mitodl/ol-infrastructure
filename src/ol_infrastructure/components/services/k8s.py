@@ -14,6 +14,7 @@ from pydantic import (
     ConfigDict,
     Field,
     NonNegativeInt,
+    PositiveFloat,
     PositiveInt,
     field_validator,
     model_validator,
@@ -60,10 +61,16 @@ def scheduled_job_name(application_name: str, job_name: str) -> str:
     return truncate_k8s_metanames(f"{application_name}-{job_name}".replace("_", "-"))
 
 
+def dev_shell_deployment_name(application_name: str) -> str:
+    """Name of the developer shell Deployment OLApplicationK8s creates."""
+    return truncate_k8s_metanames(f"{application_name}-dev-shell".replace("_", "-"))
+
+
 def application_deployment_names(
     application_name: str,
     celery_worker_configs: "list[OLApplicationK8sCeleryWorkerConfig] | None" = None,
     celery_beat_config: "OLApplicationK8sCeleryBeatConfig | None" = None,
+    dev_shell_config: "OLApplicationK8sDevShellConfig | None" = None,
 ) -> list[str]:
     """Deployment names OLApplicationK8s will create, without constructing it.
 
@@ -104,6 +111,8 @@ def application_deployment_names(
         )
     if celery_beat_config is not None:
         names.append(celery_beat_deployment_name(application_name))
+    if dev_shell_config is not None:
+        names.append(dev_shell_deployment_name(application_name))
     return names
 
 
@@ -213,6 +222,16 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     min_replicas: NonNegativeInt = 1
     max_replicas: NonNegativeInt = 10
     autoscale_queue_depth: NonNegativeInt = 10
+    # Resident set size, in KiB, above which celery retires a pool child. Checked
+    # after each task returns, so it bounds what a child *carries into the next
+    # task* -- it cannot stop a single task that blows the cgroup limit on its own.
+    # Without it the only recycle trigger is --max-tasks-per-child (100), so a
+    # child that balloons on task 1 stays resident for 99 more and the kernel
+    # OOM-kills the whole container, taking unrelated in-flight tasks with it.
+    # Size it so master + concurrency * (cap + one task's growth) clears the
+    # *smallest* limit the pod can run under, which under a VPA is the floor-
+    # derived limit, not the declared one.
+    max_memory_per_child_kib: PositiveInt | None = None
     redis_database_index: str = "1"
     redis_host: Output[str]
     redis_password: str
@@ -321,6 +340,72 @@ class OLApplicationK8sScheduledJobConfig(BaseModel):
     )
 
 
+class OLApplicationK8sDevShellConfig(BaseModel):
+    """Configuration for a long-lived developer shell Deployment.
+
+    A Deployment of the application image with the webapp's env, secrets,
+    volumes, service account and security group, whose pod does nothing until
+    a developer ``kubectl exec``s into it to run ``manage.py`` commands, a
+    Django shell, or ad-hoc scripts. It exists because none of the other pods
+    are a safe place for that work: the webapp is autoscaled and VPA-evicted,
+    celery workers are KEDA-scaled to zero and sized for their task mix, and a
+    pre-deploy Job is gated on the rollout. A session in any of them can be
+    OOMKilled or scaled away mid-command.
+
+    It is launch-on-request. The Deployment is created with zero replicas and
+    Pulumi ignores ``spec.replicas`` from then on, so a developer scales it up,
+    works, and scales it back down, and a deploy in between rolls the image
+    without resetting the count::
+
+        kubectl -n <ns> scale deploy/<app>-dev-shell --replicas=1
+        kubectl -n <ns> exec -it deploy/<app>-dev-shell -- bash
+        kubectl -n <ns> scale deploy/<app>-dev-shell --replicas=0
+
+    Nothing scales it down automatically. A forgotten shell holds its memory
+    request until someone notices, which is the accepted cost of not having a
+    reaper with RBAC over the Deployment.
+
+    What keeps a session alive once it is up:
+
+    * Labels that match no other Deployment's selector, so no HPA, KEDA
+      ScaledObject or VPA counts or resizes this pod. Do not create a VPA for
+      it; its whole point is a fixed, generous memory limit.
+    * No Service routes to it and it exposes no ports.
+    * ``karpenter.sh/do-not-disrupt`` on the pod, so node consolidation does
+      not evict it under someone.
+    * ``Recreate`` strategy, so a rollout never runs two shells or waits on
+      surge capacity.
+
+    What does NOT keep a session alive, deliberately: the pod runs the same
+    image as the webapp, so every application deploy rolls it. That is the
+    right trade -- a shell running last week's code against a freshly migrated
+    database is worse than an interrupted session -- but it means long-running
+    commands should be started with the deploy schedule in mind. The rollout
+    sends SIGTERM to PID 1 (``sleep``), which ignores it, so an exec'd command
+    gets the pod's full termination grace period before SIGKILL.
+
+    The pod is included in ``all_deployment_names`` and so in Vault secret
+    ``restart_targets``: credential rotation restarts it, because a shell whose
+    database password has expired is not useful either.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    command: list[str] = Field(
+        default=["sleep", "infinity"],
+        description="Container entrypoint. Must block forever without using resources.",
+    )
+    resource_requests: dict[str, str] = Field(default={"cpu": "250m", "memory": "4Gi"})
+    resource_limits: dict[str, str] = Field(default={"memory": "4Gi"})
+    termination_grace_period_seconds: PositiveInt = Field(
+        default=60,
+        description=(
+            "How long an exec'd command gets to finish when a deploy rolls the pod. "
+            "With the Recreate strategy the deploy's rollout waits this long, so "
+            "keep it short enough not to stall a release."
+        ),
+    )
+
+
 class GranianConfig(BaseModel):
     """Configuration for running applications with the Granian ASGI/WSGI server.
 
@@ -330,8 +415,9 @@ class GranianConfig(BaseModel):
 
     The supported subset of granian CLI options is: interface, host, port, workers,
     runtime_mode, runtime_threads, blocking_threads, backpressure, no_ws,
-    workers_max_rss, blocking_threads_idle_timeout, respawn_failed_workers, backlog,
-    log_level, application_module, and metrics-related flags.
+    workers_max_rss, blocking_threads_idle_timeout, respawn_failed_workers,
+    respawn_interval, backlog, log_level, application_module, and metrics-related
+    flags.
 
     **Concurrency defaults:** ``workers``, ``runtime_threads`` and ``runtime_mode`` track
     Granian's own CLI defaults (1 / 1 / auto); scale horizontally with replicas rather
@@ -385,18 +471,42 @@ class GranianConfig(BaseModel):
     concurrent Python work."""
     no_ws: bool = True
     limit_workers_max_rss: bool = True
-    """When ``True`` (default), automatically cap each worker's RSS at 90 % of the
-    per-worker share of the container memory limit.  Set to ``False`` to disable the
-    ``--workers-max-rss`` flag entirely (e.g. for ASGI apps without a fixed memory
-    budget or when the limit is managed externally)."""
+    """When ``True`` (default), derive ``--workers-max-rss`` from the container memory
+    limit; see ``resolve_workers_max_rss``.  Set to ``False`` to disable the flag
+    entirely (e.g. for ASGI apps without a fixed memory budget or when the limit is
+    managed externally)."""
     workers_max_rss: PositiveInt | None = None
     """Explicit per-worker RSS cap in MiB.  When ``None`` and ``limit_workers_max_rss``
     is ``True``, the value is derived from the container ``resource_limits["memory"]``
-    via ``floor(memory_limit_bytes / workers * 0.9) MiB``.  Set explicitly only to
-    override the computed value."""
+    by ``resolve_workers_max_rss``.  Set explicitly only to override the computed
+    value."""
+    worker_startup_rss: PositiveInt | None = None
+    """RSS in MiB of a newly spawned worker shortly after it has imported the app,
+    measured per app. Subtracted from the memory budget before it is split into a
+    per-worker cap.
+
+    A planned respawn (RSS cap, lifetime) starts the replacement worker before stopping
+    the old one and keeps both for ``respawn_interval`` (granian/server/common.py
+    ``_respawn_workers``, v2.7.4 and v2.8.2). So the moment a cap trips, the container
+    holds every worker at up to the cap plus a new worker. Without this term, one worker
+    at 90% of the limit plus an app import exceeds the limit, and the graceful respawn
+    becomes the OOMKill the cap exists to prevent. ``None`` leaves it out of the
+    derivation, which is only safe where the cap never trips."""
     blocking_threads_idle_timeout: PositiveInt | None = None
     """Seconds before an idle blocking thread is retired (granian ``--blocking-threads-idle-timeout``). Omitted when ``None``."""
     respawn_failed_workers: bool = True
+    respawn_interval: PositiveFloat | None = None
+    """Seconds Granian keeps the old worker running after starting its replacement
+    during a planned respawn (granian ``--respawn-interval``, default 3.5). ``None``
+    takes Granian's default.
+
+    Granian 2.8.x has no listener in the main process: each worker binds its own
+    SO_REUSEPORT socket only after importing the app, and the old worker is stopped
+    once this interval elapses whether or not the new one is listening. At workers=1 an
+    interval shorter than the app's import time leaves the pod refusing connections for
+    the difference. Size it above the measured worker cold start. On 2.7.x the main
+    process holds the listener, so connections queue instead and this only sets how
+    long two workers overlap. Crash respawns do not wait for it either way."""
     backlog: PositiveInt | None = 128
     """Kernel listen backlog (granian ``--backlog``). Now that ``backpressure`` and
     ``blocking_threads`` are resolved explicitly this no longer feeds Granian's own
@@ -513,6 +623,48 @@ class GranianConfig(BaseModel):
             raise ValueError(msg)
         return self
 
+    @model_validator(mode="after")
+    def validate_worker_startup_rss(self) -> "GranianConfig":
+        """Reject a startup RSS that the cap derivation would never read."""
+        if self.worker_startup_rss is not None and (
+            self.workers_max_rss is not None or not self.limit_workers_max_rss
+        ):
+            msg = (
+                "granian_config.worker_startup_rss only feeds the derived "
+                "--workers-max-rss, but workers_max_rss is set explicitly or "
+                "limit_workers_max_rss is False. Remove it, or fold the headroom into "
+                "the explicit cap."
+            )
+            raise ValueError(msg)
+        return self
+
+    def resolve_workers_max_rss(self, memory_limit: str) -> "GranianConfig":
+        """Return a copy with ``workers_max_rss`` derived from a container memory limit.
+
+        ``floor((0.9 * limit_mib - worker_startup_rss) / workers)``: during a planned
+        respawn every worker can sit at the cap while the replacement imports, so that
+        total has to fit. The remaining 10% covers the Granian main process and growth
+        between RSS samples (``--rss-sample-interval``, 30s).
+
+        The limit is the one declared in the manifest. The kernel enforces the pod's
+        admitted limit, which a VPA can set lower, so size the declared limit as the
+        lowest one a pod can be admitted with.
+        """
+        if not self.limit_workers_max_rss or self.workers_max_rss is not None:
+            return self
+        budget_mib = int(parse_quantity(memory_limit)) * 0.9 / (1024 * 1024)
+        startup_rss = self.worker_startup_rss or 0
+        cap = int((budget_mib - startup_rss) // self.workers)
+        if cap <= startup_rss:
+            msg = (
+                f"A {memory_limit} memory limit leaves a {cap}MiB --workers-max-rss for "
+                f"{self.workers} worker(s) after reserving worker_startup_rss="
+                f"{startup_rss}MiB for a respawn. A cap at or below a fresh worker's RSS "
+                "respawns continuously. Raise the memory limit or lower workers."
+            )
+            raise ValueError(msg)
+        return self.model_copy(update={"workers_max_rss": cap})
+
     def build_args(self) -> list[str]:
         """Build the granian CLI argument list from this configuration."""
         args = [
@@ -534,6 +686,7 @@ class GranianConfig(BaseModel):
             ("--backpressure", self.backpressure),
             ("--workers-max-rss", self.workers_max_rss),
             ("--blocking-threads-idle-timeout", self.blocking_threads_idle_timeout),
+            ("--respawn-interval", self.respawn_interval),
         ):
             if value is not None:
                 args += [flag, str(value)]
@@ -844,6 +997,13 @@ class OLApplicationK8sConfig(BaseModel):
         default_factory=list,
         description="CronJobs to run in the application image on a wall-clock schedule.",
     )
+    dev_shell_config: OLApplicationK8sDevShellConfig | None = Field(
+        default=None,
+        description=(
+            "Create a long-lived, unrouted developer shell Deployment in the "
+            "application image. None (the default) creates nothing."
+        ),
+    )
 
     @model_validator(mode="after")
     def check_scheduled_job_names_unique(self):
@@ -1060,6 +1220,25 @@ class OLApplicationK8sConfig(BaseModel):
                 f"127.0.0.1:{DEFAULT_WSGI_PORT}, so traffic will be misdirected. "
                 "Either keep the default port or supply a custom nginx_config_filename "
                 "whose upstream address matches the overridden port."
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_worker_startup_rss_has_memory_limit(
+        self,
+    ) -> "OLApplicationK8sConfig":
+        """Reject worker_startup_rss when there is no memory limit to derive a cap from."""
+        gc = self.granian_config
+        if (
+            gc is not None
+            and gc.worker_startup_rss is not None
+            and "memory" not in self.resource_limits
+        ):
+            msg = (
+                "granian_config.worker_startup_rss is set but resource_limits has no "
+                "'memory' entry, so --workers-max-rss is never derived and the "
+                "headroom is ignored. Set a memory limit or remove worker_startup_rss."
             )
             raise ValueError(msg)
         return self
@@ -1299,18 +1478,8 @@ class OLApplicationK8s(ComponentResource):
         effective_extra_ports = list(ol_app_k8s_config.extra_container_ports)
         if ol_app_k8s_config.granian_config is not None:
             gc = ol_app_k8s_config.granian_config
-            # Derive workers_max_rss from the container memory limit when not explicit.
-            # Formula: floor(memory_limit_bytes / workers * 0.9) MiB
-            if (
-                gc.limit_workers_max_rss
-                and gc.workers_max_rss is None
-                and (memory_str := ol_app_k8s_config.resource_limits.get("memory"))
-            ):
-                limit_bytes = int(parse_quantity(memory_str))
-                computed_rss = max(
-                    1, int(limit_bytes / gc.workers * 0.9) // (1024 * 1024)
-                )
-                gc = gc.model_copy(update={"workers_max_rss": computed_rss})
+            if memory_str := ol_app_k8s_config.resource_limits.get("memory"):
+                gc = gc.resolve_workers_max_rss(memory_str)
             effective_nginx_config_path = f"files/{gc.nginx_config_filename}"
             effective_cmd_array: list[str] | None = ["granian"]
             effective_arg_array: list[str] | None = gc.build_args()
@@ -1592,6 +1761,8 @@ class OLApplicationK8s(ComponentResource):
         self.celery_deployment_names: list[str] = []
         self.celery_deployments: list[kubernetes.apps.v1.Deployment] = []
         self.beat_deployment_name: str | None = None
+        self.dev_shell_deployment_name: str | None = None
+        self.dev_shell_deployment: kubernetes.apps.v1.Deployment | None = None
         self.scheduled_job_names: list[str] = []
         self.scheduled_jobs: list[kubernetes.batch.v1.CronJob] = []
         self.webapp_pod_monitor: kubernetes.apiextensions.CustomResource | None = None
@@ -2189,6 +2360,31 @@ class OLApplicationK8s(ComponentResource):
                                         celery_worker_config.application_name,
                                         "worker",  # COMMAND
                                         "-E",  # send task-related events for monitoring
+                                        # Gossip is worker-to-worker peer
+                                        # awareness, and on a Redis broker it
+                                        # leaks. Every worker that starts
+                                        # declares a celeryev.<uuid> queue for
+                                        # it
+                                        # (celery.worker.consumer.gossip.Gossip.get_consumers)
+                                        # and relies on the broker to reclaim
+                                        # it. kombu's Redis transport never
+                                        # does: Channel.close() only deletes
+                                        # queues in _fanout_queues, which
+                                        # _queue_bind populates only for FANOUT
+                                        # exchanges, and celery declares
+                                        # celeryev as a TOPIC exchange. So the
+                                        # queue and its binding survive even a
+                                        # clean shutdown, and the exchange goes
+                                        # on copying every event into the
+                                        # orphan forever. 4,112 of them held
+                                        # 64.7 GiB on
+                                        # edxapp-redis-mitxonline-production on
+                                        # 2026-09-21.
+                                        # This does NOT affect monitoring:
+                                        # events are still emitted by -E above,
+                                        # and leek's revoke goes over pidbox
+                                        # (the Control bootstep), not gossip.
+                                        "--without-gossip",
                                         *(
                                             [
                                                 "-Q",  # queue name filter
@@ -2206,6 +2402,18 @@ class OLApplicationK8s(ComponentResource):
                                         celery_worker_config.log_level,
                                         "--max-tasks-per-child",  # Max number of tasks the pool worker will process before being replaced
                                         "100",
+                                        *(
+                                            [
+                                                # Max RSS (KiB) a pool worker may
+                                                # hold before being replaced
+                                                "--max-memory-per-child",
+                                                str(
+                                                    celery_worker_config.max_memory_per_child_kib
+                                                ),
+                                            ]
+                                            if celery_worker_config.max_memory_per_child_kib
+                                            else []
+                                        ),
                                         "--concurrency=2",  # Don't try to use all cores on node
                                         "--prefetch-multiplier=1",
                                     ],
@@ -2496,6 +2704,108 @@ class OLApplicationK8s(ComponentResource):
             )
             self.scheduled_jobs.append(_scheduled_job)
 
+        if ol_app_k8s_config.dev_shell_config is not None:
+            dev_shell_config = ol_app_k8s_config.dev_shell_config
+            # Same reasoning as the scheduled jobs above: these must not be the
+            # webapp's selector labels or the webapp HPA/KEDA counts this pod, and
+            # they must not be a celery worker's or its KEDA ScaledObject and VPA
+            # adopt it. The pod-security-group label stays so the SecurityGroupPolicy
+            # below gives the shell the same RDS/Redis reachability as the webapp.
+            dev_shell_labels = ol_app_k8s_config.k8s_global_labels | {
+                "ol.mit.edu/component": "dev-shell",
+                "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
+                "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
+                    truncate_k8s_metanames
+                ),
+            }
+            if ol_app_k8s_config.slack_channel:
+                dev_shell_labels["ol.mit.edu/slack-channel"] = (
+                    ol_app_k8s_config.slack_channel
+                )
+            _dev_shell_deployment_name = dev_shell_deployment_name(
+                ol_app_k8s_config.application_name
+            )
+            self.dev_shell_deployment_name = _dev_shell_deployment_name
+            self.dev_shell_deployment = kubernetes.apps.v1.Deployment(
+                f"{ol_app_k8s_config.application_name}-dev-shell-{stack_info.env_suffix}",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=_dev_shell_deployment_name,
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=dev_shell_labels,
+                ),
+                spec=kubernetes.apps.v1.DeploymentSpecArgs(
+                    replicas=0,
+                    strategy=kubernetes.apps.v1.DeploymentStrategyArgs(type="Recreate"),
+                    selector=kubernetes.meta.v1.LabelSelectorArgs(
+                        match_labels=dev_shell_labels,
+                    ),
+                    template=kubernetes.core.v1.PodTemplateSpecArgs(
+                        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                            labels=dev_shell_labels,
+                            annotations={
+                                **pod_config_hash_annotations,
+                                "karpenter.sh/do-not-disrupt": "true",
+                                "kubectl.kubernetes.io/default-container": "dev-shell",
+                            },
+                        ),
+                        spec=kubernetes.core.v1.PodSpecArgs(
+                            service_account_name=ol_app_k8s_config.application_service_account_name,
+                            dns_policy="ClusterFirst",
+                            termination_grace_period_seconds=dev_shell_config.termination_grace_period_seconds,
+                            volumes=ol_app_k8s_config.extra_volumes or None,
+                            # Init containers build the application's runtime config
+                            # (see the scheduled jobs above); the collectstatic and
+                            # migration init steps are omitted because a shell needs
+                            # neither.
+                            init_containers=[
+                                *[
+                                    kubernetes.core.v1.ContainerArgs(
+                                        **{
+                                            k: v
+                                            for k, v in vars(c).items()
+                                            if k != "volume_mounts" and v is not None
+                                        },
+                                        volume_mounts=[
+                                            *(getattr(c, "volume_mounts", None) or []),
+                                            *ol_app_k8s_config.extra_volume_mounts,
+                                            *ol_app_k8s_config.extra_init_volume_mounts,
+                                        ],
+                                    )
+                                    for c in ol_app_k8s_config.extra_init_containers
+                                ]
+                            ]
+                            or None,
+                            # No sidecars: nothing routes here, so nginx has nothing to
+                            # proxy, and a log shipper would only ever see "sleep".
+                            containers=[
+                                kubernetes.core.v1.ContainerArgs(
+                                    name="dev-shell",
+                                    image=app_image,
+                                    command=dev_shell_config.command,
+                                    image_pull_policy=image_pull_policy,
+                                    env=application_deployment_env_vars,
+                                    env_from=application_deployment_envfrom,
+                                    resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                        requests=dev_shell_config.resource_requests,
+                                        limits=dev_shell_config.resource_limits,
+                                    ),
+                                    volume_mounts=ol_app_k8s_config.extra_volume_mounts
+                                    or None,
+                                    **app_container_security_context,
+                                ),
+                            ],
+                            **worker_pod_spec_args,
+                        ),
+                    ),
+                ),
+                # replicas is the developer's knob (kubectl scale), not Pulumi's.
+                # Without this every deploy would scale a shell in use back to 0.
+                opts=ResourceOptions.merge(
+                    resource_options,
+                    ResourceOptions(ignore_changes=["spec.replicas"]),
+                ),
+            )
+
         _application_pod_security_group_policy = (
             kubernetes.apiextensions.CustomResource(
                 f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-application-pod-security-group-policy",
@@ -2529,8 +2839,8 @@ class OLApplicationK8s(ComponentResource):
     def all_deployment_names(self) -> list[str]:
         """All Kubernetes Deployment names managed by this component.
 
-        Includes the webapp deployment, all celery worker deployments, and the
-        celery beat deployment (if configured).  Use this to populate
+        Includes the webapp deployment, all celery worker deployments, the
+        celery beat deployment and the developer shell (each if configured).  Use this to populate
         ``restart_targets`` on ``OLVaultK8SDynamicSecretConfig`` so that all
         pods restart when Vault dynamic credentials are rotated:
 
@@ -2549,4 +2859,6 @@ class OLApplicationK8s(ComponentResource):
         names.extend(self.celery_deployment_names)
         if self.beat_deployment_name:
             names.append(self.beat_deployment_name)
+        if self.dev_shell_deployment_name:
+            names.append(self.dev_shell_deployment_name)
         return names

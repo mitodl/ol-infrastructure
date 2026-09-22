@@ -67,7 +67,6 @@ config:
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_courseware_index: "true"
   edxapp:elasticsearch_enabled: "false"
-  edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     admin_console: admin-console
     authoring: authoring
@@ -105,10 +104,12 @@ config:
       workers: 1
       runtime_threads: 1
       blocking_threads: 8
+      respawn_interval: 60
     lms:
       workers: 1
       runtime_threads: 1
       blocking_threads: 8
+      respawn_interval: 60
   edxapp:k8s_replicas:
     webapp:
       cms:

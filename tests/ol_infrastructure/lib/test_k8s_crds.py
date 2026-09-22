@@ -2,7 +2,7 @@
 
 The two things that make that adoption work are easy to regress silently: the
 patchForce annotation (without it server-side apply stops on a conflict with Helm's
-field manager) and the include filter (without it APISIX's bundled standard-channel
+field manager) and the group filter (without it APISIX's bundled standard-channel
 Gateway API CRDs would overwrite the experimental ones setup_traefik owns).
 """
 
@@ -24,7 +24,7 @@ def _crd(name: str) -> str:
             "apiVersion": "apiextensions.k8s.io/v1",
             "kind": "CustomResourceDefinition",
             "metadata": {"name": name},
-            "spec": {"versions": [{"name": "v1"}]},
+            "spec": {"group": name.split(".", 1)[1], "versions": [{"name": "v1"}]},
         }
     )
 
@@ -113,11 +113,43 @@ def test_takes_subchart_crds_but_not_templated_ones():
 
 
 @pytest.mark.usefixtures("fetched")
-def test_include_filters_out_foreign_crds():
+def test_groups_filters_out_foreign_crds():
     crds = k8s_crds.fetch_helm_chart_crds(
-        "https://charts.example.com", "demo", "1.0.0", include={"own-crds.yaml"}
+        "https://charts.example.com", "demo", "1.0.0", groups={"example.com"}
     )
-    assert [crd["metadata"]["name"] for crd in crds] == ["widgets.example.com"]
+    assert [crd["metadata"]["name"] for crd in crds] == [
+        "gadgets.example.com",
+        "widgets.example.com",
+    ]
+
+
+def test_group_filter_survives_a_crd_file_split(monkeypatch):
+    """A chart that renames or splits its CRD files must not shed CRDs silently.
+
+    APISIX did exactly this inside 2.x: seven per-kind files in 2.11.0, one
+    consolidated file from 2.15.0. A file-name allowlist pinned to either layout
+    would adopt nothing from the other, and with skip_crds=True nobody creates
+    the CRDs it misses.
+    """
+    split_layout = {
+        "demo/Chart.yaml": CHART_FILES["demo/Chart.yaml"],
+        "demo/crds/Widget.yaml": _crd("widgets.example.com"),
+        "demo/crds/Sprocket.yaml": _crd("sprockets.example.com"),
+        "demo/crds/gwapi-crds.yaml": _crd("gateways.gateway.networking.k8s.io"),
+    }
+    monkeypatch.setattr(k8s_crds, "_resolve_chart_url", lambda *_: "https://x/c.tgz")
+    monkeypatch.setattr(
+        k8s_crds.urllib.request,
+        "urlopen",
+        lambda *_, **__: io.BytesIO(_archive(split_layout)),
+    )
+    crds = k8s_crds.fetch_helm_chart_crds(
+        "https://charts.example.com", "demo", "1.0.0", groups={"example.com"}
+    )
+    assert [crd["metadata"]["name"] for crd in crds] == [
+        "sprockets.example.com",
+        "widgets.example.com",
+    ]
 
 
 @pytest.mark.usefixtures("fetched")
@@ -140,7 +172,10 @@ def test_layout_change_that_matches_nothing_is_an_error():
     """Adopting zero CRDs looks like success and silently keeps Helm's frozen ones."""
     with pytest.raises(ValueError, match="No CRDs found"):
         k8s_crds.fetch_helm_chart_crds(
-            "https://charts.example.com", "demo", "1.0.0", include={"renamed.yaml"}
+            "https://charts.example.com",
+            "demo",
+            "1.0.0",
+            groups={"renamed.example.com"},
         )
 
 

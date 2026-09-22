@@ -632,6 +632,13 @@ def setup_apisix(
                             "upstream_response_time=$upstream_response_time "
                             "upstream_status=$upstream_status "
                             'http_referer="$http_referer" '
+                            # Referer is subject to the page's referrer policy
+                            # and is often absent on cross-origin API calls;
+                            # Origin is sent on every CORS-mode request no
+                            # matter the policy, and Sec-Fetch-Site says
+                            # same-origin/cross-site/none without any URL.
+                            'http_origin="$http_origin" '
+                            'sec_fetch_site="$http_sec_fetch_site" '
                             'http_user_agent="$http_user_agent" '
                             "method=$request_method "
                             'request="$request" '

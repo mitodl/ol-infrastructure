@@ -121,6 +121,7 @@ def create_storage_migration(  # noqa: PLR0913
     cluster_configmap_name: str,
     service_account_name: str,
     maintenance: OmnigraphMaintenance | None = None,
+    server_deployment: kubernetes.apps.v1.Deployment | None = None,
     opts: ResourceOptions | None = None,
 ) -> OmnigraphStorageMigration:
     """Provision the one-shot rebuild Job.
@@ -147,6 +148,14 @@ def create_storage_migration(  # noqa: PLR0913
     mutates a root the migration has declared frozen — and Pulumi would
     otherwise be free to create the Job in parallel with the updates that
     suspend them.
+
+    ``server_deployment`` is ordered ahead of the Job for the same reason and
+    is the larger of the two writers. Arming the migration takes it to zero
+    replicas, but nothing in the Job's own definition references it, so without
+    this edge Pulumi creates the Job concurrently with the scale-down: the
+    baseline and the export would then read a root a live server is still
+    writing, which is the "baseline of a moving target" the runbook's
+    step-1-first rule exists for.
     """
     script_config_map = kubernetes.core.v1.ConfigMap(
         f"omnigraph-storage-migration-script-{stack_info.env_suffix}",
@@ -159,16 +168,23 @@ def create_storage_migration(  # noqa: PLR0913
         opts=opts,
     )
 
-    # Ordered behind the suspension of both sweeps. `depends_on` is the only
-    # thing that sequences these — the Job references neither CronJob, so
-    # Pulumi is otherwise free to create it while `suspend=true` is still being
-    # applied, leaving a window in which a tick can fire against the old root.
+    # Ordered behind EVERY writer: the two sweeps' suspension and the server's
+    # scale-down. `depends_on` is the only thing that sequences these — the Job
+    # references none of those resources, so Pulumi is otherwise free to create
+    # it while `suspend=true` and `replicas=0` are still being applied, leaving
+    # a window in which a tick, or the server itself, writes the root this Job
+    # has just taken a baseline of.
     job_opts = ResourceOptions.merge(
         opts,
         ResourceOptions(
-            depends_on=[maintenance.optimize, maintenance.cleanup]
-            if maintenance is not None
-            else []
+            depends_on=[
+                *(
+                    [maintenance.optimize, maintenance.cleanup]
+                    if maintenance is not None
+                    else []
+                ),
+                *([server_deployment] if server_deployment is not None else []),
+            ]
         ),
     )
 

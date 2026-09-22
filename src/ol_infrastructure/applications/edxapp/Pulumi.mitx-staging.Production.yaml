@@ -55,7 +55,6 @@ config:
   edxapp:edx_xqueue_secrets:
     secure: v1:jgBYHCVD4xbM2TGu:P0rmQmQm2SYH/pQh928vZq5C5ZRXWQsKvRijEitpVjsIo5YfzyYGM84GOIQQG2FTINUdINXCGkWXHNUsfYFGq1dKcOsrql9n5nUka8k/4bWcqEuyBy0dI0bCpoEf6Ui0hL1On/Or4/rV7itDycwjIsTe7Eq6pE2oLRw+64RV77e3ho9f1M/63BC00rzYynBkaw==
   edxapp:enable_courseware_index: "true"
-  edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     authoring: authoring
     communications: communications
@@ -94,10 +93,14 @@ config:
       workers: 1
       runtime_threads: 1
       blocking_threads: 8
+      respawn_interval: 60
+      worker_startup_rss: 700
     lms:
       workers: 1
       runtime_threads: 1
       blocking_threads: 8
+      respawn_interval: 60
+      worker_startup_rss: 700
   edxapp:k8s_replicas:
     webapp:
       cms:

@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""Find and remove orphaned celery event queues on a Redis/Valkey broker.
+
+WHY THIS EXISTS
+
+Celery's event machinery declares a queue per consumer, named
+`celeryev.<uuid>`, bound to the `celeryev` topic exchange. Two things create
+them: `celery.worker.consumer.gossip.Gossip.get_consumers`, which runs in every
+worker unless `--without-gossip` is passed, and any monitor (leek, flower,
+`celery events`).
+
+Celery expects the broker to clean those up. It declares each one
+`auto_delete=True` with `x-expires` (default 60s), so on RabbitMQ the queue and
+its bindings disappear once the consumer goes away. On Redis none of that
+holds:
+
+  - `x-message-ttl` is implemented by exactly one kombu transport, mongodb.
+    The Redis transport never reads it, so `CELERY_EVENT_QUEUE_TTL` is inert
+    there no matter what it is set to.
+  - `auto_delete` and `x-expires` are tracked in `Channel.auto_delete_queues`
+    and `Channel._expires`, ordinary Python objects in the client process, and
+    the PEXPIRE `x-expires` sets is only refreshed by that live channel.
+  - The only code that deletes a queue on shutdown is `Channel.close()`, and it
+    iterates `self._fanout_queues` alone. `_queue_bind` populates that dict
+    only when the exchange is FANOUT, and celery declares `celeryev` as a TOPIC
+    exchange. So a gossip queue is never in it, and a clean shutdown deletes
+    nothing.
+  - Nothing on the server reconciles any of it.
+
+So every worker that has ever run leaves its binding in
+`_kombu.binding.celeryev` permanently, however it exited. The exchange keeps
+LPUSHing every event into that queue's list, and because writing to a missing
+key recreates it without a TTL, the key cannot stay expired even if a PEXPIRE
+did fire. The queue grows without bound.
+
+Measured on edxapp-redis-mitxonline-production on 2026-09-21: 4,112 orphaned
+`celeryev.*` lists holding 64.7 GiB, which was 98.93% of a 65.4 GiB instance.
+The Django cache on db 0 was 929 MiB. Three prior ElastiCache upsizes had been
+paying rent on this.
+
+WHAT THIS DOES
+
+Removes the binding first, then the queue keys. That order matters: delete the
+key first and the next event published recreates it.
+
+It only ever considers queues reachable from the named exchange's binding set
+and named with that exchange's prefix, so task queues cannot be touched.
+
+ORPHAN TEST
+
+A live consumer drains its queue continuously, so its backlog sits near zero.
+An orphan only grows. This samples LLEN twice, `--settle-seconds` apart, and
+treats a queue as orphaned when it holds at least `--min-length` messages and
+did not shrink between samples. A queue that is empty, or draining, is left
+alone.
+
+A false positive costs a monitor some buffered events, which are ephemeral
+telemetry, not tasks. It cannot lose queued work.
+
+Dry-run by default. `--apply` requires the primary endpoint; it refuses to
+write to a replica.
+"""
+
+import os
+import sys
+import time
+from dataclasses import dataclass
+
+import cyclopts
+import redis
+
+app = cyclopts.App(
+    name="celeryev-gc",
+    help="Remove orphaned celery event queues from a Redis/Valkey broker.",
+)
+
+# kombu.transport.redis constants. Changing these silently targets the wrong
+# keys, so they are named rather than inlined.
+BINDING_KEY_TEMPLATE = "_kombu.binding.%s"
+SEP = "\x06\x16"
+PRIORITY_STEPS = (0, 3, 6, 9)
+
+
+def queue_keys(queue: str) -> list[str]:
+    """Every Redis key backing one logical queue.
+
+    Mirrors ``kombu.transport.redis.Channel._q_for_pri``: priority 0 is the
+    bare name, other priorities get a separator-delimited suffix.
+
+    :param queue: logical queue name
+    :returns: the key for each priority step
+    :rtype: list[str]
+    """
+    return [queue if pri == 0 else f"{queue}{SEP}{pri}" for pri in PRIORITY_STEPS]
+
+
+@dataclass
+class Candidate:
+    """One queue found via the exchange's binding set."""
+
+    queue: str
+    binding_members: list[str]
+    first_len: int = 0
+    second_len: int = 0
+
+    @property
+    def orphaned_by(self) -> str | None:
+        """Why this queue looks orphaned, or None if it looks alive."""
+        if self.second_len < self.first_len:
+            return None  # draining, so something is consuming it
+        return "not draining"
+
+
+def human(num: float) -> str:
+    """Render a byte count in binary units."""
+    for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        if abs(num) < 1024:
+            return f"{num:,.1f} {unit}"
+        num /= 1024
+    return f"{num:,.1f} PiB"
+
+
+def connect(host: str, port: int, db: int, password: str, *, tls: bool) -> redis.Redis:
+    """Open a client. ``ssl_cert_reqs=None`` matches how the apps connect."""
+    return redis.Redis(
+        host=host,
+        port=port,
+        db=db,
+        password=password,
+        ssl=tls,
+        ssl_cert_reqs=None,
+        socket_timeout=30,
+        decode_responses=True,
+    )
+
+
+def measure(client: redis.Redis, candidates: list[Candidate], *, field: str) -> None:
+    """Fill ``field`` on each candidate with its total backlog, pipelined."""
+    pipe = client.pipeline(transaction=False)
+    for cand in candidates:
+        for key in queue_keys(cand.queue):
+            pipe.llen(key)
+    results = pipe.execute(raise_on_error=False)
+    width = len(PRIORITY_STEPS)
+    for idx, cand in enumerate(candidates):
+        chunk = results[idx * width : (idx + 1) * width]
+        setattr(cand, field, sum(n for n in chunk if isinstance(n, int)))
+
+
+@app.default
+def main(
+    host: str,
+    *,
+    port: int = 6379,
+    db: int = 1,
+    password_env: str = "REDIS_PASSWORD",  # noqa: S107
+    tls: bool = True,
+    exchange: str = "celeryev",
+    min_length: int = 100,
+    settle_seconds: int = 60,
+    apply: bool = False,
+    limit: int | None = None,
+) -> int:
+    """Report, and optionally remove, orphaned celery event queues.
+
+    :param host: broker endpoint. Use the PRIMARY when passing --apply.
+    :param port: broker port
+    :param db: database index holding the broker (edxapp uses 1)
+    :param password_env: environment variable holding the auth token. The token
+        is never accepted as an argument so it stays out of argv and shell
+        history.
+    :param tls: connect with TLS
+    :param exchange: exchange whose binding set to scan
+    :param min_length: backlog at or above which a non-draining queue counts as
+        orphaned
+    :param settle_seconds: gap between the two backlog samples
+    :param apply: actually delete. Without it, nothing is written.
+    :param limit: stop after this many orphans, largest first
+    :returns: process exit status
+    :rtype: int
+    """
+    password = os.environ.get(password_env)
+    if not password:
+        print(f"error: ${password_env} is not set", file=sys.stderr)
+        return 2
+
+    client = connect(host, port, db, password, tls=tls)
+    role = client.info("replication").get("role")
+    if apply and role != "master":
+        print(
+            f"error: --apply needs the primary, but {host} reports role={role!r}. "
+            "Deletes on a replica would be overwritten by replication.",
+            file=sys.stderr,
+        )
+        return 2
+
+    before = client.info("memory").get("used_memory", 0)
+    binding_key = BINDING_KEY_TEMPLATE % exchange
+    members = client.smembers(binding_key)
+    print(f"{host} db={db} role={role} used_memory={human(before)}")
+    print(f"{binding_key}: {len(members):,} bindings")
+
+    # A binding member is "routing_key<SEP>pattern<SEP>queue".
+    by_queue: dict[str, list[str]] = {}
+    for member in members:
+        parts = member.split(SEP)
+        if len(parts) != 3:
+            continue
+        queue = parts[2]
+        # Refuse anything not named for this exchange. Task queues live on
+        # other exchanges and must never be reachable from here.
+        if not queue.startswith(f"{exchange}."):
+            continue
+        by_queue.setdefault(queue, []).append(member)
+
+    candidates = [Candidate(queue=q, binding_members=m) for q, m in by_queue.items()]
+    if not candidates:
+        print("no candidate queues found")
+        return 0
+
+    print(f"{len(candidates):,} queues named {exchange}.*; sampling backlog...")
+    measure(client, candidates, field="first_len")
+    print(f"waiting {settle_seconds}s to see which are draining...")
+    time.sleep(settle_seconds)
+    measure(client, candidates, field="second_len")
+
+    orphans = [
+        c
+        for c in candidates
+        if c.second_len >= min_length and c.orphaned_by is not None
+    ]
+    orphans.sort(key=lambda c: -c.second_len)
+    alive = len(candidates) - len(orphans)
+    # `orphans` stays the full finding; `selected` is what this run acts on.
+    # Keeping them separate means the counts below always reconcile against
+    # len(candidates), whether or not --limit truncated the work.
+    selected = orphans if limit is None else orphans[:limit]
+
+    print(f"\n{'queue':46}{'backlog t0':>12}{'backlog t1':>12}")
+    for cand in selected[:25]:
+        print(f"{cand.queue:46}{cand.first_len:>12,}{cand.second_len:>12,}")
+    if len(selected) > 25:
+        print(f"... and {len(selected) - 25:,} more")
+
+    print(
+        f"\n{len(orphans):,} orphaned, {alive:,} left alone (draining or below --min-length)"
+    )
+    if len(selected) != len(orphans):
+        print(f"acting on {len(selected):,} of them this run (--limit)")
+
+    if not apply:
+        print("\ndry run; nothing written. Pass --apply to delete.")
+        return 0
+
+    deleted = 0
+    for cand in selected:
+        # Binding first. Delete the key first and the next published event
+        # recreates it, with no TTL.
+        pipe = client.pipeline(transaction=False)
+        for member in cand.binding_members:
+            pipe.srem(binding_key, member)
+        pipe.delete(*queue_keys(cand.queue))
+        pipe.execute(raise_on_error=False)
+        deleted += 1
+
+    after = client.info("memory").get("used_memory", 0)
+    print(
+        f"deleted {deleted:,} queues; used_memory {human(before)} -> {human(after)} "
+        f"(reclaimed {human(before - after)})"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(app())

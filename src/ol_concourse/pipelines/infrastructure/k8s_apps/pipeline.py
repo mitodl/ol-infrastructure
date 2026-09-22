@@ -1130,10 +1130,17 @@ def _build_release_image_job(
     build_target: str | None = None,
     sentry_sourcemaps: SentrySourcemapsConfig | None = None,
 ) -> Job:
-    """Generate an image build job triggered by the release resource.
+    """Generate the release image build job for an app.
+
+    Nothing schedules this job: the release bot checks the release resource
+    and then triggers the job explicitly, and a hotfix takes the same path
+    with the commit to cherry-pick carried in the resource's ``hotfix`` file,
+    since triggering a job carries no parameters.  Checking the resource does
+    not start a build, and neither does a `put` to it -- see the comment on
+    the first get for why that matters.
 
     This job:
-    1. Gets the release resource (trigger) and main repo source.
+    1. Gets the release resource and main repo source.
     2. Bumps the version in the app source using bumpver.
     3. Creates the release commit, branch, and tag via the release resource.
     4. Builds and pushes a versioned Docker image to DockerHub and ECR.
@@ -1159,7 +1166,29 @@ def _build_release_image_job(
 
     release_source = Identifier("release-source")
     plan = [
-        GetStep(get=release_res.name, trigger=True),
+        # Deliberately not `trigger: true`. A `put` publishes a version of the
+        # resource, and Concourse schedules on a version it has not seen
+        # before whether that version came from a check or from a put. This
+        # job's own `action: create` put, the `action: finish` put at the end
+        # of deploy-production, and the `action: abandon` put therefore all
+        # re-triggered this job, each carrying the version just released:
+        #
+        #   create   the cut no-ops against the matching tag, but the image is
+        #            still rebuilt and re-pushed, and a digest differing from
+        #            the first build carries it back through the deploy chain
+        #   finish   fails, because the release branch has been merged back and
+        #            the commit a re-cut would tag is now the merge commit
+        #            ("Tag X already exists at <sha>, which does not match the
+        #            commit being released")
+        #   abandon  deletes the branch and the tag, so the re-cut finds no tag,
+        #            succeeds, and resurrects the abandoned release
+        #
+        # Nothing is lost by dropping the trigger. The resource is
+        # `check_every: never` with no webhook, and the release bot starts a
+        # release by checking the resource over the API and then triggering
+        # this job explicitly (see release_bot.bot._release), so the trigger
+        # could only ever fire on a put or race the bot's own build.
+        GetStep(get=release_res.name, trigger=False),
         GetStep(get=main_repo.name, trigger=False),
         LoadVarStep(
             load_var="release_version",

@@ -101,6 +101,13 @@ k8s_labels = K8sGlobalLabels(
 
 setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
 CLICKHOUSE_NAMESPACE = "clickhouse"
+# Declared for every cluster in infrastructure/aws/eks; must exist before a PVC
+# references it or the modification sits in Pending until it does. Rollback is
+# `pulumi config set clickhouse:data_volume_attributes_class ebs-gp3-iops-75000`
+# (production) or `ebs-gp3-iops-25000` (QA) -- those classes are declared there
+# too -- followed by an apply. Each switch recreates the StatefulSets, so every
+# replica restarts once.
+EBS_GP3_IOPS_3000_VAC = "ebs-gp3-iops-3000"
 # ClickHouse's conventional Prometheus port, used for both server and Keeper.
 CLICKHOUSE_METRICS_PORT = 9363
 
@@ -112,6 +119,9 @@ cluster_stack.require_output("namespaces").apply(
 hot_data_days = int(clickhouse_config.get("hot_data_days") or "7")
 hot_storage_size = clickhouse_config.get("hot_storage_size") or "100Gi"
 storage_class = stateful_workload_storage["storage_class"]
+data_volume_attributes_class = (
+    clickhouse_config.get("data_volume_attributes_class") or EBS_GP3_IOPS_3000_VAC
+)
 use_io_optimized_nodes = stateful_workload_storage["use_io_optimized_nodes"]
 ch_replicas = int(clickhouse_config.get("replicas") or "1")
 keeper_replicas = int(clickhouse_config.get("keeper_replicas") or "1")
@@ -356,6 +366,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     ch_image: str,
     use_io_optimized: bool,
     storage_class: str,
+    data_volume_attributes_class: str,
     hot_storage_size: str,
     cold_bucket_name: "Output[str]",
     backup_bucket_name: "Output[str]",
@@ -676,6 +687,20 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                             "spec": {
                                 "accessModes": ["ReadWriteOnce"],
                                 "storageClassName": storage_class,
+                                # ebs-gp3-sc derives IOPS from size (iopsPerGB), which
+                                # gave the 1500Gi production volumes 75,000 IOPS each
+                                # against a one-second peak under 2,000 ops/s. The class
+                                # pins them to gp3's free 3,000. The operator applies a
+                                # template VAC to existing PVCs on reconcile (0.26.0
+                                # storage-reconciler.go reconcileVolumeAttributeClass),
+                                # and the CSI driver modifies the EBS volume online.
+                                **(
+                                    {
+                                        "volumeAttributesClassName": data_volume_attributes_class
+                                    }
+                                    if storage_class == "ebs-gp3-sc"
+                                    else {}
+                                ),
                                 "resources": {
                                     "requests": {
                                         "storage": hot_storage_size,
@@ -950,6 +975,7 @@ clickhouse_installation = _create_clickhouse_installation(
     ch_image=ch_image,
     use_io_optimized=use_io_optimized_nodes,
     storage_class=storage_class,
+    data_volume_attributes_class=data_volume_attributes_class,
     hot_storage_size=hot_storage_size,
     cold_bucket_name=cold_bucket.bucket_v2.bucket,
     backup_bucket_name=backup_bucket.bucket_v2.bucket,

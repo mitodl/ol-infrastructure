@@ -81,20 +81,19 @@ config:
   # Benign at a 0.003 utilisation ratio, but it is the same denominator trap as
   # les-a-ratio-alert-s-denominator-constrains-what-you.
   #
-  # min_pool_size stays at 40 deliberately. One lever per pass -- moving the
-  # floor and the divisor together would make the next measurement
+  # min_pool_size was deliberately left at 40 in this pass. One lever per pass --
+  # moving the floor and the divisor together would make the next measurement
   # unattributable, which is the failure mode this whole exercise exists to stop
-  # repeating. The floor is the obvious next candidate: 40 was sized for a
-  # session-mode per-replica peak of 35, and transaction mode has cut per-replica
-  # in-flight demand to 2-3.
+  # repeating. It moved 40 -> 20 in its own pass on 2026-09-18, after 14 days of
+  # clean history at 4 replicas; derivation in __main__.py next to the setting.
   dagster:pgbouncer_replica_count: 4
   # Down from the previous global 100. Production has never come close to
   # needing it: three days of 1-minute exporter samples peaked at 122 active
   # server connections against an aggregate cap of 4248, and the pool sat on
   # its min_pool_size floor of 900 the entire time. Both of those figures are
   # HISTORICAL -- they were taken before #5464 cut min_pool_size 150 -> 40 and
-  # before pool_mode went session -> transaction, and the equivalents now are a
-  # 13 active peak against a 160 floor. The conclusion is unaffected and gets
+  # before pool_mode went session -> transaction. As of 2026-09-18 the
+  # equivalents are a 15 active peak (14 days) against an 80 floor. The conclusion is unaffected and gets
   # stronger, which is why the number is not being moved again here. 80 trims
   # the worst case
   # without touching anything observed. Note the aggregate cap overstates real
@@ -123,9 +122,10 @@ config:
   #
   # 50 is derived from measurement, not from halving 100. The arithmetic below
   # was done on 2026-08-19 against SIX replicas and is kept as it was performed;
-  # at the current four the PgBouncer floor term is 160 (40 x 4), not 240, which
-  # would leave ~200 of client retention rather than ~120 and make 50 more
-  # generous still. Re-derive here if the floor or the replica count moves again.
+  # as of 2026-09-18 (four replicas, min_pool_size 20) the PgBouncer floor term
+  # is 80 (20 x 4), not 240, which would leave ~280 of client retention rather
+  # than ~120 and make 50 more generous still. Re-derive here if the floor or the
+  # replica count moves again.
   #
   # Held connections across the whole pool have ranged 359-1577 over the week
   # since the pooled storages landed, against a 4248 aggregate cap -- so the
@@ -152,8 +152,8 @@ config:
   # about once per TRANSACTION, so it now measures query throughput: measured
   # 2026-08-25 over the six days since the switch, 75/s at rest and 2673/s at
   # peak, with zero clients ever waiting and maxwait flat at 0. Nothing is wrong;
-  # the counter means something else. Both churn rules are unlabelled and routed
-  # to `oblivion` for exactly this reason (see metric_rules/dagster_pgbouncer.py).
+  # the counter means something else. The churn rules built on it were deleted
+  # for exactly this reason (see metric_rules/dagster_pgbouncer.py).
   #
   # Use the client-side view instead -- pgbouncer_pools_client_waiting_connections
   # and client_maxwait_seconds -- plus the "QueuePool limit of size 50 overflow

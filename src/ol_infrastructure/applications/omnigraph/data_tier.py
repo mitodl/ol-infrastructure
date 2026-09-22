@@ -46,6 +46,7 @@ import hashlib
 import json
 from typing import NamedTuple
 
+import pulumi
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
 import yaml
@@ -55,11 +56,18 @@ from ol_infrastructure.applications.omnigraph.cluster_config import (
     build_cluster_graphs,
     build_cluster_policies,
 )
+from ol_infrastructure.applications.omnigraph.image_schema import (
+    ImageSchemaUnavailableError,
+    read_image_internal_schema,
+)
 from ol_infrastructure.applications.omnigraph.maintenance import (
     OmnigraphMaintenance,
     create_maintenance,
 )
-from ol_infrastructure.applications.omnigraph.storage import storage_uri_for
+from ol_infrastructure.applications.omnigraph.storage import (
+    storage_uri_for,
+    validate_image_internal_schema,
+)
 from ol_infrastructure.components.applications.eks import OLEKSAuthBinding
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.vault import OLVaultK8SSecret
@@ -68,6 +76,14 @@ from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import StackInfo, format_docker_image_ref
 
 OMNIGRAPH_SERVER_SERVICE_NAME = "omnigraph-server"
+# The ECR repository the Concourse build pushes to, shared across all three
+# environments. Spelled the same as the service name but not derived from it:
+# one is a Kubernetes object name, the other a registry path. Both the image
+# reference and the storage-format check read it from here, because a mismatch
+# between the two fails SILENTLY: ECR answers ImageNotFound, which the check
+# treats as a pre-label image and skips, turning the gate off with nothing
+# failing.
+OMNIGRAPH_SERVER_ECR_REPOSITORY = "omnigraph-server"
 OMNIGRAPH_SERVER_PORT = 8080
 OMNIGRAPH_SERVICE_ACCOUNT_NAME = "omnigraph-server"
 
@@ -230,7 +246,11 @@ class OmnigraphDataTier(NamedTuple):
     image_repository: str
     service: kubernetes.core.v1.Service
     deployment: kubernetes.apps.v1.Deployment
-    cluster_apply_job: kubernetes.batch.v1.Job
+    # ``None`` while a storage-format migration is armed: the Job runs the NEW
+    # image and can only fail against the OLD root, and the Deployment
+    # depends_on it, so creating it during a migration guarantees a failed
+    # update. It comes back at cutover, when the new root is what is served.
+    cluster_apply_job: kubernetes.batch.v1.Job | None
     maintenance: OmnigraphMaintenance
     # The resolved cluster storage root (bucket + any storage_prefix), so the
     # program can export what is actually being served rather than the config
@@ -256,10 +276,13 @@ def create_data_tier(  # noqa: PLR0913
     cleanup_schedule: str,
     cleanup_older_than: str,
     storage_prefix: str = "",
+    internal_schema_version: int | None = None,
+    migrate_to_prefix: str = "",
     per_actor_inflight_max: int = DEFAULT_PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max: int = DEFAULT_PER_ACTOR_BYTES_MAX,
     *,
     suspend_maintenance: bool = False,
+    migration_armed: bool = False,
 ) -> OmnigraphDataTier:
     """Provision the S3 bucket, IRSA policy, ECR repo, ConfigMap, and Deployment.
 
@@ -270,6 +293,11 @@ def create_data_tier(  # noqa: PLR0913
     rebuilt under a new root and the cluster is then repointed at it, leaving
     the old root intact as the rollback. Empty (the default) means the bucket
     root, which is the steady state.
+
+    ``internal_schema_version`` and ``migrate_to_prefix`` are not used to build
+    anything — they are what the deploying image's declared storage format is
+    checked against, below. They are passed here rather than checked in
+    ``__main__`` because this is where the image reference is resolved.
 
     ``per_actor_inflight_max`` / ``per_actor_bytes_max`` default to the measured
     constants above and exist as parameters so a stack can retune admission
@@ -343,9 +371,32 @@ def create_data_tier(  # noqa: PLR0913
     omnigraph_aws_account = aws.get_caller_identity()
     image_repository = (
         f"{omnigraph_aws_account.account_id}.dkr.ecr.{aws_config.region}"
-        ".amazonaws.com/omnigraph-server"
+        f".amazonaws.com/{OMNIGRAPH_SERVER_ECR_REPOSITORY}"
     )
     omnigraph_server_image = format_docker_image_ref(image_repository, "OMNIGRAPH")
+
+    # ★ DOES THIS IMAGE READ THE FORMAT THIS CLUSTER SERVES? Until agent-kit
+    # stamped the format onto the image, nothing here could answer that, and
+    # the answer arrived as a cluster-apply Job failing three times mid-deploy
+    # (CI 2026-09-16, builds 187/188/189). Reading the label makes it a preview
+    # failure instead. A label that cannot be read is NOT a failure — an image
+    # predating the label, or a run without ECR access, warns and skips, since
+    # refusing those would make a rollback impossible.
+    try:
+        image_internal_schema: int | None = read_image_internal_schema(
+            OMNIGRAPH_SERVER_ECR_REPOSITORY, omnigraph_server_image, aws_config.region
+        )
+    except ImageSchemaUnavailableError as exc:
+        pulumi.log.warn(
+            f"skipping the image storage-format check: {exc}",
+        )
+        image_internal_schema = None
+    validate_image_internal_schema(
+        image_internal_schema,
+        internal_schema_version,
+        migrate_to_prefix,
+        migration_armed=migration_armed,
+    )
 
     # cluster.yaml — the Layer-1 (memory/task/workflow) `council` graph,
     # organization-wide, plus the `code-bridge` graph and one `code-<repo>`
@@ -445,94 +496,109 @@ def create_data_tier(  # noqa: PLR0913
             f"{args['cluster_yaml']}\n{args['image']}".encode()
         ).hexdigest()
     )
-    cluster_apply_job = kubernetes.batch.v1.Job(
-        f"omnigraph-cluster-apply-{stack_info.env_suffix}",
-        # Deliberately unnamed (Pulumi auto-naming): a Job's pod template is
-        # immutable, so every change here is a replacement, and auto-naming lets
-        # the new Job be created before the old one is removed.
-        metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            namespace=namespace,
-            labels=k8s_global_labels,
-        ),
-        spec=kubernetes.batch.v1.JobSpecArgs(
-            # Converging is idempotent, so a couple of retries costs nothing and
-            # rides out a transient S3 or IRSA-credential hiccup.
-            backoff_limit=2,
-            # Keep a completed Job around for a day so its logs are readable
-            # after a deploy, then let the TTL controller reap it.
-            ttl_seconds_after_finished=86400,
-            template=kubernetes.core.v1.PodTemplateSpecArgs(
-                metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels={
-                        **k8s_global_labels,
-                        "app.kubernetes.io/name": "omnigraph-cluster-apply",
-                    },
-                    # Forces a new Job whenever the declared graph list OR the
-                    # image (and therefore the baked schemas) changes. Without
-                    # it, adding a repo to cluster.yaml would leave this Job's
-                    # spec byte-identical and the graph would never be created.
-                    annotations={"ol.mit.edu/config-hash": cluster_apply_hash},
-                ),
-                spec=kubernetes.core.v1.PodSpecArgs(
-                    restart_policy="Never",
-                    # Same IRSA identity as the server: this writes the graphs'
-                    # Lance stores directly in S3, not through the server.
-                    service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
-                    containers=[
-                        kubernetes.core.v1.ContainerArgs(
-                            name="cluster-apply",
-                            image=omnigraph_server_image,
-                            # Override the image's server entrypoint script —
-                            # this runs the `omnigraph` CLI baked alongside it.
-                            command=["omnigraph"],
-                            args=[
-                                "cluster",
-                                "apply",
-                                "--config",
-                                CLUSTER_CONFIG_DIR,
-                                "--as",
-                                CLUSTER_APPLY_ACTOR,
-                            ],
-                            env=[
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="AWS_REGION", value=aws_config.region
+    # ★ NOT CREATED WHILE A MIGRATION IS ARMED. `cluster apply` runs the NEW
+    # image against whatever root is currently SERVED, which during a
+    # migration is still the old one — so it refuses the format and the Job
+    # exhausts its backoff, failing the whole update. Observed on CI
+    # 2026-09-16 (builds 187/188/189). Skipping it also keeps the resource
+    # out of a `--target`ed migration apply, which otherwise cannot run at
+    # all in a stack that has never created it: Pulumi refuses to let the
+    # maintenance CronJobs acquire a new depends_on edge to a resource
+    # outside the target list (hit on Production, whose state had no
+    # cluster-apply resource). At cutover the knobs clear, this is created,
+    # and it converges the schemas against the new root.
+    cluster_apply_job = (
+        None
+        if migration_armed
+        else kubernetes.batch.v1.Job(
+            f"omnigraph-cluster-apply-{stack_info.env_suffix}",
+            # Deliberately unnamed (Pulumi auto-naming): a Job's pod template is
+            # immutable, so every change here is a replacement, and auto-naming lets
+            # the new Job be created before the old one is removed.
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                namespace=namespace,
+                labels=k8s_global_labels,
+            ),
+            spec=kubernetes.batch.v1.JobSpecArgs(
+                # Converging is idempotent, so a couple of retries costs nothing and
+                # rides out a transient S3 or IRSA-credential hiccup.
+                backoff_limit=2,
+                # Keep a completed Job around for a day so its logs are readable
+                # after a deploy, then let the TTL controller reap it.
+                ttl_seconds_after_finished=86400,
+                template=kubernetes.core.v1.PodTemplateSpecArgs(
+                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                        labels={
+                            **k8s_global_labels,
+                            "app.kubernetes.io/name": "omnigraph-cluster-apply",
+                        },
+                        # Forces a new Job whenever the declared graph list OR the
+                        # image (and therefore the baked schemas) changes. Without
+                        # it, adding a repo to cluster.yaml would leave this Job's
+                        # spec byte-identical and the graph would never be created.
+                        annotations={"ol.mit.edu/config-hash": cluster_apply_hash},
+                    ),
+                    spec=kubernetes.core.v1.PodSpecArgs(
+                        restart_policy="Never",
+                        # Same IRSA identity as the server: this writes the graphs'
+                        # Lance stores directly in S3, not through the server.
+                        service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
+                        containers=[
+                            kubernetes.core.v1.ContainerArgs(
+                                name="cluster-apply",
+                                image=omnigraph_server_image,
+                                # Override the image's server entrypoint script —
+                                # this runs the `omnigraph` CLI baked alongside it.
+                                command=["omnigraph"],
+                                args=[
+                                    "cluster",
+                                    "apply",
+                                    "--config",
+                                    CLUSTER_CONFIG_DIR,
+                                    "--as",
+                                    CLUSTER_APPLY_ACTOR,
+                                ],
+                                env=[
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name="AWS_REGION", value=aws_config.region
+                                    ),
+                                ],
+                                resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                    requests={"cpu": "100m", "memory": "256Mi"},
+                                    limits={"cpu": "1", "memory": "1Gi"},
                                 ),
-                            ],
-                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                requests={"cpu": "100m", "memory": "256Mi"},
-                                limits={"cpu": "1", "memory": "1Gi"},
-                            ),
-                            volume_mounts=[
-                                # sub_path for the same reason the Deployment
-                                # uses it: overlay only cluster.yaml and leave
-                                # the image's baked-in schema files visible
-                                # alongside it. `cluster apply` reads both.
-                                kubernetes.core.v1.VolumeMountArgs(
-                                    name="cluster-config",
-                                    mount_path=f"{CLUSTER_CONFIG_DIR}/cluster.yaml",
-                                    sub_path="cluster.yaml",
-                                    read_only=True,
+                                volume_mounts=[
+                                    # sub_path for the same reason the Deployment
+                                    # uses it: overlay only cluster.yaml and leave
+                                    # the image's baked-in schema files visible
+                                    # alongside it. `cluster apply` reads both.
+                                    kubernetes.core.v1.VolumeMountArgs(
+                                        name="cluster-config",
+                                        mount_path=f"{CLUSTER_CONFIG_DIR}/cluster.yaml",
+                                        sub_path="cluster.yaml",
+                                        read_only=True,
+                                    ),
+                                ],
+                            )
+                        ],
+                        volumes=[
+                            kubernetes.core.v1.VolumeArgs(
+                                name="cluster-config",
+                                config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                                    name=CLUSTER_CONFIGMAP_NAME,
                                 ),
-                            ],
-                        )
-                    ],
-                    volumes=[
-                        kubernetes.core.v1.VolumeArgs(
-                            name="cluster-config",
-                            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
-                                name=CLUSTER_CONFIGMAP_NAME,
                             ),
-                        ),
-                    ],
+                        ],
+                    ),
                 ),
             ),
-        ),
-        opts=ResourceOptions(
-            depends_on=[
-                cluster_configmap,
-                *auth_binding.irsa_service_accounts,
-            ]
-        ),
+            opts=ResourceOptions(
+                depends_on=[
+                    cluster_configmap,
+                    *auth_binding.irsa_service_accounts,
+                ]
+            ),
+        )
     )
 
     omnigraph_pod_labels = {
@@ -552,7 +618,18 @@ def create_data_tier(  # noqa: PLR0913
             # and lists it under Don't; concurrent writers rely on a single
             # server's in-process CAS, not cross-process coordination. Do NOT add
             # an HPA or bump replicas without validating multi-writer safety.
-            replicas=1,
+            #
+            # ZERO WHILE A MIGRATION IS ARMED, which is what makes an armed
+            # window survive a plain `pulumi up`. Arming means the rebuild has
+            # not finished, so the served root is still the old format while
+            # this image can only read the new one — a running pod is a
+            # crashloop at best and a second writer against a root being
+            # rebuilt at worst. Declaring 1 unconditionally (with no
+            # ignore_changes) is why both the CI and QA cutovers needed
+            # `pulumi up --target` and a manual `kubectl scale`: an untargeted
+            # apply scaled the tier back up mid-migration. Clearing
+            # migrate_from_image at cutover scales it back to 1.
+            replicas=0 if migration_armed else 1,
             # Recreate, NOT the default RollingUpdate: storage is
             # strict-single-version ("a binary reads exactly one storage-format
             # version"; a mixed fleet writing one graph is unsupported), so a
@@ -853,7 +930,8 @@ def create_data_tier(  # noqa: PLR0913
                 # Converge the graphs' schemas before the server restarts into
                 # them — omnigraph only serves the applied revision after a
                 # restart, so this ordering is what makes the new schema live.
-                cluster_apply_job,
+                # Absent while a migration is armed (see cluster_apply_job).
+                *([cluster_apply_job] if cluster_apply_job is not None else []),
                 # The pod's service_account_name is the IRSA SA this stack
                 # creates via auth_binding (create_irsa_service_account=True);
                 # wait for it so the initial apply doesn't transiently fail
@@ -905,7 +983,10 @@ def create_data_tier(  # noqa: PLR0913
         optimize_schedule=optimize_schedule,
         cleanup_schedule=cleanup_schedule,
         cleanup_older_than=cleanup_older_than,
-        depends_on=[cluster_apply_job, *auth_binding.irsa_service_accounts],
+        depends_on=[
+            *([cluster_apply_job] if cluster_apply_job is not None else []),
+            *auth_binding.irsa_service_accounts,
+        ],
         suspend=suspend_maintenance,
     )
 

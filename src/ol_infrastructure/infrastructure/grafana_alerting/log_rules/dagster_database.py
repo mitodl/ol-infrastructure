@@ -22,10 +22,13 @@ are connections the pool never sees. No threshold on a concurrency rule can cove
 this, which is why this lives in its own module rather than being bolted onto
 dagster_pgbouncer.py as a tighter bound on an existing series.
 
-DagsterPgBouncerConnectionChurn was added to that file alongside this module and
-is the one pool-side series that does see the churn, earlier than this rule does
--- but it measures arrival rate, a third axis again, and it covers only the one
-failure mode. See below. Do not delete any of the three as redundant.
+DagsterPgBouncerConnectionChurn was added to that file alongside this module as
+the one pool-side series that saw the churn, earlier than this rule did. It was
+removed on 2026-09-18 because pool_mode = transaction turned its counter into a
+transaction count that no longer separates a pooled client from a reconnecting
+one (see that module's docstring). Nothing replaced it as the earlier warning,
+so this rule is now the only alert for a storage regressing to connect-per-use,
+and it fires only once connects are already failing. Do not narrow it.
 
 Why a log rule rather than a metric
 ------------------------------------
@@ -38,10 +41,10 @@ logs every failed connection attempt regardless of cause -- DNS, refused, port
 exhaustion, pool cap, RDS failover -- so it needs no new plumbing and is not
 specific to the one failure mode that prompted it.
 
-Why this outlives the metric rule it is paired with
+Why this outlived the metric rule it was paired with
 ----------------------------------------------------
-DagsterPgBouncerConnectionChurn watches the precondition for port exhaustion and
-is the earlier warning, but it only sees that one failure mode. The 2026-08-18
+DagsterPgBouncerConnectionChurn watched the precondition for port exhaustion and
+was the earlier warning, but it only saw that one failure mode. The 2026-08-18
 remediation is the proof, and it ran in two phases rather than one:
 
   until ~16:40Z  non-pooling storages -- churn 415/s, ~270 retries/min,

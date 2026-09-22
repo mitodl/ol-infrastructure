@@ -49,6 +49,7 @@ config:
     AI_MIT_SYLLABUS_URL: "https://api.ci.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.ci.learn.mit.edu/api/v0/vector_content_files_search/"
     APPZI_URL: ""
+    AWS_S3_CUSTOM_DOMAIN: "ci.learn.mit.edu"
     CSRF_COOKIE_NAME: "learn_ci_csrftoken"
     COURSE_ARCHIVE_BUCKET_NAME: "ol-data-lake-landing-zone-qa"
     DEBUG: "false"

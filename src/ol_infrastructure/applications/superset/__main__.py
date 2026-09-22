@@ -707,15 +707,39 @@ superset_chart = kubernetes.helm.v3.Release(
             "supersetNode": {
                 "podLabels": k8s_global_labels,
                 "replicas": {"enabled": False},
+                # CPU is the only HPA metric. A gunicorn web pod's memory is a
+                # resident baseline that does not fall when replicas are added,
+                # so a memory Utilization target above that baseline can never
+                # be satisfied and the HPA ratchets to maxReplicas (production
+                # sat at 48 idle pods on a 768Mi request for a year).
                 "autoscaling": {
                     "enabled": True,
+                    "minReplicas": 2,
+                    "maxReplicas": 8,
                     "targetCPUUtilizationPercentage": "60",
-                    "targetMemoryUtilizationPercentage": "80",
                 },
+                # The single gunicorn worker never returns heap: its working
+                # set steps up on heavy dashboard/SQL Lab requests and only
+                # grows, so recycle it before it reaches the limit. run-server.sh
+                # in the pinned 6.1.0 image maps these to gunicorn's
+                # --max-requests / --max-requests-jitter. Scoped to supersetNode
+                # so only the web Deployment recycles, not celery.
+                # Probes alone are 480 req/pod/hour (11.5k/day, measured), plus
+                # 330-2200 real req/hour, so a pod recycles a little under daily
+                # at idle and about twice daily under load.
+                "env": {
+                    "WORKER_MAX_REQUESTS": "10000",
+                    "WORKER_MAX_REQUESTS_JITTER": "2000",
+                },
+                # Sized to the un-recycled peak on purpose: 24h-old pods reached
+                # 1412MiB and 1885MiB working set on 2026-09-22, so the request
+                # stays until a week of post-recycling data says what the bounded
+                # peak actually is.
                 "resources": {
-                    "limits": {"cpu": "2000m", "memory": "2Gi"},
-                    "requests": {"cpu": "500m", "memory": "768Mi"},
+                    "limits": {"cpu": "2000m", "memory": "3Gi"},
+                    "requests": {"cpu": "500m", "memory": "1536Mi"},
                 },
+                "podDisruptionBudget": {"enabled": True, "minAvailable": 1},
             },
             "supersetWorker": {
                 "podLabels": k8s_global_labels,
@@ -880,9 +904,9 @@ _gateway = OLEKSGateway(
 # DNS is managed at the Gateway/ingress layer via cert-manager/external-dns
 
 # VPA objects for Superset workloads.
-# No webapp VPA: the chart's supersetNode.autoscaling scales on both cpu (60%)
-# and memory (80%) Resource metrics, so there's no resource axis left for VPA
-# to safely control without fighting the HPA's utilization signal.
+# No webapp VPA yet: the HPA owns the cpu axis, and a memory-only VPA is only
+# safe once WORKER_MAX_REQUESTS has been observed to bound the worker's growth.
+# Until then it would chase that growth up to maxAllowed.
 # Worker uses KEDA (Redis queue depth) so CPU+memory VPA is safe there.
 make_vpa(
     name="superset-worker-vpa",

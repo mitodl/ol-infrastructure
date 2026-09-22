@@ -1044,6 +1044,21 @@ pgbouncer_ini_template = dagster_db.db_instance.address.apply(
             # warm, so nothing in normal operation waits on a connect, and drops the
             # parked total from 900 to 240.
             #
+            # 40 -> 20, re-measured under transaction mode over 14 days ending
+            # 2026-09-18 (clean history only; the event_logs autovacuum bug inflated
+            # query time until 2026-09-03):
+            #
+            #   peak server_active, busiest replica   8 production, 12 QA
+            #   held servers per replica              40 at every sample, both envs
+            #   maxwait                               0 at every sample, both envs
+            #
+            # Neither pool grew past its floor once, so how fast a pool grows from
+            # cold is still unmeasured. 20 does not depend on it: the floor only
+            # costs connect latency when a replica needs more backends than it
+            # holds, and 20 is still above every per-replica peak either
+            # environment recorded. Cold growth is paid only for demand above
+            # anything observed.
+            #
             # default_pool_size and reserve_pool_size were dead numbers: 800 + 2000
             # per pod against a derived cap of 708 means max_db_connections already
             # bound first, so neither value could take effect on production. Rather
@@ -1060,7 +1075,7 @@ pgbouncer_ini_template = dagster_db.db_instance.address.apply(
             # dead -- saturation would surface only as clients queueing, which is the
             # symptom the headroom rule exists to get ahead of.
             f"default_pool_size = {pgbouncer_max_db_connections}",
-            "min_pool_size = 40",
+            "min_pool_size = 20",
             "reserve_pool_size = 0",
             # The aggregate ceiling. See the derivation above; this is the
             # only setting here that bounds total backends across replicas,
@@ -2333,6 +2348,26 @@ edxorg_gcp_secret = OLVaultK8SSecret(
 # enable direction rather than the disable one. Read it before widening the set.
 OTEL_AGENT_PYTHONPATH = "/opt/otel/auto_instrumentation"
 
+# Metrics export, for db.client.connections.usage: the sqlalchemy
+# instrumentation's count of each QueuePool's connections by state (idle/used).
+# PgBouncer's exporter measures the server end of every connection, so a
+# saturated client pool (the "QueuePool limit of size N overflow M reached"
+# failure) reads as a healthy PgBouncer. This is the only series that sees it.
+#
+# Opt-in per stack rather than on everywhere, because enabling the metrics
+# exporter enables every installed instrumentation's metrics at once, not just
+# this one. requests and urllib3 each emit http.client.* duration and size
+# histograms. The canvas API client uses httpx2, which is not instrumented, but
+# S3 IO goes through botocore over urllib3 and Vault through hvac over
+# requests. The run workers that inherit this env (canvas, see
+# OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS) are short-lived processes, each with
+# its own random service.instance.id, and so is every step subprocess the
+# multiprocess executor spawns inside one. Production started ~440-475 canvas
+# run-worker Jobs a day in the week to 2026-09-18, each minting at least one
+# fresh set of series. Measure the series count on QA before setting this in
+# Production.
+dagster_otel_metrics_enabled = dagster_config.get_bool("otel_metrics_enabled") or False
+
 
 def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, str]]:
     """Build the OTEL_* + PYTHONPATH block for one long-lived Dagster process.
@@ -2370,10 +2405,20 @@ def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, st
         # Only the HTTP OTLP exporter is installed in the images; the SDK default
         # "otlp" resolves to the gRPC exporter, which is absent. An unresolvable
         # exporter aborts SDK initialisation outright -- traces included -- which
-        # is why metrics and logs are named off rather than left at their
-        # defaults. Same reasoning as edxapp/k8s_resources.py's _OTEL_SDK_ENV.
+        # is why metrics and logs are named off or named explicitly rather than
+        # left at their defaults. Same reasoning as edxapp/k8s_resources.py's
+        # _OTEL_SDK_ENV. otlp_proto_http is registered for metrics by the same
+        # opentelemetry-exporter-otlp-proto-http package the traces use.
         {"name": "OTEL_TRACES_EXPORTER", "value": "otlp_proto_http"},
-        {"name": "OTEL_METRICS_EXPORTER", "value": "none"},
+        *(
+            [
+                {"name": "OTEL_METRICS_EXPORTER", "value": "otlp_proto_http"},
+                # The interval mit_learn, learn_ai and witan export at.
+                {"name": "OTEL_METRIC_EXPORT_INTERVAL", "value": "60000"},
+            ]
+            if dagster_otel_metrics_enabled
+            else [{"name": "OTEL_METRICS_EXPORTER", "value": "none"}]
+        ),
         {"name": "OTEL_LOGS_EXPORTER", "value": "none"},
         # The mit_learn/learn_ai ratio, so a trace crossing from one of those
         # services is sampled once rather than decided twice. Alloy's
@@ -2468,11 +2513,7 @@ code_locations: list[dict[str, str | int]] = [
     {"name": "data_platform", "module": "data_platform.definitions", "port": 4001},
     {"name": "edxorg", "module": "edxorg.definitions", "port": 4002},
     {"name": "lakehouse", "module": "lakehouse.definitions", "port": 4003},
-    {
-        "name": "learning_resources",
-        "module": "learning_resources.definitions",
-        "port": 4004,
-    },
+    {"name": "delivery", "module": "delivery.definitions", "port": 4004},
     {"name": "legacy_openedx", "module": "legacy_openedx.definitions", "port": 4005},
     {"name": "openedx", "module": "openedx.definitions", "port": 4006},
     {

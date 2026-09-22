@@ -21,6 +21,8 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         context=APP_DIR,
         target='local-dev',
         dockerfile=APP_DIR + '/Dockerfile',
+        # .claude/ holds agent worktrees; syncing one into the pod restarted it in a loop.
+        ignore=['.claude/'],
         # Sync the whole repo: Django apps are top-level dirs (courses,
         # ecommerce, cms, ...). granian's --reload-ignore-dirs filters the
         # non-Python churn.

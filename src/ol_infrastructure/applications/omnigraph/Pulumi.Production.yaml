@@ -4,9 +4,11 @@ config:
   omnigraph:managed_repos:
     # Repos with a per-repo `code-<repo>` graph on this cluster. Canonical repo
     # URIs, matched byte-for-byte against what witan-code detects from a
-    # checkout's git remote. Adding one here needs a `pulumi up` plus an
-    # `omnigraph cluster apply` and a server restart before clients can reach
-    # it — see applications/omnigraph/data_tier.py build_cluster_graphs.
+    # checkout's git remote. A `pulumi up` is all adding one needs: the
+    # pre-deploy `omnigraph cluster apply` Job creates the graph and the server
+    # restarts into it (data_tier.py; graph ids from cluster_config.py
+    # build_cluster_graphs). The CI indexer reads this list from the stack
+    # output, so it starts indexing a new repo on the next witan deploy.
     #
     # Seeded from the mitodl repos with the most human-authored commits in the
     # 90 days to 2026-07-31 (bot commits excluded), cut at >=35. Re-derive
@@ -26,6 +28,11 @@ config:
   - https://github.com/mitodl/learn-ai
   - https://github.com/mitodl/ocw-hugo-themes
   - https://github.com/mitodl/ol-django
+    # Added 2026-09-18 by the same cut, re-derived over the 90 days to
+    # 2026-09-18, for repos agents were already querying and getting
+    # ClusterGraphMissing on: ol-analytics-api (39), platform-engineering-site (36).
+  - https://github.com/mitodl/ol-analytics-api
+  - https://github.com/mitodl/platform-engineering-site
   # Turns actor-token sync on: the bootstrap Job and the hourly CronJob take
   # ownership of secret-operations/witan/actor-tokens, which Pulumi otherwise
   # writes directly. Safe only because the existing actor-tokens resource
@@ -44,9 +51,9 @@ config:
   aws:region: us-east-1
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
-  omnigraph:storage_prefix: fmt6
+  omnigraph:storage_prefix: fmt9
   # Cross-checked against storage_prefix at preview time — see the CI
   # config's comment on this same key for why.
-  omnigraph:internal_schema_version: 6
+  omnigraph:internal_schema_version: 9
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwF51lHyFZBMipn03XTrTTsKAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMIK7o7DGmOomYnJtDAgEQgDuWNWhBp4MmY5g1IS5INjiOfMa0yZcKOzoHa0L7AjLfrw9rMSs/jELIM0qfIJguIuQsCYjLMpJoX7CgSQ==
