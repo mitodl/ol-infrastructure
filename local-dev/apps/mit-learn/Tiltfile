@@ -36,6 +36,8 @@ if os.path.exists(os.path.join(MIT_LEARN_DIR, ".git")):
             "frontends/",
             ".yarn/",
             "**/node_modules",
+            # Agent worktrees; syncing one into the pod restarted it in a loop.
+            ".claude/",
         ],
         # Live update: sync source changes into the container; granian runs
         # with --reload (see deployment.yaml) and restarts workers on change.
