@@ -472,8 +472,14 @@ def setup_grafana(
                     # loses this series by surprise.
                     "metrics": {
                         "filters": {
+                            # Bracket classes, not backslash escapes: this
+                            # string crosses Helm's Sprig `quote` and Alloy's
+                            # River string-unescaping before OTTL parses it,
+                            # and each hop consumes one level of backslash.
+                            # `\.` doesn't survive that round trip as a valid
+                            # OTTL escape; `[.]` needs no escaping at all.
                             "metric": [
-                                'IsMatch(name, "^http\\.client\\.") and '
+                                'IsMatch(name, "^http[.]client[.]") and '
                                 'resource.attributes["service.namespace"] '
                                 '== "dagster"',
                             ],
