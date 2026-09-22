@@ -261,6 +261,111 @@ Fastly and reporting it against the new version. If you add another post-deploy 
 that has to complete before the property is really serving the new release, put it
 before the marker steps.
 
+## What a run blocks
+
+The deploy trigger above is one leg of a round trip. This is the other: a release the
+canary could not get through on RC does not reach production.
+
+```
+k8s_apps QA job  --deploy marker (version in key)-->  canary-<property> run
+                                                              |
+                                                        verdict (pass/fail),
+                                                        keyed by that version
+                                                              |
+k8s_apps Production job  <--<app>-rc-canary-gate reads it-----+
+```
+
+Issue #5592 asked for "failures should block releases from going to production". The
+gate is a task at the head of `deploy-ol-application-<app>-production`, and it blocks
+by exiting non-zero — the promotion fails the way any other failed deploy step does.
+**This is not a new result signal.** There is still no metric, Grafana rule, Mimir
+series, Slack route or Rootly path anywhere in this design; a Concourse job going red
+is the whole mechanism, here as everywhere else.
+
+Operator-facing procedure, including the override, is
+[`docs/canary-release-gate-break-glass-runbook.md`](../../../../docs/canary-release-gate-break-glass-runbook.md).
+What follows is why it is shaped that way.
+
+### The verdict, and why its key carries the version
+
+Every run that can name the release it tested writes one object, on the green path and
+the red path alike:
+
+```
+s3://ol-eng-artifacts/canary-verdicts/<app>/RC/<version>/{pass,fail}.json
+```
+
+The layout lives in [`../canary_verdicts.py`](../canary_verdicts.py) and both ends build
+it from there, for the same reason the deploy marker does. Neither end uses a Concourse
+resource, and that is the point: a `get` resolves the **latest** version of a resource,
+so a gate built on one is satisfied by a green run against the *previous* release. That
+stale green is the failure mode the whole round trip exists to remove, and putting the
+release version in the key is what removes it — the gate checks one key it computes from
+its own `((.:image_tag))`.
+
+Two consequences worth holding onto:
+
+- **A red run records a `fail`, not merely an absent `pass`.** Both block, but they mean
+  different things — "tested and broken" against "never tested" — and the gate says
+  which. A gate that cannot tell you which one you are looking at sends you to the wrong
+  place first, every time.
+- **Verdicts are written by scheduled runs too, not only deploy-triggered ones.** Each
+  run records a verdict for whatever release the marker says is on RC. That is what makes
+  the gate self-healing: a release sitting on RC acquires a verdict within one canary
+  interval whether or not its deploy trigger fired, so an app that is gated before its
+  first deploy-triggered run is not stuck. It also means a release rolled *back* on RC
+  can be attributed wrongly — the marker resource orders versions, so a rollback to an
+  older calver does not become the current marker, and runs against the rolled-back
+  deployment keep recording against the newer version. Rare, and worth knowing before
+  you trust a verdict during a rollback.
+
+### Missing evidence blocks
+
+The decision that could most reasonably have gone the other way. A gate that opens when
+its evidence is missing is not a gate: the canary being paused, broken, locked out of
+its account, or simply never set up is exactly the state in which a bad release is most
+likely to walk into production unexamined. So no verdict means no promotion.
+
+The cost of that choice is bounded by the self-healing property above and by the
+break-glass path. The cost of the other choice is unbounded and silent.
+
+### Why the override is an S3 object
+
+The measured hard-failure rate is ~0.5% per run (8 in 1,360 over 10.5 days), so roughly
+one promotion in two hundred can expect to be blocked by something other than a real
+regression. That number on its own is fine. What is not fine is that the block lands at
+the worst possible time — during an incident, when the release being held back is the
+fix.
+
+So the override has to work for someone under pressure who has never read this file:
+
+- One command, which **the gate prints itself** when it blocks, version already filled
+  in. A runbook nobody can find during an incident is not an override.
+- No `fly` access and no pipeline re-set. AWS access is the bar, which is the same
+  population that can promote.
+- Scoped to one release version, so it cannot quietly disable the gate for the next
+  release and there is nothing to remember to undo.
+- A non-empty `reason` is **enforced**, not requested. The object is the only durable
+  record of the decision; the build that acted on it is reaped within days.
+
+The gate and the runbook both render that command from `break_glass_command()`, so the
+documented override and the working override cannot drift apart.
+
+### Gating another property
+
+Three flags, in two files, and the Pydantic validator refuses the incoherent subsets:
+
+1. `CanaryParams.deploy_trigger` here — without release identity there is no verdict.
+2. `AppPipelineParams.publish_rc_deploy_marker=True` in
+   [`../infrastructure/k8s_apps/pipeline.py`](../infrastructure/k8s_apps/pipeline.py).
+3. `AppPipelineParams.gate_production_on_rc_canary=True` in the same entry.
+
+Before turning on (3), check that verdicts are actually landing for the release on RC —
+`aws s3 ls --recursive s3://ol-eng-artifacts/canary-verdicts/<app>/RC/`. And check the
+property's flake history first: gating converts a canary nobody has to act on into one
+that can stop a release, and a journey with a known hydration race should be fixed
+rather than gated on.
+
 ## Result and failure artifacts
 
 Concourse build status is the sole canary result: a passing journey makes the build
@@ -268,12 +373,16 @@ green and a failed journey makes it red. Do not add metric pushes, Grafana alert
 Slack notifications, or Rootly incidents. This deliberately matches how most of our
 pipelines report success and failure.
 
-Two things are published, on deliberately different conditions:
+Three things are published, on deliberately different conditions:
 
 | What | When | Where |
 |---|---|---|
 | Traces, screenshots, video, HTML report | **failure only** | `s3://ol-eng-artifacts/canary-results/…` |
 | `results.json` — Playwright's machine-readable report | **every run** | `s3://ol-eng-artifacts/canary-runs/…` |
+| The release verdict | **every run that can name a release** | `s3://ol-eng-artifacts/canary-verdicts/…` |
+
+Only the third is read by anything other than a human — see "What a run blocks" above.
+The first two are evidence, and nothing should be built on them.
 
 The release under test is carried into `results.json` as `config.metadata.releaseRef`,
 set from `CANARY_RELEASE_REF` in `playwright.config.ts`. Concourse's build page shows

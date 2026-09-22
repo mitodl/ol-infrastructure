@@ -22,6 +22,7 @@ Do not redirect stdout to a file — that would mix the JSON with the fly comman
 pipelines/
   constants.py            # Pipeline-level constants (ECR_REGION, PULUMI_WATCHED_PATHS, etc.)
   deploy_markers.py       # Cross-pipeline "a deploy finished" contract (see below)
+  canary_verdicts.py      # Cross-pipeline "the canary judged this release" contract
   jobs.py                 # Top-level job factories (packer_jobs, pulumi_jobs_chain, pulumi_job)
   infrastructure/         # Platform infra pipelines (consul, vault, eks, dagster, etc.)
   applications/           # Application deployment pipelines
@@ -47,6 +48,23 @@ pipelines. A producer writing keys the consumer's `regexp` does not match is a s
 failure at both ends. Today's participants are `infrastructure/k8s_apps/` (producer,
 opt-in via `AppPipelineParams.publish_rc_deploy_marker`) and `canaries/` (consumer,
 opt-in via `CanaryParams.deploy_trigger`).
+
+[`pipelines/canary_verdicts.py`](pipelines/canary_verdicts.py) is the same idea running
+the other way — pipeline B reporting a result back to pipeline A, so A can *gate* on it
+rather than merely react to it. Two differences are worth knowing before you copy the
+pattern:
+
+- **Not a Concourse resource on either end.** A `get` resolves the *latest* version of a
+  resource, and "latest" is exactly wrong for a gate: a green run against the previous
+  release would satisfy it. The verdict's key contains the release version, and the
+  consuming job checks the one key it cares about with `aws s3api head-object`, computed
+  from its own `((.:image_tag))`.
+- **A gate needs a documented override, decided before it is switched on.** Here that is
+  a per-version break-glass object the gate prints the command for when it blocks, and
+  [`docs/canary-release-gate-break-glass-runbook.md`](../../docs/canary-release-gate-break-glass-runbook.md)
+  writes up. Both the gate and the runbook generate that command from
+  `break_glass_command()`, so an override that does not work cannot be discovered
+  mid-incident.
 
 `pipelines/canaries/` is unlike everything else here: it holds the only
 JavaScript/TypeScript in this repository, as a self-contained Playwright project whose

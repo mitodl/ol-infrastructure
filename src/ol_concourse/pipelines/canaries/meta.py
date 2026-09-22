@@ -129,6 +129,11 @@ def meta_pipeline(canary_names: list[str]) -> Pipeline:
             # no longer matches fails silently at both ends -- the canary just
             # stops deploy-triggering and keeps passing on its schedule.
             "src/ol_concourse/pipelines/deploy_markers.py",
+            # The canary-verdict key layout, watched for the same reason and
+            # by the same pair of meta pipelines. This is the leg a production
+            # promotion depends on: a canary writing verdicts the k8s_apps gate
+            # does not look for blocks releases rather than failing quietly.
+            "src/ol_concourse/pipelines/canary_verdicts.py",
             "pyproject.toml",
         ],
     )

@@ -24,6 +24,7 @@ from ol_concourse.lib.models.pipeline import (
     Command,
     GetStep,
     Identifier,
+    InParallelStep,
     Input,
     Job,
     LoadVarStep,
@@ -40,6 +41,11 @@ from ol_concourse.lib.resource_types import rclone
 from ol_concourse.lib.resources import git_repo, schedule
 from pydantic import BaseModel, model_validator
 
+from ol_concourse.pipelines.canary_verdicts import (
+    CANARY_VERDICT_PREFIX,
+    UNATTRIBUTABLE_RELEASE_REFS,
+    canary_verdict_key,
+)
 from ol_concourse.pipelines.deploy_markers import (
     RC_ENVIRONMENT,
     deploy_marker_resource,
@@ -86,6 +92,18 @@ ARTIFACT_OUTPUT = Identifier("canary-results")
 # the back of this.
 REPORT_PREFIX = "canary-runs"
 REPORT_OUTPUT = Identifier("canary-report")
+
+# The per-release verdict, written on both the green and the red path for any
+# canary that can name the release it tested, and read by the production deploy
+# gate in ``infrastructure/k8s_apps/pipeline.py``. See
+# :mod:`ol_concourse.pipelines.canary_verdicts` for the key layout and for why
+# this is a file the task writes rather than a Concourse resource.
+#
+# Unlike the two uploads above, something downstream *acts* on this one. That
+# does not make it a second result signal -- there is still no metric, alert or
+# notification anywhere, and the gate's own verdict is a Concourse job going red
+# exactly like every other promotion check.
+VERDICT_OUTPUT = Identifier("canary-verdict")
 
 # Surfaced to the specs and recorded into results.json via playwright.config.ts's
 # `metadata`. Exported unconditionally: a run with no deploy trigger configured
@@ -247,6 +265,75 @@ pipeline_params: dict[str, CanaryParams] = {
 }
 
 
+def _release_verdict_lines(params: CanaryParams, artifact_run_prefix: str) -> list[str]:
+    """Return the shell that records this run's verdict on the release it tested.
+
+    Emitted only for a canary with a ``deploy_trigger``: without one there is no
+    release identity, and a verdict about a release nobody can name is a file
+    that can only ever mislead.
+
+    Written **after** the test run and on both paths -- a red run records a
+    ``fail`` verdict, not merely an absent ``pass`` -- so the gate that reads
+    these can tell "the canary tested this release and it was broken" from "the
+    canary has not tested this release at all". Both block a promotion, but they
+    call for different actions and the gate says which it is.
+
+    Nothing here can change the canary's own result: the verdict is written from
+    ``$canary_status``, and the exit at the end of the script re-raises it
+    untouched.
+
+    :param params: The canary being rendered.
+    :param artifact_run_prefix: ``<pipeline>/<job>``, used to point the verdict
+        at this run's retained ``results.json``.
+    :returns: Lines to splice into the canary task script, or an empty list.
+    """
+    if not params.deploy_trigger:
+        return []
+    app_name = params.deploy_trigger.app_name
+    environment = params.deploy_trigger.environment
+    # The local tree under VERDICT_OUTPUT mirrors the object key *below* the
+    # prefix, because the rclone destination below already carries the prefix.
+    # Built from canary_verdict_key rather than spelled out so the producer
+    # cannot drift from the gate that reads it.
+    verdict_relative_key = canary_verdict_key(
+        app_name, environment, "${CANARY_RELEASE_REF}", "${verdict}"
+    ).removeprefix(f"{CANARY_VERDICT_PREFIX}/")
+    unattributable = "|".join(f'"{ref}"' for ref in UNATTRIBUTABLE_RELEASE_REFS)
+    results_object = (
+        f"s3://{ARTIFACT_BUCKET}/{REPORT_PREFIX}/{artifact_run_prefix}/$run_stamp.json"
+    )
+    return [
+        'if [ "$canary_status" -eq 0 ]; then',
+        "  verdict=pass",
+        "else",
+        "  verdict=fail",
+        "fi",
+        # A canary with a deploy trigger still reports the marker's synthetic
+        # initial version until the app has published a real one, and that is
+        # not a release anything can promote.
+        'case "$CANARY_RELEASE_REF" in',
+        f"  {unattributable})",
+        "    echo \"Release ref is '$CANARY_RELEASE_REF'; recording no verdict.\" ;;",
+        "  *)",
+        f'    verdict_file="$verdict_root/{verdict_relative_key}"',
+        '    mkdir -p "$(dirname "$verdict_file")"',
+        '    cat > "$verdict_file" <<EOF',
+        "{",
+        f'  "app": "{app_name}",',
+        f'  "environment": "{environment}",',
+        '  "release": "$CANARY_RELEASE_REF",',
+        '  "outcome": "$verdict",',
+        f'  "canary": "canary-{params.canary_name}",',
+        '  "run": "$run_stamp",',
+        '  "recorded_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",',
+        f'  "results": "{results_object}"',
+        "}",
+        "EOF",
+        '    cat "$verdict_file" ;;',
+        "esac",
+    ]
+
+
 def build_canary_pipeline(canary_name: str) -> Pipeline:
     """Render the canary pipeline for one property.
 
@@ -301,6 +388,16 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
         task_params["CANARY_USER_EMAIL"] = f"(({params.credential_secret}.email))"
         task_params["CANARY_USER_PASSWORD"] = f"(({params.credential_secret}.password))"
 
+    # Uploaded by the ensure hook on the canary task below. The report goes up
+    # on every run; the verdict exists only for a canary that can name the
+    # release it tested, and a canary without one renders exactly the pipeline
+    # it rendered before verdicts existed rather than a no-op upload 144 times
+    # a day.
+    evidence_uploads = [
+        (REPORT_OUTPUT, REPORT_PREFIX),
+        *([(VERDICT_OUTPUT, CANARY_VERDICT_PREFIX)] if params.deploy_trigger else []),
+    ]
+
     project_flags = " ".join(f"--project={browser}" for browser in params.browsers)
     spec_arguments = " ".join(params.spec_paths)
     canary_job = Identifier(f"run-{params.canary_name}-canary")
@@ -310,6 +407,14 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
     # The put step's own container does have them, but a `put` cannot interpolate
     # them into a destination, so neither end can supply the build number.
     artifact_run_prefix = f"canary-{params.canary_name}/{canary_job}"
+    verdict_lines = _release_verdict_lines(params, artifact_run_prefix)
+    # Resolved before the `cd` for the same reason the two above are, and only
+    # when there is a verdict to write.
+    verdict_root_lines = (
+        [f'verdict_root="$PWD/{VERDICT_OUTPUT}"', 'mkdir -p "$verdict_root"']
+        if verdict_lines
+        else []
+    )
     run_canary = "\n".join(
         [
             "set -euo pipefail",
@@ -325,6 +430,7 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
             # the build's start time in Concourse.
             f'artifact_dir="$PWD/{ARTIFACT_OUTPUT}/{artifact_run_prefix}/$run_stamp"',
             f'report_dir="$PWD/{REPORT_OUTPUT}/{artifact_run_prefix}"',
+            *verdict_root_lines,
             f"cd canary-code/{CANARY_REPO_PATH}",
             # @playwright/test is not installed globally in the image, so this is
             # mandatory. It is also cheap -- 6 packages, no browser download,
@@ -353,6 +459,7 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
             "if [ -f canary-results/results.json ]; then",
             '  cp canary-results/results.json "$report_dir/$run_stamp.json"',
             "fi",
+            *verdict_lines,
             'exit "$canary_status"',
         ]
     )
@@ -375,6 +482,28 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
             )
         },
     )
+
+    evidence_puts = [
+        PutStep(
+            put=artifact_store.name,
+            no_get=True,
+            # `inputs` is not optional here: without it Concourse streams every
+            # artifact in the plan, including the failure tree and the
+            # repository checkout, into the put container to upload one small
+            # file.
+            inputs=[output],
+            params={
+                "source": str(output),
+                "destination": [
+                    {
+                        "command": "copy",
+                        "dir": f"s3-remote:{ARTIFACT_BUCKET}/{prefix}/",
+                    }
+                ],
+            },
+        )
+        for output, prefix in evidence_uploads
+    ]
 
     # The deploy trigger is a second trigger on the *same* job, not a second
     # job. Two jobs would need a serial_group to stop a deploy-triggered run and
@@ -437,7 +566,7 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
                             inputs=[Input(name=canary_code.name)],
                             outputs=[
                                 Output(name=ARTIFACT_OUTPUT),
-                                Output(name=REPORT_OUTPUT),
+                                *(Output(name=name) for name, _ in evidence_uploads),
                             ],
                             params=task_params,
                             run=Command(
@@ -480,10 +609,6 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
                         # into the failure tree as well -- cheap, and it keeps the
                         # run history uniform across green and red.
                         #
-                        # `inputs` is not optional here: without it Concourse
-                        # streams every artifact in the plan, including the
-                        # failure tree and the repository checkout, into the put
-                        # container to upload one small file.
                         #
                         # Wrapped in `try` because Concourse propagates a hook
                         # failure to its parent: "If the parent step succeeds
@@ -500,25 +625,23 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
                         # it only runs on builds that are already red, so it
                         # cannot change an outcome, and leaving it bare keeps a
                         # broken artifact upload visible instead of silent.
-                        ensure=TryStep(
-                            try_=PutStep(
-                                put=artifact_store.name,
-                                no_get=True,
-                                inputs=[REPORT_OUTPUT],
-                                params={
-                                    "source": str(REPORT_OUTPUT),
-                                    "destination": [
-                                        {
-                                            "command": "copy",
-                                            "dir": (
-                                                f"s3-remote:{ARTIFACT_BUCKET}"
-                                                f"/{REPORT_PREFIX}/"
-                                            ),
-                                        }
-                                    ],
-                                },
-                            )
-                        ),
+                        #
+                        # The verdict upload rides in the same hook, in
+                        # parallel and under the same `try`. `in_parallel` does
+                        # not fail fast, so neither upload can stop the other
+                        # from being attempted, and the single `try` keeps the
+                        # "evidence cannot contradict the result" rule intact
+                        # for both. A canary with no deploy trigger has no
+                        # verdict to upload and renders one put here, as it did
+                        # before verdicts existed.
+                        #
+                        # A verdict that fails to upload after a *green* run
+                        # leaves the release with no pass recorded, which blocks
+                        # its promotion until the next run writes one or someone
+                        # breaks glass. That is the direction to fail in: the
+                        # alternative is a gate that opens because its evidence
+                        # went missing.
+                        ensure=TryStep(try_=InParallelStep(in_parallel=evidence_puts)),
                     ),
                 ],
             )

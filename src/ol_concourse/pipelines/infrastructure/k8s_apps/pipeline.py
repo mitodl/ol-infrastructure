@@ -47,6 +47,15 @@ from bridge.settings.apps import (
     release_resource_workflow as app_release_resource_workflow,
 )
 from bridge.settings.apps import repo_main_branch as app_repo_main_branch
+from ol_concourse.pipelines.canary_verdicts import (
+    BREAK_GLASS_VERDICT,
+    CANARY_VERDICT_BUCKET,
+    FAIL_VERDICT,
+    PASS_VERDICT,
+    break_glass_command,
+    canary_verdict_directory,
+    canary_verdict_key,
+)
 from ol_concourse.pipelines.constants import (
     ECR_REGION,
     PULUMI_WATCHED_PATHS,
@@ -135,6 +144,14 @@ class AppPipelineParams(BaseModel):
             ``passed`` is pipeline-local). See
             :mod:`ol_concourse.pipelines.deploy_markers`. Costs two steps at the
             end of one job and nothing at all when left off.
+        gate_production_on_rc_canary (bool): Whether the Production deploy job
+            refuses to run unless this app's Playwright canary passed against
+            **the exact release being promoted** on RC. Defaults to False.
+            Requires ``publish_rc_deploy_marker`` -- without a marker the canary
+            cannot name the release it tested, so it publishes no verdict and
+            the gate would block every promotion. See
+            :func:`_rc_canary_gate_step` for the semantics and
+            ``docs/canary-release-gate-break-glass-runbook.md`` for the override.
     """
 
     app_name: str
@@ -155,6 +172,7 @@ class AppPipelineParams(BaseModel):
     sentry_sourcemaps: SentrySourcemapsConfig | None = None
     refresh_stack: bool = True
     publish_rc_deploy_marker: bool = False
+    gate_production_on_rc_canary: bool = False
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -163,6 +181,31 @@ class AppPipelineParams(BaseModel):
             self.repo_name = self.app_name
         if not self.github_repo:
             self.github_repo = f"mitodl/{self.repo_name}"
+        return self
+
+    @model_validator(mode="after")
+    def validate_canary_gate(self) -> "AppPipelineParams":
+        """Refuse a canary gate that can never be satisfied.
+
+        The gate looks for a verdict keyed by release version, and the only
+        thing that gives a canary run a release version is the deploy marker
+        this same pipeline publishes. Gating without publishing renders a
+        pipeline whose production job blocks on evidence nothing will ever
+        write -- which presents as "promotions are broken", days later, to
+        someone who did not make this edit.
+
+        Raises:
+            ValueError: if ``gate_production_on_rc_canary`` is set without
+                ``publish_rc_deploy_marker``.
+        """
+        if self.gate_production_on_rc_canary and not self.publish_rc_deploy_marker:
+            msg = (
+                f"{self.app_name}: gate_production_on_rc_canary=True requires "
+                "publish_rc_deploy_marker=True. The canary keys its verdict on the "
+                "release version it learns from the deploy marker; with no marker "
+                "it publishes no verdict and the gate blocks every promotion."
+            )
+            raise ValueError(msg)
         return self
 
     @model_validator(mode="after")
@@ -243,6 +286,12 @@ pipeline_params = {
         # instead of at the next 10-minute tick. See
         # src/ol_concourse/pipelines/canaries/AGENTS.md.
         publish_rc_deploy_marker=True,
+        # ... and reads the verdict back on the way out: a release the canary
+        # could not get through on RC does not reach learn.mit.edu. Issue #5592.
+        # Break-glass is one `aws s3 cp`, printed by the gate itself when it
+        # blocks and written up in
+        # docs/canary-release-gate-break-glass-runbook.md.
+        gate_production_on_rc_canary=True,
     ),
     "ocw-studio": AppPipelineParams(
         app_name="ocw-studio",
@@ -423,6 +472,207 @@ def _rc_deploy_marker_steps(
             params={"file": f"{marker_output}/{deploy_marker_filename('*')}"},
         ),
     ]
+
+
+def _rc_canary_gate_step(app_name: str) -> TaskStep:
+    """Return the task that blocks a promotion the RC canary did not clear.
+
+    Issue #5592: "failures should block releases from going to production".
+    This is that block. It reads the verdict the canary published for the
+    release this job is about to promote -- see
+    :mod:`ol_concourse.pipelines.canary_verdicts` -- and exits non-zero unless
+    one of two things is true: the canary passed against that release, or an
+    operator has explicitly authorised the promotion anyway.
+
+    Three decisions are baked in here, each of which could reasonably have gone
+    the other way:
+
+    **It gates on a verdict for this exact release, not on the canary's latest
+    result.** The obvious implementation -- "is canary-<app> green right now" --
+    is satisfied by a scheduled run against the *previous* release, which is the
+    failure mode the whole deploy-marker/verdict round trip exists to remove.
+    The release version is in the verdict's key, so this is one `head-object` on
+    a key computed from ``((.:image_tag))``.
+
+    **It blocks when no verdict exists at all, rather than warning.** A gate
+    that opens when its evidence is missing is not a gate: the canary pipeline
+    being paused, broken or unset is precisely when a bad release is most likely
+    to reach production unexamined. This is cheap to satisfy in practice --
+    every canary run records a verdict for whatever release it finds on RC, not
+    only deploy-triggered ones, so a release sitting on RC acquires a verdict
+    within one canary interval whether or not the deploy trigger fired. When it
+    is not satisfied, the message says which of "never ran" and "ran and failed"
+    it is looking at, because those call for different responses.
+
+    **Break-glass is an S3 object, not a pipeline var.** The measured canary
+    failure rate is ~0.5% per run, so roughly one promotion in two hundred can
+    expect to be blocked by something other than a real regression -- and the
+    cost of a block is not the block, it is the block landing during an
+    incident when the thing being shipped is the fix. The override therefore has
+    to be usable by someone under pressure who has not read this file: a single
+    command, which the gate prints when it blocks, needing no pipeline re-set
+    and no fly access. It is scoped to one release version, so it cannot
+    silently disable the gate for the next one, and it requires a ``reason``,
+    so the decision leaves a record.
+
+    :param app_name: Application name, which is also the verdict's app segment.
+    :returns: A task step for the head of the Production deploy job.
+    """
+    verdict_directory = canary_verdict_directory(
+        app_name, RC_ENVIRONMENT, "${RELEASE_VERSION}"
+    )
+
+    def key(outcome: str) -> str:
+        return canary_verdict_key(
+            app_name, RC_ENVIRONMENT, "${RELEASE_VERSION}", outcome
+        )
+
+    gate_script = "\n".join(
+        [
+            "set -eu",
+            # ((.:image_tag)) is loaded from the release artifact earlier in this
+            # job. Empty means the load_var did not resolve, and a gate that
+            # cannot name the release it is checking must not pass it.
+            'if [ -z "${RELEASE_VERSION:-}" ]; then',
+            '  echo "RELEASE_VERSION is empty; refusing to promote a release this '
+            'gate cannot name." >&2',
+            "  exit 1",
+            "fi",
+            f'bucket="{CANARY_VERDICT_BUCKET}"',
+            f'pass_key="{key(PASS_VERDICT)}"',
+            f'fail_key="{key(FAIL_VERDICT)}"',
+            f'break_glass_key="{key(BREAK_GLASS_VERDICT)}"',
+            # head-object rather than `s3 ls`: an object-level GetObject is the
+            # narrowest permission that answers the question, and it answers it
+            # exactly rather than by prefix match.
+            "object_exists() {",
+            '  aws s3api head-object --bucket "$bucket" --key "$1" >/dev/null 2>&1',
+            "}",
+            "",
+            'if object_exists "$break_glass_key"; then',
+            '  override="$(aws s3 cp "s3://$bucket/$break_glass_key" -)"',
+            '  printf "%s\\n" "$override"',
+            # Enforced rather than requested. An override with no stated reason
+            # is an undocumented one, and this object is the only place the
+            # decision is recorded -- the build that acted on it is reaped
+            # within days.
+            # tr first, so a pretty-printed override is judged on its content
+            # rather than on where its newlines fell.
+            "  if ! printf '%s' \"$override\" | tr -d '\\n' "
+            '| grep -q \'"reason"[[:space:]]*:[[:space:]]*"[^"]\'; then',
+            '    echo "The break-glass object carries no non-empty \\"reason\\"; '
+            'refusing to use it." >&2',
+            "    exit 1",
+            "  fi",
+            f'  echo "BREAK GLASS: promoting {app_name} $RELEASE_VERSION past the '
+            'canary gate on the override above."',
+            "  exit 0",
+            "fi",
+            "",
+            'if object_exists "$pass_key"; then',
+            '  aws s3 cp "s3://$bucket/$pass_key" -',
+            # Reported, not enforced. A release that passed and later failed is
+            # worth a human look, but by then the failure is as likely to be RC
+            # itself (an emptied search index, a slow day) as the release, and
+            # blocking on it would make every promotion hostage to RC's mood.
+            '  if object_exists "$fail_key"; then',
+            '    echo "NOTE: the canary also recorded a FAILING run against '
+            f"{app_name} $RELEASE_VERSION on {RC_ENVIRONMENT}. The pass above is "
+            'what opens this gate, but look at the failure before you promote."',
+            "  fi",
+            f'  echo "Canary gate: PASS for {app_name} $RELEASE_VERSION."',
+            "  exit 0",
+            "fi",
+            "",
+            'if object_exists "$fail_key"; then',
+            '  aws s3 cp "s3://$bucket/$fail_key" -',
+            f'  echo "Canary gate: BLOCKED. The {app_name} canary FAILED against '
+            f"$RELEASE_VERSION on {RC_ENVIRONMENT} and never passed against it. "
+            "The verdict above points at the run's results.json; the trace is "
+            f'under s3://{CANARY_VERDICT_BUCKET}/canary-results/." >&2',
+            "else",
+            f'  echo "Canary gate: BLOCKED. No canary verdict exists for '
+            f"{app_name} $RELEASE_VERSION on {RC_ENVIRONMENT}. Either the canary "
+            "has not run against this release yet -- it records one within a "
+            "canary interval of the release reaching RC -- or the canary "
+            'pipeline is not running at all." >&2',
+            "fi",
+            f'echo "Objects under s3://$bucket/{verdict_directory}/:" >&2',
+            # Also surfaces a permissions problem, which otherwise reads
+            # identically to an absent verdict.
+            f'aws s3 ls "s3://$bucket/{verdict_directory}/" >&2 || true',
+            # An unquoted heredoc, so ${RELEASE_VERSION} lands in the printed
+            # command and it can be pasted as-is. The inner `<<'JSON'` is only
+            # text here; nothing about it nests.
+            "cat >&2 <<BREAKGLASS",
+            "",
+            "To promote anyway, record why and re-run this job:",
+            "",
+            break_glass_command(app_name, RC_ENVIRONMENT, "${RELEASE_VERSION}"),
+            "",
+            "See docs/canary-release-gate-break-glass-runbook.md.",
+            "BREAKGLASS",
+            "exit 1",
+        ]
+    )
+    return TaskStep(
+        task=Identifier(f"{app_name}-rc-canary-gate"),
+        config=TaskConfig(
+            platform=Platform.linux,
+            # Same image and cache route as _ensure_ecr_repository_step: this
+            # needs the AWS CLI and nothing else, and the pull-through cache
+            # keeps it off Docker Hub's anonymous pull limit.
+            image_resource=AnonymousResource(
+                type=REGISTRY_IMAGE,
+                source={
+                    "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
+                    "tag": "latest",
+                    "aws_region": ECR_REGION,
+                },
+            ),
+            params={
+                "RELEASE_VERSION": "((.:image_tag))",
+                "AWS_DEFAULT_REGION": "us-east-1",
+                "AWS_PAGER": "cat",
+            },
+            run=Command(path="sh", args=["-c", gate_script]),
+        ),
+    )
+
+
+def _insert_rc_canary_gate(production_job: Job, app_name: str) -> None:
+    """Put the canary gate at the front of a Production deploy job.
+
+    Anchored immediately after the last ``load_var`` rather than immediately
+    before the Pulumi ``put``, and that is deliberate on both ends:
+
+    - It cannot go earlier, because ``((.:image_tag))`` is what the gate
+      checks and a ``load_var`` is what sets it.
+    - It must not go later, because in the release-resource pipeline shape the
+      steps between the ``load_var`` and the Pulumi ``put`` include the
+      ``action: start`` put on the production GitHub Deployment. Gating after
+      that would leave a deployment permanently recorded as in-flight every
+      time a promotion is blocked.
+
+    :param production_job: The last job of the QA -> Production chain.
+    :param app_name: Application name.
+    :raises ValueError: If the job has no ``load_var`` step, which means the
+        release version this gate is supposed to check is not available and the
+        pipeline shape has changed underneath it.
+    """
+    load_var_indices = [
+        index
+        for index, step in enumerate(production_job.plan)
+        if isinstance(step, LoadVarStep)
+    ]
+    if not load_var_indices:
+        msg = (
+            f"{app_name}: cannot gate production on the RC canary -- "
+            f"{production_job.name} has no load_var step, so there is no "
+            "((.:image_tag)) naming the release being promoted."
+        )
+        raise ValueError(msg)
+    production_job.plan.insert(load_var_indices[-1] + 1, _rc_canary_gate_step(app_name))
 
 
 def _ensure_ecr_repository_step(
@@ -937,6 +1187,13 @@ def _build_legacy_app_pipeline(
     qa_and_production_fragment.jobs[-1].plan.insert(
         0, GetStep(get=release_repo.name, trigger=True)
     )
+
+    # The other half of the canary round trip: the QA job above announced the
+    # release to the canary, and this refuses to promote it without the
+    # canary's verdict on that same release. Inserted after the trigger get
+    # above so the gate is anchored on the plan as it will actually run.
+    if pipeline_parameters.gate_production_on_rc_canary:
+        _insert_rc_canary_gate(qa_and_production_fragment.jobs[-1], app_name)
 
     # Make the release-candidate branch code available to the RC
     # pulumi deployment job similar to how it is available to production
@@ -1666,6 +1923,14 @@ def _build_release_resource_app_pipeline(
         enable_github_issue_resource=False,
         slack_url_path="eks.slack_url",
     )
+
+    # Same wiring as the legacy shape, and kept in step with it for the same
+    # reason the marker producer is: the flag is per-app and so is the
+    # migration, so an app carrying a gate across a shape migration must not
+    # quietly lose it. Here the gate lands before the `action: start` put on
+    # the production GitHub Deployment -- see _insert_rc_canary_gate.
+    if pipeline_parameters.gate_production_on_rc_canary:
+        _insert_rc_canary_gate(qa_and_production_fragment.jobs[-1], app_name)
 
     main_branch_container_fragement = PipelineFragment(
         resources=[main_repo, app_ci_image, docker_ci_image],

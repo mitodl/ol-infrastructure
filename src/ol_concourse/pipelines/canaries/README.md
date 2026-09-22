@@ -78,6 +78,19 @@ The job's success or failure is the canary result. There is deliberately no sepa
 Grafana, Slack, or Rootly notification path: like most pipelines here, a passing run
 is green in Concourse and a failed journey is red.
 
+One thing does read that result back. For a gated app —
+`AppPipelineParams.gate_production_on_rc_canary`, today only `mit-learn` — the
+production deploy job refuses to promote a release the canary did not pass **against
+that exact release** on RC, which is the other half of the round trip the deploy marker
+starts. Each run records a small verdict at
+`s3://ol-eng-artifacts/canary-verdicts/<app>/RC/<version>/{pass,fail}.json`, and the
+gate checks the one key naming the release being promoted, so a green run against the
+previous release cannot open it. Blocking with no verdict at all is deliberate, and the
+override is a single `aws s3 cp` the gate prints when it blocks — see
+[`../../../../docs/canary-release-gate-break-glass-runbook.md`](../../../../docs/canary-release-gate-break-glass-runbook.md)
+and [`AGENTS.md`](AGENTS.md). The gate is still just a Concourse job going red; it adds
+no notification path.
+
 When a run fails, its traces, screenshots and video are uploaded to
 `s3://ol-eng-artifacts/canary-results/<pipeline>/<job>/<YYYYMMDDTHHMMSSZ>/`, matched to a
 build by its start time. These artifacts help diagnose a red build; they are not another

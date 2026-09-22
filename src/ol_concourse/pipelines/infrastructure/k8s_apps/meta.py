@@ -80,6 +80,11 @@ def meta_pipeline(app_names: list[str]) -> Pipeline:
             # consumer's regexp no longer matches -- a failure with no red build
             # at either end.
             "src/ol_concourse/pipelines/deploy_markers.py",
+            # The canary-verdict key layout, the return leg of the same round
+            # trip and shared with the same meta pipeline. A production deploy
+            # job looking for a key the canary no longer writes blocks every
+            # promotion until someone breaks glass.
+            "src/ol_concourse/pipelines/canary_verdicts.py",
             # build_app_pipeline reads AppRegistration.release_resource_workflow
             # from here to choose the pipeline shape, so a registry-only edit
             # has to regenerate. Without this the documented one-field rollout
