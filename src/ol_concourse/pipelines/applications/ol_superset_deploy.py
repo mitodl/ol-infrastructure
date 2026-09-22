@@ -15,6 +15,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 ol_data_platform_repo = git_repo(
     name=Identifier("ol-data-platform-repository"),
@@ -146,9 +147,23 @@ deploy_pipeline = Pipeline(
 )
 
 if __name__ == "__main__":
+    output = pipeline_json_with_user_data(
+        deploy_pipeline,
+        user_data={
+            "description": (
+                "Watches `ol-data-platform`'s `src/ol_superset/assets/` and "
+                "promotes those Superset dashboard/chart assets to the QA and "
+                "production Superset instances via `ol-superset promote "
+                "--force`, authenticating with per-instance OAuth service "
+                "account credentials from Vault."
+            ),
+            "team": "infrastructure",
+            "category": "data-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(deploy_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(deploy_pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.write(
         "\nfly -t <target> set-pipeline -p ol-superset-deploy -c definition.json\n"
     )

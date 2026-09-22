@@ -51,6 +51,7 @@ from ol_concourse.pipelines.constants import (
     GH_ISSUES_DEFAULT_REPOSITORY,
     GH_ISSUES_ENTERPRISE_POLL_FREQUENCY,
 )
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 LEHRER_URI = "https://github.com/mitodl/lehrer"
 
@@ -345,21 +346,27 @@ def site_promote_job(
     return PipelineFragment(resources=[post_resource], jobs=[job])
 
 
+def _resolve_site_project(deployment_name: str) -> SiteProjectConfig:
+    """Look up a deployment's SiteProjectConfig, or exit with the supported list."""
+    by_name = {p.deployment_name: p for p in SITE_PROJECTS}
+    project = by_name.get(deployment_name)
+    if project is None:
+        supported = ", ".join(by_name)
+        msg = (
+            f"Unknown deployment {deployment_name!r}. "
+            f"Supported deployments: {supported}"
+        )
+        raise SystemExit(msg)
+    return project
+
+
 def site_pipeline(deployment_name: str) -> Pipeline:
     """Generate the OEP-65 Site Project pipeline for one deployment.
 
     Produces three jobs: CI (build + upload via Dagger), QA (rclone promote),
     Production (rclone promote).  Called by meta.py analogously to pipeline.py.
     """
-    _by_name = {p.deployment_name: p for p in SITE_PROJECTS}
-    project = _by_name.get(deployment_name)
-    if project is None:
-        supported = ", ".join(_by_name)
-        msg = (
-            f"Unknown deployment {deployment_name!r}. "
-            f"Supported deployments: {supported}"
-        )
-        raise SystemExit(msg)
+    project = _resolve_site_project(deployment_name)
     ci_env, qa_env, prod_env = project.envs
 
     ci_fragment = site_build_job(ci_env)
@@ -423,7 +430,23 @@ def site_pipeline(deployment_name: str) -> Pipeline:
 
 if __name__ == "__main__":
     deployment: str = sys.argv[1]
-    pipeline = site_pipeline(deployment)
+    _config_source = (
+        _resolve_site_project(deployment).envs[0].config_source or deployment
+    )
+    output = pipeline_json_with_user_data(
+        site_pipeline(deployment),
+        user_data={
+            "description": (
+                f"Builds the OEP-65 Site Project for {deployment} once in CI "
+                f"(from `frontend/{_config_source}` via lehrer's Dagger module, "
+                "covering all registered MFE apps for this deployment), then "
+                "promotes the same artifact unchanged to QA and Production via "
+                "rclone cross-bucket copy -- no rebuild per stage."
+            ),
+            "team": deployment,
+            "category": "open-edx",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(pipeline.model_dump_json(indent=2))
-    sys.stdout.write(pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)

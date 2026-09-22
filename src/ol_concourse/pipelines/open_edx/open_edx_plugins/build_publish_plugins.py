@@ -8,6 +8,7 @@ from ol_concourse.pipelines.libraries.pypi_monorepo import (
     discover_python_packages,
     monorepo_publish_pipeline,
 )
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 SOURCE_REPO_URI = "https://github.com/mitodl/open-edx-plugins"
 EXPECTED_ARG_COUNT = 2
@@ -43,9 +44,21 @@ if __name__ == "__main__":
         raise SystemExit(msg)
 
     plugins, pipeline = pipeline_from_source(sys.argv[1])
+    output = pipeline_json_with_user_data(
+        pipeline,
+        user_data={
+            "description": (
+                "Discovers every Python package in the `open-edx-plugins` "
+                "monorepo and builds+publishes each to PyPI via `uv build`/"
+                "`twine upload`, one job per package."
+            ),
+            "team": "main",
+            "category": "package-publishing",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(pipeline.model_dump_json(indent=2))
-    sys.stdout.write(pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stderr.write(
         f"\nDiscovered packages: {', '.join(dist for _, dist in plugins)}\n"
         "fly -t pr-main sp -p publish-open-edx-plugins-pypi -c definition.json\n"

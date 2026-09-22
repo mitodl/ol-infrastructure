@@ -22,6 +22,7 @@ from ol_concourse.lib.resources import git_repo, registry_image, ssh_git_repo
 from bridge.lib.versions import OPENAPI_GENERATOR_VERSION
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 from ol_concourse.pipelines.libraries.configuration import PIPELINE_CONFIGS
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 
 def _read_script(script_name: str) -> str:
@@ -241,4 +242,20 @@ if __name__ == "__main__":
     variant_config = PIPELINE_CONFIGS[args.variant]
     pipeline = generate_api_client_pipeline(**variant_config)
     # Print the generated pipeline definition JSON to stdout
-    sys.stdout.write(pipeline.model_dump_json(indent=2))
+    sys.stdout.write(
+        pipeline_json_with_user_data(
+            pipeline,
+            user_data={
+                "description": (
+                    f"Generates the TypeScript API client for "
+                    f"`{variant_config['source_repo_name']}` from its OpenAPI "
+                    f"spec (`openapi/specs/*.yaml`) via openapi-generator, "
+                    f"bumps and commits the version in "
+                    f"`{variant_config['client_repo_name']}`, then publishes "
+                    "the package to npm."
+                ),
+                "team": "main",
+                "category": "package-publishing",
+            },
+        )
+    )

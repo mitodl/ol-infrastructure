@@ -80,8 +80,22 @@ docker_baseline_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
+    from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
+
+    output = pipeline_json_with_user_data(
+        docker_baseline_pipeline,
+        user_data={
+            "description": (
+                "Builds the `docker_baseline_ami`: the base AMI every Docker-hosting "
+                "EC2 node type starts from, bundling Vector, the Vault agent, and "
+                "the Consul agent/template binaries at their pinned releases."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(docker_baseline_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(docker_baseline_pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     print()  # noqa: T201
     print("fly -t pr-inf sp -p packer-docker-baseline -c definition.json")  # noqa: T201

@@ -36,7 +36,9 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resource_types import rclone
 from ol_concourse.lib.resources import git_repo, schedule
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
+
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 CANARY_DIRECTORY = Path(__file__).parent
 # Where this directory sits in a checkout, for the git resource's watched paths.
@@ -133,6 +135,9 @@ class CanaryParams(BaseModel):
         schedule_stop: Optional daily window end, ``HH:MM``.
         schedule_days: Optional days to run, e.g. ``["Monday"]``.
         branch: Branch the specs are read from.
+        description: One or two sentences on the user journeys this property's
+            canary exercises. Written into the pipeline's ``user_data`` -- see
+            ``ol_concourse.pipelines.pipeline_output``.
     """
 
     canary_name: str
@@ -147,6 +152,12 @@ class CanaryParams(BaseModel):
     schedule_stop: str | None = None
     schedule_days: list[str] | None = None
     branch: str = "main"
+    description: str = Field(
+        description=(
+            "Rendered as the pipeline's info-page description once "
+            "concourse/concourse#9661 ships in a release."
+        )
+    )
 
     @model_validator(mode="after")
     def default_spec_paths_to_property_directory(self) -> "CanaryParams":
@@ -163,6 +174,15 @@ pipeline_params: dict[str, CanaryParams] = {
         # The Concourse credential's NAME, not a credential. Resolves from Vault at
         # secret-concourse/infrastructure/canary_mit_learn for pr-inf pipelines.
         credential_secret="canary_mit_learn",  # noqa: S106  # pragma: allowlist secret
+        description=(
+            "Runs the MIT Learn (learn.mit.edu) Playwright canaries against RC "
+            "every 10 minutes: an anonymous channel page render plus its "
+            "resource-drawer deep link (the site's #1 route by traffic), a "
+            "direct search URL with query and facet parameters (#2), the "
+            "homepage, and a signed-in login-then-search-from-header flow. "
+            "Journeys are ranked by production OTEL trace volume, not "
+            "intuition -- see specs/mit-learn/README.md."
+        ),
     ),
 }
 
@@ -343,7 +363,14 @@ if __name__ == "__main__":
     canary_name = sys.argv[1]
 
     try:
-        pipeline_json = build_canary_pipeline(canary_name).model_dump_json(indent=2)
+        pipeline_json = pipeline_json_with_user_data(
+            build_canary_pipeline(canary_name),
+            user_data={
+                "description": pipeline_params[canary_name].description,
+                "team": "infrastructure",
+                "category": "applications",
+            },
+        )
         with open("definition.json", "w") as definition:  # noqa: PTH123
             definition.write(pipeline_json)
         sys.stdout.write(pipeline_json)

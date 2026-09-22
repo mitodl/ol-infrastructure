@@ -12,7 +12,7 @@ which requires a different orchestration approach.
 
 Fly command to bootstrap this meta pipeline:
     python meta.py
-    fly -t pr-inf sp -p container-images-meta -c definition.json
+    fly -t pr-main sp -p container-images-meta -c definition.json
 """
 
 import sys
@@ -34,6 +34,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 _OL_INFRA_IMAGE_SOURCE = {
     "repository": dockerhub_ecr_image_uri("mitodl/ol-infrastructure"),
@@ -185,9 +186,21 @@ def meta_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    pipeline_json = meta_pipeline().model_dump_json(indent=2)
+    pipeline_json = pipeline_json_with_user_data(
+        meta_pipeline(),
+        user_data={
+            "description": (
+                "Regenerates and applies the container-image pipelines "
+                f"listed in `PIPELINE_CONFIGS` ({len(PIPELINE_CONFIGS)} "
+                "pipelines) whenever their definition scripts change, and "
+                "keeps itself up to date via a `set_pipeline: self` job."
+            ),
+            "team": "main",
+            "category": "meta",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)
     print()  # noqa: T201
-    print("fly -t pr-inf sp -p container-images-meta -c definition.json")  # noqa: T201
+    print("fly -t pr-main sp -p container-images-meta -c definition.json")  # noqa: T201

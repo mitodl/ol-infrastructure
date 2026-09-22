@@ -54,6 +54,7 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -141,6 +142,8 @@ class AppPipelineParams(BaseModel):
     github_repo: str | None = None
     sentry_sourcemaps: SentrySourcemapsConfig | None = None
     refresh_stack: bool = True
+    description: str = ""
+    category: str = "applications"
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -187,9 +190,13 @@ pipeline_params = {
         settings_dir="micromasters",
         version_file="VERSION",
         refresh_stack=False,
+        description="Builds the MicroMasters Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
     "mitxonline": AppPipelineParams(
-        app_name="mitxonline", build_target="production", refresh_stack=False
+        app_name="mitxonline",
+        build_target="production",
+        refresh_stack=False,
+        description="Builds the MITx Online Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
     "mit-learn-nextjs": AppPipelineParams(
         app_name="mit-learn-nextjs",
@@ -211,6 +218,7 @@ pipeline_params = {
             auth_token_vault_key="((sentry.mitlearn_auth_token))",  # noqa: S106  # pragma: allowlist secret
             rootfs_asset_path="app/frontends/main/.next",
         ),
+        description="Builds the MIT Learn Next.js frontend image, deploys it to Kubernetes via Pulumi, purges the Fastly HTML-page cache on deploy, and uploads the build's source maps to Sentry.",
     ),
     "xpro": AppPipelineParams(
         app_name="xpro",
@@ -219,21 +227,36 @@ pipeline_params = {
         build_target="production",
         settings_dir="mitxpro",
         refresh_stack=False,
+        description="Builds the xPRO Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
-    "learn-ai": AppPipelineParams(app_name="learn-ai", refresh_stack=False),
-    "mit-learn": AppPipelineParams(app_name="mit-learn", refresh_stack=False),
+    "learn-ai": AppPipelineParams(
+        app_name="learn-ai",
+        refresh_stack=False,
+        description="Builds the Learn AI service image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
+    ),
+    "mit-learn": AppPipelineParams(
+        app_name="mit-learn",
+        refresh_stack=False,
+        description="Builds the MIT Learn Django/API backend image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
+    ),
     "ocw-studio": AppPipelineParams(
         app_name="ocw-studio",
         repo_main_branch=app_repo_main_branch("ocw-studio"),
         build_target="production",
+        description="Builds the OCW Studio Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
     "odl-video-service": AppPipelineParams(
         app_name="odl-video-service",
         repo_main_branch=app_repo_main_branch("odl-video-service"),
         build_target="production",
         settings_dir="odl_video",
+        description="Builds the ODL Video Service Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
-    "ol-analytics-api": AppPipelineParams(app_name="ol-analytics-api"),
+    "ol-analytics-api": AppPipelineParams(
+        app_name="ol-analytics-api",
+        description="Builds the OL Analytics API image and deploys it to Kubernetes via Pulumi.",
+        category="data-platform",
+    ),
 }
 
 
@@ -1625,11 +1648,20 @@ if __name__ == "__main__":
     if not app_name:
         msg = "Please provide an app name as a command line argument."
         raise ValueError(msg)
+    built_pipeline = build_app_pipeline(app_name=app_name)
+    app_params = pipeline_params.get(app_name)
+    output = pipeline_json_with_user_data(
+        built_pipeline,
+        user_data={
+            "description": (app_params.description if app_params else "")
+            or f"Builds `{app_name}` and deploys it to Kubernetes via Pulumi.",
+            "team": "infrastructure",
+            "category": app_params.category if app_params else "applications",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(
-            build_app_pipeline(app_name=app_name).model_dump_json(indent=2)
-        )
-    sys.stdout.write(build_app_pipeline(app_name=app_name).model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     # Note: The pipeline name generated below might need adjustment
     # if the app_name changes the resulting pipeline identifier.
     pipeline_name = f"docker-pulumi-{app_name}"

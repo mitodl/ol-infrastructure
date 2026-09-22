@@ -30,6 +30,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 _OL_INFRA_IMAGE_SOURCE = {
     "repository": dockerhub_ecr_image_uri("mitodl/ol-infrastructure"),
@@ -214,7 +215,21 @@ def meta_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    pipeline_json = meta_pipeline().model_dump_json(indent=2)
+    pipeline_json = pipeline_json_with_user_data(
+        meta_pipeline(),
+        user_data={
+            "description": (
+                f"Regenerates and re-applies {len(PIPELINE_CONFIGS)} dedicated "
+                "Pulumi/Packer infrastructure pipelines from `PIPELINE_CONFIGS`, "
+                "one job per entry, whenever `src/ol_concourse/pipelines/"
+                "infrastructure/` (or its shared `constants.py`/`jobs.py`/"
+                "`secrets_map.py`) changes. Also keeps itself up to date via a "
+                "`set_pipeline: self` job."
+            ),
+            "team": "infrastructure",
+            "category": "meta",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)
