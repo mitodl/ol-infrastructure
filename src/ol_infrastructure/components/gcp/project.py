@@ -141,6 +141,33 @@ class OLGCPAPIKeyConfig(BaseModel):
         return self
 
 
+class OLGCPOIDCProviderConfig(BaseModel):
+    """An OIDC issuer whose tokens a workload identity pool accepts.
+
+    The motivating case is an EKS cluster: its service-account tokens are JWTs
+    signed by a per-cluster public issuer, so a pod can exchange a projected
+    token for a Google access token with no key material at rest.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    provider_id: str = Field(min_length=4, max_length=32)
+    display_name: str
+    # An Output when resolved from another stack, e.g. an EKS cluster's issuer.
+    issuer_uri: str | Output
+
+
+class OLGCPWorkloadIdentityPoolConfig(BaseModel):
+    """A workload identity pool and the OIDC providers that feed it."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    pool_id: str = Field(min_length=4, max_length=32)
+    display_name: str
+    description: str = ""
+    oidc_providers: list[OLGCPOIDCProviderConfig] = Field(default_factory=list)
+
+
 class OLGCPProjectConfig(GCPBase):
     """Configuration for the resources managed inside one GCP project."""
 
@@ -150,6 +177,9 @@ class OLGCPProjectConfig(GCPBase):
     enabled_services: list[str] = Field(default_factory=list)
     service_accounts: list[OLGCPServiceAccountConfig] = Field(default_factory=list)
     api_keys: list[OLGCPAPIKeyConfig] = Field(default_factory=list)
+    workload_identity_pools: list[OLGCPWorkloadIdentityPoolConfig] = Field(
+        default_factory=list
+    )
     # Required whenever api_keys are declared. The API Keys API identifies a
     # project by NUMBER, so a key read back from GCP always carries the number
     # in its `project` field. Declaring the id instead produces a permanent
@@ -189,6 +219,10 @@ class OLGCPProject(ComponentResource):
         self.service_accounts: dict[str, gcp.serviceaccount.Account] = {}
         self.service_account_emails: dict[str, Output[str]] = {}
         self.api_keys: dict[str, gcp.projects.ApiKey] = {}
+        # Keyed "<pool_id>/<provider_id>"; provider ids are only unique per pool.
+        self.workload_identity_providers: dict[
+            str, gcp.iam.WorkloadIdentityPoolProvider
+        ] = {}
 
         for service in config.enabled_services:
             # disable_on_destroy is set explicitly rather than left to the
@@ -251,6 +285,41 @@ class OLGCPProject(ComponentResource):
                 opts=adoption_opts(child_opts, api_key.import_id),
             )
 
+        for pool_config in config.workload_identity_pools:
+            pool = gcp.iam.WorkloadIdentityPool(
+                f"{name}-wif-pool-{pool_config.pool_id}",
+                project=config.project_id,
+                workload_identity_pool_id=pool_config.pool_id,
+                display_name=pool_config.display_name,
+                description=pool_config.description,
+                opts=child_opts,
+            )
+            for provider_config in pool_config.oidc_providers:
+                self.workload_identity_providers[
+                    f"{pool_config.pool_id}/{provider_config.provider_id}"
+                ] = gcp.iam.WorkloadIdentityPoolProvider(
+                    f"{name}-wif-provider-{pool_config.pool_id}-"
+                    f"{provider_config.provider_id}",
+                    project=config.project_id,
+                    workload_identity_pool_id=pool.workload_identity_pool_id,
+                    workload_identity_pool_provider_id=provider_config.provider_id,
+                    display_name=provider_config.display_name,
+                    # Principals are pool-scoped, so two clusters issuing the
+                    # same `sub` (system:serviceaccount:<ns>:<name>) would
+                    # otherwise map to one principal, and a grant meant for
+                    # production would admit the CI cluster too. Prefixing the
+                    # provider id keeps each issuer's subjects distinct.
+                    attribute_mapping={
+                        "google.subject": (
+                            f'"{provider_config.provider_id}::" + assertion.sub'
+                        ),
+                    },
+                    oidc=gcp.iam.WorkloadIdentityPoolProviderOidcArgs(
+                        issuer_uri=provider_config.issuer_uri,
+                    ),
+                    opts=child_opts.merge(ResourceOptions(parent=pool)),
+                )
+
         self.register_outputs(
             {
                 "project_id": config.project_id,
@@ -277,9 +346,11 @@ def adoption_opts(opts: ResourceOptions, import_id: str | None) -> ResourceOptio
 __all__ = [
     "APIKeyRestrictionType",
     "OLGCPAPIKeyConfig",
+    "OLGCPOIDCProviderConfig",
     "OLGCPProject",
     "OLGCPProjectConfig",
     "OLGCPServiceAccountConfig",
     "OLGCPServiceAccountIAMMemberConfig",
+    "OLGCPWorkloadIdentityPoolConfig",
     "adoption_opts",
 ]

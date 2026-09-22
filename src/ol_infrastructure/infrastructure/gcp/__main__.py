@@ -26,16 +26,21 @@ deal of per-project detail worth keeping under review in YAML.
 needs an identity other than the one the federated credential impersonates.
 """
 
-from pulumi import Config, ResourceOptions, export
+from typing import Any
+
+from pulumi import Config, Output, ResourceOptions, export
 
 from ol_infrastructure.components.gcp.project import (
     OLGCPAPIKeyConfig,
+    OLGCPOIDCProviderConfig,
     OLGCPProject,
     OLGCPProjectConfig,
     OLGCPServiceAccountConfig,
+    OLGCPWorkloadIdentityPoolConfig,
 )
+from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.gcp.provider import gcp_provider
-from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.pulumi_helper import make_stack_reference, parse_stack
 
 stack_info = parse_stack()
 gcp_config = Config("ol_gcp")
@@ -49,6 +54,29 @@ override_service_account = gcp_config.get("impersonate_service_account")
 managed_projects = gcp_config.require_object("projects")
 
 gcp_projects: dict[str, OLGCPProject] = {}
+
+
+def eks_oidc_issuer(eks_stack: str) -> Output[str]:
+    """Read an EKS cluster's service-account token issuer from its stack.
+
+    :param eks_stack: Stack name within the EKS project, e.g. ``data.Production``.
+
+    :returns: The cluster's OIDC issuer URL.
+    """
+    return (
+        make_stack_reference(projects.EKS, eks_stack)
+        .require_output("cluster_identities")
+        .apply(lambda identities: identities[0]["oidcs"][0]["issuer"])
+    )
+
+
+def oidc_provider_config(provider: dict[str, Any]) -> OLGCPOIDCProviderConfig:
+    """Build a provider config, resolving ``eks_stack`` to its issuer."""
+    provider = dict(provider)
+    if eks_stack := provider.pop("eks_stack", None):
+        provider["issuer_uri"] = eks_oidc_issuer(eks_stack)
+    return OLGCPOIDCProviderConfig(**provider)
+
 
 for project in managed_projects:
     project_id = project["project_id"]
@@ -81,6 +109,18 @@ for project in managed_projects:
         api_keys=[
             OLGCPAPIKeyConfig(**api_key) for api_key in project.get("api_keys") or []
         ],
+        workload_identity_pools=[
+            OLGCPWorkloadIdentityPoolConfig(
+                **{
+                    **pool,
+                    "oidc_providers": [
+                        oidc_provider_config(provider)
+                        for provider in pool.get("oidc_providers") or []
+                    ],
+                }
+            )
+            for pool in project.get("workload_identity_pools") or []
+        ],
     )
 
     gcp_projects[project_id] = OLGCPProject(
@@ -96,5 +136,16 @@ export(
         project_id: gcp_project.service_account_emails
         for project_id, gcp_project in gcp_projects.items()
         if gcp_project.service_account_emails
+    },
+)
+# Consumers build their external_account credential document from this: the
+# token audience is "https://iam.googleapis.com/" + name and the credential's
+# `audience` field is "//iam.googleapis.com/" + name.
+export(
+    "workload_identity_providers",
+    {
+        key: provider.name
+        for gcp_project in gcp_projects.values()
+        for key, provider in gcp_project.workload_identity_providers.items()
     },
 )
