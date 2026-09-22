@@ -112,6 +112,18 @@ def generate_api_client_pipeline(  # noqa: PLR0913
             fetch_tags=True,
             tag_regex=source_repo_tag_regex,
         )
+        # An ol-concourse without version_type support does not reject the
+        # argument: git_repo forwards it through **kwargs onto the Resource, so
+        # it lands as a top-level key, `source` never gets it, and the resource
+        # silently falls back to versioning commits on `main` with no paths
+        # filter -- republishing the client on every commit. Fail here instead.
+        if "version_type" not in source_repository.source:
+            msg = (
+                f"{source_repo_name} asked to version on tags, but the installed "
+                "ol-concourse dropped version_type from the resource source. "
+                "Upgrade ol-concourse to a release that supports it."
+            )
+            raise RuntimeError(msg)
     else:
         source_repository = git_repo(
             name=Identifier(source_repo_name),
@@ -156,8 +168,10 @@ def generate_api_client_pipeline(  # noqa: PLR0913
             LoadVarStep(
                 load_var=Identifier(f"{source_repo_name}-git-rev"),
                 # .git/ref, not .git/refs/heads/<branch>: the git resource
-                # writes it for every version_type, and a tag checkout is
-                # detached, so there is no branch ref on disk to read.
+                # writes it under both version_types used here (commits and
+                # tags), and a tag checkout is detached, so there is no branch
+                # ref on disk to read. Note in_branches.sh does not write it,
+                # so this would need revisiting for a branches-based config.
                 file=f"{source_repository.name}/.git/ref",
                 reveal=True,
             ),

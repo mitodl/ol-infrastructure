@@ -6,7 +6,11 @@ PIPELINE_CONFIGS = {
         "source_repo_name": "ol-analytics-api",
         "source_repo_uri": "https://github.com/mitodl/ol-analytics-api",
         "source_repo_branch": "main",
-        "source_repo_tag_regex": r"^\d{4}\.\d{1,2}\.\d{1,2}\.\d+$",
+        # POSIX ERE, not PCRE: the resource filters tags with `grep -E`, where
+        # `\d` is not a digit class. GNU grep warns "stray \ before d" and drops
+        # it, leaving a pattern that matches nothing and a pipeline that never
+        # fires on a release.
+        "source_repo_tag_regex": r"^[0-9]{4}\.[0-9]{1,2}\.[0-9]{1,2}\.[0-9]+$",
         "client_repo_name": "ol-analytics-api-clients",
         "client_repo_uri": "git@github.com:mitodl/ol-analytics-api-clients.git",
         "client_repo_branch": "main",
