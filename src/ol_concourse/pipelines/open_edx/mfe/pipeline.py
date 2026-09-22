@@ -57,6 +57,7 @@ from ol_concourse.pipelines.constants import (
     GH_ISSUES_DEFAULT_REPOSITORY,
     GH_ISSUES_ENTERPRISE_POLL_FREQUENCY,
 )
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 LEHRER_URI = "https://github.com/mitodl/lehrer"
 LEHRER_LEGACY_SLOT_CONFIG = "./deployments/mit-ol/mfe_slot_config/legacy"
@@ -505,6 +506,21 @@ if __name__ == "__main__":
     deployment: OpenEdxDeploymentName = sys.argv[1]
     release_name: OpenEdxSupportedRelease = sys.argv[2]
     pipeline = mfe_pipeline(deployment, release_name)
+    output = pipeline_json_with_user_data(
+        pipeline,
+        user_data={
+            "description": (
+                f"Builds and deploys the {deployment} MFEs for the "
+                f"{release_name} Open edX release: runs lehrer's Dagger "
+                "`build-legacy-configured` module per MFE, syncs the compiled "
+                "dist to that environment's S3 bucket, and purges Fastly. "
+                "Promotion CI -> QA -> Production is gated on closing a "
+                "GitHub issue at each stage."
+            ),
+            "team": deployment,
+            "category": "open-edx",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(pipeline.model_dump_json(indent=2))
-    sys.stdout.write(pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)

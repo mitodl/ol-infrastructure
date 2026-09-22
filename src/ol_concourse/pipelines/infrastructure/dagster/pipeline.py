@@ -25,6 +25,7 @@ from ol_concourse.pipelines.constants import (
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -271,9 +272,24 @@ def build_dagster_docker_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
+    output = pipeline_json_with_user_data(
+        build_dagster_docker_pipeline(),
+        user_data={
+            "description": (
+                "Builds a Docker image per Dagster code location from "
+                "ol-data-platform's `dg_projects/` (canvas, data_loading, "
+                "data_platform, edxorg, lakehouse, delivery, legacy_openedx, "
+                "openedx, b2b_organization, ml, plus the dagster-k8s base image), "
+                "pushes each to ECR, then deploys the Dagster server via Pulumi to "
+                "QA and Production once every image build has passed."
+            ),
+            "team": "infrastructure",
+            "category": "data-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(build_dagster_docker_pipeline().json(indent=2))
-    sys.stdout.write(build_dagster_docker_pipeline().json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.writelines(
         ("\n", "fly -t pr-inf sp -p docker-pulumi-dagster -c definition.json")
     )

@@ -88,6 +88,32 @@ if __name__ == "__main__":
 | `pulumi_jobs_chain(...)` | `pipelines/jobs.py` | Multi-env Pulumi deploy chain |
 | `pulumi_job(...)` | `pipelines/jobs.py` | Single-env Pulumi deploy job |
 | `container_build_task(...)` | `lib/containers.py` | Docker image build task config |
+| `pipeline_json_with_user_data(pipeline, user_data)` | `pipelines/pipeline_output.py` | Serializes a `Pipeline`, merging in a top-level `user_data` key |
+
+## Pipeline descriptions (`user_data`)
+
+Every `__main__` block should use `pipeline_json_with_user_data(pipeline, user_data={...})`
+in place of `pipeline.model_dump_json(indent=2)` when writing `definition.json` and stdout.
+`user_data` is an opaque field Concourse already accepts and preserves through
+set-pipeline/get-pipeline (concourse/concourse#9489, shipped in our pinned
+`CONCOURSE_VERSION`), but the web UI doesn't render it until concourse/concourse#9661
+ships in a release we've upgraded to. Set it now regardless — it costs nothing and
+starts rendering automatically once we bump the version.
+
+The installed `ol-concourse` `Pipeline` model has no typed `user_data` field yet and
+uses `extra="forbid"`, so it can't go through `Pipeline(...)` directly; that's what
+`pipeline_json_with_user_data` works around. Don't hand-roll this per pipeline.
+
+Shape, matching #9661's own rendering rule (a string `description` key renders as
+markdown, remaining keys render as YAML below it):
+
+```python
+user_data = {
+    "description": "One or two sentences: what this pipeline builds/deploys and why.",
+    "team": "infrastructure",  # or "main" -- the Concourse team, not org team
+    "category": "core-platform",  # see docs/plans/concourse-dashboard-reorganization.md §3
+}
+```
 
 ## Pydantic Model Rules
 

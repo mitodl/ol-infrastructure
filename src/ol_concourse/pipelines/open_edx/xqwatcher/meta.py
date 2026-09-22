@@ -94,9 +94,23 @@ meta_pipeline = Pipeline(resources=[pipeline_code], jobs=meta_jobs)
 
 
 if __name__ == "__main__":
+    from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
+
+    pipeline_json = pipeline_json_with_user_data(
+        meta_pipeline,
+        user_data={
+            "description": (
+                "Regenerates and applies the per-release xqwatcher pipelines "
+                "(`docker-pulumi-xqwatcher-{release}`) for every "
+                "`OpenEdxSupportedRelease`, plus this meta pipeline itself."
+            ),
+            "team": "infrastructure",
+            "category": "meta",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(meta_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(meta_pipeline.model_dump_json(indent=2))
+        definition.write(pipeline_json)
+    sys.stdout.write(pipeline_json)
     sys.stdout.write(
         "\nfly -t <target> set-pipeline -p docker-pulumi-xqwatcher-meta -c definition.json"  # noqa: E501
     )

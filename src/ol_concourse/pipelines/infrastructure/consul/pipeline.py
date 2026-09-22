@@ -151,8 +151,23 @@ consul_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
+    from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
+
+    output = pipeline_json_with_user_data(
+        consul_pipeline,
+        user_data={
+            "description": (
+                "Builds the Consul server AMI, then deploys it via Pulumi to the "
+                "`operations` network's CI, QA, and Production stages, gated on a "
+                "reviewed preview. Also runs the `substructure/consul/` Pulumi "
+                "chain for the same network."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(consul_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(consul_pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     print()  # noqa: T201
     print("fly -t pr-inf sp -p packer-pulumi-consul -c definition.json")  # noqa: T201
