@@ -33,6 +33,7 @@ from ol_concourse.lib.models.pipeline import (
     Resource,
     TaskConfig,
     TaskStep,
+    TryStep,
 )
 from ol_concourse.lib.resource_types import rclone
 from ol_concourse.lib.resources import git_repo, schedule
@@ -63,6 +64,24 @@ ARTIFACT_PREFIX = "canary-results"
 # The task output the specs' traces, screenshots and video are collected into,
 # and the directory rclone uploads.
 ARTIFACT_OUTPUT = Identifier("canary-results")
+
+# Playwright's machine-readable report, uploaded on *every* run rather than only
+# on failure, and kept under its own prefix so listing the run history is one
+# cheap prefix scan that does not interleave with multi-megabyte failure trees.
+#
+# This exists because a flake is invisible in every other record. A journey that
+# fails its first attempt and passes on the retry exits 0 -- measured, not assumed
+# -- so the build is green, the failure-only upload publishes nothing, and
+# Playwright's "N flaky" line survives only in a task log Concourse reaps within a
+# handful of builds. results.json carries `stats.flaky` and the per-attempt status
+# of every test, so retaining it makes the green-run flake rate answerable by
+# reading the bucket.
+#
+# It is evidence, not a second result signal: Concourse build status remains the
+# only canary result. Do not grow a metric push, Grafana alert or notification off
+# the back of this.
+REPORT_PREFIX = "canary-runs"
+REPORT_OUTPUT = Identifier("canary-report")
 
 
 def playwright_image_tag(canary_directory: Path = CANARY_DIRECTORY) -> str:
@@ -239,14 +258,18 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
     run_canary = "\n".join(
         [
             "set -euo pipefail",
+            # One timestamp for both destinations, so a red build's failure tree
+            # and its results.json record carry the same name and can be matched
+            # to each other without guessing.
+            'run_stamp="$(date -u +%Y%m%dT%H%M%SZ)"',
             # Resolved before the cd, not climbed back up to afterwards: Concourse
             # lays outputs out as siblings of the task's working directory, while
             # the specs have to run from inside the checkout. The start time is
             # what keeps one failure's artifacts from overwriting the last one's,
             # since no build number is reachable from here; match it to a build by
             # the build's start time in Concourse.
-            f'artifact_dir="$PWD/{ARTIFACT_OUTPUT}/{artifact_run_prefix}'
-            '/$(date -u +%Y%m%dT%H%M%SZ)"',
+            f'artifact_dir="$PWD/{ARTIFACT_OUTPUT}/{artifact_run_prefix}/$run_stamp"',
+            f'report_dir="$PWD/{REPORT_OUTPUT}/{artifact_run_prefix}"',
             f"cd canary-code/{CANARY_REPO_PATH}",
             # @playwright/test is not installed globally in the image, so this is
             # mandatory. It is also cheap -- 6 packages, no browser download,
@@ -260,12 +283,20 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
             f"npx playwright test {spec_arguments} {project_flags}",
             "canary_status=$?",
             "set -e",
-            'mkdir -p "$artifact_dir"',
+            'mkdir -p "$artifact_dir" "$report_dir"',
             # Absent when the failure came before any test ran -- a bad image, a
             # failed npm ci -- in which case there is nothing to publish and the
-            # exit status below is the whole report.
+            # exit status below is the whole report. Both uploads tolerate that:
+            # Concourse creates a declared output as an empty directory, and an
+            # rclone copy from an empty directory is a no-op that exits 0.
             "if [ -d canary-results ]; then",
             '  cp -R canary-results/. "$artifact_dir"/',
+            "fi",
+            # Flat, one object per run named for the run, rather than a directory
+            # per run: it makes the whole flake history a single `aws s3 ls` whose
+            # output is one sortable line per run.
+            "if [ -f canary-results/results.json ]; then",
+            '  cp canary-results/results.json "$report_dir/$run_stamp.json"',
             "fi",
             'exit "$canary_status"',
         ]
@@ -314,7 +345,10 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
                                 },
                             ),
                             inputs=[Input(name=canary_code.name)],
-                            outputs=[Output(name=ARTIFACT_OUTPUT)],
+                            outputs=[
+                                Output(name=ARTIFACT_OUTPUT),
+                                Output(name=REPORT_OUTPUT),
+                            ],
                             params=task_params,
                             run=Command(
                                 path="bash",
@@ -343,6 +377,57 @@ def build_canary_pipeline(canary_name: str) -> Pipeline:
                                     }
                                 ],
                             },
+                        ),
+                        # Every run, green included -- unlike the tree above.
+                        # This is ~6-20KB of JSON against the ~19MB a failure
+                        # tree costs, and it is the only surviving record that a
+                        # green run had to retry a journey to get there.
+                        #
+                        # `ensure` rather than a following step: a step after the
+                        # task would be skipped on exactly the red builds whose
+                        # record is most worth having. It runs alongside
+                        # on_failure on a red build, which duplicates this ~20KB
+                        # into the failure tree as well -- cheap, and it keeps the
+                        # run history uniform across green and red.
+                        #
+                        # `inputs` is not optional here: without it Concourse
+                        # streams every artifact in the plan, including the
+                        # failure tree and the repository checkout, into the put
+                        # container to upload one small file.
+                        #
+                        # Wrapped in `try` because Concourse propagates a hook
+                        # failure to its parent: "If the parent step succeeds
+                        # and the ensured step fails, the overall step fails."
+                        # Unwrapped, a transient rclone/S3/IAM failure uploading
+                        # this file would turn a canary that passed every
+                        # journey red -- the target would be fine and the build
+                        # would say it was not. This file is evidence, and
+                        # evidence must never be able to contradict the result
+                        # it is evidence about. Losing one run's record is the
+                        # cheaper failure by a wide margin.
+                        #
+                        # The on_failure put above is deliberately NOT wrapped:
+                        # it only runs on builds that are already red, so it
+                        # cannot change an outcome, and leaving it bare keeps a
+                        # broken artifact upload visible instead of silent.
+                        ensure=TryStep(
+                            try_=PutStep(
+                                put=artifact_store.name,
+                                no_get=True,
+                                inputs=[REPORT_OUTPUT],
+                                params={
+                                    "source": str(REPORT_OUTPUT),
+                                    "destination": [
+                                        {
+                                            "command": "copy",
+                                            "dir": (
+                                                f"s3-remote:{ARTIFACT_BUCKET}"
+                                                f"/{REPORT_PREFIX}/"
+                                            ),
+                                        }
+                                    ],
+                                },
+                            )
                         ),
                     ),
                 ],
