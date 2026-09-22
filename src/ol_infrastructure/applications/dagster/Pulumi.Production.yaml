@@ -56,15 +56,38 @@ config:
   #    that's wanted.
   #
   # 2. Whether db.client.connections.usage itself fans out unboundedly.
-  #    Canvas run workers mint a fresh service.instance.id per Job (and per
-  #    step subprocess under the multiprocess executor), so this metric's
-  #    Production cardinality tracks concurrent canvas run-worker Jobs, not
-  #    total daily starts. OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS's own
-  #    comment puts that at a mean of 87 against a peak of 106 over 7 days
-  #    (kube_job_labels, data-production) -- steady, double digits, plus the
-  #    ~17 long-lived control-plane processes. Bounded and small next to the
-  #    280-series QA baseline of a much smaller deployment; not the
-  #    unbounded host-keyed growth http.client.* had.
+  #    This one is NOT measured on QA and can't be: canvas's schedule has no
+  #    dynamic partitions registered there, so it has never produced a
+  #    canvas run, and canvas's own code-server shows zero OTel activity of
+  #    any kind on QA (no target_info, despite otel_metrics_enabled since
+  #    #5947 and correct env/package config) -- there is no QA traffic to
+  #    measure against. The bound below is analytical, derived from the
+  #    canvas code location's actual definitions (mitodl/ol-data-platform,
+  #    dg_projects/canvas/canvas/definitions.py), not an extrapolation from
+  #    a live series count.
+  #
+  #    Canvas run workers mint a fresh service.instance.id per Job, and so
+  #    does every step subprocess the multiprocess executor spawns inside
+  #    one -- canvas_course_export_job takes no executor_def, so it gets the
+  #    house default, multi_or_in_process_executor, which defaults to
+  #    multiprocess mode (confirmed against dagster==1.13.23's
+  #    executor_definition.py: config_schema default_value is
+  #    {"multiprocess": {}}). Under multiprocess mode every step -- even a
+  #    single one -- runs in its own forked child, so a Job is the run
+  #    coordinator process plus one step-subprocess, not one process. The
+  #    job's selection is exactly one op (the `export_course_content`
+  #    multi_asset, canvas/assets/canvas.py), so that multiplier is a flat
+  #    2x, not open-ended: OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS's own
+  #    comment puts concurrent canvas Jobs at a mean of 87 against a peak of
+  #    106 over 7 days (kube_job_labels, data-production), so the corrected
+  #    bound is ~174 mean / ~212 peak OTel processes, plus the ~17
+  #    long-lived control-plane processes. Still double-to-low-triple
+  #    digits and still bounded by Job concurrency, which is what makes it
+  #    a different risk shape than http.client.* -- that one grew with
+  #    every new external host hit, unbounded by anything in this stack's
+  #    control. This one is bounded by how many canvas runs are ever
+  #    in flight at once, a number the K8sRunLauncher and
+  #    max_concurrent_runs already cap.
   dagster:otel_metrics_enabled: "true"
   # 6 -> 4. The first replica count set from the exporter rather than from a
   # guess. Six days of 1-minute samples (8640 points) taken entirely after the
