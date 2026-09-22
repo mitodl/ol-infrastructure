@@ -186,15 +186,18 @@ grant below exists. Owner is not a superset here.
 #### Getting access
 
 `roles/iam.serviceAccountTokenCreator` on `pulumi-gcp@mitol01` is what makes
-the command above work. It is granted to `group:odl-devops@mit.edu`, declared
-in `Pulumi.Production.yaml` under the `pulumi-gcp` account's `iam_members` —
-so onboarding an engineer is a group-membership change, not a Pulumi change,
-and no one needs to remember a `gcloud add-iam-policy-binding` incantation.
+the command above work. It belongs in `Pulumi.Production.yaml` under the
+`pulumi-gcp` account's `iam_members`, granted to a Google group so onboarding
+an engineer is a group-membership change rather than a Pulumi change.
 
-Both grants on that account are declared there: the `workloadIdentityUser`
-binding for the Concourse principal set, and the `serviceAccountTokenCreator`
-binding for people. Service-account-level IAM does not appear in the project's
-IAM policy, so if it is not written down here it exists only as a console click
+It is not declared today. The first attempt named `group:odl-devops@mit.edu`,
+and Google refused the binding with `Group odl-devops@mit.edu does not exist`,
+which failed the production deploy. It comes back once a group Google actually
+knows is chosen. Until then, anyone who needs a local preview gets the grant by
+hand, and it should be recorded here when they do.
+
+Service-account-level IAM does not appear in the project's IAM policy, so a
+grant that is not written down in stack config exists only as a console click
 nobody can reproduce.
 
 ## What this does not manage

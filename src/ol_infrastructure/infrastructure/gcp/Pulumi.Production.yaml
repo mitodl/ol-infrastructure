@@ -47,12 +47,11 @@ config:
         member: principalSet://iam.googleapis.com/projects/32631020496/locations/global/workloadIdentityPools/ol-infrastructure/attribute.concourse_env/production
         import_id: projects/mitol01/serviceAccounts/pulumi-gcp@mitol01.iam.gserviceaccount.com
           roles/iam.workloadIdentityUser principalSet://iam.googleapis.com/projects/32631020496/locations/global/workloadIdentityPools/ol-infrastructure/attribute.concourse_env/production
-        # Who may impersonate this account to run a local preview. A GROUP,
-        # not individuals -- onboarding an engineer is a membership change
-        # rather than a Pulumi change. Note roles/owner does NOT confer this;
-        # verified 2026-08-19, a project Owner still 403s without it.
-      - role: roles/iam.serviceAccountTokenCreator
-        member: group:odl-devops@mit.edu
+        # Who may impersonate this account for a local preview belongs here
+        # too, as roles/iam.serviceAccountTokenCreator for a Google group. It
+        # was declared for group:odl-devops@mit.edu, which Google rejects
+        # ("does not exist"), so it is left out until a real group is chosen.
+        # roles/owner does NOT confer it (verified 2026-08-19).
       # The tier a credential serves is carried in its own name and restrictions,
       # not in the stack it is declared from. See README.md -- splitting these
       # across CI/QA/Production stacks would buy naming, not isolation, because
