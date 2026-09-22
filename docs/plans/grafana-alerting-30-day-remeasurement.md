@@ -96,9 +96,9 @@ in that window.
 
 | Rule | Baseline | Now | |
 |---|---:|---:|---|
-| `PodOOMKilledCritical` | 195 | 43 | −78% |
+| `PodOOMKilledCritical` | 195 | 43 (14 episodes) | −78% (−93% by episodes) |
 | `HPAAtMaxReplicasCritical` | 278 | 254 | −9% |
-| `PodCrashLoopingCritical` | 52 | 849 | _+1,533%_ |
+| `PodCrashLoopingCritical` | 52 | 849 (25 episodes) | +1,533% (−52% by episodes) |
 | `DeploymentUnavailableCritical` | 26 | 0 | gone |
 | `StatefulSetReplicasMissingCritical` | 22 | 7 | −68% |
 | `HTTPRequestDurationTooHighAvg [5m]` | 1,168 | 480 | still plugin-owned, still dropped |
@@ -122,9 +122,32 @@ New since the baseline:
 | `APISIXEdge5xxRateSlow` | 31 | |
 | `DagsterDaemonHeartbeatStaleCritical` | 20 | |
 
-Three of the original four noise rules came down, and `DeploymentUnavailableCritical`
-went silent entirely. The fourth, `PodCrashLoopingCritical`, went up, but §3 shows that
-is a broken workload rather than a rule that was missed.
+The "Now" figures for the two `keep_firing_for` rules are not like-for-like with their
+baselines. The firings query counts every state-history line whose `current` state
+matches `Alerting.*`. Since #5503, an alert on these rules moves to `Recovering (NoData)`
+whenever its series drops for an evaluation, and back to `Alerting` when it returns. Each
+return writes another such line, although the alert never resolved. `PodOOMKilledCritical`
+also carries `exec_err_state="KeepLast"` from
+[#5508](https://github.com/mitodl/ol-infrastructure/pull/5508), and its flips in and out
+of `Alerting (Error, KeepLast)` count the same way. Both PRs merged on 2026-08-18, after
+the baseline window, so the baseline counts carry no `Recovering` or `KeepLast`
+re-entries. "Episodes" counts only transitions out of `Pending`, meaning a new alert
+instance. That is the number to compare against the baseline:
+
+| Rule | Counted | Episodes | `Recovering` → `Alerting` | `KeepLast` flips |
+|---|---:|---:|---:|---:|
+| `PodCrashLoopingCritical` | 849 | 25 | 824 | 0 |
+| `PodOOMKilledCritical` | 43 | 14 | 9 | 20 |
+
+No other rule has a `Recovering` re-entry in the window. `WorkloadJobFailedCritical` does
+have `KeepLast` flips, but it is already outside the before/after table for the reason
+given above. The split is measured over 2026-08-23 → 2026-09-21, one day
+short of the evidence window because Loki's 31-day lookback no longer reaches 08-22. The
+counted totals still match the table above exactly.
+
+All four of the original noise rules came down, and `DeploymentUnavailableCritical` went
+silent entirely. `PodCrashLoopingCritical` looked like it went up, but the increase is
+re-entry lines in the state history, not new alerts. §3 covers what is behind them.
 
 Firing counts are alert-instance state transitions, not Rootly
 deliveries: 849 `PodCrashLooping` transitions against 624 total Rootly alerts from all
@@ -137,19 +160,21 @@ comparison.
 ## 3. `PodCrashLoopingCritical`: the rule is fine, a workload broke
 
 The 52 → 849 jump reads like a regression in the rule. It is not. 830 of the 849 firings
-are two workloads:
+are two workloads, and almost all of them are re-entries into an alert that was already
+firing (see §2):
 
-| Namespace | Pod | Firings |
-|---|---|---:|
-| `superset` | `superset-mcp-6c89c564c8-7b4tj` | 440 |
-| `superset` | `superset-mcp-6886bccf8d-c4ssx` | 165 |
-| `superset` | `superset-mcp-6c89c564c8-tml5l` | 101 |
-| `superset` | `superset-mcp-6c89c564c8-fnkkd` | 4 |
-| `mitxonline-openedx` | `mitxonline-ts-sts-1` | 116 |
-| `mitxonline-openedx` | `mitxonline-ts-sts-0` | 4 |
+| Namespace | Pod | Firings | Episodes |
+|---|---|---:|---:|
+| `superset` | `superset-mcp-6c89c564c8-7b4tj` | 440 | 1 |
+| `superset` | `superset-mcp-6886bccf8d-c4ssx` | 165 | 1 |
+| `superset` | `superset-mcp-6c89c564c8-tml5l` | 101 | 1 |
+| `superset` | `superset-mcp-6c89c564c8-fnkkd` | 4 | 1 |
+| `mitxonline-openedx` | `mitxonline-ts-sts-1` | 116 | 3 |
+| `mitxonline-openedx` | `mitxonline-ts-sts-0` | 4 | 3 |
 
-Everything else on the stack accounts for the remaining 19, down from 52 at the baseline.
-`superset-mcp` alone is 710 across four pod names and two ReplicaSets.
+Everything else on the stack accounts for the remaining 19 firings (15 episodes).
+`superset-mcp` alone is 710 firings across four pod names and two ReplicaSets, but only
+four episodes: one per pod name.
 
 Every count in this document is taken over the window ending 2026-09-21T00:00Z. That
 matters for this rule specifically, because it is still accumulating: `…-c4ssx` reads 165
@@ -181,17 +206,26 @@ alerts carrying `alertname=PodCrashLoopingCritical` over the window with their g
 instances inspected. That has not been done, and until it is, nothing here should be read
 as evidence that W3's grouping works.
 
-### The open question
+### `keep_firing_for` is holding
 
-`keep_firing_for="30m"` is meant to hold an alert open across a churning pod's
-disappearance. A single pod name (`…-7b4tj`) recorded 440 firings over 30 days, roughly
-15 a day, which is not what a 30-minute hold on a continuously failing pod should look
-like. Either the condition is flapping faster than the hold covers, or the hold is not
-doing what it was expected to do.
+A first draft of this section asked whether `keep_firing_for="30m"` was working, since
+`…-7b4tj` recorded 440 firings. It is working. The 440 is the counting artifact described
+in §2.
 
-That is worth checking, but it is a question about `keep_firing_for`, not evidence that
-the rule was left untreated. It should be answered against a workload that is not also
-genuinely broken.
+Checked against `mitxonline-ts-sts-1`, which is not the broken superset-mcp workload. Its
+state history is `Alerting` → `Recovering (NoData)` → `Alerting`, several times an hour.
+Each `Recovering` spell lasts 60-120 s and never reaches `Normal`. It becomes
+`Normal (MissingSeries)` only after ten consecutive missing evaluations, at the end of an
+episode. The cause is in the metric:
+`kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}` is present for three to
+four minutes, then absent for one to three minutes each time kubelet restarts the
+container (checked in Mimir, 2026-09-15 09:50-10:50Z). The group evaluates every 60 s, so
+a gap is one to three evaluations. That is well inside both
+`missing_series_evals_to_resolve=10` and the 30-minute hold.
+
+So the condition does flap, but the hold covers it, and each pod name produced one alert
+instance for as long as it crashlooped. No rule change is needed. The measurement query
+is the thing to fix; the appendix has the episode count.
 
 ---
 
@@ -327,8 +361,9 @@ settled from inside the stack. §5 gives the footprint to quote against.
 
 - `superset-mcp` has been crashlooping in production for at least 30 days and is unowned.
   This is the one with a live production impact.
-- `keep_firing_for="30m"` does not appear to be holding alerts across a churning pod the
-  way #5503 intended. See §3; check it against a workload that is not also broken.
+- Count firings for `keep_firing_for` rules by episode, not by `current =~ Alerting.*`.
+  §3 found the hold working. The apparent per-pod storm was `Recovering` → `Alerting`
+  re-entries, and the appendix query counts them as firings.
 - `DiskUsageCritical` should aggregate its expression by `instance` so one full Concourse
   worker is one series rather than 148. Low priority: §4 shows the root policy already
   collapses these into one notification, so this is evaluation and state-history cost,
@@ -358,6 +393,14 @@ GET /api/datasources/proxy/uid/grafanacloud-alert-state-history/loki/api/v1/quer
     labels_deployment, labels_statefulset, labels_horizontalpodautoscaler, labels_job_name)
     (count_over_time({from="state-history", folderUID="infrastructure-alerts"} | json
      | current =~ `Alerting.*` [30d])))
+
+# Episodes vs. re-entries, §2/§3. The two queries above count Recovering -> Alerting and
+# KeepLast error flips as firings. Take previous=~"Pending.*" as the episode count.
+# 30d over all of state history times out through the MCP proxy; run [10d] windows with
+# a line filter on the rule and sum them.
+  query=sum by (labels_pod, previous, current) (count_over_time(
+    {from="state-history", folderUID="infrastructure-alerts", group="general"}
+    |= `"ruleTitle":"PodCrashLoopingCritical"` | json | current =~ `Alerting.*` [10d]))
 
 # §4's disk breakdown. Unbounded on purpose: topk(25) truncates a 148-instance result,
 # which is the whole point of that section.
