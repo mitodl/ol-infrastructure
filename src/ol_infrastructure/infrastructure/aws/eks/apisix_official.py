@@ -1021,11 +1021,12 @@ def setup_apisix(
     # Refuse the gateway's own identity headers from a client, on every route.
     #
     # The openid-connect plugin clears an inbound X-Userinfo / X-ID-Token /
-    # X-Refresh-Token before setting its own, but only where it is attached.
-    # Every other route on an OIDC host hands the client's copy straight to the
-    # application, and mitol-apigateway's middleware authenticates off
-    # X-Userinfo without asking who wrote it -- so one unprotected route on a
-    # host that has a login is enough to impersonate any account.
+    # X-Raw-ID-Token / X-Refresh-Token before setting its own, but only where
+    # it is attached.  Every other route on an OIDC host hands the client's
+    # copy straight to the application, and mitol-apigateway's middleware
+    # authenticates off X-Userinfo without asking who wrote it -- so one
+    # unprotected route on a host that has a login is enough to impersonate
+    # any account.
     #
     # A global rule rather than an entry in each application's shared plugin
     # config: the routes at risk are the ones that reference no plugin config

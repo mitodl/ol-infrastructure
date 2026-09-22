@@ -184,7 +184,7 @@ GET /t
 underscored: nil
 dashed: nil
 --- error_log
-stripped client-supplied identity header X_Userinfo
+stripped client-supplied identity header X-Userinfo
 
 
 
@@ -296,3 +296,176 @@ X-Userinfo: eyJzdWIiOiAiZm9yZ2VkIn0=
 GET /t
 --- response_body
 x-userinfo: eyJzdWIiOiAiZm9yZ2VkIn0=
+
+
+
+=== TEST 13: a header pushed past ngx.req.get_headers()'s 100-header cap is still removed
+--- config
+    underscores_in_headers on;
+    location /t {
+        rewrite_by_lua_block {
+            local strip = require("apisix.plugins.ol.strip_client_identity_headers")
+            strip({identity_header_strip = {headers = {"X-Userinfo", "X-ID-Token", "X-Raw-ID-Token", "X-Refresh-Token"}}},
+                  {var = {host = "api.learn.mit.edu", uri = "/t"}})
+        }
+        content_by_lua_block {
+            -- 0 means "no cap", so this sees the header even where the capped
+            -- default read does not.
+            ngx.say("x-userinfo: ", tostring(ngx.req.get_headers(0)["X-Userinfo"]))
+            ngx.say("capped read would have seen it: ",
+                    tostring(ngx.req.get_headers()["X-Userinfo"] ~= nil))
+        }
+    }
+--- more_headers
+X-Filler-001: 1
+X-Filler-002: 2
+X-Filler-003: 3
+X-Filler-004: 4
+X-Filler-005: 5
+X-Filler-006: 6
+X-Filler-007: 7
+X-Filler-008: 8
+X-Filler-009: 9
+X-Filler-010: 10
+X-Filler-011: 11
+X-Filler-012: 12
+X-Filler-013: 13
+X-Filler-014: 14
+X-Filler-015: 15
+X-Filler-016: 16
+X-Filler-017: 17
+X-Filler-018: 18
+X-Filler-019: 19
+X-Filler-020: 20
+X-Filler-021: 21
+X-Filler-022: 22
+X-Filler-023: 23
+X-Filler-024: 24
+X-Filler-025: 25
+X-Filler-026: 26
+X-Filler-027: 27
+X-Filler-028: 28
+X-Filler-029: 29
+X-Filler-030: 30
+X-Filler-031: 31
+X-Filler-032: 32
+X-Filler-033: 33
+X-Filler-034: 34
+X-Filler-035: 35
+X-Filler-036: 36
+X-Filler-037: 37
+X-Filler-038: 38
+X-Filler-039: 39
+X-Filler-040: 40
+X-Filler-041: 41
+X-Filler-042: 42
+X-Filler-043: 43
+X-Filler-044: 44
+X-Filler-045: 45
+X-Filler-046: 46
+X-Filler-047: 47
+X-Filler-048: 48
+X-Filler-049: 49
+X-Filler-050: 50
+X-Filler-051: 51
+X-Filler-052: 52
+X-Filler-053: 53
+X-Filler-054: 54
+X-Filler-055: 55
+X-Filler-056: 56
+X-Filler-057: 57
+X-Filler-058: 58
+X-Filler-059: 59
+X-Filler-060: 60
+X-Filler-061: 61
+X-Filler-062: 62
+X-Filler-063: 63
+X-Filler-064: 64
+X-Filler-065: 65
+X-Filler-066: 66
+X-Filler-067: 67
+X-Filler-068: 68
+X-Filler-069: 69
+X-Filler-070: 70
+X-Filler-071: 71
+X-Filler-072: 72
+X-Filler-073: 73
+X-Filler-074: 74
+X-Filler-075: 75
+X-Filler-076: 76
+X-Filler-077: 77
+X-Filler-078: 78
+X-Filler-079: 79
+X-Filler-080: 80
+X-Filler-081: 81
+X-Filler-082: 82
+X-Filler-083: 83
+X-Filler-084: 84
+X-Filler-085: 85
+X-Filler-086: 86
+X-Filler-087: 87
+X-Filler-088: 88
+X-Filler-089: 89
+X-Filler-090: 90
+X-Filler-091: 91
+X-Filler-092: 92
+X-Filler-093: 93
+X-Filler-094: 94
+X-Filler-095: 95
+X-Filler-096: 96
+X-Filler-097: 97
+X-Filler-098: 98
+X-Filler-099: 99
+X-Filler-100: 100
+X-Filler-101: 101
+X-Filler-102: 102
+X-Filler-103: 103
+X-Filler-104: 104
+X-Filler-105: 105
+X-Filler-106: 106
+X-Filler-107: 107
+X-Filler-108: 108
+X-Filler-109: 109
+X-Filler-110: 110
+X-Filler-111: 111
+X-Filler-112: 112
+X-Filler-113: 113
+X-Filler-114: 114
+X-Filler-115: 115
+X-Filler-116: 116
+X-Filler-117: 117
+X-Filler-118: 118
+X-Filler-119: 119
+X-Filler-120: 120
+X-Userinfo: eyJzdWIiOiAiZm9yZ2VkIn0=
+--- request
+GET /t
+--- response_body
+x-userinfo: nil
+capped read would have seen it: false
+
+
+
+=== TEST 14: a mixed dash/underscore spelling is removed too
+--- config
+    underscores_in_headers on;
+    location /t {
+        rewrite_by_lua_block {
+            local strip = require("apisix.plugins.ol.strip_client_identity_headers")
+            strip({identity_header_strip = {headers = {"X-Userinfo", "X-ID-Token", "X-Raw-ID-Token", "X-Refresh-Token"}}},
+                  {var = {host = "api.learn.mit.edu", uri = "/t"}})
+        }
+        content_by_lua_block {
+            local h = ngx.req.get_headers(0)
+            ngx.say("mixed id: ", tostring(h["X_ID-Token"]))
+            ngx.say("mixed raw: ", tostring(h["X-Raw_ID_Token"]))
+        }
+    }
+--- more_headers
+X_ID-Token: id-token
+X-Raw_ID_Token: raw-id-token
+--- request
+GET /t
+--- response_body
+mixed id: nil
+mixed raw: nil
