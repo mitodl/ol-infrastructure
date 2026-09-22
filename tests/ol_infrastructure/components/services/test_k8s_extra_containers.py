@@ -1194,3 +1194,33 @@ def test_max_memory_per_child_emitted_as_flag_and_value():
 def test_max_memory_per_child_rejects_non_positive():
     with pytest.raises(ValidationError):
         _celery_worker_config(max_memory_per_child_kib=0)
+
+
+@pulumi.runtime.test
+def test_celery_worker_disables_gossip_but_keeps_events():
+    """Gossip must stay off, and task events must stay on.
+
+    Every worker that starts with gossip enabled declares a celeryev.<uuid>
+    queue, and kombu's Redis transport never reclaims it: Channel.close()
+    deletes only queues in _fanout_queues, which _queue_bind populates for
+    fanout exchanges, and celery declares celeryev as a topic exchange. The
+    orphan keeps receiving every event forever. 4,112 of them held 64.7 GiB on
+    edxapp-redis-mitxonline-production on 2026-09-21.
+
+    -E is asserted alongside it because the two are easy to conflate: gossip is
+    the worker-side *consumer* of events, while -E is the *emitter* that leek
+    reads. Dropping -E to stop the leak would blind monitoring instead.
+    """
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="memcapped",
+            celery_worker_configs=[_celery_worker_config()],
+        )
+    )
+
+    def check(containers):
+        command = next(c for c in containers if c["name"] == "celery-worker")["command"]
+        assert "--without-gossip" in command
+        assert "-E" in command
+
+    return app.celery_deployments[0].spec.template.spec.containers.apply(check)

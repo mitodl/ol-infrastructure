@@ -231,23 +231,27 @@ def main(
     ]
     orphans.sort(key=lambda c: -c.second_len)
     alive = len(candidates) - len(orphans)
-    if limit is not None:
-        orphans = orphans[:limit]
+    # `orphans` stays the full finding; `selected` is what this run acts on.
+    # Keeping them separate means the counts below always reconcile against
+    # len(candidates), whether or not --limit truncated the work.
+    selected = orphans if limit is None else orphans[:limit]
 
     print(f"\n{'queue':46}{'backlog t0':>12}{'backlog t1':>12}")
-    for cand in orphans[:25]:
+    for cand in selected[:25]:
         print(f"{cand.queue:46}{cand.first_len:>12,}{cand.second_len:>12,}")
-    if len(orphans) > 25:
-        print(f"... and {len(orphans) - 25:,} more")
+    if len(selected) > 25:
+        print(f"... and {len(selected) - 25:,} more")
 
     print(f"\n{len(orphans):,} orphaned, {alive:,} left alone (empty or draining)")
+    if len(selected) != len(orphans):
+        print(f"acting on {len(selected):,} of them this run (--limit)")
 
     if not apply:
         print("\ndry run; nothing written. Pass --apply to delete.")
         return 0
 
     deleted = 0
-    for cand in orphans:
+    for cand in selected:
         # Binding first. Delete the key first and the next published event
         # recreates it, with no TTL.
         pipe = client.pipeline(transaction=False)
