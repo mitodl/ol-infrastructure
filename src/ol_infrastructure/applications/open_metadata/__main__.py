@@ -781,6 +781,15 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "name": "LOG_FORMAT",
                     "value": "json",
                 },
+                # At DEBUG, Jetty's HttpParser logs request headers verbatim, including
+                # `Authorization: Bearer <jwt>` and the OM_SESSION cookie, and these
+                # logs ship to Loki. 2.0 splits org.eclipse.jetty off the root logger
+                # via this var; pinning it keeps a LOG_LEVEL=DEBUG session from
+                # turning on that header dump.
+                {
+                    "name": "JETTY_LOG_LEVEL",
+                    "value": "INFO",
+                },
             ],
             "serviceAccount": {
                 "create": True,
