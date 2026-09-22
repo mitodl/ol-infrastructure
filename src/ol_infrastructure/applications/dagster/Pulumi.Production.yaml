@@ -25,6 +25,70 @@ config:
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   dagster:db_instance_type: db.r7g.2xlarge
+  # Exports OTel metrics (db.client.connections.usage, the client-side
+  # QueuePool occupancy) from the control plane and canvas run workers, the
+  # only client-side view of pool saturation -- PgBouncer's exporter measures
+  # the server end, so a saturated client pool reads as a healthy PgBouncer.
+  # See dagster_otel_metrics_enabled in __main__.py.
+  #
+  # Held back from Production pending two measurements on QA, both closed
+  # 2026-09-22:
+  #
+  # 1. Cardinality of enabling every instrumentation's metrics, not just the
+  #    one wanted. requests/urllib3 also emit http.client.* duration/size
+  #    histograms, one series per distinct host + per run-worker
+  #    service.instance.id. QA's fixed call set (Vault, Airbyte,
+  #    telemetry.dagster.io from one canary code location) grew 504->540
+  #    series over 3 days with spikes to 720; Production's ~13 code locations
+  #    hit far more external hosts (S3/GCS/Cybersource/edX, etc.), an
+  #    unmeasured and likely much larger regime under the same enable. #5992
+  #    drops http.client.* at the Alloy applicationObservability pipeline via
+  #    otelcol.processor.filter, scoped to resource.attributes
+  #    ["service.namespace"] == "dagster" so it applies uniformly to the
+  #    control plane and every run worker regardless of which hosts they
+  #    call -- the fix doesn't depend on host cardinality, so it closes this
+  #    for Production's larger host surface too, not just QA's. Confirmed
+  #    live on data-qa: http_client_duration_milliseconds{service_namespace=
+  #    "dagster"} stopped emitting (checked three times over ~2 minutes, the
+  #    staleness gap growing in lockstep with wall-clock), while
+  #    db_client_connections_usage held at 38 series, matching the pre-fix
+  #    30-36 baseline -- the filter doesn't collaterally drop the metric
+  #    that's wanted.
+  #
+  # 2. Whether db.client.connections.usage itself fans out unboundedly.
+  #    This one is NOT measured on QA and can't be: canvas's schedule has no
+  #    dynamic partitions registered there, so it has never produced a
+  #    canvas run, and canvas's own code-server shows zero OTel activity of
+  #    any kind on QA (no target_info, despite otel_metrics_enabled since
+  #    #5947 and correct env/package config) -- there is no QA traffic to
+  #    measure against. The bound below is analytical, derived from the
+  #    canvas code location's actual definitions (mitodl/ol-data-platform,
+  #    dg_projects/canvas/canvas/definitions.py), not an extrapolation from
+  #    a live series count.
+  #
+  #    Canvas run workers mint a fresh service.instance.id per Job, and so
+  #    does every step subprocess the multiprocess executor spawns inside
+  #    one -- canvas_course_export_job takes no executor_def, so it gets the
+  #    house default, multi_or_in_process_executor, which defaults to
+  #    multiprocess mode (confirmed against dagster==1.13.23's
+  #    executor_definition.py: config_schema default_value is
+  #    {"multiprocess": {}}). Under multiprocess mode every step -- even a
+  #    single one -- runs in its own forked child, so a Job is the run
+  #    coordinator process plus one step-subprocess, not one process. The
+  #    job's selection is exactly one op (the `export_course_content`
+  #    multi_asset, canvas/assets/canvas.py), so that multiplier is a flat
+  #    2x, not open-ended: OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS's own
+  #    comment puts concurrent canvas Jobs at a mean of 87 against a peak of
+  #    106 over 7 days (kube_job_labels, data-production), so the corrected
+  #    bound is ~174 mean / ~212 peak OTel processes, plus the ~17
+  #    long-lived control-plane processes. Still double-to-low-triple
+  #    digits and still bounded by Job concurrency, which is what makes it
+  #    a different risk shape than http.client.* -- that one grew with
+  #    every new external host hit, unbounded by anything in this stack's
+  #    control. This one is bounded by how many canvas runs are ever
+  #    in flight at once, a number the K8sRunLauncher and
+  #    max_concurrent_runs already cap.
+  dagster:otel_metrics_enabled: "true"
   # 6 -> 4. The first replica count set from the exporter rather than from a
   # guess. Six days of 1-minute samples (8640 points) taken entirely after the
   # session -> transaction pool_mode switch of 2026-08-19 18:23Z:
