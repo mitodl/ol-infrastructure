@@ -2360,6 +2360,31 @@ class OLApplicationK8s(ComponentResource):
                                         celery_worker_config.application_name,
                                         "worker",  # COMMAND
                                         "-E",  # send task-related events for monitoring
+                                        # Gossip is worker-to-worker peer
+                                        # awareness, and on a Redis broker it
+                                        # leaks. Every worker that starts
+                                        # declares a celeryev.<uuid> queue for
+                                        # it
+                                        # (celery.worker.consumer.gossip.Gossip.get_consumers)
+                                        # and relies on the broker to reclaim
+                                        # it. kombu's Redis transport never
+                                        # does: Channel.close() only deletes
+                                        # queues in _fanout_queues, which
+                                        # _queue_bind populates only for FANOUT
+                                        # exchanges, and celery declares
+                                        # celeryev as a TOPIC exchange. So the
+                                        # queue and its binding survive even a
+                                        # clean shutdown, and the exchange goes
+                                        # on copying every event into the
+                                        # orphan forever. 4,112 of them held
+                                        # 64.7 GiB on
+                                        # edxapp-redis-mitxonline-production on
+                                        # 2026-09-21.
+                                        # This does NOT affect monitoring:
+                                        # events are still emitted by -E above,
+                                        # and leek's revoke goes over pidbox
+                                        # (the Control bootstep), not gossip.
+                                        "--without-gossip",
                                         *(
                                             [
                                                 "-Q",  # queue name filter
