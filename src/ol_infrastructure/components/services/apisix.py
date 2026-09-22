@@ -1,6 +1,7 @@
 # ruff: noqa: E501
 """APISIX ingress controller components for Kubernetes."""
 
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Literal
 
@@ -8,7 +9,10 @@ import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
 from pydantic import BaseModel, Field, NonNegativeInt, field_validator, model_validator
 
-from bridge.lib.constants import DEFAULT_OIDC_SESSION_COOKIE_NAME
+from bridge.lib.constants import (
+    DEFAULT_OIDC_SESSION_COOKIE_NAME,
+    GATEWAY_IDENTITY_HEADERS,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
@@ -24,6 +28,11 @@ OIDC_ERROR_RECOVERY_LUA = (
 )
 CANONICAL_HTTPS_REDIRECT_LUA = (
     Path(__file__).parent.joinpath("files", "canonical_https_redirect.lua").read_text()
+)
+STRIP_CLIENT_IDENTITY_HEADERS_LUA = (
+    Path(__file__)
+    .parent.joinpath("files", "strip_client_identity_headers.lua")
+    .read_text()
 )
 
 # The only statuses ngx.redirect accepts; anything else is a Lua error at
@@ -275,6 +284,72 @@ def oidc_gateway_pre_function_plugin(
                 "guard_cookie_name": guard_cookie_name,
                 "guard_max_age": guard_max_age,
             },
+        },
+    )
+
+
+def identity_header_strip_plugin(
+    header_names: Sequence[str] = GATEWAY_IDENTITY_HEADERS,
+) -> OLApisixPluginConfig:
+    """Clear the gateway's own identity headers when a client supplies them.
+
+    The openid-connect plugin sets X-Userinfo, X-ID-Token, X-Raw-ID-Token and
+    X-Refresh-Token from a verified session, and clears any inbound copy before
+    it does -- but only on the routes it is attached to.  Every other route on
+    an OIDC host
+    forwards the client's version untouched, and mitol-apigateway's middleware
+    authenticates off X-Userinfo without asking whether the gateway or the
+    caller wrote it.  Two such routes exist today: mitxonline's
+    ``/static/hash.txt`` and learn-ai's ``canvas_*`` endpoints.  Neither is
+    reachable as a forgery right now -- Granian's static mount answers
+    ``/static/*`` before Django's middleware runs, and the canvas routes sit
+    behind ``key-auth``, which rejects an unkeyed request at the gateway -- but
+    both depend on something other than the trust boundary to hold, and the
+    canvas exception only holds against callers without the Canvas API key.
+
+    **This belongs on an ``ApisixGlobalRule``, not on a shared plugin config.**
+    The routes it needs to cover are precisely the ones nobody remembered to
+    attach a plugin to, and APISIX keys plugins by name when merging a plugin
+    config into a route: a route carrying ``oidc_gateway_pre_function_plugin``
+    -- which is every OIDC route -- overrides the shared config's
+    ``serverless-pre-function`` wholesale rather than running both.  Attaching
+    this there would leave it running only where it is least needed.  A global
+    rule has neither problem: it runs after route matching but before the
+    matched route's rewrite and access phases
+    (``apisix/init.lua http_access_phase``), so it lands ahead of
+    openid-connect (rewrite, priority 2599) on every route in the cluster.
+
+    ``proxy-rewrite``'s ``headers.remove`` would express the same thing
+    declaratively and is the wrong tool here: its rewrite handler
+    unconditionally runs ``ngx.req.set_uri`` on a ``uri_safe_encode``'d path
+    whether or not a rewrite was asked for, so putting it in a global rule
+    would re-encode the URI of every request in the cluster before each
+    route's own ``proxy-rewrite`` got to it.
+
+    Each name is cleared in both its dash and its underscore spelling.  APISIX
+    runs nginx with ``underscores_in_headers on``, so ``X_Userinfo`` is a
+    header in its own right that reaches the upstream, and Django folds it onto
+    the same ``HTTP_X_USERINFO`` the middleware reads.  Clearing only the dash
+    spelling would leave the hole open under a different name -- as upstream's
+    own clear in ``openid-connect.lua`` does.
+
+    :param header_names: Headers to clear.  Defaults to
+        ``GATEWAY_IDENTITY_HEADERS``, which deliberately omits X-Access-Token
+        and Authorization -- see the constant for why.
+
+    :returns: A ``serverless-pre-function`` plugin config for a global rule.
+    :rtype: OLApisixPluginConfig
+    """
+    return OLApisixPluginConfig(
+        name="serverless-pre-function",
+        secretRef=None,
+        config={
+            # rewrite, matching oidc_gateway_pre_function_plugin: the access
+            # phase would run after openid-connect had already read the
+            # request.
+            "phase": "rewrite",
+            "functions": [STRIP_CLIENT_IDENTITY_HEADERS_LUA],
+            "identity_header_strip": {"headers": list(header_names)},
         },
     )
 
