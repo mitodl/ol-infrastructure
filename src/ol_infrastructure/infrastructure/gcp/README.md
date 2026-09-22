@@ -72,10 +72,11 @@ resource type brings its own API.
 
 The automation account's own project roles are bootstrap too. They are granted
 by a project Owner, never by the stack, so the account cannot widen its own
-access through a config change. `pulumi-gcp@mitol01` holds
+access through a config change. `pulumi-gcp@mitol01` needs
 `iam.serviceAccountAdmin`, `resourcemanager.projectIamAdmin`,
-`serviceusage.apiKeysAdmin`, `serviceusage.serviceUsageAdmin` and
-`iam.workloadIdentityPoolAdmin` (for `workload_identity_pools`):
+`serviceusage.apiKeysAdmin` and `serviceusage.serviceUsageAdmin` (granted
+before the stack existed), plus `iam.workloadIdentityPoolAdmin` once a project
+declares `workload_identity_pools`:
 
 ```bash
 gcloud projects add-iam-policy-binding mitol01 \
@@ -234,6 +235,9 @@ projected Kubernetes token, so there is no key material at rest.
   `workload_identity_providers`), and points `GOOGLE_APPLICATION_CREDENTIALS`
   at an `external_account` document naming that token file. The Dagster stack's
   `ml` code location is the worked example.
+- The binding is per Kubernetes service account, not per pod. Anything that
+  runs as that service account can project the token, so scope the Kubernetes
+  service account as narrowly as the Google grant should be.
 
 ## What this does not manage
 

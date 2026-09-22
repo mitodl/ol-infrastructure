@@ -240,6 +240,43 @@ class OLGCPProject(ComponentResource):
                 opts=child_opts,
             )
 
+        pools: list[gcp.iam.WorkloadIdentityPool] = []
+        for pool_config in config.workload_identity_pools:
+            pool = gcp.iam.WorkloadIdentityPool(
+                f"{name}-wif-pool-{pool_config.pool_id}",
+                project=config.project_id,
+                workload_identity_pool_id=pool_config.pool_id,
+                display_name=pool_config.display_name,
+                description=pool_config.description,
+                opts=child_opts,
+            )
+            pools.append(pool)
+            for provider_config in pool_config.oidc_providers:
+                self.workload_identity_providers[
+                    f"{pool_config.pool_id}/{provider_config.provider_id}"
+                ] = gcp.iam.WorkloadIdentityPoolProvider(
+                    f"{name}-wif-provider-{pool_config.pool_id}-"
+                    f"{provider_config.provider_id}",
+                    project=config.project_id,
+                    workload_identity_pool_id=pool.workload_identity_pool_id,
+                    workload_identity_pool_provider_id=provider_config.provider_id,
+                    display_name=provider_config.display_name,
+                    # Principals are pool-scoped, so two clusters issuing the
+                    # same `sub` (system:serviceaccount:<ns>:<name>) would
+                    # otherwise map to one principal, and a grant meant for
+                    # production would admit the CI cluster too. Prefixing the
+                    # provider id keeps each issuer's subjects distinct.
+                    attribute_mapping={
+                        "google.subject": (
+                            f'"{provider_config.provider_id}::" + assertion.sub'
+                        ),
+                    },
+                    oidc=gcp.iam.WorkloadIdentityPoolProviderOidcArgs(
+                        issuer_uri=provider_config.issuer_uri,
+                    ),
+                    opts=child_opts.merge(ResourceOptions(parent=pool)),
+                )
+
         for account in config.service_accounts:
             account_opts = adoption_opts(child_opts, account.import_id)
             service_account = gcp.serviceaccount.Account(
@@ -270,7 +307,12 @@ class OLGCPProject(ComponentResource):
                     service_account_id=service_account.name,
                     role=grant.role,
                     member=grant.member,
-                    opts=adoption_opts(child_opts, grant.import_id),
+                    # A principal:// or principalSet:// member naming a pool
+                    # declared here must wait for that pool to exist.
+                    opts=adoption_opts(
+                        child_opts.merge(ResourceOptions(depends_on=pools)),
+                        grant.import_id,
+                    ),
                 )
 
         for api_key in config.api_keys:
@@ -284,41 +326,6 @@ class OLGCPProject(ComponentResource):
                 ),
                 opts=adoption_opts(child_opts, api_key.import_id),
             )
-
-        for pool_config in config.workload_identity_pools:
-            pool = gcp.iam.WorkloadIdentityPool(
-                f"{name}-wif-pool-{pool_config.pool_id}",
-                project=config.project_id,
-                workload_identity_pool_id=pool_config.pool_id,
-                display_name=pool_config.display_name,
-                description=pool_config.description,
-                opts=child_opts,
-            )
-            for provider_config in pool_config.oidc_providers:
-                self.workload_identity_providers[
-                    f"{pool_config.pool_id}/{provider_config.provider_id}"
-                ] = gcp.iam.WorkloadIdentityPoolProvider(
-                    f"{name}-wif-provider-{pool_config.pool_id}-"
-                    f"{provider_config.provider_id}",
-                    project=config.project_id,
-                    workload_identity_pool_id=pool.workload_identity_pool_id,
-                    workload_identity_pool_provider_id=provider_config.provider_id,
-                    display_name=provider_config.display_name,
-                    # Principals are pool-scoped, so two clusters issuing the
-                    # same `sub` (system:serviceaccount:<ns>:<name>) would
-                    # otherwise map to one principal, and a grant meant for
-                    # production would admit the CI cluster too. Prefixing the
-                    # provider id keeps each issuer's subjects distinct.
-                    attribute_mapping={
-                        "google.subject": (
-                            f'"{provider_config.provider_id}::" + assertion.sub'
-                        ),
-                    },
-                    oidc=gcp.iam.WorkloadIdentityPoolProviderOidcArgs(
-                        issuer_uri=provider_config.issuer_uri,
-                    ),
-                    opts=child_opts.merge(ResourceOptions(parent=pool)),
-                )
 
         self.register_outputs(
             {

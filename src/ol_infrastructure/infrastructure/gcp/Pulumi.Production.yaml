@@ -31,6 +31,10 @@ config:
       # Project-level IAM grants (service_accounts[].project_roles) read and
       # write the project IAM policy through this API, billed to mitol01.
     - cloudresourcemanager.googleapis.com
+      # Workload Identity Federation impersonates a service account through
+      # this API (generateAccessToken): both the Concourse -> pulumi-gcp path
+      # and the eks-workloads pool.
+    - iamcredentials.googleapis.com
     service_accounts:
       # The stack's own automation identity, adopted so the federation wiring
       # is reviewable here instead of living as console clicks nobody can
@@ -60,7 +64,9 @@ config:
       # dagster-user-code Kubernetes service account on that tier's data
       # cluster; the "<provider>::" prefix comes from the pool's subject
       # mapping (components/gcp/project.py). Every Dagster code location runs
-      # as dagster-user-code, but only ml mounts the credential document.
+      # as dagster-user-code, so any of them can project that token and become
+      # this account; only ml is wired to. Same scope as Dagster's Bedrock
+      # grant. Narrowing it needs a separate Kubernetes SA for ml.
     - account_id: dagster-ml-production
       display_name: Dagster ml Production
       project_roles:
