@@ -72,6 +72,9 @@ def create(
 
     # Disk usage thresholds: warning > 80% for 1h, critical > 95% for 10m.
     # Excludes pseudo-filesystems (squashfs, vfat) and non-/dev/ devices.
+    # Concourse bind-mounts every build volume from the root device, so each
+    # one reports the same ratio as / and would otherwise become its own alert
+    # instance. / still covers that disk.
     alerting.RuleGroup(
         "linux-host-disk-usage",
         name="disk-usage",
@@ -89,7 +92,7 @@ def create(
                     "description": 'Filesystem on {{ $labels.device }} at {{ $labels.instance }} is {{ printf "%.2f" $value }}% full.'
                 },
                 datas=rd(
-                    '(host_filesystem_used_ratio{device=~"/dev.*",filesystem!~"(squashfs|vfat)",job="integrations/linux_host"} * 100) > 80'
+                    '(host_filesystem_used_ratio{device=~"/dev.*",filesystem!~"(squashfs|vfat)",mountpoint!~"/var/concourse/worker/volumes/.*",job="integrations/linux_host"} * 100) > 80'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -103,7 +106,7 @@ def create(
                     "description": 'Filesystem on {{ $labels.device }} at {{ $labels.instance }} is {{ printf "%.2f" $value }}% full.'
                 },
                 datas=rd(
-                    '(host_filesystem_used_ratio{device=~"/dev.*",filesystem!~"(squashfs|vfat)",job="integrations/linux_host"} * 100) > 95'
+                    '(host_filesystem_used_ratio{device=~"/dev.*",filesystem!~"(squashfs|vfat)",mountpoint!~"/var/concourse/worker/volumes/.*",job="integrations/linux_host"} * 100) > 95'
                 ),
             ),
         ],
