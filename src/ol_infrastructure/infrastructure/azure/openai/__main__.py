@@ -92,12 +92,14 @@ if stack_info.env_suffix == "production" and configured_capacity is None:
     raise ValueError(msg)
 default_capacity = configured_capacity or 5
 
-# gpt-4o and gpt-4o-mini are learn-ai's current defaults; gpt-5.2 is what edxapp's
-# translations config already asks OpenAI for. Deploying all three is what lets Azure
-# stand in for both consumers without changing either app's model settings.
+# gpt-4o is learn-ai's current default and gpt-5.2 is what edxapp's translations config
+# already asks OpenAI for. learn-ai's other default, gpt-4o-mini, cannot be deployed:
+# its only version (2024-07-18) is Deprecating, and Azure refuses new deployments of it
+# with ServiceModelDeprecating. gpt-5-mini is its stand-in, so an app moving that
+# workload to Azure changes its model name deliberately rather than silently.
 model_names = azure_config.get_object("models") or [
     "gpt-4o",
-    "gpt-4o-mini",
+    "gpt-5-mini",
     "gpt-5.2",
 ]
 
@@ -172,9 +174,13 @@ for consumer, (namespace, service_account) in CONSUMER_SUBJECTS.items():
     cognitive_accounts[consumer] = account
 
     deployment_names[consumer] = []
+    # Azure allows one deployment operation per account at a time and answers a second
+    # with 409 RequestConflict ("Another operation is being performed on the parent
+    # resource"), so each deployment waits for the one before it.
+    previous_deployment: azure_native.cognitiveservices.Deployment | None = None
     for model_name in model_names:
         pinned_version = model_versions.get(model_name)
-        azure_native.cognitiveservices.Deployment(
+        previous_deployment = azure_native.cognitiveservices.Deployment(
             f"{account_name}-{model_name}",
             deployment_name=model_name,
             account_name=account.name,
@@ -195,7 +201,11 @@ for consumer, (namespace, service_account) in CONSUMER_SUBJECTS.items():
                     else "OnceNewDefaultVersionAvailable"
                 ),
             ),
-            opts=azure_opts,
+            opts=azure_opts.merge(
+                ResourceOptions(
+                    depends_on=[previous_deployment] if previous_deployment else []
+                )
+            ),
         )
         deployment_names[consumer].append(model_name)
 
