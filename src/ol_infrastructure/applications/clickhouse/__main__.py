@@ -102,7 +102,13 @@ k8s_labels = K8sGlobalLabels(
 setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
 CLICKHOUSE_NAMESPACE = "clickhouse"
 # Declared for every cluster in infrastructure/aws/eks; must exist before a PVC
-# references it or the modification sits in Pending until it does. Rollback is
+# references it. It does NOT recover on its own once the class shows up: the CSI
+# external-resizer emits `VolumeModifyFailed  VAC "ebs-gp3-iops-3000" does not
+# exist.`, drops the PVC's key, and never re-enqueues it -- data-ci sat Pending
+# for hours after the class appeared. Touching the PVC (an annotation, a relabel)
+# does not re-enqueue it either; only restarting the resizer does:
+# `kubectl -n kube-system rollout restart deployment ebs-csi-controller`.
+# Apply the eks stack before this one. Rollback is
 # `pulumi config set clickhouse:data_volume_attributes_class ebs-gp3-iops-75000`
 # (production) or `ebs-gp3-iops-25000` (QA) -- those classes are declared there
 # too -- followed by an apply. Each switch recreates the StatefulSets, so every
