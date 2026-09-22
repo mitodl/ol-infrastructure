@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -21,6 +22,7 @@ from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
     Config,
+    Output,
     ResourceOptions,
     export,
 )
@@ -135,6 +137,14 @@ mitxonline_stack = (
 # code's tracing is a no-op.
 opik_stack = (
     make_stack_reference(projects.OPIK, stack_info.name)
+    if stack_info.env_suffix in ("ci", "qa", "production")
+    else None
+)
+# The ml code location calls Gemini through Vertex AI in mitol01, authenticating
+# by Workload Identity Federation from the data cluster (see the GCP stack's
+# README). The GCP stack only federates the CI/QA/Production data clusters.
+gcp_stack = (
+    make_stack_reference(projects.GCP, "Production")
     if stack_info.env_suffix in ("ci", "qa", "production")
     else None
 )
@@ -2280,6 +2290,90 @@ aws_profile_configmap = kubernetes.core.v1.ConfigMap(
     },
 )
 
+# Workload Identity Federation for the ml code location. The pod projects a
+# Kubernetes token for the eks-workloads pool provider of this tier's data
+# cluster and exchanges it for a token as dagster-ml-<tier>@mitol01, so no
+# Google key material exists anywhere. The credential document below is not a
+# secret: it only says where the token file is and which account to become.
+VERTEX_PROJECT = "mitol01"
+GCP_TOKEN_DIR = "/var/run/secrets/gcp"  # noqa: S105 -- a mount path, not a secret
+GCP_CREDENTIALS_DIR = "/etc/gcp"
+ml_gcp_env: list[dict[str, Any]] = []
+ml_gcp_volumes: list[dict[str, Any]] = []
+ml_gcp_volume_mounts: list[dict[str, Any]] = []
+if gcp_stack is not None:
+    wif_provider_name = gcp_stack.require_output("workload_identity_providers")[
+        f"eks-workloads/data-{stack_info.env_suffix}"
+    ]
+    ml_gcp_service_account = gcp_stack.require_output("service_account_emails")[
+        VERTEX_PROJECT
+    ][f"dagster-ml-{stack_info.env_suffix}"]
+    ml_gcp_credentials = kubernetes.core.v1.ConfigMap(
+        f"dagster-ml-gcp-credentials-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="dagster-ml-gcp-credentials",
+            namespace=dagster_namespace,
+            labels=k8s_global_labels.model_dump(),
+        ),
+        data={
+            "credentials.json": Output.all(
+                wif_provider_name, ml_gcp_service_account
+            ).apply(
+                lambda args: json.dumps(
+                    {
+                        "type": "external_account",
+                        "audience": f"//iam.googleapis.com/{args[0]}",
+                        "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+                        "token_url": "https://sts.googleapis.com/v1/token",
+                        "service_account_impersonation_url": (
+                            "https://iamcredentials.googleapis.com/v1/projects/-/"
+                            f"serviceAccounts/{args[1]}:generateAccessToken"
+                        ),
+                        "credential_source": {"file": f"{GCP_TOKEN_DIR}/token"},
+                    }
+                )
+            ),
+        },
+    )
+    ml_gcp_volumes = [
+        {
+            "name": "gcp-wif-token",
+            "projected": {
+                "sources": [
+                    {
+                        "serviceAccountToken": {
+                            # The pool provider's default accepted audience.
+                            "audience": wif_provider_name.apply(
+                                lambda name: f"https://iam.googleapis.com/{name}"
+                            ),
+                            "expirationSeconds": 3600,
+                            "path": "token",
+                        }
+                    }
+                ]
+            },
+        },
+        {
+            "name": "gcp-credentials",
+            "configMap": {"name": "dagster-ml-gcp-credentials"},
+        },
+    ]
+    ml_gcp_volume_mounts = [
+        {"name": "gcp-wif-token", "mountPath": GCP_TOKEN_DIR, "readOnly": True},
+        {"name": "gcp-credentials", "mountPath": GCP_CREDENTIALS_DIR, "readOnly": True},
+    ]
+    # google-genai reads the last three to construct a Vertex AI client from a
+    # bare genai.Client(), with application default credentials.
+    ml_gcp_env = [
+        {
+            "name": "GOOGLE_APPLICATION_CREDENTIALS",
+            "value": f"{GCP_CREDENTIALS_DIR}/credentials.json",
+        },
+        {"name": "GOOGLE_GENAI_USE_VERTEXAI", "value": "true"},
+        {"name": "GOOGLE_CLOUD_PROJECT", "value": VERTEX_PROJECT},
+        {"name": "GOOGLE_CLOUD_LOCATION", "value": "global"},
+    ]
+
 # Create Vault secret for edxorg GCP credentials used by legacy_openedx pipelines
 edxorg_gcp_secret = OLVaultK8SSecret(
     f"dagster-k8s-edxorg-gcp-secrets-{stack_info.env_suffix}",
@@ -2687,6 +2781,14 @@ for location in code_locations:
     # secret-operations/sso/opik itself (dagster_server_policy.hcl), the same
     # secret learn_ai syncs. No OPIK_API_KEY -- the Keycloak auth hook owns the
     # Authorization header (see the opik stack's OPIK_SDK_KEYCLOAK_AUTH.md).
+    # The chart copies a code location's env, volumes and volumeMounts into the
+    # run pods it launches (includeConfigInLaunchedRuns), so ml's run workers
+    # get the same federated credential as its code server.
+    if name == "ml" and gcp_stack is not None:
+        deployment["env"].extend(ml_gcp_env)
+        deployment["volumes"] = ml_gcp_volumes
+        deployment["volumeMounts"] = ml_gcp_volume_mounts
+
     if name == "ml" and opik_stack is not None:
         deployment["env"].extend(
             [
