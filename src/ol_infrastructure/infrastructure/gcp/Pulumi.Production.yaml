@@ -31,9 +31,12 @@ config:
       # Project-level IAM grants (service_accounts[].project_roles) read and
       # write the project IAM policy through this API, billed to mitol01.
     - cloudresourcemanager.googleapis.com
-      # Workload Identity Federation impersonates a service account through
-      # this API (generateAccessToken): both the Concourse -> pulumi-gcp path
-      # and the eks-workloads pool.
+      # Workload Identity Federation: sts exchanges the external token,
+      # iamcredentials impersonates the service account (generateAccessToken).
+      # Used by the Concourse -> pulumi-gcp path and the eks-workloads pool.
+      # sts read DISABLED on 2026-09-22 while Concourse federation worked, but
+      # Google's setup lists both, so both are declared.
+    - sts.googleapis.com
     - iamcredentials.googleapis.com
     service_accounts:
       # The stack's own automation identity, adopted so the federation wiring

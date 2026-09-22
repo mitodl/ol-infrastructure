@@ -144,8 +144,11 @@ export(
 export(
     "workload_identity_providers",
     {
-        key: provider.name
-        for gcp_project in gcp_projects.values()
-        for key, provider in gcp_project.workload_identity_providers.items()
+        project_id: {
+            key: provider.name
+            for key, provider in gcp_project.workload_identity_providers.items()
+        }
+        for project_id, gcp_project in gcp_projects.items()
+        if gcp_project.workload_identity_providers
     },
 )

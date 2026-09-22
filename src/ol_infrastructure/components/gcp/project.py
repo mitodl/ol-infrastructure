@@ -1,12 +1,15 @@
 """Pulumi management of the resources that live inside a single GCP project.
 
-An :class:`OLGCPProject` owns the three GCP resource types that the credential
+An :class:`OLGCPProject` owns the GCP resource types that the credential
 inventory in ``docs/plans/gcp-service-account-consumer-map.md`` found to be
-both load-bearing and Pulumi-manageable:
+both load-bearing and Pulumi-manageable, plus the federation that replaces
+downloaded keys:
 
 * **enabled services** -- ``gcp.projects.Service``
 * **service accounts and their project role bindings** -- ``gcp.serviceaccount``
 * **API keys, with mandatory restrictions** -- ``gcp.projects.ApiKey``
+* **workload identity pools and their OIDC providers** --
+  ``gcp.iam.WorkloadIdentityPool`` / ``WorkloadIdentityPoolProvider``
 
 It deliberately does *not* create the project itself. ``mitol01``, the
 consolidation target, already exists; whether further ``mitol`` projects can be
@@ -37,12 +40,13 @@ Two GCP credential types are absent because no API can manage them:
   once the app-side cutover is designed.
 """
 
+import re
 from enum import StrEnum
 from typing import Any
 
 import pulumi_gcp as gcp
 from pulumi import ComponentResource, Output, ResourceOptions
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ol_infrastructure.lib.ol_types import GCPBase
 
@@ -141,6 +145,22 @@ class OLGCPAPIKeyConfig(BaseModel):
         return self
 
 
+# Pool and provider ids share one contract: 4-32 lowercase letters, digits or
+# hyphens, and the "gcp-" prefix is reserved by Google.
+WORKLOAD_IDENTITY_ID_PATTERN = re.compile(r"[a-z0-9-]{4,32}")
+
+
+def validate_workload_identity_id(value: str) -> str:
+    """Reject an id GCP would refuse at create time rather than at plan time."""
+    if not WORKLOAD_IDENTITY_ID_PATTERN.fullmatch(value) or value.startswith("gcp-"):
+        msg = (
+            f"{value!r} is not a valid workload identity pool/provider id: use "
+            "4-32 lowercase letters, digits or hyphens, not starting with 'gcp-'."
+        )
+        raise ValueError(msg)
+    return value
+
+
 class OLGCPOIDCProviderConfig(BaseModel):
     """An OIDC issuer whose tokens a workload identity pool accepts.
 
@@ -151,10 +171,14 @@ class OLGCPOIDCProviderConfig(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    provider_id: str = Field(min_length=4, max_length=32)
+    provider_id: str
     display_name: str
     # An Output when resolved from another stack, e.g. an EKS cluster's issuer.
     issuer_uri: str | Output
+
+    _validate_provider_id = field_validator("provider_id")(
+        validate_workload_identity_id
+    )
 
 
 class OLGCPWorkloadIdentityPoolConfig(BaseModel):
@@ -162,10 +186,12 @@ class OLGCPWorkloadIdentityPoolConfig(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    pool_id: str = Field(min_length=4, max_length=32)
+    pool_id: str
     display_name: str
     description: str = ""
     oidc_providers: list[OLGCPOIDCProviderConfig] = Field(default_factory=list)
+
+    _validate_pool_id = field_validator("pool_id")(validate_workload_identity_id)
 
 
 class OLGCPProjectConfig(GCPBase):

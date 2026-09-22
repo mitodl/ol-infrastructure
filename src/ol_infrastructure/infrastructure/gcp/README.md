@@ -232,7 +232,8 @@ projected Kubernetes token, so there is no key material at rest.
   `principal://iam.googleapis.com/projects/32631020496/locations/global/workloadIdentityPools/eks-workloads/subject/<provider_id>::system:serviceaccount:<namespace>:<name>`.
 - The pod projects a token whose audience is
   `https://iam.googleapis.com/` + the provider's `name` (exported as
-  `workload_identity_providers`), and points `GOOGLE_APPLICATION_CREDENTIALS`
+  `workload_identity_providers["<project>"]["<pool>/<provider>"]`), and points
+  `GOOGLE_APPLICATION_CREDENTIALS`
   at an `external_account` document naming that token file. The Dagster stack's
   `ml` code location is the worked example.
 - The binding is per Kubernetes service account, not per pod. Anything that

@@ -385,9 +385,9 @@ class TestWorkloadIdentityPools:
             providers["eks-workloads/data-ci"].attribute_mapping,
         ).apply(check)
 
-    @pytest.mark.parametrize("bad_id", ["abc", "x" * 33])
-    def test_id_length_enforced(self, bad_id):
-        # GCP accepts 4-32 characters for both pool and provider ids.
+    @pytest.mark.parametrize("bad_id", ["abc", "x" * 33, "ABCD", "data_ci", "gcp-test"])
+    def test_invalid_ids_rejected(self, bad_id):
+        # 4-32 lowercase letters, digits or hyphens; "gcp-" is reserved.
         with pytest.raises(ValueError, match="pool_id"):
             OLGCPWorkloadIdentityPoolConfig(pool_id=bad_id, display_name="x")
         with pytest.raises(ValueError, match="provider_id"):
