@@ -2,3 +2,4 @@
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 config:
   azure_openai:location: eastus
+encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagFZmyRvyui8/iizV43cU3wfAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMMYekFwUZ2b8YXOc0AgEQgDvitR9QrpIN0882Ucz5Fc82XeJOCXax6+t3mL98JEifpvSQ9ZGVuySQq+yyqJSt6iq5kzENPHyf8zsJGQ==
