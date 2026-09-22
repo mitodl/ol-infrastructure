@@ -498,9 +498,6 @@ def create_serving_tier(  # noqa: PLR0913
     oidc_resource_url: str,
     actor_tokens_secret_name: str,
     actor_tokens_secret: Resource,
-    witan_ci_token_secret_name: str,
-    witan_ci_token_secret_key: str,
-    witan_ci_token_secret: Resource,
     witan_code_token_secret_name: str,
     witan_code_token_secret_key: str,
     witan_code_token_secret: Resource,
@@ -707,9 +704,14 @@ def create_serving_tier(  # noqa: PLR0913
                                         f"{ACTOR_TOKENS_FILENAME}"
                                     ),
                                 ),
-                                # Module-level fallback OmnigraphClient's target
-                                # (ADR-0004 D4) — omnigraph-server's in-cluster
-                                # address.
+                                # omnigraph-server's in-cluster address, which
+                                # every per-actor OmnigraphClient targets.
+                                #
+                                # There is deliberately no WITAN_MEMORY_TOKEN
+                                # here. witan only uses it for a pod without
+                                # WITAN_OIDC_ISSUER; this one sets it, so every
+                                # memory call runs as the caller's own token and
+                                # a request with no caller is refused.
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="WITAN_MEMORY_URI",
                                     value=omnigraph_server_addr,
@@ -738,15 +740,6 @@ def create_serving_tier(  # noqa: PLR0913
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="WITAN_CODE_SERVER",
                                     value=omnigraph_server_addr,
-                                ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="WITAN_MEMORY_TOKEN",
-                                    value_from=kubernetes.core.v1.EnvVarSourceArgs(
-                                        secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
-                                            name=witan_ci_token_secret_name,
-                                            key=witan_ci_token_secret_key,
-                                        )
-                                    ),
                                 ),
                                 # The tier's own credential against the code
                                 # graphs, for the questions asked *about* the
@@ -975,7 +968,6 @@ def create_serving_tier(  # noqa: PLR0913
         opts=ResourceOptions(
             depends_on=[
                 witan_service_account,
-                witan_ci_token_secret,
                 witan_code_token_secret,
                 sentry_dsn_secret,
                 actor_tokens_secret,

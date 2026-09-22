@@ -398,11 +398,12 @@ ACTOR_TOKENS_SECRET_KEY = "tokens.json"  # noqa: S105  # pragma: allowlist secre
 # further down resolves to an empty Secret — and the app to an empty token
 # map — if the Vault secret uses any other key.
 ACTOR_TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
-# witan's own module-level fallback OmnigraphClient authenticates as this raw
-# token (WITAN_MEMORY_TOKEN) when a request carries no per-actor JWT — see
-# applications/witan/__main__.py and witan_policy.hcl. Its value must match
-# the "svc-witan-ci" entry of the actor-tokens map above; both come from the
-# same SOPS source record below so they can't drift.
+# The raw svc-witan-ci token, read by the witan CI indexer, the view reaper and
+# (where svc-witan-admin is not provisioned) the migration Job. See
+# applications/witan/__main__.py and witan_policy.hcl. The MCP tier's memory
+# path does not read it: every memory call there runs as the caller's own actor
+# token. Its value must match the "svc-witan-ci" entry of the actor-tokens map
+# above; both come from the same SOPS source record below so they can't drift.
 WITAN_CI_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 WITAN_CI_ACTOR_ID = "svc-witan-ci"
 
