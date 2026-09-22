@@ -1550,6 +1550,18 @@ def create_k8s_resources(  # noqa: C901
                                 "--app=lms.celery",
                                 "worker",
                                 "-E",
+                                # Every worker that starts declares a
+                                # celeryev.<uuid> queue for gossip and relies on the
+                                # broker to reclaim it. kombu's Redis transport never
+                                # does: Channel.close() only deletes queues in
+                                # _fanout_queues, which _queue_bind populates only for
+                                # FANOUT exchanges, and celery declares celeryev as a
+                                # TOPIC exchange. The queue and its binding survive
+                                # even a clean shutdown, and the exchange copies every
+                                # event into the orphan forever. Monitoring is
+                                # unaffected: -E above still emits events, and leek's
+                                # revoke goes over pidbox, not gossip.
+                                "--without-gossip",
                                 "--loglevel=info",
                                 "--hostname=edx.lms.core.default.%h",
                                 "--max-tasks-per-child",
@@ -1740,6 +1752,10 @@ def create_k8s_resources(  # noqa: C901
                                 "--app=lms.celery",
                                 "worker",
                                 "-E",
+                                # See the note on the default LMS celery worker
+                                # above: on a Redis broker, gossip's per-worker
+                                # celeryev.<uuid> queue is never reclaimed.
+                                "--without-gossip",
                                 "--loglevel=info",
                                 "--hostname=edx.lms.core.high_mem.%h",
                                 # One report per process, then recycle, so a report's
@@ -2131,6 +2147,12 @@ def create_k8s_resources(  # noqa: C901
                                 "--app=cms.celery",
                                 "worker",
                                 "-E",
+                                # See the note on the default LMS celery worker
+                                # above: on a Redis broker, gossip's per-worker
+                                # celeryev.<uuid> queue is never reclaimed. This
+                                # deployment churns hardest under KEDA, so it
+                                # starts the most of them.
+                                "--without-gossip",
                                 "--loglevel=info",
                                 "--hostname=edx.cms.core.default.%h",
                                 "--max-tasks-per-child",
