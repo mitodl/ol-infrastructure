@@ -38,6 +38,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     client_repo_uri: str,
     client_repo_branch: str,
     client_repo_subpath: str,
+    source_repo_tag_regex: str | None = None,
 ) -> Pipeline:
     """
     Generate a pipeline definition for building and publishing API clients.
@@ -45,6 +46,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     :param source_repo_name: The identifier for the source code repository resource.
     :param source_repo_uri: The URI of the source code repository (e.g., GitHub URL).
     :param source_repo_branch: The branch of the source code repository to track.
+        Ignored when *source_repo_tag_regex* is set.
     :param client_repo_name: The identifier for the generated client code repository
         resource.
     :param client_repo_uri: The URI of the client code repository (e.g., GitHub SSH
@@ -52,6 +54,14 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     :param client_repo_branch: The branch of the client code repository to push to.
     :param client_repo_subpath: The subpath within the client repo where the generated
         code resides (relative to src/typescript/).
+    :param source_repo_tag_regex: Regenerate on tags matching this regex rather than
+        on spec changes landing on a branch. For a repo that cuts releases as tags
+        and has no long-lived release branch. Note the tradeoff: the git resource
+        consults ``paths`` only when versioning on commits, so under a tag regex
+        every matching tag rebuilds the client whether or not a spec actually
+        moved -- the "only when the interface changed" property comes from the
+        release cadence instead. ``branch`` stops applying too, so a matching tag
+        anywhere in the repo triggers it.
 
     :return: A Pipeline object representing the Concourse pipeline definition.
     """
@@ -86,12 +96,21 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     )
 
     # Define source and client repositories using parameters
-    source_repository = git_repo(
-        name=Identifier(source_repo_name),
-        uri=source_repo_uri,
-        branch=source_repo_branch,
-        paths=["openapi/specs/*.yaml"],
-    )
+    if source_repo_tag_regex:
+        source_repository = git_repo(
+            name=Identifier(source_repo_name),
+            uri=source_repo_uri,
+            version_type="tags",
+            fetch_tags=True,
+            tag_regex=source_repo_tag_regex,
+        )
+    else:
+        source_repository = git_repo(
+            name=Identifier(source_repo_name),
+            uri=source_repo_uri,
+            branch=source_repo_branch,
+            paths=["openapi/specs/*.yaml"],
+        )
 
     api_clients_repository = ssh_git_repo(
         name=Identifier(client_repo_name),
@@ -128,7 +147,10 @@ def generate_api_client_pipeline(  # noqa: PLR0913
             ),
             LoadVarStep(
                 load_var=Identifier(f"{source_repo_name}-git-rev"),
-                file=f"{source_repository.name}/.git/refs/heads/{source_repository.source['branch']}",
+                # .git/ref, not .git/refs/heads/<branch>: the git resource
+                # writes it for every version_type, and a tag checkout is
+                # detached, so there is no branch ref on disk to read.
+                file=f"{source_repository.name}/.git/ref",
                 reveal=True,
             ),
             TaskStep(
