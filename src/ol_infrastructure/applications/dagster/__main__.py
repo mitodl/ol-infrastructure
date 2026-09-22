@@ -303,6 +303,14 @@ dagster_s3_permissions: list[dict[str, str | list[str]]] = [
         ]
         + [f"arn:aws:s3:::{bucket_name}/*" for bucket_name in dagster_pipeline_buckets],
     },
+    {
+        # A re-run of an IRx drop removes the drop's manifest before rewriting
+        # any file, so IRx never sees a manifest next to a partial drop. Only
+        # the manifest: the files themselves are overwritten in place.
+        "Effect": "Allow",
+        "Action": ["s3:DeleteObject"],
+        "Resource": [f"arn:aws:s3:::{irx_export_bucket_name}/*/_MANIFEST.json"],
+    },
 ]
 
 athena_permissions: list[dict[str, str | list[str]]] = [
