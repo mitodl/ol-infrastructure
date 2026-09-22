@@ -155,6 +155,12 @@ config:
         cpu_request: "500m"
         memory_request: "2Gi"
         memory_limit: "3Gi"
+        # The VPA keeps the 1.5 limit/request ratio, so this floor admits pods at
+        # the declared 3Gi or more. The derived cap (1664) plus the
+        # worker_startup_rss reservation (1100) is 90% of 3Gi. Below that limit an
+        # RSS respawn OOMKills during the respawn_interval overlap. With the old
+        # 256Mi floor, pods ran at 2103-2224MiB (2026-09-22).
+        vpa_min_allowed_memory: "2Gi"
       cms:
         # Studio operations (course publish/import, outline rebuilds) burst to
         # ~0.65 cores per pod at only 1-9 req/s. The KEDA CPU trigger scales on
