@@ -9,9 +9,8 @@
 # grant read on whatever anyone stored there later.
 
 # svc-witan-ci: the single shared bearer token used for automated
-# main-branch code-graph writes (ADR-0009 decision point 3). Also the value
-# witan's own module-level fallback OmnigraphClient authenticates as
-# (WITAN_MEMORY_TOKEN) when a request has no per-actor JWT in scope.
+# main-branch code-graph writes (ADR-0009 decision point 3). Also read by the
+# view reaper, and by the migration Job where svc-witan-admin is not provisioned.
 path "secret-operations/witan/ci-token" {
   capabilities = ["read"]
 }
