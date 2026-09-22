@@ -1,3 +1,5 @@
+# renovate: datasource=docker depName=aws-cli packageName=amazon/aws-cli
+AWS_CLI_VERSION = "2.37.0"
 # renovate: datasource=github-releases depName=concourse packageName=concourse/concourse
 CONCOURSE_VERSION = "8.3.0"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some login bugs with stale state tokens
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template

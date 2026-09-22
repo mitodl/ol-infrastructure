@@ -24,6 +24,11 @@ The initContainer needs nothing but ``cp``, so it works against any historical
 image, including ones predating the ``python3-minimal`` the main container's
 script needs.
 
+A second initContainer snapshots the old root's ``__cluster`` ledger into the
+bucket's ``backups/`` prefix, and the script's pre-flight waits on all four
+graph writers, two of which the witan stack owns. Hence the read-only Roles
+in both namespaces.
+
 WHAT IT WILL NOT DO. It does not repoint the live cluster. That is
 ``omnigraph:storage_prefix`` — Pulumi config — and this pod holds no Pulumi
 credentials; writing the ConfigMap instead would make it a second writer of a
@@ -91,6 +96,26 @@ TTL_SECONDS_AFTER_FINISHED = 604800
 # (`wc -c /tmp/export/*.jsonl` in the pod) rather than doubling it blindly.
 EXPORT_STORAGE_SIZE = "20Gi"
 
+# Copies `<old root>/__cluster` into the bucket's backups/ prefix before
+# anything else runs. The cluster ledger is small (17-21 objects, ~100KB at the
+# 0.11 cutover) and was snapshotted by hand for every cutover so far. The
+# server image has neither the AWS CLI nor boto3, so this is its own
+# initContainer under the same IRSA identity. `sync` of a missing prefix
+# succeeds having copied nothing, hence the listing afterwards.
+CLUSTER_SNAPSHOT_SCRIPT = """\
+set -eu
+dest="$BACKUP_ROOT/pre-$NEW_PREFIX-$(date -u +%Y%m%dT%H%M%SZ)/__cluster"
+aws s3 sync "$OLD_ROOT/__cluster" "$dest" --only-show-errors
+# `s3 ls` exits 1 on an empty prefix as well as on a failed call, so its
+# output is the evidence either way.
+if ! listing=$(aws s3 ls --recursive "$dest/"); then
+  echo "!!! could not list $dest: the sync copied nothing, or the list failed" >&2
+  exit 1
+fi
+count=$(printf '%s\n' "$listing" | wc -l)
+echo "snapshot: $count object(s) of $OLD_ROOT/__cluster -> $dest"
+"""
+
 
 def script_source() -> str:
     """Read the migration script out of the tree at Pulumi time.
@@ -120,6 +145,10 @@ def create_storage_migration(  # noqa: PLR0913
     new_storage_prefix: str,
     cluster_configmap_name: str,
     service_account_name: str,
+    backup_root: str | Output[str],
+    aws_cli_image: str,
+    witan_namespace: str,
+    witan_writer_cronjobs: list[str],
     maintenance: OmnigraphMaintenance | None = None,
     server_deployment: kubernetes.apps.v1.Deployment | None = None,
     opts: ResourceOptions | None = None,
@@ -156,6 +185,16 @@ def create_storage_migration(  # noqa: PLR0913
     baseline and the export would then read a root a live server is still
     writing, which is the "baseline of a moving target" the runbook's
     step-1-first rule exists for.
+
+    ``witan_namespace`` and ``witan_writer_cronjobs`` name the two writers this
+    stack does not own. Together with ``maintenance`` they are the four
+    CronJobs the Job's pre-flight waits on (suspended, nothing active) before it
+    takes a baseline, which is why it gets read access to Jobs and CronJobs in
+    both namespaces for as long as the migration is armed.
+
+    ``backup_root`` is ``s3://<bucket>/backups``; the ``__cluster`` snapshot
+    lands under a timestamped ``pre-<prefix>-`` directory there, copied by
+    ``aws_cli_image``.
     """
     script_config_map = kubernetes.core.v1.ConfigMap(
         f"omnigraph-storage-migration-script-{stack_info.env_suffix}",
@@ -168,6 +207,60 @@ def create_storage_migration(  # noqa: PLR0913
         opts=opts,
     )
 
+    own_writers = (
+        [maintenance.optimize, maintenance.cleanup] if maintenance is not None else []
+    )
+    writers = [
+        *(Output.concat(namespace, "/", cj.metadata.name) for cj in own_writers),
+        *(f"{witan_namespace}/{name}" for name in witan_writer_cronjobs),
+    ]
+
+    # Read-only, and gone with the rest of this module's resources when the
+    # migration config is cleared. Bound to the server's ServiceAccount because
+    # that is the identity carrying the IRSA grant the Job needs anyway; the
+    # server is scaled to zero for exactly the window this exists.
+    role_bindings = []
+    for role_namespace in (namespace, witan_namespace):
+        role = kubernetes.rbac.v1.Role(
+            f"omnigraph-migration-writer-check-{role_namespace}-{stack_info.env_suffix}",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="omnigraph-migration-writer-check",
+                namespace=role_namespace,
+                labels=k8s_global_labels,
+            ),
+            rules=[
+                kubernetes.rbac.v1.PolicyRuleArgs(
+                    api_groups=["batch"],
+                    resources=["cronjobs", "jobs"],
+                    verbs=["get", "list"],
+                )
+            ],
+            opts=opts,
+        )
+        role_bindings.append(
+            kubernetes.rbac.v1.RoleBinding(
+                f"omnigraph-migration-writer-check-{role_namespace}-{stack_info.env_suffix}",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name="omnigraph-migration-writer-check",
+                    namespace=role_namespace,
+                    labels=k8s_global_labels,
+                ),
+                role_ref=kubernetes.rbac.v1.RoleRefArgs(
+                    api_group="rbac.authorization.k8s.io",
+                    kind="Role",
+                    name=role.metadata.name,
+                ),
+                subjects=[
+                    kubernetes.rbac.v1.SubjectArgs(
+                        kind="ServiceAccount",
+                        name=service_account_name,
+                        namespace=namespace,
+                    )
+                ],
+                opts=opts,
+            )
+        )
+
     # Ordered behind EVERY writer: the two sweeps' suspension and the server's
     # scale-down. `depends_on` is the only thing that sequences these — the Job
     # references none of those resources, so Pulumi is otherwise free to create
@@ -178,12 +271,10 @@ def create_storage_migration(  # noqa: PLR0913
         opts,
         ResourceOptions(
             depends_on=[
-                *(
-                    [maintenance.optimize, maintenance.cleanup]
-                    if maintenance is not None
-                    else []
-                ),
+                *own_writers,
                 *([server_deployment] if server_deployment is not None else []),
+                # Without these the pre-flight's first API call is a 403.
+                *role_bindings,
             ]
         ),
     )
@@ -233,7 +324,39 @@ def create_storage_migration(  # noqa: PLR0913
                                     name="shared-bin", mount_path=SHARED_BIN_PATH
                                 )
                             ],
-                        )
+                        ),
+                        kubernetes.core.v1.ContainerArgs(
+                            name="snapshot-cluster-state",
+                            image=aws_cli_image,
+                            command=["/bin/sh", "-c", CLUSTER_SNAPSHOT_SCRIPT],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OLD_ROOT", value=old_storage_root
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="BACKUP_ROOT", value=backup_root
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="NEW_PREFIX", value=new_storage_prefix
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="AWS_REGION", value="us-east-1"
+                                ),
+                                # The pod runs as uid 1000, which has no home
+                                # in this image, and the CLI writes a cache
+                                # under $HOME.
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="HOME",
+                                    value="/tmp",  # noqa: S108
+                                ),
+                            ],
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="work",
+                                    mount_path="/tmp",  # noqa: S108
+                                )
+                            ],
+                        ),
                     ],
                     containers=[
                         kubernetes.core.v1.ContainerArgs(
@@ -275,6 +398,10 @@ def create_storage_migration(  # noqa: PLR0913
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="OMNIGRAPH_SCHEMA_DIR", value=SCHEMA_DIR
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OMNIGRAPH_WRITER_CRONJOBS",
+                                    value=Output.all(*writers).apply(" ".join),
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="AWS_REGION", value="us-east-1"

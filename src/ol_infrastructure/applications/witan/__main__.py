@@ -243,6 +243,20 @@ service_tokens_fingerprint = str(
         omnigraph_stack, "service_tokens_fingerprint", default=""
     )
 )
+# True while the omnigraph stack has a storage-format migration armed
+# (`omnigraph:migrate_from_image` set). The CI indexer and the view reaper both
+# write the graphs directly, so they have to hold still for the export and
+# rebuild the same way that stack's own optimize/cleanup sweeps do. Read from
+# there rather than set here so arming the migration is one knob, and so a
+# witan deploy mid-migration keeps them suspended instead of reconciling them
+# back to active. The migration Job's pre-flight waits for all four to show
+# `suspend: true`, which is what makes a skipped witan deploy visible.
+#
+# Optional and defaulting to False for the same reason `managed_repos` is: the
+# output is newer than the omnigraph stack's last deploy in every environment.
+writers_frozen = bool(
+    optional_stack_output_value(omnigraph_stack, "writers_frozen", default=False)
+)
 
 NAMESPACE = "witan"
 
@@ -1050,6 +1064,7 @@ witan_ci_indexer = create_ci_indexer(
     ),
     github_app_secret_name=GITHUB_APP_SECRET_NAME if github_app_secret else None,
     github_app_secret=github_app_secret,
+    suspend=writers_frozen,
 )
 
 #########################################
@@ -1071,6 +1086,7 @@ witan_view_reaper = create_view_reaper(
     witan_ci_token_secret_key=WITAN_CI_TOKEN_SECRET_KEY,
     witan_ci_token_secret=witan_ci_token_secret,
     service_version=witan_service_version,
+    suspend=writers_frozen,
 )
 
 export("namespace", NAMESPACE)
