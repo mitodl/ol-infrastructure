@@ -122,10 +122,15 @@ config:
         cpu_request: "250m"
         memory_request: "2Gi"
         memory_limit: "2Gi"
+        # Same reasoning as mitx.Production: request == limit, and the cap (1143)
+        # plus worker_startup_rss (700) is 90% of 2Gi. With the old 256Mi floor
+        # pods ran at 776-878MiB (2026-09-22).
+        vpa_min_allowed_memory: "2Gi"
       cms:
         cpu_request: "250m"
         memory_request: "2Gi"
         memory_limit: "2Gi"
+        vpa_min_allowed_memory: "2Gi"
     celery:
       lms:
         cpu_request: "250m"

@@ -1036,10 +1036,16 @@ def create_k8s_resources(  # noqa: C901
             resource_limits={
                 "memory": resources_dict["webapp"]["lms"]["memory_limit"],
             },
-            # Preserves the bounds of the hand-rolled lms-webapp-vpa this replaces.
-            # The floor is deliberately below resource_limits so the VPA can size
-            # these pods down as well as up.
-            webapp_vpa_min_allowed_memory="256Mi",
+            # 256Mi preserves the bounds of the hand-rolled lms-webapp-vpa this
+            # replaces, so the VPA can size pods down as well as up. An install that
+            # sets worker_startup_rss raises it with
+            # k8s_resources.webapp.lms.vpa_min_allowed_memory: --workers-max-rss is
+            # derived from the declared limit, and the VPA scales the limit with the
+            # request (RequestsAndLimits). A pod admitted below the declared limit has
+            # no room for the respawn overlap the startup reservation is for.
+            webapp_vpa_min_allowed_memory=resources_dict["webapp"]["lms"].get(
+                "vpa_min_allowed_memory", "256Mi"
+            ),
             webapp_vpa_max_allowed_memory="4Gi",
             pod_security_context=pod_security_context,
             extra_volumes=lms_edxapp_volumes,
@@ -1400,9 +1406,10 @@ def create_k8s_resources(  # noqa: C901
             resource_limits={
                 "memory": resources_dict["webapp"]["cms"]["memory_limit"],
             },
-            # Preserves the bounds of the hand-rolled cms-webapp-vpa this replaces.
-            # See the LMS config above.
-            webapp_vpa_min_allowed_memory="256Mi",
+            # Same default and per-install override as the LMS config above.
+            webapp_vpa_min_allowed_memory=resources_dict["webapp"]["cms"].get(
+                "vpa_min_allowed_memory", "256Mi"
+            ),
             webapp_vpa_max_allowed_memory="4Gi",
             pod_security_context=pod_security_context,
             extra_volumes=cms_edxapp_volumes,
