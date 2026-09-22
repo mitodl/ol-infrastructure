@@ -346,21 +346,27 @@ def site_promote_job(
     return PipelineFragment(resources=[post_resource], jobs=[job])
 
 
+def _resolve_site_project(deployment_name: str) -> SiteProjectConfig:
+    """Look up a deployment's SiteProjectConfig, or exit with the supported list."""
+    by_name = {p.deployment_name: p for p in SITE_PROJECTS}
+    project = by_name.get(deployment_name)
+    if project is None:
+        supported = ", ".join(by_name)
+        msg = (
+            f"Unknown deployment {deployment_name!r}. "
+            f"Supported deployments: {supported}"
+        )
+        raise SystemExit(msg)
+    return project
+
+
 def site_pipeline(deployment_name: str) -> Pipeline:
     """Generate the OEP-65 Site Project pipeline for one deployment.
 
     Produces three jobs: CI (build + upload via Dagger), QA (rclone promote),
     Production (rclone promote).  Called by meta.py analogously to pipeline.py.
     """
-    _by_name = {p.deployment_name: p for p in SITE_PROJECTS}
-    project = _by_name.get(deployment_name)
-    if project is None:
-        supported = ", ".join(_by_name)
-        msg = (
-            f"Unknown deployment {deployment_name!r}. "
-            f"Supported deployments: {supported}"
-        )
-        raise SystemExit(msg)
+    project = _resolve_site_project(deployment_name)
     ci_env, qa_env, prod_env = project.envs
 
     ci_fragment = site_build_job(ci_env)
@@ -424,8 +430,9 @@ def site_pipeline(deployment_name: str) -> Pipeline:
 
 if __name__ == "__main__":
     deployment: str = sys.argv[1]
-    _by_name = {p.deployment_name: p for p in SITE_PROJECTS}
-    _config_source = _by_name[deployment].envs[0].config_source or deployment
+    _config_source = (
+        _resolve_site_project(deployment).envs[0].config_source or deployment
+    )
     output = pipeline_json_with_user_data(
         site_pipeline(deployment),
         user_data={

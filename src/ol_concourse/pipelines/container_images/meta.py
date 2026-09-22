@@ -12,7 +12,7 @@ which requires a different orchestration approach.
 
 Fly command to bootstrap this meta pipeline:
     python meta.py
-    fly -t pr-inf sp -p container-images-meta -c definition.json
+    fly -t pr-main sp -p container-images-meta -c definition.json
 """
 
 import sys

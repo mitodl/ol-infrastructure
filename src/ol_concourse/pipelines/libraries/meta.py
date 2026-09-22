@@ -17,6 +17,7 @@ from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 from ol_concourse.pipelines.libraries.configuration import PIPELINE_CONFIGS
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.versions_map import version_pin_paths
 
 # Resource for the ol-concourse code itself
@@ -125,5 +126,20 @@ if __name__ == "__main__":
     import sys
 
     pipeline = meta_pipeline()
-    sys.stdout.write(pipeline.model_dump_json(indent=2))
+    sys.stdout.write(
+        pipeline_json_with_user_data(
+            pipeline,
+            user_data={
+                "description": (
+                    "Regenerates and applies the "
+                    f"{len(PIPELINE_CONFIGS)} `{{variant}}-api-client` "
+                    "pipelines (via `api_clients_pipeline.py`) from "
+                    "`PIPELINE_CONFIGS`, plus re-applies itself as "
+                    "`ol-api-clients-meta`."
+                ),
+                "team": "main",
+                "category": "meta",
+            },
+        )
+    )
     print("\nfly -t <target> set-pipeline -p self -c <path/to/this/file>")  # noqa: T201
