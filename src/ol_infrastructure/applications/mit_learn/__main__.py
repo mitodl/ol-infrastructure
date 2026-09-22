@@ -55,9 +55,10 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
-    OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    OLApisixSharedPluginsVariant,
     oidc_gateway_pre_function_plugin,
+    ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
@@ -1695,22 +1696,18 @@ application_labels = k8s_app_labels | {
     "ol.mit.edu/pod-security-group": "learn",
 }
 
-learn_external_service_shared_plugins = OLApisixSharedPlugins(
-    name="ol-mitlearn-external-service-apisix-plugins",
+# api.learn.mit.edu carries two shared plugin configs: the base one, and a
+# second that the browser-* routes reference so they can carry rate limiting
+# the Fastly-fronted routes must not.  Both are rendered from this one plugin
+# list rather than two hand-synchronised ones -- a plugin present on only one
+# of them changes behaviour by request Origin, which is close to invisible in
+# review and has already shipped twice here.
+learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variants(
     plugin_config=OLApisixSharedPluginsConfig(
         application_name="mitlearn",
-        resource_suffix="ol-shared-plugins",
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
-        # Explicit override, not the component's per-stack default (on
-        # everywhere except Production pending a separate soak test): the
-        # nginx sidecar this stage removes gzipped JSON responses
-        # unconditionally in every stack including Production
-        # (docs/plans/remove-nginx-sidecar.md, stage 5), so leaving Production
-        # on the default would silently drop that compression there. Revisit
-        # once the other initiative's soak test clears Production generally.
-        enable_gzip=True,
         plugins=[
             # Everyone currently logged in is holding a session cookie under
             # lua-resty-session's old default name, which the renamed plugins
@@ -1740,32 +1737,23 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
             oidc_gateway_pre_function_plugin(),
         ],
     ),
+    variants=[
+        OLApisixSharedPluginsVariant(
+            name="ol-mitlearn-external-service-apisix-plugins",
+            resource_suffix="ol-shared-plugins",
+        ),
+        OLApisixSharedPluginsVariant(
+            name="ol-mitlearn-external-service-browser-apisix-plugins",
+            resource_suffix="ol-browser-shared-plugins",
+            enable_rate_limiting=True,
+        ),
+    ],
 )
-learn_external_service_browser_shared_plugins = OLApisixSharedPlugins(
-    name="ol-mitlearn-external-service-browser-apisix-plugins",
-    plugin_config=OLApisixSharedPluginsConfig(
-        application_name="mitlearn",
-        resource_suffix="ol-browser-shared-plugins",
-        k8s_namespace=learn_namespace,
-        k8s_labels=application_labels,
-        enable_defaults=True,
-        # Same stale-cookie cleanup as the base shared plugins above -- the
-        # browser-* routes split real end-user browser traffic off onto this
-        # config, so it needs the same cleanup or logged-in users hitting
-        # these routes stop getting their old session cookie cleared.
-        plugins=[
-            stale_session_cookie_cleanup_plugin(
-                cookie_domains=[mitlearn_api_domain.removeprefix("api")],
-            ),
-            # Duplicated from the base config above rather than inherited:
-            # browser-reqauth carries /login/* for real browser traffic, so a
-            # login callback arriving with an Origin header lands here.  Without
-            # this attachment those callbacks keep 500ing while the identical
-            # request without an Origin header gets recovered.
-            oidc_gateway_pre_function_plugin(),
-        ],
-        enable_rate_limiting=True,
-    ),
+learn_external_service_shared_plugins = learn_external_service_shared_plugin_variants[
+    "ol-shared-plugins"
+]
+learn_external_service_browser_shared_plugins = (
+    learn_external_service_shared_plugin_variants["ol-browser-shared-plugins"]
 )
 
 api_tls_secret_name = "api-mitlearn-tls-pair"  # pragma: allowlist secret # noqa: S105

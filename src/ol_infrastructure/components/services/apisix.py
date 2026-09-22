@@ -8,6 +8,7 @@ import pulumi_kubernetes as kubernetes
 from pulumi import ComponentResource, Output, ResourceOptions
 from pydantic import (
     BaseModel,
+    ConfigDict,
     Field,
     NonNegativeInt,
     PositiveInt,
@@ -950,6 +951,108 @@ class OLApisixSharedPlugins(ComponentResource):
                 opts=resource_options,
             )
         )
+
+
+class OLApisixSharedPluginsVariant(BaseModel):
+    """One route-group variation on a host's single shared plugin list.
+
+    A host sometimes needs more than one shared plugin config: api.learn.mit.edu
+    splits its ``browser-*`` routes onto a second config so they can carry rate
+    limiting that the Fastly-fronted routes must not.  Expressing that as two
+    hand-written ``OLApisixSharedPluginsConfig`` objects means every
+    non-rate-limiting plugin has to be repeated in both, and a one-sided edit
+    changes behaviour by request Origin with nothing in review or CI to catch
+    it.  That drift has already shipped twice on api.learn: once by a plugin
+    being copied into only one list, and once by a rebase silently moving an
+    attachment from one list to the other because the two lists ended with the
+    same three lines of context.
+
+    This model therefore carries only the fields a variant may legitimately
+    differ on.  ``plugins`` is not among them, and ``extra="forbid"`` makes
+    passing it an error rather than a silent no-op, so the plugin list is
+    shared by construction.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Pulumi resource name for this variant's component.  Supplied per variant
+    # rather than derived, because changing the name of an existing component
+    # replaces it and every child CRD under it.
+    name: str
+    # Appended to application_name to form the CRD metadata.name that routes
+    # reference, so it also has to stay stable for an existing variant.
+    resource_suffix: str
+    enable_rate_limiting: bool = False
+
+
+def ol_apisix_shared_plugins_variants(
+    plugin_config: OLApisixSharedPluginsConfig,
+    variants: list[OLApisixSharedPluginsVariant],
+    opts: ResourceOptions | None = None,
+) -> dict[str, OLApisixSharedPlugins]:
+    """Render one plugin list as several shared plugin configs on a host.
+
+    The rate-limit thresholds stay on ``plugin_config`` where they are
+    documented; they are inert on a variant that leaves
+    ``enable_rate_limiting`` off.
+
+    :param plugin_config: the shared configuration.  ``resource_suffix`` and
+        ``enable_rate_limiting`` belong to a variant, so setting either here
+        is an error rather than a value that is quietly discarded.
+    :param variants: the per-route-group variations to render.
+    :param opts: passed through to each component.
+
+    :raises ValueError: if the shared config sets a per-variant field, or if
+        two variants would render the same CRD name.
+
+    :returns: the rendered components, keyed by ``resource_suffix``. A route's
+        ``shared_plugin_config_name`` takes the component's ``resource_name``
+        (``<application_name>-<resource_suffix>``), not the bare key.
+    :rtype: dict[str, OLApisixSharedPlugins]
+    """
+    # Refuse rather than ignore. Converting a single-config application to this
+    # factory means moving enable_rate_limiting off the config and onto a
+    # variant; leaving it behind would otherwise drop rate limiting from every
+    # route on the host with nothing to show for it, which is the same class of
+    # silent divergence this factory exists to prevent.
+    misplaced = sorted(
+        {"resource_suffix", "enable_rate_limiting"} & plugin_config.model_fields_set
+    )
+    if misplaced:
+        msg = (
+            f"{misplaced} belong to a variant, not to the shared config passed "
+            "to ol_apisix_shared_plugins_variants; set them on each "
+            "OLApisixSharedPluginsVariant instead."
+        )
+        raise ValueError(msg)
+    suffixes = [variant.resource_suffix for variant in variants]
+    if len(set(suffixes)) != len(suffixes):
+        msg = (
+            "Shared plugin variants on one host need distinct resource_suffix "
+            f"values; got {suffixes}. Both CRDs would otherwise be created "
+            "under the same metadata.name and the second would win."
+        )
+        raise ValueError(msg)
+    return {
+        variant.resource_suffix: OLApisixSharedPlugins(
+            variant.name,
+            # Shallow by design: every variant shares one ``plugins`` list
+            # object, which is the point. Safe because OLApisixSharedPlugins
+            # only reads that list -- it builds its own output list and
+            # model_dumps each entry. A caller that mutates plugin_config.plugins
+            # after this call would change every variant at once.
+            # ``update`` bypasses validation, so only values that have already
+            # been validated on OLApisixSharedPluginsVariant may go in it.
+            plugin_config=plugin_config.model_copy(
+                update={
+                    "resource_suffix": variant.resource_suffix,
+                    "enable_rate_limiting": variant.enable_rate_limiting,
+                }
+            ),
+            opts=opts,
+        )
+        for variant in variants
+    }
 
 
 class OLApisixExternalUpstreamConfig(BaseModel):
