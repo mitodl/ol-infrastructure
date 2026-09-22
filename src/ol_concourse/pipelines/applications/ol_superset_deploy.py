@@ -70,14 +70,25 @@ ol-superset promote \\
 GOVERNANCE_JSON=ol-infrastructure-repository/src/ol_infrastructure/applications/superset/ol_governance_roles.json
 RLS_POLICY_FILE=ol-data-platform-repository/src/ol_superset/policies/ol_rls_policies.json
 
+ROLES_SYNC_LOG=$(mktemp)
 ol-superset roles sync superset-production \\
     --yes \\
     --assets-dir ol-data-platform-repository/src/ol_superset/assets \\
-    --governance-json "${GOVERNANCE_JSON}"
+    --governance-json "${GOVERNANCE_JSON}" | tee "${ROLES_SYNC_LOG}"
 
 ol-superset apply-rls superset-production \\
     --yes \\
     --policy-file "${RLS_POLICY_FILE}"
+
+# roles sync exits 0 even when a governance role doesn't exist yet in
+# superset-production (e.g. it hasn't been imported by a pending Production
+# Pulumi deploy). Fail loudly instead of leaving that role's permissions
+# silently unsynced -- re-run this job once the role has been imported.
+if grep -qF "Role not found in" "${ROLES_SYNC_LOG}"; then
+    echo "One or more governance roles are missing from superset-production." >&2
+    echo "Re-run this job after the Production Superset Pulumi deploy imports them." >&2
+    exit 1
+fi
 """
 
 deploy_pipeline = Pipeline(
