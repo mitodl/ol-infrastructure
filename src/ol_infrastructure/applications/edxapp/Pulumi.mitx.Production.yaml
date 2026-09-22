@@ -137,10 +137,16 @@ config:
         cpu_request: "250m"
         memory_request: "2Gi"
         memory_limit: "2Gi"
+        # request == limit, so the VPA admits pods at this floor or above. The
+        # derived cap (1143) plus worker_startup_rss (700) is 90% of 2Gi. With
+        # the old 256Mi floor, LMS and CMS pods ran at 990-1181MiB (2026-09-22)
+        # and were OOMKilled at that limit before the cap could fire.
+        vpa_min_allowed_memory: "2Gi"
       cms:
         cpu_request: "250m"
         memory_request: "2Gi"
         memory_limit: "2Gi"
+        vpa_min_allowed_memory: "2Gi"
     celery:
       lms:
         cpu_request: "250m"

@@ -1406,9 +1406,10 @@ def create_k8s_resources(  # noqa: C901
             resource_limits={
                 "memory": resources_dict["webapp"]["cms"]["memory_limit"],
             },
-            # Preserves the bounds of the hand-rolled cms-webapp-vpa this replaces.
-            # See the LMS config above.
-            webapp_vpa_min_allowed_memory="256Mi",
+            # Same default and per-install override as the LMS config above.
+            webapp_vpa_min_allowed_memory=resources_dict["webapp"]["cms"].get(
+                "vpa_min_allowed_memory", "256Mi"
+            ),
             webapp_vpa_max_allowed_memory="4Gi",
             pod_security_context=pod_security_context,
             extra_volumes=cms_edxapp_volumes,
