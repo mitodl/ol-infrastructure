@@ -37,7 +37,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     client_repo_name: str,
     client_repo_uri: str,
     client_repo_branch: str,
-    client_repo_subpath: str,
+    client_repo_subpath: str | list[str],
     source_repo_tag_regex: str | None = None,
 ) -> Pipeline:
     """
@@ -53,7 +53,9 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         URL).
     :param client_repo_branch: The branch of the client code repository to push to.
     :param client_repo_subpath: The subpath within the client repo where the generated
-        code resides (relative to src/typescript/).
+        code resides (relative to src/typescript/). Pass a list when the source repo
+        publishes several specs and each is packaged separately -- one npm package is
+        published per entry, all sharing the repo-root VERSION.
     :param source_repo_tag_regex: Regenerate on tags matching this regex rather than
         on spec changes landing on a branch. For a repo that cuts releases as tags
         and has no long-lived release branch. Note the tradeoff: the git resource
@@ -65,6 +67,12 @@ def generate_api_client_pipeline(  # noqa: PLR0913
 
     :return: A Pipeline object representing the Concourse pipeline definition.
     """
+    client_repo_subpaths = (
+        [client_repo_subpath]
+        if isinstance(client_repo_subpath, str)
+        else client_repo_subpath
+    )
+
     # Define parameterized image tags
     python_image_tag = "3.12-slim"
     node_image_tag = "24-slim"
@@ -207,6 +215,29 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         ],
     )
 
+    # One npm package per subpath. A source repo publishing several specs
+    # generates several packages out of the one client repo, and each is
+    # published from its own directory; they share the repo-root VERSION the
+    # bump step wrote, so a release moves them together.
+    publish_steps = [
+        TaskStep(
+            task=Identifier(f"publish-node-{subpath}"),
+            image=node_image.name,
+            config=TaskConfig(
+                platform="linux",
+                inputs=[Input(name=api_clients_repository.name)],
+                params={"NPM_TOKEN": "((npm_publish.npmjs_token))"},
+                run=Command(
+                    path="sh",
+                    # Adjust dir based on which publish script is used
+                    dir=f"{api_clients_repository.name}/src/typescript/{subpath}",
+                    args=["-xc", _read_script(publish_script)],
+                ),
+            ),
+        )
+        for subpath in client_repo_subpaths
+    ]
+
     # Define the 'publish' job
     publish_job = Job(
         name="publish",
@@ -217,21 +248,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
                 passed=[generate_clients_job.name],
                 trigger=True,
             ),
-            TaskStep(
-                task="publish-node",
-                image=node_image.name,
-                config=TaskConfig(
-                    platform="linux",
-                    inputs=[Input(name=api_clients_repository.name)],
-                    params={"NPM_TOKEN": "((npm_publish.npmjs_token))"},
-                    run=Command(
-                        path="sh",
-                        # Adjust dir based on which publish script is used
-                        dir=f"{api_clients_repository.name}/src/typescript/{client_repo_subpath}",
-                        args=["-xc", _read_script(publish_script)],
-                    ),
-                ),
-            ),
+            *publish_steps,
         ],
     )
 

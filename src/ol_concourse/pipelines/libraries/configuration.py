@@ -10,7 +10,15 @@ PIPELINE_CONFIGS = {
         "client_repo_name": "ol-analytics-api-clients",
         "client_repo_uri": "git@github.com:mitodl/ol-analytics-api-clients.git",
         "client_repo_branch": "main",
-        "client_repo_subpath": "ol-analytics-api-axios",
+        # One package per tenant: the two are independent APIs with different
+        # auth and audiences (an org-manager dashboard vs a machine-to-machine
+        # partner integration), and a consumer of one has no reason to pull the
+        # other's types in. Each name must match a directory under
+        # src/typescript/ in the client repo.
+        "client_repo_subpath": [
+            "ol-analytics-dashboard-api-axios",
+            "ol-analytics-learner-records-api-axios",
+        ],
     },
     "mit-learn": {
         "source_repo_name": "mit-learn",
