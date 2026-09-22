@@ -365,6 +365,54 @@ mitxonline_oauth_secrets = OLVaultK8SSecret(
     ),
 )
 
+# The realm the learner-records tenant verifies partner tokens against, and the
+# audience it requires in them. That tenant verifies the bearer JWT itself
+# rather than trusting the X-Userinfo APISIX forwards, because the pod is
+# reachable without going through APISIX: the pod security group admits the
+# whole pod subnet, and aws-eks-nodeagent runs with
+# --enable-network-policy=false on both data clusters, so the NetworkPolicies
+# that exist are no-ops.  See the app repo's
+# docs/b2b-learner-records-provider-authorization.md.
+#
+# Both values come from the same Vault entry the route's openid-connect plugin
+# reads for its discovery URL and client id, so the gateway and the app cannot
+# end up checking different realms or a different audience.  The app derives
+# its JWKS and token URLs from the issuer.  Templated by the operator at
+# runtime for the same reason the MITx Online pair above is: the app takes
+# these as plain env vars, and pulling them into Pulumi with
+# get_secret_output would put the realm URL in stack state for no gain.
+learner_records_oidc_secret_name = (
+    "ol-analytics-api-learner-records-oidc"  # pragma: allowlist secret  # noqa: S105
+)
+learner_records_oidc_secrets = OLVaultK8SSecret(
+    name=f"ol-analytics-api-{stack_info.env_suffix}-learner-records-oidc-secrets",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name=learner_records_oidc_secret_name,
+        namespace=APPLICATION_NAMESPACE,
+        labels=k8s_global_labels,
+        dest_secret_name=learner_records_oidc_secret_name,
+        dest_secret_labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/ol-analytics-api",
+        includes=["url", "client_id"],
+        excludes=[".*"],
+        exclude_raw=True,
+        refresh_after="1h",
+        templates={
+            "OL_ANALYTICS_API_B2B_LEARNER_RECORDS_ISSUER": '{{ get .Secrets "url" }}',
+            "OL_ANALYTICS_API_B2B_LEARNER_RECORDS_AUDIENCE": (
+                '{{ get .Secrets "client_id" }}'
+            ),
+        },
+        vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=ol_analytics_api_auth_binding.vault_k8s_resources,
+    ),
+)
+
 ########################################################################
 # Application environment
 ########################################################################
@@ -468,7 +516,11 @@ ol_analytics_api_k8s = OLApplicationK8s(
         application_lb_service_name=APPLICATION_NAME,
         application_lb_service_port_name="http",
         k8s_global_labels=k8s_global_labels,
-        env_from_secret_names=[static_secrets_name, mitxonline_oauth_secret_name],
+        env_from_secret_names=[
+            static_secrets_name,
+            mitxonline_oauth_secret_name,
+            learner_records_oidc_secret_name,
+        ],
         application_security_group_id=ol_analytics_api_application_security_group.id,
         application_security_group_name=Output.from_input(APPLICATION_NAME),
         application_service_account_name=APPLICATION_NAME,
@@ -556,6 +608,7 @@ ol_analytics_api_k8s = OLApplicationK8s(
             # secret rather than waiting for it.
             static_secrets,
             mitxonline_oauth_secrets,
+            learner_records_oidc_secrets,
             ol_analytics_api_application_security_group,
         ],
     ),
