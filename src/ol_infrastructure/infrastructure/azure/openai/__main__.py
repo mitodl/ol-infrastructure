@@ -6,8 +6,8 @@ attribution has to come from the resource: Azure Monitor's Cognitive Services me
 carry no stable caller dimension.
 
 Authentication is workload identity federation. Each consumer gets a user-assigned
-managed identity that trusts the environment's EKS cluster OIDC issuer for exactly one
-Kubernetes ServiceAccount subject, and holds `Cognitive Services OpenAI User` on
+managed identity that trusts the OIDC issuer of the EKS cluster it runs on for exactly
+one Kubernetes ServiceAccount subject, and holds `Cognitive Services OpenAI User` on
 exactly one account. There is no credential to store, rotate, or revoke anywhere in
 this project's output.
 
@@ -36,15 +36,6 @@ azure_secrets = read_yaml_secrets(
     Path(f"pulumi/azure.{stack_info.env_suffix}.yaml"),
 )
 
-# All three consumers run on the applications cluster in every environment, so one
-# StackReference covers every federated credential below.
-cluster_stack = make_stack_reference(projects.EKS, f"applications.{stack_info.name}")
-# Indexed exactly as components/aws/eks.py does when it builds IRSA trust policies
-# against the same export.
-oidc_issuer = cluster_stack.require_output("cluster_identities").apply(
-    lambda identities: identities[0]["oidcs"][0]["issuer"]
-)
-
 # Built-in Azure role, identical in every tenant. Data-plane inference only: it grants
 # no control over the account, its keys, or its deployments.
 COGNITIVE_SERVICES_OPENAI_USER_ROLE_ID = "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
@@ -53,26 +44,45 @@ COGNITIVE_SERVICES_OPENAI_USER_ROLE_ID = "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
 # "Federated identity credentials must have exactly one audience".
 AZURE_TOKEN_EXCHANGE_AUDIENCE = "api://AzureADTokenExchange"  # noqa: S105
 
-# consumer -> (Kubernetes namespace, ServiceAccount the pods run under). Every field of
-# a federated credential is an exact string match with no wildcards, and a wrong value
-# creates successfully and fails only later at token exchange, so these are asserted
-# here rather than discovered at runtime. Kept in sync with:
+# consumer -> (EKS cluster, Kubernetes namespace, ServiceAccount the pods run under).
+# Every field of a federated credential is an exact string match with no wildcards, and
+# a wrong value creates successfully and fails only later at token exchange, so these
+# are asserted here rather than discovered at runtime. Kept in sync with:
 #   mitlearn    applications/mit_learn/__main__.py (mitlearn_service_account)
 #   learn-ai    applications/learn_ai/__main__.py:254
 #   mitxonline  applications/edxapp/k8s_resources.py:252
+#   dagster-ml  applications/dagster/__main__.py (dagster_user_code_service_account)
+#
+# dagster-user-code is shared by every Dagster code location, because the
+# user-deployments chart names one ServiceAccount for the whole release. So the subject
+# alone does not confine this identity to ml: only ml's deployment mounts the projected
+# token, and that is a convention, not a boundary. Any job in any code location can
+# request the same projected volume through a dagster-k8s/config run tag, with no infra
+# change. The reach is OpenAI User on this one account, the same kind of exposure the
+# shared IRSA role already has for Bedrock.
 CONSUMER_SUBJECTS = {
-    "mitlearn": ("mitlearn", "mitlearn-app"),
-    "learn-ai": ("learn-ai", "learn-ai-admin"),
-    "mitxonline": ("mitxonline-openedx", "mitxonline-edxapp-vault"),
+    "mitlearn": ("applications", "mitlearn", "mitlearn-app"),
+    "learn-ai": ("applications", "learn-ai", "learn-ai-admin"),
+    "mitxonline": ("applications", "mitxonline-openedx", "mitxonline-edxapp-vault"),
+    "dagster-ml": ("data", "dagster", "dagster-user-code"),
+}
+
+# One StackReference per cluster any consumer runs on. The issuer is indexed exactly as
+# components/aws/eks.py does when it builds IRSA trust policies against the same export.
+oidc_issuers = {
+    cluster: make_stack_reference(projects.EKS, f"{cluster}.{stack_info.name}")
+    .require_output("cluster_identities")
+    .apply(lambda identities: identities[0]["oidcs"][0]["issuer"])
+    for cluster in {cluster for cluster, _, _ in CONSUMER_SUBJECTS.values()}
 }
 
 location = azure_config.get("location") or "eastus"
 
 # Capacity is in thousands of tokens per minute. For the GlobalStandard deployments
 # below, quota is pooled per model *and version* across every region in the
-# subscription -- not one pool shared by all models, and not per region. So the three
-# deployments of a given model in this environment compete with that model's six
-# deployments in the other two environments, and with nothing else.
+# subscription -- not one pool shared by all models, and not per region. So each
+# consumer's deployment of a given model in this environment competes with every other
+# consumer's deployment of it in all three environments, and with nothing else.
 # Ref: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/quotas-limits
 #
 # Production has no default. The subscription's approved per-model quota is not known
@@ -145,7 +155,7 @@ cognitive_accounts: dict[str, azure_native.cognitiveservices.Account] = {}
 deployment_names: dict[str, list[str]] = {}
 workload_identities: dict[str, azure_native.managedidentity.UserAssignedIdentity] = {}
 
-for consumer, (namespace, service_account) in CONSUMER_SUBJECTS.items():
+for consumer, (cluster, namespace, service_account) in CONSUMER_SUBJECTS.items():
     account_name = f"ol-openai-{consumer}-{stack_info.env_suffix}"
     account = azure_native.cognitiveservices.Account(
         account_name,
@@ -232,7 +242,7 @@ for consumer, (namespace, service_account) in CONSUMER_SUBJECTS.items():
         federated_identity_credential_resource_name="eks-workload-identity",
         resource_name_=identity.name,
         resource_group_name=resource_group.name,
-        issuer=oidc_issuer,
+        issuer=oidc_issuers[cluster],
         subject=f"system:serviceaccount:{namespace}:{service_account}",
         audiences=[AZURE_TOKEN_EXCHANGE_AUDIENCE],
         opts=azure_opts,

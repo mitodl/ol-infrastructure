@@ -72,6 +72,11 @@ from ol_infrastructure.lib.aws.iam_helper import (
     data_lake_glue_resources,
 )
 from ol_infrastructure.lib.aws.rds_helper import postgres_max_connections
+from ol_infrastructure.lib.azure_workload_identity import (
+    azure_identity_env,
+    azure_identity_token_mount,
+    azure_identity_token_volume,
+)
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -136,6 +141,14 @@ mitxonline_stack = (
 opik_stack = (
     make_stack_reference(projects.OPIK, stack_info.name)
     if stack_info.env_suffix in ("ci", "qa", "production")
+    else None
+)
+# Azure OpenAI for the ml code location, federated to the data cluster's OIDC issuer
+# by infrastructure/azure/openai. Off unless a stack opts in: that project has no Dev
+# stack, and the StackReference only resolves once it has deployed the environment.
+azure_openai_stack = (
+    make_stack_reference(projects.AZURE_OPENAI, stack_info.name)
+    if dagster_config.get_bool("enable_azure_openai")
     else None
 )
 
@@ -2699,6 +2712,36 @@ for location in code_locations:
                 {"name": "OPIK_WORKSPACE", "value": "default"},
                 {"name": "OPIK_PROJECT_NAME", "value": "dagster-ml"},
             ]
+        )
+
+    # The chart copies volumes, volumeMounts, and env into the container context
+    # K8sRunLauncher applies to run workers, so ml's runs get the token as well as its
+    # code server. No other code location mounts it, which is what keeps this identity
+    # to ml while every location shares the dagster-user-code ServiceAccount.
+    #
+    # LLM_AZURE_ENDPOINT is the name ml's definitions.py reads. ml cannot use this
+    # identity yet: its azure_openai client authenticates with AZURE_OPENAI_API_KEY,
+    # and these accounts disable key auth. It needs a token provider built on
+    # azure-identity's WorkloadIdentityCredential before SUMMARY_PROVIDER=azure_openai
+    # works.
+    if name == "ml" and azure_openai_stack is not None:
+        deployment["volumes"] = [azure_identity_token_volume()]
+        deployment["volumeMounts"] = [azure_identity_token_mount()]
+        deployment["env"].extend(
+            [
+                {"name": env_name, "value": env_value}
+                for env_name, env_value in azure_identity_env(
+                    azure_openai_stack, "dagster-ml"
+                ).items()
+            ]
+        )
+        deployment["env"].append(
+            {
+                "name": "LLM_AZURE_ENDPOINT",
+                "value": azure_openai_stack.require_output("cognitive_accounts").apply(
+                    lambda accounts: accounts["dagster-ml"]["endpoint"]
+                ),
+            }
         )
 
     # Add higher resources for lakehouse deployment (runs dbt)
