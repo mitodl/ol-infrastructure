@@ -78,6 +78,15 @@ ONE_GIGABYTE_MB = 1024
 ONE_GIGAHERTZ = 1024
 ONE_MEGABYTE_BYTE = 1048576
 ONE_MONTH_SECONDS = 60 * 60 * HOURS_IN_MONTH
+# OpenMetadata 2.0's `authentication.maxActiveSessionsPerUser` and
+# `authentication.sessionExpiry`. Every authorization draws on the same
+# allowance, so browsers and MCP OAuth clients share it; upstream defaults to 5
+# and evicts by `lastAccessedAt` ascending without logging the revocation.
+# Two consumers need the same number: the `extraEnvs` that cover a from-scratch
+# install, and the Job that reconciles the persisted `authenticationConfiguration`
+# row that an existing install actually reads.
+OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER = 10
+OPEN_METADATA_SESSION_EXPIRY_SECONDS = 604800  # 7 days
 SECONDS_IN_ONE_DAY = 86400
 # What nginx's `expires max` resolves to (10 years). The Django apps served their
 # content-hashed static assets with that directive behind the nginx sidecar, so
