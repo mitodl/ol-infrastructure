@@ -262,13 +262,21 @@ APPS = [
         "seed_commands": [
             {
                 "label": "seed-ocw-studio-superuser",
-                # The user model's REQUIRED_FIELDS are email and name, so
-                # --noinput needs both. No password is set: login goes through
-                # Keycloak as the seeded admin@odl.local user.
-                "description": "Create a Django superuser for admin@odl.local",
+                # Create-or-promote rather than createsuperuser: signing in
+                # through Keycloak before seeding already created this user by
+                # email, and createsuperuser then fails on the unique email
+                # with no way out short of exec'ing in. No password is set;
+                # login goes through Keycloak.
+                "description": "Create or promote the admin@odl.local superuser",
                 "cmd": (
-                    "python manage.py createsuperuser --noinput" +
-                    " --username admin --email admin@odl.local --name Admin"
+                    "python manage.py shell -c " +
+                    "'from django.contrib.auth import get_user_model; " +
+                    "U = get_user_model(); " +
+                    "u, created = U.objects.get_or_create(" +
+                    "email=\"admin@odl.local\", " +
+                    "defaults={\"username\": \"admin\", \"name\": \"Admin\"}); " +
+                    "u.is_staff = True; u.is_superuser = True; u.save(); " +
+                    "print((\"created\" if created else \"promoted\"), u.email)'"
                 ),
             },
             {

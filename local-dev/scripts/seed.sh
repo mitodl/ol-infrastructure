@@ -60,8 +60,11 @@ python manage.py createpresets"
 
     # No migrate: the ocw-studio deployment runs it in an init container.
     # The superuser is what a Keycloak login associates to by email, so
-    # without it the first login lands as an unprivileged new user.
-    [ocw-studio]="python manage.py createsuperuser --noinput --username admin --email admin@odl.local --name Admin
+    # without it the first login lands as an unprivileged new user. Signing in
+    # before seeding creates exactly that user, and `createsuperuser` then
+    # fails on the unique email with no way forward short of exec'ing in and
+    # promoting by hand, so create-or-promote instead of create.
+    [ocw-studio]="python manage.py shell -c 'from django.contrib.auth import get_user_model; U = get_user_model(); u, created = U.objects.get_or_create(email=\"admin@odl.local\", defaults={\"username\": \"admin\", \"name\": \"Admin\"}); u.is_staff = True; u.is_superuser = True; u.save(); print((\"created\" if created else \"promoted\"), u.email)'
 python manage.py backpopulate_groups
 python manage.py import_website_starters https://github.com/mitodl/ocw-hugo-projects
 python manage.py upsert_theme_assets_pipeline"
