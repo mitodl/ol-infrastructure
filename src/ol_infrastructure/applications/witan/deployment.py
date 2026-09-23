@@ -124,6 +124,12 @@ WITAN_PORT = 8000
 # here, such a change is inert until someone edits this line.
 WITAN_MCP_PATH = "/mcp"
 
+# The Keycloak client the web UI at /ui/ logs in as, which witan publishes in
+# /ui/config.json. Must equal the `witan-ui` client_id in
+# substructure/keycloak/ol_platform_engineering.py. With WITAN_OIDC_ISSUER set
+# and this unset, witan answers every /ui/ request with a 503 naming it.
+WITAN_UI_OIDC_CLIENT_ID = "witan-ui"
+
 # Liveness/readiness. Shallow by design on witan's side: it answers from
 # process state and never touches the graph.
 #
@@ -696,6 +702,19 @@ def create_serving_tier(  # noqa: PLR0913
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="WITAN_OIDC_RESOURCE_URL",
                                     value=oidc_resource_url,
+                                ),
+                                # The web UI's login client. The issuer the page
+                                # logs in against is WITAN_OIDC_ISSUER above.
+                                #
+                                # Deliberately no Host/Origin allowlist to go
+                                # with it (agent-kit witan-ui-spec.md §2): APISIX
+                                # terminates TLS, so witan computes the request
+                                # origin as http://<host> while the browser sends
+                                # Origin: https://<host>, and an allowlist would
+                                # 403 every POST the page makes.
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="WITAN_UI_OIDC_CLIENT_ID",
+                                    value=WITAN_UI_OIDC_CLIENT_ID,
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="WITAN_ACTOR_TOKENS_FILE",
