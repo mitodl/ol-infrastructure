@@ -201,8 +201,11 @@ nothing here. Its only record is `stats.flaky` in the per-run `results.json` und
 When you add or change a journey:
 
 1. Mirror the change in `capture/<property>.capture.ts`. It follows the specs step for
-   step and keeps their assertions, so a broken page fails the capture rather than being
-   committed as a picture.
+   step and repeats every assertion, so a broken page fails the capture rather than
+   being committed as a picture. Keep it that way: an assertion that is in the spec and
+   not in the capture is a picture nobody checked. The login is not mirrored. The
+   capture calls `sign-in.ts`'s own `signIn()` and passes a hook that screenshots each
+   Keycloak screen.
 2. Regenerate the images:
 
    ```bash
@@ -214,11 +217,13 @@ When you add or change a journey:
    The signed-in test needs `CANARY_USER_EMAIL` and `CANARY_USER_PASSWORD`, supplied the
    same way as for a local run (see the `run-canary-locally` skill). It is a real login
    against the same account the pipeline uses, so treat it like one. The capture config
-   has `retries: 0` and honours the same rejected-credential marker as `sign-in.ts`.
+   has `retries: 0`, and `signIn()` keeps its rejected-credential guard.
    Add `--grep-invert "signed in"` if you only changed an anonymous journey.
-3. **Look at every signed-in image before committing it.** The masks cover the address
-   wherever the page shows it as text. They cannot cover something new that a future
-   page starts showing. Never commit a frame whose visible URL carries a token.
+3. **Look at every signed-in image before committing it.** `signIn()` masks the email
+   and password fields, and the address wherever the password screen shows it as text.
+   Frames after login have no masks, because today those pages show no address. A
+   future page that starts showing one is caught only by looking. Never commit a frame
+   whose visible URL carries a token.
 4. Update the section here.
 
 A new property gets a new `## <property>` section and its own

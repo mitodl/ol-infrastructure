@@ -1,4 +1,6 @@
 import { defineConfig, devices } from "@playwright/test"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 // Regenerates the screenshots in ../images/ for ../journeys.md. Not a canary:
 // the scheduled pipeline runs `playwright test specs/<property>` against the
@@ -23,9 +25,11 @@ export default defineConfig({
   workers: 1,
   fullyParallel: false,
   reporter: [["list"]],
-  // Outside canary-results/ and never traced: a trace of the login screens would
-  // carry the canary address unmasked.
-  outputDir: "../../canary-results/capture",
+  // Nothing is traced or recorded, since a trace of the login screens would carry
+  // the canary address unmasked. Playwright still wants an output directory; it
+  // goes to the system temp directory so it cannot land in canary-results/,
+  // which the pipeline uploads wholesale on failure.
+  outputDir: join(tmpdir(), "ol-canary-capture"),
   use: {
     baseURL,
     trace: "off",

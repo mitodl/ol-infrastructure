@@ -1,22 +1,20 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
-import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { mkdirSync } from "node:fs"
 import { dirname, join } from "node:path"
 import {
   CHANNEL_PATH,
   CHANNEL_TITLE,
   SEARCH_QUERY,
 } from "../../specs/mit-learn/helpers/fixtures"
-import {
-  REJECTED_CREDENTIAL_MARKER,
-  canaryCredentials,
-  rejectionMessage,
-} from "../../specs/mit-learn/helpers/sign-in"
+import { signIn } from "../../specs/mit-learn/helpers/sign-in"
 
 // Walks each mit-learn journey step for step and saves a screenshot at every
 // boundary ../journeys.md describes. It mirrors the specs rather than running
 // them, so that the specs stay free of documentation hooks; the price is that a
-// spec change needs the matching change here. The assertions are kept so a
-// capture of a broken page fails instead of committing a picture of it.
+// spec change needs the matching change here. Every spec assertion is repeated,
+// so a capture of a broken page fails instead of committing a picture of it.
+// The login itself is not mirrored: it is sign-in.ts's own signIn(), with its
+// lockout guard intact, and a hook that screenshots each Keycloak screen.
 
 const IMAGES = join(__dirname, "..", "images", "mit-learn")
 
@@ -63,6 +61,7 @@ test("resource drawer", async ({ page }) => {
     await expect(page).toHaveURL(/[?&]resource=\d+/, { timeout: 5_000 })
   }).toPass({ timeout: 30_000 })
   const drawer = page.getByRole("dialog")
+  await expect(drawer).toBeVisible()
   await expect(drawer.getByRole("heading", { name: literal(resourceName) })).toBeVisible()
   await shot(page, "channel-and-drawer/03-drawer-client-side")
 
@@ -74,6 +73,8 @@ test("resource drawer", async ({ page }) => {
 
 test("search by URL", async ({ page }) => {
   await page.goto(`/search?q=${SEARCH_QUERY}&resource_type=course`)
+  await expect(page).toHaveURL(new RegExp(`/search\\?.*q=${SEARCH_QUERY}`))
+  await expect(page).toHaveURL(/[?&]resource_type=course/)
   await expect(page.getByRole("heading", { name: "Search Results" })).toBeVisible()
   await expect(page.getByRole("tab", { name: /^Courses \([1-9]\d*\)/ })).toBeVisible()
   await expect(page.getByRole("tab", { name: /^Programs \(0\)/ })).toBeVisible()
@@ -82,56 +83,30 @@ test("search by URL", async ({ page }) => {
   await shot(page, "search-direct-url/01-filtered-results")
 })
 
-test("signed in: login, dashboard, header search", async ({ page }) => {
-  // The same guard sign-in.ts applies, sharing its marker: a credential that
-  // was refused once is not submitted again by a capture run either.
-  if (existsSync(REJECTED_CREDENTIAL_MARKER)) {
-    throw new Error(`Refusing to re-submit a rejected credential; see ${REJECTED_CREDENTIAL_MARKER}.`)
-  }
-  const { email, password } = canaryCredentials()
-  const emailText = page.getByText(email)
-
+// Step 1 of the signed-in journey is anonymous, so it is captured on its own and
+// a re-capture of it needs no credential. Waiting for the link rather than for
+// `main` alone is what gets a hydrated header into the frame: the link is not
+// in the server-rendered markup.
+test("login entry point", async ({ page }) => {
   await page.goto("/")
   await expect(page.locator("main")).toBeVisible()
-  const applicationOrigin = new URL(page.url()).origin
+  await expect(page.getByRole("link", { name: "Log In" })).toBeVisible()
   await shot(page, "login-and-search/01-homepage-log-in-link")
+})
 
-  await page.getByRole("link", { name: "Log In" }).click()
-  await page.waitForURL((url) => url.origin !== applicationOrigin)
-  const identityProvider = new URL(page.url()).origin
-  const emailScreen = page.url()
-  const emailField = page.getByLabel("Email", { exact: true })
-  await emailField.fill(email)
-  await shot(page, "login-and-search/02-keycloak-email", [emailField])
-
-  await page.getByRole("button", { name: "Next", exact: true }).click()
-  await page.waitForURL((url) => url.href !== emailScreen)
-  const reached = new URL(page.url())
-  if (reached.origin !== identityProvider || !reached.pathname.endsWith("/login-actions/authenticate")) {
-    throw new Error(`Expected the password screen, reached ${reached.origin}${reached.pathname}.`)
-  }
-  const passwordField = page.getByLabel("Password", { exact: true })
-  await passwordField.fill(password)
-  // The realm's theme greets by display name here, not by address, but the
-  // address is masked too in case a theme change starts echoing it.
-  await shot(page, "login-and-search/03-keycloak-password", [passwordField, emailText])
-
-  await page.getByRole("button", { name: "Next", exact: true }).click()
-  try {
-    await page.waitForURL((url) => url.origin === applicationOrigin, { timeout: 30_000 })
-  } catch (error) {
-    const rejection = await rejectionMessage(page)
-    if (rejection) {
-      writeFileSync(REJECTED_CREDENTIAL_MARKER, rejection)
-    }
-    throw error
-  }
+test("signed in: login, dashboard, header search", async ({ page }) => {
+  // No retries in this config, and signIn() keeps its own rejected-credential
+  // marker, so a refused password is submitted once and never again.
+  await signIn(page, (screen, sensitive) =>
+    shot(page, `login-and-search/0${screen === "email" ? 2 : 3}-keycloak-${screen}`, sensitive),
+  )
 
   await page.goto("/dashboard")
+  await expect(page).toHaveURL(/\/dashboard/)
   await expect(page.getByRole("heading", { name: "Your MIT Learning Journey" })).toBeVisible()
   await expect(page.getByRole("button", { name: "User Menu" })).toBeVisible()
   await expect(page.getByRole("link", { name: "Log In" })).toHaveCount(0)
-  await shot(page, "login-and-search/04-dashboard", [emailText])
+  await shot(page, "login-and-search/04-dashboard")
 
   await page.goto("/")
   const searchBox = page.getByRole("textbox", { name: "Search for" })
@@ -141,12 +116,15 @@ test("signed in: login, dashboard, header search", async ({ page }) => {
     await expect(page).toHaveURL(new RegExp(`/search\\?.*q=${SEARCH_QUERY}`), { timeout: 5_000 })
   }).toPass({ timeout: 30_000 })
   await expect(page.getByRole("heading", { name: "Search Results" })).toBeVisible()
+  await expect(page.getByRole("article").first()).toBeVisible()
+  const coursesTab = page.getByRole("tab", { name: /^Courses/ })
+  await expect(coursesTab).toBeVisible()
   await expect(page.getByRole("tab", { name: /^Courses \([1-9]\d*\)/ })).toBeVisible()
-  await shot(page, "login-and-search/05-header-search-results", [emailText])
+  await shot(page, "login-and-search/05-header-search-results")
 
-  await page.getByRole("tab", { name: /^Courses/ }).click()
+  await coursesTab.click()
   await expect(
     page.getByRole("article", { name: new RegExp(`^Course:.*${SEARCH_QUERY}`, "i") }).first(),
   ).toBeVisible()
-  await shot(page, "login-and-search/06-courses-tab", [emailText])
+  await shot(page, "login-and-search/06-courses-tab")
 })
