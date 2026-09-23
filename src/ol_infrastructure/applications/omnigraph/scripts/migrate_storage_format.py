@@ -175,10 +175,13 @@ def writer_blockers(
     the freeze keeps writing through the export. And a CronJob with no running
     Job can still start one at its next tick unless it is suspended.
 
-    ``.status.active`` is the only field that means a pod is running right now.
-    Filtering on ``status.successful`` or waiting for ``condition=complete``
-    instead matches long-dead FAILED Jobs (CI carries indexer failures over a
-    month old), which either reports phantom work or blocks on corpses.
+    A Job blocks until it carries a terminal ``Complete`` or ``Failed``
+    condition. ``.status.active`` alone is not enough: a Job the CronJob
+    created just before suspension has ``status: {}`` until the Job controller
+    reconciles it, and would start writing after the pre-flight cleared. Both
+    terminal conditions count as finished because waiting for ``Complete``
+    alone blocks on long-dead FAILED Jobs (CI carries indexer failures over a
+    month old).
 
     An absent CronJob is not a blocker: the CI indexer is not declared at all in
     an environment with no managed repos.
@@ -192,12 +195,24 @@ def writer_blockers(
         owners = job["metadata"].get("ownerReferences", [])
         if not any(o["kind"] == "CronJob" and o["name"] == name for o in owners):
             continue
-        active = job.get("status", {}).get("active", 0)
+        status = job.get("status", {})
+        if job_finished(status):
+            continue
+        job_name = f"{namespace}/{job['metadata']['name']}"
+        active = status.get("active", 0)
         if active:
-            blockers.append(
-                f"job {namespace}/{job['metadata']['name']} has {active} active pod(s)"
-            )
+            blockers.append(f"job {job_name} has {active} active pod(s)")
+        else:
+            blockers.append(f"job {job_name} has not finished")
     return blockers
+
+
+def job_finished(status: K8sObject) -> bool:
+    """Whether a Job's status carries a terminal ``Complete``/``Failed`` condition."""
+    return any(
+        c.get("type") in {"Complete", "Failed"} and c.get("status") == "True"
+        for c in status.get("conditions", [])
+    )
 
 
 def k8s_get(path: str) -> K8sObject | None:

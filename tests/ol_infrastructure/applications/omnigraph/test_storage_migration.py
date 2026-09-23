@@ -755,8 +755,12 @@ def _cronjob(*, suspend: bool) -> dict[str, Any]:
     return {"spec": {"suspend": suspend}}
 
 
-def _job(name: str, owner: str, *, active: int | None) -> dict[str, Any]:
-    status = {} if active is None else {"active": active}
+def _job(
+    name: str, owner: str, *, active: int | None, finished: str | None = None
+) -> dict[str, Any]:
+    status: dict[str, Any] = {} if active is None else {"active": active}
+    if finished is not None:
+        status["conditions"] = [{"type": finished, "status": "True"}]
     return {
         "metadata": {
             "name": name,
@@ -830,13 +834,35 @@ def test_finished_and_failed_jobs_do_not_block() -> None:
     progress would hold the outage open until the pre-flight times out.
     """
     jobs = [
-        _job("witan-ci-indexer-old-failed", "witan-ci-indexer", active=None),
-        _job("witan-ci-indexer-done", "witan-ci-indexer", active=0),
+        _job(
+            "witan-ci-indexer-old-failed",
+            "witan-ci-indexer",
+            active=None,
+            finished="Failed",
+        ),
+        _job(
+            "witan-ci-indexer-done", "witan-ci-indexer", active=0, finished="Complete"
+        ),
     ]
 
     assert not migrate.writer_blockers(
         "witan", "witan-ci-indexer", _cronjob(suspend=True), jobs
     )
+
+
+def test_a_job_the_controller_has_not_reconciled_blocks() -> None:
+    """A CronJob can create a Job just before suspension. Until the Job
+    controller fills in its status it reads `status: {}`, and its pod can start
+    writing after the pre-flight cleared.
+    """
+    blockers = migrate.writer_blockers(
+        "witan",
+        "witan-ci-indexer",
+        _cronjob(suspend=True),
+        [_job("witan-ci-indexer-29782", "witan-ci-indexer", active=None)],
+    )
+
+    assert blockers == ["job witan/witan-ci-indexer-29782 has not finished"]
 
 
 def test_another_cronjobs_active_job_is_not_attributed() -> None:
@@ -866,7 +892,11 @@ def test_the_preflight_waits_for_a_running_writer_to_finish() -> None:
 
     def finish_on_first_sleep(seconds: float) -> None:
         sleeps.append(seconds)
-        api.jobs["witan"] = [_job("witan-ci-indexer-1", "witan-ci-indexer", active=0)]
+        api.jobs["witan"] = [
+            _job(
+                "witan-ci-indexer-1", "witan-ci-indexer", active=0, finished="Complete"
+            )
+        ]
 
     migrate.wait_for_writers(
         WRITERS,

@@ -113,9 +113,12 @@ number → continue.
   Job's pre-flight does it before taking a baseline: it waits, for up to 30
   minutes, until all four writer CronJobs (`omnigraph-optimize`,
   `omnigraph-cleanup`, `witan-ci-indexer`, `witan-view-reaper`) show
-  `suspend: true` and none owns a Job with `.status.active`. `suspend` stops the
-  next schedule, not a run already in progress, which is why both conditions
-  are checked. The Job logs `waiting on graph writers: ...` while it waits. If
+  `suspend: true` and none owns a Job that lacks a `Complete` or `Failed`
+  condition. `suspend` stops the next schedule, not a run already in progress,
+  which is why both conditions are checked. A Job counts as running until it
+  has a terminal condition, not only while `.status.active` is set, because a
+  Job created just before suspension reads `status: {}` until the Job
+  controller reconciles it. The Job logs `waiting on graph writers: ...` while it waits. If
   it gives up it exits before exporting anything, naming every writer still
   able to write. The usual cause is a witan deploy that has not run yet. Once
   the writers are quiet, re-create the Job by replacing it (its spec is
@@ -127,11 +130,12 @@ number → continue.
     pulumi up --stack <CI|QA|Production> --replace '<the Job URN above>'
   ```
 
-  If you check by hand anyway, use `.status.active`:
+  If you check by hand anyway, a Job is finished only when `CONDITION` shows
+  `Complete` or `Failed`; an empty `CONDITION` is still running:
 
   ```shell
   kubectl -n witan get cronjobs,jobs \
-    -o custom-columns='KIND:.kind,NAME:.metadata.name,SUSPEND:.spec.suspend,ACTIVE:.status.active'
+    -o custom-columns='KIND:.kind,NAME:.metadata.name,SUSPEND:.spec.suspend,ACTIVE:.status.active,CONDITION:.status.conditions[*].type'
   ```
 
   Do NOT filter with `--field-selector status.successful!=1` or
