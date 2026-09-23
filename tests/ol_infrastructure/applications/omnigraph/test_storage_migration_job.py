@@ -7,6 +7,9 @@ namespaces, and the ``__cluster`` snapshot running before the migrate
 container.
 """
 
+import os
+import subprocess
+from pathlib import Path
 from typing import Any
 
 import pulumi
@@ -14,6 +17,7 @@ import pulumi_kubernetes as kubernetes
 
 from ol_infrastructure.applications.omnigraph.maintenance import OmnigraphMaintenance
 from ol_infrastructure.applications.omnigraph.storage_migration import (
+    CLUSTER_SNAPSHOT_SCRIPT,
     create_storage_migration,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
@@ -133,3 +137,41 @@ def test_the_armed_job_can_check_and_snapshot_before_migrating():
         ]
 
     return migration.job.urn.apply(check)
+
+
+def _run_snapshot(tmp_path: Path, listing: str) -> subprocess.CompletedProcess[str]:
+    """Run the snapshot script against a stub ``aws`` that lists ``listing``."""
+    (tmp_path / "listing").write_text(listing)
+    stub = tmp_path / "aws"
+    stub.write_text(f'#!/bin/sh\n[ "$2" = ls ] && cat {tmp_path / "listing"}\nexit 0\n')
+    stub.chmod(0o755)
+    env = {
+        "PATH": f"{tmp_path}:{os.environ['PATH']}",
+        "BACKUP_ROOT": "s3://bucket/backups",
+        "NEW_PREFIX": "fmt9",
+        "OLD_ROOT": "s3://bucket/fmt6",
+    }
+    return subprocess.run(  # noqa: S603
+        ["/bin/sh", "-c", CLUSTER_SNAPSHOT_SCRIPT],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_an_empty_snapshot_fails_the_job(tmp_path: Path) -> None:
+    """A sync of a missing ``__cluster`` copies nothing, and ``printf | wc -l``
+    would count the empty listing as one object.
+    """
+    result = _run_snapshot(tmp_path, "")
+
+    assert result.returncode == 1
+    assert "is empty" in result.stderr
+
+
+def test_a_populated_snapshot_reports_its_object_count(tmp_path: Path) -> None:
+    result = _run_snapshot(tmp_path, "2026-09-22 a\n2026-09-22 b\n")
+
+    assert result.returncode == 0
+    assert "snapshot: 2 object(s)" in result.stdout

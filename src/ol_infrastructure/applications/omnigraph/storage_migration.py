@@ -106,10 +106,15 @@ CLUSTER_SNAPSHOT_SCRIPT = """\
 set -eu
 dest="$BACKUP_ROOT/pre-$NEW_PREFIX-$(date -u +%Y%m%dT%H%M%SZ)/__cluster"
 aws s3 sync "$OLD_ROOT/__cluster" "$dest" --only-show-errors
-# `s3 ls` exits 1 on an empty prefix as well as on a failed call, so its
-# output is the evidence either way.
+# The listing is the evidence, so an empty one fails too rather than relying
+# on how `s3 ls` exits for an empty prefix. `printf | wc -l` would count an
+# empty listing as one object.
 if ! listing=$(aws s3 ls --recursive "$dest/"); then
   echo "!!! could not list $dest: the sync copied nothing, or the list failed" >&2
+  exit 1
+fi
+if [ -z "$listing" ]; then
+  echo "!!! $dest is empty: $OLD_ROOT/__cluster had nothing to copy" >&2
   exit 1
 fi
 count=$(printf '%s\n' "$listing" | wc -l)
