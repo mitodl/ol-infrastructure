@@ -560,6 +560,59 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         add_to_id_token=False,
         opts=resource_options,
     )
+
+    # The client the witan web UI logs in as (agent-kit
+    # docs/internals/design/witan-ui-spec.md §8). witan serves the page itself
+    # at /ui/; it runs the authorization code flow in the browser with oidc-spa
+    # and sends the access token as a bearer header on /mcp.
+    #
+    #   - Separate from `witan-desktop`: that client's redirect URIs are
+    #     Claude's and ChatGPT's backends, and sharing one client would mean
+    #     neither list can change without the other.
+    #   - PUBLIC with S256 PKCE, same reasoning as `witan-desktop`: code in a
+    #     browser cannot keep a secret, so PKCE is the only proof of possession.
+    #   - The redirect URI is the mount itself, not a /callback path: oidc-spa
+    #     always returns to its base URL and restores the page's own location
+    #     from the state it stored before leaving.
+    #   - `web_origins` is what lets the page read the token endpoint's
+    #     response. Without it Keycloak sends no CORS headers and the browser
+    #     drops the code exchange after the user has already logged in.
+    #   - The audience mapper is the same as the other two witan clients', and
+    #     for the same reason: witan's JWTVerifier rejects a token without
+    #     `aud: witan`, and Keycloak adds none by default.
+    if stack_info.env_suffix == "production":
+        witan_ui_origin = "https://witan.ol.mit.edu"
+    else:
+        witan_ui_origin = f"https://witan.{stack_info.env_suffix}.ol.mit.edu"
+    ol_platform_engineering_witan_ui_client = keycloak.openid.Client(
+        "ol-platform-engineering-witan-ui-client",
+        name="ol-platform-engineering-witan-ui-client",
+        realm_id="ol-platform-engineering",
+        client_id="witan-ui",
+        enabled=True,
+        access_type="PUBLIC",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        direct_access_grants_enabled=False,
+        service_accounts_enabled=False,
+        pkce_code_challenge_method="S256",
+        valid_redirect_uris=[f"{witan_ui_origin}/ui/"],
+        # Where oidc-spa sends the browser after an idle-session logout.
+        valid_post_logout_redirect_uris=[f"{witan_ui_origin}/ui/"],
+        web_origins=[witan_ui_origin],
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    keycloak.openid.AudienceProtocolMapper(
+        "ol-platform-engineering-witan-ui-audience-mapper",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_witan_ui_client.id,
+        name="witan-audience",
+        included_custom_audience="witan",
+        add_to_access_token=True,
+        add_to_id_token=False,
+        opts=resource_options,
+    )
     # WITAN [END] # noqa: ERA001
 
     # JUPYTERHUB [START] # noqa: ERA001
