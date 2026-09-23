@@ -362,9 +362,12 @@ local_resource(
 # ("context deadline exceeded"). The script below proves the admin API is
 # serving (admin token + authenticated GET /admin/realms) before we proceed.
 #
-# `pulumi refresh` is intentionally omitted from this loop: it issues a burst
-# of concurrent admin-API calls on every reconcile, which was the main source
-# of the warm-up 502s. Refresh on demand instead.
+# `--refresh` reconciles state against the live cluster before applying. State
+# lives in this checkout and outlives the cluster, so a cluster replaced without
+# teardown.sh leaves Pulumi believing the olapps realm exists; it then skips the
+# realm and fails on the first child that has to look one up, reporting a
+# missing `client_id` on an unrelated b2b client. Behind the readiness gate and
+# `--parallel 1` the refresh costs a few seconds.
 #
 # `--parallel 1` serialises the apply for the same reason. The Keycloak provider
 # talks to the admin API over the public ingress (host -> k3d LB -> APISIX ->
@@ -375,7 +378,7 @@ local_resource(
 # flight at a time, which the path handles comfortably.
 local_resource(
     "local-infra-apps",
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c '{wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c '{wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --refresh --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
     # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
     # the core stack only creates on demand.
     env={"LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps)},
