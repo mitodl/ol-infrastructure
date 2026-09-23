@@ -161,7 +161,12 @@ config:
   # on the 100Gi default, flat over 90 days of history. The largest populated
   # non-prod course index anywhere (mitxonline QA meilisearch) is 2.35 GiB, so
   # 20Gi is ~8x the realistic ceiling for this tier, not just the idle figure.
-  # Shrinking also drops provisioned IOPS, which scale as iopsPerGB * size.
+  #
+  # This is the ONE stack where the recreate was actually run (2026-09-23), so
+  # the CR and the live StatefulSet both say 20Gi and the operator is happy.
+  # Every other non-prod stack was reverted to the 100Gi default rather than
+  # recreated -- do not "make this consistent" by removing the line, that would
+  # re-introduce the CR/StatefulSet mismatch this setting currently avoids.
   typesense:storage_size: 20Gi
   edxapp:site_project:
     deployment: mitx
