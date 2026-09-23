@@ -85,13 +85,28 @@ log_retention_period = (
 # databases are still provisioned unconditionally, so an existing stack does
 # not churn when this is set. Same not-pinned-in-Pulumi-config caveat as
 # log_retention_period below.
-enabled_apps = tuple(
-    app.strip()
-    for app in (
-        config.get("enabled_apps") or os.environ.get("LOCAL_DEV_ENABLED_APPS", "")
-    ).split(",")
-    if app.strip()
-)
+# Unset is not the same as empty here. Empty means "no optional apps", which
+# is what most developers want. Unset means nobody said, and guessing "none"
+# destroys whatever optional resources the stack already has: a hand-run
+# `pulumi up` without the variable would delete the ocw-studio namespace and
+# the object store. Tilt always sets it, so only hand-runs can land here.
+_enabled_apps = config.get("enabled_apps")
+if _enabled_apps is None:
+    _enabled_apps = os.environ.get("LOCAL_DEV_ENABLED_APPS")
+if _enabled_apps is None:
+    msg = (
+        "enabled_apps is not set. Tilt passes LOCAL_DEV_ENABLED_APPS on every "
+        "run; a hand-run `pulumi up` has to say so itself, because defaulting "
+        "to none would destroy the resources of any optional app you have "
+        "enabled (the ocw-studio namespace and the RustFS object store).\n"
+        "  LOCAL_DEV_ENABLED_APPS=mit-learn,ocw-studio pulumi up --stack "
+        "local-dev.core.Dev\n"
+        "Pass an empty value if you really do run no optional apps:\n"
+        "  LOCAL_DEV_ENABLED_APPS= pulumi up --stack local-dev.core.Dev"
+    )
+    raise ValueError(msg)
+
+enabled_apps = tuple(app.strip() for app in _enabled_apps.split(",") if app.strip())
 
 cert_manager_version = config.get("cert_manager_version") or "v1.16.2"
 cnpg_version = config.get("cnpg_version") or "0.23.0"

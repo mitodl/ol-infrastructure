@@ -407,8 +407,14 @@ Tilt forwards it to the core Pulumi stack as `LOCAL_DEV_LOG_RETENTION`, so the s
 
 ```bash
 cd local-dev/infra/core
-LOCAL_DEV_LOG_RETENTION=72h pulumi up --stack local-dev.core.Dev
+LOCAL_DEV_LOG_RETENTION=72h LOCAL_DEV_ENABLED_APPS="${LOCAL_DEV_ENABLED_APPS:-}" \
+  pulumi up --stack local-dev.core.Dev
 ```
+
+`LOCAL_DEV_ENABLED_APPS` has to be set on any hand-run of this stack, listing
+the same apps as your `enabled_apps`. The stack refuses to run without it
+rather than assume none: assuming none would delete the resources of every
+optional app you have enabled. Set it to an empty value if you run none.
 
 Loki only honours a retention window that is a **whole number of days**, so give it hours in multiples of 24 (`48h`, `168h`) or days (`3d`, `7d`). Anything else fails the deploy with an explanatory error rather than being silently ignored.
 
@@ -753,9 +759,11 @@ on every pod start and is only ever used inside that pod.
 ### `tilt up` fails on `local-infra` (Pulumi errors)
 
 ```bash
-# Verbose core stack run
+# Verbose core stack run (LOCAL_DEV_ENABLED_APPS must list your enabled_apps;
+# an empty value is fine if you run no optional apps)
 cd local-dev/infra/core
-PULUMI_CONFIG_PASSPHRASE='' pulumi up --stack local-dev.core.Dev --logtostderr -v=3
+PULUMI_CONFIG_PASSPHRASE='' LOCAL_DEV_ENABLED_APPS="${LOCAL_DEV_ENABLED_APPS:-}" \
+  pulumi up --stack local-dev.core.Dev --logtostderr -v=3
 
 # Verbose apps_infra stack run
 cd local-dev/infra/apps_infra
