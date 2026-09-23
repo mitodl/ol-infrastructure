@@ -53,6 +53,7 @@ from typing import Any
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 
+from bridge.lib.versions import AWS_CLI_VERSION
 from bridge.secrets import sops as _bridge_sops
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.omnigraph.cluster_config import (
@@ -90,6 +91,12 @@ from ol_infrastructure.applications.omnigraph.token_sync import (
     SERVICE_TOKENS_VAULT_PATH,
     create_token_sync,
 )
+from ol_infrastructure.applications.witan.ci_indexer import (
+    CRONJOB_NAME as CI_INDEXER_CRONJOB_NAME,
+)
+from ol_infrastructure.applications.witan.view_reaper import (
+    CRONJOB_NAME as VIEW_REAPER_CRONJOB_NAME,
+)
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -101,6 +108,7 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     check_cluster_namespace,
     setup_k8s_provider,
 )
@@ -365,6 +373,9 @@ cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 NAMESPACE = "omnigraph"
+# Where the witan stack runs the two graph writers it owns (see
+# witan/__main__.py's NAMESPACE). Only the migration Job's pre-flight reads it.
+WITAN_NAMESPACE = "witan"
 
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(NAMESPACE, ns)
@@ -1076,6 +1087,14 @@ if MIGRATE_FROM_IMAGE:
         # creating the Job alongside that update — the Job would otherwise
         # baseline and export a root the server is still writing.
         server_deployment=data_tier.deployment,
+        backup_root=data_tier.bucket.bucket_v2.bucket.apply(
+            lambda name: f"s3://{name}/backups"
+        ),
+        aws_cli_image=cached_image_uri(f"amazon/aws-cli:{AWS_CLI_VERSION}"),
+        # The witan stack suspends these two off this stack's `writers_frozen`
+        # output; the Job waits until it has.
+        witan_namespace=WITAN_NAMESPACE,
+        witan_writer_cronjobs=[CI_INDEXER_CRONJOB_NAME, VIEW_REAPER_CRONJOB_NAME],
     )
     export("storage_migration_job", storage_migration.job.metadata.name)
 
@@ -1168,6 +1187,10 @@ export("managed_repos", MANAGED_REPOS)
 # goes out alongside it because that is the value they would set or clear.
 export("storage_uri", data_tier.storage_uri)
 export("storage_prefix", STORAGE_PREFIX)
+# Whether every direct writer of the graphs should be held still. This stack
+# suspends its own two sweeps off the same switch; the witan stack reads this
+# to suspend witan-ci-indexer and witan-view-reaper, which it owns.
+export("writers_frozen", bool(MIGRATE_FROM_IMAGE))
 # Whether this environment's SOPS file carries the break-glass principal, and
 # therefore whether secret-operations/witan/admin-token exists. A boolean, not
 # the token: the witan stack needs to decide *whether* to declare its

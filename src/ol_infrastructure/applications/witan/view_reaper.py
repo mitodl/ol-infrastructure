@@ -43,6 +43,9 @@ from ol_infrastructure.applications.witan.observability import (
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
+# Also read by the omnigraph stack, whose migration Job waits on this CronJob.
+CRONJOB_NAME = "witan-view-reaper"
+
 # Default cadence. Reaping is idempotent and cheap relative to the indexer
 # (no clone, no parse — a commit-log read and, rarely, a delete per graph), so
 # daily is chosen for freshness of the sprawl bound rather than out of
@@ -73,6 +76,8 @@ def create_view_reaper(  # noqa: PLR0913
     witan_ci_token_secret_key: str,
     witan_ci_token_secret: Resource,
     service_version: str,
+    *,
+    suspend: bool = False,
 ) -> kubernetes.batch.v1.CronJob:
     """Provision the CronJob that deletes idle branch views on every code graph.
 
@@ -121,12 +126,15 @@ def create_view_reaper(  # noqa: PLR0913
     return kubernetes.batch.v1.CronJob(
         f"witan-view-reaper-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="witan-view-reaper",
+            name=CRONJOB_NAME,
             namespace=namespace,
             labels=k8s_global_labels,
         ),
         spec=kubernetes.batch.v1.CronJobSpecArgs(
             schedule=schedule,
+            # Held off while the omnigraph stack has a storage-format
+            # migration armed; see `writers_frozen` in witan/__main__.py.
+            suspend=suspend,
             # Two sweeps of the same graph set concurrently is harmless on its
             # own (reaping is idempotent — a view already gone is not an
             # error) but forbidden anyway so overlapping runs cannot both log

@@ -743,3 +743,227 @@ def test_the_source_cluster_yaml_never_shadows_the_repointed_one(
 
     assert "storage: s3://b/fmt6" in config.read_text().splitlines()
     assert "storage: s3://ol-data-witan-ci" not in config.read_text().splitlines()
+
+
+WRITERS = [
+    ("omnigraph", "omnigraph-optimize"),
+    ("witan", "witan-ci-indexer"),
+]
+
+
+def _cronjob(*, suspend: bool) -> dict[str, Any]:
+    return {"spec": {"suspend": suspend}}
+
+
+def _job(
+    name: str, owner: str, *, active: int | None, finished: str | None = None
+) -> dict[str, Any]:
+    status: dict[str, Any] = {} if active is None else {"active": active}
+    if finished is not None:
+        status["conditions"] = [{"type": finished, "status": "True"}]
+    return {
+        "metadata": {
+            "name": name,
+            "ownerReferences": [{"kind": "CronJob", "name": owner}],
+        },
+        "status": status,
+    }
+
+
+class _FakeApi:
+    """The two API reads the pre-flight makes, answered from dicts."""
+
+    def __init__(
+        self,
+        cronjobs: dict[tuple[str, str], dict[str, Any] | None],
+        jobs: dict[str, list[dict[str, Any]]],
+    ) -> None:
+        self.cronjobs = cronjobs
+        self.jobs = jobs
+
+    def get(self, path: str) -> dict[str, Any] | None:
+        parts = path.split("/")
+        namespace = parts[5]
+        if parts[6] == "jobs":
+            return {"items": self.jobs.get(namespace, [])}
+        return self.cronjobs.get((namespace, parts[7]))
+
+
+def test_writer_specs_are_parsed_per_namespace() -> None:
+    """The env var the Job is given: space-separated <namespace>/<cronjob>."""
+    assert (
+        migrate.parse_writer_cronjobs(
+            "omnigraph/omnigraph-optimize  witan/witan-ci-indexer"
+        )
+        == WRITERS
+    )
+
+
+@pytest.mark.parametrize("bad", ["witan-ci-indexer", "witan/", "/x", "a/b/c"])
+def test_a_writer_without_a_namespace_is_refused(bad: str) -> None:
+    """A writer the pre-flight cannot address is a config error, not a skip."""
+    with pytest.raises(SystemExit):
+        migrate.parse_writer_cronjobs(bad)
+
+
+def test_an_unsuspended_writer_blocks() -> None:
+    """The case a skipped witan deploy leaves behind: nothing running yet, but
+    the next tick would start a writer mid-export.
+    """
+    blockers = migrate.writer_blockers(
+        "witan", "witan-ci-indexer", _cronjob(suspend=False), []
+    )
+
+    assert blockers == ["cronjob witan/witan-ci-indexer is not suspended"]
+
+
+def test_an_active_job_blocks_even_when_suspended() -> None:
+    """`suspend` stops the next schedule, not a run already in progress."""
+    blockers = migrate.writer_blockers(
+        "witan",
+        "witan-ci-indexer",
+        _cronjob(suspend=True),
+        [_job("witan-ci-indexer-29781", "witan-ci-indexer", active=1)],
+    )
+
+    assert blockers == ["job witan/witan-ci-indexer-29781 has 1 active pod(s)"]
+
+
+def test_finished_and_failed_jobs_do_not_block() -> None:
+    """A month-old failed Job has no `active` count. Treating it as work in
+    progress would hold the outage open until the pre-flight times out.
+    """
+    jobs = [
+        _job(
+            "witan-ci-indexer-old-failed",
+            "witan-ci-indexer",
+            active=None,
+            finished="Failed",
+        ),
+        _job(
+            "witan-ci-indexer-done", "witan-ci-indexer", active=0, finished="Complete"
+        ),
+    ]
+
+    assert not migrate.writer_blockers(
+        "witan", "witan-ci-indexer", _cronjob(suspend=True), jobs
+    )
+
+
+def test_a_job_the_controller_has_not_reconciled_blocks() -> None:
+    """A CronJob can create a Job just before suspension. Until the Job
+    controller fills in its status it reads `status: {}`, and its pod can start
+    writing after the pre-flight cleared.
+    """
+    blockers = migrate.writer_blockers(
+        "witan",
+        "witan-ci-indexer",
+        _cronjob(suspend=True),
+        [_job("witan-ci-indexer-29782", "witan-ci-indexer", active=None)],
+    )
+
+    assert blockers == ["job witan/witan-ci-indexer-29782 has not finished"]
+
+
+def test_another_cronjobs_active_job_is_not_attributed() -> None:
+    """Jobs are listed per namespace, so ownership decides which writer is busy."""
+    jobs = [_job("witan-view-reaper-1", "witan-view-reaper", active=1)]
+
+    assert not migrate.writer_blockers(
+        "witan", "witan-ci-indexer", _cronjob(suspend=True), jobs
+    )
+
+
+def test_an_undeclared_writer_does_not_block() -> None:
+    """The CI indexer does not exist in an environment with no managed repos."""
+    assert not migrate.writer_blockers("witan", "witan-ci-indexer", None, [])
+
+
+def test_the_preflight_waits_for_a_running_writer_to_finish() -> None:
+    """A busy writer is waited out, not treated as a failure."""
+    api = _FakeApi(
+        cronjobs={
+            ("omnigraph", "omnigraph-optimize"): _cronjob(suspend=True),
+            ("witan", "witan-ci-indexer"): _cronjob(suspend=True),
+        },
+        jobs={"witan": [_job("witan-ci-indexer-1", "witan-ci-indexer", active=1)]},
+    )
+    sleeps: list[float] = []
+
+    def finish_on_first_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        api.jobs["witan"] = [
+            _job(
+                "witan-ci-indexer-1", "witan-ci-indexer", active=0, finished="Complete"
+            )
+        ]
+
+    migrate.wait_for_writers(
+        WRITERS,
+        get=api.get,
+        wait_seconds=60,
+        poll_seconds=5,
+        sleep=finish_on_first_sleep,
+        clock=lambda: 0.0,
+    )
+
+    assert sleeps == [5]
+
+
+def test_the_preflight_gives_up_naming_every_blocker() -> None:
+    """At the deadline the Job exits before exporting, with the whole list."""
+    api = _FakeApi(
+        cronjobs={
+            ("omnigraph", "omnigraph-optimize"): _cronjob(suspend=True),
+            ("witan", "witan-ci-indexer"): _cronjob(suspend=False),
+        },
+        jobs={
+            "omnigraph": [_job("omnigraph-optimize-7", "omnigraph-optimize", active=1)]
+        },
+    )
+    now = iter([0.0, 100.0])
+
+    with pytest.raises(SystemExit) as exc:
+        migrate.wait_for_writers(
+            WRITERS,
+            get=api.get,
+            wait_seconds=60,
+            poll_seconds=5,
+            sleep=lambda _: None,
+            clock=lambda: next(now),
+        )
+
+    message = str(exc.value)
+    assert "omnigraph/omnigraph-optimize-7 has 1 active pod(s)" in message
+    assert "witan/witan-ci-indexer is not suspended" in message
+
+
+def test_an_api_error_mid_poll_is_waited_out() -> None:
+    """The Job has no retries, so one failed read must not end the migration."""
+    api = _FakeApi(
+        cronjobs={
+            ("omnigraph", "omnigraph-optimize"): _cronjob(suspend=True),
+            ("witan", "witan-ci-indexer"): _cronjob(suspend=True),
+        },
+        jobs={},
+    )
+    calls = {"n": 0}
+
+    def flaky_get(path: str) -> dict[str, Any] | None:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            timeout_msg = "read timed out"
+            raise TimeoutError(timeout_msg)
+        return api.get(path)
+
+    sleeps: list[float] = []
+    migrate.wait_for_writers(
+        WRITERS,
+        get=flaky_get,
+        wait_seconds=60,
+        poll_seconds=5,
+        sleep=sleeps.append,
+        clock=lambda: 0.0,
+    )
+
+    assert sleeps == [5]

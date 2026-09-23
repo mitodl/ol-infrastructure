@@ -81,7 +81,7 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/ocw_studio/": ["NGINX_VERSION"],
     "applications/odl_video_service/": ["NGINX_VERSION"],
     "applications/ol_analytics_api/": ["NGINX_VERSION"],
-    "applications/omnigraph/": [],
+    "applications/omnigraph/": ["AWS_CLI_VERSION"],
     "applications/open_discussions/": [],
     "applications/open_metadata/": ["OPEN_METADATA_VERSION"],
     "applications/opik/": ["OPIK_CHART_VERSION"],

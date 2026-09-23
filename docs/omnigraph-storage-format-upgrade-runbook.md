@@ -98,28 +98,44 @@ number → continue.
   it keeps promoting a format-bumping image into the next environment while you
   are still migrating this one. Pause it before the build lands, or as soon as
   you see the failed CI deploy.
-- **Pause `pulumi-witan` too, and freeze the witan writers.** Pausing
-  `pulumi-omnigraph` is not enough: `witan-ci-indexer` and `witan-view-reaper`
-  live in the `witan` namespace, belong to the witan stack, and a witan deploy
-  reconciles them back to active. Both write to the graphs.
+- **The witan writers freeze off the same knob, one deploy later.**
+  `witan-ci-indexer` and `witan-view-reaper` live in the `witan` namespace and
+  belong to the witan stack, and both write to the graphs. The omnigraph stack
+  exports `writers_frozen` (true while `migrate_from_image` is set), and the
+  witan stack suspends both CronJobs off it. The omnigraph apply cannot change
+  witan's resources, so after arming (below) run the witan deploy for the same
+  environment: the `pulumi-witan` pipeline job, or a local `pulumi up` in
+  `applications/witan` with `WITAN_DOCKER_SHA` set to the deployed digest. A
+  witan deploy mid-migration keeps them suspended, so `pulumi-witan` does not
+  need pausing.
+
+  **You do not need to check for running writer Jobs by hand.** The migration
+  Job's pre-flight does it before taking a baseline: it waits, for up to 30
+  minutes, until all four writer CronJobs (`omnigraph-optimize`,
+  `omnigraph-cleanup`, `witan-ci-indexer`, `witan-view-reaper`) show
+  `suspend: true` and none owns a Job that lacks a `Complete` or `Failed`
+  condition. `suspend` stops the next schedule, not a run already in progress,
+  which is why both conditions are checked. A Job counts as running until it
+  has a terminal condition, not only while `.status.active` is set, because a
+  Job created just before suspension reads `status: {}` until the Job
+  controller reconciles it. The Job logs `waiting on graph writers: ...` while it waits. If
+  it gives up it exits before exporting anything, naming every writer still
+  able to write. The usual cause is a witan deploy that has not run yet. Once
+  the writers are quiet, re-create the Job by replacing it (its spec is
+  immutable, and nothing in the config changed to make Pulumi do so on its own):
 
   ```shell
-  fly -t <target> pause-pipeline -p pulumi-witan
-  kubectl -n witan patch cronjob witan-ci-indexer  -p '{"spec":{"suspend":true}}'
-  kubectl -n witan patch cronjob witan-view-reaper -p '{"spec":{"suspend":true}}'
+  pulumi stack --show-urns --stack <CI|QA|Production> | grep 'batch/v1:Job::omnigraph-storage-migration-'
+  OMNIGRAPH_DOCKER_SHA=sha256:<NEW-image-digest> \
+    pulumi up --stack <CI|QA|Production> --replace '<the Job URN above>'
   ```
 
-  **`suspend` stops the next schedule, not the run in progress.** A Job created
-  a minute ago keeps writing through your export. Check for one and wait it out
-  (or delete it) before arming anything:
+  If you check by hand anyway, a Job is finished only when `CONDITION` shows
+  `Complete` or `Failed`; an empty `CONDITION` is still running:
 
   ```shell
-  # .status.active is the only field that means "a pod is running right now".
   kubectl -n witan get cronjobs,jobs \
-    -o custom-columns='KIND:.kind,NAME:.metadata.name,ACTIVE:.status.active'
-  # Then, per active Job: wait for it, or stop it.
-  kubectl -n witan wait --for=condition=complete job/<name> --timeout=15m
-  kubectl -n witan delete job/<name>        # if it will not finish in the window
+    -o custom-columns='KIND:.kind,NAME:.metadata.name,SUSPEND:.spec.suspend,ACTIVE:.status.active,CONDITION:.status.conditions[*].type'
   ```
 
   Do NOT filter with `--field-selector status.successful!=1` or
@@ -274,7 +290,16 @@ kubectl -n omnigraph logs -f job/omnigraph-migrate-fmt<N>
 Read the preview before accepting it. One apply does all of this, in order: the
 two maintenance CronJobs are suspended, the Deployment goes to zero replicas,
 and the Job is created behind both. It cannot start while maintenance is still
-schedulable or the server is still serving.
+schedulable or the server is still serving. Then run the witan deploy so the
+other two writers suspend (see **Before you start**). The Job waits for them.
+
+Before the pre-flight, an initContainer copies `<old root>/__cluster` to
+`s3://<bucket>/backups/pre-fmt<N>-<UTC timestamp>/__cluster/` and fails the Job
+if that copied nothing. Its log line gives the exact destination:
+
+```shell
+kubectl -n omnigraph logs job/omnigraph-migrate-fmt<N> -c snapshot-cluster-state
+```
 
 **Arming is what scales the tier down, so there is nothing left to do by hand
 and no reason to `--target`.** `data_tier.py` declares
@@ -295,8 +320,8 @@ is set it is not created at all and nothing depends on it. It is created again
 at cutover, once `storage_prefix` names the new root, and converges the schemas
 against it.
 
-Freezing the writers is part of **Before you start**, not this step — by the
-time you are arming the migration it is already too late.
+The Job's pre-flight is the backstop for the writer freeze. It is not a
+substitute for reading **Before you start**.
 
 **Two config knobs, and the distinction is the point.**
 `migrate_to_prefix` is where the rebuild WRITES. `storage_prefix` is what the
@@ -888,8 +913,16 @@ pulumi up --stack <CI|QA|Production>
 kubectl -n omnigraph get cronjob    # SUSPEND must read False for both
 ```
 
+Then run the witan deploy for the same environment, which reads
+`writers_frozen: false` and un-suspends the other two:
+
+```shell
+kubectl -n witan get cronjob        # SUSPEND must read False for both
+```
+
 Left suspended, the first symptom is fragment bloat degrading query latency
-weeks later, with nothing pointing back at the migration that caused it. If you
+weeks later, and a shared code graph that stops following its default branch,
+with nothing pointing back at the migration that caused either. If you
 suspended by hand instead, un-patch by hand.
 
 The old root itself waits. **Not the same day** — leave `$OLD_ROOT/graphs/`

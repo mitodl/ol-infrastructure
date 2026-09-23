@@ -49,6 +49,9 @@ from ol_infrastructure.applications.witan.observability import (
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
+# Also read by the omnigraph stack, whose migration Job waits on this CronJob.
+CRONJOB_NAME = "witan-ci-indexer"
+
 # Scratch space for the checkouts. An emptyDir rather than the container
 # filesystem so the sweep's disk use is bounded and declared, and mounted at
 # its parent rather than at the work dir itself: the entrypoint clears its work
@@ -102,6 +105,8 @@ def create_ci_indexer(  # noqa: PLR0913
     github_app_installation_id: str | None = None,
     github_app_secret_name: str | None = None,
     github_app_secret: Resource | None = None,
+    *,
+    suspend: bool = False,
 ) -> kubernetes.batch.v1.CronJob | None:
     """Provision the CronJob that indexes each repo's default branch.
 
@@ -269,12 +274,15 @@ def create_ci_indexer(  # noqa: PLR0913
     return kubernetes.batch.v1.CronJob(
         f"witan-ci-indexer-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="witan-ci-indexer",
+            name=CRONJOB_NAME,
             namespace=namespace,
             labels=k8s_global_labels,
         ),
         spec=kubernetes.batch.v1.CronJobSpecArgs(
             schedule=schedule,
+            # Held off while the omnigraph stack has a storage-format
+            # migration armed; see `writers_frozen` in witan/__main__.py.
+            suspend=suspend,
             # A cold first run can outlast an interval, and two sweeps writing
             # the same default views concurrently is exactly the multi-writer
             # case the role guard exists to prevent — the guard authorizes the

@@ -11,7 +11,9 @@ byte-for-byte intact as the rollback.
 automates, and it stays the reference for everything around it — pausing the
 Concourse pipeline, scaling the Deployment down, the cutover, retiring the old
 root. This script is steps 2, 3, 4 and 6 of that runbook: baseline, export,
-rebuild, verify.
+rebuild, verify. Before any of them it waits for every direct writer of the
+graphs to be suspended and idle (``wait_for_writers``), because nothing else in
+the Job can stop one writing through the export.
 
 WHY IN ONE POD. The runbook runs two ``kubectl run`` pods and moves every
 export through the operator's workstation with ``kubectl exec ... > file``,
@@ -39,12 +41,17 @@ import logging
 import os
 import re
 import shutil
+import ssl
 import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
 from collections import Counter
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 # `s3://<bucket>/fmt<N>`, where N is the NEW internal-schema number. Anchored
 # and digit-only on purpose: `<` and `>` are legal in S3 object keys, so an
@@ -75,6 +82,22 @@ KEYED_ROW_CAP = 8192
 # Rows per batch, under the cap with headroom — the cap belongs to a binary
 # this script does not control, and the cost of headroom is one extra commit.
 LOAD_ROW_BATCH = 8000
+
+# The in-cluster API, read with the pod's own ServiceAccount token. Only for
+# the writer pre-flight, and only read verbs: the Role this runs under grants
+# get/list on cronjobs and jobs and nothing else (storage_migration.py).
+K8sObject = dict[str, Any]
+K8S_API = "https://kubernetes.default.svc"
+SA_DIR = Path("/var/run/secrets/kubernetes.io/serviceaccount")
+
+# How long the pre-flight waits for the graph writers to go quiet before it
+# gives up. The longest of them is the CI indexer, whose own deadline is three
+# hours, but a run that long means a cold index, and holding an outage open for
+# it is the wrong trade: fail, and let the operator re-create the Job. Thirty
+# minutes also covers the gap between arming the omnigraph stack and the witan
+# deploy that suspends its two CronJobs.
+WRITER_WAIT_SECONDS = 30 * 60
+WRITER_POLL_SECONDS = 15
 
 LOG = logging.getLogger("migrate-storage-format")
 
@@ -129,6 +152,144 @@ def run(
             f"--- stdout ---\n{stdout}\n--- stderr ---\n{stderr}"
         )
     return subprocess.CompletedProcess(argv, returncode, stdout, stderr)
+
+
+def parse_writer_cronjobs(spec: str) -> list[tuple[str, str]]:
+    """Parse ``OMNIGRAPH_WRITER_CRONJOBS``: whitespace-separated ``<ns>/<name>``."""
+    writers = []
+    for item in spec.split():
+        namespace, sep, name = item.partition("/")
+        if not sep or not namespace or not name or "/" in name:
+            sys.exit(f"!!! writer {item!r} is not <namespace>/<cronjob>")
+        writers.append((namespace, name))
+    return writers
+
+
+def writer_blockers(
+    namespace: str, name: str, cronjob: K8sObject | None, jobs: list[K8sObject]
+) -> list[str]:
+    """Say why the writer CronJob ``namespace/name`` could still write, if it can.
+
+    Two conditions, and both are needed. ``spec.suspend`` stops the NEXT
+    schedule, not a Job already running, so a writer created a minute before
+    the freeze keeps writing through the export. And a CronJob with no running
+    Job can still start one at its next tick unless it is suspended.
+
+    A Job blocks until it carries a terminal ``Complete`` or ``Failed``
+    condition. ``.status.active`` alone is not enough: a Job the CronJob
+    created just before suspension has ``status: {}`` until the Job controller
+    reconciles it, and would start writing after the pre-flight cleared. Both
+    terminal conditions count as finished because waiting for ``Complete``
+    alone blocks on long-dead FAILED Jobs (CI carries indexer failures over a
+    month old).
+
+    An absent CronJob is not a blocker: the CI indexer is not declared at all in
+    an environment with no managed repos.
+    """
+    if cronjob is None:
+        return []
+    blockers = []
+    if not cronjob.get("spec", {}).get("suspend", False):
+        blockers.append(f"cronjob {namespace}/{name} is not suspended")
+    for job in jobs:
+        owners = job["metadata"].get("ownerReferences", [])
+        if not any(o["kind"] == "CronJob" and o["name"] == name for o in owners):
+            continue
+        status = job.get("status", {})
+        if job_finished(status):
+            continue
+        job_name = f"{namespace}/{job['metadata']['name']}"
+        active = status.get("active", 0)
+        if active:
+            blockers.append(f"job {job_name} has {active} active pod(s)")
+        else:
+            blockers.append(f"job {job_name} has not finished")
+    return blockers
+
+
+def job_finished(status: K8sObject) -> bool:
+    """Whether a Job's status carries a terminal ``Complete``/``Failed`` condition."""
+    return any(
+        c.get("type") in {"Complete", "Failed"} and c.get("status") == "True"
+        for c in status.get("conditions", [])
+    )
+
+
+def k8s_get(path: str) -> K8sObject | None:
+    """GET ``path`` from the in-cluster API; ``None`` on a 404."""
+    token = (SA_DIR / "token").read_text().strip()
+    context = ssl.create_default_context(cafile=str(SA_DIR / "ca.crt"))
+    request = urllib.request.Request(  # noqa: S310
+        f"{K8S_API}{path}", headers={"Authorization": f"Bearer {token}"}
+    )
+    try:
+        with urllib.request.urlopen(request, context=context, timeout=30) as resp:  # noqa: S310
+            return json.load(resp)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:  # noqa: PLR2004
+            return None
+        raise
+
+
+def current_writer_blockers(
+    writers: list[tuple[str, str]], get: Callable[[str], K8sObject | None]
+) -> list[str]:
+    """Collect every writer's blockers, listing each namespace's Jobs once."""
+    jobs_by_namespace: dict[str, list[K8sObject]] = {}
+    blockers = []
+    for namespace, name in writers:
+        if namespace not in jobs_by_namespace:
+            listed = get(f"/apis/batch/v1/namespaces/{namespace}/jobs")
+            jobs_by_namespace[namespace] = (listed or {}).get("items", [])
+        cronjob = get(f"/apis/batch/v1/namespaces/{namespace}/cronjobs/{name}")
+        blockers.extend(
+            writer_blockers(namespace, name, cronjob, jobs_by_namespace[namespace])
+        )
+    return blockers
+
+
+def wait_for_writers(  # noqa: PLR0913
+    writers: list[tuple[str, str]],
+    *,
+    get: Callable[[str], K8sObject | None] = k8s_get,
+    wait_seconds: float = WRITER_WAIT_SECONDS,
+    poll_seconds: float = WRITER_POLL_SECONDS,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> None:
+    """Block until no graph writer can write, or exit naming the ones that can.
+
+    Runs before the baseline, so waiting costs nothing but outage time and
+    giving up leaves both roots exactly as they were.
+    """
+    deadline = clock() + wait_seconds
+    while True:
+        # An API error is one more reason to wait, not a reason to fail: the
+        # Job has no retries, and a blip mid-poll would otherwise end the
+        # migration before it started. It still ends it at the deadline.
+        try:
+            blockers = current_writer_blockers(writers, get)
+        except (OSError, urllib.error.URLError) as exc:
+            blockers = [f"kubernetes API read failed: {exc}"]
+        if not blockers:
+            LOG.info(
+                "writer pre-flight clear: %s",
+                ", ".join(f"{ns}/{name}" for ns, name in writers),
+            )
+            return
+        if clock() >= deadline:
+            sys.exit(
+                "!!! graph writers still able to write after "
+                f"{wait_seconds:.0f}s, not exporting:\n  "
+                + "\n  ".join(blockers)
+                + "\nA CronJob that is not suspended usually means the witan "
+                "stack has not been deployed since the migration was armed. An "
+                "active Job can be waited out or deleted. Once the writers are "
+                "quiet, re-create this Job with `pulumi up --replace` on its URN "
+                "(docs/omnigraph-storage-format-upgrade-runbook.md)."
+            )
+        LOG.info("waiting on graph writers: %s", "; ".join(blockers))
+        sleep(poll_seconds)
 
 
 def snapshot_tables(binary: str, store: str) -> dict[str, int]:
@@ -838,6 +999,8 @@ def main() -> int:
             f"{new_root!r} — the migration would export from the root it is "
             "writing to."
         )
+
+    wait_for_writers(parse_writer_cronjobs(env("OMNIGRAPH_WRITER_CRONJOBS")))
 
     for label, binary in (("old", old_binary), ("new", new_binary)):
         reported = run([binary, "version"]).stdout.strip().replace("\n", " | ")
