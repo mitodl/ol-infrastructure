@@ -25,40 +25,24 @@
 #
 # The hostname is covered by the existing wildcard certificate (setup.sh lists
 # *.learn.${ROOT_DOMAIN} as a SAN), so no certificate reissue is involved.
-apiVersion: v1
-kind: Service
+apiVersion: apisix.apache.org/v2
+kind: ApisixUpstream
 metadata:
   name: ocw-hugo-dev
   namespace: mit-learn
 spec:
-  # No selector: the backend is a process on the developer's machine, not a
-  # pod, so the EndpointSlice below is maintained by hand rather than by the
-  # endpoints controller.
-  ports:
-  - name: http
+  ingressClassName: apache-apisix
+  # host.k3d.internal rather than an address: k3d resolves it to whatever
+  # reaches the host on this runtime, which is not the same thing on Docker
+  # Desktop as it is on Linux, and a pinned bridge gateway is simply wrong on
+  # the former. The core Pulumi stack registers the name with CoreDNS, because
+  # k3d only writes it at cluster creation and both copies it writes -- the
+  # node's /etc/hosts and the CoreDNS NodeHosts key -- are regenerated without
+  # it the next time the node container or k3s restarts.
+  externalNodes:
+  - type: Domain
+    name: host.k3d.internal
     port: 3000
-    targetPort: 3000
-    protocol: TCP
----
-apiVersion: discovery.k8s.io/v1
-kind: EndpointSlice
-metadata:
-  name: ocw-hugo-dev
-  namespace: mit-learn
-  labels:
-    kubernetes.io/service-name: ocw-hugo-dev
-addressType: IPv4
-ports:
-- name: http
-  port: 3000
-  protocol: TCP
-endpoints:
-# Substituted by tiltlib.star with the k3d bridge gateway, which is how the
-# cluster reaches the host. Set LOCAL_DEV_HOST_GATEWAY to override.
-- addresses:
-  - "__LOCAL_DEV_HOST_GATEWAY__"
-  conditions:
-    ready: true
 ---
 apiVersion: apisix.apache.org/v2
 kind: ApisixTls
@@ -88,9 +72,8 @@ spec:
       - ocw-dev.learn.mit.dev
       paths:
       - "/*"
-    backends:
-    - serviceName: ocw-hugo-dev
-      servicePort: 3000
+    upstreams:
+    - name: ocw-hugo-dev
     # Hugo's live-reload is a websocket; without this the connection is never
     # upgraded and theme edits need a manual browser refresh.
     websocket: true

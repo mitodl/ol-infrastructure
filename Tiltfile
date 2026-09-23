@@ -308,6 +308,23 @@ APPS = [
 ]
 
 # ---------------------------------------------------------------------------
+# Host address
+#
+# How a pod reaches a process on this machine. Asked of Docker rather than
+# derived from the k3d bridge, because the bridge gateway is the Docker VM's
+# gateway under Docker Desktop and does not reach the machine there.
+# Registered with CoreDNS as host.k3d.internal by the core stack: k3d defines
+# that name itself, but only at cluster creation, and both places it writes it
+# are regenerated without it when the node container or k3s restarts.
+# ---------------------------------------------------------------------------
+host_gateway = str(local(
+    "docker run --rm --add-host=hostgw:host-gateway " +
+    "alpine:3 getent hosts hostgw | awk '{print $1}'",
+    quiet=True,
+    echo_off=True,
+)).strip()
+
+# ---------------------------------------------------------------------------
 # Shared infrastructure (Pulumi stacks)
 # ---------------------------------------------------------------------------
 
@@ -327,6 +344,7 @@ local_resource(
         # ocw-studio namespace/databases and the RustFS object store). The four
         # original apps are still provisioned unconditionally.
         "LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps),
+        "LOCAL_DEV_HOST_GATEWAY": host_gateway,
         "PULUMI_CONFIG_PASSPHRASE": "",
     },
     dir="./local-dev/infra/core",

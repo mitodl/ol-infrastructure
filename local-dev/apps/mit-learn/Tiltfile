@@ -97,8 +97,7 @@ k8s_resource(
 k8s_resource(
     new_name="ocw-hugo-dev",
     objects=[
-        "ocw-hugo-dev:service",
-        "ocw-hugo-dev:endpointslice",
+        "ocw-hugo-dev:apisixupstream",
         "ocw-hugo-dev-tls:apisixtls",
         "ocw-hugo-dev-route:apisixroute",
     ],

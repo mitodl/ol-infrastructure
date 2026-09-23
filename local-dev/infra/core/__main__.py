@@ -108,6 +108,12 @@ if _enabled_apps is None:
 
 enabled_apps = tuple(app.strip() for app in _enabled_apps.split(",") if app.strip())
 
+# How a pod reaches the developer's machine, forwarded by the Tiltfile, which
+# asks Docker for it. Used for the host.k3d.internal CoreDNS entry below.
+host_gateway = (
+    config.get("host_gateway") or os.environ.get("LOCAL_DEV_HOST_GATEWAY") or ""
+)
+
 cert_manager_version = config.get("cert_manager_version") or "v1.16.2"
 cnpg_version = config.get("cnpg_version") or "0.23.0"
 apisix_version = config.get("apisix_version") or "2.13.0"
@@ -210,6 +216,37 @@ k8s.core.v1.ConfigMap(
                 "    }\n"
                 "}\n"
             )
+        ),
+        # host.k3d.internal is how a pod reaches a process on the developer's
+        # machine, which the OCW hugo dev server relies on. k3d does define it,
+        # but only at cluster creation, writing it to the node container's
+        # /etc/hosts and to CoreDNS's NodeHosts key. Docker regenerates
+        # /etc/hosts from HostConfig.ExtraHosts (empty) on every container
+        # start and k3s regenerates NodeHosts, so both copies disappear the
+        # first time the cluster is stopped and started. Registering it here
+        # puts it in cluster state that nothing else rewrites.
+        #
+        # The address comes from Docker's own `host-gateway` alias rather than
+        # a bridge gateway, because those are not the same thing everywhere:
+        # under Docker Desktop the bridge gateway is the VM's gateway and does
+        # not reach the machine.
+        **(
+            {
+                "hostk3d.server": (
+                    "host.k3d.internal:53 {\n"
+                    "    errors\n"
+                    "    cache 30\n"
+                    "    template IN A {\n"
+                    f'        answer "{{{{ .Name }}}} 60 IN A {host_gateway}"\n'
+                    "    }\n"
+                    "    template IN AAAA {\n"
+                    "        rcode NOERROR\n"
+                    "    }\n"
+                    "}\n"
+                )
+            }
+            if host_gateway
+            else {}
         ),
     },
     opts=_k8s(depends_on=[ingress.apisix]),
