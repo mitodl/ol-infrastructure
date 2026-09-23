@@ -53,7 +53,12 @@ package.json           Pins @playwright/test. Single source of truth for the
                        container image tag the pipeline pulls.
 specs/<property>/      One directory per web property.
   mit-learn/
+docs/journeys.md       Every journey, step by step, with screenshots.
+docs/capture/          Regenerates those screenshots. Not a canary; never scheduled.
 ```
+
+To see what the canaries actually do to each property without reading the specs, start
+with [`docs/journeys.md`](docs/journeys.md).
 
 ## How these run in Concourse
 
@@ -169,7 +174,8 @@ skill in `mitodl/agent-kit`.
 ## Adding a canary
 
 See [`AGENTS.md`](AGENTS.md) — written for both human and agent contributors, and the
-authoritative guide to *why* each rule is there.
+authoritative guide to *why* each rule is there. A new or changed journey also updates
+[`docs/journeys.md`](docs/journeys.md) and its screenshots in the same PR.
 
 For the step-by-step procedure — a journey on an existing property is a drop-in with no
 pipeline edit; a new property is two list edits — use the
