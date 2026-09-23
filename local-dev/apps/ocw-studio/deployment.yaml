@@ -60,7 +60,11 @@ spec:
               echo "database exists: ${db}"
             else
               echo "creating database: ${db}"
-              $PSQL "CREATE DATABASE ${db} OWNER app"
+              # `|| true` because this races the same step in concourse.yaml:
+              # on a fresh enable both pods start together, both can see
+              # `concourse` missing, and under `set -eu` the loser of the
+              # CREATE would exit non-zero and restart-loop the web pod.
+              $PSQL "CREATE DATABASE ${db} OWNER app" || true
             fi
           done
 
