@@ -135,7 +135,8 @@ identity-first: the email goes in alone, then **Next**.
 
 ![Keycloak password screen, address and password masked](images/mit-learn/login-and-search/03-keycloak-password.jpg)
 
-**3. The password screen is asserted positively before anything is typed.** The journey
+**3. The password screen is asserted positively before anything is typed.** It greets
+the account by its Keycloak display name. The journey
 checks the URL is on the same IdP origin and ends `/login-actions/authenticate`.
 An unknown account is not refused. It is redirected: to Touchstone for an `@mit.edu`
 address, or to the captcha'd signup form for anything else. Typing the canary password

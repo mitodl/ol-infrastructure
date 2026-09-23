@@ -112,7 +112,8 @@ test("signed in: login, dashboard, header search", async ({ page }) => {
   }
   const passwordField = page.getByLabel("Password", { exact: true })
   await passwordField.fill(password)
-  // The password screen echoes the address back; mask it with the field.
+  // The realm's theme greets by display name here, not by address, but the
+  // address is masked too in case a theme change starts echoing it.
   await shot(page, "login-and-search/03-keycloak-password", [passwordField, emailText])
 
   await page.getByRole("button", { name: "Next", exact: true }).click()
