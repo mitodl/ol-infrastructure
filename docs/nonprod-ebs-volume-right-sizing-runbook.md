@@ -71,6 +71,33 @@ Shrinking below 100Gi therefore saves storage but no further IOPS, except on the
 clickhouse volume which is above the baseline at any ratio. Quoting "$450/mo from
 #5869 plus $284/mo from this" would double-count.
 
+### The IOPS half is already done — this runbook now reclaims capacity only
+
+As of 2026-09-22 every non-prod 100Gi volume is already at 3,000 IOPS. #5869 only
+changed *new* provisioning, so the 38 volumes that predated it stayed at 5,000. They
+were brought down in place rather than by waiting for this recreate: 30 operator-managed
+PVCs through the `ebs-gp3-iops-3000` VolumeAttributesClass, 7 abandoned data-ci test-CHI
+volumes through `ec2 modify-volume`, and 1 already declared in Pulumi
+(`tk-apply-the-non-prod-iops-ratio-to-the-32-existing-a44a07`).
+
+So the $60/mo IOPS column above is **already banked** and is not yours to claim
+again. Running this runbook from here reclaims the $224/mo of storage and nothing
+more.
+
+That also removes the one reason to hurry the recreate on IOPS grounds, but it does
+not make it optional: the config is applied and the StatefulSets are not recreated,
+which is precisely the half-done state the two hazard sections below warn about.
+
+Note for step 3: the replacement PVCs come from the StatefulSet template, which
+carries no `volumeAttributesClassName` — neither the typesense CRD (`spec.storage`
+has only `accessMode`, `annotations`, `size`, `storageClassName`) nor the StarRocks
+`storageVolumes` schema can express one. That is harmless at 20Gi, because
+`iopsPerGB: 30` yields 600 and the EBS CSI driver clamps up to gp3's free 3,000
+baseline — confirmed across the fleet, where every non-prod volume of 8, 10, 20 and
+50 GiB sits at exactly 3,000. It stops being harmless if anyone recreates one of
+these above 100Gi, where `iopsPerGB: 30` exceeds the baseline and the VAC must be set
+on the new PVC by hand.
+
 ## Why the config change is not enough
 
 EBS volumes and PVCs can only grow. No operator in play will shrink one:
