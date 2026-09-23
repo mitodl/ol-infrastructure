@@ -14,8 +14,6 @@ automatically (the "kc-seed-users" resource) after this realm is applied.
 """
 
 import json
-from collections.abc import Sequence
-from typing import Any
 
 import pulumi_keycloak as keycloak
 import pulumi_kubernetes as k8s
@@ -27,22 +25,7 @@ from ol_infrastructure.substructure.keycloak.org_flows import (
 )
 
 
-def _first_public_key(keys: Sequence[Any]) -> str:
-    """Return the base64 body of the first realm signing key.
-
-    get_realm_keys_output resolves to typed objects, but passing it through
-    Output.all() hands the apply plain dicts, and which one you get has moved
-    between provider versions. Accept either rather than depending on it.
-    """
-    if not keys:
-        return ""
-    key = keys[0]
-    if isinstance(key, dict):
-        return key.get("public_key", "")
-    return getattr(key, "public_key", "")
-
-
-def create_olapps_dev_realm(  # noqa: PLR0913, PLR0915
+def create_olapps_dev_realm(  # noqa: PLR0913
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     k8s_provider: k8s.Provider,
@@ -855,13 +838,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913, PLR0915
             opts=kc_opts,
         )
 
-        realm_keys = keycloak.get_realm_keys_output(
-            realm_id=realm.realm,
-            algorithms=["RS256"],
-            statuses=["ACTIVE"],
-            opts=InvokeOptions(provider=keycloak_provider, parent=realm),
-        )
-
         k8s.core.v1.Secret(
             "oidc-secret-ocw-studio",
             metadata={
@@ -871,15 +847,14 @@ def create_olapps_dev_realm(  # noqa: PLR0913, PLR0915
             string_data=Output.all(
                 client_id=ocw_studio_client.client_id,
                 client_secret=ocw_studio_client_secret,
-                keys=realm_keys.keys,
+                # get_realm_keys returns the full certificate list; the backend
+                # wants the bare base64 body of the active RS256 signing key.
+                public_key=realm_keys.keys.apply(lambda keys: keys[0].public_key),
             ).apply(
                 lambda args: {
                     "SOCIAL_AUTH_KEYCLOAK_KEY": args["client_id"],
                     "SOCIAL_AUTH_KEYCLOAK_SECRET": args["client_secret"],
-                    # get_realm_keys returns the full certificate list; the
-                    # backend wants the bare base64 body of the active RS256
-                    # signing key.
-                    "SOCIAL_AUTH_KEYCLOAK_PUBLIC_KEY": _first_public_key(args["keys"]),
+                    "SOCIAL_AUTH_KEYCLOAK_PUBLIC_KEY": args["public_key"],
                 }
             ),
             opts=ResourceOptions(provider=k8s_provider, parent=ocw_studio_client),
