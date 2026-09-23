@@ -1,12 +1,15 @@
 """Pulumi management of the resources that live inside a single GCP project.
 
-An :class:`OLGCPProject` owns the three GCP resource types that the credential
+An :class:`OLGCPProject` owns the GCP resource types that the credential
 inventory in ``docs/plans/gcp-service-account-consumer-map.md`` found to be
-both load-bearing and Pulumi-manageable:
+both load-bearing and Pulumi-manageable, plus the federation that replaces
+downloaded keys:
 
 * **enabled services** -- ``gcp.projects.Service``
 * **service accounts and their project role bindings** -- ``gcp.serviceaccount``
 * **API keys, with mandatory restrictions** -- ``gcp.projects.ApiKey``
+* **workload identity pools and their OIDC providers** --
+  ``gcp.iam.WorkloadIdentityPool`` / ``WorkloadIdentityPoolProvider``
 
 It deliberately does *not* create the project itself. ``mitol01``, the
 consolidation target, already exists; whether further ``mitol`` projects can be
@@ -37,12 +40,13 @@ Two GCP credential types are absent because no API can manage them:
   once the app-side cutover is designed.
 """
 
+import re
 from enum import StrEnum
 from typing import Any
 
 import pulumi_gcp as gcp
 from pulumi import ComponentResource, Output, ResourceOptions
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ol_infrastructure.lib.ol_types import GCPBase
 
@@ -141,6 +145,55 @@ class OLGCPAPIKeyConfig(BaseModel):
         return self
 
 
+# Pool and provider ids share one contract: 4-32 lowercase letters, digits or
+# hyphens, and the "gcp-" prefix is reserved by Google.
+WORKLOAD_IDENTITY_ID_PATTERN = re.compile(r"[a-z0-9-]{4,32}")
+
+
+def validate_workload_identity_id(value: str) -> str:
+    """Reject an id GCP would refuse at create time rather than at plan time."""
+    if not WORKLOAD_IDENTITY_ID_PATTERN.fullmatch(value) or value.startswith("gcp-"):
+        msg = (
+            f"{value!r} is not a valid workload identity pool/provider id: use "
+            "4-32 lowercase letters, digits or hyphens, not starting with 'gcp-'."
+        )
+        raise ValueError(msg)
+    return value
+
+
+class OLGCPOIDCProviderConfig(BaseModel):
+    """An OIDC issuer whose tokens a workload identity pool accepts.
+
+    The motivating case is an EKS cluster: its service-account tokens are JWTs
+    signed by a per-cluster public issuer, so a pod can exchange a projected
+    token for a Google access token with no key material at rest.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    provider_id: str
+    display_name: str
+    # An Output when resolved from another stack, e.g. an EKS cluster's issuer.
+    issuer_uri: str | Output
+
+    _validate_provider_id = field_validator("provider_id")(
+        validate_workload_identity_id
+    )
+
+
+class OLGCPWorkloadIdentityPoolConfig(BaseModel):
+    """A workload identity pool and the OIDC providers that feed it."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    pool_id: str
+    display_name: str
+    description: str = ""
+    oidc_providers: list[OLGCPOIDCProviderConfig] = Field(default_factory=list)
+
+    _validate_pool_id = field_validator("pool_id")(validate_workload_identity_id)
+
+
 class OLGCPProjectConfig(GCPBase):
     """Configuration for the resources managed inside one GCP project."""
 
@@ -150,6 +203,9 @@ class OLGCPProjectConfig(GCPBase):
     enabled_services: list[str] = Field(default_factory=list)
     service_accounts: list[OLGCPServiceAccountConfig] = Field(default_factory=list)
     api_keys: list[OLGCPAPIKeyConfig] = Field(default_factory=list)
+    workload_identity_pools: list[OLGCPWorkloadIdentityPoolConfig] = Field(
+        default_factory=list
+    )
     # Required whenever api_keys are declared. The API Keys API identifies a
     # project by NUMBER, so a key read back from GCP always carries the number
     # in its `project` field. Declaring the id instead produces a permanent
@@ -189,6 +245,10 @@ class OLGCPProject(ComponentResource):
         self.service_accounts: dict[str, gcp.serviceaccount.Account] = {}
         self.service_account_emails: dict[str, Output[str]] = {}
         self.api_keys: dict[str, gcp.projects.ApiKey] = {}
+        # Keyed "<pool_id>/<provider_id>"; provider ids are only unique per pool.
+        self.workload_identity_providers: dict[
+            str, gcp.iam.WorkloadIdentityPoolProvider
+        ] = {}
 
         for service in config.enabled_services:
             # disable_on_destroy is set explicitly rather than left to the
@@ -205,6 +265,43 @@ class OLGCPProject(ComponentResource):
                 disable_dependent_services=False,
                 opts=child_opts,
             )
+
+        pools: list[gcp.iam.WorkloadIdentityPool] = []
+        for pool_config in config.workload_identity_pools:
+            pool = gcp.iam.WorkloadIdentityPool(
+                f"{name}-wif-pool-{pool_config.pool_id}",
+                project=config.project_id,
+                workload_identity_pool_id=pool_config.pool_id,
+                display_name=pool_config.display_name,
+                description=pool_config.description,
+                opts=child_opts,
+            )
+            pools.append(pool)
+            for provider_config in pool_config.oidc_providers:
+                self.workload_identity_providers[
+                    f"{pool_config.pool_id}/{provider_config.provider_id}"
+                ] = gcp.iam.WorkloadIdentityPoolProvider(
+                    f"{name}-wif-provider-{pool_config.pool_id}-"
+                    f"{provider_config.provider_id}",
+                    project=config.project_id,
+                    workload_identity_pool_id=pool.workload_identity_pool_id,
+                    workload_identity_pool_provider_id=provider_config.provider_id,
+                    display_name=provider_config.display_name,
+                    # Principals are pool-scoped, so two clusters issuing the
+                    # same `sub` (system:serviceaccount:<ns>:<name>) would
+                    # otherwise map to one principal, and a grant meant for
+                    # production would admit the CI cluster too. Prefixing the
+                    # provider id keeps each issuer's subjects distinct.
+                    attribute_mapping={
+                        "google.subject": (
+                            f'"{provider_config.provider_id}::" + assertion.sub'
+                        ),
+                    },
+                    oidc=gcp.iam.WorkloadIdentityPoolProviderOidcArgs(
+                        issuer_uri=provider_config.issuer_uri,
+                    ),
+                    opts=child_opts.merge(ResourceOptions(parent=pool)),
+                )
 
         for account in config.service_accounts:
             account_opts = adoption_opts(child_opts, account.import_id)
@@ -236,7 +333,12 @@ class OLGCPProject(ComponentResource):
                     service_account_id=service_account.name,
                     role=grant.role,
                     member=grant.member,
-                    opts=adoption_opts(child_opts, grant.import_id),
+                    # A principal:// or principalSet:// member naming a pool
+                    # declared here must wait for that pool to exist.
+                    opts=adoption_opts(
+                        child_opts.merge(ResourceOptions(depends_on=pools)),
+                        grant.import_id,
+                    ),
                 )
 
         for api_key in config.api_keys:
@@ -277,9 +379,11 @@ def adoption_opts(opts: ResourceOptions, import_id: str | None) -> ResourceOptio
 __all__ = [
     "APIKeyRestrictionType",
     "OLGCPAPIKeyConfig",
+    "OLGCPOIDCProviderConfig",
     "OLGCPProject",
     "OLGCPProjectConfig",
     "OLGCPServiceAccountConfig",
     "OLGCPServiceAccountIAMMemberConfig",
+    "OLGCPWorkloadIdentityPoolConfig",
     "adoption_opts",
 ]

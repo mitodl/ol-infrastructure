@@ -46,10 +46,12 @@ start.
 
 But the provider also needs APIs in order to **read** the resource types this
 stack manages: `iam.googleapis.com` to see service accounts,
-`apikeys.googleapis.com` to see API keys, and `serviceusage.googleapis.com` to
+`apikeys.googleapis.com` to see API keys, `serviceusage.googleapis.com` to
 see which services are enabled (every `gcp.projects.Service` lists them before
-creating one). Those have to be enabled *before* the first apply, because a
-stack cannot enable the API it needs in order to look at itself.
+creating one), and `cloudresourcemanager.googleapis.com` to read and write the
+project IAM policy for `project_roles`. Those have to be enabled *before* the
+first apply, because a stack cannot enable the API it needs in order to look
+at itself.
 
 `pulumi preview` does not catch a missing one. A resource that is not yet in
 state is planned as a create without being read, so the 403 only appears
@@ -60,12 +62,27 @@ So the bootstrap is one out-of-band command per project:
 
 ```bash
 gcloud services enable iam.googleapis.com apikeys.googleapis.com \
-  serviceusage.googleapis.com --project=<project>
+  serviceusage.googleapis.com cloudresourcemanager.googleapis.com \
+  --project=<project>
 ```
 
 and then the same services are declared in `enabled_services` so they stay
 enabled and the fact is recorded. Add to that list whenever a new managed
 resource type brings its own API.
+
+The automation account's own project roles are bootstrap too. They are granted
+by a project Owner, never by the stack, so the account cannot widen its own
+access through a config change. `pulumi-gcp@mitol01` needs
+`iam.serviceAccountAdmin`, `resourcemanager.projectIamAdmin`,
+`serviceusage.apiKeysAdmin` and `serviceusage.serviceUsageAdmin` (granted
+before the stack existed), plus `iam.workloadIdentityPoolAdmin` once a project
+declares `workload_identity_pools`:
+
+```bash
+gcloud projects add-iam-policy-binding mitol01 \
+  --member=serviceAccount:pulumi-gcp@mitol01.iam.gserviceaccount.com \
+  --role=roles/iam.workloadIdentityPoolAdmin --condition=None
+```
 
 Note this is invisible from `gcloud`: `gcloud services api-keys list` succeeds
 against a project where `apikeys.googleapis.com` is not enabled, because the
@@ -199,6 +216,29 @@ hand, and it should be recorded here when they do.
 Service-account-level IAM does not appear in the project's IAM policy, so a
 grant that is not written down in stack config exists only as a console click
 nobody can reproduce.
+
+## Kubernetes workloads calling Google APIs
+
+The `eks-workloads` pool trusts each EKS cluster's service-account token
+issuer, one OIDC provider per cluster, resolved from the cluster's EKS stack
+(`eks_stack: data.Production`). A pod gets a Google token by exchanging a
+projected Kubernetes token, so there is no key material at rest.
+
+- The provider maps `google.subject` to `"<provider_id>::" + assertion.sub`.
+  Principals are pool-scoped, and every cluster issues the same `sub` for the
+  same namespace and service account, so without the prefix a grant meant for
+  production would also admit CI.
+- Grant `roles/iam.workloadIdentityUser` on a Google service account to
+  `principal://iam.googleapis.com/projects/32631020496/locations/global/workloadIdentityPools/eks-workloads/subject/<provider_id>::system:serviceaccount:<namespace>:<name>`.
+- The pod projects a token whose audience is
+  `https://iam.googleapis.com/` + the provider's `name` (exported as
+  `workload_identity_providers["<project>"]["<pool>/<provider>"]`), and points
+  `GOOGLE_APPLICATION_CREDENTIALS`
+  at an `external_account` document naming that token file. The Dagster stack's
+  `ml` code location is the worked example.
+- The binding is per Kubernetes service account, not per pod. Anything that
+  runs as that service account can project the token, so scope the Kubernetes
+  service account as narrowly as the Google grant should be.
 
 ## What this does not manage
 

@@ -11,9 +11,11 @@ import pytest
 
 from ol_infrastructure.components.gcp.project import (
     OLGCPAPIKeyConfig,
+    OLGCPOIDCProviderConfig,
     OLGCPProject,
     OLGCPProjectConfig,
     OLGCPServiceAccountConfig,
+    OLGCPWorkloadIdentityPoolConfig,
     adoption_opts,
 )
 from ol_infrastructure.lib.ol_types import GCPBase
@@ -325,3 +327,70 @@ class TestAdoption:
         component = self.build_component(adopt=False)
         assert component.service_accounts["legacy-sa"]._protect is not True
         assert component.api_keys["legacy-key"]._protect is not True
+
+
+class TestWorkloadIdentityPools:
+    """Federation from EKS clusters into one pool."""
+
+    @staticmethod
+    def build_component() -> OLGCPProject:
+        return OLGCPProject(
+            "test-wif",
+            OLGCPProjectConfig(
+                project_id="test-project",
+                labels=valid_labels(),
+                workload_identity_pools=[
+                    OLGCPWorkloadIdentityPoolConfig(
+                        pool_id="eks-workloads",
+                        display_name="EKS workloads",
+                        oidc_providers=[
+                            OLGCPOIDCProviderConfig(
+                                provider_id=provider_id,
+                                display_name=provider_id,
+                                issuer_uri=pulumi.Output.from_input(
+                                    f"https://oidc.example.com/id/{provider_id}"
+                                ),
+                            )
+                            for provider_id in ("data-production", "data-ci")
+                        ],
+                    )
+                ],
+            ),
+        )
+
+    def test_providers_keyed_by_pool_and_provider(self):
+        component = self.build_component()
+        assert set(component.workload_identity_providers) == {
+            "eks-workloads/data-production",
+            "eks-workloads/data-ci",
+        }
+
+    @pulumi.runtime.test
+    def test_subjects_are_prefixed_per_provider(self):
+        component = self.build_component()
+        providers = component.workload_identity_providers
+
+        def check(mappings):
+            # Two clusters issue identical `sub` claims for the same namespace
+            # and service account; without the prefix they would map to one
+            # principal and a production grant would admit CI.
+            production, ci = mappings
+            assert production["google.subject"] == (
+                '"data-production::" + assertion.sub'
+            )
+            assert ci["google.subject"] == '"data-ci::" + assertion.sub'
+
+        return pulumi.Output.all(
+            providers["eks-workloads/data-production"].attribute_mapping,
+            providers["eks-workloads/data-ci"].attribute_mapping,
+        ).apply(check)
+
+    @pytest.mark.parametrize("bad_id", ["abc", "x" * 33, "ABCD", "data_ci", "gcp-test"])
+    def test_invalid_ids_rejected(self, bad_id):
+        # 4-32 lowercase letters, digits or hyphens; "gcp-" is reserved.
+        with pytest.raises(ValueError, match="pool_id"):
+            OLGCPWorkloadIdentityPoolConfig(pool_id=bad_id, display_name="x")
+        with pytest.raises(ValueError, match="provider_id"):
+            OLGCPOIDCProviderConfig(
+                provider_id=bad_id, display_name="x", issuer_uri="https://x"
+            )

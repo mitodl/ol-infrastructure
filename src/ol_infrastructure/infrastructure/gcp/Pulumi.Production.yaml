@@ -28,6 +28,16 @@ config:
       # Every Service resource above lists the project's enabled services
       # through this API, billed to mitol01.
     - serviceusage.googleapis.com
+      # Project-level IAM grants (service_accounts[].project_roles) read and
+      # write the project IAM policy through this API, billed to mitol01.
+    - cloudresourcemanager.googleapis.com
+      # Workload Identity Federation: sts exchanges the external token,
+      # iamcredentials impersonates the service account (generateAccessToken).
+      # Used by the Concourse -> pulumi-gcp path and the eks-workloads pool.
+      # sts read DISABLED on 2026-09-22 while Concourse federation worked, but
+      # Google's setup lists both, so both are declared.
+    - sts.googleapis.com
+    - iamcredentials.googleapis.com
     service_accounts:
       # The stack's own automation identity, adopted so the federation wiring
       # is reviewable here instead of living as console clicks nobody can
@@ -52,6 +62,50 @@ config:
         # was declared for group:odl-devops@mit.edu, which Google rejects
         # ("does not exist"), so it is left out until a real group is chosen.
         # roles/owner does NOT confer it (verified 2026-08-19).
+      # Vertex AI (Gemini) for the Dagster ml code location, one account per
+      # tier. The member is the eks-workloads pool subject for the
+      # dagster-user-code Kubernetes service account on that tier's data
+      # cluster; the "<provider>::" prefix comes from the pool's subject
+      # mapping (components/gcp/project.py). Every Dagster code location runs
+      # as dagster-user-code, so any of them can project that token and become
+      # this account; only ml is wired to. Same scope as Dagster's Bedrock
+      # grant. Narrowing it needs a separate Kubernetes SA for ml.
+    - account_id: dagster-ml-production
+      display_name: Dagster ml Production
+      project_roles:
+      - roles/aiplatform.user
+      iam_members:
+      - role: roles/iam.workloadIdentityUser
+        member: principal://iam.googleapis.com/projects/32631020496/locations/global/workloadIdentityPools/eks-workloads/subject/data-production::system:serviceaccount:dagster:dagster-user-code
+    - account_id: dagster-ml-qa
+      display_name: Dagster ml QA
+      project_roles:
+      - roles/aiplatform.user
+      iam_members:
+      - role: roles/iam.workloadIdentityUser
+        member: principal://iam.googleapis.com/projects/32631020496/locations/global/workloadIdentityPools/eks-workloads/subject/data-qa::system:serviceaccount:dagster:dagster-user-code
+    - account_id: dagster-ml-ci
+      display_name: Dagster ml CI
+      project_roles:
+      - roles/aiplatform.user
+      iam_members:
+      - role: roles/iam.workloadIdentityUser
+        member: principal://iam.googleapis.com/projects/32631020496/locations/global/workloadIdentityPools/eks-workloads/subject/data-ci::system:serviceaccount:dagster:dagster-user-code
+    workload_identity_pools:
+      # Kubernetes workloads on our EKS clusters. Each provider trusts one
+      # cluster's service-account token issuer, read from its EKS stack.
+    - pool_id: eks-workloads
+      display_name: EKS workloads
+      oidc_providers:
+      - provider_id: data-production
+        display_name: EKS data Production
+        eks_stack: data.Production
+      - provider_id: data-qa
+        display_name: EKS data QA
+        eks_stack: data.QA
+      - provider_id: data-ci
+        display_name: EKS data CI
+        eks_stack: data.CI
       # The tier a credential serves is carried in its own name and restrictions,
       # not in the stack it is declared from. See README.md -- splitting these
       # across CI/QA/Production stacks would buy naming, not isolation, because
