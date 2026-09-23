@@ -91,9 +91,10 @@ spec:
     backends:
     - serviceName: ocw-hugo-dev
       servicePort: 3000
+    # Hugo's live-reload is a websocket; without this the connection is never
+    # upgraded and theme edits need a manual browser refresh.
+    websocket: true
     plugins:
-    # Hugo's live-reload uses a websocket, which needs the upstream connection
-    # left alone rather than buffered.
     - name: proxy-rewrite
       enable: true
       config:
