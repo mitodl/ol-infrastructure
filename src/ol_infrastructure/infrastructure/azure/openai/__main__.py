@@ -177,6 +177,12 @@ for consumer, (namespace, service_account) in CONSUMER_SUBJECTS.items():
     # Azure allows one deployment operation per account at a time and answers a second
     # with 409 RequestConflict ("Another operation is being performed on the parent
     # resource"), so each deployment waits for the one before it.
+    #
+    # That covers creates and updates. It cannot cover deleting two models that are not
+    # adjacent in model_names in one apply: Pulumi runs deletes of removed resources
+    # after everything else, batched by direct dependency only (ScheduleDeletes in
+    # pkg/resource/deploy/step_generator.go), so both land in the same parallel batch
+    # and one can 409. Remove one model per apply.
     previous_deployment: azure_native.cognitiveservices.Deployment | None = None
     for model_name in model_names:
         pinned_version = model_versions.get(model_name)
