@@ -5,7 +5,7 @@
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
-config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service openedx")
+config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
 config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0 learn-ai=0.28.3")
 config.define_string("disk_keep_tags", usage="Newest tilt-built image tags kept per repo by the disk janitor (default: 3). Overrides LOCAL_DEV_DISK_KEEP_TAGS env var.")
@@ -14,6 +14,10 @@ config.define_string("log_retention_period", usage="How long Grafana/Loki keeps 
 config.define_string("keycloak_image", usage="Keycloak server image for the core stack (default: the published mitodl/keycloak digest). Set and cleared by local-dev/scripts/kc-theme-image.sh to test an unreleased ol-keycloakify theme. Overrides LOCAL_DEV_KEYCLOAK_IMAGE env var.")
 cfg = config.parse()
 
+# ocw-studio is deliberately absent from this default. It brings an object
+# store and a privileged Concourse worker along with it, which is a lot of
+# machine for a developer who is not working on OCW — add it to enabled_apps
+# in tilt_config.json to switch it on.
 enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
 per_app_databases = cfg.get("per_app_databases", False)
 
@@ -242,7 +246,83 @@ APPS = [
         "deploy_name": "lms",
         "tiltfile": "./local-dev/apps/openedx/Tiltfile",
     },
+    {
+        "name": "ocw-studio",
+        "dir": "ocw-studio",
+        "namespace": "ocw-studio",
+        "deploy_name": "ocwstudio-webapp",
+        "image_backend": "mitodl/ocw-studio-app",
+        # Nothing consumes prebuilt_tag_backend yet -- every app's
+        # deployment.yaml pins :latest -- so this is metadata for when that
+        # is wired up. Note 0.199.0 predates the ocw-studio change that makes
+        # the S3 and pipeline endpoints configurable, so the no-checkout path
+        # needs a release containing it before it will work here.
+        "prebuilt_tag_backend": prebuilt_tags.get("ocw-studio", "0.199.0"),
+        "tiltfile": "./local-dev/apps/ocw-studio/Tiltfile",
+        "seed_commands": [
+            {
+                "label": "seed-ocw-studio-superuser",
+                # Create-or-promote rather than createsuperuser: signing in
+                # through Keycloak before seeding already created this user by
+                # email, and createsuperuser then fails on the unique email
+                # with no way out short of exec'ing in. No password is set;
+                # login goes through Keycloak.
+                "description": "Create or promote the admin@odl.local superuser",
+                "cmd": (
+                    "python manage.py shell -c " +
+                    "'from django.contrib.auth import get_user_model; " +
+                    "U = get_user_model(); " +
+                    "u, created = U.objects.get_or_create(" +
+                    "email=\"admin@odl.local\", " +
+                    "defaults={\"username\": \"admin\", \"name\": \"Admin\"}); " +
+                    "u.is_staff = True; u.is_superuser = True; u.save(); " +
+                    "print((\"created\" if created else \"promoted\"), u.email)'"
+                ),
+            },
+            {
+                "label": "seed-ocw-studio-groups",
+                "description": "Create the global site permission groups",
+                "cmd": "python manage.py backpopulate_groups",
+            },
+            {
+                "label": "seed-ocw-studio-starters",
+                "description": (
+                    "Import site starters from ocw-hugo-projects" +
+                    " (network access required)"
+                ),
+                "cmd": (
+                    "python manage.py import_website_starters" +
+                    " https://github.com/mitodl/ocw-hugo-projects"
+                ),
+            },
+            {
+                "label": "seed-ocw-studio-theme-pipeline",
+                "description": (
+                    "Create the Concourse pipeline that builds ocw-hugo-themes" +
+                    " assets; run it before publishing any site"
+                ),
+                "cmd": "python manage.py upsert_theme_assets_pipeline",
+            },
+        ],
+    },
 ]
+
+# ---------------------------------------------------------------------------
+# Host address
+#
+# How a pod reaches a process on this machine. Asked of Docker rather than
+# derived from the k3d bridge, because the bridge gateway is the Docker VM's
+# gateway under Docker Desktop and does not reach the machine there.
+# Registered with CoreDNS as host.k3d.internal by the core stack: k3d defines
+# that name itself, but only at cluster creation, and both places it writes it
+# are regenerated without it when the node container or k3s restarts.
+# ---------------------------------------------------------------------------
+host_gateway = str(local(
+    "docker run --rm --add-host=hostgw:host-gateway " +
+    "alpine:3 getent hosts hostgw | awk '{print $1}'",
+    quiet=True,
+    echo_off=True,
+)).strip()
 
 # ---------------------------------------------------------------------------
 # Shared infrastructure (Pulumi stacks)
@@ -260,6 +340,11 @@ local_resource(
         "LOCAL_DEV_ROOT_DOMAIN": root_domain,
         "LOCAL_DEV_LOG_RETENTION": log_retention_period,
         "LOCAL_DEV_KEYCLOAK_IMAGE": keycloak_image,
+        # Gates the per-app resources added since enabled_apps existed (the
+        # ocw-studio namespace/databases and the RustFS object store). The four
+        # original apps are still provisioned unconditionally.
+        "LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps),
+        "LOCAL_DEV_HOST_GATEWAY": host_gateway,
         "PULUMI_CONFIG_PASSPHRASE": "",
     },
     dir="./local-dev/infra/core",
@@ -291,6 +376,9 @@ local_resource(
 local_resource(
     "local-infra-apps",
     cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c '{wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
+    # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
+    # the core stack only creates on demand.
+    env={"LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps)},
     dir="./local-dev/infra/apps_infra",
     deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/scripts/wait-for-keycloak-admin.sh"],
     labels=["infra"],

@@ -70,6 +70,13 @@ k8s_yaml_local([
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/apisix-routes.yaml"),
 ], local_overrides=os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/app-env.local.yaml"))
 
+# Applied separately: these objects front a process on the developer's machine
+# rather than anything in this app, and none of them are ConfigMaps or Secrets,
+# so they have no business in mit-learn's config fingerprint.
+k8s_yaml_local([
+    os.path.join(config.main_dir, "local-dev/apps/mit-learn/ocw-hugo-dev.yaml"),
+])
+
 # ─────────────────────────────────────────────────────────────
 # Resource grouping + dependency declarations
 # ─────────────────────────────────────────────────────────────
@@ -84,6 +91,19 @@ k8s_resource(
     links=[
         link("https://api.learn.mit.dev", "MIT Learn API"),
         link("https://learn.mit.dev", "MIT Learn Frontend"),
+    ],
+)
+
+k8s_resource(
+    new_name="ocw-hugo-dev",
+    objects=[
+        "ocw-hugo-dev:apisixupstream",
+        "ocw-hugo-dev-tls:apisixtls",
+        "ocw-hugo-dev-route:apisixroute",
+    ],
+    labels=["mit-learn"],
+    links=[
+        link("https://ocw-dev.learn." + _rd, "OCW theme dev server (bare metal)"),
     ],
 )
 

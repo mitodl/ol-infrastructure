@@ -34,9 +34,11 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     mitxonline_client_secret: Output,
     unified_ecommerce_client_secret: Output,
     ovs_client_secret: Output,
+    ocw_studio_client_secret: Output,
     *,
     root_domain: str,
     verify_email: bool = True,
+    enabled_apps: tuple[str, ...] = (),
 ) -> None:
     """
     Create the olapps Keycloak realm for local development.
@@ -780,3 +782,80 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         ],
         opts=kc_opts,
     )
+
+    # -------------------------------------------------------------------------
+    # ocw-studio
+    #
+    # Gated on enabled_apps: its k8s Secret lands in the ocw-studio namespace,
+    # which the core stack only creates when the app is switched on.
+    #
+    # Unlike the other apps here, ocw-studio authenticates in Django with
+    # python-social-auth's KeycloakOAuth2 backend rather than through the
+    # APISIX openid-connect plugin, so its Secret carries SOCIAL_AUTH_KEYCLOAK_*
+    # names that the app reads directly as env vars. That backend verifies the
+    # ID token signature itself and needs the realm's RS256 public key, which
+    # only exists once the realm does -- hence the get_realm_keys_output lookup
+    # rather than a literal.
+    # -------------------------------------------------------------------------
+    if "ocw-studio" in set(enabled_apps):
+        ocw_studio_client = keycloak.openid.Client(
+            "olapps-ocw-studio-client",
+            name="ol-ocw-studio-client",
+            realm_id=realm.realm,
+            client_id="ol-ocw-studio-client",
+            client_secret=ocw_studio_client_secret,
+            enabled=True,
+            access_type="CONFIDENTIAL",
+            standard_flow_enabled=True,
+            implicit_flow_enabled=False,
+            service_accounts_enabled=False,
+            valid_redirect_uris=[
+                f"https://studio.ocw.{root_domain}/*",
+            ],
+            opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
+        )
+        keycloak.openid.ClientDefaultScopes(
+            "olapps-ocw-studio-default-scopes",
+            realm_id=realm.realm,
+            client_id=ocw_studio_client.id,
+            default_scopes=DEFAULT_SCOPES,
+            opts=kc_opts,
+        )
+        # social-core's KeycloakOAuth2 decodes the access token with
+        # audience == client_id (its audience() is hardcoded to the client key,
+        # with no setting to override), and Keycloak puts the client in `azp`
+        # rather than `aud` unless a mapper adds it -- so the callback died with
+        # InvalidAudienceError. Same mapper the prod ol-mit ocw-studio client
+        # and the local-dev OVS client above carry, for the same reason.
+        keycloak.openid.AudienceProtocolMapper(
+            "olapps-ocw-studio-audience-mapper",
+            realm_id=realm.realm,
+            client_id=ocw_studio_client.id,
+            name="audience",
+            included_client_audience=ocw_studio_client.client_id,
+            add_to_id_token=True,
+            add_to_access_token=True,
+            opts=kc_opts,
+        )
+
+        k8s.core.v1.Secret(
+            "oidc-secret-ocw-studio",
+            metadata={
+                "name": "ol-ocw-studio-oidc",
+                "namespace": "ocw-studio",
+            },
+            string_data=Output.all(
+                client_id=ocw_studio_client.client_id,
+                client_secret=ocw_studio_client_secret,
+                # get_realm_keys returns the full certificate list; the backend
+                # wants the bare base64 body of the active RS256 signing key.
+                public_key=realm_keys.keys.apply(lambda keys: keys[0].public_key),
+            ).apply(
+                lambda args: {
+                    "SOCIAL_AUTH_KEYCLOAK_KEY": args["client_id"],
+                    "SOCIAL_AUTH_KEYCLOAK_SECRET": args["client_secret"],
+                    "SOCIAL_AUTH_KEYCLOAK_PUBLIC_KEY": args["public_key"],
+                }
+            ),
+            opts=ResourceOptions(provider=k8s_provider, parent=ocw_studio_client),
+        )

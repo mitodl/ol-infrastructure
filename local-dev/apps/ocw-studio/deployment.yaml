@@ -1,0 +1,403 @@
+---
+# ─────────────────────────────────────────────────────────────
+# Web Deployment (granian WSGI + nginx sidecar)
+# ─────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocwstudio-webapp
+  namespace: ocw-studio
+  labels:
+    app: ocwstudio
+    component: webapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ocwstudio
+      component: webapp
+  template:
+    metadata:
+      labels:
+        app: ocwstudio
+        component: webapp
+    spec:
+      initContainers:
+        # Merge the image's system CA bundle with the mkcert root so the pod
+        # trusts both public HTTPS endpoints and local-dev TLS. Studio needs
+        # both: GitHub/GitLab over the internet, Keycloak over local TLS.
+      - name: ca-bundle-merge
+        image: mitodl/ocw-studio-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+
+        # The CNPG cluster only runs postInitSQL on first bootstrap, so a
+        # developer enabling ocw-studio on an existing cluster has no
+        # ocwstudio database. Create both it and Concourse's on demand.
+      - name: create-databases
+        image: postgres:18-alpine
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          set -eu
+          export PGPASSWORD=localdev  # pragma: allowlist secret
+          PSQL="psql -h local-pg-rw.local-infra.svc.cluster.local -U app -d postgres -tAc"
+          until $PSQL "SELECT 1" >/dev/null 2>&1; do
+            echo "waiting for postgres..."
+            sleep 2
+          done
+          for db in ocwstudio concourse; do
+            if [ "$($PSQL "SELECT 1 FROM pg_database WHERE datname='${db}'")" = "1" ]; then
+              echo "database exists: ${db}"
+            else
+              echo "creating database: ${db}"
+              # `|| true` because this races the same step in concourse.yaml:
+              # on a fresh enable both pods start together, both can see
+              # `concourse` missing, and under `set -eu` the loser of the
+              # CREATE would exit non-zero and restart-loop the web pod.
+              $PSQL "CREATE DATABASE ${db} OWNER app" || true
+            fi
+          done
+
+      - name: bootstrap
+        image: mitodl/ocw-studio-app:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /src
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -eo pipefail
+          echo "==> Collecting static files..."
+          python manage.py collectstatic --noinput
+
+          echo "==> Running migrations..."
+          python manage.py migrate --noinput
+
+          echo "==> Bootstrap complete."
+        envFrom:
+        - configMapRef:
+            name: ocwstudio-env
+        - secretRef:
+            name: ocwstudio-secrets
+        - secretRef:
+            name: ol-ocw-studio-oidc
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over the sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: ocwstudio-env-local
+            optional: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
+        volumeMounts:
+        - name: static-files
+          mountPath: /src/staticfiles
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+
+      containers:
+        # granian WSGI application server. Studio is WSGI, not ASGI.
+      - name: app
+        image: mitodl/ocw-studio-app:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /src
+        command:
+        - granian
+        - --interface
+        - wsgi
+        - --host
+        - "0.0.0.0"
+        - --port
+        - "8041"
+        - --workers
+        - "1"
+        - --blocking-threads
+        - "1"
+        # No --reload, unlike mit-learn: that flag needs the granian[reload]
+        # extra and ocw-studio depends on plain "granian", so granian exits
+        # with 'Using --reload requires the granian[reload] extra'. Tilt still
+        # live-syncs Python changes into the container, but the process has to
+        # be restarted to pick them up — restart the resource from the Tilt UI,
+        # the same as the celery workers. Adding the extra upstream would let
+        # this go back to matching the other apps.
+        - main.wsgi:application
+        ports:
+        - containerPort: 8041
+          name: wsgi
+        envFrom:
+        - configMapRef:
+            name: ocwstudio-env
+        - secretRef:
+            name: ocwstudio-secrets
+        - secretRef:
+            name: ol-ocw-studio-oidc
+        - configMapRef:
+            name: ocwstudio-env-local
+            optional: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
+        # ocw-studio ships purpose-built probe endpoints (main/urls_healthcheck.py):
+        # readiness checks the database, cache and redis; liveness checks only
+        # the database, so a slow redis does not get the pod killed.
+        readinessProbe:
+          httpGet:
+            path: /health/readiness/
+            port: 8041
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          failureThreshold: 6
+          timeoutSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health/liveness/
+            port: 8041
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          failureThreshold: 10
+          timeoutSeconds: 10
+        volumeMounts:
+        - name: static-files
+          mountPath: /src/staticfiles
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+
+      - name: nginx
+        image: nginx:1.27-alpine
+        ports:
+        - containerPort: 8043
+          name: http
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+        - name: static-files
+          mountPath: /src/staticfiles
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: ocwstudio-nginx-conf
+      - name: static-files
+        emptyDir: {}
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
+
+---
+# ─────────────────────────────────────────────────────────────
+# Celery worker + beat
+#
+# One process for both, matching compose's `-B` flag. Studio's queues are
+# low-volume locally and the publish queue is the only busy one.
+# ─────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocwstudio-celery
+  namespace: ocw-studio
+  labels:
+    app: ocwstudio
+    component: celery
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ocwstudio
+      component: celery
+  template:
+    metadata:
+      labels:
+        app: ocwstudio
+        component: celery
+    spec:
+      initContainers:
+      - name: ca-bundle-merge
+        image: mitodl/ocw-studio-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+      containers:
+      - name: celery
+        image: mitodl/ocw-studio-app:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /src
+        command:
+        - celery
+        - -A
+        - main.celery:app
+        - worker
+        - -Q
+        - publish,batch,default
+        - -B
+        - --loglevel=info
+        - --concurrency=2
+        envFrom:
+        - configMapRef:
+            name: ocwstudio-env
+        - secretRef:
+            name: ocwstudio-secrets
+        - secretRef:
+            name: ol-ocw-studio-oidc
+        - configMapRef:
+            name: ocwstudio-env-local
+            optional: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
+        volumeMounts:
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
+
+---
+# ─────────────────────────────────────────────────────────────
+# Site host — serves published sites out of the object store
+#
+# Replaces the compose nginx listeners on :8044/:8045/:8046. Separate from the
+# Studio pod because these are public-content servers with a different
+# lifecycle: they keep serving the last publish even while Studio is rebuilding.
+# ─────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocwstudio-sitehost
+  namespace: ocw-studio
+  labels:
+    app: ocwstudio
+    component: sitehost
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ocwstudio
+      component: sitehost
+  template:
+    metadata:
+      labels:
+        app: ocwstudio
+        component: sitehost
+    spec:
+      initContainers:
+        # nginx resolves proxy_pass hostnames once, at startup, and exits if
+        # one does not resolve. Without this wait the pod crash-loops whenever
+        # it starts before the RustFS Service exists.
+      - name: wait-for-objectstore
+        image: busybox:1.37
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          until nslookup rustfs.local-infra.svc.cluster.local >/dev/null 2>&1; do
+            echo "waiting for the object store..."
+            sleep 2
+          done
+          echo "object store resolved"
+      containers:
+      - name: nginx
+        image: nginx:1.27-alpine
+        ports:
+        - containerPort: 8044
+          name: draft
+        - containerPort: 8045
+          name: live
+        - containerPort: 8046
+          name: test
+        volumeMounts:
+        - name: sitehost-config
+          mountPath: /etc/nginx/conf.d/default.conf
+          subPath: default.conf
+        # Every Hugo build in a mass build fetches instructor JSON through
+        # here, so it sees the full fan-out. Memory is not the constraint
+        # (~18Mi in practice); CPU scheduling under contention is.
+        resources:
+          requests:
+            cpu: 200m
+            memory: 64Mi
+          limits:
+            memory: 512Mi
+      volumes:
+      - name: sitehost-config
+        configMap:
+          name: ocwstudio-sitehost-conf
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ocwstudio-webapp
+  namespace: ocw-studio
+  labels:
+    app: ocwstudio
+    component: webapp
+spec:
+  selector:
+    app: ocwstudio
+    component: webapp
+  ports:
+  - name: http
+    port: 8043
+    targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ocwstudio-sitehost
+  namespace: ocw-studio
+  labels:
+    app: ocwstudio
+    component: sitehost
+spec:
+  selector:
+    app: ocwstudio
+    component: sitehost
+  ports:
+  - name: draft
+    port: 8044
+    targetPort: draft
+  - name: live
+    port: 8045
+    targetPort: live
+  - name: test
+    port: 8046
+    targetPort: test

@@ -1,0 +1,86 @@
+---
+# Serves the ocw-hugo-themes dev server at ocw-dev.learn.mit.dev.
+#
+# The dev server itself stays on bare metal: a theme developer runs it exactly
+# as before (`yarn start`, port 3000) and nothing about it moves into the
+# cluster. All this does is put a hostname and TLS in front of the host
+# process, which is what the browser needs before login works.
+#
+# Why a hostname at all, when localhost:3000 is otherwise fine: mit-learn's
+# csrftoken cookie is issued with Domain=.learn.mit.dev, and the theme reads it
+# out of document.cookie via axios (xsrfCookieName, base-theme/assets/js/axios.ts).
+# A page on localhost cannot read another domain's cookie, so it can never send
+# X-CSRFToken and every write fails. The APISIX OIDC session cookie is
+# SameSite=Lax and host-only on api.learn.mit.dev, so it is not sent from a
+# cross-site origin either, and the user reads as anonymous. Both problems go
+# away for an origin inside .learn.mit.dev, and neither is fixable from
+# localhost without changing mit-learn and the theme. Widening
+# CSRF_COOKIE_DOMAIN back to .mit.dev is not the answer: that reintroduces the
+# csrftoken collision with ocw-studio.
+#
+# Only needed when testing login, bookmarks, or anything else that depends on
+# an authenticated session. localhost:3000 still works for everything else, and
+# these objects cost nothing when the dev server is not running -- the route
+# simply 502s.
+#
+# The hostname is covered by the existing wildcard certificate (setup.sh lists
+# *.learn.${ROOT_DOMAIN} as a SAN), so no certificate reissue is involved.
+apiVersion: apisix.apache.org/v2
+kind: ApisixUpstream
+metadata:
+  name: ocw-hugo-dev
+  namespace: mit-learn
+spec:
+  ingressClassName: apache-apisix
+  # host.k3d.internal rather than an address: k3d resolves it to whatever
+  # reaches the host on this runtime, which is not the same thing on Docker
+  # Desktop as it is on Linux, and a pinned bridge gateway is simply wrong on
+  # the former. The core Pulumi stack registers the name with CoreDNS, because
+  # k3d only writes it at cluster creation and both copies it writes -- the
+  # node's /etc/hosts and the CoreDNS NodeHosts key -- are regenerated without
+  # it the next time the node container or k3s restarts.
+  externalNodes:
+  - type: Domain
+    name: host.k3d.internal
+    port: 3000
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: ocw-hugo-dev-tls
+  namespace: mit-learn
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - ocw-dev.learn.mit.dev
+  secret:
+    name: local-dev-tls
+    namespace: mit-learn
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: ocw-hugo-dev-route
+  namespace: mit-learn
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: hugo-dev
+    priority: 0
+    match:
+      hosts:
+      - ocw-dev.learn.mit.dev
+      paths:
+      - "/*"
+    upstreams:
+    - name: ocw-hugo-dev
+    # Hugo's live-reload is a websocket; without this the connection is never
+    # upgraded and theme edits need a manual browser refresh.
+    websocket: true
+    plugins:
+    - name: proxy-rewrite
+      enable: true
+      config:
+        headers:
+          set:
+            X-Forwarded-Proto: https

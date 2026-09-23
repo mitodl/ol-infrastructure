@@ -23,12 +23,14 @@
 _ROOT_DOMAIN_DEFAULT = "mit.dev"
 _CONFIG_HASH_ANNOTATION = "ol.mit.edu/config-hash"
 
+
 def current_root_domain():
     """Return the value k8s_yaml_local substitutes 'mit.dev' for, so a caller
     that needs the same value for something other than YAML (e.g. folding it
     into a downstream checksum input) doesn't duplicate the env var name or
     default."""
     return os.environ.get("LOCAL_DEV_ROOT_DOMAIN", _ROOT_DOMAIN_DEFAULT)
+
 
 def _config_fingerprint(paths_and_texts):
     """Return a stable fingerprint of the combined data/binaryData/stringData

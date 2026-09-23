@@ -36,6 +36,7 @@ from modules.identity_core import create_identity_core
 from modules.ingress import create_ingress
 from modules.messaging import create_messaging
 from modules.namespaces import create_namespaces
+from modules.objectstore import OBJECT_STORE_APPS, create_object_store
 from modules.observability import create_observability
 from modules.search import create_search
 from modules.tls import create_tls_resources
@@ -76,6 +77,41 @@ log_retention_period = (
     config.get("log_retention_period")
     or os.environ.get("LOCAL_DEV_LOG_RETENTION")
     or "168h"
+)
+
+# Which apps the developer has switched on, forwarded by the Tiltfile from
+# tilt_config.json's enabled_apps. Only the app-specific resources added since
+# per-app gating existed consult this -- the four original apps' namespaces and
+# databases are still provisioned unconditionally, so an existing stack does
+# not churn when this is set. Same not-pinned-in-Pulumi-config caveat as
+# log_retention_period below.
+# Unset is not the same as empty here. Empty means "no optional apps", which
+# is what most developers want. Unset means nobody said, and guessing "none"
+# destroys whatever optional resources the stack already has: a hand-run
+# `pulumi up` without the variable would delete the ocw-studio namespace and
+# the object store. Tilt always sets it, so only hand-runs can land here.
+_enabled_apps = config.get("enabled_apps")
+if _enabled_apps is None:
+    _enabled_apps = os.environ.get("LOCAL_DEV_ENABLED_APPS")
+if _enabled_apps is None:
+    msg = (
+        "enabled_apps is not set. Tilt passes LOCAL_DEV_ENABLED_APPS on every "
+        "run; a hand-run `pulumi up` has to say so itself, because defaulting "
+        "to none would destroy the resources of any optional app you have "
+        "enabled (the ocw-studio namespace and the RustFS object store).\n"
+        "  LOCAL_DEV_ENABLED_APPS=mit-learn,ocw-studio pulumi up --stack "
+        "local-dev.core.Dev\n"
+        "Pass an empty value if you really do run no optional apps:\n"
+        "  LOCAL_DEV_ENABLED_APPS= pulumi up --stack local-dev.core.Dev"
+    )
+    raise ValueError(msg)
+
+enabled_apps = tuple(app.strip() for app in _enabled_apps.split(",") if app.strip())
+
+# How a pod reaches the developer's machine, forwarded by the Tiltfile, which
+# asks Docker for it. Used for the host.k3d.internal CoreDNS entry below.
+host_gateway = (
+    config.get("host_gateway") or os.environ.get("LOCAL_DEV_HOST_GATEWAY") or ""
 )
 
 cert_manager_version = config.get("cert_manager_version") or "v1.16.2"
@@ -119,7 +155,7 @@ _k8s = make_resource_opts(k8s_provider)
 # Orchestration
 # ---------------------------------------------------------------------------
 
-namespaces = create_namespaces(_k8s)
+namespaces = create_namespaces(_k8s, enabled_apps=enabled_apps)
 
 tls = create_tls_resources(
     _k8s,
@@ -127,6 +163,7 @@ tls = create_tls_resources(
     cert_path=_cert_path,
     key_path=_key_path,
     ca_cert_path=_ca_cert_path,
+    enabled_apps=enabled_apps,
 )
 
 ingress = create_ingress(
@@ -180,6 +217,37 @@ k8s.core.v1.ConfigMap(
                 "}\n"
             )
         ),
+        # host.k3d.internal is how a pod reaches a process on the developer's
+        # machine, which the OCW hugo dev server relies on. k3d does define it,
+        # but only at cluster creation, writing it to the node container's
+        # /etc/hosts and to CoreDNS's NodeHosts key. Docker regenerates
+        # /etc/hosts from HostConfig.ExtraHosts (empty) on every container
+        # start and k3s regenerates NodeHosts, so both copies disappear the
+        # first time the cluster is stopped and started. Registering it here
+        # puts it in cluster state that nothing else rewrites.
+        #
+        # The address comes from Docker's own `host-gateway` alias rather than
+        # a bridge gateway, because those are not the same thing everywhere:
+        # under Docker Desktop the bridge gateway is the VM's gateway and does
+        # not reach the machine.
+        **(
+            {
+                "hostk3d.server": (
+                    "host.k3d.internal:53 {\n"
+                    "    errors\n"
+                    "    cache 30\n"
+                    "    template IN A {\n"
+                    f'        answer "{{{{ .Name }}}} 60 IN A {host_gateway}"\n'
+                    "    }\n"
+                    "    template IN AAAA {\n"
+                    "        rcode NOERROR\n"
+                    "    }\n"
+                    "}\n"
+                )
+            }
+            if host_gateway
+            else {}
+        ),
     },
     opts=_k8s(depends_on=[ingress.apisix]),
 )
@@ -212,6 +280,18 @@ if observability_enabled:
 db = create_database(_k8s, namespaces["local-infra"], cnpg_version)
 
 create_ai_services(_k8s, namespaces["local-infra"], db.cluster, _infra_dir)
+
+# S3-compatible object storage (RustFS). Roughly a 1GB workload with a 20Gi
+# volume, and only ocw-studio uses it today, so it is deployed on demand
+# rather than as unconditional shared infrastructure.
+if set(enabled_apps) & set(OBJECT_STORE_APPS):
+    create_object_store(
+        _k8s,
+        namespaces["local-infra"],
+        apisix_release=ingress.apisix,
+        tls_secret=tls.tls_secret,
+        s3_hostname=f"s3.{root_domain}",
+    )
 
 # Deploy Keycloak operator and instance (but not realm — that's in apps-infra)
 identity = create_identity_core(
