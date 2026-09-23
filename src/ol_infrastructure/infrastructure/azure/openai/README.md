@@ -13,12 +13,14 @@ Services account and one user-assigned managed identity:
 | mit-learn | `ol-openai-mitlearn-{env}` | `system:serviceaccount:mitlearn:mitlearn-app` |
 | learn-ai | `ol-openai-learn-ai-{env}` | `system:serviceaccount:learn-ai:learn-ai-admin` |
 | edxapp / mitxonline | `ol-openai-mitxonline-{env}` | `system:serviceaccount:mitxonline-openedx:mitxonline-edxapp-vault` |
+| Dagster `ml` code location | `ol-openai-dagster-ml-{env}` | `system:serviceaccount:dagster:dagster-user-code` |
 
 Each account gets a deployment of `gpt-4o`, `gpt-5-mini`, and `gpt-5.2`. `gpt-5-mini`
 stands in for `gpt-4o-mini`, which Azure no longer accepts new deployments of.
 
-Each identity holds one federated identity credential trusting the environment's EKS
-cluster OIDC issuer for exactly the subject above, and one `Cognitive Services OpenAI
+Each identity holds one federated identity credential trusting the OIDC issuer of the
+EKS cluster its consumer runs on (`applications` for the first three, `data` for
+Dagster) for exactly the subject above, and one `Cognitive Services OpenAI
 User` role assignment scoped to **its own** account. Account scope rather than resource
 group scope is what stops one app's identity from reaching another app's endpoint, and
 is the reason each consumer gets its own account rather than sharing one.
@@ -99,9 +101,9 @@ docs](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/quotas-limits) a
 explicit that "deployments of the same model and version share one quota pool across
 all regions in a subscription", so the pool is not per region either.
 
-Concretely: the three `gpt-4o` deployments in an environment compete with the six
-`gpt-4o` deployments in the other two environments, and with nothing else. Not all 27
-deployments against one pool. Capacity planning sums nine deployments per model, three
+Concretely: the four `gpt-4o` deployments in an environment compete with the eight
+`gpt-4o` deployments in the other two environments, and with nothing else. Not all 36
+deployments against one pool. Capacity planning sums twelve deployments per model, three
 times over, against three separate pools. Raising a non-production capacity still takes
 quota from Production, but only for that one model.
 
