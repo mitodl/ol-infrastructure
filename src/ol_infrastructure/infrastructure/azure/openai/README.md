@@ -14,7 +14,8 @@ Services account and one user-assigned managed identity:
 | learn-ai | `ol-openai-learn-ai-{env}` | `system:serviceaccount:learn-ai:learn-ai-admin` |
 | edxapp / mitxonline | `ol-openai-mitxonline-{env}` | `system:serviceaccount:mitxonline-openedx:mitxonline-edxapp-vault` |
 
-Each account gets a deployment of `gpt-4o`, `gpt-4o-mini`, and `gpt-5.2`.
+Each account gets a deployment of `gpt-4o`, `gpt-5-mini`, and `gpt-5.2`. `gpt-5-mini`
+stands in for `gpt-4o-mini`, which Azure no longer accepts new deployments of.
 
 Each identity holds one federated identity credential trusting the environment's EKS
 cluster OIDC issuer for exactly the subject above, and one `Cognitive Services OpenAI
