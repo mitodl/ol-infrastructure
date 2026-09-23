@@ -103,6 +103,12 @@ downloads none.
    hydration race, because WebKit loses the races that Chromium wins by being faster.
 7. No pipeline change is needed. A property's pipeline runs every spec under its
    directory.
+8. **Update [`docs/journeys.md`](docs/journeys.md) in the same PR.** It is the
+   step-by-step, screenshot-per-step account of every journey, and it goes stale the
+   first time a journey lands without it. Mirror the steps in
+   `docs/capture/<property>.capture.ts`, regenerate the images, and check every
+   signed-in frame by eye before committing — the page's "Keeping this page current"
+   section has the command and the scrubbing rules.
 
 ## Adding a new property
 
@@ -112,6 +118,9 @@ downloads none.
 3. Add a `CanaryParams` entry in `pipeline.py` and add the name to the list in
    `meta.py` — two list edits, the same onboarding shape as
    [`simple_pulumi`](../infrastructure/simple_pulumi/).
+4. Append a `## <property>` section to [`docs/journeys.md`](docs/journeys.md), with its
+   own `docs/capture/<property>.capture.ts`. This is documentation, not onboarding: it
+   does not change what runs.
 
 ---
 

@@ -10,14 +10,14 @@ import { join } from "node:path"
 // retry, so refusing the second attempt has to be recorded somewhere outside the
 // process. Not under canary-results/, which is published as build artifacts;
 // tmpdir is per-container, so the refusal covers the run and nothing beyond it.
-const REJECTED_CREDENTIAL_MARKER = join(tmpdir(), "mit-learn-canary-credential-rejected")
+export const REJECTED_CREDENTIAL_MARKER = join(tmpdir(), "mit-learn-canary-credential-rejected")
 
 // Bounded so a rejected credential surfaces as itself. Left to the 90s test
 // timeout it would instead report as "test timeout", and the diagnosis below
 // would never run.
 const REDIRECT_TIMEOUT = 30_000
 
-function canaryCredentials(): { email: string; password: string } {
+export function canaryCredentials(): { email: string; password: string } {
   const email = process.env.CANARY_USER_EMAIL
   const password = process.env.CANARY_USER_PASSWORD
   if (!email || !password) {
@@ -37,7 +37,7 @@ function canaryCredentials(): { email: string; password: string } {
 const REJECTION_MESSAGE =
   /invalid username or password|invalid user credentials|account is (temporarily )?disabled|account is locked/i
 
-async function rejectionMessage(page: Page): Promise<string | null> {
+export async function rejectionMessage(page: Page): Promise<string | null> {
   const message = page.getByText(REJECTION_MESSAGE).first()
   if (!(await message.isVisible().catch(() => false))) {
     return null
