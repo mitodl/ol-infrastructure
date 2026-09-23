@@ -864,10 +864,19 @@ learn_ai_app_k8s = OLApplicationK8s(
         import_nginx_config=not learn_ai_config.get_bool("use_granian"),
         # Nginx resources (defaults from component are fine)
         # App container resources
+        # Steady-state working set runs 600-630Mi; MainConfig.ready() eagerly
+        # imports litellm, so exec'ing a shell or running a management command
+        # in a live pod has no headroom against a 1000Mi limit. Keep the
+        # request where actual usage sits and raise the limit for burst room.
         resource_requests={"cpu": "100m", "memory": "1000Mi"},
-        resource_limits={"memory": "1000Mi"},
+        resource_limits={"memory": "1536Mi"},
         init_migrations=True,
         init_collectstatic=True,  # Assuming createcachetable is not needed or handled elsewhere
+        # Both queues run --concurrency=2 prefork (component default), so each
+        # forked child re-pays the litellm import cost -- steady-state working
+        # set already sits at 815-930Mi against the old 1000Mi limit (one
+        # queue has already been OOMKilled in production). Raise the limit to
+        # give the prefork children room without changing the pool model.
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="default",
@@ -875,7 +884,7 @@ learn_ai_app_k8s = OLApplicationK8s(
                 redis_database_index="1",
                 redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "100m", "memory": "1000Mi"},
-                resource_limits={"memory": "1000Mi"},
+                resource_limits={"memory": "1536Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="edx_content",
@@ -883,7 +892,7 @@ learn_ai_app_k8s = OLApplicationK8s(
                 redis_database_index="1",
                 redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "100m", "memory": "1000Mi"},
-                resource_limits={"memory": "1000Mi"},
+                resource_limits={"memory": "1536Mi"},
             ),
         ],
         celery_beat_config=OLApplicationK8sCeleryBeatConfig(
@@ -892,10 +901,12 @@ learn_ai_app_k8s = OLApplicationK8s(
             # litellm (added in 0.36.2 to fix a separate memory leak), which
             # beat now pays for at boot despite never executing LLM code --
             # 384Mi no longer covers that baseline import cost and beat
-            # OOMKilled on every startup. Match the other three containers in
-            # this app (webapp, both celery workers), which are all 1000Mi.
+            # OOMKilled on every startup. Matching the other three containers
+            # at 1000Mi/1000Mi (zero memory headroom) still wasn't
+            # enough -- prod shows ~25 beat restarts/week -- so give it the
+            # same limit bump as the rest of the app.
             resource_requests={"cpu": "10m", "memory": "1000Mi"},
-            resource_limits={"memory": "1000Mi"},
+            resource_limits={"memory": "1536Mi"},
         ),
         # hpa_scaling_metrics is left at the component default. It is unused here:
         # the component builds a KEDA ScaledObject instead of a native HPA when
@@ -1067,8 +1078,40 @@ learn_ai_mit_learn_oidc_resources = OLApisixOIDCResources(
         # adds organization:*, which mit-learn maps to users.User.organizations
         # via APISIX_USERDATA_MAP and reads to decide whether to skip onboarding.
         oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
-        oidc_logout_path="/logout",
-        oidc_post_logout_redirect_uri="/",
+        # Prefixed, because logout_path is compared against the un-rewritten
+        # request URI and every request on this host arrives under /ai/.  Both
+        # the plugin (openid-connect.lua reads ctx.var.request_uri) and
+        # lua-resty-openidc (ngx.var.request_uri) read the original URI, which
+        # proxy-rewrite never touches -- it sets upstream_uri -- so this holds
+        # regardless of the order the two plugins run in.  The comparison is
+        # exact string equality, which is what the "logout-redirect" route
+        # below exists to satisfy.
+        #
+        # An unprefixed "/logout" therefore never matched anything here, so
+        # learn-ai's plugin never performed a logout of its own.  What logged
+        # people out instead was a three-hop detour: "logout-redirect" 302'd to
+        # mit-learn's /logout, whose CustomLogoutView cleared the mit-learn
+        # Django session and -- seeing the gateway header still present --
+        # bounced to OIDC_LOGOUT_URL, which is mit-learn's own /logout/oidc.
+        # That did end the shared session, but by way of another application's
+        # views, and it left learn-ai's own post_logout_redirect_uri dead.
+        oidc_logout_path="/ai/logout/oidc",
+        # mit-learn's own post-logout landing, not a learn-ai path: the session
+        # being destroyed is the shared MIT Learn one, and learn-ai has no
+        # logout view of its own (main/urls.py).  Its CustomLogoutView clears
+        # the mit-learn Django session -- which otherwise outlives the gateway
+        # session -- and sends the browser on to the Learn frontend.  Keycloak
+        # accepts it: this is byte-identical to the URI mit-learn's own
+        # resource passes, and ol-mitlearn-client's end_session endpoint takes
+        # it in CI, RC and Production (an unregistered URI gets a 400 there).
+        oidc_post_logout_redirect_uri=f"https://{learn_api_domain}/logout/",
+        # 14 days, matching mit_learn/__main__.py.  Unset, lua-resty-session
+        # applies its compiled-in 86400 (resty/session.lua's
+        # DEFAULT_ABSOLUTE_TIMEOUT) -- and because the "reqauth" route below
+        # performs a real login that writes the *shared* cookie, a user who
+        # logged in through /ai/http/login/ got a one-day MIT Learn session
+        # while one who logged in through mit-learn got fourteen.
+        oidc_session_absolute_timeout=60 * 20160,
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
         oidc_session_cookie_domain=learn_api_domain.removeprefix("api"),
@@ -1167,21 +1210,41 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
         # mitxonline's and mit-learn's logout-redirect routes already run on --
         # while restoring the prometheus/opentelemetry/gzip this route was
         # missing.
+        #
+        # Now feeds the plugin's own logout path instead of mit-learn's
+        # /logout.  Three patterns, all landing on /ai/logout/oidc: the two
+        # exact spellings a caller would use as the human-facing entry point,
+        # plus the trailing-slash variant of the plugin path itself.
+        #
+        # A "/foo/*" pattern is a prefix match on "/foo/" and cannot match the
+        # shorter exact "/foo", which cuts both ways here.  The old
+        # "/ai/logout/*" covered /ai/logout/ but not /ai/logout, so the
+        # slashless spelling 404s today and is new rather than retained.  And
+        # /ai/logout/oidc matches none of the three patterns below, so it falls
+        # through to "passauth", whose plugin holds the logout_path and performs
+        # the real logout -- listing it here would 302 it to itself forever.
+        #
+        # Deeper paths under /ai/logout/ no longer trigger a logout, where
+        # "/ai/logout/*" swept them all in.  Deliberate: they are not endpoints,
+        # and nothing references them.
+        #
+        # No proxy-rewrite, since a matching request is answered with a 302 and
+        # never reaches the upstream -- mitxonline's and mit-learn's equivalents
+        # omit it for the same reason.
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
             shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
-                proxy_rewrite_plugin,
                 OLApisixPluginConfig(
                     name="redirect",
                     config={
-                        "uri": "/logout",  # Redirect within the rewritten path
+                        "uri": "/ai/logout/oidc",
                     },
                 ),
             ],
             hosts=[learn_api_domain],
-            paths=["/ai/logout/*"],
+            paths=["/ai/logout", "/ai/logout/", "/ai/logout/oidc/*"],
             backend_service_name=learn_ai_app_k8s.application_lb_service_name,
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",

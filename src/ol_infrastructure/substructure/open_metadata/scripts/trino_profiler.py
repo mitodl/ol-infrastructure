@@ -30,9 +30,14 @@ config = {
                 "schemaFilterPattern": {
                     "includes": [r"^ol_warehouse_production_.*$"],
                 },
+                # sampleConfigType defaults to DYNAMIC, so STATIC has to be
+                # explicit for the fixed 10% sample to apply.
                 "profileSampleConfig": {
-                    "profileSampleType": "PERCENTAGE",
-                    "profileSample": 10.0,
+                    "sampleConfigType": "STATIC",
+                    "config": {
+                        "profileSampleType": "PERCENTAGE",
+                        "profileSample": 10.0,
+                    },
                 },
                 "computeTableMetrics": True,
                 "computeColumnMetrics": True,

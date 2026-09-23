@@ -28,9 +28,23 @@ config:
   # QA deadlocked its own pool on 2026-08-17 and stayed wedged for days. 20
   # runs at the ~22 connections apiece measured during that incident is ~440,
   # leaving room for the daemon, webserver and ten code location servers.
-  # Revisit once the pgbouncer exporter has enough history to show what a run
-  # worker really holds outside a deadlock.
+  #
+  # That per-run figure is stale (measured mid-deadlock, under session mode), but
+  # 20 held up when re-checked against 14 days of transaction-mode history to
+  # 2026-09-18. Backends: busiest replica peaked at 12 server_active against a
+  # per-pod cap of 382, maxwait 0. Runs: STARTED+STARTING reached 18 or more in
+  # 11 minutes out of ~20,000, some run was QUEUED in 24 minutes, and the oldest
+  # queued run never waited more than 95s. The limit bites during bursts but
+  # costs under two minutes of queueing, so there is no case for raising it.
+  # Raise it only if dagster_oldest_queued_run_age_seconds starts sitting in
+  # minutes. The pool can take it, but how many backends a run worker holds
+  # at once is still unmeasured.
   dagster:max_concurrent_runs: 20
+  # Exports OTel metrics (db.client.connections.usage, the client-side
+  # QueuePool occupancy) from the control plane and canvas run workers. QA
+  # only until its series count is measured; see dagster_otel_metrics_enabled
+  # in __main__.py.
+  dagster:otel_metrics_enabled: "true"
   # event_log_storage's QueuePool. QA was left on the 10+10 fallback when
   # Production was sized on 2026-08-18, on the stated grounds that it had not
   # shown the failure mode. It had: the daemon logged "QueuePool limit of size

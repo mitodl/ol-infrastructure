@@ -127,10 +127,26 @@ if __name__ == "__main__":
             f"Available releases: {', '.join(releases)}\n"
         )
         sys.exit(1)
+    from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
+
     release_name = sys.argv[1]
-    pipeline_json = build_xqwatcher_pipeline(
+    xqwatcher_pipeline = build_xqwatcher_pipeline(
         release_name,
-    ).model_dump_json(indent=2)
+    )
+    pipeline_json = pipeline_json_with_user_data(
+        xqwatcher_pipeline,
+        user_data={
+            "description": (
+                "Builds the xqueue-watcher container image, which polls xqueue "
+                "for pending student submissions and dispatches them to the "
+                "configured external graders, then deploys it via Pulumi to "
+                f"every mitodl deployment running the `{release_name}` Open edX "
+                "release."
+            ),
+            "team": "infrastructure",
+            "category": "open-edx",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)

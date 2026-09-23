@@ -287,6 +287,22 @@ def test_keda_webapp_config_custom_behavior():
 # ─── OLApplicationK8sConfig model fields ──────────────────────────────────────
 
 
+def test_worker_startup_rss_requires_a_memory_limit():
+    with pytest.raises(ValidationError, match="no 'memory' entry"):
+        _base_config(
+            resource_limits={"cpu": "1"},
+            granian_config=GranianConfig(worker_startup_rss=600),
+        )
+
+
+def test_worker_startup_rss_with_memory_limit_is_accepted():
+    cfg = _base_config(
+        resource_limits={"memory": "3Gi"},
+        granian_config=GranianConfig(worker_startup_rss=600),
+    )
+    assert cfg.granian_config.worker_startup_rss == 600
+
+
 def test_app_config_webapp_keda_config_field():
     cfg = _base_config(
         webapp_keda_config=OLApplicationK8sKedaWebappScalingConfig(
@@ -1116,3 +1132,95 @@ def test_command_prefix_prepended_for_explicit_command():
         assert container["command"] == ["opentelemetry-instrument", "celery"]
 
     return app.application_deployment.spec.template.spec.containers.apply(check)
+
+
+# ─── celery --max-memory-per-child ────────────────────────────────────────────
+
+
+def _celery_worker_config(**overrides) -> OLApplicationK8sCeleryWorkerConfig:
+    defaults = {
+        "application_name": "memcapped",
+        "worker_name": "default",
+        "redis_host": pulumi.Output.from_input("redis.example.com"),
+        "redis_password": "hunter2",  # pragma: allowlist secret
+    }
+    defaults.update(overrides)
+    return OLApplicationK8sCeleryWorkerConfig(**defaults)
+
+
+@pulumi.runtime.test
+def test_max_memory_per_child_omitted_by_default():
+    """Existing OLApplicationK8s consumers must be unaffected.
+
+    The flag changes when celery retires a pool child, so it has to stay opt-in
+    rather than arriving with a default that silently reshapes every other
+    application's worker recycling behaviour.
+    """
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="memcapped",
+            celery_worker_configs=[_celery_worker_config()],
+        )
+    )
+
+    def check(containers):
+        worker = next(c for c in containers if c["name"] == "celery-worker")
+        assert "--max-memory-per-child" not in worker["command"]
+        # the sibling recycle trigger stays unconditional
+        assert "--max-tasks-per-child" in worker["command"]
+
+    return app.celery_deployments[0].spec.template.spec.containers.apply(check)
+
+
+@pulumi.runtime.test
+def test_max_memory_per_child_emitted_as_flag_and_value():
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="memcapped",
+            celery_worker_configs=[
+                _celery_worker_config(max_memory_per_child_kib=655360)
+            ],
+        )
+    )
+
+    def check(containers):
+        command = next(c for c in containers if c["name"] == "celery-worker")["command"]
+        # celery takes the value as a separate argv entry, not --flag=value
+        assert command[command.index("--max-memory-per-child") + 1] == "655360"
+
+    return app.celery_deployments[0].spec.template.spec.containers.apply(check)
+
+
+def test_max_memory_per_child_rejects_non_positive():
+    with pytest.raises(ValidationError):
+        _celery_worker_config(max_memory_per_child_kib=0)
+
+
+@pulumi.runtime.test
+def test_celery_worker_disables_gossip_but_keeps_events():
+    """Gossip must stay off, and task events must stay on.
+
+    Every worker that starts with gossip enabled declares a celeryev.<uuid>
+    queue, and kombu's Redis transport never reclaims it: Channel.close()
+    deletes only queues in _fanout_queues, which _queue_bind populates for
+    fanout exchanges, and celery declares celeryev as a topic exchange. The
+    orphan keeps receiving every event forever. 4,112 of them held 64.7 GiB on
+    edxapp-redis-mitxonline-production on 2026-09-21.
+
+    -E is asserted alongside it because the two are easy to conflate: gossip is
+    the worker-side *consumer* of events, while -E is the *emitter* that leek
+    reads. Dropping -E to stop the leak would blind monitoring instead.
+    """
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="memcapped",
+            celery_worker_configs=[_celery_worker_config()],
+        )
+    )
+
+    def check(containers):
+        command = next(c for c in containers if c["name"] == "celery-worker")["command"]
+        assert "--without-gossip" in command
+        assert "-E" in command
+
+    return app.celery_deployments[0].spec.template.spec.containers.apply(check)

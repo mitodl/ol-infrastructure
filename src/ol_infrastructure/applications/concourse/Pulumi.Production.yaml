@@ -48,15 +48,15 @@ config:
       on_demand_base_capacity: 1
     use_spot_instances: true
   - auto_scale:
-      desired: 4
+      desired: 6
       max: 10
       min: 2
       max_instance_lifetime_seconds: 86400
     aws_tags:
       OU: operations
     concourse_team: infrastructure
-    disk_size_gb: 300
-    disk_throughput: 300
+    disk_size_gb: 1000
+    disk_throughput: 600
     disk_iops: 4000
     iam_policies:
     - base

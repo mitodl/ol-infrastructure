@@ -37,6 +37,7 @@ from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 from ol_concourse.pipelines.open_edx.grader_images.build_pipeline import (
     GRADER_PIPELINES,
 )
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 _PIPELINE_CODE_PATHS = [
     "pyproject.toml",
@@ -164,7 +165,19 @@ meta_pipeline = Pipeline(resources=[pipeline_code], jobs=meta_jobs)
 
 
 if __name__ == "__main__":
-    pipeline_json = meta_pipeline.model_dump_json(indent=2)
+    pipeline_json = pipeline_json_with_user_data(
+        meta_pipeline,
+        user_data={
+            "description": (
+                "Regenerates and applies the grader base image pipeline "
+                f"(`build-grader-base-image`) and the {len(GRADER_PIPELINES)} "
+                "per-course grader image pipelines in `GRADER_PIPELINES`, plus "
+                "re-applies itself."
+            ),
+            "team": "main",
+            "category": "meta",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)

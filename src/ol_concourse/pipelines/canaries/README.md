@@ -67,10 +67,17 @@ is green in Concourse and a failed journey is red.
 
 When a run fails, its traces, screenshots and video are uploaded to
 `s3://ol-eng-artifacts/canary-results/<pipeline>/<job>/<YYYYMMDDTHHMMSSZ>/`, matched to a
-build by its start time. Green runs upload
-nothing. These artifacts help diagnose a red build; they are not another result or
-notification channel. See [`AGENTS.md`](AGENTS.md) for how to read a trace and for
-what not to change about that step.
+build by its start time. These artifacts help diagnose a red build; they are not another
+result or notification channel.
+
+Every run — green included — additionally uploads Playwright's small `results.json` to
+`s3://ol-eng-artifacts/canary-runs/<pipeline>/<job>/<YYYYMMDDTHHMMSSZ>.json`. A journey
+that fails once and passes on the retry produces a **green** build, so that record is
+the only place the fleet's flake rate survives. It is retained evidence, not a second
+result signal.
+
+See [`AGENTS.md`](AGENTS.md) for how to read a trace, how to compute the flake rate from
+the bucket, and what not to change about either step.
 
 ```bash
 cd src/ol_concourse/pipelines/canaries
@@ -113,23 +120,58 @@ machinery.
 
 ```bash
 cd src/ol_concourse/pipelines/canaries
-npm install
+npm ci
+npx playwright install chromium
 CANARY_BASE_URL=https://rc.learn.mit.edu npx playwright test specs/mit-learn
 ```
 
+The browser install is a separate step and is **not** optional: `@playwright/test`
+ships no install script, so `npm ci` downloads no browser and a run without it fails
+with `Executable doesn't exist at …/chromium_headless_shell-…`. The pipeline does not
+need it because the image has the browsers baked in.
+
 Or in the same image Concourse uses, which is the only way to reproduce a pipeline
-failure exactly:
+failure exactly. Derive the tag from `package.json` rather than typing one — a literal
+here goes stale on the next Renovate bump, and a runner/image mismatch fails with a
+message naming neither version:
 
 ```bash
 cd src/ol_concourse/pipelines/canaries
+TAG=v$(python3 -c "import json;print(json.load(open('package.json'))['devDependencies']['@playwright/test'])")-noble
 docker run --rm -it --ipc=host \
   -v "$PWD":/specs -w /specs \
   -e CANARY_BASE_URL=https://rc.learn.mit.edu \
-  mcr.microsoft.com/playwright:v1.62.1-noble \
-  bash -c 'npm ci && npx playwright test specs/mit-learn'
+  -e CANARY_USER_EMAIL -e CANARY_USER_PASSWORD \
+  "mcr.microsoft.com/playwright:$TAG" \
+  bash -c 'npm ci && npx playwright test specs/mit-learn --project=chromium'
 ```
+
+Two details that make this an actual reproduction rather than an approximate one:
+
+- **`--project=chromium`.** The pipeline runs Chromium alone — `CanaryParams.browsers`
+  defaults to `["chromium"]` and renders exactly one `--project` flag. The image bakes
+  in all three browsers, so omitting this runs Firefox and WebKit too: slower, and a
+  failure in a browser the canary never schedules.
+- **`-e NAME` with no `=`.** `specs/mit-learn` includes the signed-in journey, and
+  Docker does not inherit your shell's credentials on its own — without these,
+  `sign-in.ts` throws before the browser opens and you reproduce a credential error
+  rather than the pipeline failure. Export the two variables first (see the
+  [`run-canary-locally`](https://github.com/mitodl/agent-kit/blob/main/skills/process/run-canary-locally/SKILL.md)
+  skill for pulling them from SOPS). The bare form makes Docker copy the value from
+  your environment, so the secret reaches neither the process list nor a file on disk.
+  Drop both flags and name an anonymous spec instead if that is all you need.
+
+For an in-depth local workflow — credentials without risking the account lockout,
+reading a trace, running WebKit — use the
+[`run-canary-locally`](https://github.com/mitodl/agent-kit/blob/main/skills/process/run-canary-locally/SKILL.md)
+skill in `mitodl/agent-kit`.
 
 ## Adding a canary
 
 See [`AGENTS.md`](AGENTS.md) — written for both human and agent contributors, and the
-authoritative guide.
+authoritative guide to *why* each rule is there.
+
+For the step-by-step procedure — a journey on an existing property is a drop-in with no
+pipeline edit; a new property is two list edits — use the
+[`add-canary-journey`](https://github.com/mitodl/agent-kit/blob/main/skills/process/add-canary-journey/SKILL.md)
+skill in `mitodl/agent-kit`.

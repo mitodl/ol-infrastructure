@@ -58,6 +58,7 @@ from ol_concourse.pipelines.applications.learn_ai_frontend.values import (
     LearnAIFrontendEnv,
 )
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 LEARN_AI_URI = "https://github.com/mitodl/learn-ai"
 FRONTEND_PATH = "frontend-demo/"
@@ -197,7 +198,21 @@ def learn_ai_frontend_pipeline() -> Pipeline:
 
 if __name__ == "__main__":
     pipeline = learn_ai_frontend_pipeline()
-    definition_json = pipeline.model_dump_json(indent=2)
+    definition_json = pipeline_json_with_user_data(
+        pipeline,
+        user_data={
+            "description": (
+                "Builds and deploys the learn-ai Next.js static frontend "
+                "(`frontend-demo/`) for CI, QA, and Production -- one job per "
+                "environment, each rebuilt from its own branch of "
+                "mitodl/learn-ai (main/release-candidate/release) and synced to "
+                "S3 behind Fastly. Recreates the three GitHub Actions workflows "
+                "deleted in mitodl/learn-ai#13."
+            ),
+            "team": "infrastructure",
+            "category": "applications",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(definition_json)
     sys.stdout.write(definition_json)

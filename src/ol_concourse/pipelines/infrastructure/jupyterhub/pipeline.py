@@ -7,6 +7,7 @@ from ol_concourse.pipelines.constants import (
     PULUMI_WATCHED_PATHS,
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -52,8 +53,20 @@ jupyter_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
+    output = pipeline_json_with_user_data(
+        jupyter_pipeline,
+        user_data={
+            "description": (
+                "Deploys the JupyterHub application via Pulumi to "
+                "`CI`/`QA`/`Production`, gated on a reviewed preview "
+                "(`topology=preview-gated`)."
+            ),
+            "team": "infrastructure",
+            "category": "data-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(jupyter_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(jupyter_pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     print()  # noqa: T201
     print("fly -t <prod_target> sp -p pulumi-jupyterhub -c definition.json")  # noqa: T201

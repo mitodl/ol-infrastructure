@@ -17,6 +17,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 pipeline_code = git_repo(
     name=Identifier("edxapp-pipeline-code"),
@@ -84,9 +85,21 @@ meta_pipeline = Pipeline(resources=[pipeline_code], jobs=meta_jobs)
 
 
 if __name__ == "__main__":
+    pipeline_json = pipeline_json_with_user_data(
+        meta_pipeline,
+        user_data={
+            "description": (
+                "Regenerates and applies the `dagger-pulumi-edxapp-global` "
+                "pipeline (and re-applies itself) via `fly set-pipeline`, keeping "
+                "them in sync with `edx_platform_v3/pipeline.py` and this file."
+            ),
+            "team": "main",
+            "category": "meta",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(meta_pipeline.json(indent=2))
-    sys.stdout.write(meta_pipeline.json(indent=2))
+        definition.write(pipeline_json)
+    sys.stdout.write(pipeline_json)
     sys.stdout.write(
         "\nfly -t <target> set-pipeline -p dagger-pulumi-edxapp-meta-v3 -c definition.json"  # noqa: E501
     )

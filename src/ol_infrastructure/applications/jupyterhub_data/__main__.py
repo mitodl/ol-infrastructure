@@ -31,7 +31,12 @@ from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import (
+    BEDROCK_PARLIAMENT_CONFIG,
+    IAM_POLICY_VERSION,
+    bedrock_invoke_statements,
+    lint_iam_policy,
+)
 from ol_infrastructure.lib.ol_types import (
     AWSBase,
     BusinessUnit,
@@ -178,6 +183,34 @@ jupyterhub_data_trust_role = OLEKSTrustRole(
 iam.RolePolicyAttachment(
     f"jupyterhub-data-policy-attachment-{stack_info.env_suffix}",
     policy_arn=jupyterhub_data_lake_policy.arn,
+    role=jupyterhub_data_trust_role.role.name,
+)
+
+# Bedrock for both marimo's AI assistant (which runs in the user's own server)
+# and code in notebook cells. Not scoped to one vendor, so a notebook can use
+# e.g. an embedding model alongside Claude without an infra change. Every user
+# pod shares this role, so Bedrock usage is not attributable to a user in AWS.
+jupyterhub_data_bedrock_policy = iam.Policy(
+    f"jupyterhub-data-bedrock-iam-policy-{stack_info.env_suffix}",
+    path=(
+        f"/ol-applications/jupyterhub-data/{stack_info.env_suffix}/"
+        if not stack_info.env_prefix
+        else f"/{stack_info.env_prefix}/{stack_info.env_suffix}/"
+    ),
+    description="Bedrock model invocation for JupyterHub data notebook pods.",
+    policy=lint_iam_policy(
+        {
+            "Version": IAM_POLICY_VERSION,
+            "Statement": bedrock_invoke_statements(aws_account.account_id),
+        },
+        stringify=True,
+        parliament_config=BEDROCK_PARLIAMENT_CONFIG,
+    ),
+    tags=aws_config.tags,
+)
+iam.RolePolicyAttachment(
+    f"jupyterhub-data-bedrock-policy-attachment-{stack_info.env_suffix}",
+    policy_arn=jupyterhub_data_bedrock_policy.arn,
     role=jupyterhub_data_trust_role.role.name,
 )
 

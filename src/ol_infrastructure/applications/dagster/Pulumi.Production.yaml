@@ -25,6 +25,70 @@ config:
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   dagster:db_instance_type: db.r7g.2xlarge
+  # Exports OTel metrics (db.client.connections.usage, the client-side
+  # QueuePool occupancy) from the control plane and canvas run workers, the
+  # only client-side view of pool saturation -- PgBouncer's exporter measures
+  # the server end, so a saturated client pool reads as a healthy PgBouncer.
+  # See dagster_otel_metrics_enabled in __main__.py.
+  #
+  # Held back from Production pending two measurements on QA, both closed
+  # 2026-09-22:
+  #
+  # 1. Cardinality of enabling every instrumentation's metrics, not just the
+  #    one wanted. requests/urllib3 also emit http.client.* duration/size
+  #    histograms, one series per distinct host + per run-worker
+  #    service.instance.id. QA's fixed call set (Vault, Airbyte,
+  #    telemetry.dagster.io from one canary code location) grew 504->540
+  #    series over 3 days with spikes to 720; Production's ~13 code locations
+  #    hit far more external hosts (S3/GCS/Cybersource/edX, etc.), an
+  #    unmeasured and likely much larger regime under the same enable. #5992
+  #    drops http.client.* at the Alloy applicationObservability pipeline via
+  #    otelcol.processor.filter, scoped to resource.attributes
+  #    ["service.namespace"] == "dagster" so it applies uniformly to the
+  #    control plane and every run worker regardless of which hosts they
+  #    call -- the fix doesn't depend on host cardinality, so it closes this
+  #    for Production's larger host surface too, not just QA's. Confirmed
+  #    live on data-qa: http_client_duration_milliseconds{service_namespace=
+  #    "dagster"} stopped emitting (checked three times over ~2 minutes, the
+  #    staleness gap growing in lockstep with wall-clock), while
+  #    db_client_connections_usage held at 38 series, matching the pre-fix
+  #    30-36 baseline -- the filter doesn't collaterally drop the metric
+  #    that's wanted.
+  #
+  # 2. Whether db.client.connections.usage itself fans out unboundedly.
+  #    This one is NOT measured on QA and can't be: canvas's schedule has no
+  #    dynamic partitions registered there, so it has never produced a
+  #    canvas run, and canvas's own code-server shows zero OTel activity of
+  #    any kind on QA (no target_info, despite otel_metrics_enabled since
+  #    #5947 and correct env/package config) -- there is no QA traffic to
+  #    measure against. The bound below is analytical, derived from the
+  #    canvas code location's actual definitions (mitodl/ol-data-platform,
+  #    dg_projects/canvas/canvas/definitions.py), not an extrapolation from
+  #    a live series count.
+  #
+  #    Canvas run workers mint a fresh service.instance.id per Job, and so
+  #    does every step subprocess the multiprocess executor spawns inside
+  #    one -- canvas_course_export_job takes no executor_def, so it gets the
+  #    house default, multi_or_in_process_executor, which defaults to
+  #    multiprocess mode (confirmed against dagster==1.13.23's
+  #    executor_definition.py: config_schema default_value is
+  #    {"multiprocess": {}}). Under multiprocess mode every step -- even a
+  #    single one -- runs in its own forked child, so a Job is the run
+  #    coordinator process plus one step-subprocess, not one process. The
+  #    job's selection is exactly one op (the `export_course_content`
+  #    multi_asset, canvas/assets/canvas.py), so that multiplier is a flat
+  #    2x, not open-ended: OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS's own
+  #    comment puts concurrent canvas Jobs at a mean of 87 against a peak of
+  #    106 over 7 days (kube_job_labels, data-production), so the corrected
+  #    bound is ~174 mean / ~212 peak OTel processes, plus the ~17
+  #    long-lived control-plane processes. Still double-to-low-triple
+  #    digits and still bounded by Job concurrency, which is what makes it
+  #    a different risk shape than http.client.* -- that one grew with
+  #    every new external host hit, unbounded by anything in this stack's
+  #    control. This one is bounded by how many canvas runs are ever
+  #    in flight at once, a number the K8sRunLauncher and
+  #    max_concurrent_runs already cap.
+  dagster:otel_metrics_enabled: "true"
   # 6 -> 4. The first replica count set from the exporter rather than from a
   # guess. Six days of 1-minute samples (8640 points) taken entirely after the
   # session -> transaction pool_mode switch of 2026-08-19 18:23Z:
@@ -81,20 +145,19 @@ config:
   # Benign at a 0.003 utilisation ratio, but it is the same denominator trap as
   # les-a-ratio-alert-s-denominator-constrains-what-you.
   #
-  # min_pool_size stays at 40 deliberately. One lever per pass -- moving the
-  # floor and the divisor together would make the next measurement
+  # min_pool_size was deliberately left at 40 in this pass. One lever per pass --
+  # moving the floor and the divisor together would make the next measurement
   # unattributable, which is the failure mode this whole exercise exists to stop
-  # repeating. The floor is the obvious next candidate: 40 was sized for a
-  # session-mode per-replica peak of 35, and transaction mode has cut per-replica
-  # in-flight demand to 2-3.
+  # repeating. It moved 40 -> 20 in its own pass on 2026-09-18, after 14 days of
+  # clean history at 4 replicas; derivation in __main__.py next to the setting.
   dagster:pgbouncer_replica_count: 4
   # Down from the previous global 100. Production has never come close to
   # needing it: three days of 1-minute exporter samples peaked at 122 active
   # server connections against an aggregate cap of 4248, and the pool sat on
   # its min_pool_size floor of 900 the entire time. Both of those figures are
   # HISTORICAL -- they were taken before #5464 cut min_pool_size 150 -> 40 and
-  # before pool_mode went session -> transaction, and the equivalents now are a
-  # 13 active peak against a 160 floor. The conclusion is unaffected and gets
+  # before pool_mode went session -> transaction. As of 2026-09-18 the
+  # equivalents are a 15 active peak (14 days) against an 80 floor. The conclusion is unaffected and gets
   # stronger, which is why the number is not being moved again here. 80 trims
   # the worst case
   # without touching anything observed. Note the aggregate cap overstates real
@@ -123,9 +186,10 @@ config:
   #
   # 50 is derived from measurement, not from halving 100. The arithmetic below
   # was done on 2026-08-19 against SIX replicas and is kept as it was performed;
-  # at the current four the PgBouncer floor term is 160 (40 x 4), not 240, which
-  # would leave ~200 of client retention rather than ~120 and make 50 more
-  # generous still. Re-derive here if the floor or the replica count moves again.
+  # as of 2026-09-18 (four replicas, min_pool_size 20) the PgBouncer floor term
+  # is 80 (20 x 4), not 240, which would leave ~280 of client retention rather
+  # than ~120 and make 50 more generous still. Re-derive here if the floor or the
+  # replica count moves again.
   #
   # Held connections across the whole pool have ranged 359-1577 over the week
   # since the pooled storages landed, against a 4248 aggregate cap -- so the
@@ -152,8 +216,8 @@ config:
   # about once per TRANSACTION, so it now measures query throughput: measured
   # 2026-08-25 over the six days since the switch, 75/s at rest and 2673/s at
   # peak, with zero clients ever waiting and maxwait flat at 0. Nothing is wrong;
-  # the counter means something else. Both churn rules are unlabelled and routed
-  # to `oblivion` for exactly this reason (see metric_rules/dagster_pgbouncer.py).
+  # the counter means something else. The churn rules built on it were deleted
+  # for exactly this reason (see metric_rules/dagster_pgbouncer.py).
   #
   # Use the client-side view instead -- pgbouncer_pools_client_waiting_connections
   # and client_maxwait_seconds -- plus the "QueuePool limit of size 50 overflow

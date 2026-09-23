@@ -453,6 +453,38 @@ def setup_grafana(
                             "port": 9411,
                         },
                     },
+                    # Dagster is the only stack with OTEL_METRICS_EXPORTER on
+                    # (dagster/__main__.py's dagster_otel_env). Turning it on
+                    # enables every installed instrumentation's metrics, not
+                    # just db.client.connections.usage -- requests/urllib3
+                    # also emit http.client.* duration histograms, one series
+                    # per distinct host an instrumented client hits. QA's
+                    # fixed set of internal calls (Vault, Airbyte,
+                    # telemetry.dagster.io) bounded that at ~540 series;
+                    # Production's canvas run workers make per-partition
+                    # S3/GCS calls against many more hosts, an untested and
+                    # likely far larger cardinality regime. There is no stock
+                    # OTEL_* env var to disable one instrumentation's metrics
+                    # without also silencing its traces (OTEL_PYTHON_DISABLED_
+                    # INSTRUMENTATIONS takes both), so the metric is dropped
+                    # here instead via otelcol.processor.filter, scoped to
+                    # dagster so nothing else that later turns on OTel metrics
+                    # loses this series by surprise.
+                    "metrics": {
+                        "filters": {
+                            # Bracket classes, not backslash escapes: this
+                            # string crosses Helm's Sprig `quote` and Alloy's
+                            # River string-unescaping before OTTL parses it,
+                            # and each hop consumes one level of backslash.
+                            # `\.` doesn't survive that round trip as a valid
+                            # OTTL escape; `[.]` needs no escaping at all.
+                            "metric": [
+                                'IsMatch(name, "^http[.]client[.]") and '
+                                'resource.attributes["service.namespace"] '
+                                '== "dagster"',
+                            ],
+                        },
+                    },
                 },
                 "integrations": {
                     # Without this, collectors.getCollectorForFeature falls

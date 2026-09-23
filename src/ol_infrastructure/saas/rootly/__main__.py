@@ -1,6 +1,7 @@
 """Management of Rootly incident management resources."""
 
 from pathlib import Path
+from typing import Any
 
 import pulumi_rootly as rootly
 from pulumi import Output, ResourceOptions
@@ -64,6 +65,33 @@ def rootly_imported_route_opts(route_id: str) -> ResourceOptions:
     return ResourceOptions.merge(rootly_opts, ResourceOptions(import_=route_id))
 
 
+def rootly_imported_escalation_path_opts(path_id: str) -> ResourceOptions:
+    """Adopt an escalation path that already exists in Rootly into this stack.
+
+    Same adoption mechanics and the same caveat as
+    `rootly_imported_route_opts`: `import_` takes ownership, it does not
+    assert equivalence. The declared bodies below were transcribed from
+    `GET /v1/escalation_policies/{id}/escalation_paths` on 2026-09-04 and
+    re-checked on 2026-09-16. Check the diff before applying anyway, because a
+    mismatch rewrites live paging behaviour instead of failing.
+
+    Safe to drop back to `rootly_opts` once every stack has applied this.
+    """
+    return ResourceOptions.merge(rootly_opts, ResourceOptions(import_=path_id))
+
+
+def rootly_imported_service_opts(service_id: str) -> ResourceOptions:
+    """Adopt a service that already exists in Rootly into this stack.
+
+    Same adoption mechanics and caveat as `rootly_imported_route_opts`. The
+    declared bodies were transcribed from `GET /v1/services/{id}` on
+    2026-09-18.
+
+    Safe to drop back to `rootly_opts` once every stack has applied this.
+    """
+    return ResourceOptions.merge(rootly_opts, ResourceOptions(import_=service_id))
+
+
 # CloudWatch alarms for QA/CI resources (e.g. "mitlearn-redis-qa-003") route
 # through the same shared warning/critical SNS topics as production (see
 # src/ol_infrastructure/lib/aws/monitoring_helper.py) and would otherwise page
@@ -90,12 +118,16 @@ CLOUDWATCH_NON_PROD_URGENCY_RULES = [
     },
 ]
 
-# Dagster's metadata database. Its alarms are worth seeing but not worth waking
-# anyone for: Dagster retries and backfills, so a degraded control plane costs
+# Dagster's metadata database. Its alarms are worth seeing but not worth
+# paging for: Dagster retries and backfills, so a degraded control plane costs
 # pipeline latency, not user-facing availability. DiskQueueDepth in particular
 # is expected to breach and self-clear about weekly (see the RDS comment in
 # applications/dagster/__main__.py), and paged on-call at High on 2026-09-11.
-# Medium routes to #devops-warnings only; see the Medium urgency paths below.
+# These alarms route to the Data Platform Escalation Policy (see
+# DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES), whose Medium path posts to
+# #devops-warnings only. Kept after the Dagster demotions on the Grafana and
+# Pingdom sources were removed, because the weekly self-clearing breach would
+# page the data platform on-call during business hours for nothing.
 CLOUDWATCH_DAGSTER_DB_URGENCY_RULES = [
     {
         "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
@@ -295,6 +327,19 @@ team_platform_engineering = rootly.Team(
     opts=rootly_opts,
 )
 
+team_data_platform = rootly.Team(
+    "data-platform",
+    auto_add_members_when_attached=True,
+    color="#D7F5E1",
+    description=(
+        "Owns alerts from the data platform: everything on the data-production "
+        "EKS cluster and the databases behind it."
+    ),
+    name="Data Platform",
+    user_ids=[99415],
+    opts=rootly_opts,
+)
+
 environment_development = rootly.Environment(
     "development",
     color="#D7E7F5",
@@ -457,7 +502,10 @@ incident_role_commander = rootly.IncidentRole(
         "• Identifying and removing blockers"
     ),
     enabled=True,
-    name="Commander",
+    # Renamed from "Commander" outside this stack; kept as the live name so an
+    # apply doesn't revert it. The resource name stays "commander" because
+    # renaming it would replace the role.
+    name="Leader",
     position=1,
     summary=(
         "Responsible for the overall management of the incident from start "
@@ -519,45 +567,12 @@ escalation_policy_default_escalation_policy = rootly.EscalationPolicy(
     last_updated_by_user_id=99415,
     name="Default Escalation Policy",
     repeat_count=5,
-    service_ids=[
-        "cdceaa06-6690-4351-a3af-dd36bfd6fb55",
-        "6ee39557-47af-40e9-a4f7-eccee9406ecf",
-        "24ef3748-0a12-4a55-9b4e-5eb94a08fe03",
-        "fa1c967f-d271-443f-b2bf-011cc78f5f20",
-        "aaede19c-4521-40cd-ab64-6a2d70dd783c",
-        "503028e7-d65f-44b6-8968-b9795ccc41c2",
-        "2c92b8b0-df02-4369-a876-72a895524773",
-        "ffd3bdea-a4f6-4f4a-a12a-f59e71f29fe9",
-        "0d45ed4d-bd52-4488-9953-f739f18bbdaf",
-        "3ad10823-4726-4207-9e99-0d81e87b0473",
-        "b2389961-09be-4167-a304-a2ee1ef9af1b",
-        "f42f1288-eca1-4bd4-b474-8a6bb96486fb",
-        "8be387cb-2c05-4688-8ea0-730328297d62",
-        "aa801b70-0496-4d9e-b889-e5ad99f2237b",
-        "e7f7e16e-a7e7-4666-b779-96b33bbf402b",
-        "5281c3c5-eb5e-4b7f-9407-950570d66261",
-        "dc51f8d3-56fb-4ee3-b921-c9fdda79ea9c",
-        "bdbf5e32-61dd-4184-9af6-f4c163e097d0",
-        "6f9bf7d9-d06c-4ac4-8105-f8def1dc91d2",
-        "e7b42ec2-216d-4e84-828e-97bd709b018b",
-        "9fc1b049-d60c-4a4c-b5d9-95ea8db3aae8",
-        "71bb3195-11a8-4a2d-b9b8-2b1dbbc5d6c2",
-        "7b46658d-cd59-4c49-970b-9e9dc8998a7e",
-        "0e8c091d-274d-4687-bb70-d85c5600e90b",
-        "24abd4d9-4aac-4ea0-afc6-eb2106cc52fd",
-        "ce09f262-1edf-475f-b145-3185d0da7241",
-        "0f046ecc-a5eb-4cdf-aba2-6922001ad774",
-        "145db75f-c893-444b-9564-85ff41d42c6a",
-        "3fa021bd-25ba-4732-b588-a304cb1a104f",
-        "aefc0e95-1376-41f2-b102-335a186e9eb7",
-        "964321a2-ebd8-46d4-bd9e-c582cb4e4e49",
-        "db3e4db5-fa3f-4239-a0f4-aa558847df66",
-        "70173c97-f29d-453f-93ea-da9321d5984d",
-        "defb1faa-e8a4-4fe5-8f03-4103667592f1",
-        "dfc02e84-e281-43a6-b340-0e7cadd62036",
-        "c144023f-00c1-48dd-9e38-ad4c302207e3",
-        "2cc9bbde-ba8a-4c34-aa85-65f4d9c8aff4",
-    ],
+    # No `service_ids`: membership is owned by each Service's
+    # `escalation_policy_id`. The provider sends this list whenever it differs
+    # from state, and this stack deploys without a refresh, so a declared copy
+    # goes stale as soon as a Service attaches itself (LLMOps - ClickHouse on
+    # 2026-09-16) and an update would detach whatever it is missing. Left
+    # undeclared, the optional+computed field is never sent.
     opts=rootly_opts,
 )
 
@@ -577,6 +592,67 @@ escalation_policy_exampledeleteme_escalationpolicy = rootly.EscalationPolicy(
     opts=rootly_opts,
 )
 
+# The two escalation paths on the Default Escalation Policy that predate this
+# stack. Both were built in the Rootly UI (2025-05-09 and 2025-05-10) and were
+# left unmanaged through the initial migration, so their levels were modeled
+# here while the paths holding those levels were not -- the ordering and the
+# urgency match rule that decide *which* path a page takes were editable in
+# the UI with nothing in this repo to notice. Adopted rather than recreated:
+# creating new ones would leave the live paths in place and the levels below
+# still attached to them.
+#
+# Escalation and deferral paths are positioned independently, so the escalation
+# ordering is Low Urgency (1) -> Medium urgency to #devops-warnings (2) ->
+# Default Escalation Path (3, and the `default` fallback), and the two deferral
+# paths carry their own 1/2.
+escalation_path_low_urgency = rootly.EscalationPath(
+    "low-urgency",
+    name="Low Urgency",
+    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    path_type="escalation",
+    match_mode="match-all-rules",
+    # Quiet selects which of each user's own notification rules fire, and those
+    # are per-user and owned outside this stack -- it does not mean "does not
+    # page". See the deferral path below for the measurement.
+    notification_type="quiet",
+    position=1,
+    repeat=False,
+    repeat_count=1,
+    initial_delay=0,
+    rules=[
+        {
+            "ruleType": "alert_urgency",
+            "urgencyIds": ["d7ed8e91-ffa9-4cc4-b524-729d14a4425b"],
+        },
+    ],
+    opts=rootly_imported_escalation_path_opts("67658f83-7fac-4a19-8e2a-0d8eee57f0a8"),
+)
+
+# The fallback path: no rules, so everything that no earlier path claimed lands
+# here, audible, repeating five times until acknowledged. This is what pages.
+escalation_path_default = rootly.EscalationPath(
+    "default-escalation-path",
+    name="Default Escalation Path",
+    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    default=True,
+    path_type="escalation",
+    match_mode="match-all-rules",
+    notification_type="audible",
+    position=3,
+    repeat=True,
+    repeat_count=5,
+    initial_delay=0,
+    # Rootly does not persist a time zone on the default path: the provider
+    # sends its enum default and the API keeps returning null, so without this
+    # every refresh plans the same no-op update. There are no time restrictions
+    # on this path for the zone to apply to. Adding any means removing this
+    # ignore, or the zone set alongside them will be silently dropped.
+    opts=ResourceOptions.merge(
+        rootly_imported_escalation_path_opts("adc991bc-d498-4323-9d80-9d2dfa156b0c"),
+        ResourceOptions(ignore_changes=["time_restriction_time_zone"]),
+    ),
+)
+
 # Adds an explicit Slack-channel notification target to this level, alongside
 # the existing schedule target, so #devops-alerts visibility for Production
 # no longer depends solely on the account-wide "default alerts channel" Slack
@@ -593,7 +669,7 @@ escalation_level_b94aa0a3_cda6_4ee6_bcb1_cddf33c69088 = rootly.EscalationLevel(
     "b94aa0a3-cda6-4ee6-bcb1-cddf33c69088",
     delay=5,
     escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
-    escalation_policy_path_id="adc991bc-d498-4323-9d80-9d2dfa156b0c",
+    escalation_policy_path_id=escalation_path_default.id,
     notification_target_params=[
         {
             "id": "fad27d50-f0e4-4d21-9b6d-57eb2dec648b",
@@ -615,7 +691,7 @@ escalation_level_r_4351b5b9_00d3_46ae_a044_05930cfbe0e2 = rootly.EscalationLevel
     "r-4351b5b9-00d3-46ae-a044-05930cfbe0e2",
     delay=5,
     escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
-    escalation_policy_path_id="adc991bc-d498-4323-9d80-9d2dfa156b0c",
+    escalation_policy_path_id=escalation_path_default.id,
     notification_target_params=[{"id": "99415", "teamMembers": "all", "type": "user"}],
     paging_strategy_configuration_schedule_strategy="on_call_only",
     paging_strategy_configuration_strategy="default",
@@ -623,8 +699,8 @@ escalation_level_r_4351b5b9_00d3_46ae_a044_05930cfbe0e2 = rootly.EscalationLevel
     opts=rootly_opts,
 )
 
-# The only level on the "Low Urgency" escalation path (which is unmanaged --
-# only this level is modeled here). Low urgency alerts used to notify the
+# The only level on the "Low Urgency" escalation path (adopted above). Low
+# urgency alerts used to notify the
 # on-call schedule here and post to #devops-alerts. The path is "quiet", so
 # those pages respected Do Not Disturb, but they were still pages, for the
 # least urgent tier we have -- Grafana severity=warning maps to Low. Both
@@ -637,7 +713,7 @@ escalation_level_r_75bc919c_824c_46a1_9589_0fc8b85e0d77 = rootly.EscalationLevel
     "r-75bc919c-824c-46a1-9589-0fc8b85e0d77",
     delay=5,
     escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
-    escalation_policy_path_id="67658f83-7fac-4a19-8e2a-0d8eee57f0a8",
+    escalation_policy_path_id=escalation_path_low_urgency.id,
     notification_target_params=[
         {
             "id": "C0BK6BHUCDP",  # #devops-warnings
@@ -656,7 +732,7 @@ escalation_level_r_8ee197b2_ffe5_4696_b4a0_760e5c84a343 = rootly.EscalationLevel
     "r-8ee197b2-ffe5-4696-b4a0-760e5c84a343",
     delay=10,
     escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
-    escalation_policy_path_id="adc991bc-d498-4323-9d80-9d2dfa156b0c",
+    escalation_policy_path_id=escalation_path_default.id,
     notification_target_params=[
         {
             "id": "fad27d50-f0e4-4d21-9b6d-57eb2dec648b",
@@ -672,8 +748,8 @@ escalation_level_r_8ee197b2_ffe5_4696_b4a0_760e5c84a343 = rootly.EscalationLevel
 
 # Medium-urgency alerts (see the alert_source_urgency_rules_attributes demotion
 # rules above) still paged on-call once even outside business hours, because
-# neither of the two existing (unmanaged, pre-dating this Pulumi migration)
-# escalation paths on the Default Escalation Policy actually holds/defers --
+# neither of the two escalation paths that pre-date this Pulumi migration
+# (adopted above) on the Default Escalation Policy actually holds/defers --
 # they only differ in how far they escalate if unacknowledged. This adds a
 # real Rootly "deferral path": Medium-urgency alerts arriving outside
 # Mon-Fri 9am-5pm ET are held (logged + visible in Rootly, no page) and
@@ -687,6 +763,17 @@ escalation_level_r_8ee197b2_ffe5_4696_b4a0_760e5c84a343 = rootly.EscalationLevel
 # "Low is never held less than Medium" -- if these ever drift apart, the lower
 # tier silently becomes the noisier one, which is the exact bug the Low path
 # below exists to fix. One definition makes that impossible.
+#
+# Rootly releases a deferred alert when the block it matched ends, and with
+# re_evaluate a release that lands inside another block is deferred again. So
+# the blocks must leave no gap. The weeknight block used to be 17:00-23:59,
+# which released everything at 23:59 into a minute no block covered: 5zNqx3,
+# deferred at 19:42 ET on 2026-09-15, posted to #devops-warnings at 23:59:01.
+# Chaining itself works: Ks2jH9, deferred Saturday 2026-09-12 at 18:42 ET, ran
+# at 09:00 ET Monday. The weeknight block now crosses midnight (Rootly derives
+# `ends_next_day` when the end is before the start) and ends at 09:00. Friday's
+# ends inside Saturday's all-day block, which chains through Sunday to Monday's
+# 00:00-09:00.
 OFF_HOURS_DEFERRAL_WINDOW = {
     "ruleType": "deferral_window",
     "timeZone": "America/New_York",
@@ -697,20 +784,12 @@ OFF_HOURS_DEFERRAL_WINDOW = {
             "wednesday": True,
             "thursday": True,
             "friday": True,
-            "startTime": "00:00",
-            "endTime": "09:00",
-        },
-        {
-            "monday": True,
-            "tuesday": True,
-            "wednesday": True,
-            "thursday": True,
-            "friday": True,
             "startTime": "17:00",
-            "endTime": "23:59",
+            "endTime": "09:00",
         },
         {"saturday": True, "allDay": True},
         {"sunday": True, "allDay": True},
+        {"monday": True, "startTime": "00:00", "endTime": "09:00"},
     ],
 }
 
@@ -734,8 +813,8 @@ escalation_path_defer_medium_urgency_off_hours = rootly.EscalationPath(
 # Low urgency had NO deferral, which made it *less* protected overnight than
 # Medium -- an inversion nobody chose. Alerts demoted to Low (the production
 # Grafana source demotes `severity=warning` this way, see
-# alert_source_urgency_rules_attributes above) match the unmanaged `Low Urgency`
-# escalation path, which is `notification_type: quiet` and has no time
+# alert_source_urgency_rules_attributes above) match the `Low Urgency`
+# escalation path above, which is `notification_type: quiet` and has no time
 # restriction at all, so it fires at 3am like any other hour.
 #
 # "Quiet" is weaker than it sounds. It does not mean "does not page" -- it
@@ -816,6 +895,235 @@ escalation_level_medium_urgency_slack_only = rootly.EscalationLevel(
     opts=rootly_opts,
 )
 
+# Data platform on-call. Alerts from the data platform (anything on the
+# data-production EKS cluster, the RDS/ElastiCache instances behind it, and the
+# Dagster and Airbyte Pingdom checks) used to land on the Default Escalation
+# Policy with everything else, and were demoted to Medium so that a stalled
+# pipeline would not page the Platform Engineering on-call overnight. That left
+# no one clearly responsible for them at any hour. This gives them their own
+# schedule and policy. Alerts arriving outside business hours are held until
+# 9am; one arriving shortly before 17:00 can still escalate past it (see the
+# Platform Engineering level below).
+#
+# Business hours are enforced twice on purpose. The rotation is only active
+# 9-5 ET on weekdays, so the schedule shows exactly when someone is
+# responsible, and the policy's deferral path holds anything arriving outside
+# that window until 9am. Without the deferral, an off-hours alert would reach
+# a schedule with nobody on call and fall straight through to the Platform
+# Engineering escalation level, which is the overnight page this avoids.
+schedule_data_platform_on_call = rootly.Schedule(
+    "data-platform-on-call-schedule",
+    all_time_coverage=False,
+    description="Data Platform on-call, business hours only (Mon-Fri 9am-5pm ET)",
+    name="Data Platform On Call",
+    owner_group_ids=[team_data_platform.id],
+    owner_user_id=99415,
+    opts=rootly_opts,
+)
+
+schedule_rotation_data_platform = rootly.ScheduleRotation(
+    "data-platform-rotation",
+    active_all_week=False,
+    active_days=["M", "T", "W", "R", "F"],
+    # same_time applies active_time_attributes to every active day; custom
+    # expects per-day ScheduleRotationActiveDay resources instead.
+    active_time_type="same_time",
+    active_time_attributes=[{"startTime": "09:00", "endTime": "17:00"}],
+    name="Data Platform Rotation",
+    position=1,
+    schedule_id=schedule_data_platform_on_call.id,
+    schedule_rotation_members=[
+        {"memberId": "99415", "memberType": "User", "position": 1},
+    ],
+    schedule_rotationable_attributes={"handoff_day": "M", "handoff_time": "09:00"},
+    schedule_rotationable_type="ScheduleWeeklyRotation",
+    time_zone="America/New_York",
+    opts=rootly_opts,
+)
+
+escalation_policy_data_platform = rootly.EscalationPolicy(
+    "data-platform-escalation-policy",
+    business_hours={
+        "days": ["F", "M", "R", "T", "W"],
+        "endTime": "17:00",
+        "startTime": "09:00",
+        "timeZone": "America/New_York",
+    },
+    description=(
+        "Data platform alerts. Business hours only: anything arriving outside "
+        "Mon-Fri 9am-5pm ET is held until the next business morning."
+    ),
+    group_ids=[team_data_platform.id],
+    name="Data Platform Escalation Policy",
+    repeat_count=3,
+    # No `service_ids`, for the same reason as the Default policy: each
+    # Service's `escalation_policy_id` owns the membership.
+    opts=rootly_opts,
+)
+
+# Holds every urgency, not only Medium and Low as on the Default policy,
+# because nothing on the data platform warrants a page outside business hours.
+# re_evaluate replays held alerts through the paths below at 9am, when the
+# rotation is active again.
+escalation_path_data_platform_defer_off_hours = rootly.EscalationPath(
+    "data-platform-defer-off-hours",
+    name="Defer all data platform alerts outside business hours",
+    escalation_policy_id=escalation_policy_data_platform.id,
+    path_type="deferral",
+    match_mode="match-all-rules",
+    after_deferral_behavior="re_evaluate",
+    rules=[OFF_HOURS_DEFERRAL_WINDOW],
+    opts=rootly_opts,
+)
+
+# Same ladder as the Default policy: Medium and Low are Slack-visible in
+# #devops-warnings and page nobody. High falls through to the default path.
+escalation_path_data_platform_non_paging = rootly.EscalationPath(
+    "data-platform-medium-low-urgency-slack-warnings",
+    name="Medium and Low urgency to #devops-warnings",
+    escalation_policy_id=escalation_policy_data_platform.id,
+    path_type="escalation",
+    match_mode="match-all-rules",
+    notification_type="quiet",
+    position=1,
+    repeat=False,
+    rules=[
+        {
+            "ruleType": "alert_urgency",
+            "urgencyIds": [
+                "fce5c971-6660-4ad9-90eb-e75122055f50",  # Medium
+                "d7ed8e91-ffa9-4cc4-b524-729d14a4425b",  # Low
+            ],
+        },
+    ],
+    opts=rootly_opts,
+)
+
+escalation_level_data_platform_non_paging = rootly.EscalationLevel(
+    "data-platform-medium-low-urgency-slack-warnings-escalation-level",
+    escalation_policy_id=escalation_policy_data_platform.id,
+    escalation_policy_path_id=escalation_path_data_platform_non_paging.id,
+    position=1,
+    notification_target_params=[
+        {
+            "type": "slack_channel",
+            "id": "C0BK6BHUCDP",  # #devops-warnings
+        },
+    ],
+    opts=rootly_opts,
+)
+
+# The two High urgency levels below have no escalation_policy_path_id, so they
+# attach to the default path Rootly creates with the policy (as the CI/QA
+# Slack Notifications level does). That path is not declared here.
+escalation_level_data_platform_on_call = rootly.EscalationLevel(
+    "data-platform-on-call-escalation-level",
+    delay=15,
+    escalation_policy_id=escalation_policy_data_platform.id,
+    notification_target_params=[
+        {
+            "id": schedule_data_platform_on_call.id,
+            "teamMembers": "all",
+            "type": "schedule",
+        },
+        {
+            "id": "GBDLJJX51",  # #devops-alerts
+            "type": "slack_channel",
+        },
+    ],
+    paging_strategy_configuration_schedule_strategy="on_call_only",
+    paging_strategy_configuration_strategy="default",
+    position=1,
+    opts=rootly_opts,
+)
+
+# Unacknowledged after 15 minutes, a data platform page goes to whoever holds
+# the Platform Engineering primary rotation. Deferral only applies when an
+# alert arrives, so an escalation that starts shortly before 17:00 keeps
+# running past it; nothing that arrives after 17:00 starts one.
+escalation_level_data_platform_platform_engineering = rootly.EscalationLevel(
+    "data-platform-platform-engineering-escalation-level",
+    escalation_policy_id=escalation_policy_data_platform.id,
+    notification_target_params=[
+        {
+            "id": "fad27d50-f0e4-4d21-9b6d-57eb2dec648b",  # Primary On Call Schedule
+            "teamMembers": "all",
+            "type": "schedule",
+        },
+    ],
+    paging_strategy_configuration_schedule_strategy="on_call_only",
+    paging_strategy_configuration_strategy="default",
+    position=2,
+    opts=rootly_opts,
+)
+
+# Production CloudWatch alarm names for the databases and caches behind the
+# data platform, as listed by `aws cloudwatch describe-alarms` on 2026-09-18.
+# The QA and CI instances are already demoted by CLOUDWATCH_NON_PROD_URGENCY_RULES.
+DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES = [
+    "ol-etl-db-production",  # Dagster
+    "airbyte-db-production",
+    "ol-superset-db-production",
+    "superset-redis-data-production",
+    "open-metadata-db-production",
+    "jupyterhub-data-db-production",
+]
+DATA_PLATFORM_GRAFANA_CLUSTERS = ["data-production"]
+# Same match as the Pingdom Service Route's Dagster and Airbyte rules, which
+# reach the data platform policy through those two services.
+DATA_PLATFORM_PINGDOM_CHECKS = ["Dagster", "Airbyte"]
+
+
+def data_platform_route_rules(
+    json_path: str, values: list[str], first_position: int
+) -> list[dict[str, Any]]:
+    """Build alert route rules that claim data platform alerts for its policy.
+
+    Every alert route attached to a source evaluates independently, so an
+    alert matching the Grafana Production Service Route also matches the
+    Grafana Production Catch-All Route (live alert i8kCWC on 2026-09-10 lists
+    both routes' fallback rules in `routing_rules`). Each of those routes needs
+    these rules ahead of its fallback, or the fallback still hands the alert
+    to the Default Escalation Policy and pages Platform Engineering.
+
+    One rule per value, rather than one rule with several condition groups,
+    because nothing in the provider documents whether condition groups are
+    ANDed or ORed.
+
+    :param json_path: The alert payload path to match against.
+    :param values: Substrings that mark an alert as data platform.
+    :param first_position: Route position of the first generated rule.
+    :returns: Alert route rule dicts targeting the data platform policy.
+    """
+    return [
+        {
+            "conditionGroups": [
+                {
+                    "conditions": [
+                        {
+                            "propertyFieldConditionType": "contains",
+                            "propertyFieldName": json_path,
+                            "propertyFieldType": "payload",
+                            "propertyFieldValue": value,
+                        },
+                    ],
+                    "position": 1,
+                },
+            ],
+            "destinations": [
+                {
+                    "targetId": escalation_policy_data_platform.id,
+                    "targetType": "EscalationPolicy",
+                },
+            ],
+            "fallbackRule": False,
+            "name": f"{value} to Data Platform Escalation Policy",
+            "position": first_position + offset,
+        }
+        for offset, value in enumerate(values)
+    ]
+
+
 # Services imported from the existing Rootly account.
 service_api_authentication = rootly.Service(
     "api-authentication",
@@ -854,10 +1162,42 @@ service_llmops_clickhouse = rootly.Service(
     color="#F5D9C4",
     description="Shared ClickHouse cluster on data EKS (namespace clickhouse)",
     environment_ids=["afe3e34e-62e7-4534-bb4c-de57d24e6a59"],
-    escalation_policy_id="96629210-cc41-4e57-b059-b182a0f01c5b",
+    # Runs on data-production, so it pages the data platform on-call.
+    escalation_policy_id=escalation_policy_data_platform.id,
     name="LLMOps - ClickHouse",
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     opts=rootly_opts,
+)
+
+# Built in the Rootly UI and adopted here only to move them to the data
+# platform policy. The Pingdom Service Route below attributes the Dagster and
+# Airbyte checks to these two services.
+service_dagster_webapp = rootly.Service(
+    "dagster-webapp",
+    alerts_email_address="service-b4bc3a3e665d3d52226883e3abbc3954@email.rootly.com",
+    color="#D7F5E1",
+    description="The Dagster data orchestration service",
+    escalation_policy_id=escalation_policy_data_platform.id,
+    github_repository_branch="master",
+    gitlab_repository_branch="master",
+    name="Dagster - Webapp",
+    owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
+    position=36,
+    opts=rootly_imported_service_opts("e7f7e16e-a7e7-4666-b779-96b33bbf402b"),
+)
+
+service_airbyte_webapp = rootly.Service(
+    "airbyte-webapp",
+    alerts_email_address="service-38f9c21c597849fe97a500144c67c90f@email.rootly.com",
+    color="#D7F5E1",
+    description="The Airbyte data integration service",
+    escalation_policy_id=escalation_policy_data_platform.id,
+    github_repository_branch="master",
+    gitlab_repository_branch="master",
+    name="Airbyte - Webapp",
+    owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
+    position=35,
+    opts=rootly_imported_service_opts("5281c3c5-eb5e-4b7f-9407-950570d66261"),
 )
 
 service_mit_learn_ai_celery = rootly.Service(
@@ -3038,16 +3378,18 @@ alerts_source_cloudwatch_warning = rootly.AlertsSource(
 # anything at it without giving it a route again.
 alerts_source_grafana = rootly.AlertsSource(
     "grafana",
+    # Listed in the order the API returns them, which is not the order most
+    # other sources use; any other order plans an update rewriting all three.
     alert_source_fields_attributes=[
-        {
-            "alertFieldId": "39b50c54-efa8-47fc-acc6-90f1455a8834",
-            "templateBody": "{{ alert.data.title }}",
-        },
         {
             "alertFieldId": "4a3add3c-5611-4dd9-ba65-4fb60b7f4fc6",
             "templateBody": "{{ alert.description }}",
         },
         {"alertFieldId": "45a09cf3-b0f2-43cf-b596-34aaab9279dc"},
+        {
+            "alertFieldId": "39b50c54-efa8-47fc-acc6-90f1455a8834",
+            "templateBody": "{{ alert.data.title }}",
+        },
     ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
@@ -3149,20 +3491,11 @@ alerts_source_grafana_prometheus_production = rootly.AlertsSource(
                 "HPAAtMaxReplicasCritical",
             ]
         ],
-        # Every Dagster rule (metric_rules/dagster_*.py, log_rules/dagster_*.py).
-        # Their production *Critical twins arrived at High and paged:
-        # DagsterQueuedRunStuckCritical and DagsterRunFailureRateCritical on
-        # 2026-09-10 around 20:45 ET. A stalled or failing Dagster delays data
-        # pipelines by hours; nothing user-facing is down, so it can wait for
-        # business hours. `contains` rather than an alertname list so a new or
-        # renamed Dagster rule cannot bypass this and page.
-        {
-            "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
-            "jsonPath": "$.commonLabels.alertname",
-            "kind": "payload",
-            "operator": "contains",
-            "value": "Dagster",
-        },
+        # No Dagster demotion. Dagster criticals paged Platform Engineering
+        # overnight on 2026-09-10 and were demoted to Medium for it; they now
+        # route to the Data Platform Escalation Policy, which defers everything
+        # outside business hours, so they keep High and page the data platform
+        # on-call during the day.
     ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
@@ -3350,15 +3683,6 @@ alerts_source_pingdom = rootly.AlertsSource(
             "operator": "is",
             "value": "LOW",
         },
-        # Same reasoning as the Dagster rule on the Grafana Production source.
-        # Matches the "Dagster Checks to Dagster Webapp" route's condition.
-        {
-            "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
-            "jsonPath": "$.check_name",
-            "kind": "payload",
-            "operator": "contains",
-            "value": "Dagster",
-        },
     ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
     deduplication_key_kind="payload",
@@ -3425,6 +3749,9 @@ alert_route_cloudwatch_catch_all_route = rootly.AlertRoute(
     name="Cloudwatch Catch-All Route",
     owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     rules=[
+        *data_platform_route_rules(
+            "$.Message.AlarmName", DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES, 1
+        ),
         {
             "destinations": [
                 {
@@ -3434,8 +3761,8 @@ alert_route_cloudwatch_catch_all_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Cloudwatch Catch-All Route",
-            "position": 1,
-        }
+            "position": len(DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES) + 1,
+        },
     ],
     opts=rootly_opts,
 )
@@ -3447,6 +3774,12 @@ alert_route_grafana_production_catch_all_route = rootly.AlertRoute(
     name="Grafana Production Catch-All Route",
     owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     rules=[
+        # `cluster` is a grouping label in grafana_alerting/alertmanager.py, so
+        # it reaches commonLabels for any rule that aggregates by it. Every
+        # data-production rule does (dagster_*, clickhouse, eks_general).
+        *data_platform_route_rules(
+            "$.commonLabels.cluster", DATA_PLATFORM_GRAFANA_CLUSTERS, 1
+        ),
         {
             "destinations": [
                 {
@@ -3456,8 +3789,8 @@ alert_route_grafana_production_catch_all_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Grafana Production Catch-All Route",
-            "position": 1,
-        }
+            "position": len(DATA_PLATFORM_GRAFANA_CLUSTERS) + 1,
+        },
     ],
     opts=rootly_opts,
 )
@@ -3469,6 +3802,7 @@ alert_route_pingdom_catch_all_route = rootly.AlertRoute(
     name="Pingdom Catch-All Route",
     owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
     rules=[
+        *data_platform_route_rules("$.check_name", DATA_PLATFORM_PINGDOM_CHECKS, 1),
         {
             "destinations": [
                 {
@@ -3478,8 +3812,8 @@ alert_route_pingdom_catch_all_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Pingdom Catch-All Route",
-            "position": 1,
-        }
+            "position": len(DATA_PLATFORM_PINGDOM_CHECKS) + 1,
+        },
     ],
     opts=rootly_opts,
 )
@@ -3806,6 +4140,10 @@ alert_route_cloudwatch_service_route = rootly.AlertRoute(
             "name": "mitx-qa elasticache AlarmName to MITx Online QA - Open edX - Redis",  # noqa: E501
             "position": 10,
         },
+        # None of the alarm names above contain these, so after them is safe.
+        *data_platform_route_rules(
+            "$.Message.AlarmName", DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES, 11
+        ),
         {
             "destinations": [
                 {
@@ -3815,7 +4153,7 @@ alert_route_cloudwatch_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Cloudwatch Service Route",
-            "position": 11,
+            "position": 11 + len(DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES),
         },
     ],
     opts=rootly_imported_route_opts("61d2fb04-f85f-4d9c-a1bc-1a6afad7ca0f"),
@@ -4108,6 +4446,15 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             "name": "clickhouse service label to LLMOps - ClickHouse",
             "position": 10,
         },
+        # Everything else on data-production. After the ClickHouse rule so
+        # ClickHouse alerts keep their service attribution (that service uses
+        # the same policy). No earlier rule matches a data-production
+        # namespace: they are airbyte, clickhouse, dagster, jupyter-data,
+        # marimo, ol-analytics, open-metadata, opik, qdrant, starrocks,
+        # superset, and cluster system namespaces as of 2026-09-18.
+        *data_platform_route_rules(
+            "$.commonLabels.cluster", DATA_PLATFORM_GRAFANA_CLUSTERS, 11
+        ),
         {
             "destinations": [
                 {
@@ -4117,7 +4464,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Grafana Production Service Route",
-            "position": 11,
+            "position": 11 + len(DATA_PLATFORM_GRAFANA_CLUSTERS),
         },
     ],
     opts=rootly_imported_route_opts("e7b002f8-e13f-4b63-b0df-af1c78aee890"),
@@ -4628,7 +4975,7 @@ alert_route_pingdom_service_route = rootly.AlertRoute(
             ],
             "destinations": [
                 {
-                    "targetId": "5281c3c5-eb5e-4b7f-9407-950570d66261",
+                    "targetId": service_airbyte_webapp.id,
                     "targetType": "Service",
                 },
             ],
@@ -4652,7 +4999,7 @@ alert_route_pingdom_service_route = rootly.AlertRoute(
             ],
             "destinations": [
                 {
-                    "targetId": "e7f7e16e-a7e7-4666-b779-96b33bbf402b",
+                    "targetId": service_dagster_webapp.id,
                     "targetType": "Service",
                 },
             ],

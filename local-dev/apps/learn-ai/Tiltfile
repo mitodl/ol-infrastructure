@@ -16,6 +16,8 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         IMAGE,
         context=APP_DIR,
         dockerfile=APP_DIR + '/Dockerfile',
+        # .claude/ holds agent worktrees; syncing one into the pod restarted it in a loop.
+        ignore=['.claude/'],
         live_update=[
             sync(APP_DIR + '/main', '/src/main'),
             run(

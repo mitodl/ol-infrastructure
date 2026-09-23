@@ -637,7 +637,7 @@ def rebuild(  # noqa: PLR0913
     schema_dir: Path,
     actor: str,
 ) -> dict[str, dict[str, int]]:
-    """Create the graphs at ``new_root`` and load every export into them.
+    """Create the graphs at ``new_root``, load every export, and index them.
 
     Returns, per graph, how many rows ``normalize_export`` collapsed away from
     each keyed edge table, which ``verify`` needs to know what the rebuilt
@@ -706,6 +706,8 @@ def rebuild(  # noqa: PLR0913
                     "--yes",
                 ]
             )
+        if pending := build_indexes(new_binary, store):
+            LOG.warning("     indexes deferred by optimize: %s", pending)
         # RECLAIM THIS GRAPH'S COPIES, AND ONLY AFTER ITS LOADS SUCCEEDED. The
         # raw export, its normalized rewrite and any batch files are three
         # copies of one graph's rows; carrying all three for every graph to the
@@ -717,6 +719,31 @@ def rebuild(  # noqa: PLR0913
         for spent in {export_dir / f"{graph}.jsonl", normalized, *batches}:
             spent.unlink(missing_ok=True)
     return collapsed
+
+
+def build_indexes(binary: str, store: str) -> list[dict[str, str]]:
+    """Build ``store``'s declared indexes, returning any it had to defer.
+
+    ``load`` builds none. omnigraph 0.11 moved index builds off every write
+    path (upstream iss-848) and left ``optimize`` as the only thing that
+    creates them, so a freshly loaded root has no BTREE on any edge's
+    ``__id``/``__src``/``__dst``. Nothing fails: traversals fall back to a full
+    edge scan per hop, which is what Production's council did after the
+    2026-09-16 fmt9 cutover (``no BTREE index on '__src'`` on every WorksOn
+    traversal). The nightly optimize CronJob would get there eventually, but it
+    is suspended for the whole migration, so the rebuild does it instead of
+    serving unindexed until the next 03:20 tick.
+
+    Deferred indexes (a vector property with no vectors yet, full-text coverage
+    that needs an explicit rebuild) are reported, not fatal: neither is an edge
+    BTREE, and neither stops the graph serving correctly.
+    """
+    out = run([binary, "optimize", "--store", store, "--json"]).stdout
+    return [
+        pending
+        for dataset in json.loads(out)["datasets"]
+        for pending in dataset["pending_indexes"]
+    ]
 
 
 def verify(

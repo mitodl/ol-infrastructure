@@ -23,6 +23,13 @@
 _ROOT_DOMAIN_DEFAULT = "mit.dev"
 _CONFIG_HASH_ANNOTATION = "ol.mit.edu/config-hash"
 
+def current_root_domain():
+    """Return the value k8s_yaml_local substitutes 'mit.dev' for, so a caller
+    that needs the same value for something other than YAML (e.g. folding it
+    into a downstream checksum input) doesn't duplicate the env var name or
+    default."""
+    return os.environ.get("LOCAL_DEV_ROOT_DOMAIN", _ROOT_DOMAIN_DEFAULT)
+
 def _config_fingerprint(paths_and_texts):
     """Return a stable fingerprint of the combined data/binaryData/stringData
     of every ConfigMap and Secret across the given (path, text) pairs (not the
@@ -83,7 +90,7 @@ def k8s_yaml_local(paths, local_overrides=None):
     fingerprint annotation covering every applied ConfigMap/Secret, including
     an optional gitignored ConfigMap of per-developer overrides (see module
     docstring)."""
-    rd = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", _ROOT_DOMAIN_DEFAULT)
+    rd = current_root_domain()
 
     # read_file(default=...) also registers a watch on the override path —
     # including its creation — so adding or editing it mid-session re-runs

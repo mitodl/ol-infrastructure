@@ -67,7 +67,6 @@ config:
   edxapp:edx_xqueue_secrets:
     secure: v1:MSer6cBbKNVi/Pas:v5XAeVblUaT5pyxdhhk9wn9cVjadZcHscOWhN1nlPHBsCD8/HgEtsvAjtTOWnW/yVMYaMzlIjOxoKvEw0/qNESQj0M7bFKC7/dtfU+qlrWyI0PJEVVmiz9QPLAOvl4rA8In2hJTAmN+BAREDqSRFM9YiOKmdOuoDssTGv+fD1+oC5EcFz4BKPUnbZDQ1
   edxapp:enable_courseware_index: "true"
-  edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     admin_console: admin-console
     authoring: authoring
@@ -109,10 +108,14 @@ config:
       workers: 1
       runtime_threads: 1
       blocking_threads: 8
+      respawn_interval: 60
+      worker_startup_rss: 700
     lms:
       workers: 1
       runtime_threads: 1
       blocking_threads: 8
+      respawn_interval: 60
+      worker_startup_rss: 700
   edxapp:k8s_replicas:
     webapp:
       cms:
@@ -134,10 +137,16 @@ config:
         cpu_request: "250m"
         memory_request: "2Gi"
         memory_limit: "2Gi"
+        # request == limit, so the VPA admits pods at this floor or above. The
+        # derived cap (1143) plus worker_startup_rss (700) is 90% of 2Gi. With
+        # the old 256Mi floor, LMS and CMS pods ran at 990-1181MiB (2026-09-22)
+        # and were OOMKilled at that limit before the cap could fire.
+        vpa_min_allowed_memory: "2Gi"
       cms:
         cpu_request: "250m"
         memory_request: "2Gi"
         memory_limit: "2Gi"
+        vpa_min_allowed_memory: "2Gi"
     celery:
       lms:
         cpu_request: "250m"

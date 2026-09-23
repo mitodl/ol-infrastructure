@@ -27,7 +27,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskStep,
 )
 from ol_concourse.lib.resources import git_repo, github_issues, registry_image
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from ol_concourse.pipelines.constants import (
     ECR_REGION,
@@ -38,6 +38,7 @@ from ol_concourse.pipelines.constants import (
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -145,6 +146,13 @@ class SimplePulumiParams(BaseModel):
                            preview-gated the gate issue is what authorises the
                            deploy, so the record issue is pure noise unless a
                            pipeline specifically wants an audit trail.
+        description: One or two sentences on what this app is and what the
+                     pipeline deploys. Rendered as the pipeline's info-page
+                     description once concourse/concourse#9661 ships in a
+                     release -- see
+                     ol_concourse.pipelines.pipeline_output.pipeline_json_with_user_data.
+        category: Dashboard cluster from docs/plans/
+                 concourse-dashboard-reorganization.md §3.
     """
 
     app_name: str
@@ -163,6 +171,21 @@ class SimplePulumiParams(BaseModel):
     topology: Literal["deploy-chained", "preview-gated"] = "deploy-chained"
     auto_deploy_stages: list[str] | None = None
     record_deployments: bool = False
+    description: str = Field(
+        description=(
+            "Rendered as the pipeline's info-page description once "
+            "concourse/concourse#9661 ships in a release -- see "
+            "ol_concourse.pipelines.pipeline_output.pipeline_json_with_user_data."
+        )
+    )
+    category: Literal[
+        "meta", "core-platform", "data-platform", "open-edx", "applications"
+    ] = Field(
+        description=(
+            "Dashboard cluster from docs/plans/"
+            "concourse-dashboard-reorganization.md §3."
+        )
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -328,6 +351,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="airbyte",
         pulumi_project_path="applications/airbyte/",
         pulumi_project_name="ol-application-airbyte",
+        description=(
+            "Deploys Airbyte, the data-integration/ELT platform used to sync "
+            "source systems into the data warehouse, via Pulumi."
+        ),
+        category="data-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -340,6 +368,10 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             image_tag="0.7.5",  # Must match LEEK_VERSION in bridge.lib.versions
             ecr_region=ECR_REGION,
         ),
+        description=(
+            "Deploys Leek, the Celery task-queue monitoring dashboard, via Pulumi."
+        ),
+        category="core-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -347,6 +379,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="clickhouse",
         pulumi_project_path="applications/clickhouse/",
         pulumi_project_name="ol-application-clickhouse",
+        description="Deploys the ClickHouse analytics database cluster via Pulumi.",
+        category="data-platform",
         stages=["CI", "QA", "Production"],
         topology="preview-gated",
         auto_deploy_stages=["CI"],
@@ -355,6 +389,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="data_warehouse",
         pulumi_project_path="infrastructure/aws/data_warehouse/",
         pulumi_project_name="ol-infrastructure-data-warehouse",
+        description="Provisions the AWS data warehouse infrastructure via Pulumi.",
+        category="data-platform",
         stages=["CI", "QA", "Production"],
         topology="preview-gated",
         auto_deploy_stages=["CI"],
@@ -363,6 +399,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="digital-credentials",
         pulumi_project_path="applications/digital_credentials/",
         pulumi_project_name="ol-application-digital-credentials",
+        description="Deploys the Digital Credentials application via Pulumi.",
+        category="applications",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -370,6 +408,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="fastly-redirector",
         pulumi_project_path="applications/fastly_redirector/",
         pulumi_project_name="ol-application-fastly-redirector",
+        description=(
+            "Deploys the Fastly Redirector app, which manages Fastly "
+            "URL-redirect rules, via Pulumi."
+        ),
+        category="core-platform",
         refresh_stack=False,
         topology="preview-gated",
         auto_deploy_stages=["CI"],
@@ -378,6 +421,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="gcp",
         pulumi_project_path="infrastructure/gcp/",
         pulumi_project_name="ol-infrastructure-gcp",
+        description=(
+            "Manages GCP service-account credentials consolidated under the "
+            "mitol01 project via Pulumi; gated on preview since adopted "
+            "resources are live credentials with external consumers."
+        ),
+        category="core-platform",
         # One stack: mitol01 is the consolidation target for the whole estate,
         # and the tier a credential serves is carried in its own name rather
         # than in a stack boundary. See infrastructure/gcp/README.md.
@@ -391,6 +440,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="github-organization",
         pulumi_project_path="saas/github/organization/",
         pulumi_project_name="ol-saas-github-organization",
+        description=(
+            "Deploys org-wide GitHub settings (teams, membership, org policy) "
+            "via Pulumi, gated on a reviewed preview."
+        ),
+        category="core-platform",
         stages=["default"],
         topology="preview-gated",
     ),
@@ -398,6 +452,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="github-repositories",
         pulumi_project_path="saas/github/repositories/",
         pulumi_project_name="ol-saas-github-repositories",
+        description=(
+            "Deploys per-repository GitHub settings and branch-protection "
+            "rulesets via Pulumi, including the release bot's required-checks "
+            "bypass for every repo in bridge.settings.apps."
+        ),
+        category="core-platform",
         stages=["default"],
         topology="preview-gated",
         # rulesets.py grants the release bot its required-checks bypass on every
@@ -410,6 +470,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="grafana-alerting",
         pulumi_project_path="infrastructure/grafana_alerting/",
         pulumi_project_name="ol-infrastructure-grafana-alerting",
+        description="Deploys Grafana alerting rules and contact points via Pulumi.",
+        category="core-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -417,6 +479,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="jupyterhub-data",
         pulumi_project_path="applications/jupyterhub_data/",
         pulumi_project_name="ol-application-jupyterhub-data",
+        description=(
+            "Deploys the data team's JupyterHub instance via Pulumi (distinct "
+            "from the course-authoring JupyterHub image pipeline)."
+        ),
+        category="data-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -424,6 +491,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="marimo-data",
         pulumi_project_path="applications/marimo_data/",
         pulumi_project_name="ol-application-marimo-data",
+        description="Deploys the data team's marimo notebook service via Pulumi.",
+        category="data-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -431,6 +500,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="mongodb-atlas",
         pulumi_project_path="infrastructure/mongodb_atlas/",
         pulumi_project_name="ol-infrastructure-mongodb-atlas",
+        description=(
+            "Provisions MongoDB Atlas clusters for the mitx, mitx-staging, "
+            "mitxonline, and xpro deployment groups via Pulumi, each running "
+            "its own parallel CI to QA to Production chain."
+        ),
+        category="data-platform",
         deployment_groups=["mitx", "mitx-staging", "mitxonline", "xpro"],
         topology="preview-gated",
         auto_deploy_stages=["CI"],
@@ -439,6 +514,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="ocw-site",
         pulumi_project_path="applications/ocw_site/",
         pulumi_project_name="ol-application-ocw-site",
+        description="Deploys the OCW (OpenCourseWare) site infrastructure via Pulumi.",
+        category="applications",
         stages=["QA", "Production"],
         refresh_stack=False,
         topology="preview-gated",
@@ -447,6 +524,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="open-discussions",
         pulumi_project_path="applications/open_discussions/",
         pulumi_project_name="ol-application-open-discussions",
+        description="Deploys the Open Discussions application via Pulumi.",
+        category="applications",
         stages=["QA", "Production"],
         topology="preview-gated",
     ),
@@ -454,6 +533,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="open-metadata",
         pulumi_project_path="applications/open_metadata/",
         pulumi_project_name="ol-application-open-metadata",
+        description="Deploys the OpenMetadata data-catalog application via Pulumi.",
+        category="data-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -461,6 +542,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="open-metadata-substructure",
         pulumi_project_path="substructure/open_metadata/",
         pulumi_project_name="ol-substructure-open-metadata",
+        description=(
+            "Deploys the substructure (database, networking, IAM) that "
+            "OpenMetadata runs on, via Pulumi."
+        ),
+        category="data-platform",
         stages=["QA", "Production"],
         topology="preview-gated",
     ),
@@ -468,6 +554,13 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="opensearch",
         pulumi_project_path="infrastructure/aws/opensearch/",
         pulumi_project_name="ol-infrastructure-opensearch",
+        description=(
+            "Provisions OpenSearch domains for the apps, celery_monitoring, "
+            "mitlearn, mitx, mitx-staging, mitxonline, open, open_metadata, "
+            "and xpro deployment groups via Pulumi, each running its own "
+            "parallel CI to QA to Production chain."
+        ),
+        category="data-platform",
         deployment_groups=[
             "apps",
             "celery_monitoring",
@@ -486,6 +579,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="opik",
         pulumi_project_path="applications/opik/",
         pulumi_project_name="ol-application-opik",
+        description=(
+            "Deploys Opik, the LLM tracing/evaluation observability platform, "
+            "via Pulumi."
+        ),
+        category="core-platform",
         stages=["CI", "QA", "Production"],
         topology="preview-gated",
         auto_deploy_stages=["CI"],
@@ -494,6 +592,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="qdrant-cloud",
         pulumi_project_path="infrastructure/qdrant_cloud/",
         pulumi_project_name="ol-infrastructure-qdrant-cloud",
+        description="Provisions the Qdrant Cloud vector database used by MIT Learn via Pulumi.",
+        category="data-platform",
         stack_prefix="mitlearn",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
@@ -502,6 +602,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="rootly",
         pulumi_project_path="saas/rootly/",
         pulumi_project_name="ol-saas-rootly",
+        description=(
+            "Manages Rootly incident-management configuration (~160 API-backed "
+            "resources: schedules, escalation policies, alert routing) via "
+            "Pulumi."
+        ),
+        category="core-platform",
         additional_watched_paths=["sdks/rootly/"],
         stages=["default"],
         topology="preview-gated",
@@ -517,6 +623,14 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="sentry",
         pulumi_project_path="infrastructure/sentry/",
         pulumi_project_name="ol-infrastructure-sentry",
+        description=(
+            "Manages Sentry project configuration (~350 API-backed "
+            "resources: code mappings, dashboards). Single `default` stack, "
+            "preview-gated. Skips `pulumi refresh` for the same reason as "
+            "Rootly: refreshing fans out a GET per resource and 429s against "
+            "Sentry's per-org rate limit before `up` runs."
+        ),
+        category="core-platform",
         stages=["default"],
         topology="preview-gated",
         # The stack manages ~350 Sentry-API-backed resources (code mappings,
@@ -533,6 +647,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         deployment_groups=[
             "lakehouse",
         ],
+        description="Deploys the StarRocks lakehouse query engine via Pulumi.",
+        category="data-platform",
         stages=["CI", "QA", "Production"],
         topology="preview-gated",
         auto_deploy_stages=["CI"],
@@ -548,6 +664,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         deployment_groups=[
             "lakehouse",
         ],
+        description=(
+            "Deploys the StarRocks substructure (networking, NLB) for "
+            "Production via Pulumi, from the prod Concourse instance since it "
+            "makes direct TCP connections to the data VPC's internal NLB."
+        ),
+        category="data-platform",
         stages=["Production"],
         prior_stage_stack="lakehouse.QA",
         topology="preview-gated",
@@ -559,6 +681,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         deployment_groups=[
             "lakehouse",
         ],
+        description=(
+            "Deploys the StarRocks substructure for QA via Pulumi, from the "
+            "QA Concourse instance since each stage must run on the instance "
+            "peered with its same-env data VPC."
+        ),
+        category="data-platform",
         stages=["QA"],
         topology="preview-gated",
     ),
@@ -569,12 +697,20 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         deployment_groups=[
             "lakehouse",
         ],
+        description=(
+            "Deploys the StarRocks substructure for CI via Pulumi, from the "
+            "CI Concourse instance -- same reasoning as "
+            "starrocks-substructure-qa, for the CI-env data VPC."
+        ),
+        category="data-platform",
         stages=["CI"],
     ),
     "tika": SimplePulumiParams(
         app_name="tika",
         pulumi_project_path="applications/tika/",
         pulumi_project_name="ol-application-tika",
+        description="Deploys Apache Tika (document text/metadata extraction) via Pulumi.",
+        category="data-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -582,6 +718,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="toolhive-apps",
         pulumi_project_path="applications/toolhive_apps/",
         pulumi_project_name="ol-application-toolhive-apps",
+        description="Deploys ToolHive-managed MCP servers for application tooling via Pulumi.",
+        category="core-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -589,6 +727,10 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="toolhive-data",
         pulumi_project_path="applications/toolhive_data/",
         pulumi_project_name="ol-application-toolhive-data",
+        description=(
+            "Deploys the ToolHive MCP server registry for data-team tools via Pulumi."
+        ),
+        category="core-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -596,6 +738,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="toolhive-operator",
         pulumi_project_path="applications/toolhive_operator/",
         pulumi_project_name="ol-application-toolhive-operator",
+        description=(
+            "Deploys the ToolHive Kubernetes operator (manages MCP server "
+            "workloads cluster-wide) via Pulumi."
+        ),
+        category="core-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -603,6 +750,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="toolhive-swe",
         pulumi_project_path="applications/toolhive_swe/",
         pulumi_project_name="ol-application-toolhive-swe",
+        description=(
+            "Deploys the ToolHive MCP server registry for the SWE/"
+            "agent-tooling team via Pulumi."
+        ),
+        category="core-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -614,6 +766,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="vector-log-proxy",
         pulumi_project_path="infrastructure/vector_log_proxy/",
         pulumi_project_name="ol-infrastructure-vector-log-proxy",
+        description="Deploys Vector Log Proxy, which forwards logs into the observability pipeline, via Pulumi.",
+        category="core-platform",
         stack_prefix="operations",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
@@ -622,6 +776,10 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="aws-ecr",
         pulumi_project_path="infrastructure/aws/ecr/",
         pulumi_project_name="ol-infrastructure-ecr",
+        description=(
+            "Deploys the shared ECR repositories and lifecycle policy via Pulumi."
+        ),
+        category="core-platform",
         stages=["default"],
         topology="preview-gated",
     ),
@@ -629,6 +787,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="aws-sftp",
         pulumi_project_path="infrastructure/aws/sftp_servers/",
         pulumi_project_name="ol-infrastructure-aws-sftp",
+        description=(
+            "Deploys the AWS Transfer Family SFTP server(s) for a single "
+            "partner integration, via Pulumi. QA/Production only -- no CI "
+            "stack exists for this project."
+        ),
+        category="core-platform",
         # No CI stack exists for this project (`pulumi stack ls` shows only
         # QA and Production) -- a single-partner SFTP integration that's
         # barely changed in a year never needed one. The default CI stage
@@ -640,6 +804,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="b2b-partners-storage",
         pulumi_project_path="applications/b2b_partners_storage/",
         pulumi_project_name="ol-application-b2b-partners-storage",
+        description="Deploys B2B partner file-storage infrastructure via Pulumi.",
+        category="applications",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -647,6 +813,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="mailgun",
         pulumi_project_path="applications/mailgun/",
         pulumi_project_name="ol-application-mailgun",
+        description="Deploys Mailgun domain/routing configuration via Pulumi.",
+        category="core-platform",
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -654,6 +822,11 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="monitoring",
         pulumi_project_path="infrastructure/monitoring/",
         pulumi_project_name="ol-infrastructure-monitoring",
+        description=(
+            "Deploys shared monitoring infrastructure (Grafana/Prometheus "
+            "config not owned by a more specific pipeline) via Pulumi."
+        ),
+        category="core-platform",
         stages=["default"],
         topology="preview-gated",
     ),
@@ -661,6 +834,10 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="starburst",
         pulumi_project_path="applications/starburst/",
         pulumi_project_name="ol-application-starburst",
+        description=(
+            "Deploys the Starburst (Trino) federated-query engine via Pulumi."
+        ),
+        category="data-platform",
         stages=["Production"],
         topology="preview-gated",
     ),
@@ -668,6 +845,8 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="xpro-partner-dns",
         pulumi_project_path="substructure/xpro_partner_dns/",
         pulumi_project_name="ol-substructure-xpro-partner-dns",
+        description="Deploys DNS records for xPro partner-facing domains via Pulumi.",
+        category="core-platform",
         stages=["default"],
         topology="preview-gated",
     ),
@@ -675,6 +854,14 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="release-bot",
         pulumi_project_path="applications/release_bot/",
         pulumi_project_name="ol-infrastructure-release-bot",
+        description=(
+            "Builds and deploys the release bot (the Slack-driven "
+            "deploy-promotion tool that also powers the nine "
+            "release_bot-referenced pipeline slash commands) via Pulumi. "
+            "Watches bridge/settings/apps.py so an app's channel or "
+            "workflow-flag change redeploys it."
+        ),
+        category="core-platform",
         stages=["default"],
         topology="preview-gated",
         # __main__.py builds REPOS_CONFIG out of bridge.settings.apps, so an
@@ -702,6 +889,12 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         app_name="vuln-scanner",
         pulumi_project_path="applications/vuln_scanner/",
         pulumi_project_name="ol-application-vuln-scanner",
+        description=(
+            "Deploys the vulnerability scanner (ZAP + Nuclei DAST) that scans "
+            "MIT Learn's QA endpoint, via Pulumi. Preview-gated since it runs "
+            "active attack payloads with S3-write/Security-Hub credentials."
+        ),
+        category="core-platform",
         # Only Pulumi.QA.yaml exists -- this scans MIT Learn's QA endpoint
         # specifically, deliberately not Production (see __main__.py's
         # module docstring).
@@ -1028,9 +1221,18 @@ if __name__ == "__main__":
 
     try:
         pipeline = build_simple_pulumi_pipeline(app_name)
+        app_params = pipeline_params[app_name]
+        output = pipeline_json_with_user_data(
+            pipeline,
+            user_data={
+                "description": app_params.description,
+                "team": "infrastructure",
+                "category": app_params.category,
+            },
+        )
         with open("definition.json", "w") as definition:  # noqa: PTH123
-            definition.write(pipeline.model_dump_json(indent=2))
-        sys.stdout.write(pipeline.model_dump_json(indent=2))
+            definition.write(output)
+        sys.stdout.write(output)
         print()  # noqa: T201
         print(f"fly -t pr-inf sp -p pulumi-{app_name} -c definition.json")  # noqa: T201
     except ValueError as e:

@@ -2,8 +2,9 @@
 
 **Status:** stage 0 merged 2026-07-23 (#5083); stage 1 merged 2026-07-27 (#5135), validated
 in production 2026-08-07; stage 2 merged 2026-08-10 (#5344), validated in production
-2026-08-17; stage 3 `mitxonline` **blocked**, `edxapp` CMS rolled back and **blocked**
-pending retuning (see stage 3), LMS handled separately per install; stage 4 pending
+2026-08-17; stage 3 `mitxonline` webapp in review 2026-09-17 (see stage 3), `edxapp` CMS
+rolled back and **blocked** pending retuning (see stage 3), LMS handled separately per
+install (`mitxonline` LMS opted in 2026-09-17 at 1 × 24); stage 4 pending
 **Project:** `wp-granian-configuration-overhaul-expose-blocking-t-3debc2`
 **Component:** `src/ol_infrastructure/components/services/k8s.py` — `GranianConfig`
 **Evidence:** witan lessons `les-granianconfig-never-exposes-blocking-threads-bac-874462`,
@@ -204,6 +205,16 @@ Consequences:
   > (`tk-evaluate-runtime-cgroup-derived-workers-max-rss--1cd258`) or a higher
   > `minAllowed`. Note this exposure already exists in the live `workers=2` config, whose
   > aggregate cap is the same 2816MiB — it is not introduced by stage 3.
+
+  > **Superseded 2026-09-17: the higher-`minAllowed` option above is the one taken.** The
+  > ceiling-derived override is removed, and so is the "aggregate cap is the same"
+  > argument, because the cap is checked per worker. At `workers=2` it fired at 1408MiB
+  > 404 times in 14 days. At `workers=1` a 2816MiB cap would leave 22MiB under the lowest
+  > admitted limit (2838MiB). Production now declares `2800Mi`, which is also the VPA's
+  > `minAllowed`, so the component's limit-derived cap (2520MiB) is below every limit a
+  > pod can be admitted with. The "Corrected action" above (retarget the override at one
+  > worker) is withdrawn too. See the stage 3 `mitxonline` note and lesson
+  > `les-granian-workers-max-rss-is-per-worker-so-a-cap-t-31dc80`.
 
 ### 5. Health probes — deferred, not dropped
 
@@ -441,6 +452,28 @@ Component change lands once; per-app behavior changes as each app's stack is dep
      `count by (namespace) (granian_workers_spawns)` and `up{namespace="mitxonline"}`
      after the production deploy.
 
+  **Unblocked 2026-09-17: `mitxonline` webapp moves to 1 worker × 16 blocking threads.**
+  Both blockers above are closed and `granian_*` series arrive. Measured over the 14 days
+  to 2026-09-17 (up to 15 pods, 6.5 rps average):
+
+  | signal | value |
+  | --- | --- |
+  | busy blocking threads, busiest pod, p99 | 0.78 |
+  | busy blocking threads, busiest pod, max | 11.7 (2026-09-16 14:09Z edxapp Deployment replacement) |
+  | same, outside that window | 6.8 (35-minute edX slowdown 2026-09-14, CPU < 0.13 cores/pod) |
+  | `granian_connections_active`, max per pod | 36 |
+  | RSS respawns / OOMKills | 404 / 11 |
+  | admitted memory limit, min / p5 | 2838 / 2991 MiB |
+
+  The respawn count retires the "`workers_max_rss` is aggregate-invariant" framing. At
+  `workers=2` the ceiling-derived cap fired per worker at 1408MiB, about 30 times a day.
+  At `workers=1` the same 2816MiB would sit 22MiB under the lowest admitted limit before
+  counting the master process, turning graceful respawns into OOMKills. Instead the
+  declared memory (and so the VPA's `minAllowed`) is per stack: Production `2800Mi`, just
+  under the 14-day admission minimum, so the component's default cap (2520MiB) sits
+  below every limit a pod can be admitted with. CI/QA stay at `1200Mi` (QA peaked at
+  988MiB). The ceiling-derived override and its constants are gone.
+
   **Resequenced 2026-08-17: `edxapp` CMS goes first, and LMS is pulled out of stage 3.**
   With `mitxonline` blocked and `edxapp` blocked by nothing, CMS went ahead. Measuring to
   order the rest produced a result the plan did not anticipate.
@@ -470,6 +503,18 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   early, and it is tracked as
   `tk-edxapp-lms-needs-blocking-threads-sized-from-mea-317fe2`.
 
+  **Sized 2026-09-17: `mitxonline` LMS goes to 1 worker × 24 blocking threads, backpressure
+  at the component default.** Re-measured over the 14 days to 2026-09-16 14:00Z (stopping
+  before the delete-before-replace outage that followed). The 17.7 above did not
+  reproduce. Worst per-pod busy threads (5-minute mean) was 13.95, on 2026-09-09 ~01:15Z, and only 2 of
+  18 pods ran hot (9–11 for ~20 minutes) while the other 16 stayed under 3. That is skew
+  across pods, not aggregate demand.
+  `granian_blocking_queue` never went above 3 outside the outage. 24 is ~1.7× the worst
+  pod. The worst single worker held 24 connections against its 64 over 7 days, so
+  backpressure is not binding and takes 256 like `mitx` LMS. CPU is the other limit on one
+  worker: the busiest pod's p99 was 0.82 cores (max 1.44), and KEDA's CPU trigger fires
+  at 0.35 cores, so this is a watch item, not a blocker.
+
   Note what this says about the original ordering. "CMS first, it takes far less traffic
   than LMS" is true on traffic and wrong on risk: `mitxonline` CMS at 0.9 rps needs p99
   8.7 threads while `mitx` LMS at 4.4 rps needs 0.27. Concurrency is rate × service time,
@@ -491,6 +536,16 @@ Component change lands once; per-app behavior changes as each app's stack is dep
   last 3**, once its VPA grew the pods past the declared 4Gi. LMS respawns, by contrast,
   are ongoing (8 and 10 over 14 days), which is a second independent reason to keep it at
   2 workers for now.
+
+  > **Superseded 2026-09-17 for `mitxonline` LMS.** The respawn argument above no longer
+  > holds. Over the 14 days to 2026-09-16 14:00Z, `granian_workers_spawns` rose above its
+  > starting value of 2 on only 3 of ~807 LMS pods (62 respawns in total). All three were
+  > the pods crash-looping on node `ip-10-13-153-180` on 2026-09-14, failing their startup
+  > probe with HTTP 500 from `/heartbeat`. Every other pod ran the whole window without a
+  > respawn. Count respawns as max minus min per pod: `increase()` over the counter reads
+  > 228, because each new pod's first scrape already shows its initial spawns. Peak
+  > container RSS was 2485MiB for both workers together, under the 2764MiB cap a single
+  > worker gets from the 3Gi limit. LMS moves to one worker on the 2026-09-17 sizing above.
 
   **Production rollback — 2026-08-26.** The judgment above was wrong because the
   busy-thread percentile hid the burst shape of a normal Studio authoring page load and

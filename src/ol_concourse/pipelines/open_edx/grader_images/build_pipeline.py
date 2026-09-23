@@ -48,6 +48,7 @@ from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 from ol_concourse.pipelines.open_edx.grader_images.base_image_pipeline import (
     DEFAULT_PYTHON_VERSION,
 )
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 _AWS_ACCOUNT_ID = "610119931565"
 _AWS_REGION = "us-east-1"
@@ -235,7 +236,21 @@ if __name__ == "__main__":
             f"Unknown pipeline name {pipeline_name!r}. "
             f"Available: {[p.pipeline_name for p in GRADER_PIPELINES]}"
         )
-    pipeline_json = grader_image_pipeline(config).model_dump_json(indent=2)
+    pipeline_json = pipeline_json_with_user_data(
+        grader_image_pipeline(config),
+        user_data={
+            "description": (
+                f"Builds `{config.pipeline_name}` from "
+                f"`{config.grader_repo_url}` on top of the "
+                f"`{config.grader_base_dockerhub_repo}:{config.grader_base_image_tag}` "
+                f"grader base image, then pushes it to "
+                f"`{config.ecr_repo_name}` on ECR. Triggers on a new commit to "
+                "the grader repo or a new digest of the base image."
+            ),
+            "team": "infrastructure",
+            "category": "open-edx",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)

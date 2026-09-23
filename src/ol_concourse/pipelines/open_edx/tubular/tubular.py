@@ -19,6 +19,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo, schedule
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 _TUBULAR_IMAGE_SOURCE = {
     "repository": dockerhub_ecr_image_uri("mitodl/openedx-tubular"),
@@ -157,8 +158,20 @@ def tubular_pipeline() -> Pipeline:
 if __name__ == "__main__":
     import sys
 
+    output = pipeline_json_with_user_data(
+        tubular_pipeline(),
+        user_data={
+            "description": (
+                "Weekly (168h schedule) GDPR learner-retirement job: finds "
+                "Open edX learners due for retirement via Tubular, then retires "
+                "each one (one task per learner, via `across`)."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(tubular_pipeline().model_dump_json(indent=2))
-    sys.stdout.write(tubular_pipeline().model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     print()  # noqa: T201
     print("fly -t pr-inf sp -p misc-cloud-tubular -c definition.json")  # noqa: T201

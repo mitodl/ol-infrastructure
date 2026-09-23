@@ -72,7 +72,7 @@ def fetch_helm_chart_crds(
     chart: str,
     version: str,
     *,
-    include: Collection[str] | None = None,
+    groups: Collection[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Read the CRDs out of a packaged Helm chart, ready to be applied by Pulumi.
 
@@ -89,13 +89,16 @@ def fetch_helm_chart_crds(
         chart: Chart name.
         version: Exact chart version, which should be the same value pinned on the
             release so the two cannot diverge.
-        include: Archive file names to keep, e.g. ``{"crds.yaml"}``. Omit to take
-            every CRD in the chart. **Pass this whenever a chart bundles CRDs owned
-            by something else.** The APISIX ingress controller ships
-            ``gwapi-crds.yaml`` alongside its own CRDs, holding the standard-channel
-            Gateway API CRDs; applying those here would force the cluster-scoped
-            ``gateway.networking.k8s.io`` CRDs down from the experimental channel
-            that setup_traefik installs and owns.
+        groups: API groups (``spec.group``) to keep, e.g. ``{"apisix.apache.org"}``.
+            Omit to take every CRD in the chart. **Pass this whenever a chart
+            bundles CRDs owned by something else.** The APISIX ingress controller
+            ships the standard-channel Gateway API CRDs alongside its own; applying
+            those here would force the cluster-scoped ``gateway.networking.k8s.io``
+            CRDs down from the experimental channel that setup_traefik installs and
+            owns. Filtering on group rather than archive file name is deliberate:
+            a chart that renames, splits, or adds a CRD file keeps matching, so a
+            new CRD in the chart's own group is adopted instead of being created
+            by nobody (``skip_crds=True`` keeps Helm from creating it either).
 
     Returns:
         The CRD manifests, ordered by name, each annotated so that server-side
@@ -125,22 +128,23 @@ def fetch_helm_chart_crds(
                 or "templates" in directories
             ):
                 continue
-            if include is not None and path[-1] not in include:
-                continue
             extracted = tar.extractfile(member)
             if extracted is None:
                 continue
             for doc in pyyaml.safe_load_all(extracted.read().decode("utf-8")):
-                if doc and doc.get("kind") == "CustomResourceDefinition":
-                    doc["metadata"].setdefault("annotations", {})[
-                        "pulumi.com/patchForce"
-                    ] = "true"
-                    crds.append(doc)
+                if not doc or doc.get("kind") != "CustomResourceDefinition":
+                    continue
+                if groups is not None and doc["spec"]["group"] not in groups:
+                    continue
+                doc["metadata"].setdefault("annotations", {})[
+                    "pulumi.com/patchForce"
+                ] = "true"
+                crds.append(doc)
 
     if not crds:
         msg = (
             f"No CRDs found in chart {chart} {version}"
-            f"{f' matching {sorted(include)}' if include else ''}"
+            f"{f' in groups {sorted(groups)}' if groups else ''}"
         )
         raise ValueError(msg)
     return sorted(crds, key=lambda crd: crd["metadata"]["name"])
@@ -163,7 +167,7 @@ def _adoption_resource_options(
         ResourceOptions(
             provider=crd_provider,
             # Deleting a CRD cascades to every custom resource of that kind, so a
-            # destroy, a removed caller, or an include= change that drops a file
+            # destroy, a removed caller, or a groups= change that drops a group
             # must not take the CRD with it -- these objects predate Pulumi and
             # are only adopted here. Propagates from the ConfigGroup to each child
             # CRD, which was confirmed against the deployed starrocks stack.
@@ -179,7 +183,7 @@ def adopt_helm_chart_crds(  # noqa: PLR0913
     repo: str,
     chart: str,
     version: str,
-    include: Collection[str] | None = None,
+    groups: Collection[str] | None = None,
     opts: ResourceOptions | None = None,
 ) -> kubernetes.yaml.v2.ConfigGroup:
     """Apply a chart's CRDs as a Pulumi resource, adopting what Helm already created.
@@ -195,7 +199,7 @@ def adopt_helm_chart_crds(  # noqa: PLR0913
         repo: Helm repository URL.
         chart: Chart name.
         version: Exact chart version pinned on the release.
-        include: Archive file names to keep. See fetch_helm_chart_crds.
+        groups: API groups to keep. See fetch_helm_chart_crds.
         opts: Resource options for the ConfigGroup. The scoped provider is supplied
             here and overrides any provider passed in, which is the point of this
             function -- pass ``parent``/``depends_on`` only.
@@ -211,6 +215,6 @@ def adopt_helm_chart_crds(  # noqa: PLR0913
     )
     return kubernetes.yaml.v2.ConfigGroup(
         resource_name,
-        objs=fetch_helm_chart_crds(repo, chart, version, include=include),
+        objs=fetch_helm_chart_crds(repo, chart, version, groups=groups),
         opts=_adoption_resource_options(opts, crd_provider),
     )

@@ -1,9 +1,10 @@
+import { SEARCH_QUERY } from "./helpers/fixtures"
 import { expect, test } from "./helpers/signed-in-test"
 
-// Broad enough that a working index cannot plausibly return nothing for it, and
-// specific enough that a result matching it means the query was actually applied.
-// Recorded in ../README.md's content-dependency table.
-const SEARCH_QUERY = "mathematics"
+// The query itself lives in helpers/fixtures.ts, shared with
+// search-direct-url.spec.ts so the property has one content dependency to
+// re-check rather than one per journey. Recorded in ../README.md's
+// content-dependency table.
 
 test.describe("MIT Learn signed-in journey", () => {
   test("signs in and reaches a page anonymous visitors cannot", async ({ page }) => {
