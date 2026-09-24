@@ -51,7 +51,7 @@ else:
     setup({
         "deploy_config":   os.path.join(lehrer_dir, "deployments/mit-ol"),
         "registry":        "localhost:5001",
-        "registry_k8s":    "k3d-registry.localhost:5001",
+        "registry_k8s":    "k3d-registry.localhost:5000",
         # Shared with every other app in this cluster. The chart names the
         # Service "opensearch-cluster-master", which is also what mit-learn's
         # OPENSEARCH_URL points at.
