@@ -132,8 +132,10 @@ use_io_optimized_nodes = stateful_workload_storage["use_io_optimized_nodes"]
 ch_replicas = int(clickhouse_config.get("replicas") or "1")
 keeper_replicas = int(clickhouse_config.get("keeper_replicas") or "1")
 # Container resources per stack. Production sets requests equal to limits so
-# both pods get Guaranteed QoS on the shared worker nodes; CI and QA run on
-# 2-vCPU nodes, where a Guaranteed ClickHouse would not fit.
+# both pods get Guaranteed QoS on the shared worker nodes. CI and QA keep these
+# Burstable defaults: their ClickHouse pods land on Karpenter default-pool nodes
+# as small as 2 vCPU (m7i.large in data-ci), where a Guaranteed ClickHouse would
+# not fit.
 ch_resources = clickhouse_config.get_object("server_resources") or {
     "requests": {"cpu": "500m", "memory": "4Gi"},
     "limits": {"memory": "8Gi"},
