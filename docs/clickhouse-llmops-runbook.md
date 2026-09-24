@@ -22,8 +22,9 @@ deployed on the data EKS cluster for LLMOps tooling (TensorZero, Opik).
 5. [Scaling the Cluster](#scaling-the-cluster)
 6. [Monitoring and Alerting](#monitoring-and-alerting)
 7. [Backup and Restore](#backup-and-restore)
-8. [Troubleshooting](#troubleshooting)
-9. [Useful Commands](#useful-commands)
+8. [Upgrade Canary (QA)](#upgrade-canary-qa)
+9. [Troubleshooting](#troubleshooting)
+10. [Useful Commands](#useful-commands)
 
 ---
 
@@ -299,6 +300,62 @@ FROM Disk('backups', '<UTC timestamp>');
 To recover individual rows into the live cluster, restore into the scratch
 cluster first, then copy across with `INSERT INTO opik_db.<table> SELECT ...
 FROM remote('<scratch host>', opik_db.<table>, ...)`.
+
+### Scratch restore server
+
+A single pod is enough for a drill or a version check. It needs no CHI or CHK,
+just `clickhouse-server` running its own embedded Keeper. This is how the
+2026-09-24 drill restored the production backup (168 s for 20 GiB, all 32
+tables, row counts in
+https://github.com/mitodl/ol-infrastructure/pull/5817#issuecomment-5823823703).
+
+- Namespace `clickhouse` in the backup's own environment, `serviceAccountName:
+  clickhouse`. The IRSA role on that service account can already read the
+  backup bucket.
+- Image: the server version under test.
+- A gp3 PVC on `/var/lib/clickhouse`, sized at 2.5x the backup (50Gi for 20 GiB).
+- One file in `config.d/` holding the `backups` s3_plain disk (copy the
+  endpoint from the live `config.d/storage.xml`), `backups/allowed_disk`, a
+  single-node `keeper_server` on localhost, `zookeeper` pointing at
+  `localhost:9181`, and `macros` `shard=0`, `replica=restore-drill`.
+  Never point it at `keeper-clickhouse`: see the warning above.
+
+```sql
+RESTORE ALL FROM Disk('backups', '<UTC timestamp>') ASYNC;
+SELECT status, error, dateDiff('second', start_time, end_time) FROM system.backups;
+```
+
+Compare `system.tables.total_rows` against replica 0. For the ReplacingMergeTree
+tables (`traces`, `spans`, `trace_threads`), compare counts with
+`last_updated_at` before the backup's start time instead, since prod keeps
+writing and merging after the backup. Delete the pod, PVC and ConfigMap when
+done.
+
+---
+
+## Upgrade Canary (QA)
+
+QA runs 2 ClickHouse replicas and 3 Keeper nodes, so it exercises replication
+and Keeper quorum the way production does. Every server, Keeper and operator
+upgrade goes to QA first.
+
+1. Confirm QA's latest `clickhouse-backup` job succeeded.
+2. Change the version in QA only (`clickhouse:version` in `Pulumi.QA.yaml` for
+   the server; the operator and Keeper versions are shared constants in
+   `bridge/lib/versions.py`, so bump those on a branch applied to QA first).
+3. Apply and watch the rollout. The operator restarts one host at a time.
+   - Replication caught up: `SELECT database, table, absolute_delay,
+     queue_size FROM system.replicas WHERE absolute_delay > 0 OR queue_size > 0`
+     returns nothing on both replicas.
+   - Keeper quorum: `echo mntr | nc localhost 2181` on each Keeper pod. One
+     reports `zk_server_state leader` with `zk_synced_followers 2`, the others
+     `follower`.
+4. Opik smoke check on QA: the UI lists recent traces, and a trace logged from
+   the SDK shows up. The Opik backend runs its Liquibase migrations against
+   replica 0 on start, so check its log for migration errors.
+5. For a server upgrade, restore the latest production backup into a scratch
+   server at the new version (above) to confirm production data loads.
+6. Promote the same change to production.
 
 ---
 
