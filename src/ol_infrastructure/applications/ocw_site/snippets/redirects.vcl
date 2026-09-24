@@ -3,10 +3,18 @@ declare local var.status INTEGER;
 declare local var.last_path_part STRING;
 declare local var.full_path STRING;
 
-# Perform redirects with dictionary lookups
 declare local var.redirect STRING;
 declare local var.url STRING;
 
+# Send public v3 course URLs to their canonical Learn host
+set var.location = table.lookup(course_v3_redirects, req.http.host, "");
+if (var.location != "" && req.url.path ~ "^/(ocw-course-v3/courses|courses/o)/") {
+  set var.location = var.location +
+    regsub(req.url, "^/(ocw-course-v3/courses|courses/o)/", "/courses/o/");
+  error 301 var.location;
+}
+
+# Perform redirects with dictionary lookups
 set var.url = regsub(req.url.path, "/$", "");
 set var.redirect = table.lookup(redirects, var.url);
 
