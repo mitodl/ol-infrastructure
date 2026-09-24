@@ -579,7 +579,7 @@ LEGACY_ETL_EXPORT_BUCKETS = {
             # under 128 KB to these classes; saying so explicitly keeps the rule
             # honest about what it does and does not touch.
             filter=s3.BucketLifecycleConfigurationRuleFilterArgs(
-                object_size_greater_than=131072,
+                object_size_greater_than=131071,
             ),
             transitions=[
                 s3.BucketLifecycleConfigurationRuleTransitionArgs(
@@ -608,13 +608,11 @@ LEGACY_ETL_EXPORT_BUCKETS = {
         s3.BucketLifecycleConfigurationRuleArgs(
             id="archive-dead-qa-exports",
             status="Enabled",
-            # Unlike IA and GLACIER_IR, DEEP_ARCHIVE has no minimum object size,
-            # so lifecycle would happily move the 2-64 KB course tarballs -- 68%
-            # of the objects here but 0.01% of the bytes. Each costs 40 KB of
-            # billable overhead once archived (32 KB index + 8 KB STANDARD
-            # metadata), which is more than they cost today, on top of a one-time
-            # $0.05/1,000 transition charge that never pays back. Same 128 KiB
-            # floor as the prod rule, for the same reason.
+            # New S3 lifecycle configurations skip objects under 128 KiB for
+            # every storage class by default, including DEEP_ARCHIVE. Keep the
+            # cutoff explicit because these 2-64 KiB course tarballs are 68% of
+            # this bucket's objects but only 0.01% of its bytes; archiving them
+            # would add 40 KiB of billable metadata and transition charges.
             filter=s3.BucketLifecycleConfigurationRuleFilterArgs(
                 object_size_greater_than=131072,
             ),
@@ -631,13 +629,11 @@ LEGACY_ETL_EXPORT_BUCKETS = {
         s3.BucketLifecycleConfigurationRuleArgs(
             id="archive-dead-qa-exports",
             status="Enabled",
-            # Unlike IA and GLACIER_IR, DEEP_ARCHIVE has no minimum object size,
-            # so lifecycle would happily move the 2-64 KB course tarballs -- 68%
-            # of the objects here but 0.01% of the bytes. Each costs 40 KB of
-            # billable overhead once archived (32 KB index + 8 KB STANDARD
-            # metadata), which is more than they cost today, on top of a one-time
-            # $0.05/1,000 transition charge that never pays back. Same 128 KiB
-            # floor as the prod rule, for the same reason.
+            # New S3 lifecycle configurations skip objects under 128 KiB for
+            # every storage class by default, including DEEP_ARCHIVE. Keep the
+            # cutoff explicit to prevent small course tarballs from incurring
+            # 40 KiB of billable metadata and transition charges if the default
+            # behavior changes.
             filter=s3.BucketLifecycleConfigurationRuleFilterArgs(
                 object_size_greater_than=131072,
             ),
