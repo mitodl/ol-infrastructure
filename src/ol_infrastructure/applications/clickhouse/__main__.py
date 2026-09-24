@@ -188,11 +188,6 @@ _LLMOPS_QUOTAS = {
 # query_metric_log exists from 24.10 and latency_log from 25.2; older servers
 # ignore the elements.
 #
-# One deviation: the chart removes asynchronous_metric_log, but its one-second
-# BlockReadOps/BlockWriteOps samples are the evidence behind the data-volume
-# IOPS sizing (infrastructure/aws/eks ebs-gp3-iops-3000). It keeps its default
-# sort key and gets the same TTL instead.
-#
 # Changing a log table's engine does not alter the existing table. On the first
 # flush after restart ClickHouse renames it to <table>_0 (which keeps its data
 # and gets no TTL) and creates a new one. Removed tables also stay on disk. Both
@@ -200,18 +195,13 @@ _LLMOPS_QUOTAS = {
 SYSTEM_LOG_TTL_DAYS = 30
 _REMOVED_SYSTEM_LOGS = (
     "opentelemetry_span_log",
+    "asynchronous_metric_log",
     "processors_profile_log",
     "text_log",
     "trace_log",
     "blob_storage_log",
 )
-_TTL_SYSTEM_LOG_ORDER_BY = {
-    "asynchronous_metric_log": "(metric, event_date, event_time)",
-    "error_log": "(event_date, event_time)",
-    "latency_log": "(event_date, event_time)",
-    "metric_log": "(event_date, event_time)",
-    "query_metric_log": "(event_date, event_time)",
-}
+_TTL_SYSTEM_LOGS = ("error_log", "latency_log", "metric_log", "query_metric_log")
 SYSTEM_LOG_TABLES_XML = "\n".join(
     [
         "<clickhouse>",
@@ -221,9 +211,9 @@ SYSTEM_LOG_TABLES_XML = "\n".join(
               <{table}>
                 <database>system</database>
                 <table>{table}</table>
-                <engine>ENGINE = MergeTree PARTITION BY toYYYYMM(event_date) ORDER BY {order_by} TTL event_date + toIntervalDay({SYSTEM_LOG_TTL_DAYS}) SETTINGS index_granularity = 8192</engine>
+                <engine>ENGINE = MergeTree PARTITION BY toYYYYMM(event_date) ORDER BY (event_date, event_time) TTL event_date + toIntervalDay({SYSTEM_LOG_TTL_DAYS}) SETTINGS index_granularity = 8192</engine>
               </{table}>""")
-            for table, order_by in _TTL_SYSTEM_LOG_ORDER_BY.items()
+            for table in _TTL_SYSTEM_LOGS
         ),
         "</clickhouse>",
         "",
