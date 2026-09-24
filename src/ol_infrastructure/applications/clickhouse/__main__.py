@@ -185,7 +185,7 @@ _LLMOPS_QUOTAS = {
 # it was inherited. The operator's own config.d already gives query_log,
 # part_log and trace_log a 30-day TTL; this file sorts after its 01-clickhouse-*
 # files, so remove="1" on trace_log wins over the operator's replace="1".
-# query_metric_log exists from 24.10 and latency_log from 25.3; older servers
+# query_metric_log exists from 24.10 and latency_log from 25.2; older servers
 # ignore the elements.
 #
 # One deviation: the chart removes asynchronous_metric_log, but its one-second
