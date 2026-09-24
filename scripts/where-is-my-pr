@@ -660,17 +660,10 @@ def _routes_for_secret(path: str, routes: list[SecretsRoute]) -> list[SecretsRou
     return selected
 
 
-def _report_secret_deploy(
-    pr: PullRequest, route: SecretsRoute, paths: list[str]
-) -> None:
-    """Report one candidate deploy once, even when it consumes several files."""
-    _report_pulumi_deploy(pr, route, "SOPS consumer", paths)
-
-
 def _report_pulumi_deploy(
     pr: PullRequest, route: SecretsRoute, heading: str, paths: list[str]
 ) -> None:
-    """Report whether one discovered Pulumi update job has deployed this commit."""
+    """Report one discovered Pulumi deploy once, even when several files feed it."""
     print(f"\n=== {heading}: {route.project} {route.stack} ({route.pipeline}) ===")
     for path in paths:
         print(f"    {path}")
@@ -749,7 +742,7 @@ def _report_sops_secrets(pr: PullRequest, paths: list[str]) -> None:
         for route in set(matches):
             grouped.setdefault(route, []).append(path)
     for route in sorted(grouped, key=_route_order):
-        _report_secret_deploy(pr, route, grouped[route])
+        _report_pulumi_deploy(pr, route, "SOPS consumer", grouped[route])
 
 
 def _report_pulumi_projects(pr: PullRequest, projects: dict[str, list[str]]) -> None:
