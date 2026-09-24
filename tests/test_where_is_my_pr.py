@@ -2,6 +2,7 @@
 
 import importlib.util
 import sys
+from dataclasses import replace
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
 from types import ModuleType
@@ -422,7 +423,10 @@ def test_report_uses_live_deploy_evidence(  # noqa: PLR0913
             "src/bridge/secrets/mitxonline/extra.qa.json",
         ],
     )
-    live.assert_called_once_with(pr, "app", "apply-qa", ["checkout", "infra"], "")
+    assert [c.args for c in live.call_args_list] == [
+        (pr, "app", job, ["checkout", "infra"], "")
+        for job in ("inspect-qa", "apply-qa")
+    ]
     output = capsys.readouterr().out
     assert "extra.qa.json" in output
     assert "SOPS consumer: applications/mitxonline/ QA" in output
@@ -568,6 +572,130 @@ def test_mixed_pr_keeps_existing_reports(
         "Other changed files (no known deployment pipeline mapping):\n    README.md"
         in output
     )
+
+
+@pytest.mark.parametrize(
+    ("path", "project"),
+    [
+        (
+            "src/ol_infrastructure/applications/ocw_site/__main__.py",
+            "applications/ocw_site/",
+        ),
+        (
+            "src/ol_infrastructure/applications/ocw_site/snippets/redirects.vcl",
+            "applications/ocw_site/",
+        ),
+        (
+            "src/ol_infrastructure/infrastructure/vault/__main__.py",
+            "infrastructure/vault/",
+        ),
+        ("src/ol_infrastructure/applications/ocw_site_extra/x.py", None),
+        ("src/ol_infrastructure/lib/fastly.py", None),
+        ("applications/ocw_site/__main__.py", None),
+        ("README.md", None),
+    ],
+)
+def test_pulumi_project_mapping(
+    script: ModuleType, path: str, project: str | None
+) -> None:
+    """Map files to registered Pulumi projects on directory boundaries only."""
+    assert script._pulumi_project(path) == project
+
+
+def test_non_registry_project_is_traced(
+    script: ModuleType,
+    pr: object,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Pulumi projects outside bridge.settings.apps use discovered deploy jobs."""
+    changed = [
+        "src/ol_infrastructure/applications/ocw_site/__main__.py",
+        "src/ol_infrastructure/applications/ocw_site/snippets/redirects.vcl",
+    ]
+    monkeypatch.setattr(script, "_changed_files", Mock(return_value=changed))
+    routes = [
+        script.SecretsRoute(
+            pipeline="pulumi-ocw-site",
+            project="applications/ocw_site/",
+            stack=stack,
+            job=f"deploy-{stack}",
+            resource="infra",
+            input_name="infra",
+            previews=(f"preview-{stack}",),
+        )
+        for stack in ("QA", "Production")
+    ]
+    unrelated = replace(routes[0], project="applications/ocw_studio/")
+    discover = Mock(return_value=([*routes, unrelated], []))
+    monkeypatch.setattr(script, "_discover_pulumi_routes", discover)
+    live = Mock(
+        return_value=script.LiveStage(
+            reached=True, build_name="7", end_time=None, deployed_commit="b" * 40
+        )
+    )
+    monkeypatch.setattr(script, "_live_stage", live)
+    app_report = Mock()
+    monkeypatch.setattr(script, "_report_ol_infra_app", app_report)
+    script._report_ol_infrastructure_pr(pr)
+    app_report.assert_not_called()
+    assert [c.args[2] for c in live.call_args_list] == [
+        "preview-QA",
+        "deploy-QA",
+        "preview-Production",
+        "deploy-Production",
+    ]
+    output = capsys.readouterr().out
+    assert "No changed files map" not in output
+    assert "Other changed files" not in output
+    assert "Pulumi project: applications/ocw_site/ QA (pulumi-ocw-site)" in output
+    assert "redirects.vcl" in output
+    assert "/pipelines/pulumi-ocw-site/jobs/preview-QA" in output
+    assert "ocw_studio" not in output
+
+
+def test_discovery_is_shared_and_gaps_are_explicit(
+    script: ModuleType,
+    pr: object,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Discover pipelines once per run and report projects with no deploy job."""
+    monkeypatch.setattr(
+        script,
+        "_changed_files",
+        Mock(
+            return_value=[
+                "src/bridge/secrets/fastly.yaml",
+                "src/ol_infrastructure/applications/ocw_site/__main__.py",
+            ]
+        ),
+    )
+    discover = Mock(return_value=([], ["broken-pipeline"]))
+    monkeypatch.setattr(script, "_discover_pulumi_routes", discover)
+    script._report_ol_infrastructure_pr(pr)
+    discover.assert_called_once_with()
+    output = capsys.readouterr().out
+    assert "applications/ocw_site/: no Concourse deploy job discovered" in output
+    assert output.count("Could not inspect broken-pipeline") == 2
+    assert "✓" not in output
+
+
+def test_non_registry_project_logged_out(
+    script: ModuleType,
+    pr: object,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Explain how to get live evidence rather than silently skipping."""
+    monkeypatch.setattr(script, "_fly_ready", Mock(return_value=False))
+    script._report_pulumi_projects(
+        pr,
+        {"applications/ocw_site/": ["src/ol_infrastructure/applications/ocw_site/x"]},
+    )
+    output = capsys.readouterr().out
+    assert "applications/ocw_site/" in output
+    assert "fly -t infrastructure login" in output
 
 
 @pytest.mark.parametrize(
