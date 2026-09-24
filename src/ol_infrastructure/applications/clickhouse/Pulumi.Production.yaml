@@ -12,7 +12,7 @@ config:
   # 0.27 GiB and 0.04 cores. The server's CPU is sized for parallelism, not
   # load: ClickHouse sets max_threads from the cgroup CPU limit (16 today, on
   # the 16-vCPU node), and Opik SELECTs peaked at a median of 6 threads (p99
-  # 22) over the same week. 4 keeps most of that parallelism.
+  # 22) over the same week. 4 caps them at 4 threads rather than 2.
   clickhouse:server_resources:
     requests:
       cpu: '4'
