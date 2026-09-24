@@ -10,7 +10,7 @@ config:
   environment:target_vpc: operations_vpc
   opensearch:domain_name: "celeryp"
   opensearch:cluster_size: "3"
-  opensearch:disk_size_gb: "90"
+  opensearch:disk_size_gb: "300"
   opensearch:engine_version: "OpenSearch_3.3"
   opensearch:public_web: "false"
   opensearch:secured_cluster: "true"
