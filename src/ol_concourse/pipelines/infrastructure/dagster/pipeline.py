@@ -37,7 +37,6 @@ def build_dagster_docker_pipeline() -> Pipeline:
     code_locations = [
         {"name": "canvas", "module": "canvas.definitions"},
         {"name": "data_loading", "module": "data_loading.definitions"},
-        {"name": "data_platform", "module": "data_platform.definitions"},
         {"name": "edxorg", "module": "edxorg.definitions"},
         {"name": "lakehouse", "module": "lakehouse.definitions"},
         {"name": "delivery", "module": "delivery.definitions"},
@@ -278,7 +277,7 @@ if __name__ == "__main__":
             "description": (
                 "Builds a Docker image per Dagster code location from "
                 "ol-data-platform's `dg_projects/` (canvas, data_loading, "
-                "data_platform, edxorg, lakehouse, delivery, legacy_openedx, "
+                "edxorg, lakehouse, delivery, legacy_openedx, "
                 "openedx, b2b_organization, ml, plus the dagster-k8s base image), "
                 "pushes each to ECR, then deploys the Dagster server via Pulumi to "
                 "QA and Production once every image build has passed."
