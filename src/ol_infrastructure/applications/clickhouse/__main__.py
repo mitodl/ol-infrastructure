@@ -131,6 +131,42 @@ data_volume_attributes_class = (
 use_io_optimized_nodes = stateful_workload_storage["use_io_optimized_nodes"]
 ch_replicas = int(clickhouse_config.get("replicas") or "1")
 keeper_replicas = int(clickhouse_config.get("keeper_replicas") or "1")
+# Container resources per stack. Production sets requests equal to limits so
+# both pods get Guaranteed QoS on the shared worker nodes; CI and QA run on
+# 2-vCPU nodes, where a Guaranteed ClickHouse would not fit.
+ch_resources = clickhouse_config.get_object("server_resources") or {
+    "requests": {"cpu": "500m", "memory": "4Gi"},
+    "limits": {"memory": "8Gi"},
+}
+keeper_resources = clickhouse_config.get_object("keeper_resources") or {
+    "requests": {"cpu": "100m", "memory": "256Mi"},
+    "limits": {"memory": "512Mi"},
+}
+# Server waits on SIGTERM for running queries (shutdown_wait_unfinished_queries)
+# and, by default, for a running BACKUP (shutdown_wait_backups_and_restores).
+# The daily backup takes ~165s on production replica 0, so the kubelet's
+# default 30s would SIGKILL a replica restarted during it.
+CLICKHOUSE_TERMINATION_GRACE_SECONDS = 300
+CLICKHOUSE_SHUTDOWN_WAIT_QUERIES_SECONDS = 60
+
+
+def _zone_spread(label_selector: dict[str, str]) -> list[dict[str, Any]]:
+    """Require replicas in distinct zones instead of relying on hostname anti-affinity.
+
+    Each replica's EBS volume pins it to the zone it was first scheduled in, so
+    this decides placement for new replicas and makes the existing spread a
+    constraint rather than luck.
+    """
+    return [
+        {
+            "maxSkew": 1,
+            "topologyKey": "topology.kubernetes.io/zone",
+            "whenUnsatisfiable": "DoNotSchedule",
+            "labelSelector": {"matchLabels": label_selector},
+        }
+    ]
+
+
 ch_version = clickhouse_config.get("version") or CLICKHOUSE_SERVER_VERSION
 ch_image = f"altinity/clickhouse-server:{ch_version}"
 keeper_image = f"clickhouse/clickhouse-keeper:{CLICKHOUSE_KEEPER_VERSION}"
@@ -206,6 +242,7 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
     use_io_optimized: bool,
     ebs_storageclass_output: "Output[Any]",
     fallback_storage_class: str,
+    resources: dict[str, Any],
 ) -> "Output[kubernetes.apiextensions.CustomResource]":
     """Create a ClickHouseKeeperInstallation CRD resource managed by the Altinity operator.
 
@@ -323,19 +360,22 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                                 "tolerations": tolerations,
                                 "nodeSelector": node_selector,
                                 **({"affinity": affinity} if affinity else {}),
+                                **(
+                                    {
+                                        "topologySpreadConstraints": _zone_spread(
+                                            {
+                                                "clickhouse-keeper.altinity.com/chk": "clickhouse"
+                                            }
+                                        )
+                                    }
+                                    if replicas > 1
+                                    else {}
+                                ),
                                 "containers": [
                                     {
                                         "name": "clickhouse-keeper",
                                         "image": image,
-                                        "resources": {
-                                            "requests": {
-                                                "cpu": "100m",
-                                                "memory": "256Mi",
-                                            },
-                                            "limits": {
-                                                "memory": "512Mi",
-                                            },
-                                        },
+                                        "resources": resources,
                                     }
                                 ],
                             },
@@ -344,6 +384,10 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                     "volumeClaimTemplates": [
                         {
                             "name": "keeper-data",
+                            # Keep the PVC (and the Raft log on it) if the
+                            # CHK or a replica is deleted; the operator
+                            # default is to delete it with the StatefulSet.
+                            "reclaimPolicy": "Retain",
                             "spec": {
                                 "accessModes": ["ReadWriteOnce"],
                                 "storageClassName": sc
@@ -381,6 +425,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     keeper_installation: "Output[kubernetes.apiextensions.CustomResource]",
     users_secret: Any,
     vault_k8s_resources: Any,
+    resources: dict[str, Any],
 ) -> "Output[kubernetes.apiextensions.CustomResource]":
     """Build the ClickHouseInstallation CRD and return it wrapped in an Output.
 
@@ -579,6 +624,18 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                 labels=labels,
             ),
             spec={
+                # wait: after restarting a replica, wait for it to rejoin the
+                # cluster before moving to the next. The operator default
+                # (0.26.0 reconcile.host.wait) waits for exclusion and
+                # running queries but not for inclusion, so a rolling
+                # restart could have two replicas out at once.
+                "reconcile": {
+                    "policy": "wait",
+                    # Never delete a data PVC the operator does not recognise
+                    # as its own (e.g. after a CHI rename); the default is
+                    # Delete for every unknown object type.
+                    "cleanup": {"unknownObjects": {"pvc": "Retain"}},
+                },
                 "defaults": {
                     "templates": {
                         "podTemplate": "clickhouse-pod-template",
@@ -626,6 +683,10 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                         # data-production). The operator applies logger
                         # changes without a restart.
                         "logger/level": "information",
+                        "shutdown_wait_unfinished_queries": "1",
+                        "shutdown_wait_unfinished": str(
+                            CLICKHOUSE_SHUTDOWN_WAIT_QUERIES_SECONDS
+                        ),
                     },
                     # Users, profiles, and quotas are managed by the operator
                     # (merged into its generated usersd configmap) rather than
@@ -656,22 +717,26 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                             ),
                             "spec": {
                                 "serviceAccountName": "clickhouse",
+                                "terminationGracePeriodSeconds": CLICKHOUSE_TERMINATION_GRACE_SECONDS,
                                 "tolerations": ch_tolerations,
                                 "nodeSelector": ch_node_selector,
                                 "affinity": ch_affinity,
+                                **(
+                                    {
+                                        "topologySpreadConstraints": _zone_spread(
+                                            {
+                                                "clickhouse.altinity.com/chi": "clickhouse"
+                                            }
+                                        )
+                                    }
+                                    if ch_replicas > 1
+                                    else {}
+                                ),
                                 "containers": [
                                     {
                                         "name": "clickhouse",
                                         "image": ch_image,
-                                        "resources": {
-                                            "requests": {
-                                                "cpu": "500m",
-                                                "memory": "4Gi",
-                                            },
-                                            "limits": {
-                                                "memory": "8Gi",
-                                            },
-                                        },
+                                        "resources": resources,
                                         "env": [
                                             {
                                                 "name": "AWS_ROLE_ARN",
@@ -690,6 +755,10 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     "volumeClaimTemplates": [
                         {
                             "name": "clickhouse-data",
+                            # Keep the PVC if the CHI or a replica is deleted;
+                            # the operator default deletes it with the
+                            # StatefulSet.
+                            "reclaimPolicy": "Retain",
                             "spec": {
                                 "accessModes": ["ReadWriteOnce"],
                                 "storageClassName": storage_class,
@@ -957,6 +1026,7 @@ keeper_installation = _create_clickhouse_keeper_installation(
     use_io_optimized=use_io_optimized_nodes,
     ebs_storageclass_output=cluster_stack.get_output("ebs_storageclass"),
     fallback_storage_class=storage_class,
+    resources=keeper_resources,
 )
 
 ############################################################
@@ -978,6 +1048,7 @@ clickhouse_installation = _create_clickhouse_installation(
     namespace=CLICKHOUSE_NAMESPACE,
     labels=k8s_global_labels,
     ch_replicas=ch_replicas,
+    resources=ch_resources,
     ch_image=ch_image,
     use_io_optimized=use_io_optimized_nodes,
     storage_class=storage_class,

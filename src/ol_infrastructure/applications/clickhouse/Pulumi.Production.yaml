@@ -7,6 +7,24 @@ config:
   clickhouse:hot_storage_size: 1500Gi
   clickhouse:replicas: '3'
   clickhouse:keeper_replicas: '3'
+  # Guaranteed QoS: requests equal limits. Over the 7 days to 2026-09-24 the
+  # server peaked at 3.14 GiB working set and 0.29 cores (5m rate), Keeper at
+  # 0.27 GiB and 0.04 cores. CPU is well above those peaks because a CPU limit
+  # throttles bursts (merges, the nightly BACKUP) that a 5m rate averages away.
+  clickhouse:server_resources:
+    requests:
+      cpu: '2'
+      memory: 8Gi
+    limits:
+      cpu: '2'
+      memory: 8Gi
+  clickhouse:keeper_resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
   clickhouse:version: 24.8.14.10546.altinitystable
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
