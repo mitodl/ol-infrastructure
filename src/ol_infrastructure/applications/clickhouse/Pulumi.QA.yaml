@@ -12,8 +12,11 @@ config:
   # workload-driven: 100Gi is ~11x current usage and ~3.9 years of headroom at
   # the observed rate. data-ci already runs 100Gi.
   clickhouse:hot_storage_size: 100Gi
-  clickhouse:replicas: '1'
-  clickhouse:keeper_replicas: '1'
+  # QA is the upgrade canary (docs/clickhouse-llmops-runbook.md), so it runs
+  # replicated like production: 2 replicas exercise replication and the
+  # operator's rolling restart, 3 Keeper nodes exercise quorum.
+  clickhouse:replicas: '2'
+  clickhouse:keeper_replicas: '3'
   clickhouse:version: 24.8.14.10546.altinitystable
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
