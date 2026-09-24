@@ -299,12 +299,15 @@ def create(
                     "description": "ClickHouse Keeper in cluster {{ $labels.cluster }} has lost quorum: either the leader has no synced followers, or no member is leader at all. Keeper cannot commit, so every replicated table is read-only. QA is the upgrade canary: hold any Keeper or server upgrade until this clears."
                 },
                 # Only once QA has a real ensemble: until the canary change
-                # applies, its single Keeper satisfies the expression.
+                # applies, its single Keeper satisfies the expression. The
+                # guard counts members over the last day, not now, so losing
+                # two of three (the case the second arm exists for) still
+                # fires instead of shrinking the count to 1.
                 datas=rd(
                     f"({_keeper_lost_quorum(_QA_CLUSTERS)})\n"
                     "and on (cluster, namespace)\n"
-                    "(count by (cluster, namespace) "
-                    f'(ClickHouseAsyncMetrics_KeeperIsLeader{{cluster=~"{_QA_CLUSTERS}"}}) > 1)'
+                    "(max_over_time((count by (cluster, namespace) "
+                    f'(ClickHouseAsyncMetrics_KeeperIsLeader{{cluster=~"{_QA_CLUSTERS}"}}))[1d:5m]) > 1)'
                 ),
             ),
             # --- Degradation ---
