@@ -952,6 +952,12 @@ for worker_def in concourse_config.get_object("workers") or []:
         user_data=consul_datacenter.apply(build_worker_user_data_partial),
         use_spot_instances=use_spot_instances,
         spot_options=spot_options_config,
+        # The OCW pipelines' s3-resource image cannot speak IMDSv2, so these
+        # workers still make token-less metadata calls and would break under
+        # "required". Drop this override once mitodl/ocw-studio#3206 is
+        # deployed and MetadataNoToken reads zero for these pools.
+        # See https://github.com/mitodl/ol-infrastructure/issues/1745
+        http_tokens="optional",
     )
 
     # We will create a 'fake' lb, targetgroup and lblistener to make use of
