@@ -340,19 +340,37 @@ and Keeper quorum the way production does. Every server, Keeper and operator
 upgrade goes to QA first.
 
 1. Confirm QA's latest `clickhouse-backup` job succeeded.
-2. Change the version in QA only (`clickhouse:version` in `Pulumi.QA.yaml` for
-   the server; the operator and Keeper versions are shared constants in
-   `bridge/lib/versions.py`, so bump those on a branch applied to QA first).
-3. Apply and watch the rollout. The operator restarts one host at a time.
-   - Replication caught up: `SELECT database, table, absolute_delay,
-     queue_size FROM system.replicas WHERE absolute_delay > 0 OR queue_size > 0`
-     returns nothing on both replicas.
+2. Change the version for QA only, and apply the stack that owns it:
+   - Server: `clickhouse:version` in `Pulumi.QA.yaml`, applied with the
+     `applications/clickhouse` QA stack.
+   - Operator: `CLICKHOUSE_OPERATOR_VERSION` in `bridge/lib/versions.py`,
+     applied with the `data.QA` stack of `substructure/aws/eks`, which installs the
+     operator.
+   - Keeper: `CLICKHOUSE_KEEPER_VERSION` in `bridge/lib/versions.py`, applied
+     with the `applications/clickhouse` QA stack. It is a floating tag
+     (`26.8-alpine`) shared by every environment and bumped by Renovate, so a
+     patch release reaches any Keeper pod that pulls the image without passing
+     through QA. Pin it to a full version or digest before relying on the
+     canary for Keeper.
+   Shared constants go on a branch applied to QA first.
+3. Watch the rollout. The operator restarts one host at a time.
+   - Both replicas hold every replicated table. Run this on replica 0; it must
+     return nothing:
+     `SELECT database, table, total_replicas, active_replicas, absolute_delay,
+     queue_size FROM system.replicas WHERE active_replicas < 2 OR
+     total_replicas < 2 OR absolute_delay > 0 OR queue_size > 0`.
+     Also compare `SELECT count() FROM system.replicas` across both replicas: a
+     replica that failed to create its tables has an empty `system.replicas`,
+     so a delay check alone passes on it.
    - Keeper quorum: `echo mntr | nc localhost 2181` on each Keeper pod. One
      reports `zk_server_state leader` with `zk_synced_followers 2`, the others
      `follower`.
-4. Opik smoke check on QA: the UI lists recent traces, and a trace logged from
-   the SDK shows up. The Opik backend runs its Liquibase migrations against
-   replica 0 on start, so check its log for migration errors.
+4. Opik smoke check on QA. Opik runs its Liquibase migrations (against
+   replica 0) only in the `backend-migrations` init container, and a
+   ClickHouse upgrade does not restart Opik, so restart it first:
+   `kubectl -n opik rollout restart deployment/opik-backend`, then
+   `kubectl -n opik logs deployment/opik-backend -c backend-migrations`.
+   The UI lists recent traces, and a trace logged from the SDK shows up.
 5. For a server upgrade, restore the latest production backup into a scratch
    server at the new version (above) to confirm production data loads.
 6. Promote the same change to production.
