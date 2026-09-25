@@ -1,0 +1,80 @@
+---
+# Local-dev stub for ol-analytics-api (the B2B analytics gateway).
+#
+# The real service reads dbt-materialized views out of StarRocks, which is not
+# run in this stack. This Deployment runs a zero-dependency stdlib HTTP server
+# (see stub_app.py) that serves the same endpoints/envelope the mit-learn
+# b2b_dashboard frontend expects, with fixture data.
+#
+# The stub source is delivered by the `analytics-api-stub-src` ConfigMap, which
+# the Tiltfile generates from stub_app.py (single source of truth). It is not
+# defined here so the two never drift.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-api
+  namespace: mit-learn
+  labels:
+    app: analytics-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-api
+  template:
+    metadata:
+      labels:
+        app: analytics-api
+    spec:
+      containers:
+      - name: analytics-api
+        image: python:3.13-slim
+        imagePullPolicy: IfNotPresent
+        command: ["python", "/app/stub_app.py"]
+        ports:
+        - containerPort: 8070
+          name: http
+        env:
+        - name: PORT
+          value: "8070"
+        resources:
+          requests:
+            cpu: 25m
+            memory: 32Mi
+          limits:
+            memory: 128Mi
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8070
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8070
+          initialDelaySeconds: 5
+          periodSeconds: 20
+        volumeMounts:
+        - name: stub-src
+          mountPath: /app
+          readOnly: true
+      volumes:
+      - name: stub-src
+        configMap:
+          name: analytics-api-stub-src
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: analytics-api
+  namespace: mit-learn
+  labels:
+    app: analytics-api
+spec:
+  selector:
+    app: analytics-api
+  ports:
+  - name: http
+    port: 8070
+    targetPort: http
