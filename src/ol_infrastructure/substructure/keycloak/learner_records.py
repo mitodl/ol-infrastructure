@@ -37,8 +37,10 @@ LEARNER_RECORDS_READ_SCOPE = "learner-records:read"
 # ol-analytics-api tenants/b2b_learner_records/auth.py reads this claim and
 # grants nothing unless it is a JSON array of UUID strings.
 ORGANIZATIONS_CLAIM = "learner_records_organizations"
-# Carried for the API to enforce once the contract-expiry question in the
-# provider-authorization doc is settled. Nothing checks it yet.
+# ol-analytics-api tenants/b2b_learner_records/token.py (mitodl/ol-analytics-api#73)
+# refuses the client's
+# tokens once this date has passed (inclusive, end of day Anywhere on Earth).
+# That is a backstop; the client should still be removed at contract end.
 CONTRACT_END_DATE_CLAIM = "learner_records_contract_end_date"
 # A token issued before its client is removed stays valid until it expires, so
 # this is the revocation window. Pinned on each client rather than inherited
