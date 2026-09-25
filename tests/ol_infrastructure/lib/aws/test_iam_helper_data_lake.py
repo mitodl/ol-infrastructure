@@ -1,4 +1,4 @@
-"""readable_data_lake_environments must agree with cross_environment_glue_denial."""
+"""readable_data_lake_environments must not name a lake the Glue Deny lists."""
 
 import pytest
 

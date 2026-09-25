@@ -304,8 +304,8 @@ query_engine_permissions: list[dict[str, str | list[str]]] = [
 ]
 
 # The cross-environment Deny deliberately does not belong in this document.
-# applications/starrocks attaches every environment's copy of this policy to
-# every StarRocks IRSA role so each instance can query both data lake catalogs.
+# applications/starrocks attaches more than one environment's copy of this
+# policy to a StarRocks IRSA role (production holds QA's, for the QA mirror).
 # A Deny embedded here travels onto those foreign principals: the QA copy landed
 # its "deny production" statement on the production role, where an explicit Deny
 # beat the Allow from the production copy attached alongside it, and production
