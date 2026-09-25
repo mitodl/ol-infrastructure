@@ -44,6 +44,8 @@ AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
 CERT_MANAGER_CHART_VERSION = "v1.21.2"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
 DAGSTER_CHART_VERSION = "1.13.23"
+# renovate: datasource=helm depName=lightdash packageName=lightdash registryUrl=https://lightdash.github.io/helm-charts
+LIGHTDASH_CHART_VERSION = "2.2.0"
 # renovate: datasource=aws-eks-addon depName=aws-ebs-csi-driver versioning=aws-eks-addon
 EBS_CSI_DRIVER_VERSION = "v1.66.0-eksbuild.1"
 # renovate: datasource=aws-eks-addon depName=aws-efs-csi-driver versioning=aws-eks-addon
