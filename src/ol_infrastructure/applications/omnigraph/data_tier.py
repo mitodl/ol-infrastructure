@@ -316,6 +316,13 @@ def create_data_tier(  # noqa: PLR0913
         S3BucketConfig(
             bucket_name=bucket_name,
             versioning_enabled=True,
+            # omnigraph's `cleanup` and `optimize` delete Lance objects on
+            # every run, and storage-format cutovers retire whole roots, so
+            # without this every removed object stays billed as a noncurrent
+            # version. 30 days keeps version-id undelete available as a
+            # restore path for a bad cleanup run; the runbooks' explicit
+            # `aws s3 sync` backups remain the primary rollback.
+            noncurrent_version_expiration_days=30,
             tags=aws_config.tags,
         ),
     )

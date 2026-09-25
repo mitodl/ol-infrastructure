@@ -249,10 +249,10 @@ kubectl -n omnigraph exec deployment/omnigraph-server -- \
 
 3. **Back up the graph roots and `__cluster` first.** Parallelise one
    `aws s3 sync` per graph and write a completion marker; a serial sync of ~90k
-   objects is needlessly slow. Bucket versioning is enabled with no
-   `NoncurrentVersionExpiration` rule, so the pre-rebuild Lance versions are
-   *also* independently recoverable — but do not rely on that alone as the
-   rollback plan.
+   objects is needlessly slow. Bucket versioning is enabled and noncurrent
+   versions expire after 30 days, so the pre-rebuild Lance versions are *also*
+   recoverable by version id within that window, but do not rely on that alone
+   as the rollback plan.
 
 4. **Rebuild, per graph and per branch, on the new image:**
 
