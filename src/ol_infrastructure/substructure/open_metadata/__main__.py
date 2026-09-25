@@ -327,6 +327,24 @@ _POD_SECURITY_CONTEXT = {
     "runAsNonRoot": True,
 }
 
+# The omjob-operator always runs an exit-handler pod after the main pod and
+# dereferences exitHandlerSpec without a null check, so a CronOMJob without one
+# ends every run as Failed ("Cannot invoke ...getEnv() because podSpec is
+# null"). The operator injects pipelineStatus=success|failed from the main
+# pod's exit code, and the exit handler's own exit code sets the final phase.
+# This handler only turns that status back into an exit code, so phase
+# reflects the ingestion result. It runs as the namespace default service
+# account because it needs neither the ingestion IRSA role nor its RBAC.
+_EXIT_HANDLER_SPEC = {
+    "image": INGESTION_IMAGE,
+    "command": ["sh", "-c", 'test "$pipelineStatus" = success'],
+    "resources": {
+        "requests": {"cpu": "10m", "memory": "16Mi"},
+        "limits": {"cpu": "100m", "memory": "64Mi"},
+    },
+    "securityContext": _POD_SECURITY_CONTEXT,
+}
+
 # Enable JSON-structured logs from the Python ingestion-base container.
 # Supported by the ingestion-base image; passed through as LOG_FORMAT env var.
 _LOG_FORMAT_ENV = {"name": "LOG_FORMAT", "value": "json"}
@@ -419,6 +437,7 @@ def _make_cronjob(  # noqa: PLR0913
                     "resources": resources or _POD_RESOURCES,
                     "securityContext": _POD_SECURITY_CONTEXT,
                 },
+                "exitHandlerSpec": _EXIT_HANDLER_SPEC,
             },
             "failedJobsHistoryLimit": 3,
             "successfulJobsHistoryLimit": 3,
