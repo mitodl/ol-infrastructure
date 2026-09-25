@@ -19,6 +19,7 @@ its client credentials are sufficient to enumerate role memberships.
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.error
@@ -37,6 +38,9 @@ _GOVERNANCE_ROLES: tuple[str, ...] = (
 
 
 _PAGE_SIZE = 100
+# groups.txt is "role:user1,user2" per line, so a principal carrying ":", "," or
+# a newline would corrupt the file or smuggle in a group entry.
+_PRINCIPAL_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
 
 
 def _api_get(url: str, headers: dict[str, str]) -> Any:
@@ -91,7 +95,10 @@ def effective_role_members(
     :rtype: dict[str, set[str]]
     """
     members: dict[str, set[str]] = {role: set() for role in _GOVERNANCE_ROLES}
+    holders = 0
     for user in _api_get_all(f"{admin_base}/users?briefRepresentation=false", headers):
+        if not user["enabled"]:
+            continue
         mapped = _api_get(
             f"{admin_base}/users/{user['id']}/role-mappings/clients/"
             f"{client_uuid}/composite",
@@ -100,15 +107,24 @@ def effective_role_members(
         granted = {role["name"] for role in mapped} & members.keys()
         if not granted:
             continue
-        saml_uid = user.get("attributes", {}).get("saml_uid")
-        if not saml_uid:
+        holders += 1
+        saml_uid = user.get("attributes", {}).get("saml_uid", [""])[0]
+        if not _PRINCIPAL_PATTERN.fullmatch(saml_uid):
             sys.stderr.write(
-                f"Skipping {user['username']}: holds {sorted(granted)} but has no "
-                "saml_uid attribute, so no StarRocks principal can match it\n"
+                f"Skipping {user['username']}: holds {sorted(granted)} but saml_uid "
+                f"{saml_uid!r} is missing or not a valid StarRocks principal\n"
             )
             continue
         for role in granted:
-            members[role].add(saml_uid[0])
+            members[role].add(saml_uid)
+    # The admin API omits attributes the realm's user profile doesn't expose, while
+    # protocol mappers still read them. If every holder lacks saml_uid, that is the
+    # likely cause, and writing an empty file would silently deny every OIDC login.
+    if holders and not any(members.values()):
+        sys.exit(
+            f"{holders} users hold governance roles but none has a usable saml_uid; "
+            "check the realm's unmanagedAttributePolicy before writing an empty file"
+        )
     return members
 
 

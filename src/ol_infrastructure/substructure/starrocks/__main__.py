@@ -889,7 +889,9 @@ if oidc_enabled:
             "KUBECONFIG_CONTENT": _kube_config,
         },
         # The script hash is here so a fix to the sync logic re-runs it; the
-        # SQL hash alone left a broken groups.txt in place from June 2026.
+        # SQL hash alone left a broken groups.txt in place from June 2026. The
+        # file group provider reads the file only at CREATE GROUP PROVIDER and FE
+        # start, so a new file takes effect after the next FE restart.
         triggers=_integration_sql.apply(
             lambda sql: [
                 hashlib.sha256(sql.encode()).hexdigest(),
