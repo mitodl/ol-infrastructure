@@ -240,6 +240,18 @@ class OLGCPProject(ComponentResource):
                 )
 
         for api_key in config.api_keys:
+            # Without an explicit edge Pulumi creates a key in parallel with the
+            # service it targets, and a key restricted to a service that is not
+            # enabled yet can fail on first apply. A target this stack does not
+            # enable is assumed to be enabled out of band.
+            target_services = [
+                self.services[target["service"]]
+                for target in api_key.restrictions.get("api_targets") or []
+                if target["service"] in self.services
+            ]
+            key_opts = adoption_opts(child_opts, api_key.import_id)
+            if target_services:
+                key_opts = key_opts.merge(ResourceOptions(depends_on=target_services))
             self.api_keys[api_key.key_name] = gcp.projects.ApiKey(
                 f"{name}-api-key-{api_key.key_name}",
                 # The number, not the id -- see project_number on the config.
@@ -248,7 +260,7 @@ class OLGCPProject(ComponentResource):
                 restrictions=gcp.projects.ApiKeyRestrictionsArgs(
                     **api_key.restrictions
                 ),
-                opts=adoption_opts(child_opts, api_key.import_id),
+                opts=key_opts,
             )
 
         self.register_outputs(

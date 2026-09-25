@@ -7,6 +7,7 @@ under a consumer that emits no measurable traffic.
 """
 
 import pulumi
+import pulumi_gcp as gcp
 import pytest
 
 from ol_infrastructure.components.gcp.project import (
@@ -253,6 +254,25 @@ class TestOLGCPProject:
         }
         assert set(component.service_accounts) == {"ocw-studio-production"}
         assert set(component.api_keys) == {"youtube"}
+
+    @pulumi.runtime.test
+    def test_api_key_depends_on_its_target_services(self, monkeypatch):
+        """A key must not race the enablement of the service it targets."""
+        # depends_on is consumed at registration and not kept on the resource,
+        # so capture the options the component passes in.
+        key_opts: list[pulumi.ResourceOptions] = []
+        real_api_key = gcp.projects.ApiKey
+
+        def recording_api_key(*args, opts, **kwargs):
+            key_opts.append(opts)
+            return real_api_key(*args, opts=opts, **kwargs)
+
+        monkeypatch.setattr(gcp.projects, "ApiKey", recording_api_key)
+        component = self.build_component()
+        (opts,) = key_opts
+        depends_on = opts.depends_on
+        assert component.services["youtube.googleapis.com"] in depends_on
+        assert component.services["drive.googleapis.com"] not in depends_on
 
 
 class TestAdoption:
