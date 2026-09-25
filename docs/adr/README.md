@@ -169,6 +169,7 @@ graph LR
 | [0009](0009-deploy-witan-as-shared-multi-tenant-mcp-service.md) | Deploy witan as a Shared, Multi-Tenant MCP Service | Accepted | 2026-07-07 |
 | [0010](0010-pingdom-checks-unmanaged-in-pulumi-state.md) | Pingdom Checks Unmanaged in Pulumi State | Proposed | 2026-07-20 |
 | [0011](0011-playwright-canary-specs-in-ol-infrastructure.md) | Playwright Canary Specs Live in ol-infrastructure, on the Stock Playwright Image | Accepted | 2026-09-01 |
+| [0012](0012-trino-to-starrocks-cutover.md) | Replace Trino/Starburst Galaxy with StarRocks as the Sole Query Engine | Accepted | 2026-09-25 |
 
 ## Creating a New ADR
 
