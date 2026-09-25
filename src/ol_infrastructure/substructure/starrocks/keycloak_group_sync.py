@@ -2,7 +2,8 @@
 """Sync Keycloak StarRocks client role memberships into a Kubernetes ConfigMap.
 
 The ConfigMap is consumed by StarRocks' file-based group provider.
-Format: one line per non-empty role — "role_name:user1,user2,...".
+Format: one line per non-empty role — "role_name:user1,user2,...", where each
+user is the holder's saml_uid (the starrocks_username claim).
 
 Required environment variables:
   KEYCLOAK_ISSUER_URL    - Keycloak realm issuer URL
@@ -68,6 +69,49 @@ def _api_get_all(url: str, headers: dict[str, str]) -> list[Any]:
     return results
 
 
+def effective_role_members(
+    admin_base: str, client_uuid: str, headers: dict[str, str]
+) -> dict[str, set[str]]:
+    """Map each governance role to the saml_uid of every user who holds it.
+
+    GET /clients/{id}/roles/{role}/users returns direct mappings only, and the
+    realm hands these roles out through composite realm roles (ol-starrocks-*),
+    so that endpoint misses nearly everyone. Reading each user's effective
+    client role mappings covers composites and group membership.
+
+    The value written is saml_uid because both security integrations set
+    principal_field=starrocks_username, which Keycloak fills from saml_uid.
+    Writing any other form (e.g. the Keycloak username, an email) makes the
+    group provider return no groups, and permitted_groups then refuses login.
+
+    :param admin_base: Keycloak admin API base URL for the realm.
+    :param client_uuid: Internal id of the ol-starrocks-client client.
+    :param headers: Authorization headers for the admin API.
+    :returns: Governance role name to the set of saml_uid values holding it.
+    :rtype: dict[str, set[str]]
+    """
+    members: dict[str, set[str]] = {role: set() for role in _GOVERNANCE_ROLES}
+    for user in _api_get_all(f"{admin_base}/users?briefRepresentation=false", headers):
+        mapped = _api_get(
+            f"{admin_base}/users/{user['id']}/role-mappings/clients/"
+            f"{client_uuid}/composite",
+            headers,
+        )
+        granted = {role["name"] for role in mapped} & members.keys()
+        if not granted:
+            continue
+        saml_uid = user.get("attributes", {}).get("saml_uid")
+        if not saml_uid:
+            sys.stderr.write(
+                f"Skipping {user['username']}: holds {sorted(granted)} but has no "
+                "saml_uid attribute, so no StarRocks principal can match it\n"
+            )
+            continue
+        for role in granted:
+            members[role].add(saml_uid[0])
+    return members
+
+
 def main() -> None:
     """Fetch Keycloak role memberships and apply them to a Kubernetes ConfigMap."""
     parser = argparse.ArgumentParser(
@@ -111,14 +155,12 @@ def main() -> None:
         sys.exit("ol-starrocks-client not found in Keycloak realm")
     client_uuid = clients[0]["id"]
 
-    lines: list[str] = []
-    for role in _GOVERNANCE_ROLES:
-        users = _api_get_all(
-            f"{admin_base}/clients/{client_uuid}/roles/{role}/users", headers
-        )
-        usernames = sorted(u["username"] for u in users if u.get("username"))
-        if usernames:
-            lines.append(f"{role}:{','.join(usernames)}")
+    members = effective_role_members(admin_base, client_uuid, headers)
+    lines = [
+        f"{role}:{','.join(sorted(members[role]))}"
+        for role in _GOVERNANCE_ROLES
+        if members[role]
+    ]
 
     manifest = {
         "apiVersion": "v1",
