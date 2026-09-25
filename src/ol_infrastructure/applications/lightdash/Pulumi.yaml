@@ -1,5 +1,5 @@
 ---
-name: ol-infrastructure-lightdash-application
+name: ol-application-lightdash
 runtime: python
 description: A code-driven BI system
 backend:
