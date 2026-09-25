@@ -40,6 +40,7 @@ from pulumi_vault.generic.get_secret import get_secret_output as vault_get_secre
 from bridge.lib.magic_numbers import ONE_MONTH_SECONDS
 from bridge.lib.versions import VAULT_PLUGIN_STARROCKS_SHA256
 from ol_infrastructure.lib import pulumi_projects
+from ol_infrastructure.lib.aws.iam_helper import readable_data_lake_environments
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
@@ -280,9 +281,14 @@ enable_data_lake = starrocks_config.get_bool("enable_data_lake_integration") or 
 oidc_enabled = starrocks_config.get_bool("oidc_enabled") or False
 
 # --- Iceberg catalogs -------------------------------------------------------
-# Both QA and Production catalogs are registered in every StarRocks instance.
-# Production datasets are more complete, so having them available in QA
-# simplifies testing against Superset without requiring a separate environment.
+# Each instance registers its own lake's catalog, and production also registers
+# QA's so the QA mirror (ol-data-platform lakehouse/assets/qa_mirror.py) can write
+# into it. QA does not get production's: its IRSA role is explicitly denied every
+# production Glue resource (cross_environment_glue_denial), so the catalog and the
+# grants below would only advertise reads that fail (RFC 12711 step 7).
+#
+# Removing an environment from this list deletes its Command, which runs the
+# DROP CATALOG below.
 #
 # CREATE IF NOT EXISTS is idempotent: it is a no-op when the catalog
 # already exists with any set of properties.  StarRocks has no ALTER CATALOG
@@ -298,7 +304,7 @@ oidc_enabled = starrocks_config.get_bool("oidc_enabled") or False
 # AWS_WEB_IDENTITY_TOKEN_FILE injected; the SDK resolves them automatically
 # without a second sts:AssumeRole call.  Setting iam_role_arn here would
 # cause StarRocks to attempt a nested AssumeRole and fail with a 403.
-_DATA_LAKE_ENVS = ["qa", "production"]
+_DATA_LAKE_ENVS = readable_data_lake_environments(stack_info.env_suffix)
 catalog_setups: list[command.local.Command] = []
 _iceberg_roles_sql = ""
 if enable_data_lake:

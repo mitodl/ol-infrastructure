@@ -120,13 +120,12 @@ config:
     # STARROCKS_HOST/STARROCKS_PORT are deliberately unset here, even though
     # QA has both a StarRocks cluster and the Vault mount behind it.
     # SyncProgramCertificatesTask pins its view_name to the
-    # ol_data_lake_production catalog with no setting to override it, and QA's
-    # StarRocks registers that catalog too -- so setting the host here would
-    # not rehearse the sync against QA data, it would replicate production
-    # learner PII (gender, year of birth, country, city, street address,
-    # postal code) into the RC database. mit-learn declines to register the
-    # beat entry while these are unset, which is the behaviour we want.
-    # Set them once the view name is environment-aware.
+    # ol_data_lake_production catalog with no setting to override it. QA's
+    # StarRocks does not register that catalog (RFC 12711 step 7), so the
+    # sync would fail rather than rehearse against QA data. It must never be
+    # pointed at production learner PII from the RC database either. mit-learn
+    # declines to register the beat entry while these are unset. Set them
+    # once the view name is environment-aware.
     TIKA_SERVER_ENDPOINT: "https://tika-qa.ol.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3
