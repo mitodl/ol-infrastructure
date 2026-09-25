@@ -31,6 +31,7 @@ import logging
 import os
 import re
 import sys
+from http import HTTPStatus
 
 from metadata.generated.schema.api.lineage.addLineage import AddLineageRequest
 from metadata.generated.schema.entity.data.table import Table
@@ -47,7 +48,9 @@ from metadata.generated.schema.type.entityLineage import (
 )
 from metadata.generated.schema.type.entityLineage import Source as LineageSource
 from metadata.generated.schema.type.entityReference import EntityReference
+from metadata.ingestion.ometa.client import APIError
 from metadata.ingestion.ometa.ometa_api import OpenMetadata
+from metadata.utils import fqn
 
 logging.basicConfig(
     stream=sys.stdout,
@@ -78,29 +81,37 @@ _server_config = OpenMetadataConnection(
 metadata = OpenMetadata(config=_server_config)
 
 
-def _build_index(service_name: str) -> dict[tuple[str, str], Table]:
-    """Return {(schema_name, table_name): Table} for *service_name*."""
-    index: dict[tuple[str, str], Table] = {}
+def _build_indexes(
+    service_names: list[str],
+) -> dict[str, dict[tuple[str, str], Table]]:
+    """Return {service: {(schema_name, table_name): Table}} for *service_names*.
+
+    The tables list endpoint has no service filter (it accepts ``database`` and
+    ``databaseSchema`` and silently ignores anything else), so list every table
+    once and split by the service component of the FQN.
+    """
+    indexes: dict[str, dict[tuple[str, str], Table]] = {
+        name: {} for name in service_names
+    }
     tables = metadata.list_all_entities(
         entity=Table,
         fields=["id", "name", "fullyQualifiedName", "databaseSchema"],
         limit=500,
-        params={"service": service_name},
     )
     for table in tables:
-        fqn = table.fullyQualifiedName.root if table.fullyQualifiedName else ""
-        parts = fqn.split(".")
-        # FQN format: <service>.<catalog/database>.<schema>.<table>
-        if len(parts) < 4:  # noqa: PLR2004
+        if not table.fullyQualifiedName:
             continue
-        schema_name = parts[-2]
-        table_name = parts[-1]
+        parts = fqn.split(table.fullyQualifiedName.root)
+        # FQN format: <service>.<catalog/database>.<schema>.<table>
+        if len(parts) != 4 or parts[0] not in indexes:  # noqa: PLR2004
+            continue
+        service_name, _, schema_name, table_name = parts
         if not _SCHEMA_RE.match(schema_name):
             continue
-        key = (schema_name, table_name)
-        index[key] = table
-    log.info("Indexed %d tables for service '%s'", len(index), service_name)
-    return index
+        indexes[service_name][(schema_name, table_name)] = table
+    for name, index in indexes.items():
+        log.info("Indexed %d tables for service '%s'", len(index), name)
+    return indexes
 
 
 def _entity_ref(table: Table) -> EntityReference:
@@ -114,6 +125,9 @@ def _entity_ref(table: Table) -> EntityReference:
 
 
 def _add_edge(from_table: Table, to_table: Table) -> None:
+    if from_table.id.root == to_table.id.root:
+        msg = f"Refusing to write a self-edge on {from_table.fullyQualifiedName}"
+        raise ValueError(msg)
     req = AddLineageRequest(
         edge=EntitiesEdge(
             fromEntity=_entity_ref(from_table),
@@ -132,11 +146,29 @@ def _add_edge(from_table: Table, to_table: Table) -> None:
         raise
 
 
+def _remove_self_edge(table: Table) -> None:
+    """Delete the X → X edge that runs before the indexing fix wrote.
+
+    Calls the endpoint directly rather than ``delete_lineage_edge``, which logs
+    the 404 for an absent edge at ERROR. Absent is the normal case once the
+    stale edges are gone.
+    """
+    table_id = table.id.root
+    try:
+        metadata.client.delete(f"/lineage/table/{table_id}/table/{table_id}")
+    except APIError as err:
+        if err.status_code != HTTPStatus.NOT_FOUND:
+            raise
+    else:
+        log.info("Removed self-edge on %s", table.fullyQualifiedName)
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
-glue_index = _build_index(_GLUE_SERVICE)
-trino_index = _build_index(_TRINO_SERVICE)
+_indexes = _build_indexes([_GLUE_SERVICE, _TRINO_SERVICE])
+glue_index = _indexes[_GLUE_SERVICE]
+trino_index = _indexes[_TRINO_SERVICE]
 
 common_keys = set(glue_index) & set(trino_index)
 glue_only = set(glue_index) - set(trino_index)
@@ -154,6 +186,8 @@ errors = 0
 for key in sorted(common_keys):
     glue_table = glue_index[key]
     trino_table = trino_index[key]
+    _remove_self_edge(glue_table)
+    _remove_self_edge(trino_table)
     try:
         # Bidirectional: Glue → Trino and Trino → Glue
         _add_edge(glue_table, trino_table)
