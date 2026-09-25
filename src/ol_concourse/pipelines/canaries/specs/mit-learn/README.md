@@ -14,6 +14,7 @@ not assumed — see [Where the journeys come from](#where-the-journeys-come-from
 | `channel-and-drawer.spec.ts` | Channel page renders its indexed listing; a card opens the resource drawer, and the same link re-enters server-side | `/c/[channelType]/[name]` — **#1**, 39,086 non-bot renders/day | anonymous | Active |
 | `search-direct-url.spec.ts` | Search entered as a URL with query and facet parameters | `/search` — **#2**, 21,470/day | anonymous | Active |
 | `homepage.spec.ts` | Homepage renders in a real browser | `/` — #3, 6,243/day | anonymous | Active |
+| `hubspot-tracking.spec.ts` | HubSpot tracking script (`js.hs-scripts.com`) loads on the homepage | `/` — rides the #3 homepage render | anonymous | Active |
 | `login-and-search.spec.ts` | Log in, reach the dashboard, then search from the header box | `/dashboard` — #11 by volume at 121/day, but **#1 by cost of silent failure** | signed in | Active |
 
 The two search journeys are deliberately separate rather than merged. They fail for
