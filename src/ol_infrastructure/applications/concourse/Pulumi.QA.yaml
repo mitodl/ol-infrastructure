@@ -20,7 +20,9 @@ config:
   - base
   - ocw
   - operations
-  concourse:web_instance_type: general_purpose_large
+  # See the Production stack for why the m7a pools moved to m8i-flex. The
+  # infra/generic pools stay burstable -- they were never m7a.
+  concourse:web_instance_type: general_purpose_intel_flex_large
   concourse:workers:
   - auto_scale:
       desired: 5
@@ -37,10 +39,11 @@ config:
     - base
     - ocw
     - pulumi_state
-    instance_type: general_purpose_xlarge
+    instance_type: general_purpose_intel_flex_xlarge
     name: ocw
     spot_options:
       instance_type_overrides:
+      - m7a.xlarge
       - m7i.xlarge
       - m6a.xlarge
       - m5a.xlarge

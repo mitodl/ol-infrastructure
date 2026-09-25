@@ -20,7 +20,11 @@ config:
   - base
   - ocw
   - operations
-  concourse:web_instance_type: general_purpose_xlarge
+  # m8i-flex trades a 40% sustained-CPU baseline for ~13% off m7a. Measured
+  # hourly CPU across every web/worker ASG never averages above 40% over a
+  # two week window (web mean 4.6%, workers 2.6-4.4%), so only the short
+  # build bursts touch the ceiling and those stay inside the burst budget.
+  concourse:web_instance_type: general_purpose_intel_flex_xlarge
   concourse:workers:
   - auto_scale:
       desired: 6
@@ -37,10 +41,11 @@ config:
     - base
     - ocw
     - pulumi_state
-    instance_type: m7a.2xlarge
+    instance_type: general_purpose_intel_flex_2xlarge
     name: ocw
     spot_options:
       instance_type_overrides:
+      - m7a.2xlarge
       - m7i.2xlarge
       - m6a.2xlarge
       - m5a.2xlarge
@@ -69,10 +74,11 @@ config:
     # deployment's infrastructure team and analyzes this pool's Production
     # role, so CI/QA workers have no reason to hold Access Analyzer access.
     - iam_drift_analysis
-    instance_type: m7a.4xlarge
+    instance_type: general_purpose_intel_flex_4xlarge
     name: infra
     spot_options:
       instance_type_overrides:
+      - m7a.4xlarge
       - m7i.4xlarge
       - m6a.4xlarge
       - m5a.4xlarge
@@ -93,10 +99,11 @@ config:
     - ocw_publish
     - operations
     - pulumi_state
-    instance_type: m7a.xlarge
+    instance_type: general_purpose_intel_flex_xlarge
     name: generic
     spot_options:
       instance_type_overrides:
+      - m7a.xlarge
       - m7i.xlarge
       - m6a.xlarge
       - m5a.xlarge
