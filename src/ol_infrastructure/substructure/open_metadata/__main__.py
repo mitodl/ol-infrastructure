@@ -333,10 +333,10 @@ _POD_SECURITY_CONTEXT = {
 # null"). The operator injects pipelineStatus=success|failed from the main
 # pod's exit code, and the exit handler's own exit code sets the final phase.
 # This handler only turns that status back into an exit code, so phase
-# reflects the ingestion result.
+# reflects the ingestion result. It runs as the namespace default service
+# account because it needs neither the ingestion IRSA role nor its RBAC.
 _EXIT_HANDLER_SPEC = {
     "image": INGESTION_IMAGE,
-    "serviceAccountName": ingestion_sa_name,
     "command": ["sh", "-c", 'test "$pipelineStatus" = success'],
     "resources": {
         "requests": {"cpu": "10m", "memory": "16Mi"},
