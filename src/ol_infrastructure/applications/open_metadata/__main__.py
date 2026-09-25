@@ -404,17 +404,6 @@ if open_metadata_connector_secrets:
             "OM_AIRBYTE_HOST_PORT": '{{ index .Secrets "airbyte" "host_port" }}',
             "OM_AIRBYTE_PIPELINE_URL": '{{ index .Secrets "airbyte" "pipeline_url" }}',
         },
-        "superset": {
-            "OM_SUPERSET_OIDC_REALM_URL": (
-                '{{ index .Secrets "superset" "oidc_realm_url" }}'
-            ),
-            "OM_SUPERSET_OIDC_CLIENT_ID": (
-                '{{ index .Secrets "superset" "oidc_client_id" }}'
-            ),
-            "OM_SUPERSET_OIDC_CLIENT_SECRET": (
-                '{{ index .Secrets "superset" "oidc_client_secret" }}'
-            ),
-        },
     }
     connector_configs = {
         name: templates
@@ -449,6 +438,36 @@ if open_metadata_connector_secrets:
         )
         connector_secrets.append(connector_secret)
         connector_secret_names.append(secret_name)
+
+# Superset ingestion authenticates as Superset's own Keycloak client, which the
+# keycloak substructure stack writes to Vault in every environment. Reading it
+# from there tracks secret rotation instead of copying it into the SOPS file.
+# Only the superset CronOMJob reads it, so it stays out of the server's envFrom
+# and has no restart target; each job pod picks up the current value at start.
+superset_connector_secret = OLVaultK8SSecret(
+    f"open-metadata-{stack_info.name}-connector-superset-secret",
+    OLVaultK8SStaticSecretConfig(
+        name="openmetadata-connector-superset",
+        namespace=open_metadata_namespace,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name="om-connector-superset",  # noqa: S106  # pragma: allowlist secret
+        labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/superset",
+        templates={
+            "OM_SUPERSET_OIDC_REALM_URL": '{{ get .Secrets "url" }}',
+            "OM_SUPERSET_OIDC_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+            "OM_SUPERSET_OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
+    ),
+)
+connector_secrets.append(superset_connector_secret)
 
 # OM ships with several system bots, each with its own JWT used by a specific
 # workflow type.  All known bots are listed here (SOPS key → OM hyphenated name).
