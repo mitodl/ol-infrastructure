@@ -871,11 +871,12 @@ def create_data_tier(  # noqa: PLR0913
                             # Readiness is on /readyz and liveness on /healthz,
                             # the split upstream's deployment guide
                             # (docs/user/deployment.md) prescribes for 0.11.
-                            # The 503 /readyz returns while draining never
-                            # reaches the kubelet here: at SIGTERM the server
-                            # sets `draining` and starts axum's graceful
-                            # shutdown in the same step, which closes the
-                            # listener, so every new probe connection is
+                            # The 503 /readyz returns while draining is a
+                            # narrow, best-effort signal here: at SIGTERM the
+                            # server sets `draining` and then releases axum's
+                            # graceful shutdown in the same task, so only a
+                            # probe accepted in that gap sees it. Once the
+                            # listener closes, new probe connections are
                             # refused on either path. The drain itself is the
                             # closed listener plus the shutdown grace above.
                             readiness_probe=kubernetes.core.v1.ProbeArgs(
