@@ -10,8 +10,11 @@
 
 ### Current Situation
 
-The Starburst Galaxy agreement expires at the end of February 2027 and will not be
-renewed. Galaxy is booked at $72K/yr in `docs/budget/fy27-infrastructure-budget.md`.
+The Starburst Galaxy agreement will not be renewed. Project scoping puts its expiry at
+the end of February 2027, while the FY27 budget draft books Galaxy at $72K/yr through
+January 2027. The exact end date and notice period are being confirmed
+(`tk-confirm-the-starburst-contract-end-date-notice-p-678ca1`). The milestones below
+assume the later date, so an earlier one compresses M3 and M4.
 
 StarRocks 4.1.4 (operator/chart 1.11.7) already runs in CI, QA and Production on the
 data EKS clusters in shared-data mode (`applications/starrocks`,
@@ -139,18 +142,30 @@ Today the CI StarRocks cluster runs with `enable_data_lake_integration: "false"`
 OIDC off. It exists only so ol-analytics-api's CI deploy can obtain Vault
 credentials. Galaxy never served CI either.
 
-We enable the lake integration on CI, against a CI lake rather than QA's.
-`readable_data_lake_environments` currently lists only `qa` and `production`, so
-flipping the flag as the code stands would register `ol_data_lake_qa` on the CI
-cluster with write access. That is the cross-tier exposure #6023 removed for QA →
-Production. The implementation therefore has to:
+We enable the lake integration on CI, against a CI lake rather than QA's. The
+`data_warehouse` CI stack already creates the `ol-data-lake-*-ci` buckets and
+`ol_warehouse_ci_*` Glue databases, but nothing registers them as a catalog.
 
-- Add `ci` to `DATA_LAKE_ENVIRONMENTS` so CI registers `ol_data_lake_ci` over the
-  existing `ol-data-lake-*-ci` buckets and Glue databases.
-- Give the CI engine read-only access to the QA lake, so slim data CI can `--defer`
-  unchanged upstream models to QA relations while writing its own subgraph to CI.
-- Keep QA's catalog free of write access to the CI lake, and size the CI CN (currently
-  1 core / 2Gi) for real builds.
+The access rule in `lib/aws/iam_helper.py` cannot express this as written.
+`DATA_LAKE_ENVIRONMENTS` lists only `qa` and `production`, and
+`readable_data_lake_environments` grants an engine every lake not in
+`PROTECTED_DATA_LAKE_ENVIRONMENTS`, with full read/write through the shared
+query-engine policy. Two naive changes both go wrong:
+
+- Flipping the CI flag alone registers `ol_data_lake_qa` on the CI cluster with write
+  access. That is the cross-tier exposure #6023 removed for QA → Production.
+- Adding `ci` to `DATA_LAKE_ENVIRONMENTS` alone makes QA _and_ Production register
+  `ol_data_lake_ci` too, with CI's read/write policy attached to their roles.
+
+So the implementation changes the rule, not only the tuple:
+
+- CI becomes a leaf tier. Its own engine registers `ol_data_lake_ci` with write access,
+  and no other environment's engine registers it.
+- A new read-only query-engine policy lets the CI engine read the QA lake, so slim data
+  CI can `--defer` unchanged upstream models to QA relations while writing its own
+  subgraph to CI. QA gains nothing.
+- `applications/starrocks` gets a `ci` entry in `_DATA_LAKE_STACK_NAMES`, and the CI CN
+  (currently 1 core / 2Gi, fixed at one replica) is sized for real builds.
 
 This moves credentialed build+test work off QA. The work covered is slim data CI
 (`tk-p2-slim-data-ci-build-test-changed-subgraph-conc-6a6ed7`), the per-adapter macro
