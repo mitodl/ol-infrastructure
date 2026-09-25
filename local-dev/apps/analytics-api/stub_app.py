@@ -289,6 +289,15 @@ _LEARNER_LAST_NAMES = [
 ]
 _LEARNER_STATUSES = ["not_started", "in_progress", "passed", "certified"]
 
+# Learners with no usable name. Production returns "" (not null) for B2B SSO
+# learners who never set a profile name; null and whitespace-only cover the
+# other shapes the frontend has to treat as "no name".
+_NAMELESS_LEARNERS = [
+    (None, "x7k2m@example.edu"),
+    ("", "jdoe@example.edu"),
+    ("   ", "sso.user.4471@example.edu"),
+]
+
 
 def _build_learner_progress():
     """Deterministic so the stub's fixture is stable across pod restarts.
@@ -298,9 +307,13 @@ def _build_learner_progress():
     both the consent banner and `include_inactive` have something to show
     without any per-request randomness.
     """
-    rows = []
+    named = []
     for i, first in enumerate(_LEARNER_FIRST_NAMES):
         last = _LEARNER_LAST_NAMES[(i * 7) % len(_LEARNER_LAST_NAMES)]
+        named.append((f"{first} {last}", f"{first.lower()}.{last.lower()}@example.edu"))
+
+    rows = []
+    for i, (full_name, email) in enumerate(named + _NAMELESS_LEARNERS):
         for run_index, run in enumerate(_LEARNER_COURSERUNS):
             n = i * len(_LEARNER_COURSERUNS) + run_index
             shared = n % 9 != 0
@@ -309,8 +322,8 @@ def _build_learner_progress():
             rows.append(
                 {
                     "learner_id": f"kc-{1000 + n}",
-                    "email": f"{first.lower()}.{last.lower()}@example.edu",
-                    "full_name": f"{first} {last}",
+                    "email": email,
+                    "full_name": full_name,
                     "courserun_readable_id": run["courserun_readable_id"],
                     "courserun_title": run["courserun_title"],
                     "courserun_start_on": run["courserun_start_on"],
@@ -393,7 +406,7 @@ class Handler(BaseHTTPRequestHandler):
     def _handle_learner_progress(self, org, qs):
         """learner-progress: filter, sort, then page — in that order, so
         `total_count`/`outcomes_withheld_count` reflect the filtered set and
-        not the fixture's full 48 rows."""
+        not the fixture's full row set."""
         search = (qs.get("search", [""])[0] or "").strip().lower()
         statuses = qs.get("completion_status", [])
         include_inactive = qs.get("include_inactive", ["false"])[0].lower() == "true"
@@ -410,7 +423,8 @@ class Handler(BaseHTTPRequestHandler):
             rows = [
                 r
                 for r in rows
-                if search in r["full_name"].lower() or search in r["email"].lower()
+                if search in (r["full_name"] or "").lower()
+                or search in r["email"].lower()
             ]
         if statuses:
             rows = [
@@ -421,7 +435,14 @@ class Handler(BaseHTTPRequestHandler):
             ]
 
         if sort_key in ("full_name", "email", "enrolled_on", "courserun_readable_id"):
-            rows = sorted(rows, key=lambda r: r[sort_key], reverse=descending)
+            # Same as the real API's `<key> IS NULL, <key> <dir>`: nulls last in
+            # either direction, while "" and "   " sort ahead of every name.
+            present = [r for r in rows if r[sort_key] is not None]
+            missing = [r for r in rows if r[sort_key] is None]
+            rows = [
+                *sorted(present, key=lambda r: r[sort_key], reverse=descending),
+                *missing,
+            ]
 
         total_count = len(rows)
         outcomes_withheld_count = sum(1 for r in rows if not r["outcomes_shared"])
