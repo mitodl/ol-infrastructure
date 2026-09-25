@@ -17,6 +17,7 @@ config:
     - aiplatform.googleapis.com
     - generativelanguage.googleapis.com
     - googleads.googleapis.com
+    - youtube.googleapis.com
       # These are what the PROVIDER needs in order to read the resource types
       # this stack manages, not what an application consumes. They must
       # already be enabled before the first apply can succeed -- a stack
@@ -137,5 +138,25 @@ config:
         - service: generativelanguage.googleapis.com
         - service: aiplatform.googleapis.com
       import_id: projects/32631020496/locations/global/keys/44e4eae4-247b-4c04-ae86-82b7bae0f933
+      # Replace mitx-residential's unrestricted 2015 "Server key 1", which every
+      # edxapp deployment (mitx, mitx-staging, mitxonline) at every tier holds
+      # as youtube_api_key. One key per tier, shared by the three deployments:
+      # the video block's yt_video_metadata handler calls Videos.List at a few
+      # hundred a day, well inside mitol01's default YouTube quota.
+    - key_name: edxapp-youtube-production
+      display_name: edxapp YouTube Production
+      restrictions:
+        api_targets:
+        - service: youtube.googleapis.com
+    - key_name: edxapp-youtube-qa
+      display_name: edxapp YouTube QA
+      restrictions:
+        api_targets:
+        - service: youtube.googleapis.com
+    - key_name: edxapp-youtube-ci
+      display_name: edxapp YouTube CI
+      restrictions:
+        api_targets:
+        - service: youtube.googleapis.com
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwGRkMYEkiqtkOL1cUu3weJtAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbjOKl/yNcSE3NH/OAgEQgDuLw4Tl0f+DTV6qFsA/BXRSwJsDLRiZRVUabJWffa9XDGRcXOzB+cIkBiVmb6jcZ+rc5y3brL6PU9RtfA==
