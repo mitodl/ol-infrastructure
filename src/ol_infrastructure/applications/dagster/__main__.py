@@ -544,6 +544,120 @@ irx_export_bucket = OLBucket(
     ),
 )
 
+# Lifecycle rules for the three legacy mitx-etl-* export buckets. None of them
+# is created by Pulumi -- they predate this repo and no project declares them --
+# but BucketLifecycleConfiguration is keyed on the bucket name, so the policy can
+# be managed here without adopting the buckets themselves. They live alongside
+# irx_export_bucket because this stack already owns the IRx delivery path and the
+# mitx-etl-* grants below; when the facade's parallel run passes and the legacy
+# drop is retired, these go with it.
+#
+# All three were 100% STANDARD with no lifecycle configuration at all as of
+# 2026-09-24: 78.0 TB, 5.5 TB and 441 GB, ~$1,932/mo combined.
+#
+# Deliberately not INTELLIGENT_TIERING: the access pattern here is known (a drop
+# is read by the ETL shortly after it lands and then never again), so paying
+# $0.0025 per 1,000 objects/mo to have S3 rediscover that is waste.
+LEGACY_ETL_EXPORT_BUCKETS = {
+    # Still written nightly -- 20260923/ landed the day before this was added.
+    # A drop is ~103 GB, dominated by a single studentmodule_query.csv, and every
+    # night is a full re-export, so the bucket only grows.
+    #
+    # GLACIER_IR rather than GLACIER or DEEP_ARCHIVE: those two make an object
+    # unreadable until an asynchronous restore completes (3-5h and 12-48h
+    # respectively), which would turn any IRx backfill into a multi-day job.
+    # GLACIER_IR keeps GetObject working at millisecond latency for 6x less than
+    # STANDARD, and the retrieval fee only applies if something actually re-reads
+    # the cold window.
+    "mitx-etl-residential-live-mitx-production": [
+        s3.BucketLifecycleConfigurationRuleArgs(
+            id="tier-cold-export-drops",
+            status="Enabled",
+            # Course tarballs in here run 2-64 KB, and IA and GLACIER_IR bill a
+            # 128 KB minimum per object -- tiering those would cost more than
+            # leaving them in STANDARD. S3 already refuses to transition objects
+            # under 128 KB to these classes; saying so explicitly keeps the rule
+            # honest about what it does and does not touch.
+            filter=s3.BucketLifecycleConfigurationRuleFilterArgs(
+                object_size_greater_than=131071,
+            ),
+            transitions=[
+                s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                    days=30,
+                    storage_class="STANDARD_IA",
+                ),
+                s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                    days=90,
+                    storage_class="GLACIER_IR",
+                ),
+            ],
+        ),
+        # The nightly studentmodule export is a 61 GB multipart upload. There are
+        # no orphaned parts today, but without this rule a single failed night
+        # would bill at STANDARD forever and never appear in a LIST.
+        s3.BucketLifecycleConfigurationRuleArgs(
+            id="abort-incomplete-multipart-uploads",
+            status="Enabled",
+            abort_incomplete_multipart_upload=s3.BucketLifecycleConfigurationRuleAbortIncompleteMultipartUploadArgs(
+                days_after_initiation=7,
+            ),
+        ),
+    ],
+    # Dead: last drop 2025-10-31.
+    "mitx-etl-xpro-qa-mitxpro-qa": [
+        s3.BucketLifecycleConfigurationRuleArgs(
+            id="archive-dead-qa-exports",
+            status="Enabled",
+            # New S3 lifecycle configurations skip objects under 128 KiB for
+            # every storage class by default, including DEEP_ARCHIVE. Keep the
+            # cutoff explicit because these 2-64 KiB course tarballs are 68% of
+            # this bucket's objects but only 0.01% of its bytes; archiving them
+            # would add 40 KiB of billable metadata and transition charges.
+            filter=s3.BucketLifecycleConfigurationRuleFilterArgs(
+                object_size_greater_than=131072,
+            ),
+            transitions=[
+                s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                    days=0,
+                    storage_class="DEEP_ARCHIVE",
+                ),
+            ],
+        ),
+    ],
+    # Dead: last drop 2023-10-25.
+    "mitx-etl-current-residential-live-mitx-qa": [
+        s3.BucketLifecycleConfigurationRuleArgs(
+            id="archive-dead-qa-exports",
+            status="Enabled",
+            # New S3 lifecycle configurations skip objects under 128 KiB for
+            # every storage class by default, including DEEP_ARCHIVE. Keep the
+            # cutoff explicit to prevent small course tarballs from incurring
+            # 40 KiB of billable metadata and transition charges if the default
+            # behavior changes.
+            filter=s3.BucketLifecycleConfigurationRuleFilterArgs(
+                object_size_greater_than=131072,
+            ),
+            transitions=[
+                s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                    days=0,
+                    storage_class="DEEP_ARCHIVE",
+                ),
+            ],
+        ),
+    ],
+}
+
+# Bucket names are globally unique and every dagster stack points at the same AWS
+# account, so only one stack may declare these.
+if stack_info.env_suffix == "production":
+    for legacy_bucket_name, legacy_bucket_rules in LEGACY_ETL_EXPORT_BUCKETS.items():
+        s3.BucketLifecycleConfiguration(
+            f"{legacy_bucket_name}-lifecycle",
+            bucket=legacy_bucket_name,
+            rules=legacy_bucket_rules,
+        )
+
+
 # IRx reads with the static key of an IAM user created by hand in 2022, which is
 # what Simeon is configured with. Its read policy and attachment were made in the
 # console too and were adopted into this stack by import (#5822). The user itself
