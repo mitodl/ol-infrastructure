@@ -146,21 +146,28 @@ def _add_edge(from_table: Table, to_table: Table) -> None:
         raise
 
 
-def _remove_self_edge(table: Table) -> None:
+def _remove_self_edge(table: Table) -> bool:
     """Delete the X → X edge that runs before the indexing fix wrote.
 
-    Calls the endpoint directly rather than ``delete_lineage_edge``, which logs
-    the 404 for an absent edge at ERROR. Absent is the normal case once the
-    stale edges are gone.
+    Only an ``ExternalTableLineage`` self-edge is removed, so a legitimate one
+    from another source (e.g. query lineage for a self-referencing MERGE)
+    survives. Uses the client directly because ``delete_lineage_edge`` logs
+    the 404 for an absent edge at ERROR, and absent is the normal case.
+
+    :returns: whether an edge was removed.
     """
     table_id = table.id.root
     try:
-        metadata.client.delete(f"/lineage/table/{table_id}/table/{table_id}")
+        found = metadata.client.get(f"/lineage/getLineageEdge/{table_id}/{table_id}")
     except APIError as err:
-        if err.status_code != HTTPStatus.NOT_FOUND:
-            raise
-    else:
-        log.info("Removed self-edge on %s", table.fullyQualifiedName)
+        if err.status_code == HTTPStatus.NOT_FOUND:
+            return False
+        raise
+    if found["edge"].get("source") != LineageSource.ExternalTableLineage.value:
+        return False
+    metadata.client.delete(f"/lineage/table/{table_id}/table/{table_id}")
+    log.info("Removed self-edge on %s", table.fullyQualifiedName)
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -181,13 +188,23 @@ log.info(
     len(trino_only),
 )
 
-linked = 0
 errors = 0
+
+# Before the indexing fix every indexed table, matched or not, could carry a
+# self-edge, so the cleanup covers both indexes rather than only the pairs.
+removed = 0
+for table in [*glue_index.values(), *trino_index.values()]:
+    try:
+        removed += _remove_self_edge(table)
+    except Exception:
+        log.exception("Failed to remove self-edge on %s", table.fullyQualifiedName)
+        errors += 1
+log.info("Removed %d stale self-edges", removed)
+
+linked = 0
 for key in sorted(common_keys):
     glue_table = glue_index[key]
     trino_table = trino_index[key]
-    _remove_self_edge(glue_table)
-    _remove_self_edge(trino_table)
     try:
         # Bidirectional: Glue → Trino and Trino → Glue
         _add_edge(glue_table, trino_table)
