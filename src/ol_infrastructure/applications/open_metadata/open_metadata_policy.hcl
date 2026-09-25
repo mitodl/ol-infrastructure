@@ -10,6 +10,10 @@ path "secret-operations/sso/open_metadata/*" {
 path "secret-operations/sso/open_metadata" {
   capabilities = ["read"]
 }
+# Superset's OIDC client, used by the Superset ingestion job
+path "secret-operations/sso/superset" {
+  capabilities = ["read"]
+}
 # Connector credentials for OpenMetadata ingestion pipelines
 path "secret-openmetadata/data/connectors" {
   capabilities = ["read"]
