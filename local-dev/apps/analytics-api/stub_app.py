@@ -277,15 +277,56 @@ _LEARNER_COURSERUNS = [
 ]
 
 _LEARNER_FIRST_NAMES = [
-    "Anton", "Hugo", "Jordan", "Marcus", "Sam", "Nina", "Rohan", "Tobias",
-    "Zara", "Grace", "Amara", "Chiara", "Sofia", "Aisha", "Noah", "Yuki",
-    "Anja", "Luca", "Priya", "Mateo", "Elena", "Kwame", "Ines", "Felix",
+    "Anton",
+    "Hugo",
+    "Jordan",
+    "Marcus",
+    "Sam",
+    "Nina",
+    "Rohan",
+    "Tobias",
+    "Zara",
+    "Grace",
+    "Amara",
+    "Chiara",
+    "Sofia",
+    "Aisha",
+    "Noah",
+    "Yuki",
+    "Anja",
+    "Luca",
+    "Priya",
+    "Mateo",
+    "Elena",
+    "Kwame",
+    "Ines",
+    "Felix",
 ]
 _LEARNER_LAST_NAMES = [
-    "Petrov", "Bernard", "Brooks", "Reid", "Okafor", "Lang", "Malik",
-    "Nakamura", "Nwosu", "Bruno", "Rossi", "Rahman", "Weiss", "Tanaka",
-    "Kowalski", "Gupta", "Moreau", "Silva", "Haddad", "Novak", "Adeyemi",
-    "Cohen", "Dubois", "Park",
+    "Petrov",
+    "Bernard",
+    "Brooks",
+    "Reid",
+    "Okafor",
+    "Lang",
+    "Malik",
+    "Nakamura",
+    "Nwosu",
+    "Bruno",
+    "Rossi",
+    "Rahman",
+    "Weiss",
+    "Tanaka",
+    "Kowalski",
+    "Gupta",
+    "Moreau",
+    "Silva",
+    "Haddad",
+    "Novak",
+    "Adeyemi",
+    "Cohen",
+    "Dubois",
+    "Park",
 ]
 _LEARNER_STATUSES = ["not_started", "in_progress", "passed", "certified"]
 
@@ -333,7 +374,9 @@ def _build_learner_progress():
                     "enrollment_mode": "audit" if n % 4 == 0 else "verified",
                     "outcomes_shared": shared,
                     "completion_status": status if shared else None,
-                    "is_passing": (status in ("passed", "certified")) if shared else None,
+                    "is_passing": (status in ("passed", "certified"))
+                    if shared
+                    else None,
                     "grade": round((n % 10) / 10, 2) if shared else None,
                     "letter_grade": None,
                     "certificate_issued_on": "2026-06-01T00:00:00Z"
@@ -406,7 +449,8 @@ class Handler(BaseHTTPRequestHandler):
     def _handle_learner_progress(self, org, qs):
         """learner-progress: filter, sort, then page — in that order, so
         `total_count`/`outcomes_withheld_count` reflect the filtered set and
-        not the fixture's full row set."""
+        not the fixture's full row set.
+        """
         search = (qs.get("search", [""])[0] or "").strip().lower()
         statuses = qs.get("completion_status", [])
         include_inactive = qs.get("include_inactive", ["false"])[0].lower() == "true"
