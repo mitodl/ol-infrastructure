@@ -217,6 +217,13 @@ DEFAULT_PER_ACTOR_BYTES_MAX = 256 * 1024 * 1024
 # startup flag that trades a narrow failure for a broad one — see
 # tk-observability-for-shared-witan-service-ad3dba.
 #
+# omnigraph 0.11's unauthenticated /readyz does not change this. It reports
+# `quarantined_graph_count` but not which graph, and it answers 200 with any
+# number quarantined; only draining turns it 503 (server_ready in
+# crates/omnigraph-server/src/handlers.rs at v0.11.0). The readiness probe
+# below is on it because upstream names it the readiness endpoint, not
+# because it detects quarantine.
+#
 # REVISIT IF: the cluster ever collapses back to serving `council` alone, or
 # the server grows a per-graph health signal a readiness probe can reach
 # unauthenticated.
@@ -316,6 +323,13 @@ def create_data_tier(  # noqa: PLR0913
         S3BucketConfig(
             bucket_name=bucket_name,
             versioning_enabled=True,
+            # omnigraph's `cleanup` and `optimize` delete Lance objects on
+            # every run, and storage-format cutovers retire whole roots, so
+            # without this every removed object stays billed as a noncurrent
+            # version. 30 days keeps version-id undelete available as a
+            # restore path for a bad cleanup run; the runbooks' explicit
+            # `aws s3 sync` backups remain the primary rollback.
+            noncurrent_version_expiration_days=30,
             tags=aws_config.tags,
         ),
     )
@@ -854,9 +868,20 @@ def create_data_tier(  # noqa: PLR0913
                                 period_seconds=5,
                                 failure_threshold=24,
                             ),
+                            # Readiness is on /readyz and liveness on /healthz,
+                            # the split upstream's deployment guide
+                            # (docs/user/deployment.md) prescribes for 0.11.
+                            # The 503 /readyz returns while draining is a
+                            # narrow, best-effort signal here: at SIGTERM the
+                            # server sets `draining` and then releases axum's
+                            # graceful shutdown in the same task, so only a
+                            # probe accepted in that gap sees it. Once the
+                            # listener closes, new probe connections are
+                            # refused on either path. The drain itself is the
+                            # closed listener plus the shutdown grace above.
                             readiness_probe=kubernetes.core.v1.ProbeArgs(
                                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                                    path="/healthz",
+                                    path="/readyz",
                                     port=OMNIGRAPH_SERVER_PORT,
                                 ),
                                 # Explicit 0, not omitted. A merge that only

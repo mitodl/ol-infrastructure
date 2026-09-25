@@ -249,10 +249,10 @@ kubectl -n omnigraph exec deployment/omnigraph-server -- \
 
 3. **Back up the graph roots and `__cluster` first.** Parallelise one
    `aws s3 sync` per graph and write a completion marker; a serial sync of ~90k
-   objects is needlessly slow. Bucket versioning is enabled with no
-   `NoncurrentVersionExpiration` rule, so the pre-rebuild Lance versions are
-   *also* independently recoverable — but do not rely on that alone as the
-   rollback plan.
+   objects is needlessly slow. Bucket versioning is enabled and noncurrent
+   versions expire after 30 days, so the pre-rebuild Lance versions are *also*
+   recoverable by version id within that window, but do not rely on that alone
+   as the rollback plan.
 
 4. **Rebuild, per graph and per branch, on the new image:**
 
@@ -317,7 +317,8 @@ witan break-glass pod (agent-kit ADR-0005 path b) is the wrong path despite
   here; it needs the offline export → rebuild → repoint procedure. Tracked
   separately (`tk-runbook-adr-addendum-omnigraph-storage-format-bu-a2032d`).
 - **A quarantined graph.** By default the server logs a graph that fails to open
-  and serves the rest, and `/healthz` stays 200 throughout — so a quarantined
+  and serves the rest, and `/healthz` and `/readyz` stay 200 throughout
+  (`/readyz` reports only a `quarantined_graph_count`) — so a quarantined
   `council` is a silent brownout that no probe catches. `OMNIGRAPH_REQUIRE_ALL_GRAPHS`
   is deliberately left unset (see the rationale in `data_tier.py`); detecting it
   belongs with the service's monitoring.
