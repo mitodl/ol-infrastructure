@@ -14,7 +14,7 @@ The Starburst Galaxy agreement will not be renewed. Project scoping puts its exp
 the end of February 2027, while the FY27 budget draft books Galaxy at $72K/yr through
 January 2027. The exact end date and notice period are being confirmed
 (`tk-confirm-the-starburst-contract-end-date-notice-p-678ca1`). The milestones below
-assume the later date, so an earlier one compresses M3 and M4.
+carry a schedule for each date, and confirming it is a gate before M2.
 
 StarRocks 4.1.4 (operator/chart 1.11.7) already runs in CI, QA and Production on the
 data EKS clusters in shared-data mode (`applications/starrocks`,
@@ -35,8 +35,8 @@ it, and what shape the StarRocks deployment has to take to be the only one.
 
 ### Constraints
 
-- Galaxy access must be revoked, and its IaC removed, by 2027-02-13. That leaves a
-  two-week buffer before expiry.
+- Galaxy access must be revoked, and its IaC removed, at least two weeks before the
+  confirmed contract end date.
 - StarRocks here is the open source build. Enterprise-only features are not options.
 - The Lakekeeper/Gravitino Iceberg REST catalog work
   (`wp-starrocks-iceberg-rest-catalog-jwt-identity-dele-13ccbe`) is in flight on its
@@ -52,8 +52,10 @@ reporting) as Iceberg through the Glue external catalog, using dbt-starrocks
 `config(catalog=..., database=...)`. Native `default_catalog` tables are only for
 serving materialized views such as `b2b_analytics`.
 
-A native-table warehouse would be invisible to pyiceberg, IRx, DuckDB and Trino. It
-would also have no backup story beyond the shared-data bucket, and no parallel-run
+A native-table warehouse would be invisible to pyiceberg, IRx, DuckDB and Trino. Its
+recovery would rest on Cluster Snapshot, which covers FE metadata and data in
+shared-data mode but is beta and not configured in our IaC, so it would be new
+snapshot and restore work to build and validate. It would also have no parallel-run
 path against the Trino build. `b2b_analytics` already demonstrates the invisibility:
 it exists in `default_catalog` and is absent from Glue.
 
@@ -87,9 +89,10 @@ We accept these costs, each tracked:
   `merge` or `delete+insert`. The 21 delete+insert models need a different strategy
   (`tk-port-the-21-delete-insert-incremental-models-11--c9c109`).
 
-Six of these are filed upstream (StarRocks/dbt-starrocks#123 through #128,
-StarRocks/starrocks#79448). The adapter's external-catalog support landed days before
-the spike, so they may close upstream. The plan does not depend on that.
+The spike's findings are filed upstream as seven issues: StarRocks/dbt-starrocks#123
+through #128 for the adapter, and StarRocks/starrocks#79448 for Glue view support. The
+adapter's external-catalog support landed days before the spike, so the adapter
+issues may close upstream. The plan does not depend on that.
 
 ### 2. Glue remains the write catalog through the cutover
 
@@ -196,13 +199,17 @@ also assumes Trino can read StarRocks-written Iceberg tables, which is unverifie
 
 ## Milestones
 
-| Milestone | Date | Exit condition |
-|-----------|------|----------------|
-| M0 | 2026-09-25 | This ADR |
-| M1 | 2026-10-31 | Full warehouse green on QA StarRocks |
-| M2 | 2026-11-30 | Production parallel run; QA consumers repointed |
-| M3 | 2027-01-15 | All production consumers on StarRocks; Trino build disabled |
-| M4 | 2027-02-13 | Galaxy access revoked; Galaxy IaC, IAM trust role and secrets removed |
+The contract end date gates the schedule. It must be confirmed before M2. If the
+agreement ends 2027-02-28, the February column applies. If it ends 2027-01-31, M3 and
+M4 move to the January column, which keeps the same two-week buffer.
+
+| Milestone | Feb 28 end | Jan 31 end | Exit condition |
+|-----------|------------|------------|----------------|
+| M0 | 2026-09-25 | 2026-09-25 | This ADR |
+| M1 | 2026-10-31 | 2026-10-31 | Full warehouse green on QA StarRocks |
+| M2 | 2026-11-30 | 2026-11-30 | Production parallel run; QA consumers repointed; contract end date confirmed |
+| M3 | 2027-01-15 | 2026-12-18 | All production consumers on StarRocks; Trino build disabled |
+| M4 | 2027-02-13 | 2027-01-15 | Galaxy access revoked; Galaxy IaC, IAM trust role and secrets removed |
 
 ## Out of Scope
 
