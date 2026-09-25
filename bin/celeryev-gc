@@ -46,6 +46,21 @@ key first and the next event published recreates it.
 It only ever considers queues reachable from the named exchange's binding set
 and named with that exchange's prefix, so task queues cannot be touched.
 
+FINDING THE QUEUES
+
+Candidates come from two places, because neither alone is complete:
+
+  - the exchange's binding set, `_kombu.binding.<exchange>`; and
+  - a keyspace SCAN for `<exchange>.*`.
+
+The scan matters because a queue can lose its binding and keep its keys — a
+delete that removed the binding but not the data, which earlier versions of
+this script could produce and then silently report as success. Such a queue is
+absent from the binding set for good, so a binding-set walk reports a clean
+instance while the data sits there forever. On
+mitxonline-app-redis-production, 239 unbound `celeryev.*` lists held 36.9 GiB
+that three binding-set-only runs had reported nothing about.
+
 ORPHAN TEST
 
 A live consumer drains its queue continuously, so its backlog sits near zero.
@@ -53,6 +68,11 @@ An orphan only grows. This samples LLEN twice, `--settle-seconds` apart, and
 treats a queue as orphaned when it holds at least `--min-length` messages and
 did not shrink between samples. A queue that is empty, or draining, is left
 alone.
+
+An unbound queue is orphaned by definition and skips the drain test: nothing
+routes to it and nothing declared it, so it is frozen rather than growing and
+"did not shrink" would never distinguish it from a live one. It still has to
+clear `--min-length`.
 
 A false positive costs a monitor some buffered events, which are ephemeral
 telemetry, not tasks. It cannot lose queued work.
@@ -79,6 +99,7 @@ app = cyclopts.App(
 BINDING_KEY_TEMPLATE = "_kombu.binding.%s"
 SEP = "\x06\x16"
 PRIORITY_STEPS = (0, 3, 6, 9)
+SCAN_COUNT = 500
 
 
 def queue_keys(queue: str) -> list[str]:
@@ -96,7 +117,14 @@ def queue_keys(queue: str) -> list[str]:
 
 @dataclass
 class Candidate:
-    """One queue found via the exchange's binding set."""
+    """One queue found via the exchange's binding set, or by keyspace scan.
+
+    ``binding_members`` is empty for a queue whose binding is already gone.
+    Those still hold their data, and because nothing routes to them any more
+    they are frozen rather than growing, so the drain test alone would never
+    single them out. They are the residue of a delete that removed the binding
+    without removing the keys.
+    """
 
     queue: str
     binding_members: list[str]
@@ -104,8 +132,17 @@ class Candidate:
     second_len: int = 0
 
     @property
+    def unbound(self) -> bool:
+        """True when no binding references this queue."""
+        return not self.binding_members
+
+    @property
     def orphaned_by(self) -> str | None:
         """Why this queue looks orphaned, or None if it looks alive."""
+        if self.unbound:
+            # Unreachable from the exchange: no publisher can write to it and
+            # no consumer declared it. Nothing will ever drain it.
+            return "unbound"
         if self.second_len < self.first_len:
             return None  # draining, so something is consuming it
         return "not draining"
@@ -213,12 +250,29 @@ def main(
             continue
         by_queue.setdefault(queue, []).append(member)
 
+    # The binding set is not a complete index of what is on disk. A queue whose
+    # binding was removed without its keys is invisible there for good, so scan
+    # the keyspace as well and take the union. Measured on
+    # mitxonline-app-redis-production 2026-09-25: 239 unbound celeryev lists
+    # holding 36.9 GiB, none of them reachable from the binding set.
+    scanned: set[str] = set()
+    for key in client.scan_iter(match=f"{exchange}.*", count=SCAN_COUNT):
+        # Priority variants share one logical queue; see queue_keys().
+        scanned.add(key.split(SEP)[0])
+    for queue in scanned:
+        by_queue.setdefault(queue, [])
+
     candidates = [Candidate(queue=q, binding_members=m) for q, m in by_queue.items()]
     if not candidates:
         print("no candidate queues found")
         return 0
 
-    print(f"{len(candidates):,} queues named {exchange}.*; sampling backlog...")
+    unbound_count = sum(1 for c in candidates if c.unbound)
+    print(
+        f"{len(candidates):,} queues named {exchange}.* "
+        f"({len(candidates) - unbound_count:,} bound, {unbound_count:,} unbound); "
+        "sampling backlog..."
+    )
     measure(client, candidates, field="first_len")
     print(f"waiting {settle_seconds}s to see which are draining...")
     time.sleep(settle_seconds)
@@ -236,9 +290,12 @@ def main(
     # len(candidates), whether or not --limit truncated the work.
     selected = orphans if limit is None else orphans[:limit]
 
-    print(f"\n{'queue':46}{'backlog t0':>12}{'backlog t1':>12}")
+    print(f"\n{'queue':46}{'backlog t0':>12}{'backlog t1':>12}  why")
     for cand in selected[:25]:
-        print(f"{cand.queue:46}{cand.first_len:>12,}{cand.second_len:>12,}")
+        print(
+            f"{cand.queue:46}{cand.first_len:>12,}{cand.second_len:>12,}"
+            f"  {cand.orphaned_by}"
+        )
     if len(selected) > 25:
         print(f"... and {len(selected) - 25:,} more")
 
@@ -253,21 +310,41 @@ def main(
         return 0
 
     deleted = 0
+    failed = 0
     for cand in selected:
         # Binding first. Delete the key first and the next published event
         # recreates it, with no TTL.
+        #
+        # UNLINK rather than DEL: these lists reach hundreds of MiB and DEL
+        # frees every element on the main thread, stalling the server for the
+        # duration. UNLINK hands the free to the background thread.
         pipe = client.pipeline(transaction=False)
         for member in cand.binding_members:
             pipe.srem(binding_key, member)
-        pipe.delete(*queue_keys(cand.queue))
-        pipe.execute(raise_on_error=False)
-        deleted += 1
+        pipe.unlink(*queue_keys(cand.queue))
+        results = pipe.execute(raise_on_error=False)
+        # Never swallow this. A failed unlink after a successful srem is what
+        # strands a queue: it loses the binding, keeps its data, and no
+        # binding-set walk can ever find it again.
+        errors = [r for r in results if isinstance(r, Exception)]
+        if errors:
+            failed += 1
+            print(f"  ERROR {cand.queue}: {errors[0]}", file=sys.stderr)
+        else:
+            deleted += 1
 
     after = client.info("memory").get("used_memory", 0)
     print(
         f"deleted {deleted:,} queues; used_memory {human(before)} -> {human(after)} "
         f"(reclaimed {human(before - after)})"
     )
+    if failed:
+        print(
+            f"{failed:,} queues failed to delete and may now be unbound with "
+            "their keys intact; re-run to pick them up.",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 
