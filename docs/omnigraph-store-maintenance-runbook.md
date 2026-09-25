@@ -317,7 +317,8 @@ witan break-glass pod (agent-kit ADR-0005 path b) is the wrong path despite
   here; it needs the offline export → rebuild → repoint procedure. Tracked
   separately (`tk-runbook-adr-addendum-omnigraph-storage-format-bu-a2032d`).
 - **A quarantined graph.** By default the server logs a graph that fails to open
-  and serves the rest, and `/healthz` stays 200 throughout — so a quarantined
+  and serves the rest, and `/healthz` and `/readyz` stay 200 throughout
+  (`/readyz` reports only a `quarantined_graph_count`) — so a quarantined
   `council` is a silent brownout that no probe catches. `OMNIGRAPH_REQUIRE_ALL_GRAPHS`
   is deliberately left unset (see the rationale in `data_tier.py`); detecting it
   belongs with the service's monitoring.

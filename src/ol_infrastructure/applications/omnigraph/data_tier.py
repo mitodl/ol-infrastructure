@@ -217,6 +217,13 @@ DEFAULT_PER_ACTOR_BYTES_MAX = 256 * 1024 * 1024
 # startup flag that trades a narrow failure for a broad one — see
 # tk-observability-for-shared-witan-service-ad3dba.
 #
+# omnigraph 0.11's unauthenticated /readyz does not change this. It reports
+# `quarantined_graph_count` but not which graph, and it answers 200 with any
+# number quarantined; only draining turns it 503 (server_ready in
+# crates/omnigraph-server/src/handlers.rs at v0.11.0). The readiness probe
+# below is on it because upstream names it the readiness endpoint, not
+# because it detects quarantine.
+#
 # REVISIT IF: the cluster ever collapses back to serving `council` alone, or
 # the server grows a per-graph health signal a readiness probe can reach
 # unauthenticated.
@@ -861,9 +868,19 @@ def create_data_tier(  # noqa: PLR0913
                                 period_seconds=5,
                                 failure_threshold=24,
                             ),
+                            # Readiness is on /readyz and liveness on /healthz,
+                            # the split upstream's deployment guide
+                            # (docs/user/deployment.md) prescribes for 0.11.
+                            # The 503 /readyz returns while draining never
+                            # reaches the kubelet here: at SIGTERM the server
+                            # sets `draining` and starts axum's graceful
+                            # shutdown in the same step, which closes the
+                            # listener, so every new probe connection is
+                            # refused on either path. The drain itself is the
+                            # closed listener plus the shutdown grace above.
                             readiness_probe=kubernetes.core.v1.ProbeArgs(
                                 http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                                    path="/healthz",
+                                    path="/readyz",
                                     port=OMNIGRAPH_SERVER_PORT,
                                 ),
                                 # Explicit 0, not omitted. A merge that only
