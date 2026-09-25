@@ -340,6 +340,10 @@ DATA_LAKE_GLUE_NAMESPACES = (
 # the production dbt profile.
 PROTECTED_DATA_LAKE_ENVIRONMENTS = ("production",)
 
+# Environments with a data lake of their own, i.e. a Glue catalog a query engine
+# can register.
+DATA_LAKE_ENVIRONMENTS = ("qa", "production")
+
 # Glue resource types the data lake identities act on, with the suffix each ARN
 # needs after the database name.
 _GLUE_RESOURCE_SUFFIXES = {
@@ -462,6 +466,31 @@ def cross_environment_glue_denial(env_suffix: str) -> list[dict[str, Any]]:
                 for resource_type, suffix in _GLUE_RESOURCE_SUFFIXES.items()
             ],
         }
+    ]
+
+
+def readable_data_lake_environments(env_suffix: str) -> list[str]:
+    """List the data lakes a query engine in ``env_suffix`` registers a catalog for.
+
+    Its own lake plus every lake that is not protected from it -- the same rule
+    ``cross_environment_glue_denial`` enforces in IAM. A catalog outside that set
+    would be one the engine's role is explicitly denied, so registering it only
+    advertises access that fails at query time. Production keeps the QA catalog
+    because ol-data-platform's QA mirror runs on the production cluster and
+    writes into it.
+
+    :param env_suffix: The query engine's environment, e.g. ``qa``.
+    :type env_suffix: str
+
+    :returns: Environment suffixes, in ``DATA_LAKE_ENVIRONMENTS`` order.
+
+    :rtype: list[str]
+    """
+    return [
+        environment
+        for environment in DATA_LAKE_ENVIRONMENTS
+        if environment == env_suffix
+        or environment not in PROTECTED_DATA_LAKE_ENVIRONMENTS
     ]
 
 
