@@ -28,6 +28,7 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSTrustRole,
     OLEKSTrustRoleConfig,
 )
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
@@ -603,6 +604,53 @@ open_metadata_bedrock_iam_policy = iam.Policy(
     tags=aws_config.tags,
 )
 
+# Backs 2.0's asset uploader (Context Center Documents and attachments). The
+# server builds its S3 client from the AWS default credential chain whenever no
+# custom endpoint is set, so the pod's IRSA role is what authenticates;
+# ASSET_UPLOADER_S3_USE_IAM_ROLE only satisfies the config validator and
+# ASSET_UPLOADER_S3_IAM_ROLE_ARN is never read. S3AssetService calls PutObject,
+# GetObject and DeleteObject and nothing else. Without a CloudFront cdnUrl the
+# download endpoint streams through the server rather than redirecting to a
+# presigned URL, so browsers never talk to the bucket and it needs no CORS.
+open_metadata_assets_bucket = OLBucket(
+    f"open-metadata-assets-bucket-{stack_info.env_suffix}",
+    S3BucketConfig(
+        bucket_name=f"ol-data-open-metadata-assets-{stack_info.env_suffix}",
+        versioning_enabled=True,
+        # A document deleted through the UI stays restorable by version id for
+        # 30 days, then stops being billed.
+        noncurrent_version_expiration_days=30,
+        tags=aws_config.tags,
+    ),
+)
+
+open_metadata_assets_iam_policy = iam.Policy(
+    f"open-metadata-assets-policy-{stack_info.env_suffix}",
+    name=f"open-metadata-assets-policy-{stack_info.env_suffix}",
+    path=f"/ol-applications/open-metadata/open_metadata/{stack_info.env_suffix}/",
+    description="Read/write on the OpenMetadata asset uploader bucket",
+    policy=open_metadata_assets_bucket.bucket_v2.arn.apply(
+        lambda bucket_arn: lint_iam_policy(
+            {
+                "Version": IAM_POLICY_VERSION,
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "s3:GetObject",
+                            "s3:PutObject",
+                            "s3:DeleteObject",
+                        ],
+                        "Resource": [f"{bucket_arn}/*"],
+                    },
+                ],
+            },
+            stringify=True,
+        )
+    ),
+    tags=aws_config.tags,
+)
+
 open_metadata_irsa_role = OLEKSTrustRole(
     f"open-metadata-irsa-trust-role-{stack_info.env_suffix}",
     role_config=OLEKSTrustRoleConfig(
@@ -631,6 +679,13 @@ open_metadata_glue_policy_attachment = iam.RolePolicyAttachment(
 open_metadata_bedrock_policy_attachment = iam.RolePolicyAttachment(
     f"open-metadata-bedrock-policy-attachment-{stack_info.env_suffix}",
     policy_arn=open_metadata_bedrock_iam_policy.arn,
+    role=open_metadata_irsa_role.role.name,
+    opts=ResourceOptions(parent=open_metadata_irsa_role),
+)
+
+open_metadata_assets_policy_attachment = iam.RolePolicyAttachment(
+    f"open-metadata-assets-policy-attachment-{stack_info.env_suffix}",
+    policy_arn=open_metadata_assets_iam_policy.arn,
     role=open_metadata_irsa_role.role.name,
     opts=ResourceOptions(parent=open_metadata_irsa_role),
 )
@@ -952,6 +1007,20 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "name": "AUTHENTICATION_MAX_ACTIVE_SESSIONS_PER_USER",
                     "value": str(OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER),
                 },
+                # Asset uploader, see open_metadata_assets_bucket above. Objects
+                # are keyed by asset id under the prefix. AES256 (SSE-S3) because
+                # aws:kms would need a key and kms grants on the IRSA role for no
+                # gain here: the bucket is private and only this role can read it.
+                {"name": "ASSET_UPLOADER_ENABLE", "value": "true"},
+                {"name": "ASSET_UPLOADER_PROVIDER", "value": "s3"},
+                {
+                    "name": "ASSET_UPLOADER_S3_BUCKET_NAME",
+                    "value": open_metadata_assets_bucket.bucket_v2.bucket,
+                },
+                {"name": "ASSET_UPLOADER_S3_REGION", "value": aws_config.region},
+                {"name": "ASSET_UPLOADER_S3_USE_IAM_ROLE", "value": "true"},
+                {"name": "ASSET_UPLOADER_S3_PREFIX_PATH", "value": "assets"},
+                {"name": "ASSET_UPLOADER_S3_SSE_ALGORITHM", "value": "AES256"},
             ],
             "serviceAccount": {
                 "create": True,
@@ -1015,6 +1084,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
             open_metadata_irsa_role,
             open_metadata_glue_policy_attachment,
             open_metadata_bedrock_policy_attachment,
+            open_metadata_assets_policy_attachment,
             *connector_secrets,
         ],
     ),
