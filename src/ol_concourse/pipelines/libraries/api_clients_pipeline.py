@@ -229,42 +229,43 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         ],
     )
 
-    # One npm package per subpath. A source repo publishing several specs
-    # generates several packages out of the one client repo, and each is
-    # published from its own directory; they share the repo-root VERSION the
-    # bump step wrote, so a release moves them together.
-    publish_steps = [
-        TaskStep(
-            task=Identifier(f"publish-node-{subpath}"),
-            image=node_image.name,
-            config=TaskConfig(
-                platform="linux",
-                inputs=[Input(name=api_clients_repository.name)],
-                params={"NPM_TOKEN": "((npm_publish.npmjs_token))"},
-                run=Command(
-                    path="sh",
-                    # Adjust dir based on which publish script is used
-                    dir=f"{api_clients_repository.name}/src/typescript/{subpath}",
-                    args=["-xc", _read_script(publish_script)],
+    # One publish job per subpath, each gated on the same successful
+    # generate-clients run. A source repo publishing several specs generates
+    # several packages out of the one client repo, and each is published from
+    # its own directory; they share the repo-root VERSION the bump step
+    # wrote, so a release moves them together. Separate jobs (rather than
+    # sequential steps in one job) keep a failed package retryable on its
+    # own -- npm rejects republishing an already-published name/version, so
+    # retrying a single job that already published some packages would fail
+    # before reaching the one that didn't.
+    publish_jobs = [
+        Job(
+            name=Identifier(f"publish-{subpath}"),
+            plan=[
+                GetStep(get=node_image.name, trigger=True),
+                GetStep(
+                    get=api_clients_repository.name,
+                    passed=[generate_clients_job.name],
+                    trigger=True,
                 ),
-            ),
+                TaskStep(
+                    task=Identifier(f"publish-node-{subpath}"),
+                    image=node_image.name,
+                    config=TaskConfig(
+                        platform="linux",
+                        inputs=[Input(name=api_clients_repository.name)],
+                        params={"NPM_TOKEN": "((npm_publish.npmjs_token))"},
+                        run=Command(
+                            path="sh",
+                            dir=f"{api_clients_repository.name}/src/typescript/{subpath}",
+                            args=["-xc", _read_script(publish_script)],
+                        ),
+                    ),
+                ),
+            ],
         )
         for subpath in client_repo_subpaths
     ]
-
-    # Define the 'publish' job
-    publish_job = Job(
-        name="publish",
-        plan=[
-            GetStep(get=node_image.name, trigger=True),
-            GetStep(
-                get=api_clients_repository.name,
-                passed=[generate_clients_job.name],
-                trigger=True,
-            ),
-            *publish_steps,
-        ],
-    )
 
     # Construct the final pipeline
     return Pipeline(
@@ -277,7 +278,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         ],
         jobs=[
             generate_clients_job,
-            publish_job,
+            *publish_jobs,
         ],
     )
 
