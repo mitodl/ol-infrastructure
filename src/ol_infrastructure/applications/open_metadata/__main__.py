@@ -609,9 +609,10 @@ open_metadata_bedrock_iam_policy = iam.Policy(
 # custom endpoint is set, so the pod's IRSA role is what authenticates;
 # ASSET_UPLOADER_S3_USE_IAM_ROLE only satisfies the config validator and
 # ASSET_UPLOADER_S3_IAM_ROLE_ARN is never read. S3AssetService calls PutObject,
-# GetObject and DeleteObject and nothing else. Without a CloudFront cdnUrl the
-# download endpoint streams through the server rather than redirecting to a
-# presigned URL, so browsers never talk to the bucket and it needs no CORS.
+# GetObject and DeleteObject and nothing else. Context Center file downloads
+# default to a 307 to a presigned URL, but the UI requests redirect=false and
+# gets the bytes through the server, so no browser script reads the bucket and
+# it needs no CORS. API clients that follow the redirect need only GetObject.
 open_metadata_assets_bucket = OLBucket(
     f"open-metadata-assets-bucket-{stack_info.env_suffix}",
     S3BucketConfig(
