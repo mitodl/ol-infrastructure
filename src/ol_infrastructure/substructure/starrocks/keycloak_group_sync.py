@@ -2,7 +2,8 @@
 """Sync Keycloak StarRocks client role memberships into a Kubernetes ConfigMap.
 
 The ConfigMap is consumed by StarRocks' file-based group provider.
-Format: one line per non-empty role — "role_name:user1,user2,...".
+Format: one line per non-empty role — "role_name:user1,user2,...", where each
+user is the holder's saml_uid (the starrocks_username claim).
 
 Required environment variables:
   KEYCLOAK_ISSUER_URL    - Keycloak realm issuer URL
@@ -18,6 +19,7 @@ its client credentials are sufficient to enumerate role memberships.
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.error
@@ -36,6 +38,9 @@ _GOVERNANCE_ROLES: tuple[str, ...] = (
 
 
 _PAGE_SIZE = 100
+# groups.txt is "role:user1,user2" per line, so a principal carrying ":", "," or
+# a newline would corrupt the file or smuggle in a group entry.
+_PRINCIPAL_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
 
 
 def _api_get(url: str, headers: dict[str, str]) -> Any:
@@ -66,6 +71,61 @@ def _api_get_all(url: str, headers: dict[str, str]) -> list[Any]:
             break
         first += _PAGE_SIZE
     return results
+
+
+def effective_role_members(
+    admin_base: str, client_uuid: str, headers: dict[str, str]
+) -> dict[str, set[str]]:
+    """Map each governance role to the saml_uid of every user who holds it.
+
+    GET /clients/{id}/roles/{role}/users returns direct mappings only, and the
+    realm hands these roles out through composite realm roles (ol-starrocks-*),
+    so that endpoint misses nearly everyone. Reading each user's effective
+    client role mappings covers composites and group membership.
+
+    The value written is saml_uid because both security integrations set
+    principal_field=starrocks_username, which Keycloak fills from saml_uid.
+    Writing any other form (e.g. the Keycloak username, an email) makes the
+    group provider return no groups, and permitted_groups then refuses login.
+
+    :param admin_base: Keycloak admin API base URL for the realm.
+    :param client_uuid: Internal id of the ol-starrocks-client client.
+    :param headers: Authorization headers for the admin API.
+    :returns: Governance role name to the set of saml_uid values holding it.
+    :rtype: dict[str, set[str]]
+    """
+    members: dict[str, set[str]] = {role: set() for role in _GOVERNANCE_ROLES}
+    holders = 0
+    for user in _api_get_all(f"{admin_base}/users?briefRepresentation=false", headers):
+        if not user["enabled"]:
+            continue
+        mapped = _api_get(
+            f"{admin_base}/users/{user['id']}/role-mappings/clients/"
+            f"{client_uuid}/composite",
+            headers,
+        )
+        granted = {role["name"] for role in mapped} & members.keys()
+        if not granted:
+            continue
+        holders += 1
+        saml_uid = user.get("attributes", {}).get("saml_uid", [""])[0]
+        if not _PRINCIPAL_PATTERN.fullmatch(saml_uid):
+            sys.stderr.write(
+                f"Skipping {user['username']}: holds {sorted(granted)} but saml_uid "
+                f"{saml_uid!r} is missing or not a valid StarRocks principal\n"
+            )
+            continue
+        for role in granted:
+            members[role].add(saml_uid)
+    # The admin API omits attributes the realm's user profile doesn't expose, while
+    # protocol mappers still read them. If every holder lacks saml_uid, that is the
+    # likely cause, and writing an empty file would silently deny every OIDC login.
+    if holders and not any(members.values()):
+        sys.exit(
+            f"{holders} users hold governance roles but none has a usable saml_uid; "
+            "check the realm's unmanagedAttributePolicy before writing an empty file"
+        )
+    return members
 
 
 def main() -> None:
@@ -111,14 +171,12 @@ def main() -> None:
         sys.exit("ol-starrocks-client not found in Keycloak realm")
     client_uuid = clients[0]["id"]
 
-    lines: list[str] = []
-    for role in _GOVERNANCE_ROLES:
-        users = _api_get_all(
-            f"{admin_base}/clients/{client_uuid}/roles/{role}/users", headers
-        )
-        usernames = sorted(u["username"] for u in users if u.get("username"))
-        if usernames:
-            lines.append(f"{role}:{','.join(usernames)}")
+    members = effective_role_members(admin_base, client_uuid, headers)
+    lines = [
+        f"{role}:{','.join(sorted(members[role]))}"
+        for role in _GOVERNANCE_ROLES
+        if members[role]
+    ]
 
     manifest = {
         "apiVersion": "v1",

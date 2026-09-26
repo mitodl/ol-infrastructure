@@ -848,11 +848,11 @@ if oidc_enabled:
     # --- File group provider: automatic role assignment from Keycloak --------
     # keycloak_group_sync.py calls the Keycloak Admin API (using the
     # ol-starrocks-client service account, which has view-users on
-    # realm-management) to enumerate current members of each governance role
-    # and writes the result to a Kubernetes ConfigMap mounted in the FE pods.
+    # realm-management) to enumerate the effective holders of each governance
+    # role and writes the result to a Kubernetes ConfigMap mounted in the FE pods.
     # StarRocks' file group provider reads that file; combined with
     # GRANT role TO EXTERNAL GROUP, any OAuth2-authenticated user whose
-    # preferred_username appears in the file receives the corresponding
+    # starrocks_username (saml_uid) appears in the file receives the corresponding
     # StarRocks role automatically — no starrocks:oidc_users entry needed.
     #
     # Upstream feature request for a native JWT-claims group provider that
@@ -888,8 +888,15 @@ if oidc_enabled:
             "KEYCLOAK_CLIENT_SECRET": _oidc_client_secret,
             "KUBECONFIG_CONTENT": _kube_config,
         },
+        # The script hash is here so a fix to the sync logic re-runs it; the
+        # SQL hash alone left a broken groups.txt in place from June 2026. The
+        # file group provider reads the file only at CREATE GROUP PROVIDER and FE
+        # start, so a new file takes effect after the next FE restart.
         triggers=_integration_sql.apply(
-            lambda sql: [hashlib.sha256(sql.encode()).hexdigest()]
+            lambda sql: [
+                hashlib.sha256(sql.encode()).hexdigest(),
+                hashlib.sha256(Path(_sync_script).read_bytes()).hexdigest(),
+            ]
         ),
         opts=ResourceOptions(
             delete_before_replace=True,
