@@ -2801,8 +2801,10 @@ for location in code_locations:
     # get the same federated credential as its code server.
     if name == "ml" and gcp_stack is not None:
         deployment["env"].extend(ml_gcp_env)
-        deployment["volumes"] = ml_gcp_volumes
-        deployment["volumeMounts"] = ml_gcp_volume_mounts
+        # Appended, not assigned: the Azure OpenAI block below mounts its own
+        # token into the same ml deployment.
+        deployment.setdefault("volumes", []).extend(ml_gcp_volumes)
+        deployment.setdefault("volumeMounts", []).extend(ml_gcp_volume_mounts)
 
     if name == "ml" and opik_stack is not None:
         deployment["env"].extend(
@@ -2829,8 +2831,8 @@ for location in code_locations:
     # azure-identity's WorkloadIdentityCredential before SUMMARY_PROVIDER=azure_openai
     # works.
     if name == "ml" and azure_openai_stack is not None:
-        deployment["volumes"] = [azure_identity_token_volume()]
-        deployment["volumeMounts"] = [azure_identity_token_mount()]
+        deployment.setdefault("volumes", []).append(azure_identity_token_volume())
+        deployment.setdefault("volumeMounts", []).append(azure_identity_token_mount())
         deployment["env"].extend(
             [
                 {"name": env_name, "value": env_value}
