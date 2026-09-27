@@ -72,6 +72,18 @@ _SHARED_NOTEBOOKS_MOUNT_PATH = "/home/jovyan/shared_nb"
 
 _MARIMO_AI_DEFAULTS_SCRIPT = "/etc/marimo/marimo_ai_defaults.py"
 _MARIMO_AI_DEFAULTS_JSON = "/etc/marimo/ai_defaults.json"
+# JupyterLab reads overrides.json from <sys.prefix>/share/jupyter/lab/settings,
+# and the image's prefix is /opt/conda (quay.io/jupyter/minimal-notebook).
+_LAB_SETTINGS_OVERRIDES_PATH = "/opt/conda/share/jupyter/lab/settings/overrides.json"
+# The marimo labextension registers its widget factory as "marimo" with
+# "python" among its fileTypes, but it is defaultFor only *_mo.py. Making it
+# the default viewer for "python" opens every .py in marimo on double-click.
+# "Open With > Editor" still edits a helper module as text.
+_LAB_SETTINGS_OVERRIDES = {
+    "@jupyterlab/docmanager-extension:plugin": {
+        "defaultViewers": {"python": "marimo"},
+    },
+}
 # KubeSpawner profile list: currently defines Standard and Large CPU/memory tiers.
 _PROFILE_LIST = f"""
 c.KubeSpawner.profile_list = [
@@ -560,6 +572,10 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         "pullSecrets": [ghcr_pull_secret_name],
                     },
                     "cmd": ["jupyterhub-singleuser"],
+                    # The postStart hook below re-seeds any missing template on
+                    # every server start, so this file exists even for a user
+                    # who deleted it.
+                    "defaultUrl": "/lab/tree/notebooks/getting_started.py",
                     "startTimeout": 300,
                     "networkPolicy": {"enabled": False},
                     # Seed the notebook templates into the user's home on first
@@ -607,6 +623,10 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                         "jupyter-server-config": {
                             "mountPath": "/etc/jupyter/jupyter_server_config.py",
                             "stringData": "c.MarimoProxyConfig.timeout = 120\n",
+                        },
+                        "lab-settings-overrides": {
+                            "mountPath": _LAB_SETTINGS_OVERRIDES_PATH,
+                            "stringData": json.dumps(_LAB_SETTINGS_OVERRIDES),
                         },
                         "marimo-ai-defaults-script": {
                             "mountPath": _MARIMO_AI_DEFAULTS_SCRIPT,
