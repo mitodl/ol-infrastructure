@@ -22,5 +22,9 @@ data:
   # LOCAL_DEV_ROOT_DOMAIN at apply time — see local-dev/tiltlib.star.
   LMS_BASE_URL: "https://lms.mit.dev"
   CMS_BASE_URL: "https://studio.mit.dev"
+  # Host forms of the two above. lehrer sets them to its standalone
+  # localhost:8000/8010, which is where the LMS's Studio links would point.
+  LMS_BASE: "lms.mit.dev"
+  CMS_BASE: "studio.mit.dev"
   EDXNOTES_PUBLIC_API: "https://notes.mit.dev/api/v1"
   HTTPS: "on"
