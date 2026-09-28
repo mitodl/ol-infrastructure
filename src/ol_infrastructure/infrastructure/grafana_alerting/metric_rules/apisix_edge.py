@@ -134,13 +134,22 @@ That distinction matters: measured 2026-09-28 over 30 days, the production edge
 saw ~37.6k 429s on courses.learn.mit.edu, ~10.6k on lms.mitx.mit.edu, 6 on
 courses.xpro and 4 on api.learn, every one of them `response_source="upstream"`
 (edxapp and Django throttling). Gateway-sourced 429s were zero on every host.
-So the baseline is zero, any firing is a limit plugin rejecting traffic, and the
-rule covers any host that later gets a limit plugin without an edit here.
+So the baseline is zero and any firing is a limit plugin rejecting traffic.
+That holds for any host that later gets a limit plugin, with one condition:
+limit-req and limit-conn default `rejected_code` to 503, and #4759 overrides it
+to 429. A limit plugin configured some other way shows up as
+`code="503", response_source="apisix"` and counts toward the 5xx rules above
+instead of this one.
 
-`increase > 0` over 10m confirmed for 5m, rather than a rate threshold, because
-the limit has ~30x headroom over measured per-browser peaks (pf-api-learn-rate-
-limiting-excludes-next-js-ssr-onl-e6495e): a legitimate client should never
-reach it, and a scraper that does is still worth a human look at who it is.
+It fires on any rejection rather than a rate, and with no pending period,
+because a legitimate client should never reach the limit. #4759 sized it at
+~10x the busiest single browser IP over 30 days (~5 req/s against 50), so a
+client that trips it is worth a human look at who it is. `increase()` alone
+would miss that first rejection: each (pod, route, host) series only exists
+once a pod has rejected something, it appears already at 1, and `increase()`
+needs two samples. The limits are per pod across the APISIX replicas, so a
+short burst is often exactly one rejection per pod. The `unless ... offset`
+clause catches those new series.
 
 The metric has no client label, and "which client" is the first question.
 Answer it from the access log, where a gateway rejection has `upstream_status=-`:
@@ -196,10 +205,11 @@ def _error_ratio_expr(window: str, threshold: str) -> str:
 
 # Gateway-produced 429s per host and route. Upstream 429s (app throttling) are
 # excluded by `response_source`; see the module docstring.
+_GATEWAY_429 = 'apisix_http_status{code="429", response_source="apisix"}'
 _RATE_LIMITED_EXPR = (
-    "sum by (matched_host, route) ("
-    'increase(apisix_http_status{code="429", response_source="apisix"}[10m])'
-    ") > 0"
+    f"sum by (matched_host, route) (increase({_GATEWAY_429}[10m])) > 0"
+    " or "
+    f"count by (matched_host, route) ({_GATEWAY_429} unless {_GATEWAY_429} offset 10m)"
 )
 
 
@@ -265,13 +275,14 @@ def create(
             alerting.RuleGroupRuleArgs(
                 name="APISIXEdgeRateLimited",
                 condition="C",
-                for_="5m",
+                # Any rejection is the signal; see the module docstring.
+                for_="0s",
                 no_data_state="OK",
                 exec_err_state="OK",
                 labels={"severity": "warning", **routing},
                 annotations={
                     "summary": "APISIX is rate limiting clients on {{ $labels.matched_host }}",
-                    "description": 'The APISIX gateway itself returned 429 to requests for {{ $labels.matched_host }} (route {{ $labels.route }}) over the last 10 minutes. Normal browser traffic sits ~30x below the limit, so either one client is misbehaving or the limit is catching legitimate traffic. Find the client in the APISIX access log: gateway rejections have status=429 and upstream_status=-, e.g. {service_name="apache-apisix"} |= `status=429` | logfmt | status="429" | upstream_status="-" | host="{{ $labels.matched_host }}", then group by remote_addr.',
+                    "description": 'The APISIX gateway itself returned 429 to requests for {{ $labels.matched_host }} (route {{ $labels.route }}) over the last 10 minutes. The limit sits ~10x above the busiest browser seen over 30 days, so either one client is misbehaving or the limit is catching legitimate traffic. Find the client in the APISIX access log: gateway rejections have status=429 and upstream_status=-, e.g. {service_name="apache-apisix"} |= `status=429` | logfmt | status="429" | upstream_status="-" | host="{{ $labels.matched_host }}", then group by remote_addr.',
                 },
                 datas=rd(_RATE_LIMITED_EXPR),
             ),
