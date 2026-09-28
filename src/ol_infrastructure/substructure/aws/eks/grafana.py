@@ -413,6 +413,35 @@ def setup_grafana(
                                     },
                                 },
                             },
+                            # APISIX 3.18's access phase (verify_https_client
+                            # in apisix/init.lua) re-runs the SNI router with
+                            # the Host header, and radixtree_sni.lua marks the
+                            # sni_radixtree_match span ERROR on a miss even
+                            # though its own comment calls that miss expected.
+                            # Behind Fastly the lookup misses: the ApisixTls
+                            # certs cover the backend_* origin names Fastly
+                            # sends as SNI, not the public Host. That put an
+                            # ERROR span in nearly every APISIX trace, so
+                            # keep-errors sampled 86-87% of residential-production
+                            # traces and 20-24% of applications-production's
+                            # (count_traces_sampled, 2026-09-28).
+                            #
+                            # The miss is harmless there: verify_https_client
+                            # returns true and the request proceeds. It is also
+                            # the only source of this span in Tempo, because the
+                            # TLS handshake's own lookup (ssl_client_hello_phase)
+                            # calls tracer.release() and is never exported, and
+                            # nothing here uses the stream proxy. So resetting
+                            # it hides no failure. This runs on the receiver,
+                            # ahead of the loadbalancing hop to the sampler.
+                            "transform": {
+                                "traces": {
+                                    "span": [
+                                        'set(span.status.code, STATUS_CODE_UNSET) where resource.attributes["service.name"] == "apisix" and span.name == "sni_radixtree_match" and span.status.message == "failed match SNI"',
+                                        'set(span.status.message, "") where resource.attributes["service.name"] == "apisix" and span.name == "sni_radixtree_match" and span.status.code == STATUS_CODE_UNSET',
+                                    ],
+                                },
+                            },
                             # Traefik's tracing.otlp exporter (see traefik.py)
                             # runs with traceVerbosity: detailed on the
                             # websecure entrypoint, which spans every internal
