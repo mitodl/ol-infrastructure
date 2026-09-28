@@ -285,10 +285,17 @@ In dependency order:
 - Keycloak. Same operator version and CR apiVersion. Parametrize
   `create_olapps_realm` so the local realm is the deployed realm with Mailpit
   SMTP and local hostnames, and retire `local-dev/infra/modules/keycloak.py`.
-  Whether Keycloak moves behind Traefik locally to match deployed is an open
-  question below.
+  Decided 2026-09-28: Keycloak stays behind APISIX locally, served over HTTPS
+  with a certificate from the CA issuer. Deployed Keycloak is behind Traefik,
+  but running Traefik locally for one service costs more than it buys; what
+  applications see (an HTTPS issuer URL on the Keycloak hostname) matches.
 - Postgres, Valkey, OpenSearch. Pin to the deployed versions. Enable TLS and
   auth on Valkey and the security plugin on OpenSearch.
+- Object storage. Decided 2026-09-28: RustFS, already installed for
+  ocw-studio, becomes the `object-storage` capability. Each app stack that
+  uses S3 when deployed (mit-learn, mitxonline, odl-video-service,
+  ocw-studio) creates its own bucket and a static key Secret, and its
+  bindings carry the RustFS endpoint.
 
 ### 5. Composition
 
@@ -422,34 +429,38 @@ program.
    realm, data service versions and TLS.
 5. Catalog, per-app stacks, profiles.
 6. Remaining apps: learn-ai, mit-learn, odl-video-service, ocw-studio.
-7. mit-learn-nextjs and Open edX, which need their own decisions (below).
+7. mit-learn-nextjs and Open edX (see "Decisions" below).
 
 Steps 2 and 4 do not depend on step 3 and can run in parallel with it.
 
-## Open questions
+## Decisions
 
-- Keycloak ingress. Deployed Keycloak sits behind Traefik, not APISIX.
-  Matching that means running Traefik locally for one service (two once
-  mit-learn-nextjs is included).
-- mit-learn-nextjs. Its deployed definition is a raw Deployment. Either it
-  moves onto `OLApplicationK8s` (a Deployment rename in production, and the
-  component needs per-key secret env and a configurable `PORT`), or its env
-  construction is extracted and shared while the workload stays separate.
-- Open edX. Local manifests belong to lehrer. Generating them from
-  `OLApplicationK8s` replaces lehrer's manifests, and the deployed edxapp
-  celery workers are outside the component. This needs a decision with the
-  lehrer maintainers.
-- Object storage for mit-learn, mitxonline and odl-video-service. All three
-  use S3 when deployed and nothing locally.
-- A fidelity profile that installs metrics-server, KEDA, and the Prometheus
-  operator CRDs, for testing autoscaling and scrape configuration before RC.
+Made by the devops lead on 2026-09-28, in addition to those recorded inline
+above (secrets as data, celery topology, Tilt Option 1 pending the pilot).
+
+- Keycloak ingress. Behind APISIX over HTTPS locally, not Traefik. See
+  "Platform layer" above.
+- mit-learn-nextjs. Its env construction is extracted into a definition
+  module that the deployed program and the local program both call. The
+  workload stays a raw Deployment, so production is not renamed and the
+  component does not need per-key secret env or a configurable `PORT`.
+- Open edX. In scope. We maintain lehrer, and the lehrer side is tracked in
+  the "lehrer: local-dev DX and repo hygiene" project. The existing boundary
+  holds: lehrer owns build definitions, ol-infrastructure owns deployment
+  topology. The deployed edxapp celery workers are outside `OLApplicationK8s`,
+  so the edxapp definition module covers both the component and those
+  workers.
+- Object storage. RustFS with a bucket per app. See "Platform layer" above.
+- Autoscaling. KEDA is out of scope for local-dev, so there is no fidelity
+  profile. Autoscaling and scrape configuration are tested in RC.
 
 ## Found along the way
 
 Not part of this work. Each needs its own check before acting on it.
 
 - `mit_learn/Pulumi.QA.yaml:46` sets `mit_learn:min_replicas`; the program
-  reads the `mitlearn` namespace, so QA falls back to 2.
+  reads the `mitlearn` namespace (`mit_learn/__main__.py:2013`), so QA falls
+  back to 2. Confirmed in code on 2026-09-28; Production uses the right key.
 - odl_video_service's broker URL uses Redis database 0
   (`odl_video_service/k8s_secrets.py:168`) while its KEDA trigger reads the
   worker config default, database 1. Read from code, not observed.
