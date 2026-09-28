@@ -73,6 +73,7 @@ dev = [
   "PyGithub>=2.4,<3",
   "pytest>=9.0.1,<10",
   "pytest-asyncio>=0.24.0",
+  "pytest-cov>=6.0.0",
   "pytest-testinfra>=10.0.0,<11",
   "ruff>=0.12,<1",
   "types-boto3>=1.42.65",
