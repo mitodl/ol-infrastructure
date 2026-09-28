@@ -341,6 +341,46 @@ def setup_grafana(
                                         "threshold_ms": 5000,
                                     },
                                     {
+                                        # Keep every trace that touches one of
+                                        # these low-volume first-party services.
+                                        # At 15% they sample into invisibility:
+                                        # ol-analytics-api sees ~10 requests a
+                                        # day, so "broken" and "quiet" look the
+                                        # same in Tempo.
+                                        #
+                                        # Non-inverted on purpose.  The
+                                        # processor ORs a non-inverted match
+                                        # across every resource in the trace
+                                        # (hasResourceOrSpanWithCondition), so a
+                                        # trace through APISIX into one of these
+                                        # is kept.  invert_match ANDs instead,
+                                        # and since APISIX fronts nearly every
+                                        # request an inverted exclusion list
+                                        # almost never fires.
+                                        #
+                                        # The cost is that a new low-volume
+                                        # service is sampled at 15% until it is
+                                        # added here.  Keeping these whole adds
+                                        # ~1% to exported spans (spanmetrics, 7d
+                                        # to 2026-09-28: ~1.7M kept at 15% vs
+                                        # ~1.5B exported in total).
+                                        #
+                                        # Regexes are unanchored in the
+                                        # processor, hence ^...$.
+                                        "name": "keep-low-volume-services",
+                                        "type": "string_attribute",
+                                        "key": "service.name",
+                                        "enabled_regex_matching": True,
+                                        "values": [
+                                            "^ol-analytics-api$",
+                                            "^learn-ai-webapp$",
+                                            "^ocw-studio-webapp$",
+                                            "^ovs-webapp$",
+                                            f"^{stack_info.env_suffix}-witan$",
+                                            f"^{stack_info.env_suffix}-toolhive-.+$",
+                                        ],
+                                    },
+                                    {
                                         "name": "sample-15pct-traces",
                                         "type": "probabilistic",
                                         "sampling_percentage": 15,
