@@ -18,30 +18,35 @@ every Deployment, it maps to OTel service names one-to-many (edxapp alone is
 lms, cms, their celery workers and beat), so the join would need its own
 maintained mapping.
 
-So this fires on a regression instead: a service with SERVER spans in the two
-days ending 24h ago and none in the last 24h. It cannot catch a service that
+So this fires on a regression instead: a service with SERVER spans in the 24h
+before the last 24h and none since. It cannot catch a service that
 has never emitted (the ol-analytics-api case). It does catch an exporter,
 collector, or instrumentation change that silences a service that used to
 work, and a service leaving the keep-list and sampling into invisibility.
 
 Why SERVER spans, and why 24h
 ------------------------------
-Measured 2026-09-28 against 7 days of traces_spanmetrics_calls_total:
+Measured 2026-09-28 over 6 days of hourly evaluations (144) of
+traces_spanmetrics_calls_total:
 
   - Without a span_kind filter, the same expression would have fired for
     four celery workers (mitx-staging cms/lms-celery, both lms-high-mem-celery
-    queues), for up to 96 of 144 hourly evaluations. Those workers are
+    queues), for up to 96 of the 144 evaluations. Those workers are
     event-driven and go days without a task.
   - Restricted to SPAN_KIND_SERVER it fired zero times in production and QA.
-    The quietest request-serving services had a 24h minimum of about 2
-    server spans (the ToolHive vMCP tier, in both stacks); every other one
-    was in the hundreds or more.
+    The quietest request-serving service over the 7 days to 2026-09-28 had a
+    24h minimum of about 2 server spans (the ToolHive vMCP tier, in both
+    stacks), so one idle day there will fire it; every other one was in the
+    hundreds or more.
   - At 12h, production-witan's SERVER spans reached zero, so the window
     can't be shorter without per-service thresholds.
 
-A deliberately removed service fires until its last span falls out of the
-2-day baseline, i.e. for about a day. That is the cost of not maintaining an
-allowlist.
+A deliberately removed service starts firing 24h after its last span and
+resolves 24h later, when that span leaves the baseline window. That is the
+cost of not maintaining an allowlist.
+
+Aggregated by service, not cluster: a service silent in one cluster but
+still emitting in another is not caught.
 
 The sampler rules
 -----------------
@@ -53,8 +58,9 @@ was 7,284 on data-production. The warning sits at 25,000, half of
 `numTraces`, so there is room to resize before loss starts. Keep it in step
 if `numTraces` changes.
 
-`sampling_trace_dropped_too_early_total` counts that loss directly. It was 0
-on every production cluster over the same 7 days, so any increase is new.
+`sampling_trace_dropped_too_early_total` counts that loss directly. Its series
+was present and flat at 0 on every production cluster over the same 7 days, so
+any increase is new.
 
 Routing
 -------
@@ -79,7 +85,7 @@ _ROUTING = {"channel": "devops-warnings"}
 
 _SILENT_SERVICE_EXPR = (
     "label_replace("
-    f"(sum by (service) (increase({_CALLS}[2d] offset 1d)) > 0)"
+    f"(sum by (service) (increase({_CALLS}[1d] offset 1d)) > 0)"
     " unless on (service) "
     f"(sum by (service) (increase({_CALLS}[1d])) > 0)"
     ', "service_name", "$1", "service", "(.+)")'
@@ -96,7 +102,7 @@ def create(
         "otel-trace-pipeline",
         name="otel-trace-pipeline",
         folder_uid=folder_uid,
-        interval_seconds=300,
+        interval_seconds=900,
         rules=[
             alerting.RuleGroupRuleArgs(
                 name="TempoServiceSilent",
@@ -107,7 +113,7 @@ def create(
                 labels={"severity": "warning", **_ROUTING},
                 annotations={
                     "summary": "{{ $labels.service_name }} has sent no server spans to Tempo for 24h",
-                    "description": "{{ $labels.service_name }} produced SERVER spans in the two days before the last 24h and none since. Either it stopped serving requests or its trace export broke (exporter config, collector, instrumentation). A service that was removed on purpose fires for about a day and then resolves.",
+                    "description": "{{ $labels.service_name }} produced SERVER spans in the 24h before the last 24h and none since. Either it stopped serving requests or its trace export broke (exporter config, collector, instrumentation). A service that was removed on purpose fires for a day and then resolves.",
                 },
                 datas=rd(_SILENT_SERVICE_EXPR),
             ),
@@ -141,7 +147,7 @@ def create(
             alerting.RuleGroupRuleArgs(
                 name="TailSamplerDroppingTraces",
                 condition="C",
-                for_="0s",
+                for_="0m",
                 no_data_state="OK",
                 exec_err_state="OK",
                 labels={"severity": "warning", **_ROUTING},
