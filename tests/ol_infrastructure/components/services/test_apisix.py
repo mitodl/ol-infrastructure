@@ -1207,31 +1207,68 @@ def _local_names_for(tree):
     return names
 
 
-def _application_name_of(call):
-    """Return the ``application_name`` literal of a call, or None.
+def _string_constants(tree):
+    """Map each name bound exactly once, to a string literal, in this module.
 
-    None whenever it is not a plain string literal, so such a call is never
-    grouped with any other.
+    A name that is also assigned anything else (or a different literal) is left
+    out, so a lookup never resolves to a value the name might not hold.
+    """
+    bindings: dict[str, list[object]] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        value = (
+            node.value.value
+            if isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+            else object()
+        )
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                bindings.setdefault(target.id, []).append(value)
+    return {
+        name: values[0]
+        for name, values in bindings.items()
+        if len(values) == 1 and isinstance(values[0], str)
+    }
+
+
+def _application_name_of(call, module_key, constants):
+    """Return the host key of an OLApisixSharedPlugins call, or None.
+
+    A string literal, or a name bound once to one, is the application name.
+    Any other expression (``base_name`` read from stack config, say) cannot be
+    evaluated statically, so it is keyed by its source text within the module:
+    two hand-written configs off the same expression still collide, and it
+    never collides with another module's.
+
+    None means ``plugin_config`` is not an inline constructor call carrying an
+    ``application_name``, so there is nothing to key on.
     """
     for keyword in call.keywords:
         if keyword.arg != "plugin_config" or not isinstance(keyword.value, ast.Call):
             continue
         for inner in keyword.value.keywords:
-            if inner.arg == "application_name" and isinstance(
-                inner.value, ast.Constant
-            ):
-                return inner.value.value
+            if inner.arg != "application_name":
+                continue
+            value = inner.value
+            if isinstance(value, ast.Constant):
+                return value.value
+            if isinstance(value, ast.Name) and value.id in constants:
+                return constants[value.id]
+            return f"{module_key}::{ast.unparse(value)}"
     return None
 
 
-def _shared_plugin_call_hosts(tree):
-    """Yield the application_name of each OLApisixSharedPlugins call.
+def _shared_plugin_calls(tree, module_key):
+    """Yield ``(lineno, host key)`` for each OLApisixSharedPlugins call.
 
     Counts attribute-style calls (``apisix.OLApisixSharedPlugins(...)``) and
     aliased imports as well as bare ones, so neither spelling slips past the
     check below.
     """
     local_names = _local_names_for(tree)
+    constants = _string_constants(tree)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
@@ -1239,7 +1276,7 @@ def _shared_plugin_call_hosts(tree):
         if (isinstance(func, ast.Name) and func.id in local_names) or (
             isinstance(func, ast.Attribute) and func.attr == SHARED_PLUGINS_CLASS
         ):
-            yield _application_name_of(node)
+            yield node.lineno, _application_name_of(node, module_key, constants)
 
 
 def test_no_application_hand_writes_two_shared_plugin_configs():
@@ -1259,15 +1296,19 @@ def test_no_application_hand_writes_two_shared_plugin_configs():
     modules = sorted(applications.rglob("*.py"))
     hosts: collections.Counter[str] = collections.Counter()
     unparsed = {}
+    unkeyed = []
     for module in modules:
+        module_key = str(module.relative_to(applications))
         try:
             tree = ast.parse(module.read_text(encoding="utf-8"))
         except (SyntaxError, UnicodeDecodeError) as exc:
-            unparsed[str(module.relative_to(applications))] = str(exc)
+            unparsed[module_key] = str(exc)
             continue
-        hosts.update(
-            host for host in _shared_plugin_call_hosts(tree) if host is not None
-        )
+        for lineno, host in _shared_plugin_calls(tree, module_key):
+            if host is None:
+                unkeyed.append(f"{module_key}:{lineno}")
+            else:
+                hosts[host] += 1
 
     # Without these the test passes by scanning nothing -- a moved test file
     # (parents[4] no longer resolving) or a renamed class would leave it
@@ -1275,6 +1316,12 @@ def test_no_application_hand_writes_two_shared_plugin_configs():
     assert modules, f"scanned no application modules under {applications}"
     assert hosts, f"found no {SHARED_PLUGINS_CLASS} calls under {applications}"
     assert not unparsed, f"could not parse: {unparsed}"
+    assert not unkeyed, (
+        f"{SHARED_PLUGINS_CLASS} calls with no inline "
+        f"plugin_config=OLApisixSharedPluginsConfig(application_name=...), which "
+        f"this check cannot key by host: {unkeyed}. Pass the config inline, or "
+        "teach _application_name_of to resolve the new shape."
+    )
 
     offenders = {host: count for host, count in hosts.items() if count > 1}
     assert not offenders, (
