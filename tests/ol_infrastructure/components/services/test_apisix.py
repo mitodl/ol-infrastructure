@@ -16,9 +16,12 @@ This module verifies:
 
 from __future__ import annotations
 
+import ast
 import asyncio
+import collections
 from contextlib import contextmanager
 from dataclasses import replace
+from pathlib import Path
 
 import pulumi
 
@@ -53,10 +56,12 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixOIDCResources,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    OLApisixSharedPluginsVariant,
     OLApisixUpstream,
     OLApisixUpstreamConfig,
     identity_header_strip_plugin,
     oidc_gateway_pre_function_plugin,
+    ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
 )
 
@@ -1017,3 +1022,339 @@ def test_rate_limit_burst_fields_reject_negative(field):
             k8s_namespace="myapp-ns",
             **{field: -1},
         )
+
+
+# ─── Shared plugin variants ─────────────────────────────────────────────────────
+
+
+def learn_shaped_variants():
+    """Two variants on one host, shaped like api.learn.mit.edu's."""
+    return ol_apisix_shared_plugins_variants(
+        plugin_config=OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+            plugins=[oidc_gateway_pre_function_plugin()],
+        ),
+        variants=[
+            OLApisixSharedPluginsVariant(
+                name="test-variants-base",
+                resource_suffix="ol-shared-plugins",
+            ),
+            OLApisixSharedPluginsVariant(
+                name="test-variants-browser",
+                resource_suffix="ol-browser-shared-plugins",
+                enable_rate_limiting=True,
+            ),
+        ],
+    )
+
+
+@pulumi.runtime.test
+def test_variants_render_the_same_plugins_apart_from_rate_limiting():
+    """The whole point of the factory. Two hand-written configs on one host
+    diverge silently -- a plugin on only one of them changes behaviour by
+    request Origin, and it has shipped that way twice on api.learn. Rate
+    limiting is the one difference a variant is allowed to carry.
+    """
+    variants = learn_shaped_variants()
+    rate_limit_plugins = {"limit-conn", "limit-req"}
+
+    def check(specs):
+        base, browser = specs
+        base_names = [plugin["name"] for plugin in base["plugins"]]
+        browser_names = [
+            plugin["name"]
+            for plugin in browser["plugins"]
+            if plugin["name"] not in rate_limit_plugins
+        ]
+        assert base_names, "nothing was compared"
+        assert base_names == browser_names
+        assert rate_limit_plugins.isdisjoint(base_names)
+        assert rate_limit_plugins.issubset(
+            {plugin["name"] for plugin in browser["plugins"]}
+        )
+
+    return pulumi.Output.all(
+        variants["ol-shared-plugins"].shared_plugin_apisix_pluginconfig_resource.spec,
+        variants[
+            "ol-browser-shared-plugins"
+        ].shared_plugin_apisix_pluginconfig_resource.spec,
+    ).apply(check)
+
+
+@pulumi.runtime.test
+def test_variants_render_the_same_plugins_on_gateway_api_pluginconfig():
+    """The v1alpha1 PluginConfig is built by its own comprehension, so it needs
+    its own assertion rather than inheriting the v2 one.
+    """
+    variants = learn_shaped_variants()
+
+    rate_limit_plugins = {"limit-conn", "limit-req"}
+
+    def check(specs):
+        base, browser = specs
+        base_names = [plugin["name"] for plugin in base["plugins"]]
+        browser_names = [
+            plugin["name"]
+            for plugin in browser["plugins"]
+            if plugin["name"] not in rate_limit_plugins
+        ]
+        assert base_names, "nothing was compared"
+        assert base_names == browser_names
+        # Without these the filter above turns into a no-op the moment the
+        # v1alpha1 comprehension stops emitting the rate-limit plugins, and
+        # this test stays green while every Gateway API browser route loses
+        # its rate limiting.
+        assert rate_limit_plugins.isdisjoint(base_names)
+        assert rate_limit_plugins.issubset(
+            {plugin["name"] for plugin in browser["plugins"]}
+        )
+
+    return pulumi.Output.all(
+        variants["ol-shared-plugins"].shared_plugin_pluginconfig_resource.spec,
+        variants["ol-browser-shared-plugins"].shared_plugin_pluginconfig_resource.spec,
+    ).apply(check)
+
+
+def test_variants_keep_distinct_crd_names():
+    """Routes reference a variant by the CRD metadata.name that
+    resource_suffix produces, so the suffix has to reach the component.
+    """
+    variants = learn_shaped_variants()
+    assert variants["ol-shared-plugins"].resource_name == "myapp-ol-shared-plugins"
+    assert (
+        variants["ol-browser-shared-plugins"].resource_name
+        == "myapp-ol-browser-shared-plugins"
+    )
+
+
+def test_variants_reject_a_duplicate_resource_suffix():
+    """Both CRDs would be created under one metadata.name and the second would
+    win, which is a silent swap of a host's plugin list.
+    """
+    with pytest.raises(ValueError, match="distinct resource_suffix"):
+        ol_apisix_shared_plugins_variants(
+            plugin_config=OLApisixSharedPluginsConfig(
+                application_name="myapp",
+                k8s_namespace="myapp-ns",
+            ),
+            variants=[
+                OLApisixSharedPluginsVariant(
+                    name="test-variants-dupe-a", resource_suffix="same"
+                ),
+                OLApisixSharedPluginsVariant(
+                    name="test-variants-dupe-b", resource_suffix="same"
+                ),
+            ],
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "enable_rate_limiting",
+        "resource_suffix",
+    ],
+)
+def test_variants_reject_per_variant_fields_on_the_shared_config(field):
+    """Converting a single-config application to the factory means moving
+    these onto a variant. Left behind on the shared config they would be
+    silently discarded, which for enable_rate_limiting means dropping rate
+    limiting from every route on the host with nothing to show for it.
+    """
+    values = {"enable_rate_limiting": True, "resource_suffix": "ol-shared-plugins"}
+    with pytest.raises(ValueError, match="belong to a variant"):
+        ol_apisix_shared_plugins_variants(
+            plugin_config=OLApisixSharedPluginsConfig(
+                application_name="myapp",
+                k8s_namespace="myapp-ns",
+                **{field: values[field]},
+            ),
+            variants=[
+                OLApisixSharedPluginsVariant(
+                    name="test-variants-misplaced",
+                    resource_suffix="ol-shared-plugins",
+                ),
+            ],
+        )
+
+
+def test_variant_cannot_carry_its_own_plugin_list():
+    """``extra="forbid"`` is what makes the shared list structural: a
+    per-variant ``plugins`` is an error rather than a silently ignored field.
+    """
+    with pytest.raises(ValidationError):
+        OLApisixSharedPluginsVariant(
+            name="test-variant-own-plugins",
+            resource_suffix="ol-shared-plugins",
+            plugins=[oidc_gateway_pre_function_plugin()],
+        )
+
+
+SHARED_PLUGINS_CLASS = "OLApisixSharedPlugins"
+SHARED_PLUGINS_FACTORY = "ol_apisix_shared_plugins_variants"
+
+
+def _local_names_for(tree, target):
+    """Return every name ``target`` is bound to in this module."""
+    names = {target}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            names.update(
+                alias.asname
+                for alias in node.names
+                if alias.name == target and alias.asname
+            )
+    return names
+
+
+def _string_constants(tree):
+    """Map each name bound exactly once, to a string literal, in this module.
+
+    A name that is also assigned anything else (or a different literal) is left
+    out, so a lookup never resolves to a value the name might not hold.
+    """
+    bindings: dict[str, list[object]] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        value = (
+            node.value.value
+            if isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+            else object()
+        )
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                bindings.setdefault(target.id, []).append(value)
+    return {
+        name: values[0]
+        for name, values in bindings.items()
+        if len(values) == 1 and isinstance(values[0], str)
+    }
+
+
+def _application_name_of(call, module_key, constants):
+    """Return the host key of an OLApisixSharedPlugins call, or None.
+
+    A string literal, or a name bound once to one, is the application name.
+    Any other expression (``base_name`` read from stack config, say) cannot be
+    evaluated statically, so it is keyed by its source text within the module:
+    two hand-written configs off the same expression still collide, and it
+    never collides with another module's.
+
+    None means ``plugin_config`` is not an inline constructor call carrying an
+    ``application_name``, so there is nothing to key on.
+    """
+    for keyword in call.keywords:
+        if keyword.arg != "plugin_config" or not isinstance(keyword.value, ast.Call):
+            continue
+        for inner in keyword.value.keywords:
+            if inner.arg != "application_name":
+                continue
+            value = inner.value
+            if isinstance(value, ast.Constant):
+                return value.value
+            if isinstance(value, ast.Name) and value.id in constants:
+                return constants[value.id]
+            return f"{module_key}::{ast.unparse(value)}"
+    return None
+
+
+def _shared_plugin_calls(tree, module_key):
+    """Yield ``(lineno, kind, host key)`` for each relevant call.
+
+    ``kind`` is ``"direct"`` for a bare ``OLApisixSharedPlugins(...)``
+    construction and ``"factory"`` for one routed through
+    ``ol_apisix_shared_plugins_variants``, which renders several configs off
+    one shared plugin list and so is not itself a "more than one" violation
+    below. Counts attribute-style calls (``apisix.OLApisixSharedPlugins(...)``)
+    and aliased imports as well as bare ones, so neither spelling slips past
+    the check below.
+    """
+    direct_names = _local_names_for(tree, SHARED_PLUGINS_CLASS)
+    factory_names = _local_names_for(tree, SHARED_PLUGINS_FACTORY)
+    constants = _string_constants(tree)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if (isinstance(func, ast.Name) and func.id in direct_names) or (
+            isinstance(func, ast.Attribute) and func.attr == SHARED_PLUGINS_CLASS
+        ):
+            kind = "direct"
+        elif (isinstance(func, ast.Name) and func.id in factory_names) or (
+            isinstance(func, ast.Attribute) and func.attr == SHARED_PLUGINS_FACTORY
+        ):
+            kind = "factory"
+        else:
+            continue
+        yield node.lineno, kind, _application_name_of(node, module_key, constants)
+
+
+def test_no_application_hand_writes_two_shared_plugin_configs():
+    """A host that needs a second shared plugin config has to go through
+    ol_apisix_shared_plugins_variants, so the plugin list is shared by
+    construction. Two configs built by hand for one application is the shape
+    that drifted twice on api.learn, and the component tests above cannot see
+    it because they only ever exercise one config at a time.
+
+    A host already on the factory is not exempt from this: a single manual
+    OLApisixSharedPlugins call added alongside it has a count of one, which is
+    exactly the "safe" count for a host with no factory call at all -- the
+    check below has to know which hosts are on the factory to tell those two
+    apart.
+
+    Grouped by ``application_name`` across the whole tree rather than per file:
+    the invariant is one plugin list per host, so two configs for two different
+    applications are fine wherever they live (edxapp and meilisearch are that
+    case today), and splitting one host's two configs into sibling modules is
+    not a way out.
+    """
+    applications = Path(__file__).parents[4] / "src/ol_infrastructure/applications"
+    modules = sorted(applications.rglob("*.py"))
+    direct_hosts: collections.Counter[str] = collections.Counter()
+    factory_hosts: collections.Counter[str] = collections.Counter()
+    unparsed = {}
+    unkeyed = []
+    for module in modules:
+        module_key = str(module.relative_to(applications))
+        try:
+            tree = ast.parse(module.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError) as exc:
+            unparsed[module_key] = str(exc)
+            continue
+        for lineno, kind, host in _shared_plugin_calls(tree, module_key):
+            if host is None:
+                unkeyed.append(f"{module_key}:{lineno}")
+                continue
+            (factory_hosts if kind == "factory" else direct_hosts)[host] += 1
+
+    # Without these the test passes by scanning nothing -- a moved test file
+    # (parents[4] no longer resolving) or a renamed class would leave it
+    # permanently green, and it is the only guard behind the invariant.
+    assert modules, f"scanned no application modules under {applications}"
+    assert direct_hosts or factory_hosts, (
+        f"found no {SHARED_PLUGINS_CLASS}/{SHARED_PLUGINS_FACTORY} calls under "
+        f"{applications}"
+    )
+    assert not unparsed, f"could not parse: {unparsed}"
+    assert not unkeyed, (
+        f"{SHARED_PLUGINS_CLASS}/{SHARED_PLUGINS_FACTORY} calls with no inline "
+        f"plugin_config=OLApisixSharedPluginsConfig(application_name=...), which "
+        f"this check cannot key by host: {unkeyed}. Pass the config inline, or "
+        "teach _application_name_of to resolve the new shape."
+    )
+
+    offenders = {}
+    for host in direct_hosts.keys() | factory_hosts.keys():
+        direct, factory = direct_hosts[host], factory_hosts[host]
+        if factory > 1 or (factory and direct) or (not factory and direct > 1):
+            offenders[host] = {"direct": direct, "factory": factory}
+    assert not offenders, (
+        "These applications build more than one shared plugin list for the "
+        f"same host: {offenders} (counts are direct OLApisixSharedPlugins "
+        "calls vs. ol_apisix_shared_plugins_variants calls). Route every "
+        "config for a host through one ol_apisix_shared_plugins_variants "
+        "call instead."
+    )
