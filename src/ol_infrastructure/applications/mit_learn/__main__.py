@@ -1764,7 +1764,12 @@ learn_external_service_browser_shared_plugins = OLApisixSharedPlugins(
             # request without an Origin header gets recovered.
             oidc_gateway_pre_function_plugin(),
         ],
-        enable_rate_limiting=True,
+        # CI/QA soak before Production, same rollout shape as enable_gzip's
+        # own soak: the thresholds above are sized from 30d of
+        # api.learn.mit.edu traffic, not from measured Production request
+        # volume under load. Flip to unconditional True once that's
+        # confirmed; #5562 tracks the SSR-side limiter this doesn't cover.
+        enable_rate_limiting=stack_info.env_suffix != "production",
     ),
 )
 
