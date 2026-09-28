@@ -75,6 +75,36 @@ def create_default_asg():
     return OLAutoScaling(asg_config=asg_config, lt_config=lt_config)
 
 
+def create_imdsv1_opt_out_asg():
+    """Create an ASG that explicitly opts back down to IMDSv1 for testing."""
+    mock_sg_id = pulumi.Output.from_input("sg-12345678")
+    lt_config = OLLaunchTemplateConfig(
+        block_device_mappings=[BlockDeviceMapping(volume_size=25, encrypted=False)],
+        image_id="ami-12345678",
+        instance_profile_arn="arn:aws:iam::123456789012:instance-profile/test",
+        instance_type="t3.medium",
+        security_groups=[mock_sg_id],
+        tag_specifications=[
+            TagSpecification(
+                resource_type="instance",
+                tags={"Name": "test-instance", "Environment": "test"},
+            )
+        ],
+        user_data=None,
+        tags={"Name": "test-lt", "OU": "operations", "Environment": "test"},
+        http_tokens="optional",
+    )
+    asg_config = OLAutoScaleGroupConfig(
+        asg_name="test-imdsv1-asg",
+        desired_size=2,
+        min_size=1,
+        max_size=3,
+        vpc_zone_identifiers=pulumi.Output.from_input(["subnet-1", "subnet-2"]),
+        tags={"Name": "test-asg", "OU": "operations", "Environment": "test"},
+    )
+    return OLAutoScaling(asg_config=asg_config, lt_config=lt_config)
+
+
 def create_spot_asg():
     """Create spot instance ASG for testing."""
     mock_sg_id = pulumi.Output.from_input("sg-12345678")
@@ -191,6 +221,64 @@ def create_spot_asg_with_lb():
 
 
 # Unit tests using @pulumi.runtime.test decorator
+@pulumi.runtime.test
+def test_launch_template_requires_imdsv2_by_default():
+    """Verify launch templates require IMDSv2 unless told otherwise.
+
+    A regression here silently re-opens the IMDSv1 SSRF-to-credentials path on
+    every ASG-launched instance, so assert the whole metadata block rather than
+    just http_tokens. See https://github.com/mitodl/ol-infrastructure/issues/1745
+    """
+    asg = create_default_asg()
+
+    def check_imdsv2_required(args):
+        urn, metadata_options = args
+        assert metadata_options is not None, (
+            f"Launch template {urn} should configure metadata options"
+        )
+        assert metadata_options.get("http_tokens") == "required", (
+            f"Launch template {urn} should require IMDSv2 by default, got "
+            f"{metadata_options.get('http_tokens')!r}"
+        )
+        assert metadata_options.get("http_endpoint") == "enabled", (
+            f"Launch template {urn} should keep the metadata endpoint enabled"
+        )
+        # Containerized workloads reach IMDS through a bridge, which costs a hop.
+        assert metadata_options.get("http_put_response_hop_limit") == 5, (
+            f"Launch template {urn} should allow multiple hops for IMDSv2"
+        )
+
+    return pulumi.Output.all(
+        asg.launch_template.urn,
+        asg.launch_template.metadata_options,
+    ).apply(check_imdsv2_required)
+
+
+@pulumi.runtime.test
+def test_launch_template_honors_imdsv1_opt_out():
+    """Verify a launch template can still opt down to IMDSv1 when required.
+
+    The Concourse workers depend on this while the OCW pipelines' s3-resource
+    image cannot send an IMDSv2 token.
+    """
+    asg = create_imdsv1_opt_out_asg()
+
+    def check_imdsv1_allowed(args):
+        urn, metadata_options = args
+        assert metadata_options is not None, (
+            f"Launch template {urn} should configure metadata options"
+        )
+        assert metadata_options.get("http_tokens") == "optional", (
+            f"Launch template {urn} should honor the IMDSv1 opt-out, got "
+            f"{metadata_options.get('http_tokens')!r}"
+        )
+
+    return pulumi.Output.all(
+        asg.launch_template.urn,
+        asg.launch_template.metadata_options,
+    ).apply(check_imdsv1_allowed)
+
+
 @pulumi.runtime.test
 def test_default_launch_template_no_spot_instances():
     """Verify default launch template does not configure spot instances."""
