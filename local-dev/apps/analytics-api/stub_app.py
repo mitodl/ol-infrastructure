@@ -490,6 +490,15 @@ class Handler(BaseHTTPRequestHandler):
 
         total_count = len(rows)
         outcomes_withheld_count = sum(1 for r in rows if not r["outcomes_shared"])
+        # Not floored by k-anonymity in the real API either (waived for this
+        # endpoint per mitodl/ol-analytics-api#58), so this tallies plainly.
+        # Sums to slightly less than total_count here because it's tallied off
+        # the already-consent-nulled `completion_status` field, unlike the real
+        # API, which tallies before nulling and always sums to total_count.
+        completion_status_counts = {
+            status: sum(1 for r in rows if r["completion_status"] == status)
+            for status in _LEARNER_STATUSES
+        }
 
         offset, limit = self._parse_offset_limit(qs)
         page = rows[offset:]
@@ -503,6 +512,7 @@ class Handler(BaseHTTPRequestHandler):
                 "as_of": AS_OF,
                 "total_count": total_count,
                 "outcomes_withheld_count": outcomes_withheld_count,
+                "completion_status_counts": completion_status_counts,
                 "data": page,
             },
         )
