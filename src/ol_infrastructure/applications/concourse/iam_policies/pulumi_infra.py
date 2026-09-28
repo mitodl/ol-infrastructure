@@ -317,9 +317,19 @@ policy_definition = {
                 "kms:ListResourceTags",
                 "kms:Sign",
                 "lambda:ListFunctions",
+                # aws:cloudwatch/logGroup lifecycle -- the EKS project owns the
+                # control-plane log group so its retention actually applies.
+                "logs:CreateLogGroup",
                 "logs:CreateScheduledQuery",
+                "logs:DeleteLogGroup",
+                "logs:DeleteRetentionPolicy",
                 "logs:DeleteScheduledQuery",
+                "logs:DescribeLogGroups",
                 "logs:GetScheduledQuery",
+                "logs:ListTagsForResource",
+                "logs:PutRetentionPolicy",
+                "logs:TagResource",
+                "logs:UntagResource",
                 "mediaconvert:CreateQueue",
                 "mediaconvert:DeleteQueue",
                 "mediaconvert:DescribeEndpoints",
@@ -337,10 +347,14 @@ policy_definition = {
                 # just fails one step later each retry.
                 "rds:CreateDBInstanceReadReplica",
                 "rds:CreateDBParameterGroup",
+                "rds:CreateDBSnapshot",
                 "rds:CreateTenantDatabase",
                 "rds:DeleteBlueGreenDeployment",
+                "rds:DeleteDBCluster",
+                "rds:DeleteDBClusterEndpoint",
                 "rds:DeleteDBInstance",
                 "rds:DeleteDBParameterGroup",
+                "rds:DeleteTenantDatabase",
                 # Not in AWS's documented lifecycle list, but the provider polls
                 # it to wait for the green environment and for deletion. Without
                 # it the apply dies after CreateBlueGreenDeployment succeeds and
@@ -352,9 +366,11 @@ policy_definition = {
                 "rds:DescribeDBParameters",
                 "rds:DescribeDBSubnetGroups",
                 "rds:ListTagsForResource",
+                "rds:ModifyDBCluster",
                 "rds:ModifyDBInstance",
                 "rds:ModifyDBSubnetGroup",
                 "rds:PromoteReadReplica",
+                "rds:PromoteReadReplicaDBCluster",
                 "rds:ResetDBParameterGroup",
                 "rds:SwitchoverBlueGreenDeployment",
                 "route53:CreateHostedZone",

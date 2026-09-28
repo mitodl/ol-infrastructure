@@ -1,0 +1,26 @@
+---
+# LMS config deltas for composing lehrer's Open edX stack into this cluster.
+#
+# Not a copy of lehrer's lms-config: it is layered last in envFrom by lehrer's
+# platform manifests, so only the keys that differ belong here. Everything else
+# (MySQL/MongoDB hosts, codejail, OTel, logging) is inherited from lehrer's own
+# ConfigMap and stays correct as that file changes.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lms-config-overrides
+  namespace: openedx
+data:
+  # Valkey and OpenSearch come from this cluster's shared local-infra namespace
+  # instead of a per-stack copy in the openedx namespace. These two keys are the
+  # composition; without them lehrer installs its own (manage_infra).
+  CELERY_BROKER_HOSTNAME: "valkey.local-infra.svc.cluster.local"
+  ELASTIC_SEARCH_HOST: "opensearch-cluster-master.local-infra.svc.cluster.local"
+
+  # Served through APISIX on the shared wildcard cert rather than the
+  # port-forwards lehrer's standalone cluster uses. 'mit.dev' is substituted for
+  # LOCAL_DEV_ROOT_DOMAIN at apply time — see local-dev/tiltlib.star.
+  LMS_BASE_URL: "https://lms.mit.dev"
+  CMS_BASE_URL: "https://studio.mit.dev"
+  EDXNOTES_PUBLIC_API: "https://notes.mit.dev/api/v1"
+  HTTPS: "on"

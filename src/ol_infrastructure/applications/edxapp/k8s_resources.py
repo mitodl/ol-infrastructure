@@ -4,8 +4,9 @@
 import hashlib
 import json
 import os
+from collections.abc import Awaitable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pulumi
 import pulumi_aws as aws
@@ -154,14 +155,28 @@ def _pod_config_hash(
     of that template, which leaves a config-only change inert until something
     else happens to restart the pod. Annotating the pod template with this hash
     makes the template change whenever the config does.
+
+    The returned Output deliberately carries no resource dependencies. These
+    ConfigMaps have fixed names, so a data change replaces them delete-first,
+    and Pulumi then replaces every resource with a recorded property dependency
+    on them -- also delete-first. Left in place, that edge turns any config
+    change into deleting every edxapp Deployment at once (2026-09-16, mitxonline
+    LMS dropped from 27 pods to 3). Without it, the Deployment sees only a
+    changed annotation and does a rolling update.
     """
     names = sorted(config_maps)
-    return Output.all(
+    config_hash = Output.all(
         *(_config_map_contents(config_maps[name]) for name in names)
     ).apply(
         lambda contents: hashlib.sha256(
             json.dumps(dict(zip(names, contents, strict=True)), sort_keys=True).encode()
         ).hexdigest()
+    )
+    return Output(
+        set(),
+        cast(Awaitable[str], config_hash.future()),
+        config_hash.is_known(),
+        config_hash.is_secret(),
     )
 
 
@@ -228,6 +243,21 @@ def create_k8s_resources(  # noqa: C901
     # 2026-08-26 saturation was the connection ceiling, not the thread pool: idle
     # APISIX keepalives consume backpressure while doing no work, so CMS takes
     # DEFAULT_WSGI_BACKPRESSURE and only its threads stay pinned.
+    #
+    # Installs at workers=1 also set respawn_interval and, in production,
+    # worker_startup_rss. edxapp runs Granian 2.8.x, where a worker listens only after
+    # importing the app and a planned respawn stops the old worker after
+    # respawn_interval (default 3.5s) regardless, so at one worker a short interval
+    # refuses connections until the import finishes. On 2026-09-17, mitxonline LMS
+    # pods on warm nodes went Ready 18s after container start (the first probe). On a
+    # node that had just pulled the image, a first start exceeded the 60s startup probe
+    # and its restart still refused connections 24s in. 60s covers the restart case;
+    # a respawn never runs on a node without the image. worker_startup_rss is the p95 container RSS
+    # of pods 1-5 minutes old at one worker (mitxonline LMS 1075MiB over the first 80
+    # minutes at workers=1; mitx and mitx-staging LMS and CMS 609-642MiB over 7 days),
+    # rounded up. It reserves room for the replacement worker in the derived
+    # --workers-max-rss. Not set in CI/QA, whose 2Gi limit cannot fit mitxonline
+    # LMS's value and whose low traffic keeps the cap from tripping.
     #
     # See docs/plans/granian-configuration-overhaul.md stage 3.
     LMS_GRANIAN_HOLDING_PINS = {
@@ -1006,10 +1036,16 @@ def create_k8s_resources(  # noqa: C901
             resource_limits={
                 "memory": resources_dict["webapp"]["lms"]["memory_limit"],
             },
-            # Preserves the bounds of the hand-rolled lms-webapp-vpa this replaces.
-            # The floor is deliberately below resource_limits so the VPA can size
-            # these pods down as well as up.
-            webapp_vpa_min_allowed_memory="256Mi",
+            # 256Mi preserves the bounds of the hand-rolled lms-webapp-vpa this
+            # replaces, so the VPA can size pods down as well as up. An install that
+            # sets worker_startup_rss raises it with
+            # k8s_resources.webapp.lms.vpa_min_allowed_memory: --workers-max-rss is
+            # derived from the declared limit, and the VPA scales the limit with the
+            # request (RequestsAndLimits). A pod admitted below the declared limit has
+            # no room for the respawn overlap the startup reservation is for.
+            webapp_vpa_min_allowed_memory=resources_dict["webapp"]["lms"].get(
+                "vpa_min_allowed_memory", "256Mi"
+            ),
             webapp_vpa_max_allowed_memory="4Gi",
             pod_security_context=pod_security_context,
             extra_volumes=lms_edxapp_volumes,
@@ -1370,9 +1406,10 @@ def create_k8s_resources(  # noqa: C901
             resource_limits={
                 "memory": resources_dict["webapp"]["cms"]["memory_limit"],
             },
-            # Preserves the bounds of the hand-rolled cms-webapp-vpa this replaces.
-            # See the LMS config above.
-            webapp_vpa_min_allowed_memory="256Mi",
+            # Same default and per-install override as the LMS config above.
+            webapp_vpa_min_allowed_memory=resources_dict["webapp"]["cms"].get(
+                "vpa_min_allowed_memory", "256Mi"
+            ),
             webapp_vpa_max_allowed_memory="4Gi",
             pod_security_context=pod_security_context,
             extra_volumes=cms_edxapp_volumes,
@@ -1520,6 +1557,18 @@ def create_k8s_resources(  # noqa: C901
                                 "--app=lms.celery",
                                 "worker",
                                 "-E",
+                                # Every worker that starts declares a
+                                # celeryev.<uuid> queue for gossip and relies on the
+                                # broker to reclaim it. kombu's Redis transport never
+                                # does: Channel.close() only deletes queues in
+                                # _fanout_queues, which _queue_bind populates only for
+                                # FANOUT exchanges, and celery declares celeryev as a
+                                # TOPIC exchange. The queue and its binding survive
+                                # even a clean shutdown, and the exchange copies every
+                                # event into the orphan forever. Monitoring is
+                                # unaffected: -E above still emits events, and leek's
+                                # revoke goes over pidbox, not gossip.
+                                "--without-gossip",
                                 "--loglevel=info",
                                 "--hostname=edx.lms.core.default.%h",
                                 "--max-tasks-per-child",
@@ -1710,6 +1759,10 @@ def create_k8s_resources(  # noqa: C901
                                 "--app=lms.celery",
                                 "worker",
                                 "-E",
+                                # See the note on the default LMS celery worker
+                                # above: on a Redis broker, gossip's per-worker
+                                # celeryev.<uuid> queue is never reclaimed.
+                                "--without-gossip",
                                 "--loglevel=info",
                                 "--hostname=edx.lms.core.high_mem.%h",
                                 # One report per process, then recycle, so a report's
@@ -2101,6 +2154,12 @@ def create_k8s_resources(  # noqa: C901
                                 "--app=cms.celery",
                                 "worker",
                                 "-E",
+                                # See the note on the default LMS celery worker
+                                # above: on a Redis broker, gossip's per-worker
+                                # celeryev.<uuid> queue is never reclaimed. This
+                                # deployment churns hardest under KEDA, so it
+                                # starts the most of them.
+                                "--without-gossip",
                                 "--loglevel=info",
                                 "--hostname=edx.cms.core.default.%h",
                                 "--max-tasks-per-child",

@@ -1,0 +1,15 @@
+---
+# CMS (Studio) config deltas — see configmaps/lms-config.yaml for why this is an
+# override layer rather than a full ConfigMap.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cms-config-overrides
+  namespace: openedx
+data:
+  CELERY_BROKER_HOSTNAME: "valkey.local-infra.svc.cluster.local"
+  ELASTIC_SEARCH_HOST: "opensearch-cluster-master.local-infra.svc.cluster.local"
+
+  LMS_BASE_URL: "https://lms.mit.dev"
+  CMS_BASE_URL: "https://studio.mit.dev"
+  HTTPS: "on"

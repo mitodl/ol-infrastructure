@@ -4,6 +4,7 @@ from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 ocw_site_pulumi_code = git_repo(
     name=Identifier("ol-infrastructure-pulumi"),
@@ -48,8 +49,21 @@ ocw_site_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
+    output = pipeline_json_with_user_data(
+        ocw_site_pipeline,
+        user_data={
+            "description": (
+                "Deploys the OCW (OpenCourseWare) site Pulumi application "
+                "(`ol-infrastructure-ocw-site-application`) to QA and "
+                "Production, triggered by changes to the app's own Pulumi code "
+                "or to the OCW Hugo theme's 404 page template."
+            ),
+            "team": "infrastructure",
+            "category": "applications",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(ocw_site_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(ocw_site_pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.write("\n")
     sys.stdout.write("fly -t pr-inf set-pipeline -p pulumi-ocw-site -c definition.json")

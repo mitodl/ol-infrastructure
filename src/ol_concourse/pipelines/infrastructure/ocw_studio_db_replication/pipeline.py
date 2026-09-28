@@ -13,6 +13,7 @@ from ol_concourse.lib.models.pipeline import (
 )
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 postgres_resource = AnonymousResource(
     type=REGISTRY_IMAGE,
@@ -84,9 +85,22 @@ def db_replication_pipeline() -> Pipeline:
 if __name__ == "__main__":
     import sys
 
+    output = pipeline_json_with_user_data(
+        db_replication_pipeline(),
+        user_data={
+            "description": (
+                "On-demand `restore-db` job: `pg_dump`s the `((source.*))` "
+                "Postgres database and `pg_restore`s it into "
+                "`((destination.*))`, for replicating an ocw-studio database "
+                "between environments."
+            ),
+            "team": "ocw",
+            "category": "applications",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(db_replication_pipeline().model_dump_json(indent=2))
-    sys.stdout.write(db_replication_pipeline().model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.write("\n")
     sys.stdout.write(
         "fly -t qa-ocw set-pipeline -p ocw-studio-db-replication -c definition.json\n"

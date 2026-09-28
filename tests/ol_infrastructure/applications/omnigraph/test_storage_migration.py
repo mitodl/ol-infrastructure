@@ -11,6 +11,7 @@ cluster, which is what the runbook rehearsal covers.
 import importlib.util
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -179,22 +180,389 @@ def test_a_config_with_no_storage_line_is_refused(tmp_path: Path) -> None:
 def test_row_counts_are_parsed_per_table() -> None:
     """Verification compares per table. A total-row check would pass a rebuild
     that put every row in the wrong table.
+
+    The shape is verbatim `snapshot` output from omnigraph 0.10.0, and 0.11.0
+    prints the same per-table lines. The 0.8 `rows=N` shape this regex used to
+    expect matched nothing on either, so the Job stopped at its first graph.
     """
     snapshot = (
-        "branch: main\n"
-        "manifest_version: 4\n"
+        "graph_branch: main\n"
+        "graph_manifest_version: 5\n"
         "internal_schema_version: 6\n"
-        "edge:Supersedes v1 branch=main rows=0\n"
-        "node:Memory v2 branch=main rows=41\n"
-        "node:Task v1 branch=main rows=7\n"
+        "edge type 'Supersedes' published_dataset_version=1 "
+        "native_dataset_branch=main entities=0\n"
+        "node type 'Memory' published_dataset_version=2 "
+        "native_dataset_branch=main entities=41\n"
+        "node type 'Task' published_dataset_version=1 "
+        "native_dataset_branch=main entities=7\n"
     )
 
     counts = {
         m["table"]: int(m["rows"]) for m in migrate.SNAPSHOT_ROW_RE.finditer(snapshot)
     }
 
-    assert counts == {"edge:Supersedes": 0, "node:Memory": 41, "node:Task": 7}
+    assert counts == {"Supersedes": 0, "Memory": 41, "Task": 7}
     assert migrate.SNAPSHOT_SCHEMA_RE.search(snapshot).group(1) == "6"
+
+
+_KEYED_SCHEMA = """\
+node Memory { slug: String @key }
+node Topic { slug: String @key }
+
+// edge Commented: Memory -> Memory { @key(@src, @dst) }
+edge Tagged: Memory -> Topic {
+    @key(@src, @dst)
+    confidence: enum(asserted, inferred)? @index
+    created_at: DateTime?
+}
+edge RelatedTo: Memory -> Memory { @key(@dst, @src) }
+edge Loose: Memory -> Memory {
+    role: String?
+}
+edge Bare: Memory -> Memory
+"""
+
+
+def test_keyed_edge_types_are_read_from_the_schema(tmp_path: Path) -> None:
+    """The export cannot say which edge types are keyed; only the schema the
+    rebuild creates can, and a commented-out declaration must not count.
+    """
+    schema = tmp_path / "schema.pg"
+    schema.write_text(_KEYED_SCHEMA)
+
+    assert migrate.keyed_edge_types(schema) == {"Tagged", "RelatedTo"}
+
+
+def test_a_key_beyond_the_endpoint_pair_is_refused(tmp_path: Path) -> None:
+    """Collapsing on (from, to) would merge rows a wider key keeps apart."""
+    schema = tmp_path / "schema.pg"
+    schema.write_text(
+        "node M { slug: String @key }\n"
+        "edge Wide: M -> M {\n    @key(@src, @dst, kind)\n    kind: String\n}\n"
+    )
+
+    with pytest.raises(SystemExit, match="Wide"):
+        migrate.keyed_edge_types(schema)
+
+
+def test_schema_files_are_mapped_per_graph(tmp_path: Path) -> None:
+    """Each graph's keyed types come from its own schema, not council's."""
+    mapping = migrate.schema_files_by_graph(_cluster_yaml(tmp_path))
+
+    assert set(mapping) == set(build_cluster_graphs(REPOS))
+    assert mapping["council"] == "schema.pg"
+    assert mapping["code-bridge"] == "bridge-schema.pg"
+
+
+def _write_jsonl(path: Path, records: list[dict[str, object]]) -> Path:
+    path.write_text("".join(json.dumps(record) + "\n" for record in records))
+    return path
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    return [json.loads(line) for line in path.read_text().splitlines() if line]
+
+
+def _tagged(row_id: str, **data: object) -> dict[str, object]:
+    return {"edge": "Tagged", "from": "m1", "to": "t1", "data": {"id": row_id, **data}}
+
+
+def test_normalize_relocates_node_ids_and_drops_keyed_edge_ids(tmp_path: Path) -> None:
+    """0.11 refuses `data.id` on load, and refuses a 0.10 ULID on a keyed edge
+    because it does not match the id the key derives. Unkeyed edges keep theirs.
+    """
+    export = _write_jsonl(
+        tmp_path / "g.jsonl",
+        [
+            {"type": "Memory", "data": {"id": "m1", "slug": "m1"}},
+            _tagged("01A", confidence="inferred"),
+            {"edge": "Loose", "from": "m1", "to": "m2", "data": {"id": "01B"}},
+        ],
+    )
+
+    normalized, collapsed = migrate.normalize_export(export, {"Tagged"})
+
+    rows = _read_jsonl(normalized)
+    memory = next(r for r in rows if r.get("type") == "Memory")
+    assert memory["id"] == "m1"
+    assert "id" not in memory["data"]
+    tagged = next(r for r in rows if r.get("edge") == "Tagged")
+    assert "id" not in tagged
+    assert "id" not in tagged["data"]
+    loose = next(r for r in rows if r.get("edge") == "Loose")
+    assert loose["id"] == "01B"
+    assert collapsed == {}
+
+
+def test_an_asserted_duplicate_outranks_a_newer_inferred_one(tmp_path: Path) -> None:
+    """Two rows for one keyed pair fail the whole load. The survivor is a whole
+    row, and a link someone named beats one witan derived, however recent.
+    """
+    export = _write_jsonl(
+        tmp_path / "g.jsonl",
+        [
+            _tagged(
+                "01A", confidence="asserted", role="named", created_at=1767225600000
+            ),
+            _tagged(
+                "01B",
+                confidence="inferred",
+                role="derived",
+                created_at="2026-06-01T00:00:00",
+            ),
+        ],
+    )
+
+    normalized, collapsed = migrate.normalize_export(export, {"Tagged"})
+
+    assert [r["data"]["role"] for r in _read_jsonl(normalized)] == ["named"]
+    assert collapsed == {"Tagged": 1}
+
+
+def test_the_newest_created_at_wins_across_timestamp_shapes(tmp_path: Path) -> None:
+    """0.10 exports DateTime as epoch milliseconds, 0.11 as a naive ISO string,
+    and edges written before 2026-09 have none, which ranks oldest.
+    """
+    export = _write_jsonl(
+        tmp_path / "g.jsonl",
+        [
+            _tagged("01A", role="unstamped", created_at=None),
+            _tagged("01B", role="january", created_at=1767225600000),
+            _tagged("01C", role="march", created_at="2026-03-01T00:00:00"),
+            _tagged("01D", role="february", created_at=1769904000000),
+        ],
+    )
+
+    normalized, collapsed = migrate.normalize_export(export, {"Tagged"})
+
+    assert [r["data"]["role"] for r in _read_jsonl(normalized)] == ["march"]
+    assert collapsed == {"Tagged": 3}
+
+
+def test_an_exact_tie_keeps_the_later_row(tmp_path: Path) -> None:
+    """Identical rank is the common 0.10 duplicate: the same unstamped edge
+    appended by every re-link. The later row in the export survives, which is
+    deterministic for a given export but is not necessarily the last write.
+    """
+    export = _write_jsonl(
+        tmp_path / "g.jsonl",
+        [_tagged("01A", role="a"), _tagged("01B", role="b"), _tagged("01C", role="c")],
+    )
+
+    normalized, _ = migrate.normalize_export(export, {"Tagged"})
+
+    assert [r["data"]["role"] for r in _read_jsonl(normalized)] == ["c"]
+
+
+def test_a_tie_holds_across_a_long_gap_between_duplicates(tmp_path: Path) -> None:
+    """Duplicates sit anywhere in the export, which is why the collapse takes
+    two passes over the file rather than one pass buffering rewritten rows: the
+    rank is decided in pass 1 and the survivor streamed out in pass 2. Rank ties
+    still keep the later row, and the rows in between still pass through.
+    """
+    filler: list[dict[str, object]] = [
+        {"type": "Memory", "data": {"id": f"m{n}", "slug": f"m{n}"}} for n in range(300)
+    ]
+    export = _write_jsonl(
+        tmp_path / "g.jsonl",
+        [
+            _tagged("01A", role="first"),
+            *filler,
+            _tagged("01B", role="middle"),
+            *filler,
+            _tagged("01C", role="last"),
+        ],
+    )
+
+    normalized, collapsed = migrate.normalize_export(export, {"Tagged"})
+
+    rows = _read_jsonl(normalized)
+    assert [r["data"]["role"] for r in rows if r.get("edge") == "Tagged"] == ["last"]
+    assert len([r for r in rows if r.get("type") == "Memory"]) == 600
+    assert collapsed == {"Tagged": 2}
+
+
+def test_indexes_are_built_on_the_rebuilt_store(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`load` builds no indexes in 0.11, so optimize has to run against the new
+    store; anything it defers is surfaced rather than dropped.
+    """
+    calls: list[list[str]] = []
+    optimize_out = {
+        "datasets": [
+            {"type_key": "edge:WorksOn", "pending_indexes": []},
+            {
+                "type_key": "node:Memory",
+                "pending_indexes": [
+                    {
+                        "type_key": "node:Memory",
+                        "property": "embedding",
+                        "reason": "property has no non-null vectors to train on yet",
+                    }
+                ],
+            },
+        ]
+    }
+
+    def fake_run(argv: list[str], **_: Any) -> Any:
+        calls.append(argv)
+        return migrate.subprocess.CompletedProcess(argv, 0, json.dumps(optimize_out))
+
+    monkeypatch.setattr(migrate, "run", fake_run)
+
+    pending = migrate.build_indexes("omnigraph", "s3://b/fmt9/graphs/council.omni")
+
+    assert calls == [
+        [
+            "omnigraph",
+            "optimize",
+            "--store",
+            "s3://b/fmt9/graphs/council.omni",
+            "--json",
+        ]
+    ]
+    assert [p["property"] for p in pending] == ["embedding"]
+
+
+def test_rebuild_optimizes_each_graph_once_after_its_last_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Optimizing before a graph's final batch would leave that batch's
+    fragments uncovered, and a skipped graph serves with no indexes at all.
+    """
+    calls: list[list[str]] = []
+    pending = {"type_key": "node:Memory", "property": "embedding", "reason": "x"}
+
+    def fake_run(argv: list[str], **_: Any) -> Any:
+        calls.append(argv)
+        out = ""
+        if argv[1] == "optimize":
+            deferred = [pending] if "council" in argv[3] else []
+            out = json.dumps({"datasets": [{"pending_indexes": deferred}]})
+        return migrate.subprocess.CompletedProcess(argv, 0, out)
+
+    graphs = ["council", "code-bridge"]
+    monkeypatch.setattr(migrate, "run", fake_run)
+    monkeypatch.setattr(
+        migrate, "build_rebuild_config", lambda *_: tmp_path / "cluster.yaml"
+    )
+    monkeypatch.setattr(
+        migrate, "schema_files_by_graph", lambda _: dict.fromkeys(graphs, "s.pg")
+    )
+    monkeypatch.setattr(migrate, "keyed_edge_types", lambda _: set())
+    monkeypatch.setattr(migrate, "normalize_export", lambda path, _: (path, {}))
+    monkeypatch.setattr(
+        migrate,
+        "chunk_export",
+        lambda path: [path.with_suffix(".000.jsonl"), path.with_suffix(".001.jsonl")],
+    )
+
+    migrate.rebuild(
+        "omnigraph",
+        "s3://b/fmt9",
+        graphs,
+        tmp_path / "export",
+        tmp_path / "rebuild",
+        tmp_path / "cluster.yaml",
+        tmp_path / "schemas",
+        "svc-witan-admin",
+    )
+
+    per_graph = [
+        (argv[1], argv[3].rsplit("/", 1)[-1])
+        for argv in calls
+        if argv[1] in {"load", "optimize"}
+    ]
+    assert per_graph == [
+        ("load", "council.omni"),
+        ("load", "council.omni"),
+        ("optimize", "council.omni"),
+        ("load", "code-bridge.omni"),
+        ("load", "code-bridge.omni"),
+        ("optimize", "code-bridge.omni"),
+    ]
+    deferred_logs = [r for r in caplog.records if "indexes deferred" in r.message]
+    assert len(deferred_logs) == 1
+    assert "embedding" in deferred_logs[0].getMessage()
+
+
+def test_verify_expects_the_collapsed_edge_counts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The 0.10 baseline counts duplicates the rebuild deliberately removed, so
+    strict equality with it would fail every graph that had any.
+    """
+    monkeypatch.setattr(
+        migrate, "snapshot_tables", lambda *_: {"Memory": 2, "Tagged": 1}
+    )
+
+    report, mismatched = migrate.verify(
+        "omnigraph",
+        "file:///new",
+        ["council"],
+        {"council": {"Memory": 2, "Tagged": 3}},
+        {"council": {"Tagged": 2}},
+    )
+
+    assert mismatched == []
+    assert report["council"]["expected"] == {"Memory": 2, "Tagged": 1}
+    assert report["council"]["collapsed_duplicates"] == {"Tagged": 2}
+
+
+def test_verify_still_fails_a_short_rebuild(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Collapse accounting must not excuse a table that lost rows it kept."""
+    monkeypatch.setattr(
+        migrate, "snapshot_tables", lambda *_: {"Memory": 1, "Tagged": 1}
+    )
+
+    report, mismatched = migrate.verify(
+        "omnigraph",
+        "file:///new",
+        ["council"],
+        {"council": {"Memory": 2, "Tagged": 3}},
+        {"council": {"Tagged": 2}},
+    )
+
+    assert mismatched == ["council"]
+    assert report["council"]["changed_tables"] == ["Memory"]
+
+
+def test_verify_accepts_an_empty_table_the_new_schema_added(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A graph created before its schema grew a type has no baseline row for
+    that table, and the rebuild creates it empty. Found on a real local store
+    that predates TaskComment.
+    """
+    monkeypatch.setattr(
+        migrate, "snapshot_tables", lambda *_: {"Memory": 2, "TaskComment": 0}
+    )
+
+    report, mismatched = migrate.verify(
+        "omnigraph", "file:///new", ["council"], {"council": {"Memory": 2}}, {}
+    )
+
+    assert mismatched == []
+    assert report["council"]["new_tables"] == ["TaskComment"]
+
+
+def test_verify_fails_a_new_table_that_has_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No export can put rows in a table the old graph lacked, so rows there
+    mean the rebuild loaded something the baseline never counted.
+    """
+    monkeypatch.setattr(
+        migrate, "snapshot_tables", lambda *_: {"Memory": 2, "TaskComment": 3}
+    )
+
+    report, mismatched = migrate.verify(
+        "omnigraph", "file:///new", ["council"], {"council": {"Memory": 2}}, {}
+    )
+
+    assert mismatched == ["council"]
+    assert report["council"]["changed_tables"] == ["TaskComment"]
 
 
 def test_cutover_instructions_set_both_paired_config_values() -> None:
@@ -277,6 +645,26 @@ def test_every_node_precedes_every_edge_across_batches(tmp_path: Path) -> None:
     assert seen_edge
 
 
+def test_batch_numbering_continues_across_the_node_and_edge_groups(
+    tmp_path: Path,
+) -> None:
+    """The two groups are written by separate passes, so their numbering has to
+    share a counter: restarting it for the edges would have edge batches
+    reopening the node batch files and silently dropping every node row.
+    """
+    export = _export(
+        tmp_path, nodes=migrate.KEYED_ROW_CAP + 10, edges=migrate.KEYED_ROW_CAP + 10
+    )
+
+    batches = migrate.chunk_export(export)
+
+    assert len(batches) == len({b.name for b in batches}), "a batch file was reused"
+    total = sum(
+        len([ln for ln in b.read_text().splitlines() if ln.strip()]) for b in batches
+    )
+    assert total == 2 * (migrate.KEYED_ROW_CAP + 10)
+
+
 def test_a_format_that_did_not_move_is_reported() -> None:
     """Both images on one format means the outage bought nothing — or the wrong
     image was named as migrate_from_image.
@@ -355,3 +743,227 @@ def test_the_source_cluster_yaml_never_shadows_the_repointed_one(
 
     assert "storage: s3://b/fmt6" in config.read_text().splitlines()
     assert "storage: s3://ol-data-witan-ci" not in config.read_text().splitlines()
+
+
+WRITERS = [
+    ("omnigraph", "omnigraph-optimize"),
+    ("witan", "witan-ci-indexer"),
+]
+
+
+def _cronjob(*, suspend: bool) -> dict[str, Any]:
+    return {"spec": {"suspend": suspend}}
+
+
+def _job(
+    name: str, owner: str, *, active: int | None, finished: str | None = None
+) -> dict[str, Any]:
+    status: dict[str, Any] = {} if active is None else {"active": active}
+    if finished is not None:
+        status["conditions"] = [{"type": finished, "status": "True"}]
+    return {
+        "metadata": {
+            "name": name,
+            "ownerReferences": [{"kind": "CronJob", "name": owner}],
+        },
+        "status": status,
+    }
+
+
+class _FakeApi:
+    """The two API reads the pre-flight makes, answered from dicts."""
+
+    def __init__(
+        self,
+        cronjobs: dict[tuple[str, str], dict[str, Any] | None],
+        jobs: dict[str, list[dict[str, Any]]],
+    ) -> None:
+        self.cronjobs = cronjobs
+        self.jobs = jobs
+
+    def get(self, path: str) -> dict[str, Any] | None:
+        parts = path.split("/")
+        namespace = parts[5]
+        if parts[6] == "jobs":
+            return {"items": self.jobs.get(namespace, [])}
+        return self.cronjobs.get((namespace, parts[7]))
+
+
+def test_writer_specs_are_parsed_per_namespace() -> None:
+    """The env var the Job is given: space-separated <namespace>/<cronjob>."""
+    assert (
+        migrate.parse_writer_cronjobs(
+            "omnigraph/omnigraph-optimize  witan/witan-ci-indexer"
+        )
+        == WRITERS
+    )
+
+
+@pytest.mark.parametrize("bad", ["witan-ci-indexer", "witan/", "/x", "a/b/c"])
+def test_a_writer_without_a_namespace_is_refused(bad: str) -> None:
+    """A writer the pre-flight cannot address is a config error, not a skip."""
+    with pytest.raises(SystemExit):
+        migrate.parse_writer_cronjobs(bad)
+
+
+def test_an_unsuspended_writer_blocks() -> None:
+    """The case a skipped witan deploy leaves behind: nothing running yet, but
+    the next tick would start a writer mid-export.
+    """
+    blockers = migrate.writer_blockers(
+        "witan", "witan-ci-indexer", _cronjob(suspend=False), []
+    )
+
+    assert blockers == ["cronjob witan/witan-ci-indexer is not suspended"]
+
+
+def test_an_active_job_blocks_even_when_suspended() -> None:
+    """`suspend` stops the next schedule, not a run already in progress."""
+    blockers = migrate.writer_blockers(
+        "witan",
+        "witan-ci-indexer",
+        _cronjob(suspend=True),
+        [_job("witan-ci-indexer-29781", "witan-ci-indexer", active=1)],
+    )
+
+    assert blockers == ["job witan/witan-ci-indexer-29781 has 1 active pod(s)"]
+
+
+def test_finished_and_failed_jobs_do_not_block() -> None:
+    """A month-old failed Job has no `active` count. Treating it as work in
+    progress would hold the outage open until the pre-flight times out.
+    """
+    jobs = [
+        _job(
+            "witan-ci-indexer-old-failed",
+            "witan-ci-indexer",
+            active=None,
+            finished="Failed",
+        ),
+        _job(
+            "witan-ci-indexer-done", "witan-ci-indexer", active=0, finished="Complete"
+        ),
+    ]
+
+    assert not migrate.writer_blockers(
+        "witan", "witan-ci-indexer", _cronjob(suspend=True), jobs
+    )
+
+
+def test_a_job_the_controller_has_not_reconciled_blocks() -> None:
+    """A CronJob can create a Job just before suspension. Until the Job
+    controller fills in its status it reads `status: {}`, and its pod can start
+    writing after the pre-flight cleared.
+    """
+    blockers = migrate.writer_blockers(
+        "witan",
+        "witan-ci-indexer",
+        _cronjob(suspend=True),
+        [_job("witan-ci-indexer-29782", "witan-ci-indexer", active=None)],
+    )
+
+    assert blockers == ["job witan/witan-ci-indexer-29782 has not finished"]
+
+
+def test_another_cronjobs_active_job_is_not_attributed() -> None:
+    """Jobs are listed per namespace, so ownership decides which writer is busy."""
+    jobs = [_job("witan-view-reaper-1", "witan-view-reaper", active=1)]
+
+    assert not migrate.writer_blockers(
+        "witan", "witan-ci-indexer", _cronjob(suspend=True), jobs
+    )
+
+
+def test_an_undeclared_writer_does_not_block() -> None:
+    """The CI indexer does not exist in an environment with no managed repos."""
+    assert not migrate.writer_blockers("witan", "witan-ci-indexer", None, [])
+
+
+def test_the_preflight_waits_for_a_running_writer_to_finish() -> None:
+    """A busy writer is waited out, not treated as a failure."""
+    api = _FakeApi(
+        cronjobs={
+            ("omnigraph", "omnigraph-optimize"): _cronjob(suspend=True),
+            ("witan", "witan-ci-indexer"): _cronjob(suspend=True),
+        },
+        jobs={"witan": [_job("witan-ci-indexer-1", "witan-ci-indexer", active=1)]},
+    )
+    sleeps: list[float] = []
+
+    def finish_on_first_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        api.jobs["witan"] = [
+            _job(
+                "witan-ci-indexer-1", "witan-ci-indexer", active=0, finished="Complete"
+            )
+        ]
+
+    migrate.wait_for_writers(
+        WRITERS,
+        get=api.get,
+        wait_seconds=60,
+        poll_seconds=5,
+        sleep=finish_on_first_sleep,
+        clock=lambda: 0.0,
+    )
+
+    assert sleeps == [5]
+
+
+def test_the_preflight_gives_up_naming_every_blocker() -> None:
+    """At the deadline the Job exits before exporting, with the whole list."""
+    api = _FakeApi(
+        cronjobs={
+            ("omnigraph", "omnigraph-optimize"): _cronjob(suspend=True),
+            ("witan", "witan-ci-indexer"): _cronjob(suspend=False),
+        },
+        jobs={
+            "omnigraph": [_job("omnigraph-optimize-7", "omnigraph-optimize", active=1)]
+        },
+    )
+    now = iter([0.0, 100.0])
+
+    with pytest.raises(SystemExit) as exc:
+        migrate.wait_for_writers(
+            WRITERS,
+            get=api.get,
+            wait_seconds=60,
+            poll_seconds=5,
+            sleep=lambda _: None,
+            clock=lambda: next(now),
+        )
+
+    message = str(exc.value)
+    assert "omnigraph/omnigraph-optimize-7 has 1 active pod(s)" in message
+    assert "witan/witan-ci-indexer is not suspended" in message
+
+
+def test_an_api_error_mid_poll_is_waited_out() -> None:
+    """The Job has no retries, so one failed read must not end the migration."""
+    api = _FakeApi(
+        cronjobs={
+            ("omnigraph", "omnigraph-optimize"): _cronjob(suspend=True),
+            ("witan", "witan-ci-indexer"): _cronjob(suspend=True),
+        },
+        jobs={},
+    )
+    calls = {"n": 0}
+
+    def flaky_get(path: str) -> dict[str, Any] | None:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            timeout_msg = "read timed out"
+            raise TimeoutError(timeout_msg)
+        return api.get(path)
+
+    sleeps: list[float] = []
+    migrate.wait_for_writers(
+        WRITERS,
+        get=flaky_get,
+        wait_seconds=60,
+        poll_seconds=5,
+        sleep=sleeps.append,
+        clock=lambda: 0.0,
+    )
+
+    assert sleeps == [5]

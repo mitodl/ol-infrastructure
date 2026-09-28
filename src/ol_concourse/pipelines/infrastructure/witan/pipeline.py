@@ -54,6 +54,7 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -168,7 +169,23 @@ def build_witan_pipeline() -> PipelineFragment:
 if __name__ == "__main__":
     pipeline = build_witan_pipeline().to_pipeline()
 
+    output = pipeline_json_with_user_data(
+        pipeline,
+        user_data={
+            "description": (
+                "Builds the witan MCP-service image from the `mitodl/agent-kit` "
+                "repo (Dockerfile builds from that repo's root to reach the "
+                "whole uv workspace plus the witan MCP servers) and deploys it "
+                "via Pulumi (`ol-application-witan`) through CI, QA, and "
+                "Production. Its stack reaches the omnigraph-server data tier "
+                "(deployed separately by `pulumi-omnigraph`) via "
+                "StackReference and fails loudly if that hasn't deployed yet."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(pipeline.model_dump_json(indent=2))
-    sys.stdout.write(pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.writelines(("\n", "fly -t pr-inf sp -p pulumi-witan -c definition.json"))

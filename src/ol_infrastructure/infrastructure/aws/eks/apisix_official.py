@@ -17,9 +17,13 @@ from bridge.lib.magic_numbers import (
     AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
     DEFAULT_HTTPS_PORT,
 )
+from ol_infrastructure.components.services.apisix import (
+    identity_header_strip_plugin,
+)
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
 )
+from ol_infrastructure.lib.k8s_crds import adopt_helm_chart_crds
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -316,6 +320,30 @@ def setup_apisix(
         ),
     )
 
+    # The apisix-ingress-controller subchart ships its CRDs in crds/, which Helm
+    # only ever writes on install, so they froze at whatever chart version first
+    # landed on each cluster while APISIX_CHART was upgraded repeatedly.
+    # backendtrafficpolicies was 30 schema properties behind on all 12 clusters and
+    # apisixupstreams 18 on most.
+    #
+    # Only the apisix.apache.org group. The subchart also ships gwapi-crds.yaml,
+    # holding the Gateway API CRDs at channel "standard", bundle v1.6.0 -- the same
+    # cluster-scoped objects setup_traefik installs from the *experimental* bundle
+    # at GATEWAY_API_VERSION and owns. Adopting those here would force every
+    # gateway.networking.k8s.io CRD down from experimental to standard and leave
+    # two Pulumi resources overwriting each other on every up. skip_crds below
+    # keeps Helm from installing that copy on a fresh cluster too, which the
+    # release's existing depends_on gateway_api_crds already makes unnecessary.
+    apisix_crds = adopt_helm_chart_crds(
+        f"{cluster_name}-apisix-crds",
+        kubeconfig=cluster.kubeconfig,
+        repo="https://apache.github.io/apisix-helm-chart",
+        chart="apisix",
+        version=apisix_chart_version,
+        groups={"apisix.apache.org"},
+        opts=ResourceOptions(parent=operations_namespace, depends_on=[cluster]),
+    )
+
     apisix_helm_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-apisix-official-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
@@ -324,6 +352,9 @@ def setup_apisix(
             namespace="operations",
             cleanup_on_fail=True,
             chart="apisix",
+            # The CRDs are applied above as their own Pulumi resource. Helm would
+            # only write them on a fresh install anyway, which is the bug.
+            skip_crds=True,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://apache.github.io/apisix-helm-chart",
             ),
@@ -632,6 +663,13 @@ def setup_apisix(
                             "upstream_response_time=$upstream_response_time "
                             "upstream_status=$upstream_status "
                             'http_referer="$http_referer" '
+                            # Referer is subject to the page's referrer policy
+                            # and is often absent on cross-origin API calls;
+                            # Origin is sent on every CORS-mode request no
+                            # matter the policy, and Sec-Fetch-Site says
+                            # same-origin/cross-site/none without any URL.
+                            'http_origin="$http_origin" '
+                            'sec_fetch_site="$http_sec_fetch_site" '
                             'http_user_agent="$http_user_agent" '
                             "method=$request_method "
                             'request="$request" '
@@ -971,6 +1009,7 @@ def setup_apisix(
                 *node_groups,
                 operations_namespace,
                 gateway_api_crds,
+                apisix_crds,
                 lb_controller,
                 error_pages_configmap,
             ],
@@ -1004,6 +1043,56 @@ def setup_apisix(
         opts=ResourceOptions(
             provider=k8s_provider,
             parent=operations_namespace,
+            depends_on=[apisix_helm_release],
+        ),
+    )
+
+    # Refuse the gateway's own identity headers from a client, on every route.
+    #
+    # The openid-connect plugin clears an inbound X-Userinfo / X-ID-Token /
+    # X-Raw-ID-Token / X-Refresh-Token before setting its own, but only where
+    # it is attached.  Every other route on an OIDC host hands the client's
+    # copy straight to the application, and mitol-apigateway's middleware
+    # authenticates off X-Userinfo without asking who wrote it -- so one
+    # unprotected route on a host that has a login is enough to impersonate
+    # any account.
+    #
+    # A global rule rather than an entry in each application's shared plugin
+    # config: the routes at risk are the ones that reference no plugin config
+    # at all, and a route carrying its own serverless-pre-function (every OIDC
+    # route does) would override a shared one by plugin name instead of running
+    # both.  Global rules run after route matching but ahead of the matched
+    # route's rewrite phase, which is where openid-connect lives, so the strip
+    # lands before the real headers are set and after nothing.
+    #
+    # The ingress controller flattens every ApisixGlobalRule in the cluster
+    # into one plugin-name-keyed map (internal/adc/translator/globalrule.go),
+    # so this is the cluster's only global ``serverless-pre-function``: a
+    # second one anywhere would silently replace it rather than run alongside.
+    # Anything else that has to run globally before openid-connect belongs in
+    # ``strip_client_identity_headers.lua``'s ``functions`` list, the same way
+    # ``oidc_gateway_pre_function_plugin`` stacks its two.
+    kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-apisix-identity-header-strip-global-rule",
+        api_version="apisix.apache.org/v2",
+        kind="ApisixGlobalRule",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="identity-header-strip",
+            namespace="operations",
+            labels=k8s_global_labels,
+        ),
+        spec={
+            "ingressClassName": "apache-apisix",
+            "plugins": [
+                identity_header_strip_plugin().model_dump(
+                    by_alias=True, exclude_none=True
+                )
+            ],
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+            delete_before_replace=True,
             depends_on=[apisix_helm_release],
         ),
     )

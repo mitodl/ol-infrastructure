@@ -276,12 +276,29 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
 
 
 if __name__ == "__main__":
+    from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
+
     pipeline = PipelineFragment.combine_fragments(
         build_keycloak_infrastructure_pipeline(), build_keycloak_substructure_pipeline()
     ).to_pipeline()
+    output = pipeline_json_with_user_data(
+        pipeline,
+        user_data={
+            "description": (
+                "Builds the `mitodl/keycloak` image (upstream Keycloak plus the CAS "
+                "protocol, OL, and Keycloakify SPIs, and the SCIM plugin), then "
+                "deploys it via Pulumi to CI, QA, and Production, gated on a "
+                "reviewed preview. Also runs the `substructure/keycloak/` Pulumi "
+                "chain. This is the org-wide IdP -- core-platform, not an Open edX "
+                "component."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(pipeline.model_dump_json(indent=2))
-    sys.stdout.write(pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.writelines(
         ("\n", "fly -t pr-inf sp -p docker-packer-pulumi-keycloak -c definition.json")
     )

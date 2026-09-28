@@ -12,6 +12,7 @@ from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -46,8 +47,22 @@ azure_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
+    output = pipeline_json_with_user_data(
+        azure_pipeline,
+        user_data={
+            "description": (
+                "Deploys the Azure OpenAI infrastructure (`infrastructure/azure/`) "
+                "to CI, QA, and Production. mit-learn, learn-ai, and edxapp take a "
+                "StackReference on this project for their managed identity client "
+                "ids and account endpoints, so it must run for an environment "
+                "before those stacks can deploy their Azure wiring there."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(azure_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(azure_pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     print()  # noqa: T201
     print("fly -t pr-inf sp -p pulumi-azure -c definition.json")  # noqa: T201

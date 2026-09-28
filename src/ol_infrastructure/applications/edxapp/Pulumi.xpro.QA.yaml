@@ -45,7 +45,6 @@ config:
     secure: v1:Tpg1BEYCoSw2D6HQ:yGnhmeKYzo+EetdiUpY/7VzE9vq+OtX/O02d6ugQwMI3D57r3yvxtsY3u+lRYwr0R2yvvVr/Lhm9xXQ3EfycxNtpOUxviHCFsL5wXLA=
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_courseware_index: "true"
-  edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     authoring: authoring
     communications: communications
@@ -114,6 +113,12 @@ config:
   meilisearch:memory_limit: "1Gi"
   typesense:deploy: "true"
   typesense:enabled: "false"
+  # Measured 2026-09-15: every non-prod typesense volume holds 0.74-0.86 GiB
+  # on the 100Gi default, flat over 90 days of history. The largest populated
+  # non-prod course index anywhere (mitxonline QA meilisearch) is 2.35 GiB, so
+  # 20Gi is ~8x the realistic ceiling for this tier, not just the idle figure.
+  # Shrinking also drops provisioned IOPS, which scale as iopsPerGB * size.
+  typesense:storage_size: 20Gi
   edxapp:site_project:
     deployment: xpro
     mfe_apps:

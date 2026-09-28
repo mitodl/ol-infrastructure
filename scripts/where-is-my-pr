@@ -33,6 +33,13 @@ or shared infrastructure code (``PULUMI_WATCHED_PATHS`` -- consumed by every
 app's ``ol-infra-{app}`` pipeline resource) it touches, and each affected
 app pipeline's stages are checked for whether they've picked up this commit.
 
+Changes to any other Pulumi project (``src/ol_infrastructure/{project}/``,
+e.g. ``applications/ocw_site/`` or ``infrastructure/vault/``, which deploy via
+dedicated or simple-Pulumi pipelines rather than an ``{app}-pipeline``) are
+traced the same way as SOPS files: every live Concourse job that runs a
+Pulumi update for that project is discovered, and its last successful build
+is checked for whether it deployed this commit.
+
 SOPS files under ``src/bridge/secrets/`` are mapped to candidate Pulumi consumers
 using ``PROJECT_SECRETS`` (including shared files and provider-credential
 exceptions). Live Concourse configurations supply the actual project, stack,
@@ -51,6 +58,7 @@ from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from fnmatch import fnmatchcase
+from functools import cache
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, urlencode
@@ -81,6 +89,7 @@ OL_INFRA_REPO = "mitodl/ol-infrastructure"
 # naming AppPipelineParams.project_source_path assumes for every app.
 APP_DIR_TO_NAME = {name.replace("-", "_"): name for name in APPS}
 APPLICATIONS_DIR_RE = re.compile(r"^src/ol_infrastructure/applications/([^/]+)/")
+PULUMI_ROOT = "src/ol_infrastructure"
 
 PR_URL_RE = re.compile(
     r"github\.com/(?P<owner>[^/]+)/(?P<repo>[^/]+)/pull/(?P<number>\d+)"
@@ -110,6 +119,20 @@ class SecretsRoute:
 
 
 SECRETS_ENV_RE = re.compile(r"[.-](ci|qa|production)\.(yaml|yml|json|env)$")
+ENV_ORDER = {"ci": 0, "qa": 1, "production": 2}
+
+
+def _route_order(route: SecretsRoute) -> tuple[str, str, str, int, str, str]:
+    """Sort routes by pipeline, then in promotion order (CI, QA, Production)."""
+    group, _, env = route.stack.rpartition(".")
+    return (
+        route.project,
+        route.pipeline,
+        route.instance_query,
+        ENV_ORDER.get(env.lower(), len(ENV_ORDER)),
+        group,
+        route.job,
+    )
 
 
 @dataclass
@@ -356,14 +379,30 @@ def _changed_files(owner: str, repo: str, number: int) -> list[str]:
     return [f["filename"] for page in pages for f in page]
 
 
-def _impacted_apps(paths: list[str]) -> tuple[set[str], bool, list[str]]:
-    """Map an ol-infrastructure PR's changed files to affected app pipelines.
+def _pulumi_project(path: str) -> str | None:
+    """Return the Pulumi project (as keyed in PROJECT_SECRETS) containing `path`.
+
+    PROJECT_SECRETS is test-enforced to list every Pulumi project on disk, so
+    it doubles as the project registry here.
+    """
+    relative = path.removeprefix(f"{PULUMI_ROOT}/")
+    if relative == path:
+        return None
+    return next((p for p in PROJECT_SECRETS if relative.startswith(p)), None)
+
+
+def _impacted_apps(
+    paths: list[str],
+) -> tuple[set[str], bool, dict[str, list[str]], list[str]]:
+    """Map an ol-infrastructure PR's changed files to affected pipelines.
 
     Returns (directly modified apps, whether shared infra code was touched,
-    changed files that don't map to any known app pipeline).
+    changed files by Pulumi project for projects outside the app registry,
+    changed files that don't map to any known pipeline).
     """
     direct: set[str] = set()
     shared_hit = False
+    projects: dict[str, list[str]] = {}
     other: list[str] = []
     for path in paths:
         match = APPLICATIONS_DIR_RE.match(path)
@@ -373,8 +412,12 @@ def _impacted_apps(paths: list[str]) -> tuple[set[str], bool, list[str]]:
         if any(path.startswith(prefix) for prefix in PULUMI_WATCHED_PATHS):
             shared_hit = True
             continue
+        project = _pulumi_project(path)
+        if project is not None:
+            projects.setdefault(project, []).append(path)
+            continue
         other.append(path)
-    return direct, shared_hit, other
+    return direct, shared_hit, projects, other
 
 
 def _report_ol_infra_app(pr: PullRequest, app_name: str) -> None:
@@ -570,6 +613,19 @@ def _discover_pulumi_routes() -> tuple[list[SecretsRoute], list[str]]:
     return routes, failures
 
 
+@cache
+def _pulumi_routes() -> tuple[list[SecretsRoute], list[str]]:
+    """Discover once per run; SOPS and Pulumi-code reporting share the result."""
+    return _discover_pulumi_routes()
+
+
+def _print_fly_login_hint(action: str) -> None:
+    print(f"    ?  fly not logged in to 'infrastructure' -- can't {action}")
+    print(
+        f"    Log in: fly -t {CONCOURSE_TEAM} login -c {CONCOURSE_URL} -n {CONCOURSE_TEAM}"
+    )
+
+
 def _routes_for_secret(path: str, routes: list[SecretsRoute]) -> list[SecretsRoute]:
     """Narrow candidate consumers by environment and known stack-group tokens."""
     projects = _secret_projects(path)
@@ -604,36 +660,43 @@ def _routes_for_secret(path: str, routes: list[SecretsRoute]) -> list[SecretsRou
     return selected
 
 
-def _report_secret_deploy(
-    pr: PullRequest, route: SecretsRoute, paths: list[str]
+def _report_pulumi_deploy(
+    pr: PullRequest, route: SecretsRoute, heading: str, paths: list[str]
 ) -> None:
-    """Report one candidate deploy once, even when it consumes several files."""
-    print(f"\n=== SOPS consumer: {route.project} {route.stack} ({route.pipeline}) ===")
+    """Report one discovered Pulumi deploy once, even when several files feed it."""
+    print(f"\n=== {heading}: {route.project} {route.stack} ({route.pipeline}) ===")
     for path in paths:
         print(f"    {path}")
-    print(f"    -> Pulumi src/ol_infrastructure/{route.project} (stack {route.stack})")
-    print(f"    Deploy: {route.job_url(route.job)}")
+    print(f"    -> Pulumi {PULUMI_ROOT}/{route.project} (stack {route.stack})")
+    inputs = list(dict.fromkeys((route.input_name, route.resource)))
     for preview in route.previews:
         print(f"    Preview: {route.job_url(preview)}")
+        _report_route_job(pr, route, preview, "Preview", inputs)
     if route.previews:
         print(
-            "    Deploy is gated on preview; check its approval inputs. Preview does not write secrets."
+            "    Deploy is gated on preview; check its approval inputs. Preview does not apply changes."
         )
-    inputs = list(dict.fromkeys((route.input_name, route.resource)))
-    live = _live_stage(pr, route.pipeline, route.job, inputs, route.instance_query)
+    print(f"    Deploy: {route.job_url(route.job)}")
+    _report_route_job(pr, route, route.job, "Deploy", inputs)
+
+
+def _report_route_job(
+    pr: PullRequest, route: SecretsRoute, job: str, label: str, inputs: list[str]
+) -> None:
+    live = _live_stage(pr, route.pipeline, job, inputs, route.instance_query)
     if live is None:
         print(
-            "    ?  Could not verify a successful deploy build/input (API unavailable or no usable build in the last 10)."
+            f"    ?  Could not verify a successful {label.lower()} build/input (API unavailable or no usable build in the last 10)."
         )
         return
     print(
         _format_stage(
-            "Deploy",
+            label,
             live.reached,
             f"build #{live.build_name} used ol-infra {live.deployed_commit[:8]}",
         )
     )
-    print(f"    Build: {route.job_url(route.job, live.build_name)}")
+    print(f"    Build: {route.job_url(job, live.build_name)}")
 
 
 def _report_sops_secrets(pr: PullRequest, paths: list[str]) -> None:
@@ -664,14 +727,9 @@ def _report_sops_secrets(pr: PullRequest, paths: list[str]) -> None:
     if not any(consumers.values()):
         return
     if not _fly_ready():
-        print(
-            "    ?  fly not logged in to 'infrastructure' -- can't discover pipelines or verify builds"
-        )
-        print(
-            f"    Log in: fly -t {CONCOURSE_TEAM} login -c {CONCOURSE_URL} -n {CONCOURSE_TEAM}"
-        )
+        _print_fly_login_hint("discover pipelines or verify builds")
         return
-    routes, failures = _discover_pulumi_routes()
+    routes, failures = _pulumi_routes()
     for failure in failures:
         print(f"    ?  Could not inspect {failure}; discovery is incomplete.")
     grouped: dict[SecretsRoute, list[str]] = {}
@@ -683,16 +741,36 @@ def _report_sops_secrets(pr: PullRequest, paths: list[str]) -> None:
             )
         for route in set(matches):
             grouped.setdefault(route, []).append(path)
-    for route in sorted(
-        grouped, key=lambda r: (r.project, r.pipeline, r.instance_query, r.stack, r.job)
-    ):
-        _report_secret_deploy(pr, route, grouped[route])
+    for route in sorted(grouped, key=_route_order):
+        _report_pulumi_deploy(pr, route, "SOPS consumer", grouped[route])
+
+
+def _report_pulumi_projects(pr: PullRequest, projects: dict[str, list[str]]) -> None:
+    """Trace Pulumi code changes for projects that aren't in the app registry."""
+    print(
+        "\nPulumi projects changed outside the app registry: "
+        f"{', '.join(sorted(projects))}"
+    )
+    if not _fly_ready():
+        _print_fly_login_hint("discover their pipelines or verify builds")
+        return
+    routes, failures = _pulumi_routes()
+    for failure in failures:
+        print(f"    ?  Could not inspect {failure}; discovery is incomplete.")
+    for project, paths in sorted(projects.items()):
+        matches = sorted((r for r in routes if r.project == project), key=_route_order)
+        if not matches:
+            print(f"    ?  {project}: no Concourse deploy job discovered.")
+            for path in paths:
+                print(f"        {path}")
+        for route in matches:
+            _report_pulumi_deploy(pr, route, "Pulumi project", paths)
 
 
 def _report_ol_infrastructure_pr(pr: PullRequest) -> None:
     paths = _changed_files(pr.owner, pr.repo, pr.number)
     secret_paths = [path for path in paths if _is_secrets_file(path)]
-    direct, shared_hit, other = _impacted_apps(
+    direct, shared_hit, projects, other = _impacted_apps(
         [path for path in paths if path not in secret_paths]
     )
     impacted = direct | (set(APPS) if shared_hit else set())
@@ -707,8 +785,10 @@ def _report_ol_infrastructure_pr(pr: PullRequest) -> None:
         )
     if secret_paths:
         _report_sops_secrets(pr, secret_paths)
+    if projects:
+        _report_pulumi_projects(pr, projects)
 
-    if not impacted and not secret_paths:
+    if not impacted and not secret_paths and not projects:
         print("\nNo changed files map to a known deployment pipeline.")
 
     for app_name in sorted(impacted):

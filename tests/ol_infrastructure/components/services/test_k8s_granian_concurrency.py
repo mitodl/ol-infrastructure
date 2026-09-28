@@ -8,7 +8,6 @@ workers_max_rss derivation from the container memory limit.
 from __future__ import annotations
 
 import pytest
-from kubernetes.utils.quantity import parse_quantity
 from pydantic import ValidationError
 
 from bridge.lib.magic_numbers import (
@@ -137,22 +136,62 @@ def test_holding_pins_reproduce_granians_old_derivation():
 
 
 @pytest.mark.parametrize(
-    ("memory_limit", "workers", "expected_mib"),
+    ("memory_limit", "workers", "startup_rss", "expected_mib"),
     [
-        ("1200Mi", 1, 1080),
-        ("1Gi", 1, 921),
-        ("2000Mi", 2, 900),
+        ("1200Mi", 1, None, 1080),
+        ("1Gi", 1, None, 921),
+        ("2000Mi", 2, None, 900),
+        ("2800Mi", 1, None, 2520),
+        # Headroom for the replacement worker during a planned respawn.
+        ("3Gi", 1, 1100, 1664),
+        ("2800Mi", 1, 600, 1920),
+        ("4Gi", 2, 900, 1393),
     ],
 )
-def test_workers_max_rss_derivation(memory_limit, workers, expected_mib):
-    """Mirrors the synth-time formula in OLApplicationK8s.
+def test_workers_max_rss_derivation(memory_limit, workers, startup_rss, expected_mib):
+    """Derived from the pod's *current* declared limit, not the VPA ceiling."""
+    gc = GranianConfig(workers=workers, worker_startup_rss=startup_rss)
+    resolved = gc.resolve_workers_max_rss(memory_limit)
+    assert resolved.workers_max_rss == expected_mib
+    assert arg_value(resolved.build_args(), "--workers-max-rss") == str(expected_mib)
 
-    floor(limit_bytes / workers * 0.9) MiB, against the pod's *current* declared
-    limit -- not the VPA ceiling, which the kernel OOM killer does not enforce.
-    """
-    limit_bytes = int(parse_quantity(memory_limit))
-    computed = max(1, int(limit_bytes / workers * 0.9) // (1024 * 1024))
-    assert computed == expected_mib
+
+def test_workers_max_rss_overlap_fits_the_budget():
+    """Every worker at the cap plus a fresh worker stays within 90% of the limit."""
+    gc = GranianConfig(workers=2, worker_startup_rss=700).resolve_workers_max_rss("3Gi")
+    assert gc.workers * gc.workers_max_rss + 700 <= 0.9 * 3072
+
+
+def test_workers_max_rss_refuses_a_cap_below_startup_rss():
+    with pytest.raises(ValueError, match="respawns continuously"):
+        GranianConfig(worker_startup_rss=1100).resolve_workers_max_rss("2Gi")
+
+
+def test_workers_max_rss_resolution_keeps_explicit_or_disabled_caps():
+    assert (
+        GranianConfig(workers_max_rss=1500)
+        .resolve_workers_max_rss("3Gi")
+        .workers_max_rss
+        == 1500
+    )
+    assert (
+        GranianConfig(limit_workers_max_rss=False)
+        .resolve_workers_max_rss("3Gi")
+        .workers_max_rss
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"workers_max_rss": 1500},
+        {"limit_workers_max_rss": False},
+    ],
+)
+def test_worker_startup_rss_rejected_when_it_would_be_ignored(kwargs):
+    with pytest.raises(ValidationError, match="worker_startup_rss"):
+        GranianConfig(worker_startup_rss=600, **kwargs)
 
 
 def test_workers_max_rss_explicit_is_emitted_verbatim():
@@ -163,3 +202,15 @@ def test_workers_max_rss_explicit_is_emitted_verbatim():
 def test_workers_max_rss_absent_when_unresolved():
     """The component resolves this at synth time; the model alone emits nothing."""
     assert "--workers-max-rss" not in GranianConfig().build_args()
+
+
+# ─── respawn_interval ─────────────────────────────────────────────────────────
+
+
+def test_respawn_interval_omitted_by_default():
+    assert "--respawn-interval" not in GranianConfig().build_args()
+
+
+def test_respawn_interval_emitted():
+    args = GranianConfig(respawn_interval=60).build_args()
+    assert arg_value(args, "--respawn-interval") == "60.0"

@@ -6,6 +6,13 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
+# StarRocks forwards the user's ID token to the Iceberg REST catalog under
+# iceberg.catalog.security=JWT and never refreshes it, and Keycloak expires the ID
+# token with the access token. At the realm default of 5m every catalog call fails
+# about five minutes into a session. See
+# docs/plans/gravitino-keycloak-integration-spec.md D3.
+STARROCKS_TOKEN_LIFESPAN_SECONDS = 3600
+
 
 def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
@@ -474,6 +481,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         implicit_flow_enabled=False,
         service_accounts_enabled=True,
         valid_redirect_uris=ol_data_platform_starrocks_redirect_uris,
+        access_token_lifespan=str(STARROCKS_TOKEN_LIFESPAN_SECONDS),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
     ol_data_platform_starrocks_client_roles = (
@@ -689,6 +697,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             "http://127.0.0.1:18080/callback",
         ],
         web_origins=["+"],
+        access_token_lifespan=str(STARROCKS_TOKEN_LIFESPAN_SECONDS),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
     keycloak.openid.ClientDefaultScopes(
@@ -718,7 +727,118 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         add_to_userinfo=True,
         opts=resource_options,
     )
+    # The interactive PKCE path issues through ol-starrocks-cli, so without this
+    # mapper role-driven policy downstream of the token (e.g. Gravitino groups)
+    # matched nothing for the tokens humans actually arrive with. It projects the
+    # same ol-starrocks-client roles as the confidential client's mapper.
+    # multivalued=True matters: Gravitino drops a non-list groups claim silently.
+    keycloak.openid.UserClientRoleProtocolMapper(
+        "ol-data-platform-starrocks-cli-role-keys-mapper",
+        claim_name="role_keys",
+        realm_id=ol_data_platform_realm.id,
+        add_to_access_token=True,
+        add_to_id_token=True,
+        add_to_userinfo=True,
+        claim_value_type="String",
+        client_id=ol_data_platform_starrocks_cli_client.id,
+        client_id_for_role_mappings="ol-starrocks-client",
+        multivalued=True,
+        name="starrocks-role-keys",
+        opts=resource_options,
+    )
     # STARROCKS [END] # noqa: ERA001
+
+    # GRAVITINO [START] # noqa: ERA001
+    # Bootstrap credential for StarRocks' CREATE EXTERNAL CATALOG. security=JWT
+    # alone cannot create the catalog: RESTSessionCatalog.initialize() runs with
+    # no user session, so GET /v1/config goes out unauthenticated. This
+    # credential is used at catalog init only; every per-user operation carries
+    # the end user's own token. Its client id is also the catalog's audience.
+    ol_data_platform_gravitino_catalog_client = keycloak.openid.Client(
+        "ol-data-platform-gravitino-catalog-client",
+        name="ol-data-platform-gravitino-catalog-client",
+        realm_id=ol_data_platform_realm.id,
+        client_id="ol-gravitino-catalog",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=False,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=True,
+        direct_access_grants_enabled=False,
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    # Gravitino service admin, used by the reconciler that creates the metalake,
+    # catalog, groups, roles and grants through the management API. Its
+    # realm-management roles let it enumerate users and client roles when adding
+    # users to the metalake. See gravitino-authorization-spec.md A6-A8 in
+    # https://github.com/mitodl/ol-infrastructure/pull/5925
+    ol_data_platform_gravitino_admin_client = keycloak.openid.Client(
+        "ol-data-platform-gravitino-admin-client",
+        name="ol-data-platform-gravitino-admin-client",
+        realm_id=ol_data_platform_realm.id,
+        client_id="ol-gravitino-admin",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=False,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=True,
+        direct_access_grants_enabled=False,
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    for resource_name, role in [
+        ("ol-gravitino-admin-service-account-view-users", "view-users"),
+        ("ol-gravitino-admin-service-account-view-clients", "view-clients"),
+    ]:
+        keycloak.openid.ClientServiceAccountRole(
+            resource_name,
+            realm_id=ol_data_platform_realm.id,
+            service_account_user_id=ol_data_platform_gravitino_admin_client.service_account_user_id,
+            client_id=realm_mgmt_client.id,
+            role=role,
+            opts=resource_options,
+        )
+
+    for vault_name, gravitino_client in (
+        ("gravitino-catalog", ol_data_platform_gravitino_catalog_client),
+        ("gravitino-admin", ol_data_platform_gravitino_admin_client),
+    ):
+        vault.generic.Secret(
+            f"ol-data-platform-{vault_name}-client-vault-credentials",
+            path=f"secret-operations/sso/{vault_name}",
+            data_json=Output.all(
+                url=gravitino_client.realm_id.apply(
+                    lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+                ),
+                client_id=gravitino_client.client_id,
+                client_secret=gravitino_client.client_secret,
+                realm_id=gravitino_client.realm_id,
+                realm_name="ol-data-platform",
+            ).apply(json.dumps),
+        )
+
+    # Gravitino accepts exactly one serviceAudience, so every client whose tokens
+    # reach it has to carry the same aud value. The two StarRocks paths forward
+    # the ID token; the service accounts only have an access token. Keycloak
+    # appends rather than replaces aud, and StarRocks checks aud by containment,
+    # so existing StarRocks logins are unaffected.
+    for mapper_name, audience_client in (
+        ("starrocks", ol_data_platform_starrocks_client),
+        ("starrocks-cli", ol_data_platform_starrocks_cli_client),
+        ("gravitino-catalog", ol_data_platform_gravitino_catalog_client),
+        ("gravitino-admin", ol_data_platform_gravitino_admin_client),
+    ):
+        keycloak.openid.AudienceProtocolMapper(
+            f"ol-data-platform-{mapper_name}-gravitino-audience-mapper",
+            realm_id=ol_data_platform_realm.id,
+            client_id=audience_client.id,
+            name="gravitino-audience",
+            included_client_audience=ol_data_platform_gravitino_catalog_client.client_id,
+            add_to_id_token=True,
+            add_to_access_token=True,
+            opts=resource_options,
+        )
+    # GRAVITINO [END] # noqa: ERA001
 
     # MARIMO [START] # noqa: ERA001
     # ol-marimo-client: used by JupyterHub GenericOAuthenticator (auth code flow)

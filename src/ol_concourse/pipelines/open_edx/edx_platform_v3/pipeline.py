@@ -31,6 +31,7 @@ from bridge.settings.openedx.types import (
 )
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -282,7 +283,22 @@ def build_edx_pipeline(release_names: list[str]) -> Pipeline:
 
 if __name__ == "__main__":
     releases = [release_name.name for release_name in OpenEdxSupportedRelease]
-    pipeline_json = build_edx_pipeline(releases).json(indent=1)
+    pipeline_json = pipeline_json_with_user_data(
+        build_edx_pipeline(releases),
+        user_data={
+            "description": (
+                "Builds the edx-platform Docker image (edx-platform + theme, via "
+                "the `lehrer` dagger module) for every supported Open edX release "
+                f"({', '.join(releases)}) and deployment combination, then deploys "
+                "each via a Pulumi chain gated on a preview of itself "
+                "(`topology=preview-gated`) rather than the previous stage's diff -- "
+                "edxapp is the highest blast-radius app in the estate and its "
+                "environments are the most likely to have drifted."
+            ),
+            "team": "infrastructure",
+            "category": "open-edx",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)

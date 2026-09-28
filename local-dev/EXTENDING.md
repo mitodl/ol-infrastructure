@@ -5,7 +5,8 @@ How to add a new app to the stack or change the shared in-cluster infrastructure
 ## Table of Contents
 
 1. [Adding a New App](#adding-a-new-app)
-2. [Modifying Shared Infrastructure](#modifying-shared-infrastructure)
+2. [Composing a Stack from Another Repo](#composing-a-stack-from-another-repo)
+3. [Modifying Shared Infrastructure](#modifying-shared-infrastructure)
 
 ## Adding a New App
 
@@ -35,7 +36,14 @@ In `local-dev/infra/modules/database.py`, add to the `postInitSQL` list:
 
 ### 3. Register the namespace (TLS secret comes with it)
 
-Add `"my-app"` to the `APP_NAMESPACES` tuple in `local-dev/infra/modules/namespaces.py`, and to the matching `app_namespaces` tuple in `local-dev/infra/modules/tls.py` — the latter's loops then create the `local-dev-tls` Secret and mkcert CA ConfigMap in the new namespace automatically.
+Add `"my-app"` to the `APP_NAMESPACES` tuple in `local-dev/infra/modules/namespaces.py`. `tls.py` reads the same list through `app_namespaces_for()`, so the `local-dev-tls` Secret and mkcert CA ConfigMap appear in the new namespace automatically.
+
+If the app brings heavyweight infrastructure with it — an object store, a CI system, anything a developer who is not working on that app should not be paying for — put its name in `OPTIONAL_APP_NAMESPACES` instead. Namespaces listed there are only created when the app appears in `enabled_apps`, which the Tiltfile forwards to both Pulumi stacks as `LOCAL_DEV_ENABLED_APPS`. Gate the expensive resources on the same value; `ocw-studio` and the RustFS object store are the worked example.
+
+Two things not to do:
+
+- Don't add the app's database to the CNPG cluster's `postInitSQL` (step 2) if the app is optional. That block only runs when initdb bootstraps an empty data directory, so it does nothing for anyone who already has a cluster, while still producing a spec diff Pulumi will try to apply to an immutable `initdb` section. Create the database from an init container instead — `local-dev/apps/ocw-studio/deployment.yaml` shows the idempotent pattern.
+- Don't retrofit gating onto the four original apps. Their namespaces and databases are provisioned unconditionally on purpose: changing that would churn Pulumi state on every existing developer's cluster to save a namespace and an empty database.
 
 ### 4. Add the Keycloak OIDC client (if needed)
 
@@ -69,6 +77,37 @@ In `Tiltfile`, add an entry to the `APPS` list:
 ### 6. Add hosts and DNS
 
 In `setup.sh`, add the hostname to `HOSTS` and ensure it's covered by a `MKCERT_DOMAINS` wildcard. Re-run `setup.sh` to update `/etc/hosts` and regenerate the cert.
+
+## Composing a Stack from Another Repo
+
+The steps above are for an app whose manifests live here. When another repo
+already owns a full Tilt stack, compose it instead of reimplementing it — the
+`openedx` app is the worked example, and `local-dev/apps/openedx/Tiltfile` is
+short enough to read end to end.
+
+The pattern, and what makes it hold up over time:
+
+1. **The owning repo exposes a parameterised entry point.** lehrer's
+   `local-dev/lehrer-core.star` exports `setup(cfg)`; this repo pulls it in with
+   `load_dynamic()` and passes topology. No manifests are copied. It has to be
+   `load_dynamic()` rather than `load()`, because the path depends on
+   `MITOL_WORKSPACE_ROOT` and Starlark's `load()` takes a string literal only.
+2. **Say which shared services to reuse.** `manage_infra: False` tells lehrer
+   not to install Valkey/OpenSearch because `local-infra` already has them.
+   Anything this cluster genuinely lacks (MariaDB, MongoDB) stays the owning
+   repo's to install.
+3. **Layer config deltas; never fork a ConfigMap.** lehrer's manifests read an
+   optional `*-config-overrides` ConfigMap last in `envFrom`, so this repo
+   supplies only the keys that differ and inherits every key added upstream. A
+   full replacement ConfigMap would silently go stale instead.
+4. **Share credential defaults through a file both sides read**, rather than
+   restating them. lehrer's `local-dev/secret-defaults.yaml` is read both by
+   its CLI and by `setup()`'s `manage_secrets`, so the Secret is identical
+   however the stack is started.
+
+Steps 3 and 4 are what keep composition from decaying into a fork. If the
+stack you are composing offers neither, adding them upstream is usually a
+smaller change than maintaining the copy.
 
 ## Modifying Shared Infrastructure
 

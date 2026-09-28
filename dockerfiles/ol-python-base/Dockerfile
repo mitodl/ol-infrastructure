@@ -79,7 +79,7 @@ RUN apt-get update && \
 RUN command -v python >/dev/null 2>&1 || ln -s "$(command -v python3)" /usr/local/bin/python
 
 # Install uv (pinned via the upstream tag; bump deliberately).
-COPY --from=ghcr.io/astral-sh/uv:0.12.13@sha256:b485bd65cc2cf1c9a93b3554012c9c3778cf7b1b5fd3d3096ce9e1226c97e1e6 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.12.19@sha256:04d046b13e60d6bcec73cbc5e1cad25d680dea90c8573340950a0ac2d1aef424 /uv /uvx /usr/local/bin/
 
 # Non-root runtime user and the directories the apps expect to own.
 RUN adduser --disabled-password --gecos "" mitodl && \

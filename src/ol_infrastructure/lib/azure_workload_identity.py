@@ -68,7 +68,7 @@ def azure_identity_env(
 
     :param azure_openai_stack: StackReference on ``infrastructure/azure/openai``.
     :param consumer: Key into that stack's ``workload_identities`` output --
-        ``mitlearn``, ``learn-ai``, or ``mitxonline``.
+        ``mitlearn``, ``learn-ai``, ``mitxonline``, or ``dagster-ml``.
     """
     return {
         "AZURE_CLIENT_ID": azure_openai_stack.require_output(

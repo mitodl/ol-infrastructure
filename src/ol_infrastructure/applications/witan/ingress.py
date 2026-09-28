@@ -70,8 +70,14 @@ def create_ingress_resources(
     # The visible consequence is that `/health` becomes publicly reachable and
     # reports witan's version. It carries no graph data and no per-actor state,
     # and the kubelet reaches it via the pod IP rather than through here, so
-    # narrowing this to `/mcp` later costs nothing operationally — a follow-up
-    # worth taking once this cutover has settled.
+    # narrowing this later costs nothing operationally — a follow-up worth
+    # taking once this cutover has settled.
+    #
+    # Whoever narrows it must keep more than `/mcp`: `/ui/*` serves the web UI
+    # and its /ui/config.json (the page logs in through the `witan-ui` Keycloak
+    # client, then calls /mcp from the same origin), and
+    # `/.well-known/oauth-protected-resource*` is the RFC 9728 metadata MCP
+    # clients discover the issuer from.
     witan_httproute = OLApisixHTTPRoute(
         f"witan-apisix-httproute-{stack_info.env_suffix}",
         route_configs=[

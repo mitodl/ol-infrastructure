@@ -10,6 +10,8 @@ This module verifies:
    keys the pinned APISIX expects, and omits them when unset
 5. The session cookie names derived by bridge.lib.constants, and the stale
    cookie cleanup plugin's generated Lua
+6. The identity-header strip plugin's wiring: the Lua it ships, the phase it
+   runs in, and the header list it defaults to
 """
 
 from __future__ import annotations
@@ -41,6 +43,7 @@ import pytest  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
 from bridge.lib.constants import (  # noqa: E402
+    GATEWAY_IDENTITY_HEADERS,
     apisix_oidc_session_cookie_name,
     mit_learn_session_cookie_name,
 )
@@ -52,6 +55,7 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixSharedPluginsConfig,
     OLApisixUpstream,
     OLApisixUpstreamConfig,
+    identity_header_strip_plugin,
     oidc_gateway_pre_function_plugin,
     stale_session_cookie_cleanup_plugin,
 )
@@ -807,3 +811,85 @@ def test_cors_disabled_reaches_the_gateway_api_plugin_config():
             assert plugin_named(spec["plugins"], name) is not None, name
 
     return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+# ─── identity_header_strip_plugin wiring ──────────────────────────────────────
+#
+# The test-nginx suite drives the Lua directly with a hand-built config, so it
+# cannot catch a Python-side regression: a builder that shipped the wrong file,
+# ran in the access phase, or dropped a header from the list would pass all of
+# it.  These cover the seam between the two.
+
+
+def test_identity_strip_plugin_runs_in_rewrite_before_openid_connect():
+    """openid-connect is a rewrite plugin (priority 2599) and a global rule's
+    rewrite phase runs ahead of the matched route's.  In the access phase this
+    would land after openid-connect had already read the request.
+    """
+    plugin = identity_header_strip_plugin()
+
+    assert plugin.name == "serverless-pre-function"
+    assert plugin.config["phase"] == "rewrite"
+
+
+def test_identity_strip_plugin_ships_the_lua_verbatim():
+    """The function body is the checked-in .lua file -- the header list travels
+    as config and is read off ``conf``, not interpolated into the source.
+    """
+    plugin = identity_header_strip_plugin(header_names=["X-Interpolation-Canary"])
+
+    assert plugin.config["functions"] == [
+        apisix_module.STRIP_CLIENT_IDENTITY_HEADERS_LUA
+    ]
+    assert "X-Interpolation-Canary" not in plugin.config["functions"][0]
+
+
+def test_identity_strip_plugin_defaults_to_the_gateway_identity_headers():
+    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+
+    assert headers == list(GATEWAY_IDENTITY_HEADERS)
+
+
+def test_identity_strip_plugin_covers_everything_openid_connect_mints():
+    """openid-connect.lua clears-then-sets these four (3.18.0, lines 1174-1177
+    and 1482-1500).  Dropping one silently reopens the hole under that name.
+    """
+    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+
+    assert set(headers) == {
+        "X-Userinfo",
+        "X-ID-Token",
+        "X-Raw-ID-Token",
+        "X-Refresh-Token",
+    }
+
+
+def test_identity_strip_plugin_leaves_the_tika_shared_secret_alone():
+    """X-Access-Token is a *client* credential here, not a gateway assertion:
+    Tika's route validates it in the access phase -- after this runs -- and
+    mit-learn sends it on every extraction request.  Stripping it cluster-wide
+    would 401 all content extraction while protecting nothing, since no
+    application reads it as an identity claim.  Authorization is out for the
+    same reason at much larger scale.
+    """
+    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+
+    assert "X-Access-Token" not in headers
+    assert "Authorization" not in headers
+
+
+def test_identity_strip_plugin_honours_a_custom_header_list():
+    headers = identity_header_strip_plugin(
+        header_names=["X-Custom-Identity"],
+    ).config["identity_header_strip"]["headers"]
+
+    assert headers == ["X-Custom-Identity"]
+
+
+def test_identity_strip_plugin_emits_a_list_not_a_tuple():
+    """The config is rendered into a CRD spec, and a tuple round-trips through
+    the Pulumi/Kubernetes provider differently from a list.
+    """
+    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+
+    assert isinstance(headers, list)

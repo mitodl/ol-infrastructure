@@ -91,8 +91,9 @@ Per environment, for `consumer in {mitlearn, learn-ai, mitxonline}`:
   "additive migration" rationale that conflated Azure account keys with the unrelated OpenAI
   API key.) `custom_sub_domain_name` **must** be set or the account accepts only API-key auth,
   which defeats Entra token auth entirely.
-- `azure_native.cognitiveservices.Deployment` for `gpt-4o`, `gpt-4o-mini`, `gpt-5.2` on each
-  account. Model versions stay unpinned by default (which versions exist is a property of the
+- `azure_native.cognitiveservices.Deployment` for `gpt-4o`, `gpt-5-mini`, `gpt-5.2` on each
+  account. (`gpt-5-mini` replaced `gpt-4o-mini` on 2026-09-22: Azure refuses new
+  deployments of `gpt-4o-mini`'s only version, `2024-07-18`, with `ServiceModelDeprecating`.) Model versions stay unpinned by default (which versions exist is a property of the
   subscription and region, and a wrong version string fails at deployment creation rather than
   at preview); pin via a `{model: version}` stack config map once confirmed, which also
   switches the deployment to `NoAutoUpgrade`.
@@ -413,7 +414,7 @@ allocate heavily to Production and minimally to CI and QA.
 - **Q1. Subscription and region. STILL OPEN, blocks deployment.** The subscription is
   `1a5054d4-e995-477d-9551-e08d33f60fdb` (`ol-engineering`). Confirm
   `Microsoft.CognitiveServices` is registered, the subscription is approved for Azure OpenAI,
-  and the TPM quota for `gpt-4o`, `gpt-4o-mini`, and `gpt-5.2`. The answer needs to be **three
+  and the TPM quota for `gpt-4o`, `gpt-5-mini`, and `gpt-5.2`. The answer needs to be **three
   numbers, one per model**, not a yes: each model has its own pool, and nine deployments share
   it (§4). A subscription without quota fails at `Deployment` creation, not at preview. The
   Production stack now refuses to preview at all without an explicit

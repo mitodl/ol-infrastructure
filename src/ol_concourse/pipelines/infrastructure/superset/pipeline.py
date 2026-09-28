@@ -25,6 +25,7 @@ from ol_concourse.pipelines.constants import (
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -164,9 +165,22 @@ def build_superset_docker_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
+    output = pipeline_json_with_user_data(
+        build_superset_docker_pipeline(),
+        user_data={
+            "description": (
+                "Builds the Superset Docker image from `src/ol_superset/`, baked "
+                "against the latest matching `apache/superset` release tag "
+                "(`^6`), pushes it to ECR, then deploys Superset via Pulumi "
+                "(`applications/superset/`) to `CI`, `QA`, and `Production`."
+            ),
+            "team": "infrastructure",
+            "category": "data-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(build_superset_docker_pipeline().json(indent=2))
-    sys.stdout.write(build_superset_docker_pipeline().json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.writelines(
         ("\n", "fly -t pr-inf sp -p docker-packer-pulumi-superset -c definition.json")
     )

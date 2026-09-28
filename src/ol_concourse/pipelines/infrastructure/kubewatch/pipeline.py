@@ -18,6 +18,7 @@ from ol_concourse.pipelines.constants import (
     PULUMI_WATCHED_PATHS,
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -186,9 +187,23 @@ if __name__ == "__main__":
         kubewatch_fragment,
     ).to_pipeline()
 
+    output = pipeline_json_with_user_data(
+        pipeline,
+        user_data={
+            "description": (
+                "Builds and deploys kubewatch and its companion "
+                "kubewatch_webhook_handler service: builds the webhook handler "
+                "image and deploys it via Pulumi first, then deploys the "
+                "kubewatch Helm chart, which references the handler's service "
+                "URL via StackReference, across CI, QA, and Production."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(pipeline.model_dump_json(indent=2))
-    sys.stdout.write(pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.writelines(
         ("\n", "fly -t pr-inf sp -p pulumi-kubewatch -c definition.json")
     )

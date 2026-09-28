@@ -84,6 +84,58 @@ fi
 ok "TLS certificates found."
 
 # ---------------------------------------------------------------------------
+# Is this the cluster the Pulumi state was written against?
+# ---------------------------------------------------------------------------
+# State lives in this checkout and outlives the cluster. The stacks recover on
+# their own (both `pulumi refresh` before applying), but the databases in a
+# replaced cluster are empty, and unannounced that reads as data disappearing.
+# kube-system's UID is assigned at bootstrap, so it changes with the cluster.
+# The marker sits under .pulumi so wiping the state wipes the claim too.
+CLUSTER_ID_FILE="${REPO_ROOT}/local-dev/infra/.pulumi/cluster-id"
+live_cluster_id="$(kubectl get namespace kube-system -o jsonpath='{.metadata.uid}' 2>/dev/null)" || true
+
+if [[ -z "${live_cluster_id}" ]]; then
+	warn "Could not read the cluster's identity; skipping the replaced-cluster check."
+elif [[ ! -f "${CLUSTER_ID_FILE}" ]]; then
+	mkdir -p "$(dirname "${CLUSTER_ID_FILE}")"
+	echo "${live_cluster_id}" >"${CLUSTER_ID_FILE}"
+	ok "Recorded this cluster's identity."
+elif [[ "$(cat "${CLUSTER_ID_FILE}")" != "${live_cluster_id}" ]]; then
+	warn "This is not the cluster the Pulumi state was written against."
+	warn "  It was replaced without teardown.sh — deleted by hand, or swept up by"
+	warn "  'docker system prune', which removes stopped containers and orphans"
+	warn "  the anonymous volumes holding every node's data."
+	warn "  The infra stacks will reconcile and rebuild what is missing, but the"
+	warn "  app databases in the new cluster are empty."
+	# Newest dump that is actually complete: pg-backup.sh makes its directory up
+	# front, so an interrupted run leaves one behind. keycloak-users.json is the
+	# last artifact it writes, and the manifest/dump counts are the same check
+	# pg-restore.sh makes. `|| true`: no .backups directory is the common case,
+	# and pipefail would otherwise abort the script mid-warning.
+	newest_backup=""
+	while read -r candidate; do
+		[[ -n "${candidate}" && -f "${candidate}/manifest.txt" ]] || continue
+		[[ -s "${candidate}/keycloak-users.json" ]] || continue
+		listed="$(wc -l <"${candidate}/manifest.txt" | tr -d ' ')"
+		dumps="$(find "${candidate}" -maxdepth 1 -name '*.dump' | wc -l | tr -d ' ')"
+		if [[ "${listed}" == "${dumps}" && "${dumps}" != "0" ]]; then
+			newest_backup="${candidate}"
+			break
+		fi
+	done < <(find "${REPO_ROOT}/local-dev/.backups" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -r || true)
+	if [[ -n "${newest_backup}" ]]; then
+		warn "  Newest dump is ${newest_backup##*/} — load it with:"
+		warn "    ./local-dev/scripts/pg-restore.sh local-dev/.backups/${newest_backup##*/}"
+	else
+		warn "  No dump to restore from — worth running ./local-dev/scripts/pg-backup.sh"
+		warn "  once there is data worth keeping."
+	fi
+	echo "${live_cluster_id}" >"${CLUSTER_ID_FILE}"
+else
+	ok "Pulumi state matches this cluster."
+fi
+
+# ---------------------------------------------------------------------------
 # Heal wedged kubelet exec/streaming (post-sleep recovery)
 # ---------------------------------------------------------------------------
 # After a Docker VM pause on Mac sleep (OrbStack or Docker Desktop), a node's kubelet exec/streaming server

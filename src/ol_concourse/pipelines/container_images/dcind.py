@@ -20,6 +20,7 @@ from ol_concourse.lib.resources import git_repo, registry_image
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.versions_map import version_pin_paths
 
 # The dagger version comes from bridge.lib.versions, not from a github_release
@@ -128,9 +129,24 @@ docker_pipeline = Pipeline(
 )
 
 if __name__ == "__main__":
+    output = pipeline_json_with_user_data(
+        docker_pipeline,
+        user_data={
+            "description": (
+                "Builds `mitodl/dcind`, a Docker-in-Docker image used as the "
+                "Concourse resource type backing Dagger-based builds. Triggers "
+                "on changes to `dockerfiles/dcind/` or a bump to `DAGGER_VERSION` "
+                "in `bridge.lib.versions` (synced into a version-pin file). "
+                "Publishes to Docker Hub and ECR, tagged with the resolved "
+                "Dagger version."
+            ),
+            "team": "main",
+            "category": "concourse-tooling",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(docker_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(docker_pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.write(
-        "\nfly -t pr-inf set-pipeline -p dcind-resource-image -c definition.json"
+        "\nfly -t pr-main set-pipeline -p dcind-resource-image -c definition.json"
     )

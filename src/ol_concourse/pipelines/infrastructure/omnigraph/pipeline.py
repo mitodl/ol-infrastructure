@@ -51,6 +51,7 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -165,9 +166,25 @@ def build_omnigraph_pipeline() -> PipelineFragment:
 if __name__ == "__main__":
     pipeline = build_omnigraph_pipeline().to_pipeline()
 
+    output = pipeline_json_with_user_data(
+        pipeline,
+        user_data={
+            "description": (
+                "Builds the omnigraph-server image from the `mitodl/agent-kit` "
+                "repo (Dockerfile builds from that repo's root to reach the "
+                "whole uv workspace plus the `schema.pg` baked into the image) "
+                "and deploys it via Pulumi (`ol-application-omnigraph`) through "
+                "CI, QA, and Production. It's the knowledge-graph data tier the "
+                "witan MCP service (deployed separately) reaches via "
+                "StackReference."
+            ),
+            "team": "infrastructure",
+            "category": "data-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(pipeline.model_dump_json(indent=2))
-    sys.stdout.write(pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.writelines(
         ("\n", "fly -t pr-inf sp -p pulumi-omnigraph -c definition.json")
     )

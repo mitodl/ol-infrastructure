@@ -52,7 +52,7 @@ Sub-modules
   dagster_pgbouncer
                — New in 2026-08. Dagster's PgBouncer pool: aggregate connection
                  headroom against the max_db_connections cap, queued clients,
-                 connection turnover, and exporter health. Depends on the
+                 and exporter health. Depends on the
                  pgbouncer_exporter sidecar added to the dagster stack in #5426.
                  Pairs with log_rules/dagster_database.py, which covers the
                  client side of the same relationship -- nothing here can see a

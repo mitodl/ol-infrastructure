@@ -137,10 +137,26 @@ def build_xqueue_pipeline(release_name: str):
 
 
 if __name__ == "__main__":
+    from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
+
     release_name = sys.argv[1]
-    pipeline_json = build_xqueue_pipeline(
+    xqueue_pipeline = build_xqueue_pipeline(
         release_name,
-    ).model_dump_json(indent=2)
+    )
+    pipeline_json = pipeline_json_with_user_data(
+        xqueue_pipeline,
+        user_data={
+            "description": (
+                "Builds the xqueue container image, the external grader queue "
+                "service that routes student submissions (e.g. coding "
+                "assessments) to external graders and returns their results to "
+                "edx-platform, then deploys it via Pulumi to every mitodl "
+                f"deployment running the `{release_name}` Open edX release."
+            ),
+            "team": "infrastructure",
+            "category": "open-edx",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)

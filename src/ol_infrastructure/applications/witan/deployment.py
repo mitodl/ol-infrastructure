@@ -124,6 +124,12 @@ WITAN_PORT = 8000
 # here, such a change is inert until someone edits this line.
 WITAN_MCP_PATH = "/mcp"
 
+# The Keycloak client the web UI at /ui/ logs in as, which witan publishes in
+# /ui/config.json. Must equal the `witan-ui` client_id in
+# substructure/keycloak/ol_platform_engineering.py. With WITAN_OIDC_ISSUER set
+# and this unset, witan answers every /ui/ request with a 503 naming it.
+WITAN_UI_OIDC_CLIENT_ID = "witan-ui"
+
 # Liveness/readiness. Shallow by design on witan's side: it answers from
 # process state and never touches the graph.
 #
@@ -498,9 +504,6 @@ def create_serving_tier(  # noqa: PLR0913
     oidc_resource_url: str,
     actor_tokens_secret_name: str,
     actor_tokens_secret: Resource,
-    witan_ci_token_secret_name: str,
-    witan_ci_token_secret_key: str,
-    witan_ci_token_secret: Resource,
     witan_code_token_secret_name: str,
     witan_code_token_secret_key: str,
     witan_code_token_secret: Resource,
@@ -700,6 +703,19 @@ def create_serving_tier(  # noqa: PLR0913
                                     name="WITAN_OIDC_RESOURCE_URL",
                                     value=oidc_resource_url,
                                 ),
+                                # The web UI's login client. The issuer the page
+                                # logs in against is WITAN_OIDC_ISSUER above.
+                                #
+                                # Deliberately no Host/Origin allowlist to go
+                                # with it (agent-kit witan-ui-spec.md §2): APISIX
+                                # terminates TLS, so witan computes the request
+                                # origin as http://<host> while the browser sends
+                                # Origin: https://<host>, and an allowlist would
+                                # 403 every POST the page makes.
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="WITAN_UI_OIDC_CLIENT_ID",
+                                    value=WITAN_UI_OIDC_CLIENT_ID,
+                                ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="WITAN_ACTOR_TOKENS_FILE",
                                     value=(
@@ -707,9 +723,14 @@ def create_serving_tier(  # noqa: PLR0913
                                         f"{ACTOR_TOKENS_FILENAME}"
                                     ),
                                 ),
-                                # Module-level fallback OmnigraphClient's target
-                                # (ADR-0004 D4) — omnigraph-server's in-cluster
-                                # address.
+                                # omnigraph-server's in-cluster address, which
+                                # every per-actor OmnigraphClient targets.
+                                #
+                                # There is deliberately no WITAN_MEMORY_TOKEN
+                                # here. witan only uses it for a pod without
+                                # WITAN_OIDC_ISSUER; this one sets it, so every
+                                # memory call runs as the caller's own token and
+                                # a request with no caller is refused.
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="WITAN_MEMORY_URI",
                                     value=omnigraph_server_addr,
@@ -738,15 +759,6 @@ def create_serving_tier(  # noqa: PLR0913
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="WITAN_CODE_SERVER",
                                     value=omnigraph_server_addr,
-                                ),
-                                kubernetes.core.v1.EnvVarArgs(
-                                    name="WITAN_MEMORY_TOKEN",
-                                    value_from=kubernetes.core.v1.EnvVarSourceArgs(
-                                        secret_key_ref=kubernetes.core.v1.SecretKeySelectorArgs(
-                                            name=witan_ci_token_secret_name,
-                                            key=witan_ci_token_secret_key,
-                                        )
-                                    ),
                                 ),
                                 # The tier's own credential against the code
                                 # graphs, for the questions asked *about* the
@@ -975,7 +987,6 @@ def create_serving_tier(  # noqa: PLR0913
         opts=ResourceOptions(
             depends_on=[
                 witan_service_account,
-                witan_ci_token_secret,
                 witan_code_token_secret,
                 sentry_dsn_secret,
                 actor_tokens_secret,

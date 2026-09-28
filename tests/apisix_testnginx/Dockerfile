@@ -8,19 +8,19 @@
 # Runs APISIX's own test-nginx harness against the Lua in this repo.
 #
 # Built on the same image the cluster runs (see APISIX_CHART in
-# bridge/lib/versions.py -- chart 2.16.x ships APISIX 3.17.x), so the Lua is
+# bridge/lib/versions.py -- chart 2.17.x ships APISIX 3.18.x), so the Lua is
 # exercised by the same OpenResty build, with APISIX's real lua_package_path.
 #
 # t/APISIX.pm and the certs it reads are fetched at build time rather than
 # vendored: they are upstream test fixtures, and the key files would trip
 # secret scanning if committed here.
-ARG APISIX_VERSION=3.17.0
+ARG APISIX_VERSION=3.18.0
 FROM apache/apisix:${APISIX_VERSION}-debian
 
 # Repeated with its default: a global ARG's default is not inherited by a
 # stage-level redeclaration, so omitting it here silently yields an empty string
 # and the fetch below 404s.
-ARG APISIX_VERSION=3.17.0
+ARG APISIX_VERSION=3.18.0
 USER root
 
 # The image ships a minimal perl with no prove and no Test::Harness, so the
@@ -84,9 +84,11 @@ RUN set -eu; \
 # drift, and the suite would then pass against Lua the gateway never runs.
 COPY src/ol_infrastructure/components/services/files/oidc_error_callback_recovery.lua \
      src/ol_infrastructure/components/services/files/canonical_https_redirect.lua \
+     src/ol_infrastructure/components/services/files/strip_client_identity_headers.lua \
      apisix/plugins/ol/
 COPY tests/apisix_testnginx/oidc_error_callback_recovery.t \
      tests/apisix_testnginx/canonical_https_redirect.t \
+     tests/apisix_testnginx/strip_client_identity_headers.t \
      t/
 COPY tests/apisix_testnginx/run-tests.sh /usr/local/bin/run-tests.sh
 RUN chmod +x /usr/local/bin/run-tests.sh

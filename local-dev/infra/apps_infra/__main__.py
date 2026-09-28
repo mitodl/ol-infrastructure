@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from modules.helpers import make_resource_opts
 from modules.keycloak import create_olapps_dev_realm
-from pulumi import Config
+from pulumi import Config, Output
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -52,6 +52,25 @@ unified_ecommerce_client_secret = config.require_secret(
     "unified_ecommerce_client_secret"
 )
 ovs_client_secret = config.require_secret("ovs_client_secret")
+# Not require_secret: ocw-studio's client is only created when the app is
+# enabled, so a stack that has never enabled it has no reason to carry the
+# value. Config still wins when set.
+ocw_studio_client_secret = config.get_secret(
+    "ocw_studio_client_secret"
+) or Output.secret(
+    "local-dev-ocw-studio-secret"  # pragma: allowlist secret
+)
+
+# Which apps are switched on, forwarded by the Tiltfile from tilt_config.json.
+# Gates the per-app Keycloak clients whose k8s Secrets target a namespace the
+# core stack only creates on demand.
+enabled_apps = tuple(
+    app.strip()
+    for app in (
+        config.get("enabled_apps") or os.environ.get("LOCAL_DEV_ENABLED_APPS", "")
+    ).split(",")
+    if app.strip()
+)
 
 # ---------------------------------------------------------------------------
 # Kubernetes provider
@@ -98,8 +117,10 @@ create_olapps_dev_realm(
     mitxonline_client_secret=mitxonline_client_secret,
     unified_ecommerce_client_secret=unified_ecommerce_client_secret,
     ovs_client_secret=ovs_client_secret,
+    ocw_studio_client_secret=ocw_studio_client_secret,
     root_domain=root_domain,
     verify_email=verify_email,
+    enabled_apps=enabled_apps,
 )
 
 # ---------------------------------------------------------------------------

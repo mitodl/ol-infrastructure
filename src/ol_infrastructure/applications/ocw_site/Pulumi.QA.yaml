@@ -5,6 +5,8 @@ config:
   aws:region: us-east-1
   ocw_site:enable_fastly_shielding: "true"
   ocw_site:enable_fastly_image_optimization: "true"
+  ocw_site:course_v3_redirects:
+    live-qa.ocw.mit.edu: https://rc.learn.mit.edu
   ocw_site:domains:
     draft:
     - draft-qa.ocw.mit.edu

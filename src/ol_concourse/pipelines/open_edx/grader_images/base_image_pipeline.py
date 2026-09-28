@@ -47,6 +47,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo, registry_image
 
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 _AWS_REGION = "us-east-1"
 _BASE_IMAGE_REPO = "mitodl/xqueue-watcher-grader-base"
@@ -216,7 +217,22 @@ def grader_base_image_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    pipeline_json = grader_base_image_pipeline().model_dump_json(indent=2)
+    pipeline_json = pipeline_json_with_user_data(
+        grader_base_image_pipeline(),
+        user_data={
+            "description": (
+                "Builds the xqueue-watcher grader base image "
+                "(`grader_support/Dockerfile.base`) for each supported Python "
+                f"version ({', '.join(_PYTHON_VERSIONS)}) and publishes it to "
+                "both DockerHub (public, the default `GRADER_BASE_IMAGE` build "
+                "arg the per-grader pipelines trigger off) and ECR (private "
+                "AWS mirror). The default version also gets a floating "
+                "`:latest` tag for legacy consumers."
+            ),
+            "team": "infrastructure",
+            "category": "open-edx",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)

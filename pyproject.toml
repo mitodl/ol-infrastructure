@@ -315,6 +315,7 @@ extend_exclude = [
   # import that application's own packages (metadata, superset, kubespawner,
   # lms, xmodule, ...), which belong to the image, not to this project.
   "src/ol_infrastructure/substructure/open_metadata/scripts/",
+  "src/ol_infrastructure/applications/open_metadata/scripts/",
   "src/ol_infrastructure/applications/superset/superset_config\\.py",
   "src/ol_infrastructure/applications/jupyterhub/dynamicImageConfig\\.py",
   "dockerfiles/",

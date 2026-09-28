@@ -12,3 +12,5 @@ config:
   toolhive_swe:context7_enabled: "false"
   toolhive_swe:aws_mcp_enabled: "false"
   toolhive_swe:vantage_enabled: "false"
+  toolhive_swe:grafana_caller_token:
+    secure: v1:LEDENDZF0b7L7NPe:07OY/b0otipIlM1anebkg1kce2mnuDeUes4fOJ5iTA1o6ycmURgIWV7lVSmvz58LXyaDMCQeA8ECYVAK5XzDevqGcfYkRWIQZ+zbzl3oFT4=

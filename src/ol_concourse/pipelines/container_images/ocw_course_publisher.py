@@ -14,6 +14,7 @@ from ol_concourse.lib.resources import git_repo, registry_image
 
 from ol_concourse.pipelines.constants import ECR_REGION
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 ocw_studio_repo = git_repo(
     name=Identifier("ocw-studio-repository"),
@@ -93,10 +94,23 @@ docker_pipeline = Pipeline(
 )
 
 if __name__ == "__main__":
+    output = pipeline_json_with_user_data(
+        docker_pipeline,
+        user_data={
+            "description": (
+                "Builds `mitodl/ocw-course-publisher` from ocw-studio's "
+                "`docker/ocw-course-publisher/` (Dockerfile plus a `tag` "
+                "file). Publishes to Docker Hub and ECR, tagged from that "
+                "repo's tag file."
+            ),
+            "team": "main",
+            "category": "base-images",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(docker_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(docker_pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.write(
-        "\nfly -t <target> set-pipeline -p ocw-course-publisher-image"
+        "\nfly -t pr-main set-pipeline -p ocw-course-publisher-image"
         " -c definition.json\n"
     )

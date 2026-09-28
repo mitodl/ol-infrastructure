@@ -32,7 +32,10 @@ from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.aws.iam_helper import cross_environment_glue_denial
+from ol_infrastructure.lib.aws.iam_helper import (
+    cross_environment_glue_denial,
+    readable_data_lake_environments,
+)
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -269,13 +272,19 @@ if starrocks_config.get_bool("oidc_enabled"):
 # account) can call the Glue Data Catalog API and read Iceberg data from the
 # corresponding S3 buckets.
 #
-# Both QA and production catalogs are registered in every StarRocks instance
-# (see substructure/starrocks _DATA_LAKE_ENVS), so the IRSA role needs query-engine
-# access to both environments' Glue catalogs and S3 buckets.
+# The role gets query-engine access to the same lakes the substructure stack
+# registers catalogs for (readable_data_lake_environments): its own, plus QA's on
+# production for the QA mirror. QA must not get production's policy: the
+# cross-environment denial below covers Glue only, so that policy left the QA role
+# with Get/Put/DeleteObject on production's data lake buckets.
 #
 # The Iceberg external catalogs are created and maintained by the substructure stack
 # (substructure/starrocks) using the pulumi-command local.Command resource.
-_DATA_LAKE_ENVS = ("QA", "Production")
+_DATA_LAKE_STACK_NAMES = {"qa": "QA", "production": "Production"}
+_DATA_LAKE_ENVS = [
+    _DATA_LAKE_STACK_NAMES[env]
+    for env in readable_data_lake_environments(stack_info.env_suffix)
+]
 
 if starrocks_config.get_bool("enable_data_lake_integration"):
     _dw_stacks = {}
@@ -292,8 +301,8 @@ if starrocks_config.get_bool("enable_data_lake_integration"):
             opts=ResourceOptions(parent=starrocks_auth_binding),
         )
 
-    # The attachments above hand this role both environments' catalogs, which for
-    # a lower environment means handing it production. The guard has to be scoped
+    # The attachments above no longer hand a lower environment production's
+    # catalog, but this Deny stays as defence in depth. The guard has to be scoped
     # to this role rather than folded into either policy above, since those are
     # shared across environments and a Deny in one of them also lands on the
     # production role and revokes production's access to its own catalog.

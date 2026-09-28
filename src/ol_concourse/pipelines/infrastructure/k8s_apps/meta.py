@@ -17,6 +17,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 _OL_INFRA_IMAGE_SOURCE = {
     "repository": dockerhub_ecr_image_uri("mitodl/ol-infrastructure"),
@@ -138,6 +139,18 @@ if __name__ == "__main__":
         "xpro",
     ]
 
+    output = pipeline_json_with_user_data(
+        meta_pipeline(app_names),
+        user_data={
+            "description": (
+                f"Regenerates and applies the {len(app_names)} k8s_apps "
+                "product-deploy pipelines from `pipeline_params` in "
+                "`k8s_apps/pipeline.py`, plus re-applies itself."
+            ),
+            "team": "infrastructure",
+            "category": "meta",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(meta_pipeline(app_names).model_dump_json(indent=2))
-    sys.stdout.write(meta_pipeline(app_names).model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)

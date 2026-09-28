@@ -23,6 +23,8 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         context=APP_DIR,
         dockerfile=APP_DIR + '/Dockerfile',
         target='local-dev' if has_local_dev else 'production',
+        # .claude/ holds agent worktrees; syncing one into the pod restarted it in a loop.
+        ignore=['.claude/'],
         # Sync the whole repo (Django apps are top-level dirs: ui, cloudsync,
         # techtv2ovs, ...); granian's --reload-ignore-dirs filters the churn.
         # Only with the local-dev target: without --reload a sync makes Tilt

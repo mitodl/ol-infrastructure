@@ -227,6 +227,8 @@ run_launcher:
         #   seconds" -- not the milliseconds the OTel spec defines. At 2s a full
         #   2048-span queue drains in at most four 512-span batches, so ~8s
         #   worst case, leaving 20s+ of the grace period for dagster's teardown.
+        #   On a stack with dagster:otel_metrics_enabled, the MeterProvider's
+        #   final export at exit reads the same timeout, adding at most 2s.
         #   The grace period is deliberately NOT raised: preemption relief speed
         #   is the reason these pods are preemptible at all.
         #

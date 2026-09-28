@@ -234,6 +234,69 @@ opik_helm_release = kubernetes.helm.v3.Release(
             "partitionMetrics": {"enabled": True},
             "component": {
                 "backend": {
+                    # Two replicas so a rollout, a node loss, or a single wedged
+                    # pod is not a total API outage. Note this does NOT protect
+                    # against the ClickHouse connection-pool leak described on the
+                    # liveness probe below: both replicas run the same periodic
+                    # jobs against the same ClickHouse and drain their pools at
+                    # the same rate, so that failure is correlated, not
+                    # independent.
+                    "replicaCount": 2,
+                    "podDisruptionBudget": {"enabled": True, "minAvailable": 1},
+                    # The chart ships only an ephemeral-storage request, which
+                    # leaves the pod BestEffort with no cgroup memory limit. That
+                    # matters because JAVA_OPTS carries -XX:MaxRAMPercentage=80:
+                    # with no limit the JVM resolves that against the *node*, and
+                    # on a 92.8Gi data-production node it sized MaxHeapSize at
+                    # 74.3Gi while actually using ~1.3Gi. A memory limit fixes
+                    # both ends at once -- the pod leaves BestEffort (so it is no
+                    # longer first to be evicted under node pressure) and the JVM
+                    # sizes the heap from the cgroup instead: 80% of the 6Gi limit
+                    # is a 4.8Gi ceiling, leaving ~1.2Gi for metaspace, thread
+                    # stacks and direct buffers. Generous against the ~1.3Gi the
+                    # pod actually uses; the limit is a ceiling, not a target.
+                    "resources": {
+                        "requests": {
+                            "cpu": "500m",
+                            "memory": "2Gi",
+                            "ephemeral-storage": "10Gi",
+                        },
+                        "limits": {"memory": "6Gi"},
+                    },
+                    # Liveness deliberately probes `type=ready`, not the chart's
+                    # `type=alive`. The ClickHouse checks are all `type=ready`, and
+                    # the backend's client-v2 connection pool can leak every one of
+                    # its 10 slots (opik never calls setMaxConnections /
+                    # setConnectionTTL, so connection_ttl=-1 and nothing evicts a
+                    # leaked lease). A pod in that state is unrecoverable without a
+                    # restart -- config.yml says so outright -- yet stays Running
+                    # forever at 0 restarts, which is how opik-backend sat out of
+                    # rotation for ~12h on 2026-09-23.
+                    #
+                    # Upstream leaves ClickHouse out of the liveness gate to avoid
+                    # restart-storming the fleet on a transient blip. Two things
+                    # bound that here: failureThreshold 30 x periodSeconds 10 means
+                    # only ~5 minutes of *sustained* unreadiness restarts anything,
+                    # and a liveness failure kills the container, not the pod, so it
+                    # is subject to the restart policy's exponential backoff
+                    # (CrashLoopBackOff) rather than hot-looping, and the
+                    # waitForClickhouse init container does not re-run -- init
+                    # containers execute once per pod sandbox, not per container
+                    # restart. initialDelaySeconds 120 is far above the measured
+                    # 21s container-start-to-Ready (migrations run in an init
+                    # container, so they are already done by then).
+                    "livenessProbe": {
+                        "httpGet": {
+                            "path": "/health-check?name=all&type=ready",
+                            "port": 8080,
+                            "httpHeaders": [
+                                {"name": "Accept", "value": "application/json"}
+                            ],
+                        },
+                        "initialDelaySeconds": 120,
+                        "periodSeconds": 10,
+                        "failureThreshold": 30,
+                    },
                     # Gate backend startup on the external ClickHouse being
                     # reachable over HTTP.
                     "waitForClickhouse": {
