@@ -36,6 +36,7 @@ USERS = [
     _user("dave", "dave"),
     _user("erin", "erin", enabled=False),
     _user("frank", "frank,ol_platform_admin"),
+    {**_user("gina"), "attributes": {"saml_uid": []}},
 ]
 # Effective client roles, as /users/{id}/role-mappings/clients/{c}/composite
 # returns them after expanding composite realm roles and groups.
@@ -46,6 +47,7 @@ EFFECTIVE_ROLES = {
     "dave": [],
     "erin": ["ol_platform_admin"],
     "frank": ["ol_data_analyst"],
+    "gina": ["ol_data_analyst"],
 }
 
 
@@ -107,6 +109,7 @@ def test_unusable_saml_uid_is_skipped_not_written(
     err = capsys.readouterr().err
     assert "carol@mit.edu" in err
     assert "frank@mit.edu" in err
+    assert "gina@mit.edu" in err
 
 
 def test_all_holders_missing_saml_uid_fails_instead_of_writing_empty(

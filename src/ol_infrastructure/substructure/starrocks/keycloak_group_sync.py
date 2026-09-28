@@ -108,7 +108,7 @@ def effective_role_members(
         if not granted:
             continue
         holders += 1
-        saml_uid = user.get("attributes", {}).get("saml_uid", [""])[0]
+        saml_uid = (user.get("attributes", {}).get("saml_uid") or [""])[0]
         if not _PRINCIPAL_PATTERN.fullmatch(saml_uid):
             sys.stderr.write(
                 f"Skipping {user['username']}: holds {sorted(granted)} but saml_uid "
