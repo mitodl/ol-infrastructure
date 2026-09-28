@@ -995,6 +995,17 @@ if site_project_deployment:
         raise ValueError(msg)
     _sp = site_project_deployment
     _apps_alt = "|".join(site_project_mfe_apps)
+    # gradebook's "back to dashboard" link resolves to the Site Project's
+    # /apps/instructor-dashboard route, which only loads if Fastly serves it.
+    if (
+        "gradebook" in site_project_root_apps
+        and "instructor-dashboard" not in site_project_mfe_apps
+    ):
+        msg = (
+            "edxapp:site_project.root_apps lists gradebook, which requires "
+            "instructor-dashboard in edxapp:site_project.mfe_apps"
+        )
+        raise ValueError(msg)
     # root_apps keep the legacy MFE's own path. This recv rewrite runs before the
     # backend is chosen, so a listed path is served the Site Project's
     # index.html instead of the legacy build in the MFE bucket.
