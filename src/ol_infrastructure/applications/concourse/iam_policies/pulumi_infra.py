@@ -579,5 +579,36 @@ policy_definition = {
                 }
             },
         },
+        {
+            # Updating an ASG's mixed instances policy makes AutoScaling
+            # re-validate that the caller may *use* the launch template, and
+            # that check includes passing the template's instance profile role
+            # to EC2. Without this the update fails as "AccessDenied: You are
+            # not authorized to use launch template: lt-..." -- naming the
+            # template rather than the missing PassRole, which makes it look
+            # like an EC2 or instance-type problem. Confirmed with
+            # simulate-principal-policy: iam:PassRole is implicitDeny for
+            # PassedToService=ec2.amazonaws.com and allowed for
+            # rds.amazonaws.com.
+            #
+            # Unlike the RDS grant above, this one is scoped by resource and
+            # not only by service. Every pulumi-managed launch template's
+            # instance profile role lives under one of these paths, which are
+            # the same paths the iam:CreateRole statement already allows. The
+            # instance profile roles at the default "/" path are all pre-Pulumi
+            # legacy (cassandra, reddit, zookeeper, edx-*, salt-master) and
+            # include AdminEC2Role -- with Resource "*" this role could attach
+            # that to an instance it launches, so the paths are the boundary
+            # that keeps PassRole from becoming an escalation path.
+            "Effect": "Allow",
+            "Action": ["iam:PassRole"],
+            "Resource": [
+                "arn:aws:iam::*:role/ol-applications/*",
+                "arn:aws:iam::*:role/ol-data/*",
+                "arn:aws:iam::*:role/ol-infrastructure/*",
+                "arn:aws:iam::*:role/ol-operations/*",
+            ],
+            "Condition": {"StringEquals": {"iam:PassedToService": "ec2.amazonaws.com"}},
+        },
     ],
 }
