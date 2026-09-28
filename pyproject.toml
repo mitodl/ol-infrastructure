@@ -312,6 +312,9 @@ extend_exclude = [
   "src/ol_infrastructure/applications/open_metadata/scripts/",
   "src/ol_infrastructure/applications/superset/superset_config\\.py",
   "src/ol_infrastructure/applications/jupyterhub/dynamicImageConfig\\.py",
+  # Runs in marimo single-user pods from a postStart hook; tomlkit comes with
+  # marimo there.
+  "src/ol_infrastructure/applications/jupyterhub_data/marimo_ai_defaults\\.py",
   "dockerfiles/",
   "scripts/helpers/",
   "scripts/openedx/",
