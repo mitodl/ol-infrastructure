@@ -589,6 +589,23 @@ def create_k8s_resources(  # noqa: C901
             sub_path="production.py",
             read_only=True,
         ),
+        # Granian entrypoints that restore RAW_URI -- see the comment on the
+        # wsgi_entrypoint ConfigMap in k8s_configmaps.py. Mounted next to the
+        # edx-platform packages so they are importable as top-level modules, the
+        # same way lms.wsgi already resolves. Both land in every service because
+        # the mount list is shared; the unused one is never imported.
+        kubernetes.core.v1.VolumeMountArgs(
+            name=configmaps.wsgi_entrypoint_config_name,
+            mount_path="/openedx/edx-platform/ol_lms_wsgi.py",
+            sub_path="ol_lms_wsgi.py",
+            read_only=True,
+        ),
+        kubernetes.core.v1.VolumeMountArgs(
+            name=configmaps.wsgi_entrypoint_config_name,
+            mount_path="/openedx/edx-platform/ol_cms_wsgi.py",
+            sub_path="ol_cms_wsgi.py",
+            read_only=True,
+        ),
     ]
 
     # The Vector log-shipping sidecar mounts differ per service (lms vs cms log paths).
@@ -827,6 +844,7 @@ def create_k8s_resources(  # noqa: C901
         # Volume only -- deliberately absent from lms_edxapp_config_sources, which the
         # init container cats into lms.env.yml. This is a Python module, not config.
         configmaps.settings_override_config_name: configmaps.settings_override,
+        configmaps.wsgi_entrypoint_config_name: configmaps.wsgi_entrypoint,
     }
     if configmaps.azure_openai:
         lms_edxapp_config_maps[configmaps.azure_openai_config_name] = (
@@ -965,7 +983,7 @@ def create_k8s_resources(  # noqa: C901
             # executable).
             command_prefix=["opentelemetry-instrument"],
             granian_config=GranianConfig(
-                application_module="lms.wsgi:application",
+                application_module="ol_lms_wsgi:application",
                 port=8000,
                 no_ws=True,
                 # Concurrency is per-install; see lms_granian_concurrency above.
@@ -1194,6 +1212,7 @@ def create_k8s_resources(  # noqa: C901
         configmaps.cms_interpolated_config_name: configmaps.cms_interpolated,
         # Volume only -- see the note on lms_edxapp_config_maps.
         configmaps.settings_override_config_name: configmaps.settings_override,
+        configmaps.wsgi_entrypoint_config_name: configmaps.wsgi_entrypoint,
     }
     if configmaps.azure_openai:
         cms_edxapp_config_maps[configmaps.azure_openai_config_name] = (
@@ -1328,7 +1347,7 @@ def create_k8s_resources(  # noqa: C901
             # executable).
             command_prefix=["opentelemetry-instrument"],
             granian_config=GranianConfig(
-                application_module="cms.wsgi:application",
+                application_module="ol_cms_wsgi:application",
                 port=8000,
                 no_ws=True,
                 # Concurrency is per-install; see cms_granian_concurrency above.
