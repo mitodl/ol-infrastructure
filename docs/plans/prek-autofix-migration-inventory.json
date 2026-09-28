@@ -23,7 +23,36 @@
     "pre_commit_ci_installation": {
       "id": 22207049,
       "repository_selection": "selected",
-      "selected_repositories": "NOT DISCLOSED BY API; must be read by an org owner at https://github.com/organizations/mitodl/settings/installations/22207049",
+      "selected_repositories": {
+        "source": "read by an org owner from the installation settings page, 2026-09-28",
+        "count": 22,
+        "in_scope": [
+          "mit-learn",
+          "mit-learn-api-clients",
+          "mitxonline",
+          "mitxpro",
+          "ocw-hugo-projects",
+          "ocw-studio",
+          "ocw_oer_export",
+          "odl-video-service",
+          "ol-data-platform",
+          "ol-django",
+          "ol-infrastructure",
+          "ol-keycloak",
+          "open-edx-plugins",
+          "smoot-design"
+        ],
+        "archived": [
+          "concourse-packer-resource",
+          "concourse-pulumi-resource",
+          "herokuconfigurator",
+          "mit-open-login-button",
+          "social-auth-mitxpro",
+          "unified-ecommerce",
+          "unified-ecommerce-frontend"
+        ],
+        "archived_private_unnamed": 1
+      },
       "permissions": {
         "contents": "write",
         "pull_requests": "write",
@@ -150,7 +179,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "access-forge",
@@ -243,7 +273,8 @@
       },
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "agent-kit",
@@ -306,14 +337,15 @@
         "AGENTS.md:65: | `prek run --all-files` | Run all pre-commit checks |",
         "docs/internals/design/witan-ui-spec.md:408: - Tooling: `tsc --noEmit`, vitest, and biome, which `prek.toml` already runs for",
         "docs/internals/design/witan-ui-spec.md:409: TypeScript (`prek.toml:138-141`). Node version pinned in `ui/.node-version`,",
-        "docs/internals/design/witan-workflow-ux-p1-spec.md:264: - `pre-commit`, `mypy`, and the witan test suite pass; new tests per \u00a73.1/\u00a74."
+        "docs/internals/design/witan-workflow-ux-p1-spec.md:264: - `pre-commit`, `mypy`, and the witan test suite pass; new tests per §3.1/§4."
       ],
       "tooling_refs": [
         "bin/check_skill_portability.py:35: pre-commit hook with no environment to build, like bin/gen_llms.py. Run it",
-        "bin/gen_docs.py:136: \u2605 TRAILING WHITESPACE IS STRIPPED BECAUSE THE PRE-COMMIT HOOK STRIPS IT.",
+        "bin/gen_docs.py:136: ★ TRAILING WHITESPACE IS STRIPPED BECAUSE THE PRE-COMMIT HOOK STRIPS IT.",
         "justfile:207: # Also runs as the `skill-portability` prek hook."
       ],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "alerting-omnibus",
@@ -397,7 +429,8 @@
       },
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "apisix-testbed",
@@ -442,7 +475,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "common-access",
@@ -489,7 +523,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "concourse-workflow",
@@ -534,7 +569,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "course-search-utils",
@@ -581,7 +617,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "default-labels-repo",
@@ -626,7 +663,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "django-aqueduct",
@@ -690,10 +728,11 @@
         "docs/project_plan.md:25: - Write `prek.toml` with built-in hooks (trailing-whitespace, end-of-file-fixer, check-merge-conflict, check-case-conflict, check-added-large-files, check-toml,",
         "docs/project_plan.md:27: - Run `prek run --all-files` and fix any findings",
         "docs/project_plan.md:28: - **Done:** `prek run --all-files` exits 0 on the initial file set",
-        "docs/project_plan.md:116: - Write `.github/workflows/ci.yml`: jobs `lint` (`prek run --all-files`), `typecheck` (`mypy`), `test` (matrix: **Python 3.12 / 3.13 / 3.14 \u00d7 Django 5.0 / 5.1 /"
+        "docs/project_plan.md:116: - Write `.github/workflows/ci.yml`: jobs `lint` (`prek run --all-files`), `typecheck` (`mypy`), `test` (matrix: **Python 3.12 / 3.13 / 3.14 × Django 5.0 / 5.1 /"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "django-cas-mapper",
@@ -738,7 +777,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "edx-api-client",
@@ -781,7 +821,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "edxcut",
@@ -826,7 +867,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "eslint-config",
@@ -873,7 +915,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "gwarek",
@@ -918,7 +961,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "hacksnack",
@@ -963,7 +1007,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "handbook",
@@ -1010,7 +1055,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "hq",
@@ -1092,7 +1138,8 @@
       },
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "keycloak-scim",
@@ -1139,7 +1186,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "learn-ai",
@@ -1314,7 +1362,8 @@
         "scripts/generate_openapi.sh:24: # We expect pre-commit to exit with a non-zero status since it is reformatting",
         "scripts/generate_openapi.sh:26: git ls-files frontend-demo/api/src/generated | xargs pre-commit run --files ||"
       ],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "lehrer",
@@ -1536,7 +1585,8 @@
         "README.md:880: The rest of the hooks run on commit, so `uv run pre-commit run --all-files`"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "micromasters",
@@ -1583,7 +1633,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "mit-learn",
@@ -1788,7 +1839,8 @@
         "scripts/generate_openapi.sh:26: # We expect pre-commit to exit with a non-zero status since it is reformatting",
         "scripts/generate_openapi.sh:28: git ls-files frontends/api/src/generated | xargs pre-commit run --files ||"
       ],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "mit-learn-api-clients",
@@ -1927,7 +1979,8 @@
       },
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "mit-moira",
@@ -1972,7 +2025,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "mitx-grading-library",
@@ -2019,7 +2073,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "mitx-theme",
@@ -2066,7 +2121,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "mitx_cas_mapper",
@@ -2111,7 +2167,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "mitxonline",
@@ -2271,7 +2328,8 @@
         "AGENTS.md:268: - Prefer `pre-commit run` for formatting and linting; Ruff runs via the configured `ruff-format` and `ruff` hooks"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "mitxonline-api-clients",
@@ -2427,7 +2485,8 @@
       },
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "mitxonline-theme",
@@ -2474,7 +2533,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "mitxpro",
@@ -2651,7 +2711,7 @@
       },
       "doc_refs": [
         "AGENTS.md:40: pre-commit run --all-files                 # Ruff, shfmt, yamllint, detect-secrets",
-        "AGENTS.md:67: - **Python**: Ruff (formatting + linting via pre-commit). No additional config needed \u2014 pre-commit handles it.",
+        "AGENTS.md:67: - **Python**: Ruff (formatting + linting via pre-commit). No additional config needed — pre-commit handles it.",
         "README.md:81: # We have a Ruff hook in the pre-commit that checks and formats files wherever possible.",
         "README.md:82: pip install pre-commit",
         "README.md:83: pre-commit run --all-files",
@@ -2661,7 +2721,8 @@
         "README.md:175: pre-commit init-templatedir ~/.git-template"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "mitxpro-theme",
@@ -2708,7 +2769,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "ocw-hugo-projects",
@@ -2812,7 +2874,8 @@
         "README.md:27: pre-commit run yamlfmt --all-files"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "ocw-hugo-themes",
@@ -2894,7 +2957,8 @@
       },
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "ocw-studio",
@@ -3082,7 +3146,8 @@
         "README.md:95: pre-commit init-templatedir ~/.git-template"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "ocw_oer_export",
@@ -3188,7 +3253,8 @@
         "README.md:80: pre-commit run --all-files"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "odl-video-service",
@@ -3339,7 +3405,8 @@
         "README.rst:382: pre-commit init-templatedir ~/.git-template"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "ol-analytics-api",
@@ -3397,7 +3464,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "ol-concourse",
@@ -3542,12 +3610,13 @@
       "doc_refs": [
         "AGENTS.md:28: # All pre-commit hooks (includes yamlfmt, yamllint, ruff, mypy, actionlint, shellcheck)",
         "AGENTS.md:29: uv run pre-commit run --all-files",
-        "AGENTS.md:70: - YAML files are auto-formatted by `yamlfmt` (2-space mapping/sequence, 80-char width) \u2014 let pre-commit handle formatting rather than editing by hand.",
+        "AGENTS.md:70: - YAML files are auto-formatted by `yamlfmt` (2-space mapping/sequence, 80-char width) — let pre-commit handle formatting rather than editing by hand.",
         "README.md:35: # Run pre-commit hooks",
         "README.md:36: uv run pre-commit run --all-files"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "ol-customizations-nytimes-library",
@@ -3594,7 +3663,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "ol-data-platform",
@@ -3746,13 +3816,14 @@
         "AGENTS.md:89: **Pre-commit hooks in order** (all must pass for CI):",
         "AGENTS.md:99: SKIP=sqlfluff-lint pre-commit run --all-files",
         "AGENTS.md:110: **Error: \"pre-commit sqlfluff timeout\"**",
-        "AGENTS.md:111: \u2192 Solution: sqlfluff-lint is slow (60+ sec). Run on specific files or skip: `SKIP=sqlfluff-lint pre-commit run`",
+        "AGENTS.md:111: → Solution: sqlfluff-lint is slow (60+ sec). Run on specific files or skip: `SKIP=sqlfluff-lint pre-commit run`",
         "AGENTS.md:173: - `.pre-commit-config.yaml`: All pre-commit hooks (must pass for CI)",
         "docs/specs/DBT_WAREHOUSE_CI_QA_SPEC.md:24: on PRs**. Today's only PR-time dbt guardrail is pre-commit `sqlfluff`. `.github/workflows/`",
-        "docs/specs/DBT_WAREHOUSE_CI_QA_SPEC.md:269: 5. **sqlfluff-lint** \u2014 run the same sqlfluff config used in pre-commit (today pre-commit only)."
+        "docs/specs/DBT_WAREHOUSE_CI_QA_SPEC.md:269: 5. **sqlfluff-lint** — run the same sqlfluff config used in pre-commit (today pre-commit only)."
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "ol-django",
@@ -3886,7 +3957,8 @@
       },
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "ol-github-workflows",
@@ -3931,7 +4003,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "ol-infra-health-checks",
@@ -4068,7 +4141,8 @@
       },
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "ol-infrastructure",
@@ -4254,32 +4328,33 @@
       "doc_refs": [
         "AGENTS.md:42: - Pre-commit hooks and validation checklist",
         "AGENTS.md:138: uv run pre-commit run --all-files         # optional; budget 2+ minutes",
-        "AGENTS.md:159: - `.pre-commit-config.yaml` \u2014 Pre-commit hook definitions",
+        "AGENTS.md:159: - `.pre-commit-config.yaml` — Pre-commit hook definitions",
         "docs/adr/0011-playwright-canary-specs-in-ol-infrastructure.md:35: `.pre-commit-config.yaml`, and 0 `.ts`/`.tsx` files.",
         "docs/adr/0011-playwright-canary-specs-in-ol-infrastructure.md:157: - The cost actually paid is one `package.json` in one directory. `.pre-commit-config.yaml`",
-        "docs/context/01-repository-overview.md:57: - `.pre-commit-config.yaml` \u2014 Pre-commit hook definitions",
-        "docs/context/01-repository-overview.md:78: - `.pre-commit-config.yaml` \u2014 Pre-commit hooks (ruff, mypy, yamllint, shellcheck, packer fmt, hadolint)",
-        "docs/context/01-repository-overview.md:92: 5. **Pre-commit:** Tests may fail on unrelated Docker linting\u2014ignore if not your changes",
+        "docs/context/01-repository-overview.md:57: - `.pre-commit-config.yaml` — Pre-commit hook definitions",
+        "docs/context/01-repository-overview.md:78: - `.pre-commit-config.yaml` — Pre-commit hooks (ruff, mypy, yamllint, shellcheck, packer fmt, hadolint)",
+        "docs/context/01-repository-overview.md:92: 5. **Pre-commit:** Tests may fail on unrelated Docker linting—ignore if not your changes",
         "docs/context/02-build-and-validation.md:38: ## Pre-commit Hooks",
         "docs/context/02-build-and-validation.md:41: # Run all pre-commit hooks (includes ruff, mypy, shellcheck, yamllint, etc.)",
         "docs/context/02-build-and-validation.md:43: uv run pre-commit run --all-files",
-        "docs/context/02-build-and-validation.md:75: - `uv run pre-commit run --all-files` \u2014 Run all hooks (may take 2+ minutes)",
+        "docs/context/02-build-and-validation.md:75: - `uv run pre-commit run --all-files` — Run all hooks (may take 2+ minutes)",
         "docs/context/02-build-and-validation.md:85: ### Issue: pre-commit hook `hadolint-docker` fails with existing Docker warnings",
         "docs/context/09-troubleshooting.md:47: ### Issue: pre-commit hook `hadolint-docker` fails with existing Docker warnings",
         "docs/context/09-troubleshooting.md:52: # Skip pre-commit hooks",
         "docs/context/09-troubleshooting.md:271: # Pre-commit may take 2+ minutes",
         "docs/context/09-troubleshooting.md:272: uv run pre-commit run --all-files  # Budget 180s",
         "docs/github-app-installation-audit.md:136: | `pre-commit-ci` | selected | `contents:write`, `workflows:write` | 140 PRs; posts `pre-commit.ci - push` on every repo sampled | **In use, heavily.** |",
-        "docs/omnigraph-storage-format-upgrade-runbook.md:739: \u2014 not by the push's exit code.** A pre-commit hook (`yamlfmt`) can modify the",
+        "docs/omnigraph-storage-format-upgrade-runbook.md:739: — not by the push's exit code.** A pre-commit hook (`yamlfmt`) can modify the",
         "docs/plans/azure-openai-credentials-spec.md:331: - `pre-commit run --all-files` and `mypy` on all touched files.",
-        "docs/plans/github-org-pulumi-import.md:513: The 21 installed apps (Renovate, GitGuardian, Codecov, pre-commit-ci, Sentry, Claude, \u2026) are",
+        "docs/plans/github-org-pulumi-import.md:513: The 21 installed apps (Renovate, GitGuardian, Codecov, pre-commit-ci, Sentry, Claude, …) are",
         "docs/plans/rootly-label-routing-implementation-spec.md:332: `applications-production` gap would add latency to the long pole. A pre-commit/CI"
       ],
       "tooling_refs": [
         "bin/github-org-inventory:1322: # it, every regeneration shows all 316 files as modified, pre-commit adds the",
         "bin/github-required-checks:85: #: pre-commit.ci, Sentry) do not match. Nothing in this repo can tell whether those"
       ],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "ol-keycloak",
@@ -4370,7 +4445,8 @@
       },
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "ol-keycloakify",
@@ -4451,7 +4527,8 @@
       },
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "ol-notebook-extensions",
@@ -4498,7 +4575,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "ol-rootly-manager",
@@ -4644,7 +4722,8 @@
       },
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "oldevops-scratch",
@@ -4689,7 +4768,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "open-collaboration",
@@ -4734,7 +4814,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "open-discussions",
@@ -4816,7 +4897,8 @@
         "docs/discussions-removal/PROJECT_SUMMARY.md:154: - Pre-commit hooks pass (secrets detection, linting)"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "open-edx-plugins",
@@ -4968,7 +5050,7 @@
         "note": null
       },
       "doc_refs": [
-        "AGENTS.md:41: \u251c\u2500\u2500 .pre-commit-config.yaml      # Pre-commit hooks configuration",
+        "AGENTS.md:41: ├── .pre-commit-config.yaml      # Pre-commit hooks configuration",
         "AGENTS.md:72: This installs all workspace dependencies and dev tools (pytest, ruff, pre-commit, etc.). Always run this first in a clean environment or after pulling changes.",
         "AGENTS.md:87: **Run pre-commit hooks:**",
         "AGENTS.md:89: pre-commit run --all-files",
@@ -4978,7 +5060,8 @@
         "AGENTS.md:260: - [ ] Pre-commit hooks pass: `pre-commit run --all-files`"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "open-learnix",
@@ -5028,7 +5111,8 @@
         "README.md:41: If a project is using `pre-commit` hooks that haven't been accounted for here, you may need to update this project"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "open-podcast-data",
@@ -5075,7 +5159,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "open-resource-blocklists",
@@ -5120,7 +5205,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "open-video-data",
@@ -5165,7 +5251,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "platform-engineering-site",
@@ -5333,7 +5420,8 @@
         "docs/handbook/how-to/write-performant-apis.md:982: Both mitxonline and mit-learn run it as a local `pre-commit` hook over `serializers.py`:"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "product",
@@ -5378,7 +5466,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "realistic-mm-users",
@@ -5423,7 +5512,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "reddit-config",
@@ -5468,7 +5558,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "redux-asserts",
@@ -5515,7 +5606,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "redux-hammock",
@@ -5562,7 +5654,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "release-script",
@@ -5613,7 +5706,8 @@
         "CLAUDE.md:34: There is no typechecker and no pre-commit config. `pyproject.toml` has no `[tool.*]`"
       ],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "smoot-design",
@@ -5754,7 +5848,8 @@
       },
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": true
     },
     {
       "name": "superset-marimo",
@@ -5852,7 +5947,8 @@
       },
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "superset-nl-explorer",
@@ -5897,7 +5993,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "tech-talk-slides",
@@ -5944,7 +6041,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "template-mit-demo",
@@ -5989,7 +6087,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "vault-plugin-database-starrocks",
@@ -6036,7 +6135,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "vault-raft-backup",
@@ -6083,7 +6183,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "video_translation_demo",
@@ -6128,7 +6229,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": false
+      "stale_over_365_days": false,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "world_geographic_regions",
@@ -6173,7 +6275,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     },
     {
       "name": "xanalytics",
@@ -6218,7 +6321,8 @@
       "measured": null,
       "doc_refs": [],
       "tooling_refs": [],
-      "stale_over_365_days": true
+      "stale_over_365_days": true,
+      "pre_commit_ci_installed": false
     }
   ],
   "withheld": {

@@ -26,9 +26,9 @@ manifest declarations, workflow references, Renovate coverage, rulesets and meas
   `packer_fmt`. The three local `system` hooks (lehrer's two schema builders and mit-learn's
   `check-vendor-directory`) are not in a pilot, so those repositories' own migration PRs are
   their first run under prek.
-- **Only 14 of the 28 are enforced by pre-commit.ci today.** The other 14 had no
-  pre-commit.ci status on any of their last 15 PRs, and nothing else runs their hooks in CI
-  (apart from three hooks in lehrer). Their default branches have drifted: eight of them fail
+- **Only 14 of the 28 are enforced by pre-commit.ci today.** The other 14 are not in the
+  pre-commit.ci installation (§5), and nothing else runs their hooks in CI (apart from three
+  hooks in lehrer). Their default branches have drifted: eight of them fail
   their own hooks right now. For those repos the migration adds a gate rather than replacing
   one, and each migration PR has to make its tree clean first.
 - **Some skipped hooks have never run in CI anywhere.** pre-commit.ci's `ci: skip` removed
@@ -54,7 +54,7 @@ explained below cannot be attributed to particular repositories.
 | Default branches with `.pre-commit-config.yaml` | 28 | 28 | — |
 | Repositories with a pre-commit.ci `ci:` block | 3 | 12 | The 09-09 count was wrong. Twelve repositories use `ci: skip`; smoot-design also sets `autoupdate_commit_msg` |
 | `pyproject.toml` declaring `pre-commit` | 9 | 8 | Not attributable |
-| pre-commit.ci installation | selected scope | selected scope | Unchanged; membership still not readable (§5) |
+| pre-commit.ci installation | selected scope | 22 selected repositories | Membership read by an org owner on 2026-09-28 (§5) |
 | autofix.ci installation | absent | absent | Unchanged |
 
 ## 3. Waves
@@ -71,7 +71,8 @@ explained below cannot be attributed to particular repositories.
 ### 3.1 Rollout table
 
 *pc.ci status* means a `pre-commit.ci - pr`/`push` status appeared on at least one of the
-last 15 PRs. That is the only available evidence of installation membership (§5).
+last 15 PRs. The 14 "yes" rows are exactly the in-scope repositories in the pre-commit.ci
+installation, and the "no" rows are exactly the ones outside it (§5).
 *autoupdate* counts pre-commit.ci autoupdate PRs opened since 2026-06-01. *Renovate hooks*
 means Renovate's `pre-commit` manager is enabled, via the org preset or repository config.
 *prek run* is `prek run --all-files` on the unmodified default branch; hooks in the JSON's
@@ -230,14 +231,27 @@ autofix.ci's permission list is from <https://autofix.ci/security>. It has no `w
 scope, but it adds `actions:write`. The install task should confirm what the app actually
 asks for at install time.
 
-**Gap:** GitHub does not report which repositories a `selected` installation covers to an org
-admin's token. `GET /orgs/{org}/installations` omits the list, and
-`GET /user/installations/{id}/repositories` needs a user-to-server token. The *pc.ci status*
-column is the best available evidence, but a repository missing it may just have had no PRs
-while in scope. An org owner must read the list at
-<https://github.com/organizations/mitodl/settings/installations/22207049> and record it here
-before the uninstall task. The same limitation is documented for all selected installs in
-[`docs/github-app-installation-audit.md`](../github-app-installation-audit.md).
+**Installation membership.** GitHub does not report which repositories a `selected`
+installation covers to an org admin's token: `GET /orgs/{org}/installations` omits the list,
+and `GET /user/installations/{id}/repositories` needs a user-to-server token. The same
+limitation is documented for all selected installs in
+[`docs/github-app-installation-audit.md`](../github-app-installation-audit.md). An org owner
+therefore read the list from
+<https://github.com/organizations/mitodl/settings/installations/22207049> on 2026-09-28.
+The installation covers **22 repositories**:
+
+- **14 in scope**, the same 14 that show a pre-commit.ci status in §3.1: mit-learn,
+  mit-learn-api-clients, mitxonline, mitxpro, ocw-hugo-projects, ocw-studio, ocw_oer_export,
+  odl-video-service, ol-data-platform, ol-django, ol-infrastructure, ol-keycloak,
+  open-edx-plugins, smoot-design.
+- **8 archived:** concourse-packer-resource, concourse-pulumi-resource, herokuconfigurator,
+  mit-open-login-button, social-auth-mitxpro, unified-ecommerce, unified-ecommerce-frontend,
+  and one private archived repository. Archived repositories are read-only, so pre-commit.ci
+  does nothing there, and removing it costs them nothing.
+
+The other 14 in-scope repositories are outside the installation. Five of them (learn-ai,
+lehrer, mitxonline-api-clients, ol-rootly-manager, platform-engineering-site) still carry a
+`ci:` block, which nothing reads.
 
 Candidate action pins, resolved from each project's latest release on 2026-09-28. The
 reference-workflow task re-resolves them.
