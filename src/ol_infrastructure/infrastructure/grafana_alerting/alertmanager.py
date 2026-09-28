@@ -185,6 +185,12 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             # erroring at once in the same namespace would collapse into one
             # notification group.
             "component_id",
+            # metric_rules/apisix_edge.py's APISIXEdgeRateLimited aggregates
+            # `by (matched_host, route)`. A host can carry several rate-limited
+            # route groups (api.learn's browser and API rules), so without this
+            # label rejections on two routes of one host would arrive as one
+            # notification group.
+            "route",
         ],
         # "1m", not "60s" — Grafana normalizes durations to the largest unit and
         # a mismatched spelling shows as a perpetual diff on every preview.

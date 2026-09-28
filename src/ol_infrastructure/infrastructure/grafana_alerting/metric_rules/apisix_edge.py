@@ -118,6 +118,49 @@ Measure with:
   sum by (ruleTitle, labels_matched_host) (count_over_time(
     {from="state-history"} | json | current="Alerting"
     | ruleTitle=~`APISIXEdge5xx.*` [14d]))
+
+Gateway rate limiting (APISIXEdgeRateLimited)
+---------------------------------------------
+ol-infrastructure#4759 puts limit-req/limit-conn in front of api.learn.mit.edu,
+keyed on client IP and rejecting with 429. If the threshold is wrong, or a
+routing change moves an aggregating client (a proxy, the SSR server) onto a
+limited route, the result is real users getting 429s, and without this rule that
+surfaces as user reports.
+
+The rule matches on `response_source="apisix"`, not on the host. APISIX sets
+that label when the gateway itself produced the response, so it separates a
+plugin rejection from an app's own throttling passed through from upstream.
+That distinction matters: measured 2026-09-28 over 30 days, the production edge
+saw ~37.6k 429s on courses.learn.mit.edu, ~10.6k on lms.mitx.mit.edu, 6 on
+courses.xpro and 4 on api.learn, every one of them `response_source="upstream"`
+(edxapp and Django throttling). Gateway-sourced 429s were zero on every host.
+So the baseline is zero and any firing is a limit plugin rejecting traffic.
+That holds for any host that later gets a limit plugin, with one condition:
+limit-req and limit-conn default `rejected_code` to 503, and #4759 overrides it
+to 429. A limit plugin configured some other way shows up as
+`code="503", response_source="apisix"` and counts toward the 5xx rules above
+instead of this one.
+
+It fires on any rejection rather than a rate, and with no pending period,
+because a legitimate client should never reach the limit. #4759 sized it at
+~10x the busiest single browser IP over 30 days (~5 req/s against 50), so a
+client that trips it is worth a human look at who it is. `increase()` alone
+would miss that first rejection: each (pod, route, host) series only exists
+once a pod has rejected something, it appears already at 1, and `increase()`
+needs two samples. The limits are per pod across the APISIX replicas, so a
+short burst is often exactly one rejection per pod. The `unless ... offset`
+clause catches those new series.
+
+The metric has no client label, and "which client" is the first question.
+Answer it from the access log, where a gateway rejection has `upstream_status=-`:
+  sum by (remote_addr, http_user_agent) (count_over_time(
+    {service_name="apache-apisix", cluster="applications-production"}
+    |= `status=429` | logfmt | status="429" | upstream_status="-" [1h]))
+
+Routed to Slack like the 5xx rules, for the same reason: it has no firing
+history yet. The opposite signal (a month with zero firings means the limit can
+be tightened) is only visible from this rule's state history, so check it there
+before changing the #4759 thresholds.
 """
 
 from collections.abc import Callable
@@ -158,6 +201,16 @@ def _error_ratio_expr(window: str, threshold: str) -> str:
         f" / sum by (matched_host) (rate(apisix_http_status[{window}]))"
         f" > {threshold}"
     )
+
+
+# Gateway-produced 429s per host and route. Upstream 429s (app throttling) are
+# excluded by `response_source`; see the module docstring.
+_GATEWAY_429 = 'apisix_http_status{code="429", response_source="apisix"}'
+_RATE_LIMITED_EXPR = (
+    f"sum by (matched_host, route) (increase({_GATEWAY_429}[10m])) > 0"
+    " or "
+    f"count by (matched_host, route) ({_GATEWAY_429} unless {_GATEWAY_429} offset 10m)"
+)
 
 
 def create(
@@ -208,6 +261,30 @@ def create(
                     "description": "More than 1% of requests to {{ $labels.matched_host }} returned a 5xx status at the APISIX edge over the last 6 hours. This catches a slow error-rate creep that a short-window threshold cannot: api.mitxonline.mit.edu climbed from 0% to 25% over four weeks in July 2026 without tripping any existing rule.",
                 },
                 datas=rd(_error_ratio_expr("6h", "0.01")),
+            ),
+        ],
+        opts=resource_opts,
+    )
+
+    alerting.RuleGroup(
+        "apisix-edge-rate-limit",
+        name="apisix-edge-rate-limit",
+        folder_uid=folder_uid,
+        interval_seconds=60,
+        rules=[
+            alerting.RuleGroupRuleArgs(
+                name="APISIXEdgeRateLimited",
+                condition="C",
+                # Any rejection is the signal; see the module docstring.
+                for_="0s",
+                no_data_state="OK",
+                exec_err_state="OK",
+                labels={"severity": "warning", **routing},
+                annotations={
+                    "summary": "APISIX is rate limiting clients on {{ $labels.matched_host }}",
+                    "description": 'The APISIX gateway itself returned 429 to requests for {{ $labels.matched_host }} (route {{ $labels.route }}) over the last 10 minutes. The limit sits ~10x above the busiest browser seen over 30 days, so either one client is misbehaving or the limit is catching legitimate traffic. Find the client in the APISIX access log: gateway rejections have status=429 and upstream_status=-, e.g. {service_name="apache-apisix"} |= `status=429` | logfmt | status="429" | upstream_status="-" | host="{{ $labels.matched_host }}", then group by remote_addr.',
+                },
+                datas=rd(_RATE_LIMITED_EXPR),
             ),
         ],
         opts=resource_opts,
