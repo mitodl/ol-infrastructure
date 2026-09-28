@@ -678,21 +678,6 @@ edxapp_mysql_role_statements["edxapp-csmh"] = {
     "renew": [],
     "rollback": [],
 }
-edxapp_mysql_role_statements["xqueue"] = {
-    "create": [
-        Template("""CREATE DATABASE IF NOT EXISTS xqueue;"""),
-        Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
-        Template(
-            """
-            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES,
-            CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue.* TO '{{name}}'@'%';
-            """
-        ),
-    ],
-    "revoke": [Template("DROP USER '{{name}}';")],
-    "renew": [],
-    "rollback": [],
-}
 edxapp_mysql_role_statements["notes"] = {
     "create": [
         Template("""CREATE DATABASE IF NOT EXISTS edx_notes_api;"""),

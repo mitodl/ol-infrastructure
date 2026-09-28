@@ -108,7 +108,6 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/vuln_scanner/": [],
     "applications/witan/": [],
     "applications/xpro/": ["NGINX_VERSION"],
-    "applications/xqueue/": ["NGINX_VERSION"],
     "applications/xqwatcher/": [],
     # ---- infrastructure/ ----------------------------------------------------
     "infrastructure/aws/data_warehouse/": [],

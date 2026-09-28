@@ -134,7 +134,6 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "applications/vuln_scanner/": [],
     "applications/witan/": ["witan/"],
     "applications/xpro/": ["fastly.yaml", "vector/", "xpro/"],
-    "applications/xqueue/": [],
     "applications/xqwatcher/": [],
     # ---- infrastructure/ --------------------------------------------------
     "infrastructure/aws/data_warehouse/": [],
