@@ -263,6 +263,102 @@ def test_custom_guard_lifetime_reaches_the_cookie():
     assert "Max-Age=90;" in set_cookie
 
 
+SESSION_COOKIES = ["mitxonline_apisix_session", "mitlearn_apisix_session"]
+
+
+def test_code_callback_without_a_session_is_sent_back_through_login():
+    """142 of mitxonline's 160 code-callback 500s a day look like this: the
+    browser finishing the login holds no session to check `state` against.
+    """
+    uri, status, set_cookie = Harness(session_cookie_names=SESSION_COOKIES).callback(
+        "/login/.apisix/redirect",
+        {"code": "abc123", "state": "xyz"},
+        cookies={"csrf_mitxonline": "1"},
+    )
+
+    assert (uri, status) == ("/login/", 302)
+    assert set_cookie.startswith("apisix_oidc_recovery=1;")
+
+
+def test_code_callback_with_a_session_is_left_to_openid_connect():
+    """Every successful login arrives like this, carrying the pre-auth session."""
+    uri, _, set_cookie = Harness(session_cookie_names=SESSION_COOKIES).callback(
+        "/login/.apisix/redirect",
+        {"code": "abc123", "state": "xyz"},
+        cookies={"mitxonline_apisix_session": "pre-auth"},
+    )
+
+    assert uri is None
+    assert set_cookie is None
+
+
+def test_any_listed_session_cookie_is_enough_to_pass_through():
+    """Mitxonline's shared config also serves /mitxonline/* on MIT Learn's host,
+    where the login runs under MIT Learn's cookie.  Requiring the first name
+    would divert every one of those logins.
+    """
+    uri, _, _ = Harness(session_cookie_names=SESSION_COOKIES).callback(
+        "/mitxonline/login/.apisix/redirect",
+        {"code": "abc123", "state": "xyz"},
+        cookies={"mitlearn_apisix_session": "pre-auth"},
+    )
+
+    assert uri is None
+
+
+def test_session_lookup_reads_the_exact_cookie_name():
+    uri, _, _ = Harness(session_cookie_names=SESSION_COOKIES).callback(
+        "/login/.apisix/redirect",
+        {"code": "abc123", "state": "xyz"},
+        cookies={"old_mitxonline_apisix_session": "1"},
+    )
+
+    assert uri == "/login/"
+
+
+def test_missing_session_recovery_is_off_without_cookie_names():
+    """The default, so a host that has not listed its cookies keeps the old
+    behaviour rather than diverting every login.
+    """
+    uri, _, _ = Harness().callback(
+        "/login/.apisix/redirect",
+        {"code": "abc123", "state": "xyz"},
+    )
+
+    assert uri is None
+
+
+def test_guard_cookie_stops_a_second_missing_session_recovery():
+    """A browser that keeps the guard but not the session has to end on the
+    error page, not bounce between the gateway and Keycloak.
+    """
+    uri, _, _ = Harness(session_cookie_names=SESSION_COOKIES).callback(
+        "/login/.apisix/redirect",
+        {"code": "abc123", "state": "xyz"},
+        cookies={"apisix_oidc_recovery": "1"},
+    )
+
+    assert uri is None
+
+
+def test_unrecoverable_error_is_not_rescued_by_the_session_branch():
+    """access_denied carries no code, so a missing session must not turn a
+    Cancel into a redirect loop.
+    """
+    uri, _, _ = Harness(session_cookie_names=SESSION_COOKIES).callback(
+        "/login/.apisix/redirect",
+        {"error": "access_denied", "state": "xyz"},
+    )
+
+    assert uri is None
+
+
+def test_session_cookie_names_reach_the_plugin_config():
+    config = oidc_gateway_pre_function_plugin(session_cookie_names=("a", "b")).config
+
+    assert config["oidc_error_recovery"]["session_cookie_names"] == ["a", "b"]
+
+
 class OriginHarness(Harness):
     """Runs the canonical-origin function against a stubbed ngx.
 

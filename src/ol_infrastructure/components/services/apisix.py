@@ -136,8 +136,9 @@ end"""
     )
 
 
-def oidc_gateway_pre_function_plugin(
+def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
     recoverable_errors: list[str] | None = None,
+    session_cookie_names: Sequence[str] = (),
     guard_cookie_name: str = "apisix_oidc_recovery",
     guard_max_age: int = 60,
     *,
@@ -217,6 +218,34 @@ def oidc_gateway_pre_function_plugin(
     looping: a persistently broken IdP should surface as an error, not as an
     infinite redirect.
 
+    **Missing-session recovery** (same function, enabled by
+    ``session_cookie_names``).  A callback that carries a ``code`` but none of
+    the host's OIDC session cookies cannot succeed: lua-resty-openidc checks the
+    ``state`` parameter against the one it stored in that session when it sent
+    the browser to Keycloak, and with no session there is nothing to check
+    against.  The browser finishing the login is not the one that started it --
+    an email verification or password-reset link opened in a different browser
+    or an in-app webview, most likely -- or it has lost the cookie since.
+
+    This is the larger share of what remained after the error-callback fix.  In
+    the 24h to 2026-09-28, 142 of mitxonline.mit.edu's 160 ``code`` callback
+    500s and 57 of api.learn.mit.edu's 64 carried no session cookie, and none of
+    the sampled ``state`` values ever got a 302, so these are not replays of a
+    login that already worked.  Conversely, all 6,741 successful ``code``
+    callbacks over the same day carried the session cookie, so the check cannot
+    divert a login that would have succeeded.  Sending the browser back through
+    the login prefix starts a flow it holds the cookie for, and the Keycloak SSO
+    session it just established completes that flow without a second prompt.
+
+    Pass every session cookie name that any route referencing the shared config
+    uses.  Recovery happens only when *none* of them is present, so listing a
+    name too many is harmless, but omitting one would divert every successful
+    login on the routes that use it.  An empty sequence (the default) turns the
+    branch off.  The same guard cookie bounds it to one attempt per window.  A
+    browser that drops this host's cookies while keeping Keycloak's would drop
+    the guard too, and ends at the browser's own redirect limit instead of the
+    500 page -- no worse for someone whose login could not have succeeded.
+
     Both functions live in ``files/`` and are shipped verbatim -- nothing is
     interpolated into them.  Tunables travel as ``oidc_error_recovery`` and
     ``canonical_https_redirect`` blocks on the plugin config, which the functions
@@ -232,6 +261,9 @@ def oidc_gateway_pre_function_plugin(
         production emits today.  An explicit empty list makes the plugin a
         no-op, for turning it off without detaching it from every route that
         references a shared plugin config.
+    :param session_cookie_names: OIDC session cookie names used by the routes
+        this plugin config is attached to.  A ``code`` callback carrying none of
+        them is restarted rather than left to fail.  Empty disables this.
     :param guard_cookie_name: Name of the loop-breaker cookie.
     :param guard_max_age: Seconds the guard cookie lives, bounding how often one
         browser can be sent back through login.
@@ -289,6 +321,7 @@ def oidc_gateway_pre_function_plugin(
                     if recoverable_errors is None
                     else recoverable_errors
                 ),
+                "session_cookie_names": list(session_cookie_names),
                 "guard_cookie_name": guard_cookie_name,
                 "guard_max_age": guard_max_age,
             },

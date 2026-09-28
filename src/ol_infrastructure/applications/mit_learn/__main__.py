@@ -1736,7 +1736,11 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
             # canonicalises the origin: `curl http://api.learn.mit.edu/login`
             # currently sends Keycloak an http:// redirect_uri, and answers with
             # an OIDC session cookie over cleartext.
-            oidc_gateway_pre_function_plugin(),
+            oidc_gateway_pre_function_plugin(
+                session_cookie_names=[
+                    mit_learn_session_cookie_name(stack_info.env_suffix)
+                ],
+            ),
         ],
     ),
     variants=[

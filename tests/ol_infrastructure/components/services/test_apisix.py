@@ -659,6 +659,7 @@ def test_recovery_plugin_renders_into_the_v2_plugin_config():
         # tightens any of those, this is the assertion that should fail first.
         assert recovery["config"]["oidc_error_recovery"] == {
             "recoverable_errors": ["temporarily_unavailable"],
+            "session_cookie_names": [],
             "guard_cookie_name": "apisix_oidc_recovery",
             "guard_max_age": 60,
         }
