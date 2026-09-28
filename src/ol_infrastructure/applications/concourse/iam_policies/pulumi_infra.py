@@ -592,14 +592,22 @@ policy_definition = {
             # rds.amazonaws.com.
             #
             # Unlike the RDS grant above, this one is scoped by resource and
-            # not only by service. Every pulumi-managed launch template's
-            # instance profile role lives under one of these paths, which are
-            # the same paths the iam:CreateRole statement already allows. The
-            # instance profile roles at the default "/" path are all pre-Pulumi
-            # legacy (cassandra, reddit, zookeeper, edx-*, salt-master) and
-            # include AdminEC2Role -- with Resource "*" this role could attach
-            # that to an instance it launches, so the paths are the boundary
-            # that keeps PassRole from becoming an escalation path.
+            # not only by service: every pulumi-managed launch template's
+            # instance profile role lives under one of these four paths.
+            # /ol-applications/*, /ol-data/* and /ol-infrastructure/* match the
+            # role ARNs the iam:CreateRole statement already allows;
+            # /ol-operations/* is additionally required here and is NOT in that
+            # statement, because the consul and keycloak instance roles
+            # (/ol-operations/consul/role/, /ol-operations/keycloak/role/) are
+            # created by another stack but still have to be passed to EC2 by
+            # this one when their ASGs change.
+            #
+            # The instance profile roles at the default "/" path are all
+            # pre-Pulumi legacy (cassandra, reddit, zookeeper, edx-*,
+            # salt-master) and include AdminEC2Role -- with Resource "*" this
+            # role could attach that to an instance it launches, so the paths
+            # are the boundary that keeps PassRole from becoming an escalation
+            # path.
             "Effect": "Allow",
             "Action": ["iam:PassRole"],
             "Resource": [
