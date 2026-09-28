@@ -841,8 +841,17 @@ class OLApplicationK8sConfig(BaseModel):
     application_deployment_use_anti_affinity: bool = True
     k8s_global_labels: dict[str, str]
     env_from_secret_names: list[str]
-    application_security_group_id: Output[str]
-    application_security_group_name: Output[str]
+    application_security_group_id: Output[str] | None = Field(
+        default=None,
+        description=(
+            "AWS security group attached to the application pods through a "
+            "SecurityGroupPolicy. Set together with application_security_group_name. "
+            "Leave both unset on a cluster without the AWS VPC CNI (e.g. k3d), where "
+            "the SecurityGroupPolicy CRD does not exist: the policy and the "
+            "ol.mit.edu/pod-security-group pod label are then omitted."
+        ),
+    )
+    application_security_group_name: Output[str] | None = None
     application_service_account_name: str | Output[str] | None = None
     application_image_repository: str
     application_image_repository_suffix: str | None = None
@@ -867,8 +876,19 @@ class OLApplicationK8sConfig(BaseModel):
     # handler reads to route that workload's notifications to a specific
     # channel instead of the default one.
     slack_channel: str | None = None
-    vault_k8s_resource_auth_name: str
-    registry: Literal["dockerhub", "ecr"] = "ecr"
+    # Not read by the component. Optional so a stack that does not source its
+    # secrets from Vault has nothing to invent here.
+    vault_k8s_resource_auth_name: str | None = None
+    registry: Literal["dockerhub", "ecr", "direct"] = Field(
+        default="ecr",
+        description=(
+            "Where images are pulled from. 'ecr' prefixes the application image with "
+            "the ECR registry, 'dockerhub' with the ECR pull-through cache of "
+            "DockerHub. Both also pull the nginx sidecar through that cache. "
+            "'direct' uses application_image_repository exactly as given and pulls "
+            "nginx from DockerHub, for clusters with no access to ECR."
+        ),
+    )
     image_pull_policy: str = "IfNotPresent"
     # CPU-only by default. Memory is handled vertically by the webapp VPA (see
     # manage_webapp_memory_vpa below), NOT horizontally here.
@@ -892,6 +912,31 @@ class OLApplicationK8sConfig(BaseModel):
             ),
         ),
     ]
+    manage_webapp_autoscaler: bool = Field(
+        default=True,
+        description=(
+            "Create the webapp's horizontal autoscaler: a KEDA ScaledObject when "
+            "webapp_keda_config is set, a HorizontalPodAutoscaler otherwise. Set "
+            "False on a cluster without metrics-server or KEDA; the webapp "
+            "Deployment then runs a fixed application_min_replicas."
+        ),
+    )
+    manage_celery_autoscalers: bool = Field(
+        default=True,
+        description=(
+            "Create a KEDA ScaledObject per celery worker. Set False on a cluster "
+            "without KEDA; each worker Deployment then runs a fixed min_replicas "
+            "from its worker config, so a worker with min_replicas=0 does not run."
+        ),
+    )
+    manage_pod_monitor: bool = Field(
+        default=True,
+        description=(
+            "Create the PodMonitor for the granian metrics port when "
+            "granian_config.enable_metrics is set. Set False on a cluster without "
+            "the Prometheus operator CRDs. The metrics port itself stays exposed."
+        ),
+    )
     manage_webapp_memory_vpa: bool = Field(
         default=True,
         description=(
@@ -1164,15 +1209,47 @@ class OLApplicationK8sConfig(BaseModel):
     # for docs. This unwraps the value so Pydantic can store it in the config class.
     @field_validator("application_security_group_id")
     @classmethod
-    def validate_sec_group_id(cls, application_security_group_id: Output[str]):
+    def validate_sec_group_id(cls, application_security_group_id: Output[str] | None):
         """Ensure that the security group ID is unwrapped from the Pulumi Output."""
+        if application_security_group_id is None:
+            return None
         return Output.from_input(application_security_group_id)
 
     @field_validator("application_security_group_name")
     @classmethod
-    def validate_sec_group_name(cls, application_security_group_name: Output[str]):
+    def validate_sec_group_name(
+        cls, application_security_group_name: Output[str] | None
+    ):
         """Ensure that the security group name is unwrapped from the Pulumi Output."""
+        if application_security_group_name is None:
+            return None
         return Output.from_input(application_security_group_name)
+
+    @model_validator(mode="after")
+    def validate_security_group_is_complete(self) -> "OLApplicationK8sConfig":
+        """Require the security group ID and name together, or neither."""
+        if (self.application_security_group_id is None) != (
+            self.application_security_group_name is None
+        ):
+            msg = (
+                "application_security_group_id and application_security_group_name "
+                "must be set together. The SecurityGroupPolicy needs the ID and "
+                "selects pods by a label derived from the name."
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_webapp_autoscaler_has_a_cluster(self) -> "OLApplicationK8sConfig":
+        """Reject KEDA webapp scaling on a config that creates no autoscaler."""
+        if not self.manage_webapp_autoscaler and self.webapp_keda_config is not None:
+            msg = (
+                "webapp_keda_config is set but manage_webapp_autoscaler is False, so "
+                "the ScaledObject it describes would never be created. Remove "
+                "webapp_keda_config or set manage_webapp_autoscaler=True."
+            )
+            raise ValueError(msg)
+        return self
 
     @field_validator("application_config")
     @classmethod
@@ -1404,7 +1481,7 @@ class OLApplicationK8s(ComponentResource):
         # KEDA ScaledObject manages replicas when webapp_keda_config is set.
         # When using native HPA with metrics, replicas are also omitted.
         # Only set a fixed replica count when neither HPA nor KEDA is active.
-        if (
+        if ol_app_k8s_config.manage_webapp_autoscaler and (
             ol_app_k8s_config.webapp_keda_config is not None
             or ol_app_k8s_config.hpa_scaling_metrics
         ):
@@ -1448,10 +1525,23 @@ class OLApplicationK8s(ComponentResource):
         else:
             # Use tag format: repository:tag
             app_image = f"{ol_app_k8s_config.application_image_repository}:{ol_app_k8s_config.application_docker_tag}"
+        nginx_image = f"nginx:{NGINX_VERSION}"
         if ol_app_k8s_config.registry == "dockerhub":
             app_image = cached_image_uri(app_image)
-        else:
+            nginx_image = cached_image_uri(nginx_image)
+        elif ol_app_k8s_config.registry == "ecr":
             app_image = ecr_image_uri(app_image)
+            nginx_image = cached_image_uri(nginx_image)
+
+        # Selected by the SecurityGroupPolicy at the end of this constructor, so
+        # it is on every pod the component creates or on none of them.
+        security_group_labels: dict[str, Output[str]] = {}
+        if ol_app_k8s_config.application_security_group_name is not None:
+            security_group_labels["ol.mit.edu/pod-security-group"] = (
+                ol_app_k8s_config.application_security_group_name.apply(
+                    truncate_k8s_metanames
+                )
+            )
 
         volumes = [
             kubernetes.core.v1.VolumeArgs(
@@ -1550,7 +1640,7 @@ class OLApplicationK8s(ComponentResource):
             app_containers.append(  # nginx container infront of uwsgi
                 kubernetes.core.v1.ContainerArgs(
                     name="nginx",
-                    image=cached_image_uri(f"nginx:{NGINX_VERSION}"),
+                    image=nginx_image,
                     ports=[
                         kubernetes.core.v1.ContainerPortArgs(
                             container_port=DEFAULT_NGINX_PORT
@@ -1699,9 +1789,7 @@ class OLApplicationK8s(ComponentResource):
             # that still select pods using `ol.mit.edu/process`.
             "ol.mit.edu/process": "webapp",
             "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
-            "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
-                truncate_k8s_metanames
-            ),
+            **security_group_labels,
         }
 
         # Add Slack channel label if specified
@@ -1766,6 +1854,15 @@ class OLApplicationK8s(ComponentResource):
         self.scheduled_job_names: list[str] = []
         self.scheduled_jobs: list[kubernetes.batch.v1.CronJob] = []
         self.webapp_pod_monitor: kubernetes.apiextensions.CustomResource | None = None
+        self.webapp_autoscaler: (
+            kubernetes.autoscaling.v2.HorizontalPodAutoscaler
+            | kubernetes.apiextensions.CustomResource
+            | None
+        ) = None
+        self.celery_scaled_objects: list[kubernetes.apiextensions.CustomResource] = []
+        self.security_group_policy: kubernetes.apiextensions.CustomResource | None = (
+            None
+        )
 
         if pre_deploy_commands := ol_app_k8s_config.pre_deploy_commands:
             _pre_deploy_job = kubernetes.batch.v1.Job(
@@ -1777,9 +1874,7 @@ class OLApplicationK8s(ComponentResource):
                     | {
                         "ol.mit.edu/job": "pre-deploy",
                         "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
-                        "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
-                            truncate_k8s_metanames
-                        ),
+                        **security_group_labels,
                     },
                 ),
                 spec=kubernetes.batch.v1.JobSpecArgs(
@@ -1934,7 +2029,8 @@ class OLApplicationK8s(ComponentResource):
         )
 
         if (
-            ol_app_k8s_config.granian_config is not None
+            ol_app_k8s_config.manage_pod_monitor
+            and ol_app_k8s_config.granian_config is not None
             and ol_app_k8s_config.granian_config.enable_metrics
         ):
             gc = ol_app_k8s_config.granian_config
@@ -2003,9 +2099,7 @@ class OLApplicationK8s(ComponentResource):
                     | {
                         "ol.mit.edu/job": "post-deploy",
                         "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
-                        "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
-                            truncate_k8s_metanames
-                        ),
+                        **security_group_labels,
                     },
                 ),
                 spec=kubernetes.batch.v1.JobSpecArgs(
@@ -2101,7 +2195,7 @@ class OLApplicationK8s(ComponentResource):
             _webapp_scaled_object_name = truncate_k8s_metanames(
                 f"{ol_app_k8s_config.application_name}-webapp-scaledobject"
             )
-            kubernetes.apiextensions.CustomResource(
+            self.webapp_autoscaler = kubernetes.apiextensions.CustomResource(
                 f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-webapp-scaledobject",
                 api_version="keda.sh/v1alpha1",
                 kind="ScaledObject",
@@ -2158,8 +2252,8 @@ class OLApplicationK8s(ComponentResource):
                     )
                 ),
             )
-        else:
-            _application_hpa = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
+        elif ol_app_k8s_config.manage_webapp_autoscaler:
+            self.webapp_autoscaler = kubernetes.autoscaling.v2.HorizontalPodAutoscaler(
                 "application-hpa",
                 spec=kubernetes.autoscaling.v2.HorizontalPodAutoscalerSpecArgs(
                     scale_target_ref=kubernetes.autoscaling.v2.CrossVersionObjectReferenceArgs(
@@ -2292,9 +2386,7 @@ class OLApplicationK8s(ComponentResource):
             celery_labels = ol_app_k8s_config.k8s_global_labels | {
                 "ol.mit.edu/component": str(Component.celery),
                 "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
-                "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
-                    truncate_k8s_metanames
-                ),
+                **security_group_labels,
                 # This is important!
                 # Every type of worker needs a unique set of labels or the pod selectors will break.
                 "ol.mit.edu/worker-name": celery_worker_config.worker_name,
@@ -2321,6 +2413,12 @@ class OLApplicationK8s(ComponentResource):
                 spec=kubernetes.apps.v1.DeploymentSpecArgs(
                     selector=kubernetes.meta.v1.LabelSelectorArgs(
                         match_labels=celery_labels,
+                    ),
+                    # KEDA owns the replica count when it manages the worker.
+                    replicas=(
+                        None
+                        if ol_app_k8s_config.manage_celery_autoscalers
+                        else celery_worker_config.min_replicas
                     ),
                     template=kubernetes.core.v1.PodTemplateSpecArgs(
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -2437,6 +2535,8 @@ class OLApplicationK8s(ComponentResource):
             )
             self.celery_deployments.append(_celery_deployment)
 
+            if not ol_app_k8s_config.manage_celery_autoscalers:
+                continue
             _celery_scaled_object = kubernetes.apiextensions.CustomResource(
                 f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.worker_name}-{stack_info.env_suffix}-scaledobject",
                 api_version="keda.sh/v1alpha1",
@@ -2503,15 +2603,14 @@ class OLApplicationK8s(ComponentResource):
                     ResourceOptions(delete_before_replace=True)
                 ),
             )
+            self.celery_scaled_objects.append(_celery_scaled_object)
 
         if ol_app_k8s_config.celery_beat_config is not None:
             beat_config = ol_app_k8s_config.celery_beat_config
             beat_labels = ol_app_k8s_config.k8s_global_labels | {
                 "ol.mit.edu/component": str(Component.celery),
                 "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
-                "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
-                    truncate_k8s_metanames
-                ),
+                **security_group_labels,
                 "ol.mit.edu/worker-name": "beat",
             }
             if ol_app_k8s_config.slack_channel:
@@ -2605,9 +2704,7 @@ class OLApplicationK8s(ComponentResource):
             scheduled_job_labels = ol_app_k8s_config.k8s_global_labels | {
                 "ol.mit.edu/component": "scheduled-job",
                 "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
-                "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
-                    truncate_k8s_metanames
-                ),
+                **security_group_labels,
                 "ol.mit.edu/job-name": scheduled_job.name,
             }
             _scheduled_job_name = scheduled_job_name(
@@ -2714,9 +2811,7 @@ class OLApplicationK8s(ComponentResource):
             dev_shell_labels = ol_app_k8s_config.k8s_global_labels | {
                 "ol.mit.edu/component": "dev-shell",
                 "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
-                "ol.mit.edu/pod-security-group": ol_app_k8s_config.application_security_group_name.apply(
-                    truncate_k8s_metanames
-                ),
+                **security_group_labels,
             }
             if ol_app_k8s_config.slack_channel:
                 dev_shell_labels["ol.mit.edu/slack-channel"] = (
@@ -2806,8 +2901,11 @@ class OLApplicationK8s(ComponentResource):
                 ),
             )
 
-        _application_pod_security_group_policy = (
-            kubernetes.apiextensions.CustomResource(
+        if (
+            ol_app_k8s_config.application_security_group_id is not None
+            and ol_app_k8s_config.application_security_group_name is not None
+        ):
+            self.security_group_policy = kubernetes.apiextensions.CustomResource(
                 f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-application-pod-security-group-policy",
                 api_version="vpcresources.k8s.aws/v1beta1",
                 kind="SecurityGroupPolicy",
@@ -2832,8 +2930,7 @@ class OLApplicationK8s(ComponentResource):
                         ],
                     },
                 },
-            ),
-        )
+            )
 
     @property
     def all_deployment_names(self) -> list[str]:
