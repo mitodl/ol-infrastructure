@@ -60,7 +60,13 @@ if `numTraces` changes.
 
 `sampling_trace_dropped_too_early_total` counts that loss directly. Its series
 was present and flat at 0 on every production cluster over the same 7 days, so
-any increase is new.
+any increase is new. The series is per sampler pod (`instance` is the pod IP),
+so a replaced pod starts a new series. `increase()` needs two samples and
+cannot see drops that land before the new pod's first scrape, so the rule has
+a second arm (`x unless x offset 15m`) for a series whose first value is
+already non-zero, the same workaround clickhouse.py uses. Its `> 0` keeps a
+new pod that starts at 0 quiet; over the 7 days to 2026-09-28 three clusters
+replaced a sampler pod and the full expression fired zero times.
 
 Routing
 -------
@@ -80,6 +86,8 @@ _CALLS = 'traces_spanmetrics_calls_total{span_kind="SPAN_KIND_SERVER"}'
 
 # Half of the sampler's per-pod numTraces in substructure/aws/eks/grafana.py.
 _SAMPLER_BUFFER_WARN_TRACES = 25000
+
+_DROPPED = "otelcol_processor_tail_sampling_sampling_trace_dropped_too_early_total"
 
 _ROUTING = {"channel": "devops-warnings"}
 
@@ -156,9 +164,9 @@ def create(
                     "description": "otelcol_processor_tail_sampling_sampling_trace_dropped_too_early_total increased on {{ $labels.cluster }} in the last 15 minutes. Those traces never reach Tempo, and every span-derived metric computed from them is skewed. The buffer is too small for the current trace rate: raise numTraces in substructure/aws/eks/grafana.py.",
                 },
                 datas=rd(
-                    "sum by (cluster) (increase("
-                    "otelcol_processor_tail_sampling_sampling_trace_dropped_too_early_total"
-                    "[15m])) > 0"
+                    f"sum by (cluster) (increase({_DROPPED}[15m])) > 0\n"
+                    "or\n"
+                    f"sum by (cluster) ({_DROPPED} unless {_DROPPED} offset 15m) > 0"
                 ),
             ),
         ],
