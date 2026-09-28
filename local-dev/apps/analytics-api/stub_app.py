@@ -23,6 +23,7 @@ stub ignores which UUID it is and returns the same fixtures for all of them.
 import json
 import os
 import re
+from collections import defaultdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -392,6 +393,65 @@ def _build_learner_progress():
 
 
 LEARNER_PROGRESS = _build_learner_progress()
+
+
+def _reconcile_course_counts():
+    """Keeps `ENROLLMENT_FUNNEL`/`CONTENT_ENGAGEMENT`'s per-course "enrolled"
+    figures consistent with `LEARNER_PROGRESS` for the courses both cover,
+    rather than leaving two independently hand-authored numbers free to drift
+    apart. Mit-learn's Learner progress section reads one, Course
+    performance/Content engagement read the other, side by side on the same
+    page, so a mismatch there reads as a bug rather than a stub quirk.
+
+    The course under contract "2" has no `LEARNER_PROGRESS` rows at all (that
+    fixture only covers contract "1" — see `_VIEWED_CONTRACT`), so it's left
+    as hand-authored fixture data untouched.
+    """
+    by_course = defaultdict(list)
+    for row in LEARNER_PROGRESS:
+        by_course[row["courserun_readable_id"]].append(row)
+
+    for entry in ENROLLMENT_FUNNEL:
+        rows = by_course.get(entry["courserun_readable_id"])
+        if not rows:
+            continue
+        enrolled = len(rows)
+        active = sum(1 for r in rows if r["enrollment_is_active"])
+        passing = sum(
+            1
+            for r in rows
+            if r["outcomes_shared"]
+            and r["completion_status"] in ("passed", "certified")
+        )
+        certified = sum(
+            1
+            for r in rows
+            if r["outcomes_shared"] and r["completion_status"] == "certified"
+        )
+        entry.update(
+            {
+                "enrolled_learners": enrolled,
+                "active_learners": active,
+                "passing_learners": passing,
+                "certified_learners": certified,
+                "active_rate_pct": round(active / enrolled * 100, 1),
+                "completion_rate_pct": round(passing / enrolled * 100, 1),
+            }
+        )
+
+    for entry in CONTENT_ENGAGEMENT:
+        rows = by_course.get(entry["courserun_readable_id"])
+        if not rows:
+            continue
+        entry["total_enrolled_learners"] = len(rows)
+        entry["certificates_earned"] = sum(
+            1
+            for r in rows
+            if r["outcomes_shared"] and r["completion_status"] == "certified"
+        )
+
+
+_reconcile_course_counts()
 
 # Identity of "the" contract every contract-scoped request is treated as
 # viewing — the stub ignores which contract_id is actually in the path (same
