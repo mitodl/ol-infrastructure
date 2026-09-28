@@ -2440,7 +2440,11 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
         # docs/plans/remove-nginx-sidecar.md.
         OLApisixRouteConfig(
             route_name="dnt-policy",
-            priority=10,
+            # Above every fastly-*/browser-* route (max 50). Their "/*" paths
+            # also match this URL, and APISIX picks by priority before path
+            # specificity, so at 10 a request carrying an Origin or
+            # Fastly-Client-IP header was proxied to Django and 404'd.
+            priority=60,
             # Referenced no plugin config, unlike every sibling here, so
             # this path emitted no prometheus series and no OTLP span. `mocking`
             # short-circuits before the upstream but `prometheus` runs in the log
