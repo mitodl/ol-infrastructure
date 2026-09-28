@@ -10,10 +10,29 @@ from packaging.version import Version
 from pulumi_aws import ec2
 from pulumi_kubernetes import Provider
 
-from ol_infrastructure.lib.aws.aws_helper import AWS_ACCOUNT_ID
+from ol_infrastructure.lib.aws.aws_helper import aws_account_id
 
-eks_client = boto3.client("eks")
-ECR_DOCKERHUB_REGISTRY = f"{AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/dockerhub"
+
+@lru_cache
+def eks_client() -> Any:
+    """Create the EKS client on first use.
+
+    Not a module constant because creating a client needs an AWS region,
+    and this module is imported by programs that never call EKS.
+
+    :returns: A boto3 EKS client
+    """
+    return boto3.client("eks")
+
+
+def ecr_dockerhub_registry() -> str:
+    """Build the address of the ECR pull-through cache of DockerHub.
+
+    :returns: The registry host and path prefix
+    :rtype: str
+    """
+    return f"{aws_account_id()}.dkr.ecr.us-east-1.amazonaws.com/dockerhub"
+
 
 # Like our ec2 practices, allow pods to egress anywhere they want
 default_psg_egress_args = [
@@ -60,11 +79,11 @@ def check_cluster_namespace(namespace: str, namespaces: list[str]):
 def get_cluster_version(*, use_default: bool = True) -> str:
     """Get the current version of the EKS cluster."""
     if use_default:
-        cluster_versions = eks_client.describe_cluster_versions(
+        cluster_versions = eks_client().describe_cluster_versions(
             defaultOnly=use_default, clusterType="eks"
         )
     else:
-        cluster_versions = eks_client.describe_cluster_versions(
+        cluster_versions = eks_client().describe_cluster_versions(
             clusterType="eks", versionStatus="STANDARD_SUPPORT"
         )
     versions_list = sorted(
@@ -140,7 +159,7 @@ def get_eks_addon_version(
     """
     if cluster_version is None:
         cluster_version = get_cluster_version()
-    version_info = eks_client.describe_addon_versions(
+    version_info = eks_client().describe_addon_versions(
         kubernetesVersion=cluster_version,
         addonName=addon_name,
     )["addons"][0]
@@ -235,7 +254,7 @@ def access_entry_opts(
     resource_id = ""
 
     try:
-        eks_client.describe_access_entry(
+        eks_client().describe_access_entry(
             clusterName=cluster_name,
             principalArn=principal_arn,
         )
