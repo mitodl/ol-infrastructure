@@ -341,6 +341,7 @@ ReleaseMap: dict[
                 application="admin-console",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="codejail",
@@ -382,6 +383,7 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="learning",
@@ -418,6 +420,7 @@ ReleaseMap: dict[
                 application="admin-console",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="communications",
@@ -450,11 +453,13 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="learner-dashboard",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="learning",
@@ -492,6 +497,7 @@ ReleaseMap: dict[
                 application="admin-console",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="communications",
@@ -524,6 +530,7 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="learning",
@@ -534,6 +541,7 @@ ReleaseMap: dict[
                 application="learner-dashboard",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="notes-api",
