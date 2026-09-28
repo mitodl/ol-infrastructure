@@ -81,8 +81,7 @@ config:
     OCW_ITERATOR_CHUNK_SIZE: 300
     OCW_LIVE_BUCKET: "ocw-content-live-production"
     OIDC_ENDPOINT: "https://sso-ci.ol.mit.edu/realms/olapps"
-    # Must match OVS QA's CloudFront domain (distribution E1KA122GOS192Z), or
-    # mit-learn rejects all OVS media.
+    # = OVS QA CloudFront (E1KA122GOS192Z); a mismatch drops all OVS media
     OVS_ALLOWED_MEDIA_HOSTS: '["du3yhovcx8dht.cloudfront.net"]'
     OVS_API_BASE_URL: "https://video-rc.odl.mit.edu"
     OPENSEARCH_INDEX: "mitlearn-ci"
