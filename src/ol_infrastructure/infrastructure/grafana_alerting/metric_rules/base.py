@@ -83,6 +83,12 @@ Sub-modules
                  an edge/blackbox view. Pairs with
                  dashboards/service_red.py -- see that module and this one's
                  own docstring for why metrics rather than traces.
+  otel_trace_pipeline
+               — New in 2026-09. The trace pipeline itself: a service whose
+                 SERVER spans stop reaching Tempo, and the tail sampler's
+                 buffer and early-drop counters. The complement to
+                 otel_service_red, which cannot see a service that has
+                 stopped exporting at all.
   clickhouse   — New in 2026-09. The shared LLMOps ClickHouse cluster behind
                  Opik: server and Keeper health, replication, insert pressure,
                  disk, and the daily SQL backup's staleness. Off the Altinity
@@ -109,6 +115,7 @@ from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
     eks_general,
     linux_host,
     otel_service_red,
+    otel_trace_pipeline,
     synthetic_monitoring,
     vector_edxapp_tracking,
     witan,
@@ -217,6 +224,7 @@ def create(resource_opts: ResourceOptions) -> None:
     witan.create(alerts_folder.uid, rd, resource_opts)
     clickhouse.create(alerts_folder.uid, rd, resource_opts)
     otel_service_red.create(alerts_folder.uid, rd, resource_opts)
+    otel_trace_pipeline.create(alerts_folder.uid, rd, resource_opts)
     vector_edxapp_tracking.create(alerts_folder.uid, rd, resource_opts)
     # No folder_uid: these rules live in the Synthetic Monitoring plugin's own
     # folder rather than the one created above. See the module docstring.
