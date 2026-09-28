@@ -226,6 +226,15 @@ def _build_interpolated_config_dict(
             "languagePreferenceCookieName": f"{env_name}-openedx-language-preference",
             "userInfoCookieName": f"{env_name}-edx-user-info",
             "csrfTokenApiPath": "/csrf/api/v1/token",
+            # Where frontend-base resolves the course authoring role, e.g.
+            # admin-console's error page "back" link. Mirrors
+            # COURSE_AUTHORING_MICROFRONTEND_URL, which the legacy MFE read.
+            "externalRoutes": [
+                {
+                    "role": "org.openedx.frontend.role.courseAuthoring",
+                    "url": f"https://{domains['studio']}/authoring",
+                }
+            ],
             "commonAppConfig": {
                 "mitolFooter": {
                     "accessibilityUrl": "https://accessibility.mit.edu/",
