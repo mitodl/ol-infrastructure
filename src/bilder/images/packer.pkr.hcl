@@ -3,6 +3,9 @@ source "amazon-ebs" "third-party" {
   ami_name                = "${var.app_name}-${var.node_type}-${local.timestamp}"
   ami_virtualization_type = "hvm"
   instance_type           = "t3a.medium"
+  # Temporary mitigation for GHSA-r374-rxx8-8654 / CVE-2026-44405: use an
+  # Ed25519 session key so pyinfra's Paramiko SSH auth does not rely on RSA.
+  temporary_key_pair_type = "ed25519"
   launch_block_device_mappings {
     device_name           = "/dev/xvda"
     volume_size           = 25
