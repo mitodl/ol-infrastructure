@@ -60,7 +60,10 @@ def build_dagster_docker_pipeline() -> Pipeline:
     extra_watched_paths = {
         "data_loading": ["src/ol_dlt/"],
         "lakehouse": ["src/ol_dbt/"],
-        "k8s": ["dg_deployments/reconcile_edxorg_partitions.py"],
+        "k8s": [
+            "dg_deployments/reconcile_edxorg_partitions.py",
+            "dg_deployments/dagster-k8s/",
+        ],
     }
 
     # Create git resources for each code location with specific path filters
