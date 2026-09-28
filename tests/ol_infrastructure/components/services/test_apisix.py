@@ -1192,17 +1192,18 @@ def test_variant_cannot_carry_its_own_plugin_list():
 
 
 SHARED_PLUGINS_CLASS = "OLApisixSharedPlugins"
+SHARED_PLUGINS_FACTORY = "ol_apisix_shared_plugins_variants"
 
 
-def _local_names_for(tree):
-    """Return every name OLApisixSharedPlugins is bound to in this module."""
-    names = {SHARED_PLUGINS_CLASS}
+def _local_names_for(tree, target):
+    """Return every name ``target`` is bound to in this module."""
+    names = {target}
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
             names.update(
                 alias.asname
                 for alias in node.names
-                if alias.name == SHARED_PLUGINS_CLASS and alias.asname
+                if alias.name == target and alias.asname
             )
     return names
 
@@ -1261,22 +1262,34 @@ def _application_name_of(call, module_key, constants):
 
 
 def _shared_plugin_calls(tree, module_key):
-    """Yield ``(lineno, host key)`` for each OLApisixSharedPlugins call.
+    """Yield ``(lineno, kind, host key)`` for each relevant call.
 
-    Counts attribute-style calls (``apisix.OLApisixSharedPlugins(...)``) and
-    aliased imports as well as bare ones, so neither spelling slips past the
-    check below.
+    ``kind`` is ``"direct"`` for a bare ``OLApisixSharedPlugins(...)``
+    construction and ``"factory"`` for one routed through
+    ``ol_apisix_shared_plugins_variants``, which renders several configs off
+    one shared plugin list and so is not itself a "more than one" violation
+    below. Counts attribute-style calls (``apisix.OLApisixSharedPlugins(...)``)
+    and aliased imports as well as bare ones, so neither spelling slips past
+    the check below.
     """
-    local_names = _local_names_for(tree)
+    direct_names = _local_names_for(tree, SHARED_PLUGINS_CLASS)
+    factory_names = _local_names_for(tree, SHARED_PLUGINS_FACTORY)
     constants = _string_constants(tree)
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
         func = node.func
-        if (isinstance(func, ast.Name) and func.id in local_names) or (
+        if (isinstance(func, ast.Name) and func.id in direct_names) or (
             isinstance(func, ast.Attribute) and func.attr == SHARED_PLUGINS_CLASS
         ):
-            yield node.lineno, _application_name_of(node, module_key, constants)
+            kind = "direct"
+        elif (isinstance(func, ast.Name) and func.id in factory_names) or (
+            isinstance(func, ast.Attribute) and func.attr == SHARED_PLUGINS_FACTORY
+        ):
+            kind = "factory"
+        else:
+            continue
+        yield node.lineno, kind, _application_name_of(node, module_key, constants)
 
 
 def test_no_application_hand_writes_two_shared_plugin_configs():
@@ -1286,6 +1299,12 @@ def test_no_application_hand_writes_two_shared_plugin_configs():
     that drifted twice on api.learn, and the component tests above cannot see
     it because they only ever exercise one config at a time.
 
+    A host already on the factory is not exempt from this: a single manual
+    OLApisixSharedPlugins call added alongside it has a count of one, which is
+    exactly the "safe" count for a host with no factory call at all -- the
+    check below has to know which hosts are on the factory to tell those two
+    apart.
+
     Grouped by ``application_name`` across the whole tree rather than per file:
     the invariant is one plugin list per host, so two configs for two different
     applications are fine wherever they live (edxapp and meilisearch are that
@@ -1294,7 +1313,8 @@ def test_no_application_hand_writes_two_shared_plugin_configs():
     """
     applications = Path(__file__).parents[4] / "src/ol_infrastructure/applications"
     modules = sorted(applications.rglob("*.py"))
-    hosts: collections.Counter[str] = collections.Counter()
+    direct_hosts: collections.Counter[str] = collections.Counter()
+    factory_hosts: collections.Counter[str] = collections.Counter()
     unparsed = {}
     unkeyed = []
     for module in modules:
@@ -1304,29 +1324,37 @@ def test_no_application_hand_writes_two_shared_plugin_configs():
         except (SyntaxError, UnicodeDecodeError) as exc:
             unparsed[module_key] = str(exc)
             continue
-        for lineno, host in _shared_plugin_calls(tree, module_key):
+        for lineno, kind, host in _shared_plugin_calls(tree, module_key):
             if host is None:
                 unkeyed.append(f"{module_key}:{lineno}")
-            else:
-                hosts[host] += 1
+                continue
+            (factory_hosts if kind == "factory" else direct_hosts)[host] += 1
 
     # Without these the test passes by scanning nothing -- a moved test file
     # (parents[4] no longer resolving) or a renamed class would leave it
     # permanently green, and it is the only guard behind the invariant.
     assert modules, f"scanned no application modules under {applications}"
-    assert hosts, f"found no {SHARED_PLUGINS_CLASS} calls under {applications}"
+    assert direct_hosts or factory_hosts, (
+        f"found no {SHARED_PLUGINS_CLASS}/{SHARED_PLUGINS_FACTORY} calls under "
+        f"{applications}"
+    )
     assert not unparsed, f"could not parse: {unparsed}"
     assert not unkeyed, (
-        f"{SHARED_PLUGINS_CLASS} calls with no inline "
+        f"{SHARED_PLUGINS_CLASS}/{SHARED_PLUGINS_FACTORY} calls with no inline "
         f"plugin_config=OLApisixSharedPluginsConfig(application_name=...), which "
         f"this check cannot key by host: {unkeyed}. Pass the config inline, or "
         "teach _application_name_of to resolve the new shape."
     )
 
-    offenders = {host: count for host, count in hosts.items() if count > 1}
+    offenders = {}
+    for host in direct_hosts.keys() | factory_hosts.keys():
+        direct, factory = direct_hosts[host], factory_hosts[host]
+        if factory > 1 or (factory and direct) or (not factory and direct > 1):
+            offenders[host] = {"direct": direct, "factory": factory}
     assert not offenders, (
-        "These applications build more than one "
-        f"{SHARED_PLUGINS_CLASS} by hand, so their plugin lists have to be kept "
-        f"in step by hand: {offenders}. Use ol_apisix_shared_plugins_variants "
-        "instead."
+        "These applications build more than one shared plugin list for the "
+        f"same host: {offenders} (counts are direct OLApisixSharedPlugins "
+        "calls vs. ol_apisix_shared_plugins_variants calls). Route every "
+        "config for a host through one ol_apisix_shared_plugins_variants "
+        "call instead."
     )
