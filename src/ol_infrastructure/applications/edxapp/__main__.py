@@ -958,15 +958,23 @@ fastly_access_logging_iam_role = monitoring_stack.require_output(
 mfe_regex = "^/({})/".format("|".join(edxapp_mfe_paths))
 
 # OEP-65 Site Project routing (optional, additive — legacy MFE rules are unchanged).
-# Set edxapp:site_project in the stack YAML with two keys:
+# Set edxapp:site_project in the stack YAML with these keys:
 #   deployment — the Site Project deployment name (e.g. mitxonline)
-#   mfe_apps   — list of MFE app path names served by this Site Project (e.g. instructor-dashboard)
+#   mfe_apps   — list of MFE app path names served by this Site Project under
+#                /apps/<name> (e.g. instructor-dashboard)
+#   root_apps  — optional list of MFE app path names served by this Site Project
+#                at /<name>, the path the legacy MFE used (e.g. gradebook). For
+#                module libraries that register absolute route paths, which
+#                cannot be nested under /apps.
 site_project_config = edxapp_config.get_object("site_project")
 site_project_deployment = (
     site_project_config.get("deployment") if site_project_config else None
 )
 site_project_mfe_apps: list[str] = (
     list(site_project_config.get("mfe_apps", [])) if site_project_config else []
+)
+site_project_root_apps: list[str] = (
+    list(site_project_config.get("root_apps", [])) if site_project_config else []
 )
 
 # When a Site Project is active, recv snippets tag matching requests with
@@ -987,6 +995,19 @@ if site_project_deployment:
         raise ValueError(msg)
     _sp = site_project_deployment
     _apps_alt = "|".join(site_project_mfe_apps)
+    # root_apps keep the legacy MFE's own path. This recv rewrite runs before the
+    # backend is chosen, so a listed path is served the Site Project's
+    # index.html instead of the legacy build in the MFE bucket.
+    _root_apps_branch = ""
+    if site_project_root_apps:
+        _root_alt = "|".join(site_project_root_apps)
+        _root_apps_branch = (
+            f' else if (req.url.path ~ "^/({_root_alt})(/|$)") {{\n'
+            '  set req.http.X-Site-Project = "1";\n'
+            f'  set req.url = "/{_sp}-site/index.html";\n'
+            "  unset req.http.Cookie;\n"
+            "}"
+        )
     _site_project_snippets.append(
         vcl_snippet(
             content=textwrap.dedent(
@@ -1001,7 +1022,8 @@ if site_project_deployment:
                   set req.url = "/{_sp}-site/index.html";
                   unset req.http.Cookie;
                 }}"""
-            ),
+            )
+            + _root_apps_branch,
             name="Handle Site Project routing",
             priority=90,
             type="recv",

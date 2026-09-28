@@ -180,3 +180,6 @@ config:
     deployment: mitxonline
     mfe_apps:
     - instructor-dashboard
+    root_apps:
+    - admin-console
+    - gradebook
