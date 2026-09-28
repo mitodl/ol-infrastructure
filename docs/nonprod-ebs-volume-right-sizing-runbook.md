@@ -8,6 +8,42 @@ actively hazardous if left unpaired with the recreate below. Read
 [Why the config change is not enough](#why-the-config-change-is-not-enough) before
 running `pulumi up` on any of these stacks.
 
+## Status: closed out 2026-09-23 — do not run this as-is
+
+This runbook was **partially executed and then deliberately stopped**. Production
+was never touched and never needed to be. Current state:
+
+| Workload | Outcome |
+|---|---|
+| `residential-ci` `mitx-ts` | **Recreated at 20Gi.** CR and StatefulSet agree; quorum healthy. Old 100Gi PVCs `data-mitx-ts-sts-1/2` deliberately left in place (see below). |
+| `data-qa` StarRocks FE meta + log | **Recreated at 20Gi.** CR and StatefulSet agree. |
+| `data-qa` ClickHouse hot | Config and live StatefulSet both 100Gi; nothing outstanding. |
+| All 7 other non-prod typesense stacks | **Config reverted to the 100Gi default.** Not recreated. |
+
+Two corrections to the procedure below, learned by running it:
+
+1. **Replacing the surviving PVCs is unnecessary.** Step 3's ordinal-by-ordinal PVC
+   replacement is *pure cost optimisation*, not part of disarming the operator
+   hazard. Kubernetes never reconciles existing PVCs against a StatefulSet's
+   `volumeClaimTemplates`; both operator hazards depend only on the **CR vs live
+   StatefulSet** agreeing. An old oversized PVC can stay indefinitely at no risk.
+   `residential-ci` still has two 100Gi typesense PVCs on purpose.
+
+2. **The recreate has an unstated prerequisite: schedulable capacity.** Typesense
+   pods pin to `nodeSelector: ol.mit.edu/core_node=true`, and *no* Karpenter
+   nodepool can provision such a node — `default` and `gpu` both set
+   `ol.mit.edu/core_node: "false"`. Core capacity is therefore fixed. On
+   2026-09-23 `residential-ci`'s four core nodes were at 91–99% memory requests,
+   so deleting the StatefulSet stranded two pods in `Pending` and dropped the
+   cluster to `QuorumNotReady` with no path to recovery. **Before deleting any
+   StatefulSet on a core-pinned workload, confirm the pods can be rescheduled**
+   — on a saturated fixed-size pool the delete is a one-way door.
+
+The remaining unreclaimed capacity is roughly $200/mo and was consciously left on
+the table: the per-ordinal recreate costs more engineering time than the storage is
+worth, and carries the downtime risk described in point 2. Reopen this only if the
+economics change materially.
+
 ## Measurement this is based on
 
 `kubelet_volume_stats_used_bytes` / `kubelet_volume_stats_capacity_bytes`, taken

@@ -157,12 +157,11 @@ config:
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
   typesense:forum_search_enabled: "true"
-  # Measured 2026-09-15: every non-prod typesense volume holds 0.74-0.86 GiB
-  # on the 100Gi default, flat over 90 days of history. The largest populated
-  # non-prod course index anywhere (mitxonline QA meilisearch) is 2.35 GiB, so
-  # 20Gi is ~8x the realistic ceiling for this tier, not just the idle figure.
-  # Shrinking also drops provisioned IOPS, which scale as iopsPerGB * size.
-  typesense:storage_size: 20Gi
+  # storage_size intentionally left at the 100Gi default. The 20Gi sizing from
+  # #5870 was sound, but it only takes effect via a StatefulSet recreate, and an
+  # unpaired CR/StatefulSet mismatch wedges the operator (see typesense.py).
+  # Reclaiming the capacity was not worth the recreate on these stacks; do not
+  # re-add this without running docs/nonprod-ebs-volume-right-sizing-runbook.md.
   edxapp:site_project:
     deployment: mitx
     mfe_apps:
