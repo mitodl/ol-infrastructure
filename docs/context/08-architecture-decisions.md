@@ -226,3 +226,5 @@ Rejected ADRs are archived but preserved for historical context:
 - Include explanation of why rejected
 - Keep in `docs/adr/` for reference
 - May be revisited in future with new information
+
+Clean line added by the prek pilot base-moved fixture.
