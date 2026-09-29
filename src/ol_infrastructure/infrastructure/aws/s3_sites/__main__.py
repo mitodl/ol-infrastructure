@@ -79,20 +79,31 @@ if stack_info.env_suffix == "production":
         # inactivity to reach an archive tier) and go straight to the
         # cheapest class.
         intelligent_tiering_enabled=False,
+        # Restores S3's pre-September-2024 default so that objects under
+        # 128KB -- including zero-byte objects -- still transition to
+        # DEEP_ARCHIVE below, rather than being silently left behind in
+        # Standard forever. (A per-rule `ObjectSizeGreaterThan` filter can't
+        # cover this: it's an exclusive lower bound, so even a value of `0`
+        # excludes zero-byte objects.)
+        transition_default_minimum_object_size="varies_by_storage_class",
         lifecycle_rules=[
             s3.BucketLifecycleConfigurationRuleArgs(
                 id="archive-immediately",
                 status="Enabled",
-                # Overrides S3's default exclusion of objects under 128KB
-                # from lifecycle transitions -- this archive is full of
-                # exactly that kind of small file (thumbnails, metadata,
-                # etc.) and none of it should be left behind in Standard.
-                filter=s3.BucketLifecycleConfigurationRuleFilterArgs(
-                    object_size_greater_than=0,
-                ),
                 transitions=[
                     s3.BucketLifecycleConfigurationRuleTransitionArgs(
                         days=0,
+                        storage_class="DEEP_ARCHIVE",
+                    )
+                ],
+                # The migration process this bucket exists for copies every
+                # version of a source object under the same destination key,
+                # so earlier copies become noncurrent versions here, not just
+                # current ones. Without this, that history would stay in
+                # Standard indefinitely.
+                noncurrent_version_transitions=[
+                    s3.BucketLifecycleConfigurationRuleNoncurrentVersionTransitionArgs(
+                        noncurrent_days=0,
                         storage_class="DEEP_ARCHIVE",
                     )
                 ],

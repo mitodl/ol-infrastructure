@@ -754,3 +754,98 @@ class TestOLBucketNoncurrentVersionExpirationResource:
             assert "intelligent-tiering-transition" in rule_ids
 
         return self._rule_ids(bucket).apply(check)
+
+
+class TestS3BucketConfigTransitionDefaultMinimumObjectSizeValidation:
+    """Validate the transition_default_minimum_object_size field."""
+
+    @staticmethod
+    def get_valid_tags():
+        return {
+            "OU": "operations",
+            "Environment": "test",
+            "Application": "test-app",
+            "Owner": "test-owner",
+        }
+
+    def test_unset_by_default(self):
+        config = S3BucketConfig(
+            bucket_name="test-bucket",
+            tags=self.get_valid_tags(),
+        )
+        assert config.transition_default_minimum_object_size is None
+
+    def test_all_storage_classes_128k_accepted(self):
+        config = S3BucketConfig(
+            bucket_name="test-bucket",
+            transition_default_minimum_object_size="all_storage_classes_128K",
+            tags=self.get_valid_tags(),
+        )
+        assert (
+            config.transition_default_minimum_object_size == "all_storage_classes_128K"
+        )
+
+    def test_varies_by_storage_class_accepted(self):
+        config = S3BucketConfig(
+            bucket_name="test-bucket",
+            transition_default_minimum_object_size="varies_by_storage_class",
+            tags=self.get_valid_tags(),
+        )
+        assert (
+            config.transition_default_minimum_object_size == "varies_by_storage_class"
+        )
+
+    def test_invalid_value_rejected(self):
+        with pytest.raises(
+            ValueError, match="transition_default_minimum_object_size must be"
+        ):
+            S3BucketConfig(
+                bucket_name="test-bucket",
+                transition_default_minimum_object_size="not_a_real_value",
+                tags=self.get_valid_tags(),
+            )
+
+
+class TestOLBucketTransitionDefaultMinimumObjectSizeResource:
+    """OLBucket passes the field through to BucketLifecycleConfiguration."""
+
+    @staticmethod
+    def get_valid_tags():
+        return {
+            "OU": "operations",
+            "Environment": "test",
+            "Application": "test-app",
+            "Owner": "test-owner",
+        }
+
+    @pulumi.runtime.test
+    def test_unset_by_default(self):
+        """No override by default -- AWS's own default behavior applies."""
+        config = S3BucketConfig(
+            bucket_name="test-transition-default-unset",
+            tags=self.get_valid_tags(),
+        )
+        bucket = OLBucket("test-transition-default-unset", config=config)
+
+        def check(value):
+            assert value is None
+
+        return pulumi.Output.from_input(
+            bucket.bucket_lifecycle.transition_default_minimum_object_size
+        ).apply(check)
+
+    @pulumi.runtime.test
+    def test_set_value_is_passed_through(self):
+        config = S3BucketConfig(
+            bucket_name="test-transition-default-set",
+            transition_default_minimum_object_size="varies_by_storage_class",
+            tags=self.get_valid_tags(),
+        )
+        bucket = OLBucket("test-transition-default-set", config=config)
+
+        def check(value):
+            assert value == "varies_by_storage_class"
+
+        return pulumi.Output.from_input(
+            bucket.bucket_lifecycle.transition_default_minimum_object_size
+        ).apply(check)
