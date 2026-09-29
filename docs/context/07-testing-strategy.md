@@ -443,4 +443,4 @@ uv run pytest tests/integration/ -v
 - **Automation API:** https://www.pulumi.com/docs/iac/packages-and-automation/automation-api/
 - **Pytest Documentation:** https://docs.pytest.org/
 - **Example Repository:** `tests/ol_infrastructure/components/aws/test_kubernetes_app_auth.py`
-Seeded trailing whitespace after the base moved.   
+Seeded trailing whitespace after the base moved.
