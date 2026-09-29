@@ -1224,14 +1224,16 @@ def test_celery_worker_skip_rollout_await_sets_annotation():
     )
 
     def check(args):
-        awaited, skipped = args
+        awaited, skipped, skipped_pod = args
         # The flag is per worker, not per application.
         assert "pulumi.com/skipAwait" not in (awaited or {})
         assert skipped["pulumi.com/skipAwait"] == "true"
+        assert "pulumi.com/skipAwait" not in (skipped_pod or {})
 
     return pulumi.Output.all(
         app.celery_deployments[0].metadata.annotations,
         app.celery_deployments[1].metadata.annotations,
+        app.celery_deployments[1].spec.template.metadata.annotations,
     ).apply(check)
 
 
