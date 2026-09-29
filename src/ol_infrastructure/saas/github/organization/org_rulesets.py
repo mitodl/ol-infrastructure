@@ -66,7 +66,7 @@ and a disabled ruleset is invisible everywhere except `/orgs/{org}/rulesets`.
 import pulumi_github as github
 from pulumi import ResourceOptions
 
-from bridge.settings.apps import RELEASE_BOT_APP_ID
+from bridge.settings.apps import DATA_PLATFORM_APP_ID, RELEASE_BOT_APP_ID
 from ol_infrastructure.saas.github.organization.teams import github_teams
 from ol_infrastructure.saas.github.tiers import (
     TIER_ONE,
@@ -156,6 +156,22 @@ _ADMIN_BYPASS = [
     github.OrganizationRulesetBypassActorArgs(
         actor_type="Integration",
         actor_id=RELEASE_BOT_APP_ID,
+        bypass_mode="always",
+    ),
+    # ol-data-platform, Dagster's GitHub identity. update_access_forge_repo commits
+    # the instructor user list straight to access-forge's default branch instead of
+    # opening a PR per run (it opened one daily and they sat unmerged), which the
+    # `pull_request` rule rejects without a bypass. `always` for the same reason as
+    # ol-release-bot above: the point is a direct push.
+    #
+    # BLAST RADIUS: the App can push to the default branch of every repo its
+    # installation selects, without review. That is bounded by the installation
+    # being `selected` and holding only `contents`/`issues` write, not by anything
+    # here. Adding a repo to the installation for issues alone grants it this push
+    # path too.
+    github.OrganizationRulesetBypassActorArgs(
+        actor_type="Integration",
+        actor_id=DATA_PLATFORM_APP_ID,
         bypass_mode="always",
     ),
 ]

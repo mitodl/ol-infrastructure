@@ -36,6 +36,7 @@ from bridge.lib.versions import (
     PGBOUNCER_VERSION,
     SQL_EXPORTER_VERSION,
 )
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -961,6 +962,23 @@ dagster_sentry_vault_secret = vault.generic.Secret(
     path="secret-data/dagster/sentry",
     data_json=sentry_stack.require_output("dagster_sentry_dsn").apply(
         lambda dsn: json.dumps({"dsn": dsn})
+    ),
+    opts=ResourceOptions(delete_before_replace=True),
+)
+
+# The ol-data-platform GitHub App, which ol_orchestrate's GithubApiClientFactory
+# authenticates as. One App serves every environment, so the SOPS file is global.
+# Only what the resource reads is written: client_id is for OAuth flows it does
+# not use.
+dagster_github_app_secrets = read_yaml_secrets(Path("ol_data/global.yaml"))["github"]
+dagster_github_app_vault_secret = vault.generic.Secret(
+    f"dagster-github-app-{stack_info.env_suffix}",
+    path="secret-data/pipelines/github-app",
+    data_json=json.dumps(
+        {
+            key: dagster_github_app_secrets[key]
+            for key in ("app_id", "installation_id", "private_key")
+        }
     ),
     opts=ResourceOptions(delete_before_replace=True),
 )
