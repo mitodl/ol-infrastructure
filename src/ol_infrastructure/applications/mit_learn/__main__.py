@@ -1964,6 +1964,9 @@ mitlearn_celery_worker_configs = [
     OLApplicationK8sCeleryWorkerConfig(
         queue_name="embeddings",
         max_replicas=30,
+        # KEDA holds this at or near 30 replicas through backlogs, so a deploy
+        # that waits for all 30 to be available at once fails under spot churn.
+        skip_rollout_await=True,
         redis_host=redis_cache.address,
         redis_password=redis_config.require("password"),
         resource_requests=celery_embeddings_resource_requests,
