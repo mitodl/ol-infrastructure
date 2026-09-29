@@ -30,4 +30,5 @@ config:
   nextjs:recommendation_endpoint: "https://api.rc.learn.mit.edu/ai/http/recommendation_agent/"
   nextjs:sentry_env: "rc"
   nextjs:syllabus_endpoint: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
+  nextjs:search_summary_endpoint: "https://api.rc.learn.mit.edu/ai/http/search_summary_agent/"
   nextjs:optimize_images: "true"
