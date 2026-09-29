@@ -3,6 +3,7 @@ ENV DEBIAN_FRONTEND=non-interactive
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install --no-install-recommends -y git && apt-get clean && rm -r /var/lib/apt/lists/* && \
     useradd -m app && mkdir /home/app/workspace && chown app:app /home/app/workspace
+# hadolint ignore=DL3066
 USER app
 WORKDIR /home/app/workspace
 ENV PATH /bin:/usr/bin/:/usr/local/bin:/home/app/.local/bin
