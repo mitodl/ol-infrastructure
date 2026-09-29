@@ -164,11 +164,15 @@ _ADMIN_BYPASS = [
     # `pull_request` rule rejects without a bypass. `always` for the same reason as
     # ol-release-bot above: the point is a direct push.
     #
-    # BLAST RADIUS: the App can push to the default branch of every repo its
-    # installation selects, without review. That is bounded by the installation
-    # being `selected` and holding only `contents`/`issues` write, not by anything
-    # here. Adding a repo to the installation for issues alone grants it this push
-    # path too.
+    # BLAST RADIUS, as for ol-release-bot: the App can push to, force-push, and
+    # delete the default branch of every `tier-1`/`standard` repo its installation
+    # selects, without review, because `always` exempts it from `non_fast_forward`
+    # and `deletion` as well as `pull_request`. That is bounded by the installation
+    # being `selected` (access-forge for the user list, mit-learn for program
+    # review issues) and holding only `contents`/`issues` write, not by anything
+    # here. `token_permissions` in the Dagster resource narrows a token's
+    # permissions, not its repositories, so adding a repo to the installation for
+    # issues alone grants it this push path too.
     github.OrganizationRulesetBypassActorArgs(
         actor_type="Integration",
         actor_id=DATA_PLATFORM_APP_ID,

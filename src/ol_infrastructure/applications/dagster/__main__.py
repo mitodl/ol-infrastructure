@@ -967,21 +967,27 @@ dagster_sentry_vault_secret = vault.generic.Secret(
 )
 
 # The ol-data-platform GitHub App, which ol_orchestrate's GithubApiClientFactory
-# authenticates as. One App serves every environment, so the SOPS file is global.
-# Only what the resource reads is written: client_id is for OAuth flows it does
-# not use.
-dagster_github_app_secrets = read_yaml_secrets(Path("ol_data/global.yaml"))["github"]
-dagster_github_app_vault_secret = vault.generic.Secret(
-    f"dagster-github-app-{stack_info.env_suffix}",
-    path="secret-data/pipelines/github-app",
-    data_json=json.dumps(
-        {
-            key: dagster_github_app_secrets[key]
-            for key in ("app_id", "installation_id", "private_key")
-        }
-    ),
-    opts=ResourceOptions(delete_before_replace=True),
-)
+# authenticates as. Production only: the App writes to real repositories (it
+# commits access-forge's user list to main without review), and every Dagster
+# asset that uses it is registered in all environments with only its schedule
+# gated to production. Leaving the key out of QA and CI is what stops a hand-run
+# materialization there from writing to GitHub. Only what the resource reads is
+# written; client_id is for OAuth flows it does not use.
+if stack_info.env_suffix == "production":
+    dagster_github_app_secrets = read_yaml_secrets(Path("ol_data/global.yaml"))[
+        "github"
+    ]
+    vault.generic.Secret(
+        f"dagster-github-app-{stack_info.env_suffix}",
+        path="secret-data/pipelines/github-app",
+        data_json=json.dumps(
+            {
+                key: dagster_github_app_secrets[key]
+                for key in ("app_id", "installation_id", "private_key")
+            }
+        ),
+        opts=ResourceOptions(delete_before_replace=True),
+    )
 
 # Sentry DSN for the code locations and run workers. Kept as its own secret
 # rather than folded into dagster-static-secrets because an OLVaultK8SSecret
