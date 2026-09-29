@@ -401,11 +401,13 @@ def setup_grafana(
                                     # That is untenable now that numTraces buffers
                                     # ~50k traces (order 1GiB) instead of 100.  No
                                     # CPU limit: throttling the sampler stalls the
-                                    # trace pipeline for the whole cluster.
+                                    # trace pipeline for the whole cluster.  CPU
+                                    # peaks at ~175m on applications-production
+                                    # and under 35m everywhere else (30d, 1m).
                                     "alloy": {
                                         "resources": {
                                             "requests": {
-                                                "cpu": "500m",
+                                                "cpu": "200m",
                                                 "memory": "1Gi",
                                             },
                                             "limits": {"memory": "2Gi"},
