@@ -374,9 +374,9 @@ uv run pytest tests/ -m "not integration"
 
 ## CI/CD Integration
 
-**Pre-commit hooks** (run automatically before commit):
+**Hooks** (run by prek before each commit after `uv run prek install -f`, and in CI as the `prek` check):
 ```bash
-uv run pre-commit run --all-files
+uv run prek run --all-files
 ```
 
 **Manual validation before PR:**
