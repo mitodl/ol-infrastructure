@@ -125,6 +125,16 @@ _OTEL_SDK_ENV: dict[str, str] = {
     # edxapp is upstream of everything it calls, so a head sample here would
     # discard whole traces. The Alloy tail sampler owns that (see lib/otel.py).
     "OTEL_TRACES_SAMPLER": "parentbased_always_on",
+    # The old HTTP semconv makes opentelemetry-instrumentation-wsgi fall back to
+    # wsgiref.util.request_uri() when RAW_URI/REQUEST_URI is absent, which
+    # granian never sets. That latin-1 encodes PATH_INFO after Django has
+    # rewritten it to UTF-8, so any path with a codepoint above U+00FF (learner
+    # usernames) 500s in the OTel middleware. The stable semconv skips that
+    # fallback. "http/dup" still emits the old attributes and still crashes.
+    # Safe here only because edxapp exports no metrics: the RED dashboards and
+    # alerts read the old-semconv http_server_duration_milliseconds.
+    # https://github.com/open-telemetry/opentelemetry-python-contrib/issues/3237
+    "OTEL_SEMCONV_STABILITY_OPT_IN": "http",
 }
 
 
