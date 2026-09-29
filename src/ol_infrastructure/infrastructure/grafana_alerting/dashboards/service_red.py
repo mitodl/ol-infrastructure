@@ -11,8 +11,9 @@ neither of which works:
   `febljk0a32qyoa` ("Lightweight APM for OpenTelemetry") queries the *stable*
   semconv names -- `http_server_request_duration_seconds_*`,
   `http_client_request_duration_seconds_*`. Our SDK emits the old ones:
-  `OTEL_SEMCONV_STABILITY_OPT_IN` is set nowhere in `src/`, and
-  opentelemetry-instrumentation-wsgi/-asgi gate the stable metric behind it.
+  `OTEL_SEMCONV_STABILITY_OPT_IN` is set only on edxapp, which exports no
+  metrics, and opentelemetry-instrumentation-wsgi/-asgi gate the stable metric
+  behind it.
   So that dashboard is empty for our services too.
 
 Even a spanmetrics dashboard with the right metric name would be misleading.

@@ -128,9 +128,14 @@ _OTEL_SDK_ENV: dict[str, str] = {
     # The old HTTP semconv makes opentelemetry-instrumentation-wsgi fall back to
     # wsgiref.util.request_uri() when RAW_URI/REQUEST_URI is absent, which
     # granian never sets. That latin-1 encodes PATH_INFO after Django has
-    # rewritten it to UTF-8, so any path with a codepoint above U+00FF (learner
-    # usernames) 500s in the OTel middleware. The stable semconv skips that
-    # fallback. "http/dup" still emits the old attributes and still crashes.
+    # replaced it in the shared environ with the UTF-8-decoded path, so any path
+    # with a codepoint above U+00FF (learner usernames) 500s in the OTel
+    # middleware. The stable semconv skips that fallback. "http/dup" still
+    # emits the old attributes and still crashes.
+    #
+    # Costs: with no RAW_URI/REQUEST_URI, server spans carry http.route but no
+    # url.path, so a trace can't be found by concrete path. The token also moves
+    # the mysqlclient spans from net.peer.* to server.address/server.port.
     # Safe here only because edxapp exports no metrics: the RED dashboards and
     # alerts read the old-semconv http_server_duration_milliseconds.
     # https://github.com/open-telemetry/opentelemetry-python-contrib/issues/3237
