@@ -63,13 +63,15 @@ dependencies = [
 Repository = "https://github.com/mitodl/ol-infrastructure"
 
 [dependency-groups]
+# CI installs only this group (.github/workflows/autofix.yml); `dev` includes it.
+prek = ["prek==0.5.4"]
 dev = [
+  { include-group = "prek" },
   "copier",
   "datamodel-code-generator",
   "lupa>=2.0",
   "mypy",
   "pip>=26.0.1",
-  "pre-commit>=4.0.0,<5",
   "PyGithub>=2.4,<3",
   "pytest>=9.0.1,<10",
   "pytest-asyncio>=0.24.0",
@@ -371,6 +373,10 @@ exclude-newer = "7d"
 required-version = ">=0.9.17"
 
 [tool.uv.exclude-newer-package]
+# prek is pinned exactly in the `prek` group to the release the org's autofix.ci
+# contract names (mitodl/ol-github-workflows); Renovate's minimumReleaseAge
+# still gates each bump of that pin.
+prek = "0d"
 ol-concourse = "0d"
 django-aqueduct = "0d"
 edx-sysadmin = "0d"
