@@ -232,6 +232,16 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     # *smallest* limit the pod can run under, which under a VPA is the floor-
     # derived limit, not the declared one.
     max_memory_per_child_kib: PositiveInt | None = None
+    # Stop Pulumi from blocking the update until every replica is available.
+    # Pulumi's Deployment await wants *all* KEDA-set replicas up at once, and
+    # it re-runs that await on every later `up` once it has failed, even with
+    # no diff. A worker KEDA pins near max_replicas on spot capacity may never
+    # clear that bar: mit-learn's embeddings worker (30 x 1 CPU) failed two
+    # production deploys in a row on 2026-09-29, while the cluster took 29 spot
+    # interruptions in 41 minutes. Workers have no readiness probe, so the await
+    # only proves pods were scheduled and their container started. The webapp
+    # Deployment (and pre-deploy Job, if configured) still gate the same image.
+    skip_rollout_await: bool = False
     redis_database_index: str = "1"
     redis_host: Output[str]
     redis_password: str
@@ -2317,6 +2327,11 @@ class OLApplicationK8s(ComponentResource):
                     name=_celery_deployment_name,
                     namespace=ol_app_k8s_config.application_namespace,
                     labels=celery_labels,
+                    annotations=(
+                        {"pulumi.com/skipAwait": "true"}
+                        if celery_worker_config.skip_rollout_await
+                        else None
+                    ),
                 ),
                 spec=kubernetes.apps.v1.DeploymentSpecArgs(
                     selector=kubernetes.meta.v1.LabelSelectorArgs(

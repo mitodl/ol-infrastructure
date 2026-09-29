@@ -1191,6 +1191,52 @@ def test_max_memory_per_child_emitted_as_flag_and_value():
     return app.celery_deployments[0].spec.template.spec.containers.apply(check)
 
 
+@pulumi.runtime.test
+def test_celery_worker_awaits_rollout_by_default():
+    """Other applications' deploys must keep failing on a broken worker rollout."""
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="memcapped",
+            celery_worker_configs=[_celery_worker_config()],
+        )
+    )
+
+    def check(annotations):
+        assert "pulumi.com/skipAwait" not in (annotations or {})
+
+    return app.celery_deployments[0].metadata.annotations.apply(check)
+
+
+@pulumi.runtime.test
+def test_celery_worker_skip_rollout_await_sets_annotation():
+    """The annotation goes on the Deployment metadata of only the opted-in worker.
+
+    It must not land on the pod template, or setting the flag would roll the pods.
+    """
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="memcapped",
+            celery_worker_configs=[
+                _celery_worker_config(worker_name="awaited"),
+                _celery_worker_config(worker_name="skipped", skip_rollout_await=True),
+            ],
+        )
+    )
+
+    def check(args):
+        awaited, skipped, skipped_pod = args
+        # The flag is per worker, not per application.
+        assert "pulumi.com/skipAwait" not in (awaited or {})
+        assert skipped["pulumi.com/skipAwait"] == "true"
+        assert "pulumi.com/skipAwait" not in (skipped_pod or {})
+
+    return pulumi.Output.all(
+        app.celery_deployments[0].metadata.annotations,
+        app.celery_deployments[1].metadata.annotations,
+        app.celery_deployments[1].spec.template.metadata.annotations,
+    ).apply(check)
+
+
 def test_max_memory_per_child_rejects_non_positive():
     with pytest.raises(ValidationError):
         _celery_worker_config(max_memory_per_child_kib=0)
