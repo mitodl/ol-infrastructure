@@ -89,11 +89,25 @@ set `azure_openai:model_versions` to a `{model: version}` map in the stack confi
 Pinning also switches that deployment to `NoAutoUpgrade`, so a new default version
 cannot change model behaviour under a running application with no deploy and no diff.
 
+Production pins them to the versions CI and QA have been serving. CI and QA stay on
+auto-upgrade, so they pick up a new default version first.
+
 Capacity (`azure_openai:model_capacity`, in thousands of tokens per minute) defaults to
 5 outside Production. **Production has no default and must be set explicitly** — the
-stack raises at preview otherwise. The subscription's approved quota is not known yet,
-and a default that asks for capacity nobody confirmed turns a bootstrap into a partial
-deploy: the account and identity create, then `Deployment` creation fails on quota.
+stack raises at preview otherwise, because a default that asks for capacity nobody
+confirmed turns a bootstrap into a partial deploy: the account and identity create, then
+`Deployment` creation fails on quota. Production is set to 1000 (1M TPM per deployment).
+
+The `ol-engineering` subscription's `GlobalStandard` limits, measured 2026-09-29 in
+capacity units (1 unit = 1K TPM):
+
+| Model | Limit |
+| --- | --- |
+| `gpt-4o` | 30000 |
+| `gpt-5-mini` | 10000 |
+| `gpt-5.2` | 30000 |
+
+Check current usage against them with `az cognitiveservices usage list -l eastus`.
 
 Quota is pooled **per model and version, per deployment type** — not one pool shared by
 all models. These are `GlobalStandard` deployments, and [Microsoft's

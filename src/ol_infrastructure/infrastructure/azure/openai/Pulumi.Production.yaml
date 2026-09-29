@@ -2,4 +2,13 @@
 secretsprovider: awskms://alias/infrastructure-secrets-production
 config:
   azure_openai:location: eastus
+  # 1M TPM per deployment. Four consumers x 1000 is 4000 units of each model's
+  # subscription-wide pool; the tightest is gpt-5-mini at 10000 (measured 2026-09-29).
+  azure_openai:model_capacity: 1000
+  # The versions CI and QA have been serving (auto-upgraded there, so they canary new
+  # defaults). Pinning makes these NoAutoUpgrade in Production only.
+  azure_openai:model_versions:
+    gpt-4o: "2024-11-20"
+    gpt-5-mini: "2025-08-07"
+    gpt-5.2: "2025-12-11"
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwFvj91bDLxrOf1sdg9uKj+4AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMKT8npQNJRUf/wGNXAgEQgDvkzDj1rsUB99dSGpP2zpv6CDG4x604RHcq9OlgCHUicbmNsKuCVvvZYWmdddGQwckfsaIFju5+urIH3Q==
