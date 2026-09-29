@@ -46,7 +46,8 @@ config:
     # The request is what the HPA's 80% target is measured against, so at 16
     # CPU it could only scale out at 12.8 cores avg and never had. At 4 CPU it
     # scales out at 3.2 cores avg, above today's peak but well before a real
-    # scan workload saturates a pod; the 16-core limit keeps burst headroom.
+    # scan workload saturates a pod. The 16-core limit only lets a pod burst
+    # into CPU its node has idle; unlike the old request, it reserves nothing.
     cpu_request: 4000m
     cpu_limit: 16000m
     memory_request: 16Gi
