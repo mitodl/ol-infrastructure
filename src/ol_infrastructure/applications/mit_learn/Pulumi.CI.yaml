@@ -12,6 +12,7 @@ config:
   mitlearn:db_instance_size: db.t4g.medium # Leave small for now
   mitlearn:db_password:
     secure: v1:4DWyBf0hPnxA52CE:0zCNPoe0Dzkytdqw6ITtlhHJR16tFBXKfuqvHECc8h3OD6FY9NlQM1jkBlckAduNGtwtMToXhRRdLgZ1TnmJq470i8GSYa39sOtBXfT2+d8=
+  mitlearn:enable_azure_openai: true
   mitlearn:fastly_anycast_ips: []
   mitlearn:fastly_domain: "d.sni.global.fastly.net"
   mitlearn:frontend_domain: "ci.learn.mit.edu"
