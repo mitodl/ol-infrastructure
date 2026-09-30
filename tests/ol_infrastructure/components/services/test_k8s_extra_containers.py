@@ -58,6 +58,7 @@ from ol_infrastructure.components.services.k8s import (  # noqa: E402
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
+    OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
     OLApplicationK8sKedaWebappScalingConfig,
@@ -88,6 +89,10 @@ def _base_config(**overrides) -> OLApplicationK8sConfig:
             "ol.mit.edu/application": "myapp",
             "ol.mit.edu/environment": "qa",
         },
+        "celery_redis_config": OLApplicationK8sCeleryRedisConfig(
+            host=pulumi.Output.from_input("redis.example.com"),
+            password="hunter2",  # pragma: allowlist secret
+        ),
     }
     defaults.update(overrides)
     return OLApplicationK8sConfig(**defaults)
@@ -406,8 +411,6 @@ def test_app_config_extra_init_volume_mounts_accepts_mount_list():
 def test_celery_worker_config_default_application_name():
     cfg = OLApplicationK8sCeleryWorkerConfig(
         queue_name="default",
-        redis_host=pulumi.Output.from_input("redis.example.com"),
-        redis_password="secret",  # pragma: allowlist secret
     )
     assert cfg.application_name == "main.celery:app"
 
@@ -416,8 +419,6 @@ def test_celery_worker_config_custom_application_name():
     cfg = OLApplicationK8sCeleryWorkerConfig(
         queue_name="default",
         application_name="lms.celery:app",
-        redis_host=pulumi.Output.from_input("redis.example.com"),
-        redis_password="secret",  # pragma: allowlist secret
     )
     assert cfg.application_name == "lms.celery:app"
 
@@ -1020,8 +1021,6 @@ def test_container_security_context_applied_to_celery_worker():
                 OLApplicationK8sCeleryWorkerConfig(
                     application_name="hardenedcelery",
                     worker_name="default",
-                    redis_host=pulumi.Output.from_input("redis.example.com"),
-                    redis_password="hunter2",  # pragma: allowlist secret
                 )
             ],
         )
@@ -1141,8 +1140,6 @@ def _celery_worker_config(**overrides) -> OLApplicationK8sCeleryWorkerConfig:
     defaults = {
         "application_name": "memcapped",
         "worker_name": "default",
-        "redis_host": pulumi.Output.from_input("redis.example.com"),
-        "redis_password": "hunter2",  # pragma: allowlist secret
     }
     defaults.update(overrides)
     return OLApplicationK8sCeleryWorkerConfig(**defaults)

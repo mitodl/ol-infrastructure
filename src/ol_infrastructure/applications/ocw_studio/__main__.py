@@ -50,6 +50,7 @@ from ol_infrastructure.components.services.k8s import (
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
+    OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
 )
@@ -654,25 +655,23 @@ ocw_studio_k8s_app = OLApplicationK8s(
         # request == limit == 768Mi the default queue rode at ~694Mi and OOMKilled
         # on publish/batch bursts, taking the deployment unavailable; the request
         # still reflects steady-state use, the limit now absorbs the spike.
+        celery_redis_config=OLApplicationK8sCeleryRedisConfig(
+            host=redis_cache.address,
+            password=redis_config.require("password"),
+        ),
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="default",
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "50m", "memory": "768Mi"},
                 resource_limits={"memory": "1536Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="publish",
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "50m", "memory": "768Mi"},
                 resource_limits={"memory": "1536Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="batch",
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "50m", "memory": "768Mi"},
                 resource_limits={"memory": "1536Mi"},
             ),

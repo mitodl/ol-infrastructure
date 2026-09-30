@@ -61,6 +61,7 @@ from ol_infrastructure.components.services.k8s import (
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
+    OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
     OLApplicationK8sDevShellConfig,
@@ -651,18 +652,18 @@ mitxonline_k8s_app = OLApplicationK8s(
         pre_deploy_commands=[
             ("migrate", ["python", "manage.py", "migrate", "--noinput"])
         ],
+        celery_redis_config=OLApplicationK8sCeleryRedisConfig(
+            host=redis_cache.address,
+            password=redis_config.require("password"),
+        ),
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="celery",
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "100m", "memory": "2Gi"},
                 resource_limits={"memory": "2Gi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="hubspot_sync",
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "100m", "memory": "1Gi"},
                 resource_limits={"memory": "1Gi"},
             ),

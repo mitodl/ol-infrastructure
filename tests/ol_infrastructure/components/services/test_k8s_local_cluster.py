@@ -37,6 +37,7 @@ from bridge.lib.versions import NGINX_VERSION  # noqa: E402
 from ol_infrastructure.components.services.k8s import (  # noqa: E402
     GranianConfig,
     OLApplicationK8s,
+    OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
     OLApplicationK8sDevShellConfig,
@@ -54,12 +55,11 @@ def _nginx_project_root(tmp_path):
     return tmp_path
 
 
+_REDIS_PASSWORD = "not-a-real-password"  # pragma: allowlist secret  # noqa: S105
+
+
 def _worker(**overrides) -> OLApplicationK8sCeleryWorkerConfig:
-    defaults = {
-        "queue_name": "default",
-        "redis_host": pulumi.Output.from_input("redis.example.com"),
-        "redis_password": "not-a-real-password",  # pragma: allowlist secret
-    }
+    defaults = {"queue_name": "default"}
     defaults.update(overrides)
     return OLApplicationK8sCeleryWorkerConfig(**defaults)
 
@@ -81,6 +81,10 @@ def _deployed_config(**overrides) -> OLApplicationK8sConfig:
         "project_root": "/tmp/myapp",  # noqa: S108
         "import_nginx_config": False,
         "k8s_global_labels": {"ol.mit.edu/application": "myapp"},
+        "celery_redis_config": OLApplicationK8sCeleryRedisConfig(
+            host=pulumi.Output.from_input("redis.example.com"),
+            password=_REDIS_PASSWORD,
+        ),
     }
     defaults.update(overrides)
     return OLApplicationK8sConfig(**defaults)
@@ -138,20 +142,14 @@ def test_keda_webapp_config_rejected_without_an_autoscaler():
 
 
 def test_workers_need_no_redis_without_celery_autoscalers():
-    cfg = _local_config(
-        celery_worker_configs=[_worker(redis_host=None, redis_password=None)]
-    )
+    cfg = _local_config(celery_worker_configs=[_worker()])
 
-    assert cfg.celery_worker_configs[0].redis_host is None
+    assert cfg.celery_redis_config is None
 
 
-@pytest.mark.parametrize("field", ["redis_host", "redis_password"])
-def test_celery_autoscalers_require_redis_on_every_worker(field):
-    workers = [_worker(worker_name="complete"), _worker(worker_name="partial")]
-    setattr(workers[1], field, None)
-
-    with pytest.raises(ValidationError, match="Missing on: partial"):
-        _deployed_config(celery_worker_configs=workers)
+def test_celery_autoscalers_require_redis():
+    with pytest.raises(ValidationError, match="Set celery_redis_config"):
+        _deployed_config(celery_worker_configs=[_worker()], celery_redis_config=None)
 
 
 def test_eks_wiring_defaults_are_on():
@@ -312,6 +310,45 @@ def test_deployed_config_creates_eks_resources():
     assert app.webapp_autoscaler is not None
     assert len(app.celery_scaled_objects) == 1
     assert app.webapp_pod_monitor is not None
+
+
+@pulumi.runtime.test
+def test_scaled_objects_read_the_redis_password_from_a_secret():
+    """Inline, the password is readable by anyone who can read ScaledObjects."""
+    app = OLApplicationK8s(
+        _deployed_config(
+            application_name="deployed-redis-auth",
+            celery_worker_configs=[_worker(worker_name="a"), _worker(worker_name="b")],
+        )
+    )
+    assert app.celery_redis_trigger_auth is not None
+
+    def check(args):
+        auth_name, auth_spec, *scaled_object_specs = args
+        assert auth_spec["secretTargetRef"] == [
+            {"parameter": "password", "name": auth_name, "key": "password"}
+        ]
+        for spec, worker_name in zip(scaled_object_specs, ["a", "b"], strict=True):
+            (trigger,) = spec["triggers"]
+            assert "password" not in trigger["metadata"]
+            assert trigger["metadata"]["address"] == "redis.example.com:6379"
+            assert trigger["metadata"]["listName"] == worker_name
+            assert trigger["authenticationRef"] == {"name": auth_name}
+
+    return pulumi.Output.all(
+        app.celery_redis_trigger_auth.metadata["name"],
+        app.celery_redis_trigger_auth.spec,
+        *(so.spec for so in app.celery_scaled_objects),
+    ).apply(check)
+
+
+def test_no_redis_auth_without_celery_autoscalers():
+    app = OLApplicationK8s(
+        _local_config(
+            application_name="local-redis-auth", celery_worker_configs=[_worker()]
+        )
+    )
+    assert app.celery_redis_trigger_auth is None
 
 
 @pulumi.runtime.test

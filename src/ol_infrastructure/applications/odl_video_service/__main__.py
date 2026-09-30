@@ -55,6 +55,7 @@ from ol_infrastructure.components.services.k8s import (
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
+    OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
 )
@@ -984,13 +985,15 @@ ovs_k8s_app = OLApplicationK8s(
                 timeout_seconds=5,
             ),
         },
+        celery_redis_config=OLApplicationK8sCeleryRedisConfig(
+            host=ovs_server_redis_cluster.address,
+            password=redis_auth_token,
+        ),
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 application_name="odl_video",
                 worker_name="celery",
                 log_level=celery_log_level,
-                redis_host=ovs_server_redis_cluster.address,
-                redis_password=redis_auth_token,
                 resource_requests={"cpu": "100m", "memory": "3000Mi"},
                 resource_limits={"memory": "3000Mi"},
                 min_replicas=1,
