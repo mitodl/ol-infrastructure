@@ -43,6 +43,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
+from ol_infrastructure.lib.k8s_crds import keycloak_operator_crd_urls
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -120,20 +121,9 @@ env_name = f"keycloak-{stack_info.env_suffix}"
 # download custom resource definitions for the keycloak operator
 KEYCLOAK_OPERATOR_CRD_BASE_URL = f"https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/{KEYCLOAK_OPERATOR_CRD_VERSION}/kubernetes"
 
-# Discover the CRD manifests for this release from its own kustomization.yml
-# rather than hardcoding filenames, which go stale whenever the operator adds
-# a new CRD (e.g. the SAML/OIDC client CRDs added in 26.7.0) and silently
-# leaves the new controller without its CRD, crashing the operator on startup.
-kustomization = yaml.safe_load(
-    requests.get(f"{KEYCLOAK_OPERATOR_CRD_BASE_URL}/kustomization.yml").content  # noqa: S113
-)
-crd_files = [
-    resource for resource in kustomization["resources"] if resource != "kubernetes.yml"
-]
-
 keycloak_operator_crds = kubernetes.yaml.v2.ConfigGroup(
     f"{env_name}-keycloak-operator-crds",
-    files=[f"{KEYCLOAK_OPERATOR_CRD_BASE_URL}/{crd_file}" for crd_file in crd_files],
+    files=keycloak_operator_crd_urls(KEYCLOAK_OPERATOR_CRD_BASE_URL),
     opts=ResourceOptions(
         delete_before_replace=False,
     ),

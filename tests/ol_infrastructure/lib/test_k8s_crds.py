@@ -261,3 +261,37 @@ def test_caller_parent_and_depends_on_survive_the_merge():
     assert opts.parent is parent
     assert opts.depends_on == [dependency]
     return parent.urn
+
+
+def test_keycloak_operator_crds_come_from_the_kustomization(monkeypatch):
+    """A CRD the release adds is installed without anyone editing a file list."""
+    base = "https://raw.example.com/keycloak-k8s-resources/26.7.4/kubernetes"
+    kustomization = pyyaml.safe_dump(
+        {
+            "resources": [
+                "keycloakoidcclients.k8s.keycloak.org-v1.yml",
+                "keycloaks.k8s.keycloak.org-v1.yml",
+                "kubernetes.yml",
+            ]
+        }
+    )
+    requested = []
+
+    class _Response(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_):
+            self.close()
+
+    def _urlopen(url, timeout=None):  # noqa: ARG001
+        requested.append(url)
+        return _Response(kustomization.encode())
+
+    monkeypatch.setattr(k8s_crds.urllib.request, "urlopen", _urlopen)
+
+    assert k8s_crds.keycloak_operator_crd_urls(base) == [
+        f"{base}/keycloakoidcclients.k8s.keycloak.org-v1.yml",
+        f"{base}/keycloaks.k8s.keycloak.org-v1.yml",
+    ]
+    assert requested == [f"{base}/kustomization.yml"]

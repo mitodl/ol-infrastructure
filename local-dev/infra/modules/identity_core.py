@@ -16,6 +16,8 @@ import requests
 import yaml as pyyaml
 from pulumi import Alias, ResourceOptions
 
+from ol_infrastructure.lib.k8s_crds import keycloak_operator_crd_urls
+
 
 @dataclass
 class IdentityCoreResources:
@@ -53,20 +55,10 @@ def create_identity_core(  # noqa: PLR0913
         f"keycloak-k8s-resources/{keycloak_operator_version}/kubernetes"
     )
 
-    # CRDs first — cluster-scoped, no namespace patching needed. The file list
-    # comes from the release's own kustomization.yml, as in the deployed
-    # keycloak stack: 26.7 added client CRDs, and an operator started without
-    # one of its CRDs crashes.
-    kustomization_resp = requests.get(f"{kc_base}/kustomization.yml", timeout=30)
-    kustomization_resp.raise_for_status()
-    crd_files = [
-        resource
-        for resource in pyyaml.safe_load(kustomization_resp.text)["resources"]
-        if resource != "kubernetes.yml"
-    ]
+    # CRDs first — cluster-scoped, no namespace patching needed.
     operator_crds = k8s.yaml.v2.ConfigGroup(
         "keycloak-operator-crds",
-        files=[f"{kc_base}/{crd_file}" for crd_file in crd_files],
+        files=keycloak_operator_crd_urls(kc_base),
         opts=_k8s(parent=local_infra_ns, delete_before_replace=False),
     )
 
