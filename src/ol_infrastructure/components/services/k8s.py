@@ -233,8 +233,11 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     # derived limit, not the declared one.
     max_memory_per_child_kib: PositiveInt | None = None
     redis_database_index: str = "1"
-    redis_host: Output[str]
-    redis_password: str
+    # Read only by the worker's KEDA ScaledObject, so optional when
+    # OLApplicationK8sConfig.manage_celery_autoscalers is False. That config
+    # requires both when it is True.
+    redis_host: Output[str] | None = None
+    redis_password: str | None = None
     redis_port: int = DEFAULT_REDIS_PORT
     run_beat: bool = (
         False  # Deprecated: use celery_beat_config on OLApplicationK8sConfig instead
@@ -1247,6 +1250,25 @@ class OLApplicationK8sConfig(BaseModel):
                 "webapp_keda_config is set but manage_webapp_autoscaler is False, so "
                 "the ScaledObject it describes would never be created. Remove "
                 "webapp_keda_config or set manage_webapp_autoscaler=True."
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_celery_autoscalers_have_redis(self) -> "OLApplicationK8sConfig":
+        """Require Redis connection details on every worker a ScaledObject reads."""
+        if not self.manage_celery_autoscalers:
+            return self
+        missing = [
+            worker.worker_name
+            for worker in self.celery_worker_configs
+            if worker.redis_host is None or worker.redis_password is None
+        ]
+        if missing:
+            msg = (
+                "manage_celery_autoscalers is True, so each celery worker's KEDA "
+                "ScaledObject needs redis_host and redis_password. Missing on: "
+                f"{', '.join(str(name) for name in missing)}."
             )
             raise ValueError(msg)
         return self

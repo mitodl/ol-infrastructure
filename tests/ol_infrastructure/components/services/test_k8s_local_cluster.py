@@ -137,6 +137,23 @@ def test_keda_webapp_config_rejected_without_an_autoscaler():
         )
 
 
+def test_workers_need_no_redis_without_celery_autoscalers():
+    cfg = _local_config(
+        celery_worker_configs=[_worker(redis_host=None, redis_password=None)]
+    )
+
+    assert cfg.celery_worker_configs[0].redis_host is None
+
+
+@pytest.mark.parametrize("field", ["redis_host", "redis_password"])
+def test_celery_autoscalers_require_redis_on_every_worker(field):
+    workers = [_worker(worker_name="complete"), _worker(worker_name="partial")]
+    setattr(workers[1], field, None)
+
+    with pytest.raises(ValidationError, match="Missing on: partial"):
+        _deployed_config(celery_worker_configs=workers)
+
+
 def test_eks_wiring_defaults_are_on():
     cfg = _deployed_config()
     assert cfg.registry == "ecr"
