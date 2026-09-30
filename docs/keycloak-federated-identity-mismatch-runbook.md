@@ -63,11 +63,28 @@ uv run python bin/keycloak-federated-identity-lookup lookup \
 If it reports `MISMATCH`, that confirms this root cause. If it reports
 `MATCH` (identity is already correctly linked) and the learner is still
 failing, **stop here and investigate differently** — this is not that bug.
-In that case, check whether the request is reaching us at all:
+In that case, check whether the request is reaching us at all.
+
+Prefer Grafana Loki over `kubectl logs` for this check: Keycloak runs as 3
+replicas behind a Service with no session affinity (see the "Known related
+issue" section below), so a learner's requests can land on any pod, and
+`kubectl logs` only covers each pod's lifetime since its last restart (often
+much shorter than the window you need to check). Query all pods over the
+actual time range in question:
+
+```logql
+{namespace="keycloak", container="keycloak"} |= "<learner-email-or-user-id>"
+```
+
+If you only have `kubectl` access, you must check **every** pod explicitly —
+checking just one and treating a miss as conclusive is a false negative
+waiting to happen, for the exact cross-pod reason this runbook exists:
 
 ```bash
-kubectl --context operations-production -n keycloak logs keycloak-production-0 --since=2h \
-  | grep -i '<learner-email-or-user-id>'
+for pod in keycloak-production-0 keycloak-production-1 keycloak-production-2; do
+  kubectl --context operations-production -n keycloak logs "$pod" --since=2h \
+    | grep -i '<learner-email-or-user-id>'
+done
 ```
 
 No hits at all (not even an error) across every Keycloak pod means the

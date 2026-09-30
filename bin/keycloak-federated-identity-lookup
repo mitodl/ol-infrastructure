@@ -220,7 +220,8 @@ def lookup(
         print(f"No user found with email {email!r} in realm {realm!r}.")
         sys.exit(1)
 
-    links = client.get_federated_identities(realm, user["id"])
+    all_links = client.get_federated_identities(realm, user["id"])
+    links = all_links
     if identity_provider:
         links = [
             link
@@ -255,7 +256,12 @@ def lookup(
     print(f"  Keycloak user ID: {user['id']}")
     print(f"  Created: {user.get('createdTimestamp')}")
     if not links:
-        print("  No federated identity links found.")
+        if identity_provider and all_links:
+            print(
+                f"  No federated identity links found for provider {identity_provider!r}."
+            )
+        else:
+            print("  No federated identity links found.")
     for link in links:
         print(f"  IdP: {link.get('identityProvider')}")
         print(f"    External user ID (federated_user_id): {link.get('userId')}")
@@ -361,9 +367,23 @@ def relink(
         return
 
     client.delete_federated_identity(realm, user["id"], identity_provider)
-    client.add_federated_identity(
-        realm, user["id"], identity_provider, new_external_id, new_username
-    )
+    try:
+        client.add_federated_identity(
+            realm, user["id"], identity_provider, new_external_id, new_username
+        )
+    except httpx.HTTPStatusError as e:
+        print(
+            f"\nERROR: the old {identity_provider!r} link was removed, but adding "
+            f"the new one failed ({e}). The user currently has NO {identity_provider!r} "
+            "link at all."
+        )
+        if existing is not None:
+            print(
+                "To restore the previous link manually, re-run with:\n"
+                f"  --new-external-id {existing['userId']!r} "
+                f"--new-username {existing['userName']!r} --confirm"
+            )
+        sys.exit(1)
 
     links_after = client.get_federated_identities(realm, user["id"])
     updated = next(
