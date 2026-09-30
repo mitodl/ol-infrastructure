@@ -14,9 +14,10 @@ mitxonline and mit_learn stacks. That plugin handles the browser login flow and,
 optionally, bearer tokens.
 
 The plugin only reads the `Authorization` header when one of `bearer_only`,
-`introspection_endpoint`, `public_key` or `use_jwks` is set (`rewrite()` and `introspect()`
-in `apisix/plugins/openid-connect.lua`, APISIX 3.18.0). None of them are set today, so a
-bearer token passes through to Django untouched. With `use_jwks` on, every request carrying
+`introspection_endpoint`, `public_key` or `use_jwks` is truthy (`rewrite()` and
+`introspect()` in `apisix/plugins/openid-connect.lua`, APISIX 3.18.0). Today
+`OLApisixOIDCResources` always renders `bearer_only: false` and omits the other three, so
+a bearer token passes through to Django untouched. With `use_jwks` on, every request carrying
 `Authorization: Bearer ...` (or `X-Access-Token`) is verified as a JWT from the discovery
 document's issuer, Keycloak. A token that fails verification gets a 401 before
 `unauth_action` is consulted, so the check applies to `unauth_action: pass` routes too.
@@ -67,8 +68,9 @@ hosts.
 ## Decision
 
 Option 3. The `openid-connect` plugin configs that the mitxonline and mit_learn stacks
-attach to their routes set none of `bearer_only`, `introspection_endpoint`, `public_key`
-or `use_jwks`.
+attach to their routes enable none of `bearer_only`, `introspection_endpoint`,
+`public_key` or `use_jwks`. `bearer_only` is rendered as `false`, and the other three are
+absent.
 
 If a Keycloak service account needs to call one of these hosts, give it a dedicated route
 that matches only its paths and the `Authorization: Bearer` header. Set `bearer_only`,
