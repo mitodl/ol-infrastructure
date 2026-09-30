@@ -170,6 +170,7 @@ graph LR
 | [0010](0010-pingdom-checks-unmanaged-in-pulumi-state.md) | Pingdom Checks Unmanaged in Pulumi State | Proposed | 2026-07-20 |
 | [0011](0011-playwright-canary-specs-in-ol-infrastructure.md) | Playwright Canary Specs Live in ol-infrastructure, on the Stock Playwright Image | Accepted | 2026-09-01 |
 | [0012](0012-trino-to-starrocks-cutover.md) | Replace Trino/Starburst Galaxy with StarRocks as the Sole Query Engine | Accepted | 2026-09-25 |
+| [0013](0013-apisix-leaves-bearer-tokens-to-mitxonline-and-mit-learn.md) | APISIX Leaves Bearer Tokens to MITx Online and MIT Learn | Accepted | 2026-09-30 |
 
 ## Creating a New ADR
 
