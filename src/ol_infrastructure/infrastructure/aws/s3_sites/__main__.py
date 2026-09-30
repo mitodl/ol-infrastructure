@@ -1,13 +1,15 @@
 """Module for creating and managing S3 buckets that are not used by any applications."""
 
 from pulumi import export
-from pulumi_aws import route53
+from pulumi_aws import route53, s3
 
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.aws.s3_cloudfront_site import (
     S3ServerlessSite,
     S3ServerlessSiteConfig,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
+from ol_infrastructure.lib.ol_types import BusinessUnit, Environment
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
@@ -61,3 +63,52 @@ if stack_info.env_suffix == "production":
     export("ocw_legacy_bucket", ocw_legacy_site.site_bucket.bucket)
     export("ocw_legacy_distribution_id", ocw_legacy_site.cloudfront_distribution.id)
     export("ocw_legacy_acm_cname", ocw_legacy_site.site_tls.domain_name)
+
+    # Durable archive for content copied out of buckets being decommissioned,
+    # per the archive-then-delete cleanup process (see
+    # https://github.com/mitodl/ol-infrastructure/issues/6089). Each
+    # decommissioned bucket's contents land under a same-named prefix here
+    # before the source bucket itself is deleted.
+    archive_bucket_config = S3BucketConfig(
+        bucket_name="ol-archive",
+        tags={"OU": BusinessUnit.operations, "Environment": Environment.operations},
+        versioning_enabled=True,
+        # Everything landing here is already known-dead data, so skip the
+        # Standard-tier waiting period Intelligent-Tiering would otherwise
+        # impose (90 days to INTELLIGENT_TIERING, then another 90-180 days of
+        # inactivity to reach an archive tier) and go straight to the
+        # cheapest class.
+        intelligent_tiering_enabled=False,
+        # Restores S3's pre-September-2024 default so that objects under
+        # 128KB -- including zero-byte objects -- still transition to
+        # DEEP_ARCHIVE below, rather than being silently left behind in
+        # Standard forever. (A per-rule `ObjectSizeGreaterThan` filter can't
+        # cover this: it's an exclusive lower bound, so even a value of `0`
+        # excludes zero-byte objects.)
+        transition_default_minimum_object_size="varies_by_storage_class",
+        lifecycle_rules=[
+            s3.BucketLifecycleConfigurationRuleArgs(
+                id="archive-immediately",
+                status="Enabled",
+                transitions=[
+                    s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                        days=0,
+                        storage_class="DEEP_ARCHIVE",
+                    )
+                ],
+                # The migration process this bucket exists for copies every
+                # version of a source object under the same destination key,
+                # so earlier copies become noncurrent versions here, not just
+                # current ones. Without this, that history would stay in
+                # Standard indefinitely.
+                noncurrent_version_transitions=[
+                    s3.BucketLifecycleConfigurationRuleNoncurrentVersionTransitionArgs(
+                        noncurrent_days=0,
+                        storage_class="DEEP_ARCHIVE",
+                    )
+                ],
+            )
+        ],
+    )
+    archive_bucket = OLBucket("ol-archive", archive_bucket_config)
+    export("ol_archive_bucket", archive_bucket.bucket_v2.bucket)
