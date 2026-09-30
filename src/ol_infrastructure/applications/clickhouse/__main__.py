@@ -1176,7 +1176,16 @@ clickhouse_client_service = kubernetes.core.v1.Service(
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
         type="ClusterIP",
-        selector={"clickhouse.altinity.com/chi": "clickhouse"},
+        # ready=yes is the operator's own signal that a host is in service: it
+        # sets it only after the pod passes /ping, the host's tables exist and
+        # (for a new replica) replication has caught up, and removes it while
+        # excluding a host for a restart. Readiness alone is only /ping, so
+        # without this a new or restarting replica takes Opik queries before
+        # it has the opik_db schema or its data.
+        selector={
+            "clickhouse.altinity.com/chi": "clickhouse",
+            "clickhouse.altinity.com/ready": "yes",
+        },
         ports=[
             kubernetes.core.v1.ServicePortArgs(
                 name="http",
@@ -1188,6 +1197,24 @@ clickhouse_client_service = kubernetes.core.v1.Service(
                 port=9000,
                 target_port=9000,
             ),
+        ],
+    ),
+)
+
+# Metrics get their own Service, not gated on ready=yes, so a replica the
+# operator has pulled out of service is still scraped. Headless because
+# Prometheus scrapes each pod's endpoint, never the Service address.
+clickhouse_metrics_service = kubernetes.core.v1.Service(
+    f"clickhouse-metrics-service-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="clickhouse-metrics",
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels={**k8s_global_labels, "app": "clickhouse-metrics"},
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        cluster_ip="None",
+        selector={"clickhouse.altinity.com/chi": "clickhouse"},
+        ports=[
             kubernetes.core.v1.ServicePortArgs(
                 name="metrics",
                 port=CLICKHOUSE_METRICS_PORT,
@@ -1304,8 +1331,11 @@ clickhouse_network_policy = kubernetes.networking.v1.NetworkPolicy(
 # ClickHouse serves Prometheus metrics at /metrics on CLICKHOUSE_METRICS_PORT
 # (9363), and only because the CHI's prometheus/* settings turn it on. It does
 # not serve them on the HTTP port (8123); a ServiceMonitor pointed there
-# scraped up=0. The ServiceMonitor selects the ``clickhouse`` Service, and
-# Prometheus scrapes each replica's endpoint behind it individually.
+# scraped up=0. The ServiceMonitor selects the ``clickhouse-metrics`` Service,
+# and Prometheus scrapes each replica's endpoint behind it individually.
+# Prometheus names the job after the Service; the relabel keeps job="clickhouse"
+# from when it scraped the client Service, so existing series and queries
+# continue.
 # Requires the Prometheus Operator (monitoring.coreos.com/v1 CRDs) to be
 # installed in the cluster (already present per EKS infrastructure stack).
 ############################################################
@@ -1324,7 +1354,7 @@ clickhouse_service_monitor = kubernetes.apiextensions.CustomResource(
     ),
     spec={
         "selector": {
-            "matchLabels": {"app": "clickhouse"},
+            "matchLabels": {"app": "clickhouse-metrics"},
         },
         "namespaceSelector": {"matchNames": [CLICKHOUSE_NAMESPACE]},
         "endpoints": [
@@ -1335,6 +1365,7 @@ clickhouse_service_monitor = kubernetes.apiextensions.CustomResource(
                 "interval": "30s",
                 "scrapeTimeout": "10s",
                 "relabelings": [
+                    {"targetLabel": "job", "replacement": "clickhouse"},
                     {
                         "sourceLabels": ["__meta_kubernetes_pod_name"],
                         "targetLabel": "pod",
@@ -1347,7 +1378,7 @@ clickhouse_service_monitor = kubernetes.apiextensions.CustomResource(
             }
         ],
     },
-    opts=ResourceOptions(depends_on=[clickhouse_client_service]),
+    opts=ResourceOptions(depends_on=[clickhouse_metrics_service]),
 )
 
 keeper_service_monitor = kubernetes.apiextensions.CustomResource(

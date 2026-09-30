@@ -56,6 +56,7 @@ from pulumiverse_grafana import alerting
 
 _NON_PROD_CLUSTERS = ".*-(ci|qa)"
 _PROD_CLUSTERS = ".*-(production)"
+_QA_CLUSTERS = ".*-(qa)"
 _LABELS = {"service": "clickhouse"}
 _BY_HOST = "cluster, namespace, hostname"
 _BY_KEEPER = "cluster, namespace, pod"
@@ -105,11 +106,10 @@ def _disk_almost_full(clusters: str) -> str:
     )
 
 
-def _keeper_lost_quorum() -> str:
-    # Production only, and not paired with a CI/QA rule: CI and QA run a single
-    # Keeper, which is a leader with zero synced followers by construction and
-    # would satisfy this permanently. Add QA once its canary ensemble has three
-    # members.
+def _keeper_lost_quorum(clusters: str) -> str:
+    # Production (Critical) and QA (Warning, the upgrade canary's three-member
+    # ensemble) only. CI runs a single Keeper, which is a leader with zero
+    # synced followers by construction and would satisfy this permanently.
     #
     # Two ways to lose quorum, one arm each. Keeper emits KeeperIsLeader and
     # KeeperSyncedFollowers on every node, 0 on followers
@@ -121,7 +121,7 @@ def _keeper_lost_quorum() -> str:
     #     the first arm alone would never fire for it. The second arm's value
     #     is the number of nodes still reporting, so it is positive whenever
     #     it matches.
-    keeper = f'{{cluster=~"{_PROD_CLUSTERS}"}}'
+    keeper = f'{{cluster=~"{clusters}"}}'
     return (
         f"(max by ({_BY_KEEPER}) (ClickHouseAsyncMetrics_KeeperIsLeader{keeper}) == 1\n"
         f"and on ({_BY_KEEPER})\n"
@@ -286,7 +286,29 @@ def create(
                 annotations={
                     "description": "ClickHouse Keeper in cluster {{ $labels.cluster }} has lost quorum: either the leader has no synced followers, or no member is leader at all. Keeper cannot commit, so every replicated table is read-only."
                 },
-                datas=rd(_keeper_lost_quorum()),
+                datas=rd(_keeper_lost_quorum(_PROD_CLUSTERS)),
+            ),
+            alerting.RuleGroupRuleArgs(
+                name="ClickHouseKeeperLostQuorumWarning",
+                condition="C",
+                for_="5m",
+                no_data_state="OK",
+                exec_err_state="OK",
+                labels={**_LABELS, "severity": "warning"},
+                annotations={
+                    "description": "ClickHouse Keeper in cluster {{ $labels.cluster }} has lost quorum: either the leader has no synced followers, or no member is leader at all. Keeper cannot commit, so every replicated table is read-only. QA is the upgrade canary: hold any Keeper or server upgrade until this clears."
+                },
+                # Only once QA has a real ensemble: until the canary change
+                # applies, its single Keeper satisfies the expression. The
+                # guard counts members over the last day, not now, so losing
+                # two of three (the case the second arm exists for) still
+                # fires instead of shrinking the count to 1.
+                datas=rd(
+                    f"({_keeper_lost_quorum(_QA_CLUSTERS)})\n"
+                    "and on (cluster, namespace)\n"
+                    "(max_over_time((count by (cluster, namespace) "
+                    f'(ClickHouseAsyncMetrics_KeeperIsLeader{{cluster=~"{_QA_CLUSTERS}"}}))[1d:5m]) > 1)'
+                ),
             ),
             # --- Degradation ---
             _warning(
