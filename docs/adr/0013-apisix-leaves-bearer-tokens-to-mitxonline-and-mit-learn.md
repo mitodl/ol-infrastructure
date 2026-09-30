@@ -9,8 +9,9 @@
 ## Context
 
 APISIX fronts mitxonline.mit.edu and api.learn.mit.edu with the `openid-connect` plugin,
-through shared plugin configs built by `OLApisixOIDCResources`. That plugin handles the
-browser login flow and, optionally, bearer tokens.
+attached per route from `OLApisixOIDCResources.get_full_oidc_plugin_config()` in the
+mitxonline and mit_learn stacks. That plugin handles the browser login flow and,
+optionally, bearer tokens.
 
 The plugin only reads the `Authorization` header when one of `bearer_only`,
 `introspection_endpoint`, `public_key` or `use_jwks` is set (`rewrite()` and `introspect()`
@@ -65,21 +66,28 @@ hosts.
 
 ## Decision
 
-Option 3. The shared OIDC plugin configs for mitxonline and mit_learn set none of
-`bearer_only`, `introspection_endpoint`, `public_key` or `use_jwks`.
+Option 3. The `openid-connect` plugin configs that the mitxonline and mit_learn stacks
+attach to their routes set none of `bearer_only`, `introspection_endpoint`, `public_key`
+or `use_jwks`.
 
 If a Keycloak service account needs to call one of these hosts, give it a dedicated route
 that matches only its paths and the `Authorization: Bearer` header. Set `bearer_only`,
 `use_jwks` and an explicit `claim_validator.issuer.valid_issuers` on that route's plugin
-config only, never on a host's shared config. `applications/opik/__main__.py` is the
-working example of that shape. Accepting the token in Django (e.g. a DRF authentication
-class that validates Keycloak JWTs for the views that need it) is the alternative when the
-view already has one.
+config only, never on the configs the host's other routes use.
+`applications/opik/__main__.py` shows the route shape (a header-matched bearer route with
+`bearer_only` and `use_jwks`). It does not pin `valid_issuers` and relies on the discovery
+document's issuer, so add the pin when copying it. Accepting the token in Django (e.g. a
+DRF authentication class that validates Keycloak JWTs for the views that need it) is the
+alternative when the view already has one.
 
-`tests/ol_infrastructure/applications/test_apisix_bearer_passthrough.py` fails if any of the
-four options appears as a keyword argument or string literal anywhere under
-`applications/mitxonline/` or `applications/mit_learn/`. Against #4810's versions of those
-files it reports all four `oidc_use_jwks=True` lines.
+Two tests enforce this. `tests/ol_infrastructure/applications/test_apisix_bearer_passthrough.py`
+fails if any of the four options, with or without the `oidc_` prefix, appears as a keyword
+argument, attribute or string literal anywhere under `applications/mitxonline/` or
+`applications/mit_learn/`. Against #4810's versions of those files it reports all four
+`oidc_use_jwks=True` lines. `test_default_plugin_config_does_not_validate_bearer_tokens` in
+`tests/ol_infrastructure/components/services/test_apisix.py` fails if
+`OLApisixOIDCResources` starts enabling any of them by default, which is the other half of
+the change surface #4810 touched.
 
 ## Consequences
 
@@ -92,9 +100,9 @@ files it reports all four `oidc_use_jwks=True` lines.
 
 - The gateway does no bearer-token checking on these hosts. Each view's DRF authentication
   classes are the only check, which is the case today.
-- The source-level test cannot see options that arrive another way (e.g. a shared helper
-  outside these two directories that sets them). A change to `OLApisixOIDCResources` that
-  starts emitting one of them by default would need its own review.
+- The source-level test cannot see options set by a helper outside these two directories
+  and the `OLApisixOIDCResources` defaults (e.g. a new shared function that mutates the
+  plugin dict).
 
 ### Neutral
 
@@ -103,6 +111,9 @@ files it reports all four `oidc_use_jwks=True` lines.
 - Not covered by the inventory: learn-ai's calls to api.learn, and any client that sends a
   cookie and a bearer token together, because the access log records neither the header
   nor its scheme.
+- Out of scope: learn_ai's own `/ai/*` routes on api.learn carry their own
+  `openid-connect` plugin from `applications/learn_ai/`. Open edX tokens don't go there, so
+  INC-10 can't recur through them, and the test does not scan that directory.
 
 ## References
 

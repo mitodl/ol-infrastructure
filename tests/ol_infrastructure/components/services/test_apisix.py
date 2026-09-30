@@ -67,6 +67,9 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
 )
+from tests.ol_infrastructure.applications.test_apisix_bearer_passthrough import (  # noqa: E402
+    BEARER_VALIDATION_OPTIONS,
+)
 
 # ─── OLApisixUpstreamConfig validation ─────────────────────────────────────────
 
@@ -270,6 +273,18 @@ def test_session_cookie_name_survives_plugin_rendering():
     assert plugin["name"] == "openid-connect"
     assert plugin["config"]["session"]["cookie_name"] == "mitlearn_apisix_session"
     assert plugin["config"]["unauth_action"] == "pass"
+
+
+def test_default_plugin_config_does_not_validate_bearer_tokens():
+    """Mitxonline and mit_learn rely on these defaults.  Any of these options
+    makes the plugin 401 the Open edX-issued bearer tokens mitxonline accepts
+    (Rootly INC-10, docs/adr/0013).
+    """
+    oidc = oidc_resources("test-oidc-no-bearer-validation")
+
+    config = oidc.get_full_oidc_plugin_config(unauth_action="pass")["config"]
+
+    assert not {option for option in BEARER_VALIDATION_OPTIONS if config.get(option)}
 
 
 # ─── Session cookie naming ─────────────────────────────────────────────────────

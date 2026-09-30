@@ -26,20 +26,26 @@ BEARER_VALIDATION_OPTIONS = frozenset(
 
 
 def _bearer_validation_references(tree: ast.AST) -> list[tuple[int, str]]:
-    """Find every keyword argument or string literal naming a bearer option.
+    """Find every keyword argument, attribute or string literal naming a bearer
+    option, with or without the ``OLApisixOIDCConfig`` field prefix ``oidc_``.
 
-    Keyword arguments catch an ``OLApisixOIDCConfig(oidc_use_jwks=True)``
-    style field; string literals catch a plugin dict mutated after the fact,
-    e.g. ``plugin["config"]["use_jwks"] = True``.
+    Keyword arguments catch ``OLApisixOIDCConfig(oidc_use_jwks=True)``,
+    attributes catch ``config.oidc_bearer_only = True``, and string literals
+    catch a plugin dict mutated after the fact, e.g.
+    ``plugin["config"]["use_jwks"] = True`` or ``**{"oidc_use_jwks": True}``.
     """
     references = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.keyword) and node.arg:
-            name = node.arg.removeprefix("oidc_")
-            if name in BEARER_VALIDATION_OPTIONS:
-                references.append((node.value.lineno, node.arg))
-        elif isinstance(node, ast.Constant) and node.value in BEARER_VALIDATION_OPTIONS:
-            references.append((node.lineno, node.value))
+        if isinstance(node, ast.keyword):
+            name, lineno = node.arg, node.value.lineno
+        elif isinstance(node, ast.Attribute):
+            name, lineno = node.attr, node.lineno
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            name, lineno = node.value, node.lineno
+        else:
+            continue
+        if name and name.removeprefix("oidc_") in BEARER_VALIDATION_OPTIONS:
+            references.append((lineno, name))
     return references
 
 
@@ -63,6 +69,9 @@ def test_gateway_does_not_validate_bearer_tokens(application):
         'plugin["config"]["use_jwks"] = True',
         'plugin["config"].update({"public_key": key})',
         'plugin["config"]["introspection_endpoint"] = url',
+        'cfg.model_copy(update={"oidc_use_jwks": True})',
+        'OLApisixOIDCConfig(**{"oidc_bearer_only": True})',
+        "cfg.oidc_bearer_only = True",
     ],
 )
 def test_detects_bearer_validation(source):
