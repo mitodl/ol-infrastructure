@@ -381,10 +381,16 @@ def relink(
             "link at all."
         )
         if existing is not None:
+            old_username = existing.get("userName")
+            username_arg = (
+                f"--new-username {old_username!r}"
+                if old_username is not None
+                else "--new-username <no username was stored on the old link>"
+            )
             print(
                 "To restore the previous link manually, re-run with:\n"
-                f"  --new-external-id {existing.get('userId')!r} "
-                f"--new-username {existing.get('userName')!r} --confirm"
+                f"  --new-external-id {existing.get('userId')!r} {username_arg} "
+                "--confirm"
             )
         sys.exit(1)
 
