@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pulumi_azure_native as azure_native
 from pulumi import Config, Output, ResourceOptions, export
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_validator
 
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib import pulumi_projects as projects
@@ -151,6 +151,33 @@ class ModelConfig(BaseModel):
     # which also switches that model to NoAutoUpgrade so a new default version cannot
     # change model behaviour under a running application with no deploy and no diff.
     model_versions: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def check_names_are_deployed(self) -> "ModelConfig":
+        """Reject names nothing looks up, which would otherwise be silently ignored.
+
+        The deployment loop only reads consumers from CONSUMER_SUBJECTS and models it
+        deploys, so a misspelled key (e.g. `mit-learn`) previews clean and changes
+        nothing.
+        """
+        unknown_consumers = set(self.consumer_extra_models) - set(CONSUMER_SUBJECTS)
+        if unknown_consumers:
+            msg = (
+                "consumer_extra_models has unknown consumers "
+                f"{sorted(unknown_consumers)}; expected a subset of "
+                f"{sorted(CONSUMER_SUBJECTS)}"
+            )
+            raise ValueError(msg)
+        deployed = set(self.models).union(*self.consumer_extra_models.values())
+        for field_name in ("model_capacities", "model_versions"):
+            undeployed = set(getattr(self, field_name)) - deployed
+            if undeployed:
+                msg = (
+                    f"{field_name} names models that are not deployed "
+                    f"{sorted(undeployed)}; deployed models are {sorted(deployed)}"
+                )
+                raise ValueError(msg)
+        return self
 
 
 deployment_config = ModelConfig.model_validate(
