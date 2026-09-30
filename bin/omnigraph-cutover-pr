@@ -1,0 +1,440 @@
+#!/usr/bin/env python3
+"""Open the pull request that cuts an omnigraph stack over to a rebuilt root.
+
+The storage-format migration Job (``applications/omnigraph/storage_migration.py``)
+rebuilds every graph at ``s3://<bucket>/fmt<N>``, verifies it, and writes a
+verdict to ``s3://<bucket>/migrations/fmt<N>/verdict.json``. It deliberately
+stops there: repointing the cluster is a Pulumi config change, and the Job
+holds no Pulumi credentials. This turns a verified verdict into that config
+change, as a pull request carrying the verdict as its evidence.
+
+Four lines move together, because ``__main__.py`` cross-checks them:
+``storage_prefix`` and ``internal_schema_version`` name the new root, and
+``migrate_from_image``/``migrate_to_prefix`` are removed so the Job stops
+existing and the optimize/cleanup sweeps resume in the same apply.
+
+The edit is four line rewrites, not a YAML load and dump. ``pulumi config set``
+quoted ``6`` and re-indented ``managed_repos`` when it was used for the fmt9
+cutover (2026-09-16), and a round-trip through a YAML library would drop the
+comments these stack files depend on. The result is checked twice: the diff
+must touch only those four lines, and yamlfmt must leave the file unchanged.
+
+It never merges. The old root stays untouched as the rollback until the
+stack has soaked, and retiring it is a separate, manual step of
+``docs/omnigraph-storage-format-upgrade-runbook.md``.
+
+Authenticates the push and the PR through ``bin/open-drift-pr``: as the
+GitHub App when ``GITHUB_APP_ID``/``GITHUB_APP_INSTALLATION_ID``/
+``GITHUB_APP_PRIVATE_KEY`` are set (Concourse), otherwise with the local
+``gh auth token`` under your own git identity.
+"""
+
+import difflib
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Annotated, Any, Literal
+
+import boto3
+import cyclopts
+
+app = cyclopts.App(
+    help="Open the pull request that cuts an omnigraph stack over to a rebuilt root."
+)
+
+GITHUB_REPO = "mitodl/ol-infrastructure"
+STACK_DIR = Path("src/ol_infrastructure/applications/omnigraph")
+OPEN_DRIFT_PR = Path(__file__).resolve().parent / "open-drift-pr"
+
+PREFIX_RE = re.compile(r"^fmt[0-9]+$")
+
+# Every line this script may touch, by config key. The two-space indent is the
+# stack file's own: a key at any other depth is not the one Pulumi reads.
+REWRITTEN_KEYS = ("omnigraph:storage_prefix", "omnigraph:internal_schema_version")
+REMOVED_KEYS = ("omnigraph:migrate_from_image", "omnigraph:migrate_to_prefix")
+
+Verdict = dict[str, Any]
+
+
+class CutoverRefusedError(Exception):
+    """The verdict or the stack config does not describe a cutover to make."""
+
+
+@dataclass(frozen=True)
+class Cutover:
+    """What one cutover changes, as derived from a verdict and a stack config."""
+
+    env: str
+    old_root: str
+    new_root: str
+    old_prefix: str
+    new_prefix: str
+    old_schema: int
+    new_schema: int
+
+    @property
+    def branch(self) -> str:
+        """Stable per cutover, so a re-run updates the PR instead of opening one."""
+        return f"omnigraph-cutover-{self.env.lower()}-{self.new_prefix}"
+
+    @property
+    def title(self) -> str:
+        """Commit and PR title, matching the fmt9 cutover commits by hand."""
+        return (
+            f"feat(omnigraph): cut {self.env} over to storage format {self.new_schema}"
+        )
+
+
+def _key_line(key: str) -> re.Pattern[str]:
+    return re.compile(rf"^  {re.escape(key)}:[ \t]*(?P<value>.*?)[ \t]*$")
+
+
+def config_value(config_text: str, key: str) -> str:
+    """Return ``key``'s value from a stack file, refusing unless it is set once.
+
+    Quotes are stripped, since ``pulumi config set`` wrote ``'6'`` where a hand
+    edit writes ``6``. A value continued onto the next line is refused rather
+    than half-read: every key this script handles is a one-line scalar.
+    """
+    pattern = _key_line(key)
+    lines = config_text.splitlines()
+    hits = [i for i, line in enumerate(lines) if pattern.match(line)]
+    if len(hits) != 1:
+        msg = f"{key} is set {len(hits)} times in the stack config; expected once"
+        raise CutoverRefusedError(msg)
+    (index,) = hits
+    following = lines[index + 1] if index + 1 < len(lines) else ""
+    if following.startswith("   ") and not following.lstrip().startswith("#"):
+        msg = f"{key} continues onto the next line; refusing to rewrite it"
+        raise CutoverRefusedError(msg)
+    match = pattern.match(lines[index])
+    if match is None:  # pragma: no cover - `hits` already matched it
+        raise AssertionError(key)
+    return match["value"].strip("'\"")
+
+
+def plan_cutover(verdict: Verdict, config_text: str, env: str) -> Cutover:
+    """Decide the cutover a verdict supports, or refuse with the reason.
+
+    Refuses anything but a clean, uniform, verified rebuild, and anything the
+    stack config does not agree with: the rebuild has to be the one armed in
+    this stack (``migrate_to_prefix``), from the root it serves today
+    (``storage_prefix``), in this environment's bucket. The last check is what
+    stops a CI verdict from cutting Production over.
+    """
+    if verdict["ok"] is not True:
+        failed = sorted(g for g, r in verdict["graphs"].items() if not r["ok"])
+        msg = (
+            "the verdict is not ok, so the rebuild is not verified. Failed "
+            f"graphs: {failed or 'none'}; format problems: "
+            f"{verdict['format_problems'] or 'none'}"
+        )
+        raise CutoverRefusedError(msg)
+    new_schemas = set(verdict["new_internal_schema"].values())
+    old_schemas = set(verdict["old_internal_schema"].values())
+    if len(new_schemas) != 1 or len(old_schemas) != 1:
+        msg = (
+            "the graphs are not on one format: old "
+            f"{verdict['old_internal_schema']}, new {verdict['new_internal_schema']}"
+        )
+        raise CutoverRefusedError(msg)
+    (new_schema,) = new_schemas
+    (old_schema,) = old_schemas
+
+    old_root, new_root = verdict["old_root"], verdict["new_root"]
+    bucket = f"ol-data-witan-{env.lower()}"
+    for root in (old_root, new_root):
+        if root.removeprefix("s3://").split("/", 1)[0] != bucket:
+            msg = f"{root} is not in {env}'s bucket {bucket}"
+            raise CutoverRefusedError(msg)
+    new_prefix = new_root.rsplit("/", 1)[-1]
+    if not PREFIX_RE.match(new_prefix) or new_prefix != f"fmt{new_schema}":
+        msg = (
+            f"the rebuilt root {new_root} does not name format {new_schema}; "
+            "storage_prefix and internal_schema_version would disagree"
+        )
+        raise CutoverRefusedError(msg)
+    old_prefix = old_root.rsplit("/", 1)[-1]
+
+    served = config_value(config_text, "omnigraph:storage_prefix")
+    if served != old_prefix:
+        msg = (
+            f"the stack serves storage_prefix {served}, but the verdict rebuilt "
+            f"from {old_root}"
+        )
+        raise CutoverRefusedError(msg)
+    armed = config_value(config_text, "omnigraph:migrate_to_prefix")
+    if armed != new_prefix:
+        msg = f"the stack's armed migration targets {armed}, not {new_prefix}"
+        raise CutoverRefusedError(msg)
+    config_value(config_text, "omnigraph:migrate_from_image")
+    declared = config_value(config_text, "omnigraph:internal_schema_version")
+    if declared != str(old_schema):
+        msg = (
+            f"the stack declares internal_schema_version {declared}, but the "
+            f"verdict's old root is format {old_schema}"
+        )
+        raise CutoverRefusedError(msg)
+
+    return Cutover(
+        env=env,
+        old_root=old_root,
+        new_root=new_root,
+        old_prefix=old_prefix,
+        new_prefix=new_prefix,
+        old_schema=old_schema,
+        new_schema=new_schema,
+    )
+
+
+def rewrite_config(config_text: str, cutover: Cutover) -> str:
+    """Apply the cutover as line edits, preserving everything else byte for byte."""
+    replacements = {
+        "omnigraph:storage_prefix": cutover.new_prefix,
+        "omnigraph:internal_schema_version": str(cutover.new_schema),
+    }
+    patterns = {key: _key_line(key) for key in (*REWRITTEN_KEYS, *REMOVED_KEYS)}
+    out = []
+    for line in config_text.splitlines(keepends=True):
+        key = next((k for k, p in patterns.items() if p.match(line.rstrip("\n"))), None)
+        if key in REMOVED_KEYS:
+            continue
+        if key is not None:
+            line = f"  {key}: {replacements[key]}\n"  # noqa: PLW2901
+        out.append(line)
+    return "".join(out)
+
+
+def unexpected_changes(before: str, after: str) -> list[str]:
+    """Return every changed line that is not one of the four cutover keys."""
+    allowed = tuple(f"  {key}:" for key in (*REWRITTEN_KEYS, *REMOVED_KEYS))
+    return [
+        line
+        for line in difflib.unified_diff(
+            before.splitlines(), after.splitlines(), lineterm="", n=0
+        )
+        if line[:1] in "+-"
+        and not line.startswith(("+++", "---"))
+        and not line[1:].startswith(allowed)
+    ]
+
+
+def render_body(verdict: Verdict, cutover: Cutover, verdict_location: str) -> str:
+    """Render the PR body from the verdict, so the evidence travels with the change."""
+    graphs = verdict["graphs"]
+    rows = []
+    total_before = total_after = 0
+    collapsed_total: dict[str, int] = {}
+    for graph in sorted(graphs):
+        report = graphs[graph]
+        before = sum(report["before"].values())
+        after = sum(report["after"].values())
+        total_before += before
+        total_after += after
+        collapsed = report["collapsed_duplicates"]
+        for table, count in collapsed.items():
+            collapsed_total[table] = collapsed_total.get(table, 0) + count
+        detail = ", ".join(f"{t} {n}" for t, n in sorted(collapsed.items())) or "-"
+        rows.append(f"| {graph} | {before:,} | {after:,} | {detail} |")
+
+    if collapsed_total:
+        difference = (
+            "The difference is duplicate keyed edges collapsed by the rebuild ("
+            + ", ".join(f"{t} {n}" for t, n in sorted(collapsed_total.items()))
+            + "), not loss."
+        )
+    else:
+        difference = "Every graph matched its baseline exactly."
+
+    return "\n".join(
+        [
+            f"The storage-format migration Job rebuilt all {len(graphs)} "
+            f"{cutover.env} graphs into `{cutover.new_root}` and verified them: "
+            f"every graph ok, format {cutover.old_schema} -> {cutover.new_schema} "
+            f"uniformly. {total_before:,} -> {total_after:,} rows. {difference}",
+            "",
+            "This sets `omnigraph:storage_prefix` and "
+            "`omnigraph:internal_schema_version` to the new root and removes "
+            "`omnigraph:migrate_from_image`/`omnigraph:migrate_to_prefix` in the "
+            "same change, because `__main__.py` refuses a stack whose "
+            "`storage_prefix` is still armed as `migrate_to_prefix`. Removing "
+            "them also removes the Job and resumes the optimize and cleanup "
+            "sweeps in the same apply.",
+            "",
+            f"The old root `{cutover.old_root}` is untouched and stays the "
+            f"rollback until {cutover.env} has soaked.",
+            "",
+            "| Graph | Rows before | Rows after | Collapsed duplicates |",
+            "| --- | ---: | ---: | --- |",
+            *rows,
+            "",
+            f"Verdict: `{verdict_location}`, finished {verdict['finished_at']}.",
+            f"Old binary: `{verdict['binaries']['old']}`",
+            f"New binary: `{verdict['binaries']['new']}`",
+            "",
+            "Opened by `bin/omnigraph-cutover-pr`. Review the verdict before "
+            "merging; nothing here merges automatically.",
+            "",
+        ]
+    )
+
+
+def load_verdict(location: str) -> Verdict:
+    """Read a verdict from ``s3://bucket/key`` or a local path."""
+    if location.startswith("s3://"):
+        bucket, key = location.removeprefix("s3://").split("/", 1)
+        body = boto3.client("s3").get_object(Bucket=bucket, Key=key)["Body"].read()
+        return json.loads(body)
+    return json.loads(Path(location).read_text())
+
+
+def _run(argv: list[str], cwd: Path | None = None) -> str:
+    return subprocess.run(  # noqa: S603
+        argv, cwd=cwd, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def yamlfmt_changes(checkout: Path, relpath: Path) -> str:
+    """Run the repo's own yamlfmt hook on one file; return any diff it made.
+
+    Through ``prek`` rather than yamlfmt directly, so the hook's pinned rev
+    and arguments come from ``.pre-commit-config.yaml`` and cannot drift from
+    what CI enforces.
+    """
+    before = (checkout / relpath).read_text()
+    subprocess.run(  # noqa: S603
+        ["prek", "run", "yamlfmt", "--files", str(relpath)],  # noqa: S607
+        cwd=checkout,
+        check=False,
+        capture_output=True,
+    )
+    after = (checkout / relpath).read_text()
+    return "\n".join(
+        difflib.unified_diff(
+            before.splitlines(), after.splitlines(), "ours", "yamlfmt", lineterm=""
+        )
+    )
+
+
+def _github_env() -> dict[str, str]:
+    """Credentials for ``open-drift-pr``: the App when configured, else ``gh``."""
+    child = dict(os.environ)
+    app_vars = ("GITHUB_APP_ID", "GITHUB_APP_INSTALLATION_ID", "GITHUB_APP_PRIVATE_KEY")
+    if not all(child.get(var) for var in app_vars):
+        child["GITHUB_TOKEN"] = _run(["gh", "auth", "token"])
+    return child
+
+
+def _git_identity(child_env: dict[str, str]) -> list[str]:
+    """Commit as yourself on a local run; leave the App's bot identity otherwise."""
+    if "GITHUB_TOKEN" not in child_env or child_env.get("GITHUB_APP_ID"):
+        return []
+    return [
+        "--git-user-name",
+        _run(["git", "config", "--global", "user.name"]),
+        "--git-user-email",
+        _run(["git", "config", "--global", "user.email"]),
+    ]
+
+
+@app.default
+def omnigraph_cutover_pr(
+    *,
+    env: Annotated[
+        Literal["CI", "QA", "Production"],
+        cyclopts.Parameter(help="Stack to cut over."),
+    ],
+    verdict: Annotated[
+        str,
+        cyclopts.Parameter(
+            help="Verdict location: s3://ol-data-witan-<env>/migrations/fmt<N>/"
+            "verdict.json, or a local copy of it."
+        ),
+    ],
+    dry_run: Annotated[
+        bool,
+        cyclopts.Parameter(help="Print the diff and PR body; push nothing."),
+    ] = False,
+) -> None:
+    """Rewrite Pulumi.<env>.yaml from a verified verdict and open its PR.
+
+    Works in a fresh shallow clone of main, never in your checkout:
+    ``open-drift-pr`` commits everything in the tree it is pointed at.
+    """
+    loaded = load_verdict(verdict)
+    relpath = STACK_DIR / f"Pulumi.{env}.yaml"
+    with tempfile.TemporaryDirectory(prefix="omnigraph-cutover-") as scratch:
+        checkout = Path(scratch) / "ol-infrastructure"
+        _run(
+            [
+                "git",
+                "clone",
+                "--quiet",
+                "--depth",
+                "1",
+                f"https://github.com/{GITHUB_REPO}",
+                str(checkout),
+            ]
+        )
+        before = (checkout / relpath).read_text()
+        try:
+            cutover = plan_cutover(loaded, before, env)
+        except CutoverRefusedError as exc:
+            sys.exit(f"refusing to cut {env} over: {exc}")
+        after = rewrite_config(before, cutover)
+        if stray := unexpected_changes(before, after):
+            sys.exit("refusing: the rewrite changed other lines:\n" + "\n".join(stray))
+        (checkout / relpath).write_text(after)
+        if reformatted := yamlfmt_changes(checkout, relpath):
+            sys.exit(
+                "refusing: yamlfmt would reformat the rewritten file, so the PR "
+                f"would fail pre-commit:\n{reformatted}"
+            )
+
+        body = render_body(loaded, cutover, verdict)
+        print(
+            "\n".join(
+                difflib.unified_diff(
+                    before.splitlines(),
+                    after.splitlines(),
+                    f"a/{relpath}",
+                    f"b/{relpath}",
+                    lineterm="",
+                )
+            )
+        )
+        print(f"\n--- {cutover.title} ({cutover.branch}) ---\n{body}")
+        if dry_run:
+            return
+
+        body_file = Path(scratch) / "body.md"
+        body_file.write_text(body)
+        child_env = _github_env()
+        subprocess.run(  # noqa: S603
+            [
+                sys.executable,
+                str(OPEN_DRIFT_PR),
+                "--repo-dir",
+                str(checkout),
+                "--repo",
+                GITHUB_REPO,
+                "--branch",
+                cutover.branch,
+                "--title",
+                cutover.title,
+                "--body-file",
+                str(body_file),
+                *_git_identity(child_env),
+            ],
+            env=child_env,
+            check=True,
+        )
+
+
+if __name__ == "__main__":
+    sys.exit(app())

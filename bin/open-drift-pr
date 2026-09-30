@@ -135,25 +135,39 @@ def open_drift_pr(
     """Commit, push, and open or update a pull request.
 
     Requires $GITHUB_APP_ID, $GITHUB_APP_INSTALLATION_ID, and
-    $GITHUB_APP_PRIVATE_KEY.
+    $GITHUB_APP_PRIVATE_KEY, or failing those a $GITHUB_TOKEN. The token is
+    for a local run (e.g. `bin/omnigraph-cutover-pr` passing `gh auth token`),
+    which acts as the person running it rather than the App.
     """
     app_id = os.environ.get("GITHUB_APP_ID")
     installation_id = os.environ.get("GITHUB_APP_INSTALLATION_ID")
     private_key = os.environ.get("GITHUB_APP_PRIVATE_KEY")
-    if not app_id or not installation_id or not private_key:
+    if app_id and installation_id and private_key:
+        token = _mint_installation_token(app_id, installation_id, private_key)
+    elif os.environ.get("GITHUB_TOKEN"):
+        token = os.environ["GITHUB_TOKEN"]
+    else:
         msg = (
             "GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, and "
-            "GITHUB_APP_PRIVATE_KEY must all be set to push and open a pull "
-            "request"
+            "GITHUB_APP_PRIVATE_KEY must all be set, or GITHUB_TOKEN, to push "
+            "and open a pull request"
         )
         raise SystemExit(msg)
-    token = _mint_installation_token(app_id, installation_id, private_key)
     # The credential helper below reads this from the environment.
     os.environ["GITHUB_TOKEN"] = token
 
     # Concourse checks the repo out as a different uid than the task runs as
-    # often enough that git's ownership check is worth pre-empting.
-    _git(repo_dir, "config", "--global", "--add", "safe.directory", str(repo_dir))
+    # often enough that git's ownership check is worth pre-empting. Added only
+    # when missing, because on a workstation this is the person's own
+    # ~/.gitconfig and a re-run would otherwise append a duplicate each time.
+    safe = subprocess.run(
+        ["git", "config", "--global", "--get-all", "safe.directory"],  # noqa: S607
+        check=False,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    if str(repo_dir) not in safe:
+        _git(repo_dir, "config", "--global", "--add", "safe.directory", str(repo_dir))
 
     if not _git(repo_dir, "status", "--porcelain"):
         print("No drift: working tree is clean, nothing to propose.")

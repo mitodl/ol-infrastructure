@@ -34,8 +34,10 @@ WHAT IT WILL NOT DO. It does not repoint the live cluster. That is
 credentials; writing the ConfigMap instead would make it a second writer of a
 path Pulumi owns, the exact failure ``sync_actor_tokens.py`` documents on the
 token map. The Job verifies per-table row counts and stops, leaving a verdict
-in its logs and at ``/tmp/migration-verdict.json``. Cutting over stays a
-deliberate act by whoever is running the migration.
+in its logs and at ``s3://<bucket>/migrations/fmt<N>/verdict.json`` (written
+by the script through the same IRSA grant as the rebuild).
+``bin/omnigraph-cutover-pr`` turns that verdict into the cutover pull request;
+merging it stays a deliberate act by whoever is running the migration.
 """
 
 from pathlib import Path
