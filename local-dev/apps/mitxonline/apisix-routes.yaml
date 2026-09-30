@@ -260,4 +260,8 @@ spec:
         # api.learn.mit.dev, matching the learn route that issued the cookie.
         session:
           secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
+          # 0 disables lua-resty-session's 900s idling / 3600s rolling
+          # defaults, as the deployed OIDC config does.
+          idling_timeout: 0
+          rolling_timeout: 0
         unauth_action: pass
