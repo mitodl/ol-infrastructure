@@ -24,6 +24,7 @@ from pathlib import Path
 
 import pulumi_azure_native as azure_native
 from pulumi import Config, Output, ResourceOptions, export
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt
 
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib import pulumi_projects as projects
@@ -102,42 +103,67 @@ if stack_info.env_suffix == "production" and configured_capacity is None:
     raise ValueError(msg)
 default_capacity = configured_capacity or 5
 
-# gpt-4o is learn-ai's current default and gpt-5.2 is what edxapp's translations config
-# already asks OpenAI for. learn-ai's other default, gpt-4o-mini, cannot be deployed:
-# its only version (2024-07-18) is Deprecating, and Azure refuses new deployments of it
-# with ServiceModelDeprecating. gpt-5-mini is its stand-in, so an app moving that
-# workload to Azure changes its model name deliberately rather than silently.
-model_names = azure_config.get_object("models") or [
-    "gpt-4o",
-    "gpt-5-mini",
-    "gpt-5.2",
-]
 
-# Models deployed on one consumer's account only, after the shared chat models.
-# mit-learn's dense vectors come from text-embedding-3-large (-small on CI), and a
-# vector is only comparable with vectors from the same model, so the Azure deployment
-# must be that exact model for mit-learn to switch provider without reindexing Qdrant.
-consumer_extra_models: dict[str, list[str]] = azure_config.get_object(
-    "consumer_extra_models"
-) or {
-    "mitlearn": ["text-embedding-3-large", "text-embedding-3-small"],
-}
+class ModelConfig(BaseModel):
+    """Which models deploy where, from the stack's azure_openai config.
 
-# Per-model capacity overrides. Each model draws on its own quota pool, so a model
-# whose pool is smaller or larger than the chat models' can be sized on its own.
-model_capacities: dict[str, int] = azure_config.get_object("model_capacities") or {}
+    Strict, so a mistyped value (a quoted capacity, a bare string where a list
+    belongs) fails at preview instead of at the Azure API or as a surprise diff. A key
+    that is set, even to an empty value, replaces its default.
+    """
 
-# Version strings are deliberately not hardcoded here -- which versions exist is a
-# property of the subscription and region, not of this code, and a wrong string fails
-# at Deployment create time rather than at preview. Left unset, Azure deploys its
-# current default version for the model and upgrades it automatically over time.
-#
-# Pin them once confirmed against the target subscription with
-# `az cognitiveservices account list-models -n <account> -g <rg>`: set
-# `azure_openai:model_versions` to a {model: version} map in the stack config, which
-# also switches that model to NoAutoUpgrade so a new default version cannot change
-# model behaviour under a running application with no deploy and no diff.
-model_versions: dict[str, str] = azure_config.get_object("model_versions") or {}
+    model_config = ConfigDict(strict=True)
+
+    # gpt-4o is learn-ai's current default and gpt-5.2 is what edxapp's translations
+    # config already asks OpenAI for. learn-ai's other default, gpt-4o-mini, cannot be
+    # deployed: its only version (2024-07-18) is Deprecating, and Azure refuses new
+    # deployments of it with ServiceModelDeprecating. gpt-5-mini is its stand-in, so an
+    # app moving that workload to Azure changes its model name deliberately rather than
+    # silently.
+    models: list[str] = Field(
+        default_factory=lambda: ["gpt-4o", "gpt-5-mini", "gpt-5.2"]
+    )
+
+    # Models deployed on one consumer's account only, after the shared chat models.
+    # mit-learn's dense vectors come from text-embedding-3-large (-small on CI), and a
+    # vector is only comparable with vectors from the same model, so the Azure
+    # deployment must be that exact model for mit-learn to switch provider without
+    # reindexing Qdrant.
+    consumer_extra_models: dict[str, list[str]] = Field(
+        default_factory=lambda: {
+            "mitlearn": ["text-embedding-3-large", "text-embedding-3-small"],
+        }
+    )
+
+    # Per-model capacity overrides. Each model draws on its own quota pool, so a model
+    # whose pool is smaller or larger than the chat models' can be sized on its own.
+    model_capacities: dict[str, PositiveInt] = Field(default_factory=dict)
+
+    # Version strings are deliberately not hardcoded here -- which versions exist is a
+    # property of the subscription and region, not of this code, and a wrong string
+    # fails at Deployment create time rather than at preview. Left unset, Azure deploys
+    # its current default version for the model and upgrades it automatically over
+    # time.
+    #
+    # Pin them once confirmed against the target subscription with
+    # `az cognitiveservices account list-models -n <account> -g <rg>`: set
+    # `azure_openai:model_versions` to a {model: version} map in the stack config,
+    # which also switches that model to NoAutoUpgrade so a new default version cannot
+    # change model behaviour under a running application with no deploy and no diff.
+    model_versions: dict[str, str] = Field(default_factory=dict)
+
+
+deployment_config = ModelConfig.model_validate(
+    {
+        key: value
+        for key in ModelConfig.model_fields
+        if (value := azure_config.get_object(key)) is not None
+    }
+)
+model_names = deployment_config.models
+consumer_extra_models = deployment_config.consumer_extra_models
+model_capacities = deployment_config.model_capacities
+model_versions = deployment_config.model_versions
 
 azure_provider = azure_native.Provider(
     "azure-openai-provider",
