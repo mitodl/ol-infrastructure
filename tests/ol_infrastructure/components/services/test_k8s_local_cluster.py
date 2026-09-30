@@ -321,12 +321,14 @@ def test_scaled_objects_read_the_redis_password_from_a_secret():
             celery_worker_configs=[_worker(worker_name="a"), _worker(worker_name="b")],
         )
     )
+    assert app.celery_redis_auth_secret is not None
     assert app.celery_redis_trigger_auth is not None
 
     def check(args):
-        auth_name, auth_spec, *scaled_object_specs = args
+        secret_name, secret_data, auth_name, auth_spec, *scaled_object_specs = args
+        assert secret_data == {"password": _REDIS_PASSWORD}
         assert auth_spec["secretTargetRef"] == [
-            {"parameter": "password", "name": auth_name, "key": "password"}
+            {"parameter": "password", "name": secret_name, "key": "password"}
         ]
         for spec, worker_name in zip(scaled_object_specs, ["a", "b"], strict=True):
             (trigger,) = spec["triggers"]
@@ -336,6 +338,8 @@ def test_scaled_objects_read_the_redis_password_from_a_secret():
             assert trigger["authenticationRef"] == {"name": auth_name}
 
     return pulumi.Output.all(
+        app.celery_redis_auth_secret.metadata["name"],
+        app.celery_redis_auth_secret.string_data,
         app.celery_redis_trigger_auth.metadata["name"],
         app.celery_redis_trigger_auth.spec,
         *(so.spec for so in app.celery_scaled_objects),
@@ -348,6 +352,7 @@ def test_no_redis_auth_without_celery_autoscalers():
             application_name="local-redis-auth", celery_worker_configs=[_worker()]
         )
     )
+    assert app.celery_redis_auth_secret is None
     assert app.celery_redis_trigger_auth is None
 
 

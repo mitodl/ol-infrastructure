@@ -2487,6 +2487,7 @@ class OLApplicationK8s(ComponentResource):
         # guarantees celery_redis_config otherwise.
         celery_redis_trigger: Output[dict[str, Any]] | None = None
         celery_redis_trigger_deps: list[Resource] = []
+        self.celery_redis_auth_secret: kubernetes.core.v1.Secret | None = None
         self.celery_redis_trigger_auth: (
             kubernetes.apiextensions.CustomResource | None
         ) = None
@@ -2503,7 +2504,7 @@ class OLApplicationK8s(ComponentResource):
                     "_", "-"
                 )
             )
-            celery_redis_auth_secret = kubernetes.core.v1.Secret(
+            self.celery_redis_auth_secret = kubernetes.core.v1.Secret(
                 f"{ol_app_k8s_config.application_name}-celery-redis-auth-{stack_info.env_suffix}",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     name=celery_redis_auth_name,
@@ -2532,10 +2533,10 @@ class OLApplicationK8s(ComponentResource):
                     ]
                 },
                 opts=resource_options.merge(
-                    ResourceOptions(depends_on=[celery_redis_auth_secret])
+                    ResourceOptions(depends_on=[self.celery_redis_auth_secret])
                 ),
             )
-            celery_redis_trigger = Output.from_input(redis_config.host).apply(
+            celery_redis_trigger = redis_config.host.apply(
                 partial(
                     _celery_redis_trigger,
                     redis_config=redis_config,
