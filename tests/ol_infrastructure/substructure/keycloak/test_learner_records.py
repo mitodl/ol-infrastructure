@@ -70,6 +70,7 @@ class TestParseLearnerRecordsClients:
             {"organizations": []},
             {"organizations": ["contoso"]},
             {"contract_end_date": "next year"},
+            {"secret_version": 0},
             {"read_pii": True},
         ],
     )
@@ -183,6 +184,24 @@ def test_contract_end_date_claim_only_when_set(mocks):
     ]
     assert len(end_dates) == 1
     assert end_dates[0]["claimValue"] == "2027-06-30"
+
+
+def test_secret_version_drives_secret_rotation(mocks):
+    """Bumping secret_version is how a partner's secret gets rotated."""
+    _create(
+        parse_learner_records_clients(
+            [_entry(), _entry(name="fabrikam-lms", secret_version=3)]
+        )
+    )
+
+    rotation = {
+        c.inputs["clientId"]: c.inputs["clientSecretRegenerateWhenChanged"]
+        for c in mocks.of_type("keycloak:openid/client:Client")
+    }
+    assert rotation == {
+        "learner-records-contoso-lms": {"secret_version": "1"},
+        "learner-records-fabrikam-lms": {"secret_version": "3"},
+    }
 
 
 def test_read_scope_adds_the_api_audience(mocks):

@@ -18,6 +18,10 @@ Each client is one entry in the keycloak stack's
           - 8f14e45f-ceea-467a-9c1b-2f4b9c0a3d21
         contract_end_date: "2027-06-30"
 
+Bumping an entry's ``secret_version`` makes Keycloak issue the client a new
+secret and invalidates the old one immediately, so the partner must receive the
+new secret before the change is applied.
+
 Organization UUIDs are the Keycloak organization ids, which differ between QA
 and Production, so the entries live in each environment's stack config.
 """
@@ -66,6 +70,7 @@ class LearnerRecordsClient(BaseModel):
     description: Annotated[str, StringConstraints(min_length=1)]
     organizations: Annotated[list[UUID], Field(min_length=1)]
     contract_end_date: date | None = None
+    secret_version: Annotated[int, Field(ge=1)] = 1
 
     @property
     def client_id(self) -> str:
@@ -170,6 +175,9 @@ def create_learner_records_clients(  # noqa: PLR0913
             service_accounts_enabled=True,
             valid_redirect_uris=[],
             access_token_lifespan=str(ACCESS_TOKEN_LIFESPAN_SECONDS),
+            client_secret_regenerate_when_changed={
+                "secret_version": str(contract.secret_version)
+            },
             opts=opts.merge(ResourceOptions(delete_before_replace=True)),
         )
         # Replaces the realm defaults Keycloak attaches to a new client, so the
