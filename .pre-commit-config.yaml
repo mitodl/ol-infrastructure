@@ -2,6 +2,10 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 ci:
+  # autofix.ci owns fix commits; remove this block after pre-commit.ci is
+  # deselected. The skip list is unchanged from before the migration; CI runs
+  # every hook in .github/workflows/autofix.yml, these two included.
+  autofix_prs: false
   skip:
   - packer_fmt
   - hadolint-docker
@@ -16,8 +20,8 @@ repos:
     # src/bridge/lib/version_pins/ is a derived, per-constant projection of
     # versions.py that Concourse git resources watch instead of the whole file.
     # Regenerating it here means Renovate only ever has to edit versions.py --
-    # pre-commit.ci syncs the pins inside the Renovate PR, so both land in the
-    # same commit and the pipelines that pin that version retrigger correctly.
+    # autofix.ci syncs the pins inside the Renovate PR, so both land in the
+    # same PR and the pipelines that pin that version retrigger correctly.
   - id: sync-version-pins
     name: Sync src/bridge/lib/version_pins/ with versions.py
     entry: python src/bridge/lib/sync_version_pins.py

@@ -16,9 +16,11 @@ COPY --link requirements.txt /tmp/requirements.txt
 # Copy extension manifest + compiled frontend assets into the image
 # COPY --from=nl-explorer-frontend /build/nl-explorer/extension.json /app/extensions/nl-explorer/extension.json
 # COPY --from=nl-explorer-frontend /build/nl-explorer/dist/ /app/extensions/nl-explorer/dist/
+# hadolint ignore=DL3066
 USER root
 WORKDIR /app
 # hadolint ignore=DL3008
 RUN chmod 1777 /tmp && apt-get update && apt-get install -y --no-install-recommends git libmariadb-dev build-essential pkg-config && rm -rf /var/lib/apt/lists/*
 RUN uv pip install --no-cache-dir -r /tmp/requirements.txt
+# hadolint ignore=DL3066
 USER superset

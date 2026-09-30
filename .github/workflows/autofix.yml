@@ -1,0 +1,80 @@
+---
+# Reference prek + autofix.ci workflow for repositories that pin prek in uv.lock.
+#
+# Copy to .github/workflows/autofix.yml and change only the lines marked ADAPT.
+# Contract: https://github.com/mitodl/ol-github-workflows/blob/main/docs/prek-autofix-contract.md
+# Playbook: https://github.com/mitodl/ol-github-workflows/blob/main/docs/prek-autofix-playbook.md
+# Source:   https://github.com/mitodl/ol-github-workflows/blob/main/workflow-templates/autofix-uv.yml
+#
+# The repository declares prek in its own dependency group, included by `dev`:
+#
+#   [dependency-groups]
+#   prek = ["prek==X.Y.Z"]
+#   dev = [{include-group = "prek"}, ...]
+#
+# so `uv sync` installs it locally and CI installs only it, hash-checked against uv.lock.
+name: autofix.ci # autofix.ci refuses to run under any other name
+on:
+  pull_request:
+  push:
+    branches: [main] # ADAPT: the repository's default branch
+permissions:
+  contents: read
+concurrency:
+  group: autofix-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  prek:
+    name: prek # the required-check context; keep it stable
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+      with:
+        persist-credentials: false   # ADAPT: private repositories delete this block (contract §3.1)
+    - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7   # v10.2.0
+      with:
+        version: "0.12.20"
+    - name: Install prek from uv.lock
+      run: |
+        uv sync --frozen --only-group prek
+        echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9   # v6.1.0
+      with:
+        path: ~/.cache/prek
+        key: prek-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.pre-commit-config.yaml')
+          }}
+    # packer_fmt checks src/bilder/**/*.pkr.hcl. hadolint-docker needs only the
+    # runner's Docker. sync-version-pins imports nothing but the standard library.
+    - uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789   # v3.4.0
+      with:
+        version: "1.14.2"
+    - name: Tree is clean before hooks run
+      id: clean-tree
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "::error::Setup left changes in the working tree, and autofix.ci would commit them."
+          git status --porcelain
+          exit 1
+        fi
+    - name: prek (fixing pass)
+      id: fixing-pass
+      run: prek run --all-files --color=always || true
+    - name: prek (must converge)
+      id: converge
+      run: prek run --all-files --show-diff-on-failure --color=always
+    - name: Default branch has no fixable drift
+      id: no-drift
+      if: github.event_name != 'pull_request'
+      run: |
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "::error::Hooks changed files on ${GITHUB_REF_NAME}. Commit these fixes in a pull request."
+          git status --porcelain
+          git diff
+          exit 1
+        fi
+    - uses: autofix-ci/action@c5b2d67aa2274e7b5a18224e8171550871fc7e4a   # v1.3.4
+      id: autofix
+      if: github.event_name == 'pull_request'
+      with:
+        fail-fast: false
