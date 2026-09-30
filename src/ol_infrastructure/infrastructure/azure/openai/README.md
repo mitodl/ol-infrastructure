@@ -126,9 +126,10 @@ explicit that "deployments of the same model and version share one quota pool ac
 all regions in a subscription", so the pool is not per region either.
 
 Concretely: the four `gpt-4o` deployments in an environment compete with the eight
-`gpt-4o` deployments in the other two environments, and with nothing else. Not all 36
-deployments against one pool. Capacity planning sums twelve deployments per model, three
-times over, against three separate pools. Raising a non-production capacity still takes
+`gpt-4o` deployments in the other two environments, and with nothing else. Not all 42
+deployments against one pool. Capacity planning sums twelve deployments per chat model
+against each of three pools, and three deployments (mitlearn's, one per environment)
+against each of the two embedding pools. Raising a non-production capacity still takes
 quota from Production, but only for that one model.
 
 ## Local development
