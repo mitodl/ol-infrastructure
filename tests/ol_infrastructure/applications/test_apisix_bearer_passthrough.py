@@ -51,9 +51,12 @@ def _bearer_validation_references(tree: ast.AST) -> list[tuple[int, str]]:
 
 @pytest.mark.parametrize("application", ["mitxonline", "mit_learn"])
 def test_gateway_does_not_validate_bearer_tokens(application):
+    source_files = sorted((APPLICATIONS_ROOT / application).rglob("*.py"))
+    # A renamed or moved stack would otherwise scan nothing and pass.
+    assert source_files, f"scanned no modules under {APPLICATIONS_ROOT / application}"
     offenders = [
         f"{source_file}:{lineno} {name}"
-        for source_file in sorted((APPLICATIONS_ROOT / application).rglob("*.py"))
+        for source_file in source_files
         for lineno, name in _bearer_validation_references(
             ast.parse(source_file.read_text())
         )
