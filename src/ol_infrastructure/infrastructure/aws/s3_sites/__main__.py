@@ -70,7 +70,7 @@ if stack_info.env_suffix == "production":
     # decommissioned bucket's contents land under a same-named prefix here
     # before the source bucket itself is deleted.
     archive_bucket_config = S3BucketConfig(
-        bucket_name="ol-archive",
+        bucket_name="ol-s3-archive",
         tags={"OU": BusinessUnit.operations, "Environment": Environment.operations},
         versioning_enabled=True,
         # Everything landing here is already known-dead data, so skip the
@@ -96,11 +96,10 @@ if stack_info.env_suffix == "production":
                         storage_class="DEEP_ARCHIVE",
                     )
                 ],
-                # The migration process this bucket exists for copies every
-                # version of a source object under the same destination key,
-                # so earlier copies become noncurrent versions here, not just
-                # current ones. Without this, that history would stay in
-                # Standard indefinitely.
+                # Defensive: if this bucket is ever written to again for the
+                # same destination key (re-running a migration, a correction,
+                # etc.), the version it displaces becomes noncurrent here.
+                # Without this, that copy would stay in Standard indefinitely.
                 noncurrent_version_transitions=[
                     s3.BucketLifecycleConfigurationRuleNoncurrentVersionTransitionArgs(
                         noncurrent_days=0,
@@ -110,5 +109,5 @@ if stack_info.env_suffix == "production":
             )
         ],
     )
-    archive_bucket = OLBucket("ol-archive", archive_bucket_config)
+    archive_bucket = OLBucket("ol-s3-archive", archive_bucket_config)
     export("ol_archive_bucket", archive_bucket.bucket_v2.bucket)
