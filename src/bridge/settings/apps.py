@@ -124,6 +124,16 @@ def release_resource_workflow(app_name: str) -> bool:
 #: is the registry for.
 RELEASE_BOT_APP_ID = 4437866
 
+#: GitHub App id for `ol-data-platform`, the identity Dagster authenticates as when
+#: it writes to GitHub: committing the instructor user list to access-forge and
+#: opening program unpublish-review issues on mit-learn. Its credentials live in
+#: `src/bridge/secrets/ol_data/global.yaml` and reach Vault through the dagster
+#: stack. Re-derive with:
+#:
+#:     gh api /orgs/mitodl/installations \
+#:       --jq '.installations[] | select(.app_slug=="ol-data-platform") | .app_id'
+DATA_PLATFORM_APP_ID = 5126620
+
 
 def release_workflow_repos() -> frozenset[str]:
     """Return the "owner/repo" slugs slated for the ol-release-bot release workflow.

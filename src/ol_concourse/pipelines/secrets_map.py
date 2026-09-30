@@ -75,7 +75,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "applications/clickhouse/": [],
     "applications/codejail/": [],
     "applications/concourse/": ["concourse/", "vector/"],
-    "applications/dagster/": [],
+    "applications/dagster/": ["ol_data/"],
     "applications/digital_credentials/": ["digital_credentials/"],
     "applications/ecs_test/": [],
     "applications/edx_notes/": ["edx_notes/"],
