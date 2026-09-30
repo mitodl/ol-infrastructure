@@ -393,11 +393,11 @@ def verdict_object(new_root: str) -> tuple[str, str]:
 def claim_verdict_key(old_root: str, new_root: str, region: str) -> tuple[str, str]:
     """Overwrite this rebuild's verdict key with an in-progress marker.
 
-    Runs before anything else. A re-run into the same prefix that dies before
-    verification would otherwise leave the previous run's ``ok: true`` in
-    place, and the cutover script would open a PR onto a half-built root. It
-    also proves the IRSA write path works before the outage starts rather
-    than after the rebuild.
+    The pod's ``invalidate-verdict`` initContainer has already done this with
+    the AWS CLI, before any other step can fail (``storage_migration.py``).
+    Doing it again here proves this container's own stdlib write path works
+    before the export starts rather than after the rebuild, and stamps the
+    marker with when the migration itself began.
     """
     bucket, key = verdict_object(new_root)
     marker = {

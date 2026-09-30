@@ -174,20 +174,22 @@ def open_drift_pr(
     _git(repo_dir, "add", "--all")
     _git(repo_dir, "commit", "--message", title)
 
-    if _remote_tree(repo_dir, branch) == _git(repo_dir, "rev-parse", "HEAD^{tree}"):
-        print(f"Drift unchanged since the last run on {branch}; not pushing.")
-        return
-
-    _git(
-        repo_dir,
-        "-c",
-        f"credential.helper={CREDENTIAL_HELPER}",
-        "push",
-        "--force",
-        f"https://github.com/{repo}",
-        f"HEAD:refs/heads/{branch}",
+    unchanged = _remote_tree(repo_dir, branch) == _git(
+        repo_dir, "rev-parse", "HEAD^{tree}"
     )
-    print(f"Pushed {branch}")
+    if unchanged:
+        print(f"Drift unchanged since the last run on {branch}; not pushing.")
+    else:
+        _git(
+            repo_dir,
+            "-c",
+            f"credential.helper={CREDENTIAL_HELPER}",
+            "push",
+            "--force",
+            f"https://github.com/{repo}",
+            f"HEAD:refs/heads/{branch}",
+        )
+        print(f"Pushed {branch}")
 
     session = requests.Session()
     session.headers.update(
@@ -199,6 +201,13 @@ def open_drift_pr(
     )
     body = body_file.read_text()
     number = _open_pull_request_number(session, repo, branch)
+    # An unchanged tree still refreshes an open PR's body: the body can carry
+    # evidence newer than the diff (omnigraph-cutover-pr re-run against a
+    # fresh verdict for the same edit). With no open PR it stays closed, so a
+    # PR a human closed is not reopened over the same drift.
+    if number is None and unchanged:
+        print(f"No open pull request for {branch}; not reopening.")
+        return
     if number is None:
         response = session.post(
             f"{GITHUB_API}/repos/{repo}/pulls",
