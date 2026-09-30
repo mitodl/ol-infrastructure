@@ -9,6 +9,9 @@ config:
   environment:business_unit: data
   environment:target_vpc: data_vpc
   opensearch:domain_name: "omdq"
+  # OpenMetadata resets live indexes to 1 replica on every reindex, so this
+  # domain needs >1 node; stays at 3 instead of the 1-node CI/QA default.
+  opensearch:cluster_size: "3"
   opensearch:disk_size_gb: "60"
   opensearch:engine_version: "OpenSearch_3.5"
   opensearch:public_web: "false"
