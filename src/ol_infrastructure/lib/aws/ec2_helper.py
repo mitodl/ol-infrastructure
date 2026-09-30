@@ -4,13 +4,26 @@ from enum import StrEnum, unique
 from functools import lru_cache
 from ipaddress import IPv4Network
 from types import FunctionType
+from typing import Any
 
 import boto3
 import pulumi
 from botocore.exceptions import ClientError
 from pulumi_aws import ec2
 
-ec2_client = boto3.client("ec2")
+
+@lru_cache
+def ec2_client() -> Any:
+    """Create the EC2 client on first use.
+
+    Not a module constant because creating a client needs an AWS region,
+    and this module is imported by programs that never call EC2.
+
+    :returns: A boto3 EC2 client
+    """
+    return boto3.client("ec2")
+
+
 AWSFilterType = list[dict[str, str | list[str]]]
 
 default_egress_args = [
@@ -26,7 +39,7 @@ default_egress_args = [
 
 def is_valid_instance_type(instance_type):
     try:
-        ec2_client.describe_instance_types(InstanceTypes=[instance_type])
+        ec2_client().describe_instance_types(InstanceTypes=[instance_type])
         return True  # noqa: TRY300
     except ClientError:
         return False
@@ -99,7 +112,9 @@ def aws_regions() -> list[str]:
 
     :rtype: List[str]
     """
-    return [region["RegionName"] for region in ec2_client.describe_regions()["Regions"]]
+    return [
+        region["RegionName"] for region in ec2_client().describe_regions()["Regions"]
+    ]
 
 
 @lru_cache
@@ -113,7 +128,7 @@ def availability_zones(region: str = "us-east-1") -> list[str]:
 
     :rtype: List[str]
     """
-    zones = ec2_client.describe_availability_zones(
+    zones = ec2_client().describe_availability_zones(
         Filters=[{"Name": "region-name", "Values": [region]}]
     )["AvailabilityZones"]
     # Avoid using us-east-1e because it doesn't support newer instance types
@@ -130,7 +145,7 @@ def _conditional_import(
     """Determine whether to import an existing AWS resource into Pulumi.
 
     :param discover_func: A function object to be used for looking up AWS resources.
-        e.g. ec2_client.describe_vpcs
+        e.g. ec2_client().describe_vpcs
     :type discover_func: FunctionType
 
     :param filters: A set of filters to be applied to the discovery function to narrow
@@ -182,7 +197,7 @@ def _conditional_import(
             import_=resource_id, ignore_changes=change_attributes_ignored
         )
         if not pulumi.runtime.is_dry_run():
-            ec2_client.create_tags(
+            ec2_client().create_tags(
                 Resources=[resource_id],
                 Tags=[{"Key": "pulumi_managed", "Value": "true"}],
             )
@@ -209,7 +224,7 @@ def vpc_opts(
     :rtype: Tuple[pulumi.ResourceOptions, str]
     """
     return _conditional_import(
-        ec2_client.describe_vpcs,
+        ec2_client().describe_vpcs,
         [
             {"Name": "cidr", "Values": [str(vpc_cidr)]},
             {"Name": "tag:Name", "Values": [vpc_tags["Name"]]},
@@ -232,7 +247,7 @@ def internet_gateway_opts(attached_vpc_id: str) -> tuple[pulumi.ResourceOptions,
     :rtype: Tuple[pulumi.ResourceOptions, str]
     """
     return _conditional_import(
-        ec2_client.describe_internet_gateways,
+        ec2_client().describe_internet_gateways,
         [{"Name": "attachment.vpc-id", "Values": [attached_vpc_id]}],
         "InternetGateways",
         "InternetGatewayId",
@@ -256,7 +271,7 @@ def subnet_opts(
     :rtype: Tuple[pulumi.ResourceOptions, str]
     """
     return _conditional_import(
-        ec2_client.describe_subnets,
+        ec2_client().describe_subnets,
         [
             {"Name": "cidr", "Values": [str(cidr_block)]},
             {"Name": "vpc-id", "Values": [vpc_id]},
@@ -285,7 +300,7 @@ def route_table_opts(internet_gateway_id: str) -> tuple[pulumi.ResourceOptions, 
     :rtype: Tuple[pulumi.ResourceOptions, str]
     """
     return _conditional_import(
-        ec2_client.describe_route_tables,
+        ec2_client().describe_route_tables,
         [{"Name": "route.gateway-id", "Values": [internet_gateway_id]}],
         "RouteTables",
         "RouteTableId",
@@ -312,7 +327,7 @@ def vpc_peer_opts(
     :rtype: Tuple[pulumi.ResourceOptions, str]
     """
     return _conditional_import(
-        ec2_client.describe_vpc_peering_connections,
+        ec2_client().describe_vpc_peering_connections,
         [
             {
                 "Name": "accepter-vpc-info.cidr-block",

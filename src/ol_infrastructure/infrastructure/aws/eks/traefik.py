@@ -5,7 +5,7 @@ import pulumi_kubernetes as kubernetes
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
-from ol_infrastructure.lib.aws.eks_helper import ECR_DOCKERHUB_REGISTRY
+from ol_infrastructure.lib.aws.eks_helper import ecr_dockerhub_registry
 from ol_infrastructure.lib.k8s_crds import adopt_helm_chart_crds
 from ol_infrastructure.lib.ol_types import (
     AlertTier,
@@ -130,7 +130,7 @@ def setup_traefik(
             values={
                 "image": {
                     "pullPolicy": "Always",
-                    "registry": f"{ECR_DOCKERHUB_REGISTRY}/library",
+                    "registry": f"{ecr_dockerhub_registry()}/library",
                 },
                 # commonLabels reaches both the workload and the pod template
                 # in chart 41.x, and neither selector.
