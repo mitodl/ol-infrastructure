@@ -837,6 +837,28 @@ def build_application_env_vars(
     return env_vars
 
 
+def otel_service_name_label(application_config: dict[str, Any]) -> dict[str, str]:
+    """Label a webapp Deployment with the OTel service.name its spans carry.
+
+    TempoServiceNeverSeen (grafana_alerting/metric_rules/otel_trace_pipeline.py)
+    joins this label, exported by kube-state-metrics, against Tempo's span
+    metrics. Same precedence as mitol-django-observability's telemetry.py: the
+    SDK's OTEL_SERVICE_NAME wins over the Django OPENTELEMETRY_SERVICE_NAME
+    setting. Neither being set as a plain string (unset, or still an Output)
+    yields no label, which leaves the Deployment out of the check.
+
+    :param application_config: The webapp container's non-sensitive env.
+    :returns: The ``ol.mit.edu/otel-service-name`` label, or an empty dict.
+    :rtype: dict[str, str]
+    """
+    service_name = application_config.get(
+        "OTEL_SERVICE_NAME"
+    ) or application_config.get("OPENTELEMETRY_SERVICE_NAME")
+    if isinstance(service_name, str):
+        return {"ol.mit.edu/otel-service-name": service_name}
+    return {}
+
+
 class OLApplicationK8sConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -1830,6 +1852,12 @@ class OLApplicationK8s(ComponentResource):
                 ol_app_k8s_config.slack_channel
             )
 
+        # On the Deployment's own metadata only: on the selector it would force
+        # a replacement, and on the pod template a rollout.
+        deployment_labels = application_labels | otel_service_name_label(
+            ol_app_k8s_config.application_config
+        )
+
         pod_spec_args: dict[str, Any] = {}
         if ol_app_k8s_config.application_deployment_use_anti_affinity:
             pod_spec_args["affinity"] = kubernetes.core.v1.AffinityArgs(
@@ -2016,7 +2044,7 @@ class OLApplicationK8s(ComponentResource):
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 name=_application_deployment_name,
                 namespace=ol_app_k8s_config.application_namespace,
-                labels=application_labels,
+                labels=deployment_labels,
             ),
             spec=kubernetes.apps.v1.DeploymentSpecArgs(
                 selector=kubernetes.meta.v1.LabelSelectorArgs(

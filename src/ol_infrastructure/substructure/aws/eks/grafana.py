@@ -478,6 +478,17 @@ def setup_grafana(
                 "clusterMetrics": {
                     "enabled": True,
                     "collector": "alloy-metrics",
+                    # The chart's default kube-state-metrics allowlist keeps
+                    # kube_job.* and kube_statefulset.* whole but names
+                    # deployment metrics one by one, and kube_deployment_labels
+                    # is not among them. Without this, the deployments entry in
+                    # metricLabelsAllowlist below is emitted by KSM and then
+                    # dropped by Alloy before remote write.
+                    "kube-state-metrics": {
+                        "metricsTuning": {
+                            "includeMetrics": ["kube_deployment_labels"],
+                        },
+                    },
                 },
                 # v4: opencost moved from clusterMetrics to costMetrics feature
                 "costMetrics": {
@@ -704,6 +715,16 @@ def setup_grafana(
                         # labels that the Grafana Cloud Kubernetes app relies on.
                         # Harmless on clusters with no Dagster: they just get a
                         # kube_job_labels series per Job with no dagster_* labels.
+                        #
+                        # deployments: OLApplicationK8s puts
+                        # ol.mit.edu/otel-service-name on each webapp Deployment
+                        # it knows the OTel service.name for, and the
+                        # TempoServiceNeverSeen rule joins it against Tempo's span
+                        # metrics. Allowlisting a resource makes KSM emit one
+                        # kube_deployment_labels series per Deployment whether or
+                        # not it carries the label, so the cost is one series per
+                        # Deployment (245 across the production stack on
+                        # 2026-09-30, going by kube_deployment_spec_replicas).
                         "metricLabelsAllowlist": [
                             "nodes=[agentpool,alpha.eksctl.io/cluster-name,"
                             "alpha.eksctl.io/nodegroup-name,"
@@ -720,6 +741,7 @@ def setup_grafana(
                             "topology.kubernetes.io/region,"
                             "topology.kubernetes.io/zone]",
                             "jobs=[dagster/code-location,dagster/job]",
+                            "deployments=[ol.mit.edu/otel-service-name]",
                         ],
                     },
                     "kepler": {"deploy": True},
