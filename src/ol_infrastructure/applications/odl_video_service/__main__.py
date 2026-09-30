@@ -988,6 +988,8 @@ ovs_k8s_app = OLApplicationK8s(
         celery_redis_config=OLApplicationK8sCeleryRedisConfig(
             host=ovs_server_redis_cluster.address,
             password=redis_auth_token,
+            # CELERY_BROKER_URL in k8s_secrets.py uses DB 0, not the default 1.
+            database_index="0",
         ),
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
