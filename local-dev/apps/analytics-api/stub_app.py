@@ -382,7 +382,10 @@ RESOURCES = {
 # the endpoint exists rather than the filter deriving its options from
 # enrollment rows, so the fixture has to be able to express it — hence the
 # split from `_ENROLLED_COURSERUNS` below.
-_CONTRACT_COURSERUNS = [
+# Annotated because the unopened run's `courserun_end_on` is None while every
+# other value is a str: dict is invariant in its value type, so mypy otherwise
+# joins the entries to `object` and every `run[...]` read below fails to check.
+_CONTRACT_COURSERUNS: list[dict[str, str | None]] = [
     {
         "courserun_readable_id": "course-v1:MITx+14.310x+2026_Spring",
         "courserun_title": "Data Analysis for Social Scientists",
