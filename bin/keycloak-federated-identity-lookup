@@ -349,15 +349,18 @@ def relink(
     )
 
     if new_username is None:
-        if existing is None:
+        if existing is None or existing.get("userName") is None:
             print(
-                f"No existing {identity_provider!r} link to infer a username "
-                "from — pass --new-username explicitly."
+                f"No existing {identity_provider!r} link (or no stored userName "
+                "on it) to infer a username from — pass --new-username "
+                "explicitly."
             )
             sys.exit(1)
         new_username = existing["userName"]
 
-    old_id_display = existing["userId"] if existing else "(no existing link)"
+    old_id_display = (
+        existing.get("userId", "(unknown)") if existing else "(no existing link)"
+    )
     print(f"User: {email} ({user['id']})")
     print(f"  {identity_provider}: {old_id_display} -> {new_external_id}")
     print(f"  userName: {new_username}")
@@ -380,8 +383,8 @@ def relink(
         if existing is not None:
             print(
                 "To restore the previous link manually, re-run with:\n"
-                f"  --new-external-id {existing['userId']!r} "
-                f"--new-username {existing['userName']!r} --confirm"
+                f"  --new-external-id {existing.get('userId')!r} "
+                f"--new-username {existing.get('userName')!r} --confirm"
             )
         sys.exit(1)
 
