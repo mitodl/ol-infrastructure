@@ -7,6 +7,26 @@ config:
   clickhouse:hot_storage_size: 1500Gi
   clickhouse:replicas: '3'
   clickhouse:keeper_replicas: '3'
+  # Guaranteed QoS: requests equal limits. Over the 7 days to 2026-09-24 the
+  # server peaked at 3.14 GiB working set and 0.29 cores (5m rate), Keeper at
+  # 0.27 GiB and 0.04 cores. The server's CPU is sized for parallelism, not
+  # load: ClickHouse sets max_threads from the cgroup CPU limit (16 today, on
+  # the 16-vCPU node), and Opik SELECTs peaked at a median of 6 threads (p99
+  # 22) over the same week. 4 caps them at 4 threads rather than 2.
+  clickhouse:server_resources:
+    requests:
+      cpu: '4'
+      memory: 8Gi
+    limits:
+      cpu: '4'
+      memory: 8Gi
+  clickhouse:keeper_resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
   clickhouse:version: 24.8.14.10546.altinitystable
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
