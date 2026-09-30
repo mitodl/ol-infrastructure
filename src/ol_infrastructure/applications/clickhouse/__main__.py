@@ -179,6 +179,47 @@ _LLMOPS_QUOTAS = {
     "llmops_quota/interval/execution_time": "3600",
 }
 
+# System-log hardening copied from the Opik chart's conf.d/system_tables.xml
+# (chart 2.2.71), which exists because these tables filled a production disk
+# (comet-ml/opik#6224). The bundled Opik ClickHouse is disabled here, so none of
+# it was inherited. The operator's own config.d already gives query_log,
+# part_log and trace_log a 30-day TTL; this file sorts after its 01-clickhouse-*
+# files, so remove="1" on trace_log wins over the operator's replace="1".
+# query_metric_log exists from 24.10 and latency_log from 25.2; older servers
+# ignore the elements.
+#
+# Changing a log table's engine does not alter the existing table. On the first
+# flush after restart ClickHouse renames it to <table>_0 (which keeps its data
+# and gets no TTL) and creates a new one. Removed tables also stay on disk. Both
+# need a manual DROP after rollout; see the runbook comment further down.
+SYSTEM_LOG_TTL_DAYS = 30
+_REMOVED_SYSTEM_LOGS = (
+    "opentelemetry_span_log",
+    "asynchronous_metric_log",
+    "processors_profile_log",
+    "text_log",
+    "trace_log",
+    "blob_storage_log",
+)
+_TTL_SYSTEM_LOGS = ("error_log", "latency_log", "metric_log", "query_metric_log")
+SYSTEM_LOG_TABLES_XML = "\n".join(
+    [
+        "<clickhouse>",
+        *(f'  <{table} remove="1"/>' for table in _REMOVED_SYSTEM_LOGS),
+        *(
+            dedent(f"""\
+              <{table}>
+                <database>system</database>
+                <table>{table}</table>
+                <engine>ENGINE = MergeTree PARTITION BY toYYYYMM(event_date) ORDER BY (event_date, event_time) TTL event_date + toIntervalDay({SYSTEM_LOG_TTL_DAYS}) SETTINGS index_granularity = 8192</engine>
+              </{table}>""")
+            for table in _TTL_SYSTEM_LOGS
+        ),
+        "</clickhouse>",
+        "",
+    ]
+)
+
 
 def _require_password(password_output: Output, username: str) -> Output:
     """Fail fast if a ClickHouse user password is left at the insecure default."""
@@ -605,9 +646,15 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     ],
                     "files": {
                         "config.d/storage.xml": kwargs["storage_config"],
+                        "config.d/system_log_tables.xml": SYSTEM_LOG_TABLES_XML,
                     },
                     "settings": {
                         "default_storage_policy": "tiered",
+                        # Server default is 0.9 of the cgroup memory limit;
+                        # 0.85 matches the Opik chart and leaves more of the
+                        # limit for memory the server does not track before
+                        # the kernel OOM-kills the container.
+                        "max_server_memory_usage_to_ram_ratio": "0.85",
                         # Built-in Prometheus endpoint. Without a <prometheus>
                         # section ClickHouse serves no metrics at all; the old
                         # ServiceMonitor on 8123/metrics scraped up=0 on every
@@ -1003,6 +1050,15 @@ clickhouse_installation = _create_clickhouse_installation(
 #     --query "CREATE DATABASE IF NOT EXISTS opik_db"
 #
 # Required databases: opik_db
+#
+# After a change to SYSTEM_LOG_TABLES_XML rolls out, list leftover log tables
+# on every replica (system tables are local, not replicated):
+#
+#   SELECT name, formatReadableSize(total_bytes) FROM system.tables
+#   WHERE database = 'system' AND match(name, '_log(_[0-9]+)?$')
+#
+# and DROP TABLE system.<name> SYNC for each removed log and each renamed
+# <table>_N. The server never writes to either again.
 ############################################################
 
 ############################################################
