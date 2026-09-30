@@ -113,6 +113,20 @@ model_names = azure_config.get_object("models") or [
     "gpt-5.2",
 ]
 
+# Models deployed on one consumer's account only, after the shared chat models.
+# mit-learn's dense vectors come from text-embedding-3-large (-small on CI), and a
+# vector is only comparable with vectors from the same model, so the Azure deployment
+# must be that exact model for mit-learn to switch provider without reindexing Qdrant.
+consumer_extra_models: dict[str, list[str]] = azure_config.get_object(
+    "consumer_extra_models"
+) or {
+    "mitlearn": ["text-embedding-3-large", "text-embedding-3-small"],
+}
+
+# Per-model capacity overrides. Each model draws on its own quota pool, so a model
+# whose pool is smaller or larger than the chat models' can be sized on its own.
+model_capacities: dict[str, int] = azure_config.get_object("model_capacities") or {}
+
 # Version strings are deliberately not hardcoded here -- which versions exist is a
 # property of the subscription and region, not of this code, and a wrong string fails
 # at Deployment create time rather than at preview. Left unset, Azure deploys its
@@ -194,7 +208,7 @@ for consumer, (cluster, namespace, service_account) in CONSUMER_SUBJECTS.items()
     # pkg/resource/deploy/step_generator.go), so both land in the same parallel batch
     # and one can 409. Remove one model per apply.
     previous_deployment: azure_native.cognitiveservices.Deployment | None = None
-    for model_name in model_names:
+    for model_name in [*model_names, *consumer_extra_models.get(consumer, [])]:
         pinned_version = model_versions.get(model_name)
         previous_deployment = azure_native.cognitiveservices.Deployment(
             f"{account_name}-{model_name}",
@@ -203,7 +217,7 @@ for consumer, (cluster, namespace, service_account) in CONSUMER_SUBJECTS.items()
             resource_group_name=resource_group.name,
             sku=azure_native.cognitiveservices.SkuArgs(
                 name="GlobalStandard",
-                capacity=default_capacity,
+                capacity=model_capacities.get(model_name, default_capacity),
             ),
             properties=azure_native.cognitiveservices.DeploymentPropertiesArgs(
                 model=azure_native.cognitiveservices.DeploymentModelArgs(

@@ -11,4 +11,8 @@ config:
     gpt-4o: "2024-11-20"
     gpt-5-mini: "2025-08-07"
     gpt-5.2: "2025-12-11"
+    # "1" is the only version either model has (list-models, 2026-09-30). These deploy
+    # on mitlearn's account only, so each uses 1000 of its own 10000-unit pool.
+    text-embedding-3-large: "1"
+    text-embedding-3-small: "1"
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwFvj91bDLxrOf1sdg9uKj+4AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMKT8npQNJRUf/wGNXAgEQgDvkzDj1rsUB99dSGpP2zpv6CDG4x604RHcq9OlgCHUicbmNsKuCVvvZYWmdddGQwckfsaIFju5+urIH3Q==

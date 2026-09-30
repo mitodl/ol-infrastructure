@@ -18,6 +18,11 @@ Services account and one user-assigned managed identity:
 Each account gets a deployment of `gpt-4o`, `gpt-5-mini`, and `gpt-5.2`. `gpt-5-mini`
 stands in for `gpt-4o-mini`, which Azure no longer accepts new deployments of.
 
+mit-learn's account also gets `text-embedding-3-large` and `text-embedding-3-small`
+(`azure_openai:consumer_extra_models`). These have to be the same models mit-learn
+already embeds with through OpenAI, because Qdrant only holds vectors from one model and
+a different model would mean a full reindex.
+
 Each identity holds one federated identity credential trusting the OIDC issuer of the
 EKS cluster its consumer runs on (`applications` for the first three, `data` for
 Dagster) for exactly the subject above, and one `Cognitive Services OpenAI
@@ -106,6 +111,11 @@ capacity units (1 unit = 1K TPM):
 | `gpt-4o` | 30000 |
 | `gpt-5-mini` | 10000 |
 | `gpt-5.2` | 30000 |
+| `text-embedding-3-large` | 10000 (measured 2026-09-30) |
+| `text-embedding-3-small` | 10000 (measured 2026-09-30) |
+
+`azure_openai:model_capacities` overrides the capacity for a single model, for when one
+pool needs a different size than `model_capacity`.
 
 Check current usage against them with `az cognitiveservices usage list -l eastus`.
 
