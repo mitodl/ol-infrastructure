@@ -24,6 +24,7 @@ from pulumi import (
 
 from bridge.lib.magic_numbers import (
     DEFAULT_EFS_PORT,
+    DEFAULT_HTTPS_PORT,
     IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
 )
 from bridge.lib.versions import (
@@ -450,8 +451,8 @@ aws.vpc.SecurityGroupIngressRule(
     f"{cluster_name}-eks-apiserver-443-vpc-sg-rule",
     security_group_id=cluster.cluster_security_group_id,
     cidr_ipv4=target_vpc["cidr"],
-    from_port=443,
-    to_port=443,
+    from_port=DEFAULT_HTTPS_PORT,
+    to_port=DEFAULT_HTTPS_PORT,
     ip_protocol="tcp",
 )
 
