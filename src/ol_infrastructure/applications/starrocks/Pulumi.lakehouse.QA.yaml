@@ -44,9 +44,13 @@ config:
     min_replicas: 1
     max_replicas: 10
     cpu_target_utilization_percentage: 80
-    cpu_request: 4000m
-    memory_request: 8Gi
-    memory_limit: 8Gi
+    # Measured 2026-09-29 over 60 days: CN peaked at 0.02 cores and 2.8Gi.
+    # See the prod stack for why the request, not the limit, is what matters
+    # to the HPA.
+    cpu_request: 1000m
+    cpu_limit: 4000m
+    memory_request: 6Gi
+    memory_limit: 6Gi
   starrocks:enable_data_lake_integration: "true"
   starrocks:ssl_enabled: "true"
   # ssl_force_secure_transport is intentionally false: the StarRocks operator

@@ -627,7 +627,7 @@ if starrocks_config.get_bool("use_cn"):
         "resources": {
             "requests": {
                 # StarRocks recommends 16 CPU cores and 64 GB RAM per CN node.
-                # 32Gi is used as a practical minimum; increase for large datasets.
+                # 32Gi is the default; stacks set their own size from measured usage.
                 # Ref: https://docs.starrocks.io/docs/deployment/plan_cluster/
                 "cpu": cn_config.get("cpu_request", "16000m"),
                 "memory": cn_config.get("memory_request", "32Gi"),
@@ -643,6 +643,17 @@ if starrocks_config.get_bool("use_cn"):
             "minReplicas": cn_config.get("min_replicas", 1),
             "maxReplicas": cn_config.get("max_replicas", 10),
             "hpaPolicy": {
+                # The CPU limit sits above the request, so one heavy query can
+                # push average utilization past target on its own. New CNs do
+                # not help a query already running and start with a cold cache,
+                # so only scale out on load sustained across the window.
+                "behavior": {
+                    "scaleUp": {
+                        "stabilizationWindowSeconds": cn_config.get(
+                            "scale_up_stabilization_seconds", 300
+                        ),
+                    },
+                },
                 "metrics": [
                     {
                         "type": "Resource",
