@@ -58,7 +58,8 @@
     },
     {
       // VALKEY_VERSION is the local-dev stand-in for ElastiCache, whose
-      // engine_version (7.2 for every application) Renovate does not track.
+      // engine_version (7.2 for every app local-dev runs) Renovate does not
+      // track.
       // Move this together with the applications' engine_version.
       matchDatasources: [
         'docker',

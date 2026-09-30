@@ -152,14 +152,18 @@ MCP_PROXY_FOR_AWS_VERSION = "1.7.0"
 CNPG_CHART_VERSION = "0.23.0"
 # renovate: datasource=helm depName=opensearch packageName=opensearch registryUrl=https://opensearch-project.github.io/helm-charts
 OPENSEARCH_CHART_VERSION = "3.4.0"
-# Held to the ElastiCache engine_version the applications run (7.2) by the
-# valkey/valkey packageRule in renovate.json5.
+# Held to 7.2, the ElastiCache engine_version of every app local-dev runs, by
+# the valkey/valkey packageRule in renovate.json5.
 # renovate: datasource=docker depName=valkey packageName=valkey/valkey
 VALKEY_VERSION = "7.2.14-alpine"
 # renovate: datasource=docker depName=mailpit packageName=axllent/mailpit
 MAILPIT_VERSION = "v1.31.3"
 # renovate: datasource=docker depName=litellm packageName=ghcr.io/berriai/litellm
 LITELLM_VERSION = "v1.103.1"
+# Renovate does not propose updates from a prerelease pin (a -rc.N suffix only
+# matches the same suffix), so this stays on the release candidate the S3
+# behaviour in local-dev/infra/modules/objectstore.py was verified against
+# until someone re-verifies it on a release and moves it by hand.
 # renovate: datasource=docker depName=rustfs packageName=rustfs/rustfs
 RUSTFS_VERSION = "1.0.0-rc.6"
 # renovate: datasource=docker depName=loki packageName=grafana/loki
