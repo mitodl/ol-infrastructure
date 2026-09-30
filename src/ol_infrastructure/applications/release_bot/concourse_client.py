@@ -56,11 +56,17 @@ async def _get_token() -> str:
         return _token
 
 
-async def trigger_job(pipeline: str, job: str) -> str:
-    """Trigger a Concourse job and return the build URL."""
+async def trigger_job(pipeline: str, job: str, team: str | None = None) -> str:
+    """Trigger a Concourse job and return the build URL.
+
+    :param team: Concourse team owning *pipeline*. Defaults to the bot's
+        ``CONCOURSE_TEAM`` (``infrastructure``, where the per-app release
+        pipelines live). Library publish pipelines are in team ``main``, so
+        they pass their own -- see ``bridge.settings.libraries``.
+    """
     token = await _get_token()
     url = (
-        f"{CONCOURSE_URL}/api/v1/teams/{CONCOURSE_TEAM}"
+        f"{CONCOURSE_URL}/api/v1/teams/{team or CONCOURSE_TEAM}"
         f"/pipelines/{pipeline}/jobs/{job}/builds"
     )
     async with (
@@ -71,6 +77,48 @@ async def trigger_job(pipeline: str, job: str) -> str:
         build = await resp.json()
 
     return f"{CONCOURSE_URL}/builds/{build['id']}"
+
+
+async def list_jobs(pipeline: str, team: str | None = None) -> list[str]:
+    """Return the names of the jobs defined in *pipeline*, in pipeline order.
+
+    Lets the bot resolve a monorepo's publishable packages from the pipeline
+    itself instead of from a hand-maintained list. The publish pipelines
+    discover their packages at generation time by walking the source checkout
+    (``discover_python_packages``), so any list written down elsewhere is stale
+    the moment a package is added.
+    """
+    token = await _get_token()
+    url = (
+        f"{CONCOURSE_URL}/api/v1/teams/{team or CONCOURSE_TEAM}"
+        f"/pipelines/{pipeline}/jobs"
+    )
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(url, headers={"Authorization": f"Bearer {token}"}) as resp,
+    ):
+        resp.raise_for_status()
+        jobs = await resp.json()
+    return [job["name"] for job in jobs or []]
+
+
+async def pipeline_is_paused(pipeline: str, team: str | None = None) -> bool:
+    """Return whether *pipeline* is paused.
+
+    A build triggered into a paused pipeline is created and then never
+    scheduled, so the bot reports a build URL that sits at "pending" forever.
+    `publish-ol-django-pypi` is paused as of 2026-09-04, which makes this the
+    first thing a publish of it would hit.
+    """
+    token = await _get_token()
+    url = f"{CONCOURSE_URL}/api/v1/teams/{team or CONCOURSE_TEAM}/pipelines/{pipeline}"
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(url, headers={"Authorization": f"Bearer {token}"}) as resp,
+    ):
+        resp.raise_for_status()
+        body = await resp.json()
+    return bool(body.get("paused"))
 
 
 _CHECK_POLL_SECONDS = 2
