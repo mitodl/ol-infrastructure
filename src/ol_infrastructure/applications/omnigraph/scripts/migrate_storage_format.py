@@ -36,6 +36,8 @@ verification can be inspected before anything is repointed. Nothing here writes
 to the old root.
 """
 
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -46,12 +48,14 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections import Counter
 from collections.abc import Callable, Iterable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree as ET
 
 # `s3://<bucket>/fmt<N>`, where N is the NEW internal-schema number. Anchored
 # and digit-only on purpose: `<` and `>` are legal in S3 object keys, so an
@@ -74,6 +78,15 @@ SNAPSHOT_ROW_RE = re.compile(
 SNAPSHOT_SCHEMA_RE = re.compile(r"^internal_schema_version:\s*(\d+)", re.MULTILINE)
 
 VERDICT_PATH = Path("/tmp/migration-verdict.json")  # noqa: S108
+
+# The verdict's two durable copies. Loki splits a multi-line record into one
+# entry per line, and kept only the header of the Production fmt9 verdict
+# (2026-09-16), so the log copy is one compact line behind a marker that can
+# be grepped for. The S3 copy is what `bin/omnigraph-cutover-pr` reads; the
+# pod, its emptyDir and eventually its logs are all gone by the time anyone
+# cuts over from an older run.
+VERDICT_LOG_MARKER = "MIGRATION_VERDICT_JSON"
+VERDICT_KEY_TEMPLATE = "migrations/{prefix}/verdict.json"
 
 # omnigraph >= 0.9 refuses a keyed write staging more than this many rows in
 # one table, engine-side, on local stores as well as served ones. `--mode
@@ -363,6 +376,141 @@ def cutover_instructions(new_prefix: str, schema_version: int) -> str:
 def bucket_of(root: str) -> str:
     """Return the bucket name from an ``s3://<bucket>/...`` root."""
     return root.removeprefix("s3://").split("/", 1)[0]
+
+
+def verdict_object(new_root: str) -> tuple[str, str]:
+    """Return the bucket and key the verdict for a rebuild into ``new_root`` goes to.
+
+    Keyed by the target prefix, so a re-run of the same migration overwrites
+    the earlier verdict (the bucket's versioning keeps it) and a later
+    migration to a different format never does.
+    """
+    return bucket_of(new_root), VERDICT_KEY_TEMPLATE.format(
+        prefix=new_root.rsplit("/", 1)[-1]
+    )
+
+
+def _sha256_hex(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def sigv4_authorization(  # noqa: PLR0913
+    *,
+    method: str,
+    path: str,
+    headers: dict[str, str],
+    payload_hash: str,
+    region: str,
+    service: str,
+    access_key: str,
+    secret_key: str,
+) -> str:
+    """Return the SigV4 ``Authorization`` header for a request with no query string.
+
+    Every header passed is signed, and ``headers`` must already carry
+    ``host`` and ``x-amz-date``. Written against the stdlib because the server
+    image this runs in has neither boto3 nor the AWS CLI (see the
+    ``snapshot-cluster-state`` initContainer in ``storage_migration.py``).
+    """
+    amz_date = headers["x-amz-date"]
+    scope = f"{amz_date[:8]}/{region}/{service}/aws4_request"
+    canonical_headers = {k.lower(): " ".join(v.split()) for k, v in headers.items()}
+    signed = ";".join(sorted(canonical_headers))
+    canonical_request = "\n".join(
+        [
+            method,
+            urllib.parse.quote(path, safe="/-_.~"),
+            "",
+            *(f"{k}:{canonical_headers[k]}" for k in sorted(canonical_headers)),
+            "",
+            signed,
+            payload_hash,
+        ]
+    )
+    string_to_sign = "\n".join(
+        [
+            "AWS4-HMAC-SHA256",
+            amz_date,
+            scope,
+            _sha256_hex(canonical_request.encode()),
+        ]
+    )
+    key = f"AWS4{secret_key}".encode()
+    for part in scope.split("/"):
+        key = hmac.new(key, part.encode(), hashlib.sha256).digest()
+    signature = hmac.new(key, string_to_sign.encode(), hashlib.sha256).hexdigest()
+    return (
+        f"AWS4-HMAC-SHA256 Credential={access_key}/{scope}, "
+        f"SignedHeaders={signed}, Signature={signature}"
+    )
+
+
+def web_identity_credentials(region: str) -> tuple[str, str, str]:
+    """Exchange the pod's IRSA token for temporary credentials.
+
+    The EKS pod-identity webhook injects ``AWS_ROLE_ARN`` and
+    ``AWS_WEB_IDENTITY_TOKEN_FILE`` into every container of a pod whose
+    ServiceAccount carries the role annotation. ``AssumeRoleWithWebIdentity``
+    is authenticated by the token itself, so the request is unsigned.
+    """
+    form = urllib.parse.urlencode(
+        {
+            "Action": "AssumeRoleWithWebIdentity",
+            "Version": "2011-06-15",
+            "RoleArn": env("AWS_ROLE_ARN"),
+            "RoleSessionName": "omnigraph-storage-migration",
+            "WebIdentityToken": Path(env("AWS_WEB_IDENTITY_TOKEN_FILE"))
+            .read_text()
+            .strip(),
+        }
+    ).encode()
+    request = urllib.request.Request(
+        f"https://sts.{region}.amazonaws.com/", data=form, method="POST"
+    )
+    with urllib.request.urlopen(request, timeout=30) as resp:  # noqa: S310
+        tree = ET.parse(resp)  # noqa: S314  (AWS STS over TLS)
+    ns = {"sts": "https://sts.amazonaws.com/doc/2011-06-15/"}
+    creds = tree.find(".//sts:Credentials", ns)
+    if creds is None:
+        sys.exit("!!! AssumeRoleWithWebIdentity returned no Credentials")
+    return (
+        creds.findtext("sts:AccessKeyId", "", ns),
+        creds.findtext("sts:SecretAccessKey", "", ns),
+        creds.findtext("sts:SessionToken", "", ns),
+    )
+
+
+def put_object(bucket: str, key: str, body: bytes, region: str) -> None:
+    """PUT ``body`` to ``s3://bucket/key`` under the pod's IRSA identity."""
+    access_key, secret_key, session_token = web_identity_credentials(region)
+    host = f"{bucket}.s3.{region}.amazonaws.com"
+    path = f"/{key}"
+    payload_hash = _sha256_hex(body)
+    headers = {
+        "host": host,
+        "content-type": "application/json",
+        "x-amz-content-sha256": payload_hash,
+        "x-amz-date": datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"),
+        "x-amz-security-token": session_token,
+    }
+    headers["Authorization"] = sigv4_authorization(
+        method="PUT",
+        path=path,
+        headers=headers,
+        payload_hash=payload_hash,
+        region=region,
+        service="s3",
+        access_key=access_key,
+        secret_key=secret_key,
+    )
+    request = urllib.request.Request(
+        f"https://{host}{urllib.parse.quote(path, safe='/-_.~')}",
+        data=body,
+        headers=headers,
+        method="PUT",
+    )
+    with urllib.request.urlopen(request, timeout=30):  # noqa: S310
+        pass
 
 
 def check_format_moved(
@@ -1002,9 +1150,10 @@ def main() -> int:
 
     wait_for_writers(parse_writer_cronjobs(env("OMNIGRAPH_WRITER_CRONJOBS")))
 
+    binaries: dict[str, str] = {}
     for label, binary in (("old", old_binary), ("new", new_binary)):
-        reported = run([binary, "version"]).stdout.strip().replace("\n", " | ")
-        LOG.info("%s: %s", label, reported)
+        binaries[label] = run([binary, "version"]).stdout.strip().replace("\n", " | ")
+        LOG.info("%s: %s", label, binaries[label])
 
     graphs = graph_ids_from_cluster_config(cluster_yaml)
     if not graphs:
@@ -1049,15 +1198,42 @@ def main() -> int:
         "old_internal_schema": old_formats,
         "new_internal_schema": new_formats,
         "format_problems": format_problems,
+        "binaries": binaries,
+        "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
     rendered = json.dumps(verdict, indent=2, sort_keys=True)
     VERDICT_PATH.write_text(rendered)
     # ALSO to stdout. The pod's filesystem is an emptyDir that goes away with
     # the container, and `kubectl exec`/`cp` cannot reach a completed pod — so
-    # the file alone is unreadable by the time anyone wants it. The logs are
-    # what survive, so the verdict has to be in them for anything (a human or a
-    # pipeline step) to gate the cutover on it.
+    # the file alone is unreadable by the time anyone wants it. The indented
+    # copy is for a human reading `kubectl logs`; the marker line is the one
+    # Loki keeps whole.
     LOG.info("migration verdict:\n%s", rendered)
+    LOG.info(
+        "%s %s",
+        VERDICT_LOG_MARKER,
+        json.dumps(verdict, sort_keys=True, separators=(",", ":")),
+    )
+
+    # Written whatever the outcome, with `ok` exactly as computed: a failed
+    # run's verdict is the evidence for why, and the cutover script refuses
+    # anything that is not ok. A write failure fails the Job even after a clean
+    # verification, because the cutover script has nothing to read otherwise;
+    # the marker line above still carries the verdict.
+    bucket, key = verdict_object(new_root)
+    try:
+        put_object(bucket, key, rendered.encode(), env("AWS_REGION"))
+    except (OSError, urllib.error.URLError):
+        LOG.exception(
+            "could not write the verdict to s3://%s/%s. The rebuild itself "
+            "is %s; the verdict is on the %s line above.",
+            bucket,
+            key,
+            "verified" if verdict["ok"] else "NOT verified",
+            VERDICT_LOG_MARKER,
+        )
+        return 1
+    LOG.info("verdict written to s3://%s/%s", bucket, key)
 
     if format_problems:
         for problem in format_problems:
