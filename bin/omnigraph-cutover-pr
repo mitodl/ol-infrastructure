@@ -36,6 +36,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -127,6 +128,13 @@ def plan_cutover(verdict: Verdict, config_text: str, env: str) -> Cutover:
     (``storage_prefix``), in this environment's bucket. The last check is what
     stops a CI verdict from cutting Production over.
     """
+    if verdict["status"] != "finished":
+        msg = (
+            f"the verdict's run is {verdict['status']}, started "
+            f"{verdict.get('started_at', 'at an unknown time')}; it never reached "
+            "verification"
+        )
+        raise CutoverRefusedError(msg)
     if verdict["ok"] is not True:
         failed = sorted(g for g, r in verdict["graphs"].items() if not r["ok"])
         msg = (
@@ -210,18 +218,32 @@ def rewrite_config(config_text: str, cutover: Cutover) -> str:
     return "".join(out)
 
 
-def unexpected_changes(before: str, after: str) -> list[str]:
-    """Return every changed line that is not one of the four cutover keys."""
-    allowed = tuple(f"  {key}:" for key in (*REWRITTEN_KEYS, *REMOVED_KEYS))
-    return [
+def unexpected_changes(before: str, after: str, cutover: Cutover) -> list[str]:
+    """Return every way the diff differs from exactly the cutover's four lines.
+
+    The expected diff is built from ``before`` independently of
+    ``rewrite_config``: each of the four keys' current lines removed, and the
+    two rewritten keys added back with the cutover's values. Anything missing
+    from the diff or extra in it is reported, so a rewrite that keeps a key,
+    writes a wrong value or touches another line fails here.
+    """
+    lines = before.splitlines()
+    expected = Counter(
+        f"-{line}"
+        for line in lines
+        if any(_key_line(k).match(line) for k in (*REWRITTEN_KEYS, *REMOVED_KEYS))
+    )
+    expected[f"+  omnigraph:storage_prefix: {cutover.new_prefix}"] += 1
+    expected[f"+  omnigraph:internal_schema_version: {cutover.new_schema}"] += 1
+    actual = Counter(
         line
-        for line in difflib.unified_diff(
-            before.splitlines(), after.splitlines(), lineterm="", n=0
-        )
-        if line[:1] in "+-"
-        and not line.startswith(("+++", "---"))
-        and not line[1:].startswith(allowed)
-    ]
+        for line in difflib.unified_diff(lines, after.splitlines(), lineterm="", n=0)
+        if line[:1] in "+-" and not line.startswith(("+++", "---"))
+    )
+    return sorted(
+        [f"unexpected {line}" for line in (actual - expected).elements()]
+        + [f"missing {line}" for line in (expected - actual).elements()]
+    )
 
 
 def render_body(verdict: Verdict, cutover: Cutover, verdict_location: str) -> str:
@@ -307,13 +329,19 @@ def yamlfmt_changes(checkout: Path, relpath: Path) -> str:
     what CI enforces.
     """
     before = (checkout / relpath).read_text()
-    subprocess.run(  # noqa: S603
+    result = subprocess.run(  # noqa: S603
         ["prek", "run", "yamlfmt", "--files", str(relpath)],  # noqa: S607
         cwd=checkout,
         check=False,
         capture_output=True,
+        text=True,
     )
     after = (checkout / relpath).read_text()
+    # A hook that modifies a file exits non-zero, so the exit code alone cannot
+    # tell a reformat from prek failing to run at all. An unchanged file with a
+    # failing exit is the second case, and passing it would skip the check.
+    if result.returncode != 0 and after == before:
+        sys.exit(f"prek could not run yamlfmt:\n{result.stdout}\n{result.stderr}")
     return "\n".join(
         difflib.unified_diff(
             before.splitlines(), after.splitlines(), "ours", "yamlfmt", lineterm=""
@@ -387,8 +415,10 @@ def omnigraph_cutover_pr(
         except CutoverRefusedError as exc:
             sys.exit(f"refusing to cut {env} over: {exc}")
         after = rewrite_config(before, cutover)
-        if stray := unexpected_changes(before, after):
-            sys.exit("refusing: the rewrite changed other lines:\n" + "\n".join(stray))
+        if stray := unexpected_changes(before, after, cutover):
+            sys.exit(
+                "refusing: the rewrite is not exactly the cutover:\n" + "\n".join(stray)
+            )
         (checkout / relpath).write_text(after)
         if reformatted := yamlfmt_changes(checkout, relpath):
             sys.exit(

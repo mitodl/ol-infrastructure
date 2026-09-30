@@ -89,6 +89,7 @@ VERDICT: dict[str, Any] = {
     "old_internal_schema": {"council": 6, "code-agent-kit": 6},
     "new_internal_schema": {"council": 9, "code-agent-kit": 9},
     "format_problems": [],
+    "status": "finished",
     "binaries": {"old": "omnigraph 0.10.0", "new": "omnigraph 0.11.0"},
     "finished_at": "2026-09-16T18:51:00+00:00",
 }
@@ -106,7 +107,7 @@ def test_the_rewrite_reproduces_the_production_fmt9_cutover(
     rewritten = script.rewrite_config(PRODUCTION_ARMED, cutover)
 
     assert rewritten == PRODUCTION_CUT_OVER
-    assert script.unexpected_changes(PRODUCTION_ARMED, rewritten) == []
+    assert script.unexpected_changes(PRODUCTION_ARMED, rewritten, cutover) == []
     assert cutover.branch == "omnigraph-cutover-production-fmt9"
     assert cutover.title == ("feat(omnigraph): cut Production over to storage format 9")
 
@@ -124,6 +125,19 @@ def test_a_quoted_schema_version_is_read_and_rewritten(script: ModuleType) -> No
 @pytest.mark.parametrize(
     ("verdict", "config", "env", "reason"),
     [
+        pytest.param(
+            {
+                "ok": False,
+                "status": "in_progress",
+                "old_root": VERDICT["old_root"],
+                "new_root": VERDICT["new_root"],
+                "started_at": "2026-10-01T00:00:00+00:00",
+            },
+            PRODUCTION_ARMED,
+            "Production",
+            "never reached verification",
+            id="run-never-finished",
+        ),
         pytest.param(
             _verdict(ok=False, format_problems=["not all on one format"]),
             PRODUCTION_ARMED,
@@ -200,14 +214,28 @@ def test_refusals(
 
 
 def test_a_change_outside_the_four_keys_is_reported(script: ModuleType) -> None:
-    """The guard `main` runs on the rewrite, exercised on a rewrite gone wrong."""
+    """The guard `main` runs on the rewrite, exercised on rewrites gone wrong."""
+    cutover = script.plan_cutover(VERDICT, PRODUCTION_ARMED, "Production")
     stray = PRODUCTION_CUT_OVER.replace(
         "aws:region: us-east-1", "aws:region: us-west-2"
     )
+    kept = PRODUCTION_CUT_OVER.replace(
+        "secretsprovider:", "  omnigraph:migrate_to_prefix: fmt9\nsecretsprovider:"
+    )
+    wrong_value = PRODUCTION_CUT_OVER.replace(
+        "storage_prefix: fmt9", "storage_prefix: fmt6"
+    )
 
-    assert script.unexpected_changes(PRODUCTION_ARMED, stray) == [
-        "-  aws:region: us-east-1",
-        "+  aws:region: us-west-2",
+    assert script.unexpected_changes(PRODUCTION_ARMED, stray, cutover) == [
+        "unexpected +  aws:region: us-west-2",
+        "unexpected -  aws:region: us-east-1",
+    ]
+    assert script.unexpected_changes(PRODUCTION_ARMED, kept, cutover) == [
+        "missing -  omnigraph:migrate_to_prefix: fmt9",
+    ]
+    assert script.unexpected_changes(PRODUCTION_ARMED, wrong_value, cutover) == [
+        "missing +  omnigraph:storage_prefix: fmt9",
+        "missing -  omnigraph:storage_prefix: fmt6",
     ]
 
 

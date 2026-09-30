@@ -360,7 +360,9 @@ verdict (per-graph, per-table before/after counts, the old and new formats, and
 both binaries' versions) to
 `s3://ol-data-witan-<env>/migrations/fmt<N>/verdict.json`. It writes it whether
 or not verification passed, with `ok` as computed, so a failed run leaves its
-evidence too.
+evidence too. It overwrites that key with an `in_progress` marker before it
+starts, so a re-run that dies early cannot leave an older `ok` verdict behind
+for the cutover script to find.
 
 The logs carry it twice: indented for `kubectl logs`, and as one compact line
 after `MIGRATION_VERDICT_JSON`. Loki splits a multi-line record into one entry

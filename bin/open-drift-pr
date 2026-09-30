@@ -157,16 +157,11 @@ def open_drift_pr(
     os.environ["GITHUB_TOKEN"] = token
 
     # Concourse checks the repo out as a different uid than the task runs as
-    # often enough that git's ownership check is worth pre-empting. Added only
-    # when missing, because on a workstation this is the person's own
-    # ~/.gitconfig and a re-run would otherwise append a duplicate each time.
-    safe = subprocess.run(
-        ["git", "config", "--global", "--get-all", "safe.directory"],  # noqa: S607
-        check=False,
-        capture_output=True,
-        text=True,
-    ).stdout.splitlines()
-    if str(repo_dir) not in safe:
+    # often enough that git's ownership check is worth pre-empting. Only then:
+    # git's check passes for a checkout we own, and on a workstation the global
+    # config is the person's own ~/.gitconfig, which would otherwise collect a
+    # dead temp path per run.
+    if repo_dir.stat().st_uid != os.getuid():
         _git(repo_dir, "config", "--global", "--add", "safe.directory", str(repo_dir))
 
     if not _git(repo_dir, "status", "--porcelain"):

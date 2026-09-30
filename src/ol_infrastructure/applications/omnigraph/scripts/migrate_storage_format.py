@@ -390,6 +390,28 @@ def verdict_object(new_root: str) -> tuple[str, str]:
     )
 
 
+def claim_verdict_key(old_root: str, new_root: str, region: str) -> tuple[str, str]:
+    """Overwrite this rebuild's verdict key with an in-progress marker.
+
+    Runs before anything else. A re-run into the same prefix that dies before
+    verification would otherwise leave the previous run's ``ok: true`` in
+    place, and the cutover script would open a PR onto a half-built root. It
+    also proves the IRSA write path works before the outage starts rather
+    than after the rebuild.
+    """
+    bucket, key = verdict_object(new_root)
+    marker = {
+        "ok": False,
+        "status": "in_progress",
+        "old_root": old_root,
+        "new_root": new_root,
+        "started_at": datetime.now(UTC).isoformat(timespec="seconds"),
+    }
+    put_object(bucket, key, json.dumps(marker, indent=2).encode(), region)
+    LOG.info("in-progress verdict written to s3://%s/%s", bucket, key)
+    return bucket, key
+
+
 def _sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -1148,6 +1170,8 @@ def main() -> int:
             "writing to."
         )
 
+    bucket, key = claim_verdict_key(old_root, new_root, env("AWS_REGION"))
+
     wait_for_writers(parse_writer_cronjobs(env("OMNIGRAPH_WRITER_CRONJOBS")))
 
     binaries: dict[str, str] = {}
@@ -1192,6 +1216,7 @@ def main() -> int:
 
     verdict = {
         "ok": not mismatched and not format_problems,
+        "status": "finished",
         "old_root": old_root,
         "new_root": new_root,
         "graphs": report,
@@ -1220,7 +1245,6 @@ def main() -> int:
     # anything that is not ok. A write failure fails the Job even after a clean
     # verification, because the cutover script has nothing to read otherwise;
     # the marker line above still carries the verdict.
-    bucket, key = verdict_object(new_root)
     try:
         put_object(bucket, key, rendered.encode(), env("AWS_REGION"))
     except (OSError, urllib.error.URLError):
