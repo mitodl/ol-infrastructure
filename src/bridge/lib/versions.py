@@ -160,12 +160,11 @@ VALKEY_VERSION = "7.2.14-alpine"
 MAILPIT_VERSION = "v1.31.3"
 # renovate: datasource=docker depName=litellm packageName=ghcr.io/berriai/litellm
 LITELLM_VERSION = "v1.103.1"
-# Renovate does not propose updates from a prerelease pin (a -rc.N suffix only
-# matches the same suffix), so this stays on the release candidate the S3
-# behaviour in local-dev/infra/modules/objectstore.py was verified against
-# until someone re-verifies it on a release and moves it by hand.
+# Keep this on a plain release tag. Renovate never proposes an update from a
+# prerelease pin (a -rc.N suffix only matches the same suffix), and the same
+# rule keeps it from proposing the -preview.N tags RustFS also publishes.
 # renovate: datasource=docker depName=rustfs packageName=rustfs/rustfs
-RUSTFS_VERSION = "1.0.0-rc.6"
+RUSTFS_VERSION = "1.0.0"
 # renovate: datasource=docker depName=loki packageName=grafana/loki
 LOKI_VERSION = "3.3.2"
 # renovate: datasource=docker depName=alloy packageName=grafana/alloy
