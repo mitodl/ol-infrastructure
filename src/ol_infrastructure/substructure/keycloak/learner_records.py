@@ -19,8 +19,8 @@ Each client is one entry in the keycloak stack's
         contract_end_date: "2027-06-30"
 
 Bumping an entry's ``secret_version`` makes Keycloak issue the client a new
-secret and invalidates the old one immediately, so the partner must receive the
-new secret before the change is applied.
+secret on the next apply and invalidates the old one at once, so the partner's
+integration fails until it receives the new secret from Vault.
 
 Organization UUIDs are the Keycloak organization ids, which differ between QA
 and Production, so the entries live in each environment's stack config.
