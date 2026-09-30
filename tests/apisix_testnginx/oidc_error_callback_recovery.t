@@ -199,3 +199,69 @@ Location: /t/login/
 GET /t/login/foo.apisix/redirect?error=temporarily_unavailable&state=x
 --- response_body
 passed through
+
+
+
+=== TEST 8: a code callback with no session cookie is redirected back through login
+--- config
+    location /t {
+        rewrite_by_lua_block {
+            local recover = require("apisix.plugins.ol.oidc_error_callback_recovery")
+            local conf = {
+                oidc_error_recovery = {
+                    recoverable_errors = {"temporarily_unavailable"},
+                    session_cookie_names = {"mitxonline_apisix_session", "mitlearn_apisix_session"},
+                    guard_cookie_name = "apisix_oidc_recovery",
+                    guard_max_age = 60,
+                },
+            }
+            recover(conf, {var = {
+                cookie_mitxonline_apisix_session = ngx.var.cookie_mitxonline_apisix_session,
+                cookie_mitlearn_apisix_session = ngx.var.cookie_mitlearn_apisix_session,
+                cookie_apisix_oidc_recovery = ngx.var.cookie_apisix_oidc_recovery,
+            }})
+        }
+        content_by_lua_block {
+            ngx.say("not reached")
+        }
+    }
+--- request
+GET /t/login/.apisix/redirect?code=abc123&state=x
+--- more_headers
+Cookie: csrf_mitxonline=1; old_mitxonline_apisix_session=1
+--- error_code: 302
+--- response_headers
+Location: /t/login/
+Set-Cookie: apisix_oidc_recovery=1; Path=/; Max-Age=60; Secure; HttpOnly; SameSite=Lax
+
+
+
+=== TEST 9: a code callback carrying any listed session cookie is left alone
+--- config
+    location /t {
+        rewrite_by_lua_block {
+            local recover = require("apisix.plugins.ol.oidc_error_callback_recovery")
+            local conf = {
+                oidc_error_recovery = {
+                    recoverable_errors = {"temporarily_unavailable"},
+                    session_cookie_names = {"mitxonline_apisix_session", "mitlearn_apisix_session"},
+                    guard_cookie_name = "apisix_oidc_recovery",
+                    guard_max_age = 60,
+                },
+            }
+            recover(conf, {var = {
+                cookie_mitxonline_apisix_session = ngx.var.cookie_mitxonline_apisix_session,
+                cookie_mitlearn_apisix_session = ngx.var.cookie_mitlearn_apisix_session,
+                cookie_apisix_oidc_recovery = ngx.var.cookie_apisix_oidc_recovery,
+            }})
+        }
+        content_by_lua_block {
+            ngx.say("passed through")
+        }
+    }
+--- request
+GET /t/mitxonline/login/.apisix/redirect?code=abc123&state=x
+--- more_headers
+Cookie: csrf_mitxonline=1; mitlearn_apisix_session=pre-auth
+--- response_body
+passed through

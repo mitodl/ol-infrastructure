@@ -811,7 +811,19 @@ mitxonline_shared_plugins = OLApisixSharedPlugins(
             # domain a group's session cookie was scoped to.  Ditto the
             # canonical-origin redirect it also carries, which is derived from
             # the request's own host.
-            oidc_gateway_pre_function_plugin(),
+            #
+            # Both cookie names, because this config is also referenced by the
+            # /mitxonline/* routes on MIT Learn's host, which log in under MIT
+            # Learn's session.  Omitting either would divert every successful
+            # login on the routes that use it.
+            oidc_gateway_pre_function_plugin(
+                session_cookie_names=[
+                    apisix_oidc_session_cookie_name(
+                        "mitxonline", stack_info.env_suffix
+                    ),
+                    mit_learn_session_cookie_name(stack_info.env_suffix),
+                ],
+            ),
         ],
     ),
 )

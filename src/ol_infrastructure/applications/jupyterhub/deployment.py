@@ -197,7 +197,18 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                 # 7 days between them, because they take direct plain-HTTP
                 # traffic that the `redirect` default plugin never gets to
                 # upgrade.
-                oidc_gateway_pre_function_plugin(),
+                #
+                # Only this deployment's own cookie: MIT Learn's .learn.mit.edu
+                # session also reaches this host, but no route here reads it,
+                # so its presence says nothing about whether this login can
+                # succeed.
+                oidc_gateway_pre_function_plugin(
+                    session_cookie_names=[
+                        apisix_oidc_session_cookie_name(
+                            base_name, stack_info.env_suffix
+                        )
+                    ],
+                ),
             ],
         ),
     )

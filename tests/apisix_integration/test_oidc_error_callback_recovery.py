@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from tests.apisix_integration.conftest import requires_docker
+from tests.apisix_integration.conftest import SESSION_COOKIE, requires_docker
 
 pytestmark = [requires_docker, pytest.mark.integration]
 
@@ -104,8 +104,52 @@ def test_user_cancelling_login_is_not_recovered(callback):
 
 
 def test_successful_callback_is_left_alone(callback):
-    """A real login carries a code and must reach openid-connect untouched."""
-    status, _ = callback(query="?code=abc123&state=x")
+    """A real login carries a code and the pre-auth session cookie, and must
+    reach openid-connect untouched.
+    """
+    status, _ = callback(
+        query="?code=abc123&state=x",
+        cookies={SESSION_COOKIE: "pre-auth"},
+    )
+
+    assert status != HTTP_FOUND
+
+
+def test_code_callback_without_a_session_is_sent_back_through_login(callback):
+    """The larger share of what the error-callback fix left behind: a browser
+    finishing a login it did not start holds no session to check `state`
+    against, so openid-connect would 500 it every time.
+    """
+    status, headers = callback(
+        query="?code=abc123&state=x",
+        cookies={"unrelated": "1"},
+    )
+
+    assert status == HTTP_FOUND
+    assert headers["Location"] == "/login/"
+    assert GUARD_COOKIE in headers["Set-Cookie"]
+
+
+def test_session_cookie_names_reach_the_plugin_through_the_config(callback):
+    """The names travel in the same unschema'd block as the error list.  A
+    request carrying the configured cookie passing through while one without
+    it is redirected shows the list arrived intact.
+    """
+    with_session, _ = callback(
+        query="?code=abc123&state=x", cookies={SESSION_COOKIE: "1"}
+    )
+    without_session, _ = callback(
+        query="?code=abc123&state=x", cookies={f"not_{SESSION_COOKIE}": "1"}
+    )
+
+    assert (with_session != HTTP_FOUND, without_session) == (True, HTTP_FOUND)
+
+
+def test_missing_session_recovery_respects_the_guard(callback):
+    status, _ = callback(
+        query="?code=abc123&state=x",
+        cookies={GUARD_COOKIE: "1"},
+    )
 
     assert status != HTTP_FOUND
 

@@ -39,6 +39,8 @@ from ol_infrastructure.components.services.apisix import (
 APISIX_IMAGE = os.environ.get("APISIX_IT_IMAGE", "apache/apisix:3.17.0-debian")
 CONTAINER_NAME = "ol-apisix-integration-test"
 READY_TIMEOUT_SECONDS = 60
+# The OIDC session cookie the recovery routes are configured to look for.
+SESSION_COOKIE = "ol_test_apisix_session"
 
 # Standalone (yaml) config provider, so no etcd is needed.  Mirrors the
 # provider the ingress controller drives in the cluster
@@ -96,7 +98,10 @@ def apisix_routes() -> dict[str, Any]:
     # The recovery routes therefore switch it off so they exercise the callback
     # handling in isolation, exactly as they did before the two were fused into
     # the single serverless-pre-function APISIX allows per plugin config.
-    recovery = oidc_gateway_pre_function_plugin(canonical_https_redirect=False)
+    recovery = oidc_gateway_pre_function_plugin(
+        canonical_https_redirect=False,
+        session_cookie_names=[SESSION_COOKIE],
+    )
     full = oidc_gateway_pre_function_plugin()
     dead_upstream = {"type": "roundrobin", "nodes": {"127.0.0.1:1": 1}}
     return {
