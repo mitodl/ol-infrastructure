@@ -20,6 +20,7 @@ every endpoint on the Keycloak organization UUID (`sso_organization_id`); the
 stub ignores which UUID it is and returns the same fixtures for all of them.
 """
 
+import datetime
 import json
 import os
 import re
@@ -139,6 +140,60 @@ ENROLLMENT_FUNNEL = [
         "active_rate_pct": 70.4,
         "completion_rate_pct": None,
     },
+    {
+        "organization_key": ORG_KEY,
+        "organization_name": ORG_NAME,
+        "contract_pk": "1",
+        "contract_id": "1",
+        "b2b_contract_name": "FY26 Site License — Data Science Track",
+        "courserun_pk": 103,
+        "courserun_readable_id": "course-v1:MITx+6.431x+2026_Spring",
+        "courserun_title": "Probability — The Science of Uncertainty and Data",
+        # Every count below is overwritten by `_reconcile_course_counts` from
+        # the LEARNER_PROGRESS rows for this run; they are placeholders only.
+        "enrolled_learners": 0,
+        "active_learners": 0,
+        "passing_learners": 0,
+        "certified_learners": 0,
+        "active_rate_pct": 0.0,
+        "completion_rate_pct": 0.0,
+    },
+    {
+        "organization_key": ORG_KEY,
+        "organization_name": ORG_NAME,
+        "contract_pk": "1",
+        "contract_id": "1",
+        "b2b_contract_name": "FY26 Site License — Data Science Track",
+        "courserun_pk": 104,
+        "courserun_readable_id": "course-v1:MITx+18.6501x+2026_Spring",
+        "courserun_title": "Fundamentals of Statistics",
+        # Every count below is overwritten by `_reconcile_course_counts` from
+        # the LEARNER_PROGRESS rows for this run; they are placeholders only.
+        "enrolled_learners": 0,
+        "active_learners": 0,
+        "passing_learners": 0,
+        "certified_learners": 0,
+        "active_rate_pct": 0.0,
+        "completion_rate_pct": 0.0,
+    },
+    {
+        "organization_key": ORG_KEY,
+        "organization_name": ORG_NAME,
+        "contract_pk": "1",
+        "contract_id": "1",
+        "b2b_contract_name": "FY26 Site License — Data Science Track",
+        "courserun_pk": 105,
+        "courserun_readable_id": "course-v1:MITx+15.071x+2026_Summer",
+        "courserun_title": "The Analytics Edge",
+        # Every count below is overwritten by `_reconcile_course_counts` from
+        # the LEARNER_PROGRESS rows for this run; they are placeholders only.
+        "enrolled_learners": 0,
+        "active_learners": 0,
+        "passing_learners": 0,
+        "certified_learners": 0,
+        "active_rate_pct": 0.0,
+        "completion_rate_pct": 0.0,
+    },
 ]
 
 ENGAGEMENT_TREND = [
@@ -244,6 +299,66 @@ CONTENT_ENGAGEMENT = [
         "chatbot_adoption_pct": None,
         "certificates_earned": None,
     },
+    {
+        "organization_key": ORG_KEY,
+        "organization_name": ORG_NAME,
+        "courserun_readable_id": "course-v1:MITx+6.431x+2026_Spring",
+        "courserun_title": "Probability — The Science of Uncertainty and Data",
+        # total_enrolled_learners and certificates_earned are recomputed by
+        # `_reconcile_course_counts`; the engagement figures have no
+        # LEARNER_PROGRESS equivalent, so they stay hand-authored.
+        "total_enrolled_learners": 0,
+        "engaged_learners": 74,
+        "engagement_rate_pct": 79.6,
+        "total_videos_watched": 3610,
+        "avg_videos_per_engaged_learner": 48.8,
+        "total_problems_attempted": 8120,
+        "avg_problems_per_engaged_learner": 109.7,
+        "total_chatbot_interactions": 2110,
+        "chatbot_users": 55,
+        "chatbot_adoption_pct": 74.3,
+        "certificates_earned": 0,
+    },
+    {
+        "organization_key": ORG_KEY,
+        "organization_name": ORG_NAME,
+        "courserun_readable_id": "course-v1:MITx+18.6501x+2026_Spring",
+        "courserun_title": "Fundamentals of Statistics",
+        # total_enrolled_learners and certificates_earned are recomputed by
+        # `_reconcile_course_counts`; the engagement figures have no
+        # LEARNER_PROGRESS equivalent, so they stay hand-authored.
+        "total_enrolled_learners": 0,
+        "engaged_learners": 62,
+        "engagement_rate_pct": 70.5,
+        "total_videos_watched": 2980,
+        "avg_videos_per_engaged_learner": 48.1,
+        "total_problems_attempted": 7460,
+        "avg_problems_per_engaged_learner": 120.3,
+        "total_chatbot_interactions": 1620,
+        "chatbot_users": 44,
+        "chatbot_adoption_pct": 71.0,
+        "certificates_earned": 0,
+    },
+    {
+        "organization_key": ORG_KEY,
+        "organization_name": ORG_NAME,
+        "courserun_readable_id": "course-v1:MITx+15.071x+2026_Summer",
+        "courserun_title": "The Analytics Edge",
+        # total_enrolled_learners and certificates_earned are recomputed by
+        # `_reconcile_course_counts`; the engagement figures have no
+        # LEARNER_PROGRESS equivalent, so they stay hand-authored.
+        "total_enrolled_learners": 0,
+        "engaged_learners": 45,
+        "engagement_rate_pct": 58.4,
+        "total_videos_watched": 1740,
+        "avg_videos_per_engaged_learner": 38.7,
+        "total_problems_attempted": 3210,
+        "avg_problems_per_engaged_learner": 71.3,
+        "total_chatbot_interactions": 940,
+        "chatbot_users": 31,
+        "chatbot_adoption_pct": 68.9,
+        "certificates_earned": 0,
+    },
 ]
 
 RESOURCES = {
@@ -260,9 +375,14 @@ RESOURCES = {
 # envelope field (outcomes_withheld_count) rather than the aggregate
 # resources' shared offset/limit-only handling.
 #
-# Course runs match ENROLLMENT_FUNNEL's two contract-1 rows so the frontend's
-# module filter — sourced from enrollment-funnel — actually narrows this data.
-_LEARNER_COURSERUNS = [
+# Every course run on the contract, which is what `course-runs` serves and
+# what the frontend's module filter lists. Read from `mv_b2b_contract_courserun`
+# in the real API: keyed on the CONTRACT, so it is neither consent-gated nor
+# limited to runs someone has enrolled in. That distinction is the whole reason
+# the endpoint exists rather than the filter deriving its options from
+# enrollment rows, so the fixture has to be able to express it — hence the
+# split from `_ENROLLED_COURSERUNS` below.
+_CONTRACT_COURSERUNS = [
     {
         "courserun_readable_id": "course-v1:MITx+14.310x+2026_Spring",
         "courserun_title": "Data Analysis for Social Scientists",
@@ -275,6 +395,45 @@ _LEARNER_COURSERUNS = [
         "courserun_start_on": "2026-01-05T00:00:00Z",
         "courserun_end_on": "2026-05-15T00:00:00Z",
     },
+    {
+        "courserun_readable_id": "course-v1:MITx+6.431x+2026_Spring",
+        "courserun_title": "Probability — The Science of Uncertainty and Data",
+        "courserun_start_on": "2026-01-05T00:00:00Z",
+        "courserun_end_on": "2026-05-15T00:00:00Z",
+    },
+    {
+        "courserun_readable_id": "course-v1:MITx+18.6501x+2026_Spring",
+        "courserun_title": "Fundamentals of Statistics",
+        "courserun_start_on": "2026-02-02T00:00:00Z",
+        "courserun_end_on": "2026-06-12T00:00:00Z",
+    },
+    {
+        "courserun_readable_id": "course-v1:MITx+15.071x+2026_Summer",
+        "courserun_title": "The Analytics Edge",
+        "courserun_start_on": "2026-06-01T00:00:00Z",
+        "courserun_end_on": "2026-08-21T00:00:00Z",
+    },
+    # Last in the track and not yet open, so nobody is enrolled: it appears in
+    # the module filter (the contract covers it) while matching zero rows in
+    # `learner-progress`. Selecting it SHOULD empty the table — that is the
+    # correct answer, not a broken query.
+    {
+        "courserun_readable_id": "course-v1:MITx+6.419x+2026_Fall",
+        "courserun_title": "Data Analysis: Statistical Modeling and Computation",
+        "courserun_start_on": "2026-09-08T00:00:00Z",
+        "courserun_end_on": None,
+    },
+]
+
+# The runs `learner-progress` generates enrollments for: everything except the
+# unopened final module. Every one of these also has an ENROLLMENT_FUNNEL and
+# CONTENT_ENGAGEMENT entry, so the dashboard's Course performance section and
+# the learner directory agree on the course list (see
+# `_reconcile_course_counts`).
+_ENROLLED_COURSERUNS = [
+    run
+    for run in _CONTRACT_COURSERUNS
+    if run["courserun_readable_id"] != "course-v1:MITx+6.419x+2026_Fall"
 ]
 
 _LEARNER_FIRST_NAMES = [
@@ -341,6 +500,30 @@ _NAMELESS_LEARNERS = [
 ]
 
 
+# Anchored to AS_OF rather than the wall clock, so the column is stable across
+# pod restarts and screenshots (same reason AS_OF itself is frozen).
+_ACTIVITY_ANCHOR = datetime.date(2026, 6, 30)
+
+
+def _last_active_on(n, status, shared):
+    """Return a plain `YYYY-MM-DD`, matching the real field's `format: date`.
+
+    Deliberately NOT a timestamp: `LearnerProgress.last_active_on` is the only
+    date-only field on that model, and a stub that served
+    `2026-06-30T00:00:00Z` here would let a frontend that formats it via
+    `new Date()` look correct locally while rendering the previous day for
+    every user west of Greenwich.
+
+    Null in the two cases the real API nulls it: withheld consent (the response
+    model blanks every outcome field), and `not_started`, which means no
+    recorded activity at all. The spread runs 3 to 77 days back so rows land on
+    both sides of the 30-day needs-attention boundary.
+    """
+    if not shared or status == "not_started":
+        return None
+    return (_ACTIVITY_ANCHOR - datetime.timedelta(days=3 + (n * 17) % 75)).isoformat()
+
+
 def _build_learner_progress():
     """Deterministic so the stub's fixture is stable across pod restarts.
 
@@ -356,8 +539,8 @@ def _build_learner_progress():
 
     rows = []
     for i, (full_name, email) in enumerate(named + _NAMELESS_LEARNERS):
-        for run_index, run in enumerate(_LEARNER_COURSERUNS):
-            n = i * len(_LEARNER_COURSERUNS) + run_index
+        for run_index, run in enumerate(_ENROLLED_COURSERUNS):
+            n = i * len(_ENROLLED_COURSERUNS) + run_index
             shared = n % 9 != 0
             status = _LEARNER_STATUSES[n % len(_LEARNER_STATUSES)]
             certified = status == "certified"
@@ -384,9 +567,7 @@ def _build_learner_progress():
                     if shared and certified
                     else None,
                     "certificate_is_revoked": False if shared and certified else None,
-                    # Null here too: real activity data doesn't exist yet
-                    # upstream either (mitodl/ol-data-platform#2672).
-                    "last_active_on": None,
+                    "last_active_on": _last_active_on(n, status, shared),
                 }
             )
     return rows
@@ -453,6 +634,22 @@ def _reconcile_course_counts():
 
 _reconcile_course_counts()
 
+# `course-runs` rows. The readable id is served under `courserun_id`, NOT
+# `courserun_readable_id`: the real query is
+# `SELECT courserun_readable_id AS courserun_id`, and the frontend reads
+# `courserun_id` and sends it back as the `courserun_readable_id` filter. A
+# stub that "helpfully" used the same name at both ends would hide a wiring
+# bug that only shows up against the real service.
+COURSE_RUNS = [
+    {
+        "courserun_id": run["courserun_readable_id"],
+        "courserun_title": run["courserun_title"],
+        "courserun_start_on": run["courserun_start_on"],
+        "courserun_end_on": run["courserun_end_on"],
+    }
+    for run in _CONTRACT_COURSERUNS
+]
+
 # Identity of "the" contract every contract-scoped request is treated as
 # viewing — the stub ignores which contract_id is actually in the path (same
 # policy as the org UUID) and always answers as contract "1".
@@ -488,6 +685,15 @@ def _rows_for(resource, contract_scoped):
     ]
 
 
+# Endpoints the real API defines only under the contract prefix, each returning
+# individual rows rather than an aggregate, so each has its own handler instead
+# of going through RESOURCES.
+CONTRACT_ONLY = {
+    "learner-progress": "_handle_learner_progress",
+    "course-runs": "_handle_course_runs",
+}
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -505,6 +711,25 @@ class Handler(BaseHTTPRequestHandler):
         limit_raw = qs.get("limit", [None])[0]
         limit = int(limit_raw) if limit_raw is not None else None
         return offset, limit
+
+    def _handle_course_runs(self, org, qs):
+        """course-runs: the module filter's options.
+
+        Paged but never filtered: the real endpoint takes only limit/offset.
+        """
+        offset, limit = self._parse_offset_limit(qs)
+        page = COURSE_RUNS[offset:]
+        if limit is not None:
+            page = page[:limit]
+        self._send_json(
+            200,
+            {
+                "organization_id": org,
+                "as_of": AS_OF,
+                "total_count": len(COURSE_RUNS),
+                "data": page,
+            },
+        )
 
     def _handle_learner_progress(self, org, qs):
         """learner-progress: filter, sort, then page — in that order, so
@@ -598,14 +823,13 @@ class Handler(BaseHTTPRequestHandler):
         resource = match.group("resource")
         qs = parse_qs(parsed.query)
 
-        if resource == "learner-progress":
+        handler = CONTRACT_ONLY.get(resource)
+        if handler:
             if not contract_scoped:
-                self._send_json(
-                    404, {"detail": "learner-progress is contract-scoped only"}
-                )
+                self._send_json(404, {"detail": f"{resource} is contract-scoped only"})
                 return
             try:
-                self._handle_learner_progress(org, qs)
+                getattr(self, handler)(org, qs)
             except ValueError:
                 self._send_json(422, {"detail": "limit/offset must be integers"})
             return
