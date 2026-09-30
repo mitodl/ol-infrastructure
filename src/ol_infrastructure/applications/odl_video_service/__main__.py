@@ -21,7 +21,11 @@ from pulumi import (
     export,
 )
 from pulumi_aws import ec2, get_caller_identity, iam
-from pulumi_aws.s3 import BucketCorsConfigurationCorsRuleArgs
+from pulumi_aws.s3 import (
+    BucketCorsConfigurationCorsRuleArgs,
+    BucketLifecycleConfigurationRuleArgs,
+    BucketLifecycleConfigurationRuleNoncurrentVersionTransitionArgs,
+)
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
@@ -137,10 +141,31 @@ s3_thumbnail_bucket_name = ovs_config.require("s3_thumbnail_bucket_name")
 s3_transcode_bucket_name = ovs_config.require("s3_transcode_bucket_name")
 s3_watch_bucket_name = ovs_config.require("s3_watch_bucket_name")
 
+# Production has had versioning Enabled on every OVS bucket since before Pulumi
+# managed them (QA/CI never did), so the code says so rather than leaving it
+# unreconciled. Versioning cannot be turned back off, only suspended.
+#
+# The app deletes originals from the watch ("uploaded") bucket once they are
+# processed, and users delete videos from the main bucket, so both accumulate
+# noncurrent masters that only the current-version tiering rule never touches:
+# the uploaded bucket is 100% noncurrent (5.5 TiB, deleted 2017-2020). These
+# are the only copies of the source video, so archive rather than expire them.
+archive_noncurrent_originals_rule = BucketLifecycleConfigurationRuleArgs(
+    id="archive-noncurrent-originals",
+    status="Enabled",
+    noncurrent_version_transitions=[
+        BucketLifecycleConfigurationRuleNoncurrentVersionTransitionArgs(
+            noncurrent_days=30,
+            storage_class="DEEP_ARCHIVE",
+        )
+    ],
+)
+
 # Main S3 bucket (video files)
 ovs_main_bucket_config = S3BucketConfig(
     bucket_name=s3_bucket_name,
-    versioning_enabled=False,
+    versioning_enabled=True,
+    lifecycle_rules=[archive_noncurrent_originals_rule],
     server_side_encryption_enabled=True,
     intelligent_tiering_enabled=True,
     intelligent_tiering_days=90,
@@ -174,7 +199,7 @@ ovs_main_bucket = OLBucket(
 # Subtitles bucket
 ovs_subtitles_bucket_config = S3BucketConfig(
     bucket_name=s3_subtitle_bucket_name,
-    versioning_enabled=False,
+    versioning_enabled=True,
     server_side_encryption_enabled=True,
     sse_algorithm="AES256",  # Use SSE-S3 for CloudFront compatibility
     intelligent_tiering_enabled=True,
@@ -209,7 +234,7 @@ ovs_subtitles_bucket = OLBucket(
 # Thumbnails bucket
 ovs_thumbnails_bucket_config = S3BucketConfig(
     bucket_name=s3_thumbnail_bucket_name,
-    versioning_enabled=False,
+    versioning_enabled=True,
     server_side_encryption_enabled=True,
     sse_algorithm="AES256",  # Use SSE-S3 for CloudFront compatibility
     intelligent_tiering_enabled=True,
@@ -246,7 +271,10 @@ ovs_thumbnails_bucket = OLBucket(
 # objects without explicit KMS key policy permissions
 ovs_transcoded_bucket_config = S3BucketConfig(
     bucket_name=s3_transcode_bucket_name,
-    versioning_enabled=False,
+    versioning_enabled=True,
+    # Derived HLS output; 69% of sampled bytes were noncurrent (re-transcodes
+    # and deleted videos) sitting in Standard.
+    noncurrent_version_expiration_days=30,
     server_side_encryption_enabled=True,
     sse_algorithm="AES256",  # Use SSE-S3 for CloudFront compatibility
     intelligent_tiering_enabled=True,
@@ -285,7 +313,8 @@ ovs_transcoded_bucket = OLBucket(
 # Uploaded bucket (user uploads)
 ovs_uploaded_bucket_config = S3BucketConfig(
     bucket_name=s3_watch_bucket_name,
-    versioning_enabled=False,
+    versioning_enabled=True,
+    lifecycle_rules=[archive_noncurrent_originals_rule],
     server_side_encryption_enabled=True,
     intelligent_tiering_enabled=True,
     intelligent_tiering_days=90,
