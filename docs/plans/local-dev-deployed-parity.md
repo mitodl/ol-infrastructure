@@ -36,13 +36,15 @@ can produce the local app manifests) to the whole stack.
 | OpenSearch | chart 3.4.0, security plugin off | AWS OpenSearch 3.3 | none |
 | Qdrant | v1.19.1, one pod, no API key | Qdrant Cloud v1.19.1, API key | version pin |
 | Tika | image from chart 3.2.2 (`3.2.2.0-full`), no auth | chart 3.2.2, access token, behind APISIX | version pin |
-| Object storage | RustFS 1.0.0-rc.6, ocw-studio only | S3, IAM credentials issued by Vault | none |
+| Object storage | RustFS 1.0.0, ocw-studio only | S3, IAM credentials issued by Vault | none |
 | Secrets | committed plain Secrets | Vault and Vault Secrets Operator 1.6.0 | none |
 | Observability | Loki, Alloy v1.7.5, Grafana, logs only | k8s-monitoring 4.5.2 to Grafana Cloud | none |
 | nginx sidecar | 1.25 and 1.27 in four apps | removed from all five counterparts | none |
 
-Every local-dev version now comes from `src/bridge/lib/versions.py` (step 2 of
-the order of work below), so Renovate moves both columns.
+Every platform version in `local-dev/infra` now comes from
+`src/bridge/lib/versions.py` (step 2 of the order of work below), so Renovate
+moves both columns. The nginx sidecar tags in the hand-written app manifests
+are still hardcoded; the sidecar goes away with the app definitions.
 
 Three of these change behaviour an application developer depends on.
 

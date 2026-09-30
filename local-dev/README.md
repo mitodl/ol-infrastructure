@@ -424,7 +424,7 @@ This knob is deliberately *not* pinned in `Pulumi.local-dev.core.Dev.yaml` — P
 
 The infrastructure is split across two Pulumi stacks:
 
-**`local-dev/infra/core/Pulumi.local-dev.core.Dev.yaml`** — operators, Keycloak, APISIX, database, cache. Chart, operator and image versions are not stack config: they are read from `src/bridge/lib/versions.py`, the same pins the deployed stacks use.
+**`local-dev/infra/core/Pulumi.local-dev.core.Dev.yaml`** — operators, Keycloak, APISIX, database, cache. Chart, operator and image versions are not stack config: they are read from `src/bridge/lib/versions.py`. Components that also run deployed (APISIX, cert-manager, the Keycloak operator, Tika) use the deployed pins; the rest have local-only constants there.
 
 | Key | Default | Description |
 |-----|---------|-------------|

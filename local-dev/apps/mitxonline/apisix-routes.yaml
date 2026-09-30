@@ -90,8 +90,12 @@ spec:
         session:
           secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
           # Flat keys: APISIX 3.17+ ignores the nested session.cookie.* form.
+          # 0 disables lua-resty-session's 900s idling / 3600s rolling
+          # defaults, leaving absolute_timeout in charge, as deployed.
           cookie_domain: ".mitxonline.mit.dev"
           absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         session_contents:
           access_token: true
           enc_id_token: true
@@ -149,8 +153,12 @@ spec:
         session:
           secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
           # Flat keys: APISIX 3.17+ ignores the nested session.cookie.* form.
+          # 0 disables lua-resty-session's 900s idling / 3600s rolling
+          # defaults, leaving absolute_timeout in charge, as deployed.
           cookie_domain: ".mitxonline.mit.dev"
           absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         session_contents:
           access_token: true
           enc_id_token: true
@@ -189,8 +197,12 @@ spec:
         session:
           secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
           # Flat keys: APISIX 3.17+ ignores the nested session.cookie.* form.
+          # 0 disables lua-resty-session's 900s idling / 3600s rolling
+          # defaults, leaving absolute_timeout in charge, as deployed.
           cookie_domain: ".mitxonline.mit.dev"
           absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         session_contents:
           access_token: true
           enc_id_token: true
