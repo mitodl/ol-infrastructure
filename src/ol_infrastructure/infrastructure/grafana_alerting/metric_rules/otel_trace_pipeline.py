@@ -31,7 +31,9 @@ about apps with no OTel config (micromasters, xpro, the legacy xpro edxapp).
 Every service name the label will carry had SERVER spans in every 24h window
 over the 7 days to 2026-09-30, at least ~900 per day in QA and ~1,400 in
 production, so the rule should be silent when it first deploys. The 2h `for_`
-covers a new Deployment, which is labeled before it takes traffic.
+gives a new Deployment, which is labeled before it takes traffic, two hours to
+serve its first request. One deployed further ahead of its traffic cutover
+fires until spans arrive.
 
 Both rules can fire for the same service: the regression rule on day one, then
 the never-seen rule for as long as the Deployment stays silent. They are
