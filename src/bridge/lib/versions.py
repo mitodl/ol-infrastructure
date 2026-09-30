@@ -144,3 +144,27 @@ MCP_CONTEXT7_VERSION = "4.1.1"
 # endpoint. Image tags track the PyPI package (mcp-proxy-for-aws) one-for-one.
 # renovate: datasource=docker depName=mcp-proxy-for-aws packageName=public.ecr.aws/mcp-proxy-for-aws/mcp-proxy-for-aws
 MCP_PROXY_FOR_AWS_VERSION = "1.7.0"
+
+# Local-dev only (local-dev/infra). Deployed environments use a managed service
+# or nothing in these places; everything local-dev shares with a deployed stack
+# reads the deployed constant above instead.
+# renovate: datasource=helm depName=cloudnative-pg packageName=cloudnative-pg registryUrl=https://cloudnative-pg.github.io/charts
+CNPG_CHART_VERSION = "0.23.0"
+# renovate: datasource=helm depName=opensearch packageName=opensearch registryUrl=https://opensearch-project.github.io/helm-charts
+OPENSEARCH_CHART_VERSION = "3.4.0"
+# Held to the ElastiCache engine_version the applications run (7.2) by the
+# valkey/valkey packageRule in renovate.json5.
+# renovate: datasource=docker depName=valkey packageName=valkey/valkey
+VALKEY_VERSION = "7.2.14-alpine"
+# renovate: datasource=docker depName=mailpit packageName=axllent/mailpit
+MAILPIT_VERSION = "v1.31.3"
+# renovate: datasource=docker depName=litellm packageName=ghcr.io/berriai/litellm
+LITELLM_VERSION = "v1.103.1"
+# renovate: datasource=docker depName=rustfs packageName=rustfs/rustfs
+RUSTFS_VERSION = "1.0.0-rc.6"
+# renovate: datasource=docker depName=loki packageName=grafana/loki
+LOKI_VERSION = "3.3.2"
+# renovate: datasource=docker depName=alloy packageName=grafana/alloy
+ALLOY_VERSION = "v1.7.5"
+# renovate: datasource=docker depName=grafana packageName=grafana/grafana
+GRAFANA_VERSION = "11.6.16"

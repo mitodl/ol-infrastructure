@@ -23,9 +23,6 @@ config:
   # kc-theme-image.sh sets "keycloak_image" in tilt_config.json to run a
   # locally built Keycloak image instead of the published digest the code
   # defaults to.
-  # Helm chart versions
-  ol-local-dev-core:cert_manager_version: "v1.16.2"
-  ol-local-dev-core:cnpg_version: "0.23.0"
-  ol-local-dev-core:apisix_version: "2.13.0"
-  ol-local-dev-core:keycloak_operator_version: "26.0.7"
+  # Chart, operator and image versions come from src/bridge/lib/versions.py,
+  # which Renovate keeps current, not from stack config.
 encryptionsalt: v1:PidwC1BukA0=:v1:fQSvxydFUaIrKsEE:C/DV/mn+diHPVUfZrl/5F5QXOYhEuw==

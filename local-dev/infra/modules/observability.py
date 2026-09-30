@@ -37,12 +37,14 @@ import pulumi_kubernetes as k8s
 import yaml as pyyaml
 from pulumi import ResourceOptions
 
+from bridge.lib.versions import ALLOY_VERSION, GRAFANA_VERSION, LOKI_VERSION
+
 NAMESPACE = "operations"
 
-LOKI_IMAGE = "grafana/loki:3.3.2"
-ALLOY_IMAGE = "grafana/alloy:v1.7.5"
+LOKI_IMAGE = f"grafana/loki:{LOKI_VERSION}"
+ALLOY_IMAGE = f"grafana/alloy:{ALLOY_VERSION}"
 # >= 11.6.11 is the floor Grafana documents for the Logs Drilldown app below.
-GRAFANA_IMAGE = "grafana/grafana:11.6.16"
+GRAFANA_IMAGE = f"grafana/grafana:{GRAFANA_VERSION}"
 
 # Logs Drilldown -- the "Logs" entry under Drilldown in the nav. It browses
 # services, fields and patterns without anyone writing LogQL, which is the
