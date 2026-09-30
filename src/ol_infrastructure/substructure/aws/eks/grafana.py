@@ -341,6 +341,46 @@ def setup_grafana(
                                         "threshold_ms": 5000,
                                     },
                                     {
+                                        # Keep every trace that touches one of
+                                        # these low-volume first-party services.
+                                        # At 15% they sample into invisibility:
+                                        # ol-analytics-api sees ~10 requests a
+                                        # day, so "broken" and "quiet" look the
+                                        # same in Tempo.
+                                        #
+                                        # Non-inverted on purpose.  The
+                                        # processor ORs a non-inverted match
+                                        # across every resource in the trace
+                                        # (hasResourceOrSpanWithCondition), so a
+                                        # trace through APISIX into one of these
+                                        # is kept.  invert_match ANDs instead,
+                                        # and since APISIX fronts nearly every
+                                        # request an inverted exclusion list
+                                        # almost never fires.
+                                        #
+                                        # The cost is that a new low-volume
+                                        # service is sampled at 15% until it is
+                                        # added here.  Keeping these whole adds
+                                        # ~1% to exported spans (spanmetrics, 7d
+                                        # to 2026-09-28: ~1.7M kept at 15% vs
+                                        # ~1.5B exported in total).
+                                        #
+                                        # Regexes are unanchored in the
+                                        # processor, hence ^...$.
+                                        "name": "keep-low-volume-services",
+                                        "type": "string_attribute",
+                                        "key": "service.name",
+                                        "enabled_regex_matching": True,
+                                        "values": [
+                                            "^ol-analytics-api$",
+                                            "^learn-ai-webapp$",
+                                            "^ocw-studio-webapp$",
+                                            "^ovs-webapp$",
+                                            f"^{stack_info.env_suffix}-witan$",
+                                            f"^{stack_info.env_suffix}-toolhive-.+$",
+                                        ],
+                                    },
+                                    {
                                         "name": "sample-15pct-traces",
                                         "type": "probabilistic",
                                         "sampling_percentage": 15,
@@ -371,6 +411,35 @@ def setup_grafana(
                                             "limits": {"memory": "2Gi"},
                                         },
                                     },
+                                },
+                            },
+                            # APISIX 3.18's access phase (verify_https_client
+                            # in apisix/init.lua) re-runs the SNI router with
+                            # the Host header, and radixtree_sni.lua marks the
+                            # sni_radixtree_match span ERROR on a miss even
+                            # though its own comment calls that miss expected.
+                            # Behind Fastly the lookup misses: the ApisixTls
+                            # certs cover the backend_* origin names Fastly
+                            # sends as SNI, not the public Host. That put an
+                            # ERROR span in nearly every APISIX trace, so
+                            # keep-errors sampled 86-87% of residential-production
+                            # traces and 20-24% of applications-production's
+                            # (count_traces_sampled, 2026-09-28).
+                            #
+                            # The miss is harmless there: verify_https_client
+                            # returns true and the request proceeds. It is also
+                            # the only source of this span in Tempo, because the
+                            # TLS handshake's own lookup (ssl_client_hello_phase)
+                            # calls tracer.release() and is never exported, and
+                            # nothing here uses the stream proxy. So resetting
+                            # it hides no failure. This runs on the receiver,
+                            # ahead of the loadbalancing hop to the sampler.
+                            "transform": {
+                                "traces": {
+                                    "span": [
+                                        'set(span.status.code, STATUS_CODE_UNSET) where resource.attributes["service.name"] == "apisix" and span.name == "sni_radixtree_match" and span.status.message == "failed match SNI"',
+                                        'set(span.status.message, "") where resource.attributes["service.name"] == "apisix" and span.name == "sni_radixtree_match" and span.status.code == STATUS_CODE_UNSET',
+                                    ],
                                 },
                             },
                             # Traefik's tracing.otlp exporter (see traefik.py)
@@ -431,6 +500,20 @@ def setup_grafana(
                 "podLogsViaLoki": {
                     "enabled": True,
                     "collector": "alloy-logs",
+                    # The chart default (True) renders `tail_from_end = true`
+                    # on loki.source.file, which seeks to EOF for any file with
+                    # no stored position -- including every newly created
+                    # container log. Whatever a container writes before
+                    # local.file_match notices its log file (sync_period
+                    # defaults to 10s) is then dropped, so startup output
+                    # survives or vanishes depending on where the container
+                    # lands in that window. The superset web pods lost their
+                    # first 4.2s on 2026-09-21, gunicorn's arbiter block
+                    # included, and kept it on 2026-09-18.
+                    # Safe to disable only alongside the host-storage preset
+                    # below, which is what makes positions survive a collector
+                    # restart.
+                    "onlyGatherNewLogLines": False,
                     "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config()
                     + _keycloak_olapps_idp_login_redact_alloy_config(),
                 },
@@ -451,6 +534,38 @@ def setup_grafana(
                         "zipkin": {
                             "enabled": True,
                             "port": 9411,
+                        },
+                    },
+                    # Dagster is the only stack with OTEL_METRICS_EXPORTER on
+                    # (dagster/__main__.py's dagster_otel_env). Turning it on
+                    # enables every installed instrumentation's metrics, not
+                    # just db.client.connections.usage -- requests/urllib3
+                    # also emit http.client.* duration histograms, one series
+                    # per distinct host an instrumented client hits. QA's
+                    # fixed set of internal calls (Vault, Airbyte,
+                    # telemetry.dagster.io) bounded that at ~540 series;
+                    # Production's canvas run workers make per-partition
+                    # S3/GCS calls against many more hosts, an untested and
+                    # likely far larger cardinality regime. There is no stock
+                    # OTEL_* env var to disable one instrumentation's metrics
+                    # without also silencing its traces (OTEL_PYTHON_DISABLED_
+                    # INSTRUMENTATIONS takes both), so the metric is dropped
+                    # here instead via otelcol.processor.filter, scoped to
+                    # dagster so nothing else that later turns on OTel metrics
+                    # loses this series by surprise.
+                    "metrics": {
+                        "filters": {
+                            # Bracket classes, not backslash escapes: this
+                            # string crosses Helm's Sprig `quote` and Alloy's
+                            # River string-unescaping before OTTL parses it,
+                            # and each hop consumes one level of backslash.
+                            # `\.` doesn't survive that round trip as a valid
+                            # OTTL escape; `[.]` needs no escaping at all.
+                            "metric": [
+                                'IsMatch(name, "^http[.]client[.]") and '
+                                'resource.attributes["service.namespace"] '
+                                '== "dagster"',
+                            ],
                         },
                     },
                 },
@@ -652,7 +767,18 @@ def setup_grafana(
                         "presets": ["singleton"],
                     },
                     "alloy-logs": {
-                        "presets": ["filesystem-log-reader", "daemonset"],
+                        # host-storage moves Alloy's storage path off the
+                        # container filesystem (/tmp/alloy, discarded on every
+                        # pod restart) onto a /var/lib/alloy hostPath, so the
+                        # read positions outlive a collector restart. Without
+                        # it, onlyGatherNewLogLines=False above would re-read
+                        # every retained pod log on the node from byte 0 on each
+                        # restart (~60MB/node measured).
+                        "presets": [
+                            "filesystem-log-reader",
+                            "daemonset",
+                            "host-storage",
+                        ],
                     },
                     "alloy-receiver": {
                         "presets": ["deployment"],

@@ -120,6 +120,22 @@ mongodb_atlas_stack = make_stack_reference(
 notes_stack = make_stack_reference(
     projects.EDX_NOTES, f"{stack_info.env_prefix}.{stack_info.name}"
 )
+# Azure OpenAI is provisioned for the mitxonline deployment only, and only in
+# environments where infrastructure/azure/openai has been deployed -- a StackReference
+# to a stack that does not exist fails the whole preview, so the config switch is
+# needed as well as the env_prefix check.
+#
+# Both conditions are load-bearing. The wiring below reads the "mitxonline" key out of
+# the azure stack's workload_identities, so setting the flag on any other edxapp
+# deployment would hand it mitxonline's client id while its own ServiceAccount subject
+# does not match that identity's federated credential -- token exchange would fail
+# every time, at runtime, with AADSTS70021 and no deploy-time signal.
+azure_openai_stack = (
+    make_stack_reference(projects.AZURE_OPENAI, stack_info.name)
+    if edxapp_config.get_bool("enable_azure_openai")
+    and stack_info.env_prefix == "mitxonline"
+    else None
+)
 
 #############
 # Variables #
@@ -662,21 +678,6 @@ edxapp_mysql_role_statements["edxapp-csmh"] = {
     "renew": [],
     "rollback": [],
 }
-edxapp_mysql_role_statements["xqueue"] = {
-    "create": [
-        Template("""CREATE DATABASE IF NOT EXISTS xqueue;"""),
-        Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
-        Template(
-            """
-            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES,
-            CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue.* TO '{{name}}'@'%';
-            """
-        ),
-    ],
-    "revoke": [Template("DROP USER '{{name}}';")],
-    "renew": [],
-    "rollback": [],
-}
 edxapp_mysql_role_statements["notes"] = {
     "create": [
         Template("""CREATE DATABASE IF NOT EXISTS edx_notes_api;"""),
@@ -957,15 +958,23 @@ fastly_access_logging_iam_role = monitoring_stack.require_output(
 mfe_regex = "^/({})/".format("|".join(edxapp_mfe_paths))
 
 # OEP-65 Site Project routing (optional, additive — legacy MFE rules are unchanged).
-# Set edxapp:site_project in the stack YAML with two keys:
+# Set edxapp:site_project in the stack YAML with these keys:
 #   deployment — the Site Project deployment name (e.g. mitxonline)
-#   mfe_apps   — list of MFE app path names served by this Site Project (e.g. instructor-dashboard)
+#   mfe_apps   — list of MFE app path names served by this Site Project under
+#                /apps/<name> (e.g. instructor-dashboard)
+#   root_apps  — optional list of MFE app path names served by this Site Project
+#                at /<name>, the path the legacy MFE used (e.g. gradebook). For
+#                module libraries that register absolute route paths, which
+#                cannot be nested under /apps.
 site_project_config = edxapp_config.get_object("site_project")
 site_project_deployment = (
     site_project_config.get("deployment") if site_project_config else None
 )
 site_project_mfe_apps: list[str] = (
     list(site_project_config.get("mfe_apps", [])) if site_project_config else []
+)
+site_project_root_apps: list[str] = (
+    list(site_project_config.get("root_apps", [])) if site_project_config else []
 )
 
 # When a Site Project is active, recv snippets tag matching requests with
@@ -986,6 +995,30 @@ if site_project_deployment:
         raise ValueError(msg)
     _sp = site_project_deployment
     _apps_alt = "|".join(site_project_mfe_apps)
+    # gradebook's "back to dashboard" link resolves to the Site Project's
+    # /apps/instructor-dashboard route, which only loads if Fastly serves it.
+    if (
+        "gradebook" in site_project_root_apps
+        and "instructor-dashboard" not in site_project_mfe_apps
+    ):
+        msg = (
+            "edxapp:site_project.root_apps lists gradebook, which requires "
+            "instructor-dashboard in edxapp:site_project.mfe_apps"
+        )
+        raise ValueError(msg)
+    # root_apps keep the legacy MFE's own path. This recv rewrite runs before the
+    # backend is chosen, so a listed path is served the Site Project's
+    # index.html instead of the legacy build in the MFE bucket.
+    _root_apps_branch = ""
+    if site_project_root_apps:
+        _root_alt = "|".join(site_project_root_apps)
+        _root_apps_branch = (
+            f' else if (req.url.path ~ "^/({_root_alt})(/|$)") {{\n'
+            '  set req.http.X-Site-Project = "1";\n'
+            f'  set req.url = "/{_sp}-site/index.html";\n'
+            "  unset req.http.Cookie;\n"
+            "}"
+        )
     _site_project_snippets.append(
         vcl_snippet(
             content=textwrap.dedent(
@@ -1000,7 +1033,8 @@ if site_project_deployment:
                   set req.url = "/{_sp}-site/index.html";
                   unset req.http.Cookie;
                 }}"""
-            ),
+            )
+            + _root_apps_branch,
             name="Handle Site Project routing",
             priority=90,
             type="recv",
@@ -1155,6 +1189,15 @@ edxapp_fastly_service = fastly.ServiceVcl(
             content=textwrap.dedent(
                 """\
                 if (req.url.path ~ "^/asset-v1:") {
+                  # Fetch snippets run ahead of the default Cache-Control
+                  # checks, so apply them before returning early.
+                  if (beresp.http.Cache-Control ~ "(?:private|no-store)") {
+                    return (pass);
+                  }
+                  # The LMS attaches a session cookie to responses for new
+                  # visitors, which asset downloads don't need. Drop it so
+                  # public assets stay cacheable.
+                  unset beresp.http.Set-Cookie;
                   set beresp.ttl = 30s;
                   return (deliver);
                 }
@@ -1302,6 +1345,7 @@ k8s_resources = create_k8s_resources(
     stack_info=stack_info,
     vault_config=Config("vault"),
     vault_policy=edxapp_vault_policy,
+    azure_openai_stack=azure_openai_stack,
 )
 
 export_dict = {

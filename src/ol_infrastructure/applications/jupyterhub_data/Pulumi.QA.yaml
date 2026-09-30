@@ -12,4 +12,5 @@ config:
   vault_server:env_namespace: operations.qa
   jupyterhub_data:db_password:
     secure: v1:k6X8eHSCZlCsSBPm:CPOkxiNDVGKuDi38Jkpxem9eg3XdTF1md6dmKQwMCBWq26zBfm+2yQmZ+F6BtQ46sM/cX5NJvTw=
+  jupyterhub_data:bedrock_chat_model: us.anthropic.claude-sonnet-5
 encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgE9zUi6VsB8CycxqiNPh+tpAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMuHQL9wch9ewbKSDWAgEQgDsIDOFmuA2deOnyFKLHu9Jc809rvf/XaT4mliw2R72ja5wm1WRFuHPx2RVY7M7O5WmiUlojH9+OW8/7xQ==

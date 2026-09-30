@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -21,11 +22,12 @@ from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
     Config,
+    Output,
     ResourceOptions,
     export,
 )
 from pulumi.config import get_config
-from pulumi_aws import ec2, get_caller_identity
+from pulumi_aws import ec2, get_caller_identity, iam, s3
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import (
@@ -72,6 +74,11 @@ from ol_infrastructure.lib.aws.iam_helper import (
     data_lake_glue_resources,
 )
 from ol_infrastructure.lib.aws.rds_helper import postgres_max_connections
+from ol_infrastructure.lib.azure_workload_identity import (
+    azure_identity_env,
+    azure_identity_token_mount,
+    azure_identity_token_volume,
+)
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -127,6 +134,30 @@ keycloak_stack = (
 # it holds nothing from the QA app.
 mitxonline_stack = (
     make_stack_reference(projects.MITXONLINE, stack_info.name)
+    if stack_info.env_suffix in ("ci", "qa", "production")
+    else None
+)
+# Opik is also deployed to CI/QA/Production only. The ml code location traces its
+# LLM calls there; on the Dev stack OPIK_URL_OVERRIDE stays unset and the ml
+# code's tracing is a no-op.
+opik_stack = (
+    make_stack_reference(projects.OPIK, stack_info.name)
+    if stack_info.env_suffix in ("ci", "qa", "production")
+    else None
+)
+# Azure OpenAI for the ml code location, federated to the data cluster's OIDC issuer
+# by infrastructure/azure/openai. Off unless a stack opts in: that project has no Dev
+# stack, and the StackReference only resolves once it has deployed the environment.
+azure_openai_stack = (
+    make_stack_reference(projects.AZURE_OPENAI, stack_info.name)
+    if dagster_config.get_bool("enable_azure_openai")
+    else None
+)
+# The ml code location calls Gemini through Vertex AI in mitol01, authenticating
+# by Workload Identity Federation from the data cluster (see the GCP stack's
+# README). The GCP stack only federates the CI/QA/Production data clusters.
+gcp_stack = (
+    make_stack_reference(projects.GCP, "Production")
     if stack_info.env_suffix in ("ci", "qa", "production")
     else None
 )
@@ -201,8 +232,12 @@ mitlearn_env_suffix = {"ci": "ci", "qa": "rc", "production": "production"}[
 ]
 mitlearn_app_buckets = [f"ol-mitlearn-app-storage-{mitlearn_env_suffix}"]
 b2b_export_buckets = [f"ol-b2b-partners-storage-{stack_info.env_suffix}"]
+irx_export_bucket_name = f"ol-irx-partners-storage-{stack_info.env_suffix}"
 dagster_pipeline_buckets = (
-    s3_tracking_logs_buckets + mitlearn_app_buckets + b2b_export_buckets
+    s3_tracking_logs_buckets
+    + mitlearn_app_buckets
+    + b2b_export_buckets
+    + [irx_export_bucket_name]
 )
 dagster_s3_permissions: list[dict[str, str | list[str]]] = [
     {
@@ -290,6 +325,14 @@ dagster_s3_permissions: list[dict[str, str | list[str]]] = [
             f"arn:aws:s3:::{bucket_name}" for bucket_name in dagster_pipeline_buckets
         ]
         + [f"arn:aws:s3:::{bucket_name}/*" for bucket_name in dagster_pipeline_buckets],
+    },
+    {
+        # A re-run of an IRx drop removes the drop's manifest before rewriting
+        # any file, so IRx never sees a manifest next to a partial drop. Only
+        # the manifest: the files themselves are overwritten in place.
+        "Effect": "Allow",
+        "Action": ["s3:DeleteObject"],
+        "Resource": [f"arn:aws:s3:::{irx_export_bucket_name}/*/_MANIFEST.json"],
     },
 ]
 
@@ -486,6 +529,198 @@ edxorg_courses_bucket = OLBucket(
         ]
     ),
 )
+
+# Nightly drop for MIT Institutional Research (IRx), replacing the three legacy
+# mitx-etl-* buckets, laid out as {deployment}/{YYYYMMDD}/. Every night is a full
+# re-export, so drops expire instead of accumulating the way they do in the
+# legacy buckets, none of which expires anything (54-87 TB each as of 2026-08-30).
+irx_export_bucket = OLBucket(
+    "irx-export",
+    config=S3BucketConfig(
+        bucket_name=irx_export_bucket_name,
+        versioning_enabled=False,
+        server_side_encryption_enabled=True,
+        # Objects expire at 90 days, which is when tiering would first move them.
+        intelligent_tiering_enabled=False,
+        lifecycle_rules=[
+            s3.BucketLifecycleConfigurationRuleArgs(
+                id="expire-nightly-drops",
+                status="Enabled",
+                filter=s3.BucketLifecycleConfigurationRuleFilterArgs(prefix=""),
+                expiration=s3.BucketLifecycleConfigurationRuleExpirationArgs(days=90),
+            )
+        ],
+        tags=aws_config.tags,
+    ),
+)
+
+# Lifecycle rules for the three legacy mitx-etl-* export buckets. None of them
+# is created by Pulumi -- they predate this repo and no project declares them --
+# but BucketLifecycleConfiguration is keyed on the bucket name, so the policy can
+# be managed here without adopting the buckets themselves. They live alongside
+# irx_export_bucket because this stack already owns the IRx delivery path and the
+# mitx-etl-* grants below; when the facade's parallel run passes and the legacy
+# drop is retired, these go with it.
+#
+# All three were 100% STANDARD with no lifecycle configuration at all as of
+# 2026-09-24: 78.0 TB, 5.5 TB and 441 GB, ~$1,932/mo combined.
+#
+# Deliberately not INTELLIGENT_TIERING: the access pattern here is known (a drop
+# is read by the ETL shortly after it lands and then never again), so paying
+# $0.0025 per 1,000 objects/mo to have S3 rediscover that is waste.
+LEGACY_ETL_EXPORT_BUCKETS = {
+    # Still written nightly -- 20260923/ landed the day before this was added.
+    # A drop is ~103 GB, dominated by a single studentmodule_query.csv, and every
+    # night is a full re-export, so the bucket only grows.
+    #
+    # GLACIER_IR rather than GLACIER or DEEP_ARCHIVE: those two make an object
+    # unreadable until an asynchronous restore completes (3-5h and 12-48h
+    # respectively), which would turn any IRx backfill into a multi-day job.
+    # GLACIER_IR keeps GetObject working at millisecond latency for 6x less than
+    # STANDARD, and the retrieval fee only applies if something actually re-reads
+    # the cold window.
+    "mitx-etl-residential-live-mitx-production": [
+        s3.BucketLifecycleConfigurationRuleArgs(
+            id="tier-cold-export-drops",
+            status="Enabled",
+            # Course tarballs in here run 2-64 KB, and IA and GLACIER_IR bill a
+            # 128 KB minimum per object -- tiering those would cost more than
+            # leaving them in STANDARD. S3 already refuses to transition objects
+            # under 128 KB to these classes; saying so explicitly keeps the rule
+            # honest about what it does and does not touch.
+            filter=s3.BucketLifecycleConfigurationRuleFilterArgs(
+                object_size_greater_than=131071,
+            ),
+            transitions=[
+                s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                    days=30,
+                    storage_class="STANDARD_IA",
+                ),
+                s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                    days=90,
+                    storage_class="GLACIER_IR",
+                ),
+            ],
+        ),
+        # The nightly studentmodule export is a 61 GB multipart upload. There are
+        # no orphaned parts today, but without this rule a single failed night
+        # would bill at STANDARD forever and never appear in a LIST.
+        s3.BucketLifecycleConfigurationRuleArgs(
+            id="abort-incomplete-multipart-uploads",
+            status="Enabled",
+            abort_incomplete_multipart_upload=s3.BucketLifecycleConfigurationRuleAbortIncompleteMultipartUploadArgs(
+                days_after_initiation=7,
+            ),
+        ),
+    ],
+    # Dead: last drop 2025-10-31.
+    "mitx-etl-xpro-qa-mitxpro-qa": [
+        s3.BucketLifecycleConfigurationRuleArgs(
+            id="archive-dead-qa-exports",
+            status="Enabled",
+            # New S3 lifecycle configurations skip objects under 128 KiB for
+            # every storage class by default, including DEEP_ARCHIVE. Keep the
+            # cutoff explicit because these 2-64 KiB course tarballs are 68% of
+            # this bucket's objects but only 0.01% of its bytes; archiving them
+            # would add 40 KiB of billable metadata and transition charges.
+            filter=s3.BucketLifecycleConfigurationRuleFilterArgs(
+                object_size_greater_than=131072,
+            ),
+            transitions=[
+                s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                    days=0,
+                    storage_class="DEEP_ARCHIVE",
+                ),
+            ],
+        ),
+    ],
+    # Dead: last drop 2023-10-25.
+    "mitx-etl-current-residential-live-mitx-qa": [
+        s3.BucketLifecycleConfigurationRuleArgs(
+            id="archive-dead-qa-exports",
+            status="Enabled",
+            # New S3 lifecycle configurations skip objects under 128 KiB for
+            # every storage class by default, including DEEP_ARCHIVE. Keep the
+            # cutoff explicit to prevent small course tarballs from incurring
+            # 40 KiB of billable metadata and transition charges if the default
+            # behavior changes.
+            filter=s3.BucketLifecycleConfigurationRuleFilterArgs(
+                object_size_greater_than=131072,
+            ),
+            transitions=[
+                s3.BucketLifecycleConfigurationRuleTransitionArgs(
+                    days=0,
+                    storage_class="DEEP_ARCHIVE",
+                ),
+            ],
+        ),
+    ],
+}
+
+# Bucket names are globally unique and every dagster stack points at the same AWS
+# account, so only one stack may declare these.
+if stack_info.env_suffix == "production":
+    for legacy_bucket_name, legacy_bucket_rules in LEGACY_ETL_EXPORT_BUCKETS.items():
+        s3.BucketLifecycleConfiguration(
+            f"{legacy_bucket_name}-lifecycle",
+            bucket=legacy_bucket_name,
+            rules=legacy_bucket_rules,
+        )
+
+
+# IRx reads with the static key of an IAM user created by hand in 2022, which is
+# what Simeon is configured with. Its read policy and attachment were made in the
+# console too and were adopted into this stack by import (#5822). The user itself
+# stays unmanaged. The mitx-etl-* grants cover the legacy_openedx drop, which is
+# the only delivery path to IRx until the facade's parallel run passes.
+if stack_info.env_suffix == "production":
+    irx_user_name = "institutional-research-edx-data-exports-access"
+    irx_read_policy = iam.Policy(
+        "irx-edx-data-extracts-read-only",
+        name="edx-data-extracts-read-only",
+        path="/",
+        policy=json.dumps(
+            {
+                "Version": IAM_POLICY_VERSION,
+                "Statement": [
+                    {
+                        "Sid": "VisualEditor0",
+                        "Effect": "Allow",
+                        "Action": [
+                            "s3:GetObjectAcl",
+                            "s3:GetObject",
+                            "s3:GetObjectVersionTagging",
+                            "s3:GetObjectVersionAcl",
+                            "s3:GetObjectTagging",
+                            "s3:GetObjectVersion",
+                        ],
+                        "Resource": [
+                            "arn:aws:s3:::mitx-etl-*/*",
+                            "arn:aws:s3:::*production-edxapp-tracking/*",
+                            f"arn:aws:s3:::{irx_export_bucket_name}/*",
+                        ],
+                    },
+                    {
+                        "Sid": "VisualEditor1",
+                        "Effect": "Allow",
+                        "Action": ["s3:ListBucketVersions", "s3:ListBucket"],
+                        "Resource": [
+                            "arn:aws:s3:::mitx-etl-*",
+                            "arn:aws:s3:::*production-edxapp-tracking",
+                            f"arn:aws:s3:::{irx_export_bucket_name}",
+                        ],
+                    },
+                ],
+            }
+        ),
+        opts=ResourceOptions(protect=True),
+    )
+    iam.UserPolicyAttachment(
+        "irx-edx-data-extracts-read-only-attachment",
+        user=irx_user_name,
+        policy_arn=irx_read_policy.arn,
+        opts=ResourceOptions(protect=True),
+    )
 
 
 # Security group for RDS database - updated to allow Kubernetes pod access
@@ -954,6 +1189,21 @@ pgbouncer_ini_template = dagster_db.db_instance.address.apply(
             # warm, so nothing in normal operation waits on a connect, and drops the
             # parked total from 900 to 240.
             #
+            # 40 -> 20, re-measured under transaction mode over 14 days ending
+            # 2026-09-18 (clean history only; the event_logs autovacuum bug inflated
+            # query time until 2026-09-03):
+            #
+            #   peak server_active, busiest replica   8 production, 12 QA
+            #   held servers per replica              40 at every sample, both envs
+            #   maxwait                               0 at every sample, both envs
+            #
+            # Neither pool grew past its floor once, so how fast a pool grows from
+            # cold is still unmeasured. 20 does not depend on it: the floor only
+            # costs connect latency when a replica needs more backends than it
+            # holds, and 20 is still above every per-replica peak either
+            # environment recorded. Cold growth is paid only for demand above
+            # anything observed.
+            #
             # default_pool_size and reserve_pool_size were dead numbers: 800 + 2000
             # per pod against a derived cap of 708 means max_db_connections already
             # bound first, so neither value could take effect on production. Rather
@@ -970,7 +1220,7 @@ pgbouncer_ini_template = dagster_db.db_instance.address.apply(
             # dead -- saturation would surface only as clients queueing, which is the
             # symptom the headroom rule exists to get ahead of.
             f"default_pool_size = {pgbouncer_max_db_connections}",
-            "min_pool_size = 40",
+            "min_pool_size = 20",
             "reserve_pool_size = 0",
             # The aggregate ceiling. See the derivation above; this is the
             # only setting here that bounds total backends across replicas,
@@ -2167,6 +2417,92 @@ aws_profile_configmap = kubernetes.core.v1.ConfigMap(
     },
 )
 
+# Workload Identity Federation for the ml code location. The pod projects a
+# Kubernetes token for the eks-workloads pool provider of this tier's data
+# cluster and exchanges it for a token as dagster-ml-<tier>@mitol01, so no
+# Google key material exists anywhere. The credential document below is not a
+# secret: it only says where the token file is and which account to become.
+VERTEX_PROJECT = "mitol01"
+GCP_TOKEN_DIR = "/var/run/secrets/gcp"  # noqa: S105 -- a mount path, not a secret
+GCP_CREDENTIALS_DIR = "/etc/gcp"
+ml_gcp_env: list[dict[str, Any]] = []
+ml_gcp_volumes: list[dict[str, Any]] = []
+ml_gcp_volume_mounts: list[dict[str, Any]] = []
+ml_gcp_configmaps: list[kubernetes.core.v1.ConfigMap] = []
+if gcp_stack is not None:
+    wif_provider_name = gcp_stack.require_output("workload_identity_providers")[
+        VERTEX_PROJECT
+    ][f"eks-workloads/data-{stack_info.env_suffix}"]
+    ml_gcp_service_account = gcp_stack.require_output("service_account_emails")[
+        VERTEX_PROJECT
+    ][f"dagster-ml-{stack_info.env_suffix}"]
+    ml_gcp_credentials = kubernetes.core.v1.ConfigMap(
+        f"dagster-ml-gcp-credentials-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="dagster-ml-gcp-credentials",
+            namespace=dagster_namespace,
+            labels=k8s_global_labels.model_dump(),
+        ),
+        data={
+            "credentials.json": Output.all(
+                wif_provider_name, ml_gcp_service_account
+            ).apply(
+                lambda args: json.dumps(
+                    {
+                        "type": "external_account",
+                        "audience": f"//iam.googleapis.com/{args[0]}",
+                        "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+                        "token_url": "https://sts.googleapis.com/v1/token",
+                        "service_account_impersonation_url": (
+                            "https://iamcredentials.googleapis.com/v1/projects/-/"
+                            f"serviceAccounts/{args[1]}:generateAccessToken"
+                        ),
+                        "credential_source": {"file": f"{GCP_TOKEN_DIR}/token"},
+                    }
+                )
+            ),
+        },
+    )
+    ml_gcp_configmaps.append(ml_gcp_credentials)
+    ml_gcp_volumes = [
+        {
+            "name": "gcp-wif-token",
+            "projected": {
+                "sources": [
+                    {
+                        "serviceAccountToken": {
+                            # The pool provider's default accepted audience.
+                            "audience": wif_provider_name.apply(
+                                lambda name: f"https://iam.googleapis.com/{name}"
+                            ),
+                            "expirationSeconds": 3600,
+                            "path": "token",
+                        }
+                    }
+                ]
+            },
+        },
+        {
+            "name": "gcp-credentials",
+            "configMap": {"name": "dagster-ml-gcp-credentials"},
+        },
+    ]
+    ml_gcp_volume_mounts = [
+        {"name": "gcp-wif-token", "mountPath": GCP_TOKEN_DIR, "readOnly": True},
+        {"name": "gcp-credentials", "mountPath": GCP_CREDENTIALS_DIR, "readOnly": True},
+    ]
+    # google-genai reads the last three to construct a Vertex AI client from a
+    # bare genai.Client(), with application default credentials.
+    ml_gcp_env = [
+        {
+            "name": "GOOGLE_APPLICATION_CREDENTIALS",
+            "value": f"{GCP_CREDENTIALS_DIR}/credentials.json",
+        },
+        {"name": "GOOGLE_GENAI_USE_VERTEXAI", "value": "true"},
+        {"name": "GOOGLE_CLOUD_PROJECT", "value": VERTEX_PROJECT},
+        {"name": "GOOGLE_CLOUD_LOCATION", "value": "global"},
+    ]
+
 # Create Vault secret for edxorg GCP credentials used by legacy_openedx pipelines
 edxorg_gcp_secret = OLVaultK8SSecret(
     f"dagster-k8s-edxorg-gcp-secrets-{stack_info.env_suffix}",
@@ -2243,6 +2579,26 @@ edxorg_gcp_secret = OLVaultK8SSecret(
 # enable direction rather than the disable one. Read it before widening the set.
 OTEL_AGENT_PYTHONPATH = "/opt/otel/auto_instrumentation"
 
+# Metrics export, for db.client.connections.usage: the sqlalchemy
+# instrumentation's count of each QueuePool's connections by state (idle/used).
+# PgBouncer's exporter measures the server end of every connection, so a
+# saturated client pool (the "QueuePool limit of size N overflow M reached"
+# failure) reads as a healthy PgBouncer. This is the only series that sees it.
+#
+# Opt-in per stack rather than on everywhere, because enabling the metrics
+# exporter enables every installed instrumentation's metrics at once, not just
+# this one. requests and urllib3 each emit http.client.* duration and size
+# histograms. The canvas API client uses httpx2, which is not instrumented, but
+# S3 IO goes through botocore over urllib3 and Vault through hvac over
+# requests. The run workers that inherit this env (canvas, see
+# OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS) are short-lived processes, each with
+# its own random service.instance.id, and so is every step subprocess the
+# multiprocess executor spawns inside one. Production started ~440-475 canvas
+# run-worker Jobs a day in the week to 2026-09-18, each minting at least one
+# fresh set of series. Measure the series count on QA before setting this in
+# Production.
+dagster_otel_metrics_enabled = dagster_config.get_bool("otel_metrics_enabled") or False
+
 
 def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, str]]:
     """Build the OTEL_* + PYTHONPATH block for one long-lived Dagster process.
@@ -2280,10 +2636,20 @@ def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, st
         # Only the HTTP OTLP exporter is installed in the images; the SDK default
         # "otlp" resolves to the gRPC exporter, which is absent. An unresolvable
         # exporter aborts SDK initialisation outright -- traces included -- which
-        # is why metrics and logs are named off rather than left at their
-        # defaults. Same reasoning as edxapp/k8s_resources.py's _OTEL_SDK_ENV.
+        # is why metrics and logs are named off or named explicitly rather than
+        # left at their defaults. Same reasoning as edxapp/k8s_resources.py's
+        # _OTEL_SDK_ENV. otlp_proto_http is registered for metrics by the same
+        # opentelemetry-exporter-otlp-proto-http package the traces use.
         {"name": "OTEL_TRACES_EXPORTER", "value": "otlp_proto_http"},
-        {"name": "OTEL_METRICS_EXPORTER", "value": "none"},
+        *(
+            [
+                {"name": "OTEL_METRICS_EXPORTER", "value": "otlp_proto_http"},
+                # The interval mit_learn, learn_ai and witan export at.
+                {"name": "OTEL_METRIC_EXPORT_INTERVAL", "value": "60000"},
+            ]
+            if dagster_otel_metrics_enabled
+            else [{"name": "OTEL_METRICS_EXPORTER", "value": "none"}]
+        ),
         {"name": "OTEL_LOGS_EXPORTER", "value": "none"},
         # The mit_learn/learn_ai ratio, so a trace crossing from one of those
         # services is sampled once rather than decided twice. Alloy's
@@ -2375,14 +2741,9 @@ def grpc_health_check_command(port: int) -> list[str]:
 code_locations: list[dict[str, str | int]] = [
     {"name": "canvas", "module": "canvas.definitions", "port": 4000},
     {"name": "data_loading", "module": "data_loading.definitions", "port": 4000},
-    {"name": "data_platform", "module": "data_platform.definitions", "port": 4001},
     {"name": "edxorg", "module": "edxorg.definitions", "port": 4002},
     {"name": "lakehouse", "module": "lakehouse.definitions", "port": 4003},
-    {
-        "name": "learning_resources",
-        "module": "learning_resources.definitions",
-        "port": 4004,
-    },
+    {"name": "delivery", "module": "delivery.definitions", "port": 4004},
     {"name": "legacy_openedx", "module": "legacy_openedx.definitions", "port": 4005},
     {"name": "openedx", "module": "openedx.definitions", "port": 4006},
     {
@@ -2540,6 +2901,65 @@ for location in code_locations:
             {
                 "name": "MITXONLINE_APP_DB_HOST",
                 "value": mitxonline_stack.require_output("mitxonline")["rds_host"],
+            }
+        )
+
+    # ml's Opik tracing and Prompt Library. Only the non-secret settings live
+    # here: the code reads the Keycloak client-credentials from Vault at
+    # secret-operations/sso/opik itself (dagster_server_policy.hcl), the same
+    # secret learn_ai syncs. No OPIK_API_KEY -- the Keycloak auth hook owns the
+    # Authorization header (see the opik stack's OPIK_SDK_KEYCLOAK_AUTH.md).
+    # The chart copies a code location's env, volumes and volumeMounts into the
+    # run pods it launches (includeConfigInLaunchedRuns), so ml's run workers
+    # get the same federated credential as its code server.
+    if name == "ml" and gcp_stack is not None:
+        deployment["env"].extend(ml_gcp_env)
+        # Appended, not assigned: the Azure OpenAI block below mounts its own
+        # token into the same ml deployment.
+        deployment.setdefault("volumes", []).extend(ml_gcp_volumes)
+        deployment.setdefault("volumeMounts", []).extend(ml_gcp_volume_mounts)
+
+    if name == "ml" and opik_stack is not None:
+        deployment["env"].extend(
+            [
+                {
+                    "name": "OPIK_URL_OVERRIDE",
+                    "value": opik_stack.require_output("opik_url").apply(
+                        lambda url: f"{url}/api/"
+                    ),
+                },
+                {"name": "OPIK_WORKSPACE", "value": "default"},
+                {"name": "OPIK_PROJECT_NAME", "value": "dagster-ml"},
+            ]
+        )
+
+    # The chart copies volumes, volumeMounts, and env into the container context
+    # K8sRunLauncher applies to run workers, so ml's runs get the token as well as its
+    # code server. No other code location mounts it, which is what keeps this identity
+    # to ml while every location shares the dagster-user-code ServiceAccount.
+    #
+    # LLM_AZURE_ENDPOINT is the name ml's definitions.py reads. ml cannot use this
+    # identity yet: its azure_openai client authenticates with AZURE_OPENAI_API_KEY,
+    # and these accounts disable key auth. It needs a token provider built on
+    # azure-identity's WorkloadIdentityCredential before SUMMARY_PROVIDER=azure_openai
+    # works.
+    if name == "ml" and azure_openai_stack is not None:
+        deployment.setdefault("volumes", []).append(azure_identity_token_volume())
+        deployment.setdefault("volumeMounts", []).append(azure_identity_token_mount())
+        deployment["env"].extend(
+            [
+                {"name": env_name, "value": env_value}
+                for env_name, env_value in azure_identity_env(
+                    azure_openai_stack, "dagster-ml"
+                ).items()
+            ]
+        )
+        deployment["env"].append(
+            {
+                "name": "LLM_AZURE_ENDPOINT",
+                "value": azure_openai_stack.require_output("cognitive_accounts").apply(
+                    lambda accounts: accounts["dagster-ml"]["endpoint"]
+                ),
             }
         )
 
@@ -3137,6 +3557,7 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
             dagster_helm_release,
             aws_profile_configmap,
             edxorg_gcp_secret,
+            *ml_gcp_configmaps,
         ]
     ),
 )
@@ -3246,3 +3667,4 @@ export(
         "s3_prefix": "openmetadata/dbt-artifacts",
     },
 )
+export("irx_export_bucket", irx_export_bucket.bucket_v2.bucket)

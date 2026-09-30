@@ -292,6 +292,12 @@ policy_definition = {
                 "iam:GetUser",
                 "iam:ListAccessKeys",
                 "iam:ListAttachedRolePolicies",
+                # Refresh reads every aws:iam/user:User's attached managed
+                # policies the same way it reads a role's -- confirmed by a
+                # live AccessDenied on institutional-research-edx-data-exports-access's
+                # edx-data-extracts-read-only attachment. Only the role variant
+                # was granted above.
+                "iam:ListAttachedUserPolicies",
                 "iam:ListEntitiesForPolicy",
                 "iam:ListGroupsForUser",
                 "iam:ListPolicyTags",
@@ -311,9 +317,19 @@ policy_definition = {
                 "kms:ListResourceTags",
                 "kms:Sign",
                 "lambda:ListFunctions",
+                # aws:cloudwatch/logGroup lifecycle -- the EKS project owns the
+                # control-plane log group so its retention actually applies.
+                "logs:CreateLogGroup",
                 "logs:CreateScheduledQuery",
+                "logs:DeleteLogGroup",
+                "logs:DeleteRetentionPolicy",
                 "logs:DeleteScheduledQuery",
+                "logs:DescribeLogGroups",
                 "logs:GetScheduledQuery",
+                "logs:ListTagsForResource",
+                "logs:PutRetentionPolicy",
+                "logs:TagResource",
+                "logs:UntagResource",
                 "mediaconvert:CreateQueue",
                 "mediaconvert:DeleteQueue",
                 "mediaconvert:DescribeEndpoints",
@@ -331,19 +347,30 @@ policy_definition = {
                 # just fails one step later each retry.
                 "rds:CreateDBInstanceReadReplica",
                 "rds:CreateDBParameterGroup",
+                "rds:CreateDBSnapshot",
                 "rds:CreateTenantDatabase",
                 "rds:DeleteBlueGreenDeployment",
+                "rds:DeleteDBCluster",
+                "rds:DeleteDBClusterEndpoint",
                 "rds:DeleteDBInstance",
                 "rds:DeleteDBParameterGroup",
+                "rds:DeleteTenantDatabase",
+                # Not in AWS's documented lifecycle list, but the provider polls
+                # it to wait for the green environment and for deletion. Without
+                # it the apply dies after CreateBlueGreenDeployment succeeds and
+                # leaves the deployment behind (keycloak-production build #33).
+                "rds:DescribeBlueGreenDeployments",
                 "rds:DescribeDBEngineVersions",
                 "rds:DescribeDBInstances",
                 "rds:DescribeDBParameterGroups",
                 "rds:DescribeDBParameters",
                 "rds:DescribeDBSubnetGroups",
                 "rds:ListTagsForResource",
+                "rds:ModifyDBCluster",
                 "rds:ModifyDBInstance",
                 "rds:ModifyDBSubnetGroup",
                 "rds:PromoteReadReplica",
+                "rds:PromoteReadReplicaDBCluster",
                 "rds:ResetDBParameterGroup",
                 "rds:SwitchoverBlueGreenDeployment",
                 "route53:CreateHostedZone",
@@ -510,7 +537,86 @@ policy_definition = {
                     f"arn:aws:iam::*:user/mitopen-gh-workflow-{env}"
                     for env in ("ci", "qa", "production")
                 ],
+                # applications/dagster/__main__.py imports
+                # edx-data-extracts-read-only, a policy hand-created in the
+                # console in 2022 at the default "/" path -- confirmed by a
+                # live AccessDenied on the dagster production stack's
+                # CreatePolicyVersion when its content drifts from the
+                # imported document.
+                "arn:aws:iam::*:policy/edx-data-extracts-read-only",
             ],
+        },
+        {
+            # components/aws/database.py creates a
+            # "{instance_name}-rds-enhanced-monitoring-" role (name_prefix
+            # truncated to IAM_ROLE_NAME_PREFIX_MAX_LENGTH=32) for any DB with
+            # enhanced_monitoring_interval set, and blue/green updates pass it
+            # to RDS -- confirmed by a live AccessDenied on
+            # keycloak-production's CreateBlueGreenDeployment. No name-suffix
+            # marker survives truncation reliably: instance names >=30 chars
+            # (edxapp-db-mitxonline-production, xpro-db-applications-production,
+            # ocw-studio-db-applications-production) truncate before any "-rds"
+            # text is left at all, so a resource-name wildcard can't scope this
+            # safely. The real boundary is the service it can be passed to.
+            #
+            # monitoring.rds.amazonaws.com alone was not enough: with it live,
+            # CreateBlueGreenDeployment kept failing with "no identity-based
+            # policy allows the iam:PassRole action", while
+            # simulate-principal-policy allows that exact role with
+            # PassedToService=monitoring.rds.amazonaws.com and denies it with
+            # rds.amazonaws.com. The condition is the only thing that can fail,
+            # so blue/green must report a different service; rds.amazonaws.com
+            # is the likely one (inferred, not documented by AWS).
+            "Effect": "Allow",
+            "Action": ["iam:PassRole"],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "iam:PassedToService": [
+                        "monitoring.rds.amazonaws.com",
+                        "rds.amazonaws.com",
+                    ]
+                }
+            },
+        },
+        {
+            # Updating an ASG's mixed instances policy makes AutoScaling
+            # re-validate that the caller may *use* the launch template, and
+            # that check includes passing the template's instance profile role
+            # to EC2. Without this the update fails as "AccessDenied: You are
+            # not authorized to use launch template: lt-..." -- naming the
+            # template rather than the missing PassRole, which makes it look
+            # like an EC2 or instance-type problem. Confirmed with
+            # simulate-principal-policy: iam:PassRole is implicitDeny for
+            # PassedToService=ec2.amazonaws.com and allowed for
+            # rds.amazonaws.com.
+            #
+            # Unlike the RDS grant above, this one is scoped by resource and
+            # not only by service: every pulumi-managed launch template's
+            # instance profile role lives under one of these four paths.
+            # /ol-applications/*, /ol-data/* and /ol-infrastructure/* match the
+            # role ARNs the iam:CreateRole statement already allows;
+            # /ol-operations/* is additionally required here and is NOT in that
+            # statement, because the consul and keycloak instance roles
+            # (/ol-operations/consul/role/, /ol-operations/keycloak/role/) are
+            # created by another stack but still have to be passed to EC2 by
+            # this one when their ASGs change.
+            #
+            # The instance profile roles at the default "/" path are all
+            # pre-Pulumi legacy (cassandra, reddit, zookeeper, edx-*,
+            # salt-master) and include AdminEC2Role -- with Resource "*" this
+            # role could attach that to an instance it launches, so the paths
+            # are the boundary that keeps PassRole from becoming an escalation
+            # path.
+            "Effect": "Allow",
+            "Action": ["iam:PassRole"],
+            "Resource": [
+                "arn:aws:iam::*:role/ol-applications/*",
+                "arn:aws:iam::*:role/ol-data/*",
+                "arn:aws:iam::*:role/ol-infrastructure/*",
+                "arn:aws:iam::*:role/ol-operations/*",
+            ],
+            "Condition": {"StringEquals": {"iam:PassedToService": "ec2.amazonaws.com"}},
         },
     ],
 }

@@ -98,6 +98,51 @@ number → continue.
   it keeps promoting a format-bumping image into the next environment while you
   are still migrating this one. Pause it before the build lands, or as soon as
   you see the failed CI deploy.
+- **The witan writers freeze off the same knob, one deploy later.**
+  `witan-ci-indexer` and `witan-view-reaper` live in the `witan` namespace and
+  belong to the witan stack, and both write to the graphs. The omnigraph stack
+  exports `writers_frozen` (true while `migrate_from_image` is set), and the
+  witan stack suspends both CronJobs off it. The omnigraph apply cannot change
+  witan's resources, so after arming (below) run the witan deploy for the same
+  environment: the `pulumi-witan` pipeline job, or a local `pulumi up` in
+  `applications/witan` with `WITAN_DOCKER_SHA` set to the deployed digest. A
+  witan deploy mid-migration keeps them suspended, so `pulumi-witan` does not
+  need pausing.
+
+  **You do not need to check for running writer Jobs by hand.** The migration
+  Job's pre-flight does it before taking a baseline: it waits, for up to 30
+  minutes, until all four writer CronJobs (`omnigraph-optimize`,
+  `omnigraph-cleanup`, `witan-ci-indexer`, `witan-view-reaper`) show
+  `suspend: true` and none owns a Job that lacks a `Complete` or `Failed`
+  condition. `suspend` stops the next schedule, not a run already in progress,
+  which is why both conditions are checked. A Job counts as running until it
+  has a terminal condition, not only while `.status.active` is set, because a
+  Job created just before suspension reads `status: {}` until the Job
+  controller reconciles it. The Job logs `waiting on graph writers: ...` while it waits. If
+  it gives up it exits before exporting anything, naming every writer still
+  able to write. The usual cause is a witan deploy that has not run yet. Once
+  the writers are quiet, re-create the Job by replacing it (its spec is
+  immutable, and nothing in the config changed to make Pulumi do so on its own):
+
+  ```shell
+  pulumi stack --show-urns --stack <CI|QA|Production> | grep 'batch/v1:Job::omnigraph-storage-migration-'
+  OMNIGRAPH_DOCKER_SHA=sha256:<NEW-image-digest> \
+    pulumi up --stack <CI|QA|Production> --replace '<the Job URN above>'
+  ```
+
+  If you check by hand anyway, a Job is finished only when `CONDITION` shows
+  `Complete` or `Failed`; an empty `CONDITION` is still running:
+
+  ```shell
+  kubectl -n witan get cronjobs,jobs \
+    -o custom-columns='KIND:.kind,NAME:.metadata.name,SUSPEND:.spec.suspend,ACTIVE:.status.active,CONDITION:.status.conditions[*].type'
+  ```
+
+  Do NOT filter with `--field-selector status.successful!=1` or
+  `kubectl wait --for=condition=complete job --all`: both match long-dead
+  *failed* Jobs (this cluster carries indexer failures over a month old), so
+  they either report phantom work or block until timeout on corpses.
+
 - **CI, then QA, then Production**, each with a soak. This rebuilds every graph;
   do it once somewhere cheap first.
 - **Size the outage.** The data tier is down for the whole procedure — this is
@@ -171,8 +216,9 @@ recovery path anyone should be attempting under time pressure.
 
 Repointing is a config change: **`omnigraph:storage_prefix`**. Unset (the
 steady state) puts the graphs at the bucket root; set to `fmt5` they live at
-`s3://ol-data-witan-<env>/fmt5`. Step 5 sets it, rollback removes it, and no
-code is edited during the outage.
+`s3://ol-data-witan-<env>/fmt5`. Step 5 sets it, rollback sets it back to the
+root it had before (see [Rollback](#rollback), which also needs
+`storage_rollback_from`), and no code is edited during the outage.
 
 It is a *prefix inside the managed bucket*, not a free-form URI, on purpose:
 the bucket, its IAM policy and the IRSA grant are all keyed to the derived
@@ -214,16 +260,10 @@ middle needs picking apart by hand.
 **Do step 1 first.** The Job takes its baseline and exports by reading the old
 root directly, and it has no way to stop the server writing underneath it — a
 snapshot taken while the Deployment is still serving is a baseline of a moving
-target, and the export that follows can disagree with it. Scaling to zero is
-not optional just because the rest is automated:
+target, and the export that follows can disagree with it. The tier has to be at
+zero before the Job runs; arming is what puts it there.
 
-```shell
-kubectl -n omnigraph scale deploy/omnigraph-server --replicas=0
-kubectl -n omnigraph wait --for=delete pod \
-  -l app.kubernetes.io/name=omnigraph-server --timeout=120s
-```
-
-Then arm and run it:
+Arming and running it is one apply:
 
 ```shell
 cd src/ol_infrastructure/applications/omnigraph
@@ -235,15 +275,53 @@ pulumi config set omnigraph:migrate_from_image <OLD-image-ref> --stack <CI|QA|Pr
 # Where the rebuild lands. Digits = the NEW internal-schema number.
 # Rejected at preview unless it matches fmt<N>, so a typo cannot arm an outage
 # for a Job that would refuse the root it was given.
-pulumi config set omnigraph:migrate_to_prefix fmt6 --stack <CI|QA|Production>
+pulumi config set omnigraph:migrate_to_prefix fmt<N> --stack <CI|QA|Production>
 
-pulumi up --stack <CI|QA|Production>     # creates the Job; suspends both sweeps
-kubectl -n omnigraph logs -f job/omnigraph-migrate-fmt6
+# A LOCAL run needs the image ref Concourse normally injects: without it the
+# program raises `Either OMNIGRAPH_DOCKER_TAG or OMNIGRAPH_DOCKER_SHA must be
+# set`, and with the wrong value the Job's main container runs the wrong
+# binary. Use the NEW image's digest; `migrate_from_image` above stays the OLD
+# one, and must be the FULL ECR ref, not a bare `sha256:...` — it is used
+# verbatim as the initContainer's `image:`.
+OMNIGRAPH_DOCKER_SHA=sha256:<NEW-image-digest> pulumi up --stack <CI|QA|Production>
+kubectl -n omnigraph logs -f job/omnigraph-migrate-fmt<N>
 ```
 
-The Job is ordered behind the two CronJob suspensions, so it cannot start while
-maintenance is still schedulable. Scaling the Deployment down stays yours —
-Pulumi does not manage the replica count during a migration.
+Read the preview before accepting it. One apply does all of this, in order: the
+two maintenance CronJobs are suspended, the Deployment goes to zero replicas,
+and the Job is created behind both. It cannot start while maintenance is still
+schedulable or the server is still serving. Then run the witan deploy so the
+other two writers suspend (see **Before you start**). The Job waits for them.
+
+Before the pre-flight, an initContainer copies `<old root>/__cluster` to
+`s3://<bucket>/backups/pre-fmt<N>-<UTC timestamp>/__cluster/` and fails the Job
+if that copied nothing. Its log line gives the exact destination:
+
+```shell
+kubectl -n omnigraph logs job/omnigraph-migrate-fmt<N> -c snapshot-cluster-state
+```
+
+**Arming is what scales the tier down, so there is nothing left to do by hand
+and no reason to `--target`.** `data_tier.py` declares
+`replicas=0 if migration_armed else 1`, so the scale-down and the scale-back-up
+are both consequences of the config knob rather than separate manual steps.
+Clearing `migrate_from_image` at cutover returns it to 1.
+
+This was not always true, and the CI and QA cutovers on 2026-09-16 were run the
+old way: `replicas=1` was unconditional, so a plain `pulumi up` scaled the tier
+back up mid-migration, which is why those runs needed `pulumi up --target` on
+just the migration ConfigMap, Job and the two CronJobs plus a manual
+`kubectl scale`. If `data_tier.py` in the checkout you are reading declares a
+bare `replicas=1`, you are on that older code: use the targeted procedure
+instead, and read `git log` on this file for it.
+
+The `cluster-apply` Job is not part of this either: while `migrate_from_image`
+is set it is not created at all and nothing depends on it. It is created again
+at cutover, once `storage_prefix` names the new root, and converges the schemas
+against it.
+
+The Job's pre-flight is the backstop for the writer freeze. It is not a
+substitute for reading **Before you start**.
 
 **Two config knobs, and the distinction is the point.**
 `migrate_to_prefix` is where the rebuild WRITES. `storage_prefix` is what the
@@ -262,6 +340,10 @@ that fails silently — does not happen at all.
 It also **suspends `optimize` and `cleanup`** for the duration, because both
 write directly to the store and scaling the Deployment to zero does not stop
 them. Clearing `migrate_from_image` resumes them in the same `pulumi up`.
+
+After loading each graph it runs `optimize` against the new store, because
+`load` builds no indexes (see step 4). Anything optimize defers is logged as
+`indexes deferred by optimize`, not treated as a failure.
 
 It verifies two things before reporting success: per-table row counts match for
 every graph, and the storage format actually moved — to one version, the same
@@ -390,7 +472,11 @@ kubectl -n omnigraph get pods            # expect no omnigraph-server pod at all
 > A hand-patched CronJob is reverted by the next `pulumi up` for anything at
 > all, and a Production migration can span days. Prefer the config-driven
 > suspension even if you are otherwise working through this manually — set
-> `omnigraph:migrate_from_image` and the sweeps stay down until you clear it.
+> `omnigraph:migrate_from_image` **and** `omnigraph:migrate_to_prefix` and the
+> sweeps stay down until you clear them. Both, or the preview refuses: the two
+> knobs are set together and cleared together. Note that arming this way also
+> takes the Deployment to zero and skips the cluster-apply Job, which is what
+> you want here anyway.
 
 ### 2. Start the OLD-image workspace pod
 
@@ -429,7 +515,7 @@ silently dropped a table:
 ```shell
 for g in $(cat /tmp/graph-ids.txt); do
   echo "== $g"
-  omnigraph snapshot --store "$OLD_ROOT/graphs/$g.omni" | grep -E 'rows=|internal_schema'
+  omnigraph snapshot --store "$OLD_ROOT/graphs/$g.omni" | grep -E 'entities=|internal_schema'
 done | tee /tmp/baseline.txt
 ```
 
@@ -610,6 +696,34 @@ done
 and is the safe choice — `overwrite` is destructive and buys nothing here.
 `--yes` is required because a non-local destructive write refuses without a TTY.
 
+Then build the indexes. **`load` creates none**: from omnigraph 0.11 every write
+path defers index builds, and `optimize` is the only command that creates them.
+A rebuilt root without this serves correct results, but every traversal on a
+large enough edge table falls back to a full edge scan per hop. That is what
+Production's council did after the 2026-09-16 fmt9 cutover, logging
+`indexed traversal falls back to a full edge scan ... edge=WorksOn
+key_col="__src" reason=no BTREE index on '__src'` about 1.6 times a minute.
+The nightly `omnigraph-optimize` CronJob would eventually build them, but it is
+suspended for the migration and its next tick can be most of a day away.
+
+```shell
+for g in $(cat /tmp/graph-ids.txt); do
+  echo "== $g"
+  out=$(omnigraph optimize --store "$NEW_ROOT/graphs/$g.omni" --json) \
+    || { echo "!!! optimize FAILED for $g: do not cut over"; break; }
+  printf '%s\n' "$out" | grep -A3 '"pending_indexes": \[$'
+done
+```
+
+Optimize's exit status is checked before its output is filtered. Piped straight
+into `grep`, a failed optimize and one with nothing deferred both print nothing.
+Every edge table gets BTREEs on `__id`, `__src` and `__dst`, and node tables get
+their declared indexes. A graph whose header is followed by nothing had no
+deferred work; any output is a `pending_indexes` entry, which lists what it deferred
+(a vector property with no vectors yet, full-text coverage needing
+`rebuild-full-text-indexes`). Neither blocks the cutover. No `--as`: `optimize`
+is a direct command and rejects it (see `maintenance.py`).
+
 ### 5. Repoint the cluster and deploy the new image
 
 Set the prefix — the same one `$NEW_ROOT` names, without the `s3://<bucket>/`
@@ -621,16 +735,39 @@ pulumi config set omnigraph:storage_prefix fmt5 --stack <CI|QA|Production>
 pulumi config set omnigraph:internal_schema_version 5 --stack <CI|QA|Production>
 ```
 
+★ **Check the commit reached `origin/main`, and check it by reading the remote
+— not by the push's exit code.** A pre-commit hook (`yamlfmt`) can modify the
+stack file and abort the commit while `git push HEAD:main` still reports
+success, because it pushed the unchanged head. That leaves the old prefix on
+main with the new format live, which is the outage described above waiting for
+the next pipeline deploy. Also read the diff before committing: `pulumi config
+set` rewrites the value as a quoted string and re-indents unrelated blocks.
+
+```shell
+git show origin/main:src/ol_infrastructure/applications/omnigraph/Pulumi.<env>.yaml \
+  | grep -E 'storage_prefix|internal_schema_version'
+```
+
 Both are required, both a `pulumi preview` fails loudly on if missing or if
 they disagree (`storage.py::validate_internal_schema_version`) — a leftover
 `internal_schema_version` from the LAST migration, forgotten while
 `storage_prefix` moves to this one, is exactly the drift this exists to
 catch before it reaches the cluster as a crash-looping server rather than a
-preview failure. **This check does not verify either value against the
-image actually being deployed or the live store's own
-`internal_schema_version`** — it is a self-consistency check between two
-committed config values, not a substitute for `check_format_moved`'s
-verdict above or for following this runbook's ordering.
+preview failure. It is a self-consistency check between two committed config
+values, and it is still not a substitute for `check_format_moved`'s verdict
+above or for following this runbook's ordering. It does not read the live
+store's own `internal_schema_version`.
+
+The DEPLOYING IMAGE is checked separately, by
+`storage.py::validate_image_internal_schema` against the
+`edu.mit.ol.omnigraph.internal-schema` label agent-kit stamps onto it
+(agent-kit#358). While the migration is armed that comparison is against
+`migrate_to_prefix`, since the image and the served root are supposed to
+disagree during the rebuild; once the knobs clear it is against
+`internal_schema_version`, so a cutover committing the wrong digits fails the
+preview rather than the pod. An image carrying no readable label, which is
+every image built before agent-kit#358, warns and skips rather than blocking
+— that is what keeps a rollback deployable.
 
 **Took the automated path?** Clear the migration knobs in this SAME config
 change, not later at step 7:
@@ -702,17 +839,21 @@ for g in $(cat /tmp/graph-ids.txt); do
   echo "== $g"
   kubectl -n omnigraph exec deploy/omnigraph-server -- \
     omnigraph snapshot --store "$NEW_ROOT/graphs/$g.omni" \
-    | grep -E 'rows=|internal_schema'
+    | grep -E 'entities=|internal_schema'
 done | tee /tmp/after.txt
 ```
+
+`snapshot` prints per-table counts as `entities=N` from omnigraph 0.9 onward.
+`rows=` was the 0.8 spelling and matches nothing now, so a baseline taken with
+it is silently empty and the diff below passes against nothing.
 
 Two comparisons against the step 2 baseline, and they expect **opposite**
 answers — which is why this is not one plain `diff`:
 
 ```shell
 # 1. Row counts must be identical. Empty output = pass.
-diff <(grep -E '^==|rows=' /tmp/baseline.txt) \
-     <(grep -E '^==|rows=' /tmp/after.txt) && echo "row counts match"
+diff <(grep -E '^==|entities=' /tmp/baseline.txt) \
+     <(grep -E '^==|entities=' /tmp/after.txt) && echo "row counts match"
 
 # 2. The format version must have MOVED, uniformly, on every graph.
 grep internal_schema /tmp/after.txt | sort -u
@@ -722,6 +863,22 @@ The second must print exactly one line, carrying the new binary's
 `internal-schema` number. More than one line means some graph did not get
 rebuilt; the old number means you are still serving the old root — go back to
 step 5 and check the `pulumi preview --diff`.
+
+Neither comparison looks at indexes, and a root with every index missing passes
+both. Confirm step 4's `optimize` ran for every graph: the automated Job logs
+`$ omnigraph optimize --store ...` once per graph, and the manual loop printed
+one line per graph. Then, once real traffic has hit the server, check for the
+symptom:
+
+```shell
+kubectl -n omnigraph logs deploy/omnigraph-server --since=30m \
+  | grep -c 'falls back to a full edge scan'
+```
+
+Expect `0`. Treat it as a smoke check, not proof: the warning fires only when
+the planner picks an indexed traversal, which it does on a large edge table
+(Production's council) and may never do on a small one. A non-zero count with
+`reason=no BTREE index` means indexes are missing; see Troubleshooting.
 
 Finish by exercising a real client path (a `recall`, a `task_ready`) rather
 than trusting probes.
@@ -756,8 +913,16 @@ pulumi up --stack <CI|QA|Production>
 kubectl -n omnigraph get cronjob    # SUSPEND must read False for both
 ```
 
+Then run the witan deploy for the same environment, which reads
+`writers_frozen: false` and un-suspends the other two:
+
+```shell
+kubectl -n witan get cronjob        # SUSPEND must read False for both
+```
+
 Left suspended, the first symptom is fragment bloat degrading query latency
-weeks later, with nothing pointing back at the migration that caused it. If you
+weeks later, and a shared code graph that stops following its default branch,
+with nothing pointing back at the migration that caused either. If you
 suspended by hand instead, un-patch by hand.
 
 The old root itself waits. **Not the same day** — leave `$OLD_ROOT/graphs/`
@@ -767,28 +932,66 @@ the only fast rollback. Delete it, and the workstation copy of the exports in
 
 ## Rollback
 
-Before step 5 there is nothing to roll back: scale to 1 and you are on the old
-image against the old root.
-
-After step 5:
+Before step 5 nothing is committed to roll back, but on the automated path the
+way back up is the config, not `kubectl`:
 
 ```shell
-pulumi config rm omnigraph:storage_prefix --stack <CI|QA|Production>
-pulumi config rm omnigraph:internal_schema_version --stack <CI|QA|Production>
+pulumi config rm omnigraph:migrate_from_image --stack <CI|QA|Production>
+pulumi config rm omnigraph:migrate_to_prefix --stack <CI|QA|Production>
 ```
 
-Both, not just the first: `validate_internal_schema_version` requires
-`internal_schema_version` to be unset whenever `storage_prefix` is (or does
-not follow `fmt<N>`), so leaving it behind fails the very preview this
-rollback is trying to run.
+Both, and in the same change: `__main__.py` refuses a preview with
+`migrate_to_prefix` set and `migrate_from_image` cleared, because that state
+brings the tier up while pointing the image format check at the rebuild target
+instead of the served root. Clearing `migrate_from_image` is what returns the
+Deployment to one replica, resumes both sweeps and restores the cluster-apply
+Job, so a `kubectl scale --replicas=1` is undone by the next apply.
 
-then redeploy with `OMNIGRAPH_DOCKER_SHA` pinned to the **old** image digest.
+★ **Pin that apply to the OLD digest.** Arming did not only scale the tier
+down, it also moved the Deployment's pod template to the new image. Clearing
+the knobs brings the tier back up, so an apply carrying the NEW digest starts a
+new-format binary against the old root. That is the failure the migration
+exists to avoid, reached by rolling back:
+
+```shell
+OMNIGRAPH_DOCKER_SHA=sha256:<OLD-image-digest> pulumi up --stack <CI|QA|Production>
+```
+
+With a labelled image the storage-format check refuses that apply at preview;
+with an image predating the label it warns and skips, so do not lean on it.
+
+On the manual path, where no config was armed, scaling to 1 is the way back.
+
+After step 5, edit the stack file (not `pulumi config set`, which rewrites
+unrelated keys) to put back the root and format you are returning to, and name
+the root you are leaving:
+
+```yaml
+  omnigraph:storage_prefix: fmt<OLD>
+  omnigraph:internal_schema_version: <OLD>
+  omnigraph:storage_rollback_from: fmt<NEW>
+```
+
+All three in one change. `validate_internal_schema_version` requires the first
+two to agree. `validate_storage_prefix_progression` refuses any deploy that
+moves `storage_prefix` to an older format than the stack last deployed, which
+is what stops a stale ref from undoing a cutover (QA, 2026-09-16), and
+`storage_rollback_from` is the only way past it. It has to name the root being
+left. If the old root is the bucket root, remove `storage_prefix` and
+`internal_schema_version` instead of setting them.
+
+Then redeploy with `OMNIGRAPH_DOCKER_SHA` pinned to the **old** image digest.
 Confirm with the same `pulumi preview --diff` check that `storage:` is back to
 the derived root before applying.
 
 The old root was never written to, so this is a revert, not a restore. Writes
 that landed on the new root after step 5 are lost — which is the real reason
 step 6 happens before you tell anyone the service is back.
+
+Once the rollback has deployed, remove `storage_rollback_from`. Every preview
+after that refuses while it is still set, because roots are always named
+`fmt<N>`: left in place, it would start permitting stale refs again the next
+time the environment is cut over to that same root.
 
 ## Troubleshooting
 
@@ -818,6 +1021,22 @@ ConfigMap listing in *What gets rebuilt*.
 `/tmp/export/` on your workstation and the old root is intact — roll back and
 reconcile offline. A partial load is the one outcome worse than a failed one,
 because it looks like success.
+
+**Traversals log `falls back to a full edge scan ... reason=no BTREE index`
+after cutover.** The rebuilt root was never optimized, so it has no edge
+BTREEs. Results are correct and only latency suffers, so this does not need
+a rollback. `optimize` is safe against a serving fleet
+([store maintenance runbook](omnigraph-store-maintenance-runbook.md)); run
+the CronJob now instead of waiting for its nightly tick:
+
+```shell
+kubectl -n omnigraph create job --from=cronjob/omnigraph-optimize optimize-after-cutover
+kubectl -n omnigraph logs -f job/optimize-after-cutover
+```
+
+A different `reason`, such as `a fragment is missing physical_rows` or
+uncovered fragments, means the indexes exist but writes since the last optimize
+are not covered yet. The nightly run handles that.
 
 ## Not needed for
 

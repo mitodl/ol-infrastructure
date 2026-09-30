@@ -10,13 +10,19 @@ This module verifies:
    keys the pinned APISIX expects, and omits them when unset
 5. The session cookie names derived by bridge.lib.constants, and the stale
    cookie cleanup plugin's generated Lua
+6. The identity-header strip plugin's wiring: the Lua it ships, the phase it
+   runs in, and the header list it defaults to
 """
 
 from __future__ import annotations
 
+import ast
 import asyncio
+import collections
+import re
 from contextlib import contextmanager
 from dataclasses import replace
+from pathlib import Path
 
 import pulumi
 
@@ -41,17 +47,24 @@ import pytest  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
 from bridge.lib.constants import (  # noqa: E402
+    GATEWAY_IDENTITY_HEADERS,
     apisix_oidc_session_cookie_name,
     mit_learn_session_cookie_name,
 )
 from ol_infrastructure.components.services import apisix as apisix_module  # noqa: E402
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
+    FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    OLApisixSharedPluginsVariant,
     OLApisixUpstream,
     OLApisixUpstreamConfig,
+    browser_traffic_match_exprs,
+    identity_header_strip_plugin,
+    oidc_gateway_pre_function_plugin,
+    ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
 )
 
@@ -347,6 +360,139 @@ def test_cleanup_plugin_honours_a_custom_stale_name():
     assert 'name == "mitlearn_apisix_session"' in lua
 
 
+# ─── OIDC error callback recovery ──────────────────────────────────────────────
+
+
+def test_recovery_plugin_runs_in_rewrite_before_openid_connect():
+    """openid-connect runs in rewrite; the access phase would be too late."""
+    plugin = oidc_gateway_pre_function_plugin()
+
+    assert plugin.name == "serverless-pre-function"
+    assert plugin.config["phase"] == "rewrite"
+
+
+def test_recovery_plugin_defaults_to_the_only_error_production_emits():
+    """access_denied means the user pressed Cancel -- restarting the flow there
+    would bounce the browser between the gateway and Keycloak.
+    """
+    options = oidc_gateway_pre_function_plugin().config["oidc_error_recovery"]
+
+    assert options["recoverable_errors"] == ["temporarily_unavailable"]
+
+
+def test_recovery_plugin_honours_a_custom_error_list():
+    options = oidc_gateway_pre_function_plugin(
+        recoverable_errors=["temporarily_unavailable", "server_error"],
+    ).config["oidc_error_recovery"]
+
+    assert options["recoverable_errors"] == ["temporarily_unavailable", "server_error"]
+
+
+def test_recovery_plugin_honours_an_explicit_empty_error_list():
+    """An empty list means "recover nothing" -- the way to make the plugin a
+    no-op without detaching it from every route on a shared config.
+    """
+    options = oidc_gateway_pre_function_plugin(
+        recoverable_errors=[],
+    ).config["oidc_error_recovery"]
+
+    assert options["recoverable_errors"] == []
+
+
+def test_recovery_plugin_passes_guard_settings_as_config():
+    """Tunables travel on the plugin config and are read off ``conf`` in Lua,
+    so nothing is interpolated into the shipped source.
+    """
+    options = oidc_gateway_pre_function_plugin(
+        guard_cookie_name="custom_guard",
+        guard_max_age=90,
+    ).config["oidc_error_recovery"]
+
+    assert options["guard_cookie_name"] == "custom_guard"
+    assert options["guard_max_age"] == 90
+
+
+def test_recovery_plugin_ships_the_lua_files_verbatim():
+    """The function bodies are the checked-in .lua files, not generated strings --
+    no configuration is interpolated into either.
+    """
+    sources = oidc_gateway_pre_function_plugin(
+        guard_cookie_name="custom_guard",
+        recoverable_errors=["server_error"],
+        canonical_redirect_status=301,
+    ).config["functions"]
+
+    assert sources == [
+        apisix_module.CANONICAL_HTTPS_REDIRECT_LUA,
+        apisix_module.OIDC_ERROR_RECOVERY_LUA,
+    ]
+    for source in sources:
+        assert "custom_guard" not in source
+        assert "server_error" not in source
+
+
+def test_canonical_redirect_runs_before_error_recovery():
+    """serverless/init.lua stops at the first function returning a code, so the
+    origin has to be canonical before the recovery function can redirect back
+    into a login flow -- otherwise recovery would target an http:// origin.
+    """
+    sources = oidc_gateway_pre_function_plugin().config["functions"]
+
+    assert "canonical_https_redirect" in sources[0]
+    assert "oidc_error_recovery" in sources[1]
+
+
+def test_canonical_redirect_status_reaches_the_config_block():
+    config = oidc_gateway_pre_function_plugin(canonical_redirect_status=301).config
+
+    assert config["canonical_https_redirect"]["status"] == 301
+
+
+@pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+def test_every_status_ngx_redirect_accepts_is_allowed(status):
+    config = oidc_gateway_pre_function_plugin(canonical_redirect_status=status).config
+
+    assert config["canonical_https_redirect"]["status"] == status
+
+
+@pytest.mark.parametrize("status", [200, 304, 305, 418, 500])
+def test_a_status_ngx_redirect_rejects_fails_at_preview(status):
+    """ngx.redirect raises a Lua error outside {301,302,303,307,308}, and the
+    config block carrying this is not in serverless-pre-function's schema, so
+    APISIX would not reject it either -- an unchecked value would first surface
+    as a 500 on live traffic.  This has to fail while the stack is being built.
+    """
+    with pytest.raises(ValueError, match=r"ngx\.redirect rejects anything else"):
+        oidc_gateway_pre_function_plugin(canonical_redirect_status=status)
+
+
+def test_canonical_redirect_can_be_disabled():
+    """A host that must keep answering on plain HTTP drops the function without
+    losing the error-callback recovery it necessarily shares a plugin with.
+    """
+    config = oidc_gateway_pre_function_plugin(canonical_https_redirect=False).config
+
+    assert config["functions"] == [apisix_module.OIDC_ERROR_RECOVERY_LUA]
+
+
+def test_canonical_redirect_lua_reads_its_settings_off_conf():
+    """Guards the contract between the .lua file and the config block above."""
+    source = apisix_module.CANONICAL_HTTPS_REDIRECT_LUA
+
+    assert "conf.canonical_https_redirect" in source
+    assert "opts.status" in source
+
+
+def test_recovery_lua_reads_its_settings_off_conf():
+    """Guards the contract between the .lua file and the config block above."""
+    source = apisix_module.OIDC_ERROR_RECOVERY_LUA
+
+    assert "conf.oidc_error_recovery" in source
+    assert "opts.recoverable_errors" in source
+    assert "opts.guard_cookie_name" in source
+    assert "opts.guard_max_age" in source
+
+
 # ─── Shared plugin defaults ────────────────────────────────────────────────────
 
 
@@ -492,6 +638,54 @@ def test_gzip_reaches_the_gateway_api_plugin_config():
 
 
 @pulumi.runtime.test
+def test_recovery_plugin_renders_into_the_v2_plugin_config():
+    """The applications attach this to a host's shared plugin config rather
+    than per route, so it has to survive that normalisation.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-oidc-recovery-v2",
+        plugins=[oidc_gateway_pre_function_plugin()],
+    )
+
+    def check(spec):
+        recovery = plugin_named(spec["plugins"], "serverless-pre-function")
+        assert recovery is not None
+        assert recovery["config"]["phase"] == "rewrite"
+        # The settings block is not part of serverless-pre-function's schema.
+        # It reaches the gateway because the CRD marks config
+        # x-kubernetes-preserve-unknown-fields, the controller holds it as raw
+        # apiextensionsv1.JSON, ADC as map[string]any, and APISIX's serverless
+        # schema does not set additionalProperties.  If a future version
+        # tightens any of those, this is the assertion that should fail first.
+        assert recovery["config"]["oidc_error_recovery"] == {
+            "recoverable_errors": ["temporarily_unavailable"],
+            "session_cookie_names": [],
+            "guard_cookie_name": "apisix_oidc_recovery",
+            "guard_max_age": 60,
+        }
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_recovery_plugin_reaches_the_gateway_api_plugin_config():
+    """v1alpha1 drops secretRef, which this plugin sets to None -- a shape the
+    other shared plugins do not exercise.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-oidc-recovery-gateway-api",
+        plugins=[oidc_gateway_pre_function_plugin()],
+    )
+
+    def check(spec):
+        recovery = plugin_named(spec["plugins"], "serverless-pre-function")
+        assert recovery is not None
+        assert set(recovery) == {"name", "config"}
+
+    return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
 def test_gzip_does_not_compress_streaming_or_precompressed_types():
     """text/event-stream is excluded so SSE responses are not held back by the
     compression buffers, and already-compressed formats are excluded so they
@@ -626,3 +820,636 @@ def test_cors_disabled_reaches_the_gateway_api_plugin_config():
             assert plugin_named(spec["plugins"], name) is not None, name
 
     return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+# ─── identity_header_strip_plugin wiring ──────────────────────────────────────
+#
+# The test-nginx suite drives the Lua directly with a hand-built config, so it
+# cannot catch a Python-side regression: a builder that shipped the wrong file,
+# ran in the access phase, or dropped a header from the list would pass all of
+# it.  These cover the seam between the two.
+
+
+def test_identity_strip_plugin_runs_in_rewrite_before_openid_connect():
+    """openid-connect is a rewrite plugin (priority 2599) and a global rule's
+    rewrite phase runs ahead of the matched route's.  In the access phase this
+    would land after openid-connect had already read the request.
+    """
+    plugin = identity_header_strip_plugin()
+
+    assert plugin.name == "serverless-pre-function"
+    assert plugin.config["phase"] == "rewrite"
+
+
+def test_identity_strip_plugin_ships_the_lua_verbatim():
+    """The function body is the checked-in .lua file -- the header list travels
+    as config and is read off ``conf``, not interpolated into the source.
+    """
+    plugin = identity_header_strip_plugin(header_names=["X-Interpolation-Canary"])
+
+    assert plugin.config["functions"] == [
+        apisix_module.STRIP_CLIENT_IDENTITY_HEADERS_LUA
+    ]
+    assert "X-Interpolation-Canary" not in plugin.config["functions"][0]
+
+
+def test_identity_strip_plugin_defaults_to_the_gateway_identity_headers():
+    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+
+    assert headers == list(GATEWAY_IDENTITY_HEADERS)
+
+
+def test_identity_strip_plugin_covers_everything_openid_connect_mints():
+    """openid-connect.lua clears-then-sets these four (3.18.0, lines 1174-1177
+    and 1482-1500).  Dropping one silently reopens the hole under that name.
+    """
+    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+
+    assert set(headers) == {
+        "X-Userinfo",
+        "X-ID-Token",
+        "X-Raw-ID-Token",
+        "X-Refresh-Token",
+    }
+
+
+def test_identity_strip_plugin_leaves_the_tika_shared_secret_alone():
+    """X-Access-Token is a *client* credential here, not a gateway assertion:
+    Tika's route validates it in the access phase -- after this runs -- and
+    mit-learn sends it on every extraction request.  Stripping it cluster-wide
+    would 401 all content extraction while protecting nothing, since no
+    application reads it as an identity claim.  Authorization is out for the
+    same reason at much larger scale.
+    """
+    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+
+    assert "X-Access-Token" not in headers
+    assert "Authorization" not in headers
+
+
+def test_identity_strip_plugin_honours_a_custom_header_list():
+    headers = identity_header_strip_plugin(
+        header_names=["X-Custom-Identity"],
+    ).config["identity_header_strip"]["headers"]
+
+    assert headers == ["X-Custom-Identity"]
+
+
+def test_identity_strip_plugin_emits_a_list_not_a_tuple():
+    """The config is rendered into a CRD spec, and a tuple round-trips through
+    the Pulumi/Kubernetes provider differently from a list.
+    """
+    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+
+    assert isinstance(headers, list)
+
+
+# ─── Rate limiting ──────────────────────────────────────────────────────────────
+
+
+@pulumi.runtime.test
+def test_rate_limiting_is_absent_by_default():
+    """enable_rate_limiting defaults to off so that turning it on for one
+    application does not change behaviour for other services sharing this
+    component.
+    """
+    plugins = shared_plugins("test-shared-plugins-ratelimit-default")
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "limit-conn") is None
+        assert plugin_named(spec["plugins"], "limit-req") is None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_rate_limiting_emits_both_plugins_on_apisix_pluginconfig():
+    """Opting in attaches both limit-conn (concurrency) and limit-req
+    (request rate) to the legacy v2 ApisixPluginConfig CRD.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-ratelimit-v2", enable_rate_limiting=True
+    )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "limit-conn") is not None
+        assert plugin_named(spec["plugins"], "limit-req") is not None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_rate_limiting_emits_both_plugins_on_gateway_api_pluginconfig():
+    """The v1alpha1 PluginConfig is rendered by a separate comprehension, so
+    Gateway API HTTPRoutes need their own assertion rather than inheriting
+    the v2 one -- same contract as gzip.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-ratelimit-v1alpha1", enable_rate_limiting=True
+    )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "limit-conn") is not None
+        assert plugin_named(spec["plugins"], "limit-req") is not None
+
+    return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_rate_limiting_custom_thresholds_propagate():
+    """Custom thresholds reach the rendered plugin config rather than the
+    defaults silently winning.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-ratelimit-custom",
+        enable_rate_limiting=True,
+        rate_limit_key="consumer_name",
+        rate_limit_rejected_code=503,
+        rate_limit_requests_per_second=10,
+        rate_limit_burst=5,
+        rate_limit_max_concurrent=20,
+        rate_limit_concurrent_burst=10,
+    )
+
+    def check(spec):
+        limit_conn = plugin_named(spec["plugins"], "limit-conn")["config"]
+        assert limit_conn["conn"] == 20
+        assert limit_conn["burst"] == 10
+        assert limit_conn["key"] == "consumer_name"
+        assert limit_conn["rejected_code"] == 503
+
+        limit_req = plugin_named(spec["plugins"], "limit-req")["config"]
+        assert limit_req["rate"] == 10
+        assert limit_req["burst"] == 5
+        assert limit_req["key"] == "consumer_name"
+        assert limit_req["rejected_code"] == 503
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+def test_rate_limit_rejected_code_rejects_out_of_range():
+    with pytest.raises(ValidationError):
+        OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+            rate_limit_rejected_code=100,
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "rate_limit_requests_per_second",
+        "rate_limit_max_concurrent",
+    ],
+)
+def test_rate_limit_positive_fields_reject_non_positive(field):
+    with pytest.raises(ValidationError):
+        OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+            **{field: 0},
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "rate_limit_burst",
+        "rate_limit_concurrent_burst",
+    ],
+)
+def test_rate_limit_burst_fields_reject_negative(field):
+    with pytest.raises(ValidationError):
+        OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+            **{field: -1},
+        )
+
+
+# ─── Shared plugin variants ─────────────────────────────────────────────────────
+
+
+def learn_shaped_variants():
+    """Two variants on one host, shaped like api.learn.mit.edu's."""
+    return ol_apisix_shared_plugins_variants(
+        plugin_config=OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+            plugins=[oidc_gateway_pre_function_plugin()],
+        ),
+        variants=[
+            OLApisixSharedPluginsVariant(
+                name="test-variants-base",
+                resource_suffix="ol-shared-plugins",
+            ),
+            OLApisixSharedPluginsVariant(
+                name="test-variants-browser",
+                resource_suffix="ol-browser-shared-plugins",
+                enable_rate_limiting=True,
+            ),
+        ],
+    )
+
+
+@pulumi.runtime.test
+def test_variants_render_the_same_plugins_apart_from_rate_limiting():
+    """The whole point of the factory. Two hand-written configs on one host
+    diverge silently -- a plugin on only one of them changes behaviour by
+    request Origin, and it has shipped that way twice on api.learn. Rate
+    limiting is the one difference a variant is allowed to carry.
+    """
+    variants = learn_shaped_variants()
+    rate_limit_plugins = {"limit-conn", "limit-req"}
+
+    def check(specs):
+        base, browser = specs
+        base_names = [plugin["name"] for plugin in base["plugins"]]
+        browser_names = [
+            plugin["name"]
+            for plugin in browser["plugins"]
+            if plugin["name"] not in rate_limit_plugins
+        ]
+        assert base_names, "nothing was compared"
+        assert base_names == browser_names
+        assert rate_limit_plugins.isdisjoint(base_names)
+        assert rate_limit_plugins.issubset(
+            {plugin["name"] for plugin in browser["plugins"]}
+        )
+
+    return pulumi.Output.all(
+        variants["ol-shared-plugins"].shared_plugin_apisix_pluginconfig_resource.spec,
+        variants[
+            "ol-browser-shared-plugins"
+        ].shared_plugin_apisix_pluginconfig_resource.spec,
+    ).apply(check)
+
+
+@pulumi.runtime.test
+def test_variants_render_the_same_plugins_on_gateway_api_pluginconfig():
+    """The v1alpha1 PluginConfig is built by its own comprehension, so it needs
+    its own assertion rather than inheriting the v2 one.
+    """
+    variants = learn_shaped_variants()
+
+    rate_limit_plugins = {"limit-conn", "limit-req"}
+
+    def check(specs):
+        base, browser = specs
+        base_names = [plugin["name"] for plugin in base["plugins"]]
+        browser_names = [
+            plugin["name"]
+            for plugin in browser["plugins"]
+            if plugin["name"] not in rate_limit_plugins
+        ]
+        assert base_names, "nothing was compared"
+        assert base_names == browser_names
+        # Without these the filter above turns into a no-op the moment the
+        # v1alpha1 comprehension stops emitting the rate-limit plugins, and
+        # this test stays green while every Gateway API browser route loses
+        # its rate limiting.
+        assert rate_limit_plugins.isdisjoint(base_names)
+        assert rate_limit_plugins.issubset(
+            {plugin["name"] for plugin in browser["plugins"]}
+        )
+
+    return pulumi.Output.all(
+        variants["ol-shared-plugins"].shared_plugin_pluginconfig_resource.spec,
+        variants["ol-browser-shared-plugins"].shared_plugin_pluginconfig_resource.spec,
+    ).apply(check)
+
+
+def test_variants_keep_distinct_crd_names():
+    """Routes reference a variant by the CRD metadata.name that
+    resource_suffix produces, so the suffix has to reach the component.
+    """
+    variants = learn_shaped_variants()
+    assert variants["ol-shared-plugins"].resource_name == "myapp-ol-shared-plugins"
+    assert (
+        variants["ol-browser-shared-plugins"].resource_name
+        == "myapp-ol-browser-shared-plugins"
+    )
+
+
+def test_variants_reject_a_duplicate_resource_suffix():
+    """Both CRDs would be created under one metadata.name and the second would
+    win, which is a silent swap of a host's plugin list.
+    """
+    with pytest.raises(ValueError, match="distinct resource_suffix"):
+        ol_apisix_shared_plugins_variants(
+            plugin_config=OLApisixSharedPluginsConfig(
+                application_name="myapp",
+                k8s_namespace="myapp-ns",
+            ),
+            variants=[
+                OLApisixSharedPluginsVariant(
+                    name="test-variants-dupe-a", resource_suffix="same"
+                ),
+                OLApisixSharedPluginsVariant(
+                    name="test-variants-dupe-b", resource_suffix="same"
+                ),
+            ],
+        )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "enable_rate_limiting",
+        "resource_suffix",
+    ],
+)
+def test_variants_reject_per_variant_fields_on_the_shared_config(field):
+    """Converting a single-config application to the factory means moving
+    these onto a variant. Left behind on the shared config they would be
+    silently discarded, which for enable_rate_limiting means dropping rate
+    limiting from every route on the host with nothing to show for it.
+    """
+    values = {"enable_rate_limiting": True, "resource_suffix": "ol-shared-plugins"}
+    with pytest.raises(ValueError, match="belong to a variant"):
+        ol_apisix_shared_plugins_variants(
+            plugin_config=OLApisixSharedPluginsConfig(
+                application_name="myapp",
+                k8s_namespace="myapp-ns",
+                **{field: values[field]},
+            ),
+            variants=[
+                OLApisixSharedPluginsVariant(
+                    name="test-variants-misplaced",
+                    resource_suffix="ol-shared-plugins",
+                ),
+            ],
+        )
+
+
+def test_variant_cannot_carry_its_own_plugin_list():
+    """``extra="forbid"`` is what makes the shared list structural: a
+    per-variant ``plugins`` is an error rather than a silently ignored field.
+    """
+    with pytest.raises(ValidationError):
+        OLApisixSharedPluginsVariant(
+            name="test-variant-own-plugins",
+            resource_suffix="ol-shared-plugins",
+            plugins=[oidc_gateway_pre_function_plugin()],
+        )
+
+
+SHARED_PLUGINS_CLASS = "OLApisixSharedPlugins"
+SHARED_PLUGINS_FACTORY = "ol_apisix_shared_plugins_variants"
+
+
+def _local_names_for(tree, target):
+    """Return every name ``target`` is bound to in this module."""
+    names = {target}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            names.update(
+                alias.asname
+                for alias in node.names
+                if alias.name == target and alias.asname
+            )
+    return names
+
+
+def _string_constants(tree):
+    """Map each name bound exactly once, to a string literal, in this module.
+
+    A name that is also assigned anything else (or a different literal) is left
+    out, so a lookup never resolves to a value the name might not hold.
+    """
+    bindings: dict[str, list[object]] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        value = (
+            node.value.value
+            if isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+            else object()
+        )
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                bindings.setdefault(target.id, []).append(value)
+    return {
+        name: values[0]
+        for name, values in bindings.items()
+        if len(values) == 1 and isinstance(values[0], str)
+    }
+
+
+def _application_name_of(call, module_key, constants):
+    """Return the host key of an OLApisixSharedPlugins call, or None.
+
+    A string literal, or a name bound once to one, is the application name.
+    Any other expression (``base_name`` read from stack config, say) cannot be
+    evaluated statically, so it is keyed by its source text within the module:
+    two hand-written configs off the same expression still collide, and it
+    never collides with another module's.
+
+    None means ``plugin_config`` is not an inline constructor call carrying an
+    ``application_name``, so there is nothing to key on.
+    """
+    for keyword in call.keywords:
+        if keyword.arg != "plugin_config" or not isinstance(keyword.value, ast.Call):
+            continue
+        for inner in keyword.value.keywords:
+            if inner.arg != "application_name":
+                continue
+            value = inner.value
+            if isinstance(value, ast.Constant):
+                return value.value
+            if isinstance(value, ast.Name) and value.id in constants:
+                return constants[value.id]
+            return f"{module_key}::{ast.unparse(value)}"
+    return None
+
+
+def _shared_plugin_calls(tree, module_key):
+    """Yield ``(lineno, kind, host key)`` for each relevant call.
+
+    ``kind`` is ``"direct"`` for a bare ``OLApisixSharedPlugins(...)``
+    construction and ``"factory"`` for one routed through
+    ``ol_apisix_shared_plugins_variants``, which renders several configs off
+    one shared plugin list and so is not itself a "more than one" violation
+    below. Counts attribute-style calls (``apisix.OLApisixSharedPlugins(...)``)
+    and aliased imports as well as bare ones, so neither spelling slips past
+    the check below.
+    """
+    direct_names = _local_names_for(tree, SHARED_PLUGINS_CLASS)
+    factory_names = _local_names_for(tree, SHARED_PLUGINS_FACTORY)
+    constants = _string_constants(tree)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if (isinstance(func, ast.Name) and func.id in direct_names) or (
+            isinstance(func, ast.Attribute) and func.attr == SHARED_PLUGINS_CLASS
+        ):
+            kind = "direct"
+        elif (isinstance(func, ast.Name) and func.id in factory_names) or (
+            isinstance(func, ast.Attribute) and func.attr == SHARED_PLUGINS_FACTORY
+        ):
+            kind = "factory"
+        else:
+            continue
+        yield node.lineno, kind, _application_name_of(node, module_key, constants)
+
+
+def test_no_application_hand_writes_two_shared_plugin_configs():
+    """A host that needs a second shared plugin config has to go through
+    ol_apisix_shared_plugins_variants, so the plugin list is shared by
+    construction. Two configs built by hand for one application is the shape
+    that drifted twice on api.learn, and the component tests above cannot see
+    it because they only ever exercise one config at a time.
+
+    A host already on the factory is not exempt from this: a single manual
+    OLApisixSharedPlugins call added alongside it has a count of one, which is
+    exactly the "safe" count for a host with no factory call at all -- the
+    check below has to know which hosts are on the factory to tell those two
+    apart.
+
+    Grouped by ``application_name`` across the whole tree rather than per file:
+    the invariant is one plugin list per host, so two configs for two different
+    applications are fine wherever they live (edxapp and meilisearch are that
+    case today), and splitting one host's two configs into sibling modules is
+    not a way out.
+    """
+    applications = Path(__file__).parents[4] / "src/ol_infrastructure/applications"
+    modules = sorted(applications.rglob("*.py"))
+    direct_hosts: collections.Counter[str] = collections.Counter()
+    factory_hosts: collections.Counter[str] = collections.Counter()
+    unparsed = {}
+    unkeyed = []
+    for module in modules:
+        module_key = str(module.relative_to(applications))
+        try:
+            tree = ast.parse(module.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError) as exc:
+            unparsed[module_key] = str(exc)
+            continue
+        for lineno, kind, host in _shared_plugin_calls(tree, module_key):
+            if host is None:
+                unkeyed.append(f"{module_key}:{lineno}")
+                continue
+            (factory_hosts if kind == "factory" else direct_hosts)[host] += 1
+
+    # Without these the test passes by scanning nothing -- a moved test file
+    # (parents[4] no longer resolving) or a renamed class would leave it
+    # permanently green, and it is the only guard behind the invariant.
+    assert modules, f"scanned no application modules under {applications}"
+    assert direct_hosts or factory_hosts, (
+        f"found no {SHARED_PLUGINS_CLASS}/{SHARED_PLUGINS_FACTORY} calls under "
+        f"{applications}"
+    )
+    assert not unparsed, f"could not parse: {unparsed}"
+    assert not unkeyed, (
+        f"{SHARED_PLUGINS_CLASS}/{SHARED_PLUGINS_FACTORY} calls with no inline "
+        f"plugin_config=OLApisixSharedPluginsConfig(application_name=...), which "
+        f"this check cannot key by host: {unkeyed}. Pass the config inline, or "
+        "teach _application_name_of to resolve the new shape."
+    )
+
+    offenders = {}
+    for host in direct_hosts.keys() | factory_hosts.keys():
+        direct, factory = direct_hosts[host], factory_hosts[host]
+        if factory > 1 or (factory and direct) or (not factory and direct > 1):
+            offenders[host] = {"direct": direct, "factory": factory}
+    assert not offenders, (
+        "These applications build more than one shared plugin list for the "
+        f"same host: {offenders} (counts are direct OLApisixSharedPlugins "
+        "calls vs. ol_apisix_shared_plugins_variants calls). Route every "
+        "config for a host through one ol_apisix_shared_plugins_variants "
+        "call instead."
+    )
+
+
+# ─── Browser traffic match exprs ────────────────────────────────────────────────
+
+# User-Agent strings observed on api.learn.mit.edu, 2026-09-21. The crawlers all
+# send the site's own Origin, so the Origin match alone does not separate them
+# from a browser -- which is the whole reason the User-Agent clause exists.
+MIT_LEARN_SSR_UA = "axios/1.12.2"
+BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+)
+CRAWLER_UAS = [
+    "DuckDuckBot/1.0; (+http://duckduckgo.com/duckduckbot.html)",
+    "DuckAssistBot/1.2; (+http://duckduckgo.com/duckassistbot.html)",
+    "amazon-bedrock-knowledgebase-on-behalf-of-9b9b0185",
+]
+
+
+def expr_for_header(exprs, name):
+    """Return the single expr whose subject is the named header."""
+    matches = [e for e in exprs if e["subject"]["name"] == name]
+    assert len(matches) == 1, f"{name} appears {len(matches)} times"
+    return matches[0]
+
+
+def browser_exprs():
+    """Exprs shaped like api.learn's, for the assertions below."""
+    return browser_traffic_match_exprs(
+        r"^https://learn\.mit\.edu$", FIRST_PARTY_SERVICE_CLIENT_UA_REGEX
+    )
+
+
+def test_browser_traffic_match_exprs_requires_the_site_origin():
+    """Only the site's own Origin selects the rate-limited routes.
+
+    re.search, not re.match, throughout these tests: APISIX evaluates these
+    with ngx.re.find, which is a substring search, so re.match would silently
+    supply an anchor the real matcher does not have and hide an unanchored
+    value.
+    """
+    exprs = browser_exprs()
+    origin = expr_for_header(exprs, "Origin")
+    assert origin["op"] == "RegexMatch"
+    assert origin["subject"]["scope"] == "Header"
+    assert re.search(origin["value"], "https://learn.mit.edu")
+    assert not re.search(origin["value"], "https://evil.example.com")
+    assert not re.search(origin["value"], "https://learn.mit.edu.evil.com")
+
+
+def test_browser_traffic_match_exprs_excludes_the_first_party_ssr_client():
+    """The SSR layer aggregates every end user behind four egress addresses, so
+    a per-browser bucket would throttle the whole population at once. It is
+    kept out on purpose rather than by axios happening to send no Origin.
+    """
+    user_agent = expr_for_header(browser_exprs(), "User-Agent")
+    assert user_agent["op"] == "RegexNotMatch"
+    assert re.search(user_agent["value"], MIT_LEARN_SSR_UA), (
+        "the SSR User-Agent must match the RegexNotMatch value, which is what "
+        "excludes it from the rate-limited routes"
+    )
+
+
+@pytest.mark.parametrize("user_agent", [BROWSER_UA, *CRAWLER_UAS])
+def test_browser_traffic_match_exprs_keeps_browsers_and_crawlers_in(user_agent):
+    """A crawler is a single actor sending our Origin, which is exactly what a
+    per-client-IP limit is for. Excluding every non-browser would exempt them,
+    so the clause names the first-party client instead.
+    """
+    user_agent_expr = expr_for_header(browser_exprs(), "User-Agent")
+    assert not re.search(user_agent_expr["value"], user_agent)
+
+
+def test_browser_traffic_match_exprs_ua_regex_is_anchored():
+    """Unanchored, any User-Agent merely containing the token falls out of the
+    rate-limited routes, which is a one-header way for a flood to opt out.
+
+    This is the assertion that needs re.search to have any force: under
+    re.match it passes whether or not the value is anchored.
+    """
+    assert FIRST_PARTY_SERVICE_CLIENT_UA_REGEX.startswith("^")
+    user_agent = expr_for_header(browser_exprs(), "User-Agent")
+    assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {MIT_LEARN_SSR_UA}")
+
+
+def test_browser_traffic_match_exprs_requires_an_explicit_ua_regex():
+    """Not defaulted, so a second host cannot inherit mit-learn's first-party
+    client and silently exempt every stock-axios caller of its own.
+    """
+    with pytest.raises(TypeError):
+        browser_traffic_match_exprs(r"^https://learn\.mit\.edu$")

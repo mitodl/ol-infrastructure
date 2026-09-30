@@ -185,7 +185,14 @@ _ERROR_RATE_DESCRIPTION = (
     " watches that same number. Then read witan's own mcp.tool_call lines"
     " (`kubectl -n witan logs deploy/witan-server`), which carry tool, outcome,"
     " duration_ms and actor_id, to see whether the failures are one tool or all"
-    " of them. All of them means the graph; one of them means that tool."
+    " of them. All of them means the graph; one of them means that tool. A"
+    " failed line also says why: error_type, error (the message, replaced by"
+    " error_withheld=true where it is not safe to log) and refused."
+    " refused=true means witan declined the call on purpose, and this alert"
+    " counts those as errors too. A missing `council` graph is NOT a refusal:"
+    " it logs error_type=ToolError, refused=false and an `omnigraph ... failed`"
+    " message in error. A missing code graph logs ClusterGraphMissing with"
+    " refused=true."
 )
 
 _DAILY_STALE_SUMMARY = (

@@ -46,6 +46,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo, schedule
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 GITHUB_REPOSITORY = "mitodl/ol-infrastructure"
 GITHUB_APP_ID_VAULT_PATH = "((github.drift_pr_app_id))"
@@ -193,7 +194,22 @@ def github_drift_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    definition_json = github_drift_pipeline().model_dump_json(indent=2)
+    definition_json = pipeline_json_with_user_data(
+        github_drift_pipeline(),
+        user_data={
+            "description": (
+                "Nightly job that runs `bin/github-estate-audit drift` to "
+                "compare the committed fleet YAML in "
+                "`saas/github/repositories/data/repos/` against a fresh crawl "
+                "of live GitHub, reporting any repo settings that moved out "
+                "of band. When the generated report changes, it commits "
+                "`docs/generated/github-drift-report.md` and opens or updates "
+                "a pull request; it never edits the fleet YAML itself."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(definition_json)
     sys.stdout.write(definition_json)

@@ -81,7 +81,7 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/ocw_studio/": ["NGINX_VERSION"],
     "applications/odl_video_service/": ["NGINX_VERSION"],
     "applications/ol_analytics_api/": ["NGINX_VERSION"],
-    "applications/omnigraph/": [],
+    "applications/omnigraph/": ["AWS_CLI_VERSION"],
     "applications/open_discussions/": [],
     "applications/open_metadata/": ["OPEN_METADATA_VERSION"],
     "applications/opik/": ["OPIK_CHART_VERSION"],
@@ -108,10 +108,14 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/vuln_scanner/": [],
     "applications/witan/": [],
     "applications/xpro/": ["NGINX_VERSION"],
-    "applications/xqueue/": ["NGINX_VERSION"],
     "applications/xqwatcher/": [],
     # ---- infrastructure/ ----------------------------------------------------
     "infrastructure/aws/data_warehouse/": [],
+    # Empty deliberately: the Azure OpenAI project pins no version constants.
+    # Model versions are stack config (azure_openai:model_versions), not
+    # src/bridge/lib/versions.py entries, because which versions exist is a
+    # property of the subscription and region rather than of this repo.
+    "infrastructure/azure/openai/": [],
     "infrastructure/aws/dns/": [],
     "infrastructure/aws/ecr/": [],
     "infrastructure/aws/eks/": [

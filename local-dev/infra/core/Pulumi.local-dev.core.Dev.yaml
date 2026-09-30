@@ -19,6 +19,10 @@ config:
   # LOCAL_DEV_LOG_RETENTION and therefore tilt_config.json. Default is 168h
   # (1 week); set "log_retention_period" in your gitignored tilt_config.json
   # to change it.
+  # keycloak_image: unset on purpose, same reason. local-dev/scripts/
+  # kc-theme-image.sh sets "keycloak_image" in tilt_config.json to run a
+  # locally built Keycloak image instead of the published digest the code
+  # defaults to.
   # Helm chart versions
   ol-local-dev-core:cert_manager_version: "v1.16.2"
   ol-local-dev-core:cnpg_version: "0.23.0"

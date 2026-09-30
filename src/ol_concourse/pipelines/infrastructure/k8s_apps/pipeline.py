@@ -39,7 +39,7 @@ from ol_concourse.lib.resources import (
     registry_image,
     release_resource,
 )
-from ol_concourse.lib.tasks import bump_version_task
+from ol_concourse.lib.tasks import TASK_IMAGE, bump_version_task
 from pydantic import BaseModel, model_validator
 
 from bridge.settings.apps import github_repo as app_github_repo
@@ -54,6 +54,7 @@ from ol_concourse.pipelines.constants import (
 )
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -141,6 +142,8 @@ class AppPipelineParams(BaseModel):
     github_repo: str | None = None
     sentry_sourcemaps: SentrySourcemapsConfig | None = None
     refresh_stack: bool = True
+    description: str = ""
+    category: str = "applications"
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -187,9 +190,13 @@ pipeline_params = {
         settings_dir="micromasters",
         version_file="VERSION",
         refresh_stack=False,
+        description="Builds the MicroMasters Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
     "mitxonline": AppPipelineParams(
-        app_name="mitxonline", build_target="production", refresh_stack=False
+        app_name="mitxonline",
+        build_target="production",
+        refresh_stack=False,
+        description="Builds the MITx Online Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
     "mit-learn-nextjs": AppPipelineParams(
         app_name="mit-learn-nextjs",
@@ -211,6 +218,7 @@ pipeline_params = {
             auth_token_vault_key="((sentry.mitlearn_auth_token))",  # noqa: S106  # pragma: allowlist secret
             rootfs_asset_path="app/frontends/main/.next",
         ),
+        description="Builds the MIT Learn Next.js frontend image, deploys it to Kubernetes via Pulumi, purges the Fastly HTML-page cache on deploy, and uploads the build's source maps to Sentry.",
     ),
     "xpro": AppPipelineParams(
         app_name="xpro",
@@ -219,21 +227,36 @@ pipeline_params = {
         build_target="production",
         settings_dir="mitxpro",
         refresh_stack=False,
+        description="Builds the xPRO Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
-    "learn-ai": AppPipelineParams(app_name="learn-ai", refresh_stack=False),
-    "mit-learn": AppPipelineParams(app_name="mit-learn", refresh_stack=False),
+    "learn-ai": AppPipelineParams(
+        app_name="learn-ai",
+        refresh_stack=False,
+        description="Builds the Learn AI service image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
+    ),
+    "mit-learn": AppPipelineParams(
+        app_name="mit-learn",
+        refresh_stack=False,
+        description="Builds the MIT Learn Django/API backend image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
+    ),
     "ocw-studio": AppPipelineParams(
         app_name="ocw-studio",
         repo_main_branch=app_repo_main_branch("ocw-studio"),
         build_target="production",
+        description="Builds the OCW Studio Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
     "odl-video-service": AppPipelineParams(
         app_name="odl-video-service",
         repo_main_branch=app_repo_main_branch("odl-video-service"),
         build_target="production",
         settings_dir="odl_video",
+        description="Builds the ODL Video Service Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
-    "ol-analytics-api": AppPipelineParams(app_name="ol-analytics-api"),
+    "ol-analytics-api": AppPipelineParams(
+        app_name="ol-analytics-api",
+        description="Builds the OL Analytics API image and deploys it to Kubernetes via Pulumi.",
+        category="data-platform",
+    ),
 }
 
 
@@ -1087,6 +1110,39 @@ def _build_image_job(
     return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
 
 
+def _checkout_release_task(main_repo: Resource, output: Identifier) -> TaskStep:
+    """Check the cut `releases/<version>` branch out into *output*.
+
+    Also records the commit the version tag points at in
+    ``<output>/.git/release_ref``, which is what the image is stamped with.
+    The app repositories are public, as is ``main_repo``'s unauthenticated
+    https URI, so the fetch needs no credentials.
+    """
+    script = "\n".join(
+        [
+            f'cp -a "$REPO/." {output}/',
+            f"cd {output}",
+            "git fetch --quiet origin"
+            ' "+refs/heads/releases/$VERSION:refs/remotes/origin/releases/$VERSION"'
+            ' "+refs/tags/$VERSION:refs/tags/$VERSION"',
+            'git checkout --quiet --force --detach "origin/releases/$VERSION"',
+            "git clean --quiet -fdx",
+            'git rev-list -n1 "$VERSION" > .git/release_ref',
+        ]
+    )
+    return TaskStep(
+        task=Identifier("checkout-release"),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[Input(name=main_repo.name)],
+            outputs=[Output(name=output)],
+            params={"REPO": str(main_repo.name), "VERSION": "((.:release_version))"},
+            run=Command(path="sh", args=["-euc", script]),
+        ),
+    )
+
+
 def _build_release_image_job(
     app_name: str,
     dockerfile_path: str,
@@ -1097,10 +1153,17 @@ def _build_release_image_job(
     build_target: str | None = None,
     sentry_sourcemaps: SentrySourcemapsConfig | None = None,
 ) -> Job:
-    """Generate an image build job triggered by the release resource.
+    """Generate the release image build job for an app.
+
+    Nothing schedules this job: the release bot checks the release resource
+    and then triggers the job explicitly, and a hotfix takes the same path
+    with the commit to cherry-pick carried in the resource's ``hotfix`` file,
+    since triggering a job carries no parameters.  Checking the resource does
+    not start a build, and neither does a `put` to it -- see the comment on
+    the first get for why that matters.
 
     This job:
-    1. Gets the release resource (trigger) and main repo source.
+    1. Gets the release resource and main repo source.
     2. Bumps the version in the app source using bumpver.
     3. Creates the release commit, branch, and tag via the release resource.
     4. Builds and pushes a versioned Docker image to DockerHub and ECR.
@@ -1124,25 +1187,44 @@ def _build_release_image_job(
         "additional_tags": f"{release_res.name}/version",
     }
 
+    release_source = Identifier("release-source")
     plan = [
-        GetStep(get=release_res.name, trigger=True),
+        # Deliberately not `trigger: true`. A `put` publishes a version of the
+        # resource, and Concourse schedules on a version it has not seen
+        # before whether that version came from a check or from a put. This
+        # job's own `action: create` put, the `action: finish` put at the end
+        # of deploy-production, and the `action: abandon` put therefore all
+        # re-triggered this job, each carrying the version just released:
+        #
+        #   create   the cut no-ops against the matching tag, but the image is
+        #            still rebuilt and re-pushed, and a digest differing from
+        #            the first build carries it back through the deploy chain
+        #   finish   fails, because the release branch has been merged back and
+        #            the commit a re-cut would tag is now the merge commit
+        #            ("Tag X already exists at <sha>, which does not match the
+        #            commit being released")
+        #   abandon  deletes the branch and the tag, so the re-cut finds no tag,
+        #            succeeds, and resurrects the abandoned release
+        #
+        # Nothing is lost by dropping the trigger. The resource is
+        # `check_every: never` with no webhook, and the release bot starts a
+        # release by checking the resource over the API and then triggering
+        # this job explicitly (see release_bot.bot._release), so the trigger
+        # could only ever fire on a put or race the bot's own build.
+        GetStep(get=release_res.name, trigger=False),
         GetStep(get=main_repo.name, trigger=False),
         LoadVarStep(
             load_var="release_version",
             file=f"{release_res.name}/version",
             reveal=True,
         ),
-        # The release resource's "create" out-action tags the pre-bumpver HEAD SHA
-        # as the release (see ol-concourse resources/release/README.md): it records
-        # main_repo's current HEAD *before* running bump_version_task, then commits
-        # the version bump separately. Capture git_ref from main_repo here -- before
-        # bump_version_task mutates the checkout -- so the built image is stamped
-        # with the exact commit the release tag points to. The release resource
-        # itself never writes a .git/ref file (only version/commits.json/
-        # checklist.md/changelog_entry.md), so loading it from there would fail.
+        # The commit a hotfix cherry-picks onto production, or empty for a
+        # normal release. The release resource's check sets it while a
+        # `hotfix/<sha>` request tag is pending, which is how `/doof hotfix`
+        # gets a SHA to a job whose trigger carries no parameters.
         LoadVarStep(
-            load_var="git_ref",
-            file=f"{main_repo.name}/.git/ref",
+            load_var="hotfix",
+            file=f"{release_res.name}/hotfix",
             reveal=True,
         ),
         bump_version_task(
@@ -1155,13 +1237,29 @@ def _build_release_image_job(
                 "action": "create",
                 "repo_dir": str(main_repo.name),
                 "version_file": f"{release_res.name}/version",
+                "commit_hash": "((.:hotfix))",
             },
         ),
+        # Build from the cut release, not from main_repo. A hotfix is
+        # production plus one commit, which main_repo does not hold, and
+        # Concourse does not document a put writing back to its inputs, so the
+        # put's checkout is not something later steps can rely on. For a normal
+        # release, releases/<version> is the tree main_repo holds after
+        # bump_version_task, unless main moved between the get and the put, in
+        # which case the branch is what was actually tagged.
+        _checkout_release_task(main_repo, release_source),
+        # The commit the version tag points at: the pre-bump HEAD for a normal
+        # release, the cherry-picked commit for a hotfix.
+        LoadVarStep(
+            load_var="git_ref",
+            file=f"{release_source}/.git/release_ref",
+            reveal=True,
+        ),
         container_build_task(
-            inputs=[Input(name=main_repo.name)],
+            inputs=[Input(name=release_source)],
             build_parameters={
-                "CONTEXT": main_repo.name,
-                "DOCKERFILE": f"{main_repo.name}/{dockerfile_path}",
+                "CONTEXT": str(release_source),
+                "DOCKERFILE": f"{release_source}/{dockerfile_path}",
                 "BUILD_ARG_GIT_REF": "((.:git_ref))",
                 # Some Dockerfiles (e.g. ol-analytics-api) declare ARG GIT_SHA
                 # instead of the GIT_REF convention above; pass both so either
@@ -1550,11 +1648,20 @@ if __name__ == "__main__":
     if not app_name:
         msg = "Please provide an app name as a command line argument."
         raise ValueError(msg)
+    built_pipeline = build_app_pipeline(app_name=app_name)
+    app_params = pipeline_params.get(app_name)
+    output = pipeline_json_with_user_data(
+        built_pipeline,
+        user_data={
+            "description": (app_params.description if app_params else "")
+            or f"Builds `{app_name}` and deploys it to Kubernetes via Pulumi.",
+            "team": "infrastructure",
+            "category": app_params.category if app_params else "applications",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(
-            build_app_pipeline(app_name=app_name).model_dump_json(indent=2)
-        )
-    sys.stdout.write(build_app_pipeline(app_name=app_name).model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     # Note: The pipeline name generated below might need adjustment
     # if the app_name changes the resulting pipeline identifier.
     pipeline_name = f"docker-pulumi-{app_name}"

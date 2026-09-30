@@ -1,4 +1,5 @@
 # ruff: noqa: ERA001, FIX002, E501
+"""Pulumi program for deploying the MIT Learn application to Kubernetes."""
 
 import base64
 import json
@@ -8,6 +9,7 @@ from pathlib import Path
 from string import Template
 
 import pulumi_fastly as fastly
+import pulumi_kubernetes as kubernetes
 import pulumi_qdrant_cloud as qdrant_cloud
 import pulumi_vault as vault
 from pulumi import (
@@ -48,13 +50,17 @@ from ol_infrastructure.components.aws.cache import (
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix import (
+    FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
-    OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    OLApisixSharedPluginsVariant,
+    browser_traffic_match_exprs,
+    oidc_gateway_pre_function_plugin,
+    ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
@@ -84,6 +90,12 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.azure_workload_identity import (
+    azure_identity_env,
+    azure_identity_token_mount,
+    azure_identity_token_volume,
+    azure_openai_env,
+)
 from ol_infrastructure.lib.fastly import (
     build_fastly_log_format_string,
     get_fastly_provider,
@@ -262,14 +274,22 @@ s3.BucketPolicy(
 
 mitlearn_app_storage_bucket_name = f"ol-mitlearn-app-storage-{app_env_suffix}"
 
+# CI and QA pilot SigV4-signed Fastly->S3 requests (see the IAM user/Vault
+# secret below and the signing VCL on the media-storage backend). CI
+# validated live on 2026-09-15; QA added 2026-09-29 after several weeks of
+# clean CI operation, to soak on a higher-traffic environment before
+# Production. Production stays on the pre-existing public-read policy until
+# this is rolled out there too.
+_mitlearn_bucket_is_sigv4_piloted = stack_info.env_suffix in ("ci", "qa")
+
 mitlearn_application_storage_bucket_config = S3BucketConfig(
     bucket_name=mitlearn_app_storage_bucket_name,
     versioning_enabled=True,
     ownership_controls="BucketOwnerPreferred",
-    block_public_acls=False,
-    block_public_policy=False,
-    ignore_public_acls=False,
-    restrict_public_buckets=False,
+    block_public_acls=_mitlearn_bucket_is_sigv4_piloted,
+    block_public_policy=_mitlearn_bucket_is_sigv4_piloted,
+    ignore_public_acls=_mitlearn_bucket_is_sigv4_piloted,
+    restrict_public_buckets=_mitlearn_bucket_is_sigv4_piloted,
     intelligent_tiering_archive_access_days=None,  # Fastly backend
     intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
@@ -300,10 +320,78 @@ mitlearn_application_storage_bucket = OLBucket(
     ),
 )
 
-s3.BucketPolicy(
-    "ol-mitlearn-bucket-policy",
-    bucket=mitlearn_application_storage_bucket.bucket_v2.id,
-    policy=json.dumps(
+mitlearn_fastly_s3_signer_access_key = None
+if _mitlearn_bucket_is_sigv4_piloted:
+    # Dedicated identity for Fastly to authenticate to S3 with (SigV4), so the
+    # bucket can be fully private instead of Principal:"*". Scoped to GetObject
+    # on just this bucket.
+    # Concourse's deploy role can only manage IAM users/policies under the
+    # /ol-applications/* path (see
+    # applications/concourse/iam_policies/pulumi_infra.py), and only via
+    # managed policy attach/detach -- it has no iam:PutUserPolicy /
+    # iam:DeleteUserPolicy. A default-path user with an inline policy (the
+    # original shape here) is invisible to that grant and fails with
+    # AccessDenied the moment Concourse tries to apply it.
+    # No tags= here: IAM requires iam:TagUser (separate from iam:CreateUser)
+    # to authorize tags supplied at creation time, and Concourse's deploy
+    # role grants iam:TagRole/TagPolicy but not iam:TagUser -- adding tags
+    # would fail the same AccessDenied way, one step later.
+    mitlearn_fastly_s3_signer_user = iam.User(
+        "ol-mitlearn-ci-fastly-s3-signer",
+        name=f"ol-mitlearn-{stack_info.env_suffix}-fastly-s3-signer",
+        path="/ol-applications/",
+    )
+    mitlearn_fastly_s3_signer_policy = iam.Policy(
+        "ol-mitlearn-ci-fastly-s3-signer-policy",
+        path="/ol-applications/",
+        policy=json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": ["s3:GetObject"],
+                        "Resource": [
+                            f"arn:aws:s3:::{mitlearn_app_storage_bucket_name}/*"
+                        ],
+                    }
+                ],
+            }
+        ),
+    )
+    mitlearn_fastly_s3_signer_policy_attachment = iam.UserPolicyAttachment(
+        "ol-mitlearn-ci-fastly-s3-signer-policy-attachment",
+        user=mitlearn_fastly_s3_signer_user.name,
+        policy_arn=mitlearn_fastly_s3_signer_policy.arn,
+    )
+    mitlearn_fastly_s3_signer_access_key = iam.AccessKey(
+        "ol-mitlearn-ci-fastly-s3-signer-access-key",
+        user=mitlearn_fastly_s3_signer_user.name,
+        opts=ResourceOptions(depends_on=[mitlearn_fastly_s3_signer_policy_attachment]),
+    )
+    # The durable Vault copy of this key (for visibility/rotation tooling
+    # outside of Pulumi state) is created further down, once the mit-learn
+    # Vault KV mount is available -- search for "fastly-s3-signer-vault-secret".
+    mitlearn_bucket_policy_document = mitlearn_fastly_s3_signer_user.arn.apply(
+        lambda arn: json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "FastlySigV4Read",
+                        "Effect": "Allow",
+                        "Principal": {"AWS": arn},
+                        "Action": ["s3:GetObject"],
+                        "Resource": [
+                            f"arn:aws:s3:::{mitlearn_app_storage_bucket_name}/*"
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+else:
+    mitlearn_bucket_policy_document = json.dumps(
         {
             "Version": "2012-10-17",
             "Statement": [
@@ -316,7 +404,12 @@ s3.BucketPolicy(
                 }
             ],
         }
-    ),
+    )
+
+s3.BucketPolicy(
+    "ol-mitlearn-bucket-policy",
+    bucket=mitlearn_application_storage_bucket.bucket_v2.id,
+    policy=mitlearn_bucket_policy_document,
 )
 
 parliament_config = {
@@ -430,6 +523,20 @@ mitlearn_vault_static_secrets = vault.generic.Secret(
     ),
 )
 
+if _mitlearn_bucket_is_sigv4_piloted and mitlearn_fastly_s3_signer_access_key:
+    # Durable copy in Vault for visibility/rotation tooling outside of Pulumi
+    # state. Pulumi (via the iam.AccessKey resource above) is still the source
+    # of truth -- rotating means replacing that resource, which updates this
+    # secret in the same apply.
+    vault.generic.Secret(
+        "ol-mitlearn-ci-fastly-s3-signer-vault-secret",
+        path=mitlearn_vault_mount.path.apply("{}/fastly-s3-signer".format),
+        data_json=Output.all(
+            access_key_id=mitlearn_fastly_s3_signer_access_key.id,
+            secret_access_key=mitlearn_fastly_s3_signer_access_key.secret,
+        ).apply(json.dumps),
+    )
+
 # The policy has been updated to allow for reading from the old or
 # the new mount.
 mitlearn_vault_policy = vault.Policy(
@@ -465,6 +572,21 @@ vault_k8s_resources = OLVaultK8SResources(
 )
 
 ### End vault resources
+
+# Dedicated ServiceAccount for the mitlearn workloads. Until this existed they ran
+# under the namespace's `default` ServiceAccount, which is not something an Azure
+# federated identity credential can be scoped to usefully: its subject is an exact
+# string with no wildcards, so trusting `default` would trust anything that ever runs
+# in this namespace. Named to match the existing `mitlearn-app` security group.
+mitlearn_service_account = kubernetes.core.v1.ServiceAccount(
+    f"mitlearn-service-account-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="mitlearn-app",
+        namespace=learn_namespace,
+        labels=k8s_app_labels,
+    ),
+)
+
 # Create a security group for the application pods
 mitlearn_app_security_group = ec2.SecurityGroup(
     f"mitlearn-app-sg-{stack_info.env_suffix}",
@@ -843,6 +965,7 @@ CACHE_KEY_QUERY_PARAM_WHITELIST = [
     "aggregations",
     "certification",
     "certification_type",
+    "completeness_penalty",
     "content_file_score_weight",
     "course_feature",
     "delivery",
@@ -859,14 +982,18 @@ CACHE_KEY_QUERY_PARAM_WHITELIST = [
     "offset",
     "platform",
     "professional",
+    "program_boost",
     "q",
     "resource_category",
     "resource_type",
     "resource_type_group",
+    "score_cutoff",
     "search_mode",
     "show_ocw_files",
     "slop",
     "sortby",
+    "staleness_horizon_years",
+    "staleness_penalty",
     "topic",
     "yearly_decay_percent",
     # Application params.
@@ -893,6 +1020,119 @@ CACHE_KEY_QUERY_PARAM_WHITELIST = [
     "syllabus_only",
     "recommender",
 ]
+
+
+# The SHA256 hash of an empty string -- a fixed, public constant (not a
+# secret), used as the payload hash for unsigned-body GET requests in AWS
+# SigV4 signing.
+_SHA256_EMPTY_STRING = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"  # pragma: allowlist secret
+
+
+def _mitlearn_s3_sigv4_signing_body(
+    access_key_id: str, secret_access_key: str, bucket_host: str
+) -> str:
+    """VCL to sign a backend request to the mit-learn media bucket with SigV4.
+
+    Validated live against CI on 2026-09-15: a test object uploaded to
+    media/sigv4-pilot-test.txt (then deleted) round-tripped through Fastly
+    with a 200, confirming the signature is accepted by S3 with the bucket
+    fully private. Three real bugs were found and fixed along the way -- see
+    the notes below and the PR description for the full story.
+
+    Note: %0A (Fastly VCL's %xx hex-byte escape) is used for newlines below
+    instead of \\n, which Fastly parses as a literal backslash + "n", not a
+    newline byte, inside a plain double-quoted string. Deliberately no VCL
+    `#` comments inside the returned body either -- a `#` comment containing
+    an embedded double-quote character breaks Fastly's parser (confirmed by
+    hitting exactly that live).
+
+    bereq.http.host is explicitly set to bucket_host rather than trusted --
+    the backend's own override_host doesn't appear to be reflected in
+    bereq.http.host by the time a "miss" snippet runs, so signing against
+    whatever bereq.http.host already held signed the wrong Host and produced
+    SignatureDoesNotMatch (confirmed live).
+
+    The canonical query string is hardcoded empty below, so any query string
+    on the actual request must also be stripped before it goes out to S3 --
+    "Route media requests to S3" (the recv-stage snippet that sets
+    is_media_request) never removes it, unlike the OCW backend's own recv
+    snippet, which explicitly calls querystring.remove(req.url) before its S3
+    fetch for exactly this reason. Without the querystring.remove(bereq.url)
+    call below, any /media/...?... request would sign against an empty query
+    string while actually sending the real one, and S3 would reject it with
+    SignatureDoesNotMatch.
+    """
+    return textwrap.dedent(
+        f"""\
+        declare local var.aws_access_key_id STRING;
+        declare local var.aws_secret_access_key STRING;
+        declare local var.date_stamp STRING;
+        declare local var.amz_date STRING;
+        declare local var.payload_hash STRING;
+        declare local var.canonical_headers STRING;
+        declare local var.signed_headers STRING;
+        declare local var.canonical_request STRING;
+        declare local var.hashed_canonical_request STRING;
+        declare local var.credential_scope STRING;
+        declare local var.string_to_sign STRING;
+        declare local var.signature STRING;
+
+        set var.aws_access_key_id = "{access_key_id}";
+        set var.aws_secret_access_key = "{secret_access_key}";
+
+        set bereq.url = querystring.remove(bereq.url);
+
+        set var.date_stamp = strftime({{"%Y%m%d"}}, now);
+        set var.amz_date = strftime({{"%Y%m%dT%H%M%SZ"}}, now);
+        set var.payload_hash = "{_SHA256_EMPTY_STRING}";
+
+        set bereq.http.host = "{bucket_host}";
+        unset bereq.http.Authorization;
+        set bereq.http.x-amz-date = var.amz_date;
+        set bereq.http.x-amz-content-sha256 = var.payload_hash;
+
+        set var.signed_headers = "host;x-amz-content-sha256;x-amz-date";
+        set var.canonical_headers = "host:" + bereq.http.host + "%0A" + "x-amz-content-sha256:" + var.payload_hash + "%0A" + "x-amz-date:" + var.amz_date + "%0A";
+
+        set var.canonical_request = "GET" + "%0A" + bereq.url.path + "%0A" + "" + "%0A" + var.canonical_headers + "%0A" + var.signed_headers + "%0A" + var.payload_hash;
+        set var.hashed_canonical_request = digest.hash_sha256(var.canonical_request);
+
+        set var.credential_scope = var.date_stamp + "/us-east-1/s3/aws4_request";
+        set var.string_to_sign = "AWS4-HMAC-SHA256" + "%0A" + var.amz_date + "%0A" + var.credential_scope + "%0A" + var.hashed_canonical_request;
+
+        set var.signature = digest.awsv4_hmac(var.aws_secret_access_key, var.date_stamp, "us-east-1", "s3", var.string_to_sign);
+
+        set bereq.http.Authorization = "AWS4-HMAC-SHA256 Credential=" + var.aws_access_key_id + "/" + var.credential_scope + ", SignedHeaders=" + var.signed_headers + ", Signature=" + var.signature;
+        """
+    )
+
+
+if _mitlearn_bucket_is_sigv4_piloted and mitlearn_fastly_s3_signer_access_key:
+    mitlearn_s3_backend_auth_vcl = Output.all(
+        access_key_id=mitlearn_fastly_s3_signer_access_key.id,
+        secret_access_key=mitlearn_fastly_s3_signer_access_key.secret,
+    ).apply(
+        lambda args: (
+            f"if (req.backend == F_{bucket_backend_name.replace(' ', '_')}) {{\n"
+            + textwrap.indent(
+                _mitlearn_s3_sigv4_signing_body(
+                    args["access_key_id"],
+                    args["secret_access_key"],
+                    f"{mitlearn_app_storage_bucket_name}.s3.us-east-1.amazonaws.com",
+                ),
+                "  ",
+            )
+            + "}"
+        )
+    )
+else:
+    mitlearn_s3_backend_auth_vcl = textwrap.dedent(
+        f"""\
+    if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
+      unset bereq.http.Authorization;
+    }}"""
+    )
+
 mitlearn_fastly_service = fastly.ServiceVcl(
     f"fastly-mit_learn-{stack_info.env_suffix}",
     name=f"MIT Learn {stack_info.env_suffix}",
@@ -1099,12 +1339,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             type="pass",
         ),
         vcl_snippet(
-            content=textwrap.dedent(
-                f"""\
-            if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
-              unset bereq.http.Authorization;
-            }}"""
-            ),
+            content=mitlearn_s3_backend_auth_vcl,
             name="Strip auth headers in S3 miss requests",
             type="miss",
         ),
@@ -1119,12 +1354,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             type="miss",
         ),
         vcl_snippet(
-            content=textwrap.dedent(
-                f"""\
-            if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
-              unset bereq.http.Authorization;
-            }}"""
-            ),
+            content=mitlearn_s3_backend_auth_vcl,
             name="Strip auth headers in S3 pass requests",
             type="pass",
         ),
@@ -1397,6 +1627,32 @@ interpolated_vars = {
 env_vars.update(**interpolated_vars)
 env_vars.update(**mitlearn_config.get_object("vars"))
 
+# Azure OpenAI, additive alongside the existing OPENAI_API_KEY wiring, which is not
+# touched. Nothing here is secret: the managed identity is reached by exchanging the
+# projected ServiceAccount token mounted below, so the client id is an identifier
+# rather than a credential and there is nothing to rotate.
+#
+# A StackReference to a stack that does not exist fails the whole preview, so this is
+# a config switch that gets flipped per environment once infrastructure/azure/openai
+# has been deployed there.
+if mitlearn_config.get_bool("enable_azure_openai"):
+    azure_openai_stack = make_stack_reference(projects.AZURE_OPENAI, stack_info.name)
+    env_vars.update(azure_identity_env(azure_openai_stack, "mitlearn"))
+    env_vars.update(
+        azure_openai_env(
+            azure_openai_stack,
+            "mitlearn",
+            api_version=mitlearn_config.get("azure_openai_api_version") or "2024-10-21",
+            default_deployment=mitlearn_config.get("azure_openai_default_deployment")
+            or "gpt-4o",
+        )
+    )
+    azure_identity_volumes = [azure_identity_token_volume()]
+    azure_identity_volume_mounts = [azure_identity_token_mount()]
+else:
+    azure_identity_volumes = []
+    azure_identity_volume_mounts = []
+
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
 # carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_app_labels)
@@ -1444,22 +1700,18 @@ application_labels = k8s_app_labels | {
     "ol.mit.edu/pod-security-group": "learn",
 }
 
-learn_external_service_shared_plugins = OLApisixSharedPlugins(
-    name="ol-mitlearn-external-service-apisix-plugins",
+# api.learn.mit.edu carries two shared plugin configs: the base one, and a
+# second that the browser-* routes reference so they can carry rate limiting
+# the Fastly-fronted routes must not.  Both are rendered from this one plugin
+# list rather than two hand-synchronised ones -- a plugin present on only one
+# of them changes behaviour by request Origin, which is close to invisible in
+# review and has already shipped twice here.
+learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variants(
     plugin_config=OLApisixSharedPluginsConfig(
         application_name="mitlearn",
-        resource_suffix="ol-shared-plugins",
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
-        # Explicit override, not the component's per-stack default (on
-        # everywhere except Production pending a separate soak test): the
-        # nginx sidecar this stage removes gzipped JSON responses
-        # unconditionally in every stack including Production
-        # (docs/plans/remove-nginx-sidecar.md, stage 5), so leaving Production
-        # on the default would silently drop that compression there. Revisit
-        # once the other initiative's soak test clears Production generally.
-        enable_gzip=True,
         plugins=[
             # Everyone currently logged in is holding a session cookie under
             # lua-resty-session's old default name, which the renamed plugins
@@ -1468,16 +1720,53 @@ learn_external_service_shared_plugins = OLApisixSharedPlugins(
             # host-only one predates the move to a parent-domain cookie in
             # #5182 (and is also what mitxonline's /mitxonline/* routes on this
             # host used to set), and the domain-scoped one is what #5182
-            # replaced it with.  Every route on this host references this
-            # shared config, and clearing the .learn.mit.edu entry from here
-            # also clears it for analytics.<env>.learn.mit.edu, since a
-            # domain-scoped cookie is a single entry in the browser's jar.
-            # Safe to delete once the old cookies have aged out of circulation.
+            # replaced it with.  Every ol-shared-plugins/ol-browser-shared-plugins
+            # route on this host references one of these two shared configs, and
+            # clearing the .learn.mit.edu entry from here also clears it for
+            # analytics.<env>.learn.mit.edu, since a domain-scoped cookie is a
+            # single entry in the browser's jar. Safe to delete once the old
+            # cookies have aged out of circulation.
             stale_session_cookie_cleanup_plugin(
                 cookie_domains=[mitlearn_api_domain.removeprefix("api")],
             ),
+            # 327 callbacks a day on api.learn.mit.edu come back from Keycloak
+            # with error=temporarily_unavailable instead of a code, and the
+            # openid-connect plugin serves each one a 500.  Both route groups
+            # on this host need it, and the plugin derives its redirect target
+            # from the request URI, so the /login and /learn/login prefixes are
+            # handled from this one attachment.  The same attachment also
+            # canonicalises the origin: `curl http://api.learn.mit.edu/login`
+            # currently sends Keycloak an http:// redirect_uri, and answers with
+            # an OIDC session cookie over cleartext.
+            oidc_gateway_pre_function_plugin(
+                session_cookie_names=[
+                    mit_learn_session_cookie_name(stack_info.env_suffix)
+                ],
+            ),
         ],
     ),
+    variants=[
+        OLApisixSharedPluginsVariant(
+            name="ol-mitlearn-external-service-apisix-plugins",
+            resource_suffix="ol-shared-plugins",
+        ),
+        OLApisixSharedPluginsVariant(
+            name="ol-mitlearn-external-service-browser-apisix-plugins",
+            resource_suffix="ol-browser-shared-plugins",
+            # CI/QA soak before Production, same rollout shape as enable_gzip's
+            # own soak: the thresholds above are sized from 30d of
+            # api.learn.mit.edu traffic, not from measured Production request
+            # volume under load. Flip to unconditional True once that's
+            # confirmed; #5562 tracks the SSR-side limiter this doesn't cover.
+            enable_rate_limiting=stack_info.env_suffix != "production",
+        ),
+    ],
+)
+learn_external_service_shared_plugins = learn_external_service_shared_plugin_variants[
+    "ol-shared-plugins"
+]
+learn_external_service_browser_shared_plugins = (
+    learn_external_service_shared_plugin_variants["ol-browser-shared-plugins"]
 )
 
 api_tls_secret_name = "api-mitlearn-tls-pair"  # pragma: allowlist secret # noqa: S105
@@ -1650,6 +1939,24 @@ mitlearn_celery_worker_configs = [
         redis_password=redis_config.require("password"),
         resource_requests=celery_default_resource_requests,
         resource_limits=celery_default_resource_limits,
+        # 640Mi. A healthy child on this queue sits at ~165Mi (observed
+        # on applications-production 2026-08-17: whole container ~480Mi
+        # for master + 2 children), so this only fires on a child that
+        # has genuinely ballooned, not in steady state.
+        #
+        # Sized against the *floor*-derived limit (1Gi request x the 2:1
+        # ratio = 2Gi), not the 2560Mi declared above or the 6144Mi the
+        # VPA is currently enforcing, because the floor is the smallest
+        # limit a pod can run under: 150Mi master + 2 x (640 + one task's
+        # growth) has to clear 2Gi. Coupled to --concurrency=2 and to
+        # _worker_vpa_bounds["min_allowed"] below -- revisit all three
+        # together.
+        #
+        # This bounds *carry-over* only. A single task that allocates
+        # past the cgroup limit in one go still OOM-kills the container,
+        # because celery checks RSS between tasks. See the 0.77.3
+        # get_learning_resource_views regression.
+        max_memory_per_child_kib=655360,
     ),
     OLApplicationK8sCeleryWorkerConfig(
         queue_name="edx_content",
@@ -1661,6 +1968,9 @@ mitlearn_celery_worker_configs = [
     OLApplicationK8sCeleryWorkerConfig(
         queue_name="embeddings",
         max_replicas=30,
+        # KEDA holds this at or near 30 replicas through backlogs, so a deploy
+        # that waits for all 30 to be available at once fails under spot churn.
+        skip_rollout_await=True,
         redis_host=redis_cache.address,
         redis_password=redis_config.require("password"),
         resource_requests=celery_embeddings_resource_requests,
@@ -1736,6 +2046,9 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_max_replicas=mitlearn_config.get_int("max_replicas") or 10,
         application_security_group_id=mitlearn_app_security_group.id,
         application_security_group_name=mitlearn_app_security_group.name,
+        application_service_account_name=mitlearn_service_account.metadata.name,
+        extra_volumes=azure_identity_volumes,
+        extra_volume_mounts=azure_identity_volume_mounts,
         application_image_repository="mitodl/mit-learn-app",
         **docker_image_config_kwargs("MIT_LEARN"),
         application_cmd_array=["uwsgi"],
@@ -1913,12 +2226,153 @@ proxy_rewrite_plugin_config = OLApisixPluginConfig(
         ],
     },
 )
+# Why this host needs the User-Agent clause, not just the Origin match: the
+# Next.js SSR layer reaches api.learn as `axios/1.12.2`
+# (frontends/api/package.json) from four AWS egress addresses, and on
+# 2026-09-21 the busiest of them sustained 371-676 req/min -- 11.3 req/s
+# against the 50 req/s per-IP bucket the browser-* routes carry. It misses
+# these routes today only because Node axios sends no Origin header, which is
+# an accident of the HTTP client rather than a decision.
+#
+# Measured while choosing the clause: crawlers DO replay our Origin
+# (DuckDuckBot, DuckAssistBot, and an Amazon Bedrock knowledge base, the last
+# with a full cookie jar), so excluding every non-browser would exempt single
+# actors this limit should catch. Sec-Fetch-Site is not the discriminator it
+# looks like either: absent on 55% of Origin-carrying requests and present on
+# the Bedrock crawler.
+#
+# Note this is a knob any client can turn, not only a description of what
+# already happens: anything sending a matching User-Agent opts itself out.
+# Not a regression, since a non-browser caller could already opt out by
+# dropping Origin, which is easier than setting a header.
+browser_api_match_exprs = browser_traffic_match_exprs(
+    r"^https://(ci\.|rc\.)?learn\.mit\.edu$",
+    FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
+)
+fastly_api_match_exprs = [
+    {
+        "subject": {"scope": "Header", "name": "Fastly-Client-IP"},
+        "op": "RegexMatch",
+        "value": r".+",
+    }
+]
 
 learn_external_service_apisix_route_no_prefix = OLApisixRoute(
     name=f"ol-mitlearn-k8s-apisix-route-no-prefix-{stack_info.env_suffix}",
     k8s_namespace=learn_namespace,
     k8s_labels=application_labels,
     route_configs=[
+        OLApisixRouteConfig(
+            route_name="fastly-passauth",
+            # Lower priority than browser-* (see below): browser requests via
+            # Fastly carry both Origin and Fastly-Client-IP, so the more
+            # specific browser-* match must be evaluated first or the
+            # broader ".+"  Fastly-Client-IP match here swallows all browser
+            # traffic and the rate-limited routes never trigger (found by
+            # Sentry AI review on this PR).
+            priority=20,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/*"],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="fastly-logout-redirect",
+            priority=30,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/logout/oidc/*"],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="fastly-reqauth",
+            priority=30,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=[
+                "/admin/login/*",
+                "/login",
+                "/login/*",
+            ],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-passauth",
+            # Higher priority than fastly-* above: Origin is the more
+            # specific signal for direct browser traffic and must win the
+            # match before the broad Fastly-Client-IP presence check.
+            priority=40,
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/*"],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-logout-redirect",
+            priority=50,
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/logout/oidc/*"],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-reqauth",
+            priority=50,
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=[
+                "/admin/login/*",
+                "/login",
+                "/login/*",
+            ],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
         OLApisixRouteConfig(
             route_name="passauth",
             priority=0,
@@ -1968,7 +2422,9 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             priority=10,
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             plugins=[
-                OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
+                OLApisixPluginConfig(
+                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                ),
             ],
             hosts=[mitlearn_api_domain],
             paths=["/logout/oidc/*"],
@@ -2004,7 +2460,11 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
         # docs/plans/remove-nginx-sidecar.md.
         OLApisixRouteConfig(
             route_name="dnt-policy",
-            priority=10,
+            # Above every fastly-*/browser-* route (max 50). Their "/*" paths
+            # also match this URL, and APISIX picks by priority before path
+            # specificity, so at 10 a request carrying an Origin or
+            # Fastly-Client-IP header was proxied to Django and 404'd.
+            priority=60,
             # Referenced no plugin config, unlike every sibling here, so
             # this path emitted no prometheus series and no OTLP span. `mocking`
             # short-circuits before the upstream but `prometheus` runs in the log
@@ -2039,6 +2499,113 @@ learn_external_service_apisix_route = OLApisixRoute(
     k8s_namespace=learn_namespace,
     k8s_labels=application_labels,
     route_configs=[
+        OLApisixRouteConfig(
+            route_name="fastly-passauth",
+            # See the matching comment on the no-prefix route set above:
+            # lower priority than browser-* so the more specific Origin
+            # match is evaluated first.
+            priority=20,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/learn/*"],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="fastly-logout-redirect",
+            priority=30,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/learn/logout/oidc/*"],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="fastly-reqauth",
+            priority=30,
+            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=[
+                "/learn/admin/login/*",
+                "/learn/login",
+                "/learn/login/*",
+            ],
+            exprs=fastly_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-passauth",
+            # Higher priority than fastly-* above: see the matching comment
+            # on the no-prefix route set.
+            priority=40,
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="pass"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/learn/*"],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-logout-redirect",
+            priority=50,
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                OLApisixPluginConfig(
+                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=["/learn/logout/oidc/*"],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
+        OLApisixRouteConfig(
+            route_name="browser-reqauth",
+            priority=50,
+            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+            plugins=[
+                proxy_rewrite_plugin_config,
+                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
+                    unauth_action="auth"
+                ),
+            ],
+            hosts=[mitlearn_api_domain],
+            paths=[
+                "/learn/admin/login/*",
+                "/learn/login",
+                "/learn/login/*",
+            ],
+            exprs=browser_api_match_exprs,
+            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
+            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+        ),
         OLApisixRouteConfig(
             route_name="passauth",
             priority=0,
@@ -2088,7 +2655,9 @@ learn_external_service_apisix_route = OLApisixRoute(
             priority=10,
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             plugins=[
-                OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
+                OLApisixPluginConfig(
+                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                ),
             ],
             hosts=[mitlearn_api_domain],
             paths=["/learn/logout/oidc/*"],

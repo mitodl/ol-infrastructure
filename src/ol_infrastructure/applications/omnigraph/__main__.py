@@ -53,6 +53,7 @@ from typing import Any
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 
+from bridge.lib.versions import AWS_CLI_VERSION
 from bridge.secrets import sops as _bridge_sops
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.omnigraph.cluster_config import (
@@ -79,6 +80,7 @@ from ol_infrastructure.applications.omnigraph.storage import (
     validate_internal_schema_version,
     validate_migration_target_prefix,
     validate_storage_prefix,
+    validate_storage_prefix_progression,
 )
 from ol_infrastructure.applications.omnigraph.storage_migration import (
     create_storage_migration,
@@ -88,6 +90,12 @@ from ol_infrastructure.applications.omnigraph.token_sync import (
     DEFAULT_SYNC_SCHEDULE,
     SERVICE_TOKENS_VAULT_PATH,
     create_token_sync,
+)
+from ol_infrastructure.applications.witan.ci_indexer import (
+    CRONJOB_NAME as CI_INDEXER_CRONJOB_NAME,
+)
+from ol_infrastructure.applications.witan.view_reaper import (
+    CRONJOB_NAME as VIEW_REAPER_CRONJOB_NAME,
 )
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
@@ -100,6 +108,7 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
+    cached_image_uri,
     check_cluster_namespace,
     setup_k8s_provider,
 )
@@ -109,7 +118,11 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Services,
 )
-from ol_infrastructure.lib.pulumi_helper import make_stack_reference, parse_stack
+from ol_infrastructure.lib.pulumi_helper import (
+    make_stack_reference,
+    optional_stack_output_value,
+    parse_stack,
+)
 from ol_infrastructure.lib.vault import setup_vault_provider
 
 # Resolve the bridge secrets directory once at module level using the sops
@@ -179,6 +192,71 @@ MIGRATE_FROM_IMAGE: str = (omnigraph_config.get("migrate_from_image") or "").str
 # `storage_prefix` once the Job's verdict says the rebuild is good.
 MIGRATE_TO_PREFIX: str = validate_migration_target_prefix(
     omnigraph_config.get("migrate_to_prefix")
+)
+
+# ── The two migration knobs must agree with each other and with storage_prefix.
+# Every check here is pure config, so it runs BEFORE anything is constructed:
+# a half-cleared config would otherwise reach `create_data_tier` first and fail
+# on the image storage-format check instead, whose remedy ("arm the migration")
+# is the wrong advice for a config that already has a target set.
+#
+# The knobs arm DIFFERENT things — `migrate_from_image` arms the Job, the
+# suspensions and the scale-down; `migrate_to_prefix` is what the deploying
+# image's storage format is checked against — so a half-cleared config is not a
+# tidiness problem, it is a hole. Leaving `migrate_to_prefix` behind while
+# clearing `migrate_from_image` brings the tier back UP and simultaneously
+# points the image check at the rebuild target instead of the served root,
+# which is how a format-9 image passes preview against an fmt6 cluster: exactly
+# the 2026-09-16 incident. Clearing `migrate_from_image` alone is also the
+# normal way to scale the tier back up, so this is a state a hurried cutover
+# reaches easily. Refuse it here rather than discovering it as a crashloop.
+if MIGRATE_TO_PREFIX and not MIGRATE_FROM_IMAGE:
+    ORPHAN_TARGET_MSG = (
+        f"omnigraph:migrate_to_prefix is set to {MIGRATE_TO_PREFIX!r} but "
+        "omnigraph:migrate_from_image is not, so nothing is armed: there is no "
+        "migration Job, the sweeps are running and the data tier is serving. "
+        "The two are set together and cleared together. If the cutover is "
+        "done, clear migrate_to_prefix as well; if it has not started, set "
+        "migrate_from_image to the currently-deployed image ref."
+    )
+    raise ValueError(ORPHAN_TARGET_MSG)
+
+if MIGRATE_FROM_IMAGE and not MIGRATE_TO_PREFIX:
+    MIGRATION_MSG = (
+        "omnigraph:migrate_from_image is set but "
+        "omnigraph:migrate_to_prefix is not. The migration needs a target "
+        "root to rebuild into (fmt<N>, N being the NEW internal-schema "
+        "number) — without one the only root it could write is the one it "
+        "is migrating away from."
+    )
+    raise ValueError(MIGRATION_MSG)
+
+if MIGRATE_FROM_IMAGE and MIGRATE_TO_PREFIX == STORAGE_PREFIX:
+    CUTOVER_MSG = (
+        f"omnigraph:migrate_to_prefix and omnigraph:storage_prefix are "
+        f"both {MIGRATE_TO_PREFIX!r}, so the cluster is already serving "
+        "the root this migration would rebuild into — it would export "
+        "from the root it is writing to. If the cutover is done, clear "
+        "migrate_from_image/migrate_to_prefix; if it is not, clear "
+        "storage_prefix."
+    )
+    raise ValueError(CUTOVER_MSG)
+
+# ── The served root must not move back to an older format by accident.
+# Compared against this stack's own last `storage_prefix` output rather than
+# anything in the ref being deployed, because the failure is a stale ref: the
+# pipeline deploys the newest ref that passed preview, which after a cutover
+# can still carry the old prefix (QA, 2026-09-16). Read before any resource is
+# declared so a refusal cannot land after the ConfigMap has already changed.
+# See validate_storage_prefix_progression.
+STORAGE_ROLLBACK_FROM: str = validate_storage_prefix(
+    omnigraph_config.get("storage_rollback_from"), key="storage_rollback_from"
+)
+DEPLOYED_STORAGE_PREFIX: str | None = optional_stack_output_value(
+    make_stack_reference(projects.OMNIGRAPH, stack_info.name), "storage_prefix"
+)
+validate_storage_prefix_progression(
+    DEPLOYED_STORAGE_PREFIX, STORAGE_PREFIX, STORAGE_ROLLBACK_FROM
 )
 
 # Keycloak realm -> actor-token sync. Set `omnigraph:keycloak_url` for an
@@ -295,6 +373,9 @@ cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 NAMESPACE = "omnigraph"
+# Where the witan stack runs the two graph writers it owns (see
+# witan/__main__.py's NAMESPACE). Only the migration Job's pre-flight reads it.
+WITAN_NAMESPACE = "witan"
 
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(NAMESPACE, ns)
@@ -328,11 +409,12 @@ ACTOR_TOKENS_SECRET_KEY = "tokens.json"  # noqa: S105  # pragma: allowlist secre
 # further down resolves to an empty Secret — and the app to an empty token
 # map — if the Vault secret uses any other key.
 ACTOR_TOKENS_VAULT_KEY = "tokens_json"  # pragma: allowlist secret
-# witan's own module-level fallback OmnigraphClient authenticates as this raw
-# token (WITAN_MEMORY_TOKEN) when a request carries no per-actor JWT — see
-# applications/witan/__main__.py and witan_policy.hcl. Its value must match
-# the "svc-witan-ci" entry of the actor-tokens map above; both come from the
-# same SOPS source record below so they can't drift.
+# The raw svc-witan-ci token, read by the witan CI indexer, the view reaper and
+# (where svc-witan-admin is not provisioned) the migration Job. See
+# applications/witan/__main__.py and witan_policy.hcl. The MCP tier's memory
+# path does not read it: every memory call there runs as the caller's own actor
+# token. Its value must match the "svc-witan-ci" entry of the actor-tokens map
+# above; both come from the same SOPS source record below so they can't drift.
 WITAN_CI_TOKEN_VAULT_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 WITAN_CI_ACTOR_ID = "svc-witan-ci"
 
@@ -940,6 +1022,11 @@ data_tier = create_data_tier(
     cleanup_schedule=CLEANUP_SCHEDULE,
     cleanup_older_than=CLEANUP_OLDER_THAN,
     storage_prefix=STORAGE_PREFIX,
+    # Not used to build anything — these are what the DEPLOYING IMAGE's own
+    # declared storage format is cross-checked against, once data_tier has
+    # resolved the image reference. See validate_image_internal_schema.
+    internal_schema_version=INTERNAL_SCHEMA_VERSION,
+    migrate_to_prefix=MIGRATE_TO_PREFIX,
     per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     # Arming a migration suspends both maintenance sweeps for its duration.
@@ -949,6 +1036,9 @@ data_tier = create_data_tier(
     # the same config that creates the Job so the two cannot drift: clearing
     # `migrate_from_image` resumes them in the same `pulumi up`.
     suspend_maintenance=bool(MIGRATE_FROM_IMAGE),
+    # Same switch, second effect: no cluster-apply Job while the migration
+    # is armed. See data_tier.py's cluster_apply_job for why.
+    migration_armed=bool(MIGRATE_FROM_IMAGE),
 )
 
 #########################################
@@ -971,25 +1061,6 @@ data_tier = create_data_tier(
 # The Job rebuilds and verifies per-table row counts, then stops — see
 # storage_migration.py and docs/omnigraph-storage-format-upgrade-runbook.md.
 if MIGRATE_FROM_IMAGE:
-    if not MIGRATE_TO_PREFIX:
-        MIGRATION_MSG = (
-            "omnigraph:migrate_from_image is set but "
-            "omnigraph:migrate_to_prefix is not. The migration needs a target "
-            "root to rebuild into (fmt<N>, N being the NEW internal-schema "
-            "number) — without one the only root it could write is the one it "
-            "is migrating away from."
-        )
-        raise ValueError(MIGRATION_MSG)
-    if MIGRATE_TO_PREFIX == STORAGE_PREFIX:
-        CUTOVER_MSG = (
-            f"omnigraph:migrate_to_prefix and omnigraph:storage_prefix are "
-            f"both {MIGRATE_TO_PREFIX!r}, so the cluster is already serving "
-            "the root this migration would rebuild into — it would export "
-            "from the root it is writing to. If the cutover is done, clear "
-            "migrate_from_image/migrate_to_prefix; if it is not, clear "
-            "storage_prefix."
-        )
-        raise ValueError(CUTOVER_MSG)
     storage_migration = create_storage_migration(
         stack_info=stack_info,
         namespace=NAMESPACE,
@@ -1012,6 +1083,18 @@ if MIGRATE_FROM_IMAGE:
         cluster_configmap_name=CLUSTER_CONFIGMAP_NAME,
         service_account_name="omnigraph-server",
         maintenance=data_tier.maintenance,
+        # Arming takes the Deployment to zero, but only this edge stops Pulumi
+        # creating the Job alongside that update — the Job would otherwise
+        # baseline and export a root the server is still writing.
+        server_deployment=data_tier.deployment,
+        backup_root=data_tier.bucket.bucket_v2.bucket.apply(
+            lambda name: f"s3://{name}/backups"
+        ),
+        aws_cli_image=cached_image_uri(f"amazon/aws-cli:{AWS_CLI_VERSION}"),
+        # The witan stack suspends these two off this stack's `writers_frozen`
+        # output; the Job waits until it has.
+        witan_namespace=WITAN_NAMESPACE,
+        witan_writer_cronjobs=[CI_INDEXER_CRONJOB_NAME, VIEW_REAPER_CRONJOB_NAME],
     )
     export("storage_migration_job", storage_migration.job.metadata.name)
 
@@ -1104,6 +1187,10 @@ export("managed_repos", MANAGED_REPOS)
 # goes out alongside it because that is the value they would set or clear.
 export("storage_uri", data_tier.storage_uri)
 export("storage_prefix", STORAGE_PREFIX)
+# Whether every direct writer of the graphs should be held still. This stack
+# suspends its own two sweeps off the same switch; the witan stack reads this
+# to suspend witan-ci-indexer and witan-view-reaper, which it owns.
+export("writers_frozen", bool(MIGRATE_FROM_IMAGE))
 # Whether this environment's SOPS file carries the break-glass principal, and
 # therefore whether secret-operations/witan/admin-token exists. A boolean, not
 # the token: the witan stack needs to decide *whether* to declare its

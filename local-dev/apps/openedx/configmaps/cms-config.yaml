@@ -1,0 +1,21 @@
+---
+# CMS (Studio) config deltas — see configmaps/lms-config.yaml for why this is an
+# override layer rather than a full ConfigMap.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cms-config-overrides
+  namespace: openedx
+data:
+  CELERY_BROKER_HOSTNAME: "valkey.local-infra.svc.cluster.local"
+  ELASTIC_SEARCH_HOST: "opensearch-cluster-master.local-infra.svc.cluster.local"
+
+  LMS_BASE_URL: "https://lms.mit.dev"
+  CMS_BASE_URL: "https://studio.mit.dev"
+  LMS_BASE: "lms.mit.dev"
+  CMS_BASE: "studio.mit.dev"
+  HTTPS: "on"
+  # lehrer turns this off for its plain-http standalone stack. Here cms-sso is
+  # registered with an https callback, and "false" would leave the callback's
+  # scheme to whatever X-Forwarded-Proto APISIX sends rather than forcing it.
+  SOCIAL_AUTH_REDIRECT_IS_HTTPS: "true"

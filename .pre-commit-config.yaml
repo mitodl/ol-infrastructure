@@ -97,7 +97,7 @@ repos:
     - src/ol_infrastructure/saas/github/repositories/data/
 - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-  rev: "v0.16.6"
+  rev: "v0.16.9"
   hooks:
   - id: ruff-format
   - id: ruff-check
@@ -128,7 +128,7 @@ repos:
     name: actionlint
     description: Runs actionlint to lint GitHub Actions workflow files
 - repo: https://github.com/zizmorcore/zizmor-pre-commit
-  rev: v1.30.0
+  rev: v1.30.1
   hooks:
   - id: zizmor
     args: [--no-progress, --min-severity=high, --min-confidence=medium]
@@ -140,3 +140,6 @@ repos:
   rev: v2.15.1
   hooks:
   - id: hadolint-docker
+    # BuildKit reads <Dockerfile>.dockerignore beside a Dockerfile; it is not
+    # Dockerfile syntax.
+    exclude: \.dockerignore$

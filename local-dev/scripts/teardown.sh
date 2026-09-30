@@ -219,6 +219,9 @@ else
     cd "${REPO_ROOT}"
 fi
 
+# start.sh's marker refers to the cluster we just deleted.
+rm -f "${REPO_ROOT}/local-dev/infra/.pulumi/cluster-id"
+
 # ---------------------------------------------------------------------------
 # Remove /etc/hosts entries
 # ---------------------------------------------------------------------------

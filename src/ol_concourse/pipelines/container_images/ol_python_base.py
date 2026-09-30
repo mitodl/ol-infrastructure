@@ -20,6 +20,7 @@ from ol_concourse.lib.resources import git_repo, registry_image
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 PYTHON_VERSIONS = ("3.11", "3.12", "3.13", "3.14")
 
@@ -186,9 +187,25 @@ ol_python_base_pipeline = Pipeline(
 )
 
 if __name__ == "__main__":
+    output = pipeline_json_with_user_data(
+        ol_python_base_pipeline,
+        user_data={
+            "description": (
+                "Builds the shared `mitodl/ol-python-base` image for Python "
+                f"{', '.join(PYTHON_VERSIONS)}, multi-arch (linux/amd64 + "
+                "linux/arm64), layered on Docker Hardened Images bases "
+                "authenticated against dhi.io. Triggers on changes to "
+                "`dockerfiles/ol-python-base/Dockerfile` or a new DHI base "
+                "image publish for any tracked Python version. Publishes to "
+                "Docker Hub and ECR, one tag per Python version."
+            ),
+            "team": "main",
+            "category": "base-images",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(ol_python_base_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(ol_python_base_pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.write(
-        "\nfly -t pr-inf set-pipeline -p ol-python-base-docker -c definition.json\n"
+        "\nfly -t pr-main set-pipeline -p ol-python-base-docker -c definition.json\n"
     )

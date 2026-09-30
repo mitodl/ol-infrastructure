@@ -12,6 +12,8 @@ from dataclasses import dataclass
 import pulumi_kubernetes as k8s
 from pulumi import ResourceOptions
 
+from bridge.lib.versions import QDRANT_VERSION
+
 
 @dataclass
 class SearchResources:
@@ -37,7 +39,11 @@ def create_search(
                     "containers": [
                         {
                             "name": "qdrant",
-                            "image": "qdrant/qdrant:v1.12.5",
+                            # Shared with the Qdrant Cloud clusters
+                            # (infrastructure/qdrant_cloud) so local dev runs
+                            # the same server MIT Learn talks to in QA and
+                            # production, and renovate moves both at once.
+                            "image": f"qdrant/qdrant:{QDRANT_VERSION}",
                             # Qdrant mmaps ~30 files per segment and mit-learn
                             # shards its collections 6 ways, so it needs far
                             # more than the 1024-fd soft limit a pod inherits

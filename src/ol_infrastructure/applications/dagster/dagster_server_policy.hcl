@@ -8,6 +8,10 @@ path "secret-global/*" {
 path "secret-operations/sso/dagster" {
   capabilities = ["read"]
 }
+# Keycloak client-credentials for Opik, read by the ml code location
+path "secret-operations/sso/opik" {
+  capabilities = ["read"]
+}
 path "mariadb-xpro/creds/readonly/*" {
   capabilities = ["read"]
 }

@@ -32,7 +32,10 @@ from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.aws.iam_helper import cross_environment_glue_denial
+from ol_infrastructure.lib.aws.iam_helper import (
+    cross_environment_glue_denial,
+    readable_data_lake_environments,
+)
 from ol_infrastructure.lib.ol_types import (
     Application,
     AWSBase,
@@ -80,6 +83,9 @@ vault_stack = make_stack_reference(
 )
 mit_learn_stack = make_stack_reference(projects.MIT_LEARN, stack_info.name)
 concourse_stack = make_stack_reference(projects.CONCOURSE, stack_info.name)
+applications_cluster_stack = make_stack_reference(
+    projects.EKS, f"applications.{stack_info.name}"
+)
 
 starrocks_env = f"data-{stack_info.env_suffix}"
 aws_config = AWSBase(tags={"OU": "data", "Environment": starrocks_env})
@@ -266,13 +272,19 @@ if starrocks_config.get_bool("oidc_enabled"):
 # account) can call the Glue Data Catalog API and read Iceberg data from the
 # corresponding S3 buckets.
 #
-# Both QA and production catalogs are registered in every StarRocks instance
-# (see substructure/starrocks _DATA_LAKE_ENVS), so the IRSA role needs query-engine
-# access to both environments' Glue catalogs and S3 buckets.
+# The role gets query-engine access to the same lakes the substructure stack
+# registers catalogs for (readable_data_lake_environments): its own, plus QA's on
+# production for the QA mirror. QA must not get production's policy: the
+# cross-environment denial below covers Glue only, so that policy left the QA role
+# with Get/Put/DeleteObject on production's data lake buckets.
 #
 # The Iceberg external catalogs are created and maintained by the substructure stack
 # (substructure/starrocks) using the pulumi-command local.Command resource.
-_DATA_LAKE_ENVS = ("QA", "Production")
+_DATA_LAKE_STACK_NAMES = {"qa": "QA", "production": "Production"}
+_DATA_LAKE_ENVS = [
+    _DATA_LAKE_STACK_NAMES[env]
+    for env in readable_data_lake_environments(stack_info.env_suffix)
+]
 
 if starrocks_config.get_bool("enable_data_lake_integration"):
     _dw_stacks = {}
@@ -289,8 +301,8 @@ if starrocks_config.get_bool("enable_data_lake_integration"):
             opts=ResourceOptions(parent=starrocks_auth_binding),
         )
 
-    # The attachments above hand this role both environments' catalogs, which for
-    # a lower environment means handing it production. The guard has to be scoped
+    # The attachments above no longer hand a lower environment production's
+    # catalog, but this Deny stays as defence in depth. The guard has to be scoped
     # to this role rather than folded into either policy above, since those are
     # shared across environments and a Deny in one of them also lands on the
     # production role and revokes production's access to its own catalog.
@@ -1059,11 +1071,20 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
 # Internal NLB exposing the StarRocks FE MySQL port (9030) to the data VPC so that
 # Vault — running on EC2 in the operations VPC, which is peered with the data VPC —
 # can reach StarRocks to manage dynamic database credentials. Also admits MIT
-# Learn's application pods (applications VPC) and Concourse workers (operations
-# VPC, which run the Vault DB-role SQL setup Command resources in
-# substructure/starrocks) as explicit sources — supplying this SG via the LBC
-# annotation below means it becomes the sole authority on the NLB's ingress, so
-# every legitimate caller must be listed here.
+# Learn (applications VPC) and Concourse workers (operations VPC, which run the
+# Vault DB-role SQL setup Command resources in substructure/starrocks) as
+# explicit sources — supplying this SG via the LBC annotation below means it
+# becomes the sole authority on the NLB's ingress, so every legitimate caller
+# must be listed here.
+#
+# MIT Learn's pod SG alone does not match its traffic. The applications cluster
+# runs security groups for pods in "standard" enforcing mode with in-node SNAT,
+# so a pod's connection to a peered VPC leaves from its node's primary ENI and
+# carries the node group SG instead. With only the pod SG listed, the NLB's
+# SecurityGroupBlockedFlowCount_Inbound_TCP metric recorded a burst of dropped
+# flows at every failed MIT Learn warehouse sync. Listing the node group SG
+# means any pod on those nodes can reach this port; StarRocks authentication is
+# what gates access.
 FE_MYSQL_PORT = 9030
 
 # Stable name for the FE MySQL endpoint, published by external-dns from the
@@ -1088,14 +1109,17 @@ fe_mysql_nlb_security_group = ec2.SecurityGroup(
             security_groups=[
                 vault_stack.require_output("vault_server")["security_group"],
                 mit_learn_stack.require_output("mit_learn")["app_security_group_id"],
+                applications_cluster_stack.require_output(
+                    "node_group_security_group_id"
+                ),
                 concourse_stack.require_output("worker_security_group"),
             ],
             protocol="tcp",
             from_port=FE_MYSQL_PORT,
             to_port=FE_MYSQL_PORT,
             description=(
-                "Allow Vault, MIT Learn application pods, and Concourse workers "
-                "to reach the StarRocks FE MySQL protocol port."
+                "Allow Vault, MIT Learn, applications cluster nodes, and "
+                "Concourse workers to reach the StarRocks FE MySQL protocol port."
             ),
         ),
     ],
@@ -1135,7 +1159,18 @@ fe_mysql_nlb_service = kubernetes.core.v1.Service(
             # internal, so the record resolves to VPC-private addresses; it is
             # reachable only from the peered VPCs the security group above
             # admits.
+            #
+            # Both prefixes are set on purpose. external-dns v0.22.0 moved the
+            # default annotation prefix from the "alpha" form to the GA one with
+            # NO fallback, so each version reads exactly one of these and ignores
+            # the other: <=v0.21.0 the alpha key, >=v0.22.0 the GA key. Carrying
+            # both is what makes the upgrade (and a rollback) a no-op rather than
+            # an outage -- under --policy=sync a version that matches no
+            # annotation sees an empty desired state and plans to delete every
+            # record it owns. Drop the alpha key only once every cluster is past
+            # v0.22.0.
             "external-dns.alpha.kubernetes.io/hostname": fe_mysql_domain,
+            "external-dns.kubernetes.io/hostname": fe_mysql_domain,
         },
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(

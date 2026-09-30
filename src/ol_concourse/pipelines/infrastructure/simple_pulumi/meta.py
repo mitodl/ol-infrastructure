@@ -32,6 +32,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 _OL_INFRA_IMAGE_SOURCE = {
     "repository": dockerhub_ecr_image_uri("mitodl/ol-infrastructure"),
@@ -251,8 +252,18 @@ if __name__ == "__main__":
         extra_args = None
         fly_target = "pr-inf"
 
-    pipeline_json = meta_pipeline(app_names, extra_args=extra_args).model_dump_json(
-        indent=2
+    pipeline_json = pipeline_json_with_user_data(
+        meta_pipeline(app_names, extra_args=extra_args),
+        user_data={
+            "description": (
+                f"Regenerates and applies the {len(app_names)} simple "
+                f"Pulumi-only app pipelines (Concourse env `{cli_args.env}`) "
+                "from `pipeline_params` in `simple_pulumi/pipeline.py`, "
+                "plus re-applies itself."
+            ),
+            "team": "infrastructure",
+            "category": "meta",
+        },
     )
     try:
         with open("definition.json", "w") as definition:  # noqa: PTH123

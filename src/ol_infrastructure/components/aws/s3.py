@@ -233,6 +233,39 @@ class S3BucketConfig(AWSBase):
         default=None,
         description="The bucket policy document as a JSON string.",
     )
+    transition_default_minimum_object_size: str | None = Field(
+        default=None,
+        description=(
+            "Overrides S3's bucket-wide default that excludes objects under "
+            "128KB from lifecycle transitions. Valid values: "
+            "'all_storage_classes_128K' (the current AWS default -- objects "
+            "under 128KB never transition to any storage class) or "
+            "'varies_by_storage_class' (the pre-September-2024 default -- "
+            "objects under 128KB, including zero-byte objects, still "
+            "transition to GLACIER/DEEP_ARCHIVE, just not to other classes). "
+            "Leave unset (AWS default applies) unless a lifecycle rule needs "
+            "small objects to reach an archive tier and a per-rule "
+            "`ObjectSizeGreaterThan` filter isn't suitable -- that filter is "
+            "an exclusive bound and so cannot itself include zero-byte "
+            "objects."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def check_transition_default_minimum_object_size(self) -> "S3BucketConfig":
+        """Validate transition_default_minimum_object_size against AWS's enum."""
+        valid_values = {"all_storage_classes_128K", "varies_by_storage_class"}
+        if (
+            self.transition_default_minimum_object_size is not None
+            and self.transition_default_minimum_object_size not in valid_values
+        ):
+            error_message = (
+                "transition_default_minimum_object_size must be one of "
+                f"{sorted(valid_values)}, got "
+                f"'{self.transition_default_minimum_object_size}'"
+            )
+            raise ValueError(error_message)
+        return self
 
     @model_validator(mode="after")
     def check_acl_and_public_access_blocks(self) -> "S3BucketConfig":
@@ -603,6 +636,7 @@ class OLBucket(pulumi.ComponentResource):
                 f"{name}-lifecycle",
                 bucket=self.bucket_v2.id,
                 rules=lifecycle_rules,
+                transition_default_minimum_object_size=config.transition_default_minimum_object_size,
                 opts=child_opts,
             )
 

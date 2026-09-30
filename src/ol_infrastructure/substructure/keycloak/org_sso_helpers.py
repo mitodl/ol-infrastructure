@@ -362,11 +362,24 @@ class OIDCIdpConfig(BaseModel):
 def onboard_oidc_org(
     oidc_config: OIDCIdpConfig,
     org: OrgConfig | keycloak.Organization,
-) -> None:
+) -> keycloak.oidc.IdentityProvider:
     """Create an OIDC IdP and link it to an org.
 
     Pass an OrgConfig to create the org, or an existing keycloak.Organization
     to attach a second IdP to an org that was already created.
+
+    Returns the created IdentityProvider so callers can attach
+    identity_provider_alias-scoped resources, e.g.
+    AttributeImporterIdentityProviderMapper, with a real Pulumi dependency
+    edge instead of a bare alias string.
+
+    :raises OidcDiscoveryError: propagated from
+        oidc_identity_provider_args_from_discovery_url if the discovery
+        document is inaccessible/unparseable, the provider is missing
+        required scopes (openid, email, profile), or it doesn't support the
+        selected client-auth method (client_secret_basic when
+        oidc_config.client_secret is set, private_key_jwt otherwise) -- this
+        fails the deploy rather than silently dropping the IdP resource.
     """
     keycloak_org = (
         org if isinstance(org, keycloak.Organization) else create_org_for_learn(org)
@@ -386,7 +399,7 @@ def onboard_oidc_org(
         "jwtX509HeadersEnabled": True,
     } | oidc_idp_arg_map.get("extra_config", {})
     oidc_idp_arg_map["login_hint"] = True  # Preserve existing login_hint configuration
-    keycloak.oidc.IdentityProvider(
+    return keycloak.oidc.IdentityProvider(
         f"ol-apps-{resource_alias}-oidc-idp",
         alias=keycloak_alias,
         client_id=oidc_config.client_id,
@@ -401,5 +414,6 @@ def onboard_oidc_org(
         organization_id=keycloak_org.id,
         validate_signature=True,
         trust_email=True,
+        opts=oidc_config.resource_options,
         **oidc_idp_arg_map,
     )

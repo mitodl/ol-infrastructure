@@ -34,6 +34,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 CANARY_DEFINITIONS = Identifier("canary-pipeline-definitions")
 CANARY_REPO_PATH = "src/ol_concourse/pipelines/canaries"
@@ -154,7 +155,22 @@ canary_names = [
 
 
 if __name__ == "__main__":
-    pipeline_json = meta_pipeline(canary_names).model_dump_json(indent=2)
+    pipeline_json = pipeline_json_with_user_data(
+        meta_pipeline(canary_names),
+        user_data={
+            "description": (
+                "Self-managing meta pipeline for the Playwright canary fleet: "
+                "renders and sets one `canary-<name>` pipeline per entry in "
+                f"`canary_names` (currently {', '.join(canary_names)}), and "
+                "re-sets itself on changes to its own generator code. "
+                "`pipeline.py`'s `pipeline_params` is a superset of "
+                "`canary_names`, so a canary can be prepared here before it "
+                "starts running against a live property."
+            ),
+            "team": "infrastructure",
+            "category": "meta",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)

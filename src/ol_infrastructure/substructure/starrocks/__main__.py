@@ -40,6 +40,7 @@ from pulumi_vault.generic.get_secret import get_secret_output as vault_get_secre
 from bridge.lib.magic_numbers import ONE_MONTH_SECONDS
 from bridge.lib.versions import VAULT_PLUGIN_STARROCKS_SHA256
 from ol_infrastructure.lib import pulumi_projects
+from ol_infrastructure.lib.aws.iam_helper import readable_data_lake_environments
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
@@ -280,9 +281,14 @@ enable_data_lake = starrocks_config.get_bool("enable_data_lake_integration") or 
 oidc_enabled = starrocks_config.get_bool("oidc_enabled") or False
 
 # --- Iceberg catalogs -------------------------------------------------------
-# Both QA and Production catalogs are registered in every StarRocks instance.
-# Production datasets are more complete, so having them available in QA
-# simplifies testing against Superset without requiring a separate environment.
+# Each instance registers its own lake's catalog, and production also registers
+# QA's so the QA mirror (ol-data-platform lakehouse/assets/qa_mirror.py) can write
+# into it. QA does not get production's: its IRSA role is explicitly denied every
+# production Glue resource (cross_environment_glue_denial), so the catalog and the
+# grants below would only advertise reads that fail (RFC 12711 step 7).
+#
+# Removing an environment from this list deletes its Command, which runs the
+# DROP CATALOG below.
 #
 # CREATE IF NOT EXISTS is idempotent: it is a no-op when the catalog
 # already exists with any set of properties.  StarRocks has no ALTER CATALOG
@@ -298,7 +304,7 @@ oidc_enabled = starrocks_config.get_bool("oidc_enabled") or False
 # AWS_WEB_IDENTITY_TOKEN_FILE injected; the SDK resolves them automatically
 # without a second sts:AssumeRole call.  Setting iam_role_arn here would
 # cause StarRocks to attempt a nested AssumeRole and fail with a 403.
-_DATA_LAKE_ENVS = ["qa", "production"]
+_DATA_LAKE_ENVS = readable_data_lake_environments(stack_info.env_suffix)
 catalog_setups: list[command.local.Command] = []
 _iceberg_roles_sql = ""
 if enable_data_lake:
@@ -410,8 +416,7 @@ if enable_data_lake:
 # LIMITATION: these GRANTs are additive.  If enable_data_lake_integration is
 # later set to false the Iceberg catalog grants already on the roles are NOT
 # automatically revoked.  A manual REVOKE USAGE ON CATALOG + REVOKE on tables
-# is required to remove them (or DROP + recreate the roles via pulumi destroy
-# followed by pulumi up).
+# is required to remove them.
 _base_roles_sql = """\
 -- Machine-access roles assigned to Vault-issued ephemeral service accounts.
 -- These are referenced by the vault.database.SecretBackendRole resources above.
@@ -499,13 +504,6 @@ GRANT SELECT ON ALL MATERIALIZED VIEWS IN ALL DATABASES TO ROLE ol_business_anal
 _roles_sql = _base_roles_sql + _iceberg_roles_sql
 _role_deps: list[pulumi.Resource] = [starrocks_db_connection, *catalog_setups]
 
-_roles_drop_sql = (
-    "DROP ROLE IF EXISTS readonly; DROP ROLE IF EXISTS app; DROP ROLE IF EXISTS admin;"
-    " DROP ROLE IF EXISTS ol_platform_admin; DROP ROLE IF EXISTS ol_data_engineer;"
-    " DROP ROLE IF EXISTS ol_data_analyst; DROP ROLE IF EXISTS ol_researcher;"
-    " DROP ROLE IF EXISTS ol_instructor; DROP ROLE IF EXISTS ol_business_analyst;"
-)
-
 # Valid Keycloak ol-starrocks-client role names.  These match StarRocks role
 # names 1:1 so no translation is needed when creating OIDC user accounts.
 _GOVERNANCE_ROLES: frozenset[str] = frozenset(
@@ -526,18 +524,23 @@ _GOVERNANCE_ROLES: frozenset[str] = frozenset(
 # generated CREATE USER / GRANT statements.
 _OIDC_USERNAME_RE = re.compile(r"^[A-Za-z0-9._%+@-]+$")
 
+# No delete step. Dropping a StarRocks role revokes it from every user that
+# holds it, and nothing re-grants roles to Vault-issued users that already
+# exist. This resource is replaced whenever _roles_sql changes (Production
+# recorded replacements on 2026-08-12 and 2026-09-03); each replacement ran a
+# DROP ROLE delete step and left the Superset and MIT Learn credentials with
+# no role at all. The roles therefore outlive this resource and must be
+# dropped by hand if that is ever wanted.
 roles_setup_cmd = command.local.Command(
     f"starrocks-{stack_info.env_suffix}-roles-setup",
     create=_exec_sql,
     update=_exec_sql,
-    delete=_exec_delete_sql,
     environment={
         **_mysql_env,
         "STARROCKS_SQL": _roles_sql,
-        "STARROCKS_DELETE_SQL": _roles_drop_sql,
     },
     triggers=[hashlib.sha256(_roles_sql.encode()).hexdigest()],
-    opts=ResourceOptions(delete_before_replace=True, depends_on=_role_deps),
+    opts=ResourceOptions(depends_on=_role_deps),
 )
 
 # --- b2b_analytics database ---------------------------------------------
@@ -561,21 +564,51 @@ CREATE DATABASE IF NOT EXISTS b2b_analytics;
 GRANT CREATE TABLE ON DATABASE b2b_analytics TO ROLE app;
 GRANT CREATE MATERIALIZED VIEW ON DATABASE b2b_analytics TO ROLE app;"""
 
-_b2b_analytics_db_drop_sql = "DROP DATABASE IF EXISTS b2b_analytics;"
-
+# No delete step and no delete_before_replace. The database is persistent
+# infrastructure holding every b2b_analytics MV, and `triggers` replaces this
+# command whenever the SQL changes -- so with a DROP DATABASE delete, adding a
+# grant would destroy the tables and MVs before recreating an empty database,
+# and a stack teardown would do the same. CREATE DATABASE IF NOT EXISTS is
+# idempotent, so a replacement simply re-runs it. Same reasoning as
+# roles_setup_cmd above: dropping the database is a deliberate manual act.
 command.local.Command(
     f"starrocks-{stack_info.env_suffix}-b2b-analytics-database-setup",
     create=_exec_sql,
     update=_exec_sql,
-    delete=_exec_delete_sql,
     environment={
         **_mysql_env,
         "STARROCKS_SQL": _b2b_analytics_db_sql,
-        "STARROCKS_DELETE_SQL": _b2b_analytics_db_drop_sql,
     },
     triggers=[hashlib.sha256(_b2b_analytics_db_sql.encode()).hexdigest()],
     opts=ResourceOptions(
-        delete_before_replace=True,
+        depends_on=[roles_setup_cmd],
+    ),
+)
+
+# --- b2b_learner_records database -------------------------------------------
+# Individually identifying learner records for ol-analytics-api's
+# b2b_learner_records tenant (ol-data-platform models/b2b_learner_records).
+# Kept out of b2b_analytics so these PII-bearing MVs can be granted to that
+# tenant's role on their own once per-tenant StarRocks users with
+# schema-scoped grants land; until then the catalog-wide SELECT grants above
+# still reach them. Same privilege shape as b2b_analytics (see there).
+_b2b_learner_records_db_sql = """\
+CREATE DATABASE IF NOT EXISTS b2b_learner_records;
+GRANT CREATE TABLE ON DATABASE b2b_learner_records TO ROLE app;
+GRANT CREATE MATERIALIZED VIEW ON DATABASE b2b_learner_records TO ROLE app;"""
+
+# No delete step, for the same reason as b2b_analytics above -- more so here,
+# since this database holds individually identifying learner records.
+command.local.Command(
+    f"starrocks-{stack_info.env_suffix}-b2b-learner-records-database-setup",
+    create=_exec_sql,
+    update=_exec_sql,
+    environment={
+        **_mysql_env,
+        "STARROCKS_SQL": _b2b_learner_records_db_sql,
+    },
+    triggers=[hashlib.sha256(_b2b_learner_records_db_sql.encode()).hexdigest()],
+    opts=ResourceOptions(
         depends_on=[roles_setup_cmd],
     ),
 )
@@ -815,11 +848,11 @@ if oidc_enabled:
     # --- File group provider: automatic role assignment from Keycloak --------
     # keycloak_group_sync.py calls the Keycloak Admin API (using the
     # ol-starrocks-client service account, which has view-users on
-    # realm-management) to enumerate current members of each governance role
-    # and writes the result to a Kubernetes ConfigMap mounted in the FE pods.
+    # realm-management) to enumerate the effective holders of each governance
+    # role and writes the result to a Kubernetes ConfigMap mounted in the FE pods.
     # StarRocks' file group provider reads that file; combined with
     # GRANT role TO EXTERNAL GROUP, any OAuth2-authenticated user whose
-    # preferred_username appears in the file receives the corresponding
+    # starrocks_username (saml_uid) appears in the file receives the corresponding
     # StarRocks role automatically — no starrocks:oidc_users entry needed.
     #
     # Upstream feature request for a native JWT-claims group provider that
@@ -855,8 +888,15 @@ if oidc_enabled:
             "KEYCLOAK_CLIENT_SECRET": _oidc_client_secret,
             "KUBECONFIG_CONTENT": _kube_config,
         },
+        # The script hash is here so a fix to the sync logic re-runs it; the
+        # SQL hash alone left a broken groups.txt in place from June 2026. The
+        # file group provider reads the file only at CREATE GROUP PROVIDER and FE
+        # start, so a new file takes effect after the next FE restart.
         triggers=_integration_sql.apply(
-            lambda sql: [hashlib.sha256(sql.encode()).hexdigest()]
+            lambda sql: [
+                hashlib.sha256(sql.encode()).hexdigest(),
+                hashlib.sha256(Path(_sync_script).read_bytes()).hexdigest(),
+            ]
         ),
         opts=ResourceOptions(
             delete_before_replace=True,

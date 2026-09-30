@@ -1,0 +1,7 @@
+---
+name: ol-infrastructure-azure-openai
+runtime: python
+description: Azure OpenAI accounts, model deployments, and the per-consumer managed
+  identities federated to the EKS cluster OIDC issuer
+backend:
+  url: s3://mitol-pulumi-state/

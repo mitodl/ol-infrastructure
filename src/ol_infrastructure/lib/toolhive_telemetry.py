@@ -233,6 +233,16 @@ def toolhive_mcpserver_audit() -> dict[str, object]:
     its SDK's handler-error path before enabling audit on it — or leaving
     ``audit`` off for that backend until someone has.
 
+    ★ A BACKEND WHOSE VERSION WE DO NOT PIN CANNOT SATISFY THIS GATE AT ALL.
+    Every backend above is frozen by an image tag in ``bridge.lib.versions``,
+    which is what makes a one-time SDK reading durable: changing it is an edit
+    to this repo that a reviewer sees. A backend reached as someone else's
+    hosted service has no such anchor — the operator of that service can change
+    its error shape at any time and nothing here would notice, so the reading is
+    only ever point-in-time. Those get ``audit=False`` rather than a re-check
+    schedule nobody will keep; toolhive_swe's ``vantage`` MCPRemoteProxy is the
+    first, and its block carries the full reasoning.
+
     ★ RE-CHECK ON ANY SDK OR ToolHive UPGRADE. Nothing tests this, and it is
     the only thing standing between an audit log and payload-derived content.
     For a backend serving user-authored data the cost would be real: content

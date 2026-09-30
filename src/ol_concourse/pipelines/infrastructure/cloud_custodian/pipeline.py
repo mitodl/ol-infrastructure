@@ -79,8 +79,23 @@ def custodian_pipeline() -> Pipeline:
 if __name__ == "__main__":
     import sys
 
+    from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
+
+    output = pipeline_json_with_user_data(
+        custodian_pipeline(),
+        user_data={
+            "description": (
+                "Runs Cloud Custodian policy jobs on a 24h schedule against the "
+                "`cloudcustodian/c7n` container: sync-ec2-tags, "
+                "tag/cleanup orphaned EBS volumes, and tag/cleanup stale Packer "
+                "security groups."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(custodian_pipeline().model_dump_json(indent=2))
-    sys.stdout.write(custodian_pipeline().model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     print()  # noqa: T201
     print("fly -t pr-inf sp -p misc-cloud-custodian -c definition.json")  # noqa: T201

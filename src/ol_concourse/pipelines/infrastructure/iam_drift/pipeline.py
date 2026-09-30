@@ -41,6 +41,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo, schedule
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 AWS_REGION = "us-east-1"
 GITHUB_REPOSITORY = "mitodl/ol-infrastructure"
@@ -186,9 +187,23 @@ def iam_drift_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    definition_json = iam_drift_pipeline().model_dump_json(indent=2)
+    output = pipeline_json_with_user_data(
+        iam_drift_pipeline(),
+        user_data={
+            "description": (
+                "Weekly least-privilege drift check for the Production infra "
+                "Concourse worker role: diffs IAM Access Analyzer's observed AWS "
+                "API usage against the `iam_policies` modules attached to that "
+                "role, then opens or updates a pull request proposing the "
+                "difference, so granted permissions stay in sync with what the "
+                "Pulumi stacks actually need."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(definition_json)
-    sys.stdout.write(definition_json)
+        definition.write(output)
+    sys.stdout.write(output)
     print()  # noqa: T201
     print("fly -t pr-inf sp -p iam-policy-drift -c definition.json")  # noqa: T201

@@ -155,3 +155,84 @@ policies:
     tag: custodian_cleanup
     op: delete
     days: 30
+
+# This third chain handles orphaned EBS *volumes* -- ones sitting in the
+# `available` (unattached) state with no owner left to reclaim them. The two
+# chains above only ever reach volumes indirectly, via the AMIs and snapshots
+# they back, so a volume whose instance was terminated without
+# DeleteOnTermination was never swept by anything.
+- name: find-and-mark-orphaned-ebs-volumes
+  resource: aws.ebs
+  description: |
+    Find unattached EBS volumes that no longer have an owner and mark them for
+    deletion. Deleting a volume is irreversible, so every filter here is a
+    deliberate carve-out rather than a broad sweep:
+
+    - `available` only. An attached volume is in use by definition.
+    - Older than 90 days. AWS exposes no "detached since" attribute, so volume
+      age is the closest proxy. Combined with the 30 day `mark-for-op` delay
+      below this puts at least 120 days between creation and deletion, which
+      keeps freshly provisioned volumes well clear.
+    - Not `OU: ike`, matching the carve-out the policies above already make --
+      ike resources are managed outside this account's automation.
+    - Not Kubernetes-managed. The EBS CSI driver detaches volumes routinely
+      while a StatefulSet pod reschedules, so `available` does not imply
+      orphaned for them -- a StarRocks FE or Open edX PVC can sit detached for
+      weeks and still be live data. Their reclaim policy is the PV's job, not
+      ours. Both the `KubernetesCluster` and `ebs.csi.aws.com/cluster` tags are
+      checked because older in-tree-provisioned volumes only carry the former.
+    - Not `pulumi_managed`. Those belong to a stack, and deleting one behind
+      Pulumi's back produces drift rather than savings.
+    - Not already marked, so a volume that stays orphaned does not have its
+      deletion date pushed out on every run (see #1472).
+  filters:
+  - and:
+    - type: value
+      key: State
+      value: available
+    - type: value
+      key: CreateTime
+      value_type: age
+      op: gt
+      value: 90
+    - type: value
+      key: 'tag:OU'
+      op: ne
+      value: 'ike'
+    - type: value
+      key: 'tag:KubernetesCluster'
+      value: absent
+    - type: value
+      key: 'tag:ebs.csi.aws.com/cluster'
+      value: absent
+    - type: value
+      key: 'tag:pulumi_managed'
+      value: absent
+    - type: value
+      key: 'tag:custodian_cleanup'
+      value: absent
+  actions:
+  - type: mark-for-op
+    tag: custodian_cleanup
+    op: delete
+    days: 30
+- name: unmark-reattached-ebs-volumes
+  resource: aws.ebs
+  description: |
+    Clear the cleanup mark from any volume that has been attached again since
+    it was marked. Without this a volume could be marked while idle, returned
+    to service, and then deleted the moment it is next detached -- the mark
+    would already have matured and the delete policy would fire immediately.
+  filters:
+  - and:
+    - type: value
+      key: 'tag:custodian_cleanup'
+      value: present
+    - type: value
+      key: State
+      op: ne
+      value: available
+  actions:
+  - type: remove-tag
+    tags:
+    - custodian_cleanup

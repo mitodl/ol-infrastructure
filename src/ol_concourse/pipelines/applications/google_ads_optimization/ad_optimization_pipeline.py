@@ -22,6 +22,7 @@ from ol_concourse.lib.resource_types import (
 from ol_concourse.lib.resources import schedule, slack_notification
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 COURSES = ["ml", "gen_ai", "sys_think", "sys_eng"]
 
@@ -132,9 +133,23 @@ def ad_optimization_pipeline() -> Pipeline:
 if __name__ == "__main__":
     import sys
 
+    output = pipeline_json_with_user_data(
+        ad_optimization_pipeline(),
+        user_data={
+            "description": (
+                "Runs the Google Ads bid-optimization job on a 24h schedule for "
+                f"one course ({', '.join(COURSES)}), instanced via "
+                "`--instance-var course_name=...`. Pulls Gurobi-solved bid "
+                "recommendations from Google Ads + SEMrush data, applies them, "
+                "and alerts to Slack on error/failure/abort/warning."
+            ),
+            "team": "main",
+            "category": "apps-misc",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(ad_optimization_pipeline().model_dump_json(indent=2))
-    sys.stdout.write(ad_optimization_pipeline().model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     print()  # noqa: T201
     for course in COURSES:
         sys.stdout.write(

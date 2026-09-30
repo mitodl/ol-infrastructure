@@ -13,6 +13,7 @@ from ol_concourse.pipelines.constants import (
     PULUMI_WATCHED_PATHS,
 )
 from ol_concourse.pipelines.jobs import packer_jobs, pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import (
     combined_secrets_paths,
     project_secrets_paths,
@@ -141,8 +142,22 @@ vault_pipeline = Pipeline(
 if __name__ == "__main__":
     import sys
 
+    output = pipeline_json_with_user_data(
+        vault_pipeline,
+        user_data={
+            "description": (
+                "Builds the Vault server AMI, then deploys it via Pulumi to "
+                "`operations.{CI,QA,Production}`, gated on a reviewed preview "
+                "(`topology=preview-gated`). Also runs the Pulumi chain for every "
+                f"`substructure/vault/*` project sharing this pipeline: "
+                f"{', '.join(VAULT_SUBSTRUCTURE_PROJECTS)}."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(vault_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(vault_pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     print()  # noqa: T201
     print("fly -t pr-inf sp -p packer-pulumi-vault -c definition.json")  # noqa: T201

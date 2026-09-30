@@ -13,6 +13,7 @@ config:
   mitxonline:backend_domain: "api.rc.mitxonline.mit.edu"
   mitxonline:frontend_domain: "rc.mitxonline.mit.edu"
   mitxonline:k8s_deploy: "true"
+  mitxonline:dev_shell_enabled: false
   mitxonline:learn_backend_domain: "api.rc.learn.mit.edu"
   mitxonline:min_replicas: 4
   mitxonline:use_granian: true

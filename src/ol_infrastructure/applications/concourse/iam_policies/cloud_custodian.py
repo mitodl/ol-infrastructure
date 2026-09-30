@@ -12,6 +12,12 @@ policy_definition = {
                 "autoscaling:DescribeLaunchConfigurations",
                 "ec2:CreateTags",
                 "ec2:DeleteSnapshot",
+                # unmark-reattached-ebs-volumes clears custodian_cleanup from a
+                # volume that went back into service, so the mark cannot mature
+                # while the volume is live. c7n's remove-tag action calls
+                # DeleteTags; without it that policy fails AccessDenied and the
+                # stale mark survives to the destructive phase.
+                "ec2:DeleteTags",
                 "ec2:DeleteVolume",
                 "ec2:DeregisterImage",
                 "ec2:DescribeImageAttribute",

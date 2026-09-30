@@ -27,4 +27,9 @@ config:
     # must set this explicitly. CI points at its own mitxonline stack, matching
     # mitxonline's own Pulumi.CI.yaml backend_domain.
     OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_API_BASE_URL: https://api.ci.mitxonline.mit.edu
+    # No learner data-sharing consent field exists upstream yet. Until one does,
+    # disclose outcomes for learners with no recorded decision. Both tenants
+    # default to failing closed when these are unset.
+    OL_ANALYTICS_API_B2B_DASHBOARD_CONSENT_FAIL_OPEN: "true"
+    OL_ANALYTICS_API_B2B_LEARNER_RECORDS_CONSENT_FAIL_OPEN: "true"
 encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQH73CeoAeclZR7G4qarBe1fAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMrp/B8G6rKWoYLDVSAgEQgDuWfJURhr3q6Jv/E3yOYWvyDlOgB/rrukkVfo3sXxAtvEoFlDWiQIMt9yRmi0N/Eziijfau+MQfuOuKmg==

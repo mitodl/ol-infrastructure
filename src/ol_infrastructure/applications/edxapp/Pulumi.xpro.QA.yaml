@@ -45,7 +45,6 @@ config:
     secure: v1:Tpg1BEYCoSw2D6HQ:yGnhmeKYzo+EetdiUpY/7VzE9vq+OtX/O02d6ugQwMI3D57r3yvxtsY3u+lRYwr0R2yvvVr/Lhm9xXQ3EfycxNtpOUxviHCFsL5wXLA=
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_courseware_index: "true"
-  edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     authoring: authoring
     communications: communications
@@ -114,6 +113,11 @@ config:
   meilisearch:memory_limit: "1Gi"
   typesense:deploy: "true"
   typesense:enabled: "false"
+  # storage_size intentionally left at the 100Gi default. The 20Gi sizing from
+  # #5870 was sound, but it only takes effect via a StatefulSet recreate, and an
+  # unpaired CR/StatefulSet mismatch wedges the operator (see typesense.py).
+  # Reclaiming the capacity was not worth the recreate on these stacks; do not
+  # re-add this without running docs/nonprod-ebs-volume-right-sizing-runbook.md.
   edxapp:site_project:
     deployment: xpro
     mfe_apps:

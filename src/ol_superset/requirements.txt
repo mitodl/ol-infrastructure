@@ -1,10 +1,13 @@
-apache-superset[cors,thumbnails,prophet,trino]>=6,<7
+# The fastmcp extra is load-bearing, not decorative: it carries Superset's
+# fastmcp<4.0,>=3.1.0 bound. Without it fastmcp resolves to 4.x, which dropped
+# the tools/__init__.py alias that makes Superset's `from fastmcp.tools.tool
+# import Tool` work, and the mcp pod crashloops at startup.
+apache-superset[cors,thumbnails,prophet,trino,fastmcp]>=6,<7
 authlib
 starrocks
 mysqlclient
 celery-redbeat
 duckdb
-fastmcp
 flask-caching
 flask-oidc
 flask-openid

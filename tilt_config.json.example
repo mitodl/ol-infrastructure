@@ -3,14 +3,13 @@
 
   "per_app_databases": false,
 
-  "openedx_mode": "qa",
-
   "prebuilt_tags": [
     "mit-learn=0.62.0",
     "mit-learn-nextjs=0.62.0",
     "learn-ai=0.28.3",
     "mitxonline=1.144.5",
-    "odl-video-service=0.85.0"
+    "odl-video-service=0.85.0",
+    "ocw-studio=0.199.0"
   ],
 
 
@@ -18,5 +17,7 @@
 
   "disk_buildcache_max_gb": "",
 
-  "log_retention_period": "168h"
+  "log_retention_period": "168h",
+
+  "keycloak_image": ""
 }

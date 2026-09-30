@@ -101,6 +101,21 @@ k8s_labels = K8sGlobalLabels(
 
 setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
 CLICKHOUSE_NAMESPACE = "clickhouse"
+# Declared for every cluster in infrastructure/aws/eks; must exist before a PVC
+# references it. It does NOT recover on its own once the class shows up: the CSI
+# external-resizer emits `VolumeModifyFailed  VAC "ebs-gp3-iops-3000" does not
+# exist.`, drops the PVC's key, and never re-enqueues it -- data-ci sat Pending
+# for hours after the class appeared. Touching the PVC (an annotation, a relabel)
+# does not re-enqueue it either; only restarting the resizer does:
+# `kubectl -n kube-system rollout restart deployment ebs-csi-controller`.
+# Apply the eks stack before this one. Rollback is
+# `pulumi config set clickhouse:data_volume_attributes_class ebs-gp3-iops-75000`
+# (production) or `ebs-gp3-iops-25000` (QA) -- those classes are declared there
+# too -- followed by an apply. Each switch recreates the StatefulSets, so every
+# replica restarts once.
+EBS_GP3_IOPS_3000_VAC = "ebs-gp3-iops-3000"
+# ClickHouse's conventional Prometheus port, used for both server and Keeper.
+CLICKHOUSE_METRICS_PORT = 9363
 
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(CLICKHOUSE_NAMESPACE, ns)
@@ -110,6 +125,9 @@ cluster_stack.require_output("namespaces").apply(
 hot_data_days = int(clickhouse_config.get("hot_data_days") or "7")
 hot_storage_size = clickhouse_config.get("hot_storage_size") or "100Gi"
 storage_class = stateful_workload_storage["storage_class"]
+data_volume_attributes_class = (
+    clickhouse_config.get("data_volume_attributes_class") or EBS_GP3_IOPS_3000_VAC
+)
 use_io_optimized_nodes = stateful_workload_storage["use_io_optimized_nodes"]
 ch_replicas = int(clickhouse_config.get("replicas") or "1")
 keeper_replicas = int(clickhouse_config.get("keeper_replicas") or "1")
@@ -160,6 +178,47 @@ _LLMOPS_QUOTAS = {
     "llmops_quota/interval/read_rows": "10000000000",
     "llmops_quota/interval/execution_time": "3600",
 }
+
+# System-log hardening copied from the Opik chart's conf.d/system_tables.xml
+# (chart 2.2.71), which exists because these tables filled a production disk
+# (comet-ml/opik#6224). The bundled Opik ClickHouse is disabled here, so none of
+# it was inherited. The operator's own config.d already gives query_log,
+# part_log and trace_log a 30-day TTL; this file sorts after its 01-clickhouse-*
+# files, so remove="1" on trace_log wins over the operator's replace="1".
+# query_metric_log exists from 24.10 and latency_log from 25.2; older servers
+# ignore the elements.
+#
+# Changing a log table's engine does not alter the existing table. On the first
+# flush after restart ClickHouse renames it to <table>_0 (which keeps its data
+# and gets no TTL) and creates a new one. Removed tables also stay on disk. Both
+# need a manual DROP after rollout; see the runbook comment further down.
+SYSTEM_LOG_TTL_DAYS = 30
+_REMOVED_SYSTEM_LOGS = (
+    "opentelemetry_span_log",
+    "asynchronous_metric_log",
+    "processors_profile_log",
+    "text_log",
+    "trace_log",
+    "blob_storage_log",
+)
+_TTL_SYSTEM_LOGS = ("error_log", "latency_log", "metric_log", "query_metric_log")
+SYSTEM_LOG_TABLES_XML = "\n".join(
+    [
+        "<clickhouse>",
+        *(f'  <{table} remove="1"/>' for table in _REMOVED_SYSTEM_LOGS),
+        *(
+            dedent(f"""\
+              <{table}>
+                <database>system</database>
+                <table>{table}</table>
+                <engine>ENGINE = MergeTree PARTITION BY toYYYYMM(event_date) ORDER BY (event_date, event_time) TTL event_date + toIntervalDay({SYSTEM_LOG_TTL_DAYS}) SETTINGS index_granularity = 8192</engine>
+              </{table}>""")
+            for table in _TTL_SYSTEM_LOGS
+        ),
+        "</clickhouse>",
+        "",
+    ]
+)
 
 
 def _require_password(password_output: Output, username: str) -> Output:
@@ -272,6 +331,16 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                         "keeper_server/coordination_settings/operation_timeout_ms": "10000",
                         "keeper_server/coordination_settings/session_timeout_ms": "30000",
                         "listen_host": "0.0.0.0",  # noqa: S104
+                        # Keeper has no SQL interface for the operator's
+                        # exporter to query, so its own endpoint is the only
+                        # source of Keeper metrics (leader, synced followers,
+                        # latency, outstanding requests).
+                        "prometheus/endpoint": "/metrics",
+                        "prometheus/port": str(CLICKHOUSE_METRICS_PORT),
+                        "prometheus/metrics": "true",
+                        "prometheus/events": "true",
+                        "prometheus/asynchronous_metrics": "true",
+                        "logger/level": "information",
                     },
                 },
                 "templates": {
@@ -344,8 +413,10 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     ch_image: str,
     use_io_optimized: bool,
     storage_class: str,
+    data_volume_attributes_class: str,
     hot_storage_size: str,
     cold_bucket_name: "Output[str]",
+    backup_bucket_name: "Output[str]",
     users_secret_name: str,
     irsa_role_arn: "Output[str]",
     keeper_installation: "Output[kubernetes.apiextensions.CustomResource]",
@@ -355,7 +426,8 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     """Build the ClickHouseInstallation CRD and return it wrapped in an Output.
 
     Uses ``Output.all().apply()`` because the storage configuration XML must be
-    resolved from the cold-storage bucket name, which is an ``Output[str]``.
+    resolved from the cold-storage and backup bucket names, which are
+    ``Output[str]``.
     """
     ch_tolerations = (
         [
@@ -428,8 +500,8 @@ def _create_clickhouse_installation(  # noqa: PLR0913
         )
     )
 
-    storage_config_xml = cold_bucket_name.apply(
-        lambda bucket: dedent(f"""\
+    storage_config_xml = Output.all(cold_bucket_name, backup_bucket_name).apply(
+        lambda buckets: dedent(f"""\
             <clickhouse>
               <storage_configuration>
                 <disks>
@@ -440,10 +512,23 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                        UNKNOWN_ELEMENT_IN_CONFIG ("cannot be equal to <path>"). -->
                   <cold_s3>
                     <type>s3</type>
-                    <endpoint>https://{bucket}.s3.amazonaws.com/data/</endpoint>
+                    <endpoint>https://{buckets[0]}.s3.amazonaws.com/data/</endpoint>
                     <use_environment_credentials>true</use_environment_credentials>
                     <metadata_path>/var/lib/clickhouse/disks/cold_s3/</metadata_path>
                   </cold_s3>
+                  <!-- Destination for BACKUP ... TO Disk('backups', ...).
+                       s3_plain rather than s3: an s3 disk keeps its object
+                       metadata on the local PVC, so a backup written through
+                       one could only be read back from the replica that wrote
+                       it. s3_plain stores files under their real names, which
+                       is what lets a different cluster or a rebuilt replica
+                       read the backup. Not referenced by any storage policy,
+                       so no table data lands here. -->
+                  <backups>
+                    <type>s3_plain</type>
+                    <endpoint>https://{buckets[1]}.s3.amazonaws.com/backups/</endpoint>
+                    <use_environment_credentials>true</use_environment_credentials>
+                  </backups>
                 </disks>
                 <policies>
                   <tiered>
@@ -459,6 +544,12 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                   </tiered>
                 </policies>
               </storage_configuration>
+              <!-- Without this, Disk() is refused outright as a BACKUP target
+                   (Code 318, "'backups.allowed_disk' configuration parameter is
+                   not set"). -->
+              <backups>
+                <allowed_disk>backups</allowed_disk>
+              </backups>
             </clickhouse>
         """)
     )
@@ -555,9 +646,33 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     ],
                     "files": {
                         "config.d/storage.xml": kwargs["storage_config"],
+                        "config.d/system_log_tables.xml": SYSTEM_LOG_TABLES_XML,
                     },
                     "settings": {
                         "default_storage_policy": "tiered",
+                        # Server default is 0.9 of the cgroup memory limit;
+                        # 0.85 matches the Opik chart and leaves more of the
+                        # limit for memory the server does not track before
+                        # the kernel OOM-kills the container.
+                        "max_server_memory_usage_to_ram_ratio": "0.85",
+                        # Built-in Prometheus endpoint. Without a <prometheus>
+                        # section ClickHouse serves no metrics at all; the old
+                        # ServiceMonitor on 8123/metrics scraped up=0 on every
+                        # replica. The operator's own exporter (kube-system,
+                        # clickhouse-operator-metrics:8888) covers replication
+                        # and table state; this adds the server's full
+                        # metrics/events/asynchronous_metrics/errors.
+                        "prometheus/endpoint": "/metrics",
+                        "prometheus/port": str(CLICKHOUSE_METRICS_PORT),
+                        "prometheus/metrics": "true",
+                        "prometheus/events": "true",
+                        "prometheus/asynchronous_metrics": "true",
+                        "prometheus/errors": "true",
+                        # Debug by default: ~1.7M lines/day per cluster to
+                        # Loki (12.08M over the 7 days to 2026-09-10 in
+                        # data-production). The operator applies logger
+                        # changes without a restart.
+                        "logger/level": "information",
                     },
                     # Users, profiles, and quotas are managed by the operator
                     # (merged into its generated usersd configmap) rather than
@@ -625,6 +740,20 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                             "spec": {
                                 "accessModes": ["ReadWriteOnce"],
                                 "storageClassName": storage_class,
+                                # ebs-gp3-sc derives IOPS from size (iopsPerGB), which
+                                # gave the 1500Gi production volumes 75,000 IOPS each
+                                # against a one-second peak under 2,000 ops/s. The class
+                                # pins them to gp3's free 3,000. The operator applies a
+                                # template VAC to existing PVCs on reconcile (0.26.0
+                                # storage-reconciler.go reconcileVolumeAttributeClass),
+                                # and the CSI driver modifies the EBS volume online.
+                                **(
+                                    {
+                                        "volumeAttributesClassName": data_volume_attributes_class
+                                    }
+                                    if storage_class == "ebs-gp3-sc"
+                                    else {}
+                                ),
                                 "resources": {
                                     "requests": {
                                         "storage": hot_storage_size,
@@ -688,12 +817,59 @@ export("cold_bucket_name", cold_bucket.bucket_v2.bucket)
 export("cold_bucket_arn", cold_bucket.bucket_v2.arn)
 
 ############################################################
+# S3 Backup Bucket
+#
+# Destination of the daily SQL BACKUP (see the CronJob below). Kept apart from
+# the cold-tier bucket: once tiering is activated that bucket holds live parts,
+# and a backup sharing a bucket with the data it protects shares its failure
+# modes (a bad lifecycle rule, a mistaken delete) too.
+#
+# ClickHouse's own IRSA role writes here, so it can also delete. Versioning is
+# what makes a backup deleted or overwritten through that role recoverable for
+# a week afterwards. Each run is a full backup (no base_backup chain), so
+# expiring by object age never strands a backup that a newer one depends on.
+############################################################
+backup_retention_days = int(clickhouse_config.get("backup_retention_days") or "14")
+backup_bucket_name = f"ol-data-clickhouse-backup-{stack_info.env_suffix}"
+
+backup_bucket = OLBucket(
+    f"clickhouse-backup-{stack_info.env_suffix}",
+    S3BucketConfig(
+        bucket_name=backup_bucket_name,
+        tags=aws_config.tags,
+        versioning_enabled=True,
+        server_side_encryption_enabled=True,
+        sse_algorithm="AES256",
+        # Objects live two weeks; Intelligent-Tiering's 30-day monitoring
+        # window never pays back on them.
+        intelligent_tiering_enabled=False,
+        noncurrent_version_expiration_days=7,
+        lifecycle_rules=[
+            aws.s3.BucketLifecycleConfigurationRuleArgs(
+                id="expire-backups",
+                status="Enabled",
+                filter=aws.s3.BucketLifecycleConfigurationRuleFilterArgs(
+                    prefix="backups/"
+                ),
+                expiration=aws.s3.BucketLifecycleConfigurationRuleExpirationArgs(
+                    days=backup_retention_days
+                ),
+            )
+        ],
+    ),
+)
+
+export("backup_bucket_name", backup_bucket.bucket_v2.bucket)
+export("backup_bucket_arn", backup_bucket.bucket_v2.arn)
+
+############################################################
 # IRSA + Vault Auth Binding for ClickHouse
 ############################################################
 
 # Build the IAM policy JSON as an Output to resolve bucket ARN values
 clickhouse_s3_policy_json: Output[str] = Output.all(
     bucket_arn=cold_bucket.bucket_v2.arn,
+    backup_bucket_arn=backup_bucket.bucket_v2.arn,
 ).apply(
     lambda args: json.dumps(
         {
@@ -713,6 +889,8 @@ clickhouse_s3_policy_json: Output[str] = Output.all(
                     "Resource": [
                         args["bucket_arn"],
                         f"{args['bucket_arn']}/*",
+                        args["backup_bucket_arn"],
+                        f"{args['backup_bucket_arn']}/*",
                     ],
                 },
             ],
@@ -850,8 +1028,10 @@ clickhouse_installation = _create_clickhouse_installation(
     ch_image=ch_image,
     use_io_optimized=use_io_optimized_nodes,
     storage_class=storage_class,
+    data_volume_attributes_class=data_volume_attributes_class,
     hot_storage_size=hot_storage_size,
     cold_bucket_name=cold_bucket.bucket_v2.bucket,
+    backup_bucket_name=backup_bucket.bucket_v2.bucket,
     users_secret_name=users_secret_name,
     irsa_role_arn=clickhouse_app.irsa_role.arn,
     keeper_installation=keeper_installation,
@@ -870,7 +1050,165 @@ clickhouse_installation = _create_clickhouse_installation(
 #     --query "CREATE DATABASE IF NOT EXISTS opik_db"
 #
 # Required databases: opik_db
+#
+# After a change to SYSTEM_LOG_TABLES_XML rolls out, list leftover log tables
+# on every replica (system tables are local, not replicated):
+#
+#   SELECT name, formatReadableSize(total_bytes) FROM system.tables
+#   WHERE database = 'system' AND match(name, '_log(_[0-9]+)?$')
+#
+# and DROP TABLE system.<name> SYNC for each removed log and each renamed
+# <table>_N. The server never writes to either again.
 ############################################################
+
+############################################################
+# Daily SQL backup
+#
+# Two recovery layers exist, and this is the second:
+#   1. AWS Backup (infrastructure/aws/eks/aws_backup.py) snapshots every CH and
+#      Keeper EBS volume daily at 05:00 UTC, kept 14 days. Crash-consistent and
+#      per volume, uncoordinated across replicas: good for "a PVC died", not
+#      for restoring into another cluster or across a server version.
+#   2. This job: BACKUP of every non-system database to the backup bucket via
+#      the s3_plain ``backups`` disk. Application-consistent per table and
+#      readable by any ClickHouse at the same or a newer version.
+#
+# Runs against replica 0 by name, not the load-balanced service. With one
+# shard every replica holds the same replicated data, but Opik's Liquibase
+# ledger (default.DATABASECHANGELOG*) has rows only on replica 0, where
+# migrations are pinned (CLICKHOUSE_MIGRATIONS_HOST in applications/opik).
+# Replicas 1 and 2 carry empty tables of the same name. A restore without the
+# ledger would replay every migration against existing tables.
+#
+# ASYNC plus polling rather than a synchronous BACKUP: the statement's outcome
+# lives in system.backups on the server, so the job exits non-zero on
+# BACKUP_FAILED instead of depending on how long the client connection survives
+# a multi-minute query. system.backups is in-memory per server, which is why
+# every query here targets the same host.
+############################################################
+BACKUP_HOST = f"chi-clickhouse-default-0-0.{CLICKHOUSE_NAMESPACE}.svc.cluster.local"
+BACKUP_SCRIPT = """\
+set -eu
+ch() {
+    clickhouse-client --host "${CLICKHOUSE_HOST}" --user admin \\
+        --password "${CLICKHOUSE_PASSWORD}" "$@"
+}
+name="$(date -u +%Y%m%dT%H%M%SZ)"
+id="$(ch --query "BACKUP ALL EXCEPT DATABASES system, INFORMATION_SCHEMA, information_schema TO Disk('backups', '${name}') ASYNC" | cut -f1)"
+echo "backup ${name} started as ${id}"
+while :; do
+    status="$(ch --param_id="${id}" --query "SELECT status FROM system.backups WHERE id = {id:String}")"
+    case "${status}" in
+        BACKUP_CREATED) break ;;
+        CREATING_BACKUP) sleep 30 ;;
+        *)
+            ch --param_id="${id}" --query "SELECT status, error FROM system.backups WHERE id = {id:String} FORMAT Vertical" >&2
+            exit 1
+            ;;
+    esac
+done
+ch --param_id="${id}" --query "SELECT name, num_files, formatReadableSize(total_size) AS size, end_time - start_time AS seconds FROM system.backups WHERE id = {id:String} FORMAT Vertical"
+"""
+
+backup_credentials_secret_name = (
+    "clickhouse-backup-credentials"  # pragma: allowlist secret  # noqa: S105
+)
+backup_credentials_secret = OLVaultK8SSecret(
+    f"clickhouse-backup-credentials-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="clickhouse-backup-credentials",
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=backup_credentials_secret_name,
+        dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+        mount=clickhouse_vault_kv_path,
+        mount_type="kv-v2",
+        path="credentials",
+        templates={"CLICKHOUSE_PASSWORD": '{{- get .Secrets "admin" -}}'},
+        refresh_after="1h",
+        vaultauth=clickhouse_app.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=clickhouse_app.vault_k8s_resources,
+    ),
+)
+
+clickhouse_backup_cron_job = kubernetes.batch.v1.CronJob(
+    f"clickhouse-backup-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="clickhouse-backup",
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels=k8s_global_labels,
+    ),
+    spec=kubernetes.batch.v1.CronJobSpecArgs(
+        # 90 minutes ahead of the 05:00 UTC AWS Backup snapshot, so a bad night
+        # for one layer is not also the same moment for the other.
+        schedule=clickhouse_config.get("backup_schedule") or "30 3 * * *",
+        concurrency_policy="Forbid",
+        starting_deadline_seconds=3600,
+        successful_jobs_history_limit=3,
+        failed_jobs_history_limit=3,
+        job_template=kubernetes.batch.v1.JobTemplateSpecArgs(
+            # On the Job as well as its pods, so `kubectl get jobs -l
+            # app.kubernetes.io/name=clickhouse-backup` (the runbook's check)
+            # finds the runs.
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels={
+                    **k8s_global_labels,
+                    "app.kubernetes.io/name": "clickhouse-backup",
+                },
+            ),
+            spec=kubernetes.batch.v1.JobSpecArgs(
+                # No retry: the server keeps running an ASYNC backup after the
+                # client pod dies, so a retry could start a second one beside
+                # it. The next night is the retry, and a failed Job alerts now.
+                backoff_limit=0,
+                active_deadline_seconds=7200,
+                template=kubernetes.core.v1.PodTemplateSpecArgs(
+                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                        labels={
+                            **k8s_global_labels,
+                            "app.kubernetes.io/name": "clickhouse-backup",
+                        },
+                    ),
+                    spec=kubernetes.core.v1.PodSpecArgs(
+                        restart_policy="Never",
+                        containers=[
+                            kubernetes.core.v1.ContainerArgs(
+                                name="backup",
+                                # Same image as the server, for a client that
+                                # speaks exactly the server's protocol version.
+                                image=ch_image,
+                                command=["/bin/sh", "-c", BACKUP_SCRIPT],
+                                env=[
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name="CLICKHOUSE_HOST", value=BACKUP_HOST
+                                    ),
+                                ],
+                                env_from=[
+                                    kubernetes.core.v1.EnvFromSourceArgs(
+                                        secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+                                            name=backup_credentials_secret_name
+                                        )
+                                    )
+                                ],
+                                resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                    requests={"cpu": "50m", "memory": "64Mi"},
+                                    limits={"cpu": "200m", "memory": "256Mi"},
+                                ),
+                            )
+                        ],
+                    ),
+                ),
+            ),
+        ),
+    ),
+    opts=ResourceOptions(
+        depends_on=[clickhouse_installation, backup_credentials_secret],
+    ),
+)
 
 ############################################################
 # Networking — ClusterIP Service + NetworkPolicy
@@ -894,7 +1232,16 @@ clickhouse_client_service = kubernetes.core.v1.Service(
     ),
     spec=kubernetes.core.v1.ServiceSpecArgs(
         type="ClusterIP",
-        selector={"clickhouse.altinity.com/chi": "clickhouse"},
+        # ready=yes is the operator's own signal that a host is in service: it
+        # sets it only after the pod passes /ping, the host's tables exist and
+        # (for a new replica) replication has caught up, and removes it while
+        # excluding a host for a restart. Readiness alone is only /ping, so
+        # without this a new or restarting replica takes Opik queries before
+        # it has the opik_db schema or its data.
+        selector={
+            "clickhouse.altinity.com/chi": "clickhouse",
+            "clickhouse.altinity.com/ready": "yes",
+        },
         ports=[
             kubernetes.core.v1.ServicePortArgs(
                 name="http",
@@ -905,6 +1252,53 @@ clickhouse_client_service = kubernetes.core.v1.Service(
                 name="native",
                 port=9000,
                 target_port=9000,
+            ),
+        ],
+    ),
+)
+
+# Metrics get their own Service, not gated on ready=yes, so a replica the
+# operator has pulled out of service is still scraped. Headless because
+# Prometheus scrapes each pod's endpoint, never the Service address.
+clickhouse_metrics_service = kubernetes.core.v1.Service(
+    f"clickhouse-metrics-service-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="clickhouse-metrics",
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels={**k8s_global_labels, "app": "clickhouse-metrics"},
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        cluster_ip="None",
+        selector={"clickhouse.altinity.com/chi": "clickhouse"},
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                name="metrics",
+                port=CLICKHOUSE_METRICS_PORT,
+                target_port=CLICKHOUSE_METRICS_PORT,
+            ),
+        ],
+    ),
+)
+
+# The operator's keeper-clickhouse Service exposes only 2181 and the raft port,
+# so Keeper's metrics port needs a Service of its own for a ServiceMonitor to
+# select. Headless because Prometheus scrapes each pod's endpoint, never the
+# Service address.
+keeper_metrics_service = kubernetes.core.v1.Service(
+    f"clickhouse-keeper-metrics-service-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="clickhouse-keeper-metrics",
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels={**k8s_global_labels, "app": "clickhouse-keeper"},
+    ),
+    spec=kubernetes.core.v1.ServiceSpecArgs(
+        cluster_ip="None",
+        selector={"clickhouse-keeper.altinity.com/chk": "clickhouse"},
+        ports=[
+            kubernetes.core.v1.ServicePortArgs(
+                name="metrics",
+                port=CLICKHOUSE_METRICS_PORT,
+                target_port=CLICKHOUSE_METRICS_PORT,
             ),
         ],
     ),
@@ -961,17 +1355,26 @@ clickhouse_network_policy = kubernetes.networking.v1.NetworkPolicy(
                     kubernetes.networking.v1.NetworkPolicyPortArgs(port=9000),
                 ],
             ),
-            # Allow Prometheus scraping from monitoring namespace
+            # Allow Prometheus scraping from Alloy, which runs in the `grafana`
+            # namespace (this used to name `monitoring`, where nothing runs).
+            #
+            # NetworkPolicy is not enforced on the data clusters today
+            # (amazon-vpc-cni enable-network-policy-controller: "false"), so
+            # none of these rules restrict anything yet. They are kept
+            # accurate so that turning enforcement on does not cut off
+            # scraping or clients.
             kubernetes.networking.v1.NetworkPolicyIngressRuleArgs(
                 from_=[
                     kubernetes.networking.v1.NetworkPolicyPeerArgs(
                         namespace_selector=kubernetes.meta.v1.LabelSelectorArgs(
-                            match_labels={"kubernetes.io/metadata.name": "monitoring"},
+                            match_labels={"kubernetes.io/metadata.name": "grafana"},
                         )
                     )
                 ],
                 ports=[
-                    kubernetes.networking.v1.NetworkPolicyPortArgs(port=8123),
+                    kubernetes.networking.v1.NetworkPolicyPortArgs(
+                        port=CLICKHOUSE_METRICS_PORT
+                    ),
                 ],
             ),
         ],
@@ -981,9 +1384,14 @@ clickhouse_network_policy = kubernetes.networking.v1.NetworkPolicy(
 ############################################################
 # Monitoring — ServiceMonitor for Prometheus Operator
 #
-# ClickHouse exposes Prometheus metrics at /metrics on the HTTP port (8123).
-# The ServiceMonitor targets the stable ``clickhouse`` ClusterIP Service
-# created above, so Prometheus scrapes all replicas through it.
+# ClickHouse serves Prometheus metrics at /metrics on CLICKHOUSE_METRICS_PORT
+# (9363), and only because the CHI's prometheus/* settings turn it on. It does
+# not serve them on the HTTP port (8123); a ServiceMonitor pointed there
+# scraped up=0. The ServiceMonitor selects the ``clickhouse-metrics`` Service,
+# and Prometheus scrapes each replica's endpoint behind it individually.
+# Prometheus names the job after the Service; the relabel keeps job="clickhouse"
+# from when it scraped the client Service, so existing series and queries
+# continue.
 # Requires the Prometheus Operator (monitoring.coreos.com/v1 CRDs) to be
 # installed in the cluster (already present per EKS infrastructure stack).
 ############################################################
@@ -1002,17 +1410,18 @@ clickhouse_service_monitor = kubernetes.apiextensions.CustomResource(
     ),
     spec={
         "selector": {
-            "matchLabels": {"app": "clickhouse"},
+            "matchLabels": {"app": "clickhouse-metrics"},
         },
         "namespaceSelector": {"matchNames": [CLICKHOUSE_NAMESPACE]},
         "endpoints": [
             {
-                "port": "http",
+                "port": "metrics",
                 "path": "/metrics",
                 "scheme": "http",
                 "interval": "30s",
                 "scrapeTimeout": "10s",
                 "relabelings": [
+                    {"targetLabel": "job", "replacement": "clickhouse"},
                     {
                         "sourceLabels": ["__meta_kubernetes_pod_name"],
                         "targetLabel": "pod",
@@ -1025,7 +1434,52 @@ clickhouse_service_monitor = kubernetes.apiextensions.CustomResource(
             }
         ],
     },
-    opts=ResourceOptions(depends_on=[clickhouse_client_service]),
+    opts=ResourceOptions(depends_on=[clickhouse_metrics_service]),
+)
+
+keeper_service_monitor = kubernetes.apiextensions.CustomResource(
+    f"clickhouse-keeper-service-monitor-{stack_info.env_suffix}",
+    api_version="monitoring.coreos.com/v1",
+    kind="ServiceMonitor",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="clickhouse-keeper",
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels={**k8s_global_labels, "release": "prometheus"},
+    ),
+    spec={
+        "selector": {"matchLabels": {"app": "clickhouse-keeper"}},
+        "namespaceSelector": {"matchNames": [CLICKHOUSE_NAMESPACE]},
+        "endpoints": [
+            {
+                "port": "metrics",
+                "path": "/metrics",
+                "interval": "30s",
+                "scrapeTimeout": "10s",
+                # pod_name, container_name and app are the labels Altinity's
+                # Keeper dashboard (grafana_alerting/dashboards) filters on.
+                # container_name is a constant rather than taken from
+                # __meta_kubernetes_pod_container_name: that meta label is only
+                # set when the scraped port is a declared container port, and
+                # the operator's Keeper pod declares only 2181 and 9444.
+                "relabelings": [
+                    {
+                        "sourceLabels": ["__meta_kubernetes_pod_name"],
+                        "targetLabel": "pod",
+                    },
+                    {
+                        "sourceLabels": ["__meta_kubernetes_pod_name"],
+                        "targetLabel": "pod_name",
+                    },
+                    {
+                        "targetLabel": "container_name",
+                        "replacement": "clickhouse-keeper",
+                    },
+                    {"targetLabel": "app", "replacement": "clickhouse-keeper"},
+                ],
+            }
+        ],
+    },
+    opts=ResourceOptions(depends_on=[keeper_metrics_service]),
 )
 
 export("clickhouse_namespace", CLICKHOUSE_NAMESPACE)

@@ -356,26 +356,16 @@ draft_backup_bucket_config = S3BucketConfig(
             allowed_origins=["*"],
         )
     ],
-    block_public_acls=False,
-    block_public_policy=False,
-    ignore_public_acls=False,
-    restrict_public_buckets=False,
-    bucket_policy_document=json.dumps(
-        {
-            "Version": IAM_POLICY_VERSION,
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": "s3:GetObject",
-                    "Resource": [
-                        f"{draft_backup_bucket_arn}/*",
-                    ],
-                }
-            ],
-        }
-    ),
-    # Backup bucket: never CDN-served, safe for archive tiers.
+    # Backup bucket: never CDN-served, safe for archive tiers, and never read
+    # over the open internet -- replication (see setup_bucket_replication
+    # below) authenticates via its own dedicated IAM role/policy scoped
+    # directly to this bucket's ARN, not via a public bucket policy. Public
+    # read here was a copy-paste artifact from the live-serving bucket config,
+    # not an intentional access grant (Security Hub S3.2, hq#13287 item 3).
+    block_public_acls=True,
+    block_public_policy=True,
+    ignore_public_acls=True,
+    restrict_public_buckets=True,
     intelligent_tiering_archive_access_days=90,
     intelligent_tiering_deep_archive_access_days=180,
     tags=aws_config.tags,
@@ -413,25 +403,16 @@ live_backup_bucket_config = S3BucketConfig(
             allowed_origins=["*"],
         )
     ],
-    block_public_acls=False,
-    block_public_policy=False,
-    ignore_public_acls=False,
-    restrict_public_buckets=False,
-    bucket_policy_document=json.dumps(
-        {
-            "Version": IAM_POLICY_VERSION,
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Principal": "*",
-                    "Action": "s3:GetObject",
-                    "Resource": [
-                        f"{live_backup_bucket_arn}/*",
-                    ],
-                }
-            ],
-        }
-    ),
+    # Backup bucket: never CDN-served, safe for archive tiers, and never read
+    # over the open internet -- replication (see setup_bucket_replication
+    # below) authenticates via its own dedicated IAM role/policy scoped
+    # directly to this bucket's ARN, not via a public bucket policy. Public
+    # read here was a copy-paste artifact from the live-serving bucket config,
+    # not an intentional access grant (Security Hub S3.2, hq#13287 item 3).
+    block_public_acls=True,
+    block_public_policy=True,
+    ignore_public_acls=True,
+    restrict_public_buckets=True,
     logging_target_bucket=audit_log_bucket_name,
     logging_target_prefix=f"ocw-site/{live_backup_bucket_name}/",
     logging_target_object_key_format=s3.BucketLoggingTargetObjectKeyFormatArgs(
@@ -440,7 +421,6 @@ live_backup_bucket_config = S3BucketConfig(
         )
     ),
     logging_expected_bucket_owner=aws_account.account_id,
-    # Backup bucket: never CDN-served, safe for archive tiers.
     intelligent_tiering_archive_access_days=90,
     intelligent_tiering_deep_archive_access_days=180,
     tags=aws_config.tags,
@@ -906,6 +886,7 @@ s3_bucket_iam_policy = iam.Policy(
 # Fastly Config #
 #################
 site_domains = ocw_site_config.get_object("domains") or {"draft": [], "live": []}
+course_v3_redirects = ocw_site_config.get_object("course_v3_redirects") or {}
 fastly_shielding_enabled = ocw_site_config.get_bool("enable_fastly_shielding") or False
 fastly_image_optimization_enabled = (
     ocw_site_config.get_bool("enable_fastly_image_optimization") or False
@@ -1109,6 +1090,17 @@ for purpose in ("draft", "live", "test"):
                 name="S3 Bucket Proxying",
                 priority=200,
                 type="miss",
+            ),
+            vcl_snippet(
+                name="Course v3 redirect origins",
+                type="init",
+                content="table course_v3_redirects {\n"
+                + "\n".join(
+                    f"  {json.dumps(domain)}: {json.dumps(origin)},"
+                    for domain, origin in course_v3_redirects.items()
+                    if domain in site_domains[purpose]
+                )
+                + "\n}",
             ),
             vcl_snippet(
                 content=snippets_dir.joinpath("redirects.vcl").read_text(),

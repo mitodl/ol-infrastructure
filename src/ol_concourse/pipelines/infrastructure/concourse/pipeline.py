@@ -10,6 +10,7 @@ from ol_concourse.pipelines.constants import (
     PULUMI_WATCHED_PATHS,
 )
 from ol_concourse.pipelines.jobs import packer_jobs, pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import (
     image_version_paths,
@@ -106,9 +107,24 @@ def concourse_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
+    output = pipeline_json_with_user_data(
+        concourse_pipeline(),
+        user_data={
+            "description": (
+                "Builds the Concourse web/worker AMI -- version sourced from the "
+                "`CONCOURSE_VERSION` pin in `src/bridge/lib/version_pins/`, not a "
+                "tracked GitHub release resource -- then deploys "
+                "`ol-infrastructure-concourse-application` via Pulumi to CI, QA, "
+                "and Production, gated on a reviewed preview. This is the "
+                "pipeline that manages the Concourse instance it runs on."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(concourse_pipeline().model_dump_json(indent=2))
-    sys.stdout.write(concourse_pipeline().model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     print()  # noqa: T201
     print(  # noqa: T201
         "fly -t pr-inf sp -p packer-pulumi-concourse -c definition.json"

@@ -144,9 +144,11 @@ def build_notes_pipeline(
                     trigger=True,
                     passed=[container_fragment.jobs[-1].name],
                 ),
+                # preview-gated honours this trigger on the auto-deploy CI stage
+                # and QA/Production previews, and strips it from the gated deploys.
                 GetStep(
                     get=notes_registry_image.name,
-                    trigger=False,
+                    trigger=True,
                     passed=[image_build_job.name],
                 ),
             ],
@@ -169,11 +171,26 @@ def build_notes_pipeline(
 
 
 if __name__ == "__main__":
+    from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
+
     release_name = sys.argv[1]
-    pipeline_json = build_notes_pipeline(
+    notes_pipeline = build_notes_pipeline(
         release_name,
         OpenLearningOpenEdxDeployment,
-    ).model_dump_json(indent=2)
+    )
+    pipeline_json = pipeline_json_with_user_data(
+        notes_pipeline,
+        user_data={
+            "description": (
+                "Builds the edx-notes-api container image, the backend service "
+                "for the Open edX student notes/annotations feature, then deploys "
+                "it via Pulumi to every mitodl Open edX deployment running the "
+                f"`{release_name}` release."
+            ),
+            "team": "infrastructure",
+            "category": "open-edx",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)

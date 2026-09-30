@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 from string import Template
@@ -12,6 +13,8 @@ from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
+    OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER,
+    OPEN_METADATA_SESSION_EXPIRY_SECONDS,
 )
 from bridge.lib.versions import OPEN_METADATA_VERSION
 from bridge.secrets import sops as _bridge_sops
@@ -25,6 +28,7 @@ from ol_infrastructure.components.aws.eks import (
     OLEKSTrustRole,
     OLEKSTrustRoleConfig,
 )
+from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultK8SDynamicSecretConfig,
@@ -108,6 +112,11 @@ aws_account = get_caller_identity()
 
 open_metadata_namespace = "open-metadata"
 open_metadata_service_account_name = "openmetadata"
+# Used both for the chart's own ingestion pods and for the om-auth-config Job,
+# which borrows it for psycopg2 rather than carrying a second image.
+om_ingestion_image = (
+    f"docker.getcollate.io/openmetadata/ingestion-base:{OPEN_METADATA_VERSION}"
+)
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(open_metadata_namespace, ns)
 )
@@ -396,17 +405,6 @@ if open_metadata_connector_secrets:
             "OM_AIRBYTE_HOST_PORT": '{{ index .Secrets "airbyte" "host_port" }}',
             "OM_AIRBYTE_PIPELINE_URL": '{{ index .Secrets "airbyte" "pipeline_url" }}',
         },
-        "superset": {
-            "OM_SUPERSET_OIDC_REALM_URL": (
-                '{{ index .Secrets "superset" "oidc_realm_url" }}'
-            ),
-            "OM_SUPERSET_OIDC_CLIENT_ID": (
-                '{{ index .Secrets "superset" "oidc_client_id" }}'
-            ),
-            "OM_SUPERSET_OIDC_CLIENT_SECRET": (
-                '{{ index .Secrets "superset" "oidc_client_secret" }}'
-            ),
-        },
     }
     connector_configs = {
         name: templates
@@ -441,6 +439,36 @@ if open_metadata_connector_secrets:
         )
         connector_secrets.append(connector_secret)
         connector_secret_names.append(secret_name)
+
+# Superset ingestion authenticates as Superset's own Keycloak client, which the
+# keycloak substructure stack writes to Vault in every environment. Reading it
+# from there tracks secret rotation instead of copying it into the SOPS file.
+# Only the superset CronOMJob reads it, so it stays out of the server's envFrom
+# and has no restart target; each job pod picks up the current value at start.
+superset_connector_secret = OLVaultK8SSecret(
+    f"open-metadata-{stack_info.name}-connector-superset-secret",
+    OLVaultK8SStaticSecretConfig(
+        name="openmetadata-connector-superset",
+        namespace=open_metadata_namespace,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name="om-connector-superset",  # noqa: S106  # pragma: allowlist secret
+        labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/superset",
+        templates={
+            "OM_SUPERSET_OIDC_REALM_URL": '{{ get .Secrets "url" }}',
+            "OM_SUPERSET_OIDC_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+            "OM_SUPERSET_OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
+    ),
+)
+connector_secrets.append(superset_connector_secret)
 
 # OM ships with several system bots, each with its own JWT used by a specific
 # workflow type.  All known bots are listed here (SOPS key → OM hyphenated name).
@@ -576,6 +604,54 @@ open_metadata_bedrock_iam_policy = iam.Policy(
     tags=aws_config.tags,
 )
 
+# Backs 2.0's asset uploader (Context Center Documents and attachments). The
+# server builds its S3 client from the AWS default credential chain whenever no
+# custom endpoint is set, so the pod's IRSA role is what authenticates;
+# ASSET_UPLOADER_S3_USE_IAM_ROLE only satisfies the config validator and
+# ASSET_UPLOADER_S3_IAM_ROLE_ARN is never read. S3AssetService calls PutObject,
+# GetObject and DeleteObject and nothing else. Context Center file downloads
+# default to a 307 to a presigned URL, but the UI requests redirect=false and
+# gets the bytes through the server, so no browser script reads the bucket and
+# it needs no CORS. API clients that follow the redirect need only GetObject.
+open_metadata_assets_bucket = OLBucket(
+    f"open-metadata-assets-bucket-{stack_info.env_suffix}",
+    S3BucketConfig(
+        bucket_name=f"ol-data-open-metadata-assets-{stack_info.env_suffix}",
+        versioning_enabled=True,
+        # A document deleted through the UI stays restorable by version id for
+        # 30 days, then stops being billed.
+        noncurrent_version_expiration_days=30,
+        tags=aws_config.tags,
+    ),
+)
+
+open_metadata_assets_iam_policy = iam.Policy(
+    f"open-metadata-assets-policy-{stack_info.env_suffix}",
+    name=f"open-metadata-assets-policy-{stack_info.env_suffix}",
+    path=f"/ol-applications/open-metadata/open_metadata/{stack_info.env_suffix}/",
+    description="Read/write on the OpenMetadata asset uploader bucket",
+    policy=open_metadata_assets_bucket.bucket_v2.arn.apply(
+        lambda bucket_arn: lint_iam_policy(
+            {
+                "Version": IAM_POLICY_VERSION,
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "s3:GetObject",
+                            "s3:PutObject",
+                            "s3:DeleteObject",
+                        ],
+                        "Resource": [f"{bucket_arn}/*"],
+                    },
+                ],
+            },
+            stringify=True,
+        )
+    ),
+    tags=aws_config.tags,
+)
+
 open_metadata_irsa_role = OLEKSTrustRole(
     f"open-metadata-irsa-trust-role-{stack_info.env_suffix}",
     role_config=OLEKSTrustRoleConfig(
@@ -606,6 +682,110 @@ open_metadata_bedrock_policy_attachment = iam.RolePolicyAttachment(
     policy_arn=open_metadata_bedrock_iam_policy.arn,
     role=open_metadata_irsa_role.role.name,
     opts=ResourceOptions(parent=open_metadata_irsa_role),
+)
+
+open_metadata_assets_policy_attachment = iam.RolePolicyAttachment(
+    f"open-metadata-assets-policy-attachment-{stack_info.env_suffix}",
+    policy_arn=open_metadata_assets_iam_policy.arn,
+    role=open_metadata_irsa_role.role.name,
+    opts=ResourceOptions(parent=open_metadata_irsa_role),
+)
+
+# Reconcile the two 2.0 session settings into the database row the server
+# actually reads.  The AUTHENTICATION_* entries in extraEnvs below only bind on
+# an install whose `authenticationConfiguration` row does not exist yet, because
+# `SettingsCache.createDefaultConfiguration` seeds that row from the YAML only
+# when it is absent and `SecurityConfigurationManager` reads it back from the
+# database on every boot.  Our row was written by 1.13.x and has neither key.
+#
+# This is a dependency of the Helm release rather than a follower of it: the
+# server snapshots its auth configuration during startup, so the write has to
+# land before the release rolls the pods for the release's own rollout to pick
+# it up.  The Job name embeds a hash of the script and of the desired values so
+# that changing either recreates the Job and re-runs it; the script itself is
+# idempotent and does nothing when the row already agrees.
+_auth_config_script = (
+    Path(__file__).parent / "scripts" / "om_auth_config.py"
+).read_text()
+_auth_config_hash = hashlib.sha256(
+    "".join(
+        [
+            _auth_config_script,
+            str(OPEN_METADATA_SESSION_EXPIRY_SECONDS),
+            str(OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER),
+        ]
+    ).encode()
+).hexdigest()[:8]
+
+open_metadata_auth_config_job = kubernetes.batch.v1.Job(
+    f"open-metadata-{stack_info.name}-auth-config-job",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=f"om-auth-config-{_auth_config_hash}",
+        namespace=open_metadata_namespace,
+        labels=k8s_global_labels,
+    ),
+    spec=kubernetes.batch.v1.JobSpecArgs(
+        template=kubernetes.core.v1.PodTemplateSpecArgs(
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                labels={**k8s_global_labels, "app": "om-auth-config"},
+            ),
+            spec=kubernetes.core.v1.PodSpecArgs(
+                restart_policy="OnFailure",
+                security_context=kubernetes.core.v1.PodSecurityContextArgs(
+                    run_as_user=1000,
+                    run_as_group=1000,
+                    run_as_non_root=True,
+                ),
+                containers=[
+                    kubernetes.core.v1.ContainerArgs(
+                        name="om-auth-config",
+                        image=om_ingestion_image,
+                        command=["python", "-c", _auth_config_script],
+                        env=[
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="OM_DB_HOST",
+                                value=open_metadata_db.db_instance.address,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="OM_DB_PORT",
+                                value=str(open_metadata_db_config.port),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="OM_DB_NAME",
+                                value=open_metadata_db_config.db_name,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="OM_SESSION_EXPIRY_SECONDS",
+                                value=str(OPEN_METADATA_SESSION_EXPIRY_SECONDS),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="OM_MAX_ACTIVE_SESSIONS_PER_USER",
+                                value=str(OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER),
+                            ),
+                        ],
+                        env_from=[
+                            kubernetes.core.v1.EnvFromSourceArgs(
+                                secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+                                    name=db_creds_secret_name,
+                                ),
+                            ),
+                        ],
+                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                            requests={"cpu": "100m", "memory": "128Mi"},
+                            limits={"cpu": "500m", "memory": "256Mi"},
+                        ),
+                    )
+                ],
+            ),
+        ),
+        backoff_limit=3,
+        ttl_seconds_after_finished=86400,  # auto-clean after 24 h
+    ),
+    opts=ResourceOptions(
+        parent=vault_k8s_resources,
+        delete_before_replace=True,
+        depends_on=[open_metadata_db, db_creds_secret],
+    ),
 )
 
 # Install the openmetadata helm chart
@@ -656,8 +836,17 @@ open_metadata_application = kubernetes.helm.v3.Release(
                             # discoveryUri loaded from vault via OIDC_DISCOVERY_URI env var.  # noqa: E501
                             # How long before re-authentication is required (seconds).
                             "tokenValidity": "21600",  # 6 hours
-                            # Overall session length (seconds).
-                            "sessionExpiry": "604800",  # 7 days
+                            # Overall session length (seconds). This renders
+                            # OIDC_SESSION_EXPIRY, which 2.0 marks "Deprecated fallback;
+                            # use AUTHENTICATION_SESSION_EXPIRY" (conf/openmetadata.yaml
+                            # line 502). This is what our installs have actually
+                            # been running on: the stored authenticationConfiguration
+                            # row has no top-level sessionExpiry, so
+                            # SessionTimeoutResolver falls through to this one. Kept
+                            # at the same value the om-auth-config Job writes, so the
+                            # fallback and the supported key agree and retiring it
+                            # later changes nothing.
+                            "sessionExpiry": str(OPEN_METADATA_SESSION_EXPIRY_SECONDS),
                         },
                     },
                     "pipelineServiceClientConfig": {
@@ -674,7 +863,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
                             # creates this SA + its IRSA role/RBAC under this name.
                             "serviceAccountName": "openmetadata-ingestion",
                             "enableFailureDiagnostics": True,
-                            "ingestionImage": f"docker.getcollate.io/openmetadata/ingestion-base:{OPEN_METADATA_VERSION}",  # noqa: E501
+                            "ingestionImage": om_ingestion_image,
                             "useOMJobOperator": True,
                             # The chart's k8s-pipeline-rbac.yaml stamps the shared
                             # `serviceAccount.annotations` (the server IRSA role) onto
@@ -781,6 +970,58 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "name": "LOG_FORMAT",
                     "value": "json",
                 },
+                # At DEBUG, Jetty's HttpParser logs request headers verbatim, including
+                # `Authorization: Bearer <jwt>` and the OM_SESSION cookie, and these
+                # logs ship to Loki. 2.0 splits org.eclipse.jetty off the root logger
+                # via this var; pinning it keeps a LOG_LEVEL=DEBUG session from
+                # turning on that header dump.
+                {
+                    "name": "JETTY_LOG_LEVEL",
+                    "value": "INFO",
+                },
+                # Two auth settings 2.0 added that 1.13.3 did not have. Both are read
+                # from the top-level `authentication` block rather than from
+                # `oidcConfiguration`, so the chart's values have no field for them and
+                # they can only be set here. Verified against conf/openmetadata.yaml in
+                # the running 2.0.2 image, lines 477-478.
+                #
+                # These only bind on an install that has no
+                # `authenticationConfiguration` row yet, since that is the only case in
+                # which the server seeds the row from this YAML. On an existing install
+                # the om-auth-config Job above is what makes the values effective.
+                #
+                # Same 7 days as oidcConfiguration.sessionExpiry above. Set explicitly
+                # so the session length comes from the supported key instead of from
+                # the OIDC_SESSION_EXPIRY fallback that 2.0 marks deprecated.
+                {
+                    "name": "AUTHENTICATION_SESSION_EXPIRY",
+                    "value": str(OPEN_METADATA_SESSION_EXPIRY_SECONDS),
+                },
+                # Defaults to 5, counting every authorization, so browsers and MCP
+                # OAuth clients draw on the same allowance. Eviction is by
+                # lastAccessedAt ascending, so the least recently used session goes
+                # first: a polling MCP client is safe and an idle one is dropped. That
+                # failure is silent. Upstream logs only when the limit cannot be
+                # enforced, not when it revokes, which matches three weeks of QA logs
+                # on 2.0 containing no line naming the cap.
+                {
+                    "name": "AUTHENTICATION_MAX_ACTIVE_SESSIONS_PER_USER",
+                    "value": str(OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER),
+                },
+                # Asset uploader, see open_metadata_assets_bucket above. Objects
+                # are keyed by asset id under the prefix. AES256 (SSE-S3) because
+                # aws:kms would need a key and kms grants on the IRSA role for no
+                # gain here: the bucket is private and only this role can read it.
+                {"name": "ASSET_UPLOADER_ENABLE", "value": "true"},
+                {"name": "ASSET_UPLOADER_PROVIDER", "value": "s3"},
+                {
+                    "name": "ASSET_UPLOADER_S3_BUCKET_NAME",
+                    "value": open_metadata_assets_bucket.bucket_v2.bucket,
+                },
+                {"name": "ASSET_UPLOADER_S3_REGION", "value": aws_config.region},
+                {"name": "ASSET_UPLOADER_S3_USE_IAM_ROLE", "value": "true"},
+                {"name": "ASSET_UPLOADER_S3_PREFIX_PATH", "value": "assets"},
+                {"name": "ASSET_UPLOADER_S3_SSE_ALGORITHM", "value": "AES256"},
             ],
             "serviceAccount": {
                 "create": True,
@@ -799,12 +1040,12 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # Not version-specific: the same sawtooth shows on 1.13.3, 1.13.4 and
             # (in QA) 2.0.0, while CI on 2.0.0 never restarts. It tracks OMJob volume,
             # so the busiest environment is the most exposed.
-            # The 254Mi peak is a CENSORED observation - the container is killed at the
-            # limit, so real demand is unknown and could be higher. 1Gi is deliberately
-            # generous to uncover the true plateau rather than to be a tight fit; once
-            # a few days of unclipped data exist, re-measure and set this from the
-            # observed ceiling. If the climb never plateaus it is a leak in
-            # omjob-operator and belongs upstream.
+            # That 254Mi peak was censored by the limit, so the limit was raised to
+            # 1Gi to find the real plateau. Unclipped, 2026-08-31 to 2026-09-18 in QA
+            # and production (2.0.0 and 2.0.1): the working set climbs for 2-3 days
+            # after a restart and then flattens at 315-353Mi, with zero restarts in
+            # either cluster. It is undersized, not leaking. The limit gives ~45%
+            # headroom over the 353Mi peak; the request sits just above the plateau.
             "omjobOperator": {
                 "enabled": True,
                 "image": {
@@ -812,8 +1053,8 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "tag": OPEN_METADATA_VERSION,
                 },
                 "resources": {
-                    "requests": {"cpu": "100m", "memory": "256Mi"},
-                    "limits": {"cpu": "500m", "memory": "1Gi"},
+                    "requests": {"cpu": "100m", "memory": "384Mi"},
+                    "limits": {"cpu": "500m", "memory": "512Mi"},
                 },
             },
             "envFrom": [
@@ -838,11 +1079,13 @@ open_metadata_application = kubernetes.helm.v3.Release(
         depends_on=[
             open_metadata_db,
             db_creds_secret,
+            open_metadata_auth_config_job,
             oidc_config_secret,
             oidc_helm_secret,
             open_metadata_irsa_role,
             open_metadata_glue_policy_attachment,
             open_metadata_bedrock_policy_attachment,
+            open_metadata_assets_policy_attachment,
             *connector_secrets,
         ],
     ),

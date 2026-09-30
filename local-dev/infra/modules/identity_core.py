@@ -34,12 +34,20 @@ def create_identity_core(  # noqa: PLR0913
     apisix_release: k8s.helm.v3.Release,
     tls_secret: k8s.core.v1.Secret,
     keycloak_operator_version: str,
+    keycloak_image: str,
     keycloak_hostname: str,
     keycloak_url: str,  # noqa: ARG001
     root_domain: str,  # noqa: ARG001
     db_cluster: k8s.apiextensions.CustomResource,
 ) -> IdentityCoreResources:
-    """Deploy Keycloak operator, instance, and routes (no realm)."""
+    """Deploy Keycloak operator, instance, and routes (no realm).
+
+    ``keycloak_image`` must be a pre-built (``kc.sh build`` already run) image
+    with the OL theme and SPI jars in ``/opt/keycloak/providers``; the instance
+    starts it with ``--optimized``. Any image built from
+    ``local-dev/keycloak/Dockerfile`` qualifies, as does the published
+    ``mitodl/keycloak`` the core stack defaults to.
+    """
     kc_base = (
         "https://raw.githubusercontent.com/keycloak/"
         f"keycloak-k8s-resources/{keycloak_operator_version}/kubernetes"
@@ -105,10 +113,7 @@ def create_identity_core(  # noqa: PLR0913
         },
         spec={
             "instances": 1,
-            "image": (
-                "mitodl/keycloak"
-                "@sha256:4475afe3c385da6bd240a4a2811fa1231dd3365497ca78c017327c7c4e0ea1e2"
-            ),
+            "image": keycloak_image,
             # The image is pre-built (kc.sh build was run during Docker build).
             # startOptimized=True uses that build; False would re-run kc.sh build
             # on every pod start (slow). The image already has organization baked
