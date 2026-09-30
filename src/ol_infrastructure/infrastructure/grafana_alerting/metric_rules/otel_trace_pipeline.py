@@ -6,23 +6,36 @@ and the tail sampler's `keep-low-volume-services` keep-list (see
 substructure/aws/eks/grafana.py) is only as good as someone remembering to
 add to it. These rules turn "nobody is looking" into a notification.
 
-Silent service: absent after present, not "deployed but absent"
-----------------------------------------------------------------
-The obvious rule joins what is deployed against what reaches Tempo. There is
-nothing to join against yet. kube-state-metrics only emits
-`kube_<resource>_labels` for resources named in its `metricLabelsAllowlist`
-(substructure/aws/eks/grafana.py), which today covers jobs and nodes, so
-`kube_deployment_labels` does not exist in any stack, and OTEL_SERVICE_NAME is
-a container env var no metric exposes. Even with ol.mit.edu/application on
-every Deployment, it maps to OTel service names one-to-many (edxapp alone is
-lms, cms, their celery workers and beat), so the join would need its own
-maintained mapping.
+Two rules for a silent service
+------------------------------
+TempoServiceSilent fires on a regression: a service with SERVER spans in the
+24h before the last 24h and none since. It needs nothing but Tempo, so it
+covers every service, labeled or not. It catches an exporter, collector, or
+instrumentation change that silences a service that used to work, and a
+service leaving the keep-list and sampling into invisibility. It cannot catch
+a service that has never emitted (the ol-analytics-api case).
 
-So this fires on a regression instead: a service with SERVER spans in the 24h
-before the last 24h and none since. It cannot catch a service that
-has never emitted (the ol-analytics-api case). It does catch an exporter,
-collector, or instrumentation change that silences a service that used to
-work, and a service leaving the keep-list and sampling into invisibility.
+TempoServiceNeverSeen covers that: it joins what is deployed against what
+reaches Tempo. OLApplicationK8s stamps ol.mit.edu/otel-service-name on each
+webapp Deployment whose application_config sets OTEL_SERVICE_NAME or the
+Django OPENTELEMETRY_SERVICE_NAME, and kube-state-metrics exports it as
+`kube_deployment_labels` (its `metricLabelsAllowlist` and the Alloy
+`includeMetrics` in substructure/aws/eks/grafana.py). The label sits next to
+the value the app is configured with, so there is no separate
+application-to-service mapping to maintain. Only webapp Deployments carry it:
+celery workers, beat and scheduled-email Deployments serve no requests, and
+SERVER spans are what the join counts. A Deployment scaled to zero is skipped.
+A Deployment with no label is not checked at all, so the rule says nothing
+about apps with no OTel config (micromasters, xpro, the legacy xpro edxapp).
+
+Every service name the label will carry had SERVER spans in every 24h window
+over the 7 days to 2026-09-30, at least ~900 per day in QA and ~1,400 in
+production, so the rule should be silent when it first deploys. The 2h `for_`
+covers a new Deployment, which is labeled before it takes traffic.
+
+Both rules can fire for the same service: the regression rule on day one, then
+the never-seen rule for as long as the Deployment stays silent. They are
+distinct alert names, so they notify separately.
 
 Why SERVER spans, and why 24h
 ------------------------------
@@ -99,6 +112,22 @@ _SILENT_SERVICE_EXPR = (
     ', "service_name", "$1", "service", "(.+)")'
 )
 
+_EXPECTED_LABEL = "label_ol_mit_edu_otel_service_name"
+
+# Deployments expecting a service name, relabeled to spanmetrics' `service` so
+# the `unless` can match, then copied to `service_name` for grouping.
+_NEVER_SEEN_EXPR = (
+    "label_replace("
+    "label_replace("
+    f"max by (cluster, namespace, deployment, {_EXPECTED_LABEL}) "
+    f'(kube_deployment_labels{{{_EXPECTED_LABEL}!=""}})'
+    " and on (cluster, namespace, deployment) (kube_deployment_spec_replicas > 0)"
+    f', "service", "$1", "{_EXPECTED_LABEL}", "(.+)")'
+    " unless on (service) "
+    f"(sum by (service) (increase({_CALLS}[1d])) > 0)"
+    ', "service_name", "$1", "service", "(.+)")'
+)
+
 
 def create(
     folder_uid: Input[str],
@@ -124,6 +153,19 @@ def create(
                     "description": "{{ $labels.service_name }} produced SERVER spans in the 24h before the last 24h and none since. Either it stopped serving requests or its trace export broke (exporter config, collector, instrumentation). A service that was removed on purpose fires for a day and then resolves.",
                 },
                 datas=rd(_SILENT_SERVICE_EXPR),
+            ),
+            alerting.RuleGroupRuleArgs(
+                name="TempoServiceNeverSeen",
+                condition="C",
+                for_="2h",
+                no_data_state="OK",
+                exec_err_state="OK",
+                labels={"severity": "warning", **_ROUTING},
+                annotations={
+                    "summary": "{{ $labels.service_name }} is deployed but has sent no server spans to Tempo for 24h",
+                    "description": "Deployment {{ $labels.namespace }}/{{ $labels.deployment }} on {{ $labels.cluster }} is labeled ol.mit.edu/otel-service-name={{ $labels.service_name }} and has replicas, but Tempo has no SERVER spans for that service in the last 24h. Either the app is not exporting (SDK not initialized, exporter endpoint wrong, instrumentation missing) or it reports a different service.name than its OTEL_SERVICE_NAME / OPENTELEMETRY_SERVICE_NAME config says.",
+                },
+                datas=rd(_NEVER_SEEN_EXPR),
             ),
         ],
         opts=resource_opts,
