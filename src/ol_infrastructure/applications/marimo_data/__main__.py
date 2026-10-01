@@ -2,8 +2,12 @@
 
 This stack provisions the shared APISIX/Vault/cert infrastructure for
 published (run-mode) MarimoNotebook CRDs at the domain configured via
-``marimo_data:apps_domain`` (e.g. ``nb.data.ol.mit.edu`` for Production,
-``nb-qa.data.ol.mit.edu`` for QA).
+``marimo_data:apps_domain`` (e.g. ``apps.nb.data.ol.mit.edu`` for Production,
+``apps.nb-qa.data.ol.mit.edu`` for QA).  The apps host is distinct from the
+JupyterHub host (``jupyterhub_data:domain``) because both stacks create a
+Certificate and ApisixTls for their host.  Legacy ApisixRoute hosts are not an
+external-dns source, so the apps host is also listed in ``eks:apisix_domains``
+for the data cluster.
 
 The marimo-operator is installed on the data EKS cluster via the
 ``ol-substructure-eks`` stack (``substructure/aws/eks/marimo_operator.py``).
