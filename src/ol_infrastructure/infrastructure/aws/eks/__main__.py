@@ -389,7 +389,7 @@ cluster = eks.Cluster(
         "audit",
         "authenticator",
     ],
-    endpoint_private_access=False,
+    endpoint_private_access=True,
     endpoint_public_access=True,
     fargate=False,
     ip_family="ipv4",
