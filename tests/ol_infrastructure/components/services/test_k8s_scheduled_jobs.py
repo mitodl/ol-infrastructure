@@ -60,6 +60,7 @@ def test_scheduled_job_pod_is_not_disrupted_by_consolidation():
     app = OLApplicationK8s(
         _base_config(
             application_name="jobpod",
+            config_hash_inputs={"settings": "v1"},
             scheduled_jobs=[
                 OLApplicationK8sScheduledJobConfig(
                     name="reindex", schedule="30 4 * * 0", command=["true"]
@@ -70,6 +71,7 @@ def test_scheduled_job_pod_is_not_disrupted_by_consolidation():
 
     def check(annotations):
         assert annotations["karpenter.sh/do-not-disrupt"] == "true"
+        assert annotations["ol.mit.edu/config-hash"]
 
     return app.scheduled_jobs[
         0
