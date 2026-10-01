@@ -24,6 +24,7 @@ from pulumi import (
 
 from bridge.lib.magic_numbers import (
     DEFAULT_EFS_PORT,
+    DEFAULT_HTTPS_PORT,
     IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
 )
 from bridge.lib.versions import (
@@ -442,6 +443,18 @@ def __create_apiserver_security_group_rules(pod_subnet_cidrs):
 
 
 pod_ip_blocks.apply(__create_apiserver_security_group_rules)
+
+# Vault and Concourse run on EC2 in the operations VPCs and call the API server.
+# They need this before private endpoint access is enabled, when in-VPC lookups
+# of the endpoint start resolving to the control-plane ENIs.
+aws.vpc.SecurityGroupIngressRule(
+    f"{cluster_name}-eks-apiserver-443-vpc-sg-rule",
+    security_group_id=cluster.cluster_security_group_id,
+    cidr_ipv4=target_vpc["cidr"],
+    from_port=DEFAULT_HTTPS_PORT,
+    to_port=DEFAULT_HTTPS_PORT,
+    ip_protocol="tcp",
+)
 
 export("cluster_name", cluster_name)
 export("kube_config", cluster.kubeconfig)
