@@ -3576,9 +3576,10 @@ escalation_level_ci_qa_slack_notifications = rootly.EscalationLevel(
 # detect whether the fallback rule below is toggled on. It shipped disabled
 # on both this route and the QA one below (2026-07-22), which made the
 # Slack diversion a no-op until 2026-08-18 -- CI/QA alerts fell through to
-# the paging default policy the whole time. Re-verify via `GET
-# /v1/alert_routes` -> `.rules[].enabled == true` for these two routes if
-# CI/QA paging noise reappears.
+# the paging default policy the whole time. If CI/QA paging noise reappears,
+# check which rule a recent CI/QA alert's `data.routing_rules` names (e.g.
+# K4eHHA on 2026-10-01 matched the QA fallback), not `.rules[].enabled`; see
+# the Service Routes comment below for why the flag is unreliable.
 alert_route_grafana_prometheus_ci_slack_warnings_route = rootly.AlertRoute(
     "grafana-prometheus-ci-slack-warnings-route",
     alerts_source_ids=[alerts_source_grafana_prometheus_ci.id],
@@ -3848,10 +3849,11 @@ alert_route_platform_engineering_team_email_monitor_route = rootly.AlertRoute(
 # Caveat on individual rules: the provider models a rule as exactly
 # (condition_groups, destinations, fallback_rule, name, position). Rootly's API
 # also returns a per-rule "enabled" flag, but there is no Pulumi field for it.
-# Every rule recreated by an apply reads enabled=false, yet still matches: after
-# the 2026-09-18 apply recreated this route's rules, alerts were still
-# attributed through them. Check alert attribution, not the flag, before
-# calling a rule dead.
+# Every rule recreated by an apply reads enabled=false, yet still matches: the
+# 2026-09-18 apply recreated this route's rules, and alert zvGhEm on 2026-10-01
+# was routed by rule f2e388ed (ol-etl-db-production), which reads
+# enabled=false. Check alert attribution, not the flag, before calling a rule
+# dead.
 alert_route_cloudwatch_service_route = rootly.AlertRoute(
     "cloudwatch-service-route",
     alerts_source_ids=[
@@ -4130,10 +4132,10 @@ alert_route_cloudwatch_service_route = rootly.AlertRoute(
                     "position": 1,
                 },
             ],
-            # Targets the CI/QA Slack policy directly. It used to target the
-            # UI-created "MITx Online QA - Open edX - Redis" service, whose
-            # "QA Non-Paging Escalation Policy" has zero levels, so these alarms
-            # matched and then notified nobody.
+            # "mitx-qa" is residential MITx QA (edxapp-redis-mitx-qa-*), not
+            # MITx Online. This used to target the "MITx Online QA - Open edX -
+            # Redis" service, created outside this stack, whose "QA Non-Paging
+            # Escalation Policy" has zero levels, so this route notified nobody.
             "destinations": [
                 {
                     "targetId": escalation_policy_ci_qa_slack_notifications.id,
