@@ -300,6 +300,10 @@ policy_definition = {
                 "iam:ListAttachedUserPolicies",
                 "iam:ListEntitiesForPolicy",
                 "iam:ListGroupsForUser",
+                # The provider lists a role's instance profiles before every
+                # DeleteRole and fails on AccessDenied, so without this the
+                # worker can't delete or replace any role it manages.
+                "iam:ListInstanceProfilesForRole",
                 "iam:ListPolicyTags",
                 "iam:ListPolicyVersions",
                 "iam:ListRolePolicies",
