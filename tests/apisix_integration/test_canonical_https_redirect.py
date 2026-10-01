@@ -65,3 +65,24 @@ def test_upgrade_wins_over_error_recovery_on_the_same_plugin(origin_request):
     assert status == 308
     assert headers["Location"].startswith("https://")
     assert "apisix_oidc_recovery" not in headers.get("Set-Cookie", "")
+
+
+def test_global_rule_upgrades_an_oidc_route_without_its_own_pre_function(
+    origin_request,
+):
+    """The gap the global rule closes: a route carrying openid-connect and no
+    per-application serverless-pre-function.  A real APISIX is what proves the
+    global rule sees openid-connect on ``ctx.matched_route.value.plugins``.
+    """
+    status, headers = origin_request(path="/global-oidc/", host="pipelines.odl.mit.edu")
+
+    assert status == 308
+    assert headers["Location"] == "https://pipelines.odl.mit.edu/global-oidc/"
+    assert "Set-Cookie" not in headers
+
+
+def test_global_rule_leaves_a_route_without_openid_connect_alone(origin_request):
+    """Proxied to the dead upstream rather than redirected."""
+    status, _ = origin_request(path="/global-plain/", host="pipelines.odl.mit.edu")
+
+    assert status == 502

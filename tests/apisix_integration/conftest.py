@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 from ol_infrastructure.components.services.apisix import (
+    gateway_global_pre_function_plugin,
     oidc_gateway_pre_function_plugin,
 )
 
@@ -41,6 +42,8 @@ CONTAINER_NAME = "ol-apisix-integration-test"
 READY_TIMEOUT_SECONDS = 60
 # The OIDC session cookie the recovery routes are configured to look for.
 SESSION_COOKIE = "ol_test_apisix_session"
+# openid-connect's schema requires one (>= 16 chars) when bearer_only is false.
+TEST_SESSION_SECRET = "integration-test-session-secret"  # noqa: S105  # pragma: allowlist secret
 
 # Standalone (yaml) config provider, so no etcd is needed.  Mirrors the
 # provider the ingress controller drives in the cluster
@@ -56,6 +59,7 @@ deployment:
 plugins:
   - serverless-pre-function
   - serverless-post-function
+  - openid-connect
 """
 
 
@@ -103,9 +107,39 @@ def apisix_routes() -> dict[str, Any]:
         session_cookie_names=[SESSION_COOKIE],
     )
     full = oidc_gateway_pre_function_plugin()
+    global_pre_function = gateway_global_pre_function_plugin()
     dead_upstream = {"type": "roundrobin", "nodes": {"127.0.0.1:1": 1}}
+    # Never contacted: the global rule redirects before openid-connect runs,
+    # and the non-redirected cases below never reach this route.  It only has
+    # to pass the plugin's schema check.
+    openid_connect = {
+        "client_id": "ol-integration-test",
+        "client_secret": "not-a-secret",  # pragma: allowlist secret
+        "discovery": "https://sso.invalid/.well-known/openid-configuration",
+        "session": {"secret": TEST_SESSION_SECRET},
+    }
     return {
+        # The ingress controller renders ApisixGlobalRules into exactly this
+        # shape, and flattens each ApisixRoute's plugin config into its route's
+        # own plugin map, as the routes below are written.
+        "global_rules": [
+            {
+                "id": "gateway-pre-function",
+                "plugins": {global_pre_function.name: global_pre_function.config},
+            }
+        ],
         "routes": [
+            {
+                "id": "global-oidc",
+                "uri": "/global-oidc/*",
+                "upstream": dead_upstream,
+                "plugins": {"openid-connect": openid_connect},
+            },
+            {
+                "id": "global-plain",
+                "uri": "/global-plain/*",
+                "upstream": dead_upstream,
+            },
             {
                 "id": "login-prefix",
                 "uri": "/login/*",
@@ -127,7 +161,7 @@ def apisix_routes() -> dict[str, Any]:
                 "upstream": dead_upstream,
                 "plugins": {full.name: full.config},
             },
-        ]
+        ],
     }
 
 

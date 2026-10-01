@@ -25,11 +25,34 @@
 -- Configuration arrives on the plugin config under `canonical_https_redirect`,
 -- the same mechanism `oidc_error_callback_recovery.lua` uses.
 --
---   canonical_https_redirect.status  redirect status code
+--   canonical_https_redirect.status                  redirect status code
+--   canonical_https_redirect.require_openid_connect  only act on routes that
+--                                                    carry openid-connect
 --
--- See `oidc_gateway_pre_function_plugin` in ../apisix.py for the deployment
+-- `require_openid_connect` is for the cluster-wide ApisixGlobalRule, which runs
+-- on every route. Non-OIDC routes already get http->https from the `redirect`
+-- plugin in their shared config, and scoping to OIDC routes keeps this from
+-- changing behaviour for anything that was not broken. The check reads the
+-- matched route's own plugin map, which is complete on this deployment: the
+-- ingress controller flattens an ApisixRoute's plugin config into its route's
+-- plugins and drops disabled plugins before they reach APISIX
+-- (apisix-ingress-controller internal/adc/translator/apisixroute.go), so a
+-- route has `openid-connect` in `value.plugins` exactly when it runs it.
+--
+-- See `oidc_gateway_pre_function_plugin` and
+-- `gateway_global_pre_function_plugin` in ../apisix.py for the deployment
 -- reasoning and t/canonical_https_redirect.t for the behavioural tests.
 return function(conf, ctx)
+    local opts = conf.canonical_https_redirect or {}
+
+    if opts.require_openid_connect then
+        local route = ctx.matched_route
+        local plugins = route and route.value and route.value.plugins
+        if not (plugins and plugins["openid-connect"]) then
+            return
+        end
+    end
+
     -- $host is the Host header lowercased with any port stripped, falling back
     -- to server_name; $http_host is the header verbatim. Comparing them catches
     -- an explicit :443, an uppercased host, and anything else that would reach
@@ -49,7 +72,6 @@ return function(conf, ctx)
     end
 
     local core = require("apisix.core")
-    local opts = conf.canonical_https_redirect or {}
 
     core.log.warn("non-canonical origin scheme=", ngx.var.scheme,
                   " host=", raw_host, " redirecting to https://", host)

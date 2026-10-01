@@ -329,10 +329,30 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
     )
 
 
-def identity_header_strip_plugin(
+def gateway_global_pre_function_plugin(
     header_names: Sequence[str] = GATEWAY_IDENTITY_HEADERS,
+    canonical_redirect_status: Literal[301, 302, 303, 307, 308] = 308,
 ) -> OLApisixPluginConfig:
-    """Clear the gateway's own identity headers when a client supplies them.
+    """Build the cluster's one global ``serverless-pre-function``.
+
+    The ingress controller flattens every ApisixGlobalRule into a single
+    plugin-name-keyed map, so anything that has to run on every route ahead of
+    openid-connect goes into this function list rather than a second rule.
+
+    **Canonical origin on OIDC routes** (``canonical_https_redirect.lua`` with
+    ``require_openid_connect``).  ``oidc_gateway_pre_function_plugin`` runs the
+    same function, but only for applications that attach it, and after it
+    shipped seven production OIDC hosts still had not (airbyte, dagster,
+    ol-analytics, opik, gwarek, celery-monitoring, learn-ai).  Each answered
+    plain HTTP with an OIDC session cookie over cleartext and without
+    ``Secure``, and sent Keycloak an ``http://`` redirect_uri.  Running it here
+    covers every OIDC route in the cluster, including routes created outside
+    Pulumi.  It is scoped to routes carrying openid-connect because every other
+    route already gets the ``redirect`` plugin's http->https upgrade, which only
+    fails where openid-connect outranks it.
+
+    **Identity-header strip** (``strip_client_identity_headers.lua``).  Clears
+    the gateway's own identity headers when a client supplies them.
 
     The openid-connect plugin sets X-Userinfo, X-ID-Token, X-Raw-ID-Token and
     X-Refresh-Token from a verified session, and clears any inbound copy before
@@ -377,10 +397,19 @@ def identity_header_strip_plugin(
     :param header_names: Headers to clear.  Defaults to
         ``GATEWAY_IDENTITY_HEADERS``, which deliberately omits X-Access-Token
         and Authorization -- see the constant for why.
+    :param canonical_redirect_status: Status for the canonical-origin redirect.
+        See ``oidc_gateway_pre_function_plugin``.
 
     :returns: A ``serverless-pre-function`` plugin config for a global rule.
     :rtype: OLApisixPluginConfig
     """
+    if canonical_redirect_status not in NGX_REDIRECT_STATUSES:
+        msg = (
+            f"canonical_redirect_status must be one of {NGX_REDIRECT_STATUSES}, "
+            f"got {canonical_redirect_status}: ngx.redirect rejects anything else."
+        )
+        raise ValueError(msg)
+
     return OLApisixPluginConfig(
         name="serverless-pre-function",
         secretRef=None,
@@ -389,7 +418,16 @@ def identity_header_strip_plugin(
             # phase would run after openid-connect had already read the
             # request.
             "phase": "rewrite",
-            "functions": [STRIP_CLIENT_IDENTITY_HEADERS_LUA],
+            # Redirect first: serverless/init.lua stops at the first function
+            # returning a code, and a redirected request needs no header strip.
+            "functions": [
+                CANONICAL_HTTPS_REDIRECT_LUA,
+                STRIP_CLIENT_IDENTITY_HEADERS_LUA,
+            ],
+            "canonical_https_redirect": {
+                "status": canonical_redirect_status,
+                "require_openid_connect": True,
+            },
             "identity_header_strip": {"headers": list(header_names)},
         },
     )

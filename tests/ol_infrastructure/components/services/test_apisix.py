@@ -62,7 +62,7 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixUpstream,
     OLApisixUpstreamConfig,
     browser_traffic_match_exprs,
-    identity_header_strip_plugin,
+    gateway_global_pre_function_plugin,
     oidc_gateway_pre_function_plugin,
     ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
@@ -837,7 +837,7 @@ def test_cors_disabled_reaches_the_gateway_api_plugin_config():
     return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
 
 
-# ─── identity_header_strip_plugin wiring ──────────────────────────────────────
+# ─── gateway_global_pre_function_plugin wiring ──────────────────────────────────────
 #
 # The test-nginx suite drives the Lua directly with a hand-built config, so it
 # cannot catch a Python-side regression: a builder that shipped the wrong file,
@@ -850,7 +850,7 @@ def test_identity_strip_plugin_runs_in_rewrite_before_openid_connect():
     rewrite phase runs ahead of the matched route's.  In the access phase this
     would land after openid-connect had already read the request.
     """
-    plugin = identity_header_strip_plugin()
+    plugin = gateway_global_pre_function_plugin()
 
     assert plugin.name == "serverless-pre-function"
     assert plugin.config["phase"] == "rewrite"
@@ -860,16 +860,36 @@ def test_identity_strip_plugin_ships_the_lua_verbatim():
     """The function body is the checked-in .lua file -- the header list travels
     as config and is read off ``conf``, not interpolated into the source.
     """
-    plugin = identity_header_strip_plugin(header_names=["X-Interpolation-Canary"])
+    plugin = gateway_global_pre_function_plugin(header_names=["X-Interpolation-Canary"])
 
     assert plugin.config["functions"] == [
-        apisix_module.STRIP_CLIENT_IDENTITY_HEADERS_LUA
+        apisix_module.CANONICAL_HTTPS_REDIRECT_LUA,
+        apisix_module.STRIP_CLIENT_IDENTITY_HEADERS_LUA,
     ]
-    assert "X-Interpolation-Canary" not in plugin.config["functions"][0]
+    assert not [
+        fn for fn in plugin.config["functions"] if "X-Interpolation-Canary" in fn
+    ]
+
+
+def test_global_canonical_redirect_is_scoped_to_openid_connect_routes():
+    """The global rule runs on every route in the cluster.  Unscoped, it would
+    also redirect routes that never had the bug, e.g. a plain-HTTP in-cluster
+    caller of a non-OIDC route.
+    """
+    conf = gateway_global_pre_function_plugin().config["canonical_https_redirect"]
+
+    assert conf == {"status": 308, "require_openid_connect": True}
+
+
+def test_global_canonical_redirect_rejects_a_status_ngx_redirect_refuses():
+    with pytest.raises(ValueError, match="canonical_redirect_status"):
+        gateway_global_pre_function_plugin(canonical_redirect_status=200)
 
 
 def test_identity_strip_plugin_defaults_to_the_gateway_identity_headers():
-    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+    headers = gateway_global_pre_function_plugin().config["identity_header_strip"][
+        "headers"
+    ]
 
     assert headers == list(GATEWAY_IDENTITY_HEADERS)
 
@@ -878,7 +898,9 @@ def test_identity_strip_plugin_covers_everything_openid_connect_mints():
     """openid-connect.lua clears-then-sets these four (3.18.0, lines 1174-1177
     and 1482-1500).  Dropping one silently reopens the hole under that name.
     """
-    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+    headers = gateway_global_pre_function_plugin().config["identity_header_strip"][
+        "headers"
+    ]
 
     assert set(headers) == {
         "X-Userinfo",
@@ -896,14 +918,16 @@ def test_identity_strip_plugin_leaves_the_tika_shared_secret_alone():
     application reads it as an identity claim.  Authorization is out for the
     same reason at much larger scale.
     """
-    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+    headers = gateway_global_pre_function_plugin().config["identity_header_strip"][
+        "headers"
+    ]
 
     assert "X-Access-Token" not in headers
     assert "Authorization" not in headers
 
 
 def test_identity_strip_plugin_honours_a_custom_header_list():
-    headers = identity_header_strip_plugin(
+    headers = gateway_global_pre_function_plugin(
         header_names=["X-Custom-Identity"],
     ).config["identity_header_strip"]["headers"]
 
@@ -914,7 +938,9 @@ def test_identity_strip_plugin_emits_a_list_not_a_tuple():
     """The config is rendered into a CRD spec, and a tuple round-trips through
     the Pulumi/Kubernetes provider differently from a list.
     """
-    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+    headers = gateway_global_pre_function_plugin().config["identity_header_strip"][
+        "headers"
+    ]
 
     assert isinstance(headers, list)
 
