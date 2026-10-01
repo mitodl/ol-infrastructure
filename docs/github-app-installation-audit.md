@@ -80,6 +80,45 @@ this audit.
   whether the Slack GitHub app even supports narrowing, so this needs a person to check
   before it becomes an action item rather than a question.
 
+## Decisions (2026-10-01): `autofix-ci` replaces `pre-commit-ci`
+
+The org is moving hook execution from pre-commit.ci to [prek](https://prek.j178.dev) in
+GitHub Actions, with autofix.ci committing the fixes
+([#5805](https://github.com/mitodl/ol-infrastructure/issues/5805)). The rules for both apps are
+in the
+[migration contract](https://github.com/mitodl/ol-github-workflows/blob/main/docs/prek-autofix-contract.md)
+(§5 and §7), and the repository set is in
+[`docs/plans/prek-autofix-migration-inventory.md`](plans/prek-autofix-migration-inventory.md).
+Like the 2026-08-18 decisions, this section records the change instead of editing the
+inventory table.
+
+**Added: `autofix-ci`**, installation `166287870`, installed 2026-09-29 with **selected**
+repositories.
+
+- Permissions: `actions:write`, `checks:write`, `contents:write`, `pull_requests:write`,
+  `metadata:read`. No `workflows` scope, and no event subscriptions.
+- What it does: the `autofix.ci` workflow in each repository runs the hooks with a read-only
+  token and uploads any fixes. The app then pushes one commit to the PR branch. The
+  autofix.ci server refuses any fix under `.github/`, and it never pushes to a default
+  branch.
+- Scope: the inventory's in-scope repositories plus `ol-github-workflows`, set by an org
+  owner in the UI on 2026-09-30. Finding 4 applies, so the set has to be read from the
+  install's settings page.
+- Private repositories are out: autofix.ci is free only for public repositories. An org
+  owner still has to deselect `access-forge`, `alerting-omnibus` and `hq`, plus
+  `superset-marimo`, `ocw_oer_export` and `ol-rootly-manager`, which left the migration.
+
+**Retiring: `pre-commit-ci`**, installation `22207049`, selected repositories. An org owner
+read its membership on 2026-09-28: 22 repositories. 14 are in the migration's scope, and 8
+are archived, so they need nothing before the uninstall.
+
+- Before the uninstall, each in-scope repository needs `prek` as a required check (contract
+  §6). Then an org owner deselects it, and a PR removes its interim `ci:` block (§7).
+- `ocw_oer_export` left the migration but is still enforced only by pre-commit.ci. The
+  uninstall leaves it with no hook enforcement unless its owner decides otherwise first.
+- Uninstalling `pre-commit-ci` removes one more `contents:write` + `workflows:write` grant.
+  `autofix-ci` holds `contents:write` without `workflows`.
+
 ## Permissions are vendor-side; scope is ours
 
 An installed app's permission set is declared by the app's author. We cannot reduce
