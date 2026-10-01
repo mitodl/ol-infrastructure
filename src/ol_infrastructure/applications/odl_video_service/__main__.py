@@ -21,7 +21,12 @@ from pulumi import (
     export,
 )
 from pulumi_aws import ec2, get_caller_identity, iam
-from pulumi_aws.s3 import BucketCorsConfigurationCorsRuleArgs
+from pulumi_aws.s3 import (
+    BucketCorsConfigurationCorsRuleArgs,
+    BucketLifecycleConfigurationRuleArgs,
+    BucketLifecycleConfigurationRuleNoncurrentVersionTransitionArgs,
+    BucketLifecycleConfigurationRuleTransitionArgs,
+)
 
 from bridge.lib.magic_numbers import (
     AWS_RDS_DEFAULT_DATABASE_CAPACITY,
@@ -247,7 +252,11 @@ ovs_thumbnails_bucket = OLBucket(
 # objects without explicit KMS key policy permissions
 ovs_transcoded_bucket_config = S3BucketConfig(
     bucket_name=s3_transcode_bucket_name,
-    versioning_enabled=False,
+    # Production was versioned outside Pulumi; a versioned bucket can only be
+    # suspended, and the versions it already holds (69% of sampled bytes) keep
+    # billing until the noncurrent expiry drains them.
+    versioning_status="Suspended",
+    noncurrent_version_expiration_days=30,
     server_side_encryption_enabled=True,
     sse_algorithm="AES256",  # Use SSE-S3 for CloudFront compatibility
     intelligent_tiering_enabled=True,
@@ -288,8 +297,28 @@ ovs_uploaded_bucket_config = S3BucketConfig(
     bucket_name=s3_watch_bucket_name,
     versioning_enabled=False,
     server_side_encryption_enabled=True,
-    intelligent_tiering_enabled=True,
-    intelligent_tiering_days=90,
+    # Raw originals are cold once transcoded. In Production the bucket is
+    # versioned and every object is a noncurrent version the app deleted
+    # after processing, so the noncurrent transition is the one doing work.
+    intelligent_tiering_enabled=False,
+    lifecycle_rules=[
+        BucketLifecycleConfigurationRuleArgs(
+            id="standard-ia-transition",
+            status="Enabled",
+            transitions=[
+                BucketLifecycleConfigurationRuleTransitionArgs(
+                    days=30,
+                    storage_class="STANDARD_IA",
+                )
+            ],
+            noncurrent_version_transitions=[
+                BucketLifecycleConfigurationRuleNoncurrentVersionTransitionArgs(
+                    noncurrent_days=30,
+                    storage_class="STANDARD_IA",
+                )
+            ],
+        )
+    ],
     tags=aws_config.merged_tags(
         {"Name": s3_watch_bucket_name, "Application": "odl-video-service"}
     ),
