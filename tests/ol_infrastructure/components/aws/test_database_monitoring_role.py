@@ -12,6 +12,7 @@ import pytest
 
 from ol_infrastructure.components.aws import database
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
+from ol_infrastructure.lib.aws import rds_helper
 
 ROLE_TYPE = "aws:iam/role:Role"
 
@@ -39,7 +40,10 @@ class RecordingMocks(pulumi.runtime.Mocks):
 @pytest.fixture
 def mocks(monkeypatch):
     """Stub the live RDS lookups and record what OLAmazonDB creates."""
-    monkeypatch.setattr(database, "db_engines", lambda: {"postgres": ["16.15"]})
+    # Both modules hold their own reference: the config validators use
+    # database's, max_minor_version uses rds_helper's.
+    for module in (database, rds_helper):
+        monkeypatch.setattr(module, "db_engines", lambda: {"postgres": ["16.15"]})
     monkeypatch.setattr(database, "get_rds_instance", lambda _name: {})
     monkeypatch.setattr(
         database, "parameter_group_family", lambda _engine, _version: "postgres16"
