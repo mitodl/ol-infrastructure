@@ -15,7 +15,7 @@ import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import iam
 
-from bridge.settings.openedx.types import OpenEdxSupportedRelease
+from bridge.settings.openedx.types import EnvStage, OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.applications.edxapp.k8s_autoscaling import (
     build_cms_webapp_keda_config,
@@ -327,6 +327,21 @@ def create_k8s_resources(  # noqa: C901
 
     # Look up what what release to deploy for this stack
     release_info = OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
+    openedx_release = release_info.release_by_env(cast("EnvStage", stack_info.name))
+
+    # Celery added --disable-prefetch in 5.6. release/ulmo pins Celery 5.5.3, whose
+    # worker exits on the unknown option.
+    celery_prefetch_args = (
+        []
+        if openedx_release == OpenEdxSupportedRelease.ulmo
+        else ["--disable-prefetch"]
+    )
+
+    # The "--" stops opentelemetry-instrument's argparse from reading the wrapped
+    # command's flags as its own. Without it, Python 3.11 (release/ulmo) treats
+    # granian's --metrics as an ambiguous abbreviation of --metrics_exporter and
+    # exits before granian starts. Python 3.12 does not, so master/verawood hid it.
+    otel_wrapper = ["opentelemetry-instrument", "--"]
 
     # Environments that have retired their OpenSearch domain set
     # edxapp:elasticsearch_enabled to false. The stack reference has to be
@@ -978,7 +993,7 @@ def create_k8s_resources(  # noqa: C901
             # installed in the image -- see mitodl/lehrer#177. Do not deploy this
             # ahead of that PR's image, or granian fails to start (missing
             # executable).
-            command_prefix=["opentelemetry-instrument"],
+            command_prefix=otel_wrapper,
             granian_config=GranianConfig(
                 application_module="lms.wsgi:application",
                 port=8000,
@@ -1341,7 +1356,7 @@ def create_k8s_resources(  # noqa: C901
             # installed in the image -- see mitodl/lehrer#177. Do not deploy this
             # ahead of that PR's image, or granian fails to start (missing
             # executable).
-            command_prefix=["opentelemetry-instrument"],
+            command_prefix=otel_wrapper,
             granian_config=GranianConfig(
                 application_module="cms.wsgi:application",
                 port=8000,
@@ -1596,7 +1611,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--exclude-queues=edx.cms.core.default",
                                 "--concurrency=2",
                                 "--prefetch-multiplier=1",
-                                "--disable-prefetch",
+                                *celery_prefetch_args,
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -1788,7 +1803,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--exclude-queues=edx.cms.core.default",
                                 "--concurrency=1",
                                 "--prefetch-multiplier=1",
-                                "--disable-prefetch",
+                                *celery_prefetch_args,
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -2183,7 +2198,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--exclude-queues=edx.lms.core.default,edx.lms.core.high,edx.lms.core.high_mem",
                                 "--prefetch-multiplier=1",
                                 "--concurrency=2",
-                                "--disable-prefetch",
+                                *celery_prefetch_args,
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
