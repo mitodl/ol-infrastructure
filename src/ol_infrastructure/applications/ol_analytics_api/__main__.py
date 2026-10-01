@@ -365,6 +365,54 @@ mitxonline_oauth_secrets = OLVaultK8SSecret(
     ),
 )
 
+# The realm the learner-records tenant verifies partner tokens against, and the
+# audience it requires in them. That tenant verifies the bearer JWT itself
+# rather than trusting the X-Userinfo APISIX forwards, because the pod is
+# reachable without going through APISIX: the pod security group admits the
+# whole pod subnet, and aws-eks-nodeagent runs with
+# --enable-network-policy=false on both data clusters, so the NetworkPolicies
+# that exist are no-ops.  See the app repo's
+# docs/b2b-learner-records-provider-authorization.md.
+#
+# Both values come from the same Vault entry the route's openid-connect plugin
+# reads for its discovery URL and client id, so the gateway and the app cannot
+# end up checking different realms or a different audience.  The app derives
+# its JWKS and token URLs from the issuer.  Templated by the operator at
+# runtime for the same reason the MITx Online pair above is: the app takes
+# these as plain env vars, and pulling them into Pulumi with
+# get_secret_output would put the realm URL in stack state for no gain.
+learner_records_oidc_secret_name = (
+    "ol-analytics-api-learner-records-oidc"  # pragma: allowlist secret  # noqa: S105
+)
+learner_records_oidc_secrets = OLVaultK8SSecret(
+    name=f"ol-analytics-api-{stack_info.env_suffix}-learner-records-oidc-secrets",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name=learner_records_oidc_secret_name,
+        namespace=APPLICATION_NAMESPACE,
+        labels=k8s_global_labels,
+        dest_secret_name=learner_records_oidc_secret_name,
+        dest_secret_labels=k8s_global_labels,
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/ol-analytics-api",
+        includes=["url", "client_id"],
+        excludes=[".*"],
+        exclude_raw=True,
+        refresh_after="1h",
+        templates={
+            "OL_ANALYTICS_API_B2B_LEARNER_RECORDS_ISSUER": '{{ get .Secrets "url" }}',
+            "OL_ANALYTICS_API_B2B_LEARNER_RECORDS_AUDIENCE": (
+                '{{ get .Secrets "client_id" }}'
+            ),
+        },
+        vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=ol_analytics_api_auth_binding.vault_k8s_resources,
+    ),
+)
+
 ########################################################################
 # Application environment
 ########################################################################
@@ -468,7 +516,11 @@ ol_analytics_api_k8s = OLApplicationK8s(
         application_lb_service_name=APPLICATION_NAME,
         application_lb_service_port_name="http",
         k8s_global_labels=k8s_global_labels,
-        env_from_secret_names=[static_secrets_name, mitxonline_oauth_secret_name],
+        env_from_secret_names=[
+            static_secrets_name,
+            mitxonline_oauth_secret_name,
+            learner_records_oidc_secret_name,
+        ],
         application_security_group_id=ol_analytics_api_application_security_group.id,
         application_security_group_name=Output.from_input(APPLICATION_NAME),
         application_service_account_name=APPLICATION_NAME,
@@ -556,6 +608,7 @@ ol_analytics_api_k8s = OLApplicationK8s(
             # secret rather than waiting for it.
             static_secrets,
             mitxonline_oauth_secrets,
+            learner_records_oidc_secrets,
             ol_analytics_api_application_security_group,
         ],
     ),
@@ -687,12 +740,50 @@ ol_analytics_api_cert = OLCertManagerCert(
     ),
 )
 
+# The learner-records tenant has no browser users. Partners call it with a
+# client-credentials token from the per-contract clients in
+# substructure/keycloak/learner_records.py, so its prefix gets a bearer-only
+# rule that answers 401 instead of redirecting. It reuses the canonical host's
+# OIDC resource only for the discovery URL and the client_id the audience is
+# checked against.
+_learner_records_bearer_plugin = (
+    ol_analytics_api_oidc_resources.get_full_oidc_plugin_config(unauth_action="deny")
+)
+_learner_records_bearer_plugin["config"].update(
+    {
+        "bearer_only": True,
+        # Verify the JWT against Keycloak's JWKS. Introspection reports
+        # client-credentials tokens as active: false (same as Opik's SDK route).
+        "use_jwks": True,
+        "required_scopes": ["learner-records:read"],
+        # Every olapps token is signed by the same realm key. Requiring
+        # ol-analytics-api-client in `aud`, which the learner-records:read scope
+        # adds, keeps tokens minted for other olapps clients out.
+        "claim_validator": {
+            "audience": {"required": True, "match_with_client_id": True}
+        },
+    }
+)
+
 # Route every path to the service behind the openid-connect plugin so APISIX
 # authenticates the Keycloak session and forwards X-Userinfo.  The canonical
 # host uses unauth_action "auth" (redirects unauthenticated browsers to
 # Keycloak); the Learn-scoped host uses "pass" against the shared mit-learn
 # session instead (see ol_analytics_api_learn_oidc_resources above for why).
+# The learner-records rule outranks both on every host, so a browser session
+# can't reach that tenant through either catch-all.
 _ol_analytics_api_route_configs = [
+    OLApisixRouteConfig(
+        route_name="ol-analytics-api-learner-records",
+        priority=20,
+        shared_plugin_config_name=ol_analytics_api_shared_plugins.resource_name,
+        plugins=[OLApisixPluginConfig(**_learner_records_bearer_plugin)],
+        hosts=ol_analytics_api_hosts,
+        paths=["/api/v1/learner-records", "/api/v1/learner-records/*"],
+        backend_service_name=ol_analytics_api_k8s.application_lb_service_name,
+        backend_service_port=ol_analytics_api_k8s.application_lb_service_port_name,
+        backend_resolve_granularity="service",
+    ),
     OLApisixRouteConfig(
         route_name="ol-analytics-api",
         priority=10,
@@ -709,7 +800,7 @@ _ol_analytics_api_route_configs = [
         backend_service_name=ol_analytics_api_k8s.application_lb_service_name,
         backend_service_port=ol_analytics_api_k8s.application_lb_service_port_name,
         backend_resolve_granularity="service",
-    )
+    ),
 ]
 if ol_analytics_api_learn_oidc_resources is not None:
     _ol_analytics_api_route_configs.append(

@@ -31,12 +31,12 @@ from ol_infrastructure.components.services.apisix import (
 )
 
 # Must track the APISIX shipped by the chart pinned in bridge.lib.versions
-# (APISIX_CHART 2.16.x => APISIX 3.17.x).  A mismatch here is the difference
+# (APISIX_CHART 2.17.x => APISIX 3.18.x).  A mismatch here is the difference
 # between testing what runs in production and testing something else -- which is
 # also why the override is an explicit environment variable rather than a
 # default that could drift: set APISIX_IT_IMAGE to rehearse a version bump
 # against this suite before moving the chart pin.
-APISIX_IMAGE = os.environ.get("APISIX_IT_IMAGE", "apache/apisix:3.17.0-debian")
+APISIX_IMAGE = os.environ.get("APISIX_IT_IMAGE", "apache/apisix:3.18.0-debian")
 CONTAINER_NAME = "ol-apisix-integration-test"
 READY_TIMEOUT_SECONDS = 60
 # The OIDC session cookie the recovery routes are configured to look for.
