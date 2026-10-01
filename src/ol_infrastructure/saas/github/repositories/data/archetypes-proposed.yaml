@@ -116,6 +116,7 @@ archived:
 - ol-keycloak-customization
 - ol-npm-libraries
 - ol-openedx-mfe-overrides
+- ol-rootly-manager
 - open-discussions-client
 - open-widget-framework
 - open-widget-sample-app
@@ -300,7 +301,6 @@ library:
 - ol-keycloak
 - ol-keycloakify
 - ol-notebook-extensions
-- ol-rootly-manager
 - oldevops-scratch
 - open-collaboration
 - open-edx-plugins
