@@ -2888,7 +2888,13 @@ class OLApplicationK8s(ComponentResource):
                             template=kubernetes.core.v1.PodTemplateSpecArgs(
                                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                                     labels=scheduled_job_labels,
-                                    annotations=pod_config_hash_annotations or None,
+                                    # A run that Karpenter consolidation evicts
+                                    # starts over from scratch, and one eviction
+                                    # uses up the default backoff_limit of 1.
+                                    annotations={
+                                        **pod_config_hash_annotations,
+                                        "karpenter.sh/do-not-disrupt": "true",
+                                    },
                                 ),
                                 spec=kubernetes.core.v1.PodSpecArgs(
                                     service_account_name=ol_app_k8s_config.application_service_account_name,
