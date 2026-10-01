@@ -140,6 +140,24 @@ def apisix_routes() -> dict[str, Any]:
                 "uri": "/global-plain/*",
                 "upstream": dead_upstream,
             },
+            # Answers with the X-Userinfo the route's own rewrite phase sees,
+            # which runs after the global rule's.  Proves the strip still runs
+            # once the canonical function ahead of it has fallen through.
+            {
+                "id": "global-strip-echo",
+                "uri": "/global-strip-echo/*",
+                "upstream": dead_upstream,
+                "plugins": {
+                    "serverless-pre-function": {
+                        "phase": "rewrite",
+                        "functions": [
+                            "return function() "
+                            "ngx.say(tostring(ngx.req.get_headers()['X-Userinfo'])) "
+                            "ngx.exit(200) end"
+                        ],
+                    }
+                },
+            },
             {
                 "id": "login-prefix",
                 "uri": "/login/*",

@@ -14,6 +14,7 @@ src/ol_infrastructure/components/services/apisix.py.
 from __future__ import annotations
 
 import pytest
+import urllib3
 
 from tests.apisix_integration.conftest import requires_docker
 
@@ -86,3 +87,21 @@ def test_global_rule_leaves_a_route_without_openid_connect_alone(origin_request)
     status, _ = origin_request(path="/global-plain/", host="pipelines.odl.mit.edu")
 
     assert status == 502
+
+
+def test_global_rule_still_strips_identity_headers_after_the_redirect_check(apisix):
+    """Both functions share the one global serverless-pre-function, and
+    serverless/init.lua stops at the first that returns a value.  If the
+    canonical function ever returned one on fall-through, the strip would stop
+    running cluster-wide with nothing else to notice.
+    """
+    response = urllib3.PoolManager(retries=False).request(
+        "GET",
+        f"{apisix}/global-strip-echo/",
+        headers={"Host": "pipelines.odl.mit.edu", "X-Userinfo": "forged"},
+        redirect=False,
+        timeout=10.0,
+    )
+
+    assert response.status == 200
+    assert response.data.decode().strip() == "nil"

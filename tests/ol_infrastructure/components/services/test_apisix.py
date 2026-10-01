@@ -837,7 +837,7 @@ def test_cors_disabled_reaches_the_gateway_api_plugin_config():
     return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
 
 
-# ─── gateway_global_pre_function_plugin wiring ──────────────────────────────────────
+# ─── gateway_global_pre_function_plugin wiring ────────────────────────────────
 #
 # The test-nginx suite drives the Lua directly with a hand-built config, so it
 # cannot catch a Python-side regression: a builder that shipped the wrong file,
@@ -879,11 +879,6 @@ def test_global_canonical_redirect_is_scoped_to_openid_connect_routes():
     conf = gateway_global_pre_function_plugin().config["canonical_https_redirect"]
 
     assert conf == {"status": 308, "require_openid_connect": True}
-
-
-def test_global_canonical_redirect_rejects_a_status_ngx_redirect_refuses():
-    with pytest.raises(ValueError, match="canonical_redirect_status"):
-        gateway_global_pre_function_plugin(canonical_redirect_status=200)
 
 
 def test_identity_strip_plugin_defaults_to_the_gateway_identity_headers():

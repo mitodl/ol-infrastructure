@@ -30,14 +30,18 @@
 --                                                    carry openid-connect
 --
 -- `require_openid_connect` is for the cluster-wide ApisixGlobalRule, which runs
--- on every route. Non-OIDC routes already get http->https from the `redirect`
--- plugin in their shared config, and scoping to OIDC routes keeps this from
--- changing behaviour for anything that was not broken. The check reads the
--- matched route's own plugin map, which is complete on this deployment: the
--- ingress controller flattens an ApisixRoute's plugin config into its route's
--- plugins and drops disabled plugins before they reach APISIX
--- (apisix-ingress-controller internal/adc/translator/apisixroute.go), so a
--- route has `openid-connect` in `value.plugins` exactly when it runs it.
+-- on every route. Only OIDC routes mint a session cookie and a redirect_uri
+-- from the request origin, so scoping to them fixes what is broken without
+-- changing how any other route treats plain HTTP.
+--
+-- The check reads `ctx.matched_route.value.plugins`, which by the time global
+-- rules run (apisix/init.lua http_access_phase) already carries the route's
+-- plugin-config and service plugins. On this deployment the ingress controller
+-- also flattens an ApisixRoute's plugin config into the route itself and drops
+-- disabled plugins before they reach APISIX
+-- (apisix-ingress-controller internal/adc/translator/apisixroute.go), and puts
+-- an HTTPRoute's plugins on its APISIX service. Either way, `openid-connect` is
+-- in the map when the route runs it.
 --
 -- See `oidc_gateway_pre_function_plugin` and
 -- `gateway_global_pre_function_plugin` in ../apisix.py for the deployment

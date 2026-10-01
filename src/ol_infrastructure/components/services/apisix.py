@@ -331,7 +331,6 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
 
 def gateway_global_pre_function_plugin(
     header_names: Sequence[str] = GATEWAY_IDENTITY_HEADERS,
-    canonical_redirect_status: Literal[301, 302, 303, 307, 308] = 308,
 ) -> OLApisixPluginConfig:
     """Build the cluster's one global ``serverless-pre-function``.
 
@@ -341,15 +340,16 @@ def gateway_global_pre_function_plugin(
 
     **Canonical origin on OIDC routes** (``canonical_https_redirect.lua`` with
     ``require_openid_connect``).  ``oidc_gateway_pre_function_plugin`` runs the
-    same function, but only for applications that attach it, and after it
-    shipped seven production OIDC hosts still had not (airbyte, dagster,
-    ol-analytics, opik, gwarek, celery-monitoring, learn-ai).  Each answered
-    plain HTTP with an OIDC session cookie over cleartext and without
-    ``Secure``, and sent Keycloak an ``http://`` redirect_uri.  Running it here
-    covers every OIDC route in the cluster, including routes created outside
-    Pulumi.  It is scoped to routes carrying openid-connect because every other
-    route already gets the ``redirect`` plugin's http->https upgrade, which only
-    fails where openid-connect outranks it.
+    same function, but only for applications that attach it.  As of 2026-10-01
+    the production OIDC routes of airbyte, dagster, ol-analytics, opik, gwarek,
+    celery-monitoring and learn-ai did not, and the hosts probed answered plain
+    HTTP with an OIDC session cookie over cleartext and without ``Secure``, and
+    sent Keycloak an ``http://`` redirect_uri.  Running it here covers every
+    OIDC route in the cluster, including routes created outside Pulumi.  It is
+    scoped to routes carrying openid-connect because those are the ones that
+    mint a session and a redirect_uri from the request origin; leaving every
+    other route alone means this changes nothing that was not broken.  The
+    status is the 308 the per-application function also defaults to.
 
     **Identity-header strip** (``strip_client_identity_headers.lua``).  Clears
     the gateway's own identity headers when a client supplies them.
@@ -397,19 +397,10 @@ def gateway_global_pre_function_plugin(
     :param header_names: Headers to clear.  Defaults to
         ``GATEWAY_IDENTITY_HEADERS``, which deliberately omits X-Access-Token
         and Authorization -- see the constant for why.
-    :param canonical_redirect_status: Status for the canonical-origin redirect.
-        See ``oidc_gateway_pre_function_plugin``.
 
     :returns: A ``serverless-pre-function`` plugin config for a global rule.
     :rtype: OLApisixPluginConfig
     """
-    if canonical_redirect_status not in NGX_REDIRECT_STATUSES:
-        msg = (
-            f"canonical_redirect_status must be one of {NGX_REDIRECT_STATUSES}, "
-            f"got {canonical_redirect_status}: ngx.redirect rejects anything else."
-        )
-        raise ValueError(msg)
-
     return OLApisixPluginConfig(
         name="serverless-pre-function",
         secretRef=None,
@@ -425,7 +416,7 @@ def gateway_global_pre_function_plugin(
                 STRIP_CLIENT_IDENTITY_HEADERS_LUA,
             ],
             "canonical_https_redirect": {
-                "status": canonical_redirect_status,
+                "status": 308,
                 "require_openid_connect": True,
             },
             "identity_header_strip": {"headers": list(header_names)},
