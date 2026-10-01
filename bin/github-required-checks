@@ -82,7 +82,7 @@ _PAGE = 100
 
 #: The workflow run id inside an Actions check run's `html_url`:
 #: `.../actions/runs/<run_id>/job/<job_id>`. Checks from other apps (GitGuardian,
-#: pre-commit.ci, Sentry) do not match. Nothing in this repo can tell whether those
+#: autofix.ci, Sentry) do not match. Nothing in this repo can tell whether those
 #: could have run on a given PR, so they are scored against every sampled PR.
 _RUN_ID = re.compile(r"/actions/runs/(\d+)/")
 
@@ -412,11 +412,11 @@ def blocked(
         ),
     ] = None,
 ) -> None:
-    """Name the OPEN PRs that a declared ruleset would hang. Exits non-zero if any.
+    """Name default-branch PRs a declared ruleset would hang. Exits non-zero if any.
 
-    The question sampling cannot answer. A gate job that landed last week is clean on
-    every merged PR that could have produced it, and still blocks any open PR cut before
-    it existed, because that branch's head commit does not define the job -- there is no
+    The rulesets this tool verifies target only the repository's default branch, so PRs
+    targeting release branches are outside their scope. For an in-scope PR, a gate job
+    that landed last week still blocks any branch cut before it existed: there is no
     failure to look at, just a check that will never report. Those PRs need a rebase, and
     their authors would rather hear it here than from a stuck merge box.
     """
@@ -427,6 +427,12 @@ def blocked(
         return
     wedged = False
     for repo, contexts in sorted(targets.items()):
+        metadata = _gh("api", f"repos/{ORG}/{repo}")
+        default_branch = (metadata or {}).get("default_branch")
+        if not default_branch:
+            print(f"{repo}: cannot determine default branch; refusing to clear gate")
+            wedged = True
+            continue
         pulls = (
             _gh(
                 "pr",
@@ -438,12 +444,13 @@ def blocked(
                 "--limit",
                 "100",
                 "--json",
-                "number,headRefOid,title,isDraft",
+                "number,headRefOid,title,isDraft,baseRefName",
             )
             or []
         )
+        pulls = [pull for pull in pulls if pull["baseRefName"] == default_branch]
         if not pulls:
-            print(f"{repo}: no open PRs")
+            print(f"{repo}: no open PRs targeting {default_branch}")
             continue
         with ThreadPoolExecutor(max_workers=_POOL) as pool:
             seen = list(pool.map(lambda p: _checks_on(repo, p["headRefOid"])[0], pulls))
