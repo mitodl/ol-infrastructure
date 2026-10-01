@@ -85,6 +85,7 @@ config:
     OVS_API_BASE_URL: "https://video-rc.odl.mit.edu"
     OPENSEARCH_INDEX: "mitlearn-ci"
     OPENSEARCH_SHARD_COUNT: 2
+    OPENSEARCH_REPLICA_COUNT: 0
     QDRANT_DENSE_MODEL: "text-embedding-3-small"
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-ci-q7fuxrc2j26me44ymcftz3ahba.us-east-1.es.amazonaws.com"
     POSTHOG_API_HOST: "https://ph.ol.mit.edu"

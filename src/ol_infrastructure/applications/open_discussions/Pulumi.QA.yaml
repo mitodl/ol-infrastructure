@@ -50,6 +50,7 @@ config:
     OPEN_DISCUSSIONS_SUPPORT_EMAIL: "odl-discussions-rc-support@mit.edu"
     OPENSEARCH_INDEX: "discussions-rc"
     OPENSEARCH_SHARD_COUNT: "2"
+    OPENSEARCH_REPLICA_COUNT: "0"
     OPENSEARCH_URL: 'https://search-opensearch-open-qa-76e2mth7e5hvtclhuhh7uckoiu.us-east-1.es.amazonaws.com'
     PGBOUNCER_DEFAULT_POOL_SIZE: "50"
     PGBOUNCER_MAX_CLIENT_CONN: "500"

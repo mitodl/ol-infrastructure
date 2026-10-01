@@ -41,7 +41,7 @@ qa_defaults = {
     },
     "opensearch": {
         "instance_type": SearchInstanceTypes.medium.value,
-        "instance_count": 3,
+        "instance_count": 1,
     },
 }
 
@@ -60,7 +60,7 @@ ci_defaults = {
     },
     "opensearch": {
         "instance_type": SearchInstanceTypes.medium.value,
-        "instance_count": 3,
+        "instance_count": 1,
     },
 }
 
