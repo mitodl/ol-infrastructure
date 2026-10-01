@@ -258,7 +258,9 @@ def create_posture_probe(  # noqa: PLR0913
                 ),
             ),
         ),
-        opts=ResourceOptions(depends_on=job_dependencies),
+        # A scheduled run during the first rollout would fail and page before
+        # the server exists.
+        opts=ResourceOptions(depends_on=[*job_dependencies, gravitino_release]),
     )
 
     # A Job's pod template is immutable, so a changed annotation makes Pulumi

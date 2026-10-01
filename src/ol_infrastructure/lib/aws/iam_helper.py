@@ -344,6 +344,20 @@ PROTECTED_DATA_LAKE_ENVIRONMENTS = ("production",)
 # can register.
 DATA_LAKE_ENVIRONMENTS = ("qa", "production")
 
+# The layer buckets each environment's lake keeps Iceberg tables in, as
+# ol-data-lake-<stage>-<env>. The Airbyte landing zone,
+# ol-data-lake-landing-zone-<env>, is deliberately not one of them.
+DATA_LAKE_STAGES = (
+    "raw",
+    "staging",
+    "intermediate",
+    "mart",
+    "integrations",
+    "external",
+    "dimensional",
+    "reporting",
+)
+
 # Glue resource types the data lake identities act on, with the suffix each ARN
 # needs after the database name.
 _GLUE_RESOURCE_SUFFIXES = {
@@ -396,6 +410,23 @@ def data_lake_glue_resources(
         for resource_type in resource_types
         for namespace in namespaces
     ]
+
+
+def data_lake_bucket_arns(env_suffix: str) -> list[str]:
+    """S3 ARNs for one environment's lake layer buckets and their objects.
+
+    :param env_suffix: The environment being scoped, e.g. ``qa``.
+    :type env_suffix: str
+
+    :returns: Bucket ARNs followed by their object ARNs, excluding the landing
+              zone bucket.
+
+    :rtype: list[str]
+    """
+    buckets = [
+        f"arn:aws:s3:::ol-data-lake-{stage}-{env_suffix}" for stage in DATA_LAKE_STAGES
+    ]
+    return buckets + [f"{bucket}/*" for bucket in buckets]
 
 
 def cross_environment_glue_denial(env_suffix: str) -> list[dict[str, Any]]:

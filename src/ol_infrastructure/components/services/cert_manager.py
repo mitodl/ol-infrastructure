@@ -20,6 +20,9 @@ class OLCertManagerCertConfig(BaseModel):
     # ClusterIssuer, e.g. a private CA whose certificates only in-cluster peers
     # need to trust. letsencrypt_env is ignored when this is set.
     issuer_name: str | None = None
+    # Certificate lifetime as a Go duration, e.g. "87600h". cert-manager defaults
+    # to 90 days.
+    duration: str | None = None
     # When set, cert-manager will add a PKCS12 keystore (keystore.p12) and truststore
     # (truststore.p12) to the TLS secret. The keystore password is read from the named
     # K8s Secret. Required for StarRocks SSL (which uses Java's JSSE / PKCS12 format).
@@ -100,6 +103,8 @@ class OLCertManagerCert(pulumi.ComponentResource):
             "dnsNames": cert_config.dns_names,
             "usages": cert_config.usages,
         }
+        if cert_config.duration is not None:
+            cert_spec["duration"] = cert_config.duration
         if cert_config.pkcs12_keystore_password_secret_name is not None:
             # When set, cert-manager adds keystore.p12 (server cert + private key) and
             # truststore.p12 (CA chain) to the TLS secret alongside tls.crt / tls.key.

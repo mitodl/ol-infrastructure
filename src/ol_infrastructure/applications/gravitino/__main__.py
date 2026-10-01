@@ -49,6 +49,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.aws.iam_helper import (
     IAM_POLICY_VERSION,
     cross_environment_glue_denial,
+    data_lake_bucket_arns,
     data_lake_glue_resources,
     lint_iam_policy,
 )
@@ -94,6 +95,10 @@ DB_NAME = "gravitino"
 CONFIG_MAP_KEY = "gravitino.conf"
 
 TLS_MOUNT_PATH = "/etc/gravitino/tls"
+# Jetty reads its keystore once at startup and nothing restarts the Deployment
+# when cert-manager renews the Secret, so a 90-day leaf would expire under a
+# long-lived pod. Every certificate here lives as long as the CA instead.
+CERTIFICATE_DURATION = "87600h"
 CA_SECRET_NAME = "gravitino-ca"  # pragma: allowlist secret  # noqa: S105
 SERVER_TLS_SECRET_NAME = (
     "gravitino-server-tls"  # pragma: allowlist secret  # noqa: S105
@@ -142,12 +147,9 @@ keycloak_issuer = gravitino_config.require("keycloak_issuer")
 ################################
 # IAM: pod role and vending role
 ################################
-# Wildcard bucket ARNs anchored on the environment suffix, matching the
-# ol-data-lake-<stage>-<env> buckets in infrastructure/aws/data_warehouse.
-data_lake_bucket_arns = [
-    f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}",
-    f"arn:aws:s3:::ol-data-lake-*-{stack_info.env_suffix}/*",
-]
+# The layer buckets only. The landing zone holds raw Airbyte files, not catalog
+# tables, and has no reason to be reachable by a vended credential.
+lake_bucket_arns = data_lake_bucket_arns(stack_info.env_suffix)
 data_lake_object_actions = [
     "s3:AbortMultipartUpload",
     "s3:DeleteObject",
@@ -191,7 +193,7 @@ gravitino_pod_policy_document = {
         {
             "Effect": "Allow",
             "Action": data_lake_object_actions,
-            "Resource": data_lake_bucket_arns,
+            "Resource": lake_bucket_arns,
         },
     ],
 }
@@ -257,7 +259,7 @@ gravitino_vending_policy = iam.Policy(
                 {
                     "Effect": "Allow",
                     "Action": data_lake_object_actions,
-                    "Resource": data_lake_bucket_arns,
+                    "Resource": lake_bucket_arns,
                 }
             ],
         },
@@ -388,7 +390,7 @@ ca_certificate = kubernetes.apiextensions.CustomResource(
         # Leaves embed this CA in their truststores at issuance, so a CA renewal
         # breaks trust until every leaf is reissued. Ten years keeps that a
         # planned event rather than a surprise.
-        "duration": "87600h",
+        "duration": CERTIFICATE_DURATION,
         "privateKey": {"algorithm": "ECDSA", "size": 256},
         "issuerRef": {
             "group": "cert-manager.io",
@@ -414,6 +416,10 @@ keystore_password_secret = kubernetes.core.v1.Secret(
         namespace=NAMESPACE,
         labels=k8s_labels,
     ),
+    # A stack secret like StarRocks' keystore password; the repo has no
+    # pulumi_random. It must not contain a backslash: Gravitino reads it back out
+    # of gravitino.conf with Properties.load, which treats one as an escape, while
+    # cert-manager uses it raw.
     string_data={"password": gravitino_config.require_secret("keystore_password")},
 )
 
@@ -428,6 +434,7 @@ server_certificate = OLCertManagerCert(
         k8s_labels=k8s_labels,
         issuer_name="gravitino-ca",
         dest_secret_name=SERVER_TLS_SECRET_NAME,
+        duration=CERTIFICATE_DURATION,
         dns_names=[SERVICE_HOST, f"{SERVICE_HOST}.cluster.local"],
         pkcs12_keystore_password_secret_name=KEYSTORE_PASSWORD_SECRET_NAME,
     ),
@@ -446,6 +453,7 @@ client_certificate = OLCertManagerCert(
         k8s_labels=k8s_labels,
         issuer_name="gravitino-ca",
         dest_secret_name=CLIENT_TLS_SECRET_NAME,
+        duration=CERTIFICATE_DURATION,
         dns_names=[f"gravitino-reconcile.{NAMESPACE}.svc"],
         usages=["digital signature", "key encipherment", "client auth"],
     ),
@@ -723,13 +731,15 @@ gravitino_values = {
 schema_file = f"schema-{GRAVITINO_VERSION}-postgresql.sql"
 schema_exists_query = "SELECT to_regclass('public.metalake_meta')"
 # SET ROLE so the tables are owned by the app role, which the Vault revoke path
-# reassigns to.
+# reassigns to. One transaction (-1), because the skip guard keys on the first
+# table the file creates: a partial apply must leave nothing behind for a retry
+# to mistake for a finished one.
 SCHEMA_SCRIPT = f"""
 if [ -n "$(psql -tAc "{schema_exists_query}")" ]; then
   echo "Gravitino schema already present; skipping."
   exit 0
 fi
-psql -v ON_ERROR_STOP=1 -c "SET ROLE {DB_NAME}" -f "/schema/{schema_file}"
+psql -1 -v ON_ERROR_STOP=1 -c "SET ROLE {DB_NAME}" -f "/schema/{schema_file}"
 """
 schema_job = kubernetes.batch.v1.Job(
     f"gravitino-schema-{stack_info.env_suffix}",
