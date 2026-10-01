@@ -120,8 +120,10 @@ names hook `ruff-check` at `astral-sh/ruff-pre-commit` `v0.9.0`, which predates 
 
 ## 4. Findings the migration contract has to answer
 
-1. **The migration PR has to fix existing hook failures.** Twelve default branches fail
-   their hooks today (§3.1). Eight of them fail in repositories nothing currently enforces.
+1. **The migration PR has to fix existing hook failures.** Twelve default branches failed
+   their hooks at measurement. Eight of them failed in repositories nothing currently
+   enforces. Ten of the twelve, six of them unenforced, are still in §3.1; access-forge and
+   hq have since been dropped (§6).
    A new check that starts red on every PR would get bypassed, so each PR either fixes the
    drift, lets the first autofix pass fix it, or narrows the hook, with the choice recorded
    in the PR.
@@ -150,7 +152,8 @@ names hook `ruff-check` at `astral-sh/ruff-pre-commit` `v0.9.0`, which predates 
    10 repositories, and Renovate also covers 9 of them, so those 9 get duplicate bump PRs
    today. The tenth, ol-data-platform, gets hook updates only from pre-commit.ci, and needs
    Renovate coverage before the uninstall. alerting-omnibus and superset-marimo get no hook
-   updates from anything today, so they need Renovate coverage regardless. Dependabot plays no part:
+   updates from anything today, so they needed Renovate coverage regardless. Both have since
+   been dropped (§6), so neither needs it now. Dependabot plays no part:
    only access-forge uses it, and only for `pip`.
 4. **`pre-commit` is called outside the hook config in three places,** and those calls change
    with the migration:
@@ -240,7 +243,8 @@ therefore read the list from
 <https://github.com/organizations/mitodl/settings/installations/22207049> on 2026-09-28.
 The installation covers **22 repositories**:
 
-- **14 in scope**, the same 14 that show a pre-commit.ci status in §3.1: mit-learn,
+- **14 in scope** at measurement, the same 14 that showed a pre-commit.ci status: the 13
+  "yes" rows still in §3.1 plus ocw_oer_export, now in §6. They are mit-learn,
   mit-learn-api-clients, mitxonline, mitxpro, ocw-hugo-projects, ocw-studio, ocw_oer_export,
   odl-video-service, ol-data-platform, ol-django, ol-infrastructure, ol-keycloak,
   open-edx-plugins, smoot-design. ocw_oer_export has since been dropped (§6), so 13 of them
