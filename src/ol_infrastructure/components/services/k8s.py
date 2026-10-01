@@ -3,12 +3,20 @@
 
 import hashlib
 import json
+from functools import partial
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
 import pulumi_kubernetes as kubernetes
 from kubernetes.utils.quantity import parse_quantity
-from pulumi import Alias, ComponentResource, CustomTimeouts, Output, ResourceOptions
+from pulumi import (
+    Alias,
+    ComponentResource,
+    CustomTimeouts,
+    Output,
+    Resource,
+    ResourceOptions,
+)
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -206,6 +214,19 @@ def default_probe_configs(port: int) -> dict[str, kubernetes.core.v1.ProbeArgs]:
     }
 
 
+class OLApplicationK8sCeleryRedisConfig(BaseModel):
+    """The celery broker's Redis, as the workers' KEDA ScaledObjects reach it.
+
+    One per application: every worker of an app consumes from the same broker.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    host: Output[str]
+    password: str | Output[str]
+    port: int = DEFAULT_REDIS_PORT
+    database_index: str = "1"
+
+
 class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     application_name: str = "main.celery:app"
@@ -242,13 +263,6 @@ class OLApplicationK8sCeleryWorkerConfig(BaseModel):
     # only proves pods were scheduled and their container started. The webapp
     # Deployment (and pre-deploy Job, if configured) still gate the same image.
     skip_rollout_await: bool = False
-    redis_database_index: str = "1"
-    # Read only by the worker's KEDA ScaledObject, so optional when
-    # OLApplicationK8sConfig.manage_celery_autoscalers is False. That config
-    # requires both when it is True.
-    redis_host: Output[str] | None = None
-    redis_password: str | None = None
-    redis_port: int = DEFAULT_REDIS_PORT
     run_beat: bool = (
         False  # Deprecated: use celery_beat_config on OLApplicationK8sConfig instead
     )
@@ -1052,6 +1066,14 @@ class OLApplicationK8sConfig(BaseModel):
     init_migrations: bool = Field(default=True)
     init_collectstatic: bool = Field(default=True)
     celery_worker_configs: list[OLApplicationK8sCeleryWorkerConfig] = []
+    celery_redis_config: OLApplicationK8sCeleryRedisConfig | None = Field(
+        default=None,
+        description=(
+            "The celery broker's Redis. Read only by the workers' KEDA "
+            "ScaledObjects, so required when manage_celery_autoscalers is True and "
+            "celery_worker_configs is not empty."
+        ),
+    )
     celery_beat_config: OLApplicationK8sCeleryBeatConfig | None = None
 
     @model_validator(mode="after")
@@ -1288,19 +1310,15 @@ class OLApplicationK8sConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_celery_autoscalers_have_redis(self) -> "OLApplicationK8sConfig":
-        """Require Redis connection details on every worker a ScaledObject reads."""
-        if not self.manage_celery_autoscalers:
-            return self
-        missing = [
-            worker.worker_name
-            for worker in self.celery_worker_configs
-            if worker.redis_host is None or worker.redis_password is None
-        ]
-        if missing:
+        """Require the broker's Redis when a worker ScaledObject will read it."""
+        if (
+            self.manage_celery_autoscalers
+            and self.celery_worker_configs
+            and self.celery_redis_config is None
+        ):
             msg = (
                 "manage_celery_autoscalers is True, so each celery worker's KEDA "
-                "ScaledObject needs redis_host and redis_password. Missing on: "
-                f"{', '.join(str(name) for name in missing)}."
+                "ScaledObject needs the broker's Redis. Set celery_redis_config."
             )
             raise ValueError(msg)
         return self
@@ -1488,6 +1506,56 @@ class OLApplicationK8sConfig(BaseModel):
 
 
 stack_info = parse_stack()
+
+
+def _celery_redis_trigger(
+    host: str, redis_config: OLApplicationK8sCeleryRedisConfig, auth_name: str
+) -> dict[str, Any]:
+    """KEDA redis trigger shared by an app's workers, less the per-worker list."""
+    return {
+        "type": "redis",
+        "metadata": {
+            "address": f"{host}:{redis_config.port}",
+            "username": "default",
+            "databaseIndex": redis_config.database_index,
+            "enableTLS": "true",
+        },
+        "authenticationRef": {"name": auth_name},
+    }
+
+
+def _celery_worker_scaled_object_spec(
+    trigger: dict[str, Any],
+    worker: OLApplicationK8sCeleryWorkerConfig,
+    deployment_name: str,
+) -> dict[str, Any]:
+    """ScaledObject spec scaling one worker Deployment on its queue's length."""
+    return {
+        "scaleTargetRef": {"kind": "Deployment", "name": deployment_name},
+        "pollingInterval": 3,
+        "cooldownPeriod": 10,
+        "maxReplicaCount": worker.max_replicas,
+        "minReplicaCount": worker.min_replicas,
+        "advanced": {
+            "horizontalPodAutoscalerConfig": {
+                "behavior": {
+                    "scaleUp": {
+                        "stabilizationWindowSeconds": 300,
+                    },
+                }
+            }
+        },
+        "triggers": [
+            trigger
+            | {
+                "metadata": trigger["metadata"]
+                | {
+                    "listName": worker.worker_name,
+                    "listLength": str(worker.autoscale_queue_depth),
+                }
+            },
+        ],
+    }
 
 
 class OLApplicationK8s(ComponentResource):
@@ -2442,6 +2510,69 @@ class OLApplicationK8s(ComponentResource):
         )
         self.application_service: kubernetes.core.v1.Service = _application_service
 
+        # The Redis trigger every worker ScaledObject shares, less its per-worker
+        # list. None when manage_celery_autoscalers is False; the config validator
+        # guarantees celery_redis_config otherwise.
+        celery_redis_trigger: Output[dict[str, Any]] | None = None
+        celery_redis_trigger_deps: list[Resource] = []
+        self.celery_redis_auth_secret: kubernetes.core.v1.Secret | None = None
+        self.celery_redis_trigger_auth: (
+            kubernetes.apiextensions.CustomResource | None
+        ) = None
+        if (
+            ol_app_k8s_config.manage_celery_autoscalers
+            and ol_app_k8s_config.celery_worker_configs
+            and (redis_config := ol_app_k8s_config.celery_redis_config)
+        ):
+            # KEDA reads the password through a TriggerAuthentication so it lives
+            # in a Secret instead of in every ScaledObject's spec, which anyone who
+            # can read ScaledObjects in the namespace could see.
+            celery_redis_auth_name = truncate_k8s_metanames(
+                f"{ol_app_k8s_config.application_name}-celery-redis-auth".replace(
+                    "_", "-"
+                )
+            )
+            self.celery_redis_auth_secret = kubernetes.core.v1.Secret(
+                f"{ol_app_k8s_config.application_name}-celery-redis-auth-{stack_info.env_suffix}",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=celery_redis_auth_name,
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=ol_app_k8s_config.k8s_global_labels,
+                ),
+                string_data={"password": Output.secret(redis_config.password)},
+                opts=resource_options,
+            )
+            self.celery_redis_trigger_auth = kubernetes.apiextensions.CustomResource(
+                f"{ol_app_k8s_config.application_name}-celery-redis-trigger-auth-{stack_info.env_suffix}",
+                api_version="keda.sh/v1alpha1",
+                kind="TriggerAuthentication",
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    name=celery_redis_auth_name,
+                    namespace=ol_app_k8s_config.application_namespace,
+                    labels=ol_app_k8s_config.k8s_global_labels,
+                ),
+                spec={
+                    "secretTargetRef": [
+                        {
+                            "parameter": "password",
+                            "name": celery_redis_auth_name,
+                            "key": "password",
+                        }
+                    ]
+                },
+                opts=resource_options.merge(
+                    ResourceOptions(depends_on=[self.celery_redis_auth_secret])
+                ),
+            )
+            celery_redis_trigger = redis_config.host.apply(
+                partial(
+                    _celery_redis_trigger,
+                    redis_config=redis_config,
+                    auth_name=celery_redis_auth_name,
+                )
+            )
+            celery_redis_trigger_deps = [self.celery_redis_trigger_auth]
+
         for celery_worker_config in ol_app_k8s_config.celery_worker_configs:
             celery_labels = ol_app_k8s_config.k8s_global_labels | {
                 "ol.mit.edu/component": str(Component.celery),
@@ -2600,7 +2731,7 @@ class OLApplicationK8s(ComponentResource):
             )
             self.celery_deployments.append(_celery_deployment)
 
-            if not ol_app_k8s_config.manage_celery_autoscalers:
+            if celery_redis_trigger is None:
                 continue
             _celery_scaled_object = kubernetes.apiextensions.CustomResource(
                 f"{ol_app_k8s_config.application_name}-celery-worker-{celery_worker_config.worker_name}-{stack_info.env_suffix}-scaledobject",
@@ -2611,61 +2742,18 @@ class OLApplicationK8s(ComponentResource):
                     namespace=ol_app_k8s_config.application_namespace,
                     labels=celery_labels,
                 ),
-                spec=Output.all(
-                    deployment_name=_celery_deployment_name,
-                    celery_config=celery_worker_config,
-                    redis_host=celery_worker_config.redis_host,
-                ).apply(
-                    lambda deployment_info: {
-                        "scaleTargetRef": {
-                            "kind": "Deployment",
-                            "name": deployment_info["deployment_name"],
-                        },
-                        "pollingInterval": 3,
-                        "cooldownPeriod": 10,
-                        "maxReplicaCount": deployment_info[
-                            "celery_config"
-                        ].max_replicas,
-                        "minReplicaCount": deployment_info[
-                            "celery_config"
-                        ].min_replicas,
-                        "advanced": {
-                            "horizontalPodAutoscalerConfig": {
-                                "behavior": {
-                                    "scaleUp": {
-                                        "stabilizationWindowSeconds": 300,
-                                    },
-                                }
-                            }
-                        },
-                        "triggers": [
-                            {
-                                "type": "redis",
-                                "metadata": {
-                                    "address": f"{deployment_info['redis_host']}:{deployment_info['celery_config'].redis_port}",
-                                    "username": "default",
-                                    "databaseIndex": deployment_info[
-                                        "celery_config"
-                                    ].redis_database_index,
-                                    "password": deployment_info[
-                                        "celery_config"
-                                    ].redis_password,
-                                    "listName": deployment_info[
-                                        "celery_config"
-                                    ].worker_name,
-                                    "listLength": str(
-                                        deployment_info[
-                                            "celery_config"
-                                        ].autoscale_queue_depth
-                                    ),
-                                    "enableTLS": "true",
-                                },
-                            },
-                        ],
-                    }
+                spec=celery_redis_trigger.apply(
+                    partial(
+                        _celery_worker_scaled_object_spec,
+                        worker=celery_worker_config,
+                        deployment_name=_celery_deployment_name,
+                    )
                 ),
                 opts=resource_options.merge(
-                    ResourceOptions(delete_before_replace=True)
+                    ResourceOptions(
+                        delete_before_replace=True,
+                        depends_on=celery_redis_trigger_deps,
+                    )
                 ),
             )
             self.celery_scaled_objects.append(_celery_scaled_object)

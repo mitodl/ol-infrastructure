@@ -47,6 +47,7 @@ from ol_infrastructure.components.services.k8s import (
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
+    OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
     application_deployment_names,
@@ -522,8 +523,6 @@ if k8s_deploy:
         OLApplicationK8sCeleryWorkerConfig(
             application_name="mitxpro.celery:app",
             worker_name="default",
-            redis_host=redis_cache.address,
-            redis_password=redis_config.require("password"),
             resource_requests={"cpu": "100m", "memory": "1200Mi"},
             resource_limits={"memory": "1200Mi"},
         ),
@@ -627,6 +626,10 @@ if k8s_deploy:
             pre_deploy_commands=[
                 ("migrate", ["python", "manage.py", "migrate", "--noinput"])
             ],
+            celery_redis_config=OLApplicationK8sCeleryRedisConfig(
+                host=redis_cache.address,
+                password=redis_config.require("password"),
+            ),
             celery_worker_configs=xpro_celery_worker_configs,
             celery_beat_config=xpro_celery_beat_config,
             resource_requests={"cpu": "250m", "memory": "2Gi"},

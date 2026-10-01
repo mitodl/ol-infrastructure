@@ -55,6 +55,7 @@ from ol_infrastructure.components.services.k8s import (
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
+    OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
 )
@@ -877,20 +878,18 @@ learn_ai_app_k8s = OLApplicationK8s(
         # set already sits at 815-930Mi against the old 1000Mi limit (one
         # queue has already been OOMKilled in production). Raise the limit to
         # give the prefork children room without changing the pool model.
+        celery_redis_config=OLApplicationK8sCeleryRedisConfig(
+            host=redis_cache.address,
+            password=redis_config.require("password"),
+        ),
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="default",
-                redis_host=redis_cache.address,
-                redis_database_index="1",
-                redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "100m", "memory": "1000Mi"},
                 resource_limits={"memory": "1536Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="edx_content",
-                redis_host=redis_cache.address,
-                redis_database_index="1",
-                redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "100m", "memory": "1000Mi"},
                 resource_limits={"memory": "1536Mi"},
             ),

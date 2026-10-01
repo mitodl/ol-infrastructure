@@ -71,6 +71,7 @@ from ol_infrastructure.components.services.k8s import (
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
+    OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
     application_deployment_names,
@@ -1935,8 +1936,6 @@ mitlearn_celery_worker_configs = [
     OLApplicationK8sCeleryWorkerConfig(
         queue_name="default",
         max_replicas=20,
-        redis_host=redis_cache.address,
-        redis_password=redis_config.require("password"),
         resource_requests=celery_default_resource_requests,
         resource_limits=celery_default_resource_limits,
         # 640Mi. A healthy child on this queue sits at ~165Mi (observed
@@ -1960,8 +1959,6 @@ mitlearn_celery_worker_configs = [
     ),
     OLApplicationK8sCeleryWorkerConfig(
         queue_name="edx_content",
-        redis_host=redis_cache.address,
-        redis_password=redis_config.require("password"),
         resource_requests=celery_edx_content_resource_requests,
         resource_limits=celery_edx_content_resource_limits,
     ),
@@ -1971,8 +1968,6 @@ mitlearn_celery_worker_configs = [
         # KEDA holds this at or near 30 replicas through backlogs, so a deploy
         # that waits for all 30 to be available at once fails under spot churn.
         skip_rollout_await=True,
-        redis_host=redis_cache.address,
-        redis_password=redis_config.require("password"),
         resource_requests=celery_embeddings_resource_requests,
         resource_limits=celery_embeddings_resource_limits,
     ),
@@ -2130,6 +2125,10 @@ mitlearn_k8s_app = OLApplicationK8s(
         init_migrations=False,
         init_collectstatic=True,  # Assuming Django app needs collectstatic
         pre_deploy_commands=[("migrate", ["scripts/heroku-release-phase.sh"])],
+        celery_redis_config=OLApplicationK8sCeleryRedisConfig(
+            host=redis_cache.address,
+            password=redis_config.require("password"),
+        ),
         celery_worker_configs=mitlearn_celery_worker_configs,
         celery_beat_config=mitlearn_celery_beat_config,
         resource_requests=webapp_resource_requests,
