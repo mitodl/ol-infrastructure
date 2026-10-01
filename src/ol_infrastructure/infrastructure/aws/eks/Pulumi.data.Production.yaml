@@ -33,6 +33,7 @@ config:
   - clickhouse
   - clickhouse-operator
   - dagster
+  - gravitino
   - jupyter-data
   - kubewatch
   - marimo
