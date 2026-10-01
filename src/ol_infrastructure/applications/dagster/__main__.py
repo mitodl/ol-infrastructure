@@ -989,6 +989,25 @@ if stack_info.env_suffix == "production":
         opts=ResourceOptions(delete_before_replace=True),
     )
 
+# MIT Learn's YouTube Data API key, for the data_loading YouTube dlt source. The
+# source reads it from Vault in the qa and production dlt profiles only, so the
+# other stacks don't get it. Copied out of the mitlearn SOPS file rather than
+# granting this policy MIT Learn's own mount, so the two share one key (and its
+# daily quota) without dagster being able to read the rest of Learn's secrets.
+if stack_info.env_suffix in ("qa", "production"):
+    vault.generic.Secret(
+        f"dagster-youtube-{stack_info.env_suffix}",
+        path="secret-data/pipelines/youtube",
+        data_json=json.dumps(
+            {
+                "developer_key": read_yaml_secrets(
+                    Path(f"mitlearn/secrets.{stack_info.env_suffix}.yaml")
+                )["youtube_developer_key"]
+            }
+        ),
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
 # Sentry DSN for the code locations and run workers. Kept as its own secret
 # rather than folded into dagster-static-secrets because an OLVaultK8SSecret
 # reads a single Vault path, and the DSN is owned by the sentry stack.
