@@ -5,10 +5,18 @@ Admin backend path (from JAR decompilation of BaseEndpoint + AdministrationBacke
   /realms/{realm}/scim/admin/backend/scim/v2/{resource}
 
 Authentication: the plugin checks the token's 'azp' (authorized party) claim.
-It accepts tokens from 'security-admin-console' (browser admin UI) or 'admin-cli'
+It accepts tokens from 'security-admin-console' (browser admin UI), 'admin-cli'
 when KC_SPI_REALM_RESTAPI_EXTENSION_SCIM_ACCEPT_ADMIN_CLI_LOGIN=true is set on
-the Keycloak instance (equivalently additionalOptions spi-realm-restapi-extension-
-scim-accept-admin-cli-login=true in the Keycloak CR).
+the Keycloak instance, or (plugin 4.x+) any service account client holding the
+master-realm 'scim-admin' client role. The Keycloak substructure stack
+provisions such a client and writes its credentials to Vault:
+
+    python export_scim_config.py \
+        --url https://sso.ol.mit.edu \
+        --realm olapps \
+        --client-id scim-config-manager \
+        --client-secret "$(vault kv get -field=client_secret \
+            secret-operations/keycloak/scim-config-manager)"
 
 Hostname check: KC_SPI_REALM_RESTAPI_EXTENSION_SCIM_ADMIN_URL_CHECK=no-context-path
 means the incoming Host header must match KC_HOSTNAME (sso.ol.mit.edu).
