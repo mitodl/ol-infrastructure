@@ -205,11 +205,11 @@ names hook `ruff-check` at `astral-sh/ruff-pre-commit` `v0.9.0`, which predates 
    step's own result fails the job. The action alone exits 0 with "Nothing to do" whenever no
    file changed, so hooks that fail without modifying anything (zizmor, detect-secrets, mypy,
    actionlint, hadolint) would go green behind a `|| true` or `continue-on-error`.
-11. **Two in-scope repositories may be unused.** superset-marimo was last pushed on
-    2026-05-22, its hook config does not load, and it has no Renovate. alerting-omnibus was
-    last pushed on 2026-06-30 and has no Renovate. Confirm with their owners before spending
-    a migration PR on either. If a repository is dropped, move it to §6 with the owner's
-    answer as the reason. Both were dropped on 2026-10-01 (§6).
+11. **Two repositories in scope at measurement may have been unused (resolved).**
+    superset-marimo was last pushed on 2026-05-22, its hook config does not load, and it has
+    no Renovate. alerting-omnibus was last pushed on 2026-06-30 and has no Renovate. The plan
+    was to confirm with their owners before spending a migration PR on either. Both were
+    dropped on 2026-10-01 and are in §6, so neither needs any migration work.
 12. **Runtimes here are not a benchmark.** `prek run --all-files` took 0.2–40 s per
    repository (mit-learn 40 s, ol-infrastructure 23 s, ol-data-platform 14 s). Those runs
    shared one hook cache four at a time, so they mix hook-environment installation with lock
