@@ -3523,8 +3523,12 @@ alerts_source_grafana_prometheus_qa = rootly.AlertsSource(
     # build (appVersion). 172 of 385 QA alerts from 2026-09-01 to 10-01 were
     # opened while one for the same groupKey was still open. groupKey is
     # Alertmanager's identity for a notification group and stays fixed through
-    # all of that. QA only for now: whether Rootly still applies a resolved
-    # payload once key dedup is on is unverified. See
+    # all of that, though an edit to the notification policy's routes or
+    # group_bies does change it for groups already open. The CloudWatch
+    # reasoning above runs the other way here: this source's native external
+    # ID is the alertname, which is coarser than groupKey, not finer. QA only
+    # for now: whether Rootly still applies a resolved payload once key dedup
+    # is on is unverified. See
     # tk-rootly-mints-a-new-alert-on-each-alertmanager-re-c6e1a7.
     deduplicate_alerts_by_key=True,
     deduplication_key_kind="payload",
