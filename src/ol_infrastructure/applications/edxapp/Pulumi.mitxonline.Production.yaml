@@ -210,6 +210,11 @@ config:
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
   typesense:forum_search_enabled: "false"
+  # Steady state reached ~500Mi in Sept 2026 against the 512Mi default, and a
+  # restarting node needs more than that while it reloads its index from disk,
+  # so it OOMs on startup and never rejoins.
+  typesense:memory_request: 1536Mi
+  typesense:memory_limit: 1536Mi
   edxapp:site_project:
     deployment: mitxonline
     mfe_apps:
