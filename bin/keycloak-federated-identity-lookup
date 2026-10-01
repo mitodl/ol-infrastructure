@@ -409,12 +409,24 @@ def relink(
         print("\nDry run only — re-run with --confirm to apply this change.")
         return
 
-    client.delete_federated_identity(realm, user["id"], identity_provider)
+    try:
+        client.delete_federated_identity(realm, user["id"], identity_provider)
+    except httpx.HTTPError as e:
+        print(
+            f"\nERROR: failed to delete the old {identity_provider!r} link ({e}). "
+            "Nothing was changed — the old link, if any, is still in place."
+        )
+        sys.exit(1)
+
     try:
         client.add_federated_identity(
             realm, user["id"], identity_provider, new_external_id, new_username
         )
-    except httpx.HTTPStatusError as e:
+    except httpx.HTTPError as e:
+        # Covers both HTTPStatusError (a 4xx/5xx from Keycloak) and
+        # RequestError (a network-level failure, e.g. a timeout) — either
+        # way, the delete above already succeeded, so the user now has no
+        # link at all and needs the same recovery guidance.
         print(
             f"\nERROR: the old {identity_provider!r} link was removed, but adding "
             f"the new one failed ({e}). The user currently has NO {identity_provider!r} "
