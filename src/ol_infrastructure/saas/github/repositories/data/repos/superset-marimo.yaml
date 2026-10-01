@@ -1,6 +1,6 @@
 ---
 _custom_properties:
-  tier: tier-1
+  tier: unmanaged
 _has_branch_protection: false
 _pushed_at: '2026-05-22T19:14:05Z'
 _ruleset_count: 2
@@ -8,7 +8,7 @@ _visibility: public
 allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
-archetype: library
+archetype: archived
 description: Marimo notebook integration for Apache Superset — connects reactive Python
   notebooks to Superset-configured data sources
 has_discussions: false
