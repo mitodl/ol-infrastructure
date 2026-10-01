@@ -247,19 +247,27 @@ pull per-video engaged-view stats for OCW's YouTube channel
 ([mitodl/hq#13305](https://github.com/mitodl/hq/issues/13305)). The stack enables
 the YouTube Analytics and YouTube Reporting APIs; everything else is manual.
 
-Standing it up:
+Steps 1 and 2 must be done before the stack config naming this project
+merges. `pulumi preview` plans the service creates without reading the project,
+so it passes either way, but `pulumi up` fails on a missing or ungranted project
+and that blocks every other change in this one stack.
 
 1. Request the project through MIT Cloud Accounts against an OCW cost object.
    It is a separate project so its OAuth consent screen does not constrain
    `mitol01`'s.
-2. As a project Owner, enable `serviceusage.googleapis.com` and grant the
-   automation account on the new project:
+2. As a project Owner, enable the bootstrap APIs and grant the automation
+   account on the new project. `serviceUsageAdmin` alone is not enough: after
+   enabling a service the provider reads the project back
+   (`resourcemanager.projects.get`), which `roles/browser` supplies.
 
    ```bash
-   gcloud services enable serviceusage.googleapis.com --project=mitol-ocw-yt-analytics
-   gcloud projects add-iam-policy-binding mitol-ocw-yt-analytics \
-     --member=serviceAccount:pulumi-gcp@mitol01.iam.gserviceaccount.com \
-     --role=roles/serviceusage.serviceUsageAdmin --condition=None
+   gcloud services enable serviceusage.googleapis.com \
+     cloudresourcemanager.googleapis.com --project=mitol-ocw-yt-analytics
+   for role in roles/serviceusage.serviceUsageAdmin roles/browser; do
+     gcloud projects add-iam-policy-binding mitol-ocw-yt-analytics \
+       --member=serviceAccount:pulumi-gcp@mitol01.iam.gserviceaccount.com \
+       --role="$role" --condition=None
+   done
    ```
 
 3. Deploy this stack.
@@ -277,6 +285,15 @@ Standing it up:
 The channel owner then completes the OAuth flow in HighSystems with
 `yt-analytics.readonly`. An OAuth client with no token requests for six months
 is deleted by Google, so a stalled integration loses its client.
+
+The consent screen's scope list does not limit what a client can request. With
+an _Internal_ app there is also no Google review and no unverified-app warning,
+so whoever holds the client secret and controls a registered redirect URI can
+ask any `mit.edu` user for any scope under an MIT-branded screen. Keep the
+redirect URIs to Data Collaborative's single callback. Name the OL owner of the
+client in its description. To cut access, rotate or delete the client secret
+in the console, and have the channel owner revoke HighSystems at
+<https://myaccount.google.com/permissions>.
 
 ## What this does not manage
 

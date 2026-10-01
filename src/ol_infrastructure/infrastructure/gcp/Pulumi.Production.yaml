@@ -170,7 +170,10 @@ config:
     enabled_services:
     - youtubeanalytics.googleapis.com
     - youtubereporting.googleapis.com
-      # Bootstrap: the provider lists enabled services through this API.
+      # Bootstrap, enabled out of band before the first apply (README.md): the
+      # provider lists services through serviceusage and reads the project
+      # back through cloudresourcemanager after enabling one.
     - serviceusage.googleapis.com
+    - cloudresourcemanager.googleapis.com
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwGRkMYEkiqtkOL1cUu3weJtAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbjOKl/yNcSE3NH/OAgEQgDuLw4Tl0f+DTV6qFsA/BXRSwJsDLRiZRVUabJWffa9XDGRcXOzB+cIkBiVmb6jcZ+rc5y3brL6PU9RtfA==
