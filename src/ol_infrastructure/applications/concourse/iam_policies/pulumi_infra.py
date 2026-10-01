@@ -345,6 +345,10 @@ policy_definition = {
                 # runs create, switchover, and old-instance deletion in a single
                 # apply, so all of them are needed together or the same update
                 # just fails one step later each retry.
+                # A new aws:rds/instance with no snapshot or replica source.
+                # Never observed in use because no stack had created an
+                # instance through this role; gravitino QA is the first.
+                "rds:CreateDBInstance",
                 "rds:CreateDBInstanceReadReplica",
                 "rds:CreateDBParameterGroup",
                 "rds:CreateDBSnapshot",
@@ -368,6 +372,10 @@ policy_definition = {
                 "rds:ListTagsForResource",
                 "rds:ModifyDBCluster",
                 "rds:ModifyDBInstance",
+                # aws:rds/parameterGroup applies its parameters with Modify after
+                # Create, so a stack that creates a new parameter group fails
+                # without it (gravitino QA, deploy #1).
+                "rds:ModifyDBParameterGroup",
                 "rds:ModifyDBSubnetGroup",
                 "rds:PromoteReadReplica",
                 "rds:PromoteReadReplicaDBCluster",
