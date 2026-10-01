@@ -779,15 +779,20 @@ def create_k8s_resources(  # noqa: C901
                     "--active",
                     "--warning",
                 ],
-                # Tracks the CMS celery worker: the sweep walks the modulestore in
-                # process rather than fanning out to celery, so it wants comparable
-                # headroom.
+                # Tracks the CMS celery worker by default: the sweep walks the
+                # modulestore in process rather than fanning out to celery, so it
+                # wants comparable headroom. Memory grows with every course the
+                # sweep visits and is never released, so a large catalog needs its
+                # own override (mitxonline Production: ~5.2Gi at start plus ~1Mi
+                # per course across ~4,300 courses).
                 resource_requests={
                     "cpu": resources_dict["celery"]["cms"]["cpu_request"],
-                    "memory": resources_dict["celery"]["cms"]["memory_request"],
+                    "memory": edxapp_config.get("courseware_reindex_memory_request")
+                    or resources_dict["celery"]["cms"]["memory_request"],
                 },
                 resource_limits={
-                    "memory": resources_dict["celery"]["cms"]["memory_limit"],
+                    "memory": edxapp_config.get("courseware_reindex_memory_limit")
+                    or resources_dict["celery"]["cms"]["memory_limit"],
                 },
                 # No active_deadline_seconds: runtime scales with the size of the
                 # course catalog, and a wrong guess converts a slow sweep into a
