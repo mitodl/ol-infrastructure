@@ -1146,8 +1146,12 @@ class OLApplicationK8sConfig(BaseModel):
     webapp_prestop_sleep_seconds: NonNegativeInt = Field(
         default=10,
         description=(
-            "Seconds the webapp containers (the app and, when present, the nginx "
-            "sidecar) sleep in a preStop hook before receiving SIGTERM. Endpoint "
+            "Seconds the webapp pod's containers sleep in a preStop hook before "
+            "receiving SIGTERM. Applies to the app container, the nginx sidecar when "
+            "present, and every extra_sidecar_containers entry that does not set its "
+            "own lifecycle (one that does keeps it unchanged), so a sidecar that "
+            "consumes the app's output keeps running while the pod still serves. "
+            "Celery worker and beat pods are not affected. Endpoint "
             "removal reaches kube-proxy and APISIX concurrently with SIGTERM, so "
             "without the sleep the server stops accepting while traffic is still "
             "routed to the pod and those requests get connection refused. The pod's "
