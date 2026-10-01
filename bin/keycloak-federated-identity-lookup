@@ -70,6 +70,20 @@ HTTP_NOT_FOUND = 404
 HTTP_UNAUTHORIZED = 401
 
 
+def _or_placeholder(value: str | None, field: str) -> str:
+    """repr(value), or a human-readable placeholder if value is None.
+
+    Never render Python's literal "None" in output meant to be read — or
+    copy-pasted as a CLI argument — by an operator.
+    """
+    return repr(value) if value is not None else f"<no {field} was stored>"
+
+
+def _cli_arg(flag: str, field: str, value: str | None) -> str:
+    """`flag repr(value)`, or a placeholder arg that can't be copy-pasted verbatim."""
+    return f"{flag} {_or_placeholder(value, field)}"
+
+
 class KeycloakAdminClient:
     """Minimal Keycloak Admin API client (client_credentials grant)."""
 
@@ -231,13 +245,21 @@ def lookup(
 
     comparison = None
     if expected_external_id is not None:
-        matched_link = next(
-            (link for link in links if link.get("userId") == expected_external_id),
-            None,
-        )
+        # `matches` is None (not False) when there's nothing to compare
+        # against — no federated identity link exists at all (optionally
+        # scoped to --identity-provider) — so that state can't be displayed
+        # or reported as a MISMATCH, which would misleadingly suggest a
+        # stale link exists when there's no link at all.
+        matches = None
+        if links:
+            matched_link = next(
+                (link for link in links if link.get("userId") == expected_external_id),
+                None,
+            )
+            matches = matched_link is not None
         comparison = {
             "expected_external_id": expected_external_id,
-            "matches": matched_link is not None,
+            "matches": matches,
         }
 
     result = {
@@ -263,13 +285,25 @@ def lookup(
         else:
             print("  No federated identity links found.")
     for link in links:
-        print(f"  IdP: {link.get('identityProvider')}")
-        print(f"    External user ID (federated_user_id): {link.get('userId')}")
-        print(f"    IdP username: {link.get('userName')}")
+        print(
+            f"  IdP: {_or_placeholder(link.get('identityProvider'), 'identityProvider')}"
+        )
+        print(
+            "    External user ID (federated_user_id): "
+            f"{_or_placeholder(link.get('userId'), 'userId')}"
+        )
+        print(f"    IdP username: {_or_placeholder(link.get('userName'), 'userName')}")
     if comparison is not None:
-        verdict = "MATCH" if comparison["matches"] else "MISMATCH"
-        print(f"\nExpected external ID {expected_external_id!r}: {verdict}")
-        if not comparison["matches"]:
+        if comparison["matches"] is None:
+            scope = f" for provider {identity_provider!r}" if identity_provider else ""
+            print(
+                f"\nExpected external ID {expected_external_id!r}: N/A — no "
+                f"federated identity links{scope} to compare against."
+            )
+        else:
+            verdict = "MATCH" if comparison["matches"] else "MISMATCH"
+            print(f"\nExpected external ID {expected_external_id!r}: {verdict}")
+        if comparison["matches"] is False:
             print(
                 "  None of the linked identities match. This is the signature "
                 "of the partner IdP having re-issued the user's federated "
@@ -330,6 +364,10 @@ def relink(
         Nothing is changed unless this is passed. Without it, prints what
         would happen and exits.
     """
+    if not new_external_id.strip():
+        print("--new-external-id must not be empty.")
+        sys.exit(1)
+
     client = KeycloakAdminClient(keycloak_url, realm, client_id, client_secret)
     identity_provider = identity_provider.lower()
 
@@ -359,7 +397,9 @@ def relink(
         new_username = existing["userName"]
 
     old_id_display = (
-        existing.get("userId", "(unknown)") if existing else "(no existing link)"
+        _or_placeholder(existing.get("userId"), "external ID")
+        if existing
+        else "(no existing link)"
     )
     print(f"User: {email} ({user['id']})")
     print(f"  {identity_provider}: {old_id_display} -> {new_external_id}")
@@ -381,12 +421,6 @@ def relink(
             "link at all."
         )
         if existing is not None:
-
-            def _cli_arg(flag: str, field: str, value: str | None) -> str:
-                if value is not None:
-                    return f"{flag} {value!r}"
-                return f"{flag} <no {field} was stored on the old link>"
-
             external_id_arg = _cli_arg(
                 "--new-external-id", "external ID", existing.get("userId")
             )
