@@ -3517,7 +3517,18 @@ alerts_source_grafana_prometheus_qa = rootly.AlertsSource(
         {"alertFieldId": "45a09cf3-b0f2-43cf-b596-34aaab9279dc"},
     ],
     alert_urgency_id="fce5c971-6660-4ad9-90eb-e75122055f50",
+    # Without a key, Rootly drops a re-sent notification only when the payload
+    # is unchanged, so a long-firing group mints a new alert whenever anything
+    # in it moves: a member joins, a value changes, or Grafana Cloud ships a new
+    # build (appVersion). 172 of 385 QA alerts from 2026-09-01 to 10-01 were
+    # opened while one for the same groupKey was still open. groupKey is
+    # Alertmanager's identity for a notification group and stays fixed through
+    # all of that. QA only for now: whether Rootly still applies a resolved
+    # payload once key dedup is on is unverified. See
+    # tk-rootly-mints-a-new-alert-on-each-alertmanager-re-c6e1a7.
+    deduplicate_alerts_by_key=True,
     deduplication_key_kind="payload",
+    deduplication_key_path="$.groupKey",
     name="Grafana Prometheus - QA",
     secret=Output.secret(
         rootly_secrets["alert_source_secrets"]["grafana_prometheus_qa"]
