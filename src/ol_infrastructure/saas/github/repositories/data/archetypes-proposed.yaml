@@ -140,6 +140,7 @@ archived:
 - social-auth-mitxpro
 - sso-django-prototype
 - standalone-course-prototype
+- superset-marimo
 - teachersportal
 - tika-formula
 - travisfail
@@ -314,7 +315,6 @@ library:
 - redux-asserts
 - redux-hammock
 - smoot-design
-- superset-marimo
 - superset-nl-explorer
 - tech-talk-slides
 - template-mit-demo
