@@ -3847,11 +3847,11 @@ alert_route_platform_engineering_team_email_monitor_route = rootly.AlertRoute(
 #
 # Caveat on individual rules: the provider models a rule as exactly
 # (condition_groups, destinations, fallback_rule, name, position). Rootly's API
-# also returns a per-rule "enabled" flag, but there is no Pulumi field for it, so
-# a rule disabled in the UI stays disabled through an apply -- and equally, that
-# state cannot be enforced from here. Three fallback rules are disabled live
-# today (the Cloudwatch, Grafana Prometheus CI, and Grafana Prometheus QA
-# catch-alls); if that matters it has to be asserted outside this stack.
+# also returns a per-rule "enabled" flag, but there is no Pulumi field for it.
+# Every rule recreated by an apply reads enabled=false, yet still matches: after
+# the 2026-09-18 apply recreated this route's rules, alerts were still
+# attributed through them. Check alert attribution, not the flag, before
+# calling a rule dead.
 alert_route_cloudwatch_service_route = rootly.AlertRoute(
     "cloudwatch-service-route",
     alerts_source_ids=[
@@ -4130,14 +4130,18 @@ alert_route_cloudwatch_service_route = rootly.AlertRoute(
                     "position": 1,
                 },
             ],
+            # Targets the CI/QA Slack policy directly. It used to target the
+            # UI-created "MITx Online QA - Open edX - Redis" service, whose
+            # "QA Non-Paging Escalation Policy" has zero levels, so these alarms
+            # matched and then notified nobody.
             "destinations": [
                 {
-                    "targetId": "cc36d725-ecfe-4d37-94f3-55d4e2ef91be",
-                    "targetType": "Service",
+                    "targetId": escalation_policy_ci_qa_slack_notifications.id,
+                    "targetType": "EscalationPolicy",
                 },
             ],
             "fallbackRule": False,
-            "name": "mitx-qa elasticache AlarmName to MITx Online QA - Open edX - Redis",  # noqa: E501
+            "name": "mitx-qa elasticache AlarmName to CI/QA Slack Notifications",
             "position": 10,
         },
         # None of the alarm names above contain these, so after them is safe.
