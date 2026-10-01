@@ -229,6 +229,10 @@ marimo_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=marimo_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        # The default cors entry is allow_origins "**" with credentials, which
+        # would let any origin read a gated app's responses with the viewer's
+        # APISIX session.  Published apps have no cross-origin caller.
+        enable_cors=False,
     ),
 )
 
