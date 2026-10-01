@@ -32,10 +32,10 @@ manifest declarations, workflow references, Renovate coverage, rulesets and meas
   their first run under prek.
 - **Only 14 of the 28 are enforced by pre-commit.ci today.** The other 14 are not in the
   pre-commit.ci installation (§5), and nothing else runs their hooks in CI (apart from three
-  hooks in lehrer). Their default branches have drifted: eight of them fail
-  their own hooks right now. For those repos the migration adds a gate rather than replacing
-  one, and each migration PR has to make its tree clean first. Of the 22 still in scope, 13
-  are in the installation and 9 are not.
+  hooks in lehrer). Their default branches had drifted: eight of them failed their own hooks
+  at measurement. Of the 22 still in scope, 13 are in the installation and 9 are not. For
+  those 9, six of them failing, the migration adds a gate rather than replacing one, and each
+  migration PR has to make its tree clean first.
 - **Some skipped hooks have never run in CI anywhere.** pre-commit.ci's `ci: skip` removed
   them, and no GitHub Actions job runs them instead. `hadolint-docker` is in that set and fails
   on `ol-infrastructure` main today.
@@ -71,7 +71,7 @@ explained below cannot be attributed to particular repositories.
 | **standard** | 11 | Everything else: remote hooks plus, at most, local `python`/`pygrep` hooks with their dependencies declared |
 | **already-prek** | 3 | `prek.toml`, no pre-commit.ci status. Only CI pinning and optional autofix.ci adoption remain |
 | **supporting** | 2 | Hold shared configuration the rollout changes |
-| **excluded** | 50 | §6. Includes the six dropped on 2026-10-01 (one complex, five standard) |
+| **excluded** | 48 | §6: 42 with no hook configuration, plus the six dropped on 2026-10-01 (one complex, five standard). The two withheld repositories are not counted (§2) |
 
 ### 3.1 Rollout table
 
