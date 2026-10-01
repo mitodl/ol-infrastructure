@@ -1011,6 +1011,47 @@ def test_container_security_context_skips_nginx_sidecar():
     return app.application_deployment.spec.template.spec.containers.apply(check)
 
 
+# ─── webapp preStop sleep ─────────────────────────────────────────────────────
+
+
+@pulumi.runtime.test
+def test_prestop_sleep_on_app_and_nginx_with_extended_grace_period():
+    """Every container that accepts traffic sleeps, and the drain budget stays 30s."""
+    project_root = Path(tempfile.mkdtemp())
+    (project_root / "files").mkdir()
+    (project_root / "files" / "web.conf").write_text("server { listen 8071; }\n")
+
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="prestop",
+            project_root=project_root,
+            import_nginx_config=True,
+        )
+    )
+
+    def check(pod_spec):
+        containers = pod_spec["containers"]
+        nginx = next(c for c in containers if c["name"] == "nginx")
+        for container in (nginx, _app_container(containers, "prestop")):
+            assert container["lifecycle"]["pre_stop"]["sleep"]["seconds"] == 10
+        assert pod_spec["termination_grace_period_seconds"] == 40
+
+    return app.application_deployment.spec.template.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_prestop_sleep_zero_disables_hook_and_keeps_default_grace_period():
+    app = OLApplicationK8s(
+        _base_config(application_name="noprestop", webapp_prestop_sleep_seconds=0)
+    )
+
+    def check(pod_spec):
+        assert "lifecycle" not in _app_container(pod_spec["containers"], "noprestop")
+        assert "termination_grace_period_seconds" not in pod_spec
+
+    return app.application_deployment.spec.template.spec.apply(check)
+
+
 @pulumi.runtime.test
 def test_container_security_context_applied_to_celery_worker():
     app = OLApplicationK8s(

@@ -42,6 +42,9 @@ from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import Component, KubernetesServiceAppProtocol
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
+# Kubernetes' default terminationGracePeriodSeconds.
+DEFAULT_TERMINATION_GRACE_PERIOD_SECONDS = 30
+
 
 def truncate_k8s_metanames(name: str) -> str:
     return name[:MAXIMUM_K8S_NAME_LENGTH].rstrip("-_.")
@@ -1140,6 +1143,18 @@ class OLApplicationK8sConfig(BaseModel):
         ),
     )
     app_pdb_maximum_unavailable: NonNegativeInt | str = 1
+    webapp_prestop_sleep_seconds: NonNegativeInt = Field(
+        default=10,
+        description=(
+            "Seconds the webapp containers (the app and, when present, the nginx "
+            "sidecar) sleep in a preStop hook before receiving SIGTERM. Endpoint "
+            "removal reaches kube-proxy and APISIX concurrently with SIGTERM, so "
+            "without the sleep the server stops accepting while traffic is still "
+            "routed to the pod and those requests get connection refused. The pod's "
+            "terminationGracePeriodSeconds is raised by the same amount so the "
+            "drain budget after SIGTERM stays at the 30s default. 0 disables the hook."
+        ),
+    )
     extra_container_ports: list[kubernetes.core.v1.ContainerPortArgs] = Field(
         default_factory=list,
         description="Additional named ports to expose on the application container (e.g. a metrics port).",
@@ -1682,6 +1697,20 @@ class OLApplicationK8s(ComponentResource):
         # Apply extra volume mounts to the main application container
         webapp_volume_mounts.extend(ol_app_k8s_config.extra_volume_mounts)
 
+        prestop_sleep_seconds = ol_app_k8s_config.webapp_prestop_sleep_seconds
+        # The native sleep action needs no binary in the image (Kubernetes >= 1.34).
+        webapp_lifecycle = (
+            kubernetes.core.v1.LifecycleArgs(
+                pre_stop=kubernetes.core.v1.LifecycleHandlerArgs(
+                    sleep=kubernetes.core.v1.SleepActionArgs(
+                        seconds=prestop_sleep_seconds
+                    )
+                )
+            )
+            if prestop_sleep_seconds
+            else None
+        )
+
         app_containers = []
 
         # Resolve granian vs. fallback application server configuration.
@@ -1774,6 +1803,7 @@ class OLApplicationK8s(ComponentResource):
                         limits={"cpu": "50m", "memory": "50Mi"},
                     ),
                     volume_mounts=nginx_volume_mounts,
+                    lifecycle=webapp_lifecycle,
                 ),
             )
 
@@ -1927,6 +1957,12 @@ class OLApplicationK8s(ComponentResource):
         )
 
         pod_spec_args: dict[str, Any] = {}
+        if prestop_sleep_seconds:
+            # The preStop hook runs inside the grace period, so extend it to keep
+            # the default 30s for draining in-flight requests after SIGTERM.
+            pod_spec_args["termination_grace_period_seconds"] = (
+                DEFAULT_TERMINATION_GRACE_PERIOD_SECONDS + prestop_sleep_seconds
+            )
         if ol_app_k8s_config.application_deployment_use_anti_affinity:
             pod_spec_args["affinity"] = kubernetes.core.v1.AffinityArgs(
                 pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
@@ -2092,6 +2128,7 @@ class OLApplicationK8s(ComponentResource):
                 env=application_deployment_env_vars,
                 env_from=application_deployment_envfrom,
                 volume_mounts=webapp_volume_mounts,
+                lifecycle=webapp_lifecycle,
                 # `is None` rather than a falsy check: an explicitly supplied
                 # empty mapping means "no probes at all", which the literal-dict
                 # default used to allow and `or` would silently override with
