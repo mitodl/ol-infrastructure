@@ -20,6 +20,8 @@ name: odl-video-service
 protected_release_branches:
 - release
 - release-candidate
+required_status_checks:
+- prek
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
 teams:
