@@ -7,6 +7,7 @@ namespaces, and the ``__cluster`` snapshot running before the migrate
 container.
 """
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -18,6 +19,7 @@ import pulumi_kubernetes as kubernetes
 from ol_infrastructure.applications.omnigraph.maintenance import OmnigraphMaintenance
 from ol_infrastructure.applications.omnigraph.storage_migration import (
     CLUSTER_SNAPSHOT_SCRIPT,
+    INVALIDATE_VERDICT_SCRIPT,
     create_storage_migration,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
@@ -120,10 +122,18 @@ def test_the_armed_job_can_check_and_snapshot_before_migrating():
         (job,) = _of_type(mocks, "kubernetes:batch/v1:Job")
         pod = job["spec"]["template"]["spec"]
         assert [c["name"] for c in pod["initContainers"]] == [
+            "invalidate-verdict",
             "stage-old-binary",
             "snapshot-cluster-state",
         ]
-        snapshot_env = {e["name"]: e["value"] for e in pod["initContainers"][1]["env"]}
+        invalidate_env = {
+            e["name"]: e["value"] for e in pod["initContainers"][0]["env"]
+        }
+        assert invalidate_env["VERDICT_URI"] == (
+            "s3://ol-data-witan-ci/migrations/fmt10/verdict.json"
+        )
+        assert invalidate_env["NEW_ROOT"] == "s3://ol-data-witan-ci/fmt10"
+        snapshot_env = {e["name"]: e["value"] for e in pod["initContainers"][2]["env"]}
         assert snapshot_env["OLD_ROOT"] == "s3://ol-data-witan-ci/fmt9"
         assert snapshot_env["BACKUP_ROOT"] == "s3://ol-data-witan-ci/backups"
         assert snapshot_env["NEW_PREFIX"] == "fmt10"
@@ -175,3 +185,33 @@ def test_a_populated_snapshot_reports_its_object_count(tmp_path: Path) -> None:
 
     assert result.returncode == 0
     assert "snapshot: 2 object(s)" in result.stdout
+
+
+def test_the_verdict_is_invalidated_with_a_refusable_marker(tmp_path: Path) -> None:
+    """What lands at the key is valid JSON that the cutover script refuses."""
+    captured = tmp_path / "captured"
+    stub = tmp_path / "aws"
+    stub.write_text(f'#!/bin/sh\necho "$@" > {captured}.args\ncat > {captured}\n')
+    stub.chmod(0o755)
+    result = subprocess.run(  # noqa: S603
+        ["/bin/sh", "-c", INVALIDATE_VERDICT_SCRIPT],
+        env={
+            "PATH": f"{tmp_path}:{os.environ['PATH']}",
+            "NEW_ROOT": "s3://bucket/fmt10",
+            "VERDICT_URI": "s3://bucket/migrations/fmt10/verdict.json",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    marker = json.loads(captured.read_text())
+    assert marker["ok"] is False
+    assert marker["status"] == "in_progress"
+    assert marker["new_root"] == "s3://bucket/fmt10"
+    assert Path(f"{captured}.args").read_text().split()[:3] == [
+        "s3",
+        "cp",
+        "-",
+    ]

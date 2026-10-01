@@ -8,8 +8,10 @@ Everything else in the script is subprocess orchestration against a real
 cluster, which is what the runbook rehearsal covers.
 """
 
+import hashlib
 import importlib.util
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -967,3 +969,107 @@ def test_an_api_error_mid_poll_is_waited_out() -> None:
     )
 
     assert sleeps == [5]
+
+
+def test_the_job_invalidates_the_same_key_the_script_writes() -> None:
+    """Two copies of the key template, one in the pod spec and one in the script."""
+    from ol_infrastructure.applications.omnigraph.storage_migration import (  # noqa: PLC0415
+        VERDICT_KEY_TEMPLATE,
+    )
+
+    assert VERDICT_KEY_TEMPLATE == migrate.VERDICT_KEY_TEMPLATE
+
+
+def test_the_verdict_is_keyed_by_the_target_prefix() -> None:
+    """A re-run of one migration overwrites its verdict; another format never does."""
+    assert migrate.verdict_object("s3://ol-data-witan-qa/fmt9") == (
+        "ol-data-witan-qa",
+        "migrations/fmt9/verdict.json",
+    )
+
+
+# AWS's published SigV4 example for an S3 PUT, from "Examples: Signature
+# Calculations in AWS Signature Version 4" in the S3 API reference.
+_AWS_EXAMPLE_SECRET = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # noqa: S105  # pragma: allowlist secret
+_AWS_EXAMPLE_KEY_ID = "AKIAIOSFODNN7EXAMPLE"  # pragma: allowlist secret
+
+
+def test_sigv4_matches_the_published_s3_put_example() -> None:
+    """Checks the signer against a signature AWS computed, not one we did."""
+    payload_hash = hashlib.sha256(b"Welcome to Amazon S3.").hexdigest()
+    authorization = migrate.sigv4_authorization(
+        method="PUT",
+        path="/test$file.text",
+        headers={
+            "Host": "examplebucket.s3.amazonaws.com",
+            "Date": "Fri, 24 May 2013 00:00:00 GMT",
+            "x-amz-date": "20130524T000000Z",
+            "x-amz-storage-class": "REDUCED_REDUNDANCY",
+            "x-amz-content-sha256": payload_hash,
+        },
+        payload_hash=payload_hash,
+        region="us-east-1",
+        service="s3",
+        access_key=_AWS_EXAMPLE_KEY_ID,
+        secret_key=_AWS_EXAMPLE_SECRET,
+    )
+
+    assert authorization == (
+        "AWS4-HMAC-SHA256 "
+        f"Credential={_AWS_EXAMPLE_KEY_ID}/20130524/us-east-1/s3/aws4_request, "
+        "SignedHeaders=date;host;x-amz-content-sha256;x-amz-date;"
+        "x-amz-storage-class, "
+        "Signature=98ad721746da40c64f1a55b78f14c238d841ea1380cd77a1b5971af0ece108bd"
+    )
+
+
+def test_sigv4_agrees_with_botocore_for_the_verdict_put(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The exact header set `put_object` sends, signed both ways."""
+    import botocore.auth  # noqa: PLC0415
+    from botocore.auth import S3SigV4Auth  # noqa: PLC0415
+    from botocore.awsrequest import AWSRequest  # noqa: PLC0415
+    from botocore.credentials import Credentials  # noqa: PLC0415
+
+    body = b'{"ok": true}'
+    payload_hash = hashlib.sha256(body).hexdigest()
+    host = "ol-data-witan-ci.s3.us-east-1.amazonaws.com"
+    headers = {
+        "host": host,
+        "content-type": "application/json",
+        "x-amz-content-sha256": payload_hash,
+        "x-amz-date": "20260930T120000Z",
+        "x-amz-security-token": "session-token",
+    }
+    ours = migrate.sigv4_authorization(
+        method="PUT",
+        path="/migrations/fmt9/verdict.json",
+        headers=headers,
+        payload_hash=payload_hash,
+        region="us-east-1",
+        service="s3",
+        access_key="AKIDEXAMPLE",
+        secret_key=_AWS_EXAMPLE_SECRET,
+    )
+
+    request = AWSRequest(
+        method="PUT",
+        url=f"https://{host}/migrations/fmt9/verdict.json",
+        data=body,
+        headers={k: v for k, v in headers.items() if k != "host"},
+    )
+    signer = S3SigV4Auth(
+        Credentials("AKIDEXAMPLE", _AWS_EXAMPLE_SECRET, "session-token"),
+        "s3",
+        "us-east-1",
+    )
+    # botocore stamps its own x-amz-date from the clock; pin it to ours.
+    monkeypatch.setattr(
+        botocore.auth,
+        "get_current_datetime",
+        lambda: datetime(2026, 9, 30, 12, 0, 0),  # noqa: DTZ001
+    )
+    signer.add_auth(request)
+
+    assert ours == request.headers["Authorization"]

@@ -355,17 +355,44 @@ credentials a workload has no business holding, and writing the ConfigMap
 instead would make it a second writer of a path Pulumi owns. On success it
 prints the exact cutover commands — all four: `storage_prefix` and
 `internal_schema_version` set together, `migrate_from_image` and
-`migrate_to_prefix` cleared together, matching step 5 below — and emits the
-verdict — per-graph, per-table before/after counts plus the old and new
-formats — **to its logs** as well as to `/tmp/migration-verdict.json`. Read it
-from the logs: the file lives on an `emptyDir` that goes with the container,
-and neither `kubectl exec` nor `kubectl cp` reaches a completed pod.
+`migrate_to_prefix` cleared together, matching step 5 below — and writes the
+verdict (per-graph, per-table before/after counts, the old and new formats, and
+both binaries' versions) to
+`s3://ol-data-witan-<env>/migrations/fmt<N>/verdict.json`. It writes it whether
+or not verification passed, with `ok` as computed, so a failed run leaves its
+evidence too. It overwrites that key with an `in_progress` marker before it
+starts, so a re-run that dies early cannot leave an older `ok` verdict behind
+for the cutover script to find.
+
+The logs carry it twice: indented for `kubectl logs`, and as one compact line
+after `MIGRATION_VERDICT_JSON`. Loki splits a multi-line record into one entry
+per line and kept only the header of the Production fmt9 verdict, so the
+marker line is the one to read once the pod is gone:
 
 ```shell
-kubectl -n omnigraph logs job/omnigraph-migrate-fmt6 | sed -n '/migration verdict:/,$p'
+kubectl -n omnigraph logs job/omnigraph-migrate-fmt9 | grep MIGRATION_VERDICT_JSON
+# after the pod is gone, in Loki:
+#   {namespace="omnigraph"} |= "MIGRATION_VERDICT_JSON"
 ```
 
-Then continue at **step 5** below, and finish with step 7.
+Open the cutover PR from the verdict instead of hand-editing step 5:
+
+```shell
+bin/omnigraph-cutover-pr --env QA \
+  --verdict s3://ol-data-witan-qa/migrations/fmt9/verdict.json --dry-run
+```
+
+It refuses unless the verdict is `ok`, every graph landed on one format, the
+verdict's roots are in that environment's bucket, and the stack config still
+serves the verdict's old root with this migration armed. It edits the four
+config lines in a fresh clone of `main`, checks the diff touched only those
+lines and that yamlfmt leaves the file unchanged, then prints the diff and the
+PR body. Without `--dry-run` it pushes `omnigraph-cutover-<env>-fmt<N>` and
+opens the PR through `bin/open-drift-pr`, as you (via `gh auth token`) unless
+the `GITHUB_APP_*` variables are set. It never merges.
+
+Then continue at **step 5** below (merging that PR is the config change), and
+finish with step 7.
 
 If the Job fails, it fails clean: the old root is untouched, the cluster still
 serves it, and the exports are still on the pod. Read the logs before deleting

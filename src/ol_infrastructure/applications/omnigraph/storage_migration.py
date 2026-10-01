@@ -34,8 +34,10 @@ WHAT IT WILL NOT DO. It does not repoint the live cluster. That is
 credentials; writing the ConfigMap instead would make it a second writer of a
 path Pulumi owns, the exact failure ``sync_actor_tokens.py`` documents on the
 token map. The Job verifies per-table row counts and stops, leaving a verdict
-in its logs and at ``/tmp/migration-verdict.json``. Cutting over stays a
-deliberate act by whoever is running the migration.
+in its logs and at ``s3://<bucket>/migrations/fmt<N>/verdict.json`` (written
+by the script through the same IRSA grant as the rebuild).
+``bin/omnigraph-cutover-pr`` turns that verdict into the cutover pull request;
+merging it stays a deliberate act by whoever is running the migration.
 """
 
 from pathlib import Path
@@ -120,6 +122,30 @@ fi
 count=$(printf '%s\n' "$listing" | wc -l)
 echo "snapshot: $count object(s) of $OLD_ROOT/__cluster -> $dest"
 """
+
+
+# Overwrites this rebuild's verdict key with an in-progress marker, as the
+# pod's FIRST step. The migrate script writes the same marker when it starts,
+# but it is the last container to run: a re-run whose init containers fail
+# (the old image won't pull, the snapshot finds nothing) would otherwise
+# leave the previous run's `ok: true` in place for `bin/omnigraph-cutover-pr`
+# to accept, describing a root the re-run may already have been cleared for.
+# The key must match `verdict_object` in scripts/migrate_storage_format.py.
+VERDICT_KEY_TEMPLATE = "migrations/{prefix}/verdict.json"
+INVALIDATE_VERDICT_SCRIPT = """\
+set -eu
+started=$(date -u +%Y-%m-%dT%H:%M:%S+00:00)
+marker='{"ok": false, "status": "in_progress", "new_root": "%s", "started_at": "%s"}'
+printf "$marker\\n" "$NEW_ROOT" "$started" \\
+  | aws s3 cp - "$VERDICT_URI" --content-type application/json --only-show-errors
+echo "verdict invalidated: $VERDICT_URI"
+"""
+
+
+def verdict_uri(new_storage_root: str, new_storage_prefix: str) -> str:
+    """Return where the rebuild into ``new_storage_root`` records its verdict."""
+    bucket = new_storage_root.removeprefix("s3://").split("/", 1)[0]
+    return f"s3://{bucket}/" + VERDICT_KEY_TEMPLATE.format(prefix=new_storage_prefix)
 
 
 def script_source() -> str:
@@ -313,6 +339,37 @@ def create_storage_migration(  # noqa: PLR0913
                         fs_group=1000,
                     ),
                     init_containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="invalidate-verdict",
+                            image=aws_cli_image,
+                            command=["/bin/sh", "-c", INVALIDATE_VERDICT_SCRIPT],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="NEW_ROOT", value=new_storage_root
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="VERDICT_URI",
+                                    value=Output.from_input(new_storage_root).apply(
+                                        lambda root: verdict_uri(
+                                            root, new_storage_prefix
+                                        )
+                                    ),
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="AWS_REGION", value="us-east-1"
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="HOME",
+                                    value="/tmp",  # noqa: S108
+                                ),
+                            ],
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="work",
+                                    mount_path="/tmp",  # noqa: S108
+                                )
+                            ],
+                        ),
                         kubernetes.core.v1.ContainerArgs(
                             name="stage-old-binary",
                             image=old_image,
