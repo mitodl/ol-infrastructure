@@ -240,6 +240,44 @@ projected Kubernetes token, so there is no key material at rest.
   runs as that service account can project the token, so scope the Kubernetes
   service account as narrowly as the Google grant should be.
 
+## OCW YouTube Analytics for HighSystems
+
+`mitol-ocw-yt-analytics` exists so Data Collaborative's HighSystems database can
+pull per-video engaged-view stats for OCW's YouTube channel
+([mitodl/hq#13305](https://github.com/mitodl/hq/issues/13305)). The stack enables
+the YouTube Analytics and YouTube Reporting APIs; everything else is manual.
+
+Standing it up:
+
+1. Request the project through MIT Cloud Accounts against an OCW cost object.
+   It is a separate project so its OAuth consent screen does not constrain
+   `mitol01`'s.
+2. As a project Owner, enable `serviceusage.googleapis.com` and grant the
+   automation account on the new project:
+
+   ```bash
+   gcloud services enable serviceusage.googleapis.com --project=mitol-ocw-yt-analytics
+   gcloud projects add-iam-policy-binding mitol-ocw-yt-analytics \
+     --member=serviceAccount:pulumi-gcp@mitol01.iam.gserviceaccount.com \
+     --role=roles/serviceusage.serviceUsageAdmin --condition=None
+   ```
+
+3. Deploy this stack.
+4. Console > Google Auth Platform > Branding/Audience: configure the consent
+   screen. User type follows the Google account that owns the OCW channel:
+   _Internal_ if it is an `mit.edu` account (no verification needed),
+   otherwise _External_, published to production. An External app left in
+   _Testing_ issues refresh tokens that expire after 7 days, which breaks a
+   scheduled sync.
+5. Console > Clients > Web application, with Data Collaborative's redirect URI.
+   The secret is shown once; capture it into
+   `src/bridge/secrets/gcp/` immediately, then hand the client id, secret and
+   project id to Data Collaborative over a secure channel.
+
+The channel owner then completes the OAuth flow in HighSystems with
+`yt-analytics.readonly`. An OAuth client with no token requests for six months
+is deleted by Google, so a stalled integration loses its client.
+
 ## What this does not manage
 
 - **The GCP projects themselves.** `mitol01` already exists, in folder
