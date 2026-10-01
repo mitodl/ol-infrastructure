@@ -1,0 +1,480 @@
+#!/usr/bin/env python
+"""Inspect and fix a Keycloak user's linked federated (broker) identities.
+
+Full triage guide, symptoms, and root-cause explanation:
+docs/keycloak-federated-identity-mismatch-runbook.md
+
+Two commands:
+
+  lookup   Read-only. Show a user's linked identity-provider links and,
+           optionally, compare one against an external ID the partner IdP
+           reports. A MISMATCH is the signature of a partner IdP having
+           re-issued that identity (e.g. their own user federation/LDAP
+           link got recreated), which makes Keycloak treat a returning
+           learner as a brand-new brokered identity and route them into
+           the first-broker-login "this email already exists" flow instead
+           of a normal login.
+
+  relink   Mutating (no-ops without --confirm). Re-point a user's
+           federated identity link to a corrected external ID via the
+           Admin REST API's `/users/{id}/federated-identity` endpoint
+           (`federated_identity.federated_user_id` under the hood). Only
+           touches the broker link, not the local user record — course
+           history/progress are untouched. Also sidesteps the fragile
+           first-broker-login flow on the learner's next attempt, since
+           Keycloak only runs that flow when there's no existing link to
+           find.
+
+Built for triaging partner-SSO support tickets like mitodl/hq#13588 and
+#13001.
+
+Authenticates as the existing `mitlearn-admin-client` service account (see
+olapps.py — a confidential client scoped to just view-users/query-users/
+manage-users, already used by Learn for this exact "read/update a user's
+federated identities" purpose) via the OAuth2 client_credentials grant. No
+human admin password involved. Get the client secret from Vault; this
+script never fetches it itself:
+
+    vault kv get -field=client_id secret-operations/sso/mitlearn-admin
+    vault kv get -field=client_secret secret-operations/sso/mitlearn-admin
+
+Usage:
+    uv run python bin/keycloak-federated-identity-lookup lookup \\
+        learner@partner-university.edu \\
+        --client-id "$(vault kv get -field=client_id secret-operations/sso/mitlearn-admin)" \\
+        --client-secret "$(vault kv get -field=client_secret secret-operations/sso/mitlearn-admin)" \\
+        --expected-external-id f:00000000-0000-0000-0000-000000000000:LEARNER.USERNAME \\
+        --identity-provider <idp-alias>
+
+    uv run python bin/keycloak-federated-identity-lookup relink \\
+        learner@partner-university.edu \\
+        --client-id "$(vault kv get -field=client_id secret-operations/sso/mitlearn-admin)" \\
+        --client-secret "$(vault kv get -field=client_secret secret-operations/sso/mitlearn-admin)" \\
+        --identity-provider <idp-alias> \\
+        --new-external-id f:00000000-0000-0000-0000-000000000000:LEARNER.USERNAME \\
+        --confirm
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from typing import Any
+
+import cyclopts
+import httpx
+
+app = cyclopts.App(help=__doc__)
+
+HTTP_NOT_FOUND = 404
+HTTP_UNAUTHORIZED = 401
+
+
+def _or_placeholder(value: str | None, field: str) -> str:
+    """repr(value), or a human-readable placeholder if value is None.
+
+    Never render Python's literal "None" in output meant to be read — or
+    copy-pasted as a CLI argument — by an operator.
+    """
+    return repr(value) if value is not None else f"<no {field} was stored>"
+
+
+def _cli_arg(flag: str, field: str, value: str | None) -> str:
+    """`flag repr(value)`, or a placeholder arg that can't be copy-pasted verbatim."""
+    return f"{flag} {_or_placeholder(value, field)}"
+
+
+class KeycloakAdminClient:
+    """Minimal Keycloak Admin API client (client_credentials grant)."""
+
+    def __init__(
+        self, keycloak_url: str, realm: str, client_id: str, client_secret: str
+    ) -> None:
+        """Store connection details; the service-account token is fetched lazily."""
+        self.keycloak_url = keycloak_url.rstrip("/")
+        self.realm = realm
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self._token: str | None = None
+
+    def _get_token(self) -> str:
+        # Service account clients authenticate against their own realm's token
+        # endpoint, not "master" — mitlearn-admin-client lives in olapps and
+        # holds realm-management roles scoped to that same realm.
+        token_url = (
+            f"{self.keycloak_url}/realms/{self.realm}/protocol/openid-connect/token"
+        )
+        response = httpx.post(
+            token_url,
+            data={
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+                "grant_type": "client_credentials",
+            },
+        )
+        response.raise_for_status()
+        return response.json()["access_token"]
+
+    def _request(self, method: str, url: str, **kwargs: Any) -> httpx.Response:
+        if self._token is None:
+            self._token = self._get_token()
+        headers = {"Authorization": f"Bearer {self._token}"}
+        response = httpx.request(method, url, headers=headers, **kwargs)
+        if response.status_code == HTTP_UNAUTHORIZED:
+            self._token = self._get_token()
+            headers = {"Authorization": f"Bearer {self._token}"}
+            response = httpx.request(method, url, headers=headers, **kwargs)
+        response.raise_for_status()
+        return response
+
+    def find_user_by_email(self, realm: str, email: str) -> dict[str, Any] | None:
+        """Exact-match a user by email. Returns None if not found."""
+        users_url = f"{self.keycloak_url}/admin/realms/{realm}/users"
+        response = self._request(
+            "GET", users_url, params={"email": email, "exact": "true"}
+        )
+        matches = response.json()
+        return matches[0] if matches else None
+
+    def get_federated_identities(
+        self, realm: str, user_id: str
+    ) -> list[dict[str, Any]]:
+        """Return this user's linked broker identities.
+
+        Each entry has `identityProvider`, `userId` (the external
+        federated_user_id — usually the IdP's `sub` claim) and `userName`.
+        """
+        idp_url = f"{self.keycloak_url}/admin/realms/{realm}/users/{user_id}/federated-identity"
+        try:
+            return self._request("GET", idp_url).json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == HTTP_NOT_FOUND:
+                return []
+            raise
+
+    def delete_federated_identity(
+        self, realm: str, user_id: str, identity_provider: str
+    ) -> None:
+        """Remove the link to `identity_provider`, if one exists."""
+        idp_url = (
+            f"{self.keycloak_url}/admin/realms/{realm}/users/{user_id}"
+            f"/federated-identity/{identity_provider}"
+        )
+        try:
+            self._request("DELETE", idp_url)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code != HTTP_NOT_FOUND:
+                raise
+
+    def add_federated_identity(
+        self,
+        realm: str,
+        user_id: str,
+        identity_provider: str,
+        external_id: str,
+        username: str,
+    ) -> None:
+        """Link `identity_provider` to this user using the given external ID."""
+        idp_url = (
+            f"{self.keycloak_url}/admin/realms/{realm}/users/{user_id}"
+            f"/federated-identity/{identity_provider}"
+        )
+        self._request(
+            "POST",
+            idp_url,
+            json={
+                "identityProvider": identity_provider,
+                "userId": external_id,
+                "userName": username,
+            },
+        )
+
+
+@app.command
+def lookup(
+    email: str,
+    /,
+    *,
+    client_id: str,
+    client_secret: str,
+    expected_external_id: str | None = None,
+    identity_provider: str | None = None,
+    keycloak_url: str = "https://sso.ol.mit.edu",
+    realm: str = "olapps",
+    output_format: str = "text",
+) -> None:
+    """Look up a user's federated identity links and optionally check one against an expected external ID.
+
+    Parameters
+    ----------
+    email:
+        The user's email address (exact match).
+    client_id:
+        The service-account client's ID. Get it with
+        `vault kv get -field=client_id secret-operations/sso/mitlearn-admin`.
+    client_secret:
+        The service-account client's secret. Get it with
+        `vault kv get -field=client_secret secret-operations/sso/mitlearn-admin`
+        — never pass it as a literal on the command line in a shared shell.
+    expected_external_id:
+        If given, compared against the stored `userId` (federated_user_id)
+        for the matching `identity_provider` link, and the result is called
+        out as MATCH or MISMATCH.
+    identity_provider:
+        Restrict the comparison (and, in text output, highlight) to this
+        IdP alias (e.g. "ucr"). Case-insensitive; Keycloak stores aliases
+        lowercased.
+    output_format:
+        "text" or "json".
+    """
+    client = KeycloakAdminClient(keycloak_url, realm, client_id, client_secret)
+
+    try:
+        user = client.find_user_by_email(realm, email)
+        if user is None:
+            print(f"No user found with email {email!r} in realm {realm!r}.")
+            sys.exit(1)
+        all_links = client.get_federated_identities(realm, user["id"])
+    except httpx.HTTPError as e:
+        print(f"\nERROR: Keycloak API request failed: {e}")
+        sys.exit(1)
+    links = all_links
+    if identity_provider:
+        links = [
+            link
+            for link in links
+            if link.get("identityProvider", "").lower() == identity_provider.lower()
+        ]
+
+    comparison = None
+    if expected_external_id is not None:
+        # `matches` is None (not False) when there's nothing to compare
+        # against — no federated identity link exists at all (optionally
+        # scoped to --identity-provider) — so that state can't be displayed
+        # or reported as a MISMATCH, which would misleadingly suggest a
+        # stale link exists when there's no link at all.
+        matches = None
+        if links:
+            matched_link = next(
+                (link for link in links if link.get("userId") == expected_external_id),
+                None,
+            )
+            matches = matched_link is not None
+        comparison = {
+            "expected_external_id": expected_external_id,
+            "matches": matches,
+        }
+
+    result = {
+        "email": email,
+        "user_id": user["id"],
+        "created_timestamp": user.get("createdTimestamp"),
+        "federated_identities": links,
+        "comparison": comparison,
+    }
+
+    if output_format == "json":
+        print(json.dumps(result, indent=2))
+        return
+
+    print(f"User: {email}")
+    print(f"  Keycloak user ID: {user['id']}")
+    print(f"  Created: {user.get('createdTimestamp')}")
+    if not links:
+        if identity_provider and all_links:
+            print(
+                f"  No federated identity links found for provider {identity_provider!r}."
+            )
+        else:
+            print("  No federated identity links found.")
+    for link in links:
+        print(
+            f"  IdP: {_or_placeholder(link.get('identityProvider'), 'identityProvider')}"
+        )
+        print(
+            "    External user ID (federated_user_id): "
+            f"{_or_placeholder(link.get('userId'), 'userId')}"
+        )
+        print(f"    IdP username: {_or_placeholder(link.get('userName'), 'userName')}")
+    if comparison is not None:
+        if comparison["matches"] is None:
+            scope = f" for provider {identity_provider!r}" if identity_provider else ""
+            print(
+                f"\nExpected external ID {expected_external_id!r}: N/A — no "
+                f"federated identity links{scope} to compare against."
+            )
+        else:
+            verdict = "MATCH" if comparison["matches"] else "MISMATCH"
+            print(f"\nExpected external ID {expected_external_id!r}: {verdict}")
+        if comparison["matches"] is False:
+            print(
+                "  None of the linked identities match. This is the signature "
+                "of the partner IdP having re-issued the user's federated "
+                "identity (e.g. a recreated LDAP/user-federation link on "
+                "their side) — Keycloak treats the new subject as a brand "
+                "new broker identity and routes into first-broker-login's "
+                "'this email already exists' flow instead of a normal login."
+            )
+
+
+@app.command
+def relink(
+    email: str,
+    /,
+    *,
+    client_id: str,
+    client_secret: str,
+    identity_provider: str,
+    new_external_id: str,
+    new_username: str | None = None,
+    keycloak_url: str = "https://sso.ol.mit.edu",
+    realm: str = "olapps",
+    confirm: bool = False,
+) -> None:
+    """Re-point a user's federated identity link to a new external ID.
+
+    Only touches the broker link (delete + re-add via the Admin API) — the
+    local user record, course history, and progress are untouched. Use this
+    when `lookup --expected-external-id` reports a MISMATCH and the partner
+    IdP has confirmed the new value is correct.
+
+    This deliberately skips the browser-based first-broker-login "confirm
+    link" flow entirely: since the link already exists and already points at
+    the right external ID before the user tries again, their next login is
+    an ordinary single-request broker LOGIN, not a multi-step flow.
+
+    Parameters
+    ----------
+    email:
+        The user's email address (exact match).
+    client_id:
+        The service-account client's ID. Get it with
+        `vault kv get -field=client_id secret-operations/sso/mitlearn-admin`.
+    client_secret:
+        The service-account client's secret. Get it with
+        `vault kv get -field=client_secret secret-operations/sso/mitlearn-admin`
+        — never pass it as a literal on the command line in a shared shell.
+    identity_provider:
+        The IdP alias to relink (e.g. "ucr"). Case-insensitive; Keycloak
+        stores aliases lowercased.
+    new_external_id:
+        The external user ID/`sub` the partner IdP now reports.
+    new_username:
+        The IdP username to store alongside the new ID. Defaults to the
+        existing link's userName if there is one, since this rarely changes
+        even when the external ID does.
+    confirm:
+        Nothing is changed unless this is passed. Without it, prints what
+        would happen and exits.
+    """
+    if not new_external_id.strip():
+        print("--new-external-id must not be empty.")
+        sys.exit(1)
+
+    client = KeycloakAdminClient(keycloak_url, realm, client_id, client_secret)
+    identity_provider = identity_provider.lower()
+
+    try:
+        user = client.find_user_by_email(realm, email)
+        if user is None:
+            print(f"No user found with email {email!r} in realm {realm!r}.")
+            sys.exit(1)
+        links = client.get_federated_identities(realm, user["id"])
+    except httpx.HTTPError as e:
+        print(f"\nERROR: Keycloak API request failed: {e}")
+        sys.exit(1)
+    existing = next(
+        (
+            link
+            for link in links
+            if link.get("identityProvider", "").lower() == identity_provider
+        ),
+        None,
+    )
+
+    if new_username is None:
+        if existing is None or existing.get("userName") is None:
+            print(
+                f"No existing {identity_provider!r} link (or no stored userName "
+                "on it) to infer a username from — pass --new-username "
+                "explicitly."
+            )
+            sys.exit(1)
+        new_username = existing["userName"]
+
+    old_id_display = (
+        _or_placeholder(existing.get("userId"), "external ID")
+        if existing
+        else "(no existing link)"
+    )
+    print(f"User: {email} ({user['id']})")
+    print(f"  {identity_provider}: {old_id_display} -> {new_external_id}")
+    print(f"  userName: {new_username}")
+
+    if not confirm:
+        print("\nDry run only — re-run with --confirm to apply this change.")
+        return
+
+    try:
+        client.delete_federated_identity(realm, user["id"], identity_provider)
+    except httpx.HTTPError as e:
+        print(
+            f"\nERROR: failed to delete the old {identity_provider!r} link ({e}). "
+            "Nothing was changed — the old link, if any, is still in place."
+        )
+        sys.exit(1)
+
+    try:
+        client.add_federated_identity(
+            realm, user["id"], identity_provider, new_external_id, new_username
+        )
+    except httpx.HTTPError as e:
+        # Covers both HTTPStatusError (a 4xx/5xx from Keycloak) and
+        # RequestError (a network-level failure, e.g. a timeout) — either
+        # way, the delete above already succeeded, so the user now has no
+        # link at all and needs the same recovery guidance.
+        print(
+            f"\nERROR: the old {identity_provider!r} link was removed, but adding "
+            f"the new one failed ({e}). The user currently has NO {identity_provider!r} "
+            "link at all."
+        )
+        if existing is not None:
+            external_id_arg = _cli_arg(
+                "--new-external-id", "external ID", existing.get("userId")
+            )
+            username_arg = _cli_arg(
+                "--new-username", "username", existing.get("userName")
+            )
+            print(
+                "To restore the previous link manually, re-run with:\n"
+                f"  {external_id_arg} {username_arg} --confirm"
+            )
+        sys.exit(1)
+
+    try:
+        links_after = client.get_federated_identities(realm, user["id"])
+    except httpx.HTTPError as e:
+        print(
+            f"\nWarning: the relink calls succeeded, but verifying the result "
+            f"failed ({e}). Re-run `lookup` to check current state."
+        )
+        return
+    updated = next(
+        (
+            link
+            for link in links_after
+            if link.get("identityProvider", "").lower() == identity_provider
+        ),
+        None,
+    )
+    if updated and updated.get("userId") == new_external_id:
+        print("Done — verified the new link is in place.")
+    else:
+        print(
+            "Warning: relink calls succeeded but verification did not find "
+            "the expected value. Re-run `lookup` to check current state."
+        )
+
+
+if __name__ == "__main__":
+    app()
