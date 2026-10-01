@@ -7,56 +7,56 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-09-22T21:06:38.504753082Z"
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
-mitol-django-google-sheets = { timestamp = "2026-09-29T21:06:38.504772843Z", span = "PT0S" }
-ol-openedx-uai-content-customization = { timestamp = "2026-09-29T21:06:38.504769551Z", span = "PT0S" }
-ol-openedx-canvas-integration = { timestamp = "2026-09-29T21:06:38.504762792Z", span = "PT0S" }
-ol-concourse = { timestamp = "2026-09-29T21:06:38.50476035Z", span = "PT0S" }
-mitol-django-olposthog = { timestamp = "2026-09-29T21:06:38.50477459Z", span = "PT0S" }
-mitol-django-oauth-toolkit-extensions = { timestamp = "2026-09-29T21:06:38.504774236Z", span = "PT0S" }
-ol-social-auth = { timestamp = "2026-09-29T21:06:38.504769873Z", span = "PT0S" }
-mitol-django-payment-gateway = { timestamp = "2026-09-29T21:06:38.504775246Z", span = "PT0S" }
-ol-openedx-ai-static-translations = { timestamp = "2026-09-29T21:06:38.504761974Z", span = "PT0S" }
-mitol-django-google-sheets-refunds = { timestamp = "2026-09-29T21:06:38.504773568Z", span = "PT0S" }
-ol-openedx-chat-xblock = { timestamp = "2026-09-29T21:06:38.504763588Z", span = "PT0S" }
-ol-openedx-events-handler = { timestamp = "2026-09-29T21:06:38.504766783Z", span = "PT0S" }
-ol-openedx-feedback = { timestamp = "2026-09-29T21:06:38.504767128Z", span = "PT0S" }
-ol-openedx-logging = { timestamp = "2026-09-29T21:06:38.504767866Z", span = "PT0S" }
-ol-openedx-rapid-response-reports = { timestamp = "2026-09-29T21:06:38.504768895Z", span = "PT0S" }
-mitol-django-observability = { timestamp = "2026-09-29T21:06:38.504776238Z", span = "PT0S" }
-mitol-django-authentication = { timestamp = "2026-09-29T21:06:38.504771864Z", span = "PT0S" }
-ol-openedx-lti-utilities = { timestamp = "2026-09-29T21:06:38.504768198Z", span = "PT0S" }
-ol-openedx-checkout-external = { timestamp = "2026-09-29T21:06:38.504763924Z", span = "PT0S" }
-mitol-django-geoip = { timestamp = "2026-09-29T21:06:38.504772521Z", span = "PT0S" }
-ol-openedx-git-auto-export = { timestamp = "2026-09-29T21:06:38.504767492Z", span = "PT0S" }
-ol-openedx-chat = { timestamp = "2026-09-29T21:06:38.504763256Z", span = "PT0S" }
-mitol-django-hubspot-api = { timestamp = "2026-09-29T21:06:38.504773905Z", span = "PT0S" }
-openedx-companion-auth = { timestamp = "2026-09-29T21:06:38.504770215Z", span = "PT0S" }
-ol-openedx-course-sync = { timestamp = "2026-09-29T21:06:38.504765257Z", span = "PT0S" }
-mitol-django-digitalcredentials = { timestamp = "2026-09-29T21:06:38.50477219Z", span = "PT0S" }
-mitol-django-common = { timestamp = "2026-09-29T21:06:38.504770867Z", span = "PT0S" }
-ol-openedx-sentry = { timestamp = "2026-09-29T21:06:38.504769214Z", span = "PT0S" }
-rapid-response-xblock = { timestamp = "2026-09-29T21:06:38.504770544Z", span = "PT0S" }
-mitol-django-mail = { timestamp = "2026-09-29T21:06:38.504771521Z", span = "PT0S" }
-mitol-django-google-sheets-deferrals = { timestamp = "2026-09-29T21:06:38.5047732Z", span = "PT0S" }
-ol-openedx-course-translations = { timestamp = "2026-09-29T21:06:38.504766449Z", span = "PT0S" }
-ol-openedx-course-outline-api = { timestamp = "2026-09-29T21:06:38.504764609Z", span = "PT0S" }
-mitol-django-transcoding = { timestamp = "2026-09-29T21:06:38.504775597Z", span = "PT0S" }
-edx-username-changer = { timestamp = "2026-09-29T21:06:38.504761595Z", span = "PT0S" }
-ol-openedx-auto-select-language = { timestamp = "2026-09-29T21:06:38.50476236Z", span = "PT0S" }
-mitol-django-apigateway = { timestamp = "2026-09-29T21:06:38.50477592Z", span = "PT0S" }
-ol-openedx-course-structure-api = { timestamp = "2026-09-29T21:06:38.504764937Z", span = "PT0S" }
-mitol-drf-lint = { timestamp = "2026-09-29T21:06:38.504776873Z", span = "PT0S" }
-django-aqueduct = { timestamp = "2026-09-29T21:06:38.504760766Z", span = "PT0S" }
-prek = { timestamp = "2026-09-29T21:06:38.504758309Z", span = "PT0S" }
-ol-openedx-otel-monitoring = { timestamp = "2026-09-29T21:06:38.504768541Z", span = "PT0S" }
-edx-sysadmin = { timestamp = "2026-09-29T21:06:38.504761144Z", span = "PT0S" }
-ol-openedx-course-export = { timestamp = "2026-09-29T21:06:38.504764264Z", span = "PT0S" }
-mitol-django-openedx = { timestamp = "2026-09-29T21:06:38.50477492Z", span = "PT0S" }
-mitol-django-scim = { timestamp = "2026-09-29T21:06:38.504776547Z", span = "PT0S" }
+django-aqueduct = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+edx-sysadmin = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+edx-username-changer = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-apigateway = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-authentication = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-common = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-digitalcredentials = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-geoip = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-google-sheets = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-google-sheets-deferrals = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-google-sheets-refunds = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-hubspot-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-mail = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-oauth-toolkit-extensions = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-observability = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-olposthog = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-openedx = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-payment-gateway = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-scim = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-django-transcoding = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+mitol-drf-lint = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-concourse = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-ai-static-translations = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-auto-select-language = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-canvas-integration = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-chat = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-chat-xblock = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-checkout-external = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-export = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-outline-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-structure-api = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-sync = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-course-translations = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-events-handler = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-feedback = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-git-auto-export = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-logging = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-lti-utilities = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-otel-monitoring = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-rapid-response-reports = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-sentry = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-openedx-uai-content-customization = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+ol-social-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+openedx-companion-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+prek = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+rapid-response-xblock = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 
 [manifest]
 members = [
@@ -2371,11 +2371,11 @@ wheels = [
 
 [[package]]
 name = "pyjwt"
-version = "2.14.0"
+version = "2.15.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/af/c3/8a3b59c25070cc61dc517fbdfa5dc0904670c96f605cc69759dc09166b99/pyjwt-2.14.0.tar.gz", hash = "sha256:77283c83fb56ecf566a886c757a714bc83668e38156de2cce8263302f42e0b86", size = 113177, upload-time = "2026-09-11T13:11:54.638Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/02/a5/5197bfd06417837ac079921c66fa6393f1dea3557272a263cebfef69e432/pyjwt-2.15.0.tar.gz", hash = "sha256:b11c5f9791d7bf51c2b39a81ed669f6b2dbbd669df2942f6c60167e9e3d1abe4", size = 120513, upload-time = "2026-09-23T16:56:00.689Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9c/97/672cb32ce0dfea44b740cb7b4f97038463b9cf7c0ead1aacf595572851d6/pyjwt-2.14.0-py3-none-any.whl", hash = "sha256:ad0cef71c756a56e74863c2919cf0985f72decbcfcb550ee2f422e7c62b5eedc", size = 32896, upload-time = "2026-09-11T13:11:53.409Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/55/40e45bf052ee8ee12a4dfd785519660f8effa7b065442b91646ec6828619/pyjwt-2.15.0-py3-none-any.whl", hash = "sha256:7a3742debf6b879e912dbb9819ceec1594be812452b78c5f2e2dfc56564954f8", size = 33680, upload-time = "2026-09-23T16:55:59.241Z" },
 ]
 
 [package.optional-dependencies]
