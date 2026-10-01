@@ -384,11 +384,11 @@ cluster = eks.Cluster(
     access_entries=access_entries,
     authentication_mode=eks.AuthenticationMode("API"),
     create_oidc_provider=True,
-    enabled_cluster_log_types=[
-        "api",
-        "audit",
-        "authenticator",
-    ],
+    # GuardDuty EKS_AUDIT_LOGS reads the audit stream directly, not from
+    # CloudWatch, so trimming these outside production costs no detection.
+    enabled_cluster_log_types=["api", "audit", "authenticator"]
+    if stack_info.env_suffix == "production"
+    else ["authenticator"],
     endpoint_private_access=False,
     endpoint_public_access=True,
     fargate=False,
