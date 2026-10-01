@@ -181,6 +181,7 @@ gwarek_db_security_group = ec2.SecurityGroup(
 )
 
 rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["read_replica"] = None
 gwarek_db_config = OLPostgresDBConfig(
     instance_name=f"gwarek-db-{stack_info.env_suffix}",
     # .require(), not .require_secret() -- OLPostgresDBConfig.password is a
