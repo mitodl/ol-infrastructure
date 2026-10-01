@@ -1716,6 +1716,44 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             opts=resource_options,
         )
 
+        # BOARD INFINITY [START]
+        # Same private_key_jwt pattern as Masai School (no client_secret ->
+        # onboard_oidc_org configures private_key_jwt automatically, verified
+        # against their discovery doc's token_endpoint_auth_methods_supported).
+        # Board Infinity additionally requires PKCE S256 on every client,
+        # confirmed by their discovery doc's code_challenge_methods_supported;
+        # that's not a first-class field on this provider's IdentityProvider
+        # resource, so it goes through extra_config.
+        onboard_oidc_org(
+            OIDCIdpConfig(
+                idp_alias="BOARDINFINITY",
+                idp_display_name="Board Infinity",
+                org_oidc_metadata_url="https://platform.boardinfinity.com/auth-api/oidc/.well-known/openid-configuration",
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="mit-learn",
+                extra_config={
+                    "pkceEnabled": "true",
+                    "pkceMethod": "S256",
+                },
+            ),
+            org=OrgConfig(
+                # Same as upGrad/Masai School/Apply7: learners reach MIT
+                # Learn via a direct kc_idp_hint link from Board Infinity's
+                # own student panel, using personal email addresses, so
+                # domain-based home-realm discovery can't route them --
+                # no domain is needed to gate access.
+                org_domains=[],
+                org_name="Board Infinity",
+                org_alias="BOARDINFINITY",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        # BOARD INFINITY [END]
+
     # B2B Organizations [END]
 
     if stack_info.env_suffix in ["ci", "qa"]:

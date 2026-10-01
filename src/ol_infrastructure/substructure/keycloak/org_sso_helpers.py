@@ -357,6 +357,7 @@ class OIDCIdpConfig(BaseModel):
     resource_options: pulumi.ResourceOptions
     client_id: str
     client_secret: str | None = None
+    extra_config: dict[str, str] | None = None  # Merged in, takes precedence
 
 
 def onboard_oidc_org(
@@ -395,9 +396,11 @@ def onboard_oidc_org(
         oidc_config.org_oidc_metadata_url,
         client_secret=oidc_config.client_secret,
     )
-    oidc_idp_arg_map["extra_config"] = {
-        "jwtX509HeadersEnabled": True,
-    } | oidc_idp_arg_map.get("extra_config", {})
+    oidc_idp_arg_map["extra_config"] = (
+        {"jwtX509HeadersEnabled": True}
+        | oidc_idp_arg_map.get("extra_config", {})
+        | (oidc_config.extra_config or {})
+    )
     oidc_idp_arg_map["login_hint"] = True  # Preserve existing login_hint configuration
     return keycloak.oidc.IdentityProvider(
         f"ol-apps-{resource_alias}-oidc-idp",
