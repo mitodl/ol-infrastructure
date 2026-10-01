@@ -159,10 +159,19 @@ live_offline_bucket_arn = f"arn:aws:s3:::{live_offline_bucket_name}"
 test_offline_bucket_name = f"ocw-content-offline-test-{stack_info.env_suffix}"
 test_offline_bucket_arn = f"arn:aws:s3:::{test_offline_bucket_name}"
 
+# ocw-studio publishes each site as a fresh Hugo build pushed with `aws s3 sync`,
+# and sync re-uploads any file whose local mtime is newer than the object, so
+# every publish leaves a full noncurrent copy of the previous build behind. With
+# no noncurrent-version expiry those copies were 97% of sampled bytes on the
+# production buckets and ~270 TiB of Standard storage overall (2026-09-30).
+# 30 days keeps a version-id undo window; OCW can always republish beyond that.
+OCW_NONCURRENT_VERSION_EXPIRATION_DAYS = 30
+
 # Draft bucket
 draft_bucket_config = S3BucketConfig(
     bucket_name=draft_bucket_name,
     versioning_enabled=True,
+    noncurrent_version_expiration_days=OCW_NONCURRENT_VERSION_EXPIRATION_DAYS,
     ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
@@ -226,6 +235,7 @@ draft_bucket = OLBucket(
 test_bucket_config = S3BucketConfig(
     bucket_name=test_bucket_name,
     versioning_enabled=True,
+    noncurrent_version_expiration_days=OCW_NONCURRENT_VERSION_EXPIRATION_DAYS,
     ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
@@ -285,6 +295,7 @@ test_bucket = OLBucket(
 live_bucket_config = S3BucketConfig(
     bucket_name=live_bucket_name,
     versioning_enabled=True,
+    noncurrent_version_expiration_days=OCW_NONCURRENT_VERSION_EXPIRATION_DAYS,
     ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
@@ -349,6 +360,7 @@ live_bucket = OLBucket(
 draft_backup_bucket_config = S3BucketConfig(
     bucket_name=draft_backup_bucket_name,
     versioning_enabled=True,
+    noncurrent_version_expiration_days=OCW_NONCURRENT_VERSION_EXPIRATION_DAYS,
     ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
@@ -396,6 +408,7 @@ draft_backup_bucket = OLBucket(
 live_backup_bucket_config = S3BucketConfig(
     bucket_name=live_backup_bucket_name,
     versioning_enabled=True,
+    noncurrent_version_expiration_days=OCW_NONCURRENT_VERSION_EXPIRATION_DAYS,
     ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
@@ -451,6 +464,7 @@ live_backup_bucket = OLBucket(
 draft_offline_bucket_config = S3BucketConfig(
     bucket_name=draft_offline_bucket_name,
     versioning_enabled=True,
+    noncurrent_version_expiration_days=OCW_NONCURRENT_VERSION_EXPIRATION_DAYS,
     ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
@@ -528,6 +542,7 @@ draft_offline_bucket = OLBucket(
 live_offline_bucket_config = S3BucketConfig(
     bucket_name=live_offline_bucket_name,
     versioning_enabled=True,
+    noncurrent_version_expiration_days=OCW_NONCURRENT_VERSION_EXPIRATION_DAYS,
     ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
@@ -602,6 +617,7 @@ live_offline_bucket = OLBucket(
 test_offline_bucket_config = S3BucketConfig(
     bucket_name=test_offline_bucket_name,
     versioning_enabled=True,
+    noncurrent_version_expiration_days=OCW_NONCURRENT_VERSION_EXPIRATION_DAYS,
     ownership_controls="BucketOwnerPreferred",
     cors_rules=[
         s3.BucketCorsConfigurationCorsRuleArgs(
