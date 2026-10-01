@@ -106,11 +106,17 @@ repositories.
   install's settings page.
 - Private repositories are out: autofix.ci is free only for public repositories. An org
   owner still has to deselect `access-forge`, `alerting-omnibus` and `hq`, plus
-  `superset-marimo`, `ocw_oer_export` and `ol-rootly-manager`, which left the migration.
+  `superset-marimo`, `ocw_oer_export` and `ol-rootly-manager`, which left the migration on
+  2026-10-01 (their migration PRs
+  [superset-marimo#2](https://github.com/mitodl/superset-marimo/pull/2),
+  [ocw_oer_export#230](https://github.com/mitodl/ocw_oer_export/pull/230) and
+  [ol-rootly-manager#7](https://github.com/mitodl/ol-rootly-manager/pull/7) were closed
+  unmerged).
 
 **Retiring: `pre-commit-ci`**, installation `22207049`, selected repositories. An org owner
-read its membership on 2026-09-28: 22 repositories. 14 are in the migration's scope, and 8
-are archived, so they need nothing before the uninstall.
+read its membership on 2026-09-28: 22 repositories. 14 were in the inventory's migration
+scope, and 13 still are; `ocw_oer_export` has since left it (below). The other 8 are
+archived, so they need nothing before the uninstall.
 
 - Before the uninstall, each in-scope repository needs `prek` as a required check (contract
   §6). Then an org owner deselects it, and a PR removes its interim `ci:` block (§7).
