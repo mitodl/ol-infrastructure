@@ -532,7 +532,7 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                             timeout_seconds=10,
                         ),
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "250m", "memory": "256Mi"},
+                            requests={"cpu": "100m", "memory": "256Mi"},
                             limits={"memory": "512Mi"},
                         ),
                         security_context=kubernetes.core.v1.SecurityContextArgs(
@@ -794,7 +794,7 @@ if edxorg_xqueue_enabled and edxorg_servers_secret and xqwatcher_edxorg_configma
                                 timeout_seconds=10,
                             ),
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                requests={"cpu": "250m", "memory": "256Mi"},
+                                requests={"cpu": "100m", "memory": "256Mi"},
                                 limits={"memory": "512Mi"},
                             ),
                             security_context=kubernetes.core.v1.SecurityContextArgs(

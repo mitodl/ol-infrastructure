@@ -84,7 +84,7 @@ config:
       tags: {}
       taints: {}
       version:
-  eks:traefik_min_replicas: 5
+  eks:traefik_min_replicas: 3
   eks:traefik_max_replicas: 10
   environment:business_unit: data
   environment:target_vpc: data_vpc

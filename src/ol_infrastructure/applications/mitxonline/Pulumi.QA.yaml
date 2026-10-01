@@ -15,7 +15,7 @@ config:
   mitxonline:k8s_deploy: "true"
   mitxonline:dev_shell_enabled: false
   mitxonline:learn_backend_domain: "api.rc.learn.mit.edu"
-  mitxonline:min_replicas: 4
+  mitxonline:min_replicas: 2
   mitxonline:use_granian: true
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-qa"
