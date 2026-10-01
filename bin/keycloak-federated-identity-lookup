@@ -381,16 +381,21 @@ def relink(
             "link at all."
         )
         if existing is not None:
-            old_username = existing.get("userName")
-            username_arg = (
-                f"--new-username {old_username!r}"
-                if old_username is not None
-                else "--new-username <no username was stored on the old link>"
+
+            def _cli_arg(flag: str, field: str, value: str | None) -> str:
+                if value is not None:
+                    return f"{flag} {value!r}"
+                return f"{flag} <no {field} was stored on the old link>"
+
+            external_id_arg = _cli_arg(
+                "--new-external-id", "external ID", existing.get("userId")
+            )
+            username_arg = _cli_arg(
+                "--new-username", "username", existing.get("userName")
             )
             print(
                 "To restore the previous link manually, re-run with:\n"
-                f"  --new-external-id {existing.get('userId')!r} {username_arg} "
-                "--confirm"
+                f"  {external_id_arg} {username_arg} --confirm"
             )
         sys.exit(1)
 
