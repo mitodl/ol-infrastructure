@@ -37,7 +37,9 @@ K8S_SA_DIR = Path("/var/run/secrets/kubernetes.io/serviceaccount")
 
 
 def _tls_context(ca_file: str) -> ssl.SSLContext:
-    return ssl.create_default_context(cafile=ca_file)
+    context = ssl.create_default_context(cafile=ca_file)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    return context
 
 
 def check_unauthenticated_rejected(host: str, port: int, ca_file: str) -> str | None:
