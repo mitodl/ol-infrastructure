@@ -1,6 +1,7 @@
 {
   "measured_at": "2026-09-28",
   "source": "gh repo list mitodl (non-archived, non-fork) + shallow default-branch clones + GitHub REST/GraphQL",
+  "scope_updated_at": "2026-10-01",
   "counts": {
     "active_non_fork_repos": 77,
     "stale_over_365_days": 16,
@@ -11,10 +12,10 @@
     "pre_commit_ci_status_on_recent_prs": 14,
     "by_wave": {
       "supporting": 2,
-      "standard": 16,
+      "standard": 11,
       "already-prek": 3,
-      "excluded": 42,
-      "complex": 9,
+      "excluded": 48,
+      "complex": 8,
       "pilot": 3,
       "withheld": 2
     }
@@ -184,8 +185,10 @@
     },
     {
       "name": "access-forge",
-      "wave": "standard",
-      "wave_reasons": [],
+      "wave": "excluded",
+      "wave_reasons": [
+        "dropped from scope 2026-10-01: D7: private repository; autofix.ci is paid on private repositories"
+      ],
       "visibility": "PRIVATE",
       "tier": "tier-1",
       "pushed_at": "2026-09-28T05:00:30Z",
@@ -274,7 +277,8 @@
       "doc_refs": [],
       "tooling_refs": [],
       "stale_over_365_days": false,
-      "pre_commit_ci_installed": false
+      "pre_commit_ci_installed": false,
+      "measured_wave": "standard"
     },
     {
       "name": "agent-kit",
@@ -349,8 +353,10 @@
     },
     {
       "name": "alerting-omnibus",
-      "wave": "standard",
-      "wave_reasons": [],
+      "wave": "excluded",
+      "wave_reasons": [
+        "dropped from scope 2026-10-01: D7: private repository; autofix.ci is paid on private repositories"
+      ],
       "visibility": "PRIVATE",
       "tier": "tier-1",
       "pushed_at": "2026-06-30T18:10:28Z",
@@ -430,7 +436,8 @@
       "doc_refs": [],
       "tooling_refs": [],
       "stale_over_365_days": false,
-      "pre_commit_ci_installed": false
+      "pre_commit_ci_installed": false,
+      "measured_wave": "standard"
     },
     {
       "name": "apisix-testbed",
@@ -1060,8 +1067,10 @@
     },
     {
       "name": "hq",
-      "wave": "standard",
-      "wave_reasons": [],
+      "wave": "excluded",
+      "wave_reasons": [
+        "dropped from scope 2026-10-01: D7: private repository; autofix.ci is paid on private repositories"
+      ],
       "visibility": "PRIVATE",
       "tier": "tier-1",
       "pushed_at": "2026-09-27T23:54:20Z",
@@ -1139,7 +1148,8 @@
       "doc_refs": [],
       "tooling_refs": [],
       "stale_over_365_days": false,
-      "pre_commit_ci_installed": false
+      "pre_commit_ci_installed": false,
+      "measured_wave": "standard"
     },
     {
       "name": "keycloak-scim",
@@ -3151,8 +3161,10 @@
     },
     {
       "name": "ocw_oer_export",
-      "wave": "standard",
-      "wave_reasons": [],
+      "wave": "excluded",
+      "wave_reasons": [
+        "dropped from scope 2026-10-01: dropped by owner; migration PR mitodl/ocw_oer_export#230 closed unmerged; its hook enforcement ends at the pre-commit.ci uninstall, accepted"
+      ],
       "visibility": "PUBLIC",
       "tier": "tier-1",
       "pushed_at": "2026-09-23T00:00:22Z",
@@ -3254,7 +3266,8 @@
       ],
       "tooling_refs": [],
       "stale_over_365_days": false,
-      "pre_commit_ci_installed": true
+      "pre_commit_ci_installed": true,
+      "measured_wave": "standard"
     },
     {
       "name": "odl-video-service",
@@ -4580,8 +4593,9 @@
     },
     {
       "name": "ol-rootly-manager",
-      "wave": "complex",
+      "wave": "excluded",
       "wave_reasons": [
+        "dropped from scope 2026-10-01: archived; migration PR mitodl/ol-rootly-manager#7 closed unmerged",
         "pre-commit.ci skips ['hadolint-docker', 'packer_fmt']; not run anywhere in CI today: ['hadolint-docker', 'packer_fmt']"
       ],
       "visibility": "PUBLIC",
@@ -4723,7 +4737,8 @@
       "doc_refs": [],
       "tooling_refs": [],
       "stale_over_365_days": false,
-      "pre_commit_ci_installed": false
+      "pre_commit_ci_installed": false,
+      "measured_wave": "complex"
     },
     {
       "name": "oldevops-scratch",
@@ -5853,8 +5868,10 @@
     },
     {
       "name": "superset-marimo",
-      "wave": "standard",
-      "wave_reasons": [],
+      "wave": "excluded",
+      "wave_reasons": [
+        "dropped from scope 2026-10-01: unused and being archived (owner); migration PR mitodl/superset-marimo#2 closed unmerged"
+      ],
       "visibility": "PUBLIC",
       "tier": "tier-1",
       "pushed_at": "2026-05-22T19:14:05Z",
@@ -5948,7 +5965,8 @@
       "doc_refs": [],
       "tooling_refs": [],
       "stale_over_365_days": false,
-      "pre_commit_ci_installed": false
+      "pre_commit_ci_installed": false,
+      "measured_wave": "standard"
     },
     {
       "name": "superset-nl-explorer",
