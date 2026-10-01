@@ -389,7 +389,7 @@ cluster = eks.Cluster(
     enabled_cluster_log_types=["api", "audit", "authenticator"]
     if stack_info.env_suffix == "production"
     else ["authenticator"],
-    endpoint_private_access=False,
+    endpoint_private_access=True,
     endpoint_public_access=True,
     fargate=False,
     ip_family="ipv4",
