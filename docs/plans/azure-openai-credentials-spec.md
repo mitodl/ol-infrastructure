@@ -328,7 +328,7 @@ exactly the credential this design exists to eliminate.
 - After the per-app deploys: `kubectl exec` to confirm the four `AZURE_*` variables and the
   projected token file are present, **and** that `OPENAI_API_KEY` is still present and
   unchanged.
-- `pre-commit run --all-files` and `mypy` on all touched files.
+- `prek run --all-files` and `mypy` on all touched files.
 
 ## 9. Rejected alternative: Vault's Azure secrets engine
 
