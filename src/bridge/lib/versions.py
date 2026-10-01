@@ -52,6 +52,15 @@ EFS_CSI_DRIVER_VERSION = "v3.4.2-eksbuild.1"
 EXTERNAL_DNS_CHART_VERSION = "1.22.0"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
 GATEWAY_API_VERSION = "v1.6.2"
+# Every chart bump needs its entity-store upgrade SQL applied first; see
+# docs/plans/gravitino-deployment-spec.md (P3). Do not merge a bump alone.
+# renovate: datasource=docker depName=gravitino-helm packageName=apache/gravitino-helm
+GRAVITINO_CHART_VERSION = "1.3.11"
+# The server image, the chart's appVersion and the schema SQL the stack applies
+# (scripts/postgresql/schema-<version>-postgresql.sql) all move together, with
+# the upgrade SQL, under the same rule as the chart above.
+# renovate: datasource=docker depName=gravitino packageName=apache/gravitino
+GRAVITINO_VERSION = "1.3.0"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
 KARPENTER_CHART_VERSION = "1.14.1"
 # renovate: datasource=helm depName=keda packageName=keda registryUrl=https://kedacore.github.io/charts

@@ -1,0 +1,17 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwGxOSneui367AP8i8gwmO2SAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMHSksYOCvP9jjHBbZAgEQgDvcwAcTGaV20IVamNM+otQZVKUY11SgYVxA31NzZ92N7WSl/GUsTBjTLH8v4xoPZ8aw90At4XXbqbS0rQ==
+config:
+  gravitino:db_password:
+    secure: v1:JKkniJjungUc3drI:9G73KkcB5Wy32ZPjBF/U1KBuuJ3OFgT/RnA1NBZh1BeXSSRJvqJJ8hnbXTxFu5pdoAlMT7gxMrJYWtfVNKlQeg==
+  gravitino:keystore_password:
+    secure: v1:fR2OqHnU4Vl720VU:NPlSYifciFfagCSBdkHYKsfzWGGtD6VRQ65PeEb96wYcIbzNTWOxKlE4ohp+cvGxNCSm7wsHW4G4M4XZDEjbhw==
+  gravitino:cpu_request: 1000m
+  gravitino:db_instance_size: db.t4g.medium
+  # The "moderate production" sizing in docs/gravitino-server-config.md.
+  gravitino:jvm_memory: -Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g
+  gravitino:keycloak_issuer: https://sso.ol.mit.edu/realms/ol-data-platform
+  gravitino:memory_limit: 6Gi
+  gravitino:replicas: "2"
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

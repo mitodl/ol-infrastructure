@@ -13,7 +13,9 @@ from pulumi_aws import athena, glue, iam, s3
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.iam_helper import (
+    DATA_LAKE_STAGES,
     cross_environment_glue_denial,
+    data_lake_bucket_arns,
     data_lake_glue_resources,
     lint_iam_policy,
 )
@@ -37,17 +39,6 @@ aws_config = AWSBase(
     },
 )
 s3_kms_key = kms_stack.require_output("kms_s3_data_analytics_key")
-
-data_stages = (
-    "raw",
-    "staging",
-    "intermediate",
-    "mart",
-    "integrations",
-    "external",
-    "dimensional",
-    "reporting",
-)
 
 results_bucket_config = S3BucketConfig(
     bucket_name=f"ol-warehouse-results-{stack_info.env_suffix}",
@@ -142,7 +133,7 @@ data_landing_zone_bucket = OLBucket(
 )
 warehouse_buckets.append(data_landing_zone_bucket)
 warehouse_dbs = []
-for data_stage in data_stages:
+for data_stage in DATA_LAKE_STAGES:
     lake_storage_bucket = OLBucket(
         f"ol_data_lake_s3_bucket_{data_stage}",
         config=S3BucketConfig(
@@ -292,14 +283,7 @@ query_engine_permissions: list[dict[str, str | list[str]]] = [
             "s3:ListBucketVersions",
             "s3:PutObject",
         ],
-        "Resource": [
-            f"arn:aws:s3:::ol-data-lake-{stage}-{stack_info.env_suffix}"
-            for stage in data_stages
-        ]
-        + [
-            f"arn:aws:s3:::ol-data-lake-{stage}-{stack_info.env_suffix}/*"
-            for stage in data_stages
-        ],
+        "Resource": data_lake_bucket_arns(stack_info.env_suffix),
     },
 ]
 

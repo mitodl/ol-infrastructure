@@ -588,6 +588,7 @@ def create(
             #   0/5 * * * *  cron-deploy-pipelines, cron-reindex   -> fast
             #   17 * * * *   witan-token-sync                      -> fast
             #   */15 * * * * witan-council-probe                   -> fast
+            #   */15 * * * * gravitino-posture                     -> fast
             #   20 3 * * *   omnigraph-optimize                    -> slow
             #
             # omnigraph-optimize is NIGHTLY and the slow bucket is 15 days, so
@@ -649,7 +650,7 @@ def create(
                 datas=rd(
                     "max by (cluster, namespace, cronjob) (time() - "
                     "(kube_cronjob_status_last_successful_time"
-                    '{cluster=~".*-(ci|qa)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync|witan-council-probe"} > 0)) > 21600'
+                    '{cluster=~".*-(ci|qa)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync|witan-council-probe|gravitino-posture"} > 0)) > 21600'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -665,7 +666,7 @@ def create(
                 datas=rd(
                     "max by (cluster, namespace, cronjob) (time() - "
                     "(kube_cronjob_status_last_successful_time"
-                    '{cluster=~".*-(production)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync|witan-council-probe"} > 0)) > 21600'
+                    '{cluster=~".*-(production)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync|witan-council-probe|gravitino-posture"} > 0)) > 21600'
                 ),
             ),
             alerting.RuleGroupRuleArgs(

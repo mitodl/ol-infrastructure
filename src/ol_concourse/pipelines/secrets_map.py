@@ -90,6 +90,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     ],
     "applications/fastly_redirector/": ["fastly.yaml"],
     "applications/google_ads_optimization/": [],
+    "applications/gravitino/": [],
     "applications/gwarek/": [],
     "applications/jupyterhub/": [],
     "applications/jupyterhub_data/": ["jupyterhub_data/"],

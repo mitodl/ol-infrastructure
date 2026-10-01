@@ -205,9 +205,10 @@ Sizing and settings:
   sized for application databases. This one holds metadata pointers and grants.
 - Schema: Gravitino creates its schema automatically only on H2 (`JDBCBackend.java:101`). For
   Postgres, `scripts/postgresql/schema-1.3.0-postgresql.sql` has to be applied before first start.
-  It is all `CREATE TABLE IF NOT EXISTS`, so it can rerun. Run it from a Kubernetes Job on the
-  Vault `app` credential under `SET ROLE gravitino` so tables are owned by the app role, which is
-  the ownership the repo's `postgres_role_statements` revoke path expects (`lib/vault.py`).
+  It is not safe to rerun: eight of its `CREATE INDEX` statements lack `IF NOT EXISTS`. The Job
+  that applies it therefore skips when `metalake_meta` already exists. Run it from a Kubernetes Job
+  on the Vault `app` credential under `SET ROLE gravitino` so tables are owned by the app role,
+  which is the ownership the repo's `postgres_role_statements` revoke path expects (`lib/vault.py`).
 - Upgrades are manual SQL (`upgrade-1.2.0-to-1.3.0-postgresql.sql` and so on) with Gravitino
   stopped (`docs/how-to-upgrade.md:17-30`). Renovate will offer chart bumps that are not safe to
   merge alone. The chart pin carries a comment saying so (P8), and each bump ships its upgrade script
@@ -337,7 +338,9 @@ primary `targetPort` also becomes a declared container port (`templates/deployme
   `scheme: HTTPS` (`docs/iceberg-rest-service.md:674-689`). The kubelet does not verify the
   certificate and cannot present a client certificate, so probing 8433 would fail.
 - Metrics are scraped from `9433/prometheus/metrics`, which serves the same registry as the
-  management port, with the ServiceMonitor trusting the namespace CA.
+  management port. The ServiceMonitor skips certificate verification rather than trusting the
+  namespace CA, because trusting it would mean letting the collector read Secrets in the namespace
+  that holds the reconciler's client certificate. The scrape carries no credential.
 
 If a consumer outside the cluster appears later (e.g. a laptop PyIceberg client), add an internal NLB
 following StarRocks' 9030 pattern (`applications/starrocks/__main__.py:1093-1185`). Do not add a

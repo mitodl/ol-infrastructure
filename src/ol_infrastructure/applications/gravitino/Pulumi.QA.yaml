@@ -1,0 +1,16 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgEsgU+Iy5NsBhKQHcoX85OpAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM7tsNsyEuV5GtvY02AgEQgDsm2NwbwHZdlrQAl0rdHM++Be9gQJzatzBUf2VdqsT313qFVt3O7U9dAtDO9UvkIlbAliU9z0bUrqiukA==
+config:
+  gravitino:db_password:
+    secure: v1:WECX2Vnd8IvJLrqh:T0zp9NGJlWQ2yTCc3/TCjBPEtovt7/Q5boKBVzsQ5YtgKlwbHfEcPXg8SZxMHy6zyBuEmVn280c7yowhChzfyg==
+  gravitino:keystore_password:
+    secure: v1:142hHNdL0kZVAY5y:KC1gkyOgFyDc2Mxsx6ujri8AoC3RqHm3yjIw7eDp9gCorfvNZIzpLy2SA1Wpko2LagWAbo5yRAea/1WmEP7DPw==
+  gravitino:cpu_request: 250m
+  gravitino:db_instance_size: db.t4g.small
+  gravitino:jvm_memory: -Xms1g -Xmx1g -XX:MaxMetaspaceSize=512m
+  gravitino:keycloak_issuer: https://sso-qa.ol.mit.edu/realms/ol-data-platform
+  gravitino:memory_limit: 2Gi
+  gravitino:replicas: "1"
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

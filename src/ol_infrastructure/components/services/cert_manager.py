@@ -16,6 +16,13 @@ class OLCertManagerCertConfig(BaseModel):
     dest_secret_name: str
     dns_names: list[str]
     letsencrypt_env: Literal["staging", "production"] = "production"
+    # Issue from a namespace-local Issuer instead of the Let's Encrypt
+    # ClusterIssuer, e.g. a private CA whose certificates only in-cluster peers
+    # need to trust. letsencrypt_env is ignored when this is set.
+    issuer_name: str | None = None
+    # Certificate lifetime as a Go duration, e.g. "87600h". cert-manager defaults
+    # to 90 days.
+    duration: str | None = None
     # When set, cert-manager will add a PKCS12 keystore (keystore.p12) and truststore
     # (truststore.p12) to the TLS secret. The keystore password is read from the named
     # K8s Secret. Required for StarRocks SSL (which uses Java's JSSE / PKCS12 format).
@@ -82,16 +89,22 @@ class OLCertManagerCert(pulumi.ComponentResource):
         # Ref: https://github.com/apache/apisix-ingress-controller/blob/adc70f3de2e745a29306fc155721a639a6367b6d/pkg/providers/translation/util.go#L35
         # Ref: https://cert-manager.io/docs/usage/certificate/
         # Ref: https://cert-manager.io/docs/reference/api-docs/#cert-manager.io/v1.Certificate
-        cert_spec: dict[str, object] = {
-            "issuerRef": {
-                "group": "cert-manager.io",
+        issuer_ref = (
+            {"name": cert_config.issuer_name, "kind": "Issuer"}
+            if cert_config.issuer_name
+            else {
                 "name": f"letsencrypt-{cert_config.letsencrypt_env}",
                 "kind": "ClusterIssuer",
-            },
+            }
+        )
+        cert_spec: dict[str, object] = {
+            "issuerRef": {"group": "cert-manager.io", **issuer_ref},
             "secretName": cert_config.dest_secret_name,
             "dnsNames": cert_config.dns_names,
             "usages": cert_config.usages,
         }
+        if cert_config.duration is not None:
+            cert_spec["duration"] = cert_config.duration
         if cert_config.pkcs12_keystore_password_secret_name is not None:
             # When set, cert-manager adds keystore.p12 (server cert + private key) and
             # truststore.p12 (CA chain) to the TLS secret alongside tls.crt / tls.key.

@@ -475,6 +475,18 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
+    "gravitino": SimplePulumiParams(
+        app_name="gravitino",
+        pulumi_project_path="applications/gravitino/",
+        pulumi_project_name="ol-application-gravitino",
+        description=(
+            "Deploys Apache Gravitino, the data lake's Iceberg REST catalog, "
+            "via Pulumi."
+        ),
+        category="data-platform",
+        stages=["QA", "Production"],
+        topology="preview-gated",
+    ),
     "jupyterhub-data": SimplePulumiParams(
         app_name="jupyterhub-data",
         pulumi_project_path="applications/jupyterhub_data/",
