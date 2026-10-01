@@ -229,12 +229,15 @@ def lookup(
     """
     client = KeycloakAdminClient(keycloak_url, realm, client_id, client_secret)
 
-    user = client.find_user_by_email(realm, email)
-    if user is None:
-        print(f"No user found with email {email!r} in realm {realm!r}.")
+    try:
+        user = client.find_user_by_email(realm, email)
+        if user is None:
+            print(f"No user found with email {email!r} in realm {realm!r}.")
+            sys.exit(1)
+        all_links = client.get_federated_identities(realm, user["id"])
+    except httpx.HTTPError as e:
+        print(f"\nERROR: Keycloak API request failed: {e}")
         sys.exit(1)
-
-    all_links = client.get_federated_identities(realm, user["id"])
     links = all_links
     if identity_provider:
         links = [
@@ -371,12 +374,15 @@ def relink(
     client = KeycloakAdminClient(keycloak_url, realm, client_id, client_secret)
     identity_provider = identity_provider.lower()
 
-    user = client.find_user_by_email(realm, email)
-    if user is None:
-        print(f"No user found with email {email!r} in realm {realm!r}.")
+    try:
+        user = client.find_user_by_email(realm, email)
+        if user is None:
+            print(f"No user found with email {email!r} in realm {realm!r}.")
+            sys.exit(1)
+        links = client.get_federated_identities(realm, user["id"])
+    except httpx.HTTPError as e:
+        print(f"\nERROR: Keycloak API request failed: {e}")
         sys.exit(1)
-
-    links = client.get_federated_identities(realm, user["id"])
     existing = next(
         (
             link
@@ -445,7 +451,14 @@ def relink(
             )
         sys.exit(1)
 
-    links_after = client.get_federated_identities(realm, user["id"])
+    try:
+        links_after = client.get_federated_identities(realm, user["id"])
+    except httpx.HTTPError as e:
+        print(
+            f"\nWarning: the relink calls succeeded, but verifying the result "
+            f"failed ({e}). Re-run `lookup` to check current state."
+        )
+        return
     updated = next(
         (
             link
