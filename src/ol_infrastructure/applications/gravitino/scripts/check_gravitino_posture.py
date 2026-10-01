@@ -33,7 +33,21 @@ from pathlib import Path
 
 HTTP_UNAUTHORIZED = 401
 REQUEST_TIMEOUT_SECONDS = 10
+# How long a server gets to reject a certificate-less client before the probe
+# concludes it was accepted.
+ALERT_WAIT_SECONDS = 3
 K8S_SA_DIR = Path("/var/run/secrets/kubernetes.io/serviceaccount")
+# The alerts a server sends when it requires a client certificate and gets none:
+# certificate_required under TLS 1.3, handshake_failure or bad_certificate under
+# TLS 1.2. Any other TLS error proves nothing about mTLS. A plain-HTTP listener,
+# for one, fails with a record-layer error that must not count as a pass.
+CLIENT_CERT_REJECTIONS = frozenset(
+    {
+        "TLSV13_ALERT_CERTIFICATE_REQUIRED",
+        "SSLV3_ALERT_HANDSHAKE_FAILURE",
+        "SSLV3_ALERT_BAD_CERTIFICATE",
+    }
+)
 
 
 def _tls_context(ca_file: str) -> ssl.SSLContext:
@@ -58,36 +72,55 @@ def check_unauthenticated_rejected(host: str, port: int, ca_file: str) -> str | 
         return f"GET {url} failed before any HTTP status: {err}"
 
 
+def _request_without_client_cert(host: str, port: int, ca_file: str) -> bytes:
+    """Connect over TLS with no client certificate; return any HTTP reply.
+
+    Read before writing. A TLS 1.3 server that requires a client certificate
+    rejects it after the handshake and closes. Had the request already been sent,
+    it would sit unread in the server's buffer, the close would go out as a RST,
+    and the RST can discard the alert before it is read: the check would flap.
+    Sending nothing until the server has had its chance to object avoids that.
+    """
+    with (
+        socket.create_connection((host, port), timeout=REQUEST_TIMEOUT_SECONDS) as raw,
+        _tls_context(ca_file).wrap_socket(raw, server_hostname=host) as tls,
+    ):
+        tls.settimeout(ALERT_WAIT_SECONDS)
+        try:
+            return tls.recv(64)
+        except TimeoutError:
+            # The server is waiting for a request, so it accepted the handshake.
+            pass
+        tls.settimeout(REQUEST_TIMEOUT_SECONDS)
+        tls.sendall(
+            f"GET / HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n".encode()
+        )
+        return tls.recv(64)
+
+
 def check_client_cert_required(host: str, port: int, ca_file: str) -> str | None:
     """Return a failure message, or None when a certificate-less client is refused.
 
     Under TLS 1.3 the server's demand for a client certificate is only acted on
     after the client's first flight, so a "successful" handshake proves nothing.
-    Send a request and treat any HTTP response as the failure.
+    Pass only on one of the alerts in CLIENT_CERT_REJECTIONS.
     """
-    context = _tls_context(ca_file)
     try:
-        raw = socket.create_connection((host, port), timeout=REQUEST_TIMEOUT_SECONDS)
-    except OSError as err:
-        # Refused or unreachable proves nothing about mTLS: the listener may have
-        # moved, or HTTPS may be off and the API served elsewhere in plain HTTP.
-        return f"could not connect to {host}:{port} to test mTLS: {err}"
-    try:
-        with context.wrap_socket(raw, server_hostname=host) as tls:
-            tls.sendall(
-                f"GET / HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n".encode()
-            )
-            reply = tls.recv(64)
+        reply = _request_without_client_cert(host, port, ca_file)
     except ssl.SSLCertVerificationError as err:
         # Our side rejecting the server is not the server rejecting us.
         return f"could not verify {host}:{port}'s certificate to test mTLS: {err}"
-    except (ssl.SSLError, ConnectionResetError, BrokenPipeError):
-        return None
-    finally:
-        raw.close()
+    except ssl.SSLError as err:
+        if err.reason in CLIENT_CERT_REJECTIONS:
+            return None
+        return f"{host}:{port} failed TLS without a client-certificate alert: {err}"
+    except OSError as err:
+        # Refused, unreachable or reset proves nothing about mTLS: the listener
+        # may have moved, or HTTPS may be off and the API served in plain HTTP.
+        return f"could not complete a TLS exchange with {host}:{port}: {err}"
     if reply.startswith(b"HTTP/"):
         return f"{host}:{port} answered HTTP without a client certificate"
-    return None
+    return f"{host}:{port} sent neither HTTP nor a client-certificate alert"
 
 
 def read_rendered_config(namespace: str, config_map: str, key: str) -> str:
@@ -140,7 +173,10 @@ def check_rendered_config(
         if key in counts
     )
     failures.extend(
-        f"{key} is enabled" for key in must_not_be_true if values.get(key) == "true"
+        # Gravitino parses booleans with Boolean.parseBoolean, which ignores case.
+        f"{key} is enabled"
+        for key in must_not_be_true
+        if values.get(key, "").lower() == "true"
     )
     return failures
 
