@@ -1040,6 +1040,59 @@ def test_prestop_sleep_on_app_and_nginx_with_extended_grace_period():
 
 
 @pulumi.runtime.test
+def test_prestop_sleep_on_sidecars_unless_they_set_their_own_lifecycle():
+    """A log shipper must not stop while the app is still serving and writing logs."""
+    own_lifecycle = kubernetes.core.v1.LifecycleArgs(
+        pre_stop=kubernetes.core.v1.LifecycleHandlerArgs(
+            sleep=kubernetes.core.v1.SleepActionArgs(seconds=25)
+        )
+    )
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="sidecars",
+            extra_sidecar_containers=[
+                kubernetes.core.v1.ContainerArgs(name="vector", image="vector:1"),
+                kubernetes.core.v1.ContainerArgs(
+                    name="custom", image="custom:1", lifecycle=own_lifecycle
+                ),
+            ],
+        )
+    )
+
+    def check(containers):
+        by_name = {c["name"]: c for c in containers}
+        assert by_name["vector"]["image"] == "vector:1"
+        assert by_name["vector"]["lifecycle"]["pre_stop"]["sleep"]["seconds"] == 10
+        assert by_name["custom"]["lifecycle"]["pre_stop"]["sleep"]["seconds"] == 25
+
+    return app.application_deployment.spec.template.spec.containers.apply(check)
+
+
+@pulumi.runtime.test
+def test_prestop_sleep_does_not_reach_celery_worker_pods():
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="prestopcelery",
+            extra_sidecar_containers=[
+                kubernetes.core.v1.ContainerArgs(name="vector", image="vector:1")
+            ],
+            celery_worker_configs=[
+                OLApplicationK8sCeleryWorkerConfig(
+                    application_name="prestopcelery",
+                    worker_name="default",
+                )
+            ],
+        )
+    )
+
+    def check(pod_spec):
+        assert "termination_grace_period_seconds" not in pod_spec
+        assert not any("lifecycle" in c for c in pod_spec["containers"])
+
+    return app.celery_deployments[0].spec.template.spec.apply(check)
+
+
+@pulumi.runtime.test
 def test_prestop_sleep_zero_disables_hook_and_keeps_default_grace_period():
     app = OLApplicationK8s(
         _base_config(application_name="noprestop", webapp_prestop_sleep_seconds=0)

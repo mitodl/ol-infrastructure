@@ -2141,8 +2141,19 @@ class OLApplicationK8s(ComponentResource):
                 **app_container_security_context,
             ),
         )
-        # Append caller-supplied sidecar containers after the main app container
-        app_containers.extend(ol_app_k8s_config.extra_sidecar_containers)
+        # Append caller-supplied sidecar containers after the main app container.
+        # They share the preStop sleep unless they set their own lifecycle, so a
+        # sidecar that consumes the app's output (e.g. edxapp's vector tailing
+        # tracking logs) is not stopped while the pod is still serving traffic.
+        app_containers.extend(
+            kubernetes.core.v1.ContainerArgs(
+                **{k: v for k, v in vars(c).items() if v is not None},
+                lifecycle=webapp_lifecycle,
+            )
+            if webapp_lifecycle and c.lifecycle is None
+            else c
+            for c in ol_app_k8s_config.extra_sidecar_containers
+        )
 
         _application_deployment = kubernetes.apps.v1.Deployment(
             f"{ol_app_k8s_config.application_name}-application-{stack_info.env_suffix}-deployment",
