@@ -3,6 +3,9 @@
 **Issue:** [ol-infrastructure#5805](https://github.com/mitodl/ol-infrastructure/issues/5805)
 **Witan project:** `wp-migrate-mitodl-repositories-from-pre-commit-ci-t-3ff60d`
 **Measured:** 2026-09-28, against the default branch of every active repository
+**Scope updated:** 2026-10-01. Six repositories were dropped from the migration (§6). Their
+measurements stay in the JSON; every other figure on this page is still the 09-28 measurement
+unless it says otherwise.
 **Machine-readable companion:** [`prek-autofix-migration-inventory.json`](prek-autofix-migration-inventory.json)
 
 This is the scope document for the migration. Every later task (the migration contract, the
@@ -15,7 +18,8 @@ manifest declarations, workflow references, Renovate coverage, rulesets and meas
 
 ## 1. The short version
 
-- **28 repositories carry a `.pre-commit-config.yaml`** and are in scope. Three more already
+- **28 repositories carry a `.pre-commit-config.yaml`**, and all 28 were in scope at
+  measurement. 22 remain in scope after six were dropped on 2026-10-01 (§6). Three more already
   use `prek.toml`. Two support repositories carry shared configuration. 42 active
   repositories have no hook configuration and are excluded, and two private repositories are
   withheld (§6).
@@ -30,15 +34,16 @@ manifest declarations, workflow references, Renovate coverage, rulesets and meas
   pre-commit.ci installation (§5), and nothing else runs their hooks in CI (apart from three
   hooks in lehrer). Their default branches have drifted: eight of them fail
   their own hooks right now. For those repos the migration adds a gate rather than replacing
-  one, and each migration PR has to make its tree clean first.
+  one, and each migration PR has to make its tree clean first. Of the 22 still in scope, 13
+  are in the installation and 9 are not.
 - **Some skipped hooks have never run in CI anywhere.** pre-commit.ci's `ci: skip` removed
   them, and no GitHub Actions job runs them instead. `hadolint-docker` is in that set and fails
   on `ol-infrastructure` main today.
 - **ol-data-platform would lose hook updates when pre-commit.ci is uninstalled.** It had 15
   pre-commit.ci autoupdate PRs since June, and its own `renovate.json` does not enable
   Renovate's `pre-commit` manager. alerting-omnibus and superset-marimo get no hook updates
-  from anything today: no Renovate, and no pre-commit.ci activity. Everything else is already
-  covered by the org preset.
+  from anything today: no Renovate, and no pre-commit.ci activity. Both have since been
+  dropped (§6). Everything else is already covered by the org preset.
 - **No required status check names a pre-commit.ci context.** Removing the app cannot wedge a
   ruleset. The new check only becomes required if the contract decides to make it required.
 
@@ -62,17 +67,18 @@ explained below cannot be attributed to particular repositories.
 | Wave | Count | Rule |
 | --- | --- | --- |
 | **pilot** | 3 | Named in the issue: Python/Pulumi, DBT/SQL, Node |
-| **complex** | 9 | Any of: a local `node`/`system`/`script` hook needing the repository's toolchain, a `ci: skip` list, or `pre-commit` called from outside the hook config |
-| **standard** | 16 | Everything else: remote hooks plus, at most, local `python`/`pygrep` hooks with their dependencies declared |
+| **complex** | 8 | Any of: a local `node`/`system`/`script` hook needing the repository's toolchain, a `ci: skip` list, or `pre-commit` called from outside the hook config |
+| **standard** | 11 | Everything else: remote hooks plus, at most, local `python`/`pygrep` hooks with their dependencies declared |
 | **already-prek** | 3 | `prek.toml`, no pre-commit.ci status. Only CI pinning and optional autofix.ci adoption remain |
 | **supporting** | 2 | Hold shared configuration the rollout changes |
-| **excluded** | 44 | §6 |
+| **excluded** | 50 | §6. Includes the six dropped on 2026-10-01 (one complex, five standard) |
 
 ### 3.1 Rollout table
 
 *pc.ci status* means a `pre-commit.ci - pr`/`push` status appeared on at least one of the
-last 15 PRs. The 14 "yes" rows are exactly the in-scope repositories in the pre-commit.ci
-installation, and the "no" rows are exactly the ones outside it (§5).
+last 15 PRs. The 13 "yes" rows are exactly the in-scope repositories in the pre-commit.ci
+installation, and the "no" rows are exactly the ones outside it (§5). The six repositories
+dropped on 2026-10-01 are listed in §6 instead.
 *autoupdate* counts pre-commit.ci autoupdate PRs opened since 2026-06-01. *Renovate hooks*
 means Renovate's `pre-commit` manager is enabled, via the org preset or repository config.
 *prek run* is `prek run --all-files` on the unmodified default branch; hooks in the JSON's
@@ -90,15 +96,10 @@ means Renovate's `pre-commit` manager is enabled, via the org preset or reposito
 | complex | mitxonline-api-clients | 16 | eslint (node) | eslint | no | 0 | yes | — | fail: trailing-whitespace, end-of-file, prettier, shfmt |
 | complex | mitxpro | 19 | prettier, eslint, stylelint (node); drf-serializer-orm-check (python) | prettier, eslint, stylelint | yes | 16 | yes | — | fail: actionlint |
 | complex | ocw-studio | 19 | prettier, eslint, stylelint (node); drf-serializer-orm-check (python) | prettier, eslint, stylelint, shfmt-docker | yes | 3 | yes | — | pass |
-| complex | ol-rootly-manager | 16 | — | packer_fmt, hadolint-docker | no | 0 | yes | — | pass |
 | complex | platform-engineering-site | 17 | — | packer_fmt | no | 0 | yes | — | fail: trailing-whitespace, end-of-file, yamlfmt, ruff-format, mypy |
-| standard | access-forge | 5 | — | — | no | 0 | yes | — | fail: zizmor |
-| standard | alerting-omnibus | 3 | — | — | no | 0 | **no** | — | pass |
-| standard | hq | 2 | — | — | no | 0 | yes | — | fail: PyMarkdown |
 | standard | mitxonline | 16 | drf-serializer-orm-check (python) | — | yes | 0 | yes | ci-gate | fail: actionlint |
 | standard | ocw-hugo-projects | 8 | — | — | yes | 1 | yes | — | pass |
 | standard | ocw-hugo-themes | 2 | — | — | no | 0 | yes | — | fail: detect-secrets |
-| standard | ocw_oer_export | 12 | — | — | yes | 0 | yes | — | pass |
 | standard | odl-video-service | 16 | drf-serializer-orm-check (python) | — | yes | 8 | yes | — | fail: actionlint |
 | standard | ol-concourse | 15 | — | — | no | 0 | yes | — | fail: yamlfmt, ruff-format, ruff, mypy |
 | standard | ol-django | 16 | — | — | yes | 7 | yes | — | pass |
@@ -107,7 +108,6 @@ means Renovate's `pre-commit` manager is enabled, via the org preset or reposito
 | standard | ol-keycloakify | 2 | — | — | no | 0 | yes | — | pass |
 | standard | open-discussions | 1 | — | — | no | 0 | yes | — | fail: detect-secrets |
 | standard | open-edx-plugins | 17 | — | — | yes | 13 | yes | — | pass |
-| standard | superset-marimo | 12 | — | — | no | 0 | **no** | — | config error |
 | already-prek | agent-kit | 20 | — | — | no | 0 | yes | — | not run |
 | already-prek | django-aqueduct | 14 | — | — | no | 0 | yes | — | not run |
 | already-prek | ol-analytics-api | 14 | — | — | no | 0 | yes | test | not run |
@@ -115,8 +115,8 @@ means Renovate's `pre-commit` manager is enabled, via the org preset or reposito
 | supporting | .github | — | — | — | — | — | — | — | Hosts the Renovate preset |
 
 Every "fail" above also fails under pre-commit on the same tree. None is a prek
-incompatibility. `superset-marimo` does not load under either tool: it names hook `ruff-check`
-at `astral-sh/ruff-pre-commit` `v0.9.0`, which predates that id.
+incompatibility. `superset-marimo` (since dropped, §6) did not load under either tool: it
+names hook `ruff-check` at `astral-sh/ruff-pre-commit` `v0.9.0`, which predates that id.
 
 ## 4. Findings the migration contract has to answer
 
@@ -206,7 +206,7 @@ at `astral-sh/ruff-pre-commit` `v0.9.0`, which predates that id.
     2026-05-22, its hook config does not load, and it has no Renovate. alerting-omnibus was
     last pushed on 2026-06-30 and has no Renovate. Confirm with their owners before spending
     a migration PR on either. If a repository is dropped, move it to §6 with the owner's
-    answer as the reason.
+    answer as the reason. Both were dropped on 2026-10-01 (§6).
 12. **Runtimes here are not a benchmark.** `prek run --all-files` took 0.2–40 s per
    repository (mit-learn 40 s, ol-infrastructure 23 s, ol-data-platform 14 s). Those runs
    shared one hook cache four at a time, so they mix hook-environment installation with lock
@@ -243,7 +243,8 @@ The installation covers **22 repositories**:
 - **14 in scope**, the same 14 that show a pre-commit.ci status in §3.1: mit-learn,
   mit-learn-api-clients, mitxonline, mitxpro, ocw-hugo-projects, ocw-studio, ocw_oer_export,
   odl-video-service, ol-data-platform, ol-django, ol-infrastructure, ol-keycloak,
-  open-edx-plugins, smoot-design.
+  open-edx-plugins, smoot-design. ocw_oer_export has since been dropped (§6), so 13 of them
+  remain in scope. It stays in the installation until the uninstall.
 - **8 archived:** concourse-packer-resource, concourse-pulumi-resource, herokuconfigurator,
   mit-open-login-button, social-auth-mitxpro, unified-ecommerce, unified-ecommerce-frontend,
   and one private archived repository. Archived repositories are read-only, so pre-commit.ci
@@ -251,7 +252,8 @@ The installation covers **22 repositories**:
 
 The other 14 in-scope repositories are outside the installation. Five of them (learn-ai,
 lehrer, mitxonline-api-clients, ol-rootly-manager, platform-engineering-site) still carry a
-`ci:` block, which nothing reads.
+`ci:` block, which nothing reads. Five of the 14 (access-forge, alerting-omnibus, hq,
+ol-rootly-manager, superset-marimo) have since been dropped (§6), leaving 9.
 
 Candidate action pins, resolved from each project's latest release on 2026-09-28. The
 reference-workflow task re-resolves them.
@@ -269,6 +271,20 @@ reference-workflow task re-resolves them.
 to an exact version or SHA. prek itself was at v0.5.4 on the measurement date.
 
 ## 6. Exclusions
+
+**Dropped from scope on 2026-10-01 (6).** These were in scope at measurement, so the JSON
+keeps their measurements: each has `wave: "excluded"`, its original wave in
+`measured_wave`, and the reason first in `wave_reasons`. An org owner removed all six from
+the autofix.ci installation (166287870) on 2026-10-01.
+
+| Repository | Measured wave | In pre-commit.ci | Reason |
+| --- | --- | --- | --- |
+| access-forge | standard | no | Private. autofix.ci is paid on private repositories ([contract D7](https://github.com/mitodl/ol-github-workflows/blob/main/docs/prek-autofix-contract.md)) |
+| alerting-omnibus | standard | no | Private (D7) |
+| hq | standard | no | Private (D7) |
+| superset-marimo | standard | no | Unused and being archived (finding 11). [superset-marimo#2](https://github.com/mitodl/superset-marimo/pull/2) closed unmerged |
+| ol-rootly-manager | complex | no | Archived. [ol-rootly-manager#7](https://github.com/mitodl/ol-rootly-manager/pull/7) closed unmerged |
+| ocw_oer_export | standard | **yes** | Dropped by the owner. [ocw_oer_export#230](https://github.com/mitodl/ocw_oer_export/pull/230) closed unmerged. pre-commit.ci is its only hook enforcement, and that ends at the uninstall; the owner accepted this |
 
 **No hook configuration (42).** None of these has a `.pre-commit-config.yaml` or `prek.toml`
 on its default branch, so there is nothing to migrate:
