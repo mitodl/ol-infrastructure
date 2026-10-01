@@ -105,6 +105,13 @@ class OLDBConfig(AWSBase):
     # Enhanced Monitoring: OS-level metrics via an agent installed on the DB host.
     # Set to 0 to disable, or to 1/5/10/15/30/60 (seconds) to enable.
     enhanced_monitoring_interval: int = 0
+    # IAM path for the Enhanced Monitoring role. None keeps the default "/",
+    # which is where every existing monitoring role lives; IAM can't change a
+    # role's path in place, so changing it replaces the role. The Concourse
+    # infra worker can only create and delete roles under /ol-applications/,
+    # /ol-data/ and /ol-infrastructure/, so a new stack it deploys needs one of
+    # those.
+    enhanced_monitoring_role_path: str | None = None
     # Performance Insights: visibility into database load broken down by wait events.
     performance_insights_enabled: bool = False
     # Retention period for Performance Insights data (days). Must be 7 or 731.
@@ -340,6 +347,7 @@ class OLAmazonDB(pulumi.ComponentResource):
                 name_prefix=f"{db_config.instance_name}-rds-enhanced-monitoring-"[
                     :IAM_ROLE_NAME_PREFIX_MAX_LENGTH
                 ],
+                path=db_config.enhanced_monitoring_role_path,
                 tags=db_config.tags,
                 opts=resource_options,
             )
