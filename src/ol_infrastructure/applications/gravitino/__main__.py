@@ -309,6 +309,9 @@ rds_defaults = defaults(stack_info)["rds"]
 # default (m7g.large plus a read replica) is sized for the latter.
 rds_defaults["instance_size"] = gravitino_config.require("db_instance_size")
 rds_defaults["read_replica"] = None
+# Production enables Enhanced Monitoring, whose role would otherwise land at
+# "/", outside the IAM paths the Concourse infra worker may create roles under.
+rds_defaults["enhanced_monitoring_role_path"] = "/ol-infrastructure/rds/"
 gravitino_db_config = OLPostgresDBConfig(
     instance_name=f"ol-gravitino-db-{stack_info.env_suffix}",
     password=gravitino_config.require("db_password"),
