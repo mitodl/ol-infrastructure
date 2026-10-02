@@ -123,6 +123,7 @@ archived:
 - openedx-course-test
 - orcoursetrion
 - pgbouncer-formula
+- pre-commit-ci-config
 - pulsar-formula
 - pycaption
 - pylti
@@ -234,7 +235,6 @@ fork:
 - openedx-events
 - openedx-ledger
 - opentelemetry-python-contrib
-- pre-commit-ci-config
 - pre-commit-packer
 - py-tree-sitter
 - pycassa
