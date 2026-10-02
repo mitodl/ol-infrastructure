@@ -2,13 +2,14 @@
 
 **Tracking issue:** [#5805](https://github.com/mitodl/ol-infrastructure/issues/5805)
 **Audited:** 2026-10-02, against each repository's default branch and the live GitHub rulesets.
+agent-kit and ol-analytics-api were migrated and updated the same day, after the first pass.
 **Baseline:** [`prek-autofix-migration-inventory.md`](prek-autofix-migration-inventory.md), scope as updated 2026-10-01.
 
 ## Result
 
-22 of the 28 audited repositories conform fully: the reference `autofix.yml` runs `prek`, `prek` is
-a required check, and nothing from pre-commit.ci remains. The other six are explained residual
-exceptions (§3); four of them were never enforced by pre-commit.ci. Nothing is unexplained, apart
+24 of the 28 audited repositories conform fully: the reference `autofix.yml` runs `prek`, `prek` is
+a required check, and nothing from pre-commit.ci remains. The other four are explained residual
+exceptions (§3); two of them were never enforced by pre-commit.ci. Nothing is unexplained, apart
 from two things this audit could not verify from the API (§4).
 
 | Check | Result |
@@ -18,7 +19,7 @@ from two things this audit could not verify from the API (§4).
 | Workflow still calling pre-commit, `pre-commit/action` or pre-commit.ci | None |
 | Action references not pinned to a full commit SHA | None, in every workflow of the 28 repositories |
 | Project manifest declaring `pre-commit` | None (`open-discussions`' `poetry.lock` mentions it only as an optional extra of other packages; there is no locked package and `pyproject.toml` does not name it) |
-| `prek` required on the default branch | 22 of the 23 migrated repositories that run it from `autofix.yml`; the exception is `platform-engineering-site` (§3) |
+| `prek` required on the default branch | 24 of the 25 migrated repositories that run it from `autofix.yml`; the exception is `platform-engineering-site` (§3) |
 | Required check naming pre-commit.ci | None |
 | `pre-commit.ci - pr` status | Only on sampled PRs whose last push predates the uninstall (2026-10-01 ~20:45Z), for example mitxonline#4069, last pushed 19:40Z and merged 2026-10-02 |
 | `pre-commit.ci` autoupdate PR opened after 2026-10-01 | None in the org (the same title search finds them in September) |
@@ -67,9 +68,9 @@ interim pre-commit.ci block was removed.
 | open-edx-plugins | standard | [#880](https://github.com/mitodl/open-edx-plugins/pull/880) | yes (#6132) | [#882](https://github.com/mitodl/open-edx-plugins/pull/882) |
 | ocw_oer_export | standard (re-scoped 2026-10-01) | [#235](https://github.com/mitodl/ocw_oer_export/pull/235) | yes ([#6148](https://github.com/mitodl/ol-infrastructure/pull/6148)) | not needed |
 | ol-github-workflows | supporting | reference workflow and contract | n/a (§3) | n/a |
-| agent-kit | already-prek | skills updated in [#448](https://github.com/mitodl/agent-kit/pull/448) | n/a (§3) | n/a |
+| agent-kit | already-prek | [#449](https://github.com/mitodl/agent-kit/pull/449), skills [#448](https://github.com/mitodl/agent-kit/pull/448) | yes ([#6151](https://github.com/mitodl/ol-infrastructure/pull/6151)) | not needed |
 | django-aqueduct | already-prek | none needed | n/a (§3) | n/a |
-| ol-analytics-api | already-prek | none needed | n/a (§3) | n/a |
+| ol-analytics-api | already-prek | [#88](https://github.com/mitodl/ol-analytics-api/pull/88) | yes ([#6151](https://github.com/mitodl/ol-infrastructure/pull/6151)) | not needed |
 | .github | supporting | none needed (hosts the Renovate preset) | n/a (§3) | n/a |
 
 ## 2. Out of scope, and why it still holds
@@ -93,29 +94,43 @@ interim pre-commit.ci block was removed.
    migration PR merged, but GitHub Actions is disabled for the repository
    (`actions/permissions` → `enabled: false`), so `autofix.yml` has never run and `prek` is not
    required. It is a documentation site; the owner declined to enable Actions.
-2. **ol-analytics-api and agent-kit: `prek.toml` exists but no workflow runs it.** Both were
-   already on prek before this project. Neither was enforced by pre-commit.ci, so nothing
-   regressed. Adopting the reference `autofix.yml` is optional, and an owner decision.
-3. **.github: no hook configuration.** It hosts the Renovate preset only.
-4. **django-aqueduct and ol-github-workflows: `prek` runs in CI but is not a required check.**
+2. **.github: no hook configuration.** It hosts the Renovate preset only.
+3. **django-aqueduct and ol-github-workflows: `prek` runs in CI but is not a required check.**
    django-aqueduct runs it from its own `ci.yml`, ol-github-workflows from `autofix.yml`. Neither
    was part of the cutover tasks.
-5. **Open PRs that predate the migration show `prek` as pending until updated.** Required checks
+4. **Open PRs that predate the migration show `prek` as pending until updated.** Required checks
    were applied without gating on in-flight PRs (owner decision, 2026-10-01). When each was
    applied, `blocked` named: ol-infrastructure 15, ol-data-platform 9, smoot-design 9 of 10,
-   ocw_oer_export 1 (#217, a stale pre-commit.ci autoupdate). About 176 default-branch PRs across 13
-   other repositories were in the same state on 2026-10-01.
-6. **ol-data-platform keeps a `dbt-core<1.12` cap** on the sqlfluff hooks. It only existed for
+   ocw_oer_export 1 (#217, a stale pre-commit.ci autoupdate), agent-kit 5 (3 Renovate PRs,
+   [#350](https://github.com/mitodl/agent-kit/pull/350) and
+   [#327](https://github.com/mitodl/agent-kit/pull/327)) and ol-analytics-api 5
+   ([#87](https://github.com/mitodl/ol-analytics-api/pull/87),
+   [#82](https://github.com/mitodl/ol-analytics-api/pull/82),
+   [#81](https://github.com/mitodl/ol-analytics-api/pull/81),
+   [#69](https://github.com/mitodl/ol-analytics-api/pull/69),
+   [#36](https://github.com/mitodl/ol-analytics-api/pull/36)). About 176 default-branch PRs across
+   13 other repositories were in the same state on 2026-10-01.
+5. **ol-data-platform keeps a `dbt-core<1.12` cap** on the sqlfluff hooks. It only existed for
    pre-commit.ci's per-environment size limit. [ol-data-platform#2807](https://github.com/mitodl/ol-data-platform/pull/2807)
    lifts it and is open; it does not block this audit.
+6. **Two hooks check nothing in CI, found while migrating agent-kit and ol-analytics-api.** A
+   migration PR does not change hooks (contract §2), so both were left as they were:
+   - `gitleaks` runs `--staged` in both repositories. Nothing is staged in the `prek` job, so a
+     committed secret passes. Confirmed by committing a Slack-format token in a scratch clone.
+   - `markdownlint` in agent-kit passes `--disable MD013 MD033`, which is variadic and swallows the
+     filenames, so the CLI prints its usage and exits 0.
+
+   Other repositories with the same hook definitions may have the same gap. That was not checked.
 
 ## 4. Not verified by this audit
 
 - **autofix.ci repository membership.** The REST API does not return an installation's repository
   list to this token (HTTP 403, same as audit finding 4). The intended set is the 28 audited
   repositories minus the ones with no `autofix.yml`; the six dropped on 2026-10-01 were removed and
-  `ocw_oer_export` was re-added on 2026-10-02, both by an org owner in the UI. An org owner should
-  confirm the list once in Settings → GitHub Apps → autofix.ci.
+  `ocw_oer_export` was re-added on 2026-10-02, both by an org owner in the UI. On 2026-10-02 the
+  owner also reported that `agent-kit` and `ol-analytics-api` are in the installation, which this
+  audit takes from the owner's statement and cannot read back. An org owner should confirm the list
+  once in Settings → GitHub Apps → autofix.ci.
 - **Fixable-path behavior on a real PR.** The only commit by `autofix-ci[bot]` found is on the
   closed pilot fixture. No post-migration PR needed an automated fix in the samples read.
 
