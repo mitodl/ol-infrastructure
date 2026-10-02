@@ -152,12 +152,13 @@ for data_stage in DATA_LAKE_STAGES:
             # and is the current version. A noncurrent version exists only
             # because the key was already deleted or overwritten.
             #
-            # 90 days is the undelete window, not a reclaim horizon. The
-            # historical backlog is well past it (100% of sampled noncurrent
-            # bytes in staging, 90.6% in mart), but the dimensional layer
-            # rebuilds often enough that ~76% of its churn is younger than 90
-            # days and stays resident at steady state.
-            noncurrent_version_expiration_days=90,
+            # The window is the undelete window, not a reclaim horizon. Raw
+            # keeps 90 days because nothing can rebuild it. Every other stage
+            # is dbt output that a rebuild from raw reproduces, and its
+            # full-rebuild churn keeps refilling the window: at 90 days mart
+            # and dimensional production held 33.6 and 30.3 TB of Standard
+            # storage against ~0.4 TB current each (2026-09-20).
+            noncurrent_version_expiration_days=90 if data_stage == "raw" else 30,
             server_side_encryption_enabled=True,
             kms_key_id=s3_kms_key["arn"],
             bucket_key_enabled=True,

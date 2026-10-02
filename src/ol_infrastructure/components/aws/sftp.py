@@ -32,6 +32,10 @@ class SFTPServerConfig(AWSBase):
     ] = "SERVICE_MANAGED"
     users: list[SFTPUserConfig] = Field(default_factory=list)
     security_policy_name: str = "TransferSecurityPolicy-2024-01"
+    # Opt-in, because expiring noncurrent versions removes the ability to undelete
+    # a partner's upload by version id. Unset, the versioned bucket keeps every
+    # overwritten or deleted upload, billed, forever.
+    noncurrent_version_expiration_days: int | None = Field(default=None, ge=1)
 
 
 class SFTPServer(ComponentResource):
@@ -75,6 +79,34 @@ class SFTPServer(ComponentResource):
             ),
             opts=generic_resource_opts,
         )
+
+        if sftp_config.noncurrent_version_expiration_days is not None:
+            s3.BucketLifecycleConfiguration(
+                f"{sftp_config.server_name}-sftp-bucket-lifecycle",
+                bucket=self.bucket.id,
+                rules=[
+                    s3.BucketLifecycleConfigurationRuleArgs(
+                        id="abort-incomplete-multipart-uploads",
+                        status="Enabled",
+                        filter=s3.BucketLifecycleConfigurationRuleFilterArgs(prefix=""),
+                        abort_incomplete_multipart_upload=s3.BucketLifecycleConfigurationRuleAbortIncompleteMultipartUploadArgs(
+                            days_after_initiation=7,
+                        ),
+                    ),
+                    s3.BucketLifecycleConfigurationRuleArgs(
+                        id="expire-noncurrent-versions",
+                        status="Enabled",
+                        filter=s3.BucketLifecycleConfigurationRuleFilterArgs(prefix=""),
+                        noncurrent_version_expiration=s3.BucketLifecycleConfigurationRuleNoncurrentVersionExpirationArgs(
+                            noncurrent_days=sftp_config.noncurrent_version_expiration_days,
+                        ),
+                        expiration=s3.BucketLifecycleConfigurationRuleExpirationArgs(
+                            expired_object_delete_marker=True,
+                        ),
+                    ),
+                ],
+                opts=generic_resource_opts,
+            )
 
         # Block public access to the bucket
         s3.BucketPublicAccessBlock(
