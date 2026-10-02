@@ -125,6 +125,25 @@ archived, so they need nothing before the uninstall.
 - Uninstalling `pre-commit-ci` removes one more `contents:write` + `workflows:write` grant.
   `autofix-ci` holds `contents:write` without `workflows`.
 
+### After-state (2026-10-02): `pre-commit-ci` is uninstalled
+
+`gh api orgs/mitodl/installations` on 2026-10-02 lists 21 installations and no `pre-commit-ci`
+(installation `22207049` is gone). `autofix-ci` (`166287870`, `repository_selection: selected`)
+is present, last updated 2026-10-01. The uninstall was done by an org owner in the UI; the
+REST API has no way to do it.
+
+- The `contents:write` + `workflows:write` grant held by `pre-commit-ci` is gone from the org.
+- The interim `ci:` blocks left in the formerly installed repositories are inert. Each repo
+  removes its own in a separate PR.
+- `ocw_oer_export` re-entered the migration after the 2026-10-01 decision above was made
+  ([ocw_oer_export#235](https://github.com/mitodl/ocw_oer_export/pull/235)). It was deselected
+  from `autofix-ci` with the other five dropped repositories, so an org owner has to add it
+  back before autofix.ci can push fixes there. The `prek` job runs and fails on unfixed drift
+  without that.
+- `autofix-ci` repository membership is not readable through the REST API (finding 4), so it
+  is not re-verified here. The six deselections made on 2026-10-01 and the pending
+  `ocw_oer_export` addition are the only expected differences from the 2026-09-30 set.
+
 ## Permissions are vendor-side; scope is ours
 
 An installed app's permission set is declared by the app's author. We cannot reduce
