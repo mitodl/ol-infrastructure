@@ -300,6 +300,7 @@ library:
 - ol-infra-health-checks
 - ol-keycloak
 - ol-keycloakify
+- ol-llm
 - ol-notebook-extensions
 - oldevops-scratch
 - open-collaboration

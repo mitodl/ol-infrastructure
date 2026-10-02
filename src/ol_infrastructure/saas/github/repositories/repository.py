@@ -74,7 +74,9 @@ def _security_and_analysis(
 #: create-time provenance, not configuration -- GitHub never lets it change and we
 #: never set it -- but the import records it, so leaving it undeclared reads as a
 #: removal. ol-keycloakify is the one repo in the fleet that has it.
-_ALWAYS_IGNORED = ["template", "isTemplate"]
+#: `autoInit` is create-time only for the same reason: GitHub never reports it back,
+#: and it only matters for a repo this stack creates rather than imports (see `build`).
+_ALWAYS_IGNORED = ["template", "isTemplate", "autoInit"]
 
 _ARCHIVED_IGNORED_SETTINGS = [
     *_ALWAYS_IGNORED,
@@ -164,9 +166,15 @@ def build(repo: dict[str, Any]) -> github.Repository:
     # retain_on_delete is the counterweight for administration:write (section 2.2).
     # Removing a repo from data/repos/ drops it from Pulumi state and NEVER from
     # GitHub. Every other safety property here is downstream of this one.
+    #
+    # `auto_init` is for a repo this stack CREATES rather than imports. A new repo is
+    # empty, and BranchDefault below cannot point at a branch that does not exist; an
+    # initial commit on the org default branch (`main`) gives it one. Imported repos
+    # leave it unset, and it is in _ALWAYS_IGNORED so it never diffs afterwards.
     repository = github.Repository(
         f"mitodl-repo-{name}",
         name=name,
+        auto_init=repo.get("auto_init"),
         description=repo.get("description"),
         homepage_url=repo.get("homepage"),
         visibility=repo.get("visibility"),

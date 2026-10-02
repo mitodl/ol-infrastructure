@@ -1,0 +1,24 @@
+---
+_custom_properties:
+  tier: tier-1
+_visibility: public
+allow_merge_commit: false
+auto_init: true
+allow_rebase_merge: false
+allow_squash_merge: true
+archetype: library
+description: Shared library for LLM calls at MIT Open Learning, with Opik tracing,
+  prompt management, and evaluation built in
+has_discussions: false
+has_projects: false
+merge_commit_message: PR_TITLE
+merge_commit_title: MERGE_MESSAGE
+name: ol-llm
+squash_merge_commit_message: COMMIT_MESSAGES
+squash_merge_commit_title: COMMIT_OR_PR_TITLE
+topics:
+- llm
+- opik
+- pydantic-ai
+- python
+visibility: public
