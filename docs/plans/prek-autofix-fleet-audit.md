@@ -68,9 +68,9 @@ interim pre-commit.ci block was removed.
 | open-edx-plugins | standard | [#880](https://github.com/mitodl/open-edx-plugins/pull/880) | yes (#6132) | [#882](https://github.com/mitodl/open-edx-plugins/pull/882) |
 | ocw_oer_export | standard (re-scoped 2026-10-01) | [#235](https://github.com/mitodl/ocw_oer_export/pull/235) | yes ([#6148](https://github.com/mitodl/ol-infrastructure/pull/6148)) | not needed |
 | ol-github-workflows | supporting | reference workflow and contract | n/a (§3) | n/a |
-| agent-kit | already-prek | [#449](https://github.com/mitodl/agent-kit/pull/449), skills [#448](https://github.com/mitodl/agent-kit/pull/448) | yes (PRREQ) | not needed |
+| agent-kit | already-prek | [#449](https://github.com/mitodl/agent-kit/pull/449), skills [#448](https://github.com/mitodl/agent-kit/pull/448) | yes ([#6151](https://github.com/mitodl/ol-infrastructure/pull/6151)) | not needed |
 | django-aqueduct | already-prek | none needed | n/a (§3) | n/a |
-| ol-analytics-api | already-prek | [#88](https://github.com/mitodl/ol-analytics-api/pull/88) | yes (PRREQ) | not needed |
+| ol-analytics-api | already-prek | [#88](https://github.com/mitodl/ol-analytics-api/pull/88) | yes ([#6151](https://github.com/mitodl/ol-infrastructure/pull/6151)) | not needed |
 | .github | supporting | none needed (hosts the Renovate preset) | n/a (§3) | n/a |
 
 ## 2. Out of scope, and why it still holds
