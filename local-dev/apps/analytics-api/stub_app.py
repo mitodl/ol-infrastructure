@@ -527,6 +527,37 @@ def _last_active_on(n, status, shared):
     return (_ACTIVITY_ANCHOR - datetime.timedelta(days=3 + (n * 17) % 75)).isoformat()
 
 
+# Mirrors the real API's NEEDS_ATTENTION_QUIET_DAYS. There the cutoff is read
+# from StarRocks once per request so two round trips cannot straddle midnight;
+# here _ACTIVITY_ANCHOR is already frozen, so one constant does the same job.
+NEEDS_ATTENTION_QUIET_DAYS = 30
+_NEEDS_ATTENTION_CUTOFF = _ACTIVITY_ANCHOR - datetime.timedelta(
+    days=NEEDS_ATTENTION_QUIET_DAYS
+)
+
+
+def _needs_attention(status, last_active_on, shared):
+    """Port of `learner_queries._needs_attention`: never started, or last
+    recorded activity on or before the cutoff.
+
+    `<=` is deliberate — "at least 30 days ago" includes the 30th day itself.
+
+    None when consent is withheld, matching every other outcome field. On a
+    shared row this is always a bool, never None: a row with a grade but no
+    tracked activity has no timestamp to judge quiet against, and the real
+    expression COALESCEs that to false rather than leaving it NULL. That is
+    what keeps such a row from falling out of `needs_attention=true` and
+    `needs_attention=false` alike.
+    """
+    if not shared:
+        return None
+    if status == "not_started":
+        return True
+    if last_active_on is None:
+        return False
+    return datetime.date.fromisoformat(last_active_on) <= _NEEDS_ATTENTION_CUTOFF
+
+
 def _build_learner_progress():
     """Deterministic so the stub's fixture is stable across pod restarts.
 
@@ -571,6 +602,9 @@ def _build_learner_progress():
                     else None,
                     "certificate_is_revoked": False if shared and certified else None,
                     "last_active_on": _last_active_on(n, status, shared),
+                    "needs_attention": _needs_attention(
+                        status, _last_active_on(n, status, shared), shared
+                    ),
                 }
             )
     return rows
@@ -743,6 +777,7 @@ class Handler(BaseHTTPRequestHandler):
         statuses = qs.get("completion_status", [])
         include_inactive = qs.get("include_inactive", ["false"])[0].lower() == "true"
         courserun = qs.get("courserun_readable_id", [None])[0]
+        needs_attention = qs.get("needs_attention", [None])[0]
         sort_key = qs.get("sort", ["full_name"])[0]
         descending = qs.get("descending", ["false"])[0].lower() == "true"
 
@@ -765,6 +800,14 @@ class Handler(BaseHTTPRequestHandler):
                 if (r["completion_status"] in statuses)
                 or (r["completion_status"] is None and "unknown" in statuses)
             ]
+        if needs_attention is not None:
+            # Withheld rows carry None here and so match NEITHER true nor
+            # false, exactly as the real API's two-valued SQL predicate leaves
+            # them out of both. Unlike `completion_status` there is no
+            # `unknown` escape hatch, so omitting the param is the only way to
+            # see them.
+            wanted = needs_attention.lower() == "true"
+            rows = [r for r in rows if r["needs_attention"] is wanted]
 
         if sort_key in ("full_name", "email", "enrolled_on", "courserun_readable_id"):
             # Same as the real API's `<key> IS NULL, <key> <dir>`: nulls last in
@@ -787,6 +830,10 @@ class Handler(BaseHTTPRequestHandler):
             status: sum(1 for r in rows if r["completion_status"] == status)
             for status in _LEARNER_STATUSES
         }
+        # Overlapping, not a fifth bucket: a row can be both `in_progress` and
+        # needing attention, so this does not partition the counts above it.
+        # Withheld rows are excluded, same as the filter.
+        needs_attention_count = sum(1 for r in rows if r["needs_attention"])
 
         offset, limit = self._parse_offset_limit(qs)
         page = rows[offset:]
@@ -801,6 +848,7 @@ class Handler(BaseHTTPRequestHandler):
                 "total_count": total_count,
                 "outcomes_withheld_count": outcomes_withheld_count,
                 "completion_status_counts": completion_status_counts,
+                "needs_attention_count": needs_attention_count,
                 "data": page,
             },
         )
