@@ -14,7 +14,9 @@ from dataclasses import dataclass
 import pulumi_kubernetes as k8s
 import requests
 import yaml as pyyaml
-from pulumi import ResourceOptions
+from pulumi import Alias, ResourceOptions
+
+from ol_infrastructure.lib.k8s_crds import keycloak_operator_crd_urls
 
 
 @dataclass
@@ -56,10 +58,7 @@ def create_identity_core(  # noqa: PLR0913
     # CRDs first — cluster-scoped, no namespace patching needed.
     operator_crds = k8s.yaml.v2.ConfigGroup(
         "keycloak-operator-crds",
-        files=[
-            f"{kc_base}/keycloaks.k8s.keycloak.org-v1.yml",
-            f"{kc_base}/keycloakrealmimports.k8s.keycloak.org-v1.yml",
-        ],
+        files=keycloak_operator_crd_urls(kc_base),
         opts=_k8s(parent=local_infra_ns, delete_before_replace=False),
     )
 
@@ -105,7 +104,7 @@ def create_identity_core(  # noqa: PLR0913
     # the Keycloak instance.
     instance = k8s.apiextensions.CustomResource(
         "keycloak-instance",
-        api_version="k8s.keycloak.org/v2alpha1",
+        api_version="k8s.keycloak.org/v2beta1",
         kind="Keycloak",
         metadata={
             "name": "keycloak",
@@ -195,33 +194,22 @@ def create_identity_core(  # noqa: PLR0913
             "resources": {
                 "limits": {"memory": "2Gi"},
             },
-            "unsupported": {
-                "podTemplate": {
-                    "spec": {
-                        "containers": [
-                            {
-                                "env": [
-                                    # Image has OTel compiled in at build time.
-                                    # Without a receiver, SDK init timeouts
-                                    # destabilise the pod.
-                                    {
-                                        "name": "OTEL_SDK_DISABLED",
-                                        "value": "true",
-                                    },
-                                    {
-                                        "name": "KC_HOSTNAME_STRICT",
-                                        "value": "false",
-                                    },
-                                ],
-                            }
-                        ]
-                    }
-                }
-            },
+            "env": [
+                # Image has OTel compiled in at build time. Without a
+                # receiver, SDK init timeouts destabilise the pod.
+                {"name": "OTEL_SDK_DISABLED", "value": "true"},
+                {"name": "KC_HOSTNAME_STRICT", "value": "false"},
+            ],
         },
         opts=_k8s(
             parent=local_infra_ns,
             depends_on=[operator, admin_secret, db_cluster],
+        ).merge(
+            # Same CRD storage, so the apiVersion change is a state identity
+            # change only; without the alias Pulumi would replace the instance.
+            ResourceOptions(
+                aliases=[Alias(type_="kubernetes:k8s.keycloak.org/v2alpha1:Keycloak")]
+            )
         ),
     )
 

@@ -89,9 +89,13 @@ spec:
         post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
         session:
           secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
-          cookie:
-            domain: ".mitxonline.mit.dev"
-            lifetime: 1209600
+          # Flat keys: APISIX 3.17+ ignores the nested session.cookie.* form.
+          # 0 disables lua-resty-session's 900s idling / 3600s rolling
+          # defaults, leaving absolute_timeout in charge, as deployed.
+          cookie_domain: ".mitxonline.mit.dev"
+          absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         session_contents:
           access_token: true
           enc_id_token: true
@@ -148,9 +152,13 @@ spec:
         post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
         session:
           secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
-          cookie:
-            domain: ".mitxonline.mit.dev"
-            lifetime: 1209600
+          # Flat keys: APISIX 3.17+ ignores the nested session.cookie.* form.
+          # 0 disables lua-resty-session's 900s idling / 3600s rolling
+          # defaults, leaving absolute_timeout in charge, as deployed.
+          cookie_domain: ".mitxonline.mit.dev"
+          absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         session_contents:
           access_token: true
           enc_id_token: true
@@ -188,9 +196,13 @@ spec:
         post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
         session:
           secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
-          cookie:
-            domain: ".mitxonline.mit.dev"
-            lifetime: 1209600
+          # Flat keys: APISIX 3.17+ ignores the nested session.cookie.* form.
+          # 0 disables lua-resty-session's 900s idling / 3600s rolling
+          # defaults, leaving absolute_timeout in charge, as deployed.
+          cookie_domain: ".mitxonline.mit.dev"
+          absolute_timeout: 1209600
+          idling_timeout: 0
+          rolling_timeout: 0
         session_contents:
           access_token: true
           enc_id_token: true
@@ -248,4 +260,8 @@ spec:
         # api.learn.mit.dev, matching the learn route that issued the cookie.
         session:
           secret: "local-dev-oidc-session-secret-32chars!"     # pragma: allowlist secret
+          # 0 disables lua-resty-session's 900s idling / 3600s rolling
+          # defaults, as the deployed OIDC config does.
+          idling_timeout: 0
+          rolling_timeout: 0
         unauth_action: pass

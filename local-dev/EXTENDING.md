@@ -129,7 +129,7 @@ Tilt also runs `pulumi up` automatically when infra files change. You can also t
 
 ### Common modifications
 
-**Change a Helm chart version:** Edit the version in `infra/core/Pulumi.local-dev.core.Dev.yaml` and run `pulumi up` in `infra/core/`.
+**Change a chart, operator or image version:** Versions live in `src/bridge/lib/versions.py`, and Renovate bumps them. Where a version is shared with a deployed stack, local-dev follows it. If local-dev has to lag (e.g. an upgrade that needs a migration), pin the older value in the module that uses it, with a comment saying why, rather than changing the shared constant.
 
 **Add a new shared service:** Add a module under `infra/modules/` and call it from `infra/core/__main__.py`. Use the existing modules (`cache.py`, `search.py`, `ai.py`) as references.
 

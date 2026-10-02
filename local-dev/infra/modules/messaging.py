@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import pulumi_kubernetes as k8s
 from pulumi import ResourceOptions
 
+from bridge.lib.versions import MAILPIT_VERSION
+
 
 @dataclass
 class MessagingResources:
@@ -37,7 +39,7 @@ def create_messaging(
                     "containers": [
                         {
                             "name": "mailpit",
-                            "image": "axllent/mailpit:latest",
+                            "image": f"axllent/mailpit:{MAILPIT_VERSION}",
                             "ports": [
                                 {"containerPort": 1025, "name": "smtp"},
                                 {"containerPort": 8025, "name": "ui"},

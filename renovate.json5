@@ -56,6 +56,19 @@
       ],
       overridePackageName: '{"addonName":"{{{depName}}}"}',
     },
+    {
+      // VALKEY_VERSION is the local-dev stand-in for ElastiCache, whose
+      // engine_version (7.2 for every app local-dev runs) Renovate does not
+      // track.
+      // Move this together with the applications' engine_version.
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'valkey/valkey',
+      ],
+      allowedVersions: '/^7\\.2\\.\\d+-alpine$/',
+    },
   ],
   pip_requirements: {
     managerFilePatterns: [

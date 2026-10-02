@@ -8,7 +8,7 @@ RustFS rather than MinIO: MinIO's community server is effectively frozen and
 RustFS is the drop-in S3-compatible replacement we are standardising on. The
 S3 surface ocw-studio exercises (canned public-read ACLs on upload, bucket
 policies, versioning, presigned URLs, anonymous path-style GETs) was verified
-against rustfs 1.0.0-rc.6 before this module was written.
+against rustfs 1.0.0-rc.6 before this module was written, and again on 1.0.0.
 
 One deliberate difference from the compose setup it replaces: the buckets are
 made world-readable with a bucket policy, not `mc anonymous set public`.
@@ -24,6 +24,8 @@ from dataclasses import dataclass
 import pulumi_kubernetes as k8s
 from pulumi import ResourceOptions
 
+from bridge.lib.versions import AWS_CLI_VERSION, RUSTFS_VERSION
+
 # Apps whose manifests expect an in-cluster S3 endpoint. Adding an app here is
 # what causes RustFS to be deployed; see create_object_store's callers.
 # odl-video-service is a candidate — its app-env.yaml currently carries stub
@@ -31,9 +33,7 @@ from pulumi import ResourceOptions
 # switched over, so it is deliberately not listed yet.
 OBJECT_STORE_APPS = ("ocw-studio",)
 
-# Pinned rather than :latest — RustFS is pre-1.0 and its release candidates
-# are not API-stable with each other.
-RUSTFS_IMAGE = "rustfs/rustfs:1.0.0-rc.6"
+RUSTFS_IMAGE = f"rustfs/rustfs:{RUSTFS_VERSION}"
 
 # Local-dev credentials. These are not secret in any meaningful sense: the
 # whole cluster is local and every app manifest carries the same literal pair.
@@ -241,7 +241,7 @@ def create_object_store(
                     "containers": [
                         {
                             "name": "bootstrap",
-                            "image": "amazon/aws-cli:2.36.44",
+                            "image": f"amazon/aws-cli:{AWS_CLI_VERSION}",
                             "command": ["/bin/sh", "/scripts/bootstrap.sh"],
                             "env": [
                                 {

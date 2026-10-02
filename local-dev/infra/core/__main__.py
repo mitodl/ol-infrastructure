@@ -42,6 +42,13 @@ from modules.search import create_search
 from modules.tls import create_tls_resources
 from pulumi import Config
 
+from bridge.lib.versions import (
+    APISIX_CHART_VERSION,
+    CERT_MANAGER_CHART_VERSION,
+    CNPG_CHART_VERSION,
+    KEYCLOAK_OPERATOR_CRD_VERSION,
+)
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -114,11 +121,6 @@ host_gateway = (
     config.get("host_gateway") or os.environ.get("LOCAL_DEV_HOST_GATEWAY") or ""
 )
 
-cert_manager_version = config.get("cert_manager_version") or "v1.16.2"
-cnpg_version = config.get("cnpg_version") or "0.23.0"
-apisix_version = config.get("apisix_version") or "2.13.0"
-keycloak_operator_version = config.get("keycloak_operator_version") or "26.0.7"
-
 # Keycloak server image. The default is the published image the hosted
 # environments run, pinned by digest; local-dev/scripts/kc-theme-image.sh reads
 # that digest as the base for a locally built theme image and writes the result
@@ -171,8 +173,8 @@ ingress = create_ingress(
     namespaces=namespaces,
     apisix_admin_key=apisix_admin_key,
     apisix_viewer_key=apisix_viewer_key,
-    cert_manager_version=cert_manager_version,
-    apisix_version=apisix_version,
+    cert_manager_version=CERT_MANAGER_CHART_VERSION,
+    apisix_version=APISIX_CHART_VERSION,
 )
 
 # ---------------------------------------------------------------------------
@@ -277,7 +279,7 @@ if observability_enabled:
     )
 
 # Create database cluster (needed by Keycloak, LiteLLM)
-db = create_database(_k8s, namespaces["local-infra"], cnpg_version)
+db = create_database(_k8s, namespaces["local-infra"], CNPG_CHART_VERSION)
 
 create_ai_services(_k8s, namespaces["local-infra"], db.cluster, _infra_dir)
 
@@ -300,7 +302,7 @@ identity = create_identity_core(
     local_infra_ns=namespaces["local-infra"],
     apisix_release=ingress.apisix,
     tls_secret=tls.tls_secret,
-    keycloak_operator_version=keycloak_operator_version,
+    keycloak_operator_version=KEYCLOAK_OPERATOR_CRD_VERSION,
     keycloak_image=keycloak_image,
     keycloak_hostname=keycloak_hostname,
     keycloak_url=keycloak_url,

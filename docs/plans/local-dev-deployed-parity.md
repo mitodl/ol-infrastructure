@@ -26,23 +26,25 @@ can produce the local app manifests) to the whole stack.
 
 | Service | Local | Deployed | Shared code |
 |---|---|---|---|
-| APISIX | chart 2.13.0 (APISIX 3.15.0, controller chart 1.1.1) | chart 2.17.0 (APISIX 3.18.0, controller chart 1.3.0) | none |
+| APISIX | chart 2.17.0 (APISIX 3.18.0, controller chart 1.3.0) | chart 2.17.0 (APISIX 3.18.0, controller chart 1.3.0) | version pin |
 | Gateway API | no `GatewayClass` or `Gateway` | `GatewayClass`/`Gateway` `apisix`, CRDs v1.6.2 | none |
-| cert-manager | v1.16.2, installed, used by nothing | v1.21.2, `ClusterIssuer` per environment | none |
-| Keycloak operator | 26.0.7, CR `v2alpha1`, behind APISIX over HTTP | 26.7.4, CR `v2beta1`, behind Traefik over HTTPS | none |
+| cert-manager | v1.21.2, installed, used by nothing | v1.21.2, `ClusterIssuer` per environment | version pin |
+| Keycloak operator | 26.7.4, CR `v2beta1`, behind APISIX over HTTP | 26.7.4, CR `v2beta1`, behind Traefik over HTTPS | version pin, CRD list helper |
 | Keycloak realm | 861 lines, credentials in k8s Secrets | about 1800 lines, credentials in Vault | flow builders |
 | Postgres | CloudNativePG 1.25.0, one shared cluster, version unpinned | RDS per app, major 15 (mit_learn, mitxonline) or 18 | none |
-| Valkey | `8-alpine`, no TLS, no auth, shared | ElastiCache Valkey 7.2, TLS and auth token, per app | none |
+| Valkey | `7.2.14-alpine`, no TLS, no auth, shared | ElastiCache Valkey 7.2, TLS and auth token, per app | none |
 | OpenSearch | chart 3.4.0, security plugin off | AWS OpenSearch 3.3 | none |
 | Qdrant | v1.19.1, one pod, no API key | Qdrant Cloud v1.19.1, API key | version pin |
-| Tika | image 3.0.0.0, no auth | chart 3.2.2, access token, behind APISIX | none |
-| Object storage | RustFS 1.0.0-rc.6, ocw-studio only | S3, IAM credentials issued by Vault | none |
+| Tika | image from chart 3.2.2 (`3.2.2.0-full`), no auth | chart 3.2.2, access token, behind APISIX | version pin |
+| Object storage | RustFS 1.0.0, ocw-studio only | S3, IAM credentials issued by Vault | none |
 | Secrets | committed plain Secrets | Vault and Vault Secrets Operator 1.6.0 | none |
 | Observability | Loki, Alloy v1.7.5, Grafana, logs only | k8s-monitoring 4.5.2 to Grafana Cloud | none |
 | nginx sidecar | 1.25 and 1.27 in four apps | removed from all five counterparts | none |
 
-Local versions are hardcoded or default in `local-dev/infra/core/__main__.py`.
-Renovate tracks `src/bridge/lib/versions.py`, so only the deployed column moves.
+Every platform version in `local-dev/infra` now comes from
+`src/bridge/lib/versions.py` (step 2 of the order of work below), so Renovate
+moves both columns. The nginx sidecar tags in the hand-written app manifests
+are still hardcoded; the sidecar goes away with the app definitions.
 
 Three of these change behaviour an application developer depends on.
 

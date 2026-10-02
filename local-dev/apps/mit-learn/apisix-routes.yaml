@@ -89,6 +89,10 @@ spec:
         unauth_action: pass
         session:
           secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          # 0 disables lua-resty-session's 900s idling / 3600s rolling
+          # defaults, as the deployed OIDC config does.
+          idling_timeout: 0
+          rolling_timeout: 0
         ssl_verify: false
 
   - name: logout-redirect
@@ -138,6 +142,10 @@ spec:
         unauth_action: auth
         session:
           secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          # 0 disables lua-resty-session's 900s idling / 3600s rolling
+          # defaults, as the deployed OIDC config does.
+          idling_timeout: 0
+          rolling_timeout: 0
         ssl_verify: false
 ---
 # ApisixRoute — /learn/ prefix (strips prefix before forwarding to backend).
@@ -188,6 +196,10 @@ spec:
         unauth_action: pass
         session:
           secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          # 0 disables lua-resty-session's 900s idling / 3600s rolling
+          # defaults, as the deployed OIDC config does.
+          idling_timeout: 0
+          rolling_timeout: 0
         ssl_verify: false
 
   - name: logout-redirect
@@ -243,4 +255,8 @@ spec:
         unauth_action: auth
         session:
           secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          # 0 disables lua-resty-session's 900s idling / 3600s rolling
+          # defaults, as the deployed OIDC config does.
+          idling_timeout: 0
+          rolling_timeout: 0
         ssl_verify: false

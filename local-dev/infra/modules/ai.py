@@ -6,6 +6,8 @@ from pathlib import Path
 import pulumi_kubernetes as k8s
 from pulumi import ResourceOptions
 
+from bridge.lib.versions import LITELLM_VERSION
+
 
 def create_ai_services(
     _k8s: Callable[..., ResourceOptions],
@@ -42,7 +44,7 @@ def create_ai_services(
                     "containers": [
                         {
                             "name": "litellm",
-                            "image": "ghcr.io/berriai/litellm:main-stable",
+                            "image": f"ghcr.io/berriai/litellm:{LITELLM_VERSION}",
                             "args": [
                                 "--config",
                                 "/etc/litellm/config.yaml",

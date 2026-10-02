@@ -424,15 +424,12 @@ This knob is deliberately *not* pinned in `Pulumi.local-dev.core.Dev.yaml` — P
 
 The infrastructure is split across two Pulumi stacks:
 
-**`local-dev/infra/core/Pulumi.local-dev.core.Dev.yaml`** — operators, Keycloak, APISIX, database, cache:
+**`local-dev/infra/core/Pulumi.local-dev.core.Dev.yaml`** — operators, Keycloak, APISIX, database, cache. Chart, operator and image versions are not stack config: they are read from `src/bridge/lib/versions.py`. Components that also run deployed (APISIX, cert-manager, the Keycloak operator, Tika) use the deployed pins; the rest have local-only constants there.
 
 | Key | Default | Description |
 |-----|---------|-------------|
 | `keycloak_hostname` | `sso.ol.mit.dev` | Keycloak ingress hostname |
 | `tls_cert_path` | `local-dev/certs/local-dev.pem` | mkcert cert (relative to repo root) |
-| `apisix_version` | `2.12.0` | APISIX Helm chart version |
-| `cnpg_version` | `0.23.0` | CloudNativePG operator Helm chart version |
-| `keycloak_operator_version` | `26.0.7` | Official Keycloak Operator version |
 | `keycloak_image` | published `mitodl/keycloak` digest | Keycloak server image. Leave unset here and use `tilt_config.json` instead — see [Testing a local ol-keycloakify build](#testing-a-local-ol-keycloakify-build). |
 | `observability_enabled` | `true` | Deploy Grafana + Loki + Alloy (~1.3GB). Set to `false` on a constrained Docker VM. |
 
