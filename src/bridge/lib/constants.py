@@ -29,7 +29,7 @@ DEFAULT_OIDC_SESSION_COOKIE_NAME = "session"  # pragma: allowlist secret
 # a copy arriving from a client is always a forgery -- mitol-apigateway's
 # middleware authenticates off X-Userinfo without asking where it came from.
 # The plugin clears inbound copies itself, but only on the routes it is
-# attached to; see ``identity_header_strip_plugin`` in
+# attached to; see ``gateway_global_pre_function_plugin`` in
 # ol_infrastructure.components.services.apisix for the cluster-wide rule that
 # covers the rest.
 #
