@@ -148,10 +148,18 @@ Packages
 
 | Package | Import | Depends on | Holds |
 | --- | --- | --- | --- |
-| `ol-llm` | `ol_llm` | `pydantic-ai-slim`, `opik` (pinned), `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http`, `httpx` | Model factory, the §3 call contract, both entry points (agent and traced completion), tracing wiring (SDK root trace, OTel spans linked by `OpikSpanProcessor`, Keycloak-refreshing auth), §4 attribution, prompt fetch through the SDK with embedded fallback, batch helpers |
-| `ol-llm[openai]`, `[anthropic]`, `[bedrock]`, `[google]`, `[mistral]` | | the matching `pydantic-ai-slim` extra | Provider SDKs, chosen per consumer |
+| `ol-llm` | `ol_llm` | `opik` (pinned), `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http`, `httpx` | What every call site needs whatever it is built on: tracing wiring (SDK root trace, OTel spans linked by `OpikSpanProcessor`, Keycloak-refreshing auth), §4 attribution, the §3 policy values (`resolve_policy`), prompt fetch through the SDK with embedded fallback, batch helpers |
+| `ol-llm[pydantic-ai]` | | `pydantic-ai-slim` | Model factory, the §6 call contract's retry wrapper, both entry points (agent and traced completion) |
+| `ol-llm[openai]`, `[anthropic]`, `[bedrock]`, `[google]`, `[mistral]` | | the matching `pydantic-ai-slim` extra, so each also installs PydanticAI | Provider SDKs, chosen per consumer |
+| `ol-llm[harness]` | | `pydantic-ai-harness` (0.x, pinned to a minor series) | In-session memory and compaction (§5 categories A and B). Each harness release pins `pydantic-ai-slim` exactly, so this extra fixes the PydanticAI version |
+| `ol-llm[memory]` | | `hindsight-client` | Client for the shared memory service (§5.5). Provisional until the Hindsight PoC reports |
 | `ol_llm.eval` (module) | `ol_llm.eval` | the full opik install, including litellm | Datasets, experiments, `evaluate(prompts=…)`, LLM-judge metrics. Runs in CI eval jobs and on developer machines, never in slimmed runtime images |
 | `ol-llm[django]` | `ol_llm.django` | Django | Settings reader, app-ready tracer setup, Celery helpers. Add only when the Django glue outgrows a settings reader |
+
+Extras added 2026-10-02 at the project owner's direction: PydanticAI is the default but not
+mandatory (settled 2026-09-10), so a LangGraph or plain-SDK call site installs the base
+package alone, and CI checks that the base imports with no extra present. Durable-execution
+extras (`temporal`, `dbos`) wait for §7's evaluation.
 
 No Dagster adapter package. The batch helpers in the core are framework-neutral, and the
 Dagster resource that wraps them belongs in ol-orchestrate-lib until a second Dagster
