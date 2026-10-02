@@ -36,9 +36,18 @@ spec:
         image: mitodl/mitxonline-app:latest
         imagePullPolicy: IfNotPresent
         command:
-        - /bin/sh
+        # /bin/bash, not /bin/sh: `set -o pipefail` is not POSIX, and the app
+        # images differ (this one symlinks sh to bash, odl-video-service's
+        # python:*-bullseye base uses dash, which rejects the option outright).
+        - /bin/bash
         - -c
         - |
+          # Without this the script's exit status is the *last* command's, so a
+          # failed `migrate` was swallowed and the pod came up serving a
+          # half-migrated schema -- how 14 unapplied ecommerce/openedx
+          # migrations went unnoticed. Same guard as apps/mit-learn and
+          # apps/ocw-studio.
+          set -eo pipefail
           python manage.py collectstatic --noinput --clear
           python manage.py migrate --noinput
           python manage.py createcachetable

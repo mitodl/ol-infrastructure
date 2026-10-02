@@ -36,9 +36,16 @@ spec:
         image: mitodl/learn-ai-app:latest
         imagePullPolicy: IfNotPresent
         command:
-        - /bin/sh
+        # /bin/bash, not /bin/sh: `set -o pipefail` is not POSIX and the app
+        # images disagree on what sh is.
+        - /bin/bash
         - -c
         - |
+          # Without this the script's exit status is the *last* command's, so a
+          # failed `migrate` is swallowed and the pod comes up serving a
+          # half-migrated schema. Same guard as apps/mit-learn and
+          # apps/ocw-studio.
+          set -eo pipefail
           python manage.py collectstatic --noinput --clear
           python manage.py migrate --noinput
           python manage.py createcachetable
