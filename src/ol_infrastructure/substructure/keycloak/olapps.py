@@ -43,6 +43,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     resource_options = ResourceOptions(provider=keycloak_provider)
     keycloak_realm_config = Config("keycloak_realm")
     captcha_domain = "www.recaptcha.net"
+    mitlearn_domain = keycloak_realm_config.require("learn_domain")
     ol_apps_realm = keycloak.Realm(
         "olapps",
         # Labeled "Client Login Timeout" in the admin console's Tokens tab
@@ -62,6 +63,13 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         access_code_lifespan_user_action="15m",
         attributes={
             "business_unit": f"operations-{env_name}",
+            # Where the login theme sends someone who has finished a flow it
+            # cannot return them from -- confirming an email change from their
+            # inbox arrives with no client session, so Keycloak has no
+            # application to offer. Read by the ol-keycloak SPI's
+            # OLSettingsBean, which substitutes "#" when this is unset, and
+            # rendered as the "Back to MIT Learn" link on info.ftl.
+            "olCanonicalHomeUrl": f"https://{mitlearn_domain}/",
         },
         display_name="MIT Learn",
         display_name_html="<b>MIT Learn</b>",
@@ -857,7 +865,6 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     # OL - browser flow [END]
     # Ensure organization scope is present
     create_organization_scope(ol_apps_realm.id, "olapps", resource_options)
-    mitlearn_domain = keycloak_realm_config.require("learn_domain")
     # Touchstone SAML [START]
     mit_mail_domains = [
         "broad.mit.edu",
