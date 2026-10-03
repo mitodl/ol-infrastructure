@@ -166,7 +166,7 @@ OPENSEARCH_CHART_VERSION = "3.4.0"
 # renovate: datasource=docker depName=valkey packageName=valkey/valkey
 VALKEY_VERSION = "7.2.14-alpine"
 # renovate: datasource=docker depName=mailpit packageName=axllent/mailpit
-MAILPIT_VERSION = "v1.31.3"
+MAILPIT_VERSION = "v1.31.4"
 # renovate: datasource=docker depName=litellm packageName=ghcr.io/berriai/litellm
 LITELLM_VERSION = "v1.103.1"
 # Keep this on a plain release tag. Renovate never proposes an update from a
