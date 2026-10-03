@@ -120,7 +120,7 @@ NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.4"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin
 NVIDIA_K8S_DEVICE_PLUGIN_CHART_VERSION = "0.20.1"
 # renovate: datasource=docker depName=pgbouncer packageName=ghcr.io/cloudnative-pg/pgbouncer
-PGBOUNCER_VERSION = "1.25.2"
+PGBOUNCER_VERSION = "1.26.0"
 # Keep at >= v0.12.1: earlier releases report the reserve_pool metric incorrectly
 # against PgBouncer >= 1.24, which is the version PGBOUNCER_VERSION pins.
 # renovate: datasource=docker depName=pgbouncer-exporter packageName=quay.io/prometheuscommunity/pgbouncer-exporter
