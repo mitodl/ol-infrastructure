@@ -2,8 +2,12 @@
 
 This stack provisions the shared APISIX/Vault/cert infrastructure for
 published (run-mode) MarimoNotebook CRDs at the domain configured via
-``marimo_data:apps_domain`` (e.g. ``nb.data.ol.mit.edu`` for Production,
-``nb-qa.data.ol.mit.edu`` for QA).
+``marimo_data:apps_domain`` (e.g. ``apps.nb.data.ol.mit.edu`` for Production,
+``apps.nb-qa.data.ol.mit.edu`` for QA).  The apps host is distinct from the
+JupyterHub host (``jupyterhub_data:domain``) because both stacks create a
+Certificate and ApisixTls for their host.  Legacy ApisixRoute hosts are not an
+external-dns source, so the apps host is also listed in ``eks:apisix_domains``
+for the data cluster.
 
 The marimo-operator is installed on the data EKS cluster via the
 ``ol-substructure-eks`` stack (``substructure/aws/eks/marimo_operator.py``).
@@ -98,10 +102,18 @@ application_labels = k8s_global_labels | {
 
 apps_domain = marimo_data_config.require("apps_domain")
 
-# Vault policy for marimo published-app pods to read the ol-marimo-app-client
-# service-account credentials.  These are Keycloak credentials and are not
-# usable against Galaxy -- see the module docstring.
+# Vault policy for the marimo namespace.  sso/marimo holds the ol-marimo-client
+# credentials that ol-apisix-marimo-data-oidc-secrets syncs for the gated
+# routes.  sso/marimo-app holds the ol-marimo-app-client service-account
+# credentials, which are Keycloak credentials and are not usable against
+# Galaxy -- see the module docstring.
 marimo_vault_policy_hcl = """
+path "secret-operations/data/sso/marimo" {
+  capabilities = ["read"]
+}
+path "secret-operations/sso/marimo" {
+  capabilities = ["read"]
+}
 path "secret-operations/data/sso/marimo-app" {
   capabilities = ["read"]
 }
@@ -120,7 +132,11 @@ marimo_vault_k8s_auth_backend_role = vault.kubernetes.AuthBackendRole(
     f"ol-marimo-data-vault-k8s-auth-backend-role-{stack_info.env_suffix}",
     role_name="marimo-data",
     backend=cluster_stack.require_output("vault_auth_endpoint"),
-    bound_service_account_names=["*"],
+    # Only the VSO ServiceAccount OLVaultK8SResources creates. Published
+    # notebooks run author code in this namespace, and with "*" any pod that
+    # mounts a ServiceAccount token could log in and read the OIDC client
+    # secret above.
+    bound_service_account_names=["marimo-data-vault"],
     bound_service_account_namespaces=[marimo_namespace],
     token_policies=[marimo_vault_policy.name],
 )
@@ -213,6 +229,10 @@ marimo_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=marimo_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        # The default cors entry is allow_origins "**" with credentials, which
+        # would let any origin read a gated app's responses with the viewer's
+        # APISIX session.  Published apps have no cross-origin caller.
+        enable_cors=False,
     ),
 )
 

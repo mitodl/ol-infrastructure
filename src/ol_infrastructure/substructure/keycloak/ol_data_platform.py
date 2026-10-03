@@ -863,6 +863,11 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             "https://nb.data.ol.mit.edu/*",
             "https://nb-qa.data.ol.mit.edu/*",
             "https://nb-ci.data.ol.mit.edu/*",
+            # Published marimo apps (applications/marimo_data). APISIX derives
+            # redirect_uri from the request path, so this has to be a wildcard.
+            "https://apps.nb.data.ol.mit.edu/*",
+            "https://apps.nb-qa.data.ol.mit.edu/*",
+            "https://apps.nb-ci.data.ol.mit.edu/*",
         ],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
