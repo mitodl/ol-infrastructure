@@ -64,7 +64,7 @@ Repository = "https://github.com/mitodl/ol-infrastructure"
 
 [dependency-groups]
 # CI installs only this group (.github/workflows/autofix.yml); `dev` includes it.
-prek = ["prek==0.5.3"]
+prek = ["prek==0.5.4"]
 dev = [
   { include-group = "prek" },
   "copier",
