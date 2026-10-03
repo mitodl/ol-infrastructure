@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.13, <3.15"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -1483,14 +1483,14 @@ wheels = [
 
 [[package]]
 name = "ol-concourse"
-version = "0.18.1"
+version = "0.19.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/63/01/5664d6456dcda2525f44cd735880fce96ee5f6825701ca4b364c363fd53f/ol_concourse-0.18.1.tar.gz", hash = "sha256:5ef37da0ddb7fd878f5cdcb816c3fe85140c50724345184204c65a86aa4ea663", size = 70508, upload-time = "2026-09-03T20:29:58.594Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fa/f1/bc3b3e09254b778c17e3a26463c5b0e5b616111010c8f1cd00e0a4c2f00e/ol_concourse-0.19.0.tar.gz", hash = "sha256:07d9852512f6be3019c5481ebb4782afee9731f8cf5febb3b5be8e23e9b13d09", size = 71550, upload-time = "2026-09-30T14:39:56.916Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0b/c4/08476d87be7d463c2478de6c6d4e2886946b873c0d724178b51c70340538/ol_concourse-0.18.1-py3-none-any.whl", hash = "sha256:9e5fa8c8762e61ef140e1e79053fdb3cc2ca83abc93cd6076a1a4024498ea9a4", size = 60793, upload-time = "2026-09-03T20:29:57.656Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/24/11e8f114654c87d6ea604713efc28eff1a802e235a0dde011598a0506ed4/ol_concourse-0.19.0-py3-none-any.whl", hash = "sha256:b391301df3af0888cd16724ad0b65dccc6d93f62ca5cc078c075a5a289aa3795", size = 61612, upload-time = "2026-09-30T14:39:55.872Z" },
 ]
 
 [[package]]
@@ -1567,7 +1567,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.0,<0.29" },
     { name = "hvac", extras = ["parser"], specifier = ">=2.0.0,<3" },
     { name = "kubernetes", specifier = ">=34.1.0" },
-    { name = "ol-concourse", specifier = ">=0.18,<0.19" },
+    { name = "ol-concourse", specifier = ">=0.19,<0.20" },
     { name = "ol-parliament", specifier = ">=1.7.0" },
     { name = "packaging", specifier = ">=24.2" },
     { name = "pulumi", specifier = ">=3.39.1,<4" },
