@@ -60,7 +60,7 @@ GRAVITINO_CHART_VERSION = "1.3.11"
 # (scripts/postgresql/schema-<version>-postgresql.sql) all move together, with
 # the upgrade SQL, under the same rule as the chart above.
 # renovate: datasource=docker depName=gravitino packageName=apache/gravitino
-GRAVITINO_VERSION = "1.3.0"
+GRAVITINO_VERSION = "1.3.1"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
 KARPENTER_CHART_VERSION = "1.14.1"
 # renovate: datasource=helm depName=keda packageName=keda registryUrl=https://kedacore.github.io/charts
