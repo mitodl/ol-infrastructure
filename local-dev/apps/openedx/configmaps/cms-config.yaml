@@ -9,8 +9,8 @@ metadata:
 data:
   CELERY_BROKER_HOSTNAME: "valkey.local-infra.svc.cluster.local"
   # lehrer leaves the vhost empty, which is DB 0 (mit-learn's broker). The LMS
-  # and Studio share one broker, so both override files use 12. Free DBs are
-  # listed next to the Valkey settings in apps/mitxonline/configmaps/app-env.yaml.
+  # and Studio share one broker, so both override files use 12. The allocation
+  # is listed next to the Valkey settings in apps/mitxonline/configmaps/app-env.yaml.
   CELERY_BROKER_VHOST: "12"
   ELASTIC_SEARCH_HOST: "opensearch-cluster-master.local-infra.svc.cluster.local"
 

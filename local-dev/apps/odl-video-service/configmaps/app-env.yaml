@@ -30,8 +30,8 @@ data:
 
   # Valkey
   # Each app needs its own Valkey DBs, or Celery and RedBeat pick up another
-  # app's tasks. In use: mit-learn 0-2, Open edX 3 (cache) and 12 (broker),
-  # ocw-studio 4-5, mitxonline 6-7, learn-ai 8-9, odl-video-service 10-11.
+  # app's tasks. The allocation is listed next to the Valkey settings in
+  # apps/mitxonline/configmaps/app-env.yaml.
   REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/10"
   CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/11"
   REDIS_MAX_CONNECTIONS: "65000"
