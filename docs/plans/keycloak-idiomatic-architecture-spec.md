@@ -25,16 +25,16 @@ defects, which are not Keycloak work (see D12).
 | D1 | Order: passkey flow fix, then per-client hygiene, then the client policy, then FGAP scoping in CI, then the 26.8 upgrade when both blockers clear, then the realm restructure. Section 6 has the dependency reasons. |
 | D2 | Fix the passkey browser flow in place: make the passkey subflow ALTERNATIVE so all top-level siblings are the same kind. Do not wait for the return to built-in flows. |
 | D3 | Drop the organization subflow from the two staff-realm browser flows. It has never executed, neither realm declares an organization, and turning it on would add an identity-first username form the realms have never shown. |
-| D4 | Keep the staff realms on a custom passwordless-only flow. Do not switch them to the built-in browser flow. **Needs sign-off**, this amends `tk-return-the-hand-copied-browser-and-first-broker--332e4f`. |
+| D4 | Keep the staff realms on a custom flow with no password step. Do not switch them to the built-in browser flow. **Needs sign-off**, this amends `tk-return-the-hand-copied-browser-and-first-broker--332e4f`. |
 | D5 | One helper builds the passkey browser flow for both staff realms, keeping today's Pulumi resource names and aliases. |
 | D6 | Client policies are added after the clients conform, never before, and every executor runs with `auto-configure` off. |
-| D7 | PKCE is enforced by policy on public clients first (`client-access-type` condition). Confidential clients get `pkce_code_challenge_method="S256"` one at a time as each consumer is checked, and the condition widens to `any-client` when the last one is done. |
+| D7 | PKCE is enforced by policy on public clients first (`client-access-type` condition), once `witan-cli` is known to send PKCE on its device request. Confidential clients get `pkce_code_challenge_method="S256"` one at a time as each consumer is checked, and the condition widens to `any-client` when the last one is done. |
 | D8 | Direct access grants and implicit flow are turned off per client first, then locked by `reject-ropc-grant` and `reject-implicit-grant`. |
 | D9 | `mitlearn-admin-client` is not scoped with FGAP. It loses its roles when mit-learn stops using the Admin API (`tk-mit-learn-get-is-sso-user-from-a-token-claim-and-0a9b85`). |
-| D10 | `mitxonline-b2b-client` is split in two: a runtime membership client scoped with FGAP v2 (Organizations plus Users permissions), and a provisioning client that keeps realm-wide `manage-identity-providers`. The FGAP trial runs on 26.7.4 in CI; it does not wait for 26.8. |
+| D10 | `mitxonline-b2b-client` is split in two: a runtime membership client with an Organizations permission and Users `manage`, and a provisioning client that keeps realm-wide `manage-identity-providers`. The split removes `manage-realm` and the IdP roles from the per-request path. It does not remove realm-wide user management, which FGAP v2 cannot scope for this use. The trial runs on 26.7.4 in CI. **Needs sign-off**, the scoping task's done-when cannot be met this way. |
 | D11 | The FGAP work is done under this project. `wp-enable-fine-grained-admin-permissions-fgap-on-sh-73d6d3` (discovery, no tasks) should be closed in favour of it. **Needs sign-off.** |
 | D12 | The DCC task leaves this project's sequence. Its two mitxonline fixes (refuse download of a revoked credential, https signer URL) do not depend on anything here and should go first. **Needs an owner.** |
-| D13 | At the 26.8 upgrade, set the `full-scope-allowed` log category to ERROR. Turning full scope off per client is restructure work and does not gate the upgrade. |
+| D13 | At the 26.8 upgrade, set the log category `org.keycloak.protocol.oidc.endpoints.TokenEndpoint.full-scope-allowed` to ERROR. Turning full scope off per client is restructure work and does not gate the upgrade. |
 
 ## Measured facts this rests on
 
@@ -86,8 +86,10 @@ on create. Pulumi writes clients through those endpoints.
 
 - `pkce-enforcer`: on REGISTER and UPDATE, `validate` throws `invalid_client_metadata` unless
   the client's PKCE method is `S256`, whatever flows the client has enabled. On
-  AUTHORIZATION_REQUEST it requires `code_challenge` and `code_challenge_method`. One config
-  key, `auto-configure`.
+  AUTHORIZATION_REQUEST it requires `code_challenge` and `code_challenge_method`, and on
+  TOKEN_REQUEST a `code_verifier`. One config key, `auto-configure`. Separately from the
+  executor, a client with the PKCE attribute set must send PKCE on a device authorization
+  request too: `DeviceEndpoint.java:147` calls `checkPKCEParams`.
 - `reject-implicit-grant` and `reject-ropc-grant`: validate on REGISTER and UPDATE, and reject
   at the authorization request and the password-grant request respectively.
 - `secure-redirect-uris-enforcer`: checks on REGISTER, UPDATE and both authorization-request
@@ -112,12 +114,24 @@ resource types Clients, Groups, Roles, Users and Organizations. Organizations ha
 the open question on the scoping task: Organizations is already an FGAP type in the version we
 run.
 
-**M10. Client inventory.** 33 `openid.Client` resources across the four realm files. Public
+**M10. Client inventory, as declared.** 32 `openid.Client` call sites in the four realm files,
+plus one per contract in `learner_records.py:164` and one in `scim.py:66`. Public
 clients: `ol-superset-cli`, `ol-starrocks-cli`, `toolhive-swe-cli`, `witan-cli`,
 `witan-desktop`, `witan-ui`. PKCE `S256` is set on `toolhive-swe-cli`, `witan-desktop`,
 `witan-ui` and `ol-grafana-client`. `witan-cli` has the standard flow off and no PKCE method.
 Direct access grants are on for `ol-superset-client`, `ol-grafana-client` and `odl-video-app`;
-implicit flow is on for `ol-open_metadata-client`.
+implicit flow is on for `ol-open_metadata-client`. About a dozen clients do not set
+`direct_access_grants_enabled` at all, and the provider field is Optional and Computed, so
+their live value is whatever the server holds. The built-in clients in each realm
+(`admin-cli`, `security-admin-console`, `account-console` and the rest) are not in Pulumi and
+are matched by `client-access-type` and `any-client` conditions like any other.
+
+**M11. Adding an organization member needs two permissions.**
+`OrganizationMemberResource.addMember` calls `auth.orgs().requireManage(organization)` and
+`auth.users().requireManage(user)` (lines 106 and 110 at 26.7.4). The user is not yet a member
+when the second check runs, so that permission cannot be limited to the organization's members.
+26.7.4 also has `manage-organizations`, `view-organizations` and `query-organizations`
+realm-management roles.
 
 ## 1. Passkey browser flow (D2 to D5)
 
@@ -136,7 +150,8 @@ The change per realm is one in-place update (the passkey subflow's `requirement`
 deletes (the org subflow and its two executions). The helper takes the realm and a name prefix
 and must produce the existing resource names and aliases
 (`ol-browser-platform-engineering-flow`, `ol-browser-data-platform-flow` and so on), because a
-renamed flow is a replace and the `Bindings` resource points at the alias. `pulumi preview`
+renamed flow is a replace and the `Bindings` resource points at the alias. It is a plain
+function, not a `ComponentResource`, which would change every URN. `pulumi preview`
 showing anything other than 1 update and 3 deletes per realm means the names drifted.
 
 What changes for users:
@@ -146,12 +161,13 @@ What changes for users:
   the 2h idle and 24h max in M5.
 - The redirector runs. With no default provider (M3) it acts only on `kc_idp_hint`. In
   `ol-data-platform`, `kc_idp_hint=<touchstone alias>` will send the user straight to
-  Touchstone, which is the stock behaviour and is not reachable today.
+  Touchstone. Today Touchstone is reachable only through its button on the username form.
 - Nothing changes for the organization step: it did not run before and is removed.
 
 Why not the built-in browser flow now (D4): the built-in forms subflow is username plus
-password with passkeys offered alongside. These realms are passkey-only by construction, and
-whether any staff user holds a password credential is live state that was not read. Moving to
+password with passkeys offered alongside. Today the only ways in are a passkey, or in
+`ol-data-platform` the Touchstone button, and whether any staff user holds a password
+credential is live state that was not read. Moving to
 the built-in would make a password a valid way in for anyone who has one. The realm password
 policy and `ol-grafana-client`'s direct access grants suggest some do. If sign-off prefers the
 built-in, the precondition is an Admin API count of users with a `password` credential in each
@@ -187,7 +203,7 @@ observed; the rule (D6) costs nothing either way.
 | Client | Change | Check before applying |
 |---|---|---|
 | `ol-superset-cli`, `ol-starrocks-cli` | `pkce_code_challenge_method="S256"`; fixed loopback port in place of `http://localhost:*/callback`; explicit web origins | The CLI sends `code_challenge`. Comments at `applications/starrocks/__main__.py:845` and `substructure/starrocks/__main__.py:756` call `starrocks-auth` a PKCE script; the Superset CLI was not read. The port must match what each CLI binds. |
-| `witan-cli` | `pkce_code_challenge_method="S256"` | None for the device flow. Needed only because `pkce-enforcer` validates the attribute on every matching client (M7). |
+| `witan-cli` | `pkce_code_challenge_method="S256"` | The witan CLI sends `code_challenge` on its device authorization request and `code_verifier` on the token request. With the attribute set, Keycloak requires both (M7), so setting it against a CLI that does not would break every `witan-cli` login. The CLI is in the witan repo and was not read. The attribute is needed because `pkce-enforcer` validates it on every matching client. |
 | `ol-open_metadata-client` | `implicit_flow_enabled=False` | OpenMetadata's configured OIDC response type. |
 | `ol-superset-client`, `ol-grafana-client`, `odl-video-app` | `direct_access_grants_enabled=False` | Who uses the password grant. Loki cannot answer this (successful token events do not reach it with a grant type). Read each consumer's config and scripts, turn it off in CI and QA for a week, then Production. |
 | `ol-mitlearn-client` | explicit web origins in place of `+` | The origins the Learn frontend calls from. |
@@ -206,10 +222,22 @@ Per realm, in a helper called once from each realm function:
   then `ol-pkce` as each becomes true of every client.
 
 The `secure-redirect-uris-enforcer` config is not settled here. Most redirect URIs end in `/*`
-and the CLIs use `http` on loopback, so the starting point is `allow-wildcard-context-path`
-and `allow-ipv4-loopback-address` on. How the executor treats `http://localhost` (a name, not
-an address) was not read. Settle the values by applying the profile to the CI realms and
-reading which client updates fail, then tighten wildcards as a later pass.
+and the CLIs use `http` on loopback, so the starting point is `allow-wildcard-context-path`,
+`allow-ipv4-loopback-address` and `allow-http-scheme` on, and `oauth-2-1-compliant` off
+(it rejects `localhost` by name). A client with the standard flow on and no redirect URIs
+fails validation outright. The executor does not catch `http://localhost:*/callback`; the
+fixed port in section 2.1 is what removes that. Settle the values by applying the profile to
+the CI realms and reading which client updates fail, then tighten wildcards as a later pass.
+
+Two things to do before `ol-grants` reaches a realm:
+
+- Read the live `directAccessGrantsEnabled` and `implicitFlowEnabled` of every client in the
+  realm, not the Pulumi inputs (M10), and set the flags explicitly on the clients that omit
+  them.
+- Confirm nothing uses the password grant through `admin-cli` in the four realms. `admin-cli`
+  is public with direct access grants on, so both policies match it and password grants
+  through it will be rejected. The Pulumi provider is not affected; it authenticates to
+  `master` with a client secret.
 
 Confidential-client PKCE, consumer by consumer. None of these was verified, and which
 integration each client uses is from the audit, not re-read:
@@ -225,7 +253,8 @@ integration each client uses is from the audit, not re-read:
 `full_scope_allowed` defaults to true in the provider and is set nowhere. Turning it off needs
 explicit role scope mappings per client and belongs with the client factory
 (`tk-extract-a-keycloak-client-factory-shared-client--5ad1b8`), where the default can flip in
-one place. `full-scope-disabled` is added to `ol-all-clients` at the end of that work.
+one place. `full-scope-disabled` is added at the end of that work, under a condition that
+excludes the built-in clients, as the 26.8 upgrade notes advise.
 
 ## 3. Service-account scoping (D9 to D11)
 
@@ -240,11 +269,19 @@ three roles are deleted when that ships.
 `mitxonline-b2b-client` holds seven realm-management roles and is used on enrollment-code
 requests. Split it:
 
-- Runtime membership client: no realm-management roles. An Organizations `manage` permission
-  on the B2B organizations and a Users permission sufficient to add a member.
-- Provisioning client: `manage-identity-providers`, `view-identity-providers` and whatever
-  organization creation needs. Identity providers have no FGAP type (M9), so this stays
-  realm-wide. The mitigation is that it is used only by the provisioning path.
+- Runtime membership client: an Organizations `manage` permission on the B2B organizations,
+  and Users `manage`. Adding a member requires both (M11), and the second cannot be limited
+  to an organization, so this client keeps the equivalent of `manage-users`. It loses
+  `manage-realm`, `view-realm` and both IdP roles.
+- Provisioning client: `manage-identity-providers`, `view-identity-providers` and
+  `manage-organizations` in place of `manage-realm`. Identity providers have no FGAP type
+  (M9), so this stays realm-wide. The mitigation is that it is used only by the provisioning
+  path.
+
+Getting realm-wide user management off the per-request path needs a different membership
+mechanism (membership granted by the organization's IdP at broker login, or invitations), not
+a permission. That is a design question for the B2B onboarding project and is not settled
+here.
 
 CI trial, on 26.7.4, before any design is fixed:
 
@@ -252,12 +289,11 @@ CI trial, on 26.7.4, before any design is fixed:
 2. Create a test client with no roles and an Organizations `manage` permission on one
    organization. There is no Pulumi resource for this permission type (M8), so create it
    through the Admin API for the trial.
-3. Call the Admin API operations mitxonline's membership path uses and record which succeed.
-   The open question from the task comment is whether adding an organization member needs a
-   Users permission as well.
+3. Add a Users `manage` permission, then call the Admin API operations mitxonline's
+   membership path uses and record which succeed.
 4. Confirm the existing role-based clients are unaffected by turning the realm switch on.
 
-The result decides the shape of the runtime client. Declaring the Organizations permission in
+Declaring the Organizations permission in
 Pulumi needs a provider resource that does not exist yet, so it is either an upstream request
 or a scripted step until then.
 
@@ -277,8 +313,10 @@ Nothing here can start until both of these exist. Neither did on 2026-10-05.
    image pipeline selects the jar by major.minor and matches nothing otherwise.
 
 `KEYCLOAK_VERSION` carries a Renovate annotation, so a 26.8 bump PR will be proposed
-regardless. It must not merge before the gates clear. How that PR is held (a Renovate rule or
-review discipline) is open; no Renovate config for it was found in this repo.
+regardless (the custom manager at `renovate.json5:78-87`). It must not merge before the gates
+clear. `renovate.json5` has no rule holding Keycloak; add a `packageRules` entry limiting
+`keycloak` and `keycloak-k8s-resources` to `26.7.x` in the same PR as the passkey fix, and
+remove it with the bump.
 
 Changes that ship with the bump:
 
@@ -286,7 +324,7 @@ Changes that ship with the bump:
   `local-dev/keycloak/Dockerfile`. In 26.8 the built-in SCIM realm resource registers under
   the same provider id as the plugin and one silently replaces the other. At 26.7.4 `SCIM_API`
   is a preview feature and off, so the flag is not needed before the bump.
-- The `full-scope-allowed` log category at ERROR (D13). Every client has full scope on, so the
+- The full-scope log category at ERROR (D13). Every client has full scope on, so the
   default would add a WARN per token issuance.
 - `tk-check-dagster-keycloak-ingest-against-the-26-8-o-d0ee3f` resolved, since 26.8 drops
   columns Dagster reads.
@@ -322,7 +360,9 @@ the earlier sections put on them.
    removes about 16.7k WARN lines a week before the upgrade adds its own.
 2. Per-client fixes in section 2.1. The two CLI clients and `witan-cli` first, since they are
    the precondition for the public-client policy.
-3. `ol-public-clients` policy in all four realms, then `ol-all-clients` with `ol-grants`.
+3. `ol-public-clients` policy, then `ol-all-clients` with `ol-grants`. Every declared public
+   client is in the two staff realms; in olapps and ol-mit the public-client policy matches
+   only built-ins.
 4. FGAP trial in CI (section 3). Can run in parallel with 2 and 3.
 5. mitxonline client split, after the trial and coordinated with the mitxonline change.
 6. 26.8 upgrade, whenever the two gates clear. Steps 1 to 3 do not block it; step 1 should be
@@ -333,13 +373,14 @@ the earlier sections put on them.
 
 ## 7. Still open
 
-- Sign-off on D4, D11 and D12.
+- Sign-off on D4, D10, D11 and D12.
 - Whether any staff-realm user has a password credential, and whether either staff realm has
   a hand-created organization. Both need Admin API reads against the live realms.
 - `secure-redirect-uris-enforcer` config values (section 2.2).
 - PKCE support for every confidential-client consumer (section 2.2).
 - Who uses the password grant on the three clients that allow it.
 - Whether the moira migration behind `odl-video-app`'s roles is finished.
-- Whether an Organizations permission alone lets a client add organization members.
-- How the Renovate PR for `KEYCLOAK_VERSION` is held until the gates clear.
+- Whether the witan CLI sends PKCE on its device authorization request.
+- Whether anything uses the password grant through `admin-cli` in the four realms.
+- Live grant flags on the clients that do not declare them.
 - Whether the vendor has published a kc-26.8 scim-for-keycloak build.
