@@ -95,15 +95,20 @@ def effective_role_members(
     :rtype: dict[str, set[str]]
     """
     members: dict[str, set[str]] = {role: set() for role in _GOVERNANCE_ROLES}
+    users = _api_get_all(f"{admin_base}/users?briefRepresentation=false", headers)
+    enabled = 0
+    with_client_role = 0
     holders = 0
-    for user in _api_get_all(f"{admin_base}/users?briefRepresentation=false", headers):
+    for user in users:
         if not user["enabled"]:
             continue
+        enabled += 1
         mapped = _api_get(
             f"{admin_base}/users/{user['id']}/role-mappings/clients/"
             f"{client_uuid}/composite",
             headers,
         )
+        with_client_role += bool(mapped)
         granted = {role["name"] for role in mapped} & members.keys()
         if not granted:
             continue
@@ -125,6 +130,15 @@ def effective_role_members(
             f"{holders} users hold governance roles but none has a usable saml_uid; "
             "check the realm's unmanagedAttributePolicy before writing an empty file"
         )
+    # An empty file is a legitimate result (nobody holds a role yet) and is also what
+    # a filtered admin API response looks like. These counts tell the two apart in
+    # the pulumi log without needing Keycloak admin access.
+    sys.stdout.write(
+        f"Scanned {len(users)} users ({enabled} enabled): {with_client_role} hold an "
+        f"ol-starrocks-client role, {holders} hold a governance role; "
+        + ", ".join(f"{role}={len(uids)}" for role, uids in members.items())
+        + "\n"
+    )
     return members
 
 

@@ -120,3 +120,18 @@ def test_all_holders_missing_saml_uid_fails_instead_of_writing_empty(
 
     with pytest.raises(SystemExit, match="none has a usable saml_uid"):
         keycloak_group_sync.effective_role_members(ADMIN, CLIENT, {})
+
+
+def test_counts_are_reported_so_an_empty_file_can_be_explained(
+    serve_users: Callable[[list[User]], None],
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The summary separates "nobody holds a role" from "nobody was visible"."""
+    serve_users(USERS)
+    keycloak_group_sync.effective_role_members(ADMIN, CLIENT, {})
+
+    out = capsys.readouterr().out
+    assert "Scanned 7 users (6 enabled)" in out
+    assert "5 hold an ol-starrocks-client role, 5 hold a governance role" in out
+    assert "ol_data_analyst=1" in out
+    assert "ol_platform_admin=0" in out
