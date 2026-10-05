@@ -1,7 +1,7 @@
 """Pod wiring for Azure workload identity federation.
 
 `azure-identity` exchanges a projected ServiceAccount token for an Entra access token,
-so a workload reaching Azure OpenAI needs a token volume and four environment
+so a workload reaching Azure OpenAI needs a token volume and five environment
 variables and nothing else. There is no credential to store, rotate, or restart pods
 for, and no Vault object involved.
 
@@ -31,6 +31,11 @@ TOKEN_EXPIRATION_SECONDS = 60 * 60
 # "Federated identity credentials must have exactly one audience".
 TOKEN_EXCHANGE_AUDIENCE = "api://AzureADTokenExchange"  # noqa: S105
 AUTHORITY_HOST = "https://login.microsoftonline.com/"
+# Limits DefaultAzureCredential to this one credential (read by azure-identity 1.25.3).
+# Without it the chain can settle on a different credential if e.g.
+# AZURE_CLIENT_SECRET is ever set, and a misconfigured pod walks the whole chain on
+# every token request.
+TOKEN_CREDENTIAL = "WorkloadIdentityCredential"  # noqa: S105
 
 
 def azure_identity_token_volume() -> kubernetes.core.v1.VolumeArgs:
@@ -77,6 +82,7 @@ def azure_identity_env(
         "AZURE_TENANT_ID": azure_openai_stack.require_output("tenant_id"),
         "AZURE_FEDERATED_TOKEN_FILE": f"{TOKEN_MOUNT_DIR}/{TOKEN_VOLUME_NAME}",
         "AZURE_AUTHORITY_HOST": AUTHORITY_HOST,
+        "AZURE_TOKEN_CREDENTIALS": TOKEN_CREDENTIAL,
     }
 
 
