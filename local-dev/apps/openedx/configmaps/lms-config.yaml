@@ -15,6 +15,10 @@ data:
   # instead of a per-stack copy in the openedx namespace. These two keys are the
   # composition; without them lehrer installs its own (manage_infra).
   CELERY_BROKER_HOSTNAME: "valkey.local-infra.svc.cluster.local"
+  # lehrer leaves the vhost empty, which is DB 0 (mit-learn's broker). The LMS
+  # and Studio share one broker, so both override files use 12. The allocation
+  # is listed next to the Valkey settings in apps/mitxonline/configmaps/app-env.yaml.
+  CELERY_BROKER_VHOST: "12"
   ELASTIC_SEARCH_HOST: "opensearch-cluster-master.local-infra.svc.cluster.local"
 
   # Served through APISIX on the shared wildcard cert rather than the

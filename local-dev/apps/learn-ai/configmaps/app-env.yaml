@@ -23,10 +23,13 @@ data:
   KEYCLOAK_REALM_NAME: "olapps"
 
   # Valkey (cluster-local)
-  REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/0"
-  REDIS_DOMAIN: "redis://valkey.local-infra.svc.cluster.local:6379/0"
-  CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/1"
-  CELERY_RESULT_BACKEND: "redis://valkey.local-infra.svc.cluster.local:6379/1"
+  # Each app needs its own Valkey DBs, or Celery and RedBeat pick up another
+  # app's tasks. The allocation is listed next to the Valkey settings in
+  # apps/mitxonline/configmaps/app-env.yaml.
+  REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/8"
+  REDIS_DOMAIN: "redis://valkey.local-infra.svc.cluster.local:6379/8"
+  CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/9"
+  CELERY_RESULT_BACKEND: "redis://valkey.local-infra.svc.cluster.local:6379/9"
 
   # AI proxy (local LiteLLM in local-infra)
   AI_PROXY_URL: "http://litellm.local-infra.svc.cluster.local:4000"
