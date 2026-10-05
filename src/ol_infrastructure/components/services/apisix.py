@@ -329,10 +329,30 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
     )
 
 
-def identity_header_strip_plugin(
+def gateway_global_pre_function_plugin(
     header_names: Sequence[str] = GATEWAY_IDENTITY_HEADERS,
 ) -> OLApisixPluginConfig:
-    """Clear the gateway's own identity headers when a client supplies them.
+    """Build the cluster's one global ``serverless-pre-function``.
+
+    The ingress controller flattens every ApisixGlobalRule into a single
+    plugin-name-keyed map, so anything that has to run on every route ahead of
+    openid-connect goes into this function list rather than a second rule.
+
+    **Canonical origin on OIDC routes** (``canonical_https_redirect.lua`` with
+    ``require_openid_connect``).  ``oidc_gateway_pre_function_plugin`` runs the
+    same function, but only for applications that attach it.  As of 2026-10-01
+    the production OIDC routes of airbyte, dagster, ol-analytics, opik, gwarek,
+    celery-monitoring and learn-ai did not, and the hosts probed answered plain
+    HTTP with an OIDC session cookie over cleartext and without ``Secure``, and
+    sent Keycloak an ``http://`` redirect_uri.  Running it here covers every
+    OIDC route in the cluster, including routes created outside Pulumi.  It is
+    scoped to routes carrying openid-connect because those are the ones that
+    mint a session and a redirect_uri from the request origin; leaving every
+    other route alone means this changes nothing that was not broken.  The
+    status is the 308 the per-application function also defaults to.
+
+    **Identity-header strip** (``strip_client_identity_headers.lua``).  Clears
+    the gateway's own identity headers when a client supplies them.
 
     The openid-connect plugin sets X-Userinfo, X-ID-Token, X-Raw-ID-Token and
     X-Refresh-Token from a verified session, and clears any inbound copy before
@@ -389,7 +409,16 @@ def identity_header_strip_plugin(
             # phase would run after openid-connect had already read the
             # request.
             "phase": "rewrite",
-            "functions": [STRIP_CLIENT_IDENTITY_HEADERS_LUA],
+            # Redirect first: serverless/init.lua stops at the first function
+            # returning a code, and a redirected request needs no header strip.
+            "functions": [
+                CANONICAL_HTTPS_REDIRECT_LUA,
+                STRIP_CLIENT_IDENTITY_HEADERS_LUA,
+            ],
+            "canonical_https_redirect": {
+                "status": 308,
+                "require_openid_connect": True,
+            },
             "identity_header_strip": {"headers": list(header_names)},
         },
     )

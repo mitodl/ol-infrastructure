@@ -18,7 +18,7 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
 )
 from ol_infrastructure.components.services.apisix import (
-    identity_header_strip_plugin,
+    gateway_global_pre_function_plugin,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
@@ -1047,7 +1047,12 @@ def setup_apisix(
         ),
     )
 
-    # Refuse the gateway's own identity headers from a client, on every route.
+    # Everything that has to run on every route ahead of openid-connect: send
+    # OIDC routes to their canonical https origin, and refuse the gateway's own
+    # identity headers from a client.  See gateway_global_pre_function_plugin.
+    #
+    # The canonical redirect is here because per-application attachment left
+    # most OIDC hosts answering plain HTTP with a cleartext session cookie.
     #
     # The openid-connect plugin clears an inbound X-Userinfo / X-ID-Token /
     # X-Raw-ID-Token / X-Refresh-Token before setting its own, but only where
@@ -1070,8 +1075,11 @@ def setup_apisix(
     # so this is the cluster's only global ``serverless-pre-function``: a
     # second one anywhere would silently replace it rather than run alongside.
     # Anything else that has to run globally before openid-connect belongs in
-    # ``strip_client_identity_headers.lua``'s ``functions`` list, the same way
-    # ``oidc_gateway_pre_function_plugin`` stacks its two.
+    # ``gateway_global_pre_function_plugin``'s ``functions`` list.
+    #
+    # The resource and object keep their original identity-header-strip name:
+    # renaming would replace the rule (delete_before_replace), leaving a
+    # window with no strip at all.
     kubernetes.apiextensions.CustomResource(
         f"{cluster_name}-apisix-identity-header-strip-global-rule",
         api_version="apisix.apache.org/v2",
@@ -1084,7 +1092,7 @@ def setup_apisix(
         spec={
             "ingressClassName": "apache-apisix",
             "plugins": [
-                identity_header_strip_plugin().model_dump(
+                gateway_global_pre_function_plugin().model_dump(
                     by_alias=True, exclude_none=True
                 )
             ],
