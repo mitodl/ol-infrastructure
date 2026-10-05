@@ -30,7 +30,7 @@ data:
 
   # Valkey
   # Each app needs its own Valkey DBs, or Celery and RedBeat pick up another
-  # app's tasks. In use: mit-learn 0-2 (Open edX's broker defaults to 0 too),
+  # app's tasks. In use: mit-learn 0-2, Open edX 3 (cache) and 12 (broker),
   # ocw-studio 4-5, mitxonline 6-7, learn-ai 8-9, odl-video-service 10-11.
   REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/10"
   CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/11"
