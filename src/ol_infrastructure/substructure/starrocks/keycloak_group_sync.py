@@ -95,15 +95,21 @@ def effective_role_members(
     :rtype: dict[str, set[str]]
     """
     members: dict[str, set[str]] = {role: set() for role in _GOVERNANCE_ROLES}
+    users = _api_get_all(f"{admin_base}/users?briefRepresentation=false", headers)
+    enabled = 0
+    with_client_role = 0
     holders = 0
-    for user in _api_get_all(f"{admin_base}/users?briefRepresentation=false", headers):
+    skipped = 0
+    for user in users:
         if not user["enabled"]:
             continue
+        enabled += 1
         mapped = _api_get(
             f"{admin_base}/users/{user['id']}/role-mappings/clients/"
             f"{client_uuid}/composite",
             headers,
         )
+        with_client_role += bool(mapped)
         granted = {role["name"] for role in mapped} & members.keys()
         if not granted:
             continue
@@ -114,6 +120,7 @@ def effective_role_members(
                 f"Skipping {user['username']}: holds {sorted(granted)} but saml_uid "
                 f"{saml_uid!r} is missing or not a valid StarRocks principal\n"
             )
+            skipped += 1
             continue
         for role in granted:
             members[role].add(saml_uid)
@@ -125,6 +132,17 @@ def effective_role_members(
             f"{holders} users hold governance roles but none has a usable saml_uid; "
             "check the realm's unmanagedAttributePolicy before writing an empty file"
         )
+    # An empty file is a legitimate result (nobody holds a role yet), and it is also
+    # what an admin API that returns no users looks like. The counts separate those.
+    # They cannot separate "nobody was assigned a role" from "role mappings came back
+    # empty", since both are a 200 with [].
+    sys.stdout.write(
+        f"Scanned {len(users)} users ({enabled} enabled): {with_client_role} hold an "
+        f"ol-starrocks-client role, {holders} hold a governance role "
+        f"({skipped} skipped); "
+        + ", ".join(f"{role}={len(uids)}" for role, uids in members.items())
+        + "\n"
+    )
     return members
 
 
