@@ -31,7 +31,8 @@ TOKEN_EXPIRATION_SECONDS = 60 * 60
 # "Federated identity credentials must have exactly one audience".
 TOKEN_EXCHANGE_AUDIENCE = "api://AzureADTokenExchange"  # noqa: S105
 AUTHORITY_HOST = "https://login.microsoftonline.com/"
-# Limits DefaultAzureCredential to this one credential (read by azure-identity 1.25.3).
+# Limits DefaultAzureCredential to this one credential. Checked against
+# azure-identity 1.25.3, which raises ValueError on a name it does not know.
 # Without it the chain can settle on a different credential if e.g.
 # AZURE_CLIENT_SECRET is ever set, and a misconfigured pod walks the whole chain on
 # every token request.
