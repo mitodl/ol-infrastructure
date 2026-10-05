@@ -3587,13 +3587,64 @@ escalation_level_ci_qa_slack_notifications = rootly.EscalationLevel(
     opts=rootly_opts,
 )
 
+
+def mitx_qa_elasticache_route_rule(position: int) -> dict[str, Any]:
+    """Build the alert route rule that sends mitx-qa ElastiCache alarms to Slack.
+
+    "mitx-qa" is residential MITx QA (edxapp-redis-mitx-qa-*), not MITx Online.
+    These alarms used to target the "MITx Online QA - Open edX - Redis" service,
+    created outside this stack, whose "QA Non-Paging Escalation Policy" has zero
+    levels. Both CloudWatch routes on the Critical source carry this rule for
+    the reason given in `data_platform_route_rules`: a route without it hands
+    the alarm to its fallback. Rootly delivers once when two routes resolve to
+    the same policy (alert dQCXUA on 2026-09-29).
+
+    As of 2026-10-01 the mitx-qa ElastiCache alarms have no AlarmActions, so
+    nothing reaches either route yet.
+
+    :param position: Route position of the rule.
+    :returns: Alert route rule dict targeting the CI/QA Slack policy.
+    """
+    return {
+        "conditionGroups": [
+            {
+                "conditions": [
+                    {
+                        "propertyFieldConditionType": "contains",
+                        "propertyFieldName": "$.Message.AlarmName",
+                        "propertyFieldType": "payload",
+                        "propertyFieldValue": "mitx-qa",
+                    },
+                    {
+                        "propertyFieldConditionType": "contains",
+                        "propertyFieldName": "$.Message.AlarmName",
+                        "propertyFieldType": "payload",
+                        "propertyFieldValue": "elasticache",
+                    },
+                ],
+                "position": 1,
+            },
+        ],
+        "destinations": [
+            {
+                "targetId": escalation_policy_ci_qa_slack_notifications.id,
+                "targetType": "EscalationPolicy",
+            },
+        ],
+        "fallbackRule": False,
+        "name": "mitx-qa elasticache AlarmName to CI/QA Slack Notifications",
+        "position": position,
+    }
+
+
 # `AlertRouteRuleArgs` has no `enabled` field, so Pulumi cannot manage or
 # detect whether the fallback rule below is toggled on. It shipped disabled
 # on both this route and the QA one below (2026-07-22), which made the
 # Slack diversion a no-op until 2026-08-18 -- CI/QA alerts fell through to
-# the paging default policy the whole time. Re-verify via `GET
-# /v1/alert_routes` -> `.rules[].enabled == true` for these two routes if
-# CI/QA paging noise reappears.
+# the paging default policy the whole time. If CI/QA paging noise reappears,
+# check which rule a recent CI/QA alert's `data.routing_rules` names (e.g.
+# K4eHHA on 2026-10-01 matched the QA fallback), not `.rules[].enabled`; see
+# the Service Routes comment below for why the flag is unreliable.
 alert_route_grafana_prometheus_ci_slack_warnings_route = rootly.AlertRoute(
     "grafana-prometheus-ci-slack-warnings-route",
     alerts_source_ids=[alerts_source_grafana_prometheus_ci.id],
@@ -3767,6 +3818,7 @@ alert_route_cloudwatch_catch_all_route = rootly.AlertRoute(
         *data_platform_route_rules(
             "$.Message.AlarmName", DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES, 1
         ),
+        mitx_qa_elasticache_route_rule(len(DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES) + 1),
         {
             "destinations": [
                 {
@@ -3776,7 +3828,7 @@ alert_route_cloudwatch_catch_all_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Cloudwatch Catch-All Route",
-            "position": len(DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES) + 1,
+            "position": len(DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES) + 2,
         },
     ],
     opts=rootly_opts,
@@ -3862,11 +3914,12 @@ alert_route_platform_engineering_team_email_monitor_route = rootly.AlertRoute(
 #
 # Caveat on individual rules: the provider models a rule as exactly
 # (condition_groups, destinations, fallback_rule, name, position). Rootly's API
-# also returns a per-rule "enabled" flag, but there is no Pulumi field for it, so
-# a rule disabled in the UI stays disabled through an apply -- and equally, that
-# state cannot be enforced from here. Three fallback rules are disabled live
-# today (the Cloudwatch, Grafana Prometheus CI, and Grafana Prometheus QA
-# catch-alls); if that matters it has to be asserted outside this stack.
+# also returns a per-rule "enabled" flag, but there is no Pulumi field for it.
+# Every rule recreated by an apply reads enabled=false, yet still matches: the
+# 2026-09-18 apply recreated this route's rules, and alert zvGhEm on 2026-10-01
+# was routed by rule f2e388ed (ol-etl-db-production), which reads
+# enabled=false. Check alert attribution, not the flag, before calling a rule
+# dead.
 alert_route_cloudwatch_service_route = rootly.AlertRoute(
     "cloudwatch-service-route",
     alerts_source_ids=[
@@ -4125,36 +4178,7 @@ alert_route_cloudwatch_service_route = rootly.AlertRoute(
             "name": "xpro AlarmName to MIT XPro Django Webapp",
             "position": 9,
         },
-        {
-            "conditionGroups": [
-                {
-                    "conditions": [
-                        {
-                            "propertyFieldConditionType": "contains",
-                            "propertyFieldName": "$.Message.AlarmName",
-                            "propertyFieldType": "payload",
-                            "propertyFieldValue": "mitx-qa",
-                        },
-                        {
-                            "propertyFieldConditionType": "contains",
-                            "propertyFieldName": "$.Message.AlarmName",
-                            "propertyFieldType": "payload",
-                            "propertyFieldValue": "elasticache",
-                        },
-                    ],
-                    "position": 1,
-                },
-            ],
-            "destinations": [
-                {
-                    "targetId": "cc36d725-ecfe-4d37-94f3-55d4e2ef91be",
-                    "targetType": "Service",
-                },
-            ],
-            "fallbackRule": False,
-            "name": "mitx-qa elasticache AlarmName to MITx Online QA - Open edX - Redis",  # noqa: E501
-            "position": 10,
-        },
+        mitx_qa_elasticache_route_rule(10),
         # None of the alarm names above contain these, so after them is safe.
         *data_platform_route_rules(
             "$.Message.AlarmName", DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES, 11
