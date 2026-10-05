@@ -365,7 +365,7 @@ gateway logs, and Prometheus. The library applies them; call sites supply values
 | `app` | always | `learn-ai` | `project_name` on the root trace, and tag `app:learn-ai` | consumer name (one consumer per app) | `consumer` (gateway), `app` (library) |
 | `use_case` | always | `tutor`, `course-translation`, `feedback-summary` | tag `use_case:…`, `opik.metadata.use_case` | request header `X-OL-LLM-Use-Case`, added to the `llm_*` metrics as an extra label (§4.3) | `use_case` (gateway and library) |
 | `environment` | always | `ci`, `qa`, `production` | native `environment` on the root trace, plus tag `env:…` | implicit (one gateway per environment) | existing environment label |
-| `model`, `provider` | always | `gpt-4o-mini`, `openai` | `gen_ai.request.model`, `gen_ai.provider.name` (emitted by PydanticAI) | `llm_model`, `request_llm_model` | `llm_model` (gateway), `model` (library) |
+| `model`, `provider` | always | `gpt-4o-mini`, `openai` | `gen_ai.request.model`, `gen_ai.provider.name` (emitted by PydanticAI) | `llm_model`, `request_llm_model` | `llm_model` (gateway), `model` and `provider` (library) |
 | `prompt_name`, `prompt_version` | when a managed prompt is used | `tutor-system`, `7` | native prompt link (the SDK attaches a prompt fetched inside the root trace), plus `prompt_name` and `prompt_version` in metadata | none | none |
 | `user_id` | request-time with a user | pseudonymous id, see 4.2 | `opik.metadata.user_id` | OpenAI `safety_identifier` or `user`, Anthropic `metadata.user_id` → `llm_end_user_id` | never |
 | `thread_id` | conversations | chat thread id | `thread_id` on the root trace; `gen_ai.conversation.id` via `run(conversation_id=…)` on spans | none | never |

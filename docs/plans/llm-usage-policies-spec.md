@@ -47,10 +47,12 @@ baseline (`tk-measure-the-llm-spend-baseline-before-any-migrat-bb6682`) exists.
 
 In phase one:
 
-- The library emits token counters on every path (labels `app`, `use_case`, `model`,
-  `environment`). Dollars are computed in Prometheus from those counters and a price table
-  kept with the model catalog (§2), and Grafana alerts go to Rootly at 50, 80, and 100
-  percent of a monthly figure per app once the baseline supplies one.
+- The library emits token counters on every path (labels `app`, `use_case`, `provider`,
+  `model`, `environment`). Dollars are computed in Prometheus from those counters and a
+  price table kept with the model catalog (§2), joined on `provider` and `model` because
+  catalog ids are `provider:model` and the same model name can carry a different price from
+  another provider (OpenAI direct vs. Azure OpenAI). Grafana alerts go to Rootly at 50, 80,
+  and 100 percent of a monthly figure per app once the baseline supplies one.
 - Vendor invoices are the accounting record and are reconciled monthly. Opik's per-trace cost
   is a debugging aid, not a ledger.
 - What already bounds usage stays: learn-ai's per-user request throttles, Celery rate limits,
