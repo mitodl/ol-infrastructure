@@ -12,6 +12,18 @@ from pulumi import Config, InvokeOptions, Output, ResourceOptions
 # about five minutes into a session. See
 # docs/plans/gravitino-keycloak-integration-spec.md D3.
 STARROCKS_TOKEN_LIFESPAN_SECONDS = 3600
+# Shared realm roles whose holders also get the same client role on
+# ol-starrocks-client. ol_instructor and ol_researcher are left out: their
+# StarRocks grants are catalog-wide SELECT today, and their access will come
+# from dbt-level grants instead.
+STARROCKS_SHARED_REALM_ROLES = frozenset(
+    {
+        "ol_platform_admin",
+        "ol_data_engineer",
+        "ol_data_analyst",
+        "ol_business_analyst",
+    }
+)
 
 
 def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
@@ -418,11 +430,12 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ol_data_platform_starrocks_client_role_refs[role] = role_ref
 
     # Realm roles are what people get assigned. Each one is a composite of the
-    # matching client role on ol-superset-client and ol-starrocks-client (no
-    # other client), so one assignment gives a person that role in both. They
-    # are created here, after both clients, because composite_roles needs both
-    # sets of client role ids. A stack with no StarRocks client roles configured
-    # (CI) gets Superset-only composites.
+    # matching client role on ol-superset-client and, for the roles in
+    # STARROCKS_SHARED_REALM_ROLES, on ol-starrocks-client, so one assignment
+    # gives a person that role in both. They are created here, after both
+    # clients, because composite_roles needs both sets of client role ids. A
+    # stack with no StarRocks client roles configured (CI) gets Superset-only
+    # composites.
     for resource_name, realm_role, client_role, description in (
         (
             "ol-platform-admin-role",
@@ -476,6 +489,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 *(
                     [ol_data_platform_starrocks_client_role_refs[client_role].id]
                     if ol_data_platform_starrocks_client_role_refs
+                    and client_role in STARROCKS_SHARED_REALM_ROLES
                     else []
                 ),
             ],
