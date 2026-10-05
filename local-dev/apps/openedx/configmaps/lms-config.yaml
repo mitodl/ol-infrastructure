@@ -30,5 +30,83 @@ data:
   # localhost:8000/8010, which is where the LMS's Studio links would point.
   LMS_BASE: "lms.mit.dev"
   CMS_BASE: "studio.mit.dev"
+  # Points the LMS's own courseware links at the learning MFE instead of the
+  # legacy /courses/<id>/course/ pages. Unset, the setting is None and the LMS
+  # silently keeps using the legacy courseware -- which works, but then the LMS
+  # and mitxonline disagree about where a course is, since
+  # CourseRun.courseware_url is hardcoded to the /learn/... shape. Same value
+  # production derives in edxapp's k8s_configmaps.py.
+  LEARNING_MICROFRONTEND_URL: "https://lms.mit.dev/learn"
   EDXNOTES_PUBLIC_API: "https://notes.mit.dev/api/v1"
   HTTPS: "on"
+
+  # --------------------------------------------------------------------------
+  # Federated login against mitxonline (ol-oauth2)
+  #
+  # Learners do not have LMS passwords: they authenticate to mitxonline through
+  # Keycloak, and the LMS federates to mitxonline over OAuth2 using
+  # ol-social-auth's OLOAuth2 backend. Without this block the LMS has no way to
+  # authenticate anyone but its own provisioned superuser, so every learner hits
+  # the courseware MFE anonymously and /login_refresh answers 401 -- correctly,
+  # since there is no session to mint a JWT from.
+  #
+  # lehrer standalone cannot set these: it has no mitxonline. They belong here,
+  # in the composition that runs both.
+  # --------------------------------------------------------------------------
+
+  # The gate. Upstream lms/envs/common.py defaults it False, and
+  # _apply_structural_overrides only prepends THIRD_PARTY_AUTH_BACKENDS onto
+  # AUTHENTICATION_BACKENDS when it is true. It is in aqueduct's
+  # FEATURES_COMPAT_KEYS, so this one key also mirrors into
+  # settings.FEATURES["ENABLE_THIRD_PARTY_AUTH"], which is what that code reads.
+  ENABLE_THIRD_PARTY_AUTH: "true"
+  # JSON, not a bare string: the field is list[str] on the aqueduct model and
+  # pydantic-settings parses list-typed env vars as JSON -- the same way lehrer's
+  # own ConfigMap passes ALLOWED_HOSTS. A bare string would arrive as a list of
+  # characters. The package is installed in the platform image already
+  # (build_manifest.yaml pins ol-social-auth); only this list was missing.
+  THIRD_PARTY_AUTH_BACKENDS: '["ol_social_auth.backends.OLOAuth2"]'
+  # Credentials and endpoints for the OAuth2ProviderConfig row that
+  # edxapp-provision creates (lehrer's bootstrap.yaml declares the provider;
+  # it skips itself unless these are supplied). The URLs can only travel this
+  # way: OAuth2ProviderConfig.get_setting serves KEY and SECRET off the row and
+  # every other name out of this JSON, never out of Django settings.
+  #
+  # AUTHORIZATION_URL is browser-facing and so must be the public host. The
+  # other two are called server-side from the LMS pod, which resolves
+  # mitxonline.mit.dev but cannot verify its mkcert-signed certificate -- no CA
+  # bundle is merged into this image and no SSL_CERT_FILE is set, unlike the
+  # mitxonline and mit-learn pods. Pointing them at the in-cluster Service over
+  # plain HTTP avoids that entirely; revisit if the LMS pod ever grows the
+  # ca-bundle-merge initContainer, at which point DISCOVERY_URL would match
+  # production instead.
+  #
+  # No DISCOVERY_URL, so OLOAuth2 derives userinfo as API_ROOT + api/users/me,
+  # whose serializer returns edx_username as `username` -- which is what the
+  # backend's ID_KEY resolves accounts on.
+  OL_OAUTH2_OTHER_SETTINGS: >-
+    {"AUTHORIZATION_URL": "https://mitxonline.mit.dev/oauth2/authorize/",
+     "ACCESS_TOKEN_URL": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8010/oauth2/token/",
+     "API_ROOT": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8010/"}
+
+  # Back on now that there is a provider to redirect to: this is what sends an
+  # anonymous visitor into the SSO flow instead of leaving the MFE staring at a
+  # 401. heartbeat and login_refresh MUST stay allow-listed -- the kubelet's
+  # probe and the MFE's token refresh are both anonymous, and redirecting them
+  # crashloops the pod and breaks the MFE respectively. Mirrors the list xpro
+  # and mitxonline carry in production (edxapp/config_builder.py).
+  MITX_REDIRECT_ENABLED: "true"
+  MITX_REDIRECT_ALLOW_RE_LIST: >-
+    ["^/(admin|auth|logout|register|api|oauth2|user_api|heartbeat|login_refresh|c4x|xqueue|asset-v1:|assets/courseware/|lti_provider)"]
+
+  # Bearer token mitxonline presents to the LMS enrollment API when pushing a
+  # learner's enrollment across (its OPENEDX_SERVICE_WORKER_API_TOKEN). The
+  # value must be identical on both sides; mitxonline's copy lives in
+  # apps/mitxonline/secrets.yaml. edxapp-provision turns this into the matching
+  # AccessToken (lehrer's bootstrap.yaml service_access_tokens), and skips that
+  # step entirely when this key is absent -- which is how lehrer standalone,
+  # with no upstream to accept enrollments from, declines it.
+  #
+  # Without it mitxonline's enrollment push fails silently: the learner is
+  # enrolled in mitxonline with edx_enrolled=False and simply has no courseware.
+  OPENEDX_SERVICE_WORKER_API_TOKEN: "local-dev-openedx-service-worker-token" # pragma: allowlist secret
