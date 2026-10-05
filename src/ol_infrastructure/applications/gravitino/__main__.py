@@ -21,7 +21,11 @@ from pulumi import Config, Output, ResourceOptions, export
 from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
-from bridge.lib.versions import GRAVITINO_CHART_VERSION, GRAVITINO_VERSION
+from bridge.lib.versions import (
+    GRAVITINO_CHART_VERSION,
+    GRAVITINO_SCHEMA_VERSION,
+    GRAVITINO_VERSION,
+)
 from ol_infrastructure.applications.gravitino.posture import create_posture_probe
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
@@ -731,7 +735,7 @@ gravitino_values = {
 # rerun (eight bare CREATE INDEX statements), so the Job skips when the schema is
 # already there. Version upgrades are manual SQL with the server stopped
 # (docs/how-to-upgrade.md), shipped in the same PR as the chart bump.
-schema_file = f"schema-{GRAVITINO_VERSION}-postgresql.sql"
+schema_file = f"schema-{GRAVITINO_SCHEMA_VERSION}-postgresql.sql"
 schema_exists_query = "SELECT to_regclass('public.metalake_meta')"
 # SET ROLE so the tables are owned by the app role, which the Vault revoke path
 # reassigns to. One transaction (-1), because the skip guard keys on the first

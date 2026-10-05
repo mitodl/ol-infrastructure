@@ -63,6 +63,7 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/google_ads_optimization/": [],
     "applications/gravitino/": [
         "GRAVITINO_CHART_VERSION",
+        "GRAVITINO_SCHEMA_VERSION",
         "GRAVITINO_VERSION",
     ],
     "applications/gwarek/": [],
