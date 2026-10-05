@@ -545,27 +545,24 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
 # `mitxonline_web_memory_ceiling`.
 #
 # Granian's --workers-max-rss is resolved at synth time from this declared value
-# (the component default, 90% of the limit for one worker). That is only safe when the
-# declared value really is the floor, so the floor is set per stack at the lowest limit
-# a pod actually needs, rather than pinning the cap to the VPA ceiling. The previous
-# ceiling-derived cap (2816MiB) sat above the admitted limit of any pod the VPA started
-# low. At workers=2 it fired per worker at 1408MiB, 404 times in production over the 14
-# days to 2026-09-17, alongside 11 OOMKills. At workers=1 a single worker would have had
-# to reach 2816MiB, 22MiB under the lowest limit admitted in that window (2838MiB),
-# before the master process is even counted, so those graceful respawns would have
-# become OOMKills.
-#
-# Production declares 2800Mi, just under that 2838MiB 14-day admission minimum, so it
-# reserves no more than the VPA was already granting. CI and QA keep
-# 1200Mi: QA peaked at 988MiB working set over the same 14 days, across up to 13 pods.
+# (90% of the limit for one worker, less granian_worker_startup_rss). That is only safe
+# when the declared value really is the floor, so the floor is set per stack at the
+# lowest limit a pod actually needs, rather than pinning the cap to the VPA ceiling.
 # See tk-stage-3-blocker-mitxonline-s-vpa-never-runs-at-t-cc6acf.
 #
-# Production also reserves granian_worker_startup_rss (600MiB) out of that 90% for the
-# replacement worker a planned respawn runs alongside the old one, giving a 1920MiB cap.
-# A 2520MiB cap plus a fresh worker (~430MiB container RSS 10 minutes after the
-# 2026-09-17 move to one worker) would exceed the 2838MiB admission minimum above. CI
-# and QA leave it unset: 1200Mi cannot fit it, and the cap does not trip there.
-mitxonline_web_memory_limit = mitxonline_config.get("web_memory_limit") or "1200Mi"
+# Sized from the week after mitxonline#4037 (the Course.get_filtered_runs leak fix,
+# first in 1.169.0) reached production on 2026-09-28. Before it, pods climbed to
+# 1.9-2.8GiB working set within hours, with 221 RSS respawns in 10 days. After it, a
+# fresh pod holds ~450MiB and the longest-lived (~4.5 days) drifted to 920MiB, briefly
+# 1092MiB. The VPA's uncapped target is 933MiB. One single-request jump to 1957MiB on
+# 2026-09-29 is treated as an outlier and not sized for.
+#
+# Production declares 2000Mi and reserves granian_worker_startup_rss (600MiB) for the
+# replacement worker a planned respawn runs alongside the old one, giving a 1200MiB cap:
+# above the 1092MiB peak, with 1200 + 600 inside 90% of the limit. CI and QA declare
+# 1000Mi with no reservation (a 900MiB cap): QA peaked at 628MiB over the same week, so
+# the cap does not trip there.
+mitxonline_web_memory_limit = mitxonline_config.get("web_memory_limit") or "1000Mi"
 mitxonline_web_memory_ceiling = "3Gi"
 
 # Horizontal scaling is KEDA-driven on APISIX request rate and p95 latency, with a
