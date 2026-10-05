@@ -48,7 +48,7 @@ jobs:
     # runner's Docker. sync-version-pins imports nothing but the standard library.
     - uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789   # v3.4.0
       with:
-        version: "1.14.2"
+        version: "1.16.1"
     - name: Tree is clean before hooks run
       id: clean-tree
       run: |
