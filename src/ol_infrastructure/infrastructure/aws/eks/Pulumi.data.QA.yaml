@@ -80,10 +80,13 @@ config:
         ondemand: true
         ol.mit.edu/core_node: true
       node_group_options: {}
+      # 4, not 3, as in Production: the ASG spans 4 AZs, so at desired=3 one AZ
+      # has no core node, and an FE whose EBS volumes live there cannot
+      # schedule (fe-0, us-east-1b, 2026-10-05).
       scaling:
-        desired: 3
+        desired: 4
         max: 5
-        min: 3
+        min: 4
       tags: {}
       taints: {}
       version:
