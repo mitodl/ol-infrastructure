@@ -826,12 +826,22 @@ by type and status:
 | Raised underneath | Class | Library error | Retry | Fall back |
 | --- | --- | --- | --- | --- |
 | `ModelHTTPError` 429 | rate limited | `LLMRateLimited` (carries `retry_after`) | yes | yes |
-| `ModelHTTPError` 408 or any 5xx | provider unavailable | `LLMUnavailable` | yes | yes |
-| `ModelAPIError` that is not `ModelHTTPError`; `httpx.TransportError`; `httpx2.TransportError` | provider unavailable | `LLMUnavailable` | yes | yes |
-| `ModelHTTPError`, any other 4xx | rejected | `LLMRejected` (carries `status_code`) | no | no |
+| `ModelHTTPError` 408, 500, 502, 503, 504, 529 | provider unavailable | `LLMUnavailable` | yes | yes |
+| `ModelAPIError` that is not `ModelHTTPError`; `TimeoutException`, `NetworkError`, and `RemoteProtocolError` from `httpx` or `httpx2` | provider unavailable | `LLMUnavailable` | yes | yes |
+| `ModelHTTPError`, any other status; any other `httpx` or `httpx2` `TransportError` | rejected | `LLMRejected` (carries `status_code`, `None` for a transport error) | no | no |
 
-§3.2 listed the statuses seen in practice; "any 5xx" and "any other 4xx" close the table so
-nothing is unclassified.
+The retry rows are the §3.2 statuses and the transport errors that mean no answer came back.
+Everything else is rejected, which closes the table so nothing is unclassified. A permanent
+failure (a 501 or 505, `UnsupportedProtocol` from a bad base URL, `LocalProtocolError`,
+`ProxyError`) then costs one attempt, not the full retry budget on every model in the
+chain, and opens the batch circuit at once (§6.7).
+
+The split by transport error type reaches only Google and Mistral, which raise raw `httpx2`
+exceptions (§6.1). The OpenAI and Anthropic SDKs wrap every transport failure in
+`APIConnectionError` (`openai/_base_client.py:1183`, `anthropic/_base_client.py:1317`) and
+PydanticAI turns that into `ModelAPIError` (`models/openai.py:243-244`,
+`models/anthropic.py:410-411`), so on those a bad URL scheme is retried like a dropped
+connection. The wrapper does not inspect `__cause__` to tell them apart.
 
 Backoff is exponential with jitter, starting at 0.5 s. On the request profile
 `MAX_BACKOFF_SECONDS` is a total across the call, and a `Retry-After` longer than what is left
@@ -926,9 +936,17 @@ stay on the exception and the trace and are never shown to users.
 
 `LLMResult.degraded` is true, with one or more reasons, when the output came from a fallback
 model (`fallback_model`), was rendered from the embedded prompt default because Opik was
-unreachable (`embedded_prompt`), or is knowingly incomplete (`partial_output`, set by the call
-site, e.g. translation segments left in the source language). The same values go on the trace
-as `opik.metadata.degraded` and `opik.metadata.degraded_reason` (§4.1).
+unreachable (`embedded_prompt`), or is knowingly incomplete (`partial_output`, e.g.
+translation segments left in the source language). The same values go on the trace as
+`opik.metadata.degraded` and `opik.metadata.degraded_reason` (§4.1).
+
+The library sets the first two. `partial_output` comes from the call site, through the
+`postprocess` argument of `run`, `run_stream`, and `complete`: a callable that takes the
+validated output and returns a `PostProcessed` holding the output to return and any degraded
+reasons. It runs inside the root trace (for a stream, in `result()`), so the result and the
+trace are marked together. `LLMResult` is frozen and the trace is closed once the entry point
+returns, so a check done after the call cannot mark either. `postprocess` keeps the output
+type, and an exception it raises reaches the caller unchanged.
 
 For the batch helpers (§3.2 rule 7): `LLMRejected` opens the circuit at once,
 `LLMRateLimited` and `LLMUnavailable` count toward its threshold, and `LLMInvalidOutput`,
@@ -949,7 +967,7 @@ model enforces nothing. The library's test suite checks that every catalog model
 with a sample batch caller and a sample streaming caller.
 
 ```python
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from decimal import Decimal
@@ -996,6 +1014,12 @@ class Attribution:
     user_id: str | None = None
     thread_id: str | None = None
     run_id: str | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class PostProcessed(Generic[OutputT]):
+    output: OutputT
+    degraded_reasons: tuple[DegradedReason, ...] = ()
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -1068,6 +1092,7 @@ async def run(
     deps: DepsT = ...,
     attribution: Attribution = ...,
     message_history: Sequence[ModelMessage] | None = None,
+    postprocess: Callable[[OutputT], PostProcessed[OutputT]] | None = None,
 ) -> LLMResult[OutputT]: ...
 
 
@@ -1087,6 +1112,7 @@ def run_stream(
     deps: DepsT = ...,
     attribution: Attribution = ...,
     message_history: Sequence[ModelMessage] | None = None,
+    postprocess: Callable[[OutputT], PostProcessed[OutputT]] | None = None,
 ) -> AbstractAsyncContextManager[LLMStream[OutputT]]: ...
 
 
@@ -1097,6 +1123,7 @@ async def complete(
     output_type: OutputSpec[OutputT] = ...,
     instructions: str | None = None,
     attribution: Attribution = ...,
+    postprocess: Callable[[OutputT], PostProcessed[OutputT]] | None = None,
 ) -> LLMResult[OutputT]: ...
 
 
@@ -1117,6 +1144,8 @@ answered, and the prompt fields from the prompt helper, whose signature belongs 
 - The stream timeout semantics were measured on the OpenAI model class only.
 - The stubs type-check; nothing behind `build_agent`, `run`, or `complete` exists yet. The
   retry wrapper is the only part with a working scratch implementation.
+- The scratch wrapper was run against a hang, a 429, a 503, and a 400. The rejected rows for
+  other 5xx statuses and for non-retryable transport errors (§6.3) were not run.
 
 ## 7. Durable execution for agent workflows
 
