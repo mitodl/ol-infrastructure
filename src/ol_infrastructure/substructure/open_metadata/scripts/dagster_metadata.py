@@ -81,7 +81,9 @@ from metadata.generated.schema.type.entityReference import EntityReference
 from metadata.ingestion.ometa.ometa_api import OpenMetadata
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+# Importing ``metadata`` already configured the root logger at WARNING, so
+# without ``force`` this call is a no-op and every INFO line is dropped.
+logging.basicConfig(level=logging.INFO, stream=sys.stdout, force=True)
 
 # ---------------------------------------------------------------------------
 # Configuration
