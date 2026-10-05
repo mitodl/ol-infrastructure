@@ -124,14 +124,38 @@ def test_all_holders_missing_saml_uid_fails_instead_of_writing_empty(
 
 def test_counts_are_reported_so_an_empty_file_can_be_explained(
     serve_users: Callable[[list[User]], None],
+    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The summary separates "nobody holds a role" from "nobody was visible"."""
+    """The summary counts each stage of the filter separately."""
+    monkeypatch.setitem(EFFECTIVE_ROLES, "dave", ["uma_protection"])
     serve_users(USERS)
     keycloak_group_sync.effective_role_members(ADMIN, CLIENT, {})
 
     out = capsys.readouterr().out
     assert "Scanned 7 users (6 enabled)" in out
-    assert "5 hold an ol-starrocks-client role, 5 hold a governance role" in out
+    assert "6 hold an ol-starrocks-client role" in out
+    assert "5 hold a governance role (3 skipped)" in out
     assert "ol_data_analyst=1" in out
     assert "ol_platform_admin=0" in out
+
+
+@pytest.mark.parametrize(
+    ("users", "expected"),
+    [
+        ([], "Scanned 0 users (0 enabled): 0 hold"),
+        ([_user("dave", "dave")], "Scanned 1 users (1 enabled): 0 hold"),
+    ],
+)
+def test_counts_are_reported_when_the_file_would_be_empty(
+    serve_users: Callable[[list[User]], None],
+    capsys: pytest.CaptureFixture[str],
+    users: list[User],
+    expected: str,
+) -> None:
+    """No visible users and no role holders print different lines."""
+    serve_users(users)
+    members = keycloak_group_sync.effective_role_members(ADMIN, CLIENT, {})
+
+    assert not any(members.values())
+    assert expected in capsys.readouterr().out
