@@ -134,9 +134,11 @@ else:
     # Mirrors the production build env in
     # src/ol_concourse/pipelines/open_edx/mfe/pipeline.py, with local-dev
     # hostnames. The cookie names are not cosmetic: the MFE reads the LMS's
-    # user-info cookie to decide whether it has a session, so a mismatch with
-    # EDXMKTG_USER_INFO_COOKIE_NAME / LANGUAGE_COOKIE_NAME presents as a
-    # permanently logged-out MFE. Values read off the running LMS.
+    # user-info cookie to decide whether it has a session, and its JWT cookie
+    # to authenticate every API call, so a mismatch with
+    # EDXMKTG_USER_INFO_COOKIE_NAME / LANGUAGE_COOKIE_NAME / JWT_AUTH's
+    # JWT_AUTH_COOKIE_HEADER_PAYLOAD presents as a permanently logged-out MFE
+    # or as a hard error page. Values read off the running LMS.
     #
     # Comma-separated because that is how dagger takes a `strings` argument;
     # none of these values may contain a comma.
@@ -155,11 +157,54 @@ else:
         "DISCUSSIONS_MFE_BASE_URL=https://lms." + _rd + "/discussions",
         "MARKETING_SITE_BASE_URL=https://mitxonline." + _rd,
         "USER_INFO_COOKIE_NAME=edx-user-info",
+        # The JWT cookie the LMS actually sets (its JWT_AUTH
+        # JWT_AUTH_COOKIE_HEADER_PAYLOAD). frontend-platform defaults this to
+        # the empty string, and an empty name is not inert: the token service
+        # reads Cookies.get("") -> undefined, POSTs login_refresh, gets a 200,
+        # re-reads Cookies.get("") -> still undefined, and throws. The throw
+        # goes to logError -> NewRelicLoggingService, which is silent in a
+        # production build, so the only symptom is the generic "An unexpected
+        # error occurred" page with a *successful* login_refresh in the network
+        # tab and no course API calls after it. Production sets this too
+        # (ol_concourse/pipelines/open_edx/mfe/pipeline.py), prefixed per
+        # environment; this deployment's cookies carry no prefix.
+        "ACCESS_TOKEN_COOKIE_NAME=edx-jwt-cookie-header-payload",  # pragma: allowlist secret
         # A cookie *name*, not a value; detect-secrets reads the hyphenated
         # string as base64 entropy.
         "LANGUAGE_PREFERENCE_COOKIE_NAME=openedx-language-preference",  # pragma: allowlist secret
         "SESSION_COOKIE_DOMAIN=" + _rd,
+        # Where the MFE primes its CSRF token before any non-GET. Unset,
+        # frontend-platform defaults it to the empty string and the prime
+        # request goes to the LMS root, which answers HTML with no token --
+        # so every write (mark-complete, save-course-goal, sequence progress)
+        # fails while the initial all-GET render still looks fine. Same path
+        # production uses. It is deliberately absent from
+        # MITX_REDIRECT_ALLOW_RE_LIST, here and in production: that middleware
+        # only redirects anonymous users, and by the time the MFE primes CSRF
+        # the session exists.
+        # An API path, not a token; detect-secrets reads the slashed
+        # string as base64 entropy because the name contains TOKEN.
+        "CSRF_TOKEN_API_PATH=/csrf/api/v1/token",  # pragma: allowlist secret
         "SITE_NAME=MIT Open Learning",
+        # Below here: required by the header/footer components via
+        # frontend-platform's ensureConfig, which only logs -- these do not
+        # break the app, they just fill the console with "App configuration
+        # error: X is required by Y" and render a degraded footer. Production
+        # supplies all of them from the same pipeline.py.
+        "SUPPORT_EMAIL=mitlearn-support@mit.edu",
+        "SUPPORT_URL=https://mitxonline." + _rd + "/support",
+        "ENABLE_ACCESSIBILITY_PAGE=true",
+        "ACCESSIBILITY_URL=https://accessibility.mit.edu/",
+        "TERMS_OF_SERVICE_URL=https://mitxonline." + _rd + "/terms",
+        "PRIVACY_POLICY_URL=https://mitxonline." + _rd + "/privacy",
+        "LOGO_URL=https://lms." + _rd + "/static/mitxonline/images/logo.png",
+        "LOGO_TRADEMARK_URL=https://lms." + _rd + "/static/mitxonline/images/logo.png",
+        "LOGO_WHITE_URL=https://lms." + _rd + "/static/mitxonline/images/logo.png",
+        "FAVICON_URL=https://lms." + _rd + "/static/mitxonline/images/favicon.ico",
+        # Gates the mitxonline-specific plugin slots the bundle checks for by
+        # name. The dagger build already takes --deployment-name; this is the
+        # value the *browser* sees, which is a separate input.
+        "DEPLOYMENT_NAME=mitxonline",
     ])
 
     # build-legacy-configured, not build-legacy: it resolves this deployment's
