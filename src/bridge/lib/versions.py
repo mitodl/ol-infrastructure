@@ -177,6 +177,6 @@ RUSTFS_VERSION = "1.0.0"
 # renovate: datasource=docker depName=loki packageName=grafana/loki
 LOKI_VERSION = "3.3.2"
 # renovate: datasource=docker depName=alloy packageName=grafana/alloy
-ALLOY_VERSION = "v1.7.5"
+ALLOY_VERSION = "v1.19.2"
 # renovate: datasource=docker depName=grafana packageName=grafana/grafana
 GRAFANA_VERSION = "11.6.16"
