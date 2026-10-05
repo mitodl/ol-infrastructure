@@ -56,11 +56,16 @@ GATEWAY_API_VERSION = "v1.6.2"
 # docs/plans/gravitino-deployment-spec.md (P3). Do not merge a bump alone.
 # renovate: datasource=docker depName=gravitino-helm packageName=apache/gravitino-helm
 GRAVITINO_CHART_VERSION = "1.3.11"
-# The server image, the chart's appVersion and the schema SQL the stack applies
-# (scripts/postgresql/schema-<version>-postgresql.sql) all move together, with
-# the upgrade SQL, under the same rule as the chart above.
+# A minor bump of the server image moves with the chart's appVersion and the
+# upgrade SQL, under the same rule as the chart above.
 # renovate: datasource=docker depName=gravitino packageName=apache/gravitino
-GRAVITINO_VERSION = "1.3.0"
+GRAVITINO_VERSION = "1.3.1"
+# The schema SQL the stack copies out of the server image
+# (scripts/postgresql/schema-<version>-postgresql.sql). Upstream names it for
+# the minor release (the 1.3.1 image still ships schema-1.3.0-postgresql.sql
+# and no upgrade script), so it is pinned apart from the image tag and has no
+# Renovate marker. Move it by hand when the image crosses a minor version.
+GRAVITINO_SCHEMA_VERSION = "1.3.0"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
 KARPENTER_CHART_VERSION = "1.14.1"
 # renovate: datasource=helm depName=keda packageName=keda registryUrl=https://kedacore.github.io/charts
