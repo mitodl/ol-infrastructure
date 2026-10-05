@@ -291,21 +291,29 @@ oidc_enabled = starrocks_config.get_bool("oidc_enabled") or False
 # DROP CATALOG below.
 #
 # CREATE IF NOT EXISTS is idempotent: it is a no-op when the catalog
-# already exists with any set of properties.  StarRocks has no ALTER CATALOG
-# statement for updating properties in-place; the only way to change catalog
-# properties after creation is to DROP and re-CREATE the catalog.  If
-# properties need to change, manually run
-#   DROP CATALOG IF EXISTS <name>;
-# against the FE, then run `pulumi up` to recreate it via this command.
+# already exists with any set of properties.  Do not change _catalog_sql to
+# change a property: its hash is the Command's trigger, so a change replaces
+# the Command, which runs DROP CATALOG, and dropping a catalog also drops
+# every grant on it.  roles_setup_cmd would not re-run to restore them
+# because its own SQL is unchanged.  Properties that have to change after
+# creation go in _catalog_mutable_props below, applied in place with
+# ALTER CATALOG ... SET.
 #
-# Credential chain: use_instance_profile=false with no explicit key/role
-# instructs StarRocks to fall through to the AWS SDK default credential
-# chain.  On EKS with IRSA the pod already has AWS_ROLE_ARN +
-# AWS_WEB_IDENTITY_TOKEN_FILE injected; the SDK resolves them automatically
-# without a second sts:AssumeRole call.  Setting iam_role_arn here would
+# Credential chain: on EKS with IRSA the pod already has AWS_ROLE_ARN +
+# AWS_WEB_IDENTITY_TOKEN_FILE injected, and the AWS SDK default chain resolves
+# them without a second sts:AssumeRole call.  Setting iam_role_arn here would
 # cause StarRocks to attempt a nested AssumeRole and fail with a 403.
+#
+# use_instance_profile=false with no explicit key only reaches that chain for
+# the Glue client and Iceberg's own S3 FileIO.  StarRocks treats the S3
+# credential as unset (AwsCloudCredential.validate() is false), so it never
+# configures the Hadoop S3A filesystem the FE uses to stat a location, and
+# CREATE DATABASE ... PROPERTIES("location" = ...) fails with a 403 on
+# getFileStatus.  aws.s3.use_aws_sdk_default_behavior names the default chain
+# explicitly so both paths use the IRSA role.
 _DATA_LAKE_ENVS = readable_data_lake_environments(stack_info.env_suffix)
 catalog_setups: list[command.local.Command] = []
+_catalog_mutable_props = {"aws.s3.use_aws_sdk_default_behavior": "true"}
 _iceberg_roles_sql = ""
 if enable_data_lake:
     aws_region = starrocks_config.get("aws_region") or "us-east-1"
@@ -345,6 +353,21 @@ if enable_data_lake:
                     depends_on=[starrocks_db_connection],
                 ),
             )
+        )
+        _catalog_props_sql = (
+            f"ALTER CATALOG {_catalog_name} SET ("
+            + ", ".join(
+                f'"{key}" = "{value}"' for key, value in _catalog_mutable_props.items()
+            )
+            + ");"
+        )
+        command.local.Command(
+            f"starrocks-{stack_info.env_suffix}-catalog-properties-{_catalog_env}",
+            create=_exec_sql,
+            update=_exec_sql,
+            environment={**_mysql_env, "STARROCKS_SQL": _catalog_props_sql},
+            triggers=[hashlib.sha256(_catalog_props_sql.encode()).hexdigest()],
+            opts=ResourceOptions(depends_on=[catalog_setups[-1]]),
         )
         _iceberg_roles_sql += (
             f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE readonly;"
