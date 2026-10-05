@@ -80,8 +80,9 @@ class SFTPServer(ComponentResource):
             opts=generic_resource_opts,
         )
 
+        self.bucket_lifecycle: s3.BucketLifecycleConfiguration | None = None
         if sftp_config.noncurrent_version_expiration_days is not None:
-            s3.BucketLifecycleConfiguration(
+            self.bucket_lifecycle = s3.BucketLifecycleConfiguration(
                 f"{sftp_config.server_name}-sftp-bucket-lifecycle",
                 bucket=self.bucket.id,
                 rules=[
