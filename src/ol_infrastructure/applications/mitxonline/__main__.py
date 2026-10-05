@@ -560,8 +560,9 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
 # Production declares 2000Mi and reserves granian_worker_startup_rss (600MiB) for the
 # replacement worker a planned respawn runs alongside the old one, giving a 1200MiB cap:
 # above the 1092MiB peak, with 1200 + 600 inside 90% of the limit. CI and QA declare
-# 1000Mi with no reservation (a 900MiB cap): QA peaked at 628MiB over the same week, so
-# the cap does not trip there.
+# 1000Mi, which cannot fit the reservation, so their 900MiB cap has none and a respawn
+# there would OOMKill. That is acceptable only because the cap does not trip: QA
+# peaked at 628MiB over the same week.
 mitxonline_web_memory_limit = mitxonline_config.get("web_memory_limit") or "1000Mi"
 mitxonline_web_memory_ceiling = "3Gi"
 
@@ -649,6 +650,11 @@ mitxonline_k8s_app = OLApplicationK8s(
         pre_deploy_commands=[
             ("migrate", ["python", "manage.py", "migrate", "--noinput"])
         ],
+        # Sized on its own rather than inheriting the webapp's limit: two production
+        # migrate runs on 2026-09-28 peaked at 2754MiB and 2766MiB working set, which
+        # the webapp's 2000Mi would OOMKill, and the Deployment waits on this Job.
+        pre_deploy_resource_requests={"cpu": "250m", "memory": "3Gi"},
+        pre_deploy_resource_limits={"memory": "3Gi"},
         celery_redis_config=OLApplicationK8sCeleryRedisConfig(
             host=redis_cache.address,
             password=redis_config.require("password"),
