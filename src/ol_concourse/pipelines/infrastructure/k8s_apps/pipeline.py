@@ -1143,6 +1143,73 @@ def _checkout_release_task(main_repo: Resource, output: Identifier) -> TaskStep:
     )
 
 
+# Run inside the Production job, before anything deploys. The release gate
+# is a TRIGGER: whichever closed issue matching its prefix fired, the job
+# deploys whatever version last passed QA. Two open issues can both match
+# (a stale one left behind when a newer release was cut, or a future
+# infrastructure-only one), and closing the wrong one would ship a release
+# nobody approved. So refuse unless the closed issue's own title names the
+# version this job is about to deploy.
+_ASSERT_GATE_SCRIPT = r"""
+import json, os, re, sys
+
+app = os.environ["APP_NAME"]
+with open(os.environ["GATE_FILE"]) as gate_file:
+    title = (json.load(gate_file).get("issue_title") or "").strip()
+with open(os.environ["VERSION_FILE"]) as version_file:
+    deploying = version_file.read().strip()
+
+shapes = (
+    rf"Release {re.escape(app)} infrastructure @ (\S+)",
+    rf"Release {re.escape(app)} (\S+)",
+)
+approved = next(
+    (m.group(1) for m in (re.fullmatch(s, title) for s in shapes) if m), None
+)
+if approved is None:
+    sys.exit(
+        f"Refusing to deploy {app} {deploying}: the gate issue that fired "
+        f"({title!r}) does not name a version. Nothing was deployed."
+    )
+if approved != deploying:
+    sys.exit(
+        f"Refusing to deploy {app} {deploying}: the gate issue that fired "
+        f"({title!r}) approved {approved}. Nothing was deployed. To ship "
+        f"{deploying}, close the release issue for {deploying}."
+    )
+print(f"Gate issue {title!r} approves deploying {app} {deploying}.")
+"""
+
+
+def _assert_gate_names_deploy_task(
+    app_name: str, release_gate: Resource, version_input: Resource
+) -> TaskStep:
+    """Fail the job unless the closed gate issue names the version it deploys.
+
+    Accepts ``Release <app> <version>`` and ``Release <app> infrastructure @
+    <version>``, and requires ``<version>`` to equal the contents of
+    ``<version_input>/version``, which has to be the same file the job's
+    ``DOCKER_TAG`` comes from. The gate get has already tombstoned the issue,
+    so a refused issue does not fire again. A failure here means nothing
+    deployed, which turns gate/deploy drift into a red build instead of an
+    unapproved release.
+    """
+    return TaskStep(
+        task=Identifier("assert-gate-names-deploy"),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[Input(name=release_gate.name), Input(name=version_input.name)],
+            params={
+                "APP_NAME": app_name,
+                "GATE_FILE": f"{release_gate.name}/gh_issue.json",
+                "VERSION_FILE": f"{version_input.name}/version",
+            },
+            run=Command(path="python3", args=["-c", _ASSERT_GATE_SCRIPT]),
+        ),
+    )
+
+
 def _build_release_image_job(
     app_name: str,
     dockerfile_path: str,
@@ -1547,6 +1614,9 @@ def _build_release_resource_app_pipeline(
             ],
             1: [
                 GetStep(get=release_gate.name, trigger=True, version="every"),
+                # Before the deployment record or the deploy itself: the
+                # issue that fired must name the version being deployed.
+                _assert_gate_names_deploy_task(app_name, release_gate, release_res),
                 # main_repo is needed by the action=finish post-step.
                 GetStep(
                     get=main_repo.name,
