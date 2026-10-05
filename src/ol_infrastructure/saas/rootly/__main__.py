@@ -3420,7 +3420,10 @@ alerts_source_grafana_prometheus_ci = rootly.AlertsSource(
     # urgency-demote, before changing this. See
     # tk-make-severity-mean-something-split-warning-criti-27f976.
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
+    # Keyed on groupKey for the reason given on the QA source below.
+    deduplicate_alerts_by_key=True,
     deduplication_key_kind="payload",
+    deduplication_key_path="$.groupKey",
     name="Grafana Prometheus - CI",
     secret=Output.secret(
         rootly_secrets["alert_source_secrets"]["grafana_prometheus_ci"]
@@ -3498,7 +3501,10 @@ alerts_source_grafana_prometheus_production = rootly.AlertsSource(
         # on-call during the day.
     ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
+    # Keyed on groupKey for the reason given on the QA source below.
+    deduplicate_alerts_by_key=True,
     deduplication_key_kind="payload",
+    deduplication_key_path="$.groupKey",
     name="Grafana Prometheus - Production",
     secret=Output.secret(
         rootly_secrets["alert_source_secrets"]["grafana_prometheus_production"]
@@ -3526,10 +3532,11 @@ alerts_source_grafana_prometheus_qa = rootly.AlertsSource(
     # all of that, though an edit to the notification policy's routes or
     # group_bies does change it for groups already open. The CloudWatch
     # reasoning above runs the other way here: this source's native external
-    # ID is the alertname, which is coarser than groupKey, not finer. QA only
-    # for now: whether Rootly still applies a resolved payload once key dedup
-    # is on is unverified. See
-    # tk-rootly-mints-a-new-alert-on-each-alertmanager-re-c6e1a7.
+    # ID is the alertname, which is coarser than groupKey, not finer. A resolved
+    # payload still closes the keyed alert, and a multi-member group stays open
+    # until its last member clears. Alerts already open when the key was
+    # switched on were not resolved afterwards in QA: close those by hand.
+    # See tk-rootly-mints-a-new-alert-on-each-alertmanager-re-c6e1a7.
     deduplicate_alerts_by_key=True,
     deduplication_key_kind="payload",
     deduplication_key_path="$.groupKey",
