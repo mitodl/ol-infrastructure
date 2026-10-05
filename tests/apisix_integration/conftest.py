@@ -128,12 +128,41 @@ def apisix_routes() -> dict[str, Any]:
                 "plugins": {global_pre_function.name: global_pre_function.config},
             }
         ],
+        # An HTTPRoute's ExtensionRef PluginConfig lands on the APISIX service,
+        # not the route (apisix-ingress-controller
+        # internal/adc/translator/httproute.go), so the global rule only sees
+        # openid-connect there if APISIX merges the service into the matched
+        # route first.
+        "services": [
+            {
+                "id": "global-oidc-service",
+                "upstream": dead_upstream,
+                "plugins": {"openid-connect": openid_connect},
+            }
+        ],
+        "plugin_configs": [
+            {
+                "id": "global-oidc-plugin-config",
+                "plugins": {"openid-connect": openid_connect},
+            }
+        ],
         "routes": [
             {
                 "id": "global-oidc",
                 "uri": "/global-oidc/*",
                 "upstream": dead_upstream,
                 "plugins": {"openid-connect": openid_connect},
+            },
+            {
+                "id": "global-oidc-via-service",
+                "uri": "/global-oidc-via-service/*",
+                "service_id": "global-oidc-service",
+            },
+            {
+                "id": "global-oidc-via-plugin-config",
+                "uri": "/global-oidc-via-plugin-config/*",
+                "upstream": dead_upstream,
+                "plugin_config_id": "global-oidc-plugin-config",
             },
             {
                 "id": "global-plain",

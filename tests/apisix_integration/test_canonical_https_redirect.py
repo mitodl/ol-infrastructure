@@ -82,6 +82,24 @@ def test_global_rule_upgrades_an_oidc_route_without_its_own_pre_function(
     assert "Set-Cookie" not in headers
 
 
+@pytest.mark.parametrize(
+    "path",
+    ["/global-oidc-via-service/", "/global-oidc-via-plugin-config/"],
+)
+def test_global_rule_upgrades_a_route_that_inherits_openid_connect(
+    origin_request, path
+):
+    """openid-connect attached through a service (how the ingress controller
+    renders an HTTPRoute's ExtensionRef PluginConfig) or a plugin config is
+    merged into ``ctx.matched_route.value.plugins`` before the global rule runs.
+    """
+    status, headers = origin_request(path=path, host="pipelines.odl.mit.edu")
+
+    assert status == 308
+    assert headers["Location"] == f"https://pipelines.odl.mit.edu{path}"
+    assert "Set-Cookie" not in headers
+
+
 def test_global_rule_leaves_a_route_without_openid_connect_alone(origin_request):
     """Proxied to the dead upstream rather than redirected."""
     status, _ = origin_request(path="/global-plain/", host="pipelines.odl.mit.edu")
