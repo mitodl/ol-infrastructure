@@ -76,7 +76,7 @@ STARROCKS_OPERATOR_CHART_VERSION = "1.11.7"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_CHART_VERSION = "1.11.7"
 # renovate: datasource=docker depName=starrocks packageName=starrocks/fe-ubuntu
-STARROCKS_VERSION = "4.1.4"
+STARROCKS_VERSION = "4.1.6"
 # renovate: datasource=github-releases depName=starrocks-vault-plugin packageName=mitodl/vault-plugin-database-starrocks
 VAULT_PLUGIN_STARROCKS_VERSION = "0.1.0"
 # Checksum of that release's `vault-plugin-database-starrocks` asset, which
