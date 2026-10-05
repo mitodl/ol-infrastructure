@@ -302,7 +302,6 @@ keycloak_database_security_group = ec2.SecurityGroup(
 
 # Database
 rds_defaults = defaults(stack_info)["rds"]
-rds_defaults["read_replica"] = None
 if stack_info.env_suffix == "qa":
     rds_defaults["instance_size"] = DBInstanceTypes.general_purpose_large.value
 if stack_info.env_suffix == "production":
