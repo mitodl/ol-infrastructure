@@ -554,8 +554,8 @@ secret_names, secret_resources = create_mitxonline_k8s_secrets(
 # first in 1.169.0) reached production on 2026-09-28. Before it, pods climbed to
 # 1.9-2.8GiB working set within hours, with 221 RSS respawns in 10 days. After it, a
 # fresh pod holds ~450MiB and the longest-lived (~4.5 days) drifted to 920MiB, briefly
-# 1092MiB. The VPA's uncapped target is 933MiB. One single-request jump to 1957MiB on
-# 2026-09-29 is treated as an outlier and not sized for.
+# 1092MiB. The VPA's uncapped target is 933MiB. One pod's jump from 412MiB to 1957MiB
+# within two minutes on 2026-09-29 is treated as an outlier and not sized for.
 #
 # Production declares 2000Mi and reserves granian_worker_startup_rss (600MiB) for the
 # replacement worker a planned respawn runs alongside the old one, giving a 1200MiB cap:
