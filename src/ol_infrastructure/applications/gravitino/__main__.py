@@ -698,7 +698,9 @@ gravitino_values = {
         {
             "port": MANAGEMENT_PORT,
             "protocol": "TCP",
-            "name": "management-https",
+            # The chart also uses this as the container port name, which
+            # Kubernetes caps at 15 characters.
+            "name": "mgmt-https",
             "targetPort": MANAGEMENT_PORT,
         }
     ],
