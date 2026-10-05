@@ -57,6 +57,10 @@ trace, and Opik cannot change that.
 2. Restrict who is admitted. UI access requires membership in a Keycloak group
    (`opik-users`), enforced either in Keycloak (a required client role on `ol-opik-client`)
    or by a claim check at APISIX. The bearer route additionally checks the token audience.
+   APISIX 3.18.0's `claim_validator.audience.match_with_client_id` compares `aud` with the
+   route's own `client_id` (`openid-connect.lua:1254-1290`), which is `ol-opik-client`, so
+   every per-app client in item 3 needs a Keycloak audience mapper that adds
+   `ol-opik-client` to its tokens. A token without it gets a 403.
    Neither mechanism has been tested; the implementation task picks one.
 3. One service identity per application and environment. Each app-environment gets its own
    Keycloak client for SDK traffic (for example `opik-learn-ai-production`), replacing the
@@ -136,8 +140,11 @@ The workflow:
    number that production runs. Changing production means a pull request that changes the
    number.
 3. The pull request runs the evaluation for that version (§5) and links the experiment.
-4. On merge, a CI job moves the `production` label to the pointed version. Only that job's
-   Keycloak client is meant to move it. Opik cannot enforce that, so the drift report
+4. On merge, a CI job moves the `production` label to the pointed version. Promotion jobs
+   for a repository run one at a time, and each reads the pointer file from the default
+   branch's HEAD when it starts, not from the commit that triggered it. Otherwise two merges
+   close together can finish out of order and the older job moves the label back. Only that
+   job's Keycloak client is meant to move it. Opik cannot enforce that, so the drift report
    (§1.2 item 5) compares the label with the pointer and reports a mismatch.
 5. Rollback is a revert of the pointer change.
 6. The build exports the text of the pointed version into the image as the embedded default
