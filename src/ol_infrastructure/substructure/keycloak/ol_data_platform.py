@@ -418,11 +418,11 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ol_data_platform_starrocks_client_role_refs[role] = role_ref
 
     # Realm roles are what people get assigned. Each one is a composite of the
-    # same-named client role on every data platform client, so one assignment
-    # gives a person the matching role in Superset and in StarRocks. They are
-    # created here, after both clients, because composite_roles needs both sets
-    # of client role ids. A stack with no StarRocks client roles configured gets
-    # Superset-only composites.
+    # matching client role on ol-superset-client and ol-starrocks-client (no
+    # other client), so one assignment gives a person that role in both. They
+    # are created here, after both clients, because composite_roles needs both
+    # sets of client role ids. A stack with no StarRocks client roles configured
+    # (CI) gets Superset-only composites.
     for resource_name, realm_role, client_role, description in (
         (
             "ol-platform-admin-role",
@@ -472,12 +472,12 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             name=realm_role,
             description=description,
             composite_roles=[
-                role_refs[client_role].id
-                for role_refs in (
-                    ol_data_platform_superset_client_role_refs,
-                    ol_data_platform_starrocks_client_role_refs,
-                )
-                if client_role in role_refs
+                ol_data_platform_superset_client_role_refs[client_role].id,
+                *(
+                    [ol_data_platform_starrocks_client_role_refs[client_role].id]
+                    if ol_data_platform_starrocks_client_role_refs
+                    else []
+                ),
             ],
             opts=resource_options,
         )
