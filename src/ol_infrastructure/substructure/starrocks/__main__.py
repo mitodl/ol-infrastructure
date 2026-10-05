@@ -366,7 +366,12 @@ if enable_data_lake:
             create=_exec_sql,
             update=_exec_sql,
             environment={**_mysql_env, "STARROCKS_SQL": _catalog_props_sql},
-            triggers=[hashlib.sha256(_catalog_props_sql.encode()).hexdigest()],
+            # The catalog's hash is here so that a replaced (dropped and
+            # re-created) catalog gets its properties applied again.
+            triggers=[
+                hashlib.sha256(_catalog_props_sql.encode()).hexdigest(),
+                hashlib.sha256(_catalog_sql.encode()).hexdigest(),
+            ],
             opts=ResourceOptions(depends_on=[catalog_setups[-1]]),
         )
         _iceberg_roles_sql += (
