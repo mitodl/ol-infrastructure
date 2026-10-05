@@ -168,7 +168,7 @@ is non-secret configuration.
 
 ### 5.1 Pod specification, all three consumers
 
-Each workload needs a projected ServiceAccount token and four environment variables:
+Each workload needs a projected ServiceAccount token and five environment variables:
 
 ```yaml
 volumes:
@@ -188,6 +188,7 @@ env:
   AZURE_TENANT_ID: <tenant id>
   AZURE_FEDERATED_TOKEN_FILE: /var/run/secrets/azure/tokens/azure-identity-token
   AZURE_AUTHORITY_HOST: https://login.microsoftonline.com/
+  AZURE_TOKEN_CREDENTIALS: WorkloadIdentityCredential
 ```
 
 The audience on the projected token is deliberately not IRSA's `sts.amazonaws.com`. The two

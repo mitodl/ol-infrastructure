@@ -1643,7 +1643,7 @@ if mitlearn_config.get_bool("enable_azure_openai"):
         azure_openai_env(
             azure_openai_stack,
             "mitlearn",
-            api_version=mitlearn_config.get("azure_openai_api_version") or "2024-10-21",
+            api_version=mitlearn_config.get("azure_openai_api_version") or "v1",
             default_deployment=mitlearn_config.get("azure_openai_default_deployment")
             or "gpt-4o",
         )
