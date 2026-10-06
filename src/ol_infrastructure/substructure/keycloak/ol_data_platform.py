@@ -199,8 +199,12 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 display_name="Touchstone uid",
                 group="user-metadata",
                 required_for_roles=[],
+                # Not editable by anyone: this value is the StarRocks principal,
+                # and only the Touchstone IdP mapper, which writes the user
+                # model directly, should set it. An editable attribute is also
+                # cleared by any admin API user update that omits it.
                 permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
-                    views=["admin"], edits=["admin"]
+                    views=["admin"], edits=[]
                 ),
             ),
         ],
