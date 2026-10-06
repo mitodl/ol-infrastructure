@@ -542,7 +542,9 @@ def reconcile_users(
     if holders and not wanted:
         msg = (
             f"{len(holders)} users hold governance roles and none has a usable "
-            "principal; check that the realm's user profile exposes saml_uid"
+            "principal; the warnings above give the reason for each. If every "
+            "one is an '@' refusal, check that the realm's user profile exposes "
+            "saml_uid"
         )
         raise ReconcileError(msg)
     for principal in sorted(wanted - existing):
