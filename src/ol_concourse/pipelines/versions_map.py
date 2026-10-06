@@ -76,6 +76,7 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/kubewatch/": ["KUBEWATCH_CHART_VERSION"],
     "applications/kubewatch_webhook_handler/": [],
     "applications/learn_ai/": ["NGINX_VERSION"],
+    "applications/lightdash/": ["LIGHTDASH_CHART_VERSION"],
     "applications/mailgun/": [],
     "applications/marimo_data/": [],
     "applications/micromasters/": ["NGINX_VERSION"],
