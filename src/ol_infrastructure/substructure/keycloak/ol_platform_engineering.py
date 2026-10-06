@@ -6,6 +6,10 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Alias, Config, InvokeOptions, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.client_policies import (
+    PKCE_REQUIRED_CLIENT_ATTRIBUTES,
+    create_pkce_client_policy,
+)
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_staff_organizations,
 )
@@ -141,6 +145,10 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         name="developer",
         description="OL Platform Engineering Developer role",
         opts=resource_options,
+    )
+
+    create_pkce_client_policy(
+        ol_platform_engineering_realm.id, "ol-platform-engineering", resource_options
     )
 
     # AIRBYTE [START] # noqa: ERA001
@@ -311,6 +319,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         # reopening the interception attack PKCE exists to close. Same setting,
         # same reasoning as ol-platform-engineering-grafana-client below.
         pkce_code_challenge_method="S256",
+        extra_config=PKCE_REQUIRED_CLIENT_ATTRIBUTES,
         valid_redirect_uris=[
             "http://localhost:8080/callback",
             "http://127.0.0.1:8080/callback",
@@ -546,6 +555,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         # `ol-platform-engineering-grafana-client`: a PUBLIC client has no
         # other proof of possession, so it must be server-enforced.
         pkce_code_challenge_method="S256",
+        extra_config=PKCE_REQUIRED_CLIENT_ATTRIBUTES,
         valid_redirect_uris=[
             # Claude Desktop / claude.ai custom connectors: the fixed
             # callback documented at
@@ -611,6 +621,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         direct_access_grants_enabled=False,
         service_accounts_enabled=False,
         pkce_code_challenge_method="S256",
+        extra_config=PKCE_REQUIRED_CLIENT_ATTRIBUTES,
         valid_redirect_uris=[f"{witan_ui_origin}/ui/"],
         # Where oidc-spa sends the browser after an idle-session logout.
         valid_post_logout_redirect_uris=[f"{witan_ui_origin}/ui/"],
@@ -726,6 +737,8 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
         service_accounts_enabled=False,
+        pkce_code_challenge_method="S256",
+        extra_config=PKCE_REQUIRED_CLIENT_ATTRIBUTES,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-platform-engineering-concourse-redirect-uris"
         ),
@@ -918,6 +931,8 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
         service_accounts_enabled=False,
+        pkce_code_challenge_method="S256",
+        extra_config=PKCE_REQUIRED_CLIENT_ATTRIBUTES,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-platform-engineering-vault-redirect-uris"
         ),
@@ -962,6 +977,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         direct_access_grants_enabled=True,
         service_accounts_enabled=False,
         pkce_code_challenge_method="S256",
+        extra_config=PKCE_REQUIRED_CLIENT_ATTRIBUTES,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-platform-engineering-grafana-redirect-uris"
         ),
