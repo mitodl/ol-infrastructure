@@ -655,12 +655,25 @@ command.local.Command(
 # property changes (e.g. a client secret rotation) are applied correctly.
 # StarRocks has no ALTER SECURITY INTEGRATION for OAuth2 core properties.
 #
-# Users authenticate via the browser-based OAuth2 Authorization Code flow.
-# Each human user must also be pre-created in StarRocks with:
-#   CREATE USER 'preferred_username'@'%' IDENTIFIED WITH authentication_oauth2;
-# and assigned an appropriate role.  Use starrocks:oidc_users in the stack
-# config to manage these accounts through Pulumi; users not listed there
-# must be created manually after the cluster is deployed.
+# Users authenticate via the browser-based OAuth2 Authorization Code flow,
+# driven by the JDBC driver; the FE exchanges the code server-side.
+#
+# Human accounts are pre-created as `IDENTIFIED WITH authentication_jwt` --
+# that is what starrocks:oidc_users below emits, and users not listed there
+# must be created the same way after the cluster is deployed.
+#
+# Do NOT create them with `IDENTIFIED WITH authentication_oauth2`. A user whose
+# persisted auth plugin is authentication_oauth2 is accepted by the FE HTTP
+# port (8030) under Basic auth with ANY password, including an empty one.
+# Measured on 4.1.6 (2026-10-06): such a user reached /system, /session,
+# /api/show_proc, /api/v1/catalogs/.../sql and _stream_load, and the stream
+# load committed rows. The cause is that
+# OAuth2AuthenticationProvider.authenticate() returns success whenever the
+# client's auth plugin is not AUTHENTICATION_OAUTH2_CLIENT and defers the real
+# check to checkLoginSuccess(), which the HTTP stack never calls. The MySQL
+# protocol is unaffected (it refuses with ERROR 5207), and authentication_jwt
+# users are refused correctly. Upstream: StarRocks#67702, closed stale and
+# never fixed.
 #
 # Service-account (application) access continues to use Vault dynamic
 # credentials (native StarRocks auth) and is unaffected by OIDC config.
