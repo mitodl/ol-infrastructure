@@ -344,12 +344,8 @@ def create_staff_organizations(
             alias=name,
             enabled=True,
             domains=[keycloak.OrganizationDomainArgs(name=domain, verified=False)],
-            # Members are added by hand, so a delete planned from a code removal or
-            # a revert must fail, not remove the organization.
             opts=opts.merge(
-                pulumi.ResourceOptions(
-                    import_=f"{realm_name}/{import_ids[name]}", protect=True
-                )
+                pulumi.ResourceOptions(import_=f"{realm_name}/{import_ids[name]}")
             ),
         )
         for name, domain in domains_by_organization.items()
