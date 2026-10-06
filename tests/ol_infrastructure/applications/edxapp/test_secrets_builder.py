@@ -77,6 +77,10 @@ class TestBuildBaseGeneralSecretsDict:
         assert "JWT_AUTH" in secrets
         assert "OPENAI_SECRET_KEY" in secrets
         assert "SENTRY_DSN" in secrets
+        assert (
+            secrets["SENTRY_USER_HASH_KEY"]
+            == '{{ get .Secrets "sentry_user_hash_key" }}'
+        )
 
     def test_jwt_auth_configuration(self, mock_stack_info_mitx):
         """Verify JWT_AUTH has correct structure."""

@@ -197,6 +197,9 @@ def _build_interpolated_config_dict(
         "PAYMENT_SUPPORT_EMAIL": edxapp_config.require("sender_email_address"),
         "PREVIEW_LMS_BASE": domains["preview"],
         "SENTRY_ENVIRONMENT": env_name,
+        # Stated here rather than left to the ol_openedx_sentry default: with it on,
+        # the SDK sends cookies, client IP and user identity with every event.
+        "SENTRY_SEND_DEFAULT_PII": False,
         "SESSION_COOKIE_DOMAIN": f".{domains['lms'].split('.', 1)[-1]}",
         "UNIVERSITY_EMAIL": edxapp_config.require("sender_email_address"),
         "OPENEDX_TELEMETRY": ["edx_django_utils.monitoring.OpenTelemetryBackend"],

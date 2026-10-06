@@ -74,6 +74,10 @@ def build_base_general_secrets_dict(
         "OPENAI_API_KEY": '{{ get .Secrets "openai_api_key" }}',
         "RETIRED_USER_SALTS": '{{ get .Secrets "user_retirement_salts" }}',
         "SENTRY_DSN": '{{ get .Secrets "sentry_dsn" }}',
+        # ol_openedx_sentry sets user.id to an HMAC of the user pk under this key,
+        # so Sentry can count affected users with send_default_pii off. Rotating
+        # it makes every user look new to Sentry.
+        "SENTRY_USER_HASH_KEY": '{{ get .Secrets "sentry_user_hash_key" }}',
         "SYSADMIN_GITHUB_WEBHOOK_KEY": '{{ get .Secrets "sysadmin_git_webhook_secret" }}',
     }
 
