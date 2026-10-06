@@ -137,8 +137,12 @@ aws.ecr.PullThroughCacheRule(
 
 # The creation template only applies to repositories created after it changes, so
 # the cache repositories that already exist get the policy attached directly.
+# Bitnami removed its versioned tags from Docker Hub, so the cache holds the only
+# copies of those tags and expiring them would be unrecoverable.
 for repository_name in aws.ecr.get_repositories().names:
-    if repository_name.startswith(pull_through_cache_prefixes):
+    if repository_name.startswith(
+        pull_through_cache_prefixes
+    ) and not repository_name.startswith("dockerhub/bitnami/"):
         aws.ecr.LifecyclePolicy(
             f"ecr-pull-through-cache-lifecycle-{repository_name.replace('/', '-')}",
             repository=repository_name,
