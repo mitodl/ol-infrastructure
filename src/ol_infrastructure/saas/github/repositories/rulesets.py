@@ -216,10 +216,11 @@ def _required_checks_bypass(
     THAT SET IS WIDER THAN THE REPOS ACTUALLY ON THE NEW WORKFLOW, deliberately.
     `AppRegistration.release_resource_workflow` is the real opt-in and today only
     `ol-analytics-api`, `learn-ai` and `micromasters` set it, so `mit-learn` and
-    `mitxonline` get a bypass here before the App releases them. `release_workflow_repos()` carries the
-    reasoning and the conditions for narrowing it later; the short version is that
-    pre-granting keeps a pipeline flip from needing a privileged GitHub edit alongside
-    it, which is the step that stranded a shipped release once already.
+    `mitxonline` get a bypass here before the App releases them.
+    `release_workflow_repos()` carries the reasoning and the conditions for narrowing
+    it later; the short version is that pre-granting keeps a pipeline flip from
+    needing a privileged GitHub edit alongside it, which is the step that stranded a
+    shipped release once already.
 
     Membership is derived rather than listed so the two cannot drift -- registering an
     app in `APPS` is what grants it the bypass, and a repo that declares no
