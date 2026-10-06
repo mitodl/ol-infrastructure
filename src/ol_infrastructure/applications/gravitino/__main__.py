@@ -937,6 +937,13 @@ if gravitino_config.require_bool("reconcile_enabled"):
                     "catalog-backend-impl": "org.apache.iceberg.aws.glue.GlueCatalog",
                     # Required by the property validator, ignored by GlueCatalog.
                     "uri": f"https://glue.{AWS_REGION}.amazonaws.com",
+                    # Gravitino refuses to load a schema without it. GlueCatalog
+                    # only uses it to place tables in a database that has no
+                    # location of its own, so it points where dbt puts the
+                    # databases it creates.
+                    "warehouse": (
+                        f"s3://ol-data-lake-staging-{stack_info.env_suffix}/processed"
+                    ),
                     "credential-providers": "aws-irsa",
                     "s3-role-arn": vending_role_arn,
                     "s3-region": AWS_REGION,

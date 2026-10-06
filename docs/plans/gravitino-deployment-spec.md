@@ -446,8 +446,14 @@ s3-token-expire-in-secs = 3600
 catalog-backend = custom
 catalog-backend-impl = org.apache.iceberg.aws.glue.GlueCatalog
 uri = https://glue.us-east-1.amazonaws.com
+warehouse = s3://ol-data-lake-staging-<env>/processed
 table-metadata-cache-impl =
 ```
+
+`warehouse` was missing from this list until the first QA reconcile run failed on it (2026-10-06):
+Gravitino will not load a schema without one. `GlueCatalog` uses it only for a database with no
+`LocationUri`, and no `ol_warehouse_<env>_*` database lacks one. The value is the prefix the
+dbt-created databases already use, so it adds no bucket.
 
 Audit goes to the `gravitino.audit` Log4j2 logger (`FileAuditWriter.java:36-71`; its file settings
 are deprecated and ignored). The chart's log4j2 config has no audit appender and puts a console
