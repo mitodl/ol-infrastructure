@@ -87,6 +87,12 @@ MAX_PRINCIPAL_LENGTH = 41
 # principal StarRocks would refuse must not be admitted here, or the two layers
 # disagree about who a user is.
 PRINCIPAL_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
+# What Iceberg's GlueCatalog accepts as a database name
+# (IcebergToGlueConverter.GLUE_DB_PATTERN). Glue itself allows more (hyphens,
+# angle brackets), and such a database is listed but can never be loaded:
+# "Cannot convert namespace ... to Glue database name". That holds only while
+# the catalog leaves glue.skip-name-validation unset.
+GLUE_NAMESPACE_PATTERN = re.compile(r"[a-z0-9_]{1,252}")
 
 Transport = Callable[[str, str, dict[str, Any] | None], tuple[int, dict[str, Any]]]
 PrivilegeSet = frozenset[tuple[str, str]]
@@ -486,6 +492,10 @@ def reconcile_schema_owners(
     failures = []
     for schema in gravitino.list_schemas(catalog):
         if not schema.startswith(prefix):
+            continue
+        if not GLUE_NAMESPACE_PATTERN.fullmatch(schema):
+            # Nothing can reach it through the catalog, so it needs no owner.
+            warn(f"Schema {schema!r} is not a name Iceberg can load; skipped")
             continue
         # One schema Gravitino cannot load must not leave every schema sorted
         # after it without its owner reasserted.
