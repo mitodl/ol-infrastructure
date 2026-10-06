@@ -594,6 +594,25 @@ carrying `service` alone before. The remaining 48 are APISIX (2), the Grafana
 Keycloak (2) and the 7 already-`service`-labeled application workloads, which need
 `component` and `alert_tier` added at their own call sites.
 
+#### 3.3.2 [2026-10-06] `OLApplicationK8s` selects on its whole label set
+
+The same selector trap as §3.3.1, in our own component. Every Deployment
+`OLApplicationK8s` creates (webapp, each celery worker, beat) passes one dict to
+`metadata.labels`, `spec.selector.matchLabels` and the pod template, and that dict
+starts from the caller's `k8s_global_labels`. Setting `alert_tier` on the
+`K8sAppLabels` an application stack builds would therefore change an immutable selector
+and delete-and-recreate the webapp of each of the ten stacks that use the component.
+
+The tier is set by the component instead, on the pod template and the Deployment
+metadata only: `webapp_alert_tier` (default `page`) and `celery_alert_tier` (default
+`notify`, workers and beat, per analysis §7.5). The config rejects an
+`ol.mit.edu/alert_tier` key in `k8s_global_labels`. `pulumi preview` on
+`mit_learn` `Production`: five Deployments updated in place, none replaced.
+
+Not covered by this: beat keeps `component=celery` (it is in beat's selector, so
+moving it to `Component.beat` is a replacement), and scheduled-job, pre/post-deploy
+Job and dev-shell pods carry no tier.
+
 Also backfill CI/QA clusters, which the analysis explicitly did not measure. Coverage
 there does not affect paging (CI/QA alerts go Slack-only per §8.1) but an unlabeled QA
 workload routes as untier-ed, so the QA stack stops being a rehearsal for the

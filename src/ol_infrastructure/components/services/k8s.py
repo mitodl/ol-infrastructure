@@ -39,11 +39,17 @@ from bridge.lib.magic_numbers import (
 from bridge.lib.versions import NGINX_VERSION
 from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, ecr_image_uri
 from ol_infrastructure.lib.k8s_vpa import make_vpa
-from ol_infrastructure.lib.ol_types import Component, KubernetesServiceAppProtocol
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    Component,
+    KubernetesServiceAppProtocol,
+)
 from ol_infrastructure.lib.pulumi_helper import parse_stack
 
 # Kubernetes' default terminationGracePeriodSeconds.
 DEFAULT_TERMINATION_GRACE_PERIOD_SECONDS = 30
+
+ALERT_TIER_LABEL = "ol.mit.edu/alert_tier"
 
 
 def truncate_k8s_metanames(name: str) -> str:
@@ -892,6 +898,21 @@ class OLApplicationK8sConfig(BaseModel):
     application_max_replicas: NonNegativeInt = 10
     application_deployment_use_anti_affinity: bool = True
     k8s_global_labels: dict[str, str]
+    webapp_alert_tier: AlertTier = Field(
+        default=AlertTier.page,
+        description=(
+            "ol.mit.edu/alert_tier for the webapp pods: how far an alert about "
+            "them may escalate."
+        ),
+    )
+    celery_alert_tier: AlertTier = Field(
+        default=AlertTier.notify,
+        description=(
+            "ol.mit.edu/alert_tier for the celery worker and beat pods. A stuck "
+            "or restarting worker delays tasks and does not take the site down, "
+            "so the default does not page."
+        ),
+    )
     env_from_secret_names: list[str]
     application_security_group_id: Output[str] | None = Field(
         default=None,
@@ -1311,6 +1332,20 @@ class OLApplicationK8sConfig(BaseModel):
                 "application_security_group_id and application_security_group_name "
                 "must be set together. The SecurityGroupPolicy needs the ID and "
                 "selects pods by a label derived from the name."
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_alert_tier_is_not_a_selector_label(self) -> "OLApplicationK8sConfig":
+        """Keep the alert tier out of the immutable Deployment selectors."""
+        if ALERT_TIER_LABEL in self.k8s_global_labels:
+            msg = (
+                f"k8s_global_labels must not carry {ALERT_TIER_LABEL}. Every "
+                "Deployment this component creates selects on k8s_global_labels, "
+                "and a selector is immutable, so adding or changing the tier there "
+                "deletes and recreates the Deployment. Set webapp_alert_tier and "
+                "celery_alert_tier, which reach the pod template only."
             )
             raise ValueError(msg)
         return self
@@ -1954,9 +1989,17 @@ class OLApplicationK8s(ComponentResource):
                 ol_app_k8s_config.slack_channel
             )
 
+        # Never on the selector, which is immutable. kube_pod_labels reads the pod
+        # template and kube_deployment_labels the Deployment's own metadata, and
+        # alert rules join on both.
+        webapp_alert_tier_label = {
+            ALERT_TIER_LABEL: str(ol_app_k8s_config.webapp_alert_tier)
+        }
+        application_pod_labels = application_labels | webapp_alert_tier_label
+
         # On the Deployment's own metadata only: on the selector it would force
         # a replacement, and on the pod template a rollout.
-        deployment_labels = application_labels | otel_service_name_label(
+        deployment_labels = application_pod_labels | otel_service_name_label(
             ol_app_k8s_config.application_config
         )
 
@@ -2017,6 +2060,7 @@ class OLApplicationK8s(ComponentResource):
         self.celery_deployment_names: list[str] = []
         self.celery_deployments: list[kubernetes.apps.v1.Deployment] = []
         self.beat_deployment_name: str | None = None
+        self.beat_deployment: kubernetes.apps.v1.Deployment | None = None
         self.dev_shell_deployment_name: str | None = None
         self.dev_shell_deployment: kubernetes.apps.v1.Deployment | None = None
         self.scheduled_job_names: list[str] = []
@@ -2181,7 +2225,7 @@ class OLApplicationK8s(ComponentResource):
                 ),
                 template=kubernetes.core.v1.PodTemplateSpecArgs(
                     metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                        labels=application_labels,
+                        labels=application_pod_labels,
                         annotations={
                             "kubectl.kubernetes.io/default-container": (
                                 f"{ol_app_k8s_config.application_name}-app"
@@ -2625,6 +2669,9 @@ class OLApplicationK8s(ComponentResource):
             )
             celery_redis_trigger_deps = [self.celery_redis_trigger_auth]
 
+        celery_alert_tier_label = {
+            ALERT_TIER_LABEL: str(ol_app_k8s_config.celery_alert_tier)
+        }
         for celery_worker_config in ol_app_k8s_config.celery_worker_configs:
             celery_labels = ol_app_k8s_config.k8s_global_labels | {
                 "ol.mit.edu/component": str(Component.celery),
@@ -2641,6 +2688,8 @@ class OLApplicationK8s(ComponentResource):
                     ol_app_k8s_config.slack_channel
                 )
 
+            celery_pod_labels = celery_labels | celery_alert_tier_label
+
             _celery_deployment_name = celery_worker_deployment_name(
                 ol_app_k8s_config.application_name,
                 celery_worker_config.worker_name or "",
@@ -2651,7 +2700,7 @@ class OLApplicationK8s(ComponentResource):
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     name=_celery_deployment_name,
                     namespace=ol_app_k8s_config.application_namespace,
-                    labels=celery_labels,
+                    labels=celery_pod_labels,
                     annotations=(
                         {"pulumi.com/skipAwait": "true"}
                         if celery_worker_config.skip_rollout_await
@@ -2670,7 +2719,7 @@ class OLApplicationK8s(ComponentResource):
                     ),
                     template=kubernetes.core.v1.PodTemplateSpecArgs(
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                            labels=celery_labels,
+                            labels=celery_pod_labels,
                             annotations=pod_config_hash_annotations or None,
                         ),
                         # Ref: https://docs.celeryq.dev/en/stable/reference/cli.html#celery-worker
@@ -2826,12 +2875,13 @@ class OLApplicationK8s(ComponentResource):
                 ol_app_k8s_config.application_name
             )
             self.beat_deployment_name = _beat_deployment_name
-            _beat_deployment = kubernetes.apps.v1.Deployment(
+            beat_pod_labels = beat_labels | celery_alert_tier_label
+            self.beat_deployment = kubernetes.apps.v1.Deployment(
                 f"{ol_app_k8s_config.application_name}-celery-beat-{stack_info.env_suffix}",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     name=_beat_deployment_name,
                     namespace=ol_app_k8s_config.application_namespace,
-                    labels=beat_labels,
+                    labels=beat_pod_labels,
                 ),
                 spec=kubernetes.apps.v1.DeploymentSpecArgs(
                     replicas=1,
@@ -2840,7 +2890,7 @@ class OLApplicationK8s(ComponentResource):
                     ),
                     template=kubernetes.core.v1.PodTemplateSpecArgs(
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                            labels=beat_labels,
+                            labels=beat_pod_labels,
                             annotations=pod_config_hash_annotations or None,
                         ),
                         spec=kubernetes.core.v1.PodSpecArgs(
