@@ -163,7 +163,7 @@ MCP_PROXY_FOR_AWS_VERSION = "1.7.0"
 # or nothing in these places; everything local-dev shares with a deployed stack
 # reads the deployed constant above instead.
 # renovate: datasource=helm depName=cloudnative-pg packageName=cloudnative-pg registryUrl=https://cloudnative-pg.github.io/charts
-CNPG_CHART_VERSION = "0.29.0"
+CNPG_CHART_VERSION = "0.29.1"
 # The local-pg Cluster's image. Without it the operator applies its own default,
 # which moves with the chart above (17.2 under 0.23.0, 18.4 under 0.29.0), so a
 # chart bump would give new clusters a different Postgres major from existing
