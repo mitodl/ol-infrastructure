@@ -17,7 +17,7 @@ MEILISEARCH_VERSION = "v1.54.3"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
 OPEN_METADATA_VERSION = "2.0.3"
 # renovate: datasource=docker depName=openapi-generator-cli packageName=openapitools/openapi-generator-cli
-OPENAPI_GENERATOR_VERSION = "v7.25.0"
+OPENAPI_GENERATOR_VERSION = "v7.26.0"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
 TRAEFIK_VERSION = "3.7.13"
 # renovate: datasource=docker depName=typesense packageName=typesense/typesense
