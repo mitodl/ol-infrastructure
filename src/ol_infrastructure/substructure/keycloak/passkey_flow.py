@@ -1,4 +1,4 @@
-"""Keycloak browser flow for the staff realms, which sign in with a passkey only."""
+"""Keycloak browser flow for the staff realms, whose login form takes a passkey."""
 
 import pulumi
 import pulumi_keycloak as keycloak
@@ -9,7 +9,11 @@ def create_passkey_browser_flow(
     name_prefix: str,
     opts: pulumi.ResourceOptions | None = None,
 ) -> keycloak.authentication.Flow:
-    """Create a browser flow whose only interactive login is username then passkey.
+    """Create a browser flow whose login form is username then passkey, no password.
+
+    An identity provider in the realm is still offered on the username form and
+    reachable with ``kc_idp_hint``; a brokered login does not go through the passkey
+    step.
 
     Every top-level step is ALTERNATIVE. Keycloak ignores the ALTERNATIVE steps of a
     flow level that also has a REQUIRED one, so a REQUIRED passkey subflow here stops
