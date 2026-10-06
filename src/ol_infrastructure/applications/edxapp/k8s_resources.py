@@ -1504,15 +1504,16 @@ def create_k8s_resources(  # noqa: C901
 
     celery_volume_mounts = common_extra_volume_mounts
 
+    # A stuck or restarting worker delays tasks and does not take the site down, so
+    # none of these pods page. The tier goes on each Deployment's metadata and pod
+    # template only: the selectors are immutable, and nothing reads a tier from the
+    # ScaledObjects that share the *_labels dicts.
+    celery_alert_tier_label = {ALERT_TIER_LABEL: str(AlertTier.notify)}
+
     # Selector labels must match the existing Deployment's spec.selector (immutable).
     # The old SGP label (pod-security-group) is kept in the selector; the new
     # edxapp-celery-sg label is added only to the pod template so the
     # edxapp_celery_sg_policy SGP can select celery pods without altering the selector.
-    # The alert tier goes on each Deployment's metadata and pod template only, for the
-    # same reason. A stuck or restarting worker delays tasks and does not take the
-    # site down, so none of these pods page. The ScaledObjects that share the
-    # *_labels dicts are left alone: nothing reads a tier from them.
-    celery_alert_tier_label = {ALERT_TIER_LABEL: str(AlertTier.notify)}
     lms_celery_selector_labels = k8s_global_labels | {
         "ol.mit.edu/component": "edxapp-lms-celery",
         "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
