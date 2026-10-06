@@ -16,7 +16,8 @@ docs/plans/gravitino-authorization-spec.md, A7-A10. Each run:
    role. Gravitino denies a user who is not in the metalake even when their
    groups hold roles, and has no create-on-first-login.
 6. Sets the owner of every ``ol_warehouse_<env>_*`` schema to the engineering
-   group, so ownership does not follow whoever created the schema.
+   group, so ownership does not follow whoever created the schema. A Glue
+   database whose name Iceberg cannot load is skipped with a warning.
 
 Step 5 grants nothing. Group membership comes from the ``role_keys`` claim of
 the user's own token, so a user this has not added yet is denied rather than
@@ -486,7 +487,9 @@ def reconcile_schema_owners(
 ) -> None:
     """Set the engineering group as owner of every schema under the prefix.
 
-    Reasserted every run, because an owner can transfer ownership.
+    Reasserted every run, because an owner can transfer ownership. A schema
+    whose name falls outside ``GLUE_NAMESPACE_PATTERN`` gets no owner: it is
+    skipped with a warning.
     """
     wanted = ("group", owner_group)
     failures = []
