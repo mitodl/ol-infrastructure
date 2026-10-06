@@ -39,6 +39,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     K8sAppLabels,
@@ -288,6 +289,8 @@ ol_app_k8s_config = OLApplicationK8sConfig(
     application_max_replicas=notes_config.get_int("max_replicas") or 3,
     application_deployment_use_anti_affinity=True,
     k8s_global_labels=k8s_app_labels.model_dump(),
+    # Losing notes degrades courseware without taking it down.
+    webapp_alert_tier=AlertTier.notify,
     env_from_secret_names=["edx-notes-secrets", db_creds_secret_name],
     application_security_group_id=notes_app_security_group.id,
     application_security_group_name=notes_app_security_group.name,

@@ -70,6 +70,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.github_helper import setup_github_provider
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
@@ -613,6 +614,8 @@ ocw_studio_k8s_app = OLApplicationK8s(
         application_lb_service_port_name="http",
         application_min_replicas=ocw_studio_config.get_int("min_replicas") or 2,
         k8s_global_labels=k8s_app_labels,
+        # An internal authoring tool, used during business hours.
+        webapp_alert_tier=AlertTier.notify,
         env_from_secret_names=secret_names,
         application_security_group_id=ocw_studio_app_security_group.id,
         application_security_group_name=ocw_studio_app_security_group.name,
