@@ -79,9 +79,10 @@ def effective_role_members(
     """Map each governance role to the saml_uid of every user who holds it.
 
     GET /clients/{id}/roles/{role}/users returns direct mappings only, and the
-    realm hands these roles out through composite realm roles (ol-starrocks-*),
-    so that endpoint misses nearly everyone. Reading each user's effective
-    client role mappings covers composites and group membership.
+    realm hands these roles out through composite realm roles (the shared ol-*
+    roles, and ol-starrocks-*), so that endpoint misses nearly everyone. Reading
+    each user's effective client role mappings covers composites and group
+    membership.
 
     The value written is saml_uid because both security integrations set
     principal_field=starrocks_username, which Keycloak fills from saml_uid.

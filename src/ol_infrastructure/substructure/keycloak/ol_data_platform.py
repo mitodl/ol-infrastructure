@@ -12,6 +12,18 @@ from pulumi import Config, InvokeOptions, Output, ResourceOptions
 # about five minutes into a session. See
 # docs/plans/gravitino-keycloak-integration-spec.md D3.
 STARROCKS_TOKEN_LIFESPAN_SECONDS = 3600
+# Shared realm roles whose holders also get the same client role on
+# ol-starrocks-client. ol_instructor and ol_researcher are left out: their
+# StarRocks grants are catalog-wide SELECT today, and their access will come
+# from dbt-level grants instead.
+STARROCKS_SHARED_REALM_ROLES = frozenset(
+    {
+        "ol_platform_admin",
+        "ol_data_engineer",
+        "ol_data_analyst",
+        "ol_business_analyst",
+    }
+)
 
 
 def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
@@ -249,88 +261,6 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
-    # Create realm roles for ol-data-platform
-    keycloak.Role(
-        "ol-platform-admin-role",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-platform-admin",
-        description=(
-            "Full administrative access to all data and platform resources - "
-            "maps to superset_admin"
-        ),
-        composite_roles=[
-            ol_data_platform_superset_client_role_refs["ol_platform_admin"].id
-        ],
-        opts=resource_options,
-    )
-
-    keycloak.Role(
-        "ol-researcher-role",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-researcher",
-        description=(
-            "Research role with ML capabilities and broad data access - "
-            "maps to superset_researcher"
-        ),
-        composite_roles=[
-            ol_data_platform_superset_client_role_refs["ol_researcher"].id
-        ],
-        opts=resource_options,
-    )
-
-    keycloak.Role(
-        "ol-data-engineer-role",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-data-engineer",
-        description=(
-            "Data engineering role with limited production access - "
-            "maps to superset_alpha"
-        ),
-        composite_roles=[
-            ol_data_platform_superset_client_role_refs["ol_data_engineer"].id
-        ],
-        opts=resource_options,
-    )
-
-    keycloak.Role(
-        "ol-data-analyst-role",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-data-analyst",
-        description=(
-            "Data analyst role with read-only access to production data - "
-            "maps to superset_gamma"
-        ),
-        composite_roles=[
-            ol_data_platform_superset_client_role_refs["ol_data_analyst"].id
-        ],
-        opts=resource_options,
-    )
-
-    keycloak.Role(
-        "ol-instructor",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-instructor",
-        description="Instructor role with limited access to educational data",
-        composite_roles=[
-            ol_data_platform_superset_client_role_refs["ol_instructor"].id
-        ],
-        opts=resource_options,
-    )
-
-    keycloak.Role(
-        "ol-business-analyst",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-business-analyst",
-        description=(
-            "Business analyst role similar to existing business_intelligence "
-            "and finance roles"
-        ),
-        composite_roles=[
-            ol_data_platform_superset_client_role_refs["ol_business_analyst"].id
-        ],
-        opts=resource_options,
-    )
-
     ol_data_platform_role_keys_openid_client_scope = keycloak.openid.ClientScope(
         "ol-data-platform-role-keys-openid-client-scope",
         realm_id=ol_data_platform_realm.id,
@@ -499,6 +429,73 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         )
         ol_data_platform_starrocks_client_role_refs[role] = role_ref
 
+    # Realm roles are what people get assigned. Each one is a composite of the
+    # matching client role on ol-superset-client and, for the roles in
+    # STARROCKS_SHARED_REALM_ROLES, on ol-starrocks-client, so one assignment
+    # gives a person that role in both. They are created here, after both
+    # clients, because composite_roles needs both sets of client role ids. A
+    # stack with no StarRocks client roles configured (CI) gets Superset-only
+    # composites.
+    for resource_name, realm_role, client_role, description in (
+        (
+            "ol-platform-admin-role",
+            "ol-platform-admin",
+            "ol_platform_admin",
+            "Full administrative access to all data and platform resources - "
+            "maps to superset_admin",
+        ),
+        (
+            "ol-researcher-role",
+            "ol-researcher",
+            "ol_researcher",
+            "Research role with ML capabilities and broad data access - "
+            "maps to superset_researcher",
+        ),
+        (
+            "ol-data-engineer-role",
+            "ol-data-engineer",
+            "ol_data_engineer",
+            "Data engineering role with limited production access - "
+            "maps to superset_alpha",
+        ),
+        (
+            "ol-data-analyst-role",
+            "ol-data-analyst",
+            "ol_data_analyst",
+            "Data analyst role with read-only access to production data - "
+            "maps to superset_gamma",
+        ),
+        (
+            "ol-instructor",
+            "ol-instructor",
+            "ol_instructor",
+            "Instructor role with limited access to educational data",
+        ),
+        (
+            "ol-business-analyst",
+            "ol-business-analyst",
+            "ol_business_analyst",
+            "Business analyst role similar to existing business_intelligence "
+            "and finance roles",
+        ),
+    ):
+        keycloak.Role(
+            resource_name,
+            realm_id=ol_data_platform_realm.id,
+            name=realm_role,
+            description=description,
+            composite_roles=[
+                ol_data_platform_superset_client_role_refs[client_role].id,
+                *(
+                    [ol_data_platform_starrocks_client_role_refs[client_role].id]
+                    if ol_data_platform_starrocks_client_role_refs
+                    and client_role in STARROCKS_SHARED_REALM_ROLES
+                    else []
+                ),
+            ],
+            opts=resource_options,
+        )
+
     vault.generic.Secret(
         "ol-data-platform-starrocks-client-vault-oidc-credentials",
         path="secret-operations/sso/starrocks",
@@ -537,7 +534,9 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             opts=resource_options,
         )
 
-    # Map composite realm roles to StarRocks client roles
+    # StarRocks-only realm roles, for someone who should have a StarRocks role
+    # without the matching Superset one. The shared ol-* realm roles above are
+    # the normal way to grant access.
     if "ol_platform_admin" in ol_data_platform_starrocks_client_role_refs:
         keycloak.Role(
             "ol-starrocks-platform-admin-composite",

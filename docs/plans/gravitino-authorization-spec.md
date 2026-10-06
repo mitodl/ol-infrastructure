@@ -254,8 +254,9 @@ exactly as D4 does (the `saml_uid` attribute if set, which is what `starrocks_us
 from, else `username`), and `POST`s any missing ones to `/api/metalakes/ol_data_platform/users`.
 
 Effective, not direct. `GET /clients/{id}/roles/{role}/users` returns direct role mappings only, and
-the realm hands these client roles out mostly through the composite realm roles `ol-starrocks-analyst`,
-`ol-starrocks-engineer` and so on (`substructure/keycloak/ol_data_platform.py:532-610`). Users who
+the realm hands these client roles out through composite realm roles: the shared `ol-data-analyst`,
+`ol-data-engineer` and so on that also carry the Superset roles, and the StarRocks-only
+`ol-starrocks-analyst`, `ol-starrocks-engineer` and so on (`substructure/keycloak/ol_data_platform.py`). Users who
 hold a role that way would never be added. Walk the realm's users instead and read each one's
 effective client roles from `GET /users/{id}/role-mappings/clients/{client-id}/composite`, which
 expands composites and group membership. That is one request per realm user per run; check the
