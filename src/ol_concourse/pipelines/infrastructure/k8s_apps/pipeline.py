@@ -1331,6 +1331,7 @@ def _build_abandon_release_job(
     app_name: str,
     main_repo: Resource,
     release_res: Resource,
+    release_issue: Resource,
 ) -> Job:
     """Generate a manually-triggered job that abandons an in-flight release.
 
@@ -1338,6 +1339,13 @@ def _build_abandon_release_job(
     from the remote so that the next ``check`` sees no in-flight release and
     recomputes the next version normally.  Use it when a release was cut but
     must be cancelled before it reaches production.
+
+    It then labels the release's gate issue ``abandoned`` and closes it. That
+    label is what ``release_gate``'s ``skip_if_labeled`` looks for; without
+    it the open issue outlives the release it names, and closing it later
+    would deploy a version whose branch and tag are gone.  The issue step runs
+    only after the release put succeeds, so a refused abandon (a version that
+    is not in flight) leaves its issue alone.
     """
     return Job(
         name=Identifier(f"abandon-{app_name}-release"),
@@ -1345,12 +1353,25 @@ def _build_abandon_release_job(
         plan=[
             GetStep(get=release_res.name, trigger=False),
             GetStep(get=main_repo.name, trigger=False),
+            LoadVarStep(
+                load_var="abandoned_version",
+                file=f"{release_res.name}/version",
+                reveal=True,
+            ),
             PutStep(
                 put=release_res.name,
                 params={
                     "action": "abandon",
                     "repo_dir": str(main_repo.name),
                     "version_file": f"{release_res.name}/version",
+                },
+                no_get=True,
+            ),
+            PutStep(
+                put=release_issue.name,
+                params={
+                    "title_template": f"Release {app_name} ((.:abandoned_version))",
+                    "close_with_labels": ["abandoned"],
                 },
                 no_get=True,
             ),
@@ -1423,6 +1444,7 @@ def _build_release_resource_app_pipeline(
         app_name=app_name,
         main_repo=main_repo,
         release_res=release_res,
+        release_issue=release_issue,
     )
 
     ci_post_steps: list[GetStep | PutStep | TaskStep] = []
