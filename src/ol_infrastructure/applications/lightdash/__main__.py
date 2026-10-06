@@ -7,7 +7,7 @@ from string import Template
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
-from pulumi_aws import ec2, get_caller_identity
+from pulumi_aws import ec2
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
 from bridge.lib.versions import LIGHTDASH_CHART_VERSION
@@ -53,11 +53,9 @@ setup_vault_provider()
 lightdash_config = Config("lightdash")
 stack_info = parse_stack()
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
-dns_stack = make_stack_reference(projects.DNS, "default")
 vault_infra_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
 )
-policy_stack = make_stack_reference(projects.POLICIES, "default")
 cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
 
 data_vpc = network_stack.require_output("data_vpc")
@@ -80,7 +78,6 @@ k8s_labels = K8sAppLabels(
 )
 k8s_global_labels = k8s_labels.model_dump()
 
-aws_account = get_caller_identity()
 lightdash_domain = lightdash_config.require("domain")
 
 ########################################
@@ -155,16 +152,15 @@ lightdash_vault_mount = vault.Mount(
 )
 lightdash_vault_kv_path = lightdash_vault_mount.path
 
-lightdash_secrets = (
-    read_yaml_secrets(Path(f"lightdash/data.{stack_info.env_suffix}.yaml")) or {}
+lightdash_secrets = read_yaml_secrets(
+    Path(f"lightdash/data.{stack_info.env_suffix}.yaml")
 )
-if lightdash_secrets:
-    vault.kv.SecretV2(
-        "lightdash-vault-secret-app",
-        mount=lightdash_vault_kv_path,
-        name="app",
-        data_json=json.dumps(lightdash_secrets),
-    )
+vault.kv.SecretV2(
+    "lightdash-vault-secret-app",
+    mount=lightdash_vault_kv_path,
+    name="app",
+    data_json=json.dumps({"lightdash_secret": lightdash_secrets["lightdash_secret"]}),
+)
 
 ########################################
 # RDS PostgreSQL + Vault DB backend    #
