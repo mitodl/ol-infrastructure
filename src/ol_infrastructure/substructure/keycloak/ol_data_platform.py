@@ -6,6 +6,10 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.passkey_flow import (
+    create_passkey_browser_flow,
+)
+
 # StarRocks forwards the user's ID token to the Iceberg REST catalog under
 # iceberg.catalog.security=JWT and never refreshes it, and Keycloak expires the ID
 # token with the access token. At the realm default of 5m every catalog call fails
@@ -1021,86 +1025,9 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
 
     # OL Data Platform Realm - Authentication Flows[START]
     # OL - browser flow [START]
-    # username-form -> ol-auth-username-password-form
-
-    ol_browser_data_platform_flow = keycloak.authentication.Flow(
-        "ol-browser-data-platform-flow",
-        realm_id=ol_data_platform_realm.id,
-        alias="ol-browser-data-platform-flow",
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-data-platform-auth-cookie",
-        realm_id=ol_data_platform_realm.id,
-        parent_flow_alias=ol_browser_data_platform_flow.alias,
-        authenticator="auth-cookie",
-        requirement="ALTERNATIVE",
-        priority=10,
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-data-platform-idp-redirector",
-        realm_id=ol_data_platform_realm.id,
-        parent_flow_alias=ol_browser_data_platform_flow.alias,
-        authenticator="identity-provider-redirector",
-        requirement="ALTERNATIVE",
-        priority=20,
-        opts=resource_options,
-    )
-    ol_browser_data_platform_flow_org = keycloak.authentication.Subflow(
-        "ol-browser-data-platform-flow-org",
-        realm_id=ol_data_platform_realm.id,
-        alias="ol-browser-data-platform-flow-org",
-        parent_flow_alias=ol_browser_data_platform_flow.alias,
-        provider_id="basic-flow",
-        requirement="ALTERNATIVE",
-        priority=30,
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-data-platform_flow-org-user-configured",
-        realm_id=ol_data_platform_realm.id,
-        parent_flow_alias=ol_browser_data_platform_flow_org.alias,
-        authenticator="conditional-user-configured",
-        priority=40,
-        requirement="REQUIRED",
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-data-platform_flow-org-identity-first",
-        realm_id=ol_data_platform_realm.id,
-        parent_flow_alias=ol_browser_data_platform_flow_org.alias,
-        authenticator="organization",
-        priority=50,
-        requirement="ALTERNATIVE",
-        opts=resource_options,
-    )
-    ol_browser_data_platform_passkey_flow = keycloak.authentication.Subflow(
-        "ol-browser-data-platform-passkey-flow",
-        realm_id=ol_data_platform_realm.id,
-        alias="ol-browser-data-platform-passkey-flow",
-        parent_flow_alias=ol_browser_data_platform_flow.alias,
-        provider_id="basic-flow",
-        priority=60,
-        requirement="REQUIRED",
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-data-platform-flow-username-form",
-        realm_id=ol_data_platform_realm.id,
-        parent_flow_alias=ol_browser_data_platform_passkey_flow.alias,
-        authenticator="auth-username-form",
-        requirement="REQUIRED",
-        priority=70,
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-data-platform-webauthn-authenticator-flow",
-        realm_id=ol_data_platform_realm.id,
-        parent_flow_alias=ol_browser_data_platform_passkey_flow.alias,
-        authenticator="webauthn-authenticator-passwordless",
-        requirement="REQUIRED",
-        priority=80,
+    ol_browser_data_platform_flow = create_passkey_browser_flow(
+        ol_data_platform_realm.id,
+        "ol-browser-data-platform",
         opts=resource_options,
     )
     # Bind the flow to the ol-data-platform realm for browser login.
