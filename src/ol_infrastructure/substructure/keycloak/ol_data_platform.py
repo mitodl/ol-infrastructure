@@ -19,6 +19,10 @@ from ol_infrastructure.substructure.keycloak.passkey_flow import (
 # about five minutes into a session. See
 # docs/plans/gravitino-keycloak-integration-spec.md D3.
 STARROCKS_TOKEN_LIFESPAN_SECONDS = 3600
+
+# eduPersonPrincipalName, e.g. "tmacey@mit.edu".
+TOUCHSTONE_EPPN_ATTRIBUTE = "urn:oid:1.3.6.1.4.1.5923.1.1.1.6"
+TOUCHSTONE_SCOPE = "mit.edu"
 # Shared realm roles whose holders also get the same client role on
 # ol-starrocks-client. ol_instructor and ol_researcher are left out: their
 # StarRocks grants are catalog-wide SELECT today, and their access will come
@@ -147,9 +151,9 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     # saml_uid has to be a managed attribute. With no unmanagedAttributePolicy
     # the admin API omits unmanaged attributes from user representations
     # (DefaultAttributes.isAllowUnmanagedAttribute), while protocol mappers
-    # read the user model directly. The starrocks_username claim therefore
-    # worked while substructure/starrocks/keycloak_group_sync.py, which reads
-    # saml_uid through GET /users, saw it empty for every user.
+    # read the user model directly. Without this,
+    # substructure/starrocks/keycloak_group_sync.py and the Gravitino grant
+    # reconciler, which read saml_uid through GET /users, could never see it.
     #
     # RealmUserProfile replaces the whole profile, so the first four attributes
     # and the group restate Keycloak's keycloak-default-user-profile.json.
@@ -758,8 +762,8 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     )
 
     # StarRocks 4.x rejects '@' in usernames.  Expose the Kerberos short username
-    # stored in the "saml_uid" user attribute (populated by the Touchstone SAML
-    # uid mapper above) as the "starrocks_username" JWT claim so that the
+    # stored in the "saml_uid" user attribute (populated by the Touchstone eppn
+    # mapper below) as the "starrocks_username" JWT claim so that the
     # StarRocks security integration principal_field can reference it.
     keycloak.openid.UserAttributeProtocolMapper(
         "ol-data-platform-starrocks-client-username-mapper",
@@ -1121,7 +1125,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         post_binding_response=True,
         post_binding_authn_request=True,
         principal_type="ATTRIBUTE",
-        principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
+        principal_attribute=TOUCHSTONE_EPPN_ATTRIBUTE,
         single_sign_on_service_url="https://idp.mit.edu/idp/profile/SAML2/POST/SSO",
         trust_email=True,
         validate_signature=True,
@@ -1185,19 +1189,37 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         },
         opts=resource_options,
     )
-    # MIT Touchstone sends the Kerberos short username (e.g. "tmacey") in the
-    # SAML "uid" attribute.  Store it as the "saml_uid" Keycloak user attribute
-    # so that protocol mappers on StarRocks clients can expose it as the
-    # "starrocks_username" claim (StarRocks 4.x rejects "@" in usernames).
-    keycloak.AttributeImporterIdentityProviderMapper(
-        "ol-data-platform-touchstone-saml-uid-attribute",
-        name="ol-data-platform-touchstone-saml-uid-attribute",
+    # Store the Kerberos short username (e.g. "tmacey") as the "saml_uid" user
+    # attribute, so that protocol mappers on StarRocks clients can expose it as
+    # the "starrocks_username" claim (StarRocks 4.x rejects "@" in usernames).
+    #
+    # Touchstone does not release a "uid" attribute by default, and an importer
+    # keyed on one left saml_uid unset for every user. It does send
+    # eduPersonPrincipalName ("tmacey@mit.edu"), which is already this IdP's
+    # principal attribute. The XPath importer wraps a plain value in <root>, so
+    # the expression takes the part before the "@". An eppn in any other scope
+    # yields the empty string, which the mapper discards: two people who share
+    # a local part across scopes must not become one principal.
+    #
+    # FORCE, so that existing users get the attribute at their next login
+    # whatever sync mode the IdP itself carries.
+    #
+    # The old "uid" importer had to go rather than sit beside this one: on a
+    # login where "uid" is absent it sets saml_uid to an empty list.
+    keycloak.CustomIdentityProviderMapping(
+        "ol-data-platform-touchstone-saml-uid-from-eppn",
+        name="ol-data-platform-touchstone-saml-uid-from-eppn",
         realm=ol_data_platform_realm.id,
-        attribute_name="uid",
         identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
-        user_attribute="saml_uid",
+        identity_provider_mapper="saml-xpath-attribute-idp-mapper",
         extra_config={
-            "syncMode": "INHERIT",
+            "attribute.name": TOUCHSTONE_EPPN_ATTRIBUTE,
+            "attribute.xpath": (
+                f"substring-before(/root[substring-after(., '@') = "
+                f"'{TOUCHSTONE_SCOPE}'], '@')"
+            ),
+            "user.attribute": "saml_uid",
+            "syncMode": "FORCE",
         },
         opts=resource_options,
     )
