@@ -25,16 +25,17 @@ defects, which are not Keycloak work (see D12).
 | D1 | Order: passkey flow fix, then the pulumi-keycloak 6.14.0 bump on its own, then per-client hygiene with the client policy growing alongside it, then FGAP scoping in CI, then the 26.8 upgrade when the remaining blocker clears, then the realm restructure. Section 6 has the dependency reasons. |
 | D2 | Fix the passkey browser flow in place: make the passkey subflow ALTERNATIVE so all top-level siblings are the same kind. Do not wait for the return to built-in flows. |
 | D3 | Drop the organization subflow from the two staff-realm browser flows. It has never executed, and both realms hold organizations created outside Pulumi in every environment (M12), so letting it run would put an identity-first username form in front of users who have never seen one. |
-| D4 | Keep the staff realms on a custom flow with no password step. Do not switch them to the built-in browser flow. **Needs sign-off**, this amends `tk-return-the-hand-copied-browser-and-first-broker--332e4f`. |
+| D4 | Keep the staff realms on a custom flow with no password step. Do not switch them to the built-in browser flow. Signed off 2026-10-06; this amends `tk-return-the-hand-copied-browser-and-first-broker--332e4f`. |
 | D5 | One helper builds the passkey browser flow for both staff realms, keeping today's Pulumi resource names and aliases. |
 | D6 | A client policy never matches a client that does not already conform, and every executor runs with `auto-configure` off. |
 | D7 | PKCE is enforced through one policy whose condition is a `client-attributes` marker, set on a client in the same change that sets `pkce_code_challenge_method="S256"` on it. The policy can exist from the first conforming client and grows one client at a time. PKCE is never applied through `client-access-type` or `any-client`: both match clients that cannot carry the attribute (the built-in `account` client, `admin-cli`, and the two SAML clients, M12). `witan-cli` gets the marker only after the witan CLI sends PKCE on its device request, which it does not today (M13). |
 | D8 | Direct access grants and implicit flow are turned off per client first, then locked by `reject-ropc-grant` and `reject-implicit-grant`. |
 | D9 | `mitlearn-admin-client` is not scoped with FGAP. It loses its roles when mit-learn stops using the Admin API (`tk-mit-learn-get-is-sso-user-from-a-token-claim-and-0a9b85`). |
-| D10 | `mitxonline-b2b-client` is split in two: a runtime membership client with an Organizations permission and Users `manage`, and a provisioning client that keeps realm-wide `manage-identity-providers`. The split removes `manage-realm` and the IdP roles from the per-request path. It does not remove realm-wide user management, which FGAP v2 cannot scope for this use. The trial runs on 26.7.4 in CI. **Needs sign-off**, the scoping task's done-when cannot be met this way. |
-| D11 | The FGAP work is done under this project. `wp-enable-fine-grained-admin-permissions-fgap-on-sh-73d6d3` (discovery, no tasks) should be closed in favour of it. **Needs sign-off.** |
-| D12 | The DCC task leaves this project's sequence. Its two mitxonline fixes (refuse download of a revoked credential, https signer URL) do not depend on anything here and should go first. **Needs an owner.** |
+| D10 | `mitxonline-b2b-client` is split in two: a runtime membership client with an Organizations permission and Users `manage`, and a provisioning client that keeps realm-wide `manage-identity-providers`. The split removes `manage-realm` and the IdP roles from the per-request path. It does not remove realm-wide user management, which FGAP v2 cannot scope for this use. The trial runs on 26.7.4 in CI. Signed off 2026-10-06; the scoping task's done-when is amended to match. |
+| D11 | The FGAP work is done under this project. `wp-enable-fine-grained-admin-permissions-fgap-on-sh-73d6d3` (discovery, no tasks) is closed in favour of it. Signed off 2026-10-06. |
+| D12 | The DCC task leaves this project's sequence. Its two mitxonline fixes (refuse download of a revoked credential, https signer URL) do not depend on anything here and should go first. Signed off 2026-10-06: the task moves to its own digital credentials project, which still needs an owner. |
 | D14 | `odl-video-app` keeps `view-users`, which its request and Celery paths use. `query-users` and `query-groups` are removed as redundant. `manage-users` stays until the OVS owners say whether `assign_group_users` is still needed; if it is, it moves to a separate service client so the login client holds no write role. This replaces "remove the roles when the moira migration is finished". |
+| D15 | After the shape fix, let a staff user sign in with a passkey straight from the login page (browser or password-manager autofill, e.g. Bitwarden) without typing a username first. Requested at sign-off 2026-10-06. The mechanism is not designed yet; section 1 has what is known. |
 | D13 | At the 26.8 upgrade, set the log category `org.keycloak.protocol.oidc.endpoints.TokenEndpoint.full-scope-allowed` to ERROR. Turning full scope off per client is restructure work and does not gate the upgrade. |
 
 ## Measured facts this rests on
@@ -258,6 +259,20 @@ valid way in for anyone who has one. In Production that is nobody in
 admin or through a reset-credentials flow, with nothing in Pulumi showing it. If sign-off
 prefers the built-in, delete the existing password credentials first and remove the password
 reset path from the realm.
+
+Direct passkey sign-in (D15). At 26.7.4 `auth-username-form` (`UsernameForm`, a subclass of
+`UsernamePasswordForm`) offers passkey autofill on the username field and accepts the
+resulting assertion itself, when the realm's passwordless policy has passkeys enabled
+(`WebAuthnConditionalUIAuthenticator.isPasskeysEnabled`). The provider exposes that as
+`passwordless_passkeys_enabled` in `web_authn_passwordless_policy`, and neither staff realm
+sets it. Turning it on is not the whole change. The passkey subflow follows the username form
+with a REQUIRED `webauthn-authenticator-passwordless`, and that authenticator has no check
+for a passkey already presented at the form (`PasswordForm` has one, it does not), so the user
+would probably be asked for the passkey twice. Dropping the second step is not safe either:
+the username form on its own succeeds for anyone who types a valid username. The subflow
+needs a shape where the second step runs only when the form was completed by username, and
+that has to be worked out on the CI realms with a real passkey in a password manager. It is a
+separate change after the shape fix, so that the SSO fix is not held up by it.
 
 Both realms hold organizations that are not in Pulumi (M12). D3 does not touch them; removing
 the subflow only means they keep having no effect on login, as now. Who created them and
@@ -502,7 +517,9 @@ the earlier sections put on them.
 
 ## 7. Still open
 
-- Sign-off on D4, D10, D11, D12 and D14.
+- Sign-off on D14. D4, D10, D11 and D12 were signed off on 2026-10-06.
+- The subflow shape for direct passkey sign-in (D15), from a CI trial.
+- An owner for the digital credentials project (D12).
 - Who created the organizations in the two staff realms and whether anything reads them.
 - Why CI and QA run 26.7.5 while the pin and Production are 26.7.4.
 - Why QA `ol-data-platform` is bound to `sh first broker login`.
