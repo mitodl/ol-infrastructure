@@ -118,12 +118,6 @@ config:
     secure: v1:iTCu9uKpnLGZe88a:Eq7sfBEJas2LCl3zY0+gDxhyo0VehCPHQmBe7ZykP4TNUge2QbPpqwZ9VeSQ97klu3jSw9ReNjdAVH4=
   keycloak_realm:dynideas_client_secret:
     secure: v1:MiHrklsdHBBmM+x/:AKedvrwKVQYvoPpZat06SQ12Bzem8a7EGwPh0411HuW2PCMaU+yfDWebdmQ4msGLJPua
-  keycloak_realm:staff_organization_import_ids:
-    ol-data-platform:
-      MIT: cc34e109-3c2c-4f95-8625-ffaf7642c22a
-    ol-platform-engineering:
-      Arbisoft: 2fd6beb2-c377-4362-9bd0-1fbce553aa42
-      MIT: c6358037-9b92-4eab-83af-646699c2f781
   keycloak_realm:ubsu-client-secret:
     secure: v1:pFUmPxSvnsIbE8nR:+FrZrRdidnTh5SU05bqIM3WWWF8iawzfx8aUMVwItpI=
   keycloak_realm:ol-mit-ovs-redirect-uris:
