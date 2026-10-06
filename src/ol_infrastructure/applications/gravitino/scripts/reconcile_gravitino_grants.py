@@ -35,6 +35,7 @@ non-zero on any API error, which is the alert signal (``WorkloadJobFailed*``).
 
 import json
 import os
+import re
 import ssl
 import sys
 import time
@@ -82,6 +83,10 @@ IMMUTABLE_CATALOG_PROPERTIES = frozenset({"catalog-backend", "io-impl"})
 # A principal becomes an STS role session name when credentials are vended,
 # which caps it at 64 characters less Gravitino's own prefix.
 MAX_PRINCIPAL_LENGTH = 41
+# The form keycloak_group_sync.py accepts for the StarRocks group file. A
+# principal StarRocks would refuse must not be admitted here, or the two layers
+# disagree about who a user is.
+PRINCIPAL_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
 
 Transport = Callable[[str, str, dict[str, Any] | None], tuple[int, dict[str, Any]]]
 PrivilegeSet = frozenset[tuple[str, str]]
@@ -188,6 +193,8 @@ def usable_principal(user: dict[str, Any]) -> tuple[str, str | None]:
         return principal, "contains '@' (no saml_uid, so the email was used)"
     if len(principal) > MAX_PRINCIPAL_LENGTH:
         return principal, f"is longer than {MAX_PRINCIPAL_LENGTH} characters"
+    if not PRINCIPAL_PATTERN.fullmatch(principal):
+        return principal, f"does not match {PRINCIPAL_PATTERN.pattern}"
     return principal, None
 
 
@@ -265,6 +272,16 @@ class Gravitino:
             self._require("POST", f"{self._base}/catalogs", catalog)
             log(f"Created catalog {catalog['name']}")
             return
+        # Fixed at creation, like the immutable properties below: no update
+        # request can repair them.
+        for field in ("type", "provider"):
+            found = existing["catalog"].get(field, "")
+            if found.lower() != catalog[field].lower():
+                msg = (
+                    f"Catalog {catalog['name']} has {field} {found!r}, expected "
+                    f"{catalog[field]!r}; it has to be recreated by hand"
+                )
+                raise ReconcileError(msg)
         actual = existing["catalog"].get("properties", {})
         changed = {
             key: value

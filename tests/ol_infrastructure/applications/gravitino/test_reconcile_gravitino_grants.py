@@ -571,3 +571,21 @@ def test_object_types_outside_the_allow_list_are_refused(object_type):
                 ]
             }
         )
+
+
+@pytest.mark.parametrize("saml_uid", ["alice:admin", "alice smith", "alice,bob", "a/b"])
+def test_principal_outside_the_starrocks_form_is_unusable(saml_uid):
+    _, problem = usable_principal(_user("alice@mit.edu", saml_uid))
+    assert problem is not None
+
+
+@pytest.mark.parametrize(
+    ("field", "value"), [("provider", "hive"), ("type", "fileset")]
+)
+def test_catalog_with_the_wrong_type_or_provider_fails(server, field, value):
+    _run(server)
+    assert server.catalog is not None
+    server.catalog[field] = value
+
+    with pytest.raises(ReconcileError, match=f"has {field} '{value}'"):
+        _run(server)
