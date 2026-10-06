@@ -59,6 +59,11 @@ def test_resource_names_match_the_deployed_organizations():
     }
 
 
+def test_no_organization_carries_an_import_id():
+    """An import id that differs from the one in state replaces the organization."""
+    assert [args.resource_id for args in _create().values() if args.resource_id] == []
+
+
 def test_inputs_match_the_deployed_organizations():
     """An input that differs from the live organization is applied as an update."""
     inputs = _create()[f"{REALM}-arbisoft-organization"].inputs
