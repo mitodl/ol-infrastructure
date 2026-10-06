@@ -15,7 +15,7 @@ LEEK_VERSION = "0.7.7"
 # renovate: datasource=docker depName=meilisearch packageName=getmeili/meilisearch
 MEILISEARCH_VERSION = "v1.54.3"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
-OPEN_METADATA_VERSION = "2.0.3"
+OPEN_METADATA_VERSION = "2.0.4"
 # renovate: datasource=docker depName=openapi-generator-cli packageName=openapitools/openapi-generator-cli
 OPENAPI_GENERATOR_VERSION = "v7.25.0"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
