@@ -138,6 +138,13 @@ mitxonline_stack = (
     if stack_info.env_suffix in ("ci", "qa", "production")
     else None
 )
+# xPro is deployed to CI/QA/Production only, like MITx Online. Its app database
+# is what the xpro_app dlt source reads (RFC 12711).
+xpro_stack = (
+    make_stack_reference(projects.XPRO, stack_info.name)
+    if stack_info.env_suffix in ("ci", "qa", "production")
+    else None
+)
 # Opik is also deployed to CI/QA/Production only. The ml code location traces its
 # LLM calls there; on the Dev stack OPIK_URL_OVERRIDE stays unset and the ml
 # code's tracing is a no-op.
@@ -2944,6 +2951,14 @@ for location in code_locations:
             {
                 "name": "MITXONLINE_APP_DB_HOST",
                 "value": mitxonline_stack.require_output("mitxonline")["rds_host"],
+            }
+        )
+
+    if name == "data_loading" and xpro_stack is not None:
+        deployment["env"].append(
+            {
+                "name": "XPRO_APP_DB_HOST",
+                "value": xpro_stack.require_output("xpro")["rds_host"],
             }
         )
 
