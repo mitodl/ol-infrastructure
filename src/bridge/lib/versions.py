@@ -19,7 +19,7 @@ OPEN_METADATA_VERSION = "2.0.3"
 # renovate: datasource=docker depName=openapi-generator-cli packageName=openapitools/openapi-generator-cli
 OPENAPI_GENERATOR_VERSION = "v7.25.0"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
-TRAEFIK_VERSION = "3.7.13"
+TRAEFIK_VERSION = "3.7.14"
 # renovate: datasource=docker depName=typesense packageName=typesense/typesense
 TYPESENSE_VERSION = "30.2"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
