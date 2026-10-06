@@ -1,6 +1,7 @@
 """Realm client policies that stop a conforming client from regressing."""
 
 import json
+from typing import Any
 
 import pulumi
 import pulumi_keycloak as keycloak
@@ -8,10 +9,17 @@ import pulumi_keycloak as keycloak
 PKCE_MARKER_ATTRIBUTE = "ol.pkce"
 PKCE_MARKER_VALUE = "required"
 
-# Pass as ``extra_config`` on a client, in the same change that sets
-# ``pkce_code_challenge_method="S256"`` on it. A marked client without S256 fails
-# its next update with ``invalid_client_metadata``.
-PKCE_REQUIRED_CLIENT_ATTRIBUTES = {PKCE_MARKER_ATTRIBUTE: PKCE_MARKER_VALUE}
+# Spread into a client's arguments. The marker and the method travel together because
+# a marked client without S256 fails its next update with ``invalid_client_metadata``.
+#
+# Taking a client back out takes two deploys. Keycloak matches the policy against the
+# stored client and validates the proposed one, so an update that drops both at once
+# is still matched and is rejected. Drop the marker first (pass the method on its
+# own), deploy, then drop the method.
+PKCE_REQUIRED_CLIENT_ARGS: dict[str, Any] = {
+    "pkce_code_challenge_method": "S256",
+    "extra_config": {PKCE_MARKER_ATTRIBUTE: PKCE_MARKER_VALUE},
+}
 
 
 def create_pkce_client_policy(

@@ -18,7 +18,7 @@ except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
-    PKCE_REQUIRED_CLIENT_ATTRIBUTES,
+    PKCE_REQUIRED_CLIENT_ARGS,
     create_pkce_client_policy,
 )
 
@@ -72,4 +72,9 @@ def test_policy_matches_the_marker_attribute_only(resources):
     assert isinstance(attributes, str)
     assert {
         entry["key"]: entry["value"] for entry in json.loads(attributes)
-    } == PKCE_REQUIRED_CLIENT_ATTRIBUTES
+    } == PKCE_REQUIRED_CLIENT_ARGS["extra_config"]
+
+
+def test_a_marked_client_always_carries_s256():
+    """The policy rejects the next update of a marked client without S256."""
+    assert PKCE_REQUIRED_CLIENT_ARGS["pkce_code_challenge_method"] == "S256"

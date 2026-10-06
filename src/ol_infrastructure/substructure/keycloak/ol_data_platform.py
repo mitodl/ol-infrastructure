@@ -7,7 +7,7 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
-    PKCE_REQUIRED_CLIENT_ATTRIBUTES,
+    PKCE_REQUIRED_CLIENT_ARGS,
     create_pkce_client_policy,
 )
 from ol_infrastructure.substructure.keycloak.org_flows import (
@@ -364,8 +364,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         implicit_flow_enabled=False,
         direct_access_grants_enabled=False,
         service_accounts_enabled=False,
-        pkce_code_challenge_method="S256",
-        extra_config=PKCE_REQUIRED_CLIENT_ATTRIBUTES,
+        **PKCE_REQUIRED_CLIENT_ARGS,
         # superset-sup listens on this fixed port. A loopback redirect has to
         # match exactly, so there is no wildcard-port entry.
         valid_redirect_uris=["http://localhost:8080/callback"],
@@ -802,8 +801,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         implicit_flow_enabled=False,
         direct_access_grants_enabled=False,
         service_accounts_enabled=False,
-        pkce_code_challenge_method="S256",
-        extra_config=PKCE_REQUIRED_CLIENT_ATTRIBUTES,
+        **PKCE_REQUIRED_CLIENT_ARGS,
         # bin/starrocks-auth in ol-data-platform listens on this fixed port.
         valid_redirect_uris=["http://localhost:18080/callback"],
         web_origins=["http://localhost:18080"],
