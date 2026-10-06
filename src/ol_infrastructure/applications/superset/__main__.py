@@ -744,6 +744,16 @@ superset_chart = kubernetes.helm.v3.Release(
             "supersetWorker": {
                 "podLabels": k8s_global_labels,
                 "replicas": {"enabled": True, "replicaCount": 1},
+                # The chart's default command plus --without-gossip: gossip
+                # leaks an orphan celeryev.<uuid> queue on the Redis broker
+                # for every worker start (see the celery worker command in
+                # components/services/k8s.py for the mechanism).
+                "command": [
+                    "/bin/sh",
+                    "-c",
+                    ". /app/pythonpath/superset_bootstrap.sh; exec celery"
+                    " --app=superset.tasks.celery_app:app worker --without-gossip",
+                ],
             },
             "supersetCeleryBeat": {
                 "enabled": True,
