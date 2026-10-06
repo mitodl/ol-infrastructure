@@ -1149,6 +1149,23 @@ class OLApplicationK8sConfig(BaseModel):
         default=None,
         description="A tuple of <job_name>, <job_command_array> for executing prior to the deployment updating",
     )
+    pre_deploy_resource_requests: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Resource requests for the pre-deploy Job's containers, defaulting to "
+            "resource_requests. Set it when a migration needs more memory than a "
+            "serving pod, so sizing the webapp down cannot OOMKill the Job that "
+            "gates the rollout. Include cpu: the Job's pods carry the webapp "
+            "selector, and a container without a cpu request stalls its HPA."
+        ),
+    )
+    pre_deploy_resource_limits: dict[str, str] | None = Field(
+        default=None,
+        description=(
+            "Resource limits for the pre-deploy Job's containers, defaulting to "
+            "resource_limits."
+        ),
+    )
     post_deploy_commands: list[tuple[str, list[str]]] | None = Field(
         default=None,
         description="A tuple of <job_name>, <job_command_array> for executing upon completion of the deployment updating",
@@ -2063,6 +2080,7 @@ class OLApplicationK8s(ComponentResource):
         self.beat_deployment: kubernetes.apps.v1.Deployment | None = None
         self.dev_shell_deployment_name: str | None = None
         self.dev_shell_deployment: kubernetes.apps.v1.Deployment | None = None
+        self.pre_deploy_job: kubernetes.batch.v1.Job | None = None
         self.scheduled_job_names: list[str] = []
         self.scheduled_jobs: list[kubernetes.batch.v1.CronJob] = []
         self.webapp_pod_monitor: kubernetes.apiextensions.CustomResource | None = None
@@ -2077,7 +2095,7 @@ class OLApplicationK8s(ComponentResource):
         )
 
         if pre_deploy_commands := ol_app_k8s_config.pre_deploy_commands:
-            _pre_deploy_job = kubernetes.batch.v1.Job(
+            self.pre_deploy_job = kubernetes.batch.v1.Job(
                 f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     name=f"{_application_deployment_name}-pre-deploy",
@@ -2135,8 +2153,10 @@ class OLApplicationK8s(ComponentResource):
                                     # *every* metric and suspending all scaling until
                                     # the Job is garbage collected.
                                     resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                        requests=ol_app_k8s_config.resource_requests,
-                                        limits=ol_app_k8s_config.resource_limits,
+                                        requests=ol_app_k8s_config.pre_deploy_resource_requests
+                                        or ol_app_k8s_config.resource_requests,
+                                        limits=ol_app_k8s_config.pre_deploy_resource_limits
+                                        or ol_app_k8s_config.resource_limits,
                                     ),
                                     volume_mounts=ol_app_k8s_config.extra_volume_mounts
                                     or None,
@@ -2152,7 +2172,7 @@ class OLApplicationK8s(ComponentResource):
                 opts=resource_options,
             )
             deployment_options = deployment_options.merge(
-                ResourceOptions(depends_on=[_pre_deploy_job])
+                ResourceOptions(depends_on=[self.pre_deploy_job])
             )
 
         app_containers.append(
