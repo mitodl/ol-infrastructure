@@ -67,7 +67,7 @@ def test_each_organization_is_imported_by_its_realm_scoped_id():
 
 
 def test_inputs_match_the_hand_made_organizations():
-    """An input that differs from the live organization fails the import."""
+    """An input that differs from the live organization is applied as an update."""
     inputs = _create(IMPORT_IDS)[f"{REALM}-arbisoft-organization"].inputs
     assert inputs == {
         "realm": REALM,

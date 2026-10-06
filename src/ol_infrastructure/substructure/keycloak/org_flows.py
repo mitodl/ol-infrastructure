@@ -329,7 +329,9 @@ def create_staff_organizations(
     :param domains_by_organization: Email domain of each organization, keyed by the
         organization name. The name is also the alias.
     :param import_ids: The existing Keycloak id of each organization in this
-        environment, keyed by the organization name.
+        environment, keyed by the organization name. Changing an id after the
+        organization is in state makes Pulumi replace it: it imports the new one
+        and plans a delete of the one it had.
     :param opts: Resource options applied to every organization.
     :returns: The organizations, keyed by name.
     :rtype: dict[str, keycloak.Organization]
@@ -342,8 +344,12 @@ def create_staff_organizations(
             alias=name,
             enabled=True,
             domains=[keycloak.OrganizationDomainArgs(name=domain, verified=False)],
+            # Members are added by hand, so a delete planned from a code removal or
+            # a revert must fail, not remove the organization.
             opts=opts.merge(
-                pulumi.ResourceOptions(import_=f"{realm_name}/{import_ids[name]}")
+                pulumi.ResourceOptions(
+                    import_=f"{realm_name}/{import_ids[name]}", protect=True
+                )
             ),
         )
         for name, domain in domains_by_organization.items()
