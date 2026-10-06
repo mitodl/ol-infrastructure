@@ -131,6 +131,89 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         events_listeners=["jboss-logging"],
     )
 
+    # saml_uid has to be a managed attribute. With no unmanagedAttributePolicy
+    # the admin API omits unmanaged attributes from user representations
+    # (DefaultAttributes.isAllowUnmanagedAttribute), while protocol mappers
+    # read the user model directly. The starrocks_username claim therefore
+    # worked while substructure/starrocks/keycloak_group_sync.py, which reads
+    # saml_uid through GET /users, saw it empty for every user.
+    #
+    # RealmUserProfile replaces the whole profile, so the first four attributes
+    # and the group restate Keycloak's keycloak-default-user-profile.json.
+    _user_and_admin = keycloak.RealmUserProfileAttributePermissionsArgs(
+        views=["admin", "user"], edits=["admin", "user"]
+    )
+    keycloak.RealmUserProfile(
+        "ol-data-platform-user-profile",
+        realm_id=ol_data_platform_realm.realm,
+        attributes=[
+            keycloak.RealmUserProfileAttributeArgs(
+                name="username",
+                display_name="${username}",
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="length", config={"min": "3", "max": "255"}
+                    ),
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="username-prohibited-characters", config={}
+                    ),
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="up-username-not-idn-homograph", config={}
+                    ),
+                ],
+                permissions=_user_and_admin,
+            ),
+            keycloak.RealmUserProfileAttributeArgs(
+                name="email",
+                display_name="${email}",
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="email", config={}
+                    ),
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="length", config={"max": "255"}
+                    ),
+                ],
+                required_for_roles=["user"],
+                permissions=_user_and_admin,
+            ),
+            *(
+                keycloak.RealmUserProfileAttributeArgs(
+                    name=name,
+                    display_name=f"${{{name}}}",
+                    validators=[
+                        keycloak.RealmUserProfileAttributeValidatorArgs(
+                            name="length", config={"max": "255"}
+                        ),
+                        keycloak.RealmUserProfileAttributeValidatorArgs(
+                            name="person-name-prohibited-characters", config={}
+                        ),
+                    ],
+                    required_for_roles=["user"],
+                    permissions=_user_and_admin,
+                )
+                for name in ("firstName", "lastName")
+            ),
+            keycloak.RealmUserProfileAttributeArgs(
+                name="saml_uid",
+                display_name="Touchstone uid",
+                group="user-metadata",
+                required_for_roles=[],
+                permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                    views=["admin"], edits=["admin"]
+                ),
+            ),
+        ],
+        groups=[
+            keycloak.RealmUserProfileGroupArgs(
+                name="user-metadata",
+                display_header="User metadata",
+                display_description="Attributes, which refer to user metadata",
+            )
+        ],
+        opts=resource_options,
+    )
+
     keycloak.RequiredAction(
         "ol-data-verify-email",
         realm_id=ol_data_platform_realm.realm,
