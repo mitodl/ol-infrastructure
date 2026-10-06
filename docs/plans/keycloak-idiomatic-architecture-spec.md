@@ -1,7 +1,7 @@
 # Keycloak audit fixes and 26.8 upgrade: sequencing and design spec
 
 Status: spec, ready for review
-Date: 2026-10-05
+Date: 2026-10-05, revised 2026-10-06 with live realm reads and consumer checks (M12 to M15)
 Project: `wp-keycloak-idiomatic-architecture-improvements-and-70b5e2`
 Task: `tk-spec-sequencing-and-design-decisions-for-the-key-060ee7`
 
@@ -22,24 +22,29 @@ defects, which are not Keycloak work (see D12).
 
 | # | Decision |
 |---|---|
-| D1 | Order: passkey flow fix, then per-client hygiene, then the client policy, then FGAP scoping in CI, then the 26.8 upgrade when both blockers clear, then the realm restructure. Section 6 has the dependency reasons. |
+| D1 | Order: passkey flow fix, then the pulumi-keycloak 6.14.0 bump on its own, then per-client hygiene with the client policy growing alongside it, then FGAP scoping in CI, then the 26.8 upgrade when the remaining blocker clears, then the realm restructure. Section 6 has the dependency reasons. |
 | D2 | Fix the passkey browser flow in place: make the passkey subflow ALTERNATIVE so all top-level siblings are the same kind. Do not wait for the return to built-in flows. |
-| D3 | Drop the organization subflow from the two staff-realm browser flows. It has never executed, neither realm declares an organization, and turning it on would add an identity-first username form the realms have never shown. |
+| D3 | Drop the organization subflow from the two staff-realm browser flows. It has never executed, and both realms hold organizations created outside Pulumi in every environment (M12), so letting it run would put an identity-first username form in front of users who have never seen one. |
 | D4 | Keep the staff realms on a custom flow with no password step. Do not switch them to the built-in browser flow. **Needs sign-off**, this amends `tk-return-the-hand-copied-browser-and-first-broker--332e4f`. |
 | D5 | One helper builds the passkey browser flow for both staff realms, keeping today's Pulumi resource names and aliases. |
-| D6 | Client policies are added after the clients conform, never before, and every executor runs with `auto-configure` off. |
-| D7 | PKCE is enforced by policy on public clients first (`client-access-type` condition), once `witan-cli` is known to send PKCE on its device request. Confidential clients get `pkce_code_challenge_method="S256"` one at a time as each consumer is checked, and the policy reaches them through a `client-attributes` marker that the Pulumi client helper sets. PKCE is never applied through `any-client`, which would also match built-in clients that do not carry the attribute (`admin-cli` is one). |
+| D6 | A client policy never matches a client that does not already conform, and every executor runs with `auto-configure` off. |
+| D7 | PKCE is enforced through one policy whose condition is a `client-attributes` marker, set on a client in the same change that sets `pkce_code_challenge_method="S256"` on it. The policy can exist from the first conforming client and grows one client at a time. PKCE is never applied through `client-access-type` or `any-client`: both match clients that cannot carry the attribute (the built-in `account` client, `admin-cli`, and the two SAML clients, M12). `witan-cli` gets the marker only after the witan CLI sends PKCE on its device request, which it does not today (M13). |
 | D8 | Direct access grants and implicit flow are turned off per client first, then locked by `reject-ropc-grant` and `reject-implicit-grant`. |
 | D9 | `mitlearn-admin-client` is not scoped with FGAP. It loses its roles when mit-learn stops using the Admin API (`tk-mit-learn-get-is-sso-user-from-a-token-claim-and-0a9b85`). |
 | D10 | `mitxonline-b2b-client` is split in two: a runtime membership client with an Organizations permission and Users `manage`, and a provisioning client that keeps realm-wide `manage-identity-providers`. The split removes `manage-realm` and the IdP roles from the per-request path. It does not remove realm-wide user management, which FGAP v2 cannot scope for this use. The trial runs on 26.7.4 in CI. **Needs sign-off**, the scoping task's done-when cannot be met this way. |
 | D11 | The FGAP work is done under this project. `wp-enable-fine-grained-admin-permissions-fgap-on-sh-73d6d3` (discovery, no tasks) should be closed in favour of it. **Needs sign-off.** |
 | D12 | The DCC task leaves this project's sequence. Its two mitxonline fixes (refuse download of a revoked credential, https signer URL) do not depend on anything here and should go first. **Needs an owner.** |
+| D14 | `odl-video-app` keeps `view-users`, which its request and Celery paths use. `query-users` and `query-groups` are removed as redundant. `manage-users` stays until the OVS owners say whether `assign_group_users` is still needed; if it is, it moves to a separate service client so the login client holds no write role. This replaces "remove the roles when the moira migration is finished". |
 | D13 | At the 26.8 upgrade, set the log category `org.keycloak.protocol.oidc.endpoints.TokenEndpoint.full-scope-allowed` to ERROR. Turning full scope off per client is restructure work and does not gate the upgrade. |
 
 ## Measured facts this rests on
 
-Read from source or from the repo at `origin/main` 3abd43920 on 2026-10-05. Keycloak source was
-read at the 26.7.4 tag, the version pinned at `src/bridge/lib/versions.py:12`.
+M1 to M11 were read from source or from the repo at `origin/main` 3abd43920 on 2026-10-05.
+Keycloak source was read at the 26.7.4 tag, the version pinned at `src/bridge/lib/versions.py:12`.
+M12 to M15 were read on 2026-10-06: live realm state through the Admin API (GET only) in CI, QA
+and Production, consumer code at each repo's default branch, and the provider releases.
+Production reports 26.7.4. CI and QA report 26.7.5, which the pin does not explain; the
+`ol-keycloak` image is built from a floating `26.7` base tag.
 
 **M1. A flow level with both kinds drops its alternatives.**
 `services/.../authentication/DefaultAuthenticationFlow.java`, `fillListsOfExecutions`: REQUIRED
@@ -70,8 +75,9 @@ Touchstone (`ol_data_platform.py:1091`).
 `organizations_enabled=True` (`ol_platform_engineering.py:45`, `ol_data_platform.py:105`) and
 neither declares an organization in Pulumi; the only `Organization` resources are in
 `olapps.py:887` and `org_sso_helpers.py:113`. With an organization present and no `login_hint`
-the authenticator renders its own username form (`initialChallenge`). Whether either staff
-realm has an organization created by hand was not read.
+the authenticator renders its own username form (`initialChallenge`). Both staff realms do
+hold organizations that Pulumi did not create (M12), so the authenticator would not be a no-op
+if the subflow ran.
 
 **M5. Both staff realms set `sso_session_idle_timeout="2h"` and
 `sso_session_max_lifespan="24h"`** (`ol_platform_engineering.py:98-99`,
@@ -122,9 +128,9 @@ clients: `ol-superset-cli`, `ol-starrocks-cli`, `toolhive-swe-cli`, `witan-cli`,
 Direct access grants are on for `ol-superset-client`, `ol-grafana-client` and `odl-video-app`;
 implicit flow is on for `ol-open_metadata-client`. About a dozen clients do not set
 `direct_access_grants_enabled` at all, and the provider field is Optional and Computed, so
-their live value is whatever the server holds. The built-in clients in each realm
-(`admin-cli`, `security-admin-console`, `account-console` and the rest) are not in Pulumi and
-are matched by `client-access-type` and `any-client` conditions like any other.
+their live value is whatever the server holds (M12 has the live values). The built-in clients
+in each realm (`admin-cli`, `security-admin-console`, `account-console` and the rest) are not
+in Pulumi and are matched by `client-access-type` and `any-client` conditions like any other.
 
 **M11. Adding an organization member needs two permissions.**
 `OrganizationMemberResource.addMember` calls `auth.orgs().requireManage(organization)` and
@@ -132,6 +138,85 @@ are matched by `client-access-type` and `any-client` conditions like any other.
 when the second check runs, so that permission cannot be limited to the organization's members.
 26.7.4 also has `manage-organizations`, `view-organizations` and `query-organizations`
 realm-management roles.
+
+**M12. Live realm state, 2026-10-06** (Admin API, all three environments unless noted).
+
+- Flow bindings in Production match the code: `Organization browser` and
+  `Organization first broker login` in olapps, `ol-browser-mit-flow`,
+  `ol-browser-platform-engineering-flow` and `ol-browser-data-platform-flow` in the others.
+  QA `ol-data-platform` has `firstBrokerLoginFlow` set to `sh first broker login` where
+  Production has `first broker login`.
+- Organizations in the staff realms: `ol-platform-engineering` has `Arbisoft` and `MIT`
+  (plus `non-MIT` in CI); `ol-data-platform` has `MIT` (plus `gmail` in QA). None is in Pulumi.
+- Staff users with a password credential: `ol-platform-engineering` has none in any
+  environment (Production 38 users, 32 with a passkey). `ol-data-platform` has none in CI,
+  2 of 14 in QA (neither has a passkey) and 14 of 568 in Production (11 of them with no
+  passkey; 54 users there have a passkey).
+- Direct access grants are on for exactly these clients: `ol-superset-client`,
+  `ol-grafana-client`, `odl-video-app`, `admin-cli` in olapps, ol-mit and
+  `ol-platform-engineering`, and the Starburst Galaxy SAML client in `ol-data-platform`. QA
+  olapps also has a hand-made `ol-open-discussions-local` with direct grants and redirect `*`.
+  Every client that omits the flag in Pulumi has it off. Implicit flow is on only for
+  `ol-open_metadata-client`.
+- `admin-cli` is not uniform. It is public in ol-mit. In the other three realms it has been
+  made confidential with a service account, which matches access-forge using it with
+  `client_credentials`.
+- Public clients beyond the six in M10: the built-in `account`, `account-console` and
+  `security-admin-console` in every realm, and two SAML clients (Sentry in
+  `ol-platform-engineering`, Starburst Galaxy in `ol-data-platform`). `account` and the SAML
+  clients have no PKCE attribute. `ClientAccessTypeCondition` tests only `publicClient` and
+  `bearerOnly`, and neither it nor the executors look at the client protocol, so a
+  `client-access-type` = `public` condition matches all of them.
+- `ol-starrocks-cli` and `ol-superset-cli` already list their fixed loopback URIs next to the
+  wildcard one. No realm has `adminPermissionsEnabled`.
+
+**M13. Which consumers send PKCE.**
+
+- `ol-starrocks-cli`: yes. `ol-data-platform` `bin/starrocks-auth` (e879a591) sends S256 and
+  binds `http://localhost:18080/callback`, fixed.
+- `ol-superset-cli`: yes. `InteractiveOAuthAuth` in `mitodl/superset-sup` (582de670) sends
+  S256 and binds `http://localhost:8080/callback`. Neither CLI sends a `127.0.0.1` redirect.
+- `witan-cli`: no. `agent-kit` `packages/witan-core/witan_core/remote/oidc.py:556-559` posts
+  `client_id`, `scope` and an optional `audience` to the device endpoint, and the poll at
+  `:608-615` has no `code_verifier` (671ad65f). Nothing in the repo builds a code challenge.
+- APISIX `openid-connect`: no. One helper builds every plugin block
+  (`components/services/apisix.py:718-727`) and does not set `use_pkce`, which exists at
+  APISIX 3.19.0 with default `false` and makes lua-resty-openidc 1.9.0 send S256. One change
+  there reaches Learn, MITx Online, learn-ai, analytics-api, the Learn JupyterHub, Airbyte,
+  Dagster, Leek, Gwarek, Opik and the published Marimo apps. `ol-mitlearn-client` is shared
+  by five stacks.
+- Vault (vault-plugin-auth-jwt 0.26.4), Concourse (dex 1.14.0) and the data-platform
+  JupyterHub (oauthenticator 17.4.0, client `ol-marimo-client`) already send S256.
+- Superset does not; `"code_challenge_method": "S256"` in the authlib `client_kwargs` at
+  `applications/superset/superset_config.py:67-82` turns it on.
+- OpenMetadata 2.0.3 does not; `oidcConfiguration.disablePkce` defaults to true. It is
+  configured as a confidential client on the code flow, not implicit. Its effective auth
+  config lives in a database row that the Helm values only seed, and that row was not read.
+- ocw-studio and OVS use social-core's `KeycloakOAuth2`, which is not a PKCE backend at any
+  release through 6.0.0. They need a code change (a subclass with `BaseOAuth2PKCE`, or a move
+  to `OpenIdConnectAuth`). open-discussions uses `OpenIdConnectAuth` at social-core 4.4.2,
+  which gained PKCE at 4.8.7. social-core before 4.8.7 sends the method as lowercase `s256`,
+  and `pkce-enforcer` compares with `S256` exactly.
+- Grafana Cloud's SSO settings are not in the repo and the API read was refused.
+  `ol-grafana-client` has S256 set live, which Keycloak enforces on its own, so a working
+  Grafana login means Grafana sends PKCE. That is an inference.
+- `ol-jupyterhub-client` and `ol-learn-ai-client` have no consumer in `src/`.
+
+**M14. No code uses the password grant on the three clients that allow it.** Superset API
+callers and OVS use `client_credentials`; OVS used a password grant for two days in April
+2026, through `admin-cli` on `master`. The comments giving a reason
+(`ol_data_platform.py:154`, `ol_mit.py:378`) describe uses that no longer exist, and
+`ol-grafana-client` has none. Password-grant callers that do exist are operator scripts in
+`scripts/` and local-dev, all through `admin-cli` and defaulting to the `master` realm. Not
+covered: Grafana Cloud's own settings, and token-endpoint traffic, which was not sampled.
+
+**M15. OVS and the roles on `odl-video-app`.** The moira code is gone from OVS
+(`odl-video-service` PR 1464, issue 1002 closed 2026-04-28). OVS still calls the Admin API at
+runtime with plain `requests`: group search, group members and user group lookups on request
+and Celery paths, all satisfied by `view-users`. `manage-users` is used by the one-off
+migration commands and by `assign_group_users`, which its docstring describes as an ongoing
+tool. Infra still provisions the moira certificate (`k8s_secrets.py:197-198`), which nothing
+reads.
 
 ## 1. Passkey browser flow (D2 to D5)
 
@@ -166,15 +251,18 @@ What changes for users:
 
 Why not the built-in browser flow now (D4): the built-in forms subflow is username plus
 password with passkeys offered alongside. Today the only ways in are a passkey, or in
-`ol-data-platform` the Touchstone button, and whether any staff user holds a password
-credential is live state that was not read. Moving to
-the built-in would make a password a valid way in for anyone who has one. The realm password
-policy and `ol-grafana-client`'s direct access grants suggest some do. If sign-off prefers the
-built-in, the precondition is an Admin API count of users with a `password` credential in each
-realm, and a decision on deleting them.
+`ol-data-platform` the Touchstone button. Moving to the built-in would make a password a
+valid way in for anyone who has one. In Production that is nobody in
+`ol-platform-engineering` and 14 users in `ol-data-platform`, 11 of them with no passkey
+(M12). Beyond those, the built-in would start accepting a password the day one is set, by an
+admin or through a reset-credentials flow, with nothing in Pulumi showing it. If sign-off
+prefers the built-in, delete the existing password credentials first and remove the password
+reset path from the realm.
 
-Before applying in each environment, check the realm for hand-created organizations (M4). If
-one exists, D3 still holds; it is only worth knowing why it is there.
+Both realms hold organizations that are not in Pulumi (M12). D3 does not touch them; removing
+the subflow only means they keep having no effect on login, as now. Who created them and
+whether anything reads their membership was not determined, and is worth asking before they
+are either declared in Pulumi or deleted.
 
 Rollout: CI, QA, Production through the substructure pipeline. Verification per environment:
 
@@ -191,22 +279,37 @@ that task describes.
 
 ## 2. Client hygiene and the realm client policy (D6 to D8)
 
-The policy is the guard against regression. It cannot be the first step, because once a policy
-matches a client the next Pulumi update of that client is validated (M6, M7) and fails the
-deploy if the client does not conform. `auto-configure` would avoid the failure by rewriting
+The policy is the guard against regression. It must never match a client that does not
+conform, because once it does the next Pulumi update of that client is validated (M6, M7) and
+fails the deploy. `auto-configure` would avoid the failure by rewriting
 the client server-side during the update, and the rewritten field would then disagree with
 Pulumi's inputs on the next refresh. That second half is an inference from M7, not something
 observed; the rule (D6) costs nothing either way.
 
-### 2.1 Per-client fixes first
+### 2.1 Per-client fixes
 
-| Client | Change | Check before applying |
+| Client | Change | State |
 |---|---|---|
-| `ol-superset-cli`, `ol-starrocks-cli` | `pkce_code_challenge_method="S256"`; fixed loopback port in place of `http://localhost:*/callback`; explicit web origins | The CLI sends `code_challenge`. Comments at `applications/starrocks/__main__.py:845` and `substructure/starrocks/__main__.py:756` call `starrocks-auth` a PKCE script; the Superset CLI was not read. The port must match what each CLI binds. |
-| `witan-cli` | `pkce_code_challenge_method="S256"` | The witan CLI sends `code_challenge` on its device authorization request and `code_verifier` on the token request. With the attribute set, Keycloak requires both (M7), so setting it against a CLI that does not would break every `witan-cli` login. The CLI is in the witan repo and was not read. The attribute is needed because `pkce-enforcer` validates it on every matching client. |
-| `ol-open_metadata-client` | `implicit_flow_enabled=False` | OpenMetadata's configured OIDC response type. |
-| `ol-superset-client`, `ol-grafana-client`, `odl-video-app` | `direct_access_grants_enabled=False` | Who uses the password grant. Loki cannot answer this (successful token events do not reach it with a grant type). Read each consumer's config and scripts, turn it off in CI and QA for a week, then Production. |
+| `ol-superset-cli`, `ol-starrocks-cli` | `pkce_code_challenge_method="S256"`; drop `http://localhost:*/callback` and the unused `127.0.0.1` entry, keeping `http://localhost:8080/callback` and `http://localhost:18080/callback` respectively; explicit web origins | Ready. Both CLIs send S256 on those fixed ports (M13). Not covered: a user's own `~/.sup/config.yml` pointing another tool at `ol-superset-cli`. |
+| `witan-cli` | `pkce_code_challenge_method="S256"` | Blocked on agent-kit. The CLI sends no PKCE on the device request or the poll (M13), and with the attribute set Keycloak requires both (M7). Add PKCE to `witan_core/remote/oidc.py`, release, and give users time to upgrade before setting the attribute. |
+| `ol-vault-client`, `ol-concourse-client`, `ol-marimo-client` | `pkce_code_challenge_method="S256"` | Ready for Vault and Concourse, which send S256 unconditionally (M13). `ol-marimo-client` also serves the published Marimo apps through APISIX, so it waits for the gateway change. |
+| `ol-open_metadata-client` | `implicit_flow_enabled=False` | OpenMetadata is configured for the code flow (M13), but its effective settings are a database row. Read `authenticationConfiguration` in CI before applying. |
+| `ol-superset-client`, `ol-grafana-client`, `odl-video-app` | `direct_access_grants_enabled=False` | No code caller on any of them (M14). CI, then QA, then Production, watching the Keycloak event log for `invalid_grant` on these clients. Grafana Cloud's settings are the one thing not read. |
 | `ol-mitlearn-client` | explicit web origins in place of `+` | The origins the Learn frontend calls from. |
+
+Confidential clients behind a consumer that does not send PKCE yet:
+
+| Consumer | Clients | What it takes |
+|---|---|---|
+| APISIX `openid-connect` | `ol-mitlearn-client`, `ol-analytics-api-client`, `ol-airbyte-client`, `ol-dagster-client`, `ol-leek-client`, `ol-gwarek-client`, `ol-opik-client`, `ol-marimo-client` | `use_pkce: True` in the shared helper's `base_oidc_config`. It reaches every route at once, so roll it through CI and QA as one gateway change, then set the attribute on each client after every stack using that client has redeployed. `ol-mitlearn-client` is used by five stacks. |
+| Superset | `ol-superset-client` | `code_challenge_method` in `client_kwargs`. The authlib version in the image is unpinned and was not read. |
+| OpenMetadata | `ol-open_metadata-client` | `disablePkce: false`, written to the database row by the existing `om_auth_config.py` Job, not only to the Helm values. |
+| ocw-studio, OVS | `ocw-studio-app`, `odl-video-app` | App code change (M13). OVS at social-core 4.8.6 would also need `SOCIAL_AUTH_KEYCLOAK_PKCE_CODE_CHALLENGE_METHOD` set to `S256`, since that version defaults to lowercase. |
+| open-discussions | `ol-open-discussions-client` | social-core 4.8.7 or later, then `SOCIAL_AUTH_OL_OIDC_USE_PKCE=True`. |
+| Grafana Cloud | `ol-grafana-client` | Attribute already set. Confirm in the Grafana Cloud SSO settings that `use_pkce` is on. |
+
+Clients with no interactive consumer (service accounts only, and `ol-jupyterhub-client` and
+`ol-learn-ai-client`, which nothing uses) do not need the attribute and never get the marker.
 
 ### 2.2 Policy and profiles
 
@@ -216,50 +319,47 @@ Per realm, in a helper called once from each realm function:
 - Profile `ol-grants`: executors `reject-implicit-grant` and `reject-ropc-grant`,
   `auto-configure: false`.
 - Profile `ol-redirects`: executor `secure-redirect-uris-enforcer`.
-- Policy `ol-public-clients`: condition `client-access-type` = `public`; profiles `ol-pkce`,
-  `ol-grants`, `ol-redirects`.
-- Policy `ol-managed-clients`: condition `client-attributes` on a marker attribute
-  (e.g. `ol.managed=true`, set as a client attribute on every client Pulumi declares); profile
-  `ol-pkce`. Added when every confidential consumer in the table below is checked.
-- Policy `ol-all-clients`: condition `any-client`; profiles `ol-grants`, then `ol-redirects`.
+- Policy `ol-pkce-clients`: condition `client-attributes` on a marker (e.g.
+  `ol.pkce=required`, set through the client's `extra_config`); profile `ol-pkce`.
+- Policy `ol-managed-clients`: condition `client-attributes` on a second marker set on every
+  OIDC client Pulumi declares; profiles `ol-grants` and `ol-redirects`.
 
-`ol-pkce` does not go on `ol-all-clients`. `any-client` matches the built-in clients, which
-are outside this inventory, and `admin-cli` has no PKCE attribute, so the first Admin API
-update of it would fail validation. The cost of the marker is that a client created by hand
-without it escapes the PKCE policy; the public-client policy still catches the public ones.
-That policy matches `admin-cli` as well. Nothing in Pulumi writes to `admin-cli`, but an edit
-of it in the admin console would fail validation; check in CI whether to set the attribute
-on it or move the public-client policy to the marker too.
-Before `ol-grants` or `ol-redirects` goes on `ol-all-clients` in a realm, list that realm's
-built-in clients with their grant flags and redirect URIs and check each against the profile,
-for the same reason.
+The PKCE marker is set in the same change as the PKCE attribute, so the policy can be created
+with the first conforming clients (the two data-platform CLIs, `toolhive-swe-cli`,
+`witan-desktop`, `witan-ui`, `ol-grafana-client`, Vault, Concourse) and then follows section
+2.1 client by client. From then on a client that carries the marker cannot lose PKCE through
+a Pulumi edit or in the admin console.
+
+Neither policy uses `client-access-type` or `any-client`. The earlier draft put PKCE on all
+public clients and grants on all clients. The live reads (M12) show what those conditions
+would also match: the built-in `account` client (public, no PKCE attribute), `admin-cli`
+(direct grants on in three realms, and a different access type per realm), and two SAML
+clients that Keycloak reports as public, one of them with the direct-grants flag on. A policy
+matching any of those fails the next Admin API update of that client. The cost of markers is
+that a client created by hand escapes both policies. Covering those is a later step: once the
+built-in and SAML clients in a realm are either conforming or excluded, add an `any-client`
+policy with `ol-grants`. Do that per realm, from a fresh client listing, not from this
+document.
+
+`ol-grants` on the managed clients has two preconditions, both now met except for the
+clients in section 2.1: every declared client has direct grants and implicit flow off live
+(M12), and the three direct-grant clients have no caller (M14). Set the two flags explicitly
+in Pulumi on the clients that omit them, in the same change that adds the marker, so the
+input and the server agree.
+
+Password grants through `admin-cli` are not affected while the policy is marker-based. If an
+`any-client` grants policy is added later, the operator scripts in `scripts/` that default to
+`master` keep working, and passing `--auth-realm` for an app realm stops working. The SCIM
+admin UI setting `spi-realm-restapi-extension-scim-accept-admin-cli-login`
+(`applications/keycloak/__main__.py:532-540`) exists for an `admin-cli` password login and
+would need the documented `client_credentials` alternative first.
 
 The `secure-redirect-uris-enforcer` config is not settled here. Most redirect URIs end in `/*`
-and the CLIs use `http` on loopback, so the starting point is `allow-wildcard-context-path`,
-`allow-ipv4-loopback-address` and `allow-http-scheme` on, and `oauth-2-1-compliant` off
-(it rejects `localhost` by name). A client with the standard flow on and no redirect URIs
-fails validation outright. The executor does not catch `http://localhost:*/callback`; the
-fixed port in section 2.1 is what removes that. Settle the values by applying the profile to
+and the CLIs and Vault use `http` on loopback, so the starting point is
+`allow-wildcard-context-path`, `allow-ipv4-loopback-address` and `allow-http-scheme` on, and
+`oauth-2-1-compliant` off (it rejects `localhost` by name). A client with the standard flow on
+and no redirect URIs fails validation outright. Settle the values by applying the profile to
 the CI realms and reading which client updates fail, then tighten wildcards as a later pass.
-
-Two things to do before `ol-grants` reaches a realm:
-
-- Read the live `directAccessGrantsEnabled` and `implicitFlowEnabled` of every client in the
-  realm, not the Pulumi inputs (M10), and set the flags explicitly on the clients that omit
-  them.
-- Confirm nothing uses the password grant through `admin-cli` in the four realms. `admin-cli`
-  is public with direct access grants on, so both policies match it and password grants
-  through it will be rejected. The Pulumi provider is not affected; it authenticates to
-  `master` with a client secret.
-
-Confidential-client PKCE, consumer by consumer. None of these was verified, and which
-integration each client uses is from the audit, not re-read:
-
-| Consumer | Clients | What to confirm |
-|---|---|---|
-| APISIX `openid-connect` | Learn, MITx Online, learn-ai, analytics-api, and the gateway-fronted tools | `use_pkce` is set nowhere in `src/` today. Turning it on is a gateway config change per route. |
-| python-social-auth | OCW Studio, OVS, open-discussions | Whether the Keycloak backend sends PKCE at the pinned version. |
-| Tool-native OIDC | Vault, Concourse, Superset, OpenMetadata, Airbyte, Dagster, Leek, JupyterHub, Opik, Marimo, Gwarek | Each tool's own setting. |
 
 ### 2.3 Full scope
 
@@ -310,26 +410,38 @@ Declaring the Organizations permission in
 Pulumi needs a provider resource that does not exist yet, so it is either an upstream request
 or a scripted step until then.
 
-`odl-video-app` keeps `manage-users`, `view-users`, `query-users` and `query-groups` for a
-moira-to-Keycloak migration, on the same client users log in with. Confirm with the OVS owners
-that the migration is finished, then remove the roles. This is the same change as turning off
-its direct access grants in section 2.1.
+`odl-video-app` holds `manage-users`, `view-users`, `query-users` and `query-groups` on the
+same client users log in with. The comments say the roles are for the moira migration; the
+migration code has shipped, but OVS reads groups and group members through the Admin API on
+request and Celery paths, which needs `view-users` (M15). So (D14): drop `query-users` and
+`query-groups` now, since every check they pass is also passed by `view-users`. Ask the OVS
+owners whether `assign_group_users` is still used. If not, drop `manage-users`. If it is,
+move it to a second service-account client that only the management command uses.  Direct access grants on
+this client go in section 2.1, and the unread moira certificate in
+`applications/odl_video_service/k8s_secrets.py:197-198` can be deleted with it.
 
 ## 4. 26.8 upgrade gates
 
-Nothing here can start until both of these exist. Neither did on 2026-10-05.
+Two gates. The first cleared on 2026-10-06, the second has not.
 
-1. A pulumi-keycloak release built on terraform-provider-keycloak 5.10.0 or later (latest is
-   6.13.0). Without it the substructure stack sends `organization_id` and the removed
-   `kc.org.*` config keys for every B2B organization IdP.
-2. A `kc-26.8` scim-for-keycloak jar in `s3://ol-eng-artifacts/keycloak/scim-client/`. The
-   image pipeline selects the jar by major.minor and matches nothing otherwise.
+1. Cleared: pulumi-keycloak 6.14.0, released 2026-10-06, is built on
+   terraform-provider-keycloak 5.10.0. Its organization-link layer
+   (`keycloak/identity_provider_organization_compat.go`) only activates when the server
+   reports 26.8.0 or later, so against 26.7.x it sends what 6.13.0 sends. On 26.8 it rejects
+   `kc.org.*` keys passed through `extra_config`; we pass none, the IdPs use the typed
+   `org_domain`, `organization_id` and `org_redirect_mode_email_matches` arguments
+   (`olapps.py:923-925`, `org_sso_helpers.py:190-192,421-423`). `uv.lock` still pins 6.13.0.
+   Bump it as its own PR now, expecting an empty `pulumi preview` on all three stacks, so the
+   provider is not a variable during the server upgrade.
+2. Open: a `kc-26.8` scim-for-keycloak jar in `s3://ol-eng-artifacts/keycloak/scim-client/`.
+   The newest on 2026-10-06 is `kc-26.7-4.1.2`. The image pipeline selects the jar by
+   major.minor and matches nothing otherwise.
 
-`KEYCLOAK_VERSION` carries a Renovate annotation, so a 26.8 bump PR will be proposed
-regardless (the custom manager at `renovate.json5:78-87`). It must not merge before the gates
-clear. `renovate.json5` has no rule holding Keycloak; add a `packageRules` entry limiting
-`keycloak` and `keycloak-k8s-resources` to `26.7.x` in the same PR as the passkey fix, and
-remove it with the bump.
+Renovate has already opened the bump: ol-infrastructure PRs 6180 (`keycloak`) and 6181
+(`keycloak-k8s-resources`), both green, neither set to automerge. They must not merge before
+gate 2 clears. `renovate.json5` has no rule holding Keycloak; add a `packageRules` entry
+limiting both packages to `26.7.x` in the same PR as the passkey fix, close those two PRs,
+and remove the rule with the real bump.
 
 Changes that ship with the bump:
 
@@ -369,31 +481,35 @@ the earlier sections put on them.
 
 ## 6. Sequence
 
-1. Passkey flow fix, CI to Production. No dependencies. It restores SSO in two realms and
-   removes about 16.7k WARN lines a week before the upgrade adds its own.
-2. Per-client fixes in section 2.1. The two CLI clients and `witan-cli` first, since they are
-   the precondition for the public-client policy.
-3. `ol-public-clients` policy, then `ol-all-clients` with `ol-grants`. Every declared public
-   client is in the two staff realms; in olapps and ol-mit the public-client policy matches
-   only built-ins.
-4. FGAP trial in CI (section 3). Can run in parallel with 2 and 3.
-5. mitxonline client split, after the trial and coordinated with the mitxonline change.
-6. 26.8 upgrade, whenever the two gates clear. Steps 1 to 3 do not block it; step 1 should be
-   done first for the log baseline.
-7. Client factory and full scope, flows to built-ins for olapps and ol-mit, authorization
+1. Passkey flow fix, CI to Production, with the Renovate hold in the same PR. No
+   dependencies. It restores SSO in two realms and removes about 16.7k WARN lines a week
+   before the upgrade adds its own.
+2. pulumi-keycloak 6.14.0, alone, expecting no diff.
+3. The clients that are ready (section 2.1): the two data-platform CLIs, Vault, Concourse,
+   direct grants off on the three clients, the two redundant OVS roles. With them, the two
+   marker policies.
+4. `use_pkce` in the APISIX helper, then the gateway-fronted clients. Superset and
+   OpenMetadata settings. These are independent of each other.
+5. Changes in other repos, each its own task: witan CLI PKCE in agent-kit, a PKCE backend for
+   ocw-studio and OVS.
+6. FGAP trial in CI (section 3). Can run in parallel with 3 to 5.
+7. mitxonline client split, after the trial and coordinated with the mitxonline change.
+8. 26.8 upgrade, when the SCIM jar exists. Steps 3 to 7 do not block it; steps 1 and 2 should
+   be done first.
+9. Client factory and full scope, flows to built-ins for olapps and ol-mit, authorization
    representation, JWKS.
-8. 26.8 feature trials, after the upgrade.
+10. 26.8 feature trials, after the upgrade.
 
 ## 7. Still open
 
-- Sign-off on D4, D10, D11 and D12.
-- Whether any staff-realm user has a password credential, and whether either staff realm has
-  a hand-created organization. Both need Admin API reads against the live realms.
-- `secure-redirect-uris-enforcer` config values (section 2.2).
-- PKCE support for every confidential-client consumer (section 2.2).
-- Who uses the password grant on the three clients that allow it.
-- Whether the moira migration behind `odl-video-app`'s roles is finished.
-- Whether the witan CLI sends PKCE on its device authorization request.
-- Whether anything uses the password grant through `admin-cli` in the four realms.
-- Live grant flags on the clients that do not declare them.
+- Sign-off on D4, D10, D11, D12 and D14.
+- Who created the organizations in the two staff realms and whether anything reads them.
+- Why CI and QA run 26.7.5 while the pin and Production are 26.7.4.
+- Why QA `ol-data-platform` is bound to `sh first broker login`.
+- `secure-redirect-uris-enforcer` config values (section 2.2), from a CI trial.
+- Whether client policies fire on Admin API updates of SAML clients. The source has no
+  protocol check in the condition or the executors; it was not exercised.
+- Grafana Cloud's SSO settings: `use_pkce`, and anything using the password grant.
+- OpenMetadata's stored `authenticationConfiguration` row.
+- Whether OVS still needs `assign_group_users`.
 - Whether the vendor has published a kc-26.8 scim-for-keycloak build.
