@@ -34,7 +34,7 @@ PR #5400 has since removed — see §0.4.
 
 | Analysis finding | Status on 2026-08-17 |
 |---|---|
-| §5.6 six routes UI-managed, ~51 rules unmanaged | **Closed.** PR #5218 adopted the Service Routes; all **12** routes are now `rootly.AlertRoute` resources in `saas/rootly/__main__.py`, `sh-test` included |
+| §5.6 six routes UI-managed, ~51 rules unmanaged | **Closed.** PR #5218 adopted the Service Routes; all **12** routes became `rootly.AlertRoute` resources in `saas/rootly/__main__.py`, `sh-test` included. 10 remain after the Grafana Service Route (#5819) and `sh-test` were deleted |
 | §5.2 QA/CI Slack diversion inert | **Open.** Both fallback rules still `enabled: false`; `pulumi_rootly`'s `AlertRouteRuleArgs` has no `enabled` field, so this is unmanageable from Pulumi (remediation spec W0) |
 | §5.2 Low urgency pages like High | **Closed.** PR #5354 added `escalation_path_defer_low_urgency_off_hours` (`__main__.py:729`); PR #5377 added `escalation_path_medium_urgency_slack_only` (`:758`) routing Medium and Low to `#devops-warnings` |
 | §5.7 `Cloudwatch - Critical` `setup_incomplete` | **Open.** Still `setup_incomplete` live |
@@ -900,7 +900,7 @@ rules against both. Renaming is cleaner and is a one-line change in
 as the rule move, not later.
 
 Ordering caution, unchanged from analysis §4.3: conditions are `contains`, so the
-narrow rules must precede the broad ones. Now that all 12 routes are in Pulumi
+narrow rules must precede the broad ones. Now that every route is in Pulumi
 (#5218), rule position is reviewable in a diff — which is the first time this
 hand-maintained invariant has been visible at all.
 
