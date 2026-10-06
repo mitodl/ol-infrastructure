@@ -7,9 +7,10 @@ each choice here, is docs/plans/gravitino-deployment-spec.md (decisions P1-P10).
 Identity settings come from docs/plans/gravitino-keycloak-integration-spec.md
 (D4-D7).
 
-This stack does not create the metalake, the catalog or any grant. Those belong
-to the grant reconciler (docs/plans/gravitino-authorization-spec.md, A7), which
-is the only workload holding the management API's client certificate.
+Pulumi does not create the metalake, the catalog or any grant. Those belong to
+the grant reconciler CronJob this stack deploys
+(docs/plans/gravitino-authorization-spec.md, A7), which is the only workload
+holding the management API's client certificate.
 """
 
 import hashlib
@@ -27,6 +28,10 @@ from bridge.lib.versions import (
     GRAVITINO_VERSION,
 )
 from ol_infrastructure.applications.gravitino.posture import create_posture_probe
+from ol_infrastructure.applications.gravitino.reconcile import (
+    create_grant_reconciler,
+    render_desired_state,
+)
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -92,6 +97,8 @@ SERVICE_ACCOUNT_NAME = "gravitino"
 SERVICE_HOST = f"{RELEASE_NAME}.{NAMESPACE}.svc"
 ICEBERG_REST_PORT = 9433
 MANAGEMENT_PORT = 8433
+MANAGEMENT_URI = f"https://{SERVICE_HOST}:{MANAGEMENT_PORT}"
+AWS_REGION = "us-east-1"
 METALAKE = "ol_data_platform"
 CATALOG = f"ol_data_lake_{stack_info.env_suffix}"
 SERVICE_ADMIN = "service-account-ol-gravitino-admin"
@@ -448,9 +455,9 @@ server_certificate = OLCertManagerCert(
     opts=ResourceOptions(depends_on=[ca_issuer, keystore_password_secret]),
 )
 
-# Mounted only by the grant reconciler, which is not deployed by this stack yet.
-# Whoever can read Secrets in this namespace can take it, so namespace RBAC is
-# the real boundary around the management API.
+# Mounted only by the grant reconciler. Whoever can read Secrets in this
+# namespace can take it, so namespace RBAC is the real boundary around the
+# management API.
 client_certificate = OLCertManagerCert(
     f"gravitino-reconcile-client-cert-{stack_info.env_suffix}",
     cert_config=OLCertManagerCertConfig(
@@ -653,7 +660,7 @@ gravitino_values = {
         # the cgroup limit. Replacing the chart default also drops its
         # MaxMetaspaceSize, so the configured value must carry its own.
         {"name": "GRAVITINO_MEM", "value": gravitino_config.require("jvm_memory")},
-        {"name": "AWS_REGION", "value": "us-east-1"},
+        {"name": "AWS_REGION", "value": AWS_REGION},
         _secret_env("GRAVITINO_JDBC_USER", DB_CREDS_SECRET_NAME, "DB_USER"),
         _secret_env("GRAVITINO_JDBC_PASSWORD", DB_CREDS_SECRET_NAME, "DB_PASS"),
         _secret_env(
@@ -906,11 +913,52 @@ create_posture_probe(
     ),
 )
 
+# Off until an environment's token and grant verification has passed
+# (authorization spec, "Verification before this is called done"). A failing run
+# alerts through WorkloadJobFailed*.
+if gravitino_config.require_bool("reconcile_enabled"):
+    create_grant_reconciler(
+        stack_info=stack_info,
+        namespace=NAMESPACE,
+        k8s_labels=k8s_labels,
+        management_uri=MANAGEMENT_URI,
+        client_tls_secret_name=CLIENT_TLS_SECRET_NAME,
+        vault_auth_name=gravitino_auth_binding.vault_k8s_resources.auth_name,
+        desired_state=gravitino_vending_role.role.arn.apply(
+            lambda vending_role_arn: render_desired_state(
+                env_suffix=stack_info.env_suffix,
+                metalake=METALAKE,
+                catalog=CATALOG,
+                # Deployment spec P5 and P6. In dynamic-config-provider mode the
+                # backend and vending settings live on the catalog, not in
+                # gravitino.conf.
+                catalog_properties={
+                    "catalog-backend": "custom",
+                    "catalog-backend-impl": "org.apache.iceberg.aws.glue.GlueCatalog",
+                    # Required by the property validator, ignored by GlueCatalog.
+                    "uri": f"https://glue.{AWS_REGION}.amazonaws.com",
+                    "credential-providers": "aws-irsa",
+                    "s3-role-arn": vending_role_arn,
+                    "s3-region": AWS_REGION,
+                    "s3-token-expire-in-secs": "3600",
+                    # GlueCatalog cannot serve the metadata cache. Blank stops
+                    # the warning Gravitino logs about it.
+                    "table-metadata-cache-impl": "",
+                },
+            )
+        ),
+        depends_on=[
+            gravitino_release,
+            client_certificate,
+            gravitino_auth_binding.vault_k8s_resources,
+        ],
+    )
+
 export(
     "gravitino",
     {
         "iceberg_rest_uri": f"https://{SERVICE_HOST}:{ICEBERG_REST_PORT}/iceberg",
-        "management_uri": f"https://{SERVICE_HOST}:{MANAGEMENT_PORT}",
+        "management_uri": MANAGEMENT_URI,
         "metalake": METALAKE,
         "catalog": CATALOG,
         "namespace": NAMESPACE,
