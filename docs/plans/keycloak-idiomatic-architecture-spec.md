@@ -28,7 +28,7 @@ defects, which are not Keycloak work (see D12).
 | D4 | Keep the staff realms on a custom flow with no password step. Do not switch them to the built-in browser flow. **Needs sign-off**, this amends `tk-return-the-hand-copied-browser-and-first-broker--332e4f`. |
 | D5 | One helper builds the passkey browser flow for both staff realms, keeping today's Pulumi resource names and aliases. |
 | D6 | Client policies are added after the clients conform, never before, and every executor runs with `auto-configure` off. |
-| D7 | PKCE is enforced by policy on public clients first (`client-access-type` condition), once `witan-cli` is known to send PKCE on its device request. Confidential clients get `pkce_code_challenge_method="S256"` one at a time as each consumer is checked, and the condition widens to `any-client` when the last one is done. |
+| D7 | PKCE is enforced by policy on public clients first (`client-access-type` condition), once `witan-cli` is known to send PKCE on its device request. Confidential clients get `pkce_code_challenge_method="S256"` one at a time as each consumer is checked, and the policy reaches them through a `client-attributes` marker that the Pulumi client helper sets. PKCE is never applied through `any-client`, which would also match built-in clients that do not carry the attribute (`admin-cli` is one). |
 | D8 | Direct access grants and implicit flow are turned off per client first, then locked by `reject-ropc-grant` and `reject-implicit-grant`. |
 | D9 | `mitlearn-admin-client` is not scoped with FGAP. It loses its roles when mit-learn stops using the Admin API (`tk-mit-learn-get-is-sso-user-from-a-token-claim-and-0a9b85`). |
 | D10 | `mitxonline-b2b-client` is split in two: a runtime membership client with an Organizations permission and Users `manage`, and a provisioning client that keeps realm-wide `manage-identity-providers`. The split removes `manage-realm` and the IdP roles from the per-request path. It does not remove realm-wide user management, which FGAP v2 cannot scope for this use. The trial runs on 26.7.4 in CI. **Needs sign-off**, the scoping task's done-when cannot be met this way. |
@@ -218,8 +218,21 @@ Per realm, in a helper called once from each realm function:
 - Profile `ol-redirects`: executor `secure-redirect-uris-enforcer`.
 - Policy `ol-public-clients`: condition `client-access-type` = `public`; profiles `ol-pkce`,
   `ol-grants`, `ol-redirects`.
-- Policy `ol-all-clients`: condition `any-client`; profiles `ol-grants`, then `ol-redirects`,
-  then `ol-pkce` as each becomes true of every client.
+- Policy `ol-managed-clients`: condition `client-attributes` on a marker attribute
+  (e.g. `ol.managed=true`, set as a client attribute on every client Pulumi declares); profile
+  `ol-pkce`. Added when every confidential consumer in the table below is checked.
+- Policy `ol-all-clients`: condition `any-client`; profiles `ol-grants`, then `ol-redirects`.
+
+`ol-pkce` does not go on `ol-all-clients`. `any-client` matches the built-in clients, which
+are outside this inventory, and `admin-cli` has no PKCE attribute, so the first Admin API
+update of it would fail validation. The cost of the marker is that a client created by hand
+without it escapes the PKCE policy; the public-client policy still catches the public ones.
+That policy matches `admin-cli` as well. Nothing in Pulumi writes to `admin-cli`, but an edit
+of it in the admin console would fail validation; check in CI whether to set the attribute
+on it or move the public-client policy to the marker too.
+Before `ol-grants` or `ol-redirects` goes on `ol-all-clients` in a realm, list that realm's
+built-in clients with their grant flags and redirect URIs and check each against the profile,
+for the same reason.
 
 The `secure-redirect-uris-enforcer` config is not settled here. Most redirect URIs end in `/*`
 and the CLIs use `http` on loopback, so the starting point is `allow-wildcard-context-path`,
