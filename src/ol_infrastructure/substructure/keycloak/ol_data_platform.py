@@ -130,9 +130,6 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     create_staff_organizations(
         "ol-data-platform",
         {"MIT": "mit.edu"},
-        keycloak_realm_config.require_object("staff_organization_import_ids")[
-            "ol-data-platform"
-        ],
         resource_options.merge(ResourceOptions(depends_on=[ol_data_platform_realm])),
     )
 
