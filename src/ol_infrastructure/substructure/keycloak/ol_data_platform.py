@@ -151,9 +151,9 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     # saml_uid has to be a managed attribute. With no unmanagedAttributePolicy
     # the admin API omits unmanaged attributes from user representations
     # (DefaultAttributes.isAllowUnmanagedAttribute), while protocol mappers
-    # read the user model directly. The starrocks_username claim therefore
-    # worked while substructure/starrocks/keycloak_group_sync.py, which reads
-    # saml_uid through GET /users, saw it empty for every user.
+    # read the user model directly. Without this,
+    # substructure/starrocks/keycloak_group_sync.py and the Gravitino grant
+    # reconciler, which read saml_uid through GET /users, could never see it.
     #
     # RealmUserProfile replaces the whole profile, so the first four attributes
     # and the group restate Keycloak's keycloak-default-user-profile.json.
@@ -762,8 +762,8 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     )
 
     # StarRocks 4.x rejects '@' in usernames.  Expose the Kerberos short username
-    # stored in the "saml_uid" user attribute (populated by the Touchstone SAML
-    # uid mapper above) as the "starrocks_username" JWT claim so that the
+    # stored in the "saml_uid" user attribute (populated by the Touchstone eppn
+    # mapper below) as the "starrocks_username" JWT claim so that the
     # StarRocks security integration principal_field can reference it.
     keycloak.openid.UserAttributeProtocolMapper(
         "ol-data-platform-starrocks-client-username-mapper",
@@ -1201,9 +1201,11 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     # yields the empty string, which the mapper discards: two people who share
     # a local part across scopes must not become one principal.
     #
-    # FORCE, because the IdP's own sync mode only applies a mapper when the user
-    # is first created, and the existing users need the attribute on their next
-    # login.
+    # FORCE, so that existing users get the attribute at their next login
+    # whatever sync mode the IdP itself carries.
+    #
+    # The old "uid" importer had to go rather than sit beside this one: on a
+    # login where "uid" is absent it sets saml_uid to an empty list.
     keycloak.CustomIdentityProviderMapping(
         "ol-data-platform-touchstone-saml-uid-from-eppn",
         name="ol-data-platform-touchstone-saml-uid-from-eppn",
