@@ -1345,7 +1345,7 @@ class OLApplicationK8sConfig(BaseModel):
                 "Deployment this component creates selects on k8s_global_labels, "
                 "and a selector is immutable, so adding or changing the tier there "
                 "deletes and recreates the Deployment. Set webapp_alert_tier and "
-                "celery_alert_tier, which reach the pod template only."
+                "celery_alert_tier, which stay off the selectors."
             )
             raise ValueError(msg)
         return self
@@ -1997,8 +1997,8 @@ class OLApplicationK8s(ComponentResource):
         }
         application_pod_labels = application_labels | webapp_alert_tier_label
 
-        # On the Deployment's own metadata only: on the selector it would force
-        # a replacement, and on the pod template a rollout.
+        # The otel label is on the Deployment's own metadata only: on the selector
+        # it would force a replacement, and on the pod template a rollout.
         deployment_labels = application_pod_labels | otel_service_name_label(
             ol_app_k8s_config.application_config
         )

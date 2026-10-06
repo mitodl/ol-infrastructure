@@ -597,9 +597,9 @@ Keycloak (2) and the 7 already-`service`-labeled application workloads, which ne
 #### 3.3.2 [2026-10-06] `OLApplicationK8s` selects on its whole label set
 
 The same selector trap as §3.3.1, in our own component. Every Deployment
-`OLApplicationK8s` creates (webapp, each celery worker, beat) passes one dict to
-`metadata.labels`, `spec.selector.matchLabels` and the pod template, and that dict
-starts from the caller's `k8s_global_labels`. Setting `alert_tier` on the
+`OLApplicationK8s` creates for the webapp, each celery worker and beat uses one dict
+for `spec.selector.matchLabels` and the pod template, and that dict starts from the
+caller's `k8s_global_labels`. Setting `alert_tier` on the
 `K8sAppLabels` an application stack builds would therefore change an immutable selector
 and delete-and-recreate the webapp of each of the ten stacks that use the component.
 
@@ -611,7 +611,9 @@ metadata only: `webapp_alert_tier` (default `page`) and `celery_alert_tier` (def
 
 Not covered by this: beat keeps `component=celery` (it is in beat's selector, so
 moving it to `Component.beat` is a replacement), and scheduled-job, pre/post-deploy
-Job and dev-shell pods carry no tier.
+Job and dev-shell pods carry no tier. edxapp uses the component for the LMS and CMS
+webapps only. Its celery and beat Deployments are built by hand in
+`edxapp/k8s_resources.py` and still need a tier there.
 
 Also backfill CI/QA clusters, which the analysis explicitly did not measure. Coverage
 there does not affect paging (CI/QA alerts go Slack-only per §8.1) but an unlabeled QA
