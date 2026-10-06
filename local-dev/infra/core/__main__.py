@@ -46,6 +46,7 @@ from bridge.lib.versions import (
     APISIX_CHART_VERSION,
     CERT_MANAGER_CHART_VERSION,
     CNPG_CHART_VERSION,
+    CNPG_POSTGRES_VERSION,
     KEYCLOAK_OPERATOR_CRD_VERSION,
 )
 
@@ -279,7 +280,9 @@ if observability_enabled:
     )
 
 # Create database cluster (needed by Keycloak, LiteLLM)
-db = create_database(_k8s, namespaces["local-infra"], CNPG_CHART_VERSION)
+db = create_database(
+    _k8s, namespaces["local-infra"], CNPG_CHART_VERSION, CNPG_POSTGRES_VERSION
+)
 
 create_ai_services(_k8s, namespaces["local-infra"], db.cluster, _infra_dir)
 
