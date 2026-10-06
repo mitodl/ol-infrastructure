@@ -38,7 +38,7 @@ PR #5400 has since removed — see §0.4.
 | §5.2 QA/CI Slack diversion inert | **Open.** Both fallback rules still `enabled: false`; `pulumi_rootly`'s `AlertRouteRuleArgs` has no `enabled` field, so this is unmanageable from Pulumi (remediation spec W0) |
 | §5.2 Low urgency pages like High | **Closed.** PR #5354 added `escalation_path_defer_low_urgency_off_hours` (`__main__.py:729`); PR #5377 added `escalation_path_medium_urgency_slack_only` (`:758`) routing Medium and Low to `#devops-warnings` |
 | §5.7 `Cloudwatch - Critical` `setup_incomplete` | **Open.** Still `setup_incomplete` live |
-| §5.7 `exampleDeleteMe-EscalationPolicy` | **Open.** Still declared at `__main__.py:538` |
+| §5.7 `exampleDeleteMe-EscalationPolicy` | **Closed 2026-10-06.** Unprotected by #6223, then removed from the stack along with the `sh-test` route |
 | §4.4 11-entry alertname demotion allowlist | **Unchanged.** All 12 urgency rules present on source `90cda8ea`, created 2026-07-20, none since |
 | §1 kube-state-metrics exports no labels | **Unchanged.** `clusterMetrics` and `telemetryServices["kube-state-metrics"]` in `substructure/aws/eks/grafana.py:379,501` carry no label configuration |
 | §3.2 schema defects | **Unchanged.** `Component` still four members; `product`/`application`/`component` still only on `K8sAppLabels`; `Services.learn_ai` still a tuple; `BusinessUnit.residential_staging` still present |
@@ -362,7 +362,7 @@ explicit.
 | 1a | CI source default urgency High → Low (`__main__.py:3013`) | remediation W2a | **open** |
 | 1b | `QA Non-Paging Escalation Policy` (`d63b7456`) has one service and zero levels — those CloudWatch alarms notify nobody | this project | **open** — delete the policy and move `MITx Online QA - Open edX - Redis` onto `CI/QA Slack Notifications` |
 | 1c | Account-wide "default alerts channel" toggle posts every alert to `#devops-alerts` regardless of routing (`__main__.py:513-521`) | this project | **open** — until this is off, the CI/QA separation has no observable effect |
-| 2 | Delete `exampleDeleteMe-EscalationPolicy` (`__main__.py:538`); finish `Cloudwatch - Critical` source setup | this project | **open** |
+| 2 | Delete `exampleDeleteMe-EscalationPolicy` (done 2026-10-06, with `sh-test`); finish `Cloudwatch - Critical` source setup | this project | **open** (`Cloudwatch - Critical` only) |
 | 3 | Three dead `component` rules in the Grafana Service Route | this project | **re-specified and promoted** — *move* to the Grafana Production Service Route, don't repair in place; two of the three match live payloads **today** (§0.4), so this is step **P1.5**, not a Phase 3 item. Delete the now-inert Grafana Service Route with them |
 | 4 | Import the six unmanaged alert routes | — | **closed** by PR #5218 |
 | 5 | Low urgency pages like High | — | **closed** by PRs #5354, #5377 |
