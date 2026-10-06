@@ -13,7 +13,7 @@ DEPLOY_NAME = 'mitxonline-webapp'
 
 if os.path.exists(os.path.join(APP_DIR, '.git')):
     # The local-dev stage gives the runtime user /src with `RUN chown -R` over
-    # ~200k files (mostly node_modules), which dominated the build. Taking
+    # ~140k files (mostly node_modules), which dominated the build. Taking
     # ownership while copying is far cheaper (seconds), so swap that line for a
     # COPY --chown of the same /src from the node stage. That copy misses files
     # the node stage dropped (stale .yarn/cache entries from the checkout), so
