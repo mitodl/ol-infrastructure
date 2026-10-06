@@ -27,7 +27,13 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, setup_k8s_provider
-from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels, Services
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    AWSBase,
+    Component,
+    K8sGlobalLabels,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
@@ -409,14 +415,20 @@ xqwatcher_grader_rolebinding = kubernetes.rbac.v1.RoleBinding(
 ##         Deployment           ##
 ##################################
 
-app_labels = {**k8s_global_labels.model_dump(), "app": "xqwatcher"}
+# A stalled watcher delays external grading and does not take courseware down, so
+# it does not page. The Deployments select on `app` alone, so these labels stay
+# off the selectors.
+workload_labels = k8s_global_labels.model_copy(
+    update={"component": Component.worker, "alert_tier": AlertTier.notify}
+).model_dump()
+app_labels = {**workload_labels, "app": "xqwatcher"}
 
 xqwatcher_deployment = kubernetes.apps.v1.Deployment(
     f"xqwatcher-{env_name}-deployment",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="xqwatcher",
         namespace=namespace,
-        labels=k8s_global_labels.model_dump(),
+        labels=workload_labels,
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
         replicas=min_replicas,
@@ -693,14 +705,14 @@ if min_replicas > 0:
 # its own ConfigMap and VaultStaticSecret so the edxorg credentials are never
 # co-located with the MIT-hosted xqueue credentials.
 if edxorg_xqueue_enabled and edxorg_servers_secret and xqwatcher_edxorg_configmap:
-    edxorg_app_labels = {**k8s_global_labels.model_dump(), "app": "xqwatcher-edxorg"}
+    edxorg_app_labels = {**workload_labels, "app": "xqwatcher-edxorg"}
 
     xqwatcher_edxorg_deployment = kubernetes.apps.v1.Deployment(
         f"xqwatcher-{env_name}-edxorg-deployment",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name="xqwatcher-edxorg",
             namespace=namespace,
-            labels=k8s_global_labels.model_dump(),
+            labels=workload_labels,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             replicas=min_replicas,
