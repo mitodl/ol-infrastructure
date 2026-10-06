@@ -141,3 +141,9 @@ config:
     secure: v1:bm9R4ZzTLXsioNmr:BAS1km5mgbC94evdYsX1CqgKyXYxzBmfvMztk9p4ItE+CV0Ri8qt1w==
   keycloak_realm:olapps-ol-analytics-api-client-secret:
     secure: v1:5VJGC7Pzu5vL300V:WqLYDxehAOTa3HNcQTl6R8nsOiYf1ZmjkOWpwe82M/HU+EzGFgtw4X6Zn7B2GM0ebFOCJUH9Xqh6xA==
+  keycloak_realm:staff_organization_import_ids:
+    ol-data-platform:
+      MIT: 19e76bb5-7564-4088-b5f1-43327632c054
+    ol-platform-engineering:
+      Arbisoft: 8c8ca173-81c7-4fd3-a910-40cd57de239d
+      MIT: 5b8148a8-234b-455b-8c99-970f528bc37a

@@ -127,3 +127,9 @@ config:
   keycloak_realm:olapps-ol-analytics-api-redirect-uris:
   - https://analytics-ci.ol.mit.edu/*
   - https://analytics.ci.learn.mit.edu/*
+  keycloak_realm:staff_organization_import_ids:
+    ol-data-platform:
+      MIT: 0153b4e8-45f1-4b1c-b4c6-be722afce384
+    ol-platform-engineering:
+      Arbisoft: 8668d7c8-52f4-4ea8-b123-1eeaa77362c9
+      MIT: 5f7bcdac-2ca6-4970-be16-abab3f058a25

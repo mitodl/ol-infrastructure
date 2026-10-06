@@ -312,3 +312,39 @@ def create_organization_first_broker_login_flows(
         opts=opts,
     )
     return main_flow
+
+
+def create_staff_organizations(
+    realm_name: str,
+    domains_by_organization: dict[str, str],
+    import_ids: dict[str, str],
+    opts: pulumi.ResourceOptions,
+) -> dict[str, keycloak.Organization]:
+    """Declare the organizations that group a staff realm's users by employer.
+
+    These were created by hand in every environment, so each is adopted with its
+    existing id. Membership is managed in the admin console, not here.
+
+    :param realm_name: The realm the organizations belong to.
+    :param domains_by_organization: Email domain of each organization, keyed by the
+        organization name. The name is also the alias.
+    :param import_ids: The existing Keycloak id of each organization in this
+        environment, keyed by the organization name.
+    :param opts: Resource options applied to every organization.
+    :returns: The organizations, keyed by name.
+    :rtype: dict[str, keycloak.Organization]
+    """
+    return {
+        name: keycloak.Organization(
+            f"{realm_name}-{name.lower()}-organization",
+            realm=realm_name,
+            name=name,
+            alias=name,
+            enabled=True,
+            domains=[keycloak.OrganizationDomainArgs(name=domain, verified=False)],
+            opts=opts.merge(
+                pulumi.ResourceOptions(import_=f"{realm_name}/{import_ids[name]}")
+            ),
+        )
+        for name, domain in domains_by_organization.items()
+    }

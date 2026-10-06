@@ -6,6 +6,9 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.org_flows import (
+    create_staff_organizations,
+)
 from ol_infrastructure.substructure.keycloak.passkey_flow import (
     create_passkey_browser_flow,
 )
@@ -122,6 +125,15 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         sso_session_idle_timeout="2h",
         sso_session_max_lifespan="24h",
         opts=resource_options,
+    )
+
+    create_staff_organizations(
+        "ol-data-platform",
+        {"MIT": "mit.edu"},
+        keycloak_realm_config.require_object("staff_organization_import_ids")[
+            "ol-data-platform"
+        ],
+        resource_options.merge(ResourceOptions(depends_on=[ol_data_platform_realm])),
     )
 
     keycloak.RealmEvents(
