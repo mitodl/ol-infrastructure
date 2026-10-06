@@ -734,21 +734,35 @@ and pay for the ~2,000 series. Cost is the lesser risk here.
 
 where `_OL_LABEL_KEYS = "ol.mit.edu/service,ol.mit.edu/component,ol.mit.edu/alert_tier,ol.mit.edu/environment"`.
 
+**[2026-10-06] As implemented, two differences from the sketch above.**
+
+1. **No Dagster drop rule.** §0.6 sized `data-production` at 2,004 of 2,606 live
+   production pods. Re-measured from `kube_pod_info`: 160 of 985 live, and over 24h
+   `dagster-(run|step)-*` pods were 1,077 of 13,862 distinct production pods (8%).
+   `applications-production` is where the churn is (11,275 distinct pods in 24h, mostly
+   DaemonSet pods following node turnover). The rule would save 8% of the new series and
+   leave run pods with no right-hand series, which silences `PodOOMKilled*` for them
+   once §4.2 lands. `kube_pod_labels` churns one for one with `kube_pod_info`, which is
+   already paid for.
+2. **`includeMetrics` needs two entries, not five.** In chart 4.5.2 the default
+   allow-list keeps `kube_job.*`, `kube_statefulset.*` and `kube_daemonset.*` whole.
+   Only `kube_deployment_labels` (added by #6103) and `kube_pod_labels` are missing
+   from it.
+
+The verification queries below are edited to match: `count(kube_pod_labels)` should
+equal `count(kube_pod_info)`, and the Dagster scoping check is gone with the rule.
+
 **Verification, before touching any alert rule:**
 
 ```
-count(kube_pod_labels)                                    → ~600  (2,606 minus dagster run pods)
+count(kube_pod_labels)                                    → equals count(kube_pod_info)
 count(kube_deployment_labels)                             → >0
+count(kube_statefulset_labels), count(kube_daemonset_labels)  → >0
 count(kube_pod_labels{label_ol_mit_edu_alert_tier!=""})    → matches §3.5 coverage
 count(kube_node_labels{label_topology_kubernetes_io_zone!=""})  → unchanged from today
-count(kube_pod_labels{namespace="dagster"})               → >0, and covers the daemon,
-                                                             webserver and code-location
-                                                             pods but no dagster-run-* pod
 ```
 
-The fourth is the regression check for the `nodes=[...]` trap in §0.3; the fifth is the
-regression check for the drop rule's scoping — a zero there means the rule is matching
-the whole namespace and would silence Dagster's long-lived services.
+The last is the regression check for the `nodes=[...]` trap in §0.3.
 
 ### 4.2 Rewrite the 16 joinable rules
 

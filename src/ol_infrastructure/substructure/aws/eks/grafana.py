@@ -8,6 +8,14 @@ from bridge.lib.versions import GRAFANA_K8S_MONITORING_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
+# The K8sGlobalLabels keys that alert rules join on to tier and route a
+# workload's alerts. kube-state-metrics surfaces each as a label_ol_mit_edu_*
+# column on kube_<kind>_labels.
+_OL_ROUTING_LABEL_KEYS = ",".join(
+    f"ol.mit.edu/{field}"
+    for field in ("service", "component", "alert_tier", "environment")
+)
+
 
 def _apisix_cookie_metrics_alloy_config() -> str:
     """
@@ -481,14 +489,18 @@ def setup_grafana(
                     "enabled": True,
                     "collector": "alloy-metrics",
                     # The chart's default kube-state-metrics allowlist keeps
-                    # kube_job.* and kube_statefulset.* whole but names
-                    # deployment metrics one by one, and kube_deployment_labels
-                    # is not among them. Without this, the deployments entry in
-                    # metricLabelsAllowlist below is emitted by KSM and then
-                    # dropped by Alloy before remote write.
+                    # kube_job.*, kube_statefulset.* and kube_daemonset.* whole
+                    # but names deployment and pod metrics one by one, and
+                    # neither kube_deployment_labels nor kube_pod_labels is
+                    # among them. Without this, the deployments and pods
+                    # entries in metricLabelsAllowlist below are emitted by KSM
+                    # and then dropped by Alloy before remote write.
                     "kube-state-metrics": {
                         "metricsTuning": {
-                            "includeMetrics": ["kube_deployment_labels"],
+                            "includeMetrics": [
+                                "kube_deployment_labels",
+                                "kube_pod_labels",
+                            ],
                         },
                     },
                 },
@@ -727,6 +739,23 @@ def setup_grafana(
                         # not it carries the label, so the cost is one series per
                         # Deployment (245 across the production stack on
                         # 2026-09-30, going by kube_deployment_spec_replicas).
+                        #
+                        # pods, deployments, statefulsets, daemonsets and jobs
+                        # carry the routing labels so alert rules can join a
+                        # workload's tier and component onto its alerts
+                        # (docs/plans/rootly-label-routing-implementation-spec.md
+                        # section 4.1). A workload without the labels still gets
+                        # a series, with no label_ol_mit_edu_* columns, so a
+                        # join against it leaves the alert untiered and does
+                        # not drop it.
+                        #
+                        # kube_pod_labels is one series per pod, the same
+                        # cardinality and churn as kube_pod_info. Dagster run
+                        # pods are deliberately not dropped from it: they were
+                        # 1,077 of the 13,862 distinct production pods seen in
+                        # 24h on 2026-10-06, and a pod with no kube_pod_labels
+                        # series is the one case where a join silences its
+                        # alert.
                         "metricLabelsAllowlist": [
                             "nodes=[agentpool,alpha.eksctl.io/cluster-name,"
                             "alpha.eksctl.io/nodegroup-name,"
@@ -742,8 +771,11 @@ def setup_grafana(
                             "node.kubernetes.io/instance-type,"
                             "topology.kubernetes.io/region,"
                             "topology.kubernetes.io/zone]",
-                            "jobs=[dagster/code-location,dagster/job]",
-                            "deployments=[ol.mit.edu/otel-service-name]",
+                            f"jobs=[dagster/code-location,dagster/job,{_OL_ROUTING_LABEL_KEYS}]",
+                            f"deployments=[ol.mit.edu/otel-service-name,{_OL_ROUTING_LABEL_KEYS}]",
+                            f"pods=[{_OL_ROUTING_LABEL_KEYS}]",
+                            f"statefulsets=[{_OL_ROUTING_LABEL_KEYS}]",
+                            f"daemonsets=[{_OL_ROUTING_LABEL_KEYS}]",
                         ],
                     },
                     "kepler": {"deploy": True},
