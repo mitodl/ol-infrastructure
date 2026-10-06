@@ -1066,9 +1066,6 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                     "client_id": kwargs["client_id"],
                     "client_secret": kwargs["client_secret"],
                     "issuer_url": f"{keycloak_url}/realms/{kwargs['realm_id']}",
-                    "domain": keycloak_url.removeprefix("https://").removeprefix(
-                        "http://"
-                    ),
                 }
             )
         ),

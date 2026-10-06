@@ -382,10 +382,11 @@ oidc_secret = OLVaultK8SSecret(
         mount_type="kv-v1",
         path="sso/lightdash",
         templates={
-            "AUTH_OKTA_OAUTH_CLIENT_ID": '{{ get .Secrets "client_id" }}',
-            "AUTH_OKTA_OAUTH_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
-            "AUTH_OKTA_OAUTH_ISSUER": '{{ get .Secrets "issuer_url" }}',
-            "AUTH_OKTA_DOMAIN": '{{ get .Secrets "domain" }}',
+            "AUTH_OIDC_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+            "AUTH_OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+            "AUTH_OIDC_METADATA_DOCUMENT_URL": (
+                '{{ get .Secrets "issuer_url" }}/.well-known/openid-configuration'
+            ),
         },
         refresh_after="1h",
         vaultauth=vault_k8s_resources.auth_name,
@@ -463,38 +464,29 @@ lightdash_chart = kubernetes.helm.v3.Release(
                     },
                 },
                 {
-                    "name": "AUTH_OKTA_OAUTH_CLIENT_ID",
+                    "name": "AUTH_OIDC_CLIENT_ID",
                     "valueFrom": {
                         "secretKeyRef": {
                             "name": oidc_secret_name,
-                            "key": "AUTH_OKTA_OAUTH_CLIENT_ID",
+                            "key": "AUTH_OIDC_CLIENT_ID",
                         }
                     },
                 },
                 {
-                    "name": "AUTH_OKTA_OAUTH_CLIENT_SECRET",
+                    "name": "AUTH_OIDC_CLIENT_SECRET",
                     "valueFrom": {
                         "secretKeyRef": {
                             "name": oidc_secret_name,
-                            "key": "AUTH_OKTA_OAUTH_CLIENT_SECRET",
+                            "key": "AUTH_OIDC_CLIENT_SECRET",
                         }
                     },
                 },
                 {
-                    "name": "AUTH_OKTA_OAUTH_ISSUER",
+                    "name": "AUTH_OIDC_METADATA_DOCUMENT_URL",
                     "valueFrom": {
                         "secretKeyRef": {
                             "name": oidc_secret_name,
-                            "key": "AUTH_OKTA_OAUTH_ISSUER",
-                        }
-                    },
-                },
-                {
-                    "name": "AUTH_OKTA_DOMAIN",
-                    "valueFrom": {
-                        "secretKeyRef": {
-                            "name": oidc_secret_name,
-                            "key": "AUTH_OKTA_DOMAIN",
+                            "key": "AUTH_OIDC_METADATA_DOCUMENT_URL",
                         }
                     },
                 },
