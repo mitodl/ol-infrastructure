@@ -50,6 +50,7 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
+    ALERT_TIER_LABEL,
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sConfig,
@@ -73,6 +74,7 @@ from ol_infrastructure.lib.azure_workload_identity import (
 )
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
@@ -1506,6 +1508,11 @@ def create_k8s_resources(  # noqa: C901
     # The old SGP label (pod-security-group) is kept in the selector; the new
     # edxapp-celery-sg label is added only to the pod template so the
     # edxapp_celery_sg_policy SGP can select celery pods without altering the selector.
+    # The alert tier goes on each Deployment's metadata and pod template only, for the
+    # same reason. A stuck or restarting worker delays tasks and does not take the
+    # site down, so none of these pods page. The ScaledObjects that share the
+    # *_labels dicts are left alone: nothing reads a tier from them.
+    celery_alert_tier_label = {ALERT_TIER_LABEL: str(AlertTier.notify)}
     lms_celery_selector_labels = k8s_global_labels | {
         "ol.mit.edu/component": "edxapp-lms-celery",
         "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
@@ -1518,7 +1525,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=f"{lms_celery_deployment_name}",
             namespace=namespace,
-            labels=lms_celery_labels,
+            labels=lms_celery_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             selector=kubernetes.meta.v1.LabelSelectorArgs(
@@ -1526,7 +1533,7 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_celery_labels,
+                    labels=lms_celery_labels | celery_alert_tier_label,
                     annotations=lms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
@@ -1701,7 +1708,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=lms_high_mem_celery_deployment_name,
             namespace=namespace,
-            labels=lms_high_mem_celery_labels,
+            labels=lms_high_mem_celery_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             selector=kubernetes.meta.v1.LabelSelectorArgs(
@@ -1722,7 +1729,7 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_high_mem_celery_labels,
+                    labels=lms_high_mem_celery_labels | celery_alert_tier_label,
                     annotations={
                         # Keep Karpenter and the cluster autoscaler from reclaiming the
                         # node underneath a running report.
@@ -1890,7 +1897,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=lms_beat_deployment_name,
             namespace=namespace,
-            labels=lms_beat_labels,
+            labels=lms_beat_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             replicas=1,
@@ -1899,7 +1906,7 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_beat_labels,
+                    labels=lms_beat_labels | celery_alert_tier_label,
                     annotations=lms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
@@ -2000,7 +2007,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=f"{env_name}-edxapp-lms-process-scheduled-emails",
             namespace=namespace,
-            labels=lms_process_scheduled_emails_labels,
+            labels=lms_process_scheduled_emails_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             replicas=1,
@@ -2009,7 +2016,8 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_process_scheduled_emails_labels,
+                    labels=lms_process_scheduled_emails_labels
+                    | celery_alert_tier_label,
                     annotations=lms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
@@ -2115,7 +2123,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=f"{cms_celery_deployment_name}",
             namespace=namespace,
-            labels=cms_celery_labels,
+            labels=cms_celery_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             selector=kubernetes.meta.v1.LabelSelectorArgs(
@@ -2123,7 +2131,7 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=cms_celery_labels,
+                    labels=cms_celery_labels | celery_alert_tier_label,
                     annotations=cms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
