@@ -749,25 +749,20 @@ where `_OL_LABEL_KEYS = "ol.mit.edu/service,ol.mit.edu/component,ol.mit.edu/aler
    Only `kube_deployment_labels` (added by #6103) and `kube_pod_labels` are missing
    from it.
 
-The first and fifth verification queries below change accordingly: `count(kube_pod_labels)`
-should equal `count(kube_pod_info)`, and `dagster-run-*` pods are expected in the
-`dagster` namespace count.
+The verification queries below are edited to match: `count(kube_pod_labels)` should
+equal `count(kube_pod_info)`, and the Dagster scoping check is gone with the rule.
 
 **Verification, before touching any alert rule:**
 
 ```
-count(kube_pod_labels)                                    → ~600  (2,606 minus dagster run pods)
+count(kube_pod_labels)                                    → equals count(kube_pod_info)
 count(kube_deployment_labels)                             → >0
+count(kube_statefulset_labels), count(kube_daemonset_labels)  → >0
 count(kube_pod_labels{label_ol_mit_edu_alert_tier!=""})    → matches §3.5 coverage
 count(kube_node_labels{label_topology_kubernetes_io_zone!=""})  → unchanged from today
-count(kube_pod_labels{namespace="dagster"})               → >0, and covers the daemon,
-                                                             webserver and code-location
-                                                             pods but no dagster-run-* pod
 ```
 
-The fourth is the regression check for the `nodes=[...]` trap in §0.3; the fifth is the
-regression check for the drop rule's scoping — a zero there means the rule is matching
-the whole namespace and would silence Dagster's long-lived services.
+The last is the regression check for the `nodes=[...]` trap in §0.3.
 
 ### 4.2 Rewrite the 16 joinable rules
 
