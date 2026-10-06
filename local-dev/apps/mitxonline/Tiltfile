@@ -15,16 +15,24 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
     # The local-dev stage gives the runtime user /src with `RUN chown -R` over
     # ~200k files (mostly node_modules), which dominated the build. Taking
     # ownership while copying is far cheaper (seconds), so swap that line for a
-    # COPY --chown of the same /src from the node stage. If mitxonline changes
-    # the line, this is a no-op and the Dockerfile builds unmodified (slowly).
+    # COPY --chown of the same /src from the node stage. That copy misses files
+    # the node stage dropped (stale .yarn/cache entries from the checkout), so
+    # re-own just those. If mitxonline changes the line, nothing is replaced
+    # and the Dockerfile builds unmodified (slowly).
     CHOWN_LINE = 'RUN chown -R mitodl:mitodl /src'
-    dockerfile_text = str(read_file(APP_DIR + '/Dockerfile'))
-    if CHOWN_LINE in dockerfile_text:
-        dockerfile_text = dockerfile_text.replace(
-            CHOWN_LINE, 'COPY --from=node --chown=mitodl:mitodl /src /src'
-        )
+    CHOWN_REPLACEMENT = '\n'.join([
+        'COPY --from=node --chown=mitodl:mitodl /src /src',
+        'RUN find /src -xdev ! -user mitodl -exec chown mitodl:mitodl {} +',
+    ])
+    dockerfile_lines = str(read_file(APP_DIR + '/Dockerfile')).split('\n')
+    if CHOWN_LINE in [line.strip() for line in dockerfile_lines]:
+        dockerfile_text = '\n'.join([
+            CHOWN_REPLACEMENT if line.strip() == CHOWN_LINE else line
+            for line in dockerfile_lines
+        ])
     else:
         print('mitxonline: Dockerfile no longer has %r; building it unmodified' % CHOWN_LINE)
+        dockerfile_text = '\n'.join(dockerfile_lines)
 
     # Build the `local-dev` target: `production` (the only target that bakes in
     # the compiled webpack frontend, which checkout needs since that flow still
