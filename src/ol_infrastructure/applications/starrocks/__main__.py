@@ -815,11 +815,14 @@ def _build_fe_config(  # noqa: PLR0913
     prevent FE startup.
 
     When oidc_issuer_url is provided, the full set of oauth2_* FE params is
-    written. Those are the globals a user created with an explicit
-    `IDENTIFIED WITH authentication_oauth2` plugin would authenticate against;
-    the authentication_chain path uses the security integration's own copies of
-    the same settings instead. They do not add an "OAuth2 Login" button to the
-    FE web dashboard, which has no OIDC entry point (StarRocks#75370).
+    written. These are not redundant with the security integration's copies:
+    OAuth2SecurityIntegration resolves every setting as
+    `propertyMap.getOrDefault(<property>, Config.oauth2_<property>)`, so the
+    integration's value wins where it sets one and these globals are the
+    fallback where it does not. Our integration omits `required_audience`,
+    which makes `oauth2_required_audience` here the live audience check for
+    authentication_chain logins. They do not add an "OAuth2 Login" button to
+    the FE web dashboard, which has no OIDC entry point (StarRocks#75370).
     The client secret ends up in a ConfigMap (StarRocks Helm chart limitation);
     access is RBAC-gated and marked as a Pulumi secret so it is not stored
     in plaintext Pulumi state.
@@ -829,11 +832,15 @@ def _build_fe_config(  # noqa: PLR0913
     if oidc_issuer_url is not None:
         _oidc_base = f"{oidc_issuer_url}/protocol/openid-connect"
         conf += (
-            # oauth2_* -- the globals read for a user created with an explicit
-            # authentication_oauth2 plugin. The authentication_chain path reads
-            # the security integration's copies of these instead, which is why
-            # the two sources can disagree: principal_field is
-            # preferred_username here and starrocks_username there.
+            # oauth2_* -- both the globals read for a user created with an
+            # explicit authentication_oauth2 plugin AND the per-property
+            # fallback for the security integration, which resolves each
+            # setting as getOrDefault(<property>, Config.oauth2_<property>).
+            # The integration sets principal_field, so starrocks_username wins
+            # over the preferred_username default above; it omits
+            # required_audience, so the value below is what actually validates
+            # the audience on authentication_chain logins. Do not drop
+            # oauth2_required_audience without replacing it in the integration.
             # StarRocks FE exchanges the authorization code server-side using
             # these credentials; the id_token is stored on the connection context
             # and forwarded to Iceberg REST catalogs when security = JWT.
@@ -921,18 +928,17 @@ if _needs_fe_config:
     _domain = starrocks_config.require("domain")
 
     # Pull OIDC client credentials from Vault when OIDC is enabled so the
-    # oauth2_* keys can go into fe.conf. A user created with an explicit auth
-    # plugin does not go through the security integration, so it reads these
-    # globals instead; that is the same rule by which oidc_users'
-    # `authentication_jwt` accounts read the jwt_* keys below.
+    # oauth2_* keys can go into fe.conf. They are read on two paths: directly
+    # by a user created with an explicit auth plugin (which skips the security
+    # integration, the same rule by which oidc_users' `authentication_jwt`
+    # accounts read the jwt_* keys below), and as the integration's
+    # per-property fallback for anything it omits. The second is the one that
+    # matters operationally, because the integration omits required_audience.
     #
     # No CREATE USER statement in this repo uses authentication_oauth2, and
     # none should: such an account is accepted on the FE HTTP port under Basic
     # auth with any password. See the OAuth2 security integration block in
-    # substructure/starrocks for the measurement and StarRocks#67702. Whether
-    # these globals are therefore dead (the /api/oauth2 code exchange may still
-    # read them) is tracked in
-    # tk-the-oauth2-fe-conf-keys-and-the-client-secret-in-264b37.
+    # substructure/starrocks for the measurement and StarRocks#67702.
     # They do NOT put an "OAuth2 Login" button on the FE web dashboard: it
     # answers with `WWW-Authenticate: Basic` unconditionally and has no OIDC
     # entry point at all (StarRocks#75370). The browser redirect belongs to the

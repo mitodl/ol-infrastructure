@@ -666,10 +666,11 @@ command.local.Command(
 # therefore comes from the group provider (see the group-sync block), not from
 # an account the integration leaves behind.
 #
-# Accounts that ARE pre-created use `IDENTIFIED WITH authentication_jwt` --
-# that is what starrocks:oidc_users below emits, with its GRANT and
-# DEFAULT ROLE statements. Users not listed there must be created the same way,
-# following the same recipe (see the oidc_users block for the full SQL).
+# Most users need no account at all, per the paragraph above. Where a durable
+# one IS wanted (a per-user GRANT, visibility to SHOW GRANTS, a role other than
+# the group provider's), it uses `IDENTIFIED WITH authentication_jwt` -- that is
+# what starrocks:oidc_users below emits, with its GRANT and DEFAULT ROLE
+# statements. Create one by hand the same way (see that block for the full SQL).
 #
 # Do NOT create them with `IDENTIFIED WITH authentication_oauth2`. A user whose
 # persisted auth plugin is authentication_oauth2 is accepted by the FE HTTP
