@@ -2,6 +2,7 @@
 """Generate Concourse pipeline definitions for building and deploying dockerized applications to Kubernetes via Pulumi."""
 
 import sys
+from pathlib import Path
 from typing import Any
 
 from ol_concourse.lib.constants import REGISTRY_IMAGE
@@ -1143,6 +1144,44 @@ def _checkout_release_task(main_repo: Resource, output: Identifier) -> TaskStep:
     )
 
 
+# Inlined into the Production job's check task, so the generated pipeline
+# carries the script itself rather than fetching it at run time. See the
+# script's docstring for why the check exists.
+_ASSERT_GATE_SCRIPT = (
+    Path(__file__).parent / "scripts" / "assert_gate_names_deploy.py"
+).read_text()
+ASSERT_GATE_TASK_NAME = "assert-gate-names-deploy"
+
+
+def _assert_gate_names_deploy_task(
+    app_name: str, release_gate: Resource, version_input: Resource
+) -> TaskStep:
+    """Fail the job unless the closed gate issue names the version it deploys.
+
+    Accepts ``Release <app> <version>`` and ``Release <app> infrastructure @
+    <version>``, and requires ``<version>`` to equal the contents of
+    ``<version_input>/version``, which has to be the same file the job's
+    ``DOCKER_TAG`` comes from. The gate get has already tombstoned the issue,
+    so a refused issue does not fire again. A failure here means nothing
+    deployed, which turns gate/deploy drift into a red build instead of an
+    unapproved release.
+    """
+    return TaskStep(
+        task=Identifier(ASSERT_GATE_TASK_NAME),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[Input(name=release_gate.name), Input(name=version_input.name)],
+            params={
+                "APP_NAME": app_name,
+                "GATE_FILE": f"{release_gate.name}/gh_issue.json",
+                "VERSION_FILE": f"{version_input.name}/version",
+            },
+            run=Command(path="python3", args=["-c", _ASSERT_GATE_SCRIPT]),
+        ),
+    )
+
+
 def _build_release_image_job(
     app_name: str,
     dockerfile_path: str,
@@ -1547,6 +1586,9 @@ def _build_release_resource_app_pipeline(
             ],
             1: [
                 GetStep(get=release_gate.name, trigger=True, version="every"),
+                # Before the deployment record or the deploy itself: the
+                # issue that fired must name the version being deployed.
+                _assert_gate_names_deploy_task(app_name, release_gate, release_res),
                 # main_repo is needed by the action=finish post-step.
                 GetStep(
                     get=main_repo.name,
