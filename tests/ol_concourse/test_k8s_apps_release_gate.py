@@ -7,6 +7,7 @@ both where it sits in the generated plan and what the shipped script decides.
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -16,11 +17,14 @@ import pytest
 
 from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
     _ASSERT_GATE_SCRIPT,
+    ASSERT_GATE_TASK_NAME,
     build_app_pipeline,
+)
+from ol_concourse.pipelines.infrastructure.k8s_apps.scripts import (
+    assert_gate_names_deploy,
 )
 
 APP = "ol-analytics-api"
-ASSERT_TASK = "assert-gate-names-deploy"
 
 
 def _plan(app_name: str, job_suffix: str) -> list[dict[str, Any]]:
@@ -30,7 +34,12 @@ def _plan(app_name: str, job_suffix: str) -> list[dict[str, Any]]:
 
 
 def _step_index(plan: list[dict[str, Any]], key: str, name: str) -> int:
-    return next(i for i, step in enumerate(plan) if step.get(key) == name)
+    index = next((i for i, step in enumerate(plan) if step.get(key) == name), None)
+    if index is None:
+        steps = [next(iter(step.items())) for step in plan]
+        msg = f"no {key!r} step named {name!r} in plan; steps are {steps}"
+        raise AssertionError(msg)
+    return index
 
 
 def test_assertion_runs_after_the_gate_and_before_anything_deploys():
@@ -38,7 +47,7 @@ def test_assertion_runs_after_the_gate_and_before_anything_deploys():
     plan = _plan(APP, "-production")
 
     gate = _step_index(plan, "get", f"{APP}-release-gate")
-    check = _step_index(plan, "task", ASSERT_TASK)
+    check = _step_index(plan, "task", ASSERT_GATE_TASK_NAME)
     deployment_start = _step_index(plan, "put", f"{APP}-deployment-production")
     pulumi_up = _step_index(plan, "put", f"pulumi-ol-application-{APP}")
 
@@ -48,7 +57,7 @@ def test_assertion_runs_after_the_gate_and_before_anything_deploys():
 def test_assertion_reads_the_version_the_job_deploys():
     """The check compares against DOCKER_TAG's source, bound to what QA saw."""
     plan = _plan(APP, "-production")
-    task = plan[_step_index(plan, "task", ASSERT_TASK)]
+    task = plan[_step_index(plan, "task", ASSERT_GATE_TASK_NAME)]
     release_get = plan[_step_index(plan, "get", f"{APP}-release")]
 
     assert task["config"]["params"]["VERSION_FILE"] == f"{APP}-release/version"
@@ -58,7 +67,7 @@ def test_assertion_reads_the_version_the_job_deploys():
 def test_legacy_pipelines_are_untouched():
     """Legacy pipelines have no release gate, so they get no check."""
     pipeline = json.loads(build_app_pipeline("mitxonline").model_dump_json())
-    assert ASSERT_TASK not in json.dumps(pipeline)
+    assert ASSERT_GATE_TASK_NAME not in json.dumps(pipeline)
 
 
 def _run(
@@ -71,6 +80,7 @@ def _run(
     return subprocess.run(  # noqa: S603
         [sys.executable, "-c", _ASSERT_GATE_SCRIPT],
         env={
+            **os.environ,
             "APP_NAME": APP,
             "GATE_FILE": str(gate_file),
             "VERSION_FILE": str(version_file),
@@ -102,6 +112,22 @@ def test_script_allows_only_the_approved_version(tmp_path, title, version, allow
     """Only a title naming the deployed version lets the job proceed."""
     result = _run(tmp_path, {"issue_title": title}, version)
     assert (result.returncode == 0) is allowed, result.stderr
+
+
+@pytest.mark.parametrize(
+    ("title", "expected"),
+    [
+        (f"Release {APP} 2026.9.22.1", "2026.9.22.1"),
+        (f"  Release {APP} 2026.9.22.1\n", "2026.9.22.1"),
+        (f"Release {APP} infrastructure @ 2026.9.17.1", "2026.9.17.1"),
+        (f"Release {APP}", None),
+        (f"Release {APP}-v2 2026.9.22.1", None),
+        ("", None),
+    ],
+)
+def test_approved_version_parses_only_the_accepted_shapes(title, expected):
+    """The title parser returns the named version, or None for anything else."""
+    assert assert_gate_names_deploy.approved_version(APP, title) == expected
 
 
 def test_script_fails_closed_on_an_empty_gate_file(tmp_path):

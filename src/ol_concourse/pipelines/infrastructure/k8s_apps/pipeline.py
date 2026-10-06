@@ -2,6 +2,7 @@
 """Generate Concourse pipeline definitions for building and deploying dockerized applications to Kubernetes via Pulumi."""
 
 import sys
+from pathlib import Path
 from typing import Any
 
 from ol_concourse.lib.constants import REGISTRY_IMAGE
@@ -1143,42 +1144,13 @@ def _checkout_release_task(main_repo: Resource, output: Identifier) -> TaskStep:
     )
 
 
-# Run inside the Production job, before anything deploys. The release gate
-# is a TRIGGER: whichever closed issue matching its prefix fired, the job
-# deploys whatever version last passed QA. Two open issues can both match
-# (a stale one left behind when a newer release was cut, or a future
-# infrastructure-only one), and closing the wrong one would ship a release
-# nobody approved. So refuse unless the closed issue's own title names the
-# version this job is about to deploy.
-_ASSERT_GATE_SCRIPT = r"""
-import json, os, re, sys
-
-app = os.environ["APP_NAME"]
-with open(os.environ["GATE_FILE"]) as gate_file:
-    title = (json.load(gate_file).get("issue_title") or "").strip()
-with open(os.environ["VERSION_FILE"]) as version_file:
-    deploying = version_file.read().strip()
-
-shapes = (
-    rf"Release {re.escape(app)} infrastructure @ (\S+)",
-    rf"Release {re.escape(app)} (\S+)",
-)
-approved = next(
-    (m.group(1) for m in (re.fullmatch(s, title) for s in shapes) if m), None
-)
-if approved is None:
-    sys.exit(
-        f"Refusing to deploy {app} {deploying}: the gate issue that fired "
-        f"({title!r}) does not name a version. Nothing was deployed."
-    )
-if approved != deploying:
-    sys.exit(
-        f"Refusing to deploy {app} {deploying}: the gate issue that fired "
-        f"({title!r}) approved {approved}. Nothing was deployed. To ship "
-        f"{deploying}, close the release issue for {deploying}."
-    )
-print(f"Gate issue {title!r} approves deploying {app} {deploying}.")
-"""
+# Inlined into the Production job's check task, so the generated pipeline
+# carries the script itself rather than fetching it at run time. See the
+# script's docstring for why the check exists.
+_ASSERT_GATE_SCRIPT = (
+    Path(__file__).parent / "scripts" / "assert_gate_names_deploy.py"
+).read_text()
+ASSERT_GATE_TASK_NAME = "assert-gate-names-deploy"
 
 
 def _assert_gate_names_deploy_task(
@@ -1195,7 +1167,7 @@ def _assert_gate_names_deploy_task(
     unapproved release.
     """
     return TaskStep(
-        task=Identifier("assert-gate-names-deploy"),
+        task=Identifier(ASSERT_GATE_TASK_NAME),
         config=TaskConfig(
             platform=Platform.linux,
             image_resource=TASK_IMAGE,
