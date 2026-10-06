@@ -54,7 +54,9 @@ class AppRegistration:
 
 
 APPS: dict[str, AppRegistration] = {
-    "learn-ai": AppRegistration(slack_channel="product-learn-ai"),
+    "learn-ai": AppRegistration(
+        slack_channel="product-learn-ai", release_resource_workflow=True
+    ),
     "micromasters": AppRegistration(
         repo_main_branch="master", slack_channel="product-micromasters"
     ),
@@ -141,9 +143,9 @@ def release_workflow_repos() -> frozenset[str]:
     EVERY REGISTERED APP, NOT ONLY THE ONES ALREADY RUNNING THE NEW WORKFLOW. That
     is deliberate and it over-grants on purpose (decision: Tobias, 2026-09-01). The
     actual opt-in is ``AppRegistration.release_resource_workflow`` above, which
-    defaults to ``False`` and today is set on ``ol-analytics-api`` alone -- so the
-    consumer below grants a bypass on ``mit-learn`` and ``mitxonline`` for an App
-    that does not yet finish their releases.
+    defaults to ``False`` and today is set on ``ol-analytics-api`` and
+    ``learn-ai`` -- so the consumer below grants a bypass on ``mit-learn`` and
+    ``mitxonline`` for an App that does not yet finish their releases.
 
     The trade is pre-provisioning against a rollout that would otherwise need a
     GitHub ruleset edit interleaved with every pipeline flip -- and that edit is the
