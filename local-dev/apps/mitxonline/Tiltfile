@@ -12,6 +12,20 @@ NAMESPACE = 'mitxonline'
 DEPLOY_NAME = 'mitxonline-webapp'
 
 if os.path.exists(os.path.join(APP_DIR, '.git')):
+    # The local-dev stage gives the runtime user /src with `RUN chown -R` over
+    # ~200k files (mostly node_modules), which dominated the build. Taking
+    # ownership while copying is far cheaper (seconds), so swap that line for a
+    # COPY --chown of the same /src from the node stage. If mitxonline changes
+    # the line, this is a no-op and the Dockerfile builds unmodified (slowly).
+    CHOWN_LINE = 'RUN chown -R mitodl:mitodl /src'
+    dockerfile_text = str(read_file(APP_DIR + '/Dockerfile'))
+    if CHOWN_LINE in dockerfile_text:
+        dockerfile_text = dockerfile_text.replace(
+            CHOWN_LINE, 'COPY --from=node --chown=mitodl:mitodl /src /src'
+        )
+    else:
+        print('mitxonline: Dockerfile no longer has %r; building it unmodified' % CHOWN_LINE)
+
     # Build the `local-dev` target: `production` (the only target that bakes in
     # the compiled webpack frontend, which checkout needs since that flow still
     # runs through mitxonline.mit.dev) plus dev deps (pytest, ipdb, ...) and
@@ -20,9 +34,18 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         IMAGE,
         context=APP_DIR,
         target='local-dev',
-        dockerfile=APP_DIR + '/Dockerfile',
-        # .claude/ holds agent worktrees; syncing one into the pod restarted it in a loop.
-        ignore=['.claude/'],
+        dockerfile_contents=dockerfile_text,
+        ignore=[
+            # Agent worktrees; syncing one into the pod restarted it in a loop.
+            '.claude/',
+            # The repo's .dockerignore only drops the root node_modules, so the
+            # host's frontend/*/node_modules (~1GB) went into the image. The
+            # node stage runs its own yarn install, so none of it is needed.
+            '**/node_modules',
+            # The host venv (~700MB) was copied into /src too; the image's
+            # own venv is /opt/venv, so it was never used.
+            '.venv/',
+        ],
         # Sync the whole repo: Django apps are top-level dirs (courses,
         # ecommerce, cms, ...). granian's --reload-ignore-dirs filters the
         # non-Python churn.
