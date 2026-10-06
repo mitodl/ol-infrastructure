@@ -52,10 +52,13 @@ from metadata.ingestion.ometa.client import APIError
 from metadata.ingestion.ometa.ometa_api import OpenMetadata
 from metadata.utils import fqn
 
+# Importing ``metadata`` already configured the root logger at WARNING, so
+# without ``force`` this call is a no-op and every INFO line is dropped.
 logging.basicConfig(
     stream=sys.stdout,
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+    force=True,
 )
 log = logging.getLogger("glue-trino-lineage")
 
