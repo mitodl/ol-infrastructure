@@ -11,6 +11,7 @@ config:
   gravitino:jvm_memory: -Xms1g -Xmx1g -XX:MaxMetaspaceSize=512m
   gravitino:keycloak_issuer: https://sso-qa.ol.mit.edu/realms/ol-data-platform
   gravitino:memory_limit: 2Gi
+  gravitino:reconcile_enabled: "true"
   gravitino:replicas: "1"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
