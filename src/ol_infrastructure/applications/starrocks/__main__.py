@@ -815,10 +815,14 @@ def _build_fe_config(  # noqa: PLR0913
     prevent FE startup.
 
     When oidc_issuer_url is provided, the full set of oauth2_* FE params is
-    written. Those serve locally-created `IDENTIFIED WITH authentication_oauth2`
-    users and the JDBC driver's browser authorization-code flow; they do not
-    add an "OAuth2 Login" button to the FE web dashboard, which has no OIDC
-    entry point (StarRocks#75370).
+    written. These are not redundant with the security integration's copies:
+    OAuth2SecurityIntegration resolves every setting as
+    `propertyMap.getOrDefault(<property>, Config.oauth2_<property>)`, so the
+    integration's value wins where it sets one and these globals are the
+    fallback where it does not. Our integration omits `required_audience`,
+    which makes `oauth2_required_audience` here the live audience check for
+    authentication_chain logins. They do not add an "OAuth2 Login" button to
+    the FE web dashboard, which has no OIDC entry point (StarRocks#75370).
     The client secret ends up in a ConfigMap (StarRocks Helm chart limitation);
     access is RBAC-gated and marked as a Pulumi secret so it is not stored
     in plaintext Pulumi state.
@@ -828,8 +832,15 @@ def _build_fe_config(  # noqa: PLR0913
     if oidc_issuer_url is not None:
         _oidc_base = f"{oidc_issuer_url}/protocol/openid-connect"
         conf += (
-            # oauth2_* — read by locally-created authentication_oauth2 users
-            # and by the JDBC driver's browser authorization-code flow.
+            # oauth2_* -- both the globals read for a user created with an
+            # explicit authentication_oauth2 plugin AND the per-property
+            # fallback for the security integration, which resolves each
+            # setting as getOrDefault(<property>, Config.oauth2_<property>).
+            # The integration sets principal_field, so starrocks_username wins
+            # over the preferred_username default above; it omits
+            # required_audience, so the value below is what actually validates
+            # the audience on authentication_chain logins. Do not drop
+            # oauth2_required_audience without replacing it in the integration.
             # StarRocks FE exchanges the authorization code server-side using
             # these credentials; the id_token is stored on the connection context
             # and forwarded to Iceberg REST catalogs when security = JWT.
@@ -917,10 +928,17 @@ if _needs_fe_config:
     _domain = starrocks_config.require("domain")
 
     # Pull OIDC client credentials from Vault when OIDC is enabled so the
-    # oauth2_* keys can go into fe.conf. Those are what a locally-created
-    # `CREATE USER ... IDENTIFIED WITH authentication_oauth2` account
-    # authenticates against -- the security integration alone is not sufficient
-    # for a user created that way, which is how starrocks:oidc_users works.
+    # oauth2_* keys can go into fe.conf. They are read on two paths: directly
+    # by a user created with an explicit auth plugin (which skips the security
+    # integration, the same rule by which oidc_users' `authentication_jwt`
+    # accounts read the jwt_* keys below), and as the integration's
+    # per-property fallback for anything it omits. The second is the one that
+    # matters operationally, because the integration omits required_audience.
+    #
+    # No CREATE USER statement in this repo uses authentication_oauth2, and
+    # none should: such an account is accepted on the FE HTTP port under Basic
+    # auth with any password. See the OAuth2 security integration block in
+    # substructure/starrocks for the measurement and StarRocks#67702.
     # They do NOT put an "OAuth2 Login" button on the FE web dashboard: it
     # answers with `WWW-Authenticate: Basic` unconditionally and has no OIDC
     # entry point at all (StarRocks#75370). The browser redirect belongs to the

@@ -655,12 +655,40 @@ command.local.Command(
 # property changes (e.g. a client secret rotation) are applied correctly.
 # StarRocks has no ALTER SECURITY INTEGRATION for OAuth2 core properties.
 #
-# Users authenticate via the browser-based OAuth2 Authorization Code flow.
-# Each human user must also be pre-created in StarRocks with:
-#   CREATE USER 'preferred_username'@'%' IDENTIFIED WITH authentication_oauth2;
-# and assigned an appropriate role.  Use starrocks:oidc_users in the stack
-# config to manage these accounts through Pulumi; users not listed there
-# must be created manually after the cluster is deployed.
+# Users authenticate via the browser-based OAuth2 Authorization Code flow,
+# driven by the JDBC driver; the FE exchanges the code server-side.
+#
+# A login that resolves through this integration does NOT create a user row.
+# On 4.1.6 AuthenticationHandler.authenticateWithSecurityIntegration() returns
+# UserIdentity.createEphemeralUserIdent(), which lives for the connection and
+# is persisted nowhere, and no source file under com/starrocks/authentication
+# reads the "auto_provision_user" property set below. Durable role assignment
+# therefore comes from the group provider (see the group-sync block), not from
+# an account the integration leaves behind.
+#
+# Most users need no account at all, per the paragraph above. Where a durable
+# one IS wanted (a per-user GRANT, visibility to SHOW GRANTS, a role other than
+# the group provider's), it uses `IDENTIFIED WITH authentication_jwt` -- that is
+# what starrocks:oidc_users below emits, with its GRANT and DEFAULT ROLE
+# statements. Create one by hand the same way (see that block for the full SQL).
+#
+# Do NOT create them with `IDENTIFIED WITH authentication_oauth2`. A user whose
+# persisted auth plugin is authentication_oauth2 is accepted by the FE HTTP
+# port (8030) under Basic auth with ANY password, including an empty one.
+# Measured on 4.1.6 (2026-10-06): such a user reached /system, /session,
+# /api/show_proc, /api/v1/catalogs/.../sql and _stream_load, and the stream
+# load committed rows. Reading the 4.1.6 source for the cause:
+# BaseAction.checkPassword() authenticates against a fresh ConnectContext that
+# carries no client auth plugin, so OAuth2AuthenticationProvider.authenticate()
+# returns success at its AUTHENTICATION_OAUTH2_CLIENT guard and defers the real
+# check to checkLoginSuccess(), which no HTTP code path calls. The MySQL
+# protocol is unaffected (it refuses with ERROR 5207), and authentication_jwt
+# users are refused correctly. Upstream: StarRocks#67702, closed stale and
+# never fixed.
+#
+# Scope if one is ever created by hand: port 8030 is not published to the
+# internet. The APISIX route exposes only the exact path /api/oauth2 and the FE
+# NLB only 9030, so the reachable surface is in-cluster and port-forward.
 #
 # Service-account (application) access continues to use Vault dynamic
 # credentials (native StarRocks auth) and is unaffected by OIDC config.
@@ -987,10 +1015,14 @@ if oidc_enabled:
     )
 
     # Pre-create OIDC-authenticated user accounts from config.
-    # With auto_provision_user=true and the file group provider in place,
-    # accounts and roles are normally handled automatically on first login.
-    # Entries here are only needed for edge-case overrides (e.g. a user who
-    # needs a different role than the one assigned via their Keycloak groups).
+    # A first login needs no entry here: the security integration authenticates
+    # an unknown username against Keycloak and the file group provider supplies
+    # the role, so entries are only needed for edge-case overrides (e.g. a user
+    # who needs a different role than their Keycloak groups give them).
+    # Note that no account is persisted by that path -- the integration's
+    # identity is ephemeral and "auto_provision_user" is not read on 4.1.6 (see
+    # the OAuth2 security integration block) -- so an entry here is also how an
+    # account becomes visible to SHOW GRANTS and to per-user GRANT statements.
     #
     # Each entry must supply:
     #   username    - the starrocks_username claim value (local part of the Keycloak
