@@ -734,6 +734,25 @@ and pay for the ~2,000 series. Cost is the lesser risk here.
 
 where `_OL_LABEL_KEYS = "ol.mit.edu/service,ol.mit.edu/component,ol.mit.edu/alert_tier,ol.mit.edu/environment"`.
 
+**[2026-10-06] As implemented, two differences from the sketch above.**
+
+1. **No Dagster drop rule.** §0.6 sized `data-production` at 2,004 of 2,606 live
+   production pods. Re-measured from `kube_pod_info`: 160 of 985 live, and over 24h
+   `dagster-(run|step)-*` pods were 1,077 of 13,862 distinct production pods (8%).
+   `applications-production` is where the churn is (11,275 distinct pods in 24h, mostly
+   DaemonSet pods following node turnover). The rule would save 8% of the new series and
+   leave run pods with no right-hand series, which silences `PodOOMKilled*` for them
+   once §4.2 lands. `kube_pod_labels` churns one for one with `kube_pod_info`, which is
+   already paid for.
+2. **`includeMetrics` needs two entries, not five.** In chart 4.5.2 the default
+   allow-list keeps `kube_job.*`, `kube_statefulset.*` and `kube_daemonset.*` whole.
+   Only `kube_deployment_labels` (added by #6103) and `kube_pod_labels` are missing
+   from it.
+
+The first and fifth verification queries below change accordingly: `count(kube_pod_labels)`
+should equal `count(kube_pod_info)`, and `dagster-run-*` pods are expected in the
+`dagster` namespace count.
+
 **Verification, before touching any alert rule:**
 
 ```
