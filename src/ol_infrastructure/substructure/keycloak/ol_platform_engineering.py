@@ -6,6 +6,10 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Alias, Config, InvokeOptions, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.passkey_flow import (
+    create_passkey_browser_flow,
+)
+
 
 def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
@@ -1091,86 +1095,9 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
 
     # OL Platform Engineering Realm - Authentication Flows[START]
     # OL - browser flow [START]
-    # username-form -> ol-auth-username-password-form
-
-    ol_browser_platform_engineering_flow = keycloak.authentication.Flow(
-        "ol-browser-platform-engineering-flow",
-        realm_id=ol_platform_engineering_realm.id,
-        alias="ol-browser-platform-engineering-flow",
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-platform-engineering-auth-cookie",
-        realm_id=ol_platform_engineering_realm.id,
-        parent_flow_alias=ol_browser_platform_engineering_flow.alias,
-        authenticator="auth-cookie",
-        requirement="ALTERNATIVE",
-        priority=10,
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-platform-engineering-idp-redirector",
-        realm_id=ol_platform_engineering_realm.id,
-        parent_flow_alias=ol_browser_platform_engineering_flow.alias,
-        authenticator="identity-provider-redirector",
-        requirement="ALTERNATIVE",
-        priority=20,
-        opts=resource_options,
-    )
-    ol_browser_platform_engineering_flow_org = keycloak.authentication.Subflow(
-        "ol-browser-platform-engineering-flow-org",
-        realm_id=ol_platform_engineering_realm.id,
-        alias="ol-browser-platform-engineering-flow-org",
-        parent_flow_alias=ol_browser_platform_engineering_flow.alias,
-        provider_id="basic-flow",
-        requirement="ALTERNATIVE",
-        priority=30,
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-platform-engineering-flow-org-user-configured",
-        realm_id=ol_platform_engineering_realm.id,
-        parent_flow_alias=ol_browser_platform_engineering_flow_org.alias,
-        authenticator="conditional-user-configured",
-        priority=40,
-        requirement="REQUIRED",
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-platform-engineering-flow-org-identity-first",
-        realm_id=ol_platform_engineering_realm.id,
-        parent_flow_alias=ol_browser_platform_engineering_flow_org.alias,
-        authenticator="organization",
-        priority=50,
-        requirement="ALTERNATIVE",
-        opts=resource_options,
-    )
-    ol_browser_platform_engineering_passkey_flow = keycloak.authentication.Subflow(
-        "ol-browser-platform-engineering-passkey-flow",
-        realm_id=ol_platform_engineering_realm.id,
-        alias="ol-browser-platform-engineering-passkey-flow",
-        parent_flow_alias=ol_browser_platform_engineering_flow.alias,
-        provider_id="basic-flow",
-        priority=60,
-        requirement="REQUIRED",
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-platform-engineering-flow-username-form",
-        realm_id=ol_platform_engineering_realm.id,
-        parent_flow_alias=ol_browser_platform_engineering_passkey_flow.alias,
-        authenticator="auth-username-form",
-        requirement="REQUIRED",
-        priority=70,
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-platform-engineering-webauthn-authenticator-flow",
-        realm_id=ol_platform_engineering_realm.id,
-        parent_flow_alias=ol_browser_platform_engineering_passkey_flow.alias,
-        authenticator="webauthn-authenticator-passwordless",
-        requirement="REQUIRED",
-        priority=80,
+    ol_browser_platform_engineering_flow = create_passkey_browser_flow(
+        ol_platform_engineering_realm.id,
+        "ol-browser-platform-engineering",
         opts=resource_options,
     )
     # Bind the flow to the ol-platform-engineering realm for browser login.
