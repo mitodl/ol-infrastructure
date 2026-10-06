@@ -191,7 +191,7 @@ pipeline_params = {
         settings_dir="micromasters",
         version_file="VERSION",
         refresh_stack=False,
-        description="Builds the MicroMasters Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
+        description="Builds the MicroMasters Django app image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
     ),
     "mitxonline": AppPipelineParams(
         app_name="mitxonline",
