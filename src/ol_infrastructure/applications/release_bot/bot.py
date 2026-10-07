@@ -1065,7 +1065,7 @@ def _stuck_release_after() -> timedelta:
 class ReleaseProgressState:
     """What the release-progress poller has already said, held in process.
 
-    `last_deployment` is seeded on first observation rather than starting
+    `last_version` is seeded on first observation rather than starting
     empty, because the poller announces *transitions*: an empty map would
     replay every app's current RC and Production deployment into Slack on
     every bot restart. The cost of seeding is at most one missed announcement,
@@ -1077,10 +1077,13 @@ class ReleaseProgressState:
     after a restart, and re-reporting it once is the point.
     """
 
+    # The release version of the newest successful deployment, not its
+    # GitHub Deployment id: the QA job records a fresh Deployment every time
+    # an infra-only merge re-runs it, so the id changes with no new release.
     # None means "polled and confirmed no successful deployment yet" -- a real
     # baseline, distinct from a (app, environment) pair never having been
     # polled at all (absent from the dict). See _announce_deployments.
-    last_deployment: dict[tuple[str, str], int | None] = field(default_factory=dict)
+    last_version: dict[tuple[str, str], str | None] = field(default_factory=dict)
     nagged_at: dict[tuple[str, str], datetime] = field(default_factory=dict)
 
 
@@ -1148,15 +1151,18 @@ async def _announce_deployments(app, repos, state: ReleaseProgressState) -> None
             # then see a real id with no key present and treat that first
             # real deployment as the restart-seed case instead of a genuine
             # no-deployment -> deployed transition.
-            first_observation = key not in state.last_deployment
+            first_observation = key not in state.last_version
             if deployment is None:
-                state.last_deployment.setdefault(key, None)
+                state.last_version.setdefault(key, None)
                 continue
-            previous = state.last_deployment.get(key)
-            state.last_deployment[key] = deployment["id"]
-            if first_observation or previous == deployment["id"]:
-                # First observation seeds the watcher; an unchanged id is the
-                # steady state between releases.
+            previous = state.last_version.get(key)
+            state.last_version[key] = deployment["version"]
+            if first_observation or previous == deployment["version"]:
+                # First observation seeds the watcher; an unchanged version is
+                # the steady state between releases, including every
+                # infra-only QA re-run, which redeploys the same release under
+                # a new Deployment id. A hotfix is announced: it is cut as a
+                # new version.
                 continue
             try:
                 await app.client.chat_postMessage(
@@ -1167,9 +1173,9 @@ async def _announce_deployments(app, repos, state: ReleaseProgressState) -> None
                 log.exception(
                     "Failed to announce the %s deployment of %s", environment, app_name
                 )
-                # Put the previous id back so the next poll retries this
+                # Put the previous version back so the next poll retries this
                 # milestone instead of silently treating it as announced.
-                state.last_deployment[key] = previous
+                state.last_version[key] = previous
 
 
 async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta) -> str:
