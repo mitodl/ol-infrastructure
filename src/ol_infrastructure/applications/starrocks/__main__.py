@@ -964,8 +964,9 @@ if _needs_fe_config:
             }
         )
     if _oidc_vault_data is not None:
-        # The Vault-synced Secret restarts the FE StatefulSet when the client
-        # secret rotates (restart_target_* on oidc_config_secret_config).
+        # The Vault-synced Secret names the FE StatefulSet as its restart
+        # target. Not confirmed: that the restart survives the operator's
+        # reconcile. After rotating the client secret, check that the FEs rolled.
         _fe_secret_env_vars.append(
             {
                 "name": FE_ENV_OAUTH2_CREDENTIAL,
