@@ -1090,12 +1090,13 @@ class OLApisixSharedPlugins(ComponentResource):
         )
 
 
-# User-Agent prefix of the first-party server-side callers that must not be
-# treated as browsers.  ``axios/`` is what the mit-learn Next.js SSR layer
-# sends (frontends/api/package.json); it is a default the application does not
-# set deliberately, so this is a floor, not a guarantee -- see
-# browser_traffic_match_exprs.
-FIRST_PARTY_SERVICE_CLIENT_UA_REGEX = r"^axios/"
+# User-Agent of the first-party server-side callers that must not be treated
+# as browsers.  ``mit-learn-ssr`` is what the mit-learn Next.js SSR layer sets
+# on purpose (frontends/main/src/bootstrap/api.ts), with or without a
+# ``/<version>`` suffix.  ``axios/`` is the HTTP client default it sent before
+# that, kept until every environment runs a release that sends the explicit
+# one -- see browser_traffic_match_exprs.
+FIRST_PARTY_SERVICE_CLIENT_UA_REGEX = r"^(?:axios/|mit-learn-ssr(?:/|$))"
 
 
 def browser_traffic_match_exprs(
