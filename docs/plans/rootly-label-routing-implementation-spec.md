@@ -659,9 +659,11 @@ with a sentinel:
 None of them reaches a selector. The last row is the constraint: the user-deployments
 chart copies a code location's `labels` into `DAGSTER_CLI_API_GRPC_CONTAINER_CONTEXT`,
 and `dagster_k8s` applies them to the Job and pod of every run that location launches,
-with the code location's value winning over the run launcher's. A code server and its
-run workers cannot carry different `component` or `alert_tier` values, so both are
-`component=worker`.
+with the code location's value winning over the run launcher's. The chart has no
+run-only labels key, so a code server and its run workers share one `component` and
+`alert_tier`, and both are `component=worker`. A single job can still override its own
+run pods through a `dagster-k8s/config` tag, which is merged after the code location's
+context.
 
 Everything in the stack is tier `notify`, including pgbouncer and the SQL exporter,
 which the stack builds by hand.
@@ -980,7 +982,7 @@ hand-maintained invariant has been visible at all.
 | P1.1 Enable the two CI/QA route rules (UI) | — | minutes |
 | P1.2 CI source urgency High → Low | — | small |
 | P1.3 Turn off the account-wide default alerts channel | P1.1 | small |
-| P1.4 Delete `exampleDeleteMe`, fix `QA Non-Paging`, finish `Cloudwatch - Critical` | — | small |
+| P1.4 Delete `exampleDeleteMe` (done 2026-10-06), fix `QA Non-Paging` (deleted 2026-10-07), finish `Cloudwatch - Critical` | — | small |
 | **P1.5 Move the 2 live `component` rules to the Production Service Route; delete the inert Grafana Service Route** | — | **small — reaches 2 orphaned services today (§0.4)** |
 | P2.A Extend `Component` + tighten the type; retype `_Check.component`; enum hygiene | — | small |
 | P2.B Add `AlertTier`; move roll-up fields to base; explicit `environment` | P2.A | small |

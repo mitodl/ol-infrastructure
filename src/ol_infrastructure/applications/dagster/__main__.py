@@ -2864,8 +2864,8 @@ for location in code_locations:
         # The chart puts these on the Deployment and its pod template, and copies
         # them into the container context of every run the location launches
         # (dagster_k8s K8sContainerContext, where the code location's value wins
-        # over the run launcher's). A code server and its run workers therefore
-        # share one label set and cannot be given different components.
+        # over the run launcher's). The chart has no run-only labels key, so a
+        # code server and its run workers share one label set.
         "labels": dagster_workload_labels(Component.worker),
         # Chart key is deploymentStrategy, not strategy.
         "deploymentStrategy": {
