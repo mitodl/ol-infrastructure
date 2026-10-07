@@ -287,6 +287,23 @@ def test_default_plugin_config_does_not_validate_bearer_tokens():
     assert not {option for option in BEARER_VALIDATION_OPTIONS if config.get(option)}
 
 
+def test_plugin_config_sends_pkce_by_default():
+    """A Keycloak client can only require PKCE once every route using it sends
+    it, so the helper has to emit use_pkce without each caller opting in.
+    """
+    oidc = oidc_resources("test-oidc-pkce-default")
+
+    config = oidc.get_full_oidc_plugin_config(unauth_action="auth")["config"]
+
+    assert config["use_pkce"] is True
+
+
+def test_pkce_can_be_turned_off_per_application():
+    oidc = oidc_resources("test-oidc-pkce-off", oidc_use_pkce=False)
+
+    assert oidc.base_oidc_config["use_pkce"] is False
+
+
 # ─── Session cookie naming ─────────────────────────────────────────────────────
 
 

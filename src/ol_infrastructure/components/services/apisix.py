@@ -621,6 +621,12 @@ class OLApisixOIDCConfig(BaseModel):
     oidc_session_idling_timeout: NonNegativeInt | None = None
     oidc_session_rolling_timeout: NonNegativeInt | None = None
     oidc_ssl_verify: bool = True
+    # Sends code_challenge (S256) on the authorization request and
+    # code_verifier on the token request. Keycloak accepts both from a client
+    # that does not require PKCE, so this has to be on, and deployed in every
+    # stack sharing a client, before that client gets
+    # pkce_code_challenge_method="S256".
+    oidc_use_pkce: bool = True
     oidc_use_session_secret: bool = True
 
 
@@ -722,6 +728,7 @@ class OLApisixOIDCResources(ComponentResource):
             "renew_access_token_on_expiry": oidc_config.oidc_renew_access_token_on_expiry,
             "logout_path": oidc_config.oidc_logout_path,
             "post_logout_redirect_uri": oidc_config.oidc_post_logout_redirect_uri,
+            "use_pkce": oidc_config.oidc_use_pkce,
             **session_config,
         }
 
