@@ -12,6 +12,16 @@ Inputs read from the environment (e.g. `MITXONLINE_DOCKER_TAG`) only have to
 be the same for both runs, which they are because both inherit this process's
 environment. They do not have to be the deployed values.
 
+Two limits on what IDENTICAL means:
+
+- Secret inputs are not compared. `pulumi preview --json` prints each one as
+  `[secret]`, so two different secret values look the same. A change to how a
+  secret is built has to be checked another way.
+- Only names with the suffix Pulumi or the Kubernetes provider appends (7 or 8
+  hex characters on a property called `name`) are masked. A resource that does
+  not exist yet and is auto-named some other way (e.g. an AWS `name_prefix`)
+  is reported as DIFFERENT on every run, including main against main.
+
 Each tree runs against its own virtualenv (`uv run --no-sync --project
 <tree>`), so each preview imports its own copy of `ol_infrastructure`.
 

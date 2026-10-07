@@ -447,6 +447,11 @@ Result for the mitxonline definition split on 2026-10-07, against `main` at
 `blocking_threads` from 16 to 17 was reported as a difference in the webapp
 Deployment's args, so the comparison does see the rendered config.
 
+Secret inputs are outside that result: `pulumi preview --json` prints them as
+`[secret]`, so the comparison cannot tell two secret values apart. The Redis
+password is the one secret that passes through the definition
+(`celery_redis`), and it is handed on unchanged.
+
 Local behaviour is covered by `test_k8s_local_cluster.py` and
 `test_k8s_without_aws.py` in `tests/ol_infrastructure/components/services/`. It
 has not been applied to a k3d cluster; that happens with the first local
