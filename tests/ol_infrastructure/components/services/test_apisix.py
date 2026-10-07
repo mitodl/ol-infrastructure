@@ -1489,6 +1489,8 @@ def test_browser_traffic_match_exprs_ua_regex_is_anchored():
     assert FIRST_PARTY_SERVICE_CLIENT_UA_REGEX.startswith("^")
     user_agent = expr_for_header(browser_exprs(), "User-Agent")
     assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {MIT_LEARN_SSR_UA}")
+    for explicit_ua in MIT_LEARN_SSR_EXPLICIT_UAS:
+        assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {explicit_ua}")
     assert not re.search(user_agent["value"], "mit-learn-ssr-lookalike/1.0")
 
 
