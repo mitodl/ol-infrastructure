@@ -570,7 +570,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "Provisions OpenSearch domains for the apps, celery_monitoring, "
             "mitlearn, mitx, mitx-staging, mitxonline, open, open_metadata, "
             "and xpro deployment groups via Pulumi, each running its own "
-            "parallel CI to QA to Production chain."
+            "parallel chain through whichever of CI, QA, and Production it has."
         ),
         category="data-platform",
         deployment_groups=[
