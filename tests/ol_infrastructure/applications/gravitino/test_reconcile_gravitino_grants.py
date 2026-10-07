@@ -336,6 +336,61 @@ def test_roles_reach_principals_only_through_their_own_group(server):
     assert server.groups["ol_data_analyst"] == {"ol_data_analyst", "hand_made_role"}
 
 
+def _retire(role: str) -> dict[str, Any]:
+    desired = _desired()
+    del desired["roles"][role]
+    desired["retired_roles"] = [role]
+    return desired
+
+
+def test_retired_role_loses_its_privileges_and_every_binding(server, capsys):
+    _run(server, holders=[_user("alice@mit.edu", "alice")])
+    server.groups["ol_researcher"].add("ol_data_analyst")
+    server.users["alice"].add("ol_data_analyst")
+    capsys.readouterr()
+    _run(server, _retire("ol_data_analyst"), [_user("alice@mit.edu", "alice")])
+
+    assert server.roles["ol_data_analyst"] == []
+    assert server.groups["ol_data_analyst"] == set()
+    assert server.groups["ol_researcher"] == {"ol_researcher"}
+    assert server.users["alice"] == set()
+    assert "not managed here" not in capsys.readouterr().err
+    assert server.privileges("ol_business_analyst", MART) == {
+        "USE_SCHEMA",
+        "SELECT_TABLE",
+    }
+
+
+def test_role_dropped_without_being_retired_is_only_reported(server, capsys):
+    _run(server)
+    desired = _desired()
+    del desired["roles"]["ol_data_analyst"]
+    _run(server, desired)
+
+    assert server.groups["ol_data_analyst"] == {"ol_data_analyst"}
+    assert server.privileges("ol_data_analyst", MART) == {"USE_SCHEMA", "SELECT_TABLE"}
+    assert "left alone: ['ol_data_analyst']" in capsys.readouterr().err
+
+
+def test_retiring_a_role_converges_and_never_creates_it(server):
+    desired = _retire("ol_data_analyst")
+    _run(server, desired)
+    assert "ol_data_analyst" not in server.roles
+
+    server.writes.clear()
+    _run(server, desired)
+    assert not any("/permissions/" in path for _, path in server.writes)
+
+
+def test_role_both_managed_and_retired_is_refused_before_any_request(server):
+    desired = _desired()
+    desired["retired_roles"] = ["ol_data_analyst"]
+
+    with pytest.raises(ReconcileError, match="both managed and retired"):
+        _run(server, desired)
+    assert server.writes == []
+
+
 def test_environment_schemas_are_owned_by_the_engineering_group(server):
     _run(server)
     owner = {"name": "ol_data_engineer", "type": "group"}

@@ -29,6 +29,7 @@ from ol_infrastructure.lib.data_lake_access import (
     CATALOG_WIDE_WRITE_ROLES,
     GOVERNANCE_LAYER_ACCESS,
     GOVERNANCE_ROLES,
+    RETIRED_ROLES,
     LakeAccess,
     layer_database,
 )
@@ -148,6 +149,7 @@ def render_desired_state(
             "properties": catalog_properties,
         },
         "roles": render_role_grants(env_suffix, catalog),
+        "retired_roles": list(RETIRED_ROLES),
         "schema_owner_group": SCHEMA_OWNER_GROUP,
         # Per-developer dbt schemas share this prefix and get the same owner.
         "owned_schema_prefix": f"ol_warehouse_{env_suffix}_",

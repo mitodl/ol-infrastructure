@@ -228,7 +228,10 @@ service admin. Each run:
 2. Ensures the six groups exist.
 3. For each role, computes the desired securable objects and privileges from the ConfigMap, then
    grants what is missing and revokes what is present but not desired. It only touches the six
-   roles it manages. Anything else is reported but left alone.
+   roles it manages. Anything else is reported but left alone, with one exception: a role listed in
+   `RETIRED_ROLES` (`lib/data_lake_access.py`) is emptied and revoked from every group and user. A
+   role deleted from `GOVERNANCE_ROLES` without being listed there keeps its privileges and its
+   group binding.
 4. Ensures each role is granted to its group, and to nothing else.
 5. Sets each existing `ol_warehouse_<env>_*` schema's owner to group `ol_data_engineer` (A9).
 6. Runs A8.
