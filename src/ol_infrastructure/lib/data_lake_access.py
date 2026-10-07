@@ -34,11 +34,11 @@ GOVERNANCE_ROLES: tuple[str, ...] = (
     "ol_instructor",
 )
 
-# Roles taken out of GOVERNANCE_ROLES. Deleting a role's entry alone leaves its
-# grants in place in every layer that only converges the roles it is told about,
-# and Keycloak may still emit the name in role_keys. A name listed here is
-# stripped of its privileges and bindings instead. Remove it once every
-# environment has converged.
+# Roles taken out of GOVERNANCE_ROLES. The Gravitino reconciler only converges
+# the roles it is told about, so deleting a role's entry alone leaves its
+# Gravitino role with every privilege and its group binding, and Keycloak may
+# still emit the name in role_keys. The reconciler strips a name listed here of
+# both instead. Remove it once every environment has converged.
 RETIRED_ROLES: tuple[str, ...] = ()
 
 # Read and write on the whole catalog, per-developer dbt schemas included.

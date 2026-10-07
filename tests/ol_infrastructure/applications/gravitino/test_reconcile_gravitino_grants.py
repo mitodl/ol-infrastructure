@@ -361,6 +361,24 @@ def test_retired_role_loses_its_privileges_and_every_binding(server, capsys):
     }
 
 
+def test_retired_role_is_unbound_before_it_is_emptied_and_then_left_alone(server):
+    _run(server)
+    server.writes.clear()
+    _run(server, _retire("ol_data_analyst"))
+
+    # The binding is what a token reaches, so it goes first: a failure while
+    # emptying the role must not leave it bound.
+    changes = [path for _, path in server.writes if "/permissions/" in path]
+    assert changes == [
+        f"/api/metalakes/{METALAKE}/permissions/groups/ol_data_analyst/revoke",
+        f"/api/metalakes/{METALAKE}/permissions/roles/ol_data_analyst/",
+    ]
+
+    server.writes.clear()
+    _run(server, _retire("ol_data_analyst"))
+    assert not any("/permissions/" in path for _, path in server.writes)
+
+
 def test_role_dropped_without_being_retired_is_only_reported(server, capsys):
     _run(server)
     desired = _desired()

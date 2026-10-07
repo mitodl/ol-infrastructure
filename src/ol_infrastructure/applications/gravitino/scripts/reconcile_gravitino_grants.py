@@ -465,9 +465,8 @@ def reconcile_roles(
 def retire_roles(gravitino: Gravitino, managed: set[str], retired: set[str]) -> None:
     """Empty every retired role that still exists and report the unmanaged rest.
 
-    The role and its group are kept: deleting them is not something a run has
-    been observed doing against a real server, and an empty, unbound role grants
-    nothing.
+    The role and its group are kept: deleting them is untested against a real
+    server, and an empty, unbound role grants nothing.
     """
     existing = set(gravitino.list_roles())
     for role in sorted(retired & existing):
