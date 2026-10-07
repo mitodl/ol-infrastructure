@@ -734,3 +734,181 @@ def test_live_stage_compares_successful_input(
         .endswith("/builds?vars.group=%22test%22&limit=10")
     )
     assert curl.call_args.args == ("/api/v1/builds/98/resources",)
+
+
+@pytest.mark.parametrize(
+    ("resource", "expected"),
+    [
+        (
+            {"type": "git", "source": {"uri": "https://github.com/mitodl/Repo.git"}},
+            "mitodl/repo",
+        ),
+        (
+            {"type": "git", "source": {"uri": "git@github.com:mitodl/repo"}},
+            "mitodl/repo",
+        ),
+        (
+            {
+                "type": "github-release",
+                "source": {"owner": "mitodl", "repository": "repo"},
+            },
+            "mitodl/repo",
+        ),
+        ({"type": "git", "source": {"uri": "https://gitlab.com/mitodl/repo"}}, None),
+        ({"type": "registry-image", "source": {"repository": "mitodl/repo"}}, None),
+    ],
+)
+def test_resource_github_repo(
+    script: ModuleType, resource: dict[str, Any], expected: str | None
+) -> None:
+    """Identify GitHub sources without treating image repositories as code."""
+    assert script._resource_github_repo(resource) == expected
+
+
+@pytest.fixture
+def upstream_pr(script: ModuleType) -> object:
+    """Create a merged PR to a repo shipped as a release another pipeline consumes."""
+    return script.PullRequest(
+        owner="mitodl",
+        repo="theme",
+        number=211,
+        title="Theme change",
+        state="MERGED",
+        merged=True,
+        commit="a" * 40,
+        merged_at="2026-10-02T14:54:41Z",
+    )
+
+
+@pytest.fixture
+def upstream_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Release -> image build -> Pulumi deploy, alongside an unrelated chain."""
+    config["resources"] += [
+        {
+            "name": "theme-release",
+            "type": "github-release",
+            "source": {"owner": "mitodl", "repository": "theme"},
+        },
+        {"name": "image", "type": "registry-image", "source": {}},
+    ]
+    build = {
+        "name": "build-image",
+        "plan": [{"get": "theme", "resource": "theme-release"}, {"put": "image"}],
+    }
+    # Feed the existing preview/apply jobs from the image build.
+    for job in config["jobs"]:
+        passed = ["build-image"] if job["name"] == "inspect-qa" else ["inspect-qa"]
+        job["plan"].insert(0, {"get": "image", "passed": passed})
+    unrelated = {"name": "unrelated", "plan": [{"get": "infra"}]}
+    config["jobs"] = [build, *config["jobs"], unrelated]
+    return config
+
+
+def test_upstream_consumers_follow_passed_chain(
+    script: ModuleType, upstream_pr: object, upstream_config: dict[str, Any]
+) -> None:
+    """Jobs fed through passed constraints consume the release; others don't."""
+    found = script.PipelineConfig("arbitrary", "", upstream_config)
+    (source,) = script._upstream_sources(upstream_pr, found)
+    assert source.resource == "theme-release"
+    assert source.direct == {"build-image"}
+    assert source.consumers == {"build-image", "inspect-qa", "apply-qa"}
+    assert "image" in source.produced
+
+
+def test_trace_deploy_back_to_release(
+    script: ModuleType,
+    upstream_pr: object,
+    upstream_config: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A deploy's image resolves to the release commit its image build used."""
+    found = script.PipelineConfig("arbitrary", "?vars.x=%221%22", upstream_config)
+    (source,) = script._upstream_sources(upstream_pr, found)
+    release = {"id": "9", "tag": "v1"}
+    release_entry = {
+        "id": 500,
+        "version": release,
+        "metadata": [{"name": "commit_sha", "value": "b" * 40}],
+    }
+    responses = {
+        "/builds/7/resources": {
+            "inputs": [
+                {"name": "checkout", "version": {"ref": "c" * 40}},
+                {"name": "image", "version": {"digest": "sha256:d"}},
+            ]
+        },
+        "/image/versions?vars.x=%221%22&filter=digest%3Asha256%3Ad": [
+            {"id": 400, "version": {"digest": "sha256:d"}}
+        ],
+        "/image/versions/400/output_of?vars.x=%221%22": [
+            {"id": 6, "job_name": "build-image", "status": "succeeded"}
+        ],
+        "/builds/6/resources": {"inputs": [{"name": "theme", "version": release}]},
+        "/theme-release/versions?vars.x=%221%22&filter=id%3A9&filter=tag%3Av1": [
+            release_entry
+        ],
+        "/theme-release/versions?vars.x=%221%22&limit=1": [release_entry],
+    }
+
+    def curl(path: str) -> Any:
+        return next(v for k, v in responses.items() if path.endswith(k))
+
+    monkeypatch.setattr(script, "_fly_curl", Mock(side_effect=curl))
+    monkeypatch.setattr(
+        script,
+        "_latest_successful_build",
+        Mock(return_value={"id": 7, "name": "12"}),
+    )
+    compare = Mock(return_value="ahead")
+    monkeypatch.setattr(script, "_compare_status", compare)
+    assert script._traced_version(source, 7, "apply-qa") == release
+    assert script._version_commit(source, release) == ("b" * 40, "v1 @ bbbbbbbb")
+    script._report_upstream_source(upstream_pr, source)
+    output = capsys.readouterr().out
+    assert "✓  Release" in output
+    assert "✓  QA           reached (apply-qa #12 used theme v1 @ bbbbbbbb)" in output
+    assert "/jobs/apply-qa/builds/12?vars.x=%221%22" in output
+    compare.assert_called_with("mitodl", "theme", "a" * 40, "b" * 40)
+
+
+def test_moving_tag_without_recorded_commit_is_unknown(
+    script: ModuleType,
+    upstream_pr: object,
+    upstream_config: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Never ask GitHub where a tag points now; it may have moved since deploy."""
+    found = script.PipelineConfig("arbitrary", "", upstream_config)
+    (source,) = script._upstream_sources(upstream_pr, found)
+    release = {"id": "1", "tag": "latest"}
+    monkeypatch.setattr(
+        script, "_fly_curl", Mock(return_value=[{"id": 1, "version": release}])
+    )
+    assert script._version_commit(source, release) is None
+
+
+def test_archived_pipelines_are_not_failures(
+    script: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Archived pipelines serve no config; skip them rather than flag them."""
+    api = Mock(side_effect=[[{"name": "old", "archived": True}]])
+    monkeypatch.setattr(script, "_fly_curl", api)
+    assert script._pipeline_configs() == ([], [])
+    api.assert_called_once()
+
+
+def test_unconsumed_repo_keeps_registry_message(
+    script: ModuleType,
+    upstream_pr: object,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Fall back to the known-app list when no live pipeline consumes the repo."""
+    monkeypatch.setattr(script, "_fetch_pr", Mock(return_value=upstream_pr))
+    monkeypatch.setattr(script, "_pipeline_configs", Mock(return_value=([], [])))
+    script.where_is_my_pr("https://github.com/mitodl/theme/pull/211")
+    assert (
+        "No known deployment pipeline maps to mitodl/theme" in capsys.readouterr().out
+    )
