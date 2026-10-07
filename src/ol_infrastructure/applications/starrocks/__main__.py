@@ -696,9 +696,14 @@ if starrocks_config.get_bool("use_cn"):
 # support (CSI ephemeral inline volumes); the fe.conf config block is
 # byte-identical.
 #
-# NOTE: The SSL keystore password appears in fe.conf (→ K8s ConfigMap). This is
-# an inherent limitation of StarRocks' SSL design; the password protects the
-# keystore file itself, not user credentials. Keep it scoped as a Pulumi secret.
+# fe.conf is rendered into a ConfigMap, which the shared cluster readonly role
+# can read, so no secret value goes into it. The FE's config loader
+# (ConfigBase.replacedByEnv) replaces ${NAME} in any property value with the
+# environment variable of that name and refuses to start when it is unset, so
+# the keystore password and the OAuth2 client secret are written as references
+# to the env vars below, which feEnvVars fills from Kubernetes Secrets.
+FE_ENV_KEYSTORE_CREDENTIAL = "FE_SSL_KEYSTORE_PASSWORD"
+FE_ENV_OAUTH2_CREDENTIAL = "FE_OAUTH2_CLIENT_SECRET"
 if (
     ssl_enabled
     or starrocks_config.get_bool("use_cn")
@@ -793,12 +798,11 @@ _FE_CONFIG_BASE = (
 
 
 def _build_fe_config(  # noqa: PLR0913
-    pwd: str | None,
+    ssl: bool,  # noqa: FBT001
     force_str: str,
     bucket_name: str | None,
     oidc_issuer_url: str | None = None,
     oidc_client_id: str | None = None,
-    oidc_client_secret: str | None = None,
     oidc_redirect_url: str | None = None,
 ) -> str:
     """Assemble a complete fe.conf from optional SSL, shared-data, and OIDC sections.
@@ -813,10 +817,8 @@ def _build_fe_config(  # noqa: PLR0913
     under a different mode — StarRocks aborts on startup when run_mode in
     fe.conf disagrees with the mode recorded in its BDB metadata.
 
-    SSL keystore password is validated here to prevent fe.conf corruption:
-    StarRocks' config parser is line-oriented, so embedded newlines or
-    leading/trailing whitespace would silently break the generated file and
-    prevent FE startup.
+    The SSL keystore password and the OAuth2 client secret are written as
+    ${ENV_VAR} references, never as values; see FE_ENV_KEYSTORE_CREDENTIAL.
 
     When oidc_issuer_url is provided, the full set of oauth2_* FE params is
     written. These are not redundant with the security integration's copies:
@@ -827,9 +829,6 @@ def _build_fe_config(  # noqa: PLR0913
     which makes `oauth2_required_audience` here the live audience check for
     authentication_chain logins. They do not add an "OAuth2 Login" button to
     the FE web dashboard, which has no OIDC entry point (StarRocks#75370).
-    The client secret ends up in a ConfigMap (StarRocks Helm chart limitation);
-    access is RBAC-gated and marked as a Pulumi secret so it is not stored
-    in plaintext Pulumi state.
     """
     conf = _FE_CONFIG_BASE
 
@@ -851,7 +850,7 @@ def _build_fe_config(  # noqa: PLR0913
             f"oauth2_auth_server_url = {_oidc_base}/auth\n"
             f"oauth2_token_server_url = {_oidc_base}/token\n"
             f"oauth2_client_id = {oidc_client_id}\n"
-            f"oauth2_client_secret = {oidc_client_secret}\n"
+            f"oauth2_client_secret = ${{{FE_ENV_OAUTH2_CREDENTIAL}}}\n"
             f"oauth2_redirect_url = {oidc_redirect_url}\n"
             f"oauth2_jwks_url = {_oidc_base}/certs\n"
             f"oauth2_required_issuer = {oidc_issuer_url}\n"
@@ -903,18 +902,11 @@ def _build_fe_config(  # noqa: PLR0913
         # against accidental run_mode migration if use_cn is ever toggled.
         conf += "run_mode = shared_nothing\n"
 
-    if pwd is not None:
-        if "\n" in pwd or "\r" in pwd:
-            msg = "starrocks:ssl_keystore_password must not contain newline characters"
-            raise ValueError(msg)
-        pwd = pwd.strip()
-        if not pwd:
-            msg = "starrocks:ssl_keystore_password must not be empty or whitespace-only"
-            raise ValueError(msg)
+    if ssl:
         conf += (
             "ssl_keystore_location = /etc/starrocks/ssl/keystore.p12\n"
-            f"ssl_keystore_password = {pwd}\n"
-            f"ssl_key_password = {pwd}\n"
+            f"ssl_keystore_password = ${{{FE_ENV_KEYSTORE_CREDENTIAL}}}\n"
+            f"ssl_key_password = ${{{FE_ENV_KEYSTORE_CREDENTIAL}}}\n"
             f"ssl_force_secure_transport = {force_str}\n"
         )
 
@@ -955,43 +947,52 @@ if _needs_fe_config:
             opts=InvokeOptions(provider=_vault_provider),
         ).data
 
-    if ssl_enabled and ssl_keystore_password is not None:
+    _fe_secret_env_vars: list[dict[str, Any]] = []
+    if ssl_enabled:
         fe_spec["secrets"] = [
             {"name": starrocks_tls_secret_name, "mountPath": "/etc/starrocks/ssl"}
         ]
-        if _oidc_vault_data is not None:
-            fe_spec["config"] = Output.all(
-                pwd=ssl_keystore_password, oidc=_oidc_vault_data
-            ).apply(
-                lambda args: _build_fe_config(
-                    args["pwd"],
-                    _force_str,
-                    shared_data_bucket_name,
-                    oidc_issuer_url=args["oidc"]["url"],
-                    oidc_client_id=args["oidc"]["client_id"],
-                    oidc_client_secret=args["oidc"]["client_secret"],
-                    oidc_redirect_url=f"https://{_domain}/api/oauth2",
-                )
-            )
-        else:
-            fe_spec["config"] = ssl_keystore_password.apply(
-                lambda pwd: _build_fe_config(pwd, _force_str, shared_data_bucket_name)
-            )
-    elif _oidc_vault_data is not None:
+        _fe_secret_env_vars.append(
+            {
+                "name": FE_ENV_KEYSTORE_CREDENTIAL,
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": ssl_keystore_password_secret_name,
+                        "key": "password",
+                    }
+                },
+            }
+        )
+    if _oidc_vault_data is not None:
+        # The Vault-synced Secret restarts the FE StatefulSet when the client
+        # secret rotates (restart_target_* on oidc_config_secret_config).
+        _fe_secret_env_vars.append(
+            {
+                "name": FE_ENV_OAUTH2_CREDENTIAL,
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": oidc_config_secret_name,
+                        "key": "OIDC_CLIENT_SECRET",
+                    }
+                },
+            }
+        )
         fe_spec["config"] = _oidc_vault_data.apply(
             lambda oidc: _build_fe_config(
-                None,
+                ssl_enabled,
                 _force_str,
                 shared_data_bucket_name,
                 oidc_issuer_url=oidc["url"],
                 oidc_client_id=oidc["client_id"],
-                oidc_client_secret=oidc["client_secret"],
                 oidc_redirect_url=f"https://{_domain}/api/oauth2",
             )
         )
     else:
-        # CN-only path (no SSL, no OIDC): no Output dependencies, build synchronously.
-        fe_spec["config"] = _build_fe_config(None, _force_str, shared_data_bucket_name)
+        fe_spec["config"] = _build_fe_config(
+            ssl_enabled, _force_str, shared_data_bucket_name
+        )
+    if _fe_secret_env_vars:
+        fe_spec["feEnvVars"] = [*fe_spec.get("feEnvVars", []), *_fe_secret_env_vars]
 
 starrocks_release = kubernetes.helm.v3.Release(
     f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-helm-release",
