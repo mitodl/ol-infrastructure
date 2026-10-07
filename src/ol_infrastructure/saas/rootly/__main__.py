@@ -3584,8 +3584,9 @@ def mitx_qa_elasticache_route_rule(position: int) -> dict[str, Any]:
 
     "mitx-qa" is residential MITx QA (edxapp-redis-mitx-qa-*), not MITx Online.
     These alarms used to target the "MITx Online QA - Open edX - Redis" service,
-    created outside this stack, whose "QA Non-Paging Escalation Policy" has zero
-    levels. Both CloudWatch routes on the Critical source carry this rule for
+    created outside this stack, whose "QA Non-Paging Escalation Policy" had zero
+    levels and so notified nobody. That service and policy were deleted on
+    2026-10-07. Both CloudWatch routes on the Critical source carry this rule for
     the reason given in `data_platform_route_rules`: a route without it hands
     the alarm to its fallback. Rootly delivers once when two routes resolve to
     the same policy (alert dQCXUA on 2026-09-29).

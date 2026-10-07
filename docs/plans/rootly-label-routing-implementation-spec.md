@@ -360,7 +360,7 @@ explicit.
 |---|---|---|---|
 | 1 | Enable the two disabled CI/QA route fallback rules (route `691913ad` rule `1e552e8f`; route `588edbfc` rule `53e8784f`) | remediation W0 | **open** — UI-only; `AlertRouteRuleArgs` has no `enabled` field |
 | 1a | CI source default urgency High → Low (`__main__.py:3013`) | remediation W2a | **open** |
-| 1b | `QA Non-Paging Escalation Policy` (`d63b7456`) has one service and zero levels — those CloudWatch alarms notify nobody | this project | **open** — delete the policy and move `MITx Online QA - Open edX - Redis` onto `CI/QA Slack Notifications` |
+| 1b | `QA Non-Paging Escalation Policy` (`d63b7456`) had one service and zero levels, so those CloudWatch alarms notified nobody | this project | **closed** 2026-10-07 — the policy and its service `MITx Online QA - Open edX - Redis` (`cc36d725`) are deleted; `mitx_qa_elasticache_route_rule` sends the mitx-qa ElastiCache alarms to `CI/QA Slack Notifications` |
 | 1c | Account-wide "default alerts channel" toggle posts every alert to `#devops-alerts` regardless of routing (`__main__.py:513-521`) | this project | **open** — until this is off, the CI/QA separation has no observable effect |
 | 2 | Delete `exampleDeleteMe-EscalationPolicy` (done 2026-10-06, with `sh-test`); finish `Cloudwatch - Critical` source setup | this project | **open** (`Cloudwatch - Critical` only) |
 | 3 | Three dead `component` rules in the Grafana Service Route | this project | **re-specified and promoted** — *move* to the Grafana Production Service Route, don't repair in place; two of the three match live payloads **today** (§0.4), so this is step **P1.5**, not a Phase 3 item. Delete the now-inert Grafana Service Route with them |
@@ -641,6 +641,32 @@ the operator are tier `notify`: losing one blinds alerting for that cluster with
 taking anything user-facing down. `opencost` and `kepler` are `ticket`, the same call
 as the Vantage agent. `kepler` and `alloy-operator` carry the labels on the pod only,
 so they join through `kube_pod_labels` and not through the workload-level series.
+
+#### 3.3.4 [2026-10-07] Dagster: a code location and its run workers share one label set
+
+The `dagster` namespace was the largest untiered block in production: 117 pods on
+`data-production`, 97 of them Job-owned run workers carrying no `ol.mit.edu` label at
+all. Keys verified by rendering charts `dagster` and `dagster-user-deployments` 1.13.25
+with a sentinel:
+
+| Workload | Key that reaches the pod | Also on the workload object |
+|---|---|---|
+| webserver | `dagsterWebserver.labels` | `dagsterWebserver.deploymentLabels` |
+| daemon | `dagsterDaemon.labels` | `dagsterDaemon.deploymentLabels` |
+| each code location | `deployments[].labels` | same key |
+| run workers | the launching code location's `deployments[].labels` | same, on the Job |
+
+None of them reaches a selector. The last row is the constraint: the user-deployments
+chart copies a code location's `labels` into `DAGSTER_CLI_API_GRPC_CONTAINER_CONTEXT`,
+and `dagster_k8s` applies them to the Job and pod of every run that location launches,
+with the code location's value winning over the run launcher's. The chart has no
+run-only labels key, so a code server and its run workers share one `component` and
+`alert_tier`, and both are `component=worker`. A single job can still override its own
+run pods through a `dagster-k8s/config` tag, which is merged after the code location's
+context.
+
+Everything in the stack is tier `notify`, including pgbouncer and the SQL exporter,
+which the stack builds by hand.
 
 Also backfill CI/QA clusters, which the analysis explicitly did not measure. Coverage
 there does not affect paging (CI/QA alerts go Slack-only per §8.1) but an unlabeled QA
@@ -956,7 +982,7 @@ hand-maintained invariant has been visible at all.
 | P1.1 Enable the two CI/QA route rules (UI) | — | minutes |
 | P1.2 CI source urgency High → Low | — | small |
 | P1.3 Turn off the account-wide default alerts channel | P1.1 | small |
-| P1.4 Delete `exampleDeleteMe`, fix `QA Non-Paging`, finish `Cloudwatch - Critical` | — | small |
+| P1.4 Delete `exampleDeleteMe` (done 2026-10-06), fix `QA Non-Paging` (deleted 2026-10-07), finish `Cloudwatch - Critical` | — | small |
 | **P1.5 Move the 2 live `component` rules to the Production Service Route; delete the inert Grafana Service Route** | — | **small — reaches 2 orphaned services today (§0.4)** |
 | P2.A Extend `Component` + tighten the type; retype `_Check.component`; enum hygiene | — | small |
 | P2.B Add `AlertTier`; move roll-up fields to base; explicit `environment` | P2.A | small |

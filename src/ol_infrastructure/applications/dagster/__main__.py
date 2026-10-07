@@ -81,9 +81,11 @@ from ol_infrastructure.lib.azure_workload_identity import (
     azure_identity_token_volume,
 )
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
+    Component,
     K8sAppLabels,
     Product,
     Services,
@@ -221,6 +223,26 @@ dagster_selector_labels = {
     for key, value in k8s_global_labels.model_dump().items()
     if key in DAGSTER_SELECTOR_LABEL_KEYS
 }
+
+
+def dagster_workload_labels(component: Component) -> dict[str, str]:
+    """Label one Dagster workload with its role and alert tier.
+
+    For workload metadata and pod templates only, never a selector (see
+    DAGSTER_SELECTOR_LABEL_KEYS above).
+
+    Every workload in this stack is tier notify. Dagster retries and backfills,
+    so a degraded control plane or a dead run worker costs freshness and is
+    worked in business hours, the same call the Rootly stack already makes for
+    Dagster's database alarms and Pingdom check.
+
+    :param component: The workload's functional role.
+    :returns: The stack's ol.mit.edu labels plus component and alert_tier.
+    """
+    return k8s_global_labels.model_copy(
+        update={"component": component, "alert_tier": AlertTier.notify}
+    ).model_dump()
+
 
 aws_account = get_caller_identity()
 dagster_namespace = "dagster"
@@ -1410,7 +1432,7 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="dagster-pgbouncer",
         namespace=dagster_namespace,
-        labels=k8s_global_labels.model_dump(),
+        labels=dagster_workload_labels(Component.pgbouncer),
         annotations={
             "pulumi.com/patchForce": "true",
         },
@@ -1440,7 +1462,7 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 labels={
                     "component": "pgbouncer",
-                    **k8s_global_labels.model_dump(),
+                    **dagster_workload_labels(Component.pgbouncer),
                 },
                 # Rolls these pods when the pgbouncer ConfigMap changes; without it a
                 # config edit never reaches the running processes. See the annotation's
@@ -2203,7 +2225,7 @@ sql_exporter_deployment = kubernetes.apps.v1.Deployment(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="dagster-sql-exporter",
         namespace=dagster_namespace,
-        labels=k8s_global_labels.model_dump(),
+        labels=dagster_workload_labels(Component.exporter),
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
         # One replica, deliberately. A second would double every gauge's cardinality
@@ -2220,7 +2242,7 @@ sql_exporter_deployment = kubernetes.apps.v1.Deployment(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 labels={
                     "component": "sql-exporter",
-                    **k8s_global_labels.model_dump(),
+                    **dagster_workload_labels(Component.exporter),
                 },
                 annotations=sql_exporter_config_checksum_annotation,
             ),
@@ -2839,6 +2861,12 @@ for location in code_locations:
             "tag": image_tag_or_digest,
             "pullPolicy": "IfNotPresent",
         },
+        # The chart puts these on the Deployment and its pod template, and copies
+        # them into the container context of every run the location launches
+        # (dagster_k8s K8sContainerContext, where the code location's value wins
+        # over the run launcher's). The chart has no run-only labels key, so a
+        # code server and its run workers share one label set.
+        "labels": dagster_workload_labels(Component.worker),
         # Chart key is deploymentStrategy, not strategy.
         "deploymentStrategy": {
             "type": "RollingUpdate",
@@ -3272,6 +3300,10 @@ dagster_helm_values = {
     # Dagster webserver (UI)
     "dagsterWebserver": {
         "annotations": dagster_instance_checksum_annotation,
+        # deploymentLabels is the Deployment's metadata and labels its pod
+        # template. Neither reaches spec.selector.
+        "deploymentLabels": dagster_workload_labels(Component.webapp),
+        "labels": dagster_workload_labels(Component.webapp),
         "image": dagster_k8s_image_config,
         "workspace": {
             "enabled": True,
@@ -3358,6 +3390,8 @@ dagster_helm_values = {
     # Dagster daemon (background job scheduler)
     "dagsterDaemon": {
         "annotations": dagster_instance_checksum_annotation,
+        "deploymentLabels": dagster_workload_labels(Component.controller),
+        "labels": dagster_workload_labels(Component.controller),
         "image": dagster_k8s_image_config,
         "env": [
             {
