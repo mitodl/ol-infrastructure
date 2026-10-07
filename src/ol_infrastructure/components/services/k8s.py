@@ -560,7 +560,7 @@ class GranianConfig(BaseModel):
     reload_ignore_dirs: list[str] = Field(default_factory=list)
     """Directory names whose changes do not trigger a reload (granian
     ``--reload-ignore-dirs``, one flag per entry). Added to the watchfiles defaults."""
-    workers_kill_timeout: PositiveInt | None = None
+    workers_kill_timeout: Annotated[int, Field(ge=1, le=1800)] | None = None
     """Seconds to wait before killing a worker that did not stop gracefully (granian
     ``--workers-kill-timeout``, 1 to 1800). Omitted when ``None``, which leaves Granian
     waiting indefinitely. Every reload waits this long for a worker whose application

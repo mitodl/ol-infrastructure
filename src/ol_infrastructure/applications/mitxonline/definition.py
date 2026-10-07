@@ -15,6 +15,7 @@ API, so that importing it needs no provider.
 from pathlib import Path
 from typing import Any, Literal
 
+from kubernetes.utils.quantity import parse_quantity
 from pulumi import Output
 from pydantic import BaseModel, ConfigDict
 
@@ -118,7 +119,7 @@ class ClusterCapabilities(BaseModel):
     VPA or the Prometheus operator turns the matching capability off.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     registry: Literal["dockerhub", "ecr", "direct"] = "ecr"
     security_group_id: Output[str] | None = None
@@ -131,7 +132,7 @@ class ClusterCapabilities(BaseModel):
 class MitxonlineBindings(BaseModel):
     """Everything about MITx Online that differs between environments."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
     env_suffix: str
     hostnames: MitxonlineHostnames
@@ -182,7 +183,10 @@ def celery_worker_configs(
     :rtype: list[OLApplicationK8sCeleryWorkerConfig]
     """
     if topology == "merged":
-        largest = CELERY_QUEUES[0]
+        largest = max(
+            CELERY_QUEUES,
+            key=lambda queue: parse_quantity(queue.resource_limits["memory"]),
+        )
         return [
             OLApplicationK8sCeleryWorkerConfig(
                 # Explicit because the name lands in the Deployment name and a

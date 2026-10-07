@@ -248,3 +248,8 @@ def test_reload_flags_emitted_before_the_application_module():
 def test_reload_ignore_dirs_rejected_without_reload():
     with pytest.raises(ValidationError, match="reload is False"):
         GranianConfig(reload_ignore_dirs=["frontend"])
+
+
+def test_workers_kill_timeout_rejects_more_than_granian_accepts():
+    with pytest.raises(ValidationError):
+        GranianConfig(workers_kill_timeout=1801)

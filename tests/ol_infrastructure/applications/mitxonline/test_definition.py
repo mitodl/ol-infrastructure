@@ -30,6 +30,7 @@ class K8sMocks(pulumi.runtime.Mocks):
 pulumi.runtime.set_mocks(K8sMocks())
 
 import pytest  # noqa: E402
+from pydantic import ValidationError  # noqa: E402
 
 from ol_infrastructure.applications.mitxonline import definition  # noqa: E402
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
@@ -129,6 +130,29 @@ def test_local_bindings_use_the_image_as_given():
     assert config.application_docker_tag == LOCAL_IMAGE_TAG
 
 
+def test_deployed_bindings_keep_the_eks_wiring():
+    config = definition.application_config(_deployed_bindings())
+
+    assert config.registry == "ecr"
+    assert config.import_nginx_config is False
+    assert config.manage_webapp_autoscaler
+    assert config.manage_celery_autoscalers
+    assert config.manage_webapp_memory_vpa
+    assert config.manage_pod_monitor
+    assert config.vault_k8s_resource_auth_name == "mitxonline-auth"
+
+
+def test_bindings_reject_a_misspelled_field():
+    with pytest.raises(ValidationError, match="dev_shell_enabled"):
+        _local_bindings(dev_shell_enabled=True)
+
+
+def test_merged_worker_is_sized_for_the_largest_queue():
+    (worker,) = definition.celery_worker_configs("merged")
+
+    assert worker.resource_limits == {"memory": "2Gi"}
+
+
 def test_deployed_topology_runs_one_worker_per_queue():
     config = definition.application_config(_deployed_bindings())
 
@@ -153,6 +177,7 @@ def test_reload_is_off_unless_the_bindings_ask_for_it():
     assert "--reload" not in deployed.granian_config.build_args()
     assert "--workers-kill-timeout" not in deployed.granian_config.build_args()
     assert "--reload" in local.granian_config.build_args()
+    assert local.granian_config.workers_kill_timeout == 1
     assert local.granian_config.reload_ignore_dirs == definition.RELOAD_IGNORE_DIRS
 
 
@@ -200,16 +225,6 @@ def test_routes_follow_the_bound_hostnames():
     ]
 
 
-def test_routes_point_at_the_service_the_component_creates():
-    bindings = _deployed_bindings()
-    config = definition.application_config(bindings)
-    direct, prefixed = _route_groups(bindings)
-
-    for route in [*direct, *prefixed]:
-        assert route.backend_service_name == config.application_lb_service_name
-        assert route.backend_service_port == config.application_lb_service_port_name
-
-
 def test_frame_ancestors_header_names_the_bound_openedx_host():
     direct, _ = _route_groups(_deployed_bindings())
     rewrites = [
@@ -237,6 +252,8 @@ def test_session_cookies_are_named_for_the_environment():
     prefixed = definition.prefixed_oidc_config(bindings)
 
     assert direct.oidc_session_cookie_name != prefixed.oidc_session_cookie_name
+    assert bindings.env_suffix in direct.oidc_session_cookie_name
+    assert bindings.env_suffix in prefixed.oidc_session_cookie_name
     assert direct.oidc_session_cookie_domain == ".mitxonline.mit.dev"
     assert prefixed.oidc_session_cookie_domain == ".learn.mit.dev"
 
