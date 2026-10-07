@@ -16,7 +16,8 @@ docs/plans/gravitino-authorization-spec.md, A7-A10. Each run:
    role. Gravitino denies a user who is not in the metalake even when their
    groups hold roles, and has no create-on-first-login.
 6. Sets the owner of every ``ol_warehouse_<env>_*`` schema to the engineering
-   group, so ownership does not follow whoever created the schema.
+   group, so ownership does not follow whoever created the schema. A Glue
+   database whose name Iceberg cannot load is skipped with a warning.
 
 Step 5 grants nothing. Group membership comes from the ``role_keys`` claim of
 the user's own token, so a user this has not added yet is denied rather than
@@ -87,6 +88,12 @@ MAX_PRINCIPAL_LENGTH = 41
 # principal StarRocks would refuse must not be admitted here, or the two layers
 # disagree about who a user is.
 PRINCIPAL_PATTERN = re.compile(r"[A-Za-z0-9._-]+")
+# What Iceberg's GlueCatalog accepts as a database name
+# (IcebergToGlueConverter.GLUE_DB_PATTERN). Glue itself allows more (hyphens,
+# angle brackets), and such a database is listed but can never be loaded:
+# "Cannot convert namespace ... to Glue database name". That holds only while
+# the catalog leaves glue.skip-name-validation unset.
+GLUE_NAMESPACE_PATTERN = re.compile(r"[a-z0-9_]{1,252}")
 
 Transport = Callable[[str, str, dict[str, Any] | None], tuple[int, dict[str, Any]]]
 PrivilegeSet = frozenset[tuple[str, str]]
@@ -480,12 +487,18 @@ def reconcile_schema_owners(
 ) -> None:
     """Set the engineering group as owner of every schema under the prefix.
 
-    Reasserted every run, because an owner can transfer ownership.
+    Reasserted every run, because an owner can transfer ownership. A schema
+    whose name falls outside ``GLUE_NAMESPACE_PATTERN`` gets no owner: it is
+    skipped with a warning.
     """
     wanted = ("group", owner_group)
     failures = []
     for schema in gravitino.list_schemas(catalog):
         if not schema.startswith(prefix):
+            continue
+        if not GLUE_NAMESPACE_PATTERN.fullmatch(schema):
+            # Nothing can reach it through the catalog, so it needs no owner.
+            warn(f"Schema {schema!r} is not a name Iceberg can load; skipped")
             continue
         # One schema Gravitino cannot load must not leave every schema sorted
         # after it without its owner reasserted.

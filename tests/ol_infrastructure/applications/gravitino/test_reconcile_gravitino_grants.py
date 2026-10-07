@@ -589,3 +589,28 @@ def test_catalog_with_the_wrong_type_or_provider_fails(server, field, value):
 
     with pytest.raises(ReconcileError, match=f"has {field} '{value}'"):
         _run(server)
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        "ol_warehouse_qa_529-stage-salesforce-data_staging",
+        "ol_warehouse_qa_<your name>_mart",
+    ],
+)
+def test_schema_iceberg_cannot_name_is_skipped_without_a_request(
+    server, capsys, schema
+):
+    server.backend_schemas.add(schema)
+    requested = []
+
+    def recording(method, path, body):
+        requested.append(path)
+        return server(method, path, body)
+
+    reconcile(Gravitino(recording, METALAKE), _desired(), list, ADMIN)
+
+    assert not any("/schemas/ol_warehouse_qa_529" in path for path in requested)
+    assert not any("your" in path for path in requested)
+    assert "is not a name Iceberg can load" in capsys.readouterr().err
+    assert server.owners[MART] == {"name": "ol_data_engineer", "type": "group"}
