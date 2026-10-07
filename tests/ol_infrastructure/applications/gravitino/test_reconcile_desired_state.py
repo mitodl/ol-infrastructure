@@ -11,10 +11,12 @@ from typing import Any
 
 import pytest
 
+from ol_infrastructure.applications.gravitino import reconcile
 from ol_infrastructure.applications.gravitino.reconcile import (
     render_desired_state,
     render_role_grants,
 )
+from ol_infrastructure.lib import data_lake_access
 from ol_infrastructure.lib.data_lake_access import (
     CATALOG_WIDE_WRITE_ROLES,
     GOVERNANCE_ROLES,
@@ -91,6 +93,19 @@ def test_desired_state_is_json_serializable_and_environment_scoped():
     assert "ol_warehouse_qa_" not in rendered
     assert state["owned_schema_prefix"] == "ol_warehouse_production_"
     assert state["catalog"]["provider"] == "lakehouse-iceberg"
+
+
+def test_retired_role_cannot_also_be_a_governance_role(monkeypatch):
+    monkeypatch.setattr(data_lake_access, "RETIRED_ROLES", ("ol_data_analyst",))
+    with pytest.raises(ValueError, match="both governance roles and retired"):
+        data_lake_access.validate_governance_access()
+
+
+def test_retired_roles_reach_the_desired_state(monkeypatch):
+    monkeypatch.setattr(reconcile, "RETIRED_ROLES", ("ol_auditor",))
+    state = render_desired_state("qa", "ol_data_platform", CATALOG, {})
+    assert state["retired_roles"] == ["ol_auditor"]
+    assert "ol_auditor" not in state["roles"]
 
 
 def test_unknown_layer_is_rejected():

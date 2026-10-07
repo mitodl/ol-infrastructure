@@ -34,6 +34,13 @@ GOVERNANCE_ROLES: tuple[str, ...] = (
     "ol_instructor",
 )
 
+# Roles taken out of GOVERNANCE_ROLES. The Gravitino reconciler only converges
+# the roles it is told about, so deleting a role's entry alone leaves its
+# Gravitino role with every privilege and its group binding, and Keycloak may
+# still emit the name in role_keys. The reconciler strips a name listed here of
+# both instead. Remove it once every environment has converged.
+RETIRED_ROLES: tuple[str, ...] = ()
+
 # Read and write on the whole catalog, per-developer dbt schemas included.
 CATALOG_WIDE_WRITE_ROLES: tuple[str, ...] = ("ol_platform_admin", "ol_data_engineer")
 
@@ -89,6 +96,10 @@ def validate_governance_access() -> None:
     overlap = scoped & set(CATALOG_WIDE_WRITE_ROLES)
     if overlap:
         msg = f"{sorted(overlap)} are catalog-wide and must not also be layer-scoped"
+        raise ValueError(msg)
+    retired = set(RETIRED_ROLES) & set(GOVERNANCE_ROLES)
+    if retired:
+        msg = f"{sorted(retired)} are both governance roles and retired"
         raise ValueError(msg)
     covered = scoped | set(CATALOG_WIDE_WRITE_ROLES)
     if covered != set(GOVERNANCE_ROLES):

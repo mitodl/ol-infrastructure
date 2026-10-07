@@ -193,7 +193,10 @@ a schema-level grant plus a table-level `DENY` (A10) come in.
 | Pipeline writers | Write any layer | Only under deployment Option B (they then talk to the catalog). A Keycloak service-account client per writer, holding the `ol_data_engineer` client role through `ClientServiceAccountRole` (Keycloak spec M15), so it arrives as group `ol_data_engineer`. Added to the metalake like a human. |
 
 Under deployment Option A the pipeline writers keep writing to Glue directly, and there are no
-pipeline principals in Gravitino at all.
+pipeline principals in Gravitino at all. The reconciler as built would not add them either: it walks
+`GET /admin/realms/{realm}/users` with no filter, and Keycloak leaves service accounts out of that
+list (`UsersResource.getUsers`, 26.7.4). Under Option B it also has to enumerate clients with
+`serviceAccountsEnabled` and read `/clients/{id}/service-account-user` for each.
 
 Writes through StarRocks are not part of this model. StarRocks 4.1.3 plans an `INSERT` as the user but
 commits it with the catalog's bootstrap credential, so with the bootstrap principal holding nothing,
@@ -228,7 +231,12 @@ service admin. Each run:
 2. Ensures the six groups exist.
 3. For each role, computes the desired securable objects and privileges from the ConfigMap, then
    grants what is missing and revokes what is present but not desired. It only touches the six
-   roles it manages. Anything else is reported but left alone.
+   roles it manages. Anything else is reported but left alone, with one exception: a role listed in
+   `RETIRED_ROLES` (`lib/data_lake_access.py`) is emptied and revoked from every group and user. A
+   role deleted from `GOVERNANCE_ROLES` without being listed there keeps its privileges and its
+   group binding. Retirement does not touch ownership (A9): step 5 takes any `ol_warehouse_<env>_*`
+   schema back from a retired group, but a table or other schema someone handed to that group stays
+   under its control until the owner is changed by hand.
 4. Ensures each role is granted to its group, and to nothing else.
 5. Sets each existing `ol_warehouse_<env>_*` schema's owner to group `ol_data_engineer` (A9).
 6. Runs A8.

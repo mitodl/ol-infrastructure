@@ -11,7 +11,9 @@ docs/plans/gravitino-authorization-spec.md, A7-A10. Each run:
 3. Replaces each managed role's privileges with the desired ones, so a privilege
    removed from the desired state, or added by hand, does not survive a run.
 4. Grants each managed role to the group of the same name and revokes it from
-   every other group and from every user.
+   every other group and from every user. A retired role (one taken out of the
+   governance roles) is emptied and revoked from everyone, so a token that
+   still carries its ``role_keys`` value gets nothing.
 5. Adds to the metalake every Keycloak user who effectively holds a governance
    role. Gravitino denies a user who is not in the metalake even when their
    groups hold roles, and has no create-on-first-login.
@@ -459,24 +461,49 @@ def reconcile_roles(
             if added or removed:
                 log(f"Role {role} on {key[0]} {key[1]}: +{added} -{removed}")
 
-    unmanaged = sorted(set(gravitino.list_roles()) - roles.keys())
+
+def retire_roles(gravitino: Gravitino, managed: set[str], retired: set[str]) -> None:
+    """Empty every retired role that still exists and report the unmanaged rest.
+
+    The role and its group are kept: deleting them is untested against a real
+    server, and an empty, unbound role grants nothing.
+
+    Ownership is separate from roles, and group membership comes from the
+    token, so a retired group still controls whatever it owns. The owner pass
+    moves every schema under the owned prefix back to the engineering group,
+    which cannot itself be retired. A table, or a schema outside the prefix,
+    whose ownership someone handed to the retired group is not found here and
+    has to be transferred by hand.
+    """
+    existing = set(gravitino.list_roles())
+    for role in sorted(retired & existing):
+        held = gravitino.role_objects(role)
+        if held:
+            gravitino.override_role(role, {})
+            log(f"Retired role {role}: removed its privileges on {sorted(held)}")
+    unmanaged = sorted(existing - managed - retired)
     if unmanaged:
         warn(f"Roles not managed here, left alone: {unmanaged}")
 
 
-def reconcile_role_bindings(gravitino: Gravitino, managed_roles: set[str]) -> None:
-    """Bind each managed role to the group of the same name and to nothing else."""
+def reconcile_role_bindings(
+    gravitino: Gravitino, managed_roles: set[str], retired_roles: set[str]
+) -> None:
+    """Bind each managed role to the group of the same name and to nothing else.
+
+    A retired role is revoked from every group and user, its own group included.
+    """
     for group, held in gravitino.principals_with_roles("groups").items():
         wanted = {group} & managed_roles
         if wanted - held:
             gravitino.change_roles("groups", group, "grant", wanted - held)
             log(f"Granted role {group} to group {group}")
-        stray = (held & managed_roles) - wanted
+        stray = (held & (managed_roles | retired_roles)) - wanted
         if stray:
             gravitino.change_roles("groups", group, "revoke", stray)
             log(f"Revoked {sorted(stray)} from group {group}")
     for user, held in gravitino.principals_with_roles("users").items():
-        stray = held & managed_roles
+        stray = held & (managed_roles | retired_roles)
         if stray:
             gravitino.change_roles("users", user, "revoke", stray)
             log(f"Revoked {sorted(stray)} from user {user}: roles go to groups only")
@@ -586,6 +613,10 @@ def reconcile(
     """
     roles = desired["roles"]
     validate_desired_roles(roles)
+    retired = set(desired["retired_roles"])
+    if retired & roles.keys():
+        msg = f"{sorted(retired & roles.keys())} are both managed and retired"
+        raise ReconcileError(msg)
     catalog = desired["catalog"]["name"]
     owner_group = desired["schema_owner_group"]
     if owner_group not in roles:
@@ -595,7 +626,9 @@ def reconcile(
     gravitino.ensure_metalake()
     gravitino.ensure_catalog(desired["catalog"])
     reconcile_roles(gravitino, roles)
-    reconcile_role_bindings(gravitino, set(roles))
+    # Unbind before emptying: the binding is what a token's role_keys reaches.
+    reconcile_role_bindings(gravitino, set(roles), retired)
+    retire_roles(gravitino, set(roles), retired)
     # Before the owner pass, which touches every schema in the catalog and is the
     # step most likely to hit one it cannot load. That must not keep a new user
     # out.
@@ -672,6 +705,12 @@ def governance_role_holders(
     composite realm roles, which ``/clients/{id}/roles/{role}/users`` does not
     expand. Each user's ``/role-mappings/clients/{id}/composite`` does, at the
     cost of one request per realm user.
+
+    Service accounts are not returned. Keycloak's unfiltered user list leaves
+    them out (``UsersResource.getUsers`` passes ``includeServiceAccounts=false``
+    when no search or filter parameter is given, read at 26.7.4), so a client
+    holding a governance role through its service account is never added to the
+    metalake. Nothing needs that while pipeline writers go to Glue directly.
     """
     base_url, _, realm = issuer.partition("/realms/")
     admin_base = f"{base_url}/admin/realms/{realm}"
