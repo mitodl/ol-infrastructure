@@ -154,6 +154,29 @@ def test_missing_session_recovery_respects_the_guard(callback):
     assert status != HTTP_FOUND
 
 
+def test_a_browser_storing_no_cookies_is_restarted_once_per_session_state(callback):
+    """The loop seen in production: no guard cookie ever comes back, so only the
+    shared-dict counter keyed on Keycloak's session_state can stop it.  This is
+    also what proves APISIX created the dict from custom_lua_shared_dict.
+    """
+    query = "?code=abc123&state=x&session_state=no-cookie-loop"
+
+    statuses = [callback(query=query)[0] for _ in range(3)]
+
+    assert statuses[0] == HTTP_FOUND
+    assert HTTP_FOUND not in statuses[1:]
+
+
+def test_restart_counter_is_per_session_state(callback):
+    """One looping browser must not use up another login's restart."""
+    callback(query="?code=abc123&state=x&session_state=first-login")
+    callback(query="?code=abc123&state=x&session_state=first-login")
+
+    status, _ = callback(query="?code=abc123&state=x&session_state=second-login")
+
+    assert status == HTTP_FOUND
+
+
 def test_callback_without_an_error_parameter_is_left_alone(callback):
     status, _ = callback()
 

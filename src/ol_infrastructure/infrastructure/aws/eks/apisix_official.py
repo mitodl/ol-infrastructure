@@ -18,6 +18,8 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
 )
 from ol_infrastructure.components.services.apisix import (
+    OIDC_RECOVERY_SHARED_DICT,
+    OIDC_RECOVERY_SHARED_DICT_SIZE,
     gateway_global_pre_function_plugin,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -633,6 +635,14 @@ def setup_apisix(
                         "workerProcesses": "auto",
                         "enableCPUAffinity": True,
                         "workerConnections": "10620",
+                        # Counts OIDC login restarts per Keycloak session_state;
+                        # see oidc_gateway_pre_function_plugin.
+                        "customLuaSharedDicts": [
+                            {
+                                "name": OIDC_RECOVERY_SHARED_DICT,
+                                "size": OIDC_RECOVERY_SHARED_DICT_SIZE,
+                            },
+                        ],
                         "logs": {
                             "enableAccessLog": True,
                             "accessLog": "/dev/stdout",

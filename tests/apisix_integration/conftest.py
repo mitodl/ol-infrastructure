@@ -29,6 +29,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 from ol_infrastructure.components.services.apisix import (
+    OIDC_RECOVERY_SHARED_DICT,
+    OIDC_RECOVERY_SHARED_DICT_SIZE,
     gateway_global_pre_function_plugin,
     oidc_gateway_pre_function_plugin,
 )
@@ -50,10 +52,14 @@ TEST_SESSION_SECRET = "integration-test-session-secret"  # noqa: S105  # pragma:
 # Standalone (yaml) config provider, so no etcd is needed.  Mirrors the
 # provider the ingress controller drives in the cluster
 # (provider.type: apisix-standalone in infrastructure/aws/eks/apisix_official.py).
-CONFIG_YAML = """
+CONFIG_YAML = f"""
 apisix:
   node_listen: 9080
   enable_admin: false
+nginx_config:
+  http:
+    custom_lua_shared_dict:
+      {OIDC_RECOVERY_SHARED_DICT}: {OIDC_RECOVERY_SHARED_DICT_SIZE}
 deployment:
   role: data_plane
   role_data_plane:

@@ -265,3 +265,64 @@ GET /t/mitxonline/login/.apisix/redirect?code=abc123&state=x
 Cookie: csrf_mitxonline=1; mitlearn_apisix_session=pre-auth
 --- response_body
 passed through
+
+
+
+=== TEST 10: a browser storing no cookies is restarted once per session_state
+--- http_config
+lua_shared_dict ol-oidc-recovery 1m;
+--- config
+    location /t {
+        rewrite_by_lua_block {
+            local recover = require("apisix.plugins.ol.oidc_error_callback_recovery")
+            local conf = {
+                oidc_error_recovery = {
+                    recoverable_errors = {"temporarily_unavailable"},
+                    session_cookie_names = {"mitxonline_apisix_session"},
+                    guard_cookie_name = "apisix_oidc_recovery",
+                    guard_max_age = 60,
+                    restart_dict_name = "ol-oidc-recovery",
+                    max_restarts = 1,
+                },
+            }
+            recover(conf, {var = {}})
+        }
+        content_by_lua_block {
+            ngx.say("passed through")
+        }
+    }
+--- pipelined_requests eval
+["GET /t/login/.apisix/redirect?code=abc123&state=x&session_state=loop",
+ "GET /t/login/.apisix/redirect?code=abc123&state=x&session_state=loop",
+ "GET /t/login/.apisix/redirect?code=abc123&state=x&session_state=other"]
+--- error_code eval
+[302, 200, 302]
+
+
+
+=== TEST 11: without the shared dict the guard cookie is the only bound
+--- config
+    location /t {
+        rewrite_by_lua_block {
+            local recover = require("apisix.plugins.ol.oidc_error_callback_recovery")
+            local conf = {
+                oidc_error_recovery = {
+                    recoverable_errors = {"temporarily_unavailable"},
+                    session_cookie_names = {"mitxonline_apisix_session"},
+                    guard_cookie_name = "apisix_oidc_recovery",
+                    guard_max_age = 60,
+                    restart_dict_name = "ol-oidc-recovery-undefined",
+                    max_restarts = 1,
+                },
+            }
+            recover(conf, {var = {}})
+        }
+        content_by_lua_block {
+            ngx.say("passed through")
+        }
+    }
+--- pipelined_requests eval
+["GET /t/login/.apisix/redirect?code=abc123&state=x&session_state=loop",
+ "GET /t/login/.apisix/redirect?code=abc123&state=x&session_state=loop"]
+--- error_code eval
+[302, 302]
