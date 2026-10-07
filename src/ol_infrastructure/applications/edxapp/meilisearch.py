@@ -1,5 +1,6 @@
 """Meilisearch Helm release installation and configuration for EDXApp."""
 
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -151,11 +152,20 @@ def create_meilisearch_resources(
             "enabled": True,
             "size": meilisearch_config.get("pv_size") or "10Gi",
         },
+        # The chart only rolls the pod on a ConfigMap change, and the key no longer
+        # lives there, so without this a rotated key would not reach the running
+        # process until someone restarted it by hand.
+        "podAnnotations": {
+            "checksum/master-key": hashlib.sha256(
+                secrets["meilisearch_master_key"].encode()
+            ).hexdigest(),
+        },
         # Enabling this also sets MEILI_EXPERIMENTAL_ENABLE_METRICS in the chart's
-        # ConfigMap. /metrics needs a key, hence the Secret above.
+        # ConfigMap. /metrics needs a key, hence the Secret above. The CI clusters
+        # run no metrics collector, so there is nothing to scrape it there.
         "serviceMonitor": {
-            "enabled": True,
-            # Label required for Prometheus Operator to discover this ServiceMonitor
+            "enabled": stack_info.env_suffix != "ci",
+            # Same discovery label as the dagster and clickhouse ServiceMonitors
             "additionalLabels": {"release": "prometheus"},
         },
         "resources": {
