@@ -97,7 +97,29 @@ def create_meilisearch_resources(
         Path(f"edxapp/{stack_info.env_prefix}.{stack_info.env_suffix}.yaml")
     )
 
+    # The chart renders `environment` into a ConfigMap, so the master key goes in
+    # a Secret that the chart mounts through auth.existingMasterKeySecret. The
+    # chart's ServiceMonitor reads its bearer token from the same Secret, and the
+    # chart only creates that Secret itself when no master key is supplied.
+    master_key_secret_name = (
+        "meilisearch-master-key"  # pragma: allowlist secret  # noqa: S105
+    )
+    master_key_secret = kubernetes.core.v1.Secret(
+        f"ol-{stack_info.env_prefix}-edxapp-meilisearch-master-key-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=master_key_secret_name,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        string_data={
+            "MEILI_MASTER_KEY": secrets["meilisearch_master_key"],
+        },
+    )
+
     meilisearch_values: dict[str, Any] = {
+        "auth": {
+            "existingMasterKeySecret": master_key_secret_name,
+        },
         "replicaCount": meilisearch_config.get_int("replica_count")
         or 1,  # Default to 1 replica
         "image": {
@@ -108,7 +130,6 @@ def create_meilisearch_resources(
         "environment": {
             "MEILI_NO_ANALYTICS": True,
             "MEILI_ENV": "production",
-            "MEILI_MASTER_KEY": secrets["meilisearch_master_key"],
             # Without this, Meilisearch refuses to start whenever the on-disk
             # database was written by a different engine version, which is what
             # forced the v1.33.0 image pin in March 2026. It migrates the
@@ -130,8 +151,12 @@ def create_meilisearch_resources(
             "enabled": True,
             "size": meilisearch_config.get("pv_size") or "10Gi",
         },
+        # Enabling this also sets MEILI_EXPERIMENTAL_ENABLE_METRICS in the chart's
+        # ConfigMap. /metrics needs a key, hence the Secret above.
         "serviceMonitor": {
-            "enabled": False,
+            "enabled": True,
+            # Label required for Prometheus Operator to discover this ServiceMonitor
+            "additionalLabels": {"release": "prometheus"},
         },
         "resources": {
             "requests": {
@@ -178,7 +203,9 @@ def create_meilisearch_resources(
             values=meilisearch_values,
             skip_await=False,
         ),
-        opts=ResourceOptions(delete_before_replace=True),
+        opts=ResourceOptions(
+            delete_before_replace=True, depends_on=[master_key_secret]
+        ),
     )
 
     # Raise the throughput of an already-provisioned volume. The storageclass sets
