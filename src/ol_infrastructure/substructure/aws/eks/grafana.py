@@ -732,16 +732,17 @@ def setup_grafana(
                         ],
                     },
                 },
-                # v4: kepler and kube-state-metrics moved to telemetryServices;
-                #     opencost moved here from clusterMetrics
                 # The operator's chart has no value that labels its Deployment
                 # object, only the pod.
                 "alloy-operator": {"podLabels": alloy_operator_labels},
+                # v4: kepler and kube-state-metrics moved to telemetryServices;
+                #     opencost moved here from clusterMetrics
                 "telemetryServices": {
                     "kube-state-metrics": {
                         "deploy": True,
-                        # Lands on the Deployment and its pod template, and
-                        # not in the selector.
+                        # Lands on every object the subchart renders (the
+                        # Deployment, its pod template, the Service and the
+                        # RBAC objects) and in no selector.
                         "customLabels": kube_state_metrics_labels,
                         # kube-state-metrics only emits kube_<resource>_labels for
                         # resources named here, so without this every kube_job_*

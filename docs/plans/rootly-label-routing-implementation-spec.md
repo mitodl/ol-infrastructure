@@ -625,8 +625,8 @@ candidate key, then check every object with a `spec.selector`.
 | Workload | Key that reaches the pod | Also on the workload object |
 |---|---|---|
 | five Alloy collectors (`alloy-metrics`, `-logs`, `-receiver`, `-singleton`, the tail sampler) | `collectorCommon.alloy.controller.podLabels` | `collectorCommon.alloy.controller.extraLabels` |
-| `kube-state-metrics` | `telemetryServices.kube-state-metrics.customLabels` | same key |
-| `opencost` | `telemetryServices.opencost.podLabels` | `telemetryServices.opencost.commonLabels` |
+| `kube-state-metrics` | `telemetryServices.kube-state-metrics.customLabels` | same key, and its Service, ServiceAccount and RBAC objects |
+| `opencost` | `telemetryServices.opencost.podLabels` | `telemetryServices.opencost.commonLabels`, which also reaches its Service, ServiceAccount and RBAC objects |
 | `kepler` | `telemetryServices.kepler.podLabels` | none |
 | `alloy-operator` | `alloy-operator.podLabels` | none |
 
