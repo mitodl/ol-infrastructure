@@ -1000,7 +1000,17 @@ if oidc_enabled:
             "STARROCKS_SQL": _group_provider_setup_sql,
             "STARROCKS_DELETE_SQL": _group_provider_drop_sql,
         },
-        triggers=[hashlib.sha256(_group_provider_setup_sql.encode()).hexdigest()],
+        # Both integration commands DROP and CREATE their integration, which
+        # discards the group_provider and permitted_groups this sets with ALTER.
+        # Their SQL is in the triggers so this re-runs whenever either one does.
+        # Without it QA ran with neither property on either integration: any
+        # realm user could log in, and nobody got a role from groups.txt.
+        triggers=pulumi.Output.all(_integration_sql, _jwt_integration_sql).apply(
+            lambda sqls: [
+                hashlib.sha256(sql.encode()).hexdigest()
+                for sql in (_group_provider_setup_sql, *sqls)
+            ]
+        ),
         opts=ResourceOptions(
             delete_before_replace=True,
             # roles_setup_cmd: GRANT <role> TO EXTERNAL GROUP requires the roles

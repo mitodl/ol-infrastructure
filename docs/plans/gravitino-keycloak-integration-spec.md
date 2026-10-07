@@ -161,6 +161,9 @@ fe.conf, while both security integrations set `"principal_field" = "starrocks_us
 (`substructure/starrocks/__main__.py:649` and `:745`). fe.conf governs manually-created
 `IDENTIFIED WITH authentication_jwt` users; the integration governs auto-provisioned ones. This is
 the divergence already tracked by `tk-verify-first-then-fix-keycloak-group-sync-writes-c1bbf7`.
+Measured in QA on 2026-10-07 (4.1.6): a hand-made `authentication_jwt` user `tmacey` was refused
+with "Login name tmacey is not matched to user tmacey@mit.edu". fe.conf now names
+`starrocks_username` for both keys.
 
 ## D1: audience
 
