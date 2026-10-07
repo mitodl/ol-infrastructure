@@ -14,6 +14,7 @@ from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.iam_helper import (
     DATA_LAKE_STAGES,
+    UNREBUILDABLE_DATA_LAKE_STAGES,
     cross_environment_glue_denial,
     data_lake_bucket_arns,
     data_lake_glue_resources,
@@ -153,12 +154,14 @@ for data_stage in DATA_LAKE_STAGES:
             # because the key was already deleted or overwritten.
             #
             # The window is the undelete window, not a reclaim horizon. Raw
-            # keeps 90 days because nothing can rebuild it. Every other stage
-            # is dbt output that a rebuild from raw reproduces, and its
-            # full-rebuild churn keeps refilling the window: at 90 days mart
-            # and dimensional production held 33.6 and 30.3 TB of Standard
+            # and history keep 90 days because nothing can rebuild them. Every
+            # other stage is dbt output that a rebuild from raw reproduces, and
+            # its full-rebuild churn keeps refilling the window: at 90 days
+            # mart and dimensional production held 33.6 and 30.3 TB of Standard
             # storage against ~0.4 TB current each (2026-09-20).
-            noncurrent_version_expiration_days=90 if data_stage == "raw" else 30,
+            noncurrent_version_expiration_days=(
+                90 if data_stage in UNREBUILDABLE_DATA_LAKE_STAGES else 30
+            ),
             server_side_encryption_enabled=True,
             kms_key_id=s3_kms_key["arn"],
             bucket_key_enabled=True,

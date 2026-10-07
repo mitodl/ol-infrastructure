@@ -356,7 +356,13 @@ DATA_LAKE_STAGES = (
     "external",
     "dimensional",
     "reporting",
+    "history",
 )
+
+# Layers a rebuild from raw cannot reproduce. ``history`` holds dbt snapshots:
+# one row per version of a raw record, written run by run, so a lost table
+# loses every version the source has since overwritten or deleted.
+UNREBUILDABLE_DATA_LAKE_STAGES = ("raw", "history")
 
 # Glue resource types the data lake identities act on, with the suffix each ARN
 # needs after the database name.
