@@ -615,6 +615,33 @@ Job and dev-shell pods carry no tier. edxapp uses the component for the LMS and 
 webapps only. Its celery and beat Deployments are built by hand in
 `edxapp/k8s_resources.py` and still need a tier there.
 
+#### 3.3.3 [2026-10-06] `k8s-monitoring` labels nine workloads per cluster from one release
+
+The Grafana `k8s-monitoring` chart (4.5.2) installs nine workloads in the `grafana`
+namespace of every QA and Production cluster, and each subchart takes its labels under
+a different key. Verified the same way as §3.3.1: render with a sentinel under each
+candidate key, then check every object with a `spec.selector`.
+
+| Workload | Key that reaches the pod | Also on the workload object |
+|---|---|---|
+| five Alloy collectors (`alloy-metrics`, `-logs`, `-receiver`, `-singleton`, the tail sampler) | `collectorCommon.alloy.controller.podLabels` | `collectorCommon.alloy.controller.extraLabels` |
+| `kube-state-metrics` | `telemetryServices.kube-state-metrics.customLabels` | same key, and its Service, ServiceAccount and RBAC objects |
+| `opencost` | `telemetryServices.opencost.podLabels` | `telemetryServices.opencost.commonLabels`, which also reaches its Service, ServiceAccount and RBAC objects |
+| `kepler` | `telemetryServices.kepler.podLabels` | none |
+| `alloy-operator` | `alloy-operator.podLabels` | none |
+
+The collectors are not rendered by this chart. It emits `Alloy` custom resources and
+the operator renders the `alloy` chart (1.12.1) from each one's spec, so the second
+hop was checked against that chart for all three controller types: `extraLabels` lands
+on the workload metadata and `podLabels` on the pod template, and neither is in the
+selector or a `volumeClaimTemplate`.
+
+All nine share `service=grafana-k8s-monitoring`. The collectors, kube-state-metrics and
+the operator are tier `notify`: losing one blinds alerting for that cluster without
+taking anything user-facing down. `opencost` and `kepler` are `ticket`, the same call
+as the Vantage agent. `kepler` and `alloy-operator` carry the labels on the pod only,
+so they join through `kube_pod_labels` and not through the workload-level series.
+
 Also backfill CI/QA clusters, which the analysis explicitly did not measure. Coverage
 there does not affect paging (CI/QA alerts go Slack-only per §8.1) but an unlabeled QA
 workload routes as untier-ed, so the QA stack stops being a rehearsal for the

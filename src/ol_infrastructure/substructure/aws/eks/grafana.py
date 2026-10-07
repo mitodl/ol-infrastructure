@@ -6,6 +6,12 @@ from pulumi import ResourceOptions
 
 from bridge.lib.versions import GRAFANA_K8S_MONITORING_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # The K8sGlobalLabels keys that alert rules join on to tier and route a
@@ -184,6 +190,7 @@ def setup_grafana(
     cluster_name: str,
     stack_info: StackInfo,
     k8s_provider: kubernetes.Provider,
+    k8s_global_labels: dict[str, str],
     grafana_k8s_monitoring_version: str = GRAFANA_K8S_MONITORING_CHART_VERSION,
 ):
     """
@@ -195,6 +202,8 @@ def setup_grafana(
         cluster_name: The name of the EKS cluster.
         stack_info: The StackInfo object containing environment information.
         k8s_provider: The Pulumi Kubernetes provider instance.
+        k8s_global_labels: The program's shared label dict, merged into each
+            workload's routing labels.
         grafana_k8s_monitoring_version: The version of the Grafana k8s-monitoring chart.
     """
     if stack_info.env_suffix.lower() == "ci":
@@ -203,6 +212,24 @@ def setup_grafana(
     grafana_vault_secrets = read_yaml_secrets(
         Path(f"alloy/grafana.{stack_info.env_suffix}.yaml")
     )
+
+    def _labels(component: Component, alert_tier: AlertTier) -> dict[str, str]:
+        return cluster_addon_labels(
+            base_labels=k8s_global_labels,
+            stack_info=stack_info,
+            service=Services.grafana_k8s_monitoring,
+            component=component,
+            alert_tier=alert_tier,
+        )
+
+    # The collectors and kube-state-metrics are what every alert rule reads
+    # from. Losing one blinds alerting for the cluster without taking anything
+    # user-facing down.
+    collector_labels = _labels(Component.agent, AlertTier.notify)
+    kube_state_metrics_labels = _labels(Component.exporter, AlertTier.notify)
+    alloy_operator_labels = _labels(Component.controller, AlertTier.notify)
+    # Cost and energy telemetry. A gap in it is a reporting problem.
+    cost_exporter_labels = _labels(Component.exporter, AlertTier.ticket)
 
     alloy_extra_env_vars = [
         {
@@ -705,11 +732,18 @@ def setup_grafana(
                         ],
                     },
                 },
+                # The operator's chart has no value that labels its Deployment
+                # object, only the pod.
+                "alloy-operator": {"podLabels": alloy_operator_labels},
                 # v4: kepler and kube-state-metrics moved to telemetryServices;
                 #     opencost moved here from clusterMetrics
                 "telemetryServices": {
                     "kube-state-metrics": {
                         "deploy": True,
+                        # Lands on every object the subchart renders (the
+                        # Deployment, its pod template, the Service and the
+                        # RBAC objects) and in no selector.
+                        "customLabels": kube_state_metrics_labels,
                         # kube-state-metrics only emits kube_<resource>_labels for
                         # resources named here, so without this every kube_job_*
                         # series is anonymous -- on data-production that is ~2000
@@ -778,9 +812,13 @@ def setup_grafana(
                             f"daemonsets=[{_OL_ROUTING_LABEL_KEYS}]",
                         ],
                     },
-                    "kepler": {"deploy": True},
+                    # Pod only: the chart has no value for the DaemonSet's own
+                    # labels.
+                    "kepler": {"deploy": True, "podLabels": cost_exporter_labels},
                     "opencost": {
                         "deploy": True,
+                        "commonLabels": cost_exporter_labels,
+                        "podLabels": cost_exporter_labels,
                         "metricsSource": "grafana-cloud-metrics",
                         "opencost": {
                             "exporter": {
@@ -799,6 +837,14 @@ def setup_grafana(
                 #     named alloy instances replaced by collectors map with presets
                 "collectorCommon": {
                     "alloy": {
+                        # Reaches all five Alloy instances, the tail-sampling
+                        # collector included. extraLabels is the workload
+                        # object and podLabels the pod template; neither is in
+                        # the selector.
+                        "controller": {
+                            "extraLabels": collector_labels,
+                            "podLabels": collector_labels,
+                        },
                         "extraEnv": alloy_extra_env_vars,
                         "remoteConfig": {
                             "enabled": True,
