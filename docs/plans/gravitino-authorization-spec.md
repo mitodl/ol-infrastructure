@@ -234,7 +234,9 @@ service admin. Each run:
    roles it manages. Anything else is reported but left alone, with one exception: a role listed in
    `RETIRED_ROLES` (`lib/data_lake_access.py`) is emptied and revoked from every group and user. A
    role deleted from `GOVERNANCE_ROLES` without being listed there keeps its privileges and its
-   group binding.
+   group binding. Retirement does not touch ownership (A9): step 5 takes any `ol_warehouse_<env>_*`
+   schema back from a retired group, but a table or other schema someone handed to that group stays
+   under its control until the owner is changed by hand.
 4. Ensures each role is granted to its group, and to nothing else.
 5. Sets each existing `ol_warehouse_<env>_*` schema's owner to group `ol_data_engineer` (A9).
 6. Runs A8.

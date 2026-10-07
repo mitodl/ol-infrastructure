@@ -467,6 +467,13 @@ def retire_roles(gravitino: Gravitino, managed: set[str], retired: set[str]) -> 
 
     The role and its group are kept: deleting them is untested against a real
     server, and an empty, unbound role grants nothing.
+
+    Ownership is separate from roles, and group membership comes from the
+    token, so a retired group still controls whatever it owns. The owner pass
+    moves every schema under the owned prefix back to the engineering group,
+    which cannot itself be retired. A table, or a schema outside the prefix,
+    whose ownership someone handed to the retired group is not found here and
+    has to be transferred by hand.
     """
     existing = set(gravitino.list_roles())
     for role in sorted(retired & existing):

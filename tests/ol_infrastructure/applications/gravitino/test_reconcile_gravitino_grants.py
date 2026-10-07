@@ -379,6 +379,20 @@ def test_retired_role_is_unbound_before_it_is_emptied_and_then_left_alone(server
     assert not any("/permissions/" in path for _, path in server.writes)
 
 
+def test_schema_handed_to_a_retired_group_goes_back_to_the_engineering_group(server):
+    _run(server)
+    server.owners[MART] = {"name": "ol_data_analyst", "type": "group"}
+    _run(server, _retire("ol_data_analyst"))
+
+    assert server.owners[MART] == {"name": "ol_data_engineer", "type": "group"}
+
+
+def test_the_schema_owner_group_cannot_be_retired(server):
+    with pytest.raises(ReconcileError, match="not a managed role"):
+        _run(server, _retire("ol_data_engineer"))
+    assert server.writes == []
+
+
 def test_role_dropped_without_being_retired_is_only_reported(server, capsys):
     _run(server)
     desired = _desired()
