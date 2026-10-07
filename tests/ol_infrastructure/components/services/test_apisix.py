@@ -1406,6 +1406,9 @@ def test_no_application_hand_writes_two_shared_plugin_configs():
 # send the site's own Origin, so the Origin match alone does not separate them
 # from a browser -- which is the whole reason the User-Agent clause exists.
 MIT_LEARN_SSR_UA = "axios/1.12.2"
+# What mit-learn sets once its SSR layer names itself; the bare form is sent
+# when NEXT_PUBLIC_VERSION is unset.
+MIT_LEARN_SSR_EXPLICIT_UAS = ["mit-learn-ssr/v0.61.2", "mit-learn-ssr"]
 BROWSER_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -1448,14 +1451,19 @@ def test_browser_traffic_match_exprs_requires_the_site_origin():
     assert not re.search(origin["value"], "https://learn.mit.edu.evil.com")
 
 
-def test_browser_traffic_match_exprs_excludes_the_first_party_ssr_client():
+@pytest.mark.parametrize(
+    "ssr_user_agent", [MIT_LEARN_SSR_UA, *MIT_LEARN_SSR_EXPLICIT_UAS]
+)
+def test_browser_traffic_match_exprs_excludes_the_first_party_ssr_client(
+    ssr_user_agent,
+):
     """The SSR layer aggregates every end user behind four egress addresses, so
     a per-browser bucket would throttle the whole population at once. It is
     kept out on purpose rather than by axios happening to send no Origin.
     """
     user_agent = expr_for_header(browser_exprs(), "User-Agent")
     assert user_agent["op"] == "RegexNotMatch"
-    assert re.search(user_agent["value"], MIT_LEARN_SSR_UA), (
+    assert re.search(user_agent["value"], ssr_user_agent), (
         "the SSR User-Agent must match the RegexNotMatch value, which is what "
         "excludes it from the rate-limited routes"
     )
@@ -1481,6 +1489,9 @@ def test_browser_traffic_match_exprs_ua_regex_is_anchored():
     assert FIRST_PARTY_SERVICE_CLIENT_UA_REGEX.startswith("^")
     user_agent = expr_for_header(browser_exprs(), "User-Agent")
     assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {MIT_LEARN_SSR_UA}")
+    for explicit_ua in MIT_LEARN_SSR_EXPLICIT_UAS:
+        assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {explicit_ua}")
+    assert not re.search(user_agent["value"], "mit-learn-ssr-lookalike/1.0")
 
 
 def test_browser_traffic_match_exprs_requires_an_explicit_ua_regex():
