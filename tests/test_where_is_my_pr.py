@@ -912,3 +912,88 @@ def test_unconsumed_repo_keeps_registry_message(
     assert (
         "No known deployment pipeline maps to mitodl/theme" in capsys.readouterr().out
     )
+
+
+def test_trace_only_follows_this_inputs_producers(
+    script: ModuleType,
+    upstream_pr: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An artifact both branches produced is traced through this deploy's branch."""
+    config = {
+        "resources": [
+            {
+                "name": "theme-release",
+                "type": "github-release",
+                "source": {"owner": "mitodl", "repository": "theme"},
+            },
+            {"name": "image", "type": "registry-image", "source": {}},
+        ],
+        "jobs": [
+            *(
+                {
+                    "name": f"build-{branch}",
+                    "plan": [{"get": "theme-release"}, {"put": "image"}],
+                }
+                for branch in ("a", "b")
+            ),
+            {
+                "name": "preview-a",
+                "plan": [{"get": "image", "passed": ["build-a"]}],
+            },
+            {
+                "name": "deploy-a",
+                "plan": [{"get": "image", "passed": ["preview-a"]}],
+            },
+        ],
+    }
+    found = script.PipelineConfig("arbitrary", "", config)
+    (source,) = script._upstream_sources(upstream_pr, found)
+    image = {"digest": "sha256:same"}
+    responses = {
+        "/builds/9/resources": {"inputs": [{"name": "image", "version": image}]},
+        "/image/versions?filter=digest%3Asha256%3Asame": [{"id": 4, "version": image}],
+        # The other branch's build is listed first.
+        "/image/versions/4/output_of": [
+            {"id": 2, "job_name": "build-b", "status": "succeeded"},
+            {"id": 1, "job_name": "build-a", "status": "succeeded"},
+        ],
+        "/builds/2/resources": {
+            "inputs": [{"name": "theme-release", "version": {"tag": "v2"}}]
+        },
+        "/builds/1/resources": {
+            "inputs": [{"name": "theme-release", "version": {"tag": "v1"}}]
+        },
+    }
+    monkeypatch.setattr(
+        script,
+        "_fly_curl",
+        Mock(
+            side_effect=lambda path: next(
+                v for k, v in responses.items() if path.endswith(k)
+            )
+        ),
+    )
+    assert script._traced_version(source, 9, "deploy-a") == {"tag": "v1"}
+
+
+def test_unresolved_stage_keeps_build_link(
+    script: ModuleType,
+    upstream_pr: object,
+    upstream_config: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A build whose source version can't be resolved is still linked."""
+    found = script.PipelineConfig("arbitrary", "", upstream_config)
+    (source,) = script._upstream_sources(upstream_pr, found)
+    monkeypatch.setattr(
+        script,
+        "_latest_successful_build",
+        Mock(return_value={"id": 7, "name": "12"}),
+    )
+    monkeypatch.setattr(script, "_traced_version", Mock(return_value=None))
+    script._report_upstream_stage(upstream_pr, source, "QA", "apply-qa")
+    output = capsys.readouterr().out
+    assert "?  QA" in output
+    assert "/jobs/apply-qa/builds/12" in output

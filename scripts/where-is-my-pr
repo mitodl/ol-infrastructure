@@ -1027,6 +1027,28 @@ def _resource_version(
     return next((v for v in data if v.get("version") == version), None)
 
 
+def _passed_ancestry(
+    source: UpstreamSource, resource: str, passed: set[str]
+) -> set[str]:
+    """Return every job a ``resource`` version must have passed to reach a get.
+
+    Follows the ``passed`` constraints of each upstream job's own get of the
+    same resource, so pass-through jobs (e.g. a preview that only gets the
+    image) lead back to the job that put it.
+    """
+    ancestry: set[str] = set()
+    frontier = list(passed)
+    while frontier:
+        job = frontier.pop()
+        if job in ancestry:
+            continue
+        ancestry.add(job)
+        for upstream_resource, upstream in source.inputs.get(job, {}).values():
+            if upstream_resource == resource:
+                frontier.extend(upstream)
+    return ancestry
+
+
 def _traced_version(
     source: UpstreamSource, build_id: int, job: str, depth: int = UPSTREAM_TRACE_DEPTH
 ) -> dict[str, Any] | None:
@@ -1048,22 +1070,25 @@ def _traced_version(
     if depth <= 0:
         return None
     candidates = [
-        (gets[i["name"]][0], i["version"])
+        (gets[i["name"]][0], i["version"], gets[i["name"]][1])
         for i in build_inputs
         if i["name"] in gets and gets[i["name"]][1] & source.consumers
     ]
     # Derived artifacts (e.g. an image built from the source) first: they
     # usually resolve in one hop, unlike inputs merely passed alongside them.
     candidates.sort(key=lambda candidate: candidate[0] not in source.produced)
-    for resource, version in candidates:
+    for resource, version, passed in candidates:
         entry = _resource_version(source, resource, version)
         if entry is None:
             continue
+        # Another branch may have output the same version (e.g. an identical
+        # image digest); only producers this input passed through count.
+        producers = _passed_ancestry(source, resource, passed) & source.consumers
         builds = _fly_curl(source.versions_api(resource, f"/{entry['id']}/output_of"))
         for build in builds if isinstance(builds, list) else []:
             if build.get("status") != "succeeded":
                 continue
-            if build.get("job_name") not in source.consumers:
+            if build.get("job_name") not in producers:
                 continue
             found = _traced_version(source, build["id"], build["job_name"], depth - 1)
             if found is not None:
@@ -1101,13 +1126,19 @@ def _report_upstream_stage(
     build = _latest_successful_build(
         source.pipeline.name, job, source.pipeline.instance_query
     )
-    version = _traced_version(source, build["id"], job) if build else None
+    if build is None:
+        print(f"    ?  {label:<12} no successful {job} build found")
+        return
+    build_path = f"/jobs/{quote(job, safe='')}/builds/{quote(build['name'], safe='')}"
+    build_url = f"       {CONCOURSE_URL}{source.url(build_path)}"
+    version = _traced_version(source, build["id"], job)
     resolved = _version_commit(source, version) if version else None
-    if build is None or resolved is None:
+    if resolved is None:
         print(
-            f"    ?  {label:<12} could not trace a successful {job} build "
+            f"    ?  {label:<12} could not trace {job} #{build['name']} "
             f"to a {source.resource} version"
         )
+        print(build_url)
         return
     commit, description = resolved
     reached = _is_ancestor(_compare_status(pr.owner, pr.repo, pr.commit, commit))
@@ -1116,8 +1147,7 @@ def _report_upstream_stage(
             label, reached, f"{job} #{build['name']} used {pr.repo} {description}"
         )
     )
-    build_path = f"/jobs/{quote(job, safe='')}/builds/{quote(build['name'], safe='')}"
-    print(f"       {CONCOURSE_URL}{source.url(build_path)}")
+    print(build_url)
 
 
 def _report_upstream_source(pr: PullRequest, source: UpstreamSource) -> None:
