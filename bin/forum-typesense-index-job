@@ -12,6 +12,10 @@ The Job is derived from the running LMS Deployment so that it has the same
 image, config, service account and security group. It prints the collection's
 document count next to the MySQL thread and comment counts.
 
+The stack needs `typesense:enabled`, which is what puts the TYPESENSE_*
+settings the forum client reads into the LMS config. Without it the Job fails
+with an AttributeError.
+
 Usage:
 
     kubectl -n <namespace> get deployment lms-edxapp-app -o json > lms.json
@@ -31,6 +35,8 @@ mode is one of:
            Run it AFTER the setting has rolled out, to pick up posts written
            between the rebuild and the rollout. Don't rerun rebuild at that
            point: posts made between the collection's delete and create fail.
+           It does not remove anything, so a thread or comment deleted between
+           the rebuild and the rollout stays in the collection.
 """
 
 import json
@@ -122,6 +128,7 @@ def build_job(deployment: dict[str, Any], job_name: str, mode: str) -> dict[str,
     # the pod keeps the LMS security group and can reach MySQL and Typesense.
     labels["ol.mit.edu/component"] = "job"
     labels["ol.mit.edu/process"] = "forum-typesense-index"
+    labels.pop("ol.mit.edu/alert_tier", None)
 
     return {
         "apiVersion": "batch/v1",
