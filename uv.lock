@@ -55,6 +55,7 @@ ol-openedx-sentry = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-openedx-uai-content-customization = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-social-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 openedx-companion-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
+pulumi-keycloak = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 rapid-response-xblock = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 
 [manifest]
@@ -1579,7 +1580,7 @@ requires-dist = [
     { name = "pulumi-fastly", specifier = ">=12,<13" },
     { name = "pulumi-gcp", specifier = ">=9.34,<10" },
     { name = "pulumi-github", specifier = ">=6.0.0,<7" },
-    { name = "pulumi-keycloak", specifier = ">=6.0.0,<7" },
+    { name = "pulumi-keycloak", specifier = ">=6.14.0,<7" },
     { name = "pulumi-kubernetes", specifier = ">=4,<5" },
     { name = "pulumi-mailgun", specifier = ">=3.0.0,<4" },
     { name = "pulumi-mongodbatlas", specifier = ">=4,<5" },
@@ -2074,16 +2075,16 @@ wheels = [
 
 [[package]]
 name = "pulumi-keycloak"
-version = "6.13.0"
+version = "6.14.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "parver" },
+    { name = "packaging" },
     { name = "pulumi" },
     { name = "semver" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/84/80/7879eac37ea76583f76755485458f790f91bfab3db97358e822b7eea132b/pulumi_keycloak-6.13.0.tar.gz", hash = "sha256:cd9333fa8feae4744c84bfd1f18b319647612aa060431c96005437669dc232fa", size = 365129, upload-time = "2026-08-01T04:42:33.216Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fa/56/052aae1073c73dd3f898fd7972b16ae9616ad8c5f2c6edc48e60b0d73a1f/pulumi_keycloak-6.14.0.tar.gz", hash = "sha256:1b1d09966fef86e26e548ccfe2bbb57c25f2105c690ba7b829ef25ed4a161478", size = 376285, upload-time = "2026-10-06T03:54:56.697Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3e/6d/cefa01e66c1d10c9aefeceaccd656e3c82884d8ed212c731891e231b8077/pulumi_keycloak-6.13.0-py3-none-any.whl", hash = "sha256:fe0b110c7245a02cc6228c36d48b2e69c990d77f6cefe02dd6ca7d0b094ae1d5", size = 549493, upload-time = "2026-08-01T04:42:31.658Z" },
+    { url = "https://files.pythonhosted.org/packages/14/ef/25f71a957eb961ec49b26bdaefbe59ce6da3ca42aade733997134320a04f/pulumi_keycloak-6.14.0-py3-none-any.whl", hash = "sha256:e0bd1297f0b6eab1c973f69168fd5134ea2e60dab21b007645cbd82cb73ffd5d", size = 560561, upload-time = "2026-10-06T03:54:55.145Z" },
 ]
 
 [[package]]
