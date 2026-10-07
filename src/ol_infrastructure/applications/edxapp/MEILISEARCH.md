@@ -49,6 +49,8 @@ deployments:
 
 - Meilisearch's own compaction, `POST /indexes/<index>/compact`, which is
   present in the v1.54 source we deploy. It runs as an ordinary Meilisearch task.
+  It writes the compacted copy to `data.mdb.copy` beside the live `data.mdb`
+  before replacing it, so the PVC needs free space for the index's used size.
 - A temp-index-and-swap rebuild. `reindex_studio --libraries-only` does this for
   the library index. For the course index it means calling `api.rebuild_index()`
   (from `openedx.core.djangoapps.content.search`) in a CMS shell, which defaults
@@ -177,9 +179,12 @@ The indexes are created and configured by a `post_migrate` handler, which our
 deploys reach through the `cms-migrate` pre-deploy job, so there is no separate
 init command. The handler does nothing when `MEILISEARCH_ENABLED` is false, and
 it logs a warning and lets the migration succeed if Meilisearch is unreachable
-or the API key is wrong. `reindex_studio` does not create an index either, so on
-a new instance a deploy has to run after `meilisearch_api_key` is in place.
-Confirm both indexes exist before populating them:
+or the API key is wrong. `reindex_studio` does not apply index settings, and
+Meilisearch creates a missing index on the first document write, so populating
+before the handler has succeeded leaves an index that exists without its
+filterable, searchable and sortable attributes. On a new instance a deploy has
+to run after `meilisearch_api_key` is in place. Confirm both indexes exist
+before populating them:
 
 ```bash
 kubectl exec -n <namespace> meilisearch-0 -c meilisearch -- \
@@ -222,7 +227,12 @@ do nothing except log a warning. Drop them from any runbook or script.
 An instance that was populated before the split has its Libraries V2 documents
 in `studio_content`, and Studio now searches `studio_library_content` for them.
 That index only holds library items edited since the upgrade until this is run
-once:
+once.
+
+Deploy the matching authoring MFE first (openedx/frontend-app-authoring#3248 on
+master, #3270 on `release/verawood`). An older MFE only searches
+`studio_content`, so once this step deletes the library documents from that
+index, library search returns nothing.
 
 ```bash
 ./manage.py cms reindex_studio --libraries-only
@@ -236,7 +246,9 @@ reindexed. Running it again is harmless, with one exception: it clears
 rewrites every course in place.
 
 Check the result from the Meilisearch pod. `studio_content` should report only
-`course_block` and `studio_library_content` the three library types:
+`course_block` and `studio_library_content` the three library types. None of
+our stacks set `MEILISEARCH_INDEX_PREFIX`; with one, substitute the prefixed
+names:
 
 ```bash
 kubectl exec -n <namespace> meilisearch-0 -c meilisearch -- sh -c '
