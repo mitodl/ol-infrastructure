@@ -43,10 +43,18 @@ jobs:
   # behaves as assumed. These two jobs cover that, and are separate so a
   # gateway-level failure is distinguishable from an ordinary test failure.
   apisix-integration:
-    name: APISIX integration (real gateway)
+    name: APISIX integration (real gateway, ${{ matrix.apisix }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every APISIX release a cluster runs. Production is split while the
+        # chart upgrade rolls out: 3.18.0 on the applications and residential
+        # clusters, 3.19.0 on data and operations (2026-10-07). Drop a version
+        # once no cluster runs it.
+        apisix: ["3.18.0", "3.19.0"]
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       with:
@@ -67,6 +75,8 @@ jobs:
 
     # Excluded from the default run by `-m 'not integration'` in pyproject.
     - name: Run APISIX integration tests
+      env:
+        APISIX_IT_IMAGE: apache/apisix:${{ matrix.apisix }}-debian
       run: uv run pytest tests/apisix_integration -m integration
 
   apisix-testnginx:

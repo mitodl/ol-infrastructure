@@ -18,6 +18,7 @@ import socket
 import subprocess
 import sys
 import time
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -25,6 +26,7 @@ import urllib3
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+    from pathlib import Path
 
 from ol_infrastructure.components.services.apisix import (
     gateway_global_pre_function_plugin,
@@ -212,20 +214,19 @@ def apisix_routes() -> dict[str, Any]:
     }
 
 
-@pytest.fixture(scope="session")
-def apisix(tmp_path_factory, apisix_routes) -> Generator[str]:
-    """Start APISIX on a free port and yield its base URL."""
-    conf_dir = tmp_path_factory.mktemp("apisix-conf")
+@contextmanager
+def run_apisix(
+    conf_dir: Path, routes: dict[str, Any], container_name: str = CONTAINER_NAME
+) -> Generator[str]:
+    """Start APISIX on a free port with ``routes`` and yield its base URL."""
     (conf_dir / "config.yaml").write_text(CONFIG_YAML)
     # APISIX's standalone loader requires the #END terminator.  JSON is a YAML
     # subset, so dumping the document avoids depending on a YAML writer here.
-    (conf_dir / "apisix.yaml").write_text(
-        json.dumps(apisix_routes, indent=2) + "\n#END\n"
-    )
+    (conf_dir / "apisix.yaml").write_text(json.dumps(routes, indent=2) + "\n#END\n")
 
     port = _free_port()
     subprocess.run(  # noqa: S603
-        ["docker", "rm", "-f", CONTAINER_NAME],  # noqa: S607
+        ["docker", "rm", "-f", container_name],  # noqa: S607
         capture_output=True,
         check=False,
     )
@@ -235,7 +236,7 @@ def apisix(tmp_path_factory, apisix_routes) -> Generator[str]:
             "run",
             "-d",
             "--name",
-            CONTAINER_NAME,
+            container_name,
             "-p",
             f"127.0.0.1:{port}:9080",
             "-v",
@@ -257,13 +258,13 @@ def apisix(tmp_path_factory, apisix_routes) -> Generator[str]:
         yield base_url
     finally:
         logs = subprocess.run(  # noqa: S603
-            ["docker", "logs", CONTAINER_NAME],  # noqa: S607
+            ["docker", "logs", container_name],  # noqa: S607
             capture_output=True,
             text=True,
             check=False,
         )
         subprocess.run(  # noqa: S603
-            ["docker", "rm", "-f", CONTAINER_NAME],  # noqa: S607
+            ["docker", "rm", "-f", container_name],  # noqa: S607
             capture_output=True,
             check=False,
         )
@@ -271,6 +272,13 @@ def apisix(tmp_path_factory, apisix_routes) -> Generator[str]:
         # shows up in APISIX's error log, not in the HTTP response.
         if logs.stdout or logs.stderr:
             sys.stdout.write(f"\n--- APISIX logs ---\n{logs.stdout}{logs.stderr}")
+
+
+@pytest.fixture(scope="session")
+def apisix(tmp_path_factory, apisix_routes) -> Generator[str]:
+    """Start APISIX on a free port and yield its base URL."""
+    with run_apisix(tmp_path_factory.mktemp("apisix-conf"), apisix_routes) as base_url:
+        yield base_url
 
 
 def _wait_until_ready(base_url: str) -> None:
