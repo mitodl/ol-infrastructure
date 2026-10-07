@@ -1065,9 +1065,13 @@ def _build_image_job(
     """
     job_name = f"build-{app_name}-image-from-{git_repo_resource.source['branch']}"
 
-    additional_build_params = {}
+    # OUTPUT_OCI keeps zstd layers inherited from the DHI-hardened base
+    # labeled as zstd; see _build_image_job_legacy and
+    # mitodl/ol-infrastructure#5714. This job uploads no source maps, so it
+    # never needs the legacy tarball output.
+    additional_build_params = {"OUTPUT_OCI": "true"}
     if build_target:
-        additional_build_params = {"TARGET": build_target}
+        additional_build_params["TARGET"] = build_target
 
     plan = [
         GetStep(get=git_repo_resource.name, trigger=True),
@@ -1095,14 +1099,14 @@ def _build_image_job(
         PutStep(
             put=dockerhub_registry_image_resource.name,
             params={
-                "image": "image/image.tar",
+                "image": "image/image",
                 "additional_tags": f"./{git_repo_resource.name}/.git/short_ref",
             },
         ),
         PutStep(
             put=ecr_registry_image_resource.name,
             params={
-                "image": "image/image.tar",
+                "image": "image/image",
                 "additional_tags": f"./{git_repo_resource.name}/.git/short_ref",
             },
         ),
@@ -1212,12 +1216,19 @@ def _build_release_image_job(
     additional_build_params = {}
     if build_target:
         additional_build_params = {"TARGET": build_target}
+    # OUTPUT_OCI keeps zstd layers inherited from the DHI-hardened base
+    # labeled as zstd; see _build_image_job_legacy and
+    # mitodl/ol-infrastructure#5714. Skipped when uploading source maps,
+    # because oci-build-task's OCI output ignores UNPACK_ROOTFS.
+    if sentry_sourcemaps is None:
+        additional_build_params["OUTPUT_OCI"] = "true"
 
     # UNPACK_ROOTFS lets the upload step read the maps out of the built image.
     sourcemap_build_params = {"UNPACK_ROOTFS": "true"} if sentry_sourcemaps else {}
 
     put_params: dict[str, Any] = {
-        "image": "image/image.tar",
+        # Directory, not image.tar, whenever OUTPUT_OCI was set above.
+        "image": "image/image" if sentry_sourcemaps is None else "image/image.tar",
         # Use the version file as additional_tags so the calver tag is pushed
         # without triggering the registry-image resource's semver validation
         # (which rejects 4-part calver strings like 2026.6.15.1).
