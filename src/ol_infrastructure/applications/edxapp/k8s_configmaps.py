@@ -321,10 +321,15 @@ def _build_interpolated_config_dict(
         config.update(
             {
                 "CANVAS_BASE_URL": edxapp_config.require("canvas_base_url"),
+                # No MKTG_URLS ROOT: since openedx-platform#38720 the LMS index
+                # redirects to ROOT whenever it differs from LMS_ROOT_URL, and
+                # residential has no separate marketing site to send users to.
+                # For the same reason any COURSES value makes /courses redirect
+                # to it, so point it at this LMS's dashboard.
                 "MKTG_URL_OVERRIDES": {
-                    "COURSES": f"https://{marketing_domain}/",
+                    "COURSES": f"https://{domains['lms']}/dashboard",
                     "PRIVACY": f"https://{marketing_domain}/privacy",
-                    "TOS": f"https://{marketing_domain}/terms",
+                    "TOS": f"https://{marketing_domain}/tos",
                     "ABOUT": f"https://{marketing_domain}/about",
                     "HONOR": f"https://{marketing_domain}/honor-code/",
                     "ACCESSIBILITY": "https://accessibility.mit.edu/",
@@ -336,9 +341,6 @@ def _build_interpolated_config_dict(
                     f"https://{domains['studio']}/logout",
                     f"https://{edxapp_config.require('mit_learn_api_domain')}/logout",
                 ],
-                "MKTG_URLS": {
-                    "ROOT": f"https://{marketing_domain}/",
-                },
             }
         )
         # Match the legacy MITx (residential) footer: only Terms of Service +
