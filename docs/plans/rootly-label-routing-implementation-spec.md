@@ -668,6 +668,50 @@ context.
 Everything in the stack is tier `notify`, including pgbouncer and the SQL exporter,
 which the stack builds by hand.
 
+#### 3.3.5 [2026-10-07] JupyterHub: six keys, pod-only, and the tier differs per hub
+
+Two stacks install chart `jupyterhub` 4.4.2: `applications/jupyterhub` (course
+notebooks, namespaces `jupyter` and `jupyter-authoring`) and
+`applications/jupyterhub_data` (analyst notebooks, `jupyter-data`). No pod in the
+three namespaces carried a tier on 2026-10-07; the count moves with user servers and
+per-node image pullers (45 to 53 on `applications-production` that day). Keys
+verified by rendering the chart with a sentinel:
+
+| Workload | Key | Component | Tier |
+|---|---|---|---|
+| hub | `hub.labels` | `webapp` | per stack |
+| proxy | `proxy.labels` | `gateway` | per stack |
+| user-scheduler | `scheduling.userScheduler.labels` | `controller` | `notify` |
+| user servers | `singleuser.extraLabels` | `worker` | `notify` |
+| user-placeholder | `scheduling.userPlaceholder.labels` | `worker` | `ticket` |
+| image pullers | `prePuller.labels` | `agent` | `ticket` |
+
+All six land on the pod only. The chart builds every selector, PodDisruptionBudget
+and NetworkPolicy from its own `component`/`app`/`release` labels and exposes no key
+for the workload object's metadata, so `kube_deployment_labels`,
+`kube_statefulset_labels` and `kube_daemonset_labels` will keep reporting these
+workloads untiered (the same gap as VPA and kepler). `singleuser.extraLabels` is
+not rendered into a manifest: it becomes `KubeSpawner.extra_labels`, so it reaches a
+user server when the hub next spawns it, not on apply. Helm merges it with the
+chart's default `hub.jupyter.org/network-access-hub` entry. The course hubs cull
+every server at `maxAge` 14400 s, so they converge within four hours. The analyst
+hub sets `maxAge: 0` and culls only after four idle hours, so a server in steady use
+keeps its unlabeled pod indefinitely: check that namespace for empty-tier pods before
+the `group_left` rewrite, and restart the stragglers.
+
+Each key carries the stack's whole label set, with `component` and `alert_tier`
+added. The image puller is enabled only on the learner hub, and the analyst hub's
+placeholder StatefulSet runs zero replicas.
+
+Applying a label change restarts the hub and the proxy. Both are single-replica
+`Recreate` Deployments, and replacing the proxy pod drops every open notebook
+connection on that hub.
+
+The hub and proxy are the two workloads whose loss takes the service down for every
+user, and their tier is the stack's: `page` for the course hubs, `notify` for the
+analyst hub. `lib/jupyterhub_config.jupyterhub_workload_labels` holds the mapping for
+both stacks.
+
 Also backfill CI/QA clusters, which the analysis explicitly did not measure. Coverage
 there does not affect paging (CI/QA alerts go Slack-only per §8.1) but an unlabeled QA
 workload routes as untier-ed, so the QA stack stops being a rehearsal for the

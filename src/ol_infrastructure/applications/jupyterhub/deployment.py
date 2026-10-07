@@ -54,6 +54,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     service_trust_role: OLEKSTrustRole,
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
+    workload_labels: dict[str, dict[str, str]],
     extra_images: dict[str, dict[str, str]] | None = None,
     service_account_name: str | None = None,
 ) -> kubernetes.helm.v3.Release:
@@ -324,6 +325,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     "users": True,
                 },
                 "proxy": {
+                    "labels": workload_labels["proxy"],
                     "service": {
                         "type": "NodePort",
                         "nodePorts": {
@@ -352,6 +354,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     "podPriority": {"enabled": True},
                     "userPlaceholder": {
                         "enabled": True,
+                        "labels": workload_labels["user_placeholder"],
                         "replicas": jupyterhub_deployment_config.get(
                             "user_placeholder_replicas"
                         )
@@ -359,6 +362,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     },
                     "userScheduler": {
                         "enabled": True,
+                        "labels": workload_labels["user_scheduler"],
                         # The chart leaves this unbounded by default; our
                         # 128Mi cap was too tight for a scheduler whose
                         # informer caches scale with total cluster object
@@ -376,6 +380,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     },
                 },
                 "hub": {
+                    "labels": workload_labels["hub"],
                     "db": {"type": "postgres"},
                     "extraEnv": [
                         {
@@ -438,8 +443,10 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     },
                     "pdb": {"enabled": True},
                 },
-                "prePuller": get_prepuller_config_for_images(extra_images_list),
+                "prePuller": get_prepuller_config_for_images(extra_images_list)
+                | {"labels": workload_labels["pre_puller"]},
                 "singleuser": {
+                    "extraLabels": workload_labels["singleuser"],
                     "serviceAccountName": service_account_name,
                     "extraFiles": {
                         "menu_override": {

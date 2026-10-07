@@ -8,6 +8,8 @@ monorepo.
 
 from typing import Any
 
+from ol_infrastructure.lib.ol_types import AlertTier, Component, K8sGlobalLabels
+
 
 class InvalidAuthenticatorError(Exception):
     """Raised when an unsupported JupyterHub authenticator class is requested."""
@@ -110,3 +112,41 @@ def get_authenticator_config(
                 f"{base_url.rstrip('/')}/hub/oauth_callback"
             )
     return auth_conf
+
+
+def jupyterhub_workload_labels(
+    labels: K8sGlobalLabels, serving_alert_tier: AlertTier
+) -> dict[str, dict[str, str]]:
+    """Label each workload of a JupyterHub Helm release with its role and tier.
+
+    The chart puts every one of these on a pod template (or, for ``singleuser``,
+    on the pods KubeSpawner creates) and none on a selector, which is built from
+    the chart's own ``component``/``app``/``release`` labels.
+
+    A single user's notebook server dying is that user's restart, so it is
+    notify. Placeholder pods and image pullers exist to be evicted or to idle,
+    so they are ticket.
+
+    :param labels: The stack's label model.
+    :param serving_alert_tier: Tier for the hub and the proxy, the two workloads
+        whose loss takes the service down for everyone.
+    :returns: Label dicts keyed by chart section: ``hub`` and ``proxy`` for
+        their ``labels``, ``user_scheduler`` and ``user_placeholder`` for
+        ``scheduling.*.labels``, ``pre_puller`` for ``prePuller.labels`` and
+        ``singleuser`` for ``singleuser.extraLabels``.
+    :rtype: dict[str, dict[str, str]]
+    """
+    roles = {
+        "hub": (Component.webapp, serving_alert_tier),
+        "proxy": (Component.gateway, serving_alert_tier),
+        "user_scheduler": (Component.controller, AlertTier.notify),
+        "singleuser": (Component.worker, AlertTier.notify),
+        "user_placeholder": (Component.worker, AlertTier.ticket),
+        "pre_puller": (Component.agent, AlertTier.ticket),
+    }
+    return {
+        section: labels.model_copy(
+            update={"component": component, "alert_tier": alert_tier}
+        ).model_dump()
+        for section, (component, alert_tier) in roles.items()
+    }

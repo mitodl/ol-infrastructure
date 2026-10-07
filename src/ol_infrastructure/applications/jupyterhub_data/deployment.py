@@ -138,6 +138,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     service_trust_role: OLEKSTrustRole,
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
+    workload_labels: dict[str, dict[str, str]],
     service_account_name: str,
     jupyterhub_data_config: Config,
 ) -> kubernetes.helm.v3.Release:
@@ -482,6 +483,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "users": False,
                 },
                 "proxy": {
+                    "labels": workload_labels["proxy"],
                     "service": {
                         "type": "ClusterIP",
                     },
@@ -495,8 +497,14 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                 },
                 "scheduling": {
                     "podPriority": {"enabled": True},
+                    # Zero replicas by chart default. Labeled so that raising
+                    # the count does not bring up untiered pods.
+                    "userPlaceholder": {
+                        "labels": workload_labels["user_placeholder"],
+                    },
                     "userScheduler": {
                         "enabled": True,
+                        "labels": workload_labels["user_scheduler"],
                         # This scheduler's informer caches scale with the total
                         # object count of the whole cluster, not with this
                         # namespace. data-production routinely carries several
@@ -508,6 +516,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     },
                 },
                 "hub": {
+                    "labels": workload_labels["hub"],
                     "db": {"type": "postgres"},
                     "extraEnv": [
                         {
@@ -562,6 +571,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "hook": {"enabled": False},
                 },
                 "singleuser": {
+                    "extraLabels": workload_labels["singleuser"],
                     "serviceAccountName": service_account_name,
                     "image": {
                         "name": "ghcr.io/mitodl/marimo-jupyterlab",
