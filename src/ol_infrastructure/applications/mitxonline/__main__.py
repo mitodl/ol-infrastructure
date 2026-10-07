@@ -633,17 +633,10 @@ mitxonline_k8s_app = OLApplicationK8s(
             # STATIC_URL is Granian's default /static route.
             static_path_mounts=["/src/staticfiles"],
             static_path_expires=STATIC_ASSET_MAX_AGE_SECONDS,
-        )
-        if mitxonline_config.get_bool("use_granian")
-        else None,
+        ),
         slack_channel=slack_channel,
         vault_k8s_resource_auth_name=vault_k8s_resources.auth_name,
-        # The sidecar is only redundant once Granian is actually serving the
-        # app (static_path_mounts above); the use_granian=False branch still
-        # runs true uwsgi with no static handling of its own, so it keeps the
-        # sidecar. See docs/plans/remove-nginx-sidecar.md.
-        import_nginx_config=not mitxonline_config.get_bool("use_granian"),
-        import_nginx_config_path="files/web.conf_uwsgi",
+        import_nginx_config=False,
         import_uwsgi_config=True,
         init_migrations=False,
         init_collectstatic=True,
