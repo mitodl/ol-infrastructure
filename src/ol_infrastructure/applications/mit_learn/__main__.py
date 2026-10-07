@@ -275,13 +275,13 @@ s3.BucketPolicy(
 
 mitlearn_app_storage_bucket_name = f"ol-mitlearn-app-storage-{app_env_suffix}"
 
-# CI and QA pilot SigV4-signed Fastly->S3 requests (see the IAM user/Vault
-# secret below and the signing VCL on the media-storage backend). CI
-# validated live on 2026-09-15; QA added 2026-09-29 after several weeks of
-# clean CI operation, to soak on a higher-traffic environment before
-# Production. Production stays on the pre-existing public-read policy until
-# this is rolled out there too.
-_mitlearn_bucket_is_sigv4_piloted = stack_info.env_suffix in ("ci", "qa")
+# CI, QA, and Production all use SigV4-signed Fastly->S3 requests (see the
+# IAM user/Vault secret below and the signing VCL on the media-storage
+# backend). CI validated live on 2026-09-15; QA added 2026-09-29 after
+# several weeks of clean CI operation; Production added 2026-10-07 after
+# several weeks of clean QA operation on a higher-traffic, more
+# content-rich environment.
+_mitlearn_bucket_is_sigv4_piloted = stack_info.env_suffix in ("ci", "qa", "production")
 
 mitlearn_application_storage_bucket_config = S3BucketConfig(
     bucket_name=mitlearn_app_storage_bucket_name,
