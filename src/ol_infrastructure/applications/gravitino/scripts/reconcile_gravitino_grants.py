@@ -699,6 +699,12 @@ def governance_role_holders(
     composite realm roles, which ``/clients/{id}/roles/{role}/users`` does not
     expand. Each user's ``/role-mappings/clients/{id}/composite`` does, at the
     cost of one request per realm user.
+
+    Service accounts are not returned. Keycloak's unfiltered user list leaves
+    them out (``UsersResource.getUsers`` passes ``includeServiceAccounts=false``
+    when no search or filter parameter is given, read at 26.7.4), so a client
+    holding a governance role through its service account is never added to the
+    metalake. Nothing needs that while pipeline writers go to Glue directly.
     """
     base_url, _, realm = issuer.partition("/realms/")
     admin_base = f"{base_url}/admin/realms/{realm}"
