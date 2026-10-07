@@ -5,7 +5,7 @@
 deployed stacks carry pending changes that have nothing to do with the branch.
 This runs `pulumi preview --json` for the same stack from two trees with the
 same inputs and compares the planned steps per URN (operation, property diff,
-inputs, parent). A refactor that changes nothing plans the same steps on both
+inputs, resource options). A refactor that changes nothing plans the same steps on both
 sides, whatever those steps are.
 
 Inputs read from the environment (e.g. `MITXONLINE_DOCKER_TAG`) only have to
@@ -40,6 +40,21 @@ STACK_FILE_PATTERN = re.compile(r"^Pulumi\.(?P<stack>.+)\.yaml$")
 # provider appends 8. The suffix is random per preview until the resource exists.
 AUTO_NAME_SUFFIX = "-[0-9a-f]{7,8}"
 MASKED_AUTO_NAME = "<auto-name>"
+SHARED_ENVIRONMENT = {"VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT", "PYTHONPATH"}
+# Resource options a refactor can drop without changing any input.
+COMPARED_OPTIONS = (
+    "parent",
+    "provider",
+    "protect",
+    "dependencies",
+    "propertyDependencies",
+    "aliases",
+    "deleteBeforeReplace",
+    "ignoreChanges",
+    "additionalSecretOutputs",
+    "retainOnDelete",
+    "customTimeouts",
+)
 STDERR_TAIL_LINES = 20
 
 
@@ -62,9 +77,9 @@ class StackResult:
 
 
 def _run(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-    # VIRTUAL_ENV would make uv resolve the caller's environment instead of the
-    # tree's own, so both previews would import the same ol_infrastructure.
-    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+    # Any of these would make both trees resolve the same environment, so both
+    # previews would import the same ol_infrastructure and always agree.
+    env = {k: v for k, v in os.environ.items() if k not in SHARED_ENVIRONMENT}
     return subprocess.run(  # noqa: S603
         command, cwd=cwd, env=env, capture_output=True, text=True, check=False
     )
@@ -100,12 +115,28 @@ def _stacks_with_state(tree: Path, project: Path) -> set[str]:
 
 
 def _mask_auto_names(value: Any, auto_name: re.Pattern[str]) -> Any:
-    if isinstance(value, str):
-        return MASKED_AUTO_NAME if auto_name.fullmatch(value) else value
+    # Only a property called "name" is auto-named (the resource's own name, or
+    # metadata.name on a Kubernetes object). Masking any matching string would
+    # hide a real difference in, say, an image tag that ends in a short SHA.
     if isinstance(value, dict):
-        return {k: _mask_auto_names(v, auto_name) for k, v in value.items()}
+        return {
+            k: MASKED_AUTO_NAME
+            if k == "name" and isinstance(v, str) and auto_name.fullmatch(v)
+            else _mask_auto_names(v, auto_name)
+            for k, v in value.items()
+        }
     if isinstance(value, list):
         return [_mask_auto_names(v, auto_name) for v in value]
+    return value
+
+
+def _unordered(value: Any) -> Any:
+    # The order of a dependency list differs between two previews of the same
+    # program (seen on a resource the compared branch did not touch).
+    if isinstance(value, dict):
+        return {k: _unordered(v) for k, v in value.items()}
+    if isinstance(value, list) and all(isinstance(v, str) for v in value):
+        return sorted(value)
     return value
 
 
@@ -113,7 +144,7 @@ def _planned_steps(preview: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Reduce a preview to what it plans for each URN.
 
     :param preview: Parsed output of ``pulumi preview --json``.
-    :returns: URN mapped to the operation, property diff, inputs and parent.
+    :returns: URN mapped to the operation, property diff, inputs and options.
     :rtype: dict[str, dict[str, Any]]
     """
     steps = {}
@@ -125,7 +156,9 @@ def _planned_steps(preview: dict[str, Any]) -> dict[str, dict[str, Any]]:
             "op": step["op"],
             "detailedDiff": step.get("detailedDiff"),
             "inputs": _mask_auto_names(new_state.get("inputs"), auto_name),
-            "parent": new_state.get("parent"),
+            "options": {
+                key: _unordered(new_state.get(key)) for key in COMPARED_OPTIONS
+            },
         }
     return steps
 
@@ -167,8 +200,9 @@ def _preview(tree: Path, project: Path, stack: str) -> dict[str, Any] | str:
         tree, project, "preview", "--json", "--non-interactive", "--stack", stack
     )
     if result.returncode != 0:
-        # pulumi reports a failed program inside the JSON document on stdout
-        tail = (result.stderr or result.stdout).strip().splitlines()
+        # pulumi reports a failed program inside the JSON document on stdout,
+        # and a failure to start one on stderr.
+        tail = f"{result.stdout}\n{result.stderr}".strip().splitlines()
         return "\n".join(tail[-STDERR_TAIL_LINES:])
     return json.loads(result.stdout)
 
@@ -221,7 +255,10 @@ def main(
 
     if all_stacks == bool(stacks):
         sys.exit("Pass stack names or --all-stacks, not both and not neither.")
-    selected = _stacks_with_config(project_dir) if all_stacks else stacks or []
+    configured = _stacks_with_config(project_dir)
+    selected = configured if all_stacks else stacks or []
+    if unknown := sorted(set(selected) - set(configured)):
+        sys.exit(f"No Pulumi.<stack>.yaml in {project_dir} for: {', '.join(unknown)}")
 
     with tempfile.TemporaryDirectory(prefix="pulumi-preview-diff-") as scratch:
         baseline_tree = Path(scratch) / "baseline"
@@ -231,7 +268,11 @@ def main(
         )
         try:
             for tree in (baseline_tree, branch_tree):
-                _checked(["uv", "sync", "--frozen", "--project", str(tree)], tree)
+                # --inexact leaves packages the caller installed by hand in place
+                _checked(
+                    ["uv", "sync", "--frozen", "--inexact", "--project", str(tree)],
+                    tree,
+                )
 
             with_state = _stacks_with_state(branch_tree, project)
             results = [
@@ -256,7 +297,9 @@ def main(
         print(f"{result.verdict.value:<10} {project} {result.stack}")
         for line in result.detail:
             print(f"  {line}")
-    if any(r.verdict in (Verdict.different, Verdict.error) for r in results):
+    if not any(r.verdict is Verdict.identical for r in results) or any(
+        r.verdict in (Verdict.different, Verdict.error) for r in results
+    ):
         sys.exit(1)
 
 
