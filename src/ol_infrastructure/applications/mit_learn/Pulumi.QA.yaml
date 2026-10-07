@@ -9,7 +9,7 @@ config:
     memory: "4800Mi"
   mitlearn:celery_default_resource_limits:
     memory: "4800Mi"
-  mitlearn:db_instance_size: db.m7g.xlarge
+  mitlearn:db_instance_size: db.t4g.large
   mitlearn:db_password:
     secure: v1:Xk9oxNvxSQAJUAHE:8CdeLN2SlyhyU0iZpqEX5rnHSJ3PClleDJi2UpzoCsVZ4UjNkr7vCOAKY7CvCuB/7CBKJKM=
   mitlearn:fastly_anycast_ips: []
