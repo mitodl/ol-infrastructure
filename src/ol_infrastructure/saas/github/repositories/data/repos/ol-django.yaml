@@ -18,6 +18,7 @@ merge_commit_message: PR_TITLE
 merge_commit_title: MERGE_MESSAGE
 name: ol-django
 required_status_checks:
+- ci-gate
 - prek
 squash_merge_commit_message: COMMIT_MESSAGES
 squash_merge_commit_title: COMMIT_OR_PR_TITLE
