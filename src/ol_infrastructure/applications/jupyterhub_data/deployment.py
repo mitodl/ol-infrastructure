@@ -497,6 +497,11 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                 },
                 "scheduling": {
                     "podPriority": {"enabled": True},
+                    # Zero replicas by chart default. Labeled so that raising
+                    # the count does not bring up untiered pods.
+                    "userPlaceholder": {
+                        "labels": workload_labels["user_placeholder"],
+                    },
                     "userScheduler": {
                         "enabled": True,
                         "labels": workload_labels["user_scheduler"],

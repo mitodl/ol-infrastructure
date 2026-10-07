@@ -40,9 +40,21 @@ def test_serving_tier_applies_to_hub_and_proxy_only():
     }
 
 
-def test_every_section_keeps_the_stack_labels_and_names_a_component():
+def test_each_section_names_its_component():
+    labels = jupyterhub_workload_labels(_labels(), AlertTier.notify)
+
+    assert {section: values[COMPONENT] for section, values in labels.items()} == {
+        "hub": "webapp",
+        "proxy": "gateway",
+        "user_scheduler": "controller",
+        "singleuser": "worker",
+        "user_placeholder": "worker",
+        "pre_puller": "agent",
+    }
+
+
+def test_every_section_keeps_the_stack_labels():
     base = _labels().model_dump()
 
     for values in jupyterhub_workload_labels(_labels(), AlertTier.notify).values():
         assert base.items() <= values.items()
-        assert values[COMPONENT]
