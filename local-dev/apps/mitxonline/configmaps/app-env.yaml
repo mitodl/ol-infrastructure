@@ -75,6 +75,35 @@ data:
   OPENEDX_API_CLIENT_ID: "local-dev-openedx-client-id" # pragma: allowlist secret
   OPENEDX_API_CLIENT_SECRET: "local-dev-openedx-client-secret" # pragma: allowlist secret
 
+  # ── Open edX hostnames ─────────────────────────────────────────────────────
+  # Every one of these has a hardcoded *devstack* default in mitxonline's
+  # main/settings.py (edx.odl.local:18000, studio.edx.odl.local:18001). Those
+  # hosts do not exist in this cluster, so leaving them unset is not "degraded"
+  # — it emits dead links into the UI and fails every server-side call. The
+  # Open edX composed in here is lehrer's, served by APISIX on the hosts
+  # declared in apps/openedx/configmaps/lms-config.yaml (LMS_BASE/CMS_BASE).
+  #
+  # OPENEDX_COURSE_BASE_URL is listed separately on purpose: it does NOT derive
+  # from OPENEDX_API_BASE_URL, it carries its own devstack default. It is what
+  # CourseRun.courseware_url is built from, so it is the one that puts
+  # http://edx.odl.local:18000/learn/course/... behind every "go to course" link
+  # on the MIT Learn and mitxonline dashboards.
+  #
+  # Only its scheme and host are used. courses/utils.py get_courseware_url does
+  # urljoin(OPENEDX_COURSE_BASE_URL, COURSEWARE_URL_PATTERN_TEMPLATE), and that
+  # template ("/learn/course/{courseware_id}/home", courses/constants.py) is
+  # root-relative, so urljoin discards whatever path this value carries. Giving
+  # it a path would only imply a configurability that does not exist -- the
+  # /learn/... shape is hardcoded in mitxonline and cannot be pointed at the
+  # LMS's legacy /courses/<id>/course/ courseware.
+  #
+  # 'mit.dev' is rewritten to LOCAL_DEV_ROOT_DOMAIN by k8s_yaml_local.
+  OPENEDX_API_BASE_URL: "https://lms.mit.dev"
+  OPENEDX_COURSE_BASE_URL: "https://lms.mit.dev"
+  OPENEDX_STUDIO_API_BASE_URL: "https://studio.mit.dev"
+  # OPENEDX_BASE_REDIRECT_URL is deliberately absent: its default is
+  # OPENEDX_API_BASE_URL, so it follows the value above.
+
   # Unified Ecommerce (optional — disable if not running)
   UNIFIED_ECOMMERCE_URL: ""
 
