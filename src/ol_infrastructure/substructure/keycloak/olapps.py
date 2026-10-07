@@ -1208,6 +1208,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         onboard_saml_org(
             SamlIdpConfig(
                 idp_alias="istanbul_aydin_staff",
+                org_domain="aydin.edu.tr",
                 idp_display_name="Istanbul Aydin University - Staff",
                 org_saml_metadata_url="https://login.microsoftonline.com/dafbbeb4-3113-49c7-bce6-faeb84139bf6/federationmetadata/2007-06/federationmetadata.xml?appid=3b4d02b1-8482-4837-b8c4-2db32d8a93ee",
                 principal_type="SUBJECT",
@@ -1232,6 +1233,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         onboard_saml_org(
             SamlIdpConfig(
                 idp_alias="istanbul_aydin_students",
+                org_domain="stu.aydin.edu.tr",
                 idp_display_name="Istanbul Aydin University - Students",
                 org_saml_metadata_url="https://login.microsoftonline.com/1220f94e-b228-4761-9501-da9e83e540ac/federationmetadata/2007-06/federationmetadata.xml?appid=d134d48b-ca70-46fd-a008-ab83b9a565fe",
                 principal_type="SUBJECT",
@@ -1269,6 +1271,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         onboard_saml_org(
             SamlIdpConfig(
                 idp_alias="cyprus_aydin_staff",
+                org_domain="cau.edu.tr",
                 idp_display_name="Cyprus Aydin University - Staff",
                 org_saml_metadata_url="https://login.microsoftonline.com/b250b687-5037-48da-a6d7-7471164c4b43/federationmetadata/2007-06/federationmetadata.xml?appid=09b2e0c2-79e9-4498-bf8f-560a6647d53d",
                 principal_type="SUBJECT",
@@ -1293,6 +1296,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         onboard_saml_org(
             SamlIdpConfig(
                 idp_alias="cyprus_aydin_students",
+                org_domain="stu.cau.edu.tr",
                 idp_display_name="Cyprus Aydin University - Students",
                 org_saml_metadata_url="https://login.microsoftonline.com/7b2d4163-41c3-478f-8911-e9117b736dfb/federationmetadata/2007-06/federationmetadata.xml?appid=59324ddf-cc35-40c2-a91b-fa7c0def6e78",
                 principal_type="SUBJECT",
