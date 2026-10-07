@@ -109,6 +109,7 @@ class Services(StrEnum):
     cert_manager = "cert-manager"
     dcgm_exporter = "dcgm-exporter"
     external_dns = "external-dns"
+    grafana_k8s_monitoring = "grafana-k8s-monitoring"
     karpenter = "karpenter"
     keda = "keda"
     metrics_server = "metrics-server"
