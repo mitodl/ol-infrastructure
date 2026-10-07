@@ -7,6 +7,9 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.client_policies import (
+    create_pkce_client_policy,
+)
 from ol_infrastructure.substructure.keycloak.learner_records import (
     create_learner_records_clients,
     parse_learner_records_clients,
@@ -182,6 +185,8 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         enabled=True,
         opts=resource_options,
     )
+
+    create_pkce_client_policy(ol_apps_realm.id, "olapps", resource_options)
 
     keycloak.RealmUserProfile(
         "olapps-user-profile",

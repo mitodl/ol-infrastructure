@@ -6,6 +6,10 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.client_policies import (
+    PKCE_REQUIRED_CLIENT_ARGS,
+    create_pkce_client_policy,
+)
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_staff_organizations,
 )
@@ -244,6 +248,10 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         opts=resource_options,
     )
 
+    create_pkce_client_policy(
+        ol_data_platform_realm.id, "ol-data-platform", resource_options
+    )
+
     # SUPERSET [START] # noqa: ERA001
     ol_data_platform_superset_client = keycloak.openid.Client(
         "ol-data-platform-superset-client",
@@ -356,12 +364,11 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         implicit_flow_enabled=False,
         direct_access_grants_enabled=False,
         service_accounts_enabled=False,
-        valid_redirect_uris=[
-            "http://localhost:8080/callback",  # CLI callback
-            "http://localhost:*/callback",  # Allow any localhost port
-            "http://127.0.0.1:8080/callback",
-        ],
-        web_origins=["+"],  # Allow all origins for CORS (CLI use)
+        **PKCE_REQUIRED_CLIENT_ARGS,
+        # superset-sup listens on this fixed port. A loopback redirect has to
+        # match exactly, so there is no wildcard-port entry.
+        valid_redirect_uris=["http://localhost:8080/callback"],
+        web_origins=["http://localhost:8080"],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
@@ -794,12 +801,10 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         implicit_flow_enabled=False,
         direct_access_grants_enabled=False,
         service_accounts_enabled=False,
-        valid_redirect_uris=[
-            "http://localhost:18080/callback",
-            "http://localhost:*/callback",
-            "http://127.0.0.1:18080/callback",
-        ],
-        web_origins=["+"],
+        **PKCE_REQUIRED_CLIENT_ARGS,
+        # bin/starrocks-auth in ol-data-platform listens on this fixed port.
+        valid_redirect_uris=["http://localhost:18080/callback"],
+        web_origins=["http://localhost:18080"],
         access_token_lifespan=str(STARROCKS_TOKEN_LIFESPAN_SECONDS),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
