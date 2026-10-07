@@ -37,7 +37,9 @@ from ol_infrastructure.lib.aws.iam_helper import (
     bedrock_invoke_statements,
     lint_iam_policy,
 )
+from ol_infrastructure.lib.jupyterhub_config import jupyterhub_workload_labels
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
@@ -75,11 +77,15 @@ aws_config = AWSBase(
     tags={"OU": BusinessUnit.data, "Environment": stack_info.env_suffix}
 )
 
-k8s_global_labels = K8sGlobalLabels(
+k8s_label_model = K8sGlobalLabels(
     service=Services.notebooks,
     ou=BusinessUnit.data,
     stack=stack_info,
-).model_dump()
+)
+k8s_global_labels = k8s_label_model.model_dump()
+# Internal analyst notebooks, worked in business hours like the rest of the
+# data platform.
+workload_labels = jupyterhub_workload_labels(k8s_label_model, AlertTier.notify)
 
 application_labels = k8s_global_labels | {
     "ol.mit.edu/application": "jupyterhub-data",
@@ -288,6 +294,7 @@ provision_jupyterhub_data_deployment(
     cluster_stack=cluster_stack,
     application_labels=application_labels,
     k8s_global_labels=k8s_global_labels,
+    workload_labels=workload_labels,
     service_account_name=jupyterhub_data_service_account_name,
     service_trust_role=jupyterhub_data_trust_role,
     jupyterhub_data_config=jupyterhub_data_config,
