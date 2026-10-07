@@ -1173,7 +1173,7 @@ async def _announce_deployments(app, repos, state: ReleaseProgressState) -> None
                 log.exception(
                     "Failed to announce the %s deployment of %s", environment, app_name
                 )
-                # Put the previous id back so the next poll retries this
+                # Put the previous version back so the next poll retries this
                 # milestone instead of silently treating it as announced.
                 state.last_version[key] = previous
 
