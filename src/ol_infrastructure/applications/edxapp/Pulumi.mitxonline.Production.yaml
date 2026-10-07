@@ -215,7 +215,7 @@ config:
   typesense:deploy: "true"
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
-  typesense:forum_search_enabled: "false"
+  typesense:forum_search_enabled: "true"
   # Steady state reached ~500Mi in Sept 2026 against the 512Mi default, and a
   # restarting node needs more than that while it reloads its index from disk,
   # so it OOMs on startup and never rejoins.
