@@ -694,6 +694,19 @@ command.local.Command(
 # credentials (native StarRocks auth) and is unaffected by OIDC config.
 _OIDC_SECURITY_INTEGRATION_NAME = "keycloak_oauth2"
 _JWT_SECURITY_INTEGRATION_NAME = "keycloak_jwt"
+_GROUP_PROVIDER_NAME = "keycloak_file_groups"
+_PERMITTED_GROUPS = ",".join(sorted(_GOVERNANCE_ROLES))
+# Both integrations are created with these, not only ALTERed to them afterwards.
+# An integration with no permitted_groups admits any realm user whose token
+# carries a starrocks_username, and one with no group_provider gives nobody a
+# role. Creating without them leaves that open from the CREATE until the group
+# provider setup runs, and for good if that command does not re-run: QA was found
+# in that state on 2026-10-07. permitted_groups with the provider not yet created
+# refuses every login, which is the safe direction.
+_INTEGRATION_GROUP_PROPERTIES = (
+    f'    "group_provider" = "{_GROUP_PROVIDER_NAME}",\n'
+    f'    "permitted_groups" = "{_PERMITTED_GROUPS}",\n'
+)
 
 if oidc_enabled:
     # Read OIDC credentials from Vault. The client_secret is explicitly
@@ -737,6 +750,7 @@ if oidc_enabled:
             '/protocol/openid-connect/certs",\n'
             '    "principal_field" = "starrocks_username",\n'
             '    "auto_provision_user" = "true",\n'
+            f"{_INTEGRATION_GROUP_PROPERTIES}"
             f'    "required_issuer" = "{issuer}"\n'
             ");"
         )
@@ -833,6 +847,7 @@ if oidc_enabled:
             f'    "jwks_url" = "{issuer}/protocol/openid-connect/certs",\n'
             '    "principal_field" = "starrocks_username",\n'
             '    "auto_provision_user" = "true",\n'
+            f"{_INTEGRATION_GROUP_PROPERTIES}"
             f'    "required_issuer" = "{issuer}"\n'
             ");"
         )
@@ -915,7 +930,7 @@ if oidc_enabled:
     # would eliminate the sync entirely:
     # https://github.com/StarRocks/starrocks/issues/75224
     _sync_script = str(Path(__file__).parent / "keycloak_group_sync.py")
-    _group_provider_name = "keycloak_file_groups"
+    _group_provider_name = _GROUP_PROVIDER_NAME
     _group_file_cm = f"{stack_info.env_prefix}-starrocks-oidc-groups"
     _group_file_path = "groups/groups.txt"
     _k8s_namespace = "starrocks"
@@ -960,7 +975,7 @@ if oidc_enabled:
         ),
     )
 
-    _permitted = ",".join(sorted(_GOVERNANCE_ROLES))
+    _permitted = _PERMITTED_GROUPS
     _group_provider_setup_sql = (
         f"CREATE GROUP PROVIDER IF NOT EXISTS {_group_provider_name}\n"
         f"PROPERTIES (\n"
@@ -1000,7 +1015,18 @@ if oidc_enabled:
             "STARROCKS_SQL": _group_provider_setup_sql,
             "STARROCKS_DELETE_SQL": _group_provider_drop_sql,
         },
-        triggers=[hashlib.sha256(_group_provider_setup_sql.encode()).hexdigest()],
+        # Both integration commands DROP and CREATE their integration. Their
+        # SQL is in the triggers so this re-runs whenever either one does, which
+        # re-creates the group provider and repeats the ALTERs. The integrations
+        # now carry both properties from their own CREATE as well (see
+        # _INTEGRATION_GROUP_PROPERTIES); before that, a recreate left QA with
+        # neither property on either integration.
+        triggers=pulumi.Output.all(_integration_sql, _jwt_integration_sql).apply(
+            lambda sqls: [
+                hashlib.sha256(sql.encode()).hexdigest()
+                for sql in (_group_provider_setup_sql, *sqls)
+            ]
+        ),
         opts=ResourceOptions(
             delete_before_replace=True,
             # roles_setup_cmd: GRANT <role> TO EXTERNAL GROUP requires the roles

@@ -780,11 +780,15 @@ _FE_CONFIG_BASE = (
     "background_refresh_metadata_enable = true\n"
     "background_refresh_metadata_interval_millis"
     f" = {fe_background_refresh_interval_ms}\n"
-    # Keycloak exposes preferred_username (human-readable) rather than sub (UUID).
-    # Set FE-level defaults so both the OAuth2 browser-redirect flow and the JWT
-    # client-plugin flow map to the same username regardless of per-user settings.
-    "oauth2_principal_field = preferred_username\n"
-    "jwt_principal_field = preferred_username\n"
+    # The claim a login name is compared with. These FE-level values are what a
+    # user created with an explicit auth plugin is checked against (it skips the
+    # security integrations), so they have to name the same claim the
+    # integrations do. StarRocks user names are the short starrocks_username
+    # (saml_uid); with preferred_username here, which is an email address in
+    # this realm, `CREATE USER 'tmacey' IDENTIFIED WITH authentication_jwt` was
+    # refused with "Login name tmacey is not matched to user tmacey@mit.edu".
+    "oauth2_principal_field = starrocks_username\n"
+    "jwt_principal_field = starrocks_username\n"
 )
 
 
@@ -836,8 +840,8 @@ def _build_fe_config(  # noqa: PLR0913
             # explicit authentication_oauth2 plugin AND the per-property
             # fallback for the security integration, which resolves each
             # setting as getOrDefault(<property>, Config.oauth2_<property>).
-            # The integration sets principal_field, so starrocks_username wins
-            # over the preferred_username default above; it omits
+            # The integration sets principal_field to the same claim as the
+            # default above; it omits
             # required_audience, so the value below is what actually validates
             # the audience on authentication_chain logins. Do not drop
             # oauth2_required_audience without replacing it in the integration.
@@ -857,7 +861,7 @@ def _build_fe_config(  # noqa: PLR0913
             # and sends it over the MySQL wire using the
             # authentication_openid_connect_client plugin (MySQL 9.2+).
             # No client_secret needed; the server verifies the JWT signature
-            # against the JWKS and maps preferred_username to the SR identity.
+            # against the JWKS and maps starrocks_username to the SR identity.
             f"jwt_jwks_url = {_oidc_base}/certs\n"
             f"jwt_required_issuer = {oidc_issuer_url}\n"
             # authentication_chain must be in fe.conf — ADMIN SET FRONTEND CONFIG
