@@ -900,8 +900,8 @@ async def test_first_poll_seeds_instead_of_announcing(repos, slack_app, monkeypa
     await bot._announce_deployments(slack_app, repos, state)
 
     slack_app.client.chat_postMessage.assert_not_called()
-    assert state.last_deployment[("my-app", "RC")] == 1
-    assert state.last_deployment[("my-app", "Production")] == 2
+    assert state.last_version[("my-app", "RC")] == "2026.9.2.1"
+    assert state.last_version[("my-app", "Production")] == "2026.9.1.1"
 
 
 async def test_new_rc_deployment_announces_version_and_release_issue(
@@ -925,7 +925,7 @@ async def test_new_rc_deployment_announces_version_and_release_issue(
             }
         ),
     )
-    state = bot.ReleaseProgressState(last_deployment={("my-app", "RC"): 6})
+    state = bot.ReleaseProgressState(last_version={("my-app", "RC"): "2026.9.1.1"})
 
     await bot._announce_deployments(slack_app, repos, state)
 
@@ -952,7 +952,9 @@ async def test_production_deployment_announces_separately(
             }
         ),
     )
-    state = bot.ReleaseProgressState(last_deployment={("my-app", "Production"): 8})
+    state = bot.ReleaseProgressState(
+        last_version={("my-app", "Production"): "2026.9.1.1"}
+    )
 
     await bot._announce_deployments(slack_app, repos, state)
 
@@ -977,6 +979,39 @@ async def test_unchanged_deployment_is_not_re_announced(repos, slack_app, monkey
     await bot._announce_deployments(slack_app, repos, state)
 
     slack_app.client.chat_postMessage.assert_not_called()
+
+
+@pytest.mark.usefixtures("_no_release_issue")
+async def test_an_infra_only_redeploy_of_the_same_version_is_not_announced(
+    repos, slack_app, monkeypatch
+):
+    """A new Deployment id for the release already on RC is not a release.
+
+    Regression: the QA job re-runs on any merge under the ol-infrastructure
+    paths it watches (src/ol_infrastructure/lib among them) and records a fresh
+    RC Deployment each time, with the same version. Keying on the id announced
+    ol-analytics-api 2026.10.1.1 as "deployed to RC" after an unrelated
+    labels change, six days after it actually was.
+    """
+    current = {"deployment": _deployment(7, "2026.10.1.1", "RC")}
+
+    async def _lookup(_repo, environment):
+        if environment != bot.github.RC_ENVIRONMENT:
+            return None
+        return current["deployment"]
+
+    monkeypatch.setattr(bot.github, "latest_successful_deployment", _lookup)
+    state = bot.ReleaseProgressState()
+    await bot._announce_deployments(slack_app, repos, state)
+
+    current["deployment"] = _deployment(8, "2026.10.1.1", "RC")
+    await bot._announce_deployments(slack_app, repos, state)
+    slack_app.client.chat_postMessage.assert_not_called()
+
+    current["deployment"] = _deployment(9, "2026.10.7.1", "RC")
+    await bot._announce_deployments(slack_app, repos, state)
+    slack_app.client.chat_postMessage.assert_called_once()
+    assert "2026.10.7.1" in slack_app.client.chat_postMessage.call_args.kwargs["text"]
 
 
 @pytest.mark.usefixtures("_no_release_issue")
@@ -1005,14 +1040,14 @@ async def test_a_brand_new_apps_first_ever_deployment_is_announced(
 
     await bot._announce_deployments(slack_app, repos, state)
     slack_app.client.chat_postMessage.assert_not_called()
-    assert state.last_deployment[("my-app", "RC")] is None
+    assert state.last_version[("my-app", "RC")] is None
 
     await bot._announce_deployments(slack_app, repos, state)
 
     slack_app.client.chat_postMessage.assert_called_once()
     text = slack_app.client.chat_postMessage.call_args.kwargs["text"]
     assert "2026.9.2.1" in text
-    assert state.last_deployment[("my-app", "RC")] == 7
+    assert state.last_version[("my-app", "RC")] == "2026.9.2.1"
 
 
 @pytest.mark.usefixtures("_no_release_issue")
@@ -1028,11 +1063,11 @@ async def test_a_failed_post_is_retried_on_the_next_poll(repos, slack_app, monke
     slack_app.client.chat_postMessage = AsyncMock(
         side_effect=RuntimeError("slack down")
     )
-    state = bot.ReleaseProgressState(last_deployment={("my-app", "RC"): 6})
+    state = bot.ReleaseProgressState(last_version={("my-app", "RC"): "2026.9.1.1"})
 
     await bot._announce_deployments(slack_app, repos, state)
 
-    assert state.last_deployment[("my-app", "RC")] == 6
+    assert state.last_version[("my-app", "RC")] == "2026.9.1.1"
     slack_app.client.chat_postMessage = AsyncMock()
     await bot._announce_deployments(slack_app, repos, state)
     slack_app.client.chat_postMessage.assert_called_once()
