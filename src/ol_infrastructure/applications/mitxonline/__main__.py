@@ -6,13 +6,11 @@
 - Create an IAM policy to grant access to S3 and other resources
 """
 
-import base64
 import json
 import mimetypes
 import textwrap
 from pathlib import Path
 
-import pulumi
 import pulumi_fastly as fastly
 import pulumi_vault as vault
 from pulumi import (
@@ -22,7 +20,7 @@ from pulumi import (
     ResourceOptions,
     export,
 )
-from pulumi_aws import ec2, iam, route53, s3
+from pulumi_aws import ec2, iam, s3
 
 from bridge.lib.constants import (
     apisix_oidc_session_cookie_name,
@@ -31,7 +29,6 @@ from bridge.lib.constants import (
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
-    ONE_MEGABYTE_BYTE,
     STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -59,6 +56,11 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
 )
+from ol_infrastructure.components.services.fastly import (
+    OLFastlyDNSRecordConfig,
+    OLFastlyTLS,
+    OLFastlyTLSConfig,
+)
 from ol_infrastructure.components.services.k8s import (
     GranianConfig,
     OLApplicationK8s,
@@ -84,14 +86,13 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.aws.route53_helper import (
-    fastly_certificate_validation_records,
     lookup_zone_id_from_domain,
 )
 from ol_infrastructure.lib.fastly import (
-    build_fastly_log_format_string,
     get_fastly_provider,
     vcl_snippet,
 )
+from ol_infrastructure.lib.fastly_logging import fastly_logging_args
 from ol_infrastructure.lib.k8s_keda import (
     build_webapp_keda_config,
     create_webapp_prometheus_trigger_auth,
@@ -135,10 +136,6 @@ apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
-monitoring_stack = make_stack_reference(projects.MONITORING, "default")
-vector_log_proxy_stack = make_stack_reference(
-    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
-)
 operations_vpc = network_stack.require_output("operations_vpc")
 mitxonline_environment = f"mitxonline-{stack_info.env_suffix}"
 
@@ -1108,22 +1105,6 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
 )
 
 ## Fastly Service
-vector_log_proxy_secrets = read_yaml_secrets(
-    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
-)
-fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
-encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
-).decode()
-vector_log_proxy_domain = vector_log_proxy_stack.require_output(
-    "vector_log_proxy_domain"
-)
-fastly_access_logging_bucket = monitoring_stack.require_output(
-    "fastly_access_logging_bucket"
-)
-fastly_access_logging_iam_role = monitoring_stack.require_output(
-    "fastly_access_logging_iam_role"
-)
 
 # UAI B2C paths that should redirect to MIT Learn.
 uai_b2c_redirects: dict[str, str] = {
@@ -1415,86 +1396,33 @@ mitxonline_service = fastly.ServiceVcl(
             type="pass",
         ),
     ],
-    logging_https=[
-        fastly.ServiceVclLoggingHttpArgs(
-            url=vector_log_proxy_domain.apply(
-                lambda domain: f"https://{domain}/fastly"
-            ),
-            name=f"fastly-mitxonline-{stack_info.env_suffix}-https-logging-args",
-            content_type="application/json",
-            format=build_fastly_log_format_string(
-                additional_static_fields={
-                    "application": Application.mitxonline,
-                    "environment": stack_info.env_suffix,
-                }
-            ),
-            format_version=2,
-            header_name="Authorization",
-            header_value=f"Basic {encoded_fastly_proxy_credentials}",
-            json_format="0",
-            method="POST",
-            request_max_bytes=ONE_MEGABYTE_BYTE,
-        )
-    ],
-    logging_s3s=[
-        fastly.ServiceVclLoggingS3Args(
-            bucket_name=fastly_access_logging_bucket["bucket_name"],
-            name=f"fastly-mitxonline-{stack_info.env_suffix}-s3-logging-args",
-            format=build_fastly_log_format_string(additional_static_fields={}),
-            gzip_level=3,
-            message_type="blank",
-            path=f"/{Application.mitxonline}/{stack_info.env_suffix}/",
-            redundancy="standard",
-            s3_iam_role=fastly_access_logging_iam_role["role_arn"],
-        ),
-    ],
+    **fastly_logging_args(
+        name=f"fastly-mitxonline-{stack_info.env_suffix}",
+        application=Application.mitxonline,
+        environment=stack_info.env_suffix,
+        s3_path=f"/{Application.mitxonline}/{stack_info.env_suffix}/",
+    ),
     stale_if_error=True,
     opts=fastly_provider,
 )
 
-tls_configuration = fastly.get_tls_configuration(
-    default=False,
-    name="TLS v1.3",
-    tls_protocols=["1.2", "1.3"],
-    opts=pulumi.InvokeOptions(provider=fastly_provider.provider),
-)
-
-mitxonline_fastly_tls = fastly.TlsSubscription(
-    f"fastly-mitxonline-{stack_info.env_suffix}-tls-subscription",
-    # valid values are certainly, lets-encrypt, or globalsign
-    certificate_authority="certainly",
-    domains=mitxonline_service.domains.apply(
-        lambda domains: [domain.name for domain in domains]
+mitxonline_fastly_tls = OLFastlyTLS(
+    f"mitxonline-fastly-tls-{stack_info.env_suffix}",
+    tls_config=OLFastlyTLSConfig(
+        subscription_resource_name=f"fastly-mitxonline-{stack_info.env_suffix}-tls-subscription",
+        validation_resource_name="mitxonline-tls-subscription-validation",
+        domains=mitxonline_service.domains.apply(
+            lambda domains: [domain.name for domain in domains]
+        ),
+        dns_records=[
+            OLFastlyDNSRecordConfig(
+                resource_name="mitxonline-fastly-dns-record",
+                domain=frontend_domain,
+                zone_id=lookup_zone_id_from_domain(frontend_domain),
+            )
+        ],
     ),
-    # Retrieved from https://manage.fastly.com/network/tls-configurations
-    configuration_id=tls_configuration.id,
     opts=fastly_provider,
-)
-
-mitxonline_fastly_tls.managed_dns_challenges.apply(
-    fastly_certificate_validation_records
-)
-
-validated_tls_subscription = fastly.TlsSubscriptionValidation(
-    "mitxonline-tls-subscription-validation",
-    subscription_id=mitxonline_fastly_tls.id,
-    opts=fastly_provider,
-)
-
-# Register frontend domain as pointing to Fastly
-five_minutes = 60 * 5
-route53.Record(
-    "mitxonline-fastly-dns-record",
-    name=frontend_domain,
-    type="A",
-    ttl=five_minutes,
-    records=[
-        record["record_value"]
-        for record in tls_configuration.dns_records
-        if record["record_type"] == "A"
-    ],
-    zone_id=lookup_zone_id_from_domain(frontend_domain),
-    allow_overwrite=True,
 )
 
 # VPA objects for mitxonline workloads.

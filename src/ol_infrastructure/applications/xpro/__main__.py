@@ -5,7 +5,6 @@
 - Create an IAM policy to grant access to S3 and other resources
 """
 
-import base64
 import json
 from pathlib import Path
 
@@ -15,16 +14,14 @@ from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
     Config,
-    InvokeOptions,
     ResourceOptions,
     export,
 )
-from pulumi_aws import ec2, iam, route53
+from pulumi_aws import ec2, iam
 
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
-    ONE_MEGABYTE_BYTE,
     STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -42,6 +39,11 @@ from ol_infrastructure.components.services.apisix_gateway_api import (
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
+)
+from ol_infrastructure.components.services.fastly import (
+    OLFastlyDNSRecordConfig,
+    OLFastlyTLS,
+    OLFastlyTLSConfig,
 )
 from ol_infrastructure.components.services.k8s import (
     GranianConfig,
@@ -68,14 +70,13 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.route53_helper import (
-    fastly_certificate_validation_records,
     lookup_zone_id_from_domain,
 )
 from ol_infrastructure.lib.fastly import (
-    build_fastly_log_format_string,
     get_fastly_provider,
     vcl_snippet,
 )
+from ol_infrastructure.lib.fastly_logging import fastly_logging_args
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -107,10 +108,6 @@ stack_info = parse_stack()
 backend_domain = xpro_config.require("backend_domain")
 frontend_domain = xpro_config.require("frontend_domain")
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
-monitoring_stack = make_stack_reference(projects.MONITORING, "default")
-vector_log_proxy_stack = make_stack_reference(
-    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
-)
 apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
@@ -792,22 +789,6 @@ if k8s_deploy:
             opts=ResourceOptions(depends_on=[xpro_k8s_app]),
         )
 
-vector_log_proxy_secrets = read_yaml_secrets(
-    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
-)
-fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
-encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
-).decode()
-vector_log_proxy_domain = vector_log_proxy_stack.require_output(
-    "vector_log_proxy_domain"
-)
-fastly_access_logging_bucket = monitoring_stack.require_output(
-    "fastly_access_logging_bucket"
-)
-fastly_access_logging_iam_role = monitoring_stack.require_output(
-    "fastly_access_logging_iam_role"
-)
 
 xpro_service = fastly.ServiceVcl(
     "xpro-service",
@@ -1072,93 +1053,47 @@ set bereq.http.x-forwarded-host = "{frontend_domain}";""",  # noqa: E501
             type="pass",
         ),
     ],
-    logging_https=[
-        fastly.ServiceVclLoggingHttpArgs(
-            url=vector_log_proxy_domain.apply(
-                lambda domain: f"https://{domain}/fastly"
-            ),
-            name=f"fastly-xpro-{stack_info.env_suffix}-https-logging-args",
-            content_type="application/json",
-            format=build_fastly_log_format_string(
-                additional_static_fields={
-                    "application": "xpro",
-                    "environment": stack_info.env_suffix,
-                }
-            ),
-            format_version=2,
-            header_name="Authorization",
-            header_value=f"Basic {encoded_fastly_proxy_credentials}",
-            json_format="0",
-            method="POST",
-            request_max_bytes=ONE_MEGABYTE_BYTE,
-        )
-    ],
-    logging_s3s=[
-        fastly.ServiceVclLoggingS3Args(
-            bucket_name=fastly_access_logging_bucket["bucket_name"],
-            name=f"fastly-xpro-{stack_info.env_suffix}-s3-logging-args",
-            format=build_fastly_log_format_string(additional_static_fields={}),
-            gzip_level=3,
-            message_type="blank",
-            path=f"/xpro/xpro/{stack_info.env_suffix}/",
-            redundancy="standard",
-            s3_iam_role=fastly_access_logging_iam_role["role_arn"],
-        ),
-    ],
+    **fastly_logging_args(
+        name=f"fastly-xpro-{stack_info.env_suffix}",
+        application="xpro",
+        environment=stack_info.env_suffix,
+        s3_path=f"/xpro/xpro/{stack_info.env_suffix}/",
+    ),
     stale_if_error=True,
     opts=fastly_provider,
 )
 
 
-xpro_tls_configuration = fastly.get_tls_configuration(
-    default=False,
-    name="TLS v1.3+0RTT",
-    tls_protocols=["1.2", "1.3+0RTT"],
-    opts=InvokeOptions(provider=fastly_provider.provider),
-)
-
-xpro_fastly_tls = fastly.TlsSubscription(
-    f"fastly-xpro-{stack_info.env_suffix}-tls-subscription",
-    # valid values are certainly, lets-encrypt, or globalsign
-    certificate_authority="certainly",
-    # Only include the frontend domain (xpro.mit.edu) in the Fastly TLS subscription.
-    # backend_domain (xpro-web.odl.mit.edu) is the K8s/APISix origin endpoint and its
-    # TLS is managed exclusively by cert-manager. Including it here causes Fastly's
-    # "certainly" CA to create a permanent _acme-challenge CNAME in Route53, which
-    # blocks cert-manager's DNS-01 solver from placing its TXT record at the same name.
-    # common_name must be set explicitly to match the new domain list — Fastly requires
-    # the common_name to be present in domains, and the state has the old value
-    # (xpro-web.odl.mit.edu) as common_name which would fail validation otherwise.
-    common_name=frontend_domain,
-    domains=xpro_service.domains.apply(
-        lambda domains: [d.name for d in domains if d.name != backend_domain]
+xpro_fastly_tls = OLFastlyTLS(
+    f"xpro-fastly-tls-{stack_info.env_suffix}",
+    tls_config=OLFastlyTLSConfig(
+        subscription_resource_name=f"fastly-xpro-{stack_info.env_suffix}-tls-subscription",
+        validation_resource_name="xpro-tls-subscription-validation",
+        tls_configuration_name="TLS v1.3+0RTT",
+        tls_protocols=["1.2", "1.3+0RTT"],
+        # Only include the frontend domain (xpro.mit.edu) in the Fastly TLS
+        # subscription. backend_domain (xpro-web.odl.mit.edu) is the K8s/APISix origin
+        # endpoint and its TLS is managed exclusively by cert-manager. Including it
+        # here causes Fastly's "certainly" CA to create a permanent _acme-challenge
+        # CNAME in Route53, which blocks cert-manager's DNS-01 solver from placing its
+        # TXT record at the same name.
+        # common_name must be set explicitly to match the new domain list. Fastly
+        # requires the common_name to be present in domains, and the state has the old
+        # value (xpro-web.odl.mit.edu) as common_name which would fail validation
+        # otherwise.
+        common_name=frontend_domain,
+        domains=xpro_service.domains.apply(
+            lambda domains: [d.name for d in domains if d.name != backend_domain]
+        ),
+        dns_records=[
+            OLFastlyDNSRecordConfig(
+                resource_name="xpro-fastly-dns-record",
+                domain=frontend_domain,
+                zone_id=lookup_zone_id_from_domain(frontend_domain),
+            )
+        ],
     ),
-    # Retrieved from https://manage.fastly.com/network/tls-configurations
-    configuration_id=xpro_tls_configuration.id,
     opts=fastly_provider,
-)
-
-xpro_fastly_tls.managed_dns_challenges.apply(fastly_certificate_validation_records)
-
-fastly.TlsSubscriptionValidation(
-    "xpro-tls-subscription-validation",
-    subscription_id=xpro_fastly_tls.id,
-    opts=fastly_provider,
-)
-
-five_minutes = 60 * 5
-route53.Record(
-    "xpro-fastly-dns-record",
-    name=frontend_domain,
-    type="A",
-    ttl=five_minutes,
-    records=[
-        record["record_value"]
-        for record in xpro_tls_configuration.dns_records
-        if record["record_type"] == "A"
-    ],
-    zone_id=lookup_zone_id_from_domain(frontend_domain),
-    allow_overwrite=True,
 )
 
 export(

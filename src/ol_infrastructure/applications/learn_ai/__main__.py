@@ -1,7 +1,6 @@
 # ruff: noqa: E501
 """Learn AI application infrastructure deployment (Pulumi)."""
 
-import base64
 import json
 import mimetypes
 import textwrap
@@ -29,7 +28,6 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_REDIS_PORT,
     DEFAULT_WSGI_PORT,
-    ONE_MEGABYTE_BYTE,
     STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -81,15 +79,16 @@ from ol_infrastructure.lib.azure_workload_identity import (
     azure_openai_env,
 )
 from ol_infrastructure.lib.fastly import (
-    build_fastly_log_format_string,
     get_fastly_provider,
     vcl_snippet,
 )
+from ol_infrastructure.lib.fastly_logging import fastly_logging_args
 from ol_infrastructure.lib.k8s_keda import (
     build_webapp_keda_config,
     create_webapp_prometheus_trigger_auth,
 )
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
@@ -115,16 +114,12 @@ cluster_substructure_stack = make_stack_reference(
     projects.EKS_SUB, f"applications.{stack_info.name}"
 )
 dns_stack = make_stack_reference(projects.DNS, "default")
-monitoring_stack = make_stack_reference(projects.MONITORING, "default")
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 opik_stack = make_stack_reference(projects.OPIK, stack_info.name)
 policy_stack = make_stack_reference(projects.POLICIES, "default")
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
-)
-vector_log_proxy_stack = make_stack_reference(
-    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
 )
 
 apps_vpc = network_stack.require_output("applications_vpc")
@@ -296,24 +291,8 @@ learn_ai_service_account = kubernetes.core.v1.ServiceAccount(
 
 ################################################
 # Fastly configuration
-vector_log_proxy_secrets = read_yaml_secrets(
-    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
-)
-fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
-encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
-).decode("utf8")
-vector_log_proxy_domain = vector_log_proxy_stack.require_output(
-    "vector_log_proxy_domain"
-)
 
 learn_ai_frontend_domain = learn_ai_config.require("frontend_domain")
-fastly_access_logging_bucket = monitoring_stack.require_output(
-    "fastly_access_logging_bucket"
-)
-fastly_access_logging_iam_role = monitoring_stack.require_output(
-    "fastly_access_logging_iam_role"
-)
 gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
 for k, v in mimetypes.types_map.items():
     if k in (
@@ -408,22 +387,12 @@ learn_ai_fastly_service = fastly.ServiceVcl(
             type="error",
         ),
     ],
-    logging_https=[
-        fastly.ServiceVclLoggingHttpArgs(
-            url=Output.all(domain=vector_log_proxy_domain).apply(
-                lambda kwargs: f"https://{kwargs['domain']}/fastly"
-            ),
-            name=f"fastly-learn_ai-{stack_info.env_suffix}-https-logging-args",
-            content_type="application/json",
-            format=build_fastly_log_format_string(additional_static_fields={}),
-            format_version=2,
-            header_name="Authorization",
-            header_value=f"Basic {encoded_fastly_proxy_credentials}",
-            json_format="0",
-            method="POST",
-            request_max_bytes=ONE_MEGABYTE_BYTE,
-        )
-    ],
+    **fastly_logging_args(
+        name=f"fastly-learn_ai-{stack_info.env_suffix}",
+        application=Application.learn_ai,
+        environment=stack_info.env_suffix,
+        s3_path=f"/{Application.learn_ai}/{stack_info.env_suffix}/",
+    ),
     opts=ResourceOptions.merge(fastly_provider, ResourceOptions()),
 )
 

@@ -5,13 +5,11 @@ MicroMasters application.
 - Create an IAM policy to grant access to S3 and other resources
 """
 
-import base64
 import json
 import mimetypes
 import textwrap
 from pathlib import Path
 
-import pulumi
 import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
@@ -19,21 +17,18 @@ from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
     Config,
-    Output,
     ResourceOptions,
     export,
 )
-from pulumi_aws import ec2, iam, route53, s3
+from pulumi_aws import ec2, iam, s3
 
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
     DEFAULT_WSGI_PORT,
-    ONE_MEGABYTE_BYTE,
     STATIC_ASSET_MAX_AGE_SECONDS,
 )
-from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
@@ -47,6 +42,11 @@ from ol_infrastructure.components.services.apisix import (
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
     OLCertManagerCertConfig,
+)
+from ol_infrastructure.components.services.fastly import (
+    OLFastlyDNSRecordConfig,
+    OLFastlyTLS,
+    OLFastlyTLSConfig,
 )
 from ol_infrastructure.components.services.k8s import (
     GranianConfig,
@@ -74,15 +74,15 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.aws.route53_helper import (
-    fastly_certificate_validation_records,
     lookup_zone_id_from_domain,
 )
 from ol_infrastructure.lib.fastly import (
-    build_fastly_log_format_string,
     get_fastly_provider,
     vcl_snippet,
 )
+from ol_infrastructure.lib.fastly_logging import fastly_logging_args
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
@@ -105,9 +105,6 @@ stack_info = parse_stack()
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 dns_stack = make_stack_reference(projects.DNS, "default")
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
-vector_log_proxy_stack = make_stack_reference(
-    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
-)
 micromasters_vpc = network_stack.require_output("applications_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 data_vpc = network_stack.require_output("data_vpc")
@@ -1194,16 +1191,6 @@ micromasters_apisix_httproute = OLApisixRoute(
 
 ################################################
 # Fastly CDN configuration
-vector_log_proxy_secrets = read_yaml_secrets(
-    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
-)
-fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
-encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
-).decode("utf8")
-vector_log_proxy_domain = vector_log_proxy_stack.require_output(
-    "vector_log_proxy_domain"
-)
 
 gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
 for k, v in mimetypes.types_map.items():
@@ -1304,68 +1291,33 @@ micromasters_fastly_service = fastly.ServiceVcl(
             type="error",
         ),
     ],
-    logging_https=[
-        fastly.ServiceVclLoggingHttpArgs(
-            url=Output.all(domain=vector_log_proxy_domain).apply(
-                lambda kwargs: f"https://{kwargs['domain']}/fastly"
-            ),
-            name=f"fastly-micromasters-{stack_info.env_suffix}-https-logging-args",
-            content_type="application/json",
-            format=build_fastly_log_format_string(additional_static_fields={}),
-            format_version=2,
-            header_name="Authorization",
-            header_value=f"Basic {encoded_fastly_proxy_credentials}",
-            json_format="0",
-            method="POST",
-            request_max_bytes=ONE_MEGABYTE_BYTE,
-        )
-    ],
+    **fastly_logging_args(
+        name=f"fastly-micromasters-{stack_info.env_suffix}",
+        application=Application.micromasters,
+        environment=stack_info.env_suffix,
+        s3_path=f"/{Application.micromasters}/{stack_info.env_suffix}/",
+    ),
     opts=ResourceOptions.merge(fastly_provider, ResourceOptions()),
 )
 
-tls_configuration = fastly.get_tls_configuration(
-    default=False,
-    name="TLS v1.3",
-    tls_protocols=["1.3"],
-    opts=pulumi.InvokeOptions(provider=fastly_provider.provider),
-)
-
-micromasters_fastly_tls = fastly.TlsSubscription(
-    f"fastly-micromasters-{stack_info.env_suffix}-tls-subscription",
-    # valid values are certainly, lets-encrypt, or globalsign
-    certificate_authority="certainly",
-    domains=micromasters_fastly_service.domains.apply(
-        lambda domains: [domain.name for domain in domains]
+micromasters_fastly_tls = OLFastlyTLS(
+    f"micromasters-fastly-tls-{stack_info.env_suffix}",
+    tls_config=OLFastlyTLSConfig(
+        subscription_resource_name=f"fastly-micromasters-{stack_info.env_suffix}-tls-subscription",
+        validation_resource_name="micromasters-tls-subscription-validation",
+        tls_protocols=["1.3"],
+        domains=micromasters_fastly_service.domains.apply(
+            lambda domains: [domain.name for domain in domains]
+        ),
+        dns_records=[
+            OLFastlyDNSRecordConfig(
+                resource_name="micromasters-fastly-dns-record",
+                domain=frontend_domain,
+                zone_id=lookup_zone_id_from_domain(frontend_domain),
+            )
+        ],
     ),
-    # Retrieved from https://manage.fastly.com/network/tls-configurations
-    configuration_id=tls_configuration.id,
     opts=fastly_provider,
-)
-
-micromasters_fastly_tls.managed_dns_challenges.apply(
-    fastly_certificate_validation_records
-)
-
-validated_tls_subscription = fastly.TlsSubscriptionValidation(
-    "micromasters-tls-subscription-validation",
-    subscription_id=micromasters_fastly_tls.id,
-    opts=fastly_provider,
-)
-
-# Point the frontend domain at Fastly
-five_minutes = 60 * 5
-route53.Record(
-    "micromasters-fastly-dns-record",
-    name=frontend_domain,
-    type="A",
-    ttl=five_minutes,
-    records=[
-        record["record_value"]
-        for record in tls_configuration.dns_records
-        if record["record_type"] == "A"
-    ],
-    zone_id=lookup_zone_id_from_domain(frontend_domain),
-    allow_overwrite=True,
 )
 
 
