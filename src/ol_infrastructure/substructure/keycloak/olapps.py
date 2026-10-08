@@ -1192,6 +1192,43 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 resource_options=resource_options,
             ),
         )
+        onboard_saml_org(
+            SamlIdpConfig(
+                idp_alias="UKM",
+                idp_display_name="Universiti Kebangsaan Malaysia",
+                org_saml_metadata_url="https://sso.ukm.my/saml2/idp/metadata.php",
+                # UKM gave one value per field for "attribute name and friendly
+                # name", so the plain name (SimpleSAMLphp's basic format) is
+                # the identifier; matching on the Name attribute works whether
+                # or not a FriendlyName is also sent.
+                principal_type="ATTRIBUTE",
+                principal_attribute="mail",
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_name_map={
+                    "email": "mail",
+                    "fullName": "displayName",
+                },
+                mapper_extra_config={
+                    attr: {"attribute.name.format": "ATTRIBUTE_FORMAT_BASIC"}
+                    for attr in ("email", "fullName")
+                },
+            ),
+            org=OrgConfig(
+                org_domains=[
+                    "ukm.edu.my",
+                    "siswa.ukm.edu.my",
+                    "ppukm.ukm.edu.my",
+                ],
+                org_name="Universiti Kebangsaan Malaysia",
+                org_alias="UKM",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
         istanbul_aydin_org = create_org_for_learn(
             OrgConfig(
                 org_domains=[
