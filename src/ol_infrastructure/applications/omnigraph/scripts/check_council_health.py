@@ -124,6 +124,16 @@ PROBE_QUERIES: tuple[tuple[str, str], ...] = (
 
 HTTP_TIMEOUT_SECONDS = 15
 
+#: The HTTP contract omnigraph-server 0.13 requires on every protected route:
+#: without exactly this header and value it answers 400
+#: ``api_contract_mismatch`` before it looks at the graph or the query. A 0.11
+#: server ignores it, so sending it is safe on both sides of the cutover. Same
+#: value as ``witan_core.omnigraph_http.HTTP_API_CONTRACT``; this script cannot
+#: import it (see WHY A RAW HTTP CALL above), so the two move together by hand.
+HTTP_API_CONTRACT_HEADER = "Omnigraph-Http-Api"
+HTTP_API_CONTRACT = "0.13"
+API_CONTRACT_MISMATCH = "api_contract_mismatch"
+
 #: Budget for everything in a run that is not an HTTP call: pod scheduling,
 #: image pull, interpreter start. Generous on purpose — the deadline below is
 #: a backstop for a wedged run, not a policy on slow nodes.
@@ -147,6 +157,19 @@ class ProbeError(Exception):
     """A condition that must exit the run non-zero."""
 
 
+def _error_code(body: str) -> str | None:
+    """Return the ``code`` of an omnigraph error body, or None if it has none.
+
+    A proxy's HTML error page is not JSON, and that is an ordinary failure to
+    report verbatim, not something to raise on.
+    """
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        return None
+    return parsed.get("code") if isinstance(parsed, dict) else None
+
+
 def run_probe(
     server_addr: str, graph_id: str, token: str, query: str = PROBE_QUERY
 ) -> dict[str, Any]:
@@ -167,6 +190,7 @@ def run_probe(
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
+            HTTP_API_CONTRACT_HEADER: HTTP_API_CONTRACT,
         },
     )
     try:
@@ -174,9 +198,22 @@ def run_probe(
             request, timeout=HTTP_TIMEOUT_SECONDS
         ) as response:
             status = response.status
+            stamped = response.headers.get_all(HTTP_API_CONTRACT_HEADER) or []
             body = response.read()
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:500]
+        error_body = exc.read().decode("utf-8", "replace")
+        detail = error_body[:500]
+        if _error_code(error_body) == API_CONTRACT_MISMATCH:
+            # Named apart from every other refusal because the remedy is
+            # different: the graph and this probe's credentials may be fine,
+            # and the server is on another omnigraph version than this script.
+            msg = (
+                f"POST {url} failed: the server does not speak "
+                f"{HTTP_API_CONTRACT_HEADER}: {HTTP_API_CONTRACT} "
+                f"(HTTP {exc.code} {detail}). Update HTTP_API_CONTRACT in "
+                "check_council_health.py to the deployed omnigraph's contract."
+            )
+            raise ProbeError(msg) from exc
         msg = f"POST {url} failed: HTTP {exc.code} {detail}"
         raise ProbeError(msg) from exc
     except urllib.error.URLError as exc:
@@ -185,6 +222,18 @@ def run_probe(
     except TimeoutError as exc:
         msg = f"POST {url} timed out after {HTTP_TIMEOUT_SECONDS}s"
         raise ProbeError(msg) from exc
+
+    # A 0.13 server stamps its contract on every response. One that names
+    # another contract is a different server than this probe was written for,
+    # whatever the body looks like. An absent stamp is not refused here: a
+    # 0.11 server sends none, and this script runs on both sides of the cutover.
+    if stamped and stamped != [HTTP_API_CONTRACT]:
+        msg = (
+            f"POST {url} returned HTTP {status} stamped "
+            f"{HTTP_API_CONTRACT_HEADER}: {', '.join(stamped)}, not "
+            f"{HTTP_API_CONTRACT}"
+        )
+        raise ProbeError(msg)
 
     try:
         parsed = json.loads(body)
