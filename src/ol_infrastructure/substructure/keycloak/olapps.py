@@ -1209,13 +1209,11 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 resource_options=resource_options,
                 attribute_name_map={
                     "email": "mail",
-                    "firstName": "displayName",
-                    "lastName": "displayName",
                     "fullName": "displayName",
                 },
                 mapper_extra_config={
                     attr: {"attribute.name.format": "ATTRIBUTE_FORMAT_BASIC"}
-                    for attr in ("email", "firstName", "lastName", "fullName")
+                    for attr in ("email", "fullName")
                 },
             ),
             org=OrgConfig(
