@@ -18,9 +18,9 @@ There is one write path for each kind of source:
 
 | Source | Shipper | Defined in |
 |--------|---------|------------|
-| EKS pod logs, cluster events, cluster/app metrics, OTLP traces/metrics/logs | Alloy, via the `k8s-monitoring` Helm chart (5 collectors per cluster plus a tail sampler) | `src/ol_infrastructure/substructure/aws/eks/grafana.py` |
+| EKS pod logs, cluster events, cluster/app metrics, OTLP traces/metrics/logs | Alloy, via the `k8s-monitoring` Helm chart (4 collectors per cluster plus a tail sampler) | `src/ol_infrastructure/substructure/aws/eks/grafana.py` |
 | Heroku log drains and Fastly real-time logs | `vector-log-proxy` (Vector on EKS) | `src/ol_infrastructure/infrastructure/vector_log_proxy/` |
-| EC2 hosts (Concourse, Consul, Vault) | Vector global log and metric sinks, plus Alloy for OTLP | `src/bilder/components/vector/templates/global_*_sink.yaml`, `src/bilder/components/alloy/files/config.alloy` |
+| EC2 hosts (Concourse, Consul, Vault) | Vector global log and metric sinks, plus Alloy for OTLP on Concourse only | `src/bilder/components/vector/templates/global_*_sink.yaml`, `src/bilder/components/alloy/files/config.alloy` |
 
 CI clusters run no Alloy (`setup_grafana` returns early, and `lib/otel.py` follows the
 same rule). Their only telemetry is the small amount that EC2 Vector ships.
@@ -133,7 +133,7 @@ else.
 #### Option 3: Cold archive. Dual-write raw telemetry to S3 with no query engine.
 
 The second destination writes compressed, partitioned objects straight to S3. Alloy's
-`otelcol.exporter.awss3` and Vector's `aws_s3` sink both do this. Nothing runs all the
+`otelcol.exporter.awss3` and Vector's `aws_s3` sink both do this. The Alloy component is still experimental. Nothing runs all the
 time. To answer a question we either query with Athena (or with StarRocks, through a
 Glue table over the prefix), or "rehydrate" a time range into a temporary Loki.
 
@@ -199,11 +199,14 @@ holds data that Cloud had redacted. Per shipper:
 
 - **k8s-monitoring (`grafana.py`)**: add `archive-logs` (`loki`), `archive-metrics`
   (`prometheus`) and `archive-otlp` (`otlp`, traces only) to `destinations`. Each
-  feature's `destinations` list has to be set *explicitly*. Today they lean on the
-  chart's "all compatible destinations" default, and with a fourth and fifth
-  destination that default could send pod logs to both `grafana-cloud-logs` and
-  `gc-otlp-endpoint`. Before the first rollout, confirm with `helm template` that
-  each feature renders exactly one Cloud and one archive writer per backend.
+  feature's `destinations` list should be set *explicitly*. Today no feature sets
+  one, so each relies on the chart's assignment rule, which sends a feature to every
+  destination in its own ecosystem. That would fan pod logs out to both Loki-type
+  destinations by itself. But an OTLP-type archive destination would also receive
+  every OTLP feature it has signals enabled for, so the archive's coverage would
+  depend on per-destination `metrics`/`logs`/`traces` flags rather than on a list
+  anyone reads. Before the first rollout, confirm with `helm template` that each
+  feature renders exactly one Cloud and one archive writer per backend.
 - **Traces and tail sampling**: the sampler is a property of the `gc-otlp-endpoint`
   destination. The archive destination needs **the same policy list**, so we lift it
   into one module-level constant that both destinations reference. The probabilistic
@@ -220,8 +223,13 @@ holds data that Cloud had redacted. Per shipper:
 
 **2. Isolate failures.** Every archive writer gets bounded retries and a bounded
 queue, and drops data once those are exhausted rather than pushing back on the
-pipeline (`max_backoff_retries`, queue sizes, and the remote-write WAL truncation
-settings). **Gate before each phase reaches Production:** scale the archive's
+pipeline. By default, `loki.write` blocks when its send queue fills
+(`queue_config.block_on_overflow` defaults to `true`, and the block is experimental),
+and it retries 10 times (`max_backoff_retries`). A blocked archive writer can
+therefore stall the shared `loki.process` stage that also feeds Cloud. Implementation
+has to set non-blocking overflow on the archive writer, and supply it through the
+chart's extra-config hooks if the chart does not expose it. Remote-write needs the
+same treatment through its queue and WAL truncation settings. **Gate before each phase reaches Production:** scale the archive's
 distributors to zero in QA for an hour, and confirm that Cloud ingest rate, collector
 memory and pod-log lag don't change.
 
@@ -232,12 +240,12 @@ config stays in `substructure/aws/eks/grafana.py`. The archive is single-tenant 
 environment, so the Production archive holds only Production data. That matches the
 Cloud stack split and keeps a QA mistake from touching production history.
 
-- **Deployment mode**: the smallest supported shape of each system's official Helm
-  chart, with zone-aware replication across 3 AZs. Our volume (well under 1 TB/day of
-  logs, under 1M series) is at the bottom of every vendor sizing table. Pick
-  monolithic or distributed mode when implementation starts, from each project's
-  *current* guidance. Loki in particular has been moving away from "simple scalable"
-  mode, so check the current state before choosing.
+- **Deployment mode**: each system's official Helm chart, with zone-aware replication
+  across 3 AZs. Production Loki at 119 GB/day is past monolithic mode's ~20 GB/day
+  guidance, and simple scalable mode is deprecated and removed in Loki 4.0. That
+  leaves Loki in **microservices (distributed) mode** at the low end of its sizing.
+  For Mimir and Tempo (under 1M series and ~51 GB/day), pick between monolithic and
+  distributed from each project's guidance when implementation starts.
 - **Storage**: one S3 bucket per backend per environment, with S3 Intelligent-Tiering.
   Retention is enforced by each compactor (`retention_period` /
   `compactor_blocks_retention_period` / `block_retention`), and an S3 lifecycle rule
@@ -277,8 +285,8 @@ writers), and compactor or retention failure. Neither ever pages.
   failure modes, and S3 cost to watch. Ownership has to be explicit, with a named
   maintainer and an upgrade cadence (quarterly at minimum), or the archive rots.
 - **Collectors get heavier and more complex.** There are more writers per collector
-  and a second tail sampler per cluster, and `grafana.py` is already the most
-  carefully tuned file in the repo. Every change to sampling policy or processing now
+  and a second tail sampler per cluster, and `grafana.py` is already heavily
+  tuned. Every change to sampling policy or processing now
   has two consumers.
 - **Keeping data longer widens our privacy and compliance exposure.** Logs contain
   learner identifiers, IP addresses and request paths. Thirteen-month retention of
@@ -288,7 +296,7 @@ writers), and compactor or retention failure. Neither ever pages.
   aggregations and Cloud recording rules. Any long-term trend we care about has to be
   re-expressed as a recording rule in mimir-archive, or computed at query time.
 - **No backfill.** History starts on the day each phase is turned on. Exporting the
-  31 days held in Cloud is possible (`logcli` export) but is not planned.
+  31 days held in Cloud is possible (`logcli query` over the range) but is not planned.
 
 ### Neutral Consequences
 
@@ -335,6 +343,7 @@ writers), and compactor or retention failure. Neither ever pages.
 
 ## References
 
+- Loki deployment modes (SSD deprecation, monolithic sizing): https://grafana.com/docs/loki/latest/get-started/deployment-modes/
 - Grafana Private Data Source Connect: https://grafana.com/docs/grafana-cloud/connect-externally-hosted/private-data-source-connect/
 - k8s-monitoring chart destinations: https://github.com/grafana/k8s-monitoring-helm/tree/main/charts/k8s-monitoring/docs
 - Loki retention and deletion: https://grafana.com/docs/loki/latest/operations/storage/retention/
@@ -349,7 +358,7 @@ Open questions for reviewers:
    right? Is there an institutional records-retention requirement (MIT IS&T, or
    FERPA-related) that sets a floor or a ceiling for logs?
 2. **QA archive.** QA is 5% of production log volume, but its 225k series are over
-   half of production's. Archiving it would roughly double the Mimir footprint for
+   half of production's. Archiving it would add about half again to the Mimir footprint for
    little value. Proposal: production only.
 3. **Phase 3 go/no-go.** Who decides, after phase 2, whether traces earn their place,
    and on what evidence (for example, the number of times an investigation needed a
