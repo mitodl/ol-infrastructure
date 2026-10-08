@@ -1444,6 +1444,18 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             request_max_bytes=ONE_MEGABYTE_BYTE,
         )
     ],
+    logging_s3s=[
+        fastly.ServiceVclLoggingS3Args(
+            bucket_name=fastly_access_logging_bucket["bucket_name"],
+            name=f"fastly-mit_learn-{stack_info.env_suffix}-s3-logging-args",
+            format=build_fastly_log_format_string(additional_static_fields={}),
+            gzip_level=3,
+            message_type="blank",
+            path=f"/mitlearn/{stack_info.env_suffix}/",
+            redundancy="standard",
+            s3_iam_role=fastly_access_logging_iam_role["role_arn"],
+        ),
+    ],
     opts=ResourceOptions.merge(
         fastly_provider,
         ResourceOptions(

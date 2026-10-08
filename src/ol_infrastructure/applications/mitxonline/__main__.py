@@ -135,6 +135,7 @@ apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
+monitoring_stack = make_stack_reference(projects.MONITORING, "default")
 vector_log_proxy_stack = make_stack_reference(
     projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
 )
@@ -1117,6 +1118,12 @@ encoded_fastly_proxy_credentials = base64.b64encode(
 vector_log_proxy_domain = vector_log_proxy_stack.require_output(
     "vector_log_proxy_domain"
 )
+fastly_access_logging_bucket = monitoring_stack.require_output(
+    "fastly_access_logging_bucket"
+)
+fastly_access_logging_iam_role = monitoring_stack.require_output(
+    "fastly_access_logging_iam_role"
+)
 
 # UAI B2C paths that should redirect to MIT Learn.
 uai_b2c_redirects: dict[str, str] = {
@@ -1428,6 +1435,18 @@ mitxonline_service = fastly.ServiceVcl(
             method="POST",
             request_max_bytes=ONE_MEGABYTE_BYTE,
         )
+    ],
+    logging_s3s=[
+        fastly.ServiceVclLoggingS3Args(
+            bucket_name=fastly_access_logging_bucket["bucket_name"],
+            name=f"fastly-mitxonline-{stack_info.env_suffix}-s3-logging-args",
+            format=build_fastly_log_format_string(additional_static_fields={}),
+            gzip_level=3,
+            message_type="blank",
+            path=f"/mitxonline/{stack_info.env_suffix}/",
+            redundancy="standard",
+            s3_iam_role=fastly_access_logging_iam_role["role_arn"],
+        ),
     ],
     stale_if_error=True,
     opts=fastly_provider,
