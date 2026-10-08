@@ -3024,11 +3024,9 @@ for location in code_locations:
     # code server. No other code location mounts it, which is what keeps this identity
     # to ml while every location shares the dagster-user-code ServiceAccount.
     #
-    # LLM_AZURE_ENDPOINT is the name ml's definitions.py reads. ml cannot use this
-    # identity yet: its azure_openai client authenticates with AZURE_OPENAI_API_KEY,
-    # and these accounts disable key auth. It needs a token provider built on
-    # azure-identity's WorkloadIdentityCredential before SUMMARY_PROVIDER=azure_openai
-    # works.
+    # LLM_AZURE_ENDPOINT is the name ml's definitions.py reads. Its azure_openai client
+    # authenticates with an Entra token from DefaultAzureCredential, and only when
+    # SUMMARY_PROVIDER=azure_openai selects it, so this wiring alone changes no calls.
     if name == "ml" and azure_openai_stack is not None:
         deployment.setdefault("volumes", []).append(azure_identity_token_volume())
         deployment.setdefault("volumeMounts", []).append(azure_identity_token_mount())
