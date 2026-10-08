@@ -123,3 +123,4 @@ uv run pytest tests/ol_infrastructure/
 - PyInfra/Packer provisioning → belongs in `src/bilder/`, not here
 - Concourse pipeline definitions → belongs in `src/ol_concourse/`
 - Glue between bilder and ol_infrastructure → belongs in `src/bridge/`
+- New Google credentials (service account, API key, OAuth client, reCAPTCHA key) → project `mitol01`, declared in `infrastructure/gcp/` where Pulumi can manage the type; never a legacy GCP project (see `infrastructure/gcp/README.md`)

@@ -6,6 +6,33 @@ APIs. This is the landing point for the work tracked in
 convention below is argued out. The credential inventory those decisions rest
 on is `docs/plans/gcp-service-account-consumer-map.md`.
 
+## Where new credentials go
+
+New Google credentials of any type (service account, API key, OAuth client,
+reCAPTCHA key) go in `mitol01`. Do not create them in the legacy projects
+(`mit-open`, `ocw-studio-qa`, `mitx-residential` and the rest of the inventory
+in `docs/plans/gcp-service-account-consumer-map.md`), even when the existing key
+for that application lives there.
+
+Service accounts, API keys and reCAPTCHA keys cannot be moved between
+projects, so each one created in a legacy project has to be re-created in
+`mitol01` later, with a new email or key string, its external grants re-issued
+by hand and a deploy of the application that holds it. The reCAPTCHA keys for
+learn.mit.edu and rc.learn.mit.edu were created in `mit-open` in April 2026 and
+are now two more keys to re-create.
+
+Service accounts and API keys are declared in `Pulumi.Production.yaml` (see
+[Configuration](#configuration)). OAuth clients and reCAPTCHA keys are created
+by hand in `mitol01` for now (see
+[What this does not manage](#what-this-does-not-manage)). If `mitol01` is
+missing an API you need, add it to `enabled_services`. A gap in `mitol01` is
+something to fix here, not a reason to use a legacy project.
+
+YouTube quota is the one gap config cannot close. `mitol01` starts at the default
+10,000 units a day, and a granted increase does not follow a consumer to
+another project, so a high-volume YouTube consumer needs the increase granted
+on `mitol01` first (see `docs/plans/gcp-consolidation-into-mitol01.md`).
+
 ## Stack layout
 
 One stack, `Production`.
