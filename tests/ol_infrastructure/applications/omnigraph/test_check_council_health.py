@@ -33,6 +33,9 @@ class _StubHandler(BaseHTTPRequestHandler):
     #: Every request this handler has served, for tests that assert on how the
     #: probe called out rather than only on what came back.
     requests: ClassVar[list[dict[str, Any]]] = []
+    #: The ``Omnigraph-Http-Api`` value stamped on every response, as a 0.13
+    #: server does. ``None`` is a 0.11 server, which sends none.
+    stamp: ClassVar[str | None] = None
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -41,12 +44,15 @@ class _StubHandler(BaseHTTPRequestHandler):
             {
                 "path": self.path,
                 "authorization": self.headers.get("Authorization"),
+                "http_api": self.headers.get_all("Omnigraph-Http-Api"),
                 "body": json.loads(raw_body) if raw_body else None,
             }
         )
         status, body = self.routes.get(self.path, (404, {"error": "not found"}))
         payload = body.encode() if isinstance(body, str) else json.dumps(body).encode()
         self.send_response(status)
+        if self.stamp is not None:
+            self.send_header("Omnigraph-Http-Api", self.stamp)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
@@ -63,6 +69,7 @@ def stub_server():
     thread.start()
     _StubHandler.routes = {}
     _StubHandler.requests = []
+    _StubHandler.stamp = None
     yield server, f"http://127.0.0.1:{server.server_port}"
     server.shutdown()
 
@@ -81,6 +88,84 @@ def test_run_probe_sends_the_bearer_token_and_query_path(stub_server):
     assert seen["authorization"] == "Bearer t"
     assert seen["body"]["params"] == {}
     assert "match" in seen["body"]["query"]
+
+
+def test_run_probe_sends_the_http_api_contract_header(stub_server):
+    """omnigraph-server 0.13 answers 400 to a protected request without it."""
+    _, base = stub_server
+    _StubHandler.stamp = "0.13"
+    _StubHandler.routes = {"/graphs/council/query": (200, {"rows": [], "row_count": 0})}
+
+    run_probe(base, "council", "t")  # pragma: allowlist secret
+
+    [seen] = _StubHandler.requests
+    assert seen["http_api"] == ["0.13"]
+
+
+def test_a_contract_mismatch_is_reported_apart_from_an_auth_failure(stub_server):
+    """Both are refusals of a healthy graph, with different remedies: one is a
+    version skew between this script and the server, the other a credential.
+    The body is the 0.13.0 server's own.
+    """
+    _, base = stub_server
+    _StubHandler.stamp = "0.14"
+    _StubHandler.routes = {
+        "/graphs/council/query": (
+            400,
+            {
+                "error": (
+                    "exactly one omnigraph-http-api header with value 0.14 is required"
+                ),
+                "code": "api_contract_mismatch",
+            },
+        )
+    }
+
+    with pytest.raises(ProbeError, match=r"does not speak Omnigraph-Http-Api: 0\.13"):
+        run_probe(base, "council", "t")  # pragma: allowlist secret
+
+    _StubHandler.routes = {
+        "/graphs/council/query": (
+            401,
+            {"error": "invalid bearer token", "code": "unauthorized"},
+        )
+    }
+    with pytest.raises(ProbeError, match="HTTP 401") as excinfo:
+        run_probe(base, "council", "t")  # pragma: allowlist secret
+    assert "does not speak" not in str(excinfo.value)
+
+
+def test_a_success_stamped_with_another_contract_is_a_failure(stub_server):
+    _, base = stub_server
+    _StubHandler.stamp = "0.14"
+    _StubHandler.routes = {"/graphs/council/query": (200, {"rows": [], "row_count": 0})}
+
+    with pytest.raises(ProbeError, match=r"stamped Omnigraph-Http-Api: 0\.14"):
+        run_probe(base, "council", "t")  # pragma: allowlist secret
+
+
+def test_an_unstamped_success_is_accepted_from_a_0_11_server(stub_server):
+    _, base = stub_server
+    _StubHandler.routes = {"/graphs/council/query": (200, {"rows": [], "row_count": 0})}
+
+    assert run_probe(base, "council", "t")["rows"] == []  # pragma: allowlist secret
+
+
+def test_a_blocked_graph_fails_the_probe(stub_server):
+    """0.12+ answers 503 graph_unavailable for a graph that failed to open,
+    where 0.11 answered 404. Either way council is down.
+    """
+    _, base = stub_server
+    _StubHandler.stamp = "0.13"
+    _StubHandler.routes = {
+        "/graphs/council/query": (
+            503,
+            {"error": "graph is unavailable", "code": "graph_unavailable"},
+        )
+    }
+
+    with pytest.raises(ProbeError, match=r"HTTP 503.*graph_unavailable"):
+        run_probe(base, "council", "t")  # pragma: allowlist secret
 
 
 def test_run_probe_targets_the_graph_id_it_is_given(stub_server):
