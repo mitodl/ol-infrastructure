@@ -234,5 +234,6 @@ def test_subdomain_record_is_a_cname():
     return pulumi.Output.all(record.type, record.records).apply(check)
 
 
+@pulumi.runtime.test
 def test_no_dns_records_by_default():
     assert _tls("no-dns").dns_records == []
