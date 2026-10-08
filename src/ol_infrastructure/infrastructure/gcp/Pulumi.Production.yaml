@@ -142,21 +142,25 @@ config:
       # edxapp deployment (mitx, mitx-staging, mitxonline) at every tier holds
       # as youtube_api_key. One key per tier, shared by the three deployments:
       # the video block's yt_video_metadata handler calls Videos.List at a few
-      # hundred a day, well inside mitol01's default YouTube quota.
+      # hundred a day, well inside mitol01's default YouTube quota. Protected
+      # because the edxapp SOPS secrets hold these key strings.
     - key_name: edxapp-youtube-production
       display_name: edxapp YouTube Production
       restrictions:
         api_targets:
         - service: youtube.googleapis.com
+      protect: true
     - key_name: edxapp-youtube-qa
       display_name: edxapp YouTube QA
       restrictions:
         api_targets:
         - service: youtube.googleapis.com
+      protect: true
     - key_name: edxapp-youtube-ci
       display_name: edxapp YouTube CI
       restrictions:
         api_targets:
         - service: youtube.googleapis.com
+      protect: true
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwGRkMYEkiqtkOL1cUu3weJtAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbjOKl/yNcSE3NH/OAgEQgDuLw4Tl0f+DTV6qFsA/BXRSwJsDLRiZRVUabJWffa9XDGRcXOzB+cIkBiVmb6jcZ+rc5y3brL6PU9RtfA==

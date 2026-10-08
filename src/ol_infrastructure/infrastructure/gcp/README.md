@@ -128,6 +128,10 @@ config:
 it". Adopted resources are automatically marked `protect=True` — see
 `adoption_opts` in `components/gcp/project.py` for why.
 
+An API key created by this stack starts unprotected. Set `protect: true` on it
+once a consumer holds the key string, because a replacement mints a new string
+and breaks that consumer.
+
 In practice `import_id` applies only to resources already resident in
 `mitol01`. Service accounts, API keys and reCAPTCHA keys **cannot be moved
 between GCP projects**, so consolidating one from a legacy project means
