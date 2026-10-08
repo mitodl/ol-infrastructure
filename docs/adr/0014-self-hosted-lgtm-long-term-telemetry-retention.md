@@ -263,7 +263,7 @@ residential clusters, each in its own VPC. Every one of those VPCs is already pe
 with its environment's operations VPC. On 2026-10-08 every route table that has
 subnets carried the route in both directions, in QA (`pcx-0477bd0342e80bd3b`,
 `pcx-02d18f805a599c248`, `pcx-045c80780feadb2b0`) and in Production
-(`pcx-066336acfe6e717ea`, `pcx-0cc05c86c12ff1529`, and the applications peering).
+(`pcx-0a5790366a86d3c20`, `pcx-066336acfe6e717ea`, `pcx-0cc05c86c12ff1529`).
 EKS pods have VPC IPs, so an Alloy pod can open a connection straight to a private
 address in the operations VPC.
 
@@ -282,7 +282,8 @@ Collectors push to that hostname over HTTPS with per-environment credentials. No
 about this path is internet-reachable.
 
 Transport options compared, using ~5 TB/month of production telemetry and us-east-1
-list prices (AWS Price List API, 2026-10-08):
+list prices (AWS Price List API, 2026-10-08; free same-AZ peering is from AWS's
+2021 peering pricing change):
 
 | Option | Path | Per-GB charges | ≈ / month |
 |--------|------|----------------|-----------|
@@ -364,7 +365,7 @@ writers), and compactor or retention failure. Neither ever pages.
   | Compute | $700–1,200 | ~20–30 vCPU / 80–120 GiB total across the three, RF3, on-demand Graviton; less with the Compute Savings Plan |
   | Cross-AZ replication | $150–250 | RF3 on ~5 TB/month ingest |
   | Cross-VPC transport | ≤ $110 | Internal NLB over peering (step 4) |
-  | **Total** | **~$1,050–1,850** | Option 2 removes roughly $250–400 of this |
+  | **Total** | **~$1,050–1,800** | Option 2 removes roughly $250–400 of this |
 
   S3 request charges are left out, because they are small at this write rate, but
   they should be checked against real bills after the first month.
