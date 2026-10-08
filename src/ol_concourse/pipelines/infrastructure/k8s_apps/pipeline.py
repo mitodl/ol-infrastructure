@@ -7,6 +7,11 @@ from typing import Any
 
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.jobs.infrastructure import (
+    PREVIEW_NO_CHANGES_MARKER,
+    PREVIEW_SUMMARY_FILENAME,
+    stack_serial_group,
+)
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
@@ -1186,6 +1191,113 @@ def _assert_gate_names_deploy_task(
     )
 
 
+_CLASSIFY_SCRIPT = (
+    Path(__file__).parent / "scripts" / "classify_promotion.py"
+).read_text()
+CLASSIFY_TASK_NAME = "classify-promotion"
+PROMOTION_DIR = "promotion"
+CACHE_BUST_TASK_NAME = "cache-bust"
+CACHE_BUST_DIR = "cache-bust"
+
+
+def _cache_bust_task() -> TaskStep:
+    """Write a value that differs on every build, to defeat Concourse's get cache.
+
+    Concourse caches a ``get`` by resource, version and params, and what
+    Production is running is not part of the release resource's version, so a
+    repeated get of the same release would return the Production version it
+    first saw. A get that passes this value in ``cache_bust`` runs ``in`` again.
+    """
+    return TaskStep(
+        task=Identifier(CACHE_BUST_TASK_NAME),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            outputs=[Output(name=Identifier(CACHE_BUST_DIR))],
+            params={"OUTPUT_DIR": CACHE_BUST_DIR},
+            run=Command(
+                path="sh",
+                args=["-euc", 'date +%s%N > "$OUTPUT_DIR/value"'],
+            ),
+        ),
+    )
+
+
+def _classify_promotion_task(
+    app_name: str,
+    release_res: Resource,
+    current_release: Identifier,
+    pulumi_resource: Resource,
+) -> TaskStep:
+    """Compose the release issue's title and body from the Production preview."""
+    return TaskStep(
+        task=Identifier(CLASSIFY_TASK_NAME),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[
+                Input(name=release_res.name),
+                Input(name=current_release),
+                Input(name=pulumi_resource.name),
+            ],
+            outputs=[Output(name=Identifier(PROMOTION_DIR))],
+            params={
+                "APP_NAME": app_name,
+                "VERSION_FILE": f"{release_res.name}/version",
+                "PRODUCTION_VERSION_FILE": f"{current_release}/production_version",
+                "PRODUCTION_STATE_FILE": f"{current_release}/production_state",
+                "CHECKLIST_FILE": f"{release_res.name}/checklist.md",
+                "PREVIEW_SUMMARY_FILE": (
+                    f"{pulumi_resource.name}/{PREVIEW_SUMMARY_FILENAME}"
+                ),
+                "NO_CHANGES_MARKER_FILE": (
+                    f"{pulumi_resource.name}/{PREVIEW_NO_CHANGES_MARKER}"
+                ),
+                "OUTPUT_DIR": PROMOTION_DIR,
+            },
+            run=Command(path="python3", args=["-c", _CLASSIFY_SCRIPT]),
+        ),
+    )
+
+
+def _preview_production_step(
+    pulumi_resource: Resource,
+    pulumi_code: Resource,
+    docker_tag_env: str,
+    *,
+    refresh_stack: bool,
+) -> PutStep:
+    """Preview the Production stack at the image tag it would deploy.
+
+    Fail-closed, unlike the retired ``preview_next_stack``: the preview is the
+    content of the gate issue, so one that fails fails the job and no issue is
+    posted. It takes the Production stack lock, which is why the QA and
+    Production jobs share a serial group.
+    """
+    return PutStep(
+        put=pulumi_resource.name,
+        inputs="all",
+        no_get=False,
+        get_params={
+            "summary_file": PREVIEW_SUMMARY_FILENAME,
+            "read_outputs": False,
+            "preview_stack": "Production",
+        },
+        params={
+            "env_os": {
+                "AWS_DEFAULT_REGION": "us-east-1",
+                "PYTHONPATH": f"/usr/lib/:/tmp/build/put/{pulumi_code.name}/src/",
+                "GITHUB_TOKEN": "((github.public_repo_access_token))",
+                docker_tag_env: "((.:image_tag))",
+            },
+            "stack_name": "Production",
+            "preview": True,
+            "env_vars_from_files": {},
+            **({"refresh_stack": False} if not refresh_stack else {}),
+        },
+    )
+
+
 def _build_release_image_job(
     app_name: str,
     dockerfile_path: str,
@@ -1498,19 +1610,56 @@ def _build_release_resource_app_pipeline(
     )
 
     # Build per-stack additional_post_steps and custom_dependencies for QA+Production
+    project_name = f"ol-application-{app_name}"
+    docker_tag_env = f"{app_name.replace('-', '_').upper()}_DOCKER_TAG"
+    release_current = Identifier(f"{app_name}-release-current")
     qa_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
-        # Open a GitHub Release Issue with the checklist from the release resource.
-        # title_template embeds the release version (via the image_tag var
-        # loaded from release_res earlier in this job's plan) so each release
-        # gets its own distinct issue title instead of every version
-        # colliding on "Release {app_name}" -- Concourse resolves
-        # ((.:image_tag)) to a plain string before the resource ever sees it.
+        # Preview Production at the tag it would deploy, then fold that diff
+        # and the app checklist into one release issue, so a single approval
+        # covers everything the Production deploy would change. See
+        # _preview_production_step: this fails the job rather than posting a
+        # gate that does not show the diff.
+        _preview_production_step(
+            pulumi_resource,
+            ol_infra_repo,
+            docker_tag_env,
+            refresh_stack=pipeline_parameters.refresh_stack,
+        ),
+        # What Production is running has to be current, not whatever the first
+        # get of this release version wrote: see _cache_bust_task.
+        _cache_bust_task(),
+        LoadVarStep(
+            load_var="cache_bust",
+            file=f"{CACHE_BUST_DIR}/value",
+            reveal=True,
+        ),
+        GetStep(
+            get=release_current,
+            resource=release_res.name,
+            params={"cache_bust": "((.:cache_bust))"},
+        ),
+        _classify_promotion_task(
+            app_name, release_res, release_current, pulumi_resource
+        ),
+        # Open (or update) the GitHub Release Issue. The title names the
+        # version it ships, or the live version for an infrastructure-only
+        # promotion, so each gets its own issue instead of every one colliding
+        # on "Release {app_name}" -- Concourse resolves ((.:promotion_title))
+        # to a plain string before the resource ever sees it. The skip marker
+        # is written when there is nothing to approve, and the put then posts
+        # nothing at all rather than closing an issue that approves something.
+        LoadVarStep(
+            load_var="promotion_title",
+            file=f"{PROMOTION_DIR}/title",
+            reveal=True,
+        ),
         PutStep(
             put=release_issue.name,
             params={
-                "body_file": f"{release_res.name}/checklist.md",
+                "body_file": f"{PROMOTION_DIR}/body.md",
                 "labels": ["release"],
-                "title_template": f"Release {app_name} ((.:image_tag))",
+                "title_template": "((.:promotion_title))",
+                "skip_if_file": f"{PROMOTION_DIR}/skip",
             },
         ),
         # Mark the RC GitHub Deployment as successful.
@@ -1576,10 +1725,20 @@ def _build_release_resource_app_pipeline(
         refresh_stack=pipeline_parameters.refresh_stack,
         pulumi_code=ol_infra_repo,
         stack_names=["QA", "Production"],
-        project_name=f"ol-application-{app_name}",
+        project_name=project_name,
         project_source_path=(
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}"
         ),
+        # The QA job previews Production, which takes the Production stack
+        # lock; lock recovery will not cancel a lock under 15 minutes old, so
+        # without a shared group a live preview would fail a real deploy.
+        serial_groups={
+            0: [
+                stack_serial_group(project_name, "QA"),
+                stack_serial_group(project_name, "Production"),
+            ],
+            1: [stack_serial_group(project_name, "Production")],
+        },
         additional_post_steps=additional_post_steps,
         dependencies=[
             GetStep(
