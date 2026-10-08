@@ -83,6 +83,12 @@ def fastly_logging_args(
     Every service posts its access logs to the vector log proxy, which forwards
     them to Grafana Cloud, and archives the same records to S3.
 
+    The endpoints read the ``operations.<stack>`` stack of
+    ``projects.VECTOR_LOG_PROXY`` and the ``default`` stack of
+    ``projects.MONITORING`` through StackReferences with the standard names. A
+    stack that calls this must not declare either reference itself, or the second
+    declaration is a duplicate URN.
+
     :param name: Prefix for the endpoint names, unique within the service.
     :param application: Value of the ``application`` label in Loki. The proxy
         cannot label a record that does not carry it.
