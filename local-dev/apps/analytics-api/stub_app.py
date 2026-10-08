@@ -537,8 +537,12 @@ _NEEDS_ATTENTION_CUTOFF = _ACTIVITY_ANCHOR - datetime.timedelta(
 
 
 def _needs_attention(status, last_active_on, shared):
-    """Port of `learner_queries._needs_attention`: never started, or last
-    recorded activity on or before the cutoff.
+    """Port of `learner_queries._needs_attention`: never started, or still
+    in progress with last recorded activity on or before the cutoff.
+
+    Staleness is scoped to `in_progress`, as in the real expression: going
+    quiet after passing or certifying is the expected end of a course, not
+    something a manager should chase.
 
     `<=` is deliberate — "at least 30 days ago" includes the 30th day itself.
 
@@ -553,7 +557,7 @@ def _needs_attention(status, last_active_on, shared):
         return None
     if status == "not_started":
         return True
-    if last_active_on is None:
+    if status != "in_progress" or last_active_on is None:
         return False
     return datetime.date.fromisoformat(last_active_on) <= _NEEDS_ATTENTION_CUTOFF
 
@@ -722,12 +726,43 @@ def _rows_for(resource, contract_scoped):
     ]
 
 
+def _needs_attention_row():
+    """`ContractNeedsAttention` for `_VIEWED_CONTRACT`, derived from
+    `LEARNER_PROGRESS` so it always agrees with the learner directory's
+    `needs_attention` filter, as the real query-time aggregate does.
+
+    Counts distinct learners, not enrollments: a learner behind in two runs
+    counts once. Keyed on email because the fixture's `learner_id` is unique
+    per row rather than per learner. Active enrollments only, matching the
+    real endpoint and `learner-progress`'s `include_inactive=false` default.
+    Not floored: the fixture's counts sit well above the real API's floor.
+    """
+    active = [r for r in LEARNER_PROGRESS if r["enrollment_is_active"]]
+    return {
+        "contract_id": int(_VIEWED_CONTRACT["contract_id"]),
+        "learners_considered": len({r["email"] for r in active}),
+        "learners_needing_attention": len(
+            {r["email"] for r in active if r["needs_attention"]}
+        ),
+        "learners_outcomes_withheld": len(
+            {r["email"] for r in active if not r["outcomes_shared"]}
+        ),
+    }
+
+
 # Endpoints the real API defines only under the contract prefix, each returning
 # individual rows rather than an aggregate, so each has its own handler instead
 # of going through RESOURCES.
 CONTRACT_ONLY = {
     "learner-progress": "_handle_learner_progress",
     "course-runs": "_handle_course_runs",
+}
+
+# Computed endpoints served at both scopes. The org form returns one row per
+# contract; the stub only has learner rows for `_VIEWED_CONTRACT`, so both
+# return that single row.
+COMPUTED = {
+    "needs-attention": "_handle_needs_attention",
 }
 
 
@@ -764,6 +799,25 @@ class Handler(BaseHTTPRequestHandler):
                 "organization_id": org,
                 "as_of": AS_OF,
                 "total_count": len(COURSE_RUNS),
+                "data": page,
+            },
+        )
+
+    def _handle_needs_attention(self, org, qs):
+        """needs-attention: distinct learners needing attention, paged like
+        every org envelope even though there is only ever one row here.
+        """
+        rows = [_needs_attention_row()]
+        offset, limit = self._parse_offset_limit(qs)
+        page = rows[offset:]
+        if limit is not None:
+            page = page[:limit]
+        self._send_json(
+            200,
+            {
+                "organization_id": org,
+                "as_of": AS_OF,
+                "total_count": len(rows),
                 "data": page,
             },
         )
@@ -874,9 +928,9 @@ class Handler(BaseHTTPRequestHandler):
         resource = match.group("resource")
         qs = parse_qs(parsed.query)
 
-        handler = CONTRACT_ONLY.get(resource)
+        handler = COMPUTED.get(resource) or CONTRACT_ONLY.get(resource)
         if handler:
-            if not contract_scoped:
+            if resource in CONTRACT_ONLY and not contract_scoped:
                 self._send_json(404, {"detail": f"{resource} is contract-scoped only"})
                 return
             try:
