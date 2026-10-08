@@ -44,6 +44,23 @@ def lookup_zone_id_from_domain(domain: str) -> str | None:
     return zones_by_domain[best_zone].split("/")[-1]
 
 
+def require_zone_id_from_domain(domain: str) -> str:
+    """Look up the hosted zone for a domain that must already have one.
+
+    :param domain: The domain name to be looked up. e.g. xpro.mit.edu
+
+    :raises ValueError: If no hosted zone covers the domain.
+
+    :returns: The ID of the most specific hosted zone that covers the domain.
+    :rtype: str
+    """
+    zone_id = lookup_zone_id_from_domain(domain)
+    if zone_id is None:
+        msg = f"No Route53 hosted zone found for domain '{domain}'"
+        raise ValueError(msg)
+    return zone_id
+
+
 def zone_opts(domain: str) -> pulumi.ResourceOptions:
     """Look up and conditionally import an existing hosted zone.
 

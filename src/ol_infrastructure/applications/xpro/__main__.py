@@ -70,7 +70,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
 from ol_infrastructure.lib.aws.route53_helper import (
-    lookup_zone_id_from_domain,
+    require_zone_id_from_domain,
 )
 from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
@@ -1089,7 +1089,7 @@ xpro_fastly_tls = OLFastlyTLS(
             OLFastlyDNSRecordConfig(
                 resource_name="xpro-fastly-dns-record",
                 domain=frontend_domain,
-                zone_id=lookup_zone_id_from_domain(frontend_domain),
+                zone_id=require_zone_id_from_domain(frontend_domain),
             )
         ],
     ),

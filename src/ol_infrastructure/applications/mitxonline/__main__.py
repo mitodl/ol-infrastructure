@@ -86,7 +86,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.aws.route53_helper import (
-    lookup_zone_id_from_domain,
+    require_zone_id_from_domain,
 )
 from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
@@ -1418,7 +1418,7 @@ mitxonline_fastly_tls = OLFastlyTLS(
             OLFastlyDNSRecordConfig(
                 resource_name="mitxonline-fastly-dns-record",
                 domain=frontend_domain,
-                zone_id=lookup_zone_id_from_domain(frontend_domain),
+                zone_id=require_zone_id_from_domain(frontend_domain),
             )
         ],
     ),
