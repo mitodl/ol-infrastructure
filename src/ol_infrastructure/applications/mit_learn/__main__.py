@@ -1451,7 +1451,7 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             format=build_fastly_log_format_string(additional_static_fields={}),
             gzip_level=3,
             message_type="blank",
-            path=f"/mitlearn/{stack_info.env_suffix}/",
+            path=f"/{Application.mit_learn}/{stack_info.env_suffix}/",
             redundancy="standard",
             s3_iam_role=fastly_access_logging_iam_role["role_arn"],
         ),
