@@ -1002,8 +1002,9 @@ def create_k8s_configmaps(  # noqa: PLR0915
     # second `TRANSLATIONS_PROVIDERS:` block. The init container concatenates the
     # config sources with `cat` instead of deep-merging them, so a second file emitting
     # that key would silently clobber the deepl / openai / gemini / mistral providers --
-    # last one wins, no error anywhere. The edx-extensions plugin folds these into
-    # TRANSLATIONS_PROVIDERS in Python, at Django settings load.
+    # last one wins, no error anywhere. ol-openedx-course-translations (0.11.0 and
+    # later, from mitodl/open-edx-plugins) folds these into TRANSLATIONS_PROVIDERS in
+    # Python, from its production plugin settings hook.
     azure_openai_config_name: str | None = None
     azure_openai_config_map = None
     if azure_openai_stack is not None:
