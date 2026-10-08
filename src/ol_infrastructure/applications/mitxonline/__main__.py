@@ -6,6 +6,7 @@
 - Create an IAM policy to grant access to S3 and other resources
 """
 
+import base64
 import json
 import mimetypes
 import textwrap
@@ -30,6 +31,7 @@ from bridge.lib.constants import (
 from bridge.lib.magic_numbers import (
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
+    ONE_MEGABYTE_BYTE,
     STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -85,7 +87,11 @@ from ol_infrastructure.lib.aws.route53_helper import (
     fastly_certificate_validation_records,
     lookup_zone_id_from_domain,
 )
-from ol_infrastructure.lib.fastly import get_fastly_provider, vcl_snippet
+from ol_infrastructure.lib.fastly import (
+    build_fastly_log_format_string,
+    get_fastly_provider,
+    vcl_snippet,
+)
 from ol_infrastructure.lib.k8s_keda import (
     build_webapp_keda_config,
     create_webapp_prometheus_trigger_auth,
@@ -129,6 +135,10 @@ apps_vpc = network_stack.require_output("applications_vpc")
 data_vpc = network_stack.require_output("data_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
+monitoring_stack = make_stack_reference(projects.MONITORING, "default")
+vector_log_proxy_stack = make_stack_reference(
+    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
+)
 operations_vpc = network_stack.require_output("operations_vpc")
 mitxonline_environment = f"mitxonline-{stack_info.env_suffix}"
 
@@ -1098,6 +1108,23 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
 )
 
 ## Fastly Service
+vector_log_proxy_secrets = read_yaml_secrets(
+    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
+)
+fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
+encoded_fastly_proxy_credentials = base64.b64encode(
+    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
+).decode()
+vector_log_proxy_domain = vector_log_proxy_stack.require_output(
+    "vector_log_proxy_domain"
+)
+fastly_access_logging_bucket = monitoring_stack.require_output(
+    "fastly_access_logging_bucket"
+)
+fastly_access_logging_iam_role = monitoring_stack.require_output(
+    "fastly_access_logging_iam_role"
+)
+
 # UAI B2C paths that should redirect to MIT Learn.
 uai_b2c_redirects: dict[str, str] = {
     "/programs/program-v1:UAI+B2C/": f"https://{learn_frontend_domain}/programs/program-v1:UAI+B2C",
@@ -1386,6 +1413,39 @@ mitxonline_service = fastly.ServiceVcl(
             }}"""),
             name="Strip auth headers in S3 pass requests",
             type="pass",
+        ),
+    ],
+    logging_https=[
+        fastly.ServiceVclLoggingHttpArgs(
+            url=vector_log_proxy_domain.apply(
+                lambda domain: f"https://{domain}/fastly"
+            ),
+            name=f"fastly-mitxonline-{stack_info.env_suffix}-https-logging-args",
+            content_type="application/json",
+            format=build_fastly_log_format_string(
+                additional_static_fields={
+                    "application": Application.mitxonline,
+                    "environment": stack_info.env_suffix,
+                }
+            ),
+            format_version=2,
+            header_name="Authorization",
+            header_value=f"Basic {encoded_fastly_proxy_credentials}",
+            json_format="0",
+            method="POST",
+            request_max_bytes=ONE_MEGABYTE_BYTE,
+        )
+    ],
+    logging_s3s=[
+        fastly.ServiceVclLoggingS3Args(
+            bucket_name=fastly_access_logging_bucket["bucket_name"],
+            name=f"fastly-mitxonline-{stack_info.env_suffix}-s3-logging-args",
+            format=build_fastly_log_format_string(additional_static_fields={}),
+            gzip_level=3,
+            message_type="blank",
+            path=f"/{Application.mitxonline}/{stack_info.env_suffix}/",
+            redundancy="standard",
+            s3_iam_role=fastly_access_logging_iam_role["role_arn"],
         ),
     ],
     stale_if_error=True,
