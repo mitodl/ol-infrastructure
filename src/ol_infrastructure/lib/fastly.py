@@ -81,6 +81,12 @@ def s3_sigv4_signing_vcl(
     - The canonical query string is hardcoded empty, so the query string is
       stripped from the backend request before signing.
 
+    The region in the credential scope is fixed at us-east-1, and `bucket_host`
+    must be a us-east-1 endpoint. Every bucket behind a Fastly service in this
+    repo lives there (their backends are addressed at `s3.us-east-1`), so it is not
+    a parameter; a bucket in another region would need one, or S3 would answer
+    SignatureDoesNotMatch.
+
     The canonical URI is the S3-style percent-encoded path, and that same encoded
     path is what is sent to S3, so what is signed always equals what is requested.
     Browsers send characters like `( ) [ ] @ + ! *` literally but S3 canonicalizes
