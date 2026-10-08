@@ -136,11 +136,34 @@ def test_validation_waits_on_the_subscription():
     return tls.validation.subscription_id.apply(check)
 
 
+@pulumi.runtime.test
 def test_children_alias_their_former_top_level_urn():
-    """A subscription that predates the component must not be replaced."""
-    tls = _tls("aliased")
-    for resource in (tls.subscription, tls.validation):
-        assert resource._aliases
+    """A subscription or DNS record that predates the component must not be
+    replaced.
+    """
+    tls = _tls(
+        "aliased",
+        dns_records=[
+            OLFastlyDNSRecordConfig(
+                resource_name="aliased-dns", domain="example.com", zone_id="Z1"
+            )
+        ],
+    )
+    children = {
+        "aliased-subscription": tls.subscription,
+        "aliased-validation": tls.validation,
+        "aliased-dns": tls.dns_records[0],
+    }
+
+    def check(alias_urns):
+        for name, urn in zip(children, alias_urns, strict=True):
+            # A child's own URN carries its parent's type before a "$".
+            assert "$" not in urn
+            assert urn.endswith(f"::{name}")
+
+    return pulumi.Output.all(
+        *(resource._aliases[0] for resource in children.values())
+    ).apply(check)
 
 
 @pulumi.runtime.test

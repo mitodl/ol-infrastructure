@@ -94,8 +94,9 @@ def test_proxy_credentials_are_secret():
 def test_https_records_carry_the_loki_labels():
     """The proxy labels on these two fields and cannot label a record without them."""
     log_format = _args()["logging_https"][0].format
-    assert '"application":"app",' in log_format
-    assert '"environment":"qa",' in log_format
+    # The order is pinned as well. A reordered format string is a new version of
+    # every service that already sent these fields.
+    assert log_format.startswith('{"environment":"qa","application":"app","client_ip"')
 
 
 @pulumi.runtime.test
@@ -119,3 +120,5 @@ def test_a_second_service_reuses_the_stack_references():
     """
     _args()
     _args()
+    assert fastly_logging._log_proxy() is fastly_logging._log_proxy()
+    assert fastly_logging._log_archive() is fastly_logging._log_archive()
