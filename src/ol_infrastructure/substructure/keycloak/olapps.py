@@ -30,7 +30,7 @@ from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
 )
 
 
-def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
+def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -1768,22 +1768,39 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         # Without these the first-broker-login review-profile step (set to
         # "missing") finds fullName/firstName/lastName empty and shows the
         # "Update Account Information" form.
-        for resource_suffix, claim_name, user_attribute in (
-            ("full-name", "name", "fullName"),
-            ("first-name", "given_name", "firstName"),
-            ("last-name", "family_name", "lastName"),
-        ):
-            keycloak.AttributeImporterIdentityProviderMapper(
-                f"map-boardinfinity-oidc-{resource_suffix}-attribute",
-                realm=ol_apps_realm.id,
-                claim_name=claim_name,
-                identity_provider_alias=board_infinity_oidc_identity_provider.alias,
-                user_attribute=user_attribute,
-                extra_config={
-                    "syncMode": "INHERIT",
-                },
-                opts=resource_options,
-            )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-boardinfinity-oidc-full-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="name",
+            identity_provider_alias=board_infinity_oidc_identity_provider.alias,
+            user_attribute="fullName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-boardinfinity-oidc-first-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="given_name",
+            identity_provider_alias=board_infinity_oidc_identity_provider.alias,
+            user_attribute="firstName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-boardinfinity-oidc-last-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="family_name",
+            identity_provider_alias=board_infinity_oidc_identity_provider.alias,
+            user_attribute="lastName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
         # BOARD INFINITY [END]
 
     # B2B Organizations [END]
