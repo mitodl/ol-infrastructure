@@ -252,18 +252,71 @@ Cloud stack split and keeps a QA mistake from touching production history.
   backstops it at retention plus 7 days. Nothing goes to Glacier Flexible Retrieval or
   Deep Archive, since none of the three can read from it.
 - **Access**: IRSA roles scoped to each bucket, with no static keys.
-- **Network**: collectors reach the archive by in-VPC or peered addresses, never
-  through a public endpoint. Routing the archive stream through NAT would cost about
-  $0.045/GB on ~5 TB/month of production telemetry.
+- **Network**: the archive's own S3 traffic uses the S3 gateway endpoint that `OLVPC`
+  gives every VPC (`components/aws/olvpc.py`, attached to every route table), so it
+  never touches NAT. Collectors in the other clusters reach the archive as described
+  in step 4.
 
-**4. Query path.** We run one PDC agent per archived environment, in the archive
+**4. Cross-VPC transport: an internal NLB over existing VPC peering.** The archive
+runs in the operations VPC, while most telemetry comes from the applications, data and
+residential clusters, each in its own VPC. Every one of those VPCs is already peered
+with its environment's operations VPC. On 2026-10-08 every route table that has
+subnets carried the route in both directions, in QA (`pcx-0477bd0342e80bd3b`,
+`pcx-02d18f805a599c248`, `pcx-045c80780feadb2b0`) and in Production
+(`pcx-066336acfe6e717ea`, `pcx-0cc05c86c12ff1529`, and the applications peering).
+EKS pods have VPC IPs, so an Alloy pod can open a connection straight to a private
+address in the operations VPC.
+
+The archive's write endpoints sit behind **one internal NLB** in the operations
+cluster, with an internal Traefik or Gateway behind it routing `/loki/api/v1/push`,
+`/api/v1/push` and OTLP to the three backends. This is the pattern StarRocks already
+uses (`applications/starrocks/__main__.py`):
+
+- `aws-load-balancer-scheme: internal` with IP targets.
+- A security group that admits only the peered VPC CIDRs.
+- An external-dns record in the public `ol.mit.edu` zone that resolves to the NLB's
+  private IPs. This works even though DNS resolution across the peering connections
+  is disabled.
+
+Collectors push to that hostname over HTTPS with per-environment credentials. Nothing
+about this path is internet-reachable.
+
+Transport options compared, using ~5 TB/month of production telemetry and us-east-1
+list prices (AWS Price List API, 2026-10-08):
+
+| Option | Path | Per-GB charges | ≈ / month |
+|--------|------|----------------|-----------|
+| **Internal NLB over peering (chosen)** | pod → peering → internal NLB → archive | Peering: free within an AZ, $0.01/GB each side across AZs. NLB: $0.0225/hr + $0.006/LCU-hr (1 LCU = 1 GB/hr) | ~$65 cross-AZ (assuming ⅔ of connections cross AZs) + ~$45 NLB ≈ **$110** |
+| PrivateLink (endpoint service + an interface endpoint in each source VPC) | pod → interface endpoint → NLB → archive | $0.01/GB processed + $0.01/hr per AZ per endpoint | ~$50 + ~$65 (3 VPCs × 3 AZs) + NLB ≈ **$160** |
+| Transit Gateway | pod → TGW → archive | $0.02/GB processed + $0.05/hr per attachment | ~$100 + ~$145 (4 attachments) ≈ **$245** |
+| Public endpoint (rejected) | pod → NAT → public LB IP → archive | NAT $0.045/GB + $0.01/GB each way via public IPs | ~$225 + ~$100 ≈ **$325+** |
+
+PrivateLink only earns its cost when peering is unavailable or CIDRs overlap, and
+neither applies here. A Transit Gateway adds charges to a mesh that peering already
+provides. The public endpoint never leaves AWS, so it avoids internet egress pricing,
+but it still pays NAT processing and public-IP transfer on traffic we send to
+ourselves. Collector configs must therefore never point at a public archive hostname.
+A post-rollout check confirms this: archive traffic must not appear in the source
+VPCs' NAT `BytesOutToDestination`.
+
+Assumptions behind the numbers:
+
+- The GB figures are Grafana Cloud's received-bytes metrics. Loki pushes are
+  snappy-compressed and OTLP is gzip-compressed, so the bytes on the wire should be
+  lower, and every per-GB figure here is an upper bound until QA measures actual
+  transfer.
+- Cross-AZ spend can be cut further by pinning collectors to the NLB's per-AZ DNS
+  names, or by turning off cross-zone load balancing. At these amounts that tuning is
+  deferred.
+
+**5. Query path.** We run one PDC agent per archived environment, in the archive
 namespace, and add datasources to the matching Cloud stack under clear names:
 `Loki (archive, 13mo)`, `Mimir (archive, 13mo)` and `Tempo (archive, 90d)`. The
 datasources and the PDC network are declared in Pulumi alongside the existing Grafana
 Cloud resources. Archive datasources are **excluded from alert rules**, enforced by
 review and by a lint in `infrastructure/grafana_alerting`.
 
-**5. The archive monitors itself in Cloud.** The archive's own metrics and logs ship
+**6. The archive monitors itself in Cloud.** The archive's own metrics and logs ship
 to Grafana Cloud through the normal pipeline. Two ticket-tier alerts cover it: archive
 writer drop rate above zero, sustained (the `*_dropped_*` counters on the archive
 writers), and compactor or retention failure. Neither ever pages.
@@ -310,7 +363,8 @@ writers), and compactor or retention failure. Neither ever pages.
   | Tempo storage | $20–40 | 51 GB/day, 90 days |
   | Compute | $700–1,200 | ~20–30 vCPU / 80–120 GiB total across the three, RF3, on-demand Graviton; less with the Compute Savings Plan |
   | Cross-AZ replication | $150–250 | RF3 on ~5 TB/month ingest |
-  | **Total** | **~$1,000–1,700** | Option 2 removes roughly $250–400 of this |
+  | Cross-VPC transport | ≤ $110 | Internal NLB over peering (step 4) |
+  | **Total** | **~$1,050–1,850** | Option 2 removes roughly $250–400 of this |
 
   S3 request charges are left out, because they are small at this write rate, but
   they should be checked against real bills after the first month.
