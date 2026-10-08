@@ -21,7 +21,7 @@ boto3 to fetch the files ourselves, write them to /tmp, and feed OM a local
 config.
 
 Most Dagster runs build a subset of the project, so one run_results.json
-covers only the models that run selected.  The local config takes a single
+covers only the models selected by that run.
 run_results file, so the files from the lookback window are merged into one
 that holds each node's most recent result.
 
