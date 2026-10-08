@@ -1,8 +1,8 @@
 """dbt artifact metadata enrichment workflow for OpenMetadata.
 
 Downloads manifest.json, catalog.json, and the recent run_results.json files
-from the Dagster S3 bucket (uploaded by DbtS3ArtifactsResource after each
-full dbt build in the lakehouse code location) and enriches the existing
+from the Dagster S3 bucket (uploaded by DbtS3ArtifactsResource from the
+lakehouse code location) and enriches the existing
 Trino service tables in OpenMetadata with:
   - Model and column descriptions from dbt YAML docs
   - dbt model tags (stored under the "dbtTags" classification)
@@ -90,27 +90,27 @@ def _recent_run_results(since: datetime) -> list[str]:
     return [key for _, key in sorted(recent)]
 
 
-def _executed_at(result: dict[str, Any]) -> str:
-    """Return when a result's node finished executing, or "" if it never ran.
+def _finished_at(result: dict[str, Any]) -> datetime:
+    """Return when dbt last worked on a result's node.
 
-    dbt writes these as fixed-format UTC ISO-8601 strings, so they order
-    lexicographically.  Skipped nodes carry no timing.
+    A node that fails while compiling has a compile timing and no execute
+    timing, so every timing counts.  Skipped nodes carry none and sort first.
     """
-    return next(
+    return max(
         (
-            timing["completed_at"]
+            datetime.fromisoformat(timing["completed_at"])
             for timing in result["timing"]
-            if timing["name"] == "execute" and timing.get("completed_at")
+            if timing.get("completed_at")
         ),
-        "",
+        default=datetime.min.replace(tzinfo=UTC),
     )
 
 
 def _merge_run_results(run_results: Iterable[dict[str, Any]]) -> dict[str, Any]:
     """Merge run_results documents, keeping each node's most recent result.
 
-    A node that executed in any run keeps its latest executed result, so a
-    later run that skipped it does not replace a real outcome.
+    A later run that skipped a node does not replace the outcome of a run
+    that worked on it.
 
     :param run_results: Parsed run_results.json documents, oldest to newest.
         Must yield at least one.
@@ -121,7 +121,7 @@ def _merge_run_results(run_results: Iterable[dict[str, Any]]) -> dict[str, Any]:
     for document in run_results:
         for result in document["results"]:
             current = latest.get(result["unique_id"])
-            if current is None or _executed_at(result) >= _executed_at(current):
+            if current is None or _finished_at(result) >= _finished_at(current):
                 latest[result["unique_id"]] = result
         newest = document
     return {**newest, "results": list(latest.values())}
@@ -143,7 +143,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
         datetime.now(tz=UTC) - timedelta(hours=_RUN_RESULTS_LOOKBACK_HOURS)
     )
     if run_keys:
-        # A generator, so only one run's document is held in memory at a time.
+        # A generator, so the runs' documents are not all held in memory at once.
         documents = (
             json.loads(s3.get_object(Bucket=_BUCKET, Key=key)["Body"].read())
             for key in run_keys
