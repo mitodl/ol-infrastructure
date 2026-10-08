@@ -152,6 +152,85 @@ def create_organization_browser_flows(
     return organization_browser_flow
 
 
+def create_organization_reset_credentials_flow(
+    realm_id: str | pulumi.Output[str],
+    realm_name: str,
+    opts: pulumi.ResourceOptions | None = None,
+) -> keycloak.authentication.Flow:
+    """Create a reset-credentials flow that denies IdP-linked users.
+
+    Mirrors Keycloak's built-in "Reset credentials" flow, with one addition:
+    a REQUIRED check runs right after the user is resolved and before the
+    reset email is sent, blocking the flow for a user who has a live
+    identity provider link. An IdP-linked account can then never set or
+    reset a local password through the forgot-password form.
+    """
+    reset_credentials_flow = keycloak.authentication.Flow(
+        f"{realm_name}_organization_reset_credentials_flow",
+        alias="Organization reset credentials",
+        realm_id=realm_id,
+        provider_id="basic-flow",
+        description="reset credentials flow that denies IdP-linked users",
+        opts=opts,
+    )
+    keycloak.authentication.Execution(
+        f"{realm_name}_organization_reset_credentials_choose_user_execution",
+        realm_id=realm_id,
+        parent_flow_alias=reset_credentials_flow.alias,
+        authenticator="reset-credentials-choose-user",
+        requirement="REQUIRED",
+        priority=10,
+        opts=opts,
+    )
+    keycloak.authentication.Execution(
+        f"{realm_name}_organization_reset_credentials_deny_idp_user_execution",
+        realm_id=realm_id,
+        parent_flow_alias=reset_credentials_flow.alias,
+        authenticator="deny-reset-credentials-for-idp-user",
+        requirement="REQUIRED",
+        priority=15,
+        opts=opts,
+    )
+    keycloak.authentication.Execution(
+        f"{realm_name}_organization_reset_credentials_send_email_execution",
+        realm_id=realm_id,
+        parent_flow_alias=reset_credentials_flow.alias,
+        authenticator="reset-credential-email",
+        requirement="REQUIRED",
+        priority=20,
+        opts=opts,
+    )
+    reset_credentials_conditional_otp_subflow = keycloak.authentication.Subflow(
+        f"{realm_name}_organization_reset_credentials_conditional_otp_subflow",
+        alias="Organization reset credentials Reset - Conditional OTP",
+        realm_id=realm_id,
+        parent_flow_alias=reset_credentials_flow.alias,
+        provider_id="basic-flow",
+        requirement="CONDITIONAL",
+        priority=30,
+        opts=opts,
+    )
+    keycloak.authentication.Execution(
+        f"{realm_name}_organization_reset_credentials_conditional_otp_user_configured_execution",
+        realm_id=realm_id,
+        parent_flow_alias=reset_credentials_conditional_otp_subflow.alias,
+        authenticator="conditional-user-configured",
+        requirement="REQUIRED",
+        priority=10,
+        opts=opts,
+    )
+    keycloak.authentication.Execution(
+        f"{realm_name}_organization_reset_credentials_conditional_otp_form_execution",
+        realm_id=realm_id,
+        parent_flow_alias=reset_credentials_conditional_otp_subflow.alias,
+        authenticator="reset-otp",
+        requirement="REQUIRED",
+        priority=20,
+        opts=opts,
+    )
+    return reset_credentials_flow
+
+
 def create_organization_first_broker_login_flows(
     realm_id: pulumi.Output[str],
     realm_name: str,
