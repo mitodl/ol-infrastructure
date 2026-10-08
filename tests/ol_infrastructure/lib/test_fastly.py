@@ -1,9 +1,12 @@
 import ast
+import re
 from pathlib import Path
 
 import pytest
 
 from ol_infrastructure.lib.fastly import (
+    fastly_backend_identifier,
+    s3_sigv4_signing_vcl,
     validate_vcl_snippet_name,
     vcl_snippet,
 )
@@ -93,3 +96,77 @@ def test_all_snippet_names_in_the_repo_are_legal():
             for keyword in node.keywords:
                 if keyword.arg == "name" and isinstance(keyword.value, ast.Constant):
                     validate_vcl_snippet_name(keyword.value.value)
+
+
+_TEST_KEY_ID = "AKIAEXAMPLEKEYID"  # pragma: allowlist secret
+_TEST_SECRET = "example-secret-key"  # pragma: allowlist secret  # noqa: S105
+
+
+def _sigv4_vcl(**overrides):
+    kwargs = {
+        "access_key_id": _TEST_KEY_ID,
+        "secret_access_key": _TEST_SECRET,
+        "bucket_host": "my-bucket.s3.amazonaws.com",
+        "backend_name": "learn-ai",
+    }
+    return s3_sigv4_signing_vcl(**{**kwargs, **overrides})
+
+
+@pytest.mark.parametrize(
+    ("backend_name", "expected"),
+    [
+        ("learn-ai", "F_learn_ai"),
+        ("MIT Learn S3 Media Storage", "F_MIT_Learn_S3_Media_Storage"),
+        ("plain_name", "F_plain_name"),
+    ],
+)
+def test_fastly_backend_identifier(backend_name, expected):
+    assert fastly_backend_identifier(backend_name) == expected
+
+
+def test_sigv4_vcl_is_guarded_to_its_backend():
+    vcl = _sigv4_vcl()
+    assert vcl.startswith("if (req.backend == F_learn_ai) {\n")
+    assert vcl.endswith("}")
+    assert vcl.count("req.backend") == 1
+
+
+def test_sigv4_vcl_embeds_credentials_and_host():
+    vcl = _sigv4_vcl()
+    assert f'set var.aws_access_key_id = "{_TEST_KEY_ID}";' in vcl
+    assert f'set var.aws_secret_access_key = "{_TEST_SECRET}";' in vcl
+    assert 'set bereq.http.host = "my-bucket.s3.amazonaws.com";' in vcl
+
+
+def test_sigv4_vcl_has_no_hash_comments():
+    # A `#` comment containing a double quote breaks Fastly's parser.
+    assert "#" not in _sigv4_vcl()
+
+
+def test_sigv4_vcl_signs_the_encoded_path_it_sends():
+    """The canonical URI is encoded generically, then both signed and sent."""
+    vcl = _sigv4_vcl()
+    steps = [
+        "set bereq.url = querystring.remove(bereq.url);",
+        'set var.canonical_uri = regsuball(bereq.url.path, "\\+", "%252B");',
+        "set var.canonical_uri = urlencode(urldecode(var.canonical_uri));",
+        'set var.canonical_uri = regsuball(var.canonical_uri, "%252[Ff]", "/");',
+        "set bereq.url = var.canonical_uri;",
+        'set var.canonical_request = "GET" + "%0A" + var.canonical_uri + "%0A"',
+    ]
+    positions = [vcl.index(step) for step in steps]
+    assert positions == sorted(positions)
+    # signing the raw path is what returned 403 for keys like `app/(home)/x.js`
+    assert 'var.canonical_request = "GET" + "%0A" + bereq.url.path' not in vcl
+
+
+def test_sigv4_vcl_percent_signs_are_valid_vcl_escapes():
+    """In a double-quoted VCL string `%` must be followed by two hex digits.
+
+    Fastly's linter rejects anything else (`"%2[Ff]"` was caught this way); a
+    literal percent sign is written `%25`. Long strings `{"..."}` are raw.
+    """
+    vcl = re.sub(r'\{"[^"]*"\}', "", _sigv4_vcl())
+    for quoted in re.findall(r'"([^"]*)"', vcl):
+        for match in re.finditer(r"%(.{0,2})", quoted):
+            assert re.fullmatch(r"[0-9A-Fa-f]{2}", match.group(1)), quoted
