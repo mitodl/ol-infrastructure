@@ -114,7 +114,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
         "vector/",
     ],
     "applications/mit_learn_nextjs/": [],
-    "applications/mitxonline/": ["fastly.yaml", "mitxonline/"],
+    "applications/mitxonline/": ["fastly.yaml", "mitxonline/", "vector/"],
     "applications/ocw_site/": ["fastly.yaml", "vector/"],
     "applications/ocw_studio/": ["ocw_studio/"],
     "applications/odl_video_service/": ["odl_video_service/"],
