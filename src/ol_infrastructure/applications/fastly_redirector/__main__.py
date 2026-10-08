@@ -5,13 +5,13 @@ from pathlib import Path
 import pulumi
 import pulumi_fastly as fastly
 from pulumi import Config
-from pulumi.invoke import InvokeOptions
-from pulumi_aws import route53
 
-from bridge.lib.constants import FASTLY_A_TLS_1_3, FASTLY_CNAME_TLS_1_3
-from bridge.lib.magic_numbers import FIVE_MINUTES
+from ol_infrastructure.components.services.fastly import (
+    OLFastlyDNSRecordConfig,
+    OLFastlyTLS,
+    OLFastlyTLSConfig,
+)
 from ol_infrastructure.lib.aws.route53_helper import (
-    fastly_certificate_validation_records,
     is_root_domain,
     lookup_zone_id_from_domain,
 )
@@ -140,13 +140,6 @@ if redirect_domain_map:
         opts=fastly_opts,
     )
 
-tls_configuration = fastly.get_tls_configuration(
-    default=False,
-    name="TLS v1.3",
-    tls_protocols=["1.2", "1.3"],
-    opts=InvokeOptions(provider=fastly_opts.provider),
-)
-
 # Generate hash of domains to identify subscription version
 # When domains change, a new subscription will be created with a unique name
 tls_domains = sorted(
@@ -155,40 +148,23 @@ tls_domains = sorted(
 domains_hash = hashlib.sha256(",".join(sorted(tls_domains)).encode()).hexdigest()[:8]
 subscription_name = f"ol-redirect-service-tls-subscription-{domains_hash}"
 
-ol_redirect_service_tls = fastly.TlsSubscription(
-    subscription_name,
-    # valid values are certainly, lets-encrypt, or globalsign
-    certificate_authority="certainly",
-    domains=tls_domains,
-    # Retrieved from https://manage.fastly.com/network/tls-configurations
-    configuration_id=tls_configuration.id,
+ol_redirect_service_tls = OLFastlyTLS(
+    f"ol-redirect-service-tls-{stack_info.env_suffix}",
+    tls_config=OLFastlyTLSConfig(
+        subscription_resource_name=subscription_name,
+        validation_resource_name=f"{subscription_name}-validation",
+        domains=tls_domains,
+        dns_records=[
+            OLFastlyDNSRecordConfig(
+                resource_name=f"fastly-target-for-domain-{domain}",
+                domain=domain,
+                zone_id=zone_id,
+                record_type="A" if is_root_domain(domain) else "CNAME",
+                region="global",
+            )
+            for domain in redirect_domains
+            if (zone_id := lookup_zone_id_from_domain(domain))
+        ],
+    ),
     opts=fastly_opts,
 )
-
-ol_redirect_service_tls.managed_dns_challenges.apply(
-    fastly_certificate_validation_records
-)
-
-validated_tls_subscription = fastly.TlsSubscriptionValidation(
-    f"{subscription_name}-validation",
-    subscription_id=ol_redirect_service_tls.id,
-    opts=fastly_opts,
-)
-
-for domain in redirect_domains:
-    if zone_id := lookup_zone_id_from_domain(domain):
-        record_type = "A" if is_root_domain(domain) else "CNAME"
-        record_map = {"A": FASTLY_A_TLS_1_3, "CNAME": [FASTLY_CNAME_TLS_1_3]}
-        route53.Record(
-            f"fastly-target-for-domain-{domain}",
-            name=domain,
-            type=record_type,
-            records=[
-                record.record_value
-                for record in tls_configuration.dns_records
-                if record.record_type == record_type and record.region == "global"
-            ],
-            allow_overwrite=True,
-            ttl=FIVE_MINUTES,
-            zone_id=zone_id,
-        )

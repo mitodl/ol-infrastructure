@@ -1,4 +1,3 @@
-import base64
 import json
 from pathlib import Path
 
@@ -8,33 +7,30 @@ from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
     Config,
-    InvokeOptions,
-    Output,
     ResourceOptions,
     export,
 )
-from pulumi_aws import get_caller_identity, iam, route53, s3
+from pulumi_aws import get_caller_identity, iam, s3
 
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
-    FIVE_MINUTES,
     HTTP_STATUS_NOT_FOUND,
     HTTP_STATUS_OK,
-    ONE_MEGABYTE_BYTE,
     SECONDS_IN_ONE_DAY,
 )
-from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.fastly import (
+    OLFastlyDNSRecordConfig,
+    OLFastlyTLS,
+    OLFastlyTLSConfig,
+)
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.aws.route53_helper import (
-    fastly_certificate_validation_records,
-)
 from ol_infrastructure.lib.fastly import (
-    build_fastly_log_format_string,
     get_fastly_provider,
     vcl_snippet,
 )
+from ol_infrastructure.lib.fastly_logging import fastly_logging_args
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
@@ -54,28 +50,6 @@ fastly_provider = get_fastly_provider()
 dns_stack = make_stack_reference(projects.DNS, "default")
 ocw_zone = dns_stack.require_output("ocw")
 
-vector_log_proxy_stack = make_stack_reference(
-    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
-)
-vector_log_proxy_domain = vector_log_proxy_stack.require_output(
-    "vector_log_proxy_domain"
-)
-
-vector_log_proxy_secrets = read_yaml_secrets(
-    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
-)
-fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
-encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
-).decode("utf8")
-
-monitoring_stack = make_stack_reference(projects.MONITORING, "default")
-fastly_access_logging_bucket = monitoring_stack.require_output(
-    "fastly_access_logging_bucket"
-)
-fastly_access_logging_iam_role = monitoring_stack.require_output(
-    "fastly_access_logging_iam_role"
-)
 
 # Get AWS account ID for audit logging configuration
 aws_account = get_caller_identity()
@@ -1185,40 +1159,12 @@ for purpose in ("draft", "live", "test"):
                 else []
             ),
         ],
-        logging_https=[
-            fastly.ServiceVclLoggingHttpArgs(
-                url=Output.all(domain=vector_log_proxy_domain).apply(
-                    lambda kwargs: f"https://{kwargs['domain']}/fastly"
-                ),
-                name=f"ocw-{purpose}-{stack_info.env_suffix}-https-logging-args",
-                content_type="application/json",
-                format=build_fastly_log_format_string(
-                    additional_static_fields={
-                        "application": "open-courseware",
-                        "environment": f"ocw-{stack_info.env_suffix}",
-                        # service will be applied by the vector-log-proxy
-                    }
-                ),
-                format_version=2,
-                header_name="Authorization",
-                header_value=f"Basic {encoded_fastly_proxy_credentials}",
-                json_format="0",
-                method="POST",
-                request_max_bytes=ONE_MEGABYTE_BYTE,
-            ),
-        ],
-        logging_s3s=[
-            fastly.ServiceVclLoggingS3Args(
-                bucket_name=fastly_access_logging_bucket["bucket_name"],
-                name=f"ocw-{purpose}-{stack_info.env_suffix}-s3-logging-args",
-                format=build_fastly_log_format_string(additional_static_fields={}),
-                gzip_level=3,
-                message_type="blank",
-                path=f"/ocw/{stack_info.env_suffix}/{purpose}/",
-                redundancy="standard",
-                s3_iam_role=fastly_access_logging_iam_role["role_arn"],
-            ),
-        ],
+        **fastly_logging_args(
+            name=f"ocw-{purpose}-{stack_info.env_suffix}",
+            application="open-courseware",
+            environment=f"ocw-{stack_info.env_suffix}",
+            s3_path=f"/ocw/{stack_info.env_suffix}/{purpose}/",
+        ),
         stale_if_error=True,
         opts=ResourceOptions(
             protect=True,
@@ -1234,54 +1180,33 @@ for purpose in ("draft", "live", "test"):
         opts=ResourceOptions(protect=True).merge(fastly_provider),
     )
 
-    tls_configuration = fastly.get_tls_configuration(
-        default=False,
-        name="TLS v1.3",
-        tls_protocols=["1.2", "1.3"],
-        opts=InvokeOptions(provider=fastly_provider.provider),
-    )
-
-    fastly_tls = fastly.TlsSubscription(
-        f"fastly-ocw_site-{stack_info.env_suffix}-{purpose}-tls-subscription",
-        # valid values are certainly, lets-encrypt, or globalsign
-        certificate_authority="certainly",
-        domains=servicevcl_backend.domains.apply(
-            lambda domains: [domain.name for domain in domains]
+    # If it's a 3 level domain then it's rooted at MIT.edu which means that we are
+    # creating an Apex record in Route53. This means that we have to use an A
+    # record. If it's deeper than 3 levels then it's a subdomain of ocw.mit.edu and
+    # we can use a CNAME.
+    OLFastlyTLS(
+        f"ocw-site-fastly-tls-{stack_info.env_suffix}-{purpose}",
+        tls_config=OLFastlyTLSConfig(
+            subscription_resource_name=f"fastly-ocw_site-{stack_info.env_suffix}-{purpose}-tls-subscription",
+            validation_resource_name=f"{purpose}-tls-subscription-validation",
+            domains=servicevcl_backend.domains.apply(
+                lambda domains: [domain.name for domain in domains]
+            ),
+            force_update=True,
+            dns_records=[
+                OLFastlyDNSRecordConfig(
+                    resource_name=f"ocw-site-dns-record-{domain}",
+                    domain=domain,
+                    zone_id=ocw_zone["id"],
+                    record_type="A" if len(domain.split(".")) == 3 else "CNAME",  # noqa: PLR2004
+                )
+                for domain in site_domains[purpose]
+            ],
         ),
-        # Retrieved from https://manage.fastly.com/network/tls-configurations
-        configuration_id=tls_configuration.id,
-        force_update=True,
-        opts=fastly_provider,
-    )
-
-    fastly_tls.managed_dns_challenges.apply(fastly_certificate_validation_records)
-
-    validated_tls_subscription = fastly.TlsSubscriptionValidation(
-        f"{purpose}-tls-subscription-validation",
-        subscription_id=fastly_tls.id,
         opts=fastly_provider,
     )
 
     fastly_distributions[purpose] = servicevcl_backend
-
-    for domain in site_domains[purpose]:
-        # If it's a 3 level domain then it's rooted at MIT.edu which means that we are
-        # creating an Apex record in Route53. This means that we have to use an A
-        # record. If it's deeper than 3 levels then it's a subdomain of ocw.mit.edu and
-        # we can use a CNAME.
-        record_type = "A" if len(domain.split(".")) == 3 else "CNAME"  # noqa: PLR2004
-        route53.Record(
-            f"ocw-site-dns-record-{domain}",
-            name=domain,
-            type=record_type,
-            ttl=FIVE_MINUTES,
-            records=[
-                record.record_value
-                for record in tls_configuration.dns_records
-                if record.record_type == record_type
-            ],
-            zone_id=ocw_zone["id"],
-        )
 
 export(
     "ocw_site_buckets",

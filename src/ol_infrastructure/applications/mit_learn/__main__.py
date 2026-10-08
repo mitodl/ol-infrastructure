@@ -1,7 +1,6 @@
 # ruff: noqa: ERA001, FIX002, E501
 """Pulumi program for deploying the MIT Learn application to Kubernetes."""
 
-import base64
 import json
 import mimetypes
 import textwrap
@@ -32,7 +31,6 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
-    ONE_MEGABYTE_BYTE,
     STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -98,10 +96,10 @@ from ol_infrastructure.lib.azure_workload_identity import (
     azure_openai_env,
 )
 from ol_infrastructure.lib.fastly import (
-    build_fastly_log_format_string,
     get_fastly_provider,
     vcl_snippet,
 )
+from ol_infrastructure.lib.fastly_logging import fastly_logging_args
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -142,10 +140,6 @@ data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
-vector_log_proxy_stack = make_stack_reference(
-    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
-)
-monitoring_stack = make_stack_reference(projects.MONITORING, "default")
 dns_stack = make_stack_reference(projects.DNS, "default")
 ocw_site_stack = make_stack_reference(
     projects.OCW_SITE, stack_info.name if stack_info.name != "CI" else "QA"
@@ -901,23 +895,6 @@ mitlearn_vault_backend_config = OLVaultPostgresDatabaseConfig(
 mitlearn_vault_backend = OLVaultDatabaseBackend(mitlearn_vault_backend_config)
 
 
-vector_log_proxy_secrets = read_yaml_secrets(
-    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
-)
-fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
-encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
-).decode("utf8")
-vector_log_proxy_domain = vector_log_proxy_stack.require_output(
-    "vector_log_proxy_domain"
-)
-
-fastly_access_logging_bucket = monitoring_stack.require_output(
-    "fastly_access_logging_bucket"
-)
-fastly_access_logging_iam_role = monitoring_stack.require_output(
-    "fastly_access_logging_iam_role"
-)
 gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
 for k, v in mimetypes.types_map.items():
     if k in (
@@ -1423,39 +1400,12 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             type="deliver",
         ),
     ],
-    logging_https=[
-        fastly.ServiceVclLoggingHttpArgs(
-            url=Output.all(domain=vector_log_proxy_domain).apply(
-                lambda kwargs: f"https://{kwargs['domain']}/fastly"
-            ),
-            name=f"fastly-mit_learn-{stack_info.env_suffix}-https-logging-args",
-            content_type="application/json",
-            format=build_fastly_log_format_string(
-                additional_static_fields={
-                    "application": Application.mit_learn,
-                    "environment": stack_info.env_suffix,
-                }
-            ),
-            format_version=2,
-            header_name="Authorization",
-            header_value=f"Basic {encoded_fastly_proxy_credentials}",
-            json_format="0",
-            method="POST",
-            request_max_bytes=ONE_MEGABYTE_BYTE,
-        )
-    ],
-    logging_s3s=[
-        fastly.ServiceVclLoggingS3Args(
-            bucket_name=fastly_access_logging_bucket["bucket_name"],
-            name=f"fastly-mit_learn-{stack_info.env_suffix}-s3-logging-args",
-            format=build_fastly_log_format_string(additional_static_fields={}),
-            gzip_level=3,
-            message_type="blank",
-            path=f"/{Application.mit_learn}/{stack_info.env_suffix}/",
-            redundancy="standard",
-            s3_iam_role=fastly_access_logging_iam_role["role_arn"],
-        ),
-    ],
+    **fastly_logging_args(
+        name=f"fastly-mit_learn-{stack_info.env_suffix}",
+        application=Application.mit_learn,
+        environment=stack_info.env_suffix,
+        s3_path=f"/{Application.mit_learn}/{stack_info.env_suffix}/",
+    ),
     opts=ResourceOptions.merge(
         fastly_provider,
         ResourceOptions(

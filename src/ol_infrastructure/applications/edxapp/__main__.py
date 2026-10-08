@@ -10,7 +10,6 @@
 - Create autoscale groups for web and worker instances
 """
 
-import base64
 import json
 import textwrap
 from pathlib import Path
@@ -28,7 +27,6 @@ from pulumi import (
     ResourceOptions,
     export,
 )
-from pulumi.invoke import InvokeOptions
 from pulumi_aws import (
     ec2,
     get_caller_identity,
@@ -42,7 +40,6 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_MYSQL_PORT,
     DEFAULT_REDIS_PORT,
-    ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
@@ -50,6 +47,10 @@ from ol_infrastructure.applications.edxapp.k8s_resources import create_k8s_resou
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.fastly import (
+    OLFastlyTLS,
+    OLFastlyTLSConfig,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultMysqlDatabaseConfig,
@@ -57,14 +58,11 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.aws.route53_helper import (
-    fastly_certificate_validation_records,
-)
 from ol_infrastructure.lib.fastly import (
-    build_fastly_log_format_string,
     get_fastly_provider,
     vcl_snippet,
 )
+from ol_infrastructure.lib.fastly_logging import fastly_logging_args
 from ol_infrastructure.lib.ol_types import AWSBase, Services
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
@@ -110,10 +108,6 @@ EDXAPP_SENTRY_DSN_OUTPUTS = {
     "mitxonline": "openedx_mitxonline_sentry_dsn",
     "xpro": "openedx_mitxpro_sentry_dsn",
 }
-monitoring_stack = make_stack_reference(projects.MONITORING, "default")
-vector_log_proxy_stack = make_stack_reference(
-    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
-)
 mongodb_atlas_stack = make_stack_reference(
     projects.MONGODB_ATLAS, f"{stack_info.env_prefix}.{stack_info.name}"
 )
@@ -935,25 +929,6 @@ cms_backend_ssl_hostname = edxapp_config.require("backend_studio_domain")
 preview_backend_address = edxapp_config.require("backend_preview_domain")
 preview_backend_ssl_hostname = edxapp_config.require("backend_preview_domain")
 
-vector_log_proxy_secrets = read_yaml_secrets(
-    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
-)
-fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
-encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
-).decode("utf8")
-
-vector_log_proxy_domain = vector_log_proxy_stack.require_output(
-    "vector_log_proxy_domain"
-)
-
-fastly_access_logging_bucket = monitoring_stack.require_output(
-    "fastly_access_logging_bucket"
-)
-fastly_access_logging_iam_role = monitoring_stack.require_output(
-    "fastly_access_logging_iam_role"
-)
-
 
 mfe_regex = "^/({})/".format("|".join(edxapp_mfe_paths))
 
@@ -1243,66 +1218,26 @@ edxapp_fastly_service = fastly.ServiceVcl(
             type="error",
         ),
     ],
-    logging_https=[
-        fastly.ServiceVclLoggingHttpArgs(
-            url=Output.all(domain=vector_log_proxy_domain).apply(
-                lambda kwargs: f"https://{kwargs['domain']}/fastly"
-            ),
-            name=f"fastly-{env_name}-https-logging-args",
-            content_type="application/json",
-            format=build_fastly_log_format_string(
-                additional_static_fields={
-                    "application": "edxapp",
-                    "environment": env_name,
-                }
-            ),
-            format_version=2,
-            header_name="Authorization",
-            header_value=f"Basic {encoded_fastly_proxy_credentials}",
-            json_format="0",
-            method="POST",
-            request_max_bytes=ONE_MEGABYTE_BYTE,
-        )
-    ],
-    logging_s3s=[
-        fastly.ServiceVclLoggingS3Args(
-            bucket_name=fastly_access_logging_bucket["bucket_name"],
-            name=f"fastly-{env_name}-s3-logging-args",
-            format=build_fastly_log_format_string(additional_static_fields={}),
-            gzip_level=3,
-            message_type="blank",
-            path=f"/edxapp/{stack_info.env_prefix}/{stack_info.env_suffix}/",
-            redundancy="standard",
-            s3_iam_role=fastly_access_logging_iam_role["role_arn"],
-        ),
-    ],
-    opts=fastly_provider,
-)
-
-tls_configuration = fastly.get_tls_configuration(
-    default=False,
-    name="TLS v1.3",
-    tls_protocols=["1.2", "1.3"],
-    opts=InvokeOptions(provider=fastly_provider.provider),
-)
-
-edxapp_fastly_tls = fastly.TlsSubscription(
-    f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
-    # valid values are certainly, lets-encrypt, or globalsign
-    certificate_authority="certainly",
-    domains=edxapp_fastly_service.domains.apply(
-        lambda domains: [domain.name for domain in domains]
+    **fastly_logging_args(
+        name=f"fastly-{env_name}",
+        application="edxapp",
+        environment=env_name,
+        s3_path=f"/edxapp/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     ),
-    # Retrieved from 0https://manage.fastly.com/network/tls-configurations
-    configuration_id=tls_configuration.id,
     opts=fastly_provider,
 )
 
-edxapp_fastly_tls.managed_dns_challenges.apply(fastly_certificate_validation_records)
-
-validated_tls_subscription = fastly.TlsSubscriptionValidation(
-    "ol-redirect-service-tls-subscription-validation",
-    subscription_id=edxapp_fastly_tls.id,
+edxapp_fastly_tls = OLFastlyTLS(
+    f"edxapp-fastly-tls-{env_name}",
+    tls_config=OLFastlyTLSConfig(
+        subscription_resource_name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
+        # The name was copied from the redirector stack and is kept because
+        # renaming it replaces the validation of a live certificate.
+        validation_resource_name="ol-redirect-service-tls-subscription-validation",
+        domains=edxapp_fastly_service.domains.apply(
+            lambda domains: [domain.name for domain in domains]
+        ),
+    ),
     opts=fastly_provider,
 )
 
