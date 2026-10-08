@@ -30,7 +30,7 @@ from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
 )
 
 
-def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
+def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -1736,7 +1736,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         # confirmed by their discovery doc's code_challenge_methods_supported;
         # that's not a first-class field on this provider's IdentityProvider
         # resource, so it goes through extra_config.
-        onboard_oidc_org(
+        board_infinity_oidc_identity_provider = onboard_oidc_org(
             OIDCIdpConfig(
                 idp_alias="BOARDINFINITY",
                 idp_display_name="Board Infinity",
@@ -1764,6 +1764,26 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 resource_options=resource_options,
             ),
         )
+        # Board Infinity's ID token carries name, given_name and family_name.
+        # Without these the first-broker-login review-profile step (set to
+        # "missing") finds fullName/firstName/lastName empty and shows the
+        # "Update Account Information" form.
+        for resource_suffix, claim_name, user_attribute in (
+            ("full-name", "name", "fullName"),
+            ("first-name", "given_name", "firstName"),
+            ("last-name", "family_name", "lastName"),
+        ):
+            keycloak.AttributeImporterIdentityProviderMapper(
+                f"map-boardinfinity-oidc-{resource_suffix}-attribute",
+                realm=ol_apps_realm.id,
+                claim_name=claim_name,
+                identity_provider_alias=board_infinity_oidc_identity_provider.alias,
+                user_attribute=user_attribute,
+                extra_config={
+                    "syncMode": "INHERIT",
+                },
+                opts=resource_options,
+            )
         # BOARD INFINITY [END]
 
     # B2B Organizations [END]
