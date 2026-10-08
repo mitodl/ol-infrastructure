@@ -200,6 +200,15 @@ def create_organization_reset_credentials_flow(
         priority=20,
         opts=opts,
     )
+    keycloak.authentication.Execution(
+        f"{realm_name}_organization_reset_credentials_reset_password_execution",
+        realm_id=realm_id,
+        parent_flow_alias=reset_credentials_flow.alias,
+        authenticator="reset-password",
+        requirement="REQUIRED",
+        priority=30,
+        opts=opts,
+    )
     reset_credentials_conditional_otp_subflow = keycloak.authentication.Subflow(
         f"{realm_name}_organization_reset_credentials_conditional_otp_subflow",
         alias="Organization reset credentials Reset - Conditional OTP",
@@ -207,7 +216,7 @@ def create_organization_reset_credentials_flow(
         parent_flow_alias=reset_credentials_flow.alias,
         provider_id="basic-flow",
         requirement="CONDITIONAL",
-        priority=30,
+        priority=40,
         opts=opts,
     )
     keycloak.authentication.Execution(
