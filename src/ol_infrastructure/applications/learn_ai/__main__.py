@@ -245,8 +245,8 @@ if _learn_ai_bucket_is_sigv4_piloted:
         user=learn_ai_fastly_s3_signer_user.name,
         opts=ResourceOptions(depends_on=[learn_ai_fastly_s3_signer_policy_attachment]),
     )
-    # The durable Vault copy of this key is created further down, once the learn-ai
-    # Vault KV mount exists -- search for "fastly-s3-signer-vault-secret".
+    # The durable Vault copy of this key is created further down -- search for
+    # "fastly-s3-signer-vault-secret".
     learn_ai_bucket_policy_document = Output.all(
         arn=learn_ai_app_storage_bucket.bucket_v2.arn,
         signer_arn=learn_ai_fastly_s3_signer_user.arn,
@@ -568,9 +568,14 @@ if _learn_ai_bucket_is_sigv4_piloted and learn_ai_fastly_s3_signer_access_key:
     # Pulumi (via the iam.AccessKey resource) is still the source of truth --
     # rotating means replacing that resource, which updates this secret in the
     # same apply.
+    # Deliberately NOT under secret-learn-ai: learn_ai_policy.hcl grants read on
+    # secret-learn-ai/*, and the Kubernetes auth role accepts every service account
+    # in the namespace, so any learn-ai workload could read the key. The app does
+    # not need it (only Fastly does), and the policy lists specific
+    # secret-operations paths, so a secret here is unreadable to the app role.
     vault.generic.Secret(
         f"learn-ai-fastly-s3-signer-vault-secret-{stack_info.env_suffix}",
-        path=learn_ai_vault_mount.path.apply("{}/fastly-s3-signer".format),
+        path="secret-operations/learn-ai/fastly-s3-signer",
         data_json=Output.all(
             access_key_id=learn_ai_fastly_s3_signer_access_key.id,
             secret_access_key=learn_ai_fastly_s3_signer_access_key.secret,
