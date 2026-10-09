@@ -921,6 +921,12 @@ def _define_git_resources(
     return main_repo, ol_infra_repo
 
 
+# The release GitHub App; see the comment in _define_release_resources.
+GITHUB_APP_ID = "((github_app.release_bot_app_id))"
+GITHUB_APP_INSTALLATION_ID = "((github_app.release_bot_app_installation_id))"
+GITHUB_APP_PRIVATE_KEY = "((github_app.release_bot_app_pem))"
+
+
 def _define_release_resources(
     app_name: str,
     github_repo: str,
@@ -938,9 +944,9 @@ def _define_release_resources(
     # team-scoped paths before the shared fallback, so a credential named
     # plain "github" here would silently resolve against the wrong
     # (team-scoped, fieldless) secret instead of ever reaching this one.
-    github_app_id = "((github_app.release_bot_app_id))"
-    github_app_installation_id = "((github_app.release_bot_app_installation_id))"
-    github_app_private_key = "((github_app.release_bot_app_pem))"
+    github_app_id = GITHUB_APP_ID
+    github_app_installation_id = GITHUB_APP_INSTALLATION_ID
+    github_app_private_key = GITHUB_APP_PRIVATE_KEY
     release_res = release_resource(
         name=Identifier(f"{app_name}-release"),
         uri=f"https://github.com/{github_repo}",
@@ -1260,6 +1266,46 @@ def _classify_promotion_task(
     )
 
 
+_SUPERSEDE_SCRIPT = (
+    Path(__file__).parent / "scripts" / "supersede_gate_issues.py"
+).read_text()
+SUPERSEDE_TASK_NAME = "supersede-gate-issues"
+
+
+def _supersede_gate_issues_task(
+    app_name: str, github_repo: str, release_issue: Resource
+) -> TaskStep:
+    """Close, and label ``abandoned``, every open gate issue but the one just posted.
+
+    Runs after the release issue put, so the comment on each superseded issue
+    can name the issue that replaced it. See the script's docstring for which
+    issues count. Retried, because it is what keeps a stale issue from being
+    closed by mistake, and not wrapped in a ``try``: a failure is red.
+    """
+    return TaskStep(
+        task=Identifier(SUPERSEDE_TASK_NAME),
+        attempts=3,
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[
+                Input(name=Identifier(PROMOTION_DIR)),
+                Input(name=release_issue.name),
+            ],
+            params={
+                "APP_NAME": app_name,
+                "GITHUB_REPOSITORY": github_repo,
+                "PROMOTION_DIR": PROMOTION_DIR,
+                "ISSUE_FILE": f"{release_issue.name}/gh_issue.json",
+                "GITHUB_APP_ID": GITHUB_APP_ID,
+                "GITHUB_APP_INSTALLATION_ID": GITHUB_APP_INSTALLATION_ID,
+                "GITHUB_APP_PRIVATE_KEY": GITHUB_APP_PRIVATE_KEY,
+            },
+            run=Command(path="python3", args=["-c", _SUPERSEDE_SCRIPT]),
+        ),
+    )
+
+
 def _preview_production_step(
     pulumi_resource: Resource,
     pulumi_code: Resource,
@@ -1533,6 +1579,7 @@ def _build_release_resource_app_pipeline(
             fastly_domains=pipeline_parameters.fastly_domains,
         )
 
+    github_repo = pipeline_parameters.github_repo or f"mitodl/{app_name}"
     (
         release_res,
         release_gate,
@@ -1541,7 +1588,7 @@ def _build_release_resource_app_pipeline(
         deployment_prod,
     ) = _define_release_resources(
         app_name=app_name,
-        github_repo=pipeline_parameters.github_repo or f"mitodl/{app_name}",
+        github_repo=github_repo,
         repo_main_branch=pipeline_parameters.repo_main_branch,
     )
 
@@ -1719,6 +1766,11 @@ def _build_release_resource_app_pipeline(
         additional_post_steps[1].append(
             PutStep(put=fastly_prod.name, params=purge_params, no_get=True)
         )
+    # Last in QA, after the RC deployment is marked and the cache purged, so
+    # a GitHub failure here leaves the job red without misreporting either.
+    additional_post_steps[0].append(
+        _supersede_gate_issues_task(app_name, github_repo, release_issue)
+    )
 
     # QA and Production Deployments
     qa_and_production_fragment = pulumi_jobs_chain(
