@@ -571,8 +571,9 @@ _promoting: set[str] = set()
 async def _update_promote_message(client, body, status: str) -> None:
     """Swap the clicked message's button for *status*, in place.
 
-    Called only on a terminal outcome (promoted, or already promoted), never
-    mid-flight: the message ts is stored nowhere, so nothing can repair this
+    Called only on a terminal outcome (promoted, or no open release issue
+    remains for this version), never mid-flight: the message ts is stored
+    nowhere, so nothing can repair this
     message later, and a message stranded without its button by a crash would
     be a release nobody can promote from Slack. Best-effort -- a failed edit
     is cosmetic and must never abort a promotion that is otherwise fine.
@@ -615,9 +616,10 @@ async def _handle_promote_button(repos, ack, body, say, client):
 async def _promote_from_button(repos, body, say, client):
     """Close the release issue behind the button and trigger the deploy.
 
-    The clicked message is edited only on a terminal outcome (promoted, or
-    already promoted). On a retryable failure it is left untouched -- button
-    intact -- and the error is posted to the channel instead.
+    The clicked message is edited only on a terminal outcome (promoted, or no
+    open release issue remains for this version). On a retryable failure it is
+    left untouched -- button intact -- and the error is posted to the channel
+    instead.
     """
     app_name, version = body["actions"][0]["value"].split(":", 1)
     cfg, error = _resolve_app(repos, app_name)
@@ -635,15 +637,22 @@ async def _promote_from_button(repos, body, say, client):
     # ever appears in the body's "## Release <version>" header.
     matching = [i for i in issues if github.extract_version(i["body"]) == version]
     if not matching:
-        # The issue is already closed: promoted some other way, or an earlier
-        # click closed it and the bot died before editing the message. Settle
-        # the stale button rather than leave it reporting a lookup failure.
+        # The issue is already closed: promoted some other way, abandoned
+        # (the abandon job closes the gate issue with the `abandoned` label),
+        # closed by hand, or closed by an earlier click the bot died before
+        # narrating. Settle the stale button rather than leave it reporting a
+        # lookup failure, and keep the channel post neutral -- ✅ would read
+        # as success for a release that never shipped.
         await _update_promote_message(
             client,
             body,
-            "✅ No open release issue remains for this version — nothing to promote.",
+            # The info emoji is deliberate, not a confusable latin i.
+            "ℹ️ No open release issue remains for this version — nothing to promote.",  # noqa: RUF001
         )
-        await say(f"⚠️ Could not find open release issue for `{app_name}` `{version}`.")
+        await say(
+            f"ℹ️ `{app_name}` `{version}` has no open release issue: "  # noqa: RUF001
+            "already promoted or closed."
+        )
         return
     try:
         await github.close_release_issue(

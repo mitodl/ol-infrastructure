@@ -1339,15 +1339,13 @@ async def test_promote_button_refuses_a_legacy_app(mixed_repos, monkeypatch):
     client = AsyncMock()
 
     await bot._handle_promote_button(
-        mixed_repos,
-        AsyncMock(),
-        {"actions": [{"value": "legacy-app:2026.9.5.1"}], "user": {"id": "U1"}},
-        say,
-        client,
+        mixed_repos, AsyncMock(), _promote_body("legacy-app"), say, client
     )
 
     close.assert_not_awaited()
     assert "legacy" in str(say.call_args.args[0])
+    # The payload carries channel/ts/blocks, so this would catch an edit
+    # added to the legacy path -- the message must stay untouched.
     client.chat_update.assert_not_awaited()
 
 
@@ -1974,7 +1972,14 @@ async def test_promote_button_is_removed_once_the_promotion_lands(repos):
     edit = client.chat_update.call_args.kwargs
     assert edit["channel"] == "C123"
     assert edit["ts"] == _PROMOTE_TS
-    assert [b for b in edit["blocks"] if b.get("type") == "actions"] == []
+    # Everything but the button survives (the release summary and issue
+    # link), with the status appended -- not merely "no actions block",
+    # which an empty blocks list would also satisfy.
+    kept = [
+        b for b in _promote_body()["message"]["blocks"] if b.get("type") != "actions"
+    ]
+    assert edit["blocks"][:-1] == kept
+    assert edit["blocks"][-1]["type"] == "context"
     assert "<@U1> promoted this to Production" in edit["text"]
     # The edit is silent, so the channel post is what actually notifies.
     assert "promoted `my-app`" in str(say.call_args.args[0])
@@ -2012,15 +2017,19 @@ async def test_promote_button_resolves_a_message_stranded_by_a_restart(
     """
     promote_api.open_release_issues.return_value = []
     client = AsyncMock()
+    say = AsyncMock()
 
-    await bot._handle_promote_button(
-        repos, AsyncMock(), _promote_body(), AsyncMock(), client
-    )
+    await bot._handle_promote_button(repos, AsyncMock(), _promote_body(), say, client)
 
     edit = client.chat_update.call_args.kwargs
     assert [b for b in edit["blocks"] if b.get("type") == "actions"] == []
     assert "No open release issue remains" in edit["text"]
     promote_api.close_release_issue.assert_not_awaited()
+    # The channel post is the only notifying message, so it must be the
+    # neutral explanation, not the old lookup-failure warning.
+    posted = str(say.call_args.args[0])
+    assert "Could not find" not in posted
+    assert "has no open release issue" in posted
 
 
 async def test_a_second_click_cannot_promote_the_same_release_twice(repos, promote_api):
