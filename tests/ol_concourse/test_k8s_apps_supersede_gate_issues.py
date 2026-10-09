@@ -10,7 +10,10 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import threading
+import urllib.parse
+from datetime import UTC, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any, ClassVar
@@ -222,15 +225,28 @@ class _FakeGitHub(BaseHTTPRequestHandler):
 
     issues: ClassVar[dict[int, dict[str, Any]]] = {}
     calls: ClassVar[list[tuple[str, str, Any]]] = []
+    # The repository's label set, which POST /repos/{repo}/labels adds to.
+    repo_labels: ClassVar[set[str]] = set()
+    # HTTP status of each label-creation call, in order.
+    label_creations: ClassVar[list[int]] = []
+    # Every `since` the closed-issue listing was asked for.
+    closed_since: ClassVar[list[str]] = []
     # Issue numbers whose labels another writer replaces right after the close.
     strip_after_close: ClassVar[set[int]] = set()
+    # Issue numbers whose labels another writer replaces after every write.
+    strip_always: ClassVar[set[int]] = set()
 
     def log_message(self, *_args: Any) -> None:
         pass
 
-    def _reply(self, body: Any, headers: dict[str, str] | None = None) -> None:
+    def _reply(
+        self,
+        body: Any,
+        headers: dict[str, str] | None = None,
+        status: int = 200,
+    ) -> None:
         payload = json.dumps(body).encode()
-        self.send_response(200)
+        self.send_response(status)
         self.send_header("Content-Type", "application/json")
         for key, value in (headers or {}).items():
             self.send_header(key, value)
@@ -250,10 +266,23 @@ class _FakeGitHub(BaseHTTPRequestHandler):
             self._reply({"token": "installation-token"})
             return
         assert self.headers["Authorization"] == "token installation-token"
+        if self.path == f"/repos/{REPO}/labels":
+            exists = body["name"] in self.repo_labels
+            status = 422 if exists else 201
+            self.label_creations.append(status)
+            self.repo_labels.add(body["name"])
+            if exists:
+                self._reply({"errors": [{"code": "already_exists"}]}, status=status)
+            else:
+                self._reply(body, status=status)
+            return
         if self.path.endswith("/labels"):
-            issue = self.issues[int(self.path.split("/")[-2])]
+            number = int(self.path.split("/")[-2])
+            issue = self.issues[number]
             names = {label["name"] for label in issue["labels"]} | set(body["labels"])
             issue["labels"] = [{"name": name} for name in sorted(names)]
+            if number in self.strip_always:
+                issue["labels"] = []
         self._reply({})
 
     def do_PATCH(self) -> None:
@@ -264,7 +293,7 @@ class _FakeGitHub(BaseHTTPRequestHandler):
         issue["state"] = body["state"]
         issue["state_reason"] = body["state_reason"]
         issue["labels"] = [{"name": name} for name in body["labels"]]
-        if number in self.strip_after_close:
+        if number in self.strip_after_close | self.strip_always:
             issue["labels"] = []
         self._reply(issue)
 
@@ -272,13 +301,15 @@ class _FakeGitHub(BaseHTTPRequestHandler):
         self.calls.append(("GET", self.path, None))
         open_issues = [i for i in self.issues.values() if i["state"] == "open"]
         if "state=closed" in self.path:
-            assert "since=" in self.path
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            self.closed_since.extend(query["since"])
             self._reply([i for i in self.issues.values() if i["state"] == "closed"])
         elif "page=2" in self.path:
             self._reply(open_issues[1:])
         elif "/issues?" in self.path:
             # Lowercase, as HTTP/2 delivers it.
-            next_url = f"http://{self.headers['Host']}/repos/{REPO}/issues?page=2"
+            host, port = self.connection.getsockname()[:2]
+            next_url = f"http://{host!s}:{port}/repos/{REPO}/issues?page=2"
             self._reply(open_issues[:1], {"link": f'<{next_url}>; rel="next"'})
         else:
             self._reply(self.issues[int(self.path.rsplit("/", 1)[-1])])
@@ -288,7 +319,11 @@ class _FakeGitHub(BaseHTTPRequestHandler):
 def fake_github():
     """Serve the fake GitHub API on a free local port."""
     _FakeGitHub.calls = []
+    _FakeGitHub.repo_labels = {"release"}
+    _FakeGitHub.label_creations = []
+    _FakeGitHub.closed_since = []
     _FakeGitHub.strip_after_close = set()
+    _FakeGitHub.strip_always = set()
     _FakeGitHub.issues = {
         83: _issue(83, f"Release {APP} 2026.9.30.1", state="open"),
         96: _issue(
@@ -337,6 +372,7 @@ def _run(
     posted: int,
     skip: bool = False,
 ) -> subprocess.CompletedProcess[str]:
+    tmp_path = Path(tempfile.mkdtemp(dir=tmp_path))
     promotion = tmp_path / "promotion"
     promotion.mkdir()
     (promotion / "title").write_text(f"Release {APP} 2026.10.8.1")
@@ -371,6 +407,24 @@ def test_script_supersedes_stale_issues_end_to_end(tmp_path, fake_github, privat
     assert result.returncode == 0, result.stderr
     issues = _FakeGitHub.issues
     assert issues[83]["state"] == issues[96]["state"] == "closed"
+    assert issues[83]["state_reason"] == "not_planned"
+    patches = [
+        body
+        for method, path, body in _FakeGitHub.calls
+        if (method, path) == ("PATCH", f"/repos/{REPO}/issues/83")
+    ]
+    assert patches == [
+        {"state": "closed", "state_reason": "not_planned", "labels": ["abandoned"]}
+    ]
+    # The label exists before anything is closed with it.
+    calls = [(m, p) for m, p, _ in _FakeGitHub.calls]
+    first_patch = next(i for i, (m, _) in enumerate(calls) if m == "PATCH")
+    assert calls.index(("POST", f"/repos/{REPO}/labels")) < first_patch
+    assert _FakeGitHub.label_creations == [201]
+    # Closed issues are listed from a day back.
+    (since,) = _FakeGitHub.closed_since
+    age = datetime.now(UTC) - datetime.strptime(since, "%Y-%m-%dT%H:%M:%S%z")
+    assert timedelta(hours=23) < age < timedelta(hours=25)
     assert {label["name"] for label in issues[94]["labels"]} == {"abandoned"}
     assert issues[90]["labels"] == issues[95]["labels"] == []
     assert {label["name"] for label in issues[96]["labels"]} == {
@@ -447,3 +501,40 @@ def test_a_retry_finds_an_issue_closed_without_its_label(
 
     assert result.returncode == 0, result.stderr
     assert "abandoned" in {label["name"] for label in _FakeGitHub.issues[96]["labels"]}
+
+
+def test_script_succeeds_when_the_label_already_exists(
+    tmp_path, fake_github, private_key
+):
+    """Creating the label is idempotent: GitHub's 422 for an existing one is fine."""
+    _FakeGitHub.repo_labels.add("abandoned")
+    result = _run(tmp_path, fake_github, private_key, posted=97)
+
+    assert result.returncode == 0, result.stderr
+    assert _FakeGitHub.label_creations == [422]
+    assert _FakeGitHub.issues[83]["state"] == "closed"
+
+
+def test_a_second_run_with_the_label_present_succeeds(
+    tmp_path, fake_github, private_key
+):
+    """A rerun after a full pass finds nothing stale and touches nothing."""
+    first = _run(tmp_path, fake_github, private_key, posted=97)
+    assert first.returncode == 0, first.stderr
+    _FakeGitHub.issues[100] = _issue(100, f"Release {APP} 2026.10.9.1", state="open")
+    second = _run(tmp_path, fake_github, private_key, posted=100)
+
+    assert second.returncode == 0, second.stderr
+    assert _FakeGitHub.label_creations == [201, 422]
+    assert _FakeGitHub.issues[97]["state"] == "closed"
+
+
+def test_script_fails_when_the_label_keeps_disappearing(
+    tmp_path, fake_github, private_key
+):
+    """A label that cannot be made to stick turns the job red."""
+    _FakeGitHub.strip_always = {96}
+    result = _run(tmp_path, fake_github, private_key, posted=97)
+
+    assert result.returncode != 0
+    assert "keeps disappearing" in result.stderr

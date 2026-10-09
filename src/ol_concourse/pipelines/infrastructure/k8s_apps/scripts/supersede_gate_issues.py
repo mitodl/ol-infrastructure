@@ -9,9 +9,9 @@ or an infrastructure issue titled with a live version that has since moved.
 Closing one of those would fire the release gate.
 
 So each one is closed, labelled ``abandoned`` and given a comment that points
-at the issue that replaced it. The release gate skips ``abandoned`` issues, so
-once the label lands a superseded issue cannot fire it, even if someone closes
-it afterwards.
+at the issue that replaced it, creating the label first if the repository lacks
+it. The release gate skips ``abandoned`` issues, so once the label lands a
+superseded issue cannot fire it, even if someone closes it afterwards.
 
 A gate issue closed as *not planned*, updated in the last day, and not yet
 consumed or labelled is labelled too. This step closes issues that way, so a
@@ -54,6 +54,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -196,6 +197,29 @@ class GitHub:
         return issues
 
 
+def ensure_abandoned_label(github: GitHub, repo: str) -> None:
+    """Create the ``abandoned`` label in *repo* unless it already exists."""
+    # GitHub's REST API creates a missing label implicitly when an issue is
+    # labelled with it, in practice, but does not document that. This label is
+    # what stops the gate, so create it explicitly. 422 means it exists.
+    try:
+        github.request(
+            "POST",
+            f"/repos/{repo}/labels",
+            {
+                "name": ABANDONED_LABEL,
+                "color": "ededed",
+                "description": (
+                    "Superseded or abandoned release gate issue; "
+                    "the release gate ignores it."
+                ),
+            },
+        )
+    except urllib.error.HTTPError as error:
+        if error.code != 422:  # noqa: PLR2004
+            raise
+
+
 def installation_token(
     api_url: str, app_id: str, installation_id: str, private_key: str
 ) -> str:
@@ -302,6 +326,7 @@ def main() -> None:
         "Production already matches this code: no release is waiting and the "
         "Production preview shows no changes.",
     )
+    ensure_abandoned_label(github, repo)
     for issue in stale:
         print(f"{app}: superseding #{issue['number']} ({issue['title']!r}).")  # noqa: T201
         supersede(github, repo, issue, reason)
