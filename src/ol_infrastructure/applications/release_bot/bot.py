@@ -1086,10 +1086,10 @@ def _ready_to_promote_blocks(
                             "text": "Promote to Production?",
                         },
                         "text": {
-                            "type": "mrkdwn",
+                            "type": "plain_text",
                             "text": (
-                                f"This closes the release issue and deploys "
-                                f"`{app_name}` {version} to Production."
+                                "This closes the release issue and deploys "
+                                f"{app_name} {version} to Production."
                             ),
                         },
                         "confirm": {"type": "plain_text", "text": "Promote"},

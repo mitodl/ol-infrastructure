@@ -2197,12 +2197,15 @@ def test_promote_button_asks_for_confirmation():
     blocks = bot._ready_to_promote_blocks("my-app", "2026.9.5.1", "http://issue/1")
     button = blocks[1]["elements"][0]
     confirm = button["confirm"]
-    assert "`my-app` 2026.9.5.1" in confirm["text"]["text"]
+    assert confirm["text"]["type"] == "plain_text"
+    assert "my-app 2026.9.5.1" in confirm["text"]["text"]
     assert confirm["confirm"]["text"] == "Promote"
     assert confirm["deny"]["text"] == "Cancel"
-    # Slack rejects the whole message over these limits.
+    # Slack's documented maximums for the confirmation dialog object.
     assert len(confirm["title"]["text"]) <= 100
+    assert len(confirm["text"]["text"]) <= 300
     assert len(confirm["confirm"]["text"]) <= 30
+    assert len(confirm["deny"]["text"]) <= 30
 
 
 @pytest.mark.usefixtures("promote_api")
