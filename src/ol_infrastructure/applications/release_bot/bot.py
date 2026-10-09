@@ -57,6 +57,17 @@ def _app_lock(app_name: str) -> asyncio.Lock:
     return _app_locks.setdefault(app_name, asyncio.Lock())
 
 
+# When this process started, for `/doof uptime`. Module import is process
+# start for all practical purposes: bot.py is the container's entrypoint.
+_started_at = datetime.now(tz=UTC)
+
+# poller name -> (when its last iteration finished, whether every step in it
+# succeeded). Written by the background loops and read by `/doof uptime`.
+# A loop wedged inside an await stops updating its entry, which is exactly
+# the silent failure this exists to make visible.
+_poll_heartbeats: dict[str, tuple[datetime, bool]] = {}
+
+
 _USAGE = (
     "Usage:\n"
     "• `/doof release <app>` — cut a release\n"
@@ -71,6 +82,9 @@ _USAGE = (
     "• `/doof publish <library> [package]` — publish a library to PyPI or npm "
     "(no argument lists them)\n"
     "• `/doof abandon <app>` — abandon an in-progress release\n"
+    "• `/doof version [app]` — show what RC and Production are running\n"
+    "• `/doof uptime` — check the bot is alive and its pollers are running\n"
+    "• `/doof help` — show this message\n"
 )
 
 
@@ -934,6 +948,117 @@ async def _hotfix(respond, app_name, cfg, ref, context):
     )
 
 
+async def _cmd_help(_repos, ack, respond, _command, _context):
+    await ack()
+    await respond(_USAGE)
+
+
+def _format_elapsed(elapsed: timedelta) -> str:
+    """Render a duration as its two largest units, e.g. `3d 4h` or `5m 2s`."""
+    seconds = max(int(elapsed.total_seconds()), 0)
+    days, seconds = divmod(seconds, 86400)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, seconds = divmod(seconds, 60)
+    parts = [
+        f"{value}{unit}"
+        for value, unit in ((days, "d"), (hours, "h"), (minutes, "m"), (seconds, "s"))
+        if value
+    ]
+    return " ".join(parts[:2]) or "0s"
+
+
+# A poller is reported as overdue once its last iteration is this many poll
+# intervals old: one late cycle is a slow GitHub, three is a wedged loop.
+_POLL_OVERDUE_INTERVALS = 3
+
+
+async def _cmd_uptime(_repos, ack, respond, _command, _context):
+    """Report that the bot is up, since when, and whether its pollers run.
+
+    Doof's `uptime` mattered because Doof fell over; this bot's failure is
+    quieter. A dropped Socket Mode connection makes slash commands time out
+    with no error anywhere -- an answer here at least proves the connection
+    is up -- and a wedged background loop stops announcements without a
+    trace, which the per-poller heartbeat surfaces.
+    """
+    await ack()
+    now = datetime.now(tz=UTC)
+    pod = os.environ.get("HOSTNAME", "unknown pod")
+    lines = [
+        f"🟢 Up {_format_elapsed(now - _started_at)} "
+        f"(since {_started_at:%Y-%m-%d %H:%M} UTC) on `{pod}`."
+    ]
+    for name, interval in _POLLERS.items():
+        heartbeat = _poll_heartbeats.get(name)
+        if heartbeat is None:
+            lines.append(f"• {name} poller: has not finished a pass yet")
+            continue
+        finished_at, ok = heartbeat
+        age = now - finished_at
+        status = f"• {name} poller: last pass {_format_elapsed(age)} ago"
+        every = timedelta(seconds=interval)
+        if age > every * _POLL_OVERDUE_INTERVALS:
+            status += f" ⚠️ overdue (runs every {_format_elapsed(every)})"
+        if not ok:
+            status += " — it failed; see the bot's logs"
+        lines.append(status)
+    await respond("\n".join(lines))
+
+
+async def _deployment_line(cfg, environment: str) -> str:
+    """Describe the newest successful *environment* deployment of *cfg*'s app."""
+    try:
+        deployment = await github.latest_successful_deployment(cfg.repo, environment)
+    except Exception:
+        log.exception("Failed to read %s deployments for %s", environment, cfg.repo)
+        return f"• {environment}: ⚠️ could not read its deployments"
+    if deployment is None:
+        return f"• {environment}: no successful deployment recorded"
+    version = deployment["version"]
+    if deployment["url"]:
+        # The github-deployments resource points this at the Concourse build.
+        version = f"<{deployment['url']}|{version}>"
+    sha = deployment["sha"]
+    commit = f"<https://github.com/{cfg.repo}/commit/{sha}|{sha[:7]}>"
+    age = _format_elapsed(datetime.now(tz=UTC) - deployment["deployed_at"])
+    return f"• {environment}: {version} · {commit} · deployed {age} ago"
+
+
+async def _cmd_version(repos, ack, respond, command, _context):
+    """Report the release version and commit RC and Production are running.
+
+    Replaces Doof's `version` (what production runs) and `hash <rc|prod>`
+    (the commit a server runs) with one answer read from the GitHub
+    Deployments the pipeline records. Doof's `hash ci` has no equivalent: CI
+    records no Deployment, and it redeploys every commit on the default
+    branch, so the answer is the branch head.
+    """
+    await ack()
+    app_filter = command["text"].strip()
+    if app_filter:
+        cfg, error = _resolve_app(repos, app_filter)
+        if cfg is None:
+            await respond(error)
+            return
+        targets = {app_filter: cfg}
+    else:
+        targets = config.release_workflow_apps(repos)
+    if not targets:
+        await respond(
+            "No apps are on the release-resource workflow yet, so none has "
+            "recorded deployments to report."
+        )
+        return
+    environments = (github.PRODUCTION_ENVIRONMENT, github.RC_ENVIRONMENT)
+    lines = []
+    for name, cfg in targets.items():
+        lines.append(f"*{name}*")
+        lines += await asyncio.gather(
+            *(_deployment_line(cfg, environment) for environment in environments)
+        )
+    await respond("\n".join(lines))
+
+
 _SUBCOMMANDS = {
     "release": _cmd_release,
     "hotfix": _cmd_hotfix,
@@ -944,6 +1069,9 @@ _SUBCOMMANDS = {
     "promote": _cmd_promote,
     "publish": _cmd_publish,
     "abandon": _cmd_abandon,
+    "version": _cmd_version,
+    "uptime": _cmd_uptime,
+    "help": _cmd_help,
 }
 
 
@@ -1107,6 +1235,7 @@ async def _poll_ready_to_promote_loop(app, repos) -> None:
     # deploy/restart), and sleeping first would delay that notification by up
     # to _READY_TO_PROMOTE_POLL_SECONDS for no reason.
     while True:
+        ok = True
         try:
             await _notify_ready_to_promote(app, repos)
         except Exception:
@@ -1114,6 +1243,8 @@ async def _poll_ready_to_promote_loop(app, repos) -> None:
             # background task permanently and silently -- the feature stops
             # working with no log until someone notices and restarts the pod.
             log.exception("ready-to-promote poll iteration failed")
+            ok = False
+        _poll_heartbeats["ready-to-promote"] = (datetime.now(tz=UTC), ok)
         await asyncio.sleep(_READY_TO_PROMOTE_POLL_SECONDS)
 
 
@@ -1332,6 +1463,7 @@ async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> None:
 async def _poll_release_progress_loop(app, repos) -> None:
     state = ReleaseProgressState()
     while True:
+        ok = True
         for step, name in (
             (_announce_deployments, "deployment milestone"),
             (_nag_stuck_releases, "stuck release"),
@@ -1343,7 +1475,16 @@ async def _poll_release_progress_loop(app, repos) -> None:
                 # exception here must not kill the task permanently and
                 # silently the way an unguarded loop body would.
                 log.exception("%s poll iteration failed", name)
+                ok = False
+        _poll_heartbeats["release-progress"] = (datetime.now(tz=UTC), ok)
         await asyncio.sleep(_RELEASE_PROGRESS_POLL_SECONDS)
+
+
+# poller name -> poll interval in seconds, for `/doof uptime`.
+_POLLERS = {
+    "ready-to-promote": _READY_TO_PROMOTE_POLL_SECONDS,
+    "release-progress": _RELEASE_PROGRESS_POLL_SECONDS,
+}
 
 
 async def _report_unreachable_channels(app, repos) -> None:
