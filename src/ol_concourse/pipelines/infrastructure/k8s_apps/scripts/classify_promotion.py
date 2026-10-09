@@ -20,14 +20,16 @@ when the state is ``unknown``: guessing would either open an issue for a
 release that is already live or hide one that is not. ``none`` (Production has
 never had a successful deployment) is a first release.
 
-A new release is only approvable while its ``releases/<version>`` branch is
-still there, and this writes that branch name to ``release_branch`` for the
-issue put's ``skip_if_branch_missing``. Until a newer release is built, the
-latest cut version is still one that may have been abandoned, so an
-infrastructure merge that re-runs QA would otherwise open an issue for it, and
-closing that issue would deploy a release whose branch and tag are gone.
-``release_branch`` is empty for an infrastructure-only issue, which names the
-live version: that release finished, so its branch is gone by design.
+A new release is only approvable while its version tag is still there, and
+this writes the tag to ``release_tag`` for the issue put's
+``skip_if_tag_missing``. Until a newer release is built, the latest cut version
+is still one that may have been abandoned, so an infrastructure merge that
+re-runs QA would otherwise open an issue for it, and closing that issue would
+deploy a release whose branch and tag are gone. The tag, not the
+``releases/<version>`` branch, because abandoning deletes both while finishing
+deletes only the branch: a finished release is new again once Production rolls
+back past it, and must still get its issue. ``release_tag`` is empty for an
+infrastructure-only issue, which needs no check.
 
 ``pipeline.py`` inlines this file's text into the task (``python3 -c``), so it
 must stay standard-library only and self-contained.
@@ -40,7 +42,7 @@ Environment:
     CHECKLIST_FILE: ``<release>/checklist.md`` from the release resource.
     PREVIEW_SUMMARY_FILE: the Production preview's markdown summary.
     NO_CHANGES_MARKER_FILE: written next to the summary when it found no changes.
-    OUTPUT_DIR: directory to write ``title``, ``release_branch``, ``body.md``
+    OUTPUT_DIR: directory to write ``title``, ``release_tag``, ``body.md``
         and maybe ``skip`` into.
 """
 
@@ -49,8 +51,6 @@ import sys
 from pathlib import Path
 
 NO_INFRA_CHANGES = "No infrastructure changes: Production already matches this code."
-#: The release resource cuts each release on a branch of this name.
-RELEASE_BRANCH = "releases/{version}"
 
 
 def is_new_release(version: str, production_version: str, state: str) -> bool:
@@ -137,9 +137,8 @@ def main() -> None:
     output.mkdir(parents=True, exist_ok=True)
     # load_var needs both files to read even when nothing is posted.
     (output / "title").write_text(title or f"Release {app} infrastructure @ {version}")
-    (output / "release_branch").write_text(
-        RELEASE_BRANCH.format(version=version) if new_release else ""
-    )
+    # The release resource tags each release with its bare version.
+    (output / "release_tag").write_text(version if new_release else "")
     if skip:
         (output / "skip").write_text("nothing to approve\n")
         print(f"{app}: new release no, infrastructure diff no. Nothing to approve.")  # noqa: T201

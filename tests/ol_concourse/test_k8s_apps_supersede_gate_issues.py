@@ -221,10 +221,10 @@ def test_kept_issue_refuses_a_put_that_posted_nothing(tmp_path):
 
 
 def test_kept_issue_refuses_an_empty_put_for_an_infrastructure_issue(tmp_path):
-    """An infrastructure-only put names no branch, so posting nothing is a fault."""
+    """An infrastructure-only put names no tag, so posting nothing is a fault."""
     promotion = tmp_path / "promotion"
     promotion.mkdir()
-    (promotion / "release_branch").write_text("")
+    (promotion / "release_tag").write_text("")
     issue_file = tmp_path / "gh_issue.json"
     issue_file.write_text(json.dumps({"issue_number": "0", "issue_title": ""}))
 
@@ -232,17 +232,17 @@ def test_kept_issue_refuses_an_empty_put_for_an_infrastructure_issue(tmp_path):
         supersede_gate_issues.kept_issue(promotion, issue_file)
 
 
-def test_kept_issue_defers_an_empty_put_for_a_release_to_the_branch(tmp_path):
-    """A release put that posted nothing may have found its branch gone."""
+def test_kept_issue_defers_an_empty_put_for_a_release_to_the_tag(tmp_path):
+    """A release put that posted nothing may have found its tag gone."""
     promotion = tmp_path / "promotion"
     promotion.mkdir()
-    (promotion / "release_branch").write_text("releases/2026.10.8.1\n")
+    (promotion / "release_tag").write_text("2026.10.8.1\n")
     issue_file = tmp_path / "gh_issue.json"
     issue_file.write_text(json.dumps({"issue_number": "0", "issue_title": ""}))
 
     with pytest.raises(supersede_gate_issues.ReleaseOverError) as raised:
         supersede_gate_issues.kept_issue(promotion, issue_file)
-    assert raised.value.branch == "releases/2026.10.8.1"
+    assert raised.value.tag == "2026.10.8.1"
 
 
 class _FakeGitHub(BaseHTTPRequestHandler):
@@ -260,8 +260,8 @@ class _FakeGitHub(BaseHTTPRequestHandler):
     strip_after_close: ClassVar[set[int]] = set()
     # Issue numbers whose labels another writer replaces after every write.
     strip_always: ClassVar[set[int]] = set()
-    # Branches in the repository; any other branch is a 404.
-    branches: ClassVar[set[str]] = set()
+    # Tags in the repository; any other tag is a 404.
+    tags: ClassVar[set[str]] = set()
 
     def log_message(self, *_args: Any) -> None:
         pass
@@ -327,12 +327,12 @@ class _FakeGitHub(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         self.calls.append(("GET", self.path, None))
         open_issues = [i for i in self.issues.values() if i["state"] == "open"]
-        if self.path.startswith(f"/repos/{REPO}/branches/"):
-            name = urllib.parse.unquote(self.path.split("/branches/", 1)[1])
-            if name in self.branches:
+        if self.path.startswith(f"/repos/{REPO}/git/ref/tags/"):
+            name = urllib.parse.unquote(self.path.split("/git/ref/tags/", 1)[1])
+            if name in self.tags:
                 self._reply({"name": name})
             else:
-                self._reply({"message": "Branch not found"}, status=404)
+                self._reply({"message": "Not Found"}, status=404)
         elif "state=closed" in self.path:
             query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
             self.closed_since.extend(query["since"])
@@ -357,7 +357,7 @@ def fake_github():
     _FakeGitHub.closed_since = []
     _FakeGitHub.strip_after_close = set()
     _FakeGitHub.strip_always = set()
-    _FakeGitHub.branches = set()
+    _FakeGitHub.tags = set()
     _FakeGitHub.issues = {
         83: _issue(83, f"Release {APP} 2026.9.30.1", state="open"),
         96: _issue(
@@ -405,13 +405,13 @@ def _run(  # noqa: PLR0913
     *,
     posted: int,
     skip: bool = False,
-    release_branch: str = "",
+    release_tag: str = "",
 ) -> subprocess.CompletedProcess[str]:
     tmp_path = Path(tempfile.mkdtemp(dir=tmp_path))
     promotion = tmp_path / "promotion"
     promotion.mkdir()
     (promotion / "title").write_text(f"Release {APP} 2026.10.8.1")
-    (promotion / "release_branch").write_text(release_branch)
+    (promotion / "release_tag").write_text(release_tag)
     if skip:
         (promotion / "skip").write_text("nothing to approve\n")
     issue_file = tmp_path / "gh_issue.json"
@@ -514,7 +514,7 @@ def test_script_refuses_before_calling_github(tmp_path, fake_github, private_key
     assert _FakeGitHub.calls == []
 
 
-def test_script_supersedes_everything_once_the_release_branch_is_gone(
+def test_script_supersedes_everything_once_the_release_tag_is_gone(
     tmp_path, fake_github, private_key
 ):
     """An empty put for an abandoned release keeps nothing open, and says why."""
@@ -523,11 +523,11 @@ def test_script_supersedes_everything_once_the_release_branch_is_gone(
         fake_github,
         private_key,
         posted=0,
-        release_branch="releases/2026.10.8.1",
+        release_tag="2026.10.8.1",
     )
 
     assert result.returncode == 0, result.stderr
-    assert ("GET", f"/repos/{REPO}/branches/releases/2026.10.8.1", None) in (
+    assert ("GET", f"/repos/{REPO}/git/ref/tags/2026.10.8.1", None) in (
         _FakeGitHub.calls
     )
     issues = _FakeGitHub.issues
@@ -537,20 +537,20 @@ def test_script_supersedes_everything_once_the_release_branch_is_gone(
         for method, path, body in _FakeGitHub.calls
         if method == "POST" and path.endswith("/comments")
     )
-    assert "releases/2026.10.8.1 is gone" in comment
+    assert "Release 2026.10.8.1 was abandoned" in comment
 
 
-def test_script_refuses_an_empty_put_while_the_release_branch_exists(
+def test_script_refuses_an_empty_put_while_the_release_tag_exists(
     tmp_path, fake_github, private_key
 ):
-    """If the branch is there, the put should have posted: change nothing."""
-    _FakeGitHub.branches = {"releases/2026.10.8.1"}
+    """If the tag is there, the put should have posted: change nothing."""
+    _FakeGitHub.tags = {"2026.10.8.1"}
     result = _run(
         tmp_path,
         fake_github,
         private_key,
         posted=0,
-        release_branch="releases/2026.10.8.1",
+        release_tag="2026.10.8.1",
     )
 
     assert result.returncode != 0
