@@ -84,6 +84,50 @@ def _describe_in_flight(in_flight: dict[str, Any]) -> str:
     return f"<{in_flight['url']}|{in_flight['version']}>{when}"
 
 
+def _slack_escape(text: str) -> str:
+    """Escape the three characters Slack mrkdwn treats as control syntax."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def _commit_line(repo_slug: str, commit: dict[str, Any]) -> str:
+    """Render one unreleased commit as a Slack bullet.
+
+    Shared by `/doof preview` and `/doof release-notes` so the two cannot
+    disagree about the same release. A commit from a PR links the PR by its
+    full URL (the RFC asked for links that resolve, not bare `#123`) under the
+    PR's title; any other commit links itself by short SHA.
+    """
+    number, title = github.pull_request(commit["message"])
+    if number is not None:
+        ref = f"<https://github.com/{repo_slug}/pull/{number}|#{number}>"
+    elif commit.get("url"):
+        ref = f"<{commit['url']}|{commit['sha'][:8]}>"
+    else:
+        ref = f"`{commit['sha'][:8]}`"
+    return f"• {ref} {_slack_escape(title)} — {_slack_escape(commit['author'])}"
+
+
+def _omitted_note(omitted: int | None) -> str | None:
+    """Say that a commit list was cut short, or return None if it was not."""
+    if omitted is None:
+        return (
+            "_Only the most recent commits are shown — there is no earlier "
+            "release to count from._"
+        )
+    if omitted:
+        return f"_…and {omitted} more commit(s) not shown._"
+    return None
+
+
+def _production_job_url(app_name: str, cfg) -> str:
+    # Matches the Production deploy job k8s_apps/pipeline.py's
+    # release-resource workflow generates for the `ol-application-<app>`
+    # Pulumi project (deploy-<project>-<stack>).
+    return concourse.job_url(
+        cfg.pipeline, f"deploy-ol-application-{app_name}-production"
+    )
+
+
 def _resolve_app(repos, app_name):
     """Return (cfg, None) for an app this bot can drive, else (None, error).
 
@@ -232,11 +276,15 @@ async def _cmd_preview(repos, ack, respond, command, _context):
         return
 
     commits = preview["commits"]
+    omitted = preview.get("omitted", 0)
     since = preview["since"] or "the start of history"
+    # A truncated list under-reports, so say "at least" rather than a count
+    # that reads as the whole release.
+    count = f"At least {len(commits)}" if omitted != 0 else str(len(commits))
     lines = [
         f"*Release preview for `{app_name}`* — next version would be "
         f"`{preview['version']}`",
-        f"_{len(commits)} commit(s) since {since}_",
+        f"_{count} commit(s) since {since}_",
     ]
     if preview["in_flight"]:
         lines.append(
@@ -244,12 +292,11 @@ async def _cmd_preview(repos, ack, respond, command, _context):
             "not finished. Cutting a new release supersedes it."
         )
     if commits:
-        lines += [
-            f"• `{c['sha'][:8]}` {c['message'].splitlines()[0]} — {c['author']}"
-            for c in commits
-        ]
+        lines += [_commit_line(cfg.repo, c) for c in commits]
     else:
         lines.append("_Nothing to release._")
+    if note := _omitted_note(omitted):
+        lines.append(note)
     lines.append("_Preview only — nothing was triggered._")
     await respond("\n".join(lines))
 
@@ -262,17 +309,20 @@ async def _cmd_release_notes(repos, ack, respond, command, _context):
         await respond(error)
         return
     try:
-        commits = await github.commits_since_last_tag(cfg.repo)
+        unreleased = await github.commits_since_last_tag(cfg.repo)
     except Exception:
         log.exception("Failed to fetch release notes for %s", app_name)
         await respond(f"❌ Failed to fetch release notes for `{app_name}`.")
         return
+    commits = unreleased["commits"]
     if not commits:
         await respond(
             f"*Release notes for `{app_name}`*\n_(no commits since last release)_"
         )
         return
-    lines = [f"• `{c['sha'][:8]}` {c['message'].splitlines()[0]}" for c in commits]
+    lines = [_commit_line(cfg.repo, c) for c in commits]
+    if note := _omitted_note(unreleased["omitted"]):
+        lines.append(note)
     await respond(f"*Release notes for `{app_name}`*\n" + "\n".join(lines))
 
 
@@ -355,16 +405,31 @@ async def _cmd_promote(repos, ack, respond, command, context):
         log.exception("Failed to promote %s", app_name)
         await respond(f"❌ Failed to promote `{app_name}`.")
         return
+    deploy = await _check_release_gate(app_name, cfg)
+    _release_requesters.pop(app_name, None)
+    await respond(f"✅ `{app_name}` {issues[0]['title']} promoted. {deploy}")
+
+
+async def _check_release_gate(app_name: str, cfg) -> str:
+    """Make Production notice a just-closed gate issue; describe the deploy.
+
+    The check only records the closed issue as a new gate version -- the
+    build it triggers is scheduled by Concourse afterwards and has no id yet
+    -- so the link is to the Production job, whose newest build is listed
+    first.
+    """
+    url = _production_job_url(app_name, cfg)
     try:
         # Don't make the deploy wait for the release-gate resource's normal
         # poll interval (default 60m) to notice the issue just closed.
         await concourse.check_resource(cfg.pipeline, f"{app_name}-release-gate")
     except Exception:
         log.exception("Failed to force release-gate check for %s", app_name)
-    _release_requesters.pop(app_name, None)
-    await respond(
-        f"✅ `{app_name}` {issues[0]['title']} promoted. Production deploy triggered."
-    )
+        return (
+            "⚠️ Could not make Concourse check the release gate now, so the "
+            f"Production deploy starts on its next poll: {url}"
+        )
+    return f"Production deploy triggered: {url}"
 
 
 def _known_libraries() -> str:
@@ -664,22 +729,16 @@ async def _promote_from_button(repos, body, say, client):
         log.exception("Failed to close issue for %s %s", app_name, version)
         await say(f"⚠️ Failed to promote `{app_name}` `{version}`.")
         return
-    try:
-        # Don't make the deploy wait for the release-gate resource's normal
-        # poll interval (default 60m) to notice the issue just closed.
-        await concourse.check_resource(cfg.pipeline, f"{app_name}-release-gate")
-    except Exception:
-        log.exception("Failed to force release-gate check for %s", app_name)
+    deploy = await _check_release_gate(app_name, cfg)
     _release_requesters.pop(app_name, None)
     await _update_promote_message(
         client,
         body,
-        f"🚀 <@{user_id}> promoted this to Production. Concourse deploy triggered.",
+        f"🚀 <@{user_id}> promoted this to Production. {deploy}",
     )
     # The edit above fires no notification; this channel post is what does.
     await say(
-        f"🚀 <@{user_id}> promoted `{app_name}` `{version}` to Production. "
-        "Concourse deploy triggered."
+        f"🚀 <@{user_id}> promoted `{app_name}` `{version}` to Production. {deploy}"
     )
 
 
@@ -1019,6 +1078,23 @@ def _ready_to_promote_blocks(
                     "style": "primary",
                     "action_id": "promote_production",
                     "value": f"{app_name}:{version}",
+                    # One stray click otherwise ships to Production. Doof's
+                    # "Finish the release" button asked first, too.
+                    "confirm": {
+                        "title": {
+                            "type": "plain_text",
+                            "text": "Promote to Production?",
+                        },
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": (
+                                f"This closes the release issue and deploys "
+                                f"`{app_name}` {version} to Production."
+                            ),
+                        },
+                        "confirm": {"type": "plain_text", "text": "Promote"},
+                        "deny": {"type": "plain_text", "text": "Cancel"},
+                    },
                 }
             ],
         },

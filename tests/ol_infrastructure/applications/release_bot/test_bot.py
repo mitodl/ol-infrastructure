@@ -2070,3 +2070,188 @@ async def test_a_broken_message_edit_does_not_stop_the_promotion(repos, promote_
         "my-app-pipeline", "my-app-release-gate"
     )
     assert "promoted `my-app`" in str(say.call_args.args[0])
+
+
+# ---------------------------------------------------------------------------
+# release notes, preview truncation, promote confirmation and deploy link
+# ---------------------------------------------------------------------------
+
+
+async def test_release_notes_link_prs_and_name_authors(repos, slack, monkeypatch):
+    """Notes link each PR by full URL and say who wrote it, like preview does."""
+    monkeypatch.setattr(
+        bot.github,
+        "commits_since_last_tag",
+        AsyncMock(
+            return_value={
+                "commits": [
+                    {
+                        "sha": "abc12345678",  # pragma: allowlist secret
+                        "message": "feat: consent decisions (#91)\n\nbody",
+                        "author": "Dana",
+                        "url": "https://github.com/mitodl/my-app/commit/abc1234",
+                    },
+                    {
+                        "sha": "def45678901",  # pragma: allowlist secret
+                        "message": "chore: direct push",
+                        "author": "Lee",
+                        "url": "https://github.com/mitodl/my-app/commit/def4567",
+                    },
+                ],
+                "omitted": 0,
+            }
+        ),
+    )
+
+    await bot._cmd_release_notes(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    said = slack.said
+    assert (
+        "• <https://github.com/mitodl/my-app/pull/91|#91> feat: consent decisions"
+        " — Dana"
+    ) in said
+    # The PR number is the link now, so the subject's own "(#91)" is dropped.
+    assert "(#91)" not in said
+    assert (
+        "• <https://github.com/mitodl/my-app/commit/def4567|def45678>"
+        " chore: direct push — Lee"
+    ) in said
+    assert "not shown" not in said
+
+
+async def test_release_notes_say_when_the_list_is_truncated(repos, slack, monkeypatch):
+    monkeypatch.setattr(
+        bot.github,
+        "commits_since_last_tag",
+        AsyncMock(
+            return_value={
+                "commits": [
+                    {"sha": "a" * 40, "message": "fix: a", "author": "Dana"},
+                ],
+                "omitted": 23,
+            }
+        ),
+    )
+
+    await bot._cmd_release_notes(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    assert "and 23 more commit(s) not shown" in slack.said
+
+
+async def test_release_notes_escape_slack_control_characters(repos, slack, monkeypatch):
+    """A `<` in a subject must not open a Slack link or mention."""
+    monkeypatch.setattr(
+        bot.github,
+        "commits_since_last_tag",
+        AsyncMock(
+            return_value={
+                "commits": [
+                    {
+                        "sha": "a" * 40,
+                        "message": "fix: pin foo <2 & bar>1 (#7)",
+                        "author": "Dana",
+                    },
+                ],
+                "omitted": 0,
+            }
+        ),
+    )
+
+    await bot._cmd_release_notes(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    assert "fix: pin foo &lt;2 &amp; bar&gt;1 — Dana" in slack.said
+
+
+async def test_preview_does_not_present_a_truncated_list_as_the_whole_release(
+    repos, slack, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.github,
+        "release_preview",
+        AsyncMock(
+            return_value={
+                "version": "2026.8.12.1",
+                "since": None,
+                "commits": [{"sha": "a" * 40, "message": "fix: a", "author": "Dana"}],
+                "omitted": None,
+                "in_flight": None,
+            }
+        ),
+    )
+
+    await bot._cmd_preview(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    said = slack.said
+    assert "At least 1 commit(s) since the start of history" in said
+    assert "Only the most recent commits are shown" in said
+
+
+def test_promote_button_asks_for_confirmation():
+    """One stray click must not ship to Production."""
+    blocks = bot._ready_to_promote_blocks("my-app", "2026.9.5.1", "http://issue/1")
+    button = blocks[1]["elements"][0]
+    confirm = button["confirm"]
+    assert "`my-app` 2026.9.5.1" in confirm["text"]["text"]
+    assert confirm["confirm"]["text"] == "Promote"
+    assert confirm["deny"]["text"] == "Cancel"
+    # Slack rejects the whole message over these limits.
+    assert len(confirm["title"]["text"]) <= 100
+    assert len(confirm["confirm"]["text"]) <= 30
+
+
+@pytest.mark.usefixtures("promote_api")
+async def test_promote_button_links_the_production_deploy_job(repos):
+    client = AsyncMock()
+    say = AsyncMock()
+
+    await bot._handle_promote_button(repos, AsyncMock(), _promote_body(), say, client)
+
+    job = (
+        f"{bot.concourse.CONCOURSE_URL}/teams/{bot.concourse.CONCOURSE_TEAM}"
+        "/pipelines/my-app-pipeline/jobs/deploy-ol-application-my-app-production"
+    )
+    assert f"Production deploy triggered: {job}" in str(say.call_args.args[0])
+    assert job in client.chat_update.call_args.kwargs["text"]
+
+
+async def test_promote_command_links_the_production_deploy_job(
+    repos, slack, promote_api
+):
+    promote_api.open_release_issues.return_value = [
+        {"number": 7, "title": "Release my-app 2026.9.5.1", "body": ""}
+    ]
+
+    await bot._cmd_promote(
+        repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "U1"}
+    )
+
+    assert (
+        "Production deploy triggered: "
+        f"{bot.concourse.CONCOURSE_URL}/teams/{bot.concourse.CONCOURSE_TEAM}"
+        "/pipelines/my-app-pipeline/jobs/deploy-ol-application-my-app-production"
+    ) in slack.said
+
+
+async def test_promote_does_not_claim_a_deploy_started_when_the_gate_check_failed(
+    repos, slack, promote_api
+):
+    """The issue is closed either way; only the timing of the deploy changes."""
+    promote_api.open_release_issues.return_value = [
+        {"number": 7, "title": "Release my-app 2026.9.5.1", "body": ""}
+    ]
+    promote_api.check_resource.side_effect = RuntimeError("Concourse is down")
+
+    await bot._cmd_promote(
+        repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "U1"}
+    )
+
+    said = slack.said
+    assert "promoted" in said
+    assert "triggered" not in said
+    assert "starts on its next poll" in said
