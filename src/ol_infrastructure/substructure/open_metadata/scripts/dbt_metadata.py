@@ -171,7 +171,12 @@ with tempfile.TemporaryDirectory() as tmpdir:
                         else None,
                     },
                     "dbtUpdateDescriptions": True,
-                    "dbtUpdateOwners": False,
+                    # A table with no owner takes the one its dbt node declares
+                    # (meta.openmetadata.owner) whatever this is set to.  True
+                    # also replaces an existing owner on a model's table, so
+                    # one set in the UI lasts until the next run.  A source's
+                    # table is never overwritten.
+                    "dbtUpdateOwners": True,
                     "includeTags": True,
                     # Restrict to production dbt layer schemas to avoid attempting
                     # to resolve dev-namespace model names that don't exist in OM.

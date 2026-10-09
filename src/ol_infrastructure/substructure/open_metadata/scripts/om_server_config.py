@@ -52,6 +52,7 @@ _PATCH_HEADER = {**_AUTH_HEADER, "Content-Type": "application/json-patch+json"}
 #   autoClassificationPriority int    Tie-breaking priority when multiple tags
 #                                     could apply to the same column (higher
 #                                     wins).  Default in OM is 50.
+#   description                str    The tag's description, as Markdown.
 TAG_CONFIG: dict[str, dict[str, Any]] = {
     # ── PII classification ────────────────────────────────────────────────
     # Ships with 45 content + column-name recognizers (email, SSN, credit
@@ -77,12 +78,29 @@ TAG_CONFIG: dict[str, dict[str, Any]] = {
         "autoClassificationEnabled": False,
         "autoClassificationPriority": 60,  # higher than Personal when active
     },
+    # ── Tier classification ──────────────────────────────────────────────
+    # Tier is criticality only.  The tiers themselves are assigned from dbt
+    # meta (ol-data-platform src/ol_dbt/dbt_project.yml) by the om-ingest-dbt
+    # job; these descriptions replace the generic ones OpenMetadata ships so
+    # the UI says what each tier means here.
+    "Tier.Tier1": {
+        "description": (
+            "Assets with a data contract. Assigned per asset by the data platform team."
+        ),
+    },
+    "Tier.Tier2": {
+        "description": "Dimensional, mart and reporting models without a contract.",
+    },
+    "Tier.Tier3": {"description": "Intermediate models."},
+    "Tier.Tier4": {"description": "Staging and external models."},
+    "Tier.Tier5": {"description": "Raw and migration tables."},
 }
 
 # Fields from TAG_CONFIG that map directly to a JSON Patch /path.
 _PATCHABLE_FIELDS: list[str] = [
     "autoClassificationEnabled",
     "autoClassificationPriority",
+    "description",
 ]
 
 
