@@ -91,6 +91,78 @@ CONTRACT_UTILIZATION = [
     },
 ]
 
+# Ten more runs on contract "1", so the learner grid has a realistic number of
+# module columns to scroll through. Titles and ids are plausible but invented.
+# Their funnel and engagement rows are generated below rather than hand-written,
+# since `_reconcile_course_counts` overwrites the learner-derived figures anyway.
+_EXTRA_COURSERUNS = [
+    (
+        106,
+        "6.00.1x",
+        "2026_Spring",
+        "Introduction to Computer Science and Programming Using Python",
+        "2026-01-12",
+        "2026-04-24",
+    ),
+    (
+        107,
+        "6.006x",
+        "2026_Spring",
+        "Introduction to Algorithms",
+        "2026-01-12",
+        "2026-05-08",
+    ),
+    (108, "18.06x", "2026_Spring", "Linear Algebra", "2026-01-26", "2026-05-22"),
+    (
+        109,
+        "6.S191x",
+        "2026_Spring",
+        "Deep Learning Fundamentals",
+        "2026-02-09",
+        "2026-05-29",
+    ),
+    (
+        110,
+        "6.864x",
+        "2026_Spring",
+        "Natural Language Processing",
+        "2026-02-09",
+        "2026-06-05",
+    ),
+    (111, "6.819x", "2026_Summer", "Computer Vision", "2026-05-18", "2026-08-28"),
+    (
+        112,
+        "6.S978x",
+        "2026_Summer",
+        "Data Ethics and Responsible AI",
+        "2026-05-18",
+        "2026-08-07",
+    ),
+    (113, "15.093x", "2026_Summer", "Optimization Methods", "2026-06-01", "2026-09-04"),
+    (
+        114,
+        "14.320x",
+        "2026_Summer",
+        "Causal Inference and Experimentation",
+        "2026-06-08",
+        "2026-09-11",
+    ),
+    (
+        115,
+        "15.S08x",
+        "2026_Summer",
+        "AI Strategy for Leaders",
+        "2026-06-15",
+        "2026-09-18",
+    ),
+]
+
+
+def _extra_run_id(number, term):
+    """Return the readable id for one of `_EXTRA_COURSERUNS`."""
+    return f"course-v1:MITx+{number}+{term}"
+
+
 ENROLLMENT_FUNNEL = [
     {
         "organization_key": ORG_KEY,
@@ -195,6 +267,27 @@ ENROLLMENT_FUNNEL = [
         "completion_rate_pct": 0.0,
     },
 ]
+
+ENROLLMENT_FUNNEL.extend(
+    {
+        "organization_key": ORG_KEY,
+        "organization_name": ORG_NAME,
+        "contract_pk": "1",
+        "contract_id": "1",
+        "b2b_contract_name": "FY26 Site License — Data Science Track",
+        "courserun_pk": pk,
+        "courserun_readable_id": _extra_run_id(number, term),
+        "courserun_title": title,
+        # Overwritten by `_reconcile_course_counts`; placeholders only.
+        "enrolled_learners": 0,
+        "active_learners": 0,
+        "passing_learners": 0,
+        "certified_learners": 0,
+        "active_rate_pct": 0.0,
+        "completion_rate_pct": 0.0,
+    }
+    for (pk, number, term, title, _start, _end) in _EXTRA_COURSERUNS
+)
 
 ENGAGEMENT_TREND = [
     {
@@ -361,6 +454,29 @@ CONTENT_ENGAGEMENT = [
     },
 ]
 
+CONTENT_ENGAGEMENT.extend(
+    {
+        "organization_key": ORG_KEY,
+        "organization_name": ORG_NAME,
+        "courserun_readable_id": _extra_run_id(number, term),
+        "courserun_title": title,
+        # Recomputed by `_reconcile_course_counts`; the engagement figures have
+        # no LEARNER_PROGRESS equivalent, so they are varied by position.
+        "total_enrolled_learners": 0,
+        "engaged_learners": 40 + (i * 7) % 35,
+        "engagement_rate_pct": round(60 + (i * 5) % 25, 1),
+        "total_videos_watched": 1500 + i * 230,
+        "avg_videos_per_engaged_learner": round(35 + (i * 3) % 20, 1),
+        "total_problems_attempted": 3000 + i * 410,
+        "avg_problems_per_engaged_learner": round(70 + (i * 11) % 50, 1),
+        "total_chatbot_interactions": 800 + i * 120,
+        "chatbot_users": 25 + (i * 4) % 25,
+        "chatbot_adoption_pct": round(62 + (i * 3) % 15, 1),
+        "certificates_earned": 0,
+    }
+    for i, (_pk, number, term, title, _start, _end) in enumerate(_EXTRA_COURSERUNS)
+)
+
 RESOURCES = {
     "contract-utilization": CONTRACT_UTILIZATION,
     "enrollment-funnel": ENROLLMENT_FUNNEL,
@@ -416,6 +532,15 @@ _CONTRACT_COURSERUNS: list[dict[str, str | None]] = [
         "courserun_start_on": "2026-06-01T00:00:00Z",
         "courserun_end_on": "2026-08-21T00:00:00Z",
     },
+    *[
+        {
+            "courserun_readable_id": _extra_run_id(number, term),
+            "courserun_title": title,
+            "courserun_start_on": f"{start}T00:00:00Z",
+            "courserun_end_on": f"{end}T00:00:00Z",
+        }
+        for (_pk, number, term, title, start, end) in _EXTRA_COURSERUNS
+    ],
     # Last in the track and not yet open, so nobody is enrolled: it appears in
     # the module filter (the contract covers it) while matching zero rows in
     # `learner-progress`. Selecting it SHOULD empty the table — that is the
@@ -562,6 +687,10 @@ def _needs_attention(status, last_active_on, shared):
     return datetime.date.fromisoformat(last_active_on) <= _NEEDS_ATTENTION_CUTOFF
 
 
+# One run in this many is skipped for each learner (see `_build_learner_progress`).
+_SKIP_EVERY = 4
+
+
 def _build_learner_progress():
     """Deterministic so the stub's fixture is stable across pod restarts.
 
@@ -579,6 +708,10 @@ def _build_learner_progress():
     for i, (full_name, email) in enumerate(named + _NAMELESS_LEARNERS):
         for run_index, run in enumerate(_ENROLLED_COURSERUNS):
             n = i * len(_ENROLLED_COURSERUNS) + run_index
+            # About a quarter of the runs are skipped per learner, so the grid
+            # has "not enrolled" cells and not just status variety.
+            if (i * 3 + run_index) % _SKIP_EVERY == _SKIP_EVERY - 1:
+                continue
             shared = n % 9 != 0
             status = _LEARNER_STATUSES[n % len(_LEARNER_STATUSES)]
             certified = status == "certified"
