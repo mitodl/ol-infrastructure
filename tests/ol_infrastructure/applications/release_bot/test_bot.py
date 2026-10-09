@@ -2007,8 +2007,8 @@ async def test_promote_button_resolves_a_message_stranded_by_a_restart(
     """An already-closed issue settles the stale button instead of erroring.
 
     This is the repair path for a bot that died after closing the issue and
-    before editing the message: the next click removes the button and says the
-    release is already promoted.
+    before editing the message: the next click removes the button and settles
+    the message instead of reporting a lookup failure.
     """
     promote_api.open_release_issues.return_value = []
     client = AsyncMock()
@@ -2019,7 +2019,7 @@ async def test_promote_button_resolves_a_message_stranded_by_a_restart(
 
     edit = client.chat_update.call_args.kwargs
     assert [b for b in edit["blocks"] if b.get("type") == "actions"] == []
-    assert "Already promoted" in edit["text"]
+    assert "No open release issue remains" in edit["text"]
     promote_api.close_release_issue.assert_not_awaited()
 
 

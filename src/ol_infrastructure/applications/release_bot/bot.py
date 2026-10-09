@@ -581,11 +581,15 @@ async def _update_promote_message(client, body, status: str) -> None:
     message = body.get("message") or {}
     if not (channel and message.get("ts")):
         return
-    blocks = [
-        block for block in message.get("blocks") or [] if block.get("type") != "actions"
-    ]
-    blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text": status}]})
     try:
+        blocks = [
+            block
+            for block in message.get("blocks") or []
+            if block.get("type") != "actions"
+        ]
+        blocks.append(
+            {"type": "context", "elements": [{"type": "mrkdwn", "text": status}]}
+        )
         await client.chat_update(
             channel=channel, ts=message["ts"], text=status, blocks=blocks
         )
@@ -637,7 +641,7 @@ async def _promote_from_button(repos, body, say, client):
         await _update_promote_message(
             client,
             body,
-            "✅ Already promoted — no open release issue for this version.",
+            "✅ No open release issue remains for this version — nothing to promote.",
         )
         await say(f"⚠️ Could not find open release issue for `{app_name}` `{version}`.")
         return
