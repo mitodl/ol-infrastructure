@@ -457,6 +457,9 @@ def create_lakehouse(
         metadata={"name": "lakehouse-catalogs", "namespace": NAMESPACE},
         spec={
             "backoffLimit": 6,
+            # The script's wait loops never exit by themselves, so backoffLimit
+            # cannot end a run where Gravitino or StarRocks never comes up.
+            "activeDeadlineSeconds": 600,
             "ttlSecondsAfterFinished": 600,
             "template": {
                 "metadata": {

@@ -682,6 +682,15 @@ SELECT * FROM ol_data_lake_local.scratch.t;
 
 Things that will trip you up:
 
+- **A Postgres cluster created before 2026-07-08 needs one grant first.** The
+  `lakehouse-databases` Job creates its databases as the `app` role, and `CREATEDB` is
+  only granted when the cluster is first initialized. If the Job fails with
+  `permission denied to create database`, run this once and re-run `local-infra-core`:
+
+  ```bash
+  kubectl -n local-infra exec local-pg-1 -- psql -U postgres -c 'ALTER ROLE app CREATEDB'
+  ```
+
 - **Write to the lake from a pod, not from your machine.** The catalog tells every
   client to use the in-cluster RustFS address, overriding whatever endpoint the client
   was given. pyiceberg or dlt running on the host creates the table and then fails the
