@@ -2077,10 +2077,13 @@ async def test_a_broken_message_edit_does_not_stop_the_promotion(repos, promote_
 # ---------------------------------------------------------------------------
 
 
-async def test_help_is_a_subcommand_not_only_a_parse_failure(repos, slack):
-    await bot._cmd_doof(repos, slack.ack, slack.respond, _command("help"), {})
+async def test_help_is_a_subcommand_not_only_a_parse_failure(mixed_repos, slack):
+    await bot._cmd_doof(mixed_repos, slack.ack, slack.respond, _command("help"), {})
 
     said = slack.said
+    # The apps too, so <app> is not guesswork -- and a legacy one is flagged.
+    assert "Apps: my-app" in said
+    assert "Still on the legacy pipeline, released by Doof: legacy-app" in said
     for subcommand in ("release", "version", "uptime", "help"):
         assert f"/doof {subcommand}" in said
     # Every subcommand the dispatcher accepts is listed in the usage text.
@@ -2158,7 +2161,11 @@ async def test_version_names_a_newer_deployment_that_did_not_succeed(
 
     said = slack.said
     assert "• RC: 2026.10.8.1 · " in said
-    assert "↳ newer: 2026.10.9.1 started 20m ago, not successful (failure)" in said
+    assert (
+        "↳ newer: 2026.10.9.1 · "
+        f"<https://github.com/mitodl/my-app/commit/{'c' * 40}|ccccccc> started 20m"
+        " ago, not successful (failure)"
+    ) in said
     # Even with no success in the scanned window, the attempt is reported.
     assert "• Production: no successful deployment recorded" in said
     assert "not successful (no status)" in said
@@ -2273,8 +2280,10 @@ async def test_uptime_reports_process_age_and_each_poller(repos, slack, monkeypa
 
 
 @pytest.mark.usefixtures("_clean_heartbeats")
-async def test_uptime_flags_a_wedged_poller(repos, slack):
+async def test_uptime_flags_a_wedged_poller(repos, slack, monkeypatch):
     """A loop stuck inside an await stops beating; say so."""
+    # Freshly started, so the poller that has not beaten yet is not overdue.
+    monkeypatch.setattr(bot, "_started_at", datetime.now(tz=UTC))
     stale = datetime.now(tz=UTC) - timedelta(
         seconds=bot._READY_TO_PROMOTE_POLL_SECONDS * bot._POLL_OVERDUE_INTERVALS + 60
     )

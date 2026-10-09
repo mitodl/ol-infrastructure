@@ -950,9 +950,18 @@ async def _hotfix(respond, app_name, cfg, ref, context):
     )
 
 
-async def _cmd_help(_repos, ack, respond, _command, _context):
+async def _cmd_help(repos, ack, respond, _command, _context):
     await ack()
-    await respond(_USAGE)
+    # Name the apps too: the usage alone leaves <app> to guesswork, and a
+    # guess at a legacy app is refused.
+    migrated = list(config.release_workflow_apps(repos))
+    legacy = [name for name, cfg in repos.items() if not cfg.release_workflow]
+    lines = [_USAGE, f"Apps: {', '.join(migrated) or 'none yet'}"]
+    if legacy:
+        lines.append(
+            f"Still on the legacy pipeline, released by Doof: {', '.join(legacy)}"
+        )
+    await respond("\n".join(lines))
 
 
 def _format_elapsed(elapsed: timedelta) -> str:
@@ -1033,8 +1042,10 @@ async def _deployment_line(cfg, environment: str) -> str:
     )
     if newer:
         age = _format_elapsed(datetime.now(tz=UTC) - newer["created_at"])
+        sha = newer["sha"]
+        commit = f"<https://github.com/{cfg.repo}/commit/{sha}|{sha[:7]}>"
         line += (
-            f"\n    ↳ newer: {newer['version']} started {age} ago, "
+            f"\n    ↳ newer: {newer['version']} · {commit} started {age} ago, "
             f"not successful ({newer['state']}), so it may be partly deployed"
         )
     return line

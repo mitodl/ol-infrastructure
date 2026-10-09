@@ -369,31 +369,6 @@ _DEPLOYMENT_SCAN_LIMIT = 10
 _RELEASE_ISSUE_SCAN_LIMIT = 30
 
 
-def _latest_successful_deployment_sync(
-    repo_slug: str, environment: str
-) -> dict[str, Any] | None:
-    repo = _get_client().get_repo(repo_slug)
-    deployments = itertools.islice(
-        repo.get_deployments(environment=environment), _DEPLOYMENT_SCAN_LIMIT
-    )
-    for deployment in deployments:
-        # get_statuses() is newest-first, and only the newest counts: a
-        # deployment that failed and was re-run to success carries both.
-        latest_status = next(iter(itertools.islice(deployment.get_statuses(), 1)), None)
-        if latest_status is not None and latest_status.state == "success":
-            return {
-                "id": deployment.id,
-                "version": deployment.ref,
-                "sha": deployment.sha,
-                "environment": deployment.environment,
-                "deployed_at": latest_status.created_at,
-                # The github-deployments resource points this at the Concourse
-                # build that finished the deployment, when it supplies one.
-                "url": latest_status.target_url or "",
-            }
-    return None
-
-
 def _deployment_report_sync(repo_slug: str, environment: str) -> dict[str, Any]:
     repo = _get_client().get_repo(repo_slug)
     deployments = itertools.islice(
@@ -402,6 +377,8 @@ def _deployment_report_sync(repo_slug: str, environment: str) -> dict[str, Any]:
     success = None
     newer = None
     for index, deployment in enumerate(deployments):
+        # get_statuses() is newest-first, and only the newest counts: a
+        # deployment that failed and was re-run to success carries both.
         latest_status = next(iter(itertools.islice(deployment.get_statuses(), 1)), None)
         if latest_status is not None and latest_status.state == "success":
             success = {
@@ -410,6 +387,8 @@ def _deployment_report_sync(repo_slug: str, environment: str) -> dict[str, Any]:
                 "sha": deployment.sha,
                 "environment": deployment.environment,
                 "deployed_at": latest_status.created_at,
+                # The github-deployments resource points this at the Concourse
+                # build that finished the deployment, when it supplies one.
                 "url": latest_status.target_url or "",
             }
             break
@@ -424,6 +403,12 @@ def _deployment_report_sync(repo_slug: str, environment: str) -> dict[str, Any]:
                 "state": latest_status.state if latest_status else "no status",
             }
     return {"success": success, "newer": newer}
+
+
+def _latest_successful_deployment_sync(
+    repo_slug: str, environment: str
+) -> dict[str, Any] | None:
+    return _deployment_report_sync(repo_slug, environment)["success"]
 
 
 async def deployment_report(repo_slug: str, environment: str) -> dict[str, Any]:
