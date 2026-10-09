@@ -66,6 +66,8 @@ _started_at = datetime.now(tz=UTC)
 # A loop wedged inside an await stops updating its entry, which is exactly
 # the silent failure this exists to make visible.
 _poll_heartbeats: dict[str, tuple[datetime, bool]] = {}
+_READY_TO_PROMOTE_POLLER = "ready-to-promote"
+_RELEASE_PROGRESS_POLLER = "release-progress"
 
 
 _USAGE = (
@@ -990,30 +992,55 @@ async def _cmd_uptime(_repos, ack, respond, _command, _context):
     ]
     for name, interval in _POLLERS.items():
         heartbeat = _poll_heartbeats.get(name)
+        every = timedelta(seconds=interval)
         if heartbeat is None:
-            lines.append(f"• {name} poller: has not finished a pass yet")
+            # A first pass wedged inside an await never beats at all, so
+            # measure from process start rather than reading as a fresh boot.
+            status = f"• {name} poller: has not finished a pass yet"
+            if now - _started_at > every * _POLL_OVERDUE_INTERVALS:
+                status += f" ⚠️ overdue (runs every {_format_elapsed(every)})"
+            lines.append(status)
             continue
         finished_at, ok = heartbeat
         age = now - finished_at
         status = f"• {name} poller: last pass {_format_elapsed(age)} ago"
-        every = timedelta(seconds=interval)
         if age > every * _POLL_OVERDUE_INTERVALS:
             status += f" ⚠️ overdue (runs every {_format_elapsed(every)})"
         if not ok:
-            status += " — it failed; see the bot's logs"
+            status += " — some of its calls failed; see the bot's logs"
         lines.append(status)
     await respond("\n".join(lines))
 
 
 async def _deployment_line(cfg, environment: str) -> str:
-    """Describe the newest successful *environment* deployment of *cfg*'s app."""
+    """Describe what *cfg*'s app runs in *environment*, and any newer attempt.
+
+    A Deployment is marked successful only when its whole QA or Production
+    job finishes, after the Pulumi deploy. A job that deployed and then failed
+    a later step leaves the environment running something newer than the last
+    success, so the newest attempt is named whenever it is not that success.
+    """
     try:
-        deployment = await github.latest_successful_deployment(cfg.repo, environment)
+        report = await github.deployment_report(cfg.repo, environment)
     except Exception:
         log.exception("Failed to read %s deployments for %s", environment, cfg.repo)
         return f"• {environment}: ⚠️ could not read its deployments"
-    if deployment is None:
-        return f"• {environment}: no successful deployment recorded"
+    deployment, newer = report["success"], report["newer"]
+    line = f"• {environment}: " + (
+        _describe_deployment(cfg, deployment)
+        if deployment
+        else "no successful deployment recorded"
+    )
+    if newer:
+        age = _format_elapsed(datetime.now(tz=UTC) - newer["created_at"])
+        line += (
+            f"\n    ↳ newer: {newer['version']} started {age} ago, "
+            f"not successful ({newer['state']}), so it may be partly deployed"
+        )
+    return line
+
+
+def _describe_deployment(cfg, deployment) -> str:
     version = deployment["version"]
     if deployment["url"]:
         # The github-deployments resource points this at the Concourse build.
@@ -1021,7 +1048,7 @@ async def _deployment_line(cfg, environment: str) -> str:
     sha = deployment["sha"]
     commit = f"<https://github.com/{cfg.repo}/commit/{sha}|{sha[:7]}>"
     age = _format_elapsed(datetime.now(tz=UTC) - deployment["deployed_at"])
-    return f"• {environment}: {version} · {commit} · deployed {age} ago"
+    return f"{version} · {commit} · deployed {age} ago"
 
 
 async def _cmd_version(repos, ack, respond, command, _context):
@@ -1050,11 +1077,24 @@ async def _cmd_version(repos, ack, respond, command, _context):
         )
         return
     environments = (github.PRODUCTION_ENVIRONMENT, github.RC_ENVIRONMENT)
+    found = await asyncio.gather(
+        *(
+            _deployment_line(cfg, environment)
+            for cfg in targets.values()
+            for environment in environments
+        )
+    )
     lines = []
-    for name, cfg in targets.items():
+    for index, name in enumerate(targets):
         lines.append(f"*{name}*")
-        lines += await asyncio.gather(
-            *(_deployment_line(cfg, environment) for environment in environments)
+        lines += found[index * len(environments) : (index + 1) * len(environments)]
+    legacy = [name for name, cfg in repos.items() if not cfg.release_workflow]
+    if legacy and not app_filter:
+        # Same reason as release-status: a silently short list reads as
+        # "these are all the apps".
+        lines.append(
+            f"_Not shown -- the legacy pipeline records no deployments: "
+            f"{', '.join(legacy)}._"
         )
     await respond("\n".join(lines))
 
@@ -1073,6 +1113,7 @@ _SUBCOMMANDS = {
     "uptime": _cmd_uptime,
     "help": _cmd_help,
 }
+_PRIVATE_SUBCOMMANDS = frozenset({"help", "uptime"})
 
 
 def _in_channel(respond):
@@ -1097,9 +1138,11 @@ async def _cmd_doof(repos, ack, respond, command, context):
         return
     subcommand, *rest = parts
     sub_command = dict(command, text=rest[0] if rest else "")
-    await _SUBCOMMANDS[subcommand](
-        repos, ack, _in_channel(respond), sub_command, context
-    )
+    # Release state is for the whole channel; asking how to use the bot, or
+    # whether it is alive, is not.
+    if subcommand not in _PRIVATE_SUBCOMMANDS:
+        respond = _in_channel(respond)
+    await _SUBCOMMANDS[subcommand](repos, ack, respond, sub_command, context)
 
 
 def create_app():
@@ -1153,12 +1196,19 @@ def _ready_to_promote_blocks(
     ]
 
 
-async def _notify_ready_to_promote(app, repos) -> None:
+async def _notify_ready_to_promote(app, repos) -> bool:
     """Notify Slack for any open release issue whose checklist is now fully checked.
 
     Marks each notified issue with `github.PROMOTE_READY_LABEL` so repeated
     polls don't re-send the same notification every cycle.
+
+    Returns whether every call in the pass succeeded, for the `/doof uptime`
+    heartbeat. Each failure is caught per app so one broken app cannot starve
+    the rest -- which also means a pass in which *every* call fails (a revoked
+    GitHub App key, GitHub down) raises nothing, and only this says so. The
+    two release-progress steps return the same.
     """
+    ok = True
     for app_name, cfg in repos.items():
         channel = _announce_channel(cfg)
         if not channel:
@@ -1166,6 +1216,7 @@ async def _notify_ready_to_promote(app, repos) -> None:
         try:
             issues = await github.open_release_issues(cfg.repo)
         except Exception:
+            ok = False
             log.exception("Failed to poll release issues for %s", app_name)
             continue
         for issue in issues:
@@ -1200,6 +1251,7 @@ async def _notify_ready_to_promote(app, repos) -> None:
                     ),
                 )
             except Exception:
+                ok = False
                 log.exception(
                     "Failed to send ready-to-promote notification for %s", app_name
                 )
@@ -1215,6 +1267,7 @@ async def _notify_ready_to_promote(app, repos) -> None:
                     cfg.repo, issue["number"], github.PROMOTE_READY_LABEL
                 )
             except Exception:
+                ok = False
                 # The notification already went out -- only the "don't repeat
                 # this" bookkeeping failed. Log distinctly from a notify
                 # failure so the two aren't conflated; worst case this issue
@@ -1227,6 +1280,7 @@ async def _notify_ready_to_promote(app, repos) -> None:
                     github.PROMOTE_READY_LABEL,
                     issue["number"],
                 )
+    return ok
 
 
 async def _poll_ready_to_promote_loop(app, repos) -> None:
@@ -1235,16 +1289,15 @@ async def _poll_ready_to_promote_loop(app, repos) -> None:
     # deploy/restart), and sleeping first would delay that notification by up
     # to _READY_TO_PROMOTE_POLL_SECONDS for no reason.
     while True:
-        ok = True
+        ok = False
         try:
-            await _notify_ready_to_promote(app, repos)
+            ok = await _notify_ready_to_promote(app, repos)
         except Exception:
             # Without this, any unexpected exception here kills the
             # background task permanently and silently -- the feature stops
             # working with no log until someone notices and restarts the pod.
             log.exception("ready-to-promote poll iteration failed")
-            ok = False
-        _poll_heartbeats["ready-to-promote"] = (datetime.now(tz=UTC), ok)
+        _poll_heartbeats[_READY_TO_PROMOTE_POLLER] = (datetime.now(tz=UTC), ok)
         await asyncio.sleep(_READY_TO_PROMOTE_POLL_SECONDS)
 
 
@@ -1322,7 +1375,7 @@ async def _milestone_text(app_name, cfg, environment, deployment) -> str:
     )
 
 
-async def _announce_deployments(app, repos, state: ReleaseProgressState) -> None:
+async def _announce_deployments(app, repos, state: ReleaseProgressState) -> bool:
     """Post to Slack when an app's RC or Production deployment changes.
 
     Reads GitHub Deployments rather than watching the cluster: the pipeline
@@ -1339,6 +1392,7 @@ async def _announce_deployments(app, repos, state: ReleaseProgressState) -> None
     two only collide if a team labels its workload with the same product
     channel; that is a per-workload choice, not something to arbitrate here.
     """
+    ok = True
     for app_name, cfg in repos.items():
         channel = _announce_channel(cfg)
         if not channel:
@@ -1349,6 +1403,7 @@ async def _announce_deployments(app, repos, state: ReleaseProgressState) -> None
                     cfg.repo, environment
                 )
             except Exception:
+                ok = False
                 log.exception(
                     "Failed to read %s deployments for %s", environment, app_name
                 )
@@ -1381,12 +1436,14 @@ async def _announce_deployments(app, repos, state: ReleaseProgressState) -> None
                     text=await _milestone_text(app_name, cfg, environment, deployment),
                 )
             except Exception:
+                ok = False
                 log.exception(
                     "Failed to announce the %s deployment of %s", environment, app_name
                 )
                 # Put the previous version back so the next poll retries this
                 # milestone instead of silently treating it as announced.
                 state.last_version[key] = previous
+    return ok
 
 
 async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta) -> str:
@@ -1415,8 +1472,9 @@ async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta) -> str:
     )
 
 
-async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> None:
+async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> bool:
     """Report releases that were cut and never shipped."""
+    ok = True
     threshold = _stuck_release_after()
     now = datetime.now(tz=UTC)
     for app_name, cfg in repos.items():
@@ -1426,6 +1484,7 @@ async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> None:
         try:
             in_flight = await github.in_flight_release(cfg.repo)
         except Exception:
+            ok = False
             log.exception("Failed to check for a stuck release for %s", app_name)
             continue
         if not in_flight or in_flight.get("cut_at") is None:
@@ -1440,6 +1499,7 @@ async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> None:
         try:
             text = await _stuck_release_text(app_name, cfg, in_flight, age)
         except Exception:
+            ok = False
             log.exception(
                 "Failed to describe the stuck release %s for %s",
                 in_flight["version"],
@@ -1451,6 +1511,7 @@ async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> None:
                 channel=await slack_channels.resolve(app.client, channel), text=text
             )
         except Exception:
+            ok = False
             log.exception(
                 "Failed to report the stuck release %s for %s",
                 in_flight["version"],
@@ -1458,6 +1519,7 @@ async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> None:
             )
             continue
         state.nagged_at[key] = now
+    return ok
 
 
 async def _poll_release_progress_loop(app, repos) -> None:
@@ -1469,21 +1531,21 @@ async def _poll_release_progress_loop(app, repos) -> None:
             (_nag_stuck_releases, "stuck release"),
         ):
             try:
-                await step(app, repos, state)
+                ok = await step(app, repos, state) and ok
             except Exception:
                 # Neither step may take the other down, and an unexpected
                 # exception here must not kill the task permanently and
                 # silently the way an unguarded loop body would.
                 log.exception("%s poll iteration failed", name)
                 ok = False
-        _poll_heartbeats["release-progress"] = (datetime.now(tz=UTC), ok)
+        _poll_heartbeats[_RELEASE_PROGRESS_POLLER] = (datetime.now(tz=UTC), ok)
         await asyncio.sleep(_RELEASE_PROGRESS_POLL_SECONDS)
 
 
 # poller name -> poll interval in seconds, for `/doof uptime`.
 _POLLERS = {
-    "ready-to-promote": _READY_TO_PROMOTE_POLL_SECONDS,
-    "release-progress": _RELEASE_PROGRESS_POLL_SECONDS,
+    _READY_TO_PROMOTE_POLLER: _READY_TO_PROMOTE_POLL_SECONDS,
+    _RELEASE_PROGRESS_POLLER: _RELEASE_PROGRESS_POLL_SECONDS,
 }
 
 

@@ -394,6 +394,49 @@ def _latest_successful_deployment_sync(
     return None
 
 
+def _deployment_report_sync(repo_slug: str, environment: str) -> dict[str, Any]:
+    repo = _get_client().get_repo(repo_slug)
+    deployments = itertools.islice(
+        repo.get_deployments(environment=environment), _DEPLOYMENT_SCAN_LIMIT
+    )
+    success = None
+    newer = None
+    for index, deployment in enumerate(deployments):
+        latest_status = next(iter(itertools.islice(deployment.get_statuses(), 1)), None)
+        if latest_status is not None and latest_status.state == "success":
+            success = {
+                "id": deployment.id,
+                "version": deployment.ref,
+                "sha": deployment.sha,
+                "environment": deployment.environment,
+                "deployed_at": latest_status.created_at,
+                "url": latest_status.target_url or "",
+            }
+            break
+        if index == 0:
+            # The newest attempt, when it is not itself the newest success:
+            # still running, or a job that failed after (or before) its
+            # Pulumi deploy changed anything.
+            newer = {
+                "version": deployment.ref,
+                "sha": deployment.sha,
+                "created_at": deployment.created_at,
+                "state": latest_status.state if latest_status else "no status",
+            }
+    return {"success": success, "newer": newer}
+
+
+async def deployment_report(repo_slug: str, environment: str) -> dict[str, Any]:
+    """Return the newest successful Deployment and any newer unsuccessful one.
+
+    ``{"success": <as latest_successful_deployment> | None, "newer": {version,
+    sha, created_at, state} | None}``. ``newer`` is set when the newest
+    Deployment in *environment* is not the successful one; the success is
+    searched for across the same ``_DEPLOYMENT_SCAN_LIMIT`` entries.
+    """
+    return await asyncio.to_thread(_deployment_report_sync, repo_slug, environment)
+
+
 async def latest_successful_deployment(
     repo_slug: str, environment: str
 ) -> dict[str, Any] | None:
