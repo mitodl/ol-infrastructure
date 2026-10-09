@@ -92,9 +92,9 @@ Grafana Cloud. Nothing has to be exposed to the internet.
 ```
 
 - Pros:
-  - The archive holds exactly what Cloud holds, under the same labels, so a query
-    written for one runs unchanged on the other. Switching the datasource on an
-    Explore tab or dashboard panel is all it takes to look further back.
+  - The archive receives the same shipper-processed streams and uses the same query
+    languages. Most queries can be reused by switching datasource, but Cloud-derived
+    data, independently sampled traces and translated OTLP metrics may differ.
   - Every query language and tool people already know (LogQL, PromQL, TraceQL) works
     on the archive.
   - It needs no inbound exposure, because PDC dials out from our side.
