@@ -336,8 +336,9 @@ writers), and compactor or retention failure. Neither ever pages.
 ### Negative Consequences
 
 - **We own three more stateful systems**, with chart upgrades, ring and compactor
-  failure modes, and S3 cost to watch. Ownership has to be explicit, with a named
-  maintainer and an upgrade cadence (quarterly at minimum), or the archive rots.
+  failure modes, and S3 cost to watch. Ownership has to be explicit: the
+  infrastructure team owns it, with a recurring upgrade task (quarterly at minimum)
+  on the team's board, or the archive rots.
 - **Collectors get heavier and more complex.** There are more writers per collector
   and a second tail sampler per cluster, and `grafana.py` is already heavily
   tuned. Every change to sampling policy or processing now
