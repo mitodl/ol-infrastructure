@@ -688,11 +688,14 @@ Things that will trip you up:
   data write with `Could not resolve host: rustfs.local-infra.svc.cluster.local`.
 - **pyiceberg needs HTTP Basic auth configured**: an `auth` property of type `basic`
   with any username and any non-empty password. The username becomes the Gravitino
-  principal and the password is not checked. With no auth configured the catalog
-  answers 401.
+  principal and the password is not checked. Gravitino accepts a request with no
+  `Authorization` header and refuses a Bearer one; pyiceberg 0.12.0 with no auth
+  configured got a 401.
 - **Changed catalog properties do not reach an existing catalog.** The
   `lakehouse-catalogs` Job only creates what is missing. Drop the catalog (in StarRocks,
-  in Gravitino, or both) and re-run `local-infra-core`.
+  in Gravitino, or both), delete the Job (`kubectl -n local-infra delete job
+  lakehouse-catalogs`; it also expires by itself after ten minutes) and re-run
+  `local-infra-core`.
 
 This matches the deployed lake in engine, engine version and catalog protocol, and
 differs from it in ways that can hide a problem:
@@ -707,7 +710,8 @@ differs from it in ways that can hide a problem:
 
 Removing `data-platform` from `enabled_apps` tears all of it down on the next
 reconcile. The `data-starrocks-0` and `data-rustfs-0` PVCs and the two Postgres
-databases are left behind, so re-enabling it picks the lake back up. To start clean:
+databases are left behind, so re-enabling it picks the lake back up. To start clean
+(leave `data-rustfs-0` alone if ocw-studio is enabled, it holds those buckets too):
 
 ```bash
 kubectl -n local-infra delete pvc data-starrocks-0 data-rustfs-0

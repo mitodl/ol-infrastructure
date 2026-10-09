@@ -392,11 +392,11 @@ local_resource(
 # data-platform has no entry in APPS: it is infrastructure the core stack
 # deploys, with nothing to build. StarRocks speaks the MySQL protocol, which
 # APISIX does not route, so a host-side dbt or mysql client reaches it through
-# this forward.
+# this forward. kubectl exits when the pod behind it goes away, hence the loop.
 if "data-platform" in enabled_apps:
     local_resource(
         "starrocks-port-forward",
-        serve_cmd="kubectl -n local-infra port-forward svc/starrocks 9030:9030",
+        serve_cmd="while true; do kubectl -n local-infra port-forward svc/starrocks 9030:9030; sleep 2; done",
         labels=["infra"],
         resource_deps=["local-infra-core"],
     )

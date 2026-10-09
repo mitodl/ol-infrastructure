@@ -22,6 +22,7 @@ applications/starrocks), not its security. Where local differs, and why:
   materialized views here never exercise that path.
 """
 
+import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -94,10 +95,10 @@ echo "==> applying {_SCHEMA_FILE}"
 psql -d {GRAVITINO_DATABASE} -1 -v ON_ERROR_STOP=1 -f "/schema/{_SCHEMA_FILE}"
 """  # noqa: E501, S608
 
-# Idempotent, and the Job that runs it expires, so every reconcile replays it.
-# That is what restores the StarRocks catalog if its volume is ever deleted.
-# IF NOT EXISTS and the 200 checks mean a changed property does not reach an
-# existing catalog: drop the catalog to pick one up.
+# Idempotent. The Job that runs it expires after ten minutes, so a reconcile
+# later than that replays it, which is what restores the StarRocks catalog if
+# its volume is ever deleted. IF NOT EXISTS and the 200 checks mean a changed
+# property does not reach an existing catalog: drop the catalog first.
 _CATALOG_SCRIPT = f"""#!/bin/sh
 set -eu
 
@@ -214,22 +215,24 @@ def create_lakehouse(
     StarRocks speaks the MySQL protocol at STARROCKS_HOST:9030 as `root` with
     no password.
     """
+    bootstrap_files = {
+        "databases.sh": _DATABASE_SCRIPT,
+        "catalogs.sh": _CATALOG_SCRIPT,
+        "metalake.json": json.dumps(
+            {"name": METALAKE, "comment": "Local-dev metalake", "properties": {}}
+        ),
+        "catalog.json": json.dumps(_gravitino_catalog()),
+        "catalog.sql": _starrocks_catalog_sql(),
+    }
+    # On the Jobs' pod templates, so an edit to any of these files replaces
+    # the Jobs and runs them again instead of only updating the ConfigMap.
+    bootstrap_checksum = hashlib.sha256(
+        json.dumps(bootstrap_files, sort_keys=True).encode()
+    ).hexdigest()
     scripts = k8s.core.v1.ConfigMap(
         "lakehouse-bootstrap",
         metadata={"name": "lakehouse-bootstrap", "namespace": NAMESPACE},
-        data={
-            "databases.sh": _DATABASE_SCRIPT,
-            "catalogs.sh": _CATALOG_SCRIPT,
-            "metalake.json": json.dumps(
-                {
-                    "name": METALAKE,
-                    "comment": "Local-dev metalake",
-                    "properties": {},
-                }
-            ),
-            "catalog.json": json.dumps(_gravitino_catalog()),
-            "catalog.sql": _starrocks_catalog_sql(),
-        },
+        data=bootstrap_files,
         opts=_k8s(parent=local_infra_ns),
     )
 
@@ -240,7 +243,10 @@ def create_lakehouse(
             "backoffLimit": 6,
             "ttlSecondsAfterFinished": 600,
             "template": {
-                "metadata": {"labels": {"app": "lakehouse-databases"}},
+                "metadata": {
+                    "labels": {"app": "lakehouse-databases"},
+                    "annotations": {"checksum/bootstrap": bootstrap_checksum},
+                },
                 "spec": {
                     "restartPolicy": "OnFailure",
                     "initContainers": [
@@ -453,7 +459,10 @@ def create_lakehouse(
             "backoffLimit": 6,
             "ttlSecondsAfterFinished": 600,
             "template": {
-                "metadata": {"labels": {"app": "lakehouse-catalogs"}},
+                "metadata": {
+                    "labels": {"app": "lakehouse-catalogs"},
+                    "annotations": {"checksum/bootstrap": bootstrap_checksum},
+                },
                 "spec": {
                     "restartPolicy": "OnFailure",
                     # The StarRocks image is the one image here with both curl

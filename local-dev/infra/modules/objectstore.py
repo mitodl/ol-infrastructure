@@ -10,8 +10,8 @@ S3 surface ocw-studio exercises (canned public-read ACLs on upload, bucket
 policies, versioning, presigned URLs, anonymous path-style GETs) was verified
 against rustfs 1.0.0-rc.6 before this module was written, and again on 1.0.0.
 
-One deliberate difference from the compose setup it replaces: the buckets are
-made world-readable with a bucket policy, not `mc anonymous set public`.
+One deliberate difference from the compose setup it replaces: ocw-studio's
+buckets are made world-readable with a bucket policy, not `mc anonymous set public`.
 RustFS does not implement S3 ACLs at all — it accepts the canned ACL header
 boto3 sends and ignores it — so a policy is the only grant that actually takes
 effect. The draft/live/test site routes read from the object store with no
@@ -34,8 +34,8 @@ RUSTFS_IMAGE = f"rustfs/rustfs:{RUSTFS_VERSION}"
 ACCESS_KEY = "localdevaccess"
 SECRET_KEY = "localdevsecret123"  # noqa: S105  # pragma: allowlist secret
 
-# Buckets created at bootstrap, mirroring ocw-studio's .env.example names so a
-# developer's existing local settings keep working. Every one is granted
+# ocw-studio's buckets, mirroring its .env.example names so a developer's
+# existing local settings keep working. Every one is granted
 # anonymous read; ocw-studio's published output is public content.
 OCW_STUDIO_BUCKETS = (
     "ol-ocw-studio-app-local",
