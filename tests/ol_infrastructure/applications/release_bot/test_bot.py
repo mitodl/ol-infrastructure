@@ -1336,16 +1336,17 @@ async def test_promote_button_refuses_a_legacy_app(mixed_repos, monkeypatch):
     monkeypatch.setattr(bot.github, "open_release_issues", AsyncMock(return_value=[]))
     monkeypatch.setattr(bot.github, "close_release_issue", close)
     say = AsyncMock()
+    client = AsyncMock()
 
     await bot._handle_promote_button(
-        mixed_repos,
-        AsyncMock(),
-        {"actions": [{"value": "legacy-app:2026.9.5.1"}], "user": {"id": "U1"}},
-        say,
+        mixed_repos, AsyncMock(), _promote_body("legacy-app"), say, client
     )
 
     close.assert_not_awaited()
     assert "legacy" in str(say.call_args.args[0])
+    # The payload carries channel/ts/blocks, so this would catch an edit
+    # added to the legacy path -- the message must stay untouched.
+    client.chat_update.assert_not_awaited()
 
 
 async def test_wait_for_checkboxes_refuses_a_legacy_app(
@@ -1912,3 +1913,160 @@ async def test_concurrent_hotfixes_for_one_app_cannot_both_be_requested(
 
     assert pending == ["a" * 40]
     assert "`aaaaaaa` is already pending" in slack.said
+
+
+# ---------------------------------------------------------------------------
+# the promote button's own message
+# ---------------------------------------------------------------------------
+
+
+_PROMOTE_TS = "1700000000.000100"
+
+
+@pytest.fixture(autouse=True)
+def _clear_promoting():
+    """Reset the claim set; one leaking between tests makes the next click a no-op."""
+    bot._promoting.clear()
+    yield
+    bot._promoting.clear()
+
+
+def _promote_body(app_name="my-app", version="2026.9.5.1", user="U1"):
+    """Build a block_actions payload shaped like the one Slack sends for the button."""
+    return {
+        "actions": [{"value": f"{app_name}:{version}"}],
+        "user": {"id": user},
+        "channel": {"id": "C123"},
+        "message": {
+            "ts": _PROMOTE_TS,
+            "blocks": bot._ready_to_promote_blocks(app_name, version, "http://issue/1"),
+        },
+    }
+
+
+@pytest.fixture
+def promote_api(monkeypatch):
+    """Stub the GitHub and Concourse calls behind a successful promotion."""
+    api = MagicMock()
+    api.open_release_issues = AsyncMock(
+        return_value=[
+            {"number": 7, "body": "## Release 2026.9.5.1", "url": "http://issue/1"}
+        ]
+    )
+    api.close_release_issue = AsyncMock()
+    api.check_resource = AsyncMock()
+    monkeypatch.setattr(bot.github, "open_release_issues", api.open_release_issues)
+    monkeypatch.setattr(bot.github, "close_release_issue", api.close_release_issue)
+    monkeypatch.setattr(bot.concourse, "check_resource", api.check_resource)
+    return api
+
+
+@pytest.mark.usefixtures("promote_api")
+async def test_promote_button_is_removed_once_the_promotion_lands(repos):
+    """The clicked message loses its button so it cannot be clicked again."""
+    client = AsyncMock()
+    say = AsyncMock()
+
+    await bot._handle_promote_button(repos, AsyncMock(), _promote_body(), say, client)
+
+    edit = client.chat_update.call_args.kwargs
+    assert edit["channel"] == "C123"
+    assert edit["ts"] == _PROMOTE_TS
+    # Everything but the button survives (the release summary and issue
+    # link), with the status appended -- not merely "no actions block",
+    # which an empty blocks list would also satisfy.
+    kept = [
+        b for b in _promote_body()["message"]["blocks"] if b.get("type") != "actions"
+    ]
+    assert edit["blocks"][:-1] == kept
+    assert edit["blocks"][-1]["type"] == "context"
+    assert "<@U1> promoted this to Production" in edit["text"]
+    # The edit is silent, so the channel post is what actually notifies.
+    assert "promoted `my-app`" in str(say.call_args.args[0])
+
+
+async def test_promote_button_is_left_alone_when_the_promotion_fails(
+    repos, promote_api
+):
+    """A retryable failure keeps the message -- and its button -- intact.
+
+    A crash mid-callback freezes this message forever (nothing stores its ts),
+    so the button may only disappear on a terminal outcome; anything else must
+    leave it clickable for the retry. The claim is released for the same
+    reason.
+    """
+    promote_api.close_release_issue.side_effect = RuntimeError("GitHub is down")
+    client = AsyncMock()
+    say = AsyncMock()
+
+    await bot._handle_promote_button(repos, AsyncMock(), _promote_body(), say, client)
+
+    client.chat_update.assert_not_awaited()
+    assert "Failed to promote" in str(say.call_args.args[0])
+    assert bot._promoting == set()
+
+
+async def test_promote_button_resolves_a_message_stranded_by_a_restart(
+    repos, promote_api
+):
+    """An already-closed issue settles the stale button instead of erroring.
+
+    This is the repair path for a bot that died after closing the issue and
+    before editing the message: the next click removes the button and settles
+    the message instead of reporting a lookup failure.
+    """
+    promote_api.open_release_issues.return_value = []
+    client = AsyncMock()
+    say = AsyncMock()
+
+    await bot._handle_promote_button(repos, AsyncMock(), _promote_body(), say, client)
+
+    edit = client.chat_update.call_args.kwargs
+    assert [b for b in edit["blocks"] if b.get("type") == "actions"] == []
+    assert "No open release issue remains" in edit["text"]
+    promote_api.close_release_issue.assert_not_awaited()
+    # The channel post is the only notifying message, so it must be the
+    # neutral explanation, not the old lookup-failure warning.
+    posted = str(say.call_args.args[0])
+    assert "Could not find" not in posted
+    assert "has no open release issue" in posted
+
+
+async def test_a_second_click_cannot_promote_the_same_release_twice(repos, promote_api):
+    """Two concurrent clicks must not both close the issue."""
+    closes = []
+
+    async def _close(_repo, number, comment):  # noqa: ARG001
+        await asyncio.sleep(0)  # where the second click would slip in
+        closes.append(number)
+
+    promote_api.close_release_issue.side_effect = _close
+    client = AsyncMock()
+    say = AsyncMock()
+
+    await asyncio.gather(
+        bot._handle_promote_button(repos, AsyncMock(), _promote_body(), say, client),
+        bot._handle_promote_button(repos, AsyncMock(), _promote_body(), say, client),
+    )
+
+    assert closes == [7]
+    assert any(
+        "already being promoted" in str(call.args[0])
+        for call in say.call_args_list
+        if call.args
+    )
+
+
+async def test_a_broken_message_edit_does_not_stop_the_promotion(repos, promote_api):
+    """Slack refusing the edit is cosmetic; the deploy must still go out."""
+    client = AsyncMock()
+    client.chat_update.side_effect = RuntimeError("Slack is down")
+    say = AsyncMock()
+
+    await bot._handle_promote_button(repos, AsyncMock(), _promote_body(), say, client)
+
+    promote_api.close_release_issue.assert_awaited_once()
+    promote_api.check_resource.assert_awaited_once_with(
+        "my-app-pipeline", "my-app-release-gate"
+    )
+    assert "promoted `my-app`" in str(say.call_args.args[0])
