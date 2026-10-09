@@ -2142,7 +2142,7 @@ async def test_release_notes_say_when_the_list_is_truncated(repos, slack, monkey
         repos, slack.ack, slack.respond, _command("my-app"), {}
     )
 
-    assert "and 23 more commit(s) not shown" in slack.said
+    assert "and 23 newer commit(s) not shown" in slack.said
 
 
 async def test_release_notes_escape_slack_control_characters(repos, slack, monkeypatch):

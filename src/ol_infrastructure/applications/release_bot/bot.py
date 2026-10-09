@@ -115,7 +115,8 @@ def _omitted_note(omitted: int | None) -> str | None:
             "release to count from._"
         )
     if omitted:
-        return f"_…and {omitted} more commit(s) not shown._"
+        # The compare API lists oldest first, so the cap drops the newest.
+        return f"_…and {omitted} newer commit(s) not shown._"
     return None
 
 
