@@ -193,9 +193,11 @@ Edit `tilt_config.json`:
 }
 ```
 
-Only the listed apps will be deployed. Shared infrastructure always runs, with one
-exception: the RustFS object store is deployed only when an app that needs it is
-enabled, because it is too heavy to run for developers who have no use for it. The
+Only the listed apps will be deployed. Shared infrastructure always runs, with two
+exceptions: the RustFS object store is deployed only when an app that needs it is
+enabled, and the data lake only when `data-platform` is listed (see
+[Data lake](#data-lake-gravitino--starrocks)), because both are too heavy to run for
+developers who have no use for them. The
 Tiltfile forwards `enabled_apps` to both Pulumi stacks as `LOCAL_DEV_ENABLED_APPS`
 so they can make that call.
 
@@ -376,7 +378,7 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). |
+| `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). `data-platform` is not an app but switches on the [data lake](#data-lake-gravitino--starrocks). |
 | `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
@@ -595,7 +597,8 @@ server is effectively frozen.
 
 It is **not** deployed by default. The core Pulumi stack brings it up only when
 `enabled_apps` contains an app listed in `OBJECT_STORE_APPS`
-(`local-dev/infra/modules/objectstore.py`), which today means `ocw-studio`.
+(`local-dev/infra/modules/objectstore.py`), which today means `ocw-studio` or
+`data-platform`.
 
 Two addresses, and apps generally need both:
 
@@ -607,14 +610,14 @@ Two addresses, and apps generally need both:
 Credentials are the fixed local-dev pair `localdevaccess` / `localdevsecret123`,
 defined in `objectstore.py` and repeated in each app's `secrets.yaml`.
 
-A bootstrap Job creates the buckets and grants each one anonymous read with a bucket
-policy. The policy matters: RustFS does not implement S3 ACLs, so the canned
+A bootstrap Job creates the buckets of every enabled app. ocw-studio's are each
+granted anonymous read with a bucket policy; the data lake's bucket is left private. The policy matters: RustFS does not implement S3 ACLs, so the canned
 `public-read` header boto3 sends is accepted and ignored, and a bucket policy is the
 only grant that actually takes effect. Published sites are served with no credentials,
 so without it every page would 403.
 
-To add buckets for another app, extend `OCW_STUDIO_BUCKETS` (or pass your own
-`buckets` tuple) and add the app to `OBJECT_STORE_APPS`.
+To add buckets for another app, add it to `OBJECT_STORE_BUCKETS` with an
+`AppBuckets` saying which of its buckets are public, private or versioned.
 
 Removing the last such app from `enabled_apps` tears the object store back down on the
 next reconcile. The objects survive: the StatefulSet's `data-rustfs-0` PVC is not
@@ -641,6 +644,74 @@ AWS_ENDPOINT_URL: "http://172.17.0.1:9000"
 AWS_S3_CUSTOM_DOMAIN: "172.17.0.1:9000/ol-ocw-studio-app-local"
 AWS_ACCESS_KEY_ID: "minioadmin"  # pragma: allowlist secret
 AWS_SECRET_ACCESS_KEY: "minioadmin"  # pragma: allowlist secret
+```
+
+### Data lake (Gravitino + StarRocks)
+
+Add `data-platform` to `enabled_apps` to get a local stand-in for the data lake:
+
+```json
+{
+  "enabled_apps": ["mit-learn", "data-platform"]
+}
+```
+
+It is not an app. The core Pulumi stack deploys, all in `local-infra`:
+
+- RustFS with a private `ol-data-lake-local` bucket (see above).
+- [Apache Gravitino](https://gravitino.apache.org) as the Iceberg REST catalog, with
+  its state in two databases (`gravitino`, `iceberg`) on the shared Postgres cluster.
+- StarRocks, the single-pod `allin1` image at the version the deployed clusters run,
+  with an external catalog `ol_data_lake_local` pointing at Gravitino.
+
+Budget about 2GB of memory, a 3GB image pull and a 20Gi volume for StarRocks.
+
+| What | Address |
+|------|---------|
+| StarRocks, from your machine | `mysql -h 127.0.0.1 -P 9030 -u root` (Tilt keeps the port-forward open as `starrocks-port-forward`) |
+| StarRocks, inside the cluster | `starrocks.local-infra.svc.cluster.local:9030`, user `root`, no password |
+| Iceberg REST catalog, inside the cluster | `http://gravitino.local-infra.svc.cluster.local:9001/iceberg` |
+| Gravitino management API and UI | `kubectl -n local-infra port-forward svc/gravitino 8090:8090` |
+
+```sql
+CREATE DATABASE ol_data_lake_local.scratch;
+CREATE TABLE ol_data_lake_local.scratch.t (id int, name string);
+INSERT INTO ol_data_lake_local.scratch.t VALUES (1, 'a');
+SELECT * FROM ol_data_lake_local.scratch.t;
+```
+
+Things that will trip you up:
+
+- **Write to the lake from a pod, not from your machine.** The catalog tells every
+  client to use the in-cluster RustFS address, overriding whatever endpoint the client
+  was given. pyiceberg or dlt running on the host creates the table and then fails the
+  data write with `Could not resolve host: rustfs.local-infra.svc.cluster.local`.
+- **pyiceberg needs HTTP Basic auth configured**: an `auth` property of type `basic`
+  with any username and any non-empty password. The username becomes the Gravitino
+  principal and the password is not checked. With no auth configured the catalog
+  answers 401.
+- **Changed catalog properties do not reach an existing catalog.** The
+  `lakehouse-catalogs` Job only creates what is missing. Drop the catalog (in StarRocks,
+  in Gravitino, or both) and re-run `local-infra-core`.
+
+This matches the deployed lake in engine, engine version and catalog protocol, and
+differs from it in ways that can hide a problem:
+
+| | Local | QA / Production |
+|---|---|---|
+| Catalog authentication | none (Gravitino `simple` authenticator, plain HTTP) | Keycloak JWT per user, HTTPS |
+| Catalog authorization | off | grants per governance role |
+| Iceberg views | work (JDBC catalog backend) | not available (Glue backend), so a view-materialized dbt model builds locally and fails in QA |
+| S3 credentials | the RustFS root key, static | vended per table from an IAM role |
+| StarRocks storage | shared-nothing, internal tables on the pod's volume | shared-data, internal tables on S3 |
+
+Removing `data-platform` from `enabled_apps` tears all of it down on the next
+reconcile. The `data-starrocks-0` and `data-rustfs-0` PVCs and the two Postgres
+databases are left behind, so re-enabling it picks the lake back up. To start clean:
+
+```bash
+kubectl -n local-infra delete pvc data-starrocks-0 data-rustfs-0
+kubectl -n local-infra exec local-pg-1 -- psql -U postgres -c 'DROP DATABASE gravitino WITH (FORCE)' -c 'DROP DATABASE iceberg WITH (FORCE)'
 ```
 
 ### OCW Studio

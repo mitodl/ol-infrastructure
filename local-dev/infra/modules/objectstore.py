@@ -18,20 +18,13 @@ effect. The draft/live/test site routes read from the object store with no
 credentials, so without that grant every published page would 403.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 
 import pulumi_kubernetes as k8s
 from pulumi import ResourceOptions
 
 from bridge.lib.versions import AWS_CLI_VERSION, RUSTFS_VERSION
-
-# Apps whose manifests expect an in-cluster S3 endpoint. Adding an app here is
-# what causes RustFS to be deployed; see create_object_store's callers.
-# odl-video-service is a candidate — its app-env.yaml currently carries stub
-# AWS values and a "no real S3 in local dev" note — but it has not been
-# switched over, so it is deliberately not listed yet.
-OBJECT_STORE_APPS = ("ocw-studio",)
 
 RUSTFS_IMAGE = f"rustfs/rustfs:{RUSTFS_VERSION}"
 
@@ -61,6 +54,31 @@ OCW_STUDIO_BUCKETS = (
 # needs versioning turned on the way the real artifacts bucket does.
 VERSIONED_BUCKETS = ("ol-eng-artifacts-local",)
 
+# Warehouse bucket for the local data lake (lakehouse.py). Not public: every
+# reader goes through StarRocks or the Iceberg catalog with the keys above.
+LAKE_BUCKET = "ol-data-lake-local"
+
+
+@dataclass(frozen=True)
+class AppBuckets:
+    """Buckets one app needs, by how the bootstrap Job treats them."""
+
+    public: tuple[str, ...] = ()
+    private: tuple[str, ...] = ()
+    versioned: tuple[str, ...] = ()
+
+
+# Apps whose manifests expect an in-cluster S3 endpoint. Adding an app here is
+# what causes RustFS to be deployed; see create_object_store's callers.
+# odl-video-service is a candidate — its app-env.yaml currently carries stub
+# AWS values and a "no real S3 in local dev" note — but it has not been
+# switched over, so it is deliberately not listed yet.
+OBJECT_STORE_BUCKETS = {
+    "ocw-studio": AppBuckets(public=OCW_STUDIO_BUCKETS, versioned=VERSIONED_BUCKETS),
+    "data-platform": AppBuckets(private=(LAKE_BUCKET,)),
+}
+OBJECT_STORE_APPS = tuple(OBJECT_STORE_BUCKETS)
+
 # Idempotent: re-running it on an existing store re-asserts the policies and
 # leaves the objects alone, so the Job can be replayed after a config change.
 _BOOTSTRAP_SCRIPT = """#!/bin/sh
@@ -76,21 +94,29 @@ public_read_policy() {
 JSON
 }
 
+ensure_bucket() {
+    if s3api head-bucket --bucket "$1" >/dev/null 2>&1; then
+        echo "==> bucket exists: $1"
+    else
+        echo "==> creating bucket: $1"
+        s3api create-bucket --bucket "$1" >/dev/null
+    fi
+}
+
 echo "==> waiting for the object store to answer"
 until aws --endpoint-url "${S3_ENDPOINT}" s3api list-buckets >/dev/null 2>&1; do
     sleep 2
 done
 
-for bucket in ${PUBLIC_BUCKETS}; do
-    if s3api head-bucket --bucket "${bucket}" >/dev/null 2>&1; then
-        echo "==> bucket exists: ${bucket}"
-    else
-        echo "==> creating bucket: ${bucket}"
-        s3api create-bucket --bucket "${bucket}" >/dev/null
-    fi
+for bucket in ${PUBLIC_BUCKETS:-}; do
+    ensure_bucket "${bucket}"
     s3api put-bucket-policy --bucket "${bucket}" \
         --policy "$(public_read_policy "${bucket}")"
     echo "    anonymous read granted"
+done
+
+for bucket in ${PRIVATE_BUCKETS:-}; do
+    ensure_bucket "${bucket}"
 done
 
 for bucket in ${VERSIONED_BUCKETS:-}; do
@@ -117,15 +143,24 @@ def create_object_store(
     apisix_release: k8s.helm.v3.Release,
     tls_secret: k8s.core.v1.Secret,
     s3_hostname: str,
-    buckets: tuple[str, ...] = OCW_STUDIO_BUCKETS,
+    apps: Iterable[str],
 ) -> ObjectStoreResources:
-    """Deploy RustFS plus a Job that creates and opens up the buckets.
+    """Deploy RustFS plus a Job that creates the buckets of the given apps.
+
+    `apps` are the enabled apps listed in OBJECT_STORE_BUCKETS.
 
     The S3 API is reachable in-cluster at
     rustfs.local-infra.svc.cluster.local:9000 and from the browser at
     https://{s3_hostname} — apps need both, because pod-side boto3 calls and
     the URLs handed to a browser cannot use the same address.
     """
+    app_buckets = [OBJECT_STORE_BUCKETS[app] for app in apps]
+
+    def _bucket_list(kind: str) -> str:
+        return " ".join(
+            bucket for buckets in app_buckets for bucket in getattr(buckets, kind)
+        )
+
     credentials = k8s.core.v1.Secret(
         "rustfs-credentials",
         metadata={"name": "rustfs-credentials", "namespace": "local-infra"},
@@ -265,11 +300,15 @@ def create_object_store(
                                 },
                                 {
                                     "name": "PUBLIC_BUCKETS",
-                                    "value": " ".join(buckets),
+                                    "value": _bucket_list("public"),
+                                },
+                                {
+                                    "name": "PRIVATE_BUCKETS",
+                                    "value": _bucket_list("private"),
                                 },
                                 {
                                     "name": "VERSIONED_BUCKETS",
-                                    "value": " ".join(VERSIONED_BUCKETS),
+                                    "value": _bucket_list("versioned"),
                                 },
                             ],
                             "volumeMounts": [
