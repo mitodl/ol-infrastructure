@@ -168,6 +168,25 @@ def test_stale_issues_keeps_the_posted_issue_and_skips_pull_requests():
     assert [issue["number"] for issue in stale] == [83, 96]
 
 
+def test_closed_issues_are_stale_only_until_labelled():
+    """A closed, unconsumed, unlabelled gate issue would still fire the gate."""
+    issues = [
+        _issue(94, f"Release {APP} 2026.10.6.1", state="closed"),
+        _issue(
+            95,
+            f"Release {APP} 2026.10.5.1",
+            state="closed",
+            labels=[{"name": "abandoned"}],
+        ),
+        _issue(92, f"[CONSUMED #7]Release {APP} 2026.10.4.1", state="closed"),
+        # Listed by both the open and the closed query: handled once.
+        _issue(96, f"Release {APP} 2026.10.7.1", state="open"),
+        _issue(96, f"Release {APP} 2026.10.7.1", state="open"),
+    ]
+    stale = supersede_gate_issues.stale_issues(APP, issues, keep_number=97)
+    assert [issue["number"] for issue in stale] == [94, 96]
+
+
 def test_nothing_to_approve_supersedes_every_gate_issue():
     """With no issue posted, no open gate issue describes what would deploy."""
     issues = [
@@ -193,6 +212,8 @@ class _FakeGitHub(BaseHTTPRequestHandler):
 
     issues: ClassVar[dict[int, dict[str, Any]]] = {}
     calls: ClassVar[list[tuple[str, str, Any]]] = []
+    # Issue numbers whose labels another writer replaces right after the close.
+    strip_after_close: ClassVar[set[int]] = set()
 
     def log_message(self, *_args: Any) -> None:
         pass
@@ -217,9 +238,13 @@ class _FakeGitHub(BaseHTTPRequestHandler):
         if self.path.startswith("/app/installations/"):
             assert self.headers["Authorization"].startswith("Bearer ")
             self._reply({"token": "installation-token"})
-        else:
-            assert self.headers["Authorization"] == "token installation-token"
-            self._reply({})
+            return
+        assert self.headers["Authorization"] == "token installation-token"
+        if self.path.endswith("/labels"):
+            issue = self.issues[int(self.path.split("/")[-2])]
+            names = {label["name"] for label in issue["labels"]} | set(body["labels"])
+            issue["labels"] = [{"name": name} for name in sorted(names)]
+        self._reply({})
 
     def do_PATCH(self) -> None:
         body = self._body()
@@ -228,16 +253,22 @@ class _FakeGitHub(BaseHTTPRequestHandler):
         issue = self.issues[number]
         issue["state"] = body["state"]
         issue["labels"] = [{"name": name} for name in body["labels"]]
+        if number in self.strip_after_close:
+            issue["labels"] = []
         self._reply(issue)
 
     def do_GET(self) -> None:
         self.calls.append(("GET", self.path, None))
         open_issues = [i for i in self.issues.values() if i["state"] == "open"]
-        if "page=2" in self.path:
+        if "state=closed" in self.path:
+            assert "since=" in self.path
+            self._reply([i for i in self.issues.values() if i["state"] == "closed"])
+        elif "page=2" in self.path:
             self._reply(open_issues[1:])
         elif "/issues?" in self.path:
+            # Lowercase, as HTTP/2 delivers it.
             next_url = f"http://{self.headers['Host']}/repos/{REPO}/issues?page=2"
-            self._reply(open_issues[:1], {"Link": f'<{next_url}>; rel="next"'})
+            self._reply(open_issues[:1], {"link": f'<{next_url}>; rel="next"'})
         else:
             self._reply(self.issues[int(self.path.rsplit("/", 1)[-1])])
 
@@ -246,6 +277,7 @@ class _FakeGitHub(BaseHTTPRequestHandler):
 def fake_github():
     """Serve the fake GitHub API on a free local port."""
     _FakeGitHub.calls = []
+    _FakeGitHub.strip_after_close = set()
     _FakeGitHub.issues = {
         83: _issue(83, f"Release {APP} 2026.9.30.1", state="open"),
         96: _issue(
@@ -256,6 +288,9 @@ def fake_github():
         ),
         97: _issue(97, f"Release {APP} 2026.10.8.1", state="open"),
         99: _issue(99, "Unrelated bug", state="open"),
+        # Closed by a reviewer before QA ran; the gate has not consumed it.
+        94: _issue(94, f"Release {APP} 2026.10.6.1", state="closed"),
+        90: _issue(90, f"[CONSUMED #5]Release {APP} 2026.9.1.1", state="closed"),
     }
     server = HTTPServer(("127.0.0.1", 0), _FakeGitHub)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -318,6 +353,8 @@ def test_script_supersedes_stale_issues_end_to_end(tmp_path, fake_github, privat
     assert result.returncode == 0, result.stderr
     issues = _FakeGitHub.issues
     assert issues[83]["state"] == issues[96]["state"] == "closed"
+    assert {label["name"] for label in issues[94]["labels"]} == {"abandoned"}
+    assert issues[90]["labels"] == []
     assert {label["name"] for label in issues[96]["labels"]} == {
         "release",
         "abandoned",
@@ -330,9 +367,12 @@ def test_script_supersedes_stale_issues_end_to_end(tmp_path, fake_github, privat
     ]
     assert [path for path, _ in comments] == [
         f"/repos/{REPO}/issues/83/comments",
+        f"/repos/{REPO}/issues/94/comments",
         f"/repos/{REPO}/issues/96/comments",
     ]
     assert "Superseded by #97" in comments[0][1]
+    assert "Closed and labelled" in comments[0][1]
+    assert "Labelled `abandoned`" in comments[1][1]
     # Each comment lands before its close, so a closed issue always says why.
     methods = [(m, p) for m, p, _ in _FakeGitHub.calls if "/issues/83" in p]
     assert methods.index(("POST", f"/repos/{REPO}/issues/83/comments")) < (
@@ -364,3 +404,27 @@ def test_script_refuses_before_calling_github(tmp_path, fake_github, private_key
     assert result.returncode != 0
     assert "Refusing to supersede" in result.stderr
     assert _FakeGitHub.calls == []
+
+
+def test_script_puts_back_a_label_another_writer_removed(
+    tmp_path, fake_github, private_key
+):
+    """The label is what stops the gate, so it is confirmed after the close."""
+    _FakeGitHub.strip_after_close = {96}
+    result = _run(tmp_path, fake_github, private_key, posted=97)
+
+    assert result.returncode == 0, result.stderr
+    assert {label["name"] for label in _FakeGitHub.issues[96]["labels"]} == {
+        "abandoned"
+    }
+
+
+def test_a_retry_finds_an_issue_closed_without_its_label(
+    tmp_path, fake_github, private_key
+):
+    """An earlier attempt that closed but could not label is finished later."""
+    _FakeGitHub.issues[96]["state"] = "closed"
+    result = _run(tmp_path, fake_github, private_key, posted=97)
+
+    assert result.returncode == 0, result.stderr
+    assert "abandoned" in {label["name"] for label in _FakeGitHub.issues[96]["labels"]}

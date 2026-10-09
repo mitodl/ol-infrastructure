@@ -10,10 +10,14 @@ Closing one of those would fire the release gate.
 
 So each one is closed, labelled ``abandoned`` and given a comment that points
 at the issue that replaced it. The release gate skips ``abandoned`` issues, so
-a superseded issue cannot fire it even if someone closes it first. The
-Production job's ``assert-gate-names-deploy`` check is still what guarantees
-nothing unapproved deploys; this keeps the queue down to the one issue that
-can be approved.
+once the label lands a superseded issue cannot fire it, even if someone closes
+it afterwards. Closed stale gate issues updated in the last day that the gate
+has not consumed yet are labelled too: a reviewer may have closed one moments before
+this ran, and a retry has to find an issue an earlier attempt closed but could
+not label. A gate check that already saw an issue closed before its label
+landed can still fire on it; the Production job's ``assert-gate-names-deploy``
+check is what guarantees nothing unapproved deploys. This keeps the queue down
+to the one issue that can be approved.
 
 Only issues whose whole title is one of the two gate shapes are touched, the
 same match ``assert_gate_names_deploy.py`` uses. ``mit-learn`` and
@@ -45,12 +49,15 @@ import sys
 import tempfile
 import time
 import urllib.request
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 ABANDONED_LABEL = "abandoned"
 #: An issue as the GitHub REST API returns it.
 Issue = dict[str, Any]
+#: How far back to look for stale gate issues closed but not yet labelled.
+CLOSED_LOOKBACK = timedelta(days=1)
 _NEXT_LINK = re.compile(r'<([^>]+)>;\s*rel="next"')
 
 
@@ -66,42 +73,45 @@ def is_gate_title(app: str, title: str) -> bool:
     return any(re.fullmatch(shape, title.strip()) for shape in shapes)
 
 
-def stale_issues(
-    app: str, open_issues: list[Issue], keep_number: int | None
-) -> list[Issue]:
-    """Return the open gate issues to supersede, oldest first.
+def _label_names(issue: Issue) -> set[str]:
+    return {label["name"] for label in issue.get("labels", [])}
 
-    *keep_number* is the issue that describes what would deploy, or None when
-    nothing does, in which case every open gate issue is stale.
+
+def stale_issues(app: str, issues: list[Issue], keep_number: int | None) -> list[Issue]:
+    """Return the gate issues to supersede, oldest first.
+
+    Every open gate issue but *keep_number*, and every closed one not yet
+    labelled ``abandoned``: the gate has not consumed it (its title would
+    carry the ``[CONSUMED`` tombstone), so it would still fire. *keep_number*
+    is the issue that describes what would deploy, or None when nothing does.
     """
+    unique = {issue["number"]: issue for issue in issues}
     return sorted(
         (
             issue
-            for issue in open_issues
+            for issue in unique.values()
             if "pull_request" not in issue
             and issue["number"] != keep_number
             and is_gate_title(app, issue["title"])
+            and (
+                issue.get("state", "open") == "open"
+                or ABANDONED_LABEL not in _label_names(issue)
+            )
         ),
         key=lambda issue: issue["number"],
     )
 
 
 def comment_for(keep: Issue | None, nothing_to_approve: str) -> str:
-    """Return the comment left on a superseded issue."""
+    """Return why an issue was superseded."""
     if keep is None:
-        reason = (
+        return (
             f"Superseded: {nothing_to_approve} There is nothing for this issue "
             "to approve."
         )
-    else:
-        reason = (
-            f"Superseded by #{keep['number']} ({keep['title']}), which describes "
-            "what a Production deploy would ship now."
-        )
     return (
-        f"{reason}\n\nClosed and labelled `{ABANDONED_LABEL}` by the QA job so "
-        "the release gate ignores this issue. Approve the release by closing "
-        "the issue that superseded it, not this one."
+        f"Superseded by #{keep['number']} ({keep['title']}), which describes "
+        "what a Production deploy would ship now."
     )
 
 
@@ -156,20 +166,22 @@ class GitHub:
         )
         with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310
             raw = response.read()
-            return (json.loads(raw) if raw else None), dict(response.headers)
+            # Header names are case-insensitive; HTTP/2 sends them lowercase.
+            headers = {key.lower(): value for key, value in response.headers.items()}
+            return (json.loads(raw) if raw else None), headers
 
-    def open_issues(self, repo: str) -> list[Issue]:
-        """Return every open issue in *repo*, from the consistent issues API.
+    def issues(self, repo: str, query: str) -> list[Issue]:
+        """Return every issue in *repo* matching *query*, following pagination.
 
-        Not search: its index lags issue creation, and the issue to keep was
-        opened moments ago.
+        The issues API, not search: search's index lags issue creation, and the
+        issue to keep was opened moments ago.
         """
         issues: list[Issue] = []
-        url: str | None = f"/repos/{repo}/issues?state=open&per_page=100"
+        url: str | None = f"/repos/{repo}/issues?{query}&per_page=100"
         while url:
             page, headers = self.request("GET", url)
             issues.extend(page)
-            match = _NEXT_LINK.search(headers.get("Link", ""))
+            match = _NEXT_LINK.search(headers.get("link", ""))
             url = match.group(1) if match else None
         return issues
 
@@ -183,32 +195,51 @@ def installation_token(
     return str(body["token"])
 
 
-def supersede(github: GitHub, repo: str, issue: Issue, comment: str) -> None:
-    """Comment on *issue*, then close and label it in one PATCH.
+def supersede(github: GitHub, repo: str, issue: Issue, reason: str) -> None:
+    """Comment on *issue*, then close it if open and label it ``abandoned``.
 
-    One PATCH so no reader sees half of it: closed but unlabelled would fire
-    the gate, and open but labelled would let the issue put's
-    ``update_in_place`` strip the label as stale.
+    An open issue is closed and labelled in one PATCH, so no reader sees half
+    of it: closed but unlabelled would fire the gate, and open but labelled
+    would let the issue put's ``update_in_place`` strip the label as stale.
+
+    Raises RuntimeError if the label cannot be confirmed. The issue is then
+    closed and unlabelled, and a retry finds it again among the closed ones.
     """
     number = issue["number"]
-    github.request("POST", f"/repos/{repo}/issues/{number}/comments", {"body": comment})
-    labels = [label["name"] for label in issue.get("labels", [])]
-    if ABANDONED_LABEL not in labels:
-        labels.append(ABANDONED_LABEL)
-    github.request(
-        "PATCH",
-        f"/repos/{repo}/issues/{number}",
-        {"state": "closed", "state_reason": "not_planned", "labels": labels},
+    is_open = issue.get("state", "open") == "open"
+    action = "Closed and labelled" if is_open else "Labelled"
+    comment = (
+        f"{reason}\n\n{action} `{ABANDONED_LABEL}` by the QA job so the release "
+        "gate ignores this issue. Approve the release by closing the issue that "
+        "superseded it, not this one."
     )
-    # Re-read: the label is what stops the gate, so confirm it survived.
-    current, _ = github.request("GET", f"/repos/{repo}/issues/{number}")
-    names = {label["name"] for label in current.get("labels", [])}
-    if ABANDONED_LABEL not in names:
+    github.request("POST", f"/repos/{repo}/issues/{number}/comments", {"body": comment})
+    if is_open:
+        labels = sorted(_label_names(issue) | {ABANDONED_LABEL})
+        github.request(
+            "PATCH",
+            f"/repos/{repo}/issues/{number}",
+            {"state": "closed", "state_reason": "not_planned", "labels": labels},
+        )
+    else:
         github.request(
             "POST",
             f"/repos/{repo}/issues/{number}/labels",
             {"labels": [ABANDONED_LABEL]},
         )
+    # Re-read: the label is what stops the gate, so confirm it survived
+    # another writer, and put it back if not.
+    for _ in range(3):
+        current, _headers = github.request("GET", f"/repos/{repo}/issues/{number}")
+        if ABANDONED_LABEL in _label_names(current):
+            return
+        github.request(
+            "POST",
+            f"/repos/{repo}/issues/{number}/labels",
+            {"labels": [ABANDONED_LABEL]},
+        )
+    msg = f"#{number} is closed but its `{ABANDONED_LABEL}` label keeps disappearing"
+    raise RuntimeError(msg)
 
 
 def kept_issue(promotion_dir: Path, issue_file: Path) -> Issue | None:
@@ -246,21 +277,24 @@ def main() -> None:
         os.environ["GITHUB_APP_PRIVATE_KEY"],
     )
     github = GitHub(api_url, token)
-    stale = stale_issues(
-        app, github.open_issues(repo), keep["number"] if keep else None
-    )
+    since = (datetime.now(UTC) - CLOSED_LOOKBACK).strftime("%Y-%m-%dT%H:%M:%SZ")
+    candidates = [
+        *github.issues(repo, "state=open"),
+        *github.issues(repo, f"state=closed&since={since}"),
+    ]
+    stale = stale_issues(app, candidates, keep["number"] if keep else None)
     if not stale:
         print(f"{app}: no stale gate issues.")  # noqa: T201
         return
 
-    comment = comment_for(
+    reason = comment_for(
         keep,
         "Production already matches this code: no release is waiting and the "
         "Production preview shows no changes.",
     )
     for issue in stale:
         print(f"{app}: superseding #{issue['number']} ({issue['title']!r}).")  # noqa: T201
-        supersede(github, repo, issue, comment)
+        supersede(github, repo, issue, reason)
 
 
 if __name__ == "__main__":
