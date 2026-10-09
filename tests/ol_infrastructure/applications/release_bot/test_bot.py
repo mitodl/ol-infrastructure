@@ -214,6 +214,7 @@ async def test_preview_reports_the_next_version_and_its_commits(
                         "author": "dev",
                     }
                 ],
+                "omitted": 0,
                 "in_flight": None,
             }
         ),
@@ -243,6 +244,7 @@ async def test_preview_triggers_nothing(repos, slack, monkeypatch):
                 "version": "2026.8.12.1",
                 "since": "2026.8.3.1",
                 "commits": [],
+                "omitted": 0,
                 "in_flight": None,
             }
         ),
@@ -265,6 +267,7 @@ async def test_preview_flags_an_in_flight_release(repos, slack, monkeypatch):
                 "version": "2026.8.12.1",
                 "since": "2026.8.3.1",
                 "commits": [],
+                "omitted": 0,
                 "in_flight": {
                     "version": "2026.8.3.1",
                     "branch": "releases/2026.8.3.1",

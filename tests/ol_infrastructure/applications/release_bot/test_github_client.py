@@ -336,16 +336,39 @@ def test_commits_since_last_tag_uses_compare_when_a_tag_exists(fake_repo):
     ]
 
 
-def test_commits_since_last_tag_diverged_comparison_returns_empty(fake_repo):
-    """A "diverged" comparison status returns no commits rather than erroring."""
+def test_commits_since_last_tag_lists_a_diverged_comparison(fake_repo):
+    """An in-flight hotfix's tag is off main, so the comparison diverges.
+
+    GitHub still lists main's commits since the merge base (live, 2026-10-09:
+    a diverged compare with ahead_by=71 listed all 71), and they are exactly
+    what the next release would carry -- so they must not read as nothing.
+    """
     fake_repo(
         _FakeRepo(
             tags=[_FakeTag("2026.07.01.1")],
-            comparison=_FakeComparison("diverged", None, total_commits=4),
+            comparison=_FakeComparison(
+                "diverged",
+                [_FakeCommit("abc123", "fix: bug", "me", "https://x/abc123")],
+            ),
         )
     )
     unreleased = github._commits_since_last_tag_sync("mitodl/thing")
-    assert unreleased == {"commits": [], "omitted": 0}
+    assert [c["sha"] for c in unreleased["commits"]] == ["abc123"]
+    assert unreleased["omitted"] == 0
+
+
+def test_commits_since_last_tag_survives_an_empty_commit_message(fake_repo):
+    """Git allows an empty message; it must not take the whole reply down."""
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("2026.07.01.1")],
+            comparison=_FakeComparison(
+                "ahead", [_FakeCommit("abc123", "", "me", "https://x/abc123")]
+            ),
+        )
+    )
+    unreleased = github._commits_since_last_tag_sync("mitodl/thing")
+    assert [c["sha"] for c in unreleased["commits"]] == ["abc123"]
 
 
 def test_commits_since_last_tag_falls_back_to_commit_history_without_a_tag(fake_repo):

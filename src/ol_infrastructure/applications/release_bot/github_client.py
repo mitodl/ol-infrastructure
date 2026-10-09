@@ -166,7 +166,8 @@ def next_release_version(tags: list[str], today: date) -> str:
 
 def _is_release_machinery(message: str) -> bool:
     """Return True for the commits the release resource itself authors."""
-    return bool(_RELEASE_MACHINERY_RE.match(message.splitlines()[0].strip()))
+    subject = (message.splitlines() or [""])[0]
+    return bool(_RELEASE_MACHINERY_RE.match(subject.strip()))
 
 
 def pull_request(message: str) -> tuple[int | None, str]:
@@ -200,18 +201,16 @@ def _commits_since_last_tag_sync(repo_slug: str) -> dict[str, Any]:
 
     omitted: int | None
     if latest_tag:
+        # A "diverged" comparison still lists the branch's commits since the
+        # merge base -- which is the case while a hotfix is in flight, since
+        # its tag sits on a cherry-pick off main. Treating diverged as empty
+        # reported "nothing to release" there with commits waiting on main.
         comparison = repo.compare(latest_tag, repo.default_branch)
-        # "diverged" status means the tag is not an ancestor of the branch;
-        # GitHub omits commits entirely in that case.
-        if comparison.status == "diverged":
-            raw_commits = []
-            omitted = 0
-        else:
-            raw_commits = list(itertools.islice(comparison.commits, _COMMIT_LIST_LIMIT))
-            # total_commits counts the whole range, so this is exact. Release
-            # machinery among the omitted commits is counted too, since
-            # filtering it would mean fetching what the cap exists to skip.
-            omitted = max(comparison.total_commits - len(raw_commits), 0)
+        raw_commits = list(itertools.islice(comparison.commits, _COMMIT_LIST_LIMIT))
+        # total_commits counts the whole range, so this is exact. Release
+        # machinery among the omitted commits is counted too, since filtering
+        # it would mean fetching the commits the cap exists to skip.
+        omitted = max(comparison.total_commits - len(raw_commits), 0)
     else:
         raw_commits = list(itertools.islice(repo.get_commits(), _COMMIT_LIST_LIMIT))
         omitted = None if len(raw_commits) == _COMMIT_LIST_LIMIT else 0

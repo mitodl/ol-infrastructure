@@ -119,15 +119,6 @@ def _omitted_note(omitted: int | None) -> str | None:
     return None
 
 
-def _production_job_url(app_name: str, cfg) -> str:
-    # Matches the Production deploy job k8s_apps/pipeline.py's
-    # release-resource workflow generates for the `ol-application-<app>`
-    # Pulumi project (deploy-<project>-<stack>).
-    return concourse.job_url(
-        cfg.pipeline, f"deploy-ol-application-{app_name}-production"
-    )
-
-
 def _resolve_app(repos, app_name):
     """Return (cfg, None) for an app this bot can drive, else (None, error).
 
@@ -276,7 +267,7 @@ async def _cmd_preview(repos, ack, respond, command, _context):
         return
 
     commits = preview["commits"]
-    omitted = preview.get("omitted", 0)
+    omitted = preview["omitted"]
     since = preview["since"] or "the start of history"
     # A truncated list under-reports, so say "at least" rather than a count
     # that reads as the whole release.
@@ -418,7 +409,12 @@ async def _check_release_gate(app_name: str, cfg) -> str:
     -- so the link is to the Production job, whose newest build is listed
     first.
     """
-    url = _production_job_url(app_name, cfg)
+    # Matches the Production deploy job k8s_apps/pipeline.py's release-resource
+    # workflow generates for the `ol-application-<app>` Pulumi project
+    # (deploy-<project>-<stack>).
+    url = concourse.job_url(
+        cfg.pipeline, f"deploy-ol-application-{app_name}-production"
+    )
     try:
         # Don't make the deploy wait for the release-gate resource's normal
         # poll interval (default 60m) to notice the issue just closed.
