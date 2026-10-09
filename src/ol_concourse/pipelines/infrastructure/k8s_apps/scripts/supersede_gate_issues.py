@@ -11,13 +11,19 @@ Closing one of those would fire the release gate.
 So each one is closed, labelled ``abandoned`` and given a comment that points
 at the issue that replaced it. The release gate skips ``abandoned`` issues, so
 once the label lands a superseded issue cannot fire it, even if someone closes
-it afterwards. Closed stale gate issues updated in the last day that the gate
-has not consumed yet are labelled too: a reviewer may have closed one moments before
-this ran, and a retry has to find an issue an earlier attempt closed but could
-not label. A gate check that already saw an issue closed before its label
-landed can still fire on it; the Production job's ``assert-gate-names-deploy``
-check is what guarantees nothing unapproved deploys. This keeps the queue down
-to the one issue that can be approved.
+it afterwards.
+
+A gate issue closed as *not planned*, updated in the last day, and not yet
+consumed or labelled is labelled too. This step closes issues that way, so a
+retry finds one an earlier attempt closed but could not label; a person
+discarding an issue that way gets the same protection. An issue closed as
+*completed* is an approval and is never touched, even when a later QA run has
+posted a newer issue for the same release: whether that approval still covers
+what would deploy is the Production job's call, not this step's. A gate check
+that already saw an issue closed before its label landed can still fire on it;
+the Production job's ``assert-gate-names-deploy`` check is what guarantees
+nothing unapproved deploys. This keeps the queue down to the one issue that
+can be approved.
 
 Only issues whose whole title is one of the two gate shapes are touched, the
 same match ``assert_gate_names_deploy.py`` uses. ``mit-learn`` and
@@ -80,9 +86,10 @@ def _label_names(issue: Issue) -> set[str]:
 def stale_issues(app: str, issues: list[Issue], keep_number: int | None) -> list[Issue]:
     """Return the gate issues to supersede, oldest first.
 
-    Every open gate issue but *keep_number*, and every closed one not yet
-    labelled ``abandoned``: the gate has not consumed it (its title would
-    carry the ``[CONSUMED`` tombstone), so it would still fire. *keep_number*
+    Every open gate issue but *keep_number*, and every one closed as not
+    planned that is not yet labelled ``abandoned``: the gate has not consumed
+    it (its title would carry the ``[CONSUMED`` tombstone), so it would still
+    fire. A *completed* close is an approval and is left alone. *keep_number*
     is the issue that describes what would deploy, or None when nothing does.
     """
     unique = {issue["number"]: issue for issue in issues}
@@ -95,7 +102,10 @@ def stale_issues(app: str, issues: list[Issue], keep_number: int | None) -> list
             and is_gate_title(app, issue["title"])
             and (
                 issue.get("state", "open") == "open"
-                or ABANDONED_LABEL not in _label_names(issue)
+                or (
+                    issue.get("state_reason") == "not_planned"
+                    and ABANDONED_LABEL not in _label_names(issue)
+                )
             )
         ),
         key=lambda issue: issue["number"],

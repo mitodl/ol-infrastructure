@@ -31,6 +31,8 @@ from ol_concourse.pipelines.infrastructure.k8s_apps.scripts import (
 
 APP = "ol-analytics-api"
 REPO = f"mitodl/{APP}"
+DROP = "not_planned"
+DONE = "completed"
 
 
 def _job(app_name: str, job_suffix: str) -> dict[str, Any]:
@@ -168,17 +170,25 @@ def test_stale_issues_keeps_the_posted_issue_and_skips_pull_requests():
     assert [issue["number"] for issue in stale] == [83, 96]
 
 
-def test_closed_issues_are_stale_only_until_labelled():
-    """A closed, unconsumed, unlabelled gate issue would still fire the gate."""
+def test_closed_issues_are_stale_only_when_discarded_and_unlabelled():
+    """A not-planned close is finished; a completed close is an approval."""
     issues = [
-        _issue(94, f"Release {APP} 2026.10.6.1", state="closed"),
+        _issue(94, f"Release {APP} 2026.10.6.1", state="closed", state_reason=DROP),
         _issue(
             95,
             f"Release {APP} 2026.10.5.1",
             state="closed",
+            state_reason=DROP,
             labels=[{"name": "abandoned"}],
         ),
-        _issue(92, f"[CONSUMED #7]Release {APP} 2026.10.4.1", state="closed"),
+        _issue(
+            92,
+            f"[CONSUMED #7]Release {APP} 2026.10.4.1",
+            state="closed",
+            state_reason=DROP,
+        ),
+        # A reviewer's approval, even though #97 now describes the deploy.
+        _issue(93, f"Release {APP} 2026.10.8.1", state="closed", state_reason=DONE),
         # Listed by both the open and the closed query: handled once.
         _issue(96, f"Release {APP} 2026.10.7.1", state="open"),
         _issue(96, f"Release {APP} 2026.10.7.1", state="open"),
@@ -252,6 +262,7 @@ class _FakeGitHub(BaseHTTPRequestHandler):
         number = int(self.path.rsplit("/", 1)[-1])
         issue = self.issues[number]
         issue["state"] = body["state"]
+        issue["state_reason"] = body["state_reason"]
         issue["labels"] = [{"name": name} for name in body["labels"]]
         if number in self.strip_after_close:
             issue["labels"] = []
@@ -288,9 +299,16 @@ def fake_github():
         ),
         97: _issue(97, f"Release {APP} 2026.10.8.1", state="open"),
         99: _issue(99, "Unrelated bug", state="open"),
-        # Closed by a reviewer before QA ran; the gate has not consumed it.
-        94: _issue(94, f"Release {APP} 2026.10.6.1", state="closed"),
-        90: _issue(90, f"[CONSUMED #5]Release {APP} 2026.9.1.1", state="closed"),
+        # Discarded by a person before QA ran; the gate has not consumed it.
+        94: _issue(94, f"Release {APP} 2026.10.6.1", state="closed", state_reason=DROP),
+        # Approved by a reviewer; a later QA run then posted #97.
+        95: _issue(95, f"Release {APP} 2026.10.8.1", state="closed", state_reason=DONE),
+        90: _issue(
+            90,
+            f"[CONSUMED #5]Release {APP} 2026.9.1.1",
+            state="closed",
+            state_reason=DROP,
+        ),
     }
     server = HTTPServer(("127.0.0.1", 0), _FakeGitHub)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -354,7 +372,7 @@ def test_script_supersedes_stale_issues_end_to_end(tmp_path, fake_github, privat
     issues = _FakeGitHub.issues
     assert issues[83]["state"] == issues[96]["state"] == "closed"
     assert {label["name"] for label in issues[94]["labels"]} == {"abandoned"}
-    assert issues[90]["labels"] == []
+    assert issues[90]["labels"] == issues[95]["labels"] == []
     assert {label["name"] for label in issues[96]["labels"]} == {
         "release",
         "abandoned",
@@ -424,6 +442,7 @@ def test_a_retry_finds_an_issue_closed_without_its_label(
 ):
     """An earlier attempt that closed but could not label is finished later."""
     _FakeGitHub.issues[96]["state"] = "closed"
+    _FakeGitHub.issues[96]["state_reason"] = DROP
     result = _run(tmp_path, fake_github, private_key, posted=97)
 
     assert result.returncode == 0, result.stderr
