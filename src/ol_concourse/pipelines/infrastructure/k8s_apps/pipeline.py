@@ -957,6 +957,22 @@ def _define_release_resources(
         private_ssh_key=github_app_private_key,
         repository=github_repo,
         semver_tag_fallback=True,
+    ).model_copy(
+        # Not the library's `never`. Rebuilding the release resource image
+        # gives this resource a fresh, empty version history on its next
+        # check or put (Concourse keys history on the custom type's version),
+        # and QA/Production take it with `passed:` the release build, which
+        # resolves only against the current history. The resource's check
+        # re-emits the latest cut to repair that, but a put can start the
+        # fresh history too, and under `never` nothing would check it until
+        # the next `/doof release`. A fresh history has no next-check time,
+        # so Concourse checks it on its next pass; the interval only paces
+        # the routine re-checks. A check cannot start a build: QA triggers on
+        # this resource (pulumi_jobs_chain turns the first stack's
+        # dependencies into triggers) but only through `passed:` the release
+        # build, which a check's candidate never satisfies, and a re-emitted
+        # cut is a version QA has already run, so it is not new to QA either.
+        update={"check_every": "1h"}
     )
     # Closed release issues gate production deployments.
     release_gate = github_issues(
