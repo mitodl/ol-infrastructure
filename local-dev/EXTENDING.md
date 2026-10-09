@@ -38,7 +38,7 @@ In `local-dev/infra/modules/database.py`, add to the `postInitSQL` list:
 
 Add `"my-app"` to the `APP_NAMESPACES` tuple in `local-dev/infra/modules/namespaces.py`. `tls.py` reads the same list through `app_namespaces_for()`, so the `local-dev-tls` Secret and mkcert CA ConfigMap appear in the new namespace automatically.
 
-If the app brings heavyweight infrastructure with it — an object store, a CI system, anything a developer who is not working on that app should not be paying for — put its name in `OPTIONAL_APP_NAMESPACES` instead. Namespaces listed there are only created when the app appears in `enabled_apps`, which the Tiltfile forwards to both Pulumi stacks as `LOCAL_DEV_ENABLED_APPS`. Gate the expensive resources on the same value; `ocw-studio` and the RustFS object store are the worked example.
+If the app brings heavyweight infrastructure with it — an object store, a CI system, anything a developer who is not working on that app should not be paying for — put its name in `OPTIONAL_APP_NAMESPACES` instead. Namespaces listed there are only created when the app appears in `enabled_apps`, which the Tiltfile forwards to both Pulumi stacks as `LOCAL_DEV_ENABLED_APPS`. Gate the expensive resources on the same value; `ocw-studio` and the RustFS object store are the worked example. `data-platform` (`local-dev/infra/modules/lakehouse.py`) is the example of an `enabled_apps` entry that is infrastructure only, with no namespace or app Tiltfile of its own.
 
 Two things not to do:
 

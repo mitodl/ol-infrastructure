@@ -5,7 +5,7 @@
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
-config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx")
+config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
 config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0 learn-ai=0.28.3")
 config.define_string("disk_keep_tags", usage="Newest tilt-built image tags kept per repo by the disk janitor (default: 3). Overrides LOCAL_DEV_DISK_KEEP_TAGS env var.")
@@ -341,8 +341,9 @@ local_resource(
         "LOCAL_DEV_LOG_RETENTION": log_retention_period,
         "LOCAL_DEV_KEYCLOAK_IMAGE": keycloak_image,
         # Gates the per-app resources added since enabled_apps existed (the
-        # ocw-studio namespace/databases and the RustFS object store). The four
-        # original apps are still provisioned unconditionally.
+        # ocw-studio namespace/databases, the RustFS object store and the
+        # data-platform lake). The four original apps are still provisioned
+        # unconditionally.
         "LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps),
         "LOCAL_DEV_HOST_GATEWAY": host_gateway,
         "PULUMI_CONFIG_PASSPHRASE": "",
@@ -387,6 +388,18 @@ local_resource(
     labels=["infra"],
     resource_deps=["local-infra-core"],
 )
+
+# data-platform has no entry in APPS: it is infrastructure the core stack
+# deploys, with nothing to build. StarRocks speaks the MySQL protocol, which
+# APISIX does not route, so a host-side dbt or mysql client reaches it through
+# this forward. kubectl exits when the pod behind it goes away, hence the loop.
+if "data-platform" in enabled_apps:
+    local_resource(
+        "starrocks-port-forward",
+        serve_cmd="while true; do kubectl -n local-infra port-forward svc/starrocks 9030:9030; sleep 2; done",
+        labels=["infra"],
+        resource_deps=["local-infra-core"],
+    )
 
 # Seed the local-dev test users (admin / student / prof, password localdev123)
 # into the olapps realm. Pulumi provisions the realm and OIDC clients, but the
