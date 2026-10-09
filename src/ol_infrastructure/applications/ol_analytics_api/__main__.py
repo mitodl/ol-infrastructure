@@ -75,6 +75,7 @@ from pulumi import Config, Output, ResourceOptions, export
 from pulumi_aws import ec2
 
 from bridge.lib.constants import mit_learn_session_cookie_name
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -316,21 +317,41 @@ static_secrets = OLVaultK8SSecret(
 )
 
 # The OAuth2 client-credentials pair the app uses to authenticate its
-# org-manager check to MITx Online (mitodl/mitxonline#3807).  Unlike SENTRY_DSN
-# above, no Pulumi stack owns these: the OAuth2 Application record is created by
-# hand in MITx Online's Django admin, and its credentials are written once to
-# secret-operations.
+# org-manager check to MITx Online (mitodl/mitxonline#3807).  The OAuth2
+# Application record is created by hand in MITx Online's Django admin.
 #
-# Read by the vault-secrets-operator directly at runtime and templated into the
-# env var names the app expects, rather than being pulled into Pulumi with
-# get_secret_output.  That keeps the credential out of Pulumi state entirely and
-# lets a rotation in Vault propagate on the operator's own refresh -- rewriting
-# the Vault entry is enough, with no `pulumi up` in the loop.  Same shape as
-# applications/marimo_data's ol-marimo-app-client secret.
+# In CI the credentials come from SOPS and this stack writes them to
+# secret-operations, the same way applications/jupyterhub_data writes its crypt
+# key.  QA and Production predate that: their entries were written to Vault by
+# hand and have no SOPS file yet, so this stack leaves them alone.
+#
+# The vault-secrets-operator reads the entry at runtime and templates it into the
+# env var names the app expects, so the app never sees Vault directly.  Same
+# shape as applications/marimo_data's ol-marimo-app-client secret.
 #
 # Temporary, along with the round-trip it authenticates: once org-manager status
 # is visible in the Keycloak token (mitodl/hq#10594), the app stops calling MITx
-# Online and this can be deleted along with the Vault entry.
+# Online and this can be deleted along with the Vault entry and the SOPS file.
+mitxonline_oauth_depends_on = []
+if stack_info.env_suffix == "ci":
+    mitxonline_oauth_creds = read_yaml_secrets(
+        Path(f"ol_analytics_api/secrets.{stack_info.env_suffix}.yaml")
+    )["mitxonline_oauth"]
+    mitxonline_oauth_depends_on.append(
+        vault.generic.Secret(
+            f"ol-analytics-api-mitxonline-oauth-vault-secret-{stack_info.env_suffix}",
+            path="secret-operations/ol-analytics-api/mitxonline-oauth",
+            data_json=Output.secret(
+                json.dumps(
+                    {
+                        "client_id": mitxonline_oauth_creds["client_id"],
+                        "client_secret": mitxonline_oauth_creds["client_secret"],
+                    }
+                )
+            ),
+        )
+    )
+
 mitxonline_oauth_secret_name = (
     "ol-analytics-api-mitxonline-oauth"  # pragma: allowlist secret  # noqa: S105
 )
@@ -362,6 +383,7 @@ mitxonline_oauth_secrets = OLVaultK8SSecret(
     opts=ResourceOptions(
         delete_before_replace=True,
         parent=ol_analytics_api_auth_binding.vault_k8s_resources,
+        depends_on=mitxonline_oauth_depends_on,
     ),
 )
 
