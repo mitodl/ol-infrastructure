@@ -964,7 +964,7 @@ def _define_release_resources(
         # check or put (Concourse keys history on the custom type's version),
         # and QA/Production take it with `passed:` the release build, which
         # resolves only against the current history. The resource's check
-        # re-emits the latest cut to repair that, but a put can start the
+        # re-emits the newest cuts to repair that, but a put can start the
         # fresh history too, and under `never` nothing would check it until
         # the next `/doof release`. Concourse's periodic checker skips a
         # `never` resource outright, and otherwise checks a resource that
@@ -975,8 +975,11 @@ def _define_release_resources(
         # A check cannot start a build: QA triggers on
         # this resource (pulumi_jobs_chain turns the first stack's
         # dependencies into triggers) but only through `passed:` the release
-        # build, which a check's candidate never satisfies, and a re-emitted
-        # cut is a version QA has already run, so it is not new to QA either.
+        # build, which a check's candidate never satisfies. A re-emitted cut
+        # is normally a version QA has already run, so it is not new to QA
+        # either. The exception: when the newest cut is gone or its build
+        # failed, QA falls back to the cut before it and runs it if it never
+        # had, deploying a release that passed the build to QA.
         update={"check_every": Duration("1h")}
     )
     # Closed release issues gate production deployments.

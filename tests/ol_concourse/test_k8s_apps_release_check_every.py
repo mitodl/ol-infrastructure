@@ -3,7 +3,7 @@
 Rebuilding the release resource image gives each pipeline's release resource a
 fresh, empty version history on its next check or put. QA and Production take
 the resource with ``passed:`` the release build, so until something checks the
-fresh history (whose check re-emits the latest cut) they cannot run. Under the
+fresh history (whose check re-emits the newest cuts) they cannot run. Under the
 library's ``check_every: never`` nothing would check it until the next release.
 """
 
