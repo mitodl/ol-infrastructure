@@ -118,7 +118,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "applications/ocw_site/": ["fastly.yaml", "vector/"],
     "applications/ocw_studio/": ["ocw_studio/"],
     "applications/odl_video_service/": ["odl_video_service/"],
-    "applications/ol_analytics_api/": [],
+    "applications/ol_analytics_api/": ["ol_analytics_api/"],
     "applications/omnigraph/": ["omnigraph/"],
     "applications/open_discussions/": ["heroku/"],
     "applications/open_metadata/": ["open_metadata/"],
