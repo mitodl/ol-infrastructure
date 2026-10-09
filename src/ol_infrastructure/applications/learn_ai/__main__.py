@@ -80,6 +80,7 @@ from ol_infrastructure.lib.azure_workload_identity import (
 )
 from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
+    s3_sigv4_signing_vcl,
     vcl_snippet,
 )
 from ol_infrastructure.lib.fastly_logging import fastly_logging_args
@@ -155,14 +156,20 @@ ol_zone_id = dns_stack.require_output("ol")["id"]
 # Frontend storage bucket
 learn_ai_app_storage_bucket_name = f"ol-mit-learn-ai-{stack_info.env_suffix}"
 
+# CI pilots SigV4-signed Fastly->S3 requests, so the bucket can be fully private
+# instead of public-read (hq#13287 item 1; mit-learn runs the same pattern in
+# every environment). QA and Production stay on the public-read policy until CI
+# has been validated.
+_learn_ai_bucket_is_sigv4_piloted = stack_info.env_suffix == "ci"
+
 learn_ai_app_storage_bucket_config = S3BucketConfig(
     bucket_name=learn_ai_app_storage_bucket_name,
     versioning_enabled=True,
     ownership_controls="BucketOwnerPreferred",
-    block_public_acls=False,
-    block_public_policy=False,
-    ignore_public_acls=False,
-    restrict_public_buckets=False,
+    block_public_acls=_learn_ai_bucket_is_sigv4_piloted,
+    block_public_policy=_learn_ai_bucket_is_sigv4_piloted,
+    ignore_public_acls=_learn_ai_bucket_is_sigv4_piloted,
+    restrict_public_buckets=_learn_ai_bucket_is_sigv4_piloted,
     intelligent_tiering_archive_access_days=None,  # Fastly backend
     intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
@@ -193,10 +200,69 @@ learn_ai_app_storage_bucket = OLBucket(
     ),
 )
 
-learn_ai_app_storage_bucket_policy = s3.BucketPolicy(
-    f"learn-ai-app-storage-bucket-policy-{stack_info.env_suffix}",
-    bucket=learn_ai_app_storage_bucket.bucket_v2.id,
-    policy=learn_ai_app_storage_bucket.bucket_v2.arn.apply(
+learn_ai_fastly_s3_signer_access_key = None
+if _learn_ai_bucket_is_sigv4_piloted:
+    # Dedicated identity for Fastly to authenticate to S3 with (SigV4), scoped to
+    # GetObject on just this bucket. It must live under /ol-applications/ and carry
+    # no tags: Concourse's deploy role only manages IAM users under that path, via
+    # managed-policy attach, and has no iam:TagUser (see the same note on the
+    # mit-learn signer).
+    learn_ai_fastly_s3_signer_user = iam.User(
+        f"ol-learn-ai-fastly-s3-signer-{stack_info.env_suffix}",
+        name=f"ol-learn-ai-{stack_info.env_suffix}-fastly-s3-signer",
+        path="/ol-applications/",
+    )
+    learn_ai_fastly_s3_signer_policy = iam.Policy(
+        f"ol-learn-ai-fastly-s3-signer-policy-{stack_info.env_suffix}",
+        path="/ol-applications/",
+        policy=json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": ["s3:GetObject"],
+                        "Resource": [
+                            f"arn:aws:s3:::{learn_ai_app_storage_bucket_name}/*"
+                        ],
+                    }
+                ],
+            }
+        ),
+    )
+    learn_ai_fastly_s3_signer_policy_attachment = iam.UserPolicyAttachment(
+        f"ol-learn-ai-fastly-s3-signer-policy-attachment-{stack_info.env_suffix}",
+        user=learn_ai_fastly_s3_signer_user.name,
+        policy_arn=learn_ai_fastly_s3_signer_policy.arn,
+    )
+    learn_ai_fastly_s3_signer_access_key = iam.AccessKey(
+        f"ol-learn-ai-fastly-s3-signer-access-key-{stack_info.env_suffix}",
+        user=learn_ai_fastly_s3_signer_user.name,
+        opts=ResourceOptions(depends_on=[learn_ai_fastly_s3_signer_policy_attachment]),
+    )
+    # The durable Vault copy of this key is created further down -- search for
+    # "fastly-s3-signer-vault-secret".
+    learn_ai_bucket_policy_document = Output.all(
+        arn=learn_ai_app_storage_bucket.bucket_v2.arn,
+        signer_arn=learn_ai_fastly_s3_signer_user.arn,
+    ).apply(
+        lambda args: json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "FastlySigV4Read",
+                        "Effect": "Allow",
+                        "Principal": {"AWS": args["signer_arn"]},
+                        "Action": "s3:GetObject",
+                        "Resource": f"{args['arn']}/*",
+                    }
+                ],
+            }
+        )
+    )
+else:
+    learn_ai_bucket_policy_document = learn_ai_app_storage_bucket.bucket_v2.arn.apply(
         lambda arn: json.dumps(
             {
                 "Version": "2012-10-17",
@@ -211,7 +277,12 @@ learn_ai_app_storage_bucket_policy = s3.BucketPolicy(
                 ],
             }
         )
-    ),
+    )
+
+learn_ai_app_storage_bucket_policy = s3.BucketPolicy(
+    f"learn-ai-app-storage-bucket-policy-{stack_info.env_suffix}",
+    bucket=learn_ai_app_storage_bucket.bucket_v2.id,
+    policy=learn_ai_bucket_policy_document,
 )
 
 parliament_config = {
@@ -311,6 +382,34 @@ for k, v in mimetypes.types_map.items():
     ):
         gzip_settings["extensions"].add(k.strip("."))
         gzip_settings["content_types"].add(v)
+learn_ai_backend_name = "learn-ai"
+
+learn_ai_s3_auth_snippets = []
+if _learn_ai_bucket_is_sigv4_piloted and learn_ai_fastly_s3_signer_access_key:
+    learn_ai_s3_backend_auth_vcl = Output.all(
+        access_key_id=learn_ai_fastly_s3_signer_access_key.id,
+        secret_access_key=learn_ai_fastly_s3_signer_access_key.secret,
+    ).apply(
+        lambda args: s3_sigv4_signing_vcl(
+            args["access_key_id"],
+            args["secret_access_key"],
+            f"{learn_ai_app_storage_bucket_name}.s3.amazonaws.com",
+            learn_ai_backend_name,
+        )
+    )
+    learn_ai_s3_auth_snippets = [
+        vcl_snippet(
+            name="Sign S3 miss requests with SigV4",
+            content=learn_ai_s3_backend_auth_vcl,
+            type="miss",
+        ),
+        vcl_snippet(
+            name="Sign S3 pass requests with SigV4",
+            content=learn_ai_s3_backend_auth_vcl,
+            type="pass",
+        ),
+    ]
+
 learn_ai_fastly_service = fastly.ServiceVcl(
     f"learn-ai-fastly-service-{stack_info.env_suffix}",
     name=f"Learn AI {stack_info.env_suffix}",
@@ -318,7 +417,7 @@ learn_ai_fastly_service = fastly.ServiceVcl(
     backends=[
         fastly.ServiceVclBackendArgs(
             address=learn_ai_app_storage_bucket.bucket_v2.bucket_domain_name,
-            name="learn-ai",
+            name=learn_ai_backend_name,
             override_host=learn_ai_app_storage_bucket.bucket_v2.bucket_domain_name,
             port=DEFAULT_HTTPS_PORT,
             ssl_cert_hostname=learn_ai_app_storage_bucket.bucket_v2.bucket_domain_name,
@@ -386,6 +485,7 @@ learn_ai_fastly_service = fastly.ServiceVcl(
             ),
             type="error",
         ),
+        *learn_ai_s3_auth_snippets,
     ],
     **fastly_logging_args(
         name=f"fastly-learn_ai-{stack_info.env_suffix}",
@@ -432,6 +532,24 @@ learn_ai_vault_mount = vault.Mount(
     description="Secrets for the learn ai application.",
     opts=ResourceOptions(delete_before_replace=True),
 )
+if _learn_ai_bucket_is_sigv4_piloted and learn_ai_fastly_s3_signer_access_key:
+    # Durable copy in Vault for visibility/rotation tooling outside of Pulumi state.
+    # Pulumi (via the iam.AccessKey resource) is still the source of truth --
+    # rotating means replacing that resource, which updates this secret in the
+    # same apply.
+    # Deliberately NOT under secret-learn-ai: learn_ai_policy.hcl grants read on
+    # secret-learn-ai/*, and the Kubernetes auth role accepts every service account
+    # in the namespace, so any learn-ai workload could read the key. The app does
+    # not need it (only Fastly does), and the policy lists specific
+    # secret-operations paths, so a secret here is unreadable to the app role.
+    vault.generic.Secret(
+        f"learn-ai-fastly-s3-signer-vault-secret-{stack_info.env_suffix}",
+        path="secret-operations/learn-ai/fastly-s3-signer",
+        data_json=Output.all(
+            access_key_id=learn_ai_fastly_s3_signer_access_key.id,
+            secret_access_key=learn_ai_fastly_s3_signer_access_key.secret,
+        ).apply(json.dumps),
+    )
 learn_ai_static_vault_secrets = vault.generic.Secret(
     f"learn-ai-secrets-{stack_info.env_suffix}",
     path=learn_ai_vault_mount.path.apply("{}/secrets".format),
