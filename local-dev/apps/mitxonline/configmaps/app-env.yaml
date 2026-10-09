@@ -37,7 +37,6 @@ data:
   MITX_ONLINE_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"
   MITX_ONLINE_REPLY_TO_ADDRESS: "MIT Learn <mitlearn-support@mit.edu>"
   MITX_ONLINE_SUPPORT_EMAIL: "mitlearn-support@mit.edu"
-  MITX_ONLINE_OAUTH_PROVIDER: "mitxonline-oauth2"
   MITX_ONLINE_SECURE_SSL_REDIRECT: "False"
   EXPOSE_OIDC_LOGIN: "True"
 
@@ -103,6 +102,35 @@ data:
   OPENEDX_STUDIO_API_BASE_URL: "https://studio.mit.dev"
   # OPENEDX_BASE_REDIRECT_URL is deliberately absent: its default is
   # OPENEDX_API_BASE_URL, so it follows the value above.
+
+  # The social-auth backend the LMS registers for mitxonline, from
+  # ol-social-auth's OLOAuth2 (name = "ol-oauth2"). Both of these default to
+  # mitxpro-oauth2 upstream, which is the wrong product -- and the default is
+  # not inert: openedx/migrations/0001_add_oauth_application interpolates
+  # OPENEDX_OAUTH_PROVIDER into the edx-oauth-app redirect URI, so leaving it
+  # alone registers a callback the LMS will never call. QA and Production both
+  # set ol-oauth2 (applications/mitxonline/Pulumi.{QA,Production}.yaml).
+  OPENEDX_OAUTH_PROVIDER: "ol-oauth2"
+  OPENEDX_SOCIAL_LOGIN_PATH: "/auth/login/ol-oauth2/?auth_entry=login"
+
+  # LMS account the service-worker token belongs to. Only the course-run sync
+  # paths read it (courses/api.py, import_courserun) -- the enrollment push
+  # authenticates purely by OPENEDX_SERVICE_WORKER_API_TOKEN -- but left unset
+  # it defaults to None and those calls build a request for user "None".
+  # QA/Production set their own per-environment account name.
+  OPENEDX_SERVICE_WORKER_USERNAME: "mitxonline_service_worker"
+
+  # The LMS's half of the pair is OL_OAUTH2_CLIENT_{ID,SECRET} in
+  # openedx-secrets (lehrer's local-dev/secret-defaults.yaml); these two values
+  # must stay identical to those. Committed because they are local-dev-only,
+  # like the OPENEDX_API_CLIENT_* stubs above.
+  #
+  # The Application's stored secret is pbkdf2-hashed by django-oauth-toolkit and
+  # cannot be read back, so the bootstrap init container in deployment.yaml
+  # re-asserts both on every start rather than trusting whatever the migration
+  # minted.
+  OPENEDX_OAUTH_APP_CLIENT_ID: "edx-oauth-app-local-dev" # pragma: allowlist secret
+  OPENEDX_OAUTH_APP_CLIENT_SECRET: "edx-oauth-app-local-dev-secret" # pragma: allowlist secret
 
   # Unified Ecommerce (optional — disable if not running)
   UNIFIED_ECOMMERCE_URL: ""

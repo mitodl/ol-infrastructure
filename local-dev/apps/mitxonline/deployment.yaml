@@ -52,6 +52,48 @@ spec:
           python manage.py migrate --noinput
           python manage.py createcachetable
           python manage.py configure_wagtail
+          # Pin the OAuth2 client the composed Open edX authenticates with, so
+          # the LMS's OL_OAUTH2_CLIENT_{ID,SECRET} match something real.
+          #
+          # Not `configure_instance`, which is the documented way to do this but
+          # cannot run here: invoked without a platform argument it parses
+          # platform as None, fails its `gateway is None` check and exit(-1)s
+          # before it reaches the OAuth step. It also builds redirect URIs from
+          # hardcoded devstack/tutor hosts, none of which is lms.mit.dev.
+          #
+          # openedx/migrations/0001_add_oauth_application creates this row, but
+          # only on a fresh database, with a random secret and a redirect URI
+          # built from whatever OPENEDX_OAUTH_PROVIDER was at migration time.
+          # The secret is pbkdf2-hashed on save and unreadable afterwards, so
+          # re-asserting is the only way to converge on a known pair.
+          # Quoted heredoc, so the shell leaves the Python entirely alone --
+          # nested quoting inside `shell -c` is what makes these break.
+          python manage.py shell <<'PY'
+          import os
+          from urllib.parse import urljoin
+
+          from django.conf import settings
+          from oauth2_provider.models import get_application_model
+
+          redirect_uri = urljoin(
+              settings.OPENEDX_BASE_REDIRECT_URL,
+              f"/auth/complete/{settings.OPENEDX_OAUTH_PROVIDER}/",
+          )
+          _, created = get_application_model().objects.update_or_create(
+              name=settings.OPENEDX_OAUTH_APP_NAME,
+              defaults={
+                  "client_id": os.environ["OPENEDX_OAUTH_APP_CLIENT_ID"],
+                  "client_secret": os.environ["OPENEDX_OAUTH_APP_CLIENT_SECRET"],
+                  "client_type": "confidential",
+                  "authorization_grant_type": "authorization-code",
+                  "skip_authorization": True,
+                  "redirect_uris": redirect_uri,
+                  "user": None,
+              },
+          )
+          verb = "created" if created else "updated"
+          print(f"{verb} {settings.OPENEDX_OAUTH_APP_NAME} -> {redirect_uri}")
+          PY
         envFrom:
         - configMapRef:
             name: mitxonline-env
