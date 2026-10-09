@@ -51,6 +51,39 @@ spec:
       servicePort: 8000
     plugin_config_name: openedx-shared-plugins
 ---
+# Learning MFE — served on the LMS host at /learn, which is where
+# frontend-app-learning is built to live (PUBLIC_PATH=/learn/) and what
+# mitxonline's CourseRun.courseware_url points at. Production does the same:
+# edxapp's k8s_configmaps.py sets LEARNING_MICROFRONTEND_URL to
+# https://<lms domain>/learn.
+#
+# priority 10 beats the lms route's 0 so /learn/* lands here while every other
+# path still reaches edx-platform. Both routes share the host, and APISIX picks
+# the higher priority on a tie of specificity rather than the longer path.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: learning-mfe-route
+  namespace: openedx
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: learning-mfe
+    priority: 10
+    match:
+      hosts:
+      - "lms.mit.dev"
+      paths:
+      # Both forms: /learn/* covers the SPA routes and the hashed assets,
+      # /learn alone is the bare entry point a hand-typed URL or a redirect
+      # without the trailing slash produces, which /learn/* does not match.
+      - "/learn"
+      - "/learn/*"
+    backends:
+    - serviceName: mfe-learning
+      servicePort: 80
+    plugin_config_name: openedx-shared-plugins
+---
 # CMS (Studio) — edx-platform course authoring tool.
 apiVersion: apisix.apache.org/v2
 kind: ApisixRoute

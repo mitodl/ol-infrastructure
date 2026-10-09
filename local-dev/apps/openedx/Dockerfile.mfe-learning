@@ -1,0 +1,18 @@
+# nginx image for the Open edX learning MFE (frontend-app-learning).
+#
+# The build context is a temporary directory the Tiltfile's custom_build
+# populates: `dagger call mfe build-legacy-configured ... export --path
+# <tmp>/dist` writes the bundle, then the Tiltfile copies this Dockerfile's
+# sibling nginx conf in next to it.
+#
+# Pinned to the same nginx digest lehrer uses for its site-project MFE images
+# (lehrer local-dev/Dockerfile.mfe), so local-dev runs one nginx version rather
+# than two.
+FROM nginx:1.31-alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3
+
+# Into learn/, not the server root. The bundle is built with
+# PUBLIC_PATH=/learn/ and references its own assets absolutely, so the files
+# have to sit at the path the HTML names. See nginx-mfe-learning.conf.
+COPY dist/ /usr/share/nginx/html/learn/
+COPY nginx-mfe-learning.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
