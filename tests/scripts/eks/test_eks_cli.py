@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import importlib.util
+import socket
 import sys
+import threading
+import urllib.request
 from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -486,3 +489,104 @@ def test_setup_writes_kubeconfig_with_operator_contexts_by_default(
 
     user_names = [user["name"] for user in kubeconfig["users"]]
     assert "applications-qa-readonly" not in user_names
+
+
+# ---------------------------------------------------------------------------
+# login_oidc_get_token
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def oidc_callback_port(eks_module, monkeypatch):
+    """Run the callback server on an ephemeral port with short timeouts.
+
+    Returns a function that blocks until the server is listening and returns
+    its port.
+    """
+    monkeypatch.setattr(eks_module, "OIDC_CALLBACK_PORT", 0)
+    monkeypatch.setattr(eks_module.OidcHttpServer, "timeout", 0.2)
+    monkeypatch.setattr(eks_module.OidcCallbackHandler, "timeout", 0.2)
+    listening = threading.Event()
+    ports = []
+
+    server_activate = eks_module.OidcHttpServer.server_activate
+
+    def recording_server_activate(self):
+        server_activate(self)
+        ports.append(self.server_address[1])
+        listening.set()
+
+    monkeypatch.setattr(
+        eks_module.OidcHttpServer, "server_activate", recording_server_activate
+    )
+
+    def wait_for_port():
+        assert listening.wait(timeout=5)
+        return ports[0]
+
+    return wait_for_port
+
+
+def run_in_background(target):
+    """Start target in a daemon thread and return the thread."""
+    thread = threading.Thread(target=target, daemon=True)
+    thread.start()
+    return thread
+
+
+def run_login(eks_module):
+    """Run login_oidc_get_token, failing instead of hanging if it never returns.
+
+    Returns ``{"code": ...}`` or ``{"error": RuntimeError}``.
+    """
+    outcome = {}
+
+    def login():
+        try:
+            outcome["code"] = eks_module.login_oidc_get_token()
+        except RuntimeError as exc:
+            outcome["error"] = exc
+
+    run_in_background(login).join(timeout=5)
+    assert outcome, "login_oidc_get_token is still waiting"
+    return outcome
+
+
+@pytest.mark.unit
+def test_login_oidc_get_token_returns_callback_code(eks_module, oidc_callback_port):
+    """A callback request should yield its authorization code."""
+    run_in_background(
+        lambda: urllib.request.urlopen(
+            f"http://127.0.0.1:{oidc_callback_port()}/oidc/callback?code=abc"
+        ).read()
+    )
+
+    assert run_login(eks_module) == {"code": "abc"}
+
+
+@pytest.mark.unit
+@pytest.mark.usefixtures("oidc_callback_port")
+def test_login_oidc_get_token_times_out_without_callback(eks_module):
+    """With no callback connection, the wait should end with a timeout error."""
+    outcome = run_login(eks_module)
+
+    assert "No Vault OIDC callback within" in str(outcome["error"])
+
+
+@pytest.mark.unit
+def test_login_oidc_get_token_does_not_hang_on_idle_connection(
+    eks_module, oidc_callback_port
+):
+    """A client that connects and sends nothing should not hold the wait open."""
+    connections = []
+    run_in_background(
+        lambda: connections.append(
+            socket.create_connection(("127.0.0.1", oidc_callback_port()))
+        )
+    )
+
+    outcome = run_login(eks_module)
+
+    assert "did not return an authorization code" in str(outcome["error"])
+    for connection in connections:
+        connection.close()
