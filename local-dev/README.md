@@ -663,7 +663,9 @@ It is not an app. The core Pulumi stack deploys, all in `local-infra`:
   its state in two databases (`gravitino`, `iceberg`) on the shared Postgres cluster.
 - StarRocks, the single-pod `allin1` image at the version the deployed clusters run,
   with an external catalog `ol_data_lake_local` pointing at Gravitino and an empty
-  `ol_warehouse_local` schema in it for dbt to connect to.
+  `ol_warehouse_local` schema in it for dbt to connect to. It also gets two empty
+  databases of its own, `b2b_analytics` and `b2b_learner_records`, for the b2b
+  materialized views.
 
 Budget about 2GB of memory, a 3GB image pull and a 20Gi volume for StarRocks.
 
@@ -693,6 +695,16 @@ ol-dbt starrocks build --env dev --select +integrations__learn__oll_courses
 `ol_warehouse_local_<layer>` (`_staging`, `_intermediate`, `_integrations`, ...), and
 the sources read `ol_warehouse_local_raw`, which nothing fills for you yet: create the
 raw tables a model reads before building it.
+
+The b2b materialized views are StarRocks tables, not lake tables, so they have a
+profile of their own, `starrocks_local_b2b`. It writes `default_catalog.b2b_analytics`
+and `default_catalog.b2b_learner_records` and reads
+`ol_data_lake_local.ol_warehouse_local_dimensional`, which nothing fills yet. A bare
+`dagster dev` in the lakehouse code location builds on it, and so does:
+
+```bash
+ol-dbt starrocks build --env dev --target starrocks_local_b2b --select tag:starrocks
+```
 
 To have MIT Learn's warehouse tasks read the result, set these in its
 `app-env.local.yaml` (see [Local Configuration Overrides](#local-configuration-overrides)):
