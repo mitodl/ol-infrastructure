@@ -35,6 +35,14 @@ _RELEASE_MACHINERY_RE = re.compile(
     r"^(Release|Merge releases/)\s*\d{4}\.\d{1,2}\.\d{1,2}\.\d+$"
 )
 _RELEASE_BRANCH_PREFIX = "releases/"
+# The two ways a merged PR names itself on the default branch: a squash merge
+# appends " (#123)" to the PR title, and a merge commit's subject is
+# "Merge pull request #123 from <owner>/<branch>" with the PR title as the
+# first body line. Release notes need the number so they can link the PR --
+# the release resource fills commits.json from the PR API instead, one call
+# per commit, which is more than a Slack reply should cost.
+_SQUASH_PR_RE = re.compile(r"\s*\(#(?P<number>\d+)\)$")
+_MERGE_PR_RE = re.compile(r"^Merge pull request #(?P<number>\d+) from \S+$")
 _CHECKLIST_LINE_RE = re.compile(r"^- \[( |x)\]", re.IGNORECASE)
 # A checklist item is "- [ ] <description> by <author>". The description can
 # itself contain " by ", so the greedy .* deliberately binds to the *last*
@@ -158,26 +166,56 @@ def next_release_version(tags: list[str], today: date) -> str:
 
 def _is_release_machinery(message: str) -> bool:
     """Return True for the commits the release resource itself authors."""
-    return bool(_RELEASE_MACHINERY_RE.match(message.splitlines()[0].strip()))
+    subject = (message.splitlines() or [""])[0]
+    return bool(_RELEASE_MACHINERY_RE.match(subject.strip()))
 
 
-def _commits_since_last_tag_sync(repo_slug: str) -> list[dict[str, Any]]:
+def pull_request(message: str) -> tuple[int | None, str]:
+    """Return the PR number a commit message names, and the PR's title.
+
+    The number is None for a commit that did not come from a PR (or whose
+    message does not say so); the title is then the commit subject.
+    """
+    lines = message.splitlines() or [""]
+    subject = lines[0].strip()
+    if match := _MERGE_PR_RE.match(subject):
+        # The merge subject names only the branch; the PR title, when GitHub
+        # wrote one, is the first non-blank body line.
+        body = [line.strip() for line in lines[1:] if line.strip()]
+        return int(match.group("number")), body[0] if body else subject
+    if match := _SQUASH_PR_RE.search(subject):
+        return int(match.group("number")), subject[: match.start()]
+    return None, subject
+
+
+def _commits_since_last_tag_sync(repo_slug: str) -> dict[str, Any]:
+    """Return up to ``_COMMIT_LIST_LIMIT`` unreleased commits, and how many more.
+
+    ``omitted`` counts the commits past the cap that were not listed, so a
+    caller can say the list is truncated instead of under-reporting the
+    release. It is None when the count is unknown: with no release tag the
+    "range" is the whole history, and only the cap's worth is fetched.
+    """
     repo = _get_client().get_repo(repo_slug)
     latest_tag = _latest_release_tag(repo)
 
+    omitted: int | None
     if latest_tag:
+        # A "diverged" comparison still lists the branch's commits since the
+        # merge base -- which is the case while a hotfix is in flight, since
+        # its tag sits on a cherry-pick off main. Treating diverged as empty
+        # reported "nothing to release" there with commits waiting on main.
         comparison = repo.compare(latest_tag, repo.default_branch)
-        # "diverged" status means the tag is not an ancestor of the branch;
-        # GitHub omits commits entirely in that case.
-        raw_commits = (
-            []
-            if comparison.status == "diverged"
-            else itertools.islice(comparison.commits, _COMMIT_LIST_LIMIT)
-        )
+        raw_commits = list(itertools.islice(comparison.commits, _COMMIT_LIST_LIMIT))
+        # total_commits counts the whole range, so this is exact. Release
+        # machinery among the omitted commits is counted too, since filtering
+        # it would mean fetching the commits the cap exists to skip.
+        omitted = max(comparison.total_commits - len(raw_commits), 0)
     else:
-        raw_commits = itertools.islice(repo.get_commits(), _COMMIT_LIST_LIMIT)
+        raw_commits = list(itertools.islice(repo.get_commits(), _COMMIT_LIST_LIMIT))
+        omitted = None if len(raw_commits) == _COMMIT_LIST_LIMIT else 0
 
-    return [
+    commits = [
         {
             "sha": c.sha,
             "message": c.commit.message,
@@ -190,6 +228,7 @@ def _commits_since_last_tag_sync(repo_slug: str) -> list[dict[str, Any]]:
         # finished release reads as two commits waiting to be released.
         if not _is_release_machinery(c.commit.message)
     ]
+    return {"commits": commits, "omitted": omitted}
 
 
 def _in_flight_release_sync(repo_slug: str) -> dict[str, Any] | None:
@@ -238,10 +277,12 @@ def _release_preview_sync(repo_slug: str) -> dict[str, Any]:
     repo = _get_client().get_repo(repo_slug)
     tags = _release_tags(repo)
     latest_tag = max(tags, key=release_tag_sort_key) if tags else None
+    unreleased = _commits_since_last_tag_sync(repo_slug)
     return {
         "version": next_release_version(tags, datetime.now(tz=UTC).date()),
         "since": latest_tag,
-        "commits": _commits_since_last_tag_sync(repo_slug),
+        "commits": unreleased["commits"],
+        "omitted": unreleased["omitted"],
         "in_flight": _in_flight_release_sync(repo_slug),
     }
 
@@ -256,8 +297,11 @@ async def release_preview(repo_slug: str) -> dict[str, Any]:
     return await asyncio.to_thread(_release_preview_sync, repo_slug)
 
 
-async def commits_since_last_tag(repo_slug: str) -> list[dict[str, Any]]:
+async def commits_since_last_tag(repo_slug: str) -> dict[str, Any]:
     """Return commits on the default branch since the most recent YYYY.MM.DD.N tag.
+
+    The result is ``{"commits": [...], "omitted": int | None}``; see
+    :func:`_commits_since_last_tag_sync` for what ``omitted`` means.
 
     Uses the compare API (base=tag, head=branch) so only commits *after* the
     tag are returned -- get_commits(sha=...) walks history *starting from*

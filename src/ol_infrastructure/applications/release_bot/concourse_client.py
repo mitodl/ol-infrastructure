@@ -79,6 +79,14 @@ async def trigger_job(pipeline: str, job: str, team: str | None = None) -> str:
     return f"{CONCOURSE_URL}/builds/{build['id']}"
 
 
+def job_url(pipeline: str, job: str, team: str | None = None) -> str:
+    """Return the web UI URL of *job*, whose newest build is listed first."""
+    return (
+        f"{CONCOURSE_URL}/teams/{team or CONCOURSE_TEAM}"
+        f"/pipelines/{pipeline}/jobs/{job}"
+    )
+
+
 async def list_jobs(pipeline: str, team: str | None = None) -> list[str]:
     """Return the names of the jobs defined in *pipeline*, in pipeline order.
 
