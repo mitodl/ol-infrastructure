@@ -692,10 +692,20 @@ ol-dbt starrocks build --env dev --select +integrations__learn__oll_courses
 `ol_warehouse_local`, over the port-forward above. Models land in
 `ol_warehouse_local_<layer>` (`_staging`, `_intermediate`, `_integrations`, ...), and
 the sources read `ol_warehouse_local_raw`, which nothing fills for you yet: create the
-raw tables a model reads before building it. An app reading the result, e.g. MIT
-Learn's warehouse tasks, sets `STARROCKS_HOST=starrocks.local-infra.svc.cluster.local`,
-`STARROCKS_USER=root`, `WAREHOUSE_CATALOG=ol_data_lake_local` and
-`WAREHOUSE_SCHEMA=ol_warehouse_local_integrations`.
+raw tables a model reads before building it.
+
+To have MIT Learn's warehouse tasks read the result, set these in its
+`app-env.local.yaml` (see [Local Configuration Overrides](#local-configuration-overrides)):
+
+```yaml
+STARROCKS_HOST: "starrocks.local-infra.svc.cluster.local"
+STARROCKS_USER: "root"
+WAREHOUSE_CATALOG: "ol_data_lake_local"
+WAREHOUSE_SCHEMA: "ol_warehouse_local_integrations"
+```
+
+Each task reads one `integrations__learn__*` table, so build the one the task you are
+working on names. Celery beat is off locally, so run the task by hand.
 
 Things that will trip you up:
 
