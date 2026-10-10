@@ -729,14 +729,6 @@ missing table until one is added.
 
 Things that will trip you up:
 
-- **Removing `data-platform` while Tilt is stopped leaves MIT Learn's warehouse
-  settings behind.** Tilt only deletes the objects it applied in the same run. Remove
-  it while Tilt is running, or delete the ConfigMap yourself and restart the pods:
-
-  ```bash
-  kubectl -n mit-learn delete configmap mitlearn-env-warehouse
-  ```
-
 - **A Postgres cluster created before 2026-07-08 needs one grant first.** The
   `lakehouse-databases` Job creates its databases as the `app` role, and `CREATEDB` is
   only granted when the cluster is first initialized. If the Job fails with

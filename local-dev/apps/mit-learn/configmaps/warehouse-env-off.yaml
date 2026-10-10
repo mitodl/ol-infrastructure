@@ -1,0 +1,11 @@
+---
+# The same ConfigMap as warehouse-env.yaml with no settings, applied when
+# data-platform is not in enabled_apps. Applying it empty, where leaving it out
+# would do on a fresh cluster, is what clears the settings when the lake was
+# switched off while Tilt was stopped: Tilt only deletes objects it applied in
+# the same run.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mitlearn-env-warehouse
+  namespace: mit-learn

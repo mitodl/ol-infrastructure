@@ -1,7 +1,7 @@
 ---
 # Points MIT Learn's warehouse-pull tasks at the local data lake. Applied by the
-# Tiltfile only when data-platform is in enabled_apps; see "Data lake
-# (Gravitino + StarRocks)" in local-dev/README.md.
+# Tiltfile when data-platform is in enabled_apps, and warehouse-env-off.yaml
+# otherwise; see "Data lake (Gravitino + StarRocks)" in local-dev/README.md.
 apiVersion: v1
 kind: ConfigMap
 metadata:

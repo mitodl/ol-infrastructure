@@ -80,7 +80,7 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
-        # Only applied when data-platform is in enabled_apps (see Tiltfile).
+        # Empty unless data-platform is in enabled_apps (see Tiltfile).
         - configMapRef:
             name: mitlearn-env-warehouse
             optional: true
@@ -144,7 +144,7 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
-        # Only applied when data-platform is in enabled_apps (see Tiltfile).
+        # Empty unless data-platform is in enabled_apps (see Tiltfile).
         - configMapRef:
             name: mitlearn-env-warehouse
             optional: true
@@ -270,7 +270,7 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
-        # Only applied when data-platform is in enabled_apps (see Tiltfile).
+        # Empty unless data-platform is in enabled_apps (see Tiltfile).
         - configMapRef:
             name: mitlearn-env-warehouse
             optional: true
@@ -352,7 +352,7 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
-        # Only applied when data-platform is in enabled_apps (see Tiltfile).
+        # Empty unless data-platform is in enabled_apps (see Tiltfile).
         - configMapRef:
             name: mitlearn-env-warehouse
             optional: true
@@ -434,7 +434,7 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
-        # Only applied when data-platform is in enabled_apps (see Tiltfile).
+        # Empty unless data-platform is in enabled_apps (see Tiltfile).
         - configMapRef:
             name: mitlearn-env-warehouse
             optional: true
@@ -513,7 +513,7 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
-        # Only applied when data-platform is in enabled_apps (see Tiltfile).
+        # Empty unless data-platform is in enabled_apps (see Tiltfile).
         - configMapRef:
             name: mitlearn-env-warehouse
             optional: true
