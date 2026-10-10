@@ -674,6 +674,8 @@ Budget about 2GB of memory, a 3GB image pull and a 20Gi volume for StarRocks.
 | StarRocks, from your machine | `mysql -h 127.0.0.1 -P 9030 -u root` (Tilt keeps the port-forward open as `starrocks-port-forward`) |
 | StarRocks, inside the cluster | `starrocks.local-infra.svc.cluster.local:9030`, user `root`, no password |
 | Iceberg REST catalog, inside the cluster | `http://gravitino.local-infra.svc.cluster.local:9001/iceberg` |
+| Iceberg REST catalog, from your machine | `http://localhost:9001/iceberg` (`iceberg-catalog-port-forward`) |
+| RustFS, from your machine, for an Iceberg writer | `http://localhost:9000` (`lake-object-store-port-forward`) |
 | Gravitino management API and UI | `kubectl -n local-infra port-forward svc/gravitino 8090:8090` |
 
 ```sql
@@ -702,6 +704,18 @@ the fixture files committed in ol-data-platform, and a model whose raw tables ha
 fixture fails on the missing source table. See
 [docs/LOCAL_LAKE.md](https://github.com/mitodl/ol-data-platform/blob/main/docs/LOCAL_LAKE.md)
 there for the fixture format and how to add one.
+
+A dlt source in that checkout writes raw tables from a local app database into the same
+schema, over the catalog and RustFS forwards above plus one to Postgres
+(`kubectl -n local-infra port-forward svc/local-pg-rw 5432:5432`):
+
+```bash
+cd src/ol_dlt && uv run python -m ol_dlt.sources.keycloak
+```
+
+The catalog tells every client to use RustFS's in-cluster address, so any other
+host-side Iceberg writer has to keep its own endpoint the way `ol_dlt/local_lake.py`
+does.
 
 The b2b materialized views are StarRocks tables, not lake tables, so they have a
 profile of their own, `starrocks_local_b2b`. It writes `default_catalog.b2b_analytics`

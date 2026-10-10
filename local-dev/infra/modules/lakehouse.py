@@ -169,8 +169,8 @@ def _gravitino_catalog() -> dict[str, object]:
             "io-impl": "org.apache.iceberg.aws.s3.S3FileIO",
             # Returned to every client in /v1/config and in each loadTable
             # response, where it overrides the client's own endpoint. A writer
-            # outside the cluster cannot resolve it, so pyiceberg and dlt have
-            # to run in a pod.
+            # outside the cluster cannot resolve it and has to put its own
+            # endpoint back, as ol_dlt.local_lake in ol-data-platform does.
             "s3-endpoint": S3_ENDPOINT,
             "s3-access-key-id": ACCESS_KEY,
             "s3-secret-access-key": SECRET_KEY,

@@ -397,13 +397,22 @@ local_resource(
 # deploys, with nothing to build. StarRocks speaks the MySQL protocol, which
 # APISIX does not route, so a host-side dbt or mysql client reaches it through
 # this forward. kubectl exits when the pod behind it goes away, hence the loop.
+#
+# The other two are for a host-side Iceberg writer, which is how ol-data-platform
+# runs a dlt source into the lake (DLT_PROFILE=dev): it commits through the REST
+# catalog and writes the files to RustFS itself.
 if "data-platform" in enabled_apps:
-    local_resource(
-        "starrocks-port-forward",
-        serve_cmd="while true; do kubectl -n local-infra port-forward svc/starrocks 9030:9030; sleep 2; done",
-        labels=["infra"],
-        resource_deps=["local-infra-core"],
-    )
+    for name, service, port in [
+        ("starrocks-port-forward", "starrocks", 9030),
+        ("iceberg-catalog-port-forward", "gravitino", 9001),
+        ("lake-object-store-port-forward", "rustfs", 9000),
+    ]:
+        local_resource(
+            name,
+            serve_cmd="while true; do kubectl -n local-infra port-forward svc/{service} {port}:{port}; sleep 2; done".format(service=service, port=port),
+            labels=["infra"],
+            resource_deps=["local-infra-core"],
+        )
 
 # Seed the local-dev test users (admin / student / prof, password localdev123)
 # into the olapps realm. Pulumi provisions the realm and OIDC clients, but the
