@@ -1695,9 +1695,22 @@ def _build_release_resource_app_pipeline(
         # to a plain string before the resource ever sees it. The skip marker
         # is written when there is nothing to approve, and the put then posts
         # nothing at all rather than closing an issue that approves something.
+        #
+        # release_tag is the version for a new release and empty for an
+        # infrastructure-only one. Until a newer release is built, this job
+        # still carries the last cut version, including an abandoned one, and
+        # the put searches only open issues, so it would open a gate issue for
+        # a release whose branch and tag are gone. The tag rather than the
+        # branch, which a finished release has lost too: see
+        # classify_promotion.py.
         LoadVarStep(
             load_var="promotion_title",
             file=f"{PROMOTION_DIR}/title",
+            reveal=True,
+        ),
+        LoadVarStep(
+            load_var="release_tag",
+            file=f"{PROMOTION_DIR}/release_tag",
             reveal=True,
         ),
         PutStep(
@@ -1707,6 +1720,7 @@ def _build_release_resource_app_pipeline(
                 "labels": ["release"],
                 "title_template": "((.:promotion_title))",
                 "skip_if_file": f"{PROMOTION_DIR}/skip",
+                "skip_if_tag_missing": "((.:release_tag))",
             },
         ),
         # Mark the RC GitHub Deployment as successful.

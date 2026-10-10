@@ -126,9 +126,23 @@ def test_issue_put_carries_the_composed_body_and_skip_marker():
         "labels": ["release"],
         "title_template": "((.:promotion_title))",
         "skip_if_file": "promotion/skip",
+        "skip_if_tag_missing": "((.:release_tag))",
     }
     # An issue that does not exist must not auto-close: closing approves it.
     assert "close_if_file" not in issue["params"]
+
+
+def test_issue_put_loads_the_release_tag_classify_wrote():
+    """The tag the put checks is the one classify-promotion named."""
+    plan = _job(APP, "-qa")["plan"]
+    load = plan[_index(plan, "load_var", "release_tag")]
+
+    assert load["file"] == "promotion/release_tag"
+    assert (
+        _index(plan, "task", CLASSIFY_TASK_NAME)
+        < _index(plan, "load_var", "release_tag")
+        < _index(plan, "put", f"{APP}-release-issue")
+    )
 
 
 def test_production_deploys_the_cut_version_the_gate_names():
@@ -270,6 +284,8 @@ def test_classify_release_with_a_diff_leads_with_the_checklist(tmp_path):
     assert body.startswith(f"## Release {VERSION}")
     assert "+ 1 to update" in body
     assert not (out / "skip").exists()
+    # The put posts it only while the release is still alive.
+    assert (out / "release_tag").read_text() == VERSION
 
 
 def test_classify_release_without_a_diff_says_so(tmp_path):
@@ -285,6 +301,26 @@ def test_classify_release_without_a_diff_says_so(tmp_path):
     assert result.returncode == 0, result.stderr
     assert "No infrastructure changes" in (out / "body.md").read_text()
     assert (out / "title").read_text() == f"Release {APP} {VERSION}"
+
+
+def test_classify_a_finished_release_after_a_rollback_is_still_gated(tmp_path):
+    """Production rolled back past a finished release: it is waiting again.
+
+    Finishing deleted its branch but kept its tag, so the put must check the
+    tag; a branch check would post nothing and the release could not ship.
+    """
+    result, out = _classify(
+        tmp_path,
+        production=LIVE,
+        state="known",
+        summary="+ 1 to update",
+        no_changes=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (out / "title").read_text() == f"Release {APP} {VERSION}"
+    assert (out / "release_tag").read_text() == VERSION
+    assert not (out / "skip").exists()
 
 
 def test_classify_first_release_is_a_release(tmp_path):
@@ -312,6 +348,8 @@ def test_classify_infrastructure_only_has_no_checklist(tmp_path):
     assert "## Release" not in body
     assert "+ 1 to update" in body
     assert (out / "title").read_text() == f"Release {APP} infrastructure @ {VERSION}"
+    # An infrastructure-only issue names the live release: no check.
+    assert (out / "release_tag").read_text() == ""
 
 
 def test_classify_nothing_to_approve_writes_the_skip_marker(tmp_path):
@@ -327,8 +365,9 @@ def test_classify_nothing_to_approve_writes_the_skip_marker(tmp_path):
     assert result.returncode == 0, result.stderr
     assert (out / "skip").exists()
     assert not (out / "body.md").exists()
-    # load_var still needs a title file to read.
+    # load_var still needs both files to read.
     assert (out / "title").exists()
+    assert (out / "release_tag").read_text() == ""
 
 
 def test_classify_fails_closed_when_production_is_unknown(tmp_path):

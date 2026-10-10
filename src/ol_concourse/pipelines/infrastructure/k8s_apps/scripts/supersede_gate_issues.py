@@ -25,6 +25,13 @@ the Production job's ``assert-gate-names-deploy`` check is what guarantees
 nothing unapproved deploys. This keeps the queue down to the one issue that
 can be approved.
 
+The put also posts nothing when the release it would announce was abandoned:
+it skips when classify-promotion's ``release_tag`` is no longer in the
+repository, which is what an abandoned release looks like until a newer one is
+built. Then no skip marker exists and the put reports no issue. This confirms
+the tag is gone and treats the run as having nothing to approve. If the tag is
+still there, it refuses, as for any put that should have posted.
+
 Only issues whose whole title is one of the two gate shapes are touched, the
 same match ``assert_gate_names_deploy.py`` uses. ``mit-learn`` and
 ``mit-learn-nextjs`` share a repository, and a prefix match would close the
@@ -39,7 +46,8 @@ carries.
 Environment:
     APP_NAME: the app.
     GITHUB_REPOSITORY: ``owner/repo`` holding the app's release issues.
-    PROMOTION_DIR: classify-promotion's output (``title`` and maybe ``skip``).
+    PROMOTION_DIR: classify-promotion's output (``title``, ``release_tag``
+        and maybe ``skip``).
     ISSUE_FILE: ``<release-issue>/gh_issue.json`` from the issue put.
     GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY: the
         release GitHub App's credentials.
@@ -55,6 +63,7 @@ import sys
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -276,9 +285,20 @@ def supersede(github: GitHub, repo: str, issue: Issue, reason: str) -> None:
     raise RuntimeError(msg)
 
 
+class ReleaseOverError(Exception):
+    """The put posted nothing because the release's tag may be gone."""
+
+    def __init__(self, tag: str) -> None:
+        """Name the tag whose absence would explain the empty put."""
+        super().__init__(tag)
+        self.tag = tag
+
+
 def kept_issue(promotion_dir: Path, issue_file: Path) -> Issue | None:
     """Return the issue the put posted, or None when it posted nothing.
 
+    Raises ReleaseOverError when the put names no issue but was told to skip
+    if ``release_tag`` is missing: the caller has to confirm that it is.
     Raises ValueError when the put should have posted one but names none:
     superseding everything then would close the issue that approves the
     release.
@@ -287,10 +307,28 @@ def kept_issue(promotion_dir: Path, issue_file: Path) -> Issue | None:
         return None
     posted = json.loads(issue_file.read_text())
     number = int(posted.get("issue_number") or 0)
-    if number <= 0:
-        msg = f"the release issue put reported no issue in {issue_file}"
-        raise ValueError(msg)
-    return {"number": number, "title": posted.get("issue_title", "")}
+    if number > 0:
+        return {"number": number, "title": posted.get("issue_title", "")}
+    tag_file = promotion_dir / "release_tag"
+    tag = tag_file.read_text().strip() if tag_file.exists() else ""
+    if tag:
+        raise ReleaseOverError(tag)
+    msg = f"the release issue put reported no issue in {issue_file}"
+    raise ValueError(msg)
+
+
+def tag_exists(github: GitHub, repo: str, tag: str) -> bool:
+    """Return whether the tag *tag* is in *repo*; any error but a 404 propagates.
+
+    The single-ref endpoint matches the name exactly, unlike matching-refs.
+    """
+    try:
+        github.request("GET", f"/repos/{repo}/git/ref/tags/{urllib.parse.quote(tag)}")
+    except urllib.error.HTTPError as error:
+        if error.code == 404:  # noqa: PLR2004
+            return False
+        raise
+    return True
 
 
 def main() -> None:
@@ -299,8 +337,15 @@ def main() -> None:
     repo = os.environ["GITHUB_REPOSITORY"]
     api_url = os.environ.get("GITHUB_API_URL") or "https://api.github.com"
     promotion_dir = Path(os.environ["PROMOTION_DIR"])
+    nothing_to_approve = (
+        "Production already matches this code: no release is waiting and the "
+        "Production preview shows no changes."
+    )
+    over: str | None = None
     try:
         keep = kept_issue(promotion_dir, Path(os.environ["ISSUE_FILE"]))
+    except ReleaseOverError as error:
+        keep, over = None, error.tag
     except (ValueError, OSError) as error:
         sys.exit(f"Refusing to supersede {app}'s gate issues: {error}.")
 
@@ -311,6 +356,17 @@ def main() -> None:
         os.environ["GITHUB_APP_PRIVATE_KEY"],
     )
     github = GitHub(api_url, token)
+    if over is not None:
+        if tag_exists(github, repo, over):
+            sys.exit(
+                f"Refusing to supersede {app}'s gate issues: the release issue "
+                f"put posted nothing, but tag {over} is still in {repo}."
+            )
+        print(f"{app}: tag {over} is gone, so its release was abandoned.")  # noqa: T201
+        nothing_to_approve = (
+            f"Release {over} was abandoned (its tag is gone), and nothing can be "
+            "approved until a new release is cut."
+        )
     since = (datetime.now(UTC) - CLOSED_LOOKBACK).strftime("%Y-%m-%dT%H:%M:%SZ")
     candidates = [
         *github.issues(repo, "state=open"),
@@ -321,11 +377,7 @@ def main() -> None:
         print(f"{app}: no stale gate issues.")  # noqa: T201
         return
 
-    reason = comment_for(
-        keep,
-        "Production already matches this code: no release is waiting and the "
-        "Production preview shows no changes.",
-    )
+    reason = comment_for(keep, nothing_to_approve)
     ensure_abandoned_label(github, repo)
     for issue in stale:
         print(f"{app}: superseding #{issue['number']} ({issue['title']!r}).")  # noqa: T201
