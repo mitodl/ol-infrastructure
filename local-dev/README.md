@@ -198,8 +198,8 @@ exceptions: the RustFS object store is deployed only when an app that needs it i
 enabled, and the data lake only when `data-platform` is listed (see
 [Data lake](#data-lake-gravitino--starrocks)), because both are too heavy to run for
 developers who have no use for them. The
-Tiltfile forwards `enabled_apps` to both Pulumi stacks as `LOCAL_DEV_ENABLED_APPS`
-so they can make that call.
+Tiltfile forwards `enabled_apps` to both Pulumi stacks and to the app Tiltfiles as
+`LOCAL_DEV_ENABLED_APPS` so they can make that call.
 
 ### Open edX
 
@@ -526,7 +526,7 @@ cp local-dev/apps/mitxonline/configmaps/app-env.local.yaml.example \
 #   FEATURE_IGNORE_EDX_FAILURES: "True"
 ```
 
-How it works — plain Kubernetes, visible in each app's `deployment.yaml`: every container's `envFrom` list references the override ConfigMap (`mitxonline-env-local` etc.) **last** and with `optional: true`. Kubernetes resolves duplicate `envFrom` keys by letting the last source win, so your overrides beat both the tracked ConfigMap *and* the tracked Secret — secret values are fine in this file, it never leaves your machine. `optional: true` means no file → no ConfigMap → no-op for everyone else.
+How it works — plain Kubernetes, visible in each app's `deployment.yaml`: every container's `envFrom` list references the override ConfigMap (`mitxonline-env-local` etc.) **last** and with `optional: true`. Kubernetes resolves duplicate `envFrom` keys by letting the last source win, so your overrides beat the tracked ConfigMaps *and* the tracked Secret — secret values are fine in this file, it never leaves your machine. `optional: true` means no file → no ConfigMap → no-op for everyone else.
 
 Day-to-day behavior:
 
@@ -710,19 +710,32 @@ and `default_catalog.b2b_learner_records` and reads
 ol-dbt starrocks build --env dev --target starrocks_local_b2b --select tag:starrocks
 ```
 
-MIT Learn's warehouse tasks read the result with no further setup. With both
-`mit-learn` and `data-platform` enabled, its pods get `STARROCKS_HOST`, `STARROCKS_USER`,
-`WAREHOUSE_CATALOG` and `WAREHOUSE_SCHEMA` for the local lake from
+MIT Learn's warehouse tasks are pointed at the local lake with no further setup. With
+both `mit-learn` and `data-platform` enabled, its pods get `STARROCKS_HOST`,
+`STARROCKS_USER`, `WAREHOUSE_CATALOG` and `WAREHOUSE_SCHEMA` from
 `local-dev/apps/mit-learn/configmaps/warehouse-env.yaml`. Each task reads one
-`integrations__learn__*` table, so build the one the task you are working on names.
-Celery beat is off locally, so run the task by hand:
+`integrations__learn__*` table, so build the one the task you are working on names
+(its `table_name`). Celery beat is off locally, so run the task by hand. The task
+modules bind each name to a registered task instance, so call `run` on it directly:
 
 ```bash
 kubectl -n mit-learn exec deploy/mitlearn-webapp -c app -- python manage.py shell -c \
-  "from profiles.tasks import SyncProgramCertificatesTask as T; print(T().run(full_refresh=True))"
+  "from profiles.tasks import SyncProgramCertificatesTask as T; print(T.run(full_refresh=True))"
 ```
 
+That task is the only one on MIT Learn's main branch today, and the table it reads,
+`integrations__learn__program_certificates`, has no raw fixture yet, so it fails on a
+missing table until one is added.
+
 Things that will trip you up:
+
+- **Removing `data-platform` while Tilt is stopped leaves MIT Learn's warehouse
+  settings behind.** Tilt only deletes the objects it applied in the same run. Remove
+  it while Tilt is running, or delete the ConfigMap yourself and restart the pods:
+
+  ```bash
+  kubectl -n mit-learn delete configmap mitlearn-env-warehouse
+  ```
 
 - **A Postgres cluster created before 2026-07-08 needs one grant first.** The
   `lakehouse-databases` Job creates its databases as the `app` role, and `CREATEDB` is

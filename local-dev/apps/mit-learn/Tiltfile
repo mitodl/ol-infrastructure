@@ -63,8 +63,9 @@ if os.path.exists(os.path.join(MIT_LEARN_DIR, ".git")):
 
 # The warehouse settings go in with the rest so that enabling or disabling the
 # lake changes the config fingerprint and rolls the pods. They are left out
-# without the lake because a set STARROCKS_HOST also puts the warehouse tasks
-# on the beat schedule.
+# without the lake because the host would not resolve, and because MIT Learn
+# schedules its program certificates sync whenever beat is enabled and
+# STARROCKS_HOST and STARROCKS_USER are set.
 _manifests = [
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/nginx.yaml"),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/app-env.yaml"),
