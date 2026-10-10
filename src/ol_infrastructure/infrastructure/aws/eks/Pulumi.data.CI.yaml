@@ -38,6 +38,7 @@ config:
   - kubewatch
   - marimo
   - ol-analytics
+  - lightdash
   - open-metadata
   - opik
   - qdrant

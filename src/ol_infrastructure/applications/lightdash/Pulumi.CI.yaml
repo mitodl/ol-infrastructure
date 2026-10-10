@@ -1,0 +1,9 @@
+---
+encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagHwbJVci7VqfG11yiAM0rHFAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMIZTZBvUQH+y8eGXSAgEQgDsjXJ5fWmegaV9aLEvtR0mgCb/O9+97RUeMmFl16DZXmm3M5cG08/eK0mebCKJBfaoGCUafqLVJI7QszA==
+secretsprovider: awskms://alias/infrastructure-secrets-ci
+config:
+  lightdash:domain: lightdash-ci.ol.mit.edu
+  lightdash:db_password:
+    secure: v1:+KyWfs7TXJ2TkCgb:4JBjRonOYUCcZIvbJV1uJzXxSsqfCJTHauK+vsaZFK8MR9iADcGnbt2lQHmowA2PIQcpBi1krUQ=
+  vault:address: https://vault-ci.odl.mit.edu
+  vault_server:env_namespace: operations.ci
