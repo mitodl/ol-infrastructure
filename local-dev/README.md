@@ -684,7 +684,8 @@ SELECT * FROM ol_data_lake_local.scratch.t;
 ```
 
 dbt builds onto it from an [ol-data-platform](https://github.com/mitodl/ol-data-platform)
-checkout, with no Vault login:
+checkout, with no Vault login. Run these from its repository root, after `dbt deps` in
+`src/ol_dbt` once per checkout:
 
 ```bash
 ol-dbt fixtures load
@@ -713,12 +714,13 @@ ol-dbt starrocks build --env dev --target starrocks_local_b2b --select tag:starr
 MIT Learn's warehouse tasks are pointed at the local lake with no further setup. With
 both `mit-learn` and `data-platform` enabled, its pods get `STARROCKS_HOST`,
 `STARROCKS_USER`, `WAREHOUSE_CATALOG` and `WAREHOUSE_SCHEMA` from
-`local-dev/apps/mit-learn/configmaps/warehouse-env.yaml`. Each task reads the
-`integrations__learn__*` table its `table_name` names, so build that one first.
+`local-dev/apps/mit-learn/configmaps/warehouse-env.yaml`. Build the
+`integrations__learn__*` tables a task reads before running it: the one its
+`table_name` names, and any other its `fetch_and_upsert` reads (the xPRO course task
+also reads the runs table and refuses to run when either is empty).
 
 From a fixture row to a course in the local MIT Learn, with xPRO as the example. The
-first two commands run in ol-data-platform (`dbt deps` once per checkout, in
-`src/ol_dbt`), the rest here:
+first two commands run from the ol-data-platform repository root, the rest here:
 
 ```bash
 ol-dbt fixtures load
@@ -743,7 +745,9 @@ curl -sk "https://api.learn.mit.dev/api/v1/courses/?platform=xpro"
 
 - The xPRO tasks are in [mit-learn #4054](https://github.com/mitodl/mit-learn/pull/4054),
   which is not merged. Check that branch out in the sibling `mit-learn` directory and Tilt
-  builds the image from it. On MIT Learn's main branch the only warehouse task is
+  builds the image from it. If Tilt was already running, the webapp pod picks the
+  change up and the Celery workers do not until they are restarted, which does not
+  matter for a task run from the shell as here. On MIT Learn's main branch the only warehouse task is
   `profiles.tasks.SyncProgramCertificatesTask`, and the table it reads,
   `integrations__learn__program_certificates`, has no raw fixture.
 - A task writes nothing until `ETLSourceOwnership` names the warehouse for what it
@@ -755,7 +759,10 @@ curl -sk "https://api.learn.mit.dev/api/v1/courses/?platform=xpro"
   not run, so a second sync is not visible through the API until `clear_cache`.
 
 To see a change, edit the fixture or the model, then repeat the load (for a fixture
-edit), the build, the task and `clear_cache`.
+edit), the build, the task and `clear_cache`. An edit that takes a published course or
+program away makes the next sync fail before it writes: the tasks refuse to unpublish
+more than 10% of a source's resources, which a handful of fixture rows exceeds with one
+removal. The cutover document above covers `allow_mass_unpublish`.
 
 Things that will trip you up:
 
