@@ -662,7 +662,8 @@ It is not an app. The core Pulumi stack deploys, all in `local-infra`:
 - [Apache Gravitino](https://gravitino.apache.org) as the Iceberg REST catalog, with
   its state in two databases (`gravitino`, `iceberg`) on the shared Postgres cluster.
 - StarRocks, the single-pod `allin1` image at the version the deployed clusters run,
-  with an external catalog `ol_data_lake_local` pointing at Gravitino.
+  with an external catalog `ol_data_lake_local` pointing at Gravitino and an empty
+  `ol_warehouse_local` schema in it for dbt to connect to.
 
 Budget about 2GB of memory, a 3GB image pull and a 20Gi volume for StarRocks.
 
@@ -679,6 +680,32 @@ CREATE TABLE ol_data_lake_local.scratch.t (id int, name string);
 INSERT INTO ol_data_lake_local.scratch.t VALUES (1, 'a');
 SELECT * FROM ol_data_lake_local.scratch.t;
 ```
+
+dbt builds onto it from an [ol-data-platform](https://github.com/mitodl/ol-data-platform)
+checkout, with no Vault login:
+
+```bash
+ol-dbt starrocks build --env dev --select +integrations__learn__oll_courses
+```
+
+`--env dev` is the `starrocks_local` dbt profile: catalog `ol_data_lake_local`, schema
+`ol_warehouse_local`, over the port-forward above. Models land in
+`ol_warehouse_local_<layer>` (`_staging`, `_intermediate`, `_integrations`, ...), and
+the sources read `ol_warehouse_local_raw`, which nothing fills for you yet: create the
+raw tables a model reads before building it.
+
+To have MIT Learn's warehouse tasks read the result, set these in its
+`app-env.local.yaml` (see [Local Configuration Overrides](#local-configuration-overrides)):
+
+```yaml
+STARROCKS_HOST: "starrocks.local-infra.svc.cluster.local"
+STARROCKS_USER: "root"
+WAREHOUSE_CATALOG: "ol_data_lake_local"
+WAREHOUSE_SCHEMA: "ol_warehouse_local_integrations"
+```
+
+Each task reads one `integrations__learn__*` table, so build the one the task you are
+working on names. Celery beat is off locally, so run the task by hand.
 
 Things that will trip you up:
 

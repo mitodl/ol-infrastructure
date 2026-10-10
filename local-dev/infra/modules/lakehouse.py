@@ -59,6 +59,12 @@ ICEBERG_REST_URL = f"http://{GRAVITINO_HOST}:{ICEBERG_REST_PORT}/iceberg"
 METALAKE = "ol_data_platform"
 CATALOG = "ol_data_lake_local"
 
+# The schema the starrocks_local dbt profile in ol-data-platform connects to.
+# dbt-starrocks creates a missing profile schema itself with a bare CREATE
+# DATABASE from every thread, and the threads that lose that race fail the
+# run, so it has to exist before the first dbt run.
+WAREHOUSE_SCHEMA = "ol_warehouse_local"
+
 # Gravitino's entity store and the Iceberg JDBC catalog get a database each so
 # dropping the lake's table metadata does not take the metalake with it.
 GRAVITINO_DATABASE = "gravitino"
@@ -133,7 +139,7 @@ until starrocks -e 'SELECT 1' >/dev/null 2>&1; do
     sleep 3
 done
 
-echo "==> creating StarRocks catalog: {CATALOG}"
+echo "==> creating StarRocks catalog and schema: {CATALOG}.{WAREHOUSE_SCHEMA}"
 starrocks < /bootstrap/catalog.sql
 echo "==> lakehouse bootstrap complete"
 """  # noqa: E501
@@ -190,6 +196,7 @@ def _starrocks_catalog_sql() -> str:
     return (
         f"CREATE EXTERNAL CATALOG IF NOT EXISTS {CATALOG}\n"
         f"PROPERTIES (\n{rendered}\n);\n"
+        f"CREATE DATABASE IF NOT EXISTS {CATALOG}.{WAREHOUSE_SCHEMA};\n"
     )
 
 
