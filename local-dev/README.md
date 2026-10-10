@@ -684,10 +684,12 @@ SELECT * FROM ol_data_lake_local.scratch.t;
 ```
 
 dbt builds onto it from an [ol-data-platform](https://github.com/mitodl/ol-data-platform)
-checkout, with no Vault login. Run these from its repository root, after `dbt deps` in
-`src/ol_dbt` once per checkout:
+checkout, with no Vault login. Run these from its repository root:
 
 ```bash
+# Once per checkout: install the dbt packages.
+(cd src/ol_dbt && uv run dbt deps)
+
 ol-dbt fixtures load
 ol-dbt starrocks build --env dev --select +integrations__learn__ocw_courses
 ```
