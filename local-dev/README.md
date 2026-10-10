@@ -713,19 +713,49 @@ ol-dbt starrocks build --env dev --target starrocks_local_b2b --select tag:starr
 MIT Learn's warehouse tasks are pointed at the local lake with no further setup. With
 both `mit-learn` and `data-platform` enabled, its pods get `STARROCKS_HOST`,
 `STARROCKS_USER`, `WAREHOUSE_CATALOG` and `WAREHOUSE_SCHEMA` from
-`local-dev/apps/mit-learn/configmaps/warehouse-env.yaml`. Each task reads one
-`integrations__learn__*` table, so build the one the task you are working on names
-(its `table_name`). Celery beat is off locally, so run the task by hand. The task
-modules bind each name to a registered task instance, so call `run` on it directly:
+`local-dev/apps/mit-learn/configmaps/warehouse-env.yaml`. Each task reads the
+`integrations__learn__*` table its `table_name` names, so build that one first.
+
+From a fixture row to a course in the local MIT Learn, with xPRO as the example. The
+first two commands run in ol-data-platform (`dbt deps` once per checkout, in
+`src/ol_dbt`), the rest here:
 
 ```bash
-kubectl -n mit-learn exec deploy/mitlearn-webapp -c app -- python manage.py shell -c \
-  "from profiles.tasks import SyncProgramCertificatesTask as T; print(T.run(full_refresh=True))"
+ol-dbt fixtures load
+ol-dbt starrocks build --env dev --select \
+  "+integrations__learn__xpro_courses +integrations__learn__xpro_runs +integrations__learn__xpro_programs"
+
+kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
+from learning_resources.models import ETLSourceOwnership
+from learning_resources.tasks import SyncXproCoursesTask, SyncXproProgramsTask
+
+for resource_type in ("course", "program"):
+    ETLSourceOwnership.objects.update_or_create(
+        etl_source="xpro", resource_type=resource_type, defaults={"owner": "warehouse"}
+    )
+print(SyncXproCoursesTask.run(full_refresh=True))
+print(SyncXproProgramsTask.run(full_refresh=True))
+PY
+kubectl -n mit-learn exec deploy/mitlearn-webapp -c app -- python manage.py clear_cache
+
+curl -sk "https://api.learn.mit.dev/api/v1/courses/?platform=xpro"
 ```
 
-That task is the only one on MIT Learn's main branch today, and the table it reads,
-`integrations__learn__program_certificates`, has no raw fixture yet, so it fails on a
-missing table until one is added.
+- The xPRO tasks are in [mit-learn #4054](https://github.com/mitodl/mit-learn/pull/4054),
+  which is not merged. Check that branch out in the sibling `mit-learn` directory and Tilt
+  builds the image from it. On MIT Learn's main branch the only warehouse task is
+  `profiles.tasks.SyncProgramCertificatesTask`, and the table it reads,
+  `integrations__learn__program_certificates`, has no raw fixture.
+- A task writes nothing until `ETLSourceOwnership` names the warehouse for what it
+  loads. Without the rows it logs `Skipping warehouse write for xpro` and returns 0. See
+  `docs/how-to/etl-source-cutover.md` in mit-learn.
+- Celery beat is off locally, so run the task by hand. The task modules bind each name
+  to a registered task instance, so call `run` on it directly.
+- The list endpoints are cached for a day and the beat task that clears the cache does
+  not run, so a second sync is not visible through the API until `clear_cache`.
+
+To see a change, edit the fixture or the model, then repeat the load (for a fixture
+edit), the build, the task and `clear_cache`.
 
 Things that will trip you up:
 
