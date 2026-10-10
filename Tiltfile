@@ -21,6 +21,10 @@ cfg = config.parse()
 enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
 per_app_databases = cfg.get("per_app_databases", False)
 
+# An included Tiltfile shares no variables with this one, so an app that
+# configures itself differently when another is enabled reads the list here.
+os.putenv("LOCAL_DEV_ENABLED_APPS", ",".join(enabled_apps))
+
 # Every service hostname, CORS origin, APISIX route, and Keycloak redirect URI
 # derives from this value. local-dev/tiltlib.star reads the same environment
 # variable when applying app manifests.

@@ -198,8 +198,8 @@ exceptions: the RustFS object store is deployed only when an app that needs it i
 enabled, and the data lake only when `data-platform` is listed (see
 [Data lake](#data-lake-gravitino--starrocks)), because both are too heavy to run for
 developers who have no use for them. The
-Tiltfile forwards `enabled_apps` to both Pulumi stacks as `LOCAL_DEV_ENABLED_APPS`
-so they can make that call.
+Tiltfile forwards `enabled_apps` to both Pulumi stacks and to the app Tiltfiles as
+`LOCAL_DEV_ENABLED_APPS` so they can make that call.
 
 ### Open edX
 
@@ -526,7 +526,7 @@ cp local-dev/apps/mitxonline/configmaps/app-env.local.yaml.example \
 #   FEATURE_IGNORE_EDX_FAILURES: "True"
 ```
 
-How it works — plain Kubernetes, visible in each app's `deployment.yaml`: every container's `envFrom` list references the override ConfigMap (`mitxonline-env-local` etc.) **last** and with `optional: true`. Kubernetes resolves duplicate `envFrom` keys by letting the last source win, so your overrides beat both the tracked ConfigMap *and* the tracked Secret — secret values are fine in this file, it never leaves your machine. `optional: true` means no file → no ConfigMap → no-op for everyone else.
+How it works — plain Kubernetes, visible in each app's `deployment.yaml`: every container's `envFrom` list references the override ConfigMap (`mitxonline-env-local` etc.) **last** and with `optional: true`. Kubernetes resolves duplicate `envFrom` keys by letting the last source win, so your overrides beat the tracked ConfigMaps *and* the tracked Secret — secret values are fine in this file, it never leaves your machine. `optional: true` means no file → no ConfigMap → no-op for everyone else.
 
 Day-to-day behavior:
 
@@ -687,14 +687,18 @@ dbt builds onto it from an [ol-data-platform](https://github.com/mitodl/ol-data-
 checkout, with no Vault login:
 
 ```bash
-ol-dbt starrocks build --env dev --select +integrations__learn__oll_courses
+ol-dbt fixtures load
+ol-dbt starrocks build --env dev --select +integrations__learn__ocw_courses
 ```
 
 `--env dev` is the `starrocks_local` dbt profile: catalog `ol_data_lake_local`, schema
 `ol_warehouse_local`, over the port-forward above. Models land in
 `ol_warehouse_local_<layer>` (`_staging`, `_intermediate`, `_integrations`, ...), and
-the sources read `ol_warehouse_local_raw`, which nothing fills for you yet: create the
-raw tables a model reads before building it.
+the sources read `ol_warehouse_local_raw`. `ol-dbt fixtures load` fills that schema from
+the fixture files committed in ol-data-platform, and a model whose raw tables have no
+fixture fails on the missing source table. See
+[docs/LOCAL_LAKE.md](https://github.com/mitodl/ol-data-platform/blob/main/docs/LOCAL_LAKE.md)
+there for the fixture format and how to add one.
 
 The b2b materialized views are StarRocks tables, not lake tables, so they have a
 profile of their own, `starrocks_local_b2b`. It writes `default_catalog.b2b_analytics`
@@ -706,18 +710,22 @@ and `default_catalog.b2b_learner_records` and reads
 ol-dbt starrocks build --env dev --target starrocks_local_b2b --select tag:starrocks
 ```
 
-To have MIT Learn's warehouse tasks read the result, set these in its
-`app-env.local.yaml` (see [Local Configuration Overrides](#local-configuration-overrides)):
+MIT Learn's warehouse tasks are pointed at the local lake with no further setup. With
+both `mit-learn` and `data-platform` enabled, its pods get `STARROCKS_HOST`,
+`STARROCKS_USER`, `WAREHOUSE_CATALOG` and `WAREHOUSE_SCHEMA` from
+`local-dev/apps/mit-learn/configmaps/warehouse-env.yaml`. Each task reads one
+`integrations__learn__*` table, so build the one the task you are working on names
+(its `table_name`). Celery beat is off locally, so run the task by hand. The task
+modules bind each name to a registered task instance, so call `run` on it directly:
 
-```yaml
-STARROCKS_HOST: "starrocks.local-infra.svc.cluster.local"
-STARROCKS_USER: "root"
-WAREHOUSE_CATALOG: "ol_data_lake_local"
-WAREHOUSE_SCHEMA: "ol_warehouse_local_integrations"
+```bash
+kubectl -n mit-learn exec deploy/mitlearn-webapp -c app -- python manage.py shell -c \
+  "from profiles.tasks import SyncProgramCertificatesTask as T; print(T.run(full_refresh=True))"
 ```
 
-Each task reads one `integrations__learn__*` table, so build the one the task you are
-working on names. Celery beat is off locally, so run the task by hand.
+That task is the only one on MIT Learn's main branch today, and the table it reads,
+`integrations__learn__program_certificates`, has no raw fixture yet, so it fails on a
+missing table until one is added.
 
 Things that will trip you up:
 
