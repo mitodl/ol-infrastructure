@@ -61,14 +61,24 @@ if os.path.exists(os.path.join(MIT_LEARN_DIR, ".git")):
 # Kubernetes Resources
 # ─────────────────────────────────────────────────────────────
 
-# Apply all manifests in order.
-k8s_yaml_local([
+# The warehouse settings go in with the rest so that enabling or disabling the
+# lake changes the config fingerprint and rolls the pods. They are left out
+# without the lake because a set STARROCKS_HOST also puts the warehouse tasks
+# on the beat schedule.
+_manifests = [
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/nginx.yaml"),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/app-env.yaml"),
+]
+if "data-platform" in os.environ.get("LOCAL_DEV_ENABLED_APPS", "").split(","):
+    _manifests.append(os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/warehouse-env.yaml"))
+_manifests += [
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/secrets.yaml"),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/deployment.yaml"),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/apisix-routes.yaml"),
-], local_overrides=os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/app-env.local.yaml"))
+]
+
+# Apply all manifests in order.
+k8s_yaml_local(_manifests, local_overrides=os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/app-env.local.yaml"))
 
 # Applied separately: these objects front a process on the developer's machine
 # rather than anything in this app, and none of them are ConfigMaps or Secrets,

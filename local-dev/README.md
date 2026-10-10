@@ -687,14 +687,18 @@ dbt builds onto it from an [ol-data-platform](https://github.com/mitodl/ol-data-
 checkout, with no Vault login:
 
 ```bash
-ol-dbt starrocks build --env dev --select +integrations__learn__oll_courses
+ol-dbt fixtures load
+ol-dbt starrocks build --env dev --select +integrations__learn__ocw_courses
 ```
 
 `--env dev` is the `starrocks_local` dbt profile: catalog `ol_data_lake_local`, schema
 `ol_warehouse_local`, over the port-forward above. Models land in
 `ol_warehouse_local_<layer>` (`_staging`, `_intermediate`, `_integrations`, ...), and
-the sources read `ol_warehouse_local_raw`, which nothing fills for you yet: create the
-raw tables a model reads before building it.
+the sources read `ol_warehouse_local_raw`. `ol-dbt fixtures load` fills that schema from
+the fixture files committed in ol-data-platform, and a model whose raw tables have no
+fixture fails on the missing source table. See
+[docs/LOCAL_LAKE.md](https://github.com/mitodl/ol-data-platform/blob/main/docs/LOCAL_LAKE.md)
+there for the fixture format and how to add one.
 
 The b2b materialized views are StarRocks tables, not lake tables, so they have a
 profile of their own, `starrocks_local_b2b`. It writes `default_catalog.b2b_analytics`
@@ -706,18 +710,17 @@ and `default_catalog.b2b_learner_records` and reads
 ol-dbt starrocks build --env dev --target starrocks_local_b2b --select tag:starrocks
 ```
 
-To have MIT Learn's warehouse tasks read the result, set these in its
-`app-env.local.yaml` (see [Local Configuration Overrides](#local-configuration-overrides)):
+MIT Learn's warehouse tasks read the result with no further setup. With both
+`mit-learn` and `data-platform` enabled, its pods get `STARROCKS_HOST`, `STARROCKS_USER`,
+`WAREHOUSE_CATALOG` and `WAREHOUSE_SCHEMA` for the local lake from
+`local-dev/apps/mit-learn/configmaps/warehouse-env.yaml`. Each task reads one
+`integrations__learn__*` table, so build the one the task you are working on names.
+Celery beat is off locally, so run the task by hand:
 
-```yaml
-STARROCKS_HOST: "starrocks.local-infra.svc.cluster.local"
-STARROCKS_USER: "root"
-WAREHOUSE_CATALOG: "ol_data_lake_local"
-WAREHOUSE_SCHEMA: "ol_warehouse_local_integrations"
+```bash
+kubectl -n mit-learn exec deploy/mitlearn-webapp -c app -- python manage.py shell -c \
+  "from profiles.tasks import SyncProgramCertificatesTask as T; print(T().run(full_refresh=True))"
 ```
-
-Each task reads one `integrations__learn__*` table, so build the one the task you are
-working on names. Celery beat is off locally, so run the task by hand.
 
 Things that will trip you up:
 

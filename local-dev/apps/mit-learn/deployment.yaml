@@ -80,8 +80,12 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
+        # Only applied when data-platform is in enabled_apps (see Tiltfile).
+        - configMapRef:
+            name: mitlearn-env-warehouse
+            optional: true
         # Gitignored per-developer overrides; must stay LAST so its keys win
-        # over both sources above. See "Local Configuration Overrides" in
+        # over the sources above. See "Local Configuration Overrides" in
         # local-dev/README.md.
         - configMapRef:
             name: mitlearn-env-local
@@ -140,8 +144,12 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
+        # Only applied when data-platform is in enabled_apps (see Tiltfile).
+        - configMapRef:
+            name: mitlearn-env-warehouse
+            optional: true
         # Gitignored per-developer overrides; must stay LAST so its keys win
-        # over both sources above. See "Local Configuration Overrides" in
+        # over the sources above. See "Local Configuration Overrides" in
         # local-dev/README.md.
         - configMapRef:
             name: mitlearn-env-local
@@ -262,8 +270,12 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
+        # Only applied when data-platform is in enabled_apps (see Tiltfile).
+        - configMapRef:
+            name: mitlearn-env-warehouse
+            optional: true
         # Gitignored per-developer overrides; must stay LAST so its keys win
-        # over both sources above. See "Local Configuration Overrides" in
+        # over the sources above. See "Local Configuration Overrides" in
         # local-dev/README.md.
         - configMapRef:
             name: mitlearn-env-local
@@ -340,8 +352,12 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
+        # Only applied when data-platform is in enabled_apps (see Tiltfile).
+        - configMapRef:
+            name: mitlearn-env-warehouse
+            optional: true
         # Gitignored per-developer overrides; must stay LAST so its keys win
-        # over both sources above. See "Local Configuration Overrides" in
+        # over the sources above. See "Local Configuration Overrides" in
         # local-dev/README.md.
         - configMapRef:
             name: mitlearn-env-local
@@ -418,8 +434,12 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
+        # Only applied when data-platform is in enabled_apps (see Tiltfile).
+        - configMapRef:
+            name: mitlearn-env-warehouse
+            optional: true
         # Gitignored per-developer overrides; must stay LAST so its keys win
-        # over both sources above. See "Local Configuration Overrides" in
+        # over the sources above. See "Local Configuration Overrides" in
         # local-dev/README.md.
         - configMapRef:
             name: mitlearn-env-local
@@ -493,8 +513,12 @@ spec:
             name: mitlearn-env
         - secretRef:
             name: mitlearn-secrets
+        # Only applied when data-platform is in enabled_apps (see Tiltfile).
+        - configMapRef:
+            name: mitlearn-env-warehouse
+            optional: true
         # Gitignored per-developer overrides; must stay LAST so its keys win
-        # over both sources above. See "Local Configuration Overrides" in
+        # over the sources above. See "Local Configuration Overrides" in
         # local-dev/README.md.
         - configMapRef:
             name: mitlearn-env-local

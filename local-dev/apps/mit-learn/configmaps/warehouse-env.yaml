@@ -1,0 +1,16 @@
+---
+# Points MIT Learn's warehouse-pull tasks at the local data lake. Applied by the
+# Tiltfile only when data-platform is in enabled_apps; see "Data lake
+# (Gravitino + StarRocks)" in local-dev/README.md.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mitlearn-env-warehouse
+  namespace: mit-learn
+data:
+  STARROCKS_HOST: "starrocks.local-infra.svc.cluster.local"
+  # The allin1 image's root user has no password.
+  STARROCKS_USER: "root"
+  # Where `ol-dbt starrocks build --env dev` puts the integrations models.
+  WAREHOUSE_CATALOG: "ol_data_lake_local"
+  WAREHOUSE_SCHEMA: "ol_warehouse_local_integrations"
