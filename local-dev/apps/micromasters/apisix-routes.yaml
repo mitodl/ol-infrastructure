@@ -1,0 +1,33 @@
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: micromasters-tls
+  namespace: micromasters
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - "micromasters.mit.dev"
+  secret:
+    name: local-dev-tls
+    namespace: micromasters
+---
+# MicroMasters does OAuth inside Django (social-auth against edX or MITx
+# Online), so the route carries no openid-connect plugin.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: micromasters-route
+  namespace: micromasters
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: public
+    match:
+      hosts:
+      - "micromasters.mit.dev"
+      paths:
+      - "/*"
+    backends:
+    - serviceName: micromasters-webapp
+      servicePort: 8079

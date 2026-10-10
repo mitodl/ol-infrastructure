@@ -5,7 +5,7 @@
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
-config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx")
+config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
 config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0 learn-ai=0.28.3")
 config.define_string("disk_keep_tags", usage="Newest tilt-built image tags kept per repo by the disk janitor (default: 3). Overrides LOCAL_DEV_DISK_KEEP_TAGS env var.")
@@ -302,6 +302,51 @@ APPS = [
                     " assets; run it before publishing any site"
                 ),
                 "cmd": "python manage.py upsert_theme_assets_pipeline",
+            },
+        ],
+    },
+    {
+        # Off by default: it exists so the data platform's micromasters dlt
+        # source has a local database to read, which most developers do not
+        # need running.
+        "name": "micromasters",
+        "dir": "micromasters",
+        "namespace": "micromasters",
+        "deploy_name": "micromasters-webapp",
+        "image_backend": "mitodl/micromasters-app",
+        "prebuilt_tag_backend": prebuilt_tags.get("micromasters", "0.254.0"),
+        "tiltfile": "./local-dev/apps/micromasters/Tiltfile",
+        "seed_commands": [
+            {
+                "label": "seed-micromasters-superuser",
+                # Learner login needs edX or MITx Online OAuth credentials the
+                # tracked config does not ship, so this password login at
+                # /admin/ is the only way in by default.
+                "description": "Create or reset the admin superuser (admin / admin, log in at /admin/)",
+                "cmd": (
+                    "python manage.py shell -c " +
+                    "'from django.contrib.auth import get_user_model; " +
+                    "U = get_user_model(); " +
+                    "u, created = U.objects.get_or_create(" +
+                    "username=\"admin\", " +
+                    "defaults={\"email\": \"admin@odl.local\"}); " +
+                    "u.is_staff = True; u.is_superuser = True; " +
+                    "u.set_password(\"admin\"); u.save(); " +
+                    "print((\"created\" if created else \"reset\"), u.username)'"
+                ),
+            },
+            {
+                "label": "seed-micromasters-data",
+                "description": (
+                    "Load the seed programs, course runs and learners, then" +
+                    " rebuild the search index (needs micromasters-celery)"
+                ),
+                "cmd": "python manage.py seed_db",
+            },
+            {
+                "label": "seed-micromasters-opensearch",
+                "description": "Recreate the OpenSearch indices (needs micromasters-celery)",
+                "cmd": "python manage.py recreate_index",
             },
         ],
     },
