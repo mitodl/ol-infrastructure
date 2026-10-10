@@ -16,6 +16,7 @@ from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
+    Duration,
     GetStep,
     Identifier,
     Input,
@@ -957,6 +958,29 @@ def _define_release_resources(
         private_ssh_key=github_app_private_key,
         repository=github_repo,
         semver_tag_fallback=True,
+    ).model_copy(
+        # Not the library's `never`. Rebuilding the release resource image
+        # gives this resource a fresh, empty version history on its next
+        # check or put (Concourse keys history on the custom type's version),
+        # and QA/Production take it with `passed:` the release build, which
+        # resolves only against the current history. The resource's check
+        # re-emits the newest cuts to repair that, but a put can start the
+        # fresh history too, and under `never` nothing would check it until
+        # the next `/doof release`. Concourse's periodic checker skips a
+        # `never` resource outright, and otherwise checks a resource that
+        # only triggers through `passed:`, like this one, only while its
+        # history has never been checked, has no versions, or last failed to
+        # check. So this costs a check after a fresh history starts and an
+        # hourly retry while checks fail, not a check every hour.
+        # A check cannot start a build: QA triggers on
+        # this resource (pulumi_jobs_chain turns the first stack's
+        # dependencies into triggers) but only through `passed:` the release
+        # build, which a check's candidate never satisfies. A re-emitted cut
+        # is normally a version QA has already run, so it is not new to QA
+        # either. The exception: when the newest cut is gone or its build
+        # failed, QA falls back to the cut before it and runs it if it never
+        # had, deploying a release that passed the build to QA.
+        update={"check_every": Duration("1h")}
     )
     # Closed release issues gate production deployments.
     release_gate = github_issues(
@@ -1414,11 +1438,13 @@ def _build_release_image_job(
         #   abandon  deletes the branch and the tag, so the re-cut finds no tag,
         #            succeeds, and resurrects the abandoned release
         #
-        # Nothing is lost by dropping the trigger. The resource is
-        # `check_every: never` with no webhook, and the release bot starts a
-        # release by checking the resource over the API and then triggering
-        # this job explicitly (see release_bot.bot._release), so the trigger
-        # could only ever fire on a put or race the bot's own build.
+        # Nothing is lost by dropping the trigger. Concourse checks the
+        # resource on its own only to repair a fresh version history (see
+        # _define_release_resources), there is no webhook, and the release bot
+        # starts a release by checking the resource over the API and then
+        # triggering this job explicitly (see release_bot.bot._release), so
+        # the trigger could only ever fire on a put, on that repair, or race
+        # the bot's own build.
         GetStep(get=release_res.name, trigger=False),
         GetStep(get=main_repo.name, trigger=False),
         LoadVarStep(
