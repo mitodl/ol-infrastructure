@@ -33,6 +33,10 @@ EXEC_DEBUG_LOG_PATH = CACHE_DIR / "exec-debug.log"
 EXEC_DEBUG_ENV_VAR = "OL_EKS_DEBUG_EXEC"
 KUBECONFIG_DEFAULT_PATH = Path.home() / ".kube" / "config"
 OIDC_CALLBACK_PORT = 8250
+# The caller holds the Vault token and AWS credential cache locks while it waits
+# for the browser login, so any other eks.py run that needs fresh credentials for
+# the same mode blocks until it returns.
+OIDC_CALLBACK_TIMEOUT_SECONDS = 180
 OIDC_REDIRECT_URI = f"http://localhost:{OIDC_CALLBACK_PORT}/oidc/callback"
 PRODUCTION_VAULT_ADDRESS = "https://vault-production.odl.mit.edu"
 PREFERRED_DEFAULT_CONTEXT = "applications-qa"
@@ -117,11 +121,22 @@ class OidcHttpServer(HTTPServer):
     # Allow quick rebinds after prior login attempts so OIDC setup does not fail
     # on sockets lingering in TIME_WAIT.
     allow_reuse_address = True
+    timeout = OIDC_CALLBACK_TIMEOUT_SECONDS
+    timed_out = False
     token: str | None = None
+
+    def handle_timeout(self) -> None:
+        """Record that no callback arrived before the timeout."""
+        self.timed_out = True
 
 
 class OidcCallbackHandler(BaseHTTPRequestHandler):
     """Capture the OIDC callback code and return a self-closing page."""
+
+    # OidcHttpServer.timeout only bounds the wait for a connection; this bounds
+    # reads on an accepted one, so a client that connects and sends nothing
+    # cannot hold the wait open.
+    timeout = 10
 
     def do_GET(self) -> None:
         """Handle the OIDC callback."""
@@ -500,6 +515,12 @@ def login_oidc_get_token() -> str:
             raise RuntimeError(msg) from exc
         raise
     httpd.handle_request()
+    if httpd.timed_out:
+        msg = (
+            f"No Vault OIDC callback within {OIDC_CALLBACK_TIMEOUT_SECONDS} seconds; "
+            "the browser login was not completed. Retry to start a new login."
+        )
+        raise RuntimeError(msg)
     if not httpd.token:
         msg = "Vault OIDC callback did not return an authorization code"
         raise RuntimeError(msg)
