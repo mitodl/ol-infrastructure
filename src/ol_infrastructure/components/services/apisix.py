@@ -47,6 +47,13 @@ STRIP_CLIENT_IDENTITY_HEADERS_LUA = (
 # request time (ngx_http_lua_control.c:209-219).
 NGX_REDIRECT_STATUSES = (301, 302, 303, 307, 308)
 
+# lua_shared_dict that oidc_error_callback_recovery.lua counts restarts in.  The
+# gateway has to define it (apisix.nginx.customLuaSharedDicts in
+# infrastructure/aws/eks/apisix_official.py); where it is absent the function
+# falls back to the guard cookie alone.
+OIDC_RECOVERY_SHARED_DICT = "ol-oidc-recovery"
+OIDC_RECOVERY_SHARED_DICT_SIZE = "1m"
+
 
 class OLApisixPluginConfig(BaseModel):
     """Configuration for a single APISIX plugin instance.
@@ -142,6 +149,7 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
     guard_cookie_name: str = "apisix_oidc_recovery",
     guard_max_age: int = 60,
     *,
+    max_restarts_per_session_state: int = 1,
     canonical_https_redirect: bool = True,
     canonical_redirect_status: Literal[301, 302, 303, 307, 308] = 308,
 ) -> OLApisixPluginConfig:
@@ -241,10 +249,27 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
     uses.  Recovery happens only when *none* of them is present, so listing a
     name too many is harmless, but omitting one would divert every successful
     login on the routes that use it.  An empty sequence (the default) turns the
-    branch off.  The same guard cookie bounds it to one attempt per window.  A
-    browser that drops this host's cookies while keeping Keycloak's would drop
-    the guard too, and ends at the browser's own redirect limit instead of the
-    500 page -- no worse for someone whose login could not have succeeded.
+    branch off.  The same guard cookie bounds it to one attempt per window.
+
+    **Restart bound for browsers that store no cookies.**  A browser that drops
+    this host's cookies while keeping Keycloak's drops the guard too, so every
+    callback is restarted and it loops through Keycloak until the browser's own
+    redirect limit.  Production saw two such loops in the 20h to 2026-10-01
+    13:17Z: 35 restarts in 23s for one api.learn.mit.edu client and 7 in under
+    5s for one nb.learn.mit.edu client.  Every hop of a loop carries the same
+    Keycloak ``session_state``, so the function also counts restarts per
+    ``session_state`` in the ``OIDC_RECOVERY_SHARED_DICT`` lua_shared_dict and
+    lets the callback fall through to the 500 past
+    ``max_restarts_per_session_state``.  A browser that does keep cookies never
+    reaches the counter a second time: its second callback carries either the
+    session cookie or the guard.  The dict is per APISIX pod, so the effective
+    bound is that many restarts per replica per host.
+
+    This covers the ``code`` branch only in practice.  Keycloak sends no
+    ``session_state`` with ``error=temporarily_unavailable`` (none of the 2,027
+    such callbacks in the 24h to 2026-10-07 16:59Z carried one), so a
+    cookie-less browser on the error branch is still bounded only by its own
+    redirect limit.
 
     Both functions live in ``files/`` and are shipped verbatim -- nothing is
     interpolated into them.  Tunables travel as ``oidc_error_recovery`` and
@@ -266,7 +291,10 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
         them is restarted rather than left to fail.  Empty disables this.
     :param guard_cookie_name: Name of the loop-breaker cookie.
     :param guard_max_age: Seconds the guard cookie lives, bounding how often one
-        browser can be sent back through login.
+        browser can be sent back through login.  Also the lifetime of the
+        per-``session_state`` restart counter.
+    :param max_restarts_per_session_state: Restarts allowed for one Keycloak
+        ``session_state`` per ``guard_max_age`` window, per APISIX pod.
     :param canonical_https_redirect: Whether to send non-canonical origins to
         ``https://<bare host>`` before openid-connect runs.  ``False`` drops the
         function entirely, for a host that must keep answering on plain HTTP.
@@ -290,6 +318,18 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
         msg = (
             f"canonical_redirect_status must be one of {NGX_REDIRECT_STATUSES}, "
             f"got {canonical_redirect_status}: ngx.redirect rejects anything else."
+        )
+        raise ValueError(msg)
+
+    # guard_max_age is the counter's init_ttl, and ngx.shared.DICT treats 0 as
+    # "never expires": a session_state would stay refused until the pod restarts.
+    if guard_max_age < 1:
+        msg = f"guard_max_age must be at least 1 second, got {guard_max_age}."
+        raise ValueError(msg)
+    if max_restarts_per_session_state < 1:
+        msg = (
+            "max_restarts_per_session_state must be at least 1, got "
+            f"{max_restarts_per_session_state}: 0 would refuse every recovery."
         )
         raise ValueError(msg)
 
@@ -324,6 +364,8 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
                 "session_cookie_names": list(session_cookie_names),
                 "guard_cookie_name": guard_cookie_name,
                 "guard_max_age": guard_max_age,
+                "restart_dict_name": OIDC_RECOVERY_SHARED_DICT,
+                "max_restarts": max_restarts_per_session_state,
             },
         },
     )

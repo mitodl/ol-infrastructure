@@ -694,6 +694,8 @@ def test_recovery_plugin_renders_into_the_v2_plugin_config():
             "session_cookie_names": [],
             "guard_cookie_name": "apisix_oidc_recovery",
             "guard_max_age": 60,
+            "restart_dict_name": "ol-oidc-recovery",
+            "max_restarts": 1,
         }
 
     return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
