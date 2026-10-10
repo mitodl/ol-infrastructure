@@ -65,6 +65,13 @@ CATALOG = "ol_data_lake_local"
 # run, so it has to exist before the first dbt run.
 WAREHOUSE_SCHEMA = "ol_warehouse_local"
 
+# The StarRocks-native databases the b2b materialized views are built in, for
+# the starrocks_local_b2b profile (Dagster's `dev`). b2b_analytics is that
+# profile's schema, so it has the same race: the losing threads fail with
+# "Can't create database 'b2b_analytics'; database exists". b2b_learner_records
+# is here because the deployed clusters get both from substructure/starrocks.
+NATIVE_DATABASES = ("b2b_analytics", "b2b_learner_records")
+
 # Gravitino's entity store and the Iceberg JDBC catalog get a database each so
 # dropping the lake's table metadata does not take the metalake with it.
 GRAVITINO_DATABASE = "gravitino"
@@ -139,7 +146,7 @@ until starrocks -e 'SELECT 1' >/dev/null 2>&1; do
     sleep 3
 done
 
-echo "==> creating StarRocks catalog and schema: {CATALOG}.{WAREHOUSE_SCHEMA}"
+echo "==> creating StarRocks catalog, schema and databases: {CATALOG}.{WAREHOUSE_SCHEMA}, {", ".join(NATIVE_DATABASES)}"
 starrocks < /bootstrap/catalog.sql
 echo "==> lakehouse bootstrap complete"
 """  # noqa: E501
@@ -197,6 +204,9 @@ def _starrocks_catalog_sql() -> str:
         f"CREATE EXTERNAL CATALOG IF NOT EXISTS {CATALOG}\n"
         f"PROPERTIES (\n{rendered}\n);\n"
         f"CREATE DATABASE IF NOT EXISTS {CATALOG}.{WAREHOUSE_SCHEMA};\n"
+    ) + "".join(
+        f"CREATE DATABASE IF NOT EXISTS default_catalog.{database};\n"
+        for database in NATIVE_DATABASES
     )
 
 
