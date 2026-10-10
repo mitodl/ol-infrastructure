@@ -452,8 +452,8 @@ class GranianConfig(BaseModel):
     The supported subset of granian CLI options is: interface, host, port, workers,
     runtime_mode, runtime_threads, blocking_threads, backpressure, no_ws,
     workers_max_rss, blocking_threads_idle_timeout, respawn_failed_workers,
-    respawn_interval, backlog, log_level, application_module, and metrics-related
-    flags.
+    respawn_interval, backlog, log_level, application_module, reload,
+    reload_ignore_dirs, workers_kill_timeout, and metrics-related flags.
 
     **Concurrency defaults:** ``workers``, ``runtime_threads`` and ``runtime_mode`` track
     Granian's own CLI defaults (1 / 1 / auto); scale horizontally with replicas rather
@@ -548,6 +548,23 @@ class GranianConfig(BaseModel):
     ``blocking_threads`` are resolved explicitly this no longer feeds Granian's own
     derivations, so it means only what it says: how many connections queue outside the
     workers."""
+    reload: bool = False
+    """Restart the workers when a file under the working directory changes (granian
+    ``--reload``). For development clusters, where source is synced into the running
+    container. The image needs the ``granian[reload]`` extra; without it Granian logs
+    an error and exits at startup.
+
+    Granian turns off the RSS monitor, worker lifetime and the metrics exporter while
+    the reloader runs (granian/server/common.py, verified at v2.7.4), so
+    ``--workers-max-rss`` and ``--metrics`` are accepted and ignored."""
+    reload_ignore_dirs: list[str] = Field(default_factory=list)
+    """Directory names whose changes do not trigger a reload (granian
+    ``--reload-ignore-dirs``, one flag per entry). Added to the watchfiles defaults."""
+    workers_kill_timeout: Annotated[int, Field(ge=1, le=1800)] | None = None
+    """Seconds to wait before killing a worker that did not stop gracefully (granian
+    ``--workers-kill-timeout``, 1 to 1800). Omitted when ``None``, which leaves Granian
+    waiting indefinitely. Every reload waits this long for a worker whose application
+    threads keep it alive."""
     log_level: str = "warning"
     application_module: str = "main.wsgi:application"
     enable_metrics: bool = True
@@ -633,6 +650,17 @@ class GranianConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def validate_reload_ignore_dirs(self) -> "GranianConfig":
+        """Reject ignore dirs that no reloader would read."""
+        if self.reload_ignore_dirs and not self.reload:
+            msg = (
+                "granian_config.reload_ignore_dirs is set but reload is False, so "
+                "nothing watches for changes. Set reload=True or remove it."
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
     def resolve_concurrency(self) -> "GranianConfig":
         """Resolve blocking_threads/backpressure at config time, not at build_args time.
 
@@ -701,6 +729,14 @@ class GranianConfig(BaseModel):
             raise ValueError(msg)
         return self.model_copy(update={"workers_max_rss": cap})
 
+    def _reload_args(self) -> list[str]:
+        if not self.reload:
+            return []
+        args = ["--reload"]
+        for directory in self.reload_ignore_dirs:
+            args += ["--reload-ignore-dirs", directory]
+        return args
+
     def build_args(self) -> list[str]:
         """Build the granian CLI argument list from this configuration."""
         args = [
@@ -723,6 +759,7 @@ class GranianConfig(BaseModel):
             ("--workers-max-rss", self.workers_max_rss),
             ("--blocking-threads-idle-timeout", self.blocking_threads_idle_timeout),
             ("--respawn-interval", self.respawn_interval),
+            ("--workers-kill-timeout", self.workers_kill_timeout),
         ):
             if value is not None:
                 args += [flag, str(value)]
@@ -749,6 +786,7 @@ class GranianConfig(BaseModel):
             args += ["--static-path-mount", path]
         if self.static_path_expires is not None:
             args += ["--static-path-expires", str(self.static_path_expires)]
+        args += self._reload_args()
         args += ["--log-level", self.log_level, self.application_module]
         return args
 

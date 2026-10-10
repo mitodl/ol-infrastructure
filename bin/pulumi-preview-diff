@@ -1,0 +1,317 @@
+#!/usr/bin/env python3
+"""Compare what `pulumi preview` plans on a baseline ref and on this checkout.
+
+"`pulumi preview` shows no changes" cannot verify a refactor of shared code:
+deployed stacks carry pending changes that have nothing to do with the branch.
+This runs `pulumi preview --json` for the same stack from two trees with the
+same inputs and compares the planned steps per URN (operation, property diff,
+inputs, resource options). A refactor that changes nothing plans the same steps on both
+sides, whatever those steps are.
+
+Inputs read from the environment (e.g. `MITXONLINE_DOCKER_TAG`) only have to
+be the same for both runs, which they are because both inherit this process's
+environment. They do not have to be the deployed values.
+
+Two limits on what IDENTICAL means:
+
+- Secret inputs are not compared. `pulumi preview --json` prints each one as
+  `[secret]`, so two different secret values look the same. A change to how a
+  secret is built has to be checked another way.
+- Only names with the suffix Pulumi or the Kubernetes provider appends (7 or 8
+  hex characters on a property called `name`) are masked. A resource that does
+  not exist yet and is auto-named some other way (e.g. an AWS `name_prefix`)
+  is reported as DIFFERENT on every run, including main against main.
+
+Each tree runs against its own virtualenv (`uv run --no-sync --project
+<tree>`), so each preview imports its own copy of `ol_infrastructure`.
+
+    bin/pulumi-preview-diff src/ol_infrastructure/applications/mitxonline --all-stacks
+    bin/pulumi-preview-diff src/ol_infrastructure/applications/mitxonline QA --baseline origin/main
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from enum import StrEnum
+from pathlib import Path
+from typing import Annotated, Any
+
+import cyclopts
+
+app = cyclopts.App(help=__doc__.splitlines()[0])
+
+STACK_FILE_PATTERN = re.compile(r"^Pulumi\.(?P<stack>.+)\.yaml$")
+# Pulumi appends 7 hex characters to an auto-named resource and the Kubernetes
+# provider appends 8. The suffix is random per preview until the resource exists.
+AUTO_NAME_SUFFIX = "-[0-9a-f]{7,8}"
+MASKED_AUTO_NAME = "<auto-name>"
+SHARED_ENVIRONMENT = {"VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT", "PYTHONPATH"}
+# Resource options a refactor can drop without changing any input.
+COMPARED_OPTIONS = (
+    "parent",
+    "provider",
+    "protect",
+    "dependencies",
+    "propertyDependencies",
+    "aliases",
+    "deleteBeforeReplace",
+    "ignoreChanges",
+    "additionalSecretOutputs",
+    "retainOnDelete",
+    "customTimeouts",
+)
+STDERR_TAIL_LINES = 20
+
+
+class Verdict(StrEnum):
+    """Outcome of comparing one stack."""
+
+    identical = "IDENTICAL"
+    different = "DIFFERENT"
+    skipped = "SKIPPED"
+    error = "ERROR"
+
+
+@dataclass
+class StackResult:
+    """Verdict for one stack, with the URNs and keys that differ."""
+
+    stack: str
+    verdict: Verdict
+    detail: list[str] = field(default_factory=list)
+
+
+def _run(command: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    # Any of these would make both trees resolve the same environment, so both
+    # previews would import the same ol_infrastructure and always agree.
+    env = {k: v for k, v in os.environ.items() if k not in SHARED_ENVIRONMENT}
+    return subprocess.run(  # noqa: S603
+        command, cwd=cwd, env=env, capture_output=True, text=True, check=False
+    )
+
+
+def _checked(command: list[str], cwd: Path) -> str:
+    result = _run(command, cwd)
+    if result.returncode != 0:
+        sys.exit(f"{' '.join(command)} failed in {cwd}:\n{result.stderr}")
+    return result.stdout
+
+
+def _pulumi(tree: Path, project: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return _run(
+        ["uv", "run", "--no-sync", "--project", str(tree), "pulumi", *args],
+        cwd=tree / project,
+    )
+
+
+def _stacks_with_config(project_dir: Path) -> list[str]:
+    return sorted(
+        match.group("stack")
+        for path in project_dir.iterdir()
+        if (match := STACK_FILE_PATTERN.match(path.name))
+    )
+
+
+def _stacks_with_state(tree: Path, project: Path) -> set[str]:
+    result = _pulumi(tree, project, "stack", "ls", "--json")
+    if result.returncode != 0:
+        sys.exit(f"pulumi stack ls failed in {tree / project}:\n{result.stderr}")
+    return {stack["name"] for stack in json.loads(result.stdout)}
+
+
+def _mask_auto_names(value: Any, auto_name: re.Pattern[str]) -> Any:
+    # Only a property called "name" is auto-named (the resource's own name, or
+    # metadata.name on a Kubernetes object). Masking any matching string would
+    # hide a real difference in, say, an image tag that ends in a short SHA.
+    if isinstance(value, dict):
+        return {
+            k: MASKED_AUTO_NAME
+            if k == "name" and isinstance(v, str) and auto_name.fullmatch(v)
+            else _mask_auto_names(v, auto_name)
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [_mask_auto_names(v, auto_name) for v in value]
+    return value
+
+
+def _unordered(value: Any) -> Any:
+    # The order of a dependency list differs between two previews of the same
+    # program (seen on a resource the compared branch did not touch).
+    if isinstance(value, dict):
+        return {k: _unordered(v) for k, v in value.items()}
+    if isinstance(value, list) and all(isinstance(v, str) for v in value):
+        return sorted(value)
+    return value
+
+
+def _planned_steps(preview: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Reduce a preview to what it plans for each URN.
+
+    :param preview: Parsed output of ``pulumi preview --json``.
+    :returns: URN mapped to the operation, property diff, inputs and options.
+    :rtype: dict[str, dict[str, Any]]
+    """
+    steps = {}
+    for step in preview.get("steps", []):
+        urn = step["urn"]
+        new_state = step.get("newState") or {}
+        auto_name = re.compile(re.escape(urn.rsplit("::", 1)[-1]) + AUTO_NAME_SUFFIX)
+        steps[urn] = {
+            "op": step["op"],
+            "detailedDiff": step.get("detailedDiff"),
+            "inputs": _mask_auto_names(new_state.get("inputs"), auto_name),
+            "options": {
+                key: _unordered(new_state.get(key)) for key in COMPARED_OPTIONS
+            },
+        }
+    return steps
+
+
+def _differing_paths(left: Any, right: Any, path: str = "") -> list[str]:
+    if isinstance(left, dict) and isinstance(right, dict):
+        return [
+            found
+            for key in sorted(left.keys() | right.keys())
+            for found in _differing_paths(
+                left.get(key), right.get(key), f"{path}.{key}" if path else key
+            )
+        ]
+    if isinstance(left, list) and isinstance(right, list) and len(left) == len(right):
+        return [
+            found
+            for index, (a, b) in enumerate(zip(left, right, strict=True))
+            for found in _differing_paths(a, b, f"{path}[{index}]")
+        ]
+    return [] if left == right else [path]
+
+
+def _compare(
+    baseline: dict[str, dict[str, Any]], branch: dict[str, dict[str, Any]]
+) -> list[str]:
+    differences = []
+    for urn in sorted(baseline.keys() | branch.keys()):
+        if urn not in branch:
+            differences.append(f"{urn}\n    only planned on the baseline")
+        elif urn not in baseline:
+            differences.append(f"{urn}\n    only planned on this checkout")
+        elif paths := _differing_paths(baseline[urn], branch[urn]):
+            differences.append(f"{urn}\n    " + "\n    ".join(paths))
+    return differences
+
+
+def _preview(tree: Path, project: Path, stack: str) -> dict[str, Any] | str:
+    result = _pulumi(
+        tree, project, "preview", "--json", "--non-interactive", "--stack", stack
+    )
+    if result.returncode != 0:
+        # pulumi reports a failed program inside the JSON document on stdout,
+        # and a failure to start one on stderr.
+        tail = f"{result.stdout}\n{result.stderr}".strip().splitlines()
+        return "\n".join(tail[-STDERR_TAIL_LINES:])
+    return json.loads(result.stdout)
+
+
+def _diff_stack(
+    baseline_tree: Path, branch_tree: Path, project: Path, stack: str
+) -> StackResult:
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        baseline, branch = pool.map(
+            lambda tree: _preview(tree, project, stack), (baseline_tree, branch_tree)
+        )
+    errors = [
+        f"{side}:\n{outcome}"
+        for side, outcome in (("baseline", baseline), ("this checkout", branch))
+        if isinstance(outcome, str)
+    ]
+    if errors:
+        return StackResult(stack, Verdict.error, errors)
+    differences = _compare(_planned_steps(baseline), _planned_steps(branch))  # type: ignore[arg-type]
+    if differences:
+        return StackResult(stack, Verdict.different, differences)
+    return StackResult(stack, Verdict.identical)
+
+
+@app.default
+def main(
+    project_dir: Path,
+    stacks: list[str] | None = None,
+    *,
+    all_stacks: Annotated[
+        bool, cyclopts.Parameter(help="Every stack with a Pulumi.<stack>.yaml.")
+    ] = False,
+    baseline: Annotated[
+        str, cyclopts.Parameter(help="Git ref the checkout is compared against.")
+    ] = "origin/main",
+    jobs: Annotated[
+        int, cyclopts.Parameter(help="Stacks previewed at the same time.")
+    ] = 4,
+) -> None:
+    """Report whether each stack plans the same steps on the baseline and here.
+
+    :param project_dir: Pulumi project directory (the one holding Pulumi.yaml).
+    :param stacks: Stack names to compare. Omit when passing --all-stacks.
+    """
+    project_dir = project_dir.resolve()
+    branch_tree = Path(
+        _checked(["git", "rev-parse", "--show-toplevel"], project_dir).strip()
+    )
+    project = project_dir.relative_to(branch_tree)
+
+    if all_stacks == bool(stacks):
+        sys.exit("Pass stack names or --all-stacks, not both and not neither.")
+    configured = _stacks_with_config(project_dir)
+    selected = configured if all_stacks else stacks or []
+    if unknown := sorted(set(selected) - set(configured)):
+        sys.exit(f"No Pulumi.<stack>.yaml in {project_dir} for: {', '.join(unknown)}")
+
+    with tempfile.TemporaryDirectory(prefix="pulumi-preview-diff-") as scratch:
+        baseline_tree = Path(scratch) / "baseline"
+        _checked(
+            ["git", "worktree", "add", "--detach", str(baseline_tree), baseline],
+            branch_tree,
+        )
+        try:
+            for tree in (baseline_tree, branch_tree):
+                # --inexact leaves packages the caller installed by hand in place
+                _checked(
+                    ["uv", "sync", "--frozen", "--inexact", "--project", str(tree)],
+                    tree,
+                )
+
+            with_state = _stacks_with_state(branch_tree, project)
+            results = [
+                StackResult(stack, Verdict.skipped, ["stack file with no state"])
+                for stack in selected
+                if stack not in with_state
+            ]
+            with ThreadPoolExecutor(max_workers=jobs) as pool:
+                results += pool.map(
+                    lambda stack: _diff_stack(
+                        baseline_tree, branch_tree, project, stack
+                    ),
+                    [stack for stack in selected if stack in with_state],
+                )
+        finally:
+            _checked(
+                ["git", "worktree", "remove", "--force", str(baseline_tree)],
+                branch_tree,
+            )
+
+    for result in sorted(results, key=lambda r: r.stack):
+        print(f"{result.verdict.value:<10} {project} {result.stack}")
+        for line in result.detail:
+            print(f"  {line}")
+    if not any(r.verdict is Verdict.identical for r in results) or any(
+        r.verdict in (Verdict.different, Verdict.error) for r in results
+    ):
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    app()
