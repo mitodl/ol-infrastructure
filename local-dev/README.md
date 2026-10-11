@@ -38,6 +38,7 @@ This environment runs the MIT Learn application stack as Kubernetes workloads in
 | learn-ai | `https://ai.learn.mit.dev` | Django AI proxy service |
 | mitxonline | `https://mitxonline.mit.dev` | MITx Online LMS (Django/uwsgi) |
 | odl-video-service | `https://video.odl.mit.dev` | ODL Video Service (Django/uwsgi) |
+| micromasters | `https://micromasters.mit.dev` | MicroMasters (Django/granian), opt-in, see [MicroMasters](#micromasters) |
 | Keycloak SSO | `https://sso.ol.mit.dev` | Identity provider (olapps realm) |
 | Mailpit | `https://mail.mit.dev` | Captured outbound email (web UI) |
 | Grafana | `https://grafana.mit.dev` | Logs from every service in the cluster (1-week retention) |
@@ -341,6 +342,9 @@ tilt trigger seed-mit-learn-fixtures
 | mitxonline | `seed-mitxonline-course-data` | Populate test course data |
 | mitxonline | `seed-mitxonline-income-thresholds` | Load country income thresholds |
 | odl-video-service | `seed-ovs-presets` | Create encoding presets (requires real AWS creds) |
+| micromasters | `seed-micromasters-superuser` | Create or reset the `admin` / `admin` superuser |
+| micromasters | `seed-micromasters-data` | Load seed programs, course runs and learners, then rebuild the search index |
+| micromasters | `seed-micromasters-opensearch` | Recreate the OpenSearch indices |
 
 ---
 
@@ -378,7 +382,7 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). `data-platform` is not an app but switches on the [data lake](#data-lake-gravitino--starrocks). |
+| `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). Neither is `micromasters` — see [MicroMasters](#micromasters). `data-platform` is not an app but switches on the [data lake](#data-lake-gravitino--starrocks). |
 | `prebuilt_tags` | `[]` (run `latest`) | `["app=tag"]` list of published image tags to run in place of `latest` when the app repo is not checked out locally. An entry for an app that has a checkout is ignored. Entries were not applied before this setting was wired up, so a `tilt_config.json` copied from an older example file carries release tags from early 2026: clear the list unless you want those releases. |
 | `lake_host_ports` | `starrocks=9030`, `gravitino=9001`, `rustfs=9000` | `["service=port"]` list moving the host side of a [data lake](#data-lake-gravitino--starrocks) forward off a port something else on your machine holds. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
@@ -893,6 +897,39 @@ Two things that differ from the other apps:
   rather than `granian[reload]`, so the app container cannot run with `--reload`. Tilt
   syncs the code; restart `ocwstudio-webapp` from the Tilt UI to pick it up, the same
   as the celery workers.
+
+### MicroMasters
+
+MicroMasters is opt-in. It is here so the data platform's `micromasters` ingestion has
+a local Postgres database to read, and most developers do not need it running:
+
+```json
+{
+  "enabled_apps": ["mit-learn", "micromasters"]
+}
+```
+
+Enabling it creates the `micromasters` database on the shared Postgres cluster and
+deploys the web app at `https://micromasters.mit.dev` plus one celery worker. Re-run
+`./local-dev/scripts/setup.sh` first if your `/etc/hosts` predates the app; the
+existing `*.<domain>` certificate already covers the hostname.
+
+Run `seed-micromasters-superuser` and then `seed-micromasters-data` from the Tilt UI.
+The first gives you a login, the second fills the database with 2 programs and 120
+learners and rebuilds the search index.
+
+What differs from the other apps:
+
+- **Log in at `/admin/` as `admin` / `admin`.** Learner sign-in is OAuth against edX
+  or MITx Online, and the tracked config has credentials for neither.
+  `local-dev/apps/micromasters/configmaps/app-env.local.yaml.example` lists the
+  settings to fill in if you need it.
+- **Every code change rebuilds the image.** The image has no `watchfiles`, so granian
+  cannot reload, and the frontend bundles are baked in by the Dockerfile's
+  `node_builder` stage. Tilt rebuilds automatically when the sibling `micromasters`
+  checkout changes.
+- **Nothing scheduled runs.** There is no celery beat deployment, so the edX and MIT
+  Learn syncs never fire.
 
 ### OCW theme development (ocw-hugo-themes)
 

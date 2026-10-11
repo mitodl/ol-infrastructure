@@ -1,0 +1,230 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: micromasters-webapp
+  namespace: micromasters
+  labels:
+    app: micromasters-webapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: micromasters-webapp
+  template:
+    metadata:
+      labels:
+        app: micromasters-webapp
+    spec:
+      initContainers:
+        # Merge the image's system CA bundle with the mkcert root so pods trust
+        # both public HTTPS endpoints and local-dev TLS.
+      - name: ca-bundle-merge
+        image: mitodl/micromasters-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+
+        # The CNPG cluster only runs postInitSQL on first bootstrap, so a
+        # developer enabling micromasters on an existing cluster has no
+        # micromasters database. Create it on demand, as apps/ocw-studio does.
+      - name: create-database
+        image: postgres:18-alpine
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          set -eu
+          export PGPASSWORD=localdev  # pragma: allowlist secret
+          PSQL="psql -h local-pg-rw.local-infra.svc.cluster.local -U app -d postgres -tAc"
+          until $PSQL "SELECT 1" >/dev/null 2>&1; do
+            echo "waiting for postgres..."
+            sleep 2
+          done
+          if [ "$($PSQL "SELECT 1 FROM pg_database WHERE datname='micromasters'")" = "1" ]; then
+            echo "database exists: micromasters"
+          else
+            echo "creating database: micromasters"
+            $PSQL "CREATE DATABASE micromasters OWNER app"
+          fi
+
+      - name: bootstrap
+        image: mitodl/micromasters-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          set -eo pipefail
+          python manage.py collectstatic --noinput --clear
+          # The cms data migrations log wagtail search-index tracebacks
+          # ("title_text" does not exist) while creating the default pages.
+          # They are caught by wagtail and migrate still exits 0.
+          python manage.py migrate --noinput
+        envFrom:
+        - configMapRef:
+            name: micromasters-env
+        - secretRef:
+            name: micromasters-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: micromasters-env-local
+            optional: true
+        volumeMounts:
+        - name: static-files
+          mountPath: /src/staticfiles
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      containers:
+      - name: app
+        image: mitodl/micromasters-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        # --static-path-mount matches production: serve /static/* from
+        # Granian's Rust layer. STATIC_ROOT is /src/staticfiles, the same
+        # emptyDir collectstatic populates. No --reload: the image has no
+        # watchfiles, so a Python change rebuilds the image (see Tiltfile).
+        - exec granian --interface wsgi --host 0.0.0.0 --port 8079 --workers 2 --static-path-mount
+          /src/staticfiles micromasters.wsgi:application
+        ports:
+        - containerPort: 8079
+          name: http-wsgi
+        envFrom:
+        - configMapRef:
+            name: micromasters-env
+        - secretRef:
+            name: micromasters-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: micromasters-env-local
+            optional: true
+        resources:
+          requests:
+            cpu: 250m
+            memory: 512Mi
+          limits:
+            memory: 2Gi
+        readinessProbe:
+          tcpSocket:
+            port: 8079
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: static-files
+          mountPath: /src/staticfiles
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: static-files
+        emptyDir: {}
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
+---
+# Celery worker. One worker takes all four queues production splits across
+# four deployments. `recreate_index` and `seed_db` block on a task in the
+# `search` queue, so they hang without this pod. There is no beat deployment,
+# which keeps the scheduled edX and MIT Learn syncs from running against
+# endpoints that are not configured here.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: micromasters-celery
+  namespace: micromasters
+  labels:
+    app: micromasters-celery
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: micromasters-celery
+  template:
+    metadata:
+      labels:
+        app: micromasters-celery
+    spec:
+      initContainers:
+      - name: ca-bundle-merge
+        image: mitodl/micromasters-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+      containers:
+      - name: celery
+        image: mitodl/micromasters-app:latest
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - micromasters.celery:app
+        - worker
+        - -Q
+        - search,exams,dashboard,default
+        - -c
+        - "2"
+        envFrom:
+        - configMapRef:
+            name: micromasters-env
+        - secretRef:
+            name: micromasters-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: micromasters-env-local
+            optional: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 1Gi
+        volumeMounts:
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: micromasters-webapp
+  namespace: micromasters
+  labels:
+    app: micromasters-webapp
+spec:
+  selector:
+    app: micromasters-webapp
+  ports:
+  - name: http
+    port: 8079
+    targetPort: http-wsgi

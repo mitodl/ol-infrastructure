@@ -1,0 +1,45 @@
+# micromasters Tiltfile
+# When the sibling micromasters repo is not checked out, Tilt uses the prebuilt
+# DockerHub image (mitodl/micromasters-app:latest) without attempting a local
+# build.
+
+load("../../tiltlib.star", "k8s_yaml_local")
+
+workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
+APP_DIR = os.path.join(workspace_root, "micromasters")
+IMAGE = 'mitodl/micromasters-app'
+NAMESPACE = 'micromasters'
+DEPLOY_NAME = 'micromasters-webapp'
+
+if os.path.exists(os.path.join(APP_DIR, '.git')):
+    docker_build(
+        IMAGE,
+        context=APP_DIR,
+        dockerfile=APP_DIR + '/Dockerfile',
+        # The production target, not development: it is the only one that
+        # copies the node_builder bundles and webpack-stats.json that
+        # django-webpack-loader reads to render a page. No live_update: the
+        # image has no watchfiles, so granian cannot --reload, and a sync
+        # without a reload makes Tilt skip the rebuild and edits never land.
+        target='production',
+        # .claude/ holds agent worktrees, which are not part of the app.
+        ignore=['.claude/'],
+    )
+
+k8s_yaml_local([
+    'configmaps/app-env.yaml',
+    'secrets.yaml',
+    'deployment.yaml',
+    'apisix-routes.yaml',
+], local_overrides='configmaps/app-env.local.yaml')
+
+k8s_resource(
+    DEPLOY_NAME,
+    port_forwards=['8079:8079'],
+    labels=['micromasters'],
+    # local-infra-core provides Postgres, Valkey and OpenSearch. Nothing here
+    # reads a Secret written by local-infra-apps.
+    resource_deps=['local-infra-core'],
+)
+
+k8s_resource('micromasters-celery', labels=['micromasters'], resource_deps=['local-infra-core'])

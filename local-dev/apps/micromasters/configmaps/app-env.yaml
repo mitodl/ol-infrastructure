@@ -1,0 +1,58 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: micromasters-env
+  namespace: micromasters
+data:
+  DJANGO_SETTINGS_MODULE: "micromasters.settings"
+  MICROMASTERS_BASE_URL: "https://micromasters.mit.dev"
+  MICROMASTERS_ENVIRONMENT: "local"
+  MICROMASTERS_SECURE_SSL_REDIRECT: "False"
+  MICROMASTERS_DB_DISABLE_SSL: "True"
+  MICROMASTERS_LOG_LEVEL: "INFO"
+  MICROMASTERS_ADMIN_EMAIL: "admin@odl.local"
+  MICROMASTERS_SUPPORT_EMAIL: "ol-engineering-support@mit.edu"
+  MICROMASTERS_FROM_EMAIL: "MITx MicroMasters <ol-engineering-support@mit.edu>"
+  NODE_ENV: "production"
+  # DEBUG must stay False: settings.py adds nplusone and debug_toolbar to
+  # INSTALLED_APPS when it is True, and the production image has neither.
+  DEBUG: "False"
+  # settings.py parses both of these as Python list literals.
+  ALLOWED_HOSTS: '["*"]'
+  CSRF_TRUSTED_ORIGINS: '["https://micromasters.mit.dev"]'
+  USE_X_FORWARDED_HOST: "True"
+
+  # mkcert root CA — trusts the local wildcard TLS cert for inter-pod HTTPS
+  REQUESTS_CA_BUNDLE: "/etc/ssl/local-dev/rootCA.pem"
+  SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
+
+  # Valkey
+  # Each app needs its own Valkey DBs, or Celery picks up another app's tasks.
+  # The allocation is listed next to the Valkey settings in
+  # apps/mitxonline/configmaps/app-env.yaml. The Django cache shares the
+  # broker DB because settings.py points CACHES at CELERY_BROKER_URL.
+  CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/13"
+  CELERY_RESULT_BACKEND: "redis://valkey.local-infra.svc.cluster.local:6379/14"
+
+  # OpenSearch. The index name is required (settings.py raises without it).
+  # One shard: the app default of 5 leaves a single-node cluster with more
+  # shards than it needs for a few thousand seed documents.
+  # No scheme on the URL: search/connection.py passes it as a bare host and
+  # sets use_ssl from OPENSEARCH_HTTP_AUTH, which is unset here.
+  OPENSEARCH_URL: "opensearch-cluster-master.local-infra.svc.cluster.local:9200"
+  OPENSEARCH_INDEX: "micromasters-local"
+  OPENSEARCH_SHARD_COUNT: "1"
+
+  # Email. Django mail goes to Mailpit. Learner and financial-aid mail goes
+  # through the Mailgun HTTP API instead, and settings.py raises unless
+  # MAILGUN_URL and MAILGUN_KEY (secrets.yaml) are set, so this is a stub that
+  # resolves nowhere: those sends fail rather than reach a real recipient.
+  MICROMASTERS_EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
+  MICROMASTERS_EMAIL_HOST: "mailpit.local-infra.svc.cluster.local"
+  MICROMASTERS_EMAIL_PORT: "1025"
+  MICROMASTERS_EMAIL_TLS: "False"
+  MAILGUN_URL: "http://mailgun.invalid/v3/local"
+
+  # Status token
+  STATUS_TOKEN: "local"

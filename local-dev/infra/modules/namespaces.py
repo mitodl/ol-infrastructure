@@ -18,8 +18,10 @@ APP_NAMESPACES = (
 
 # Namespaces created only when the matching app is in enabled_apps, because
 # what fills them is expensive. ocw-studio brings an object store and a
-# Concourse install along with it.
-OPTIONAL_APP_NAMESPACES = ("ocw-studio",)
+# Concourse install along with it. micromasters is here because it was added
+# after per-app gating existed, so an unconditional namespace would churn
+# every stack for an app most developers do not run.
+OPTIONAL_APP_NAMESPACES = ("ocw-studio", "micromasters")
 
 
 def app_namespaces_for(enabled_apps: Iterable[str]) -> tuple[str, ...]:
