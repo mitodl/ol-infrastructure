@@ -38,6 +38,8 @@ data:
   # OpenSearch. The index name is required (settings.py raises without it).
   # One shard: the app default of 5 leaves a single-node cluster with more
   # shards than it needs for a few thousand seed documents.
+  # No scheme on the URL: search/connection.py passes it as a bare host and
+  # sets use_ssl from OPENSEARCH_HTTP_AUTH, which is unset here.
   OPENSEARCH_URL: "opensearch-cluster-master.local-infra.svc.cluster.local:9200"
   OPENSEARCH_INDEX: "micromasters-local"
   OPENSEARCH_SHARD_COUNT: "1"
