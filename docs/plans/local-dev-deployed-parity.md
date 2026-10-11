@@ -466,7 +466,5 @@ Not part of this work. Each needs its own check before acting on it.
 - odl_video_service's broker URL uses Redis database 0
   (`odl_video_service/k8s_secrets.py:168`) while its KEDA trigger reads the
   worker config default, database 1. Read from code, not observed.
-- `prebuilt_tags` in `tilt_config.json` is consumed by nothing; every local
-  manifest pins `:latest`. `local-dev/README.md` documents it as working.
 - `local-dev/scripts/setup.sh:280-284` recommends 8 GB for the full stack;
   `local-dev/README.md:62` says 12 to 16 GB.
