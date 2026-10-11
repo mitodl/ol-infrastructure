@@ -60,8 +60,8 @@ In `Tiltfile`, add an entry to the `APPS` list:
         "dir": "my-app",  # sibling repo directory name
         "namespace": "my-app",
         "deploy_name": "myapp-webapp",
-        "image_backend": "mitodl/my-app",
-        "prebuilt_tag_backend": "1.0.0",
+        # prebuilt_tags key -> published image; see "Editing code" in the README.
+        "images": {"my-app": "mitodl/my-app"},
         "tiltfile": "./local-dev/apps/my-app/Tiltfile",
         "seed_commands": [
             {

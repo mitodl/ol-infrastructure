@@ -235,7 +235,7 @@ With an app repo checked out next to `ol-infrastructure`, Tilt live-syncs your e
 
 - **Django apps:** granian runs with `--reload` and restarts its workers on each change — the new code serves once Django finishes re-importing (roughly 10–30 s depending on the app). Watch for `Changes detected, reloading workers..` in the app logs. Celery workers and beat don't auto-reload — restart those resources from the Tilt UI after changing task code. When `pyproject.toml` or `uv.lock` changes, Tilt runs `uv sync` inside the container first.
 - **Next.js frontend:** Tilt builds the `local-dev` stage of `Dockerfile.web`, which runs `next dev` (Turbopack). Changes under `frontends/` hot-reload in roughly a second (the first request to each page after a pod start pays a one-time on-demand compile). HMR websockets are proxied through apisix, so the browser hot-updates on `https://learn.mit.dev` too. `NEXT_PUBLIC_*` values are runtime env vars (see its `configmaps/app-env.yaml`), not build args, so changing them needs no rebuild. When `yarn.lock` changes, Tilt runs `yarn install` inside the container.
-- **No checkout:** Tilt deploys the pre-built Docker Hub image (`mitodl/<app>-app`) at the tag listed in `tilt_config.json` under `prebuilt_tags`. It works, but does not hot-reload — you can work on mit-learn without having learn-ai checked out.
+- **No checkout:** Tilt deploys the pre-built Docker Hub image (`mitodl/<app>-app:latest`). To run a specific release instead, add `"<app>=<tag>"` to `prebuilt_tags` in `tilt_config.json` (the Next.js frontend's key is `mit-learn-nextjs`). It works, but does not hot-reload — you can work on mit-learn without having learn-ai checked out.
 
 ### Access logs
 
@@ -374,12 +374,12 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 
 ## Configuration Reference
 
-`tilt_config.json` is your copy of [`tilt_config.json.example`](../tilt_config.json.example) — the example file is the canonical starting point (its image tags move over time; this doc doesn't repeat them). Keys:
+`tilt_config.json` is your copy of [`tilt_config.json.example`](../tilt_config.json.example) — the example file is the canonical starting point. Keys:
 
 | Key | Default | Description |
 |-----|---------|-------------|
 | `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). `data-platform` is not an app but switches on the [data lake](#data-lake-gravitino--starrocks). |
-| `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
+| `prebuilt_tags` | `[]` (run `latest`) | `["app=tag"]` list of published image tags to run in place of `latest` when the app repo is not checked out locally. An entry for an app that has a checkout is ignored. Entries were not applied before this setting was wired up, so a `tilt_config.json` copied from an older example file carries release tags from early 2026: clear the list unless you want those releases. |
 | `lake_host_ports` | `starrocks=9030`, `gravitino=9001`, `rustfs=9000` | `["service=port"]` list moving the host side of a [data lake](#data-lake-gravitino--starrocks) forward off a port something else on your machine holds. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
@@ -1059,7 +1059,7 @@ Already-pushed images pull fine on the new nodes without a rebuild — the regis
 
 The Next.js build needs ~4 GB of memory. If it OOMs:
 - Increase the Docker VM memory allocation (see [Prerequisites](#prerequisites))
-- Or use a prebuilt image by removing `mit-learn` from `enabled_apps` in `tilt_config.json` and letting Tilt use the `prebuilt_tags` value instead
+- Or skip the build: with no `mit-learn` checkout next to `ol-infrastructure`, Tilt runs the published `mitodl/mit-learn-nextjs-app` image (and the published backend image) instead of building
 
 ### Image push retries forever on the last layer
 
