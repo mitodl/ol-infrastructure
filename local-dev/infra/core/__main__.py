@@ -12,6 +12,8 @@ Provisions the foundational layer for the local k3d development environment:
   - AI services (Qdrant, Tika, LiteLLM)
   - Messaging (Mailpit)
   - Observability (Loki, Alloy, Grafana) — optional, see observability_enabled
+  - Object store (RustFS) and data lake (Gravitino, StarRocks) — optional,
+    see enabled_apps
 
 The apps-infra stack depends on this core stack being deployed first.
 It provisions the Keycloak realm and any other app-specific resources.
@@ -34,6 +36,14 @@ from modules.database import create_database
 from modules.helpers import make_resource_opts
 from modules.identity_core import create_identity_core
 from modules.ingress import create_ingress
+from modules.lakehouse import (
+    CATALOG,
+    DATA_PLATFORM_APP,
+    ICEBERG_REST_URL,
+    STARROCKS_HOST,
+    STARROCKS_QUERY_PORT,
+    create_lakehouse,
+)
 from modules.messaging import create_messaging
 from modules.namespaces import create_namespaces
 from modules.objectstore import OBJECT_STORE_APPS, create_object_store
@@ -106,7 +116,8 @@ if _enabled_apps is None:
         "enabled_apps is not set. Tilt passes LOCAL_DEV_ENABLED_APPS on every "
         "run; a hand-run `pulumi up` has to say so itself, because defaulting "
         "to none would destroy the resources of any optional app you have "
-        "enabled (the ocw-studio namespace and the RustFS object store).\n"
+        "enabled (the ocw-studio namespace, the RustFS object store, the data "
+        "lake).\n"
         "  LOCAL_DEV_ENABLED_APPS=mit-learn,ocw-studio pulumi up --stack "
         "local-dev.core.Dev\n"
         "Pass an empty value if you really do run no optional apps:\n"
@@ -287,15 +298,29 @@ db = create_database(
 create_ai_services(_k8s, namespaces["local-infra"], db.cluster, _infra_dir)
 
 # S3-compatible object storage (RustFS). Roughly a 1GB workload with a 20Gi
-# volume, and only ocw-studio uses it today, so it is deployed on demand
-# rather than as unconditional shared infrastructure.
-if set(enabled_apps) & set(OBJECT_STORE_APPS):
-    create_object_store(
+# volume, and only optional apps use it, so it is deployed on demand rather
+# than as unconditional shared infrastructure.
+object_store_apps = [app for app in OBJECT_STORE_APPS if app in enabled_apps]
+if object_store_apps:
+    object_store = create_object_store(
         _k8s,
         namespaces["local-infra"],
         apisix_release=ingress.apisix,
         tls_secret=tls.tls_secret,
         s3_hostname=f"s3.{root_domain}",
+        apps=object_store_apps,
+    )
+
+# Local data lake: Gravitino (Iceberg REST catalog) and StarRocks, about 2GB
+# resident and a 3GB image, so opt-in like the object store it sits on.
+data_platform_enabled = DATA_PLATFORM_APP in enabled_apps
+if data_platform_enabled:
+    create_lakehouse(
+        _k8s,
+        namespaces["local-infra"],
+        db_cluster=db.cluster,
+        object_store_bootstrap=object_store.bootstrap_job,
+        postgres_version=CNPG_POSTGRES_VERSION,
     )
 
 # Deploy Keycloak operator and instance (but not realm — that's in apps-infra)
@@ -329,6 +354,12 @@ pulumi.export(
 pulumi.export("tika_url", "http://tika.local-infra.svc.cluster.local:9998")
 pulumi.export("litellm_url", "http://litellm.local-infra.svc.cluster.local:4000")
 pulumi.export("mailpit_ui_url", "http://mailpit.local-infra.svc.cluster.local:8025")
+
+if data_platform_enabled:
+    pulumi.export("iceberg_rest_url", ICEBERG_REST_URL)
+    pulumi.export("starrocks_host", STARROCKS_HOST)
+    pulumi.export("starrocks_query_port", STARROCKS_QUERY_PORT)
+    pulumi.export("lake_catalog", CATALOG)
 
 if observability_enabled:
     pulumi.export("grafana_url", f"https://grafana.{root_domain}")
