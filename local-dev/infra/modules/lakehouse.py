@@ -20,6 +20,8 @@ applications/starrocks), not its security. Where local differs, and why:
 - StarRocks is the allin1 image, shared-nothing, one FE and one BE in a pod.
   Deployed it is shared-data on an S3 storage volume, so internal tables and
   materialized views here never exercise that path.
+- The StarRocks catalog has its Iceberg metadata cache off (see
+  STARROCKS_CATALOG_SETTINGS). Deployed it is on.
 """
 
 import hashlib
@@ -72,6 +74,13 @@ WAREHOUSE_SCHEMA = "ol_warehouse_local"
 # is here because the deployed clusters get both from substructure/starrocks.
 NATIVE_DATABASES = ("b2b_analytics", "b2b_learner_records")
 
+# With the metadata cache on, StarRocks answers from the snapshot it last read
+# for about half a minute after another writer commits. A dlt load from the host
+# followed at once by a dbt build then builds on the load before it, and passes.
+# The deployed catalogs keep the cache: this is a single-user lake of small
+# tables, where a catalog round trip per query costs nothing.
+STARROCKS_CATALOG_SETTINGS = {"enable_iceberg_metadata_cache": "false"}
+
 # Gravitino's entity store and the Iceberg JDBC catalog get a database each so
 # dropping the lake's table metadata does not take the metalake with it.
 GRAVITINO_DATABASE = "gravitino"
@@ -111,7 +120,8 @@ psql -d {GRAVITINO_DATABASE} -1 -v ON_ERROR_STOP=1 -f "/schema/{_SCHEMA_FILE}"
 # Idempotent. The Job that runs it expires after ten minutes, so a reconcile
 # later than that replays it, which is what restores the StarRocks catalog if
 # its volume is ever deleted. IF NOT EXISTS and the 200 checks mean a changed
-# property does not reach an existing catalog: drop the catalog first.
+# property does not reach an existing catalog: drop the catalog first. The
+# exception is STARROCKS_CATALOG_SETTINGS, which catalog.sql also ALTERs in.
 _CATALOG_SCRIPT = f"""#!/bin/sh
 set -eu
 
@@ -195,14 +205,20 @@ def _starrocks_catalog_sql() -> str:
         "aws.s3.region": S3_REGION,
         "aws.s3.enable_path_style_access": "true",
         "aws.s3.enable_ssl": "false",
+        **STARROCKS_CATALOG_SETTINGS,
     }
-    rendered = ",\n".join(
-        f"    {json.dumps(key)} = {json.dumps(value)}"
-        for key, value in properties.items()
-    )
+
+    def rendered(values: dict[str, str]) -> str:
+        return ",\n".join(
+            f"    {json.dumps(key)} = {json.dumps(value)}"
+            for key, value in values.items()
+        )
+
     return (
         f"CREATE EXTERNAL CATALOG IF NOT EXISTS {CATALOG}\n"
-        f"PROPERTIES (\n{rendered}\n);\n"
+        f"PROPERTIES (\n{rendered(properties)}\n);\n"
+        # For a catalog an earlier version of this stack created.
+        f"ALTER CATALOG {CATALOG} SET (\n{rendered(STARROCKS_CATALOG_SETTINGS)}\n);\n"
         f"CREATE DATABASE IF NOT EXISTS {CATALOG}.{WAREHOUSE_SCHEMA};\n"
     ) + "".join(
         f"CREATE DATABASE IF NOT EXISTS default_catalog.{database};\n"
