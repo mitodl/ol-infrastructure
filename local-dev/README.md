@@ -380,6 +380,7 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 |-----|---------|-------------|
 | `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). `data-platform` is not an app but switches on the [data lake](#data-lake-gravitino--starrocks). |
 | `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
+| `lake_host_ports` | `starrocks=9030`, `gravitino=9001`, `rustfs=9000` | `["service=port"]` list moving the host side of a [data lake](#data-lake-gravitino--starrocks) forward off a port something else on your machine holds. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
 | `keycloak_image` | published `mitodl/keycloak` digest | Keycloak server image for the core stack — see [Testing a local ol-keycloakify build](#testing-a-local-ol-keycloakify-build). |
@@ -712,6 +713,23 @@ schema, over the catalog and RustFS forwards above plus one to Postgres
 ```bash
 cd src/ol_dlt && uv run python -m ol_dlt.sources.keycloak
 ```
+
+The three forwards take host ports 9030, 9001 and 9000. An external MinIO on your host
+(above) also binds 9000: the RustFS forward then fails in its loop, and the dlt run
+talks to the MinIO in its place. Move the forward in `tilt_config.json` and give dlt the
+same address:
+
+```json
+"lake_host_ports": ["rustfs=9100"]
+```
+
+```bash
+export PYICEBERG_CATALOG__OL_DATA_LAKE_LOCAL__S3__ENDPOINT=http://localhost:9100
+```
+
+A moved Gravitino forward takes `PYICEBERG_CATALOG__OL_DATA_LAKE_LOCAL__URI`. The
+`starrocks_local` dbt profile has port 9030 written in, so a moved StarRocks forward
+means editing that profile.
 
 The catalog tells every client to use RustFS's in-cluster address, so any other
 host-side Iceberg writer has to keep its own endpoint the way `ol_dlt/local_lake.py`
