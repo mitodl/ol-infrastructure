@@ -802,79 +802,6 @@ program away makes the next sync fail before it writes: the tasks refuse to unpu
 more than 10% of a source's resources, which a handful of fixture rows exceeds with one
 removal. The cutover document above covers `allow_mass_unpublish`.
 
-#### Rehearsing a webhook cutover
-
-The other way a source reaches MIT Learn is the data platform's webhook push: a Dagster
-delivery asset reads an `integrations__learn__*` table and posts it to
-`/api/v1/webhooks/learning_resources/`. With `DBT_MODEL_LOCAL_LAKE=1` the asset reads
-the table your local build made, so the whole flip in mit-learn's
-`docs/how-to/etl-source-cutover.md` (legacy load, comparison, flip, first delivery, roll
-back) can be run here before it is run anywhere that has a catalog to lose.
-
-Open Learning Library is the source to rehearse with. Its legacy pipeline and its dlt
-source read the same CSV, so both sides load real rows with no credentials. The baseline:
-
-```bash
-kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
-from learning_resources.etl import pipelines
-from learning_resources.models import LearningResource
-
-print(len(pipelines.oll_etl()))
-print(*sorted(LearningResource.objects.filter(
-    etl_source="oll", resource_type="course", published=True
-).values_list("readable_id", flat=True)), sep="\n")
-PY
-```
-
-What the webhook would deliver, from the ol-data-platform repository root:
-
-```bash
-(cd src/ol_dlt && uv run python -m ol_dlt.sources.oll)
-ol-dbt starrocks build --env dev --select +integrations__learn__oll_courses
-
-mysql -h 127.0.0.1 -P 9030 -u root -N -e "SELECT readable_id FROM
-  ol_data_lake_local.ol_warehouse_local_integrations.integrations__learn__oll_courses ORDER BY 1"
-```
-
-Every id in the first list and not in the second is unpublished by the first delivery.
-The flip and the delivery:
-
-```bash
-kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
-from learning_resources.models import ETLSourceOwnership
-
-ETLSourceOwnership.objects.update_or_create(
-    etl_source="oll", resource_type="course", defaults={"owner": "webhook"}
-)
-PY
-
-cd dg_projects/delivery   # in ol-data-platform
-export VAULT_OIDC_NONINTERACTIVE=1 DBT_MODEL_LOCAL_LAKE=1
-export MIT_LEARN_BASE_URL=https://api.learn.mit.dev
-export MIT_LEARN_WEBHOOK_SECRET=local-dev-mitlearn-insecure-webhook-secret  # pragma: allowlist secret
-uv run dagster asset materialize -m delivery.definitions --select "mit_learn_delivery/oll_webhook"
-
-curl -s "https://api.learn.mit.dev/api/v1/courses/?platform=oll&limit=1" | jq .count
-```
-
-To roll back, set the row's `owner` to `legacy`, run `pipelines.oll_etl()` again and
-then `python manage.py clear_cache`.
-
-- Before the flip the delivery fails with `409` on every attempt of its retry policy and
-  MIT Learn logs `learning_resources webhook rejected`. After it, MIT Learn logs
-  `learning_resources webhook processed` with the count loaded, and `oll_etl()` returns
-  an empty list and logs `Skipping legacy write for oll`.
-- The webhook clears the API cache itself. The legacy pipeline run from a shell does not,
-  which is why the roll back needs `clear_cache`.
-- A delivery is a full sync with no limit on what it unpublishes. The warehouse tasks
-  above refuse to unpublish more than 10% of a source, and the webhook has no such
-  check: a model edit that left 14 of 58 rows unpublished the other 44 in one run. Only a
-  batch with no rows at all is refused, with a `400`.
-- As of 2026-10-11 the comparison is not empty for this source: the legacy pipeline
-  publishes 63 courses and the model has 58. The five missing are the rows the sheet
-  marks as offered by OCW, which the staging model drops and the legacy pipeline loads
-  under a different `readable_id`.
-
 Things that will trip you up:
 
 - **A Postgres cluster created before 2026-07-08 needs one grant first.** The
@@ -924,6 +851,81 @@ databases are left behind, so re-enabling it picks the lake back up. To start cl
 kubectl -n local-infra delete pvc data-starrocks-0 data-rustfs-0
 kubectl -n local-infra exec local-pg-1 -- psql -U postgres -c 'DROP DATABASE gravitino WITH (FORCE)' -c 'DROP DATABASE iceberg WITH (FORCE)'
 ```
+
+#### Rehearsing a webhook cutover
+
+The other way a source reaches MIT Learn is the data platform's webhook push: a Dagster
+delivery asset reads an `integrations__learn__*` table and posts it to
+`/api/v1/webhooks/learning_resources/`. With `DBT_MODEL_LOCAL_LAKE=1` the asset reads
+the table your local build made, so the whole flip in mit-learn's
+`docs/how-to/etl-source-cutover.md` (legacy load, comparison, flip, first delivery, roll
+back) can be run here before it is run anywhere that has a catalog to lose.
+
+Open Learning Library is the source to rehearse with. Its legacy pipeline and its dlt
+source read the same CSV, so both sides load real rows with no credentials. The baseline:
+
+```bash
+kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
+from learning_resources.etl import pipelines
+from learning_resources.models import LearningResource
+
+print(len(pipelines.oll_etl()))
+print(*sorted(LearningResource.objects.filter(
+    etl_source="oll", resource_type="course", published=True
+).values_list("readable_id", flat=True)), sep="\n")
+PY
+```
+
+What the webhook would deliver, from the ol-data-platform repository root:
+
+```bash
+(cd src/ol_dlt && uv run python -m ol_dlt.sources.oll)
+ol-dbt starrocks build --env dev --select +integrations__learn__oll_courses
+
+mysql -h 127.0.0.1 -P 9030 -u root -N -e "SELECT readable_id FROM
+  ol_data_lake_local.ol_warehouse_local_integrations.integrations__learn__oll_courses ORDER BY 1"
+```
+
+Every id in the first list and not in the second is unpublished by the first delivery.
+The flip and the delivery:
+
+```bash
+kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
+from learning_resources.models import ETLSourceOwnership
+
+ETLSourceOwnership.objects.update_or_create(
+    etl_source="oll", resource_type="course", defaults={"owner": "webhook"}
+)
+PY
+
+cd dg_projects/delivery   # in ol-data-platform
+unset DBT_MODEL_FIXTURE_DIR
+export VAULT_OIDC_NONINTERACTIVE=1 DBT_MODEL_LOCAL_LAKE=1
+export MIT_LEARN_BASE_URL=https://api.learn.mit.dev
+export MIT_LEARN_WEBHOOK_SECRET=local-dev-mitlearn-insecure-webhook-secret  # pragma: allowlist secret
+uv run dagster asset materialize -m delivery.definitions --select "mit_learn_delivery/oll_webhook"
+
+curl -sk "https://api.learn.mit.dev/api/v1/courses/?platform=oll&limit=1" | jq .count
+```
+
+To roll back, set the row's `owner` to `legacy`, run `pipelines.oll_etl()` again and
+then `python manage.py clear_cache`.
+
+- Before the flip the delivery fails with `409` on every attempt of its retry policy and
+  MIT Learn logs `learning_resources webhook rejected`. After it, MIT Learn logs
+  `learning_resources webhook processed` with the count loaded, and `oll_etl()` returns
+  an empty list and logs `Skipping legacy write for oll`.
+- The webhook clears the API cache itself. The legacy pipeline run from a shell does not,
+  which is why the roll back needs `clear_cache`.
+- A delivery is a full sync with no limit on what it unpublishes. The warehouse tasks
+  in mit-learn #4054 refuse to unpublish more than 10% of a source, and the webhook has
+  no such check: a model edit that left 14 of 58 rows unpublished the other 44 in one
+  run. A model that builds with no rows at all gets a `400` from this asset and changes
+  nothing.
+- As of 2026-10-11 the comparison is not empty for this source: the legacy pipeline
+  publishes 63 courses and the model has 58. The sheet marks six rows as offered by
+  OCW. The staging model drops all six, and the legacy pipeline skips one and loads
+  the other five under a `readable_id` of another form.
 
 ### OCW Studio
 
