@@ -380,6 +380,7 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 |-----|---------|-------------|
 | `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). `data-platform` is not an app but switches on the [data lake](#data-lake-gravitino--starrocks). |
 | `prebuilt_tags` | `[]` (run `latest`) | `["app=tag"]` list of published image tags to run in place of `latest` when the app repo is not checked out locally. An entry for an app that has a checkout is ignored. Entries were not applied before this setting was wired up, so a `tilt_config.json` copied from an older example file carries release tags from early 2026: clear the list unless you want those releases. |
+| `lake_host_ports` | `starrocks=9030`, `gravitino=9001`, `rustfs=9000` | `["service=port"]` list moving the host side of a [data lake](#data-lake-gravitino--starrocks) forward off a port something else on your machine holds. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
 | `keycloak_image` | published `mitodl/keycloak` digest | Keycloak server image for the core stack — see [Testing a local ol-keycloakify build](#testing-a-local-ol-keycloakify-build). |
@@ -674,6 +675,8 @@ Budget about 2GB of memory, a 3GB image pull and a 20Gi volume for StarRocks.
 | StarRocks, from your machine | `mysql -h 127.0.0.1 -P 9030 -u root` (Tilt keeps the port-forward open as `starrocks-port-forward`) |
 | StarRocks, inside the cluster | `starrocks.local-infra.svc.cluster.local:9030`, user `root`, no password |
 | Iceberg REST catalog, inside the cluster | `http://gravitino.local-infra.svc.cluster.local:9001/iceberg` |
+| Iceberg REST catalog, from your machine | `http://localhost:9001/iceberg` (`iceberg-catalog-port-forward`) |
+| RustFS, from your machine, for an Iceberg writer | `http://localhost:9000` (`lake-object-store-port-forward`) |
 | Gravitino management API and UI | `kubectl -n local-infra port-forward svc/gravitino 8090:8090` |
 
 ```sql
@@ -702,6 +705,35 @@ the fixture files committed in ol-data-platform, and a model whose raw tables ha
 fixture fails on the missing source table. See
 [docs/LOCAL_LAKE.md](https://github.com/mitodl/ol-data-platform/blob/main/docs/LOCAL_LAKE.md)
 there for the fixture format and how to add one.
+
+A dlt source in that checkout writes raw tables from a local app database into the same
+schema, over the catalog and RustFS forwards above plus one to Postgres
+(`kubectl -n local-infra port-forward svc/local-pg-rw 5432:5432`):
+
+```bash
+cd src/ol_dlt && uv run python -m ol_dlt.sources.keycloak
+```
+
+The three forwards take host ports 9030, 9001 and 9000. An external MinIO on your host
+(above) also binds 9000: the RustFS forward then fails in its loop, and the dlt run
+talks to the MinIO in its place. Move the forward in `tilt_config.json` and give dlt the
+same address:
+
+```json
+"lake_host_ports": ["rustfs=9100"]
+```
+
+```bash
+export PYICEBERG_CATALOG__OL_DATA_LAKE_LOCAL__S3__ENDPOINT=http://localhost:9100
+```
+
+A moved Gravitino forward takes `PYICEBERG_CATALOG__OL_DATA_LAKE_LOCAL__URI`. The
+`starrocks_local` dbt profile has port 9030 written in, so a moved StarRocks forward
+means editing that profile.
+
+The catalog tells every client to use RustFS's in-cluster address, so any other
+host-side Iceberg writer has to keep its own endpoint the way `ol_dlt/local_lake.py`
+does.
 
 The b2b materialized views are StarRocks tables, not lake tables, so they have a
 profile of their own, `starrocks_local_b2b`. It writes `default_catalog.b2b_analytics`

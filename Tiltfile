@@ -8,6 +8,7 @@
 config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
 config.define_string_list("prebuilt_tags", usage="Published image tag to run for an app with no checkout, instead of latest, e.g. mit-learn=0.82.0 learn-ai=0.37.0")
+config.define_string_list("lake_host_ports", usage="Host ports for the data-platform lake forwards, e.g. rustfs=9100 gravitino=9101 (defaults: starrocks=9030 gravitino=9001 rustfs=9000). Move one that another process on your machine already holds.")
 config.define_string("disk_keep_tags", usage="Newest tilt-built image tags kept per repo by the disk janitor (default: 3). Overrides LOCAL_DEV_DISK_KEEP_TAGS env var.")
 config.define_string("disk_buildcache_max_gb", usage="Docker build-cache size cap in GB (default: 10% of total disk; 0 disables). Overrides LOCAL_DEV_BUILDCACHE_MAX_GB env var.")
 config.define_string("log_retention_period", usage="How long Grafana/Loki keeps local-dev logs, as a whole number of days, e.g. 72h or 3d (default: 168h). Overrides LOCAL_DEV_LOG_RETENTION env var.")
@@ -418,13 +419,31 @@ local_resource(
 # deploys, with nothing to build. StarRocks speaks the MySQL protocol, which
 # APISIX does not route, so a host-side dbt or mysql client reaches it through
 # this forward. kubectl exits when the pod behind it goes away, hence the loop.
+#
+# The other two are for a host-side Iceberg writer, which is how ol-data-platform
+# runs a dlt source into the lake (DLT_PROFILE=dev): it commits through the REST
+# catalog and writes the files to RustFS itself.
+#
+# The host side of each is movable (lake_host_ports), because a forward whose
+# port something else holds fails in its loop while a client on that port talks
+# to the other process: an external MinIO on 9000 would take the lake's writes.
 if "data-platform" in enabled_apps:
-    local_resource(
-        "starrocks-port-forward",
-        serve_cmd="while true; do kubectl -n local-infra port-forward svc/starrocks 9030:9030; sleep 2; done",
-        labels=["infra"],
-        resource_deps=["local-infra-core"],
-    )
+    lake_host_ports = {
+        kv.split("=")[0]: kv.split("=")[1]
+        for kv in cfg.get("lake_host_ports", [])
+        if "=" in kv
+    }
+    for name, service, port in [
+        ("starrocks-port-forward", "starrocks", 9030),
+        ("iceberg-catalog-port-forward", "gravitino", 9001),
+        ("lake-object-store-port-forward", "rustfs", 9000),
+    ]:
+        local_resource(
+            name,
+            serve_cmd="while true; do kubectl -n local-infra port-forward svc/{service} {host_port}:{port}; sleep 2; done".format(service=service, host_port=lake_host_ports.get(service, port), port=port),
+            labels=["infra"],
+            resource_deps=["local-infra-core"],
+        )
 
 # Seed the local-dev test users (admin / student / prof, password localdev123)
 # into the olapps realm. Pulumi provisions the realm and OIDC clients, but the
