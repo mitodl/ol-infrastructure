@@ -120,7 +120,8 @@ psql -d {GRAVITINO_DATABASE} -1 -v ON_ERROR_STOP=1 -f "/schema/{_SCHEMA_FILE}"
 # Idempotent. The Job that runs it expires after ten minutes, so a reconcile
 # later than that replays it, which is what restores the StarRocks catalog if
 # its volume is ever deleted. IF NOT EXISTS and the 200 checks mean a changed
-# property does not reach an existing catalog: drop the catalog first.
+# property does not reach an existing catalog: drop the catalog first. The
+# exception is STARROCKS_CATALOG_SETTINGS, which catalog.sql also ALTERs in.
 _CATALOG_SCRIPT = f"""#!/bin/sh
 set -eu
 
