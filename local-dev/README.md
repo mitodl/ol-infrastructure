@@ -379,7 +379,7 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 | Key | Default | Description |
 |-----|---------|-------------|
 | `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). `data-platform` is not an app but switches on the [data lake](#data-lake-gravitino--starrocks). |
-| `prebuilt_tags` | `[]` (run `latest`) | `["app=tag"]` list of published image tags to run in place of `latest` when the app repo is not checked out locally. An entry for an app that has a checkout is ignored. |
+| `prebuilt_tags` | `[]` (run `latest`) | `["app=tag"]` list of published image tags to run in place of `latest` when the app repo is not checked out locally. An entry for an app that has a checkout is ignored. Entries were not applied before this setting was wired up, so a `tilt_config.json` copied from an older example file carries release tags from early 2026: clear the list unless you want those releases. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
 | `keycloak_image` | published `mitodl/keycloak` digest | Keycloak server image for the core stack — see [Testing a local ol-keycloakify build](#testing-a-local-ol-keycloakify-build). |
@@ -1027,7 +1027,7 @@ Already-pushed images pull fine on the new nodes without a rebuild — the regis
 
 The Next.js build needs ~4 GB of memory. If it OOMs:
 - Increase the Docker VM memory allocation (see [Prerequisites](#prerequisites))
-- Or use a prebuilt image by removing `mit-learn` from `enabled_apps` in `tilt_config.json` and letting Tilt use the `prebuilt_tags` value instead
+- Or skip the build: with no `mit-learn` checkout next to `ol-infrastructure`, Tilt runs the published `mitodl/mit-learn-nextjs-app` image (and the published backend image) instead of building
 
 ### Image push retries forever on the last layer
 

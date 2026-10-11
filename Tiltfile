@@ -51,7 +51,7 @@ if str(local(
 prebuilt_tags = {}
 for _kv in cfg.get("prebuilt_tags", []):
     _key, _, _tag = _kv.partition("=")
-    if not (_key and _tag):
+    if not (_key and _tag) or "=" in _tag:
         fail('prebuilt_tags: expected "app=tag", got "%s"' % _kv)
     prebuilt_tags[_key] = _tag
 
