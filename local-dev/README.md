@@ -908,8 +908,18 @@ uv run dagster asset materialize -m delivery.definitions --select "mit_learn_del
 curl -sk "https://api.learn.mit.dev/api/v1/courses/?platform=oll&limit=1" | jq .count
 ```
 
-To roll back, set the row's `owner` to `legacy`, run `pipelines.oll_etl()` again and
-then `python manage.py clear_cache`.
+To roll back, give the pair back to the legacy pipeline, run it and clear the cache:
+
+```bash
+kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
+from learning_resources.etl import pipelines
+from learning_resources.models import ETLSourceOwnership
+
+ETLSourceOwnership.objects.filter(etl_source="oll", resource_type="course").update(owner="legacy")
+print(len(pipelines.oll_etl()))
+PY
+kubectl -n mit-learn exec deploy/mitlearn-webapp -c app -- python manage.py clear_cache
+```
 
 - Before the flip the delivery fails with `409` on every attempt of its retry policy and
   MIT Learn logs `learning_resources webhook rejected`. After it, MIT Learn logs
