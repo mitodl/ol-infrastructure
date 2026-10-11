@@ -313,8 +313,9 @@ APPS = [
         "dir": "micromasters",
         "namespace": "micromasters",
         "deploy_name": "micromasters-webapp",
-        "image_backend": "mitodl/micromasters-app",
-        "prebuilt_tag_backend": prebuilt_tags.get("micromasters", "0.254.0"),
+        # The shape #6334 reads. Until it merges nothing consumes this and
+        # the manifests' :latest is what runs.
+        "images": {"micromasters": "mitodl/micromasters-app"},
         "tiltfile": "./local-dev/apps/micromasters/Tiltfile",
         "seed_commands": [
             {
