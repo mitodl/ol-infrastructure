@@ -822,11 +822,14 @@ Things that will trip you up:
   principal and the password is not checked. Gravitino accepts a request with no
   `Authorization` header and refuses a Bearer one; pyiceberg 0.12.0 with no auth
   configured got a 401.
-- **Changed catalog properties do not reach an existing catalog.** The
+- **Most changed catalog properties do not reach an existing catalog.** The
   `lakehouse-catalogs` Job only creates what is missing. Drop the catalog (in StarRocks,
   in Gravitino, or both), delete the Job (`kubectl -n local-infra delete job
   lakehouse-catalogs`; it also expires by itself after ten minutes) and re-run
-  `local-infra-core`.
+  `local-infra-core`. The exception is `STARROCKS_CATALOG_SETTINGS` in
+  `infra/modules/lakehouse.py`: the Job sets those on the StarRocks catalog with `ALTER
+  CATALOG` every time it runs, so a change there needs only the Job deleted and
+  `local-infra-core` re-run.
 
 This matches the deployed lake in engine, engine version and catalog protocol, and
 differs from it in ways that can hide a problem:
