@@ -719,10 +719,10 @@ cd src/ol_dlt && uv run python -m ol_dlt.sources.keycloak
 ```
 
 `ol-dbt ingest local`, from the repository root, runs every source the ingestion
-inventory marks `strategies.local: ingest` the same way (today Keycloak and MITx Online,
-so enable `mitxonline` and run its `seed-mitxonline-course-data` seed to give the second
-courses to load). `--unit mitxonline/app_postgres` runs one. See "Raw tables from a local app
-database" in docs/LOCAL_LAKE.md there.
+inventory marks `strategies.local: ingest` the same way. Today those are Keycloak and MITx
+Online, so enable `mitxonline` and run its `seed-mitxonline-course-data` seed first: the
+MITx Online source has no courses to load until it has run. `--unit mitxonline/app_postgres`
+runs one. See "Raw tables from a local app database" in docs/LOCAL_LAKE.md there.
 
 The three forwards take host ports 9030, 9001 and 9000. An external MinIO on your host
 (above) also binds 9000: the RustFS forward then fails in its loop, and the dlt run
