@@ -694,6 +694,13 @@ dbt builds onto it from an [ol-data-platform](https://github.com/mitodl/ol-data-
 checkout, with no Vault login. Run these from its repository root:
 
 ```bash
+# Once per checkout: install the `ol-dbt` CLI into .venv.
+uv sync
+
+# In each new shell: put it on PATH. Without this, write each `ol-dbt`
+# in this README as `uv run ol-dbt`.
+source .venv/bin/activate
+
 # Once per checkout: install the dbt packages.
 (cd src/ol_dbt && uv run dbt deps)
 
