@@ -718,6 +718,12 @@ schema, over the catalog and RustFS forwards above plus one to Postgres
 cd src/ol_dlt && uv run python -m ol_dlt.sources.keycloak
 ```
 
+`ol-dbt ingest local`, from the repository root, runs every source the ingestion
+inventory marks `strategies.local: ingest` the same way (today Keycloak and MITx Online,
+so enable `mitxonline` and run its `seed-mitxonline-course-data` seed for the second to
+have rows). `--unit mitxonline/app_postgres` runs one. See "Raw tables from a local app
+database" in docs/LOCAL_LAKE.md there.
+
 The three forwards take host ports 9030, 9001 and 9000. An external MinIO on your host
 (above) also binds 9000: the RustFS forward then fails in its loop, and the dlt run
 talks to the MinIO in its place. Move the forward in `tilt_config.json` and give dlt the
@@ -813,10 +819,12 @@ Things that will trip you up:
   kubectl -n local-infra exec local-pg-1 -- psql -U postgres -c 'ALTER ROLE app CREATEDB'
   ```
 
-- **Write to the lake from a pod, not from your machine.** The catalog tells every
-  client to use the in-cluster RustFS address, overriding whatever endpoint the client
-  was given. pyiceberg or dlt running on the host creates the table and then fails the
-  data write with `Could not resolve host: rustfs.local-infra.svc.cluster.local`.
+- **A plain pyiceberg client on your machine cannot write to the lake.** The catalog
+  tells every client to use the in-cluster RustFS address, overriding whatever endpoint
+  the client was given, so the client creates the table and then fails the data write
+  with `Could not resolve host: rustfs.local-infra.svc.cluster.local`. The dlt sources
+  in ol-data-platform do write from the host: `ol_dlt/local_lake.py` keeps the
+  forwarded endpoint. Anything else writes from a pod or does the same.
 - **pyiceberg needs HTTP Basic auth configured**: an `auth` property of type `basic`
   with any username and any non-empty password. The username becomes the Gravitino
   principal and the password is not checked. Gravitino accepts a request with no
