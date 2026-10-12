@@ -1678,6 +1678,10 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        # The same list Django gets as CORS_ALLOWED_ORIGINS above.  The gateway
+        # sets the Access-Control-* headers the browser actually enforces, so
+        # the two have to agree or django-cors-headers' answer is irrelevant.
+        cors_allow_origins=cors_urls_list,
         plugins=[
             # Everyone currently logged in is holding a session cookie under
             # lua-resty-session's old default name, which the renamed plugins

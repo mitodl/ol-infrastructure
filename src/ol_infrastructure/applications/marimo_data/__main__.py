@@ -228,6 +228,10 @@ marimo_shared_plugins = OLApisixSharedPlugins(
         resource_suffix="ol-shared-plugins",
         k8s_namespace=marimo_namespace,
         k8s_labels=application_labels,
+        # Each published notebook is served to the browser from its own route on
+        # this same host, so every request its page makes is same-origin.
+        # An empty list attaches no cors plugin at all.
+        cors_allow_origins=[],
         enable_defaults=True,
         # The default cors entry is allow_origins "**" with credentials, which
         # would let any origin read a gated app's responses with the viewer's
