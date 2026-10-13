@@ -61,14 +61,12 @@ secretsprovider: awskms://alias/infrastructure-secrets-production
 """
 
 
-def _graph(before: dict[str, int], collapsed: dict[str, int]) -> dict[str, Any]:
-    after = {t: n - collapsed.get(t, 0) for t, n in before.items()}
+def _graph(before: dict[str, int]) -> dict[str, Any]:
     return {
         "ok": True,
         "before": before,
-        "collapsed_duplicates": collapsed,
-        "expected": after,
-        "after": after,
+        "expected": before,
+        "after": before,
         "new_tables": [],
         "missing_tables": [],
         "changed_tables": [],
@@ -80,11 +78,8 @@ VERDICT: dict[str, Any] = {
     "old_root": "s3://ol-data-witan-production/fmt6",
     "new_root": "s3://ol-data-witan-production/fmt9",
     "graphs": {
-        "council": _graph(
-            {"Memory": 900, "ParentOf": 40, "Tagged": 700},
-            {"ParentOf": 1, "Tagged": 59},
-        ),
-        "code-agent-kit": _graph({"Symbol": 5000, "Calls": 12000}, {}),
+        "council": _graph({"Memory": 900, "ParentOf": 40, "Tagged": 700}),
+        "code-agent-kit": _graph({"Symbol": 5000, "Calls": 12000}),
     },
     "old_internal_schema": {"council": 6, "code-agent-kit": 6},
     "new_internal_schema": {"council": 9, "code-agent-kit": 9},
@@ -240,7 +235,7 @@ def test_a_change_outside_the_four_keys_is_reported(script: ModuleType) -> None:
 
 
 def test_the_body_carries_the_verdicts_evidence(script: ModuleType) -> None:
-    """Totals, per-graph collapses, both roots and both binaries."""
+    """Totals, per-graph rows, both roots and both binaries."""
     cutover = script.plan_cutover(VERDICT, PRODUCTION_ARMED, "Production")
     body = script.render_body(
         VERDICT,
@@ -249,9 +244,8 @@ def test_the_body_carries_the_verdicts_evidence(script: ModuleType) -> None:
     )
 
     assert "rebuilt all 2 Production graphs" in body
-    assert "format 6 -> 9 uniformly. 18,640 -> 18,580 rows." in body
-    assert "(ParentOf 1, Tagged 59), not loss." in body
-    assert "| council | 1,640 | 1,580 | ParentOf 1, Tagged 59 |" in body
-    assert "| code-agent-kit | 17,000 | 17,000 | - |" in body
+    assert "format 6 -> 9 uniformly. 18,640 -> 18,640 rows, every table" in body
+    assert "| council | 1,640 | 1,640 |" in body
+    assert "| code-agent-kit | 17,000 | 17,000 |" in body
     assert "`s3://ol-data-witan-production/fmt6` is untouched" in body
     assert "New binary: `omnigraph 0.11.0`" in body
