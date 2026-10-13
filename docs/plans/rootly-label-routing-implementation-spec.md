@@ -712,6 +712,43 @@ user, and their tier is the stack's: `page` for the course hubs, `notify` for th
 analyst hub. `lib/jupyterhub_config.jupyterhub_workload_labels` holds the mapping for
 both stacks.
 
+#### 3.3.6 [2026-10-13] Five data-platform charts, and a subchart that puts pod labels in a volume claim
+
+Airbyte, Superset, Gravitino, OpenMetadata and Opik had 27 untiered pods on
+`data-production` on 2026-10-13. The first four already passed the stack's labels to
+the chart, so their pods carried `service` and no `component` or `alert_tier`. Opik
+passed nothing. Keys verified by rendering each chart at its pinned version with a
+sentinel and checking every `spec.selector` and `volumeClaimTemplates`:
+
+| Chart (pinned version) | Key that reaches the pod | Also on the workload object |
+|---|---|---|
+| `airbyte` 2.4.0 | `<component>.podLabels`, one per Deployment | none |
+| `superset` 0.22.8 | `supersetNode` / `supersetWorker` / `supersetCeleryBeat` / `supersetMcp` `.podLabels` | `.deploymentLabels`, rendered for node and worker only |
+| `gravitino-helm` 1.3.11 | `podLabels` | none |
+| `openmetadata` 2.0.5 | `commonLabels` | same key |
+| `opik` 2.2.96 | `commonLabels` for backend, python-backend and frontend, `mysql.primary.podLabels`, `minio.podLabels` | `commonLabels` only |
+
+Everything is tier `notify`: these are internal tools and pipelines, and an outage is
+late data or a BI tool being down in working hours.
+
+Three things the render showed.
+
+1. **A shared key gets the tier and no component.** OpenMetadata's `commonLabels` is
+   its only label key and reaches the server pods, both CronJobs' pods and the OMJob
+   operator Deployment's metadata. Opik's reaches three Deployments with three roles.
+   Neither carries `component`, the rule `cluster_addon_labels` already states.
+   `K8sGlobalLabels.workload_labels` takes the component as optional for this.
+2. **Opik's bundled Redis cannot be labeled.** The subchart copies `redis.podLabels`
+   into the StatefulSet's `volumeClaimTemplates`, which is as immutable as a
+   selector. `opik-redis-master` stays untiered until it is patched or the subchart
+   changes. A selector check alone would have passed this.
+3. **Pods the chart does not render stay unlabeled.** The OMJob operator's pod
+   template takes no labels, and the ingestion pods it launches (owner kind `OMJob`)
+   and the sync pods Airbyte's workload launcher creates are built at runtime.
+
+The Gravitino posture and reconcile CronJobs and the schema Job are not tiered here:
+§3.5 counts Deployments, StatefulSets and DaemonSets.
+
 Also backfill CI/QA clusters, which the analysis explicitly did not measure. Coverage
 there does not affect paging (CI/QA alerts go Slack-only per §8.1) but an unlabeled QA
 workload routes as untier-ed, so the QA stack stops being a rehearsal for the

@@ -323,6 +323,27 @@ class K8sGlobalLabels(BaseModel):
         new_dict["ol.mit.edu/environment"] = self.environment or self.stack.env_suffix
         return new_dict
 
+    def workload_labels(
+        self, *, alert_tier: AlertTier, component: Component | None = None
+    ) -> dict[str, str]:
+        """Dump these labels for one workload, adding its alert tier and role.
+
+        For a stack whose workloads share one label model but not one role. The
+        result belongs on a pod template, never in a `spec.selector` or a
+        `volumeClaimTemplate`: both are immutable, so a label added there
+        replaces the workload instead of rolling it.
+
+        :param alert_tier: How far an alert about the workload may escalate.
+        :param component: Its functional role. Omit it for a label key that
+            reaches workloads which do not share one.
+        :returns: The label dict, keyed by `ol.mit.edu/<field>`.
+        :rtype: dict[str, str]
+        """
+        update: dict[str, StrEnum] = {"alert_tier": alert_tier}
+        if component:
+            update["component"] = component
+        return self.model_copy(update=update).model_dump()
+
 
 class K8sAppLabels(K8sGlobalLabels):
     """Labels for a workload that is part of a deployed application.
