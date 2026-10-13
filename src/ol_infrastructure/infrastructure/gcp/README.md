@@ -276,7 +276,8 @@ projected Kubernetes token, so there is no key material at rest.
 `ocw-yt-analytics-o7v08r` exists so Data Collaborative's HighSystems database can
 pull per-video engaged-view stats for OCW's YouTube channel
 ([mitodl/hq#13305](https://github.com/mitodl/hq/issues/13305)). The stack enables
-the YouTube Analytics and YouTube Reporting APIs; everything else is manual.
+the YouTube Analytics, YouTube Reporting and YouTube Data APIs; everything else
+is manual.
 
 Step 1 must be done before the stack config naming this project merges.
 `pulumi preview` plans the service creates without reading the project, so it

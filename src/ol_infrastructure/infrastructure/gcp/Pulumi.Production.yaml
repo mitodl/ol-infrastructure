@@ -174,6 +174,10 @@ config:
     enabled_services:
     - youtubeanalytics.googleapis.com
     - youtubereporting.googleapis.com
+      # No proven consumer yet. reports.query needs the youtube.readonly
+      # scope, and a client holding that scope can only spend it on the Data
+      # API (e.g. video titles for the ids a report returns) if it is on.
+    - youtube.googleapis.com
       # Bootstrap, enabled out of band before the first apply (README.md): the
       # provider lists services through serviceusage and reads the project
       # back through cloudresourcemanager after enabling one.
