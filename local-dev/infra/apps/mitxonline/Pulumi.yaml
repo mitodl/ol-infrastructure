@@ -1,0 +1,10 @@
+---
+name: ol-local-dev-mitxonline
+runtime: python
+description: >
+  MITx Online for local-dev, rendered from the deployed application definition
+  (src/ol_infrastructure/applications/mitxonline/definition.py). Tilt runs it
+  through apply.sh as a k8s_custom_deploy. Spike for the Option 1 measurement in
+  docs/plans/local-dev-deployed-parity.md.
+backend:
+  url: file://../../.pulumi

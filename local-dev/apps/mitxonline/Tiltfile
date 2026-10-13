@@ -38,20 +38,59 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         ],
     )
 
-k8s_yaml_local([
-    'configmaps/app-env.yaml',
-    'configmaps/nginx.yaml',
-    'secrets.yaml',
-    'deployment.yaml',
-    'apisix-routes.yaml',
-], local_overrides='configmaps/app-env.local.yaml')
+# Spike for docs/plans/local-dev-deployed-parity.md (Tilt Option 1): when the
+# gitignored marker pulumi-pilot.local.yaml exists, the workloads come from the
+# deployed definition through local-dev/infra/apps/mitxonline (pulumi up as a
+# k8s_custom_deploy) instead of deployment.yaml. Routes stay hand-written.
+PILOT_DIR = os.path.join(config.main_dir, 'local-dev/infra/apps/mitxonline')
+pilot = str(read_file('pulumi-pilot.local.yaml', default='')).strip() != ''
 
-k8s_resource(
-    DEPLOY_NAME,
-    port_forwards=['8010:8010'],
-    labels=['mitxonline'],
-    resource_deps=['local-infra-apps'],
-)
+if pilot:
+    # pulumi up waits for the pre-deploy migrate Job, which outlasts Tilt's 30s
+    # default.
+    update_settings(k8s_upsert_timeout_secs=300)
+    rd = os.environ.get('LOCAL_DEV_ROOT_DOMAIN', 'mit.dev')
+    routes = str(read_file('apisix-routes.yaml')).replace('mit.dev', rd)
+    # The component serves Granian on 8073 with no nginx sidecar in front.
+    k8s_yaml(blob(routes.replace('servicePort: 8010', 'servicePort: 8073')))
+    k8s_custom_deploy(
+        # Named after the hand-written webapp resource so the seed resources'
+        # resource_deps still resolve.
+        DEPLOY_NAME,
+        apply_cmd=[PILOT_DIR + '/apply.sh', 'up'],
+        delete_cmd=[PILOT_DIR + '/apply.sh', 'down'],
+        apply_env={'LOCAL_DEV_ROOT_DOMAIN': rd},
+        delete_env={'LOCAL_DEV_ROOT_DOMAIN': rd},
+        deps=[
+            PILOT_DIR + '/__main__.py',
+            os.path.join(config.main_dir, 'src/ol_infrastructure/applications/mitxonline/definition.py'),
+            'configmaps/app-env.yaml',
+            'configmaps/app-env.local.yaml',
+            'secrets.yaml',
+        ],
+        image_deps=[IMAGE],
+    )
+    k8s_resource(
+        DEPLOY_NAME,
+        port_forwards=['8010:8073'],
+        labels=['mitxonline'],
+        resource_deps=['local-infra-apps'],
+    )
+else:
+    k8s_yaml_local([
+        'configmaps/app-env.yaml',
+        'configmaps/nginx.yaml',
+        'secrets.yaml',
+        'deployment.yaml',
+        'apisix-routes.yaml',
+    ], local_overrides='configmaps/app-env.local.yaml')
 
-k8s_resource('mitxonline-celery', labels=['mitxonline'], resource_deps=['local-infra-apps'])
-k8s_resource('mitxonline-celery-beat', labels=['mitxonline'], resource_deps=['local-infra-apps'])
+    k8s_resource(
+        DEPLOY_NAME,
+        port_forwards=['8010:8010'],
+        labels=['mitxonline'],
+        resource_deps=['local-infra-apps'],
+    )
+
+    k8s_resource('mitxonline-celery', labels=['mitxonline'], resource_deps=['local-infra-apps'])
+    k8s_resource('mitxonline-celery-beat', labels=['mitxonline'], resource_deps=['local-infra-apps'])
