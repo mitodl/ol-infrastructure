@@ -559,6 +559,56 @@ def test_script_refuses_an_empty_put_while_the_release_tag_exists(
     assert not [p for m, p, _ in _FakeGitHub.calls if p.endswith("/comments")]
 
 
+def test_script_supersedes_the_posted_issue_once_the_release_tag_is_gone(
+    tmp_path, fake_github, private_key
+):
+    """An abandon deleted the tag after the put checked it, then the put posted #97.
+
+    The abandon job is not serialized with QA, so its own issue put may have
+    run before #97 existed.
+    """
+    result = _run(
+        tmp_path,
+        fake_github,
+        private_key,
+        posted=97,
+        release_tag="2026.10.8.1",
+    )
+
+    assert result.returncode == 0, result.stderr
+    issues = _FakeGitHub.issues
+    assert [n for n, i in sorted(issues.items()) if i["state"] == "open"] == [99]
+    assert {label["name"] for label in issues[97]["labels"]} == {"abandoned"}
+    comment = next(
+        body["body"]
+        for method, path, body in _FakeGitHub.calls
+        if (method, path) == ("POST", f"/repos/{REPO}/issues/97/comments")
+    )
+    assert "Release 2026.10.8.1 was abandoned" in comment
+
+
+def test_script_keeps_the_posted_issue_while_the_release_tag_exists(
+    tmp_path, fake_github, private_key
+):
+    """The recheck finds the tag, so the release is live and #97 approves it."""
+    _FakeGitHub.tags = {"2026.10.8.1"}
+    result = _run(
+        tmp_path,
+        fake_github,
+        private_key,
+        posted=97,
+        release_tag="2026.10.8.1",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert ("GET", f"/repos/{REPO}/git/ref/tags/2026.10.8.1", None) in (
+        _FakeGitHub.calls
+    )
+    issues = _FakeGitHub.issues
+    assert issues[97]["state"] == issues[99]["state"] == "open"
+    assert issues[83]["state"] == issues[96]["state"] == "closed"
+
+
 def test_script_puts_back_a_label_another_writer_removed(
     tmp_path, fake_github, private_key
 ):

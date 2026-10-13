@@ -32,6 +32,13 @@ built. Then no skip marker exists and the put reports no issue. This confirms
 the tag is gone and treats the run as having nothing to approve. If the tag is
 still there, it refuses, as for any put that should have posted.
 
+The abandon job is not serialized with QA, so it can delete the tag after the
+put checked it and close the release's issue before the put opens a new one.
+So when the put did post an issue for a release, the tag is checked again, and
+if it is gone that issue is superseded with the rest. Whichever way the two
+jobs interleave, either this check or the abandon job's own issue put then
+sees the issue.
+
 Only issues whose whole title is one of the two gate shapes are touched, the
 same match ``assert_gate_names_deploy.py`` uses. ``mit-learn`` and
 ``mit-learn-nextjs`` share a repository, and a prefix match would close the
@@ -309,12 +316,25 @@ def kept_issue(promotion_dir: Path, issue_file: Path) -> Issue | None:
     number = int(posted.get("issue_number") or 0)
     if number > 0:
         return {"number": number, "title": posted.get("issue_title", "")}
-    tag_file = promotion_dir / "release_tag"
-    tag = tag_file.read_text().strip() if tag_file.exists() else ""
+    tag = release_tag(promotion_dir)
     if tag:
         raise ReleaseOverError(tag)
     msg = f"the release issue put reported no issue in {issue_file}"
     raise ValueError(msg)
+
+
+def release_tag(promotion_dir: Path) -> str:
+    """Return the release the put announces, or empty for an infrastructure one."""
+    tag_file = promotion_dir / "release_tag"
+    return tag_file.read_text().strip() if tag_file.exists() else ""
+
+
+def abandoned(tag: str) -> str:
+    """Return why nothing can be approved once *tag*'s release is abandoned."""
+    return (
+        f"Release {tag} was abandoned (its tag is gone), and nothing can be "
+        "approved until a new release is cut."
+    )
 
 
 def tag_exists(github: GitHub, repo: str, tag: str) -> bool:
@@ -363,10 +383,17 @@ def main() -> None:
                 f"put posted nothing, but tag {over} is still in {repo}."
             )
         print(f"{app}: tag {over} is gone, so its release was abandoned.")  # noqa: T201
-        nothing_to_approve = (
-            f"Release {over} was abandoned (its tag is gone), and nothing can be "
-            "approved until a new release is cut."
+        nothing_to_approve = abandoned(over)
+    elif (
+        keep is not None
+        and (tag := release_tag(promotion_dir))
+        and not tag_exists(github, repo, tag)
+    ):
+        print(  # noqa: T201
+            f"{app}: tag {tag} was deleted after the put checked it, so "
+            f"#{keep['number']} is for an abandoned release."
         )
+        keep, nothing_to_approve = None, abandoned(tag)
     since = (datetime.now(UTC) - CLOSED_LOOKBACK).strftime("%Y-%m-%dT%H:%M:%SZ")
     candidates = [
         *github.issues(repo, "state=open"),
