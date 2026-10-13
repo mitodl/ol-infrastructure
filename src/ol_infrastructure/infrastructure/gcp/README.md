@@ -319,8 +319,11 @@ enabled no APIs.
    project id to Data Collaborative over a secure channel.
 
 The channel owner then completes the OAuth flow in HighSystems with
-`yt-analytics.readonly`. An OAuth client with no token requests for six months
-is deleted by Google, so a stalled integration loses its client.
+`yt-analytics.readonly` and `youtube.readonly`. The second is not optional:
+`reports.query` has required it since Google's 2018-06-18 revision, so a token
+with only the analytics scope is rejected. An OAuth client with no token
+requests for six months is deleted by Google, so a stalled integration loses
+its client.
 
 The consent screen's scope list does not limit what a client can request. With
 an _Internal_ app there is also no Google review and no unverified-app warning,
