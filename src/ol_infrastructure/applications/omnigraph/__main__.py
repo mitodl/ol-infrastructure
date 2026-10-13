@@ -175,6 +175,16 @@ INTERNAL_SCHEMA_VERSION: int | None = omnigraph_config.get_int(
 )
 validate_internal_schema_version(STORAGE_PREFIX, INTERNAL_SCHEMA_VERSION)
 
+# Graph ids the server may DELETE. From omnigraph 0.13, applying a cluster.yaml
+# that no longer declares a graph deletes its storage and history, so a repo
+# dropped from `managed_repos` by accident would lose its code graph on the
+# next restart. The entrypoint refuses that apply unless the graph is listed
+# here. Set it in the same change that removes the graph and clear it
+# afterwards: data_tier refuses an entry for a graph that is still declared.
+GRAPH_REMOVAL_ALLOWLIST: list[str] = omnigraph_config.get_object(
+    "graph_removal_allowlist", []
+)
+
 # The image to migrate FROM — the one currently deployed, whose binary can
 # still read the old root. Set only while a storage-format migration is being
 # run; unset (the steady state) means no migration Job exists at all. See the
@@ -1029,6 +1039,7 @@ data_tier = create_data_tier(
     migrate_to_prefix=MIGRATE_TO_PREFIX,
     per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
+    graph_removal_allowlist=GRAPH_REMOVAL_ALLOWLIST,
     # Arming a migration suspends both maintenance sweeps for its duration.
     # They write directly to the store, so scaling the Deployment to zero does
     # not stop them, and `optimize` rewriting fragments between the export and

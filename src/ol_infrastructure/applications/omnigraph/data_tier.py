@@ -60,6 +60,11 @@ from ol_infrastructure.applications.omnigraph.image_schema import (
     ImageSchemaUnavailableError,
     read_image_internal_schema,
 )
+from ol_infrastructure.applications.omnigraph.lock_handoff import (
+    create_lock_handoff,
+    uses_persisted_lock,
+    validate_graph_removal_allowlist,
+)
 from ol_infrastructure.applications.omnigraph.maintenance import (
     OmnigraphMaintenance,
     create_maintenance,
@@ -224,6 +229,17 @@ DEFAULT_PER_ACTOR_BYTES_MAX = 256 * 1024 * 1024
 # below is on it because upstream names it the readiness endpoint, not
 # because it detects quarantine.
 #
+# Nor does 0.13's. It is 503 while any graph is still loading, and after
+# startup it is 200 as long as one graph is ready. Measured on 0.13.0 with one
+# of four graphs' storage missing: 200, `"status":"degraded"`,
+# `ready_graph_count` 3, `blocked_graph_count` 1 (the 0.11 field
+# `quarantined_graph_count` is gone). So one blocked code graph still leaves
+# the pod Ready, which is the blast radius chosen above. Two things did
+# change: a blocked graph is not retried until the next restart, and the
+# startup line's `graph_count` now counts declared graphs, blocked ones
+# included, so it no longer drops. The per-graph signal is the WARN line
+# `graph blocked during startup graph_id=<id>`.
+#
 # REVISIT IF: the cluster ever collapses back to serving `council` alone, or
 # the server grows a per-graph health signal a readiness probe can reach
 # unauthenticated.
@@ -287,6 +303,7 @@ def create_data_tier(  # noqa: PLR0913
     migrate_to_prefix: str = "",
     per_actor_inflight_max: int = DEFAULT_PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max: int = DEFAULT_PER_ACTOR_BYTES_MAX,
+    graph_removal_allowlist: list[str] | None = None,
     *,
     suspend_maintenance: bool = False,
     migration_armed: bool = False,
@@ -313,6 +330,10 @@ def create_data_tier(  # noqa: PLR0913
     different knee, and the write cost itself is expected to move (upstream
     task tk-upstream-omnigraph-a-single-row-insert-costs-a-f-eeeae3). Retuning
     should be a `pulumi config set` away, not a code change.
+
+    ``graph_removal_allowlist`` names the graphs the server entrypoint may
+    delete when ``cluster.yaml`` stops declaring them. Only read once the
+    served format is one whose binaries delete on apply (0.13, format 14).
     """
     # The bucket is named for its tenant (witan's graphs), not the omnigraph
     # service — omnigraph is generic and a future second instance would get its
@@ -423,6 +444,15 @@ def create_data_tier(  # noqa: PLR0913
     # ``cluster.yaml`` file and leaves those baked-in schemas visible alongside
     # it, rather than replacing the whole directory.
     cluster_graphs = build_cluster_graphs(managed_repos)
+    removable_graphs = validate_graph_removal_allowlist(
+        [] if graph_removal_allowlist is None else graph_removal_allowlist,
+        list(cluster_graphs),
+    )
+    # Whether the served format is 0.12+'s, where every writer keeps the
+    # root's exclusive lock after it exits. Keyed on the served format rather
+    # than on a separate switch: `internal_schema_version` moves to 14 in the
+    # cutover change, with the image that needs all of this.
+    persisted_lock = uses_persisted_lock(internal_schema_version)
     # Storage root. Normally the bucket root; `omnigraph:storage_prefix` moves
     # it to a prefix *inside* that same bucket, which is what a storage-format
     # migration needs (docs/omnigraph-storage-format-upgrade-runbook.md).
@@ -521,9 +551,17 @@ def create_data_tier(  # noqa: PLR0913
     # outside the target list (hit on Production, whose state had no
     # cluster-apply resource). At cutover the knobs clear, this is created,
     # and it converges the schemas against the new root.
+    #
+    # ★ NOR ON A FORMAT WHOSE WRITERS KEEP THE LOCK (0.12 and later). There the
+    # running server holds the root's exclusive lock, so a direct apply beside
+    # it is refused with `state_lock_held` and this Job could only fail the
+    # deploy. The entrypoint applies instead, on every boot, under the lock it
+    # has just taken over (lock_handoff.py). A read-only `cluster plan` gate
+    # in this slot is still to come: without it a bad schema or policy change
+    # is first seen by the restarting pod rather than by a failed update.
     cluster_apply_job = (
         None
-        if migration_armed
+        if migration_armed or persisted_lock
         else kubernetes.batch.v1.Job(
             f"omnigraph-cluster-apply-{stack_info.env_suffix}",
             # Deliberately unnamed (Pulumi auto-naming): a Job's pod template is
@@ -619,6 +657,20 @@ def create_data_tier(  # noqa: PLR0913
         **k8s_global_labels,
         "app.kubernetes.io/name": OMNIGRAPH_SERVER_SERVICE_NAME,
     }
+    omnigraph_pod_selector = {"app.kubernetes.io/name": OMNIGRAPH_SERVER_SERVICE_NAME}
+    lock_handoff = (
+        create_lock_handoff(
+            stack_info=stack_info,
+            namespace=namespace,
+            k8s_global_labels=k8s_global_labels,
+            service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
+            pod_selector=omnigraph_pod_selector,
+            apply_actor=CLUSTER_APPLY_ACTOR,
+            graph_removal_allowlist=removable_graphs,
+        )
+        if persisted_lock
+        else None
+    )
     omnigraph_deployment = kubernetes.apps.v1.Deployment(
         f"omnigraph-omnigraph-server-deployment-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -632,6 +684,8 @@ def create_data_tier(  # noqa: PLR0913
             # and lists it under Don't; concurrent writers rely on a single
             # server's in-process CAS, not cross-process coordination. Do NOT add
             # an HPA or bump replicas without validating multi-writer safety.
+            # From 0.12 this is enforced rather than only unsupported: a
+            # second server is refused at startup by the first one's lock.
             #
             # ZERO WHILE A MIGRATION IS ARMED, which is what makes an armed
             # window survive a plain `pulumi up`. Arming means the rebuild has
@@ -654,7 +708,7 @@ def create_data_tier(  # noqa: PLR0913
             # runbook — Recreate only covers same-format restarts.)
             strategy=kubernetes.apps.v1.DeploymentStrategyArgs(type="Recreate"),
             selector=kubernetes.meta.v1.LabelSelectorArgs(
-                match_labels={"app.kubernetes.io/name": OMNIGRAPH_SERVER_SERVICE_NAME}
+                match_labels=omnigraph_pod_selector
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -779,6 +833,9 @@ def create_data_tier(  # noqa: PLR0913
                                     name="OMNIGRAPH_SHUTDOWN_GRACE_SECONDS",
                                     value="30",
                                 ),
+                                # What the 0.13 entrypoint reads to take over
+                                # the previous pod's lock. See lock_handoff.py.
+                                *(lock_handoff.env if lock_handoff else []),
                             ],
                             ports=[
                                 kubernetes.core.v1.ContainerPortArgs(
@@ -957,6 +1014,13 @@ def create_data_tier(  # noqa: PLR0913
                 # restart, so this ordering is what makes the new schema live.
                 # Absent while a migration is armed (see cluster_apply_job).
                 *([cluster_apply_job] if cluster_apply_job is not None else []),
+                # Without the Lease and the Role the entrypoint's first API
+                # call fails and the pod exits before serving.
+                *(
+                    [lock_handoff.lease, lock_handoff.role_binding]
+                    if lock_handoff
+                    else []
+                ),
                 # The pod's service_account_name is the IRSA SA this stack
                 # creates via auth_binding (create_irsa_service_account=True);
                 # wait for it so the initial apply doesn't transiently fail
@@ -1012,7 +1076,11 @@ def create_data_tier(  # noqa: PLR0913
             *([cluster_apply_job] if cluster_apply_job is not None else []),
             *auth_binding.irsa_service_accounts,
         ],
-        suspend=suspend_maintenance,
+        # Suspended on a format whose writers keep the lock as well: both
+        # sweeps are direct writers, so beside a serving 0.12+ server every
+        # run is refused with `state_lock_held`. The stop-window CronJob that
+        # replaces them is still to come.
+        suspend=suspend_maintenance or persisted_lock,
     )
 
     return OmnigraphDataTier(

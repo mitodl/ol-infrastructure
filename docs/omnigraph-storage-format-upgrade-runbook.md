@@ -327,9 +327,12 @@ bare `replicas=1`, you are on that older code: use the targeted procedure
 instead, and read `git log` on this file for it.
 
 The `cluster-apply` Job is not part of this either: while `migrate_from_image`
-is set it is not created at all and nothing depends on it. It is created again
-at cutover, once `storage_prefix` names the new root, and converges the schemas
-against it.
+is set it is not created at all and nothing depends on it. On a format up to
+9 (omnigraph 0.11) it is created again at cutover, once `storage_prefix` names
+the new root, and converges the schemas against it. From format 14 (0.12 and
+later) it is never created: a direct apply keeps the root's lock even when it
+changes nothing, and the server would then be refused at boot. The server's
+entrypoint applies instead, on every boot.
 
 The Job's pre-flight is the backstop for the writer freeze. It is not a
 substitute for reading **Before you start**.
@@ -851,7 +854,9 @@ own success output prints all four commands as one block for exactly this
 reason. Clearing `migrate_from_image` also un-suspends the `optimize` and
 `cleanup` CronJobs in this same `pulumi up`, earlier than step 7 describes
 below — safe, since suspension was never gated on step 6's verification,
-only on `migrate_from_image` being set.
+only on `migrate_from_image` being set. That holds up to format 9. From
+`internal_schema_version` 14 both stay suspended after the cutover, by design:
+see step 7.
 
 (The manual procedure never sets these two knobs at all, so this step does
 not apply if you did not take the automated path — `pulumi config rm` on an
@@ -885,10 +890,14 @@ pulumi preview --stack <CI|QA|Production> --json \
 Then let the paused pipeline's deploy job for this environment run (or
 `pulumi up` directly with `OMNIGRAPH_DOCKER_SHA` set to the new digest).
 
-The deploy regenerates cluster.yaml against the new root, runs its own
-`cluster apply` Job — a no-op, since step 4 already converged that root — and
-starts the Deployment on the rebuilt graphs. The pod-template config hash
-changes with cluster.yaml, so the restart happens on its own.
+The deploy regenerates cluster.yaml against the new root and starts the
+Deployment on the rebuilt graphs. The pod-template config hash changes with
+cluster.yaml, so the restart happens on its own. With `internal_schema_version`
+at 14 or later the same apply creates the `omnigraph-unlock` Lease and the
+server's Role on it, and the entrypoint runs the `cluster apply` itself before
+serving (a no-op for the graphs, since step 4 already converged that root, and
+the point at which policy group membership is rendered from the live token
+map). Up to format 9 a `cluster apply` Job does that ahead of the Deployment.
 
 ### 6. Verify before releasing the outage
 
@@ -988,6 +997,17 @@ Left suspended, the first symptom is fragment bloat degrading query latency
 weeks later, and a shared code graph that stops following its default branch,
 with nothing pointing back at the migration that caused either. If you
 suspended by hand instead, un-patch by hand.
+
+**From `internal_schema_version` 14, `omnigraph-optimize` and
+`omnigraph-cleanup` stay suspended and must read `True`.** Do not un-suspend
+them, by hand or otherwise. Both write directly to the store. Beside a serving
+0.12+ server every run is refused with `state_lock_held`, and a run that
+starts while the server is down leaves a `graph_operation` lock that the
+server's entrypoint refuses at boot, so the pod crashloops until someone
+force-unlocks it. They are replaced by a stop-window maintenance CronJob,
+which is not built yet; until it is, a format-14 environment gets no
+compaction or version cleanup. The two witan CronJobs are unaffected and
+still have to read `False`.
 
 The old root itself waits. **Not the same day** — leave `$OLD_ROOT/graphs/`
 untouched through at least one full soak (a week for Production), because it is
