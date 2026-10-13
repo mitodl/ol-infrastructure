@@ -996,6 +996,7 @@ CACHE_KEY_QUERY_PARAM_WHITELIST = [
     "status",
     "module",
     "needs_attention",
+    "view",
     # LearningResourceDrawer params (not in mit-learn's registry).
     "syllabus",
     "syllabus_only",
