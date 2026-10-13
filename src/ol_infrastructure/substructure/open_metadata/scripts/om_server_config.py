@@ -23,10 +23,17 @@ PersonalData.Personal / PersonalData.SpecialCategory
   without recognizers is a no-op.  Once recognizers are configured in the OM
   UI (Settings → Classifications → PersonalData → <tag> → Edit → Recognizers),
   flip the flag to True and redeploy to start applying the tag automatically.
+
+Teams are declared in ``TEAM_CONFIG``.  Each is created as a ``Group`` (the
+only team type that can own assets and hold users) under ``Organization``.
+Membership is not managed here: it is assigned in the OpenMetadata UI, so a
+team that already exists is never sent a ``users`` list.
 """
 
 import os
 import sys
+from collections.abc import Callable
+from functools import partial
 from typing import Any
 
 import requests
@@ -79,6 +86,47 @@ _PATCHABLE_FIELDS: list[str] = [
 ]
 
 
+# Desired state for each team, keyed by team name.  Asset ownership and alert
+# routing refer to these names, so renaming one orphans what it owns.
+TEAM_CONFIG: dict[str, dict[str, str]] = {
+    "data-platform": {
+        "displayName": "Data Platform",
+        "description": (
+            "Builds and operates the data platform. Default owner of warehouse assets."
+        ),
+    },
+    "analytics": {
+        "displayName": "Analytics",
+        "description": "Analysts who work with the warehouse.",
+    },
+}
+
+_TEAM_TYPE = "Group"
+
+# displayName is set when a team is created and never patched afterwards:
+# IngestionBotPolicy, which this job's token carries, denies EditDisplayName
+# on every resource.
+_TEAM_PATCHABLE_FIELDS: list[str] = ["description"]
+
+
+def _apply_patch(label: str, url: str, ops: list[dict[str, Any]]) -> None:
+    """Send a JSON Patch, or report that there is nothing to change.
+
+    :param label: What is being reconciled, for the log line.
+    :param url: The entity's ``/v1/<collection>/<id>`` URL.
+    :param ops: JSON Patch operations; empty when the entity is already right.
+    :raises requests.HTTPError: On any non-2xx response from the OM API.
+    """
+    if not ops:
+        print(f"[ok]   {label}: already at desired state — skipping")  # noqa: T201
+        return
+
+    changed = ", ".join(f"{op['path'].lstrip('/')}={op['value']!r}" for op in ops)
+    patch_resp = requests.patch(url, headers=_PATCH_HEADER, json=ops, timeout=30)
+    patch_resp.raise_for_status()
+    print(f"[done] {label}: patched {changed}")  # noqa: T201
+
+
 def _reconcile_tag(fqn: str, desired: dict[str, Any]) -> None:
     """Read the current tag state and PATCH only fields that differ.
 
@@ -104,30 +152,79 @@ def _reconcile_tag(fqn: str, desired: dict[str, Any]) -> None:
         if (value := desired.get(field)) is not None and tag.get(field) != value
     ]
 
-    if not ops:
-        print(f"[ok]   {fqn}: already at desired state — skipping")  # noqa: T201
-        return
+    _apply_patch(fqn, f"{OM_SERVER_URL}/v1/tags/{tag['id']}", ops)
 
-    changed = ", ".join(f"{op['path'].lstrip('/')}={op['value']!r}" for op in ops)
-    patch_resp = requests.patch(
-        f"{OM_SERVER_URL}/v1/tags/{tag['id']}",
-        headers=_PATCH_HEADER,
-        json=ops,
+
+def _reconcile_team(name: str, desired: dict[str, str]) -> None:
+    """Create the team if it is missing, else PATCH the fields that differ.
+
+    A missing team is created with POST and no ``parents``, which the server
+    places under ``Organization``.  An existing team is only ever patched on
+    ``_TEAM_PATCHABLE_FIELDS``, so the members assigned in the UI are kept.
+
+    :param name: Team name, e.g. ``"data-platform"``.
+    :param desired: Mapping of team field names to desired values.
+    :raises requests.HTTPError: On any unexpected non-2xx response from the OM API.
+    :raises ValueError: If the team exists with a type other than ``Group``.
+    """
+    get_resp = requests.get(
+        f"{OM_SERVER_URL}/v1/teams/name/{name}",
+        headers=_AUTH_HEADER,
         timeout=30,
     )
-    patch_resp.raise_for_status()
-    print(f"[done] {fqn}: patched {changed}")  # noqa: T201
+    if get_resp.status_code == requests.codes.not_found:
+        post_resp = requests.post(
+            f"{OM_SERVER_URL}/v1/teams",
+            headers=_AUTH_HEADER,
+            # isJoinable defaults to true, which would let any user add
+            # themselves to a team that owns assets.
+            json={
+                "name": name,
+                "teamType": _TEAM_TYPE,
+                "isJoinable": False,
+                **desired,
+            },
+            timeout=30,
+        )
+        post_resp.raise_for_status()
+        print(f"[done] team {name}: created")  # noqa: T201
+        return
+    get_resp.raise_for_status()
+    team = get_resp.json()
+
+    # The server refuses to change a Group's type, and a non-Group team cannot
+    # own assets, so this needs a person to sort out.
+    if team["teamType"] != _TEAM_TYPE:
+        msg = f"exists with teamType {team['teamType']!r}, expected {_TEAM_TYPE!r}"
+        raise ValueError(msg)
+
+    # "add" replaces a member that is present and sets one that is absent, which
+    # "replace" rejects; a team made by hand may have no description.
+    ops = [
+        {"op": "add", "path": f"/{field}", "value": desired[field]}
+        for field in _TEAM_PATCHABLE_FIELDS
+        if team.get(field) != desired[field]
+    ]
+
+    _apply_patch(f"team {name}", f"{OM_SERVER_URL}/v1/teams/{team['id']}", ops)
 
 
 def main() -> None:
-    """Reconcile all tags in TAG_CONFIG; exit non-zero if any step fails."""
+    """Reconcile every tag and team; exit non-zero if any step fails."""
     errors: list[str] = []
 
-    for fqn, desired in TAG_CONFIG.items():
+    steps: list[tuple[str, Callable[[], None]]] = [
+        *((fqn, partial(_reconcile_tag, fqn, tag)) for fqn, tag in TAG_CONFIG.items()),
+        *(
+            (f"team {name}", partial(_reconcile_team, name, team))
+            for name, team in TEAM_CONFIG.items()
+        ),
+    ]
+    for label, step in steps:
         try:
-            _reconcile_tag(fqn, desired)
+            step()
         except Exception as exc:  # noqa: BLE001
-            msg = f"[fail] {fqn}: {exc}"
+            msg = f"[fail] {label}: {exc}"
             print(msg, file=sys.stderr)  # noqa: T201
             errors.append(msg)
 
