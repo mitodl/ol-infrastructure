@@ -25,7 +25,6 @@ imported, and so tested, without ``pulumi_aws``.
 from typing import NamedTuple
 
 import pulumi_kubernetes as kubernetes
-from pulumi import ResourceOptions
 
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -63,8 +62,19 @@ def validate_graph_removal_allowlist(
     :param allowlist: graph ids from ``omnigraph:graph_removal_allowlist``.
     :param declared_graph_ids: the ids ``cluster.yaml`` declares in this deploy.
     :returns: the allow-list, unchanged.
-    :raises ValueError: when an entry is a declared graph.
+    :raises ValueError: when an entry is a declared graph, or the value is
+        not a list of graph ids.
     """
+    if not isinstance(allowlist, list) or not all(
+        isinstance(graph, str) for graph in allowlist
+    ):
+        # `pulumi config set` without `--path` stores one string, which would
+        # otherwise be read as a list of its characters.
+        msg = (
+            "omnigraph:graph_removal_allowlist must be a list of graph ids, "
+            f"got {allowlist!r}"
+        )
+        raise ValueError(msg)
     still_declared = sorted(set(allowlist) & set(declared_graph_ids))
     if still_declared:
         msg = (
@@ -107,8 +117,9 @@ def create_lock_handoff(  # noqa: PLR0913
     # PRE-CREATED, WITH NO HOLDER. RBAC cannot restrict `create` by resource
     # name, so letting the pod create its own Lease would mean granting create
     # on every Lease in the namespace. The holder takes this one with an
-    # `update` carrying the resourceVersion it read. `spec` is ignored after
-    # creation so a later `pulumi up` does not reset a live holder.
+    # `update` carrying the resourceVersion it read. No `spec` is declared, so
+    # Pulumi never owns the holder fields and a later `pulumi up` cannot reset
+    # a live holder.
     lease = kubernetes.coordination.v1.Lease(
         f"omnigraph-unlock-lease-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -116,7 +127,6 @@ def create_lock_handoff(  # noqa: PLR0913
             namespace=namespace,
             labels=k8s_global_labels,
         ),
-        opts=ResourceOptions(ignore_changes=["spec"]),
     )
     role = kubernetes.rbac.v1.Role(
         f"omnigraph-server-lock-handoff-role-{stack_info.env_suffix}",

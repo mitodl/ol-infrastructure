@@ -817,7 +817,9 @@ own success output prints all four commands as one block for exactly this
 reason. Clearing `migrate_from_image` also un-suspends the `optimize` and
 `cleanup` CronJobs in this same `pulumi up`, earlier than step 7 describes
 below — safe, since suspension was never gated on step 6's verification,
-only on `migrate_from_image` being set.
+only on `migrate_from_image` being set. That holds up to format 9. From
+`internal_schema_version` 14 both stay suspended after the cutover, by design:
+see step 7.
 
 (The manual procedure never sets these two knobs at all, so this step does
 not apply if you did not take the automated path — `pulumi config rm` on an
@@ -958,6 +960,17 @@ Left suspended, the first symptom is fragment bloat degrading query latency
 weeks later, and a shared code graph that stops following its default branch,
 with nothing pointing back at the migration that caused either. If you
 suspended by hand instead, un-patch by hand.
+
+**From `internal_schema_version` 14, `omnigraph-optimize` and
+`omnigraph-cleanup` stay suspended and must read `True`.** Do not un-suspend
+them, by hand or otherwise. Both write directly to the store. Beside a serving
+0.12+ server every run is refused with `state_lock_held`, and a run that
+starts while the server is down leaves a `graph_operation` lock that the
+server's entrypoint refuses at boot, so the pod crashloops until someone
+force-unlocks it. They are replaced by a stop-window maintenance CronJob,
+which is not built yet; until it is, a format-14 environment gets no
+compaction or version cleanup. The two witan CronJobs are unaffected and
+still have to read `False`.
 
 The old root itself waits. **Not the same day** — leave `$OLD_ROOT/graphs/`
 untouched through at least one full soak (a week for Production), because it is

@@ -59,6 +59,12 @@ def test_an_allowlisted_graph_that_is_still_declared_is_refused() -> None:
         )
 
 
+def test_an_allowlist_that_is_not_a_list_is_refused() -> None:
+    """`pulumi config set` without `--path` stores a bare string."""
+    with pytest.raises(ValueError, match="must be a list"):
+        validate_graph_removal_allowlist("code-a", ["council"])
+
+
 def test_an_allowlisted_graph_that_is_no_longer_declared_passes() -> None:
     """The entry and the removal arrive in the same change."""
     assert validate_graph_removal_allowlist(
@@ -119,6 +125,7 @@ def test_the_server_gets_the_lease_its_peers_and_nothing_else():
     return handoff.role_binding.urn.apply(check)
 
 
+@pulumi.runtime.test
 def test_the_env_is_what_the_entrypoint_reads() -> None:
     """The names are the entrypoint's contract; a typo is a refused boot."""
     pulumi.runtime.set_mocks(_Mocks(), preview=False)
