@@ -102,6 +102,26 @@ keep it out. The 10-day age gate clears the longest cadence in these namespaces
 (weekly), so a newly created CronJob is not reported before it has had a real
 chance to run.
 
+WitanDataTierScaledToZero: the state DeploymentUnavailable* excludes
+----------------------------------------------------------------------
+eks_general.py's ``DeploymentUnavailable*`` requires ``spec_replicas > 0``, so
+a Deployment at 0 desired replicas is by its definition not an outage. For
+omnigraph-server it is one. Two things scale it to 0: an armed storage-format
+migration, and (at storage format 14) the nightly ``omnigraph-maintenance``
+window, which leaves it at 0 ON PURPOSE when it cannot remove its own lock.
+Either one left that way takes every witan tool call down with a Deployment
+that reports nothing wrong.
+
+The pending period is what excludes the window, not a time-of-day match. The
+window's Job deadline is 36 minutes and its pod gets 120s more to scale the
+server back up, so 45 minutes at 0 replicas is longer than any window that
+ended normally, wherever ``omnigraph:maintenance_schedule`` puts it. If that
+deadline grows, this has to grow with it.
+
+A migration cutover that keeps the server down for longer than 45 minutes fires
+this too. That is correct (the data tier is down) and expected: silence it for
+the cutover.
+
 Verification
 --------------
 ★ CHECK THE VALUE, NOT THE ROW SET. base.py's pipeline ends in a threshold on
@@ -137,6 +157,14 @@ VALUE is greater than zero -- rather than only to be quiet:
                                    past the 0.5 threshold is positive by
                                    construction. See the baseline figures
                                    above.
+
+``WitanDataTierScaledToZero`` was evaluated against the production Mimir tenant
+on 2026-10-13. As committed it returns a real 0 for omnigraph-server. Over the
+30 days before, at 5-minute steps, it returns 1 at 10 of 8,641 steps, all on
+2026-09-16: two at 15:46Z-15:51Z and eight from 18:36Z to 19:11Z. That longest
+run is under the 45-minute pending period, so the rule would not have fired on
+it. The window itself exists nowhere yet, so "longer than any window" rests on
+the Job's configured deadline and not on an observed run.
 """
 
 from collections.abc import Callable
@@ -175,6 +203,11 @@ _DAILY_MAINTENANCE_CRONJOBS = (
 _NEVER_SUCCEEDED_MIN_AGE_SECONDS = 864000
 
 _WITAN_NAMESPACES = "witan|omnigraph"
+
+# Longer than the maintenance window can hold the server at 0 replicas: a
+# 36-minute Job deadline plus the 120s its pod gets to scale back up
+# (applications/omnigraph/maintenance.py).
+_SCALED_TO_ZERO_FOR = "45m"
 
 _ERROR_RATE_SUMMARY = (
     "Over half of witan's MCP tool calls in {{ $labels.cluster }} are failing"
@@ -250,6 +283,31 @@ _NEVER_SUCCEEDED_DESCRIPTION = (
     " cronjob {{ $labels.cronjob }}` before looking for a failing run."
 )
 
+_SCALED_TO_ZERO_SUMMARY = (
+    "omnigraph-server in {{ $labels.cluster }} has been scaled to 0 replicas"
+    " for over 45 minutes"
+)
+
+_SCALED_TO_ZERO_DESCRIPTION = (
+    "The omnigraph-server Deployment in cluster {{ $labels.cluster }} has"
+    " declared 0 replicas for over 45 minutes, so every witan tool call is"
+    " failing. DeploymentUnavailable does not report this: it ignores a"
+    " Deployment that asks for 0 replicas."
+    " Two things scale it to 0. The nightly omnigraph-maintenance window"
+    " (storage format 14 only) does, and leaves it there on purpose when it"
+    " cannot remove its own lock: read the last Job's log (`kubectl -n omnigraph"
+    " logs job/<newest omnigraph-maintenance job>`) and follow"
+    " docs/omnigraph-store-maintenance-runbook.md (When the window leaves the"
+    " server down). Do not scale it up before clearing the lock, because the"
+    " server refuses to start under it."
+    " An armed storage-format migration does too: `kubectl -n omnigraph get"
+    " deploy omnigraph-server -o jsonpath='{.metadata.annotations}'` shows"
+    " ol.mit.edu/migration-armed, and"
+    " docs/omnigraph-storage-format-upgrade-runbook.md is the procedure. If a"
+    " cutover is in progress this is expected, and can be silenced until it"
+    " ends."
+)
+
 
 def _error_ratio_expr(cluster_filter: str) -> str:
     """Failing share of MCP tool calls over 10 minutes, per cluster.
@@ -290,6 +348,22 @@ def _daily_stale_expr(cluster_filter: str) -> str:
         f'{{cluster=~"{cluster_filter}", '
         f'cronjob=~"{_DAILY_MAINTENANCE_CRONJOBS}"}} > 0)) '
         f"> {_DAILY_STALE_SECONDS}"
+    )
+
+
+def _scaled_to_zero_expr(cluster_filter: str) -> str:
+    """1 while omnigraph-server declares 0 replicas, else a real 0.
+
+    ``== bool 0`` and not ``== 0``: the filtering form returns the series with
+    its original value, which is 0, and base.py's ``last(A) > 0`` never fires
+    on it. See the module docstring's verification note.
+    """
+    return (
+        "max by (cluster, namespace, deployment) (\n"
+        "  kube_deployment_spec_replicas"
+        f'{{cluster=~"{cluster_filter}", namespace="omnigraph", '
+        'deployment="omnigraph-server"}\n'
+        ") == bool 0"
     )
 
 
@@ -434,6 +508,34 @@ def create(
                     "description": _NEVER_SUCCEEDED_DESCRIPTION,
                 },
                 datas=rd(_never_succeeded_expr(_PROD_CLUSTERS)),
+            ),
+            # --- Data tier left scaled to zero ---
+            # Last in the list so the rules above keep their positions.
+            alerting.RuleGroupRuleArgs(
+                name="WitanDataTierScaledToZeroWarning",
+                condition="C",
+                for_=_SCALED_TO_ZERO_FOR,
+                no_data_state="OK",
+                exec_err_state="OK",
+                labels={"severity": "warning", "environment": "non-production"},
+                annotations={
+                    "summary": _SCALED_TO_ZERO_SUMMARY,
+                    "description": _SCALED_TO_ZERO_DESCRIPTION,
+                },
+                datas=rd(_scaled_to_zero_expr(_NON_PROD_CLUSTERS)),
+            ),
+            alerting.RuleGroupRuleArgs(
+                name="WitanDataTierScaledToZeroCritical",
+                condition="C",
+                for_=_SCALED_TO_ZERO_FOR,
+                no_data_state="OK",
+                exec_err_state="KeepLast",
+                labels={"severity": "critical", "environment": "production"},
+                annotations={
+                    "summary": _SCALED_TO_ZERO_SUMMARY,
+                    "description": _SCALED_TO_ZERO_DESCRIPTION,
+                },
+                datas=rd(_scaled_to_zero_expr(_PROD_CLUSTERS)),
             ),
         ],
         opts=resource_opts,
