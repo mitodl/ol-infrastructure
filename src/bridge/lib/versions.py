@@ -51,7 +51,7 @@ EFS_CSI_DRIVER_VERSION = "v3.4.2-eksbuild.1"
 # renovate: datasource=helm depName=external-dns packageName=external-dns registryUrl=https://kubernetes-sigs.github.io/external-dns/
 EXTERNAL_DNS_CHART_VERSION = "1.23.0"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
-GATEWAY_API_VERSION = "v1.6.2"
+GATEWAY_API_VERSION = "v1.6.3"
 # Every chart bump needs its entity-store upgrade SQL applied first; see
 # docs/plans/gravitino-deployment-spec.md (P3). Do not merge a bump alone.
 # renovate: datasource=docker depName=gravitino-helm packageName=apache/gravitino-helm
