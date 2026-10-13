@@ -317,6 +317,16 @@ datasources and the PDC network are declared in Pulumi alongside the existing Gr
 Cloud resources. Archive datasources are **excluded from alert rules**, enforced by
 review and by a lint in `infrastructure/grafana_alerting`.
 
+Grafana does not charge for PDC: it is generally available on every Grafana Cloud
+tier, including the free one. Our costs are on the AWS side. Each agent is one
+single-threaded SSH process, so its compute is negligible. Its tunnel dials out
+through NAT, so every byte of query results sent back to Cloud pays NAT processing
+($0.045/GB) and internet data transfer out ($0.09/GB), about $0.135/GB in all. That
+traffic is query results, not ingest, so it stays small unless wide multi-month Loki
+queries become routine. A single agent starts to degrade at about 100–300 requests
+per second. If we reach that, we add agents to the same PDC network, and Cloud
+load-balances across them.
+
 **6. The archive monitors itself in Cloud.** The archive's own metrics and logs ship
 to Grafana Cloud through the normal pipeline. Two ticket-tier alerts cover it: archive
 writer drop rate above zero, sustained (the `*_dropped_*` counters on the archive
@@ -366,10 +376,13 @@ writers), and compactor or retention failure. Neither ever pages.
   | Compute | $700–1,200 | ~20–30 vCPU / 80–120 GiB total across the three, RF3, on-demand Graviton; less with the Compute Savings Plan |
   | Cross-AZ replication | $150–250 | RF3 on ~5 TB/month ingest |
   | Cross-VPC transport | ≤ $110 | Internal NLB over peering (step 4) |
+  | PDC query egress | ≤ $15 | ~$0.135/GB (NAT + internet transfer out) on an assumed ≤ 100 GB/month of query results (step 5) |
   | **Total** | **~$1,050–1,800** | Option 2 removes roughly $250–400 of this |
 
   S3 request charges are left out, because they are small at this write rate, but
-  they should be checked against real bills after the first month.
+  they should be checked against real bills after the first month. The same goes for
+  PDC query egress, measured from the archive VPC's NAT `BytesOutToDestination`,
+  since the 100 GB/month assumption is a guess about query habits, not a measurement.
 - The implementation adds a new Pulumi project, a new S3 bucket set per environment,
   new IRSA roles and a PDC token in SOPS.
 
@@ -383,8 +396,8 @@ writers), and compactor or retention failure. Neither ever pages.
   second-highest is mis-rendered chart destinations sending data twice to Cloud,
   which would raise the Cloud bill. Watch `grafanacloud_*_bytes_received` after every
   rollout.
-- **Dependencies:** Grafana Cloud PDC availability on our plan (expected, to confirm),
-  the retention and privacy sign-off, and a pinned Alloy version recent enough for the
+- **Dependencies:** Grafana Cloud PDC, which is GA on all tiers at no charge
+  (confirmed 2026-10-13), the retention and privacy sign-off, and a pinned Alloy version recent enough for the
   writer settings above.
 - **Migration Path:** Nothing is migrated. Rolling back means removing the archive
   destinations and deleting the stack. Cloud never notices.
@@ -401,6 +414,8 @@ writers), and compactor or retention failure. Neither ever pages.
 
 - Loki deployment modes (SSD deprecation, monolithic sizing): https://grafana.com/docs/loki/latest/get-started/deployment-modes/
 - Grafana Private Data Source Connect: https://grafana.com/docs/grafana-cloud/connect-externally-hosted/private-data-source-connect/
+- PDC GA on all Grafana Cloud tiers, including free: https://grafana.com/blog/new-in-grafana-10-securely-monitor-and-query-network-secured-data-sources-from-grafana-cloud/
+- AWS internet data transfer out, us-east-1 first 10 TB tier: AWS Price List API (`AWSDataTransfer`), 2026-10-13
 - k8s-monitoring chart destinations: https://github.com/grafana/k8s-monitoring-helm/tree/main/charts/k8s-monitoring/docs
 - Loki retention and deletion: https://grafana.com/docs/loki/latest/operations/storage/retention/
 - Mimir sizing: https://grafana.com/docs/mimir/latest/manage/run-production-environment/planning-capacity/
