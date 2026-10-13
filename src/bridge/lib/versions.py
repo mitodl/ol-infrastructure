@@ -1,5 +1,5 @@
 # renovate: datasource=docker depName=aws-cli packageName=amazon/aws-cli
-AWS_CLI_VERSION = "2.37.9"
+AWS_CLI_VERSION = "2.37.12"
 # renovate: datasource=github-releases depName=concourse packageName=concourse/concourse
 CONCOURSE_VERSION = "8.3.1"  # (TMM 2026-03-06) - Pin to <8.1.0 because of some login bugs with stale state tokens
 # renovate: datasource=github-releases depName=consul-template packageName=hashicorp/consul-template
@@ -15,7 +15,7 @@ LEEK_VERSION = "0.7.7"
 # renovate: datasource=docker depName=meilisearch packageName=getmeili/meilisearch
 MEILISEARCH_VERSION = "v1.54.3"
 # renovate: datasource=helm depName=open-metadata packageName=openmetadata registryUrl=https://helm.open-metadata.org
-OPEN_METADATA_VERSION = "2.0.4"
+OPEN_METADATA_VERSION = "2.0.5"
 # renovate: datasource=docker depName=openapi-generator-cli packageName=openapitools/openapi-generator-cli
 OPENAPI_GENERATOR_VERSION = "v7.26.0"
 # renovate: datasource=github-releases depName=traefik packageName=traefik/traefik
@@ -23,13 +23,13 @@ TRAEFIK_VERSION = "3.7.14"
 # renovate: datasource=docker depName=typesense packageName=typesense/typesense
 TYPESENSE_VERSION = "30.2"
 # renovate: datasource=github-releases depName=vault packageName=hashicorp/vault
-VAULT_VERSION = "2.1.1"
+VAULT_VERSION = "2.1.2"
 # renovate: datasource=docker depName=vector packageName=timberio/vector
 VECTOR_VERSION = "0.40.1"
 
 # EKS Specific Versions
 # renovate: datasource=helm depName=airbyte packageName=airbyte registryUrl=https://airbytehq.github.io/charts
-AIRBYTE_CHART_VERSION = "2.3.0"
+AIRBYTE_CHART_VERSION = "2.4.0"
 # renovate: datasource=helm depName=superset packageName=superset registryUrl=https://apache.github.io/superset
 SUPERSET_CHART_VERSION = "0.22.8"
 # renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.jfrog.io/artifactory/tika
@@ -43,7 +43,7 @@ AWS_NODE_TERMINATION_HANDLER_CHART_VERSION = "0.27.2"
 # renovate: datasource=helm depName=cert-manager packageName=cert-manager registryUrl=https://charts.jetstack.io
 CERT_MANAGER_CHART_VERSION = "v1.21.2"
 # renovate: datasource=helm depName=dagster packageName=dagster registryUrl=https://dagster-io.github.io/helm
-DAGSTER_CHART_VERSION = "1.13.25"
+DAGSTER_CHART_VERSION = "1.13.26"
 # renovate: datasource=aws-eks-addon depName=aws-ebs-csi-driver versioning=aws-eks-addon
 EBS_CSI_DRIVER_VERSION = "v1.66.0-eksbuild.1"
 # renovate: datasource=aws-eks-addon depName=aws-efs-csi-driver versioning=aws-eks-addon
@@ -51,7 +51,7 @@ EFS_CSI_DRIVER_VERSION = "v3.4.2-eksbuild.1"
 # renovate: datasource=helm depName=external-dns packageName=external-dns registryUrl=https://kubernetes-sigs.github.io/external-dns/
 EXTERNAL_DNS_CHART_VERSION = "1.23.0"
 # renovate: datasource=github-releases depName=gateway-api packageName=kubernetes-sigs/gateway-api
-GATEWAY_API_VERSION = "v1.6.2"
+GATEWAY_API_VERSION = "v1.6.3"
 # Every chart bump needs its entity-store upgrade SQL applied first; see
 # docs/plans/gravitino-deployment-spec.md (P3). Do not merge a bump alone.
 # renovate: datasource=docker depName=gravitino-helm packageName=apache/gravitino-helm
@@ -67,7 +67,7 @@ GRAVITINO_VERSION = "1.3.1"
 # Renovate marker. Move it by hand when the image crosses a minor version.
 GRAVITINO_SCHEMA_VERSION = "1.3.0"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
-KARPENTER_CHART_VERSION = "1.14.1"
+KARPENTER_CHART_VERSION = "1.15.0"
 # renovate: datasource=helm depName=keda packageName=keda registryUrl=https://kedacore.github.io/charts
 KEDA_CHART_VERSION = "2.21.0"
 # renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
@@ -75,7 +75,7 @@ KUBEWATCH_CHART_VERSION = "3.5.0"
 # renovate: datasource=helm depName=meilisearch packageName=meilisearch registryUrl=https://meilisearch.github.io/meilisearch-kubernetes
 MEILISEARCH_CHART_VERSION = "0.40.0"
 # renovate: datasource=helm depName=opik packageName=opik registryUrl=https://comet-ml.github.io/opik
-OPIK_CHART_VERSION = "2.2.90"
+OPIK_CHART_VERSION = "2.2.96"
 # renovate: datasource=helm depName=operator packageName=operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
 STARROCKS_OPERATOR_CHART_VERSION = "1.11.7"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
@@ -98,7 +98,7 @@ CLICKHOUSE_SERVER_VERSION = "25.8.1.2953.altinitystable"
 # renovate: datasource=docker depName=clickhouse/clickhouse-keeper packageName=clickhouse/clickhouse-keeper
 CLICKHOUSE_KEEPER_VERSION = "26.8-alpine"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
-TRAEFIK_CHART_VERSION = "41.6.1"
+TRAEFIK_CHART_VERSION = "41.7.1"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.10.0"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
@@ -119,7 +119,7 @@ MARIMO_OPERATOR_VERSION = "v0.3.0"
 # renovate: datasource=docker depName=marimo-jupyterlab packageName=ghcr.io/mitodl/marimo-jupyterlab
 MARIMO_JUPYTERLAB_VERSION = "latest"
 # renovate: datasource=helm depName=k8s-monitoring packageName=k8s-monitoring registryUrl=https://grafana.github.io/helm-charts
-GRAFANA_K8S_MONITORING_CHART_VERSION = "4.5.2"
+GRAFANA_K8S_MONITORING_CHART_VERSION = "4.5.3"
 # renovate: datasource=helm depName=dcgm-exporter packageName=dcgm-exporter registryUrl=https://nvidia.github.io/dcgm-exporter/helm-charts
 NVIDIA_DCGM_EXPORTER_CHART_VERSION = "4.8.4"
 # renovate: datasource=helm depName=nvidia-device-plugin packageName=nvidia-device-plugin registryUrl=https://nvidia.github.io/k8s-device-plugin
@@ -135,7 +135,7 @@ SQL_EXPORTER_VERSION = "0.24.9"
 # renovate: datasource=github-releases depName=local-path-provisioner packageName=rancher/local-path-provisioner
 LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.37"
 # renovate: datasource=github-releases depName=qdrant packageName=qdrant/qdrant
-QDRANT_VERSION = "v1.19.1"
+QDRANT_VERSION = "v1.19.2"
 # renovate: datasource=helm depName=typesense-operator packageName=typesense-operator registryUrl=https://akyriako.github.io/typesense-operator
 TYPESENSE_OPERATOR_CHART_VERSION = "0.4.1"
 # renovate: datasource=helm depName=vertical-pod-autoscaler packageName=vertical-pod-autoscaler registryUrl=https://kubernetes.github.io/autoscaler
@@ -145,7 +145,7 @@ TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.51.4"
 # renovate: datasource=docker depName=toolhive-operator packageName=ghcr.io/stacklok/toolhive/toolhive-operator
 TOOLHIVE_OPERATOR_CHART_VERSION = "0.51.4"
 # renovate: datasource=docker depName=mcp-grafana packageName=grafana/mcp-grafana
-MCP_GRAFANA_VERSION = "2.0.1"
+MCP_GRAFANA_VERSION = "2.0.2"
 # ToolHive-built npx wrapper image for the Sentry MCP server (getsentry/sentry-mcp
 # self-hosted stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
 # renovate: datasource=docker depName=sentry-mcp-server packageName=ghcr.io/stacklok/dockyard/npx/sentry-mcp-server
@@ -153,7 +153,7 @@ MCP_SENTRY_VERSION = "0.42.0"
 # ToolHive-built npx wrapper image for the Context7 MCP server (upstash/context7
 # stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
 # renovate: datasource=docker depName=context7 packageName=ghcr.io/stacklok/dockyard/npx/context7
-MCP_CONTEXT7_VERSION = "4.1.1"
+MCP_CONTEXT7_VERSION = "4.2.0"
 # AWS's official SigV4 proxy image, the stdio bridge to the managed AWS MCP Server
 # endpoint. Image tags track the PyPI package (mcp-proxy-for-aws) one-for-one.
 # renovate: datasource=docker depName=mcp-proxy-for-aws packageName=public.ecr.aws/mcp-proxy-for-aws/mcp-proxy-for-aws
@@ -177,9 +177,9 @@ OPENSEARCH_CHART_VERSION = "3.9.0"
 # renovate: datasource=docker depName=valkey packageName=valkey/valkey
 VALKEY_VERSION = "7.2.14-alpine"
 # renovate: datasource=docker depName=mailpit packageName=axllent/mailpit
-MAILPIT_VERSION = "v1.31.4"
+MAILPIT_VERSION = "v1.31.5"
 # renovate: datasource=docker depName=litellm packageName=ghcr.io/berriai/litellm
-LITELLM_VERSION = "v1.104.0"
+LITELLM_VERSION = "v1.105.0"
 # Keep this on a plain release tag. Renovate never proposes an update from a
 # prerelease pin (a -rc.N suffix only matches the same suffix), and the same
 # rule keeps it from proposing the -preview.N tags RustFS also publishes.

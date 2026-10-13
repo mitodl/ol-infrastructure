@@ -164,7 +164,7 @@ class OLApplicationLoadBalancedFargateService(pulumi.ComponentResource):
 
         ingress_cidr = ["0.0.0.0/0"]
         if not config.listener_open_to_all_traffic:
-            # TODO: need to provide capabilitiy for caller to set IP range  # noqa: E501, FIX002, TD002
+            # TODO: need to provide capabilitiy for caller to set IP range  # noqa: FIX002, TD002
             msg = "If listener is not open to all IP ranges, valid CIDR block must be present"  # noqa: E501
             raise ValueError(msg)
 

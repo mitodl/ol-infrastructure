@@ -365,7 +365,7 @@ gateway_config = OLEKSGatewayConfig(
             port=8443,
             protocol="HTTPS",
             tls_mode="Terminate",
-            certificate_secret_name="edx-notes-tls",  # pragma: allowlist secret  # noqa: E501, S106
+            certificate_secret_name="edx-notes-tls",  # pragma: allowlist secret  # noqa: S106
             certificate_secret_namespace=namespace,
         ),
     ],

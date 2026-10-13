@@ -5,9 +5,10 @@
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
-config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx")
+config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
-config.define_string_list("prebuilt_tags", usage="Prebuilt image tag overrides per app, e.g. mit-learn=0.62.0 learn-ai=0.28.3")
+config.define_string_list("prebuilt_tags", usage="Published image tag to run for an app with no checkout, instead of latest, e.g. mit-learn=0.82.0 learn-ai=0.37.0")
+config.define_string_list("lake_host_ports", usage="Host ports for the data-platform lake forwards, e.g. rustfs=9100 gravitino=9101 (defaults: starrocks=9030 gravitino=9001 rustfs=9000). Move one that another process on your machine already holds.")
 config.define_string("disk_keep_tags", usage="Newest tilt-built image tags kept per repo by the disk janitor (default: 3). Overrides LOCAL_DEV_DISK_KEEP_TAGS env var.")
 config.define_string("disk_buildcache_max_gb", usage="Docker build-cache size cap in GB (default: 10% of total disk; 0 disables). Overrides LOCAL_DEV_BUILDCACHE_MAX_GB env var.")
 config.define_string("log_retention_period", usage="How long Grafana/Loki keeps local-dev logs, as a whole number of days, e.g. 72h or 3d (default: 168h). Overrides LOCAL_DEV_LOG_RETENTION env var.")
@@ -20,6 +21,10 @@ cfg = config.parse()
 # in tilt_config.json to switch it on.
 enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
 per_app_databases = cfg.get("per_app_databases", False)
+
+# An included Tiltfile shares no variables with this one, so an app that
+# configures itself differently when another is enabled reads the list here.
+os.putenv("LOCAL_DEV_ENABLED_APPS", ",".join(enabled_apps))
 
 # Every service hostname, CORS origin, APISIX route, and Keycloak redirect URI
 # derives from this value. local-dev/tiltlib.star reads the same environment
@@ -44,11 +49,12 @@ if str(local(
     )
 
 # Parse prebuilt_tags list (["app=tag", ...]) into a lookup dict.
-prebuilt_tags = {
-    kv.split("=")[0]: kv.split("=")[1]
-    for kv in cfg.get("prebuilt_tags", [])
-    if "=" in kv
-}
+prebuilt_tags = {}
+for _kv in cfg.get("prebuilt_tags", []):
+    _key, _, _tag = _kv.partition("=")
+    if not (_key and _tag) or "=" in _tag:
+        fail('prebuilt_tags: expected "app=tag", got "%s"' % _kv)
+    prebuilt_tags[_key] = _tag
 
 # How long Loki keeps logs. Empty means the Pulumi program's own default (168h).
 # Set it per-developer in the gitignored tilt_config.json — it is deliberately
@@ -130,10 +136,10 @@ APPS = [
         "dir": "mit-learn",
         "namespace": "mit-learn",
         "deploy_name": "mitlearn-webapp",
-        "image_backend": "mitodl/mit-learn-app",
-        "image_frontend": "mitodl/mit-learn-nextjs-app",
-        "prebuilt_tag_backend": prebuilt_tags.get("mit-learn", "0.62.0"),
-        "prebuilt_tag_frontend": prebuilt_tags.get("mit-learn-nextjs", "0.62.0"),
+        "images": {
+            "mit-learn": "mitodl/mit-learn-app",
+            "mit-learn-nextjs": "mitodl/mit-learn-nextjs-app",
+        },
         "tiltfile": "./local-dev/apps/mit-learn/Tiltfile",
         "tiltfile_frontend": "./local-dev/apps/mit-learn-nextjs/Tiltfile",
         # Seeding commands; executed inside the web pod via `kubectl exec`.
@@ -182,8 +188,7 @@ APPS = [
         "dir": "learn-ai",
         "namespace": "learn-ai",
         "deploy_name": "learnai-webapp",
-        "image_backend": "mitodl/learn-ai-app",
-        "prebuilt_tag_backend": prebuilt_tags.get("learn-ai", "0.28.3"),
+        "images": {"learn-ai": "mitodl/learn-ai-app"},
         "tiltfile": "./local-dev/apps/learn-ai/Tiltfile",
         "seed_commands": [
             {
@@ -198,8 +203,7 @@ APPS = [
         "dir": "mitxonline",
         "namespace": "mitxonline",
         "deploy_name": "mitxonline-webapp",
-        "image_backend": "mitodl/mitxonline-app",
-        "prebuilt_tag_backend": prebuilt_tags.get("mitxonline", "1.144.5"),
+        "images": {"mitxonline": "mitodl/mitxonline-app"},
         "tiltfile": "./local-dev/apps/mitxonline/Tiltfile",
         "seed_commands": [
             {
@@ -224,8 +228,7 @@ APPS = [
         "dir": "odl-video-service",
         "namespace": "odl-video-service",
         "deploy_name": "odlvideo-webapp",
-        "image_backend": "mitodl/odl-video-service-app",
-        "prebuilt_tag_backend": prebuilt_tags.get("odl-video-service", "0.85.0"),
+        "images": {"odl-video-service": "mitodl/odl-video-service-app"},
         "tiltfile": "./local-dev/apps/odl-video-service/Tiltfile",
         "seed_commands": [
             {
@@ -251,13 +254,7 @@ APPS = [
         "dir": "ocw-studio",
         "namespace": "ocw-studio",
         "deploy_name": "ocwstudio-webapp",
-        "image_backend": "mitodl/ocw-studio-app",
-        # Nothing consumes prebuilt_tag_backend yet -- every app's
-        # deployment.yaml pins :latest -- so this is metadata for when that
-        # is wired up. Note 0.199.0 predates the ocw-studio change that makes
-        # the S3 and pipeline endpoints configurable, so the no-checkout path
-        # needs a release containing it before it will work here.
-        "prebuilt_tag_backend": prebuilt_tags.get("ocw-studio", "0.199.0"),
+        "images": {"ocw-studio": "mitodl/ocw-studio-app"},
         "tiltfile": "./local-dev/apps/ocw-studio/Tiltfile",
         "seed_commands": [
             {
@@ -305,7 +302,80 @@ APPS = [
             },
         ],
     },
+    {
+        # Off by default: it exists so the data platform's micromasters dlt
+        # source has a local database to read, which most developers do not
+        # need running.
+        "name": "micromasters",
+        "dir": "micromasters",
+        "namespace": "micromasters",
+        "deploy_name": "micromasters-webapp",
+        "images": {"micromasters": "mitodl/micromasters-app"},
+        "tiltfile": "./local-dev/apps/micromasters/Tiltfile",
+        "seed_commands": [
+            {
+                "label": "seed-micromasters-superuser",
+                # Learner login needs edX or MITx Online OAuth credentials the
+                # tracked config does not ship, so this password login at
+                # /admin/ is the only way in by default.
+                "description": "Create or reset the admin superuser (admin / admin, log in at /admin/)",
+                "cmd": (
+                    "python manage.py shell -c " +
+                    "'from django.contrib.auth import get_user_model; " +
+                    "U = get_user_model(); " +
+                    "u, created = U.objects.get_or_create(" +
+                    "username=\"admin\", " +
+                    "defaults={\"email\": \"admin@odl.local\"}); " +
+                    "u.is_staff = True; u.is_superuser = True; " +
+                    "u.set_password(\"admin\"); u.save(); " +
+                    "print((\"created\" if created else \"reset\"), u.username)'"
+                ),
+            },
+            {
+                "label": "seed-micromasters-data",
+                "description": (
+                    "Load the seed programs, course runs and learners, then" +
+                    " rebuild the search index (needs micromasters-celery)"
+                ),
+                "cmd": "python manage.py seed_db",
+            },
+            {
+                "label": "seed-micromasters-opensearch",
+                "description": "Recreate the OpenSearch indices (needs micromasters-celery)",
+                "cmd": "python manage.py recreate_index",
+            },
+        ],
+    },
 ]
+
+# ---------------------------------------------------------------------------
+# Published image tags
+#
+# An app with no sibling checkout runs its published image, which the
+# manifests reference as :latest. A prebuilt_tags entry runs that release
+# instead. The result reaches k8s_yaml_local through the environment because
+# include() takes no arguments.
+# ---------------------------------------------------------------------------
+_app_images = {}
+for _app in APPS:
+    _app_images.update(_app.get("images", {}))
+
+_unknown_tags = [k for k in prebuilt_tags if k not in _app_images]
+if _unknown_tags:
+    fail(
+        "prebuilt_tags: no app image is named %s. Known names: %s"
+        % (", ".join(_unknown_tags), ", ".join(sorted(_app_images.keys())))
+    )
+
+prebuilt_image_tags = {}
+for _app in [a for a in APPS if a["name"] in enabled_apps]:
+    if os.path.exists(os.path.join(workspace_root, _app["dir"], ".git")):
+        continue
+    for _key, _image in _app.get("images", {}).items():
+        if _key in prebuilt_tags:
+            prebuilt_image_tags[_image] = prebuilt_tags[_key]
+            print("[%s] no checkout, running %s:%s" % (_key, _image, prebuilt_tags[_key]))
+os.putenv("LOCAL_DEV_PREBUILT_IMAGE_TAGS", encode_json(prebuilt_image_tags))
 
 # ---------------------------------------------------------------------------
 # Host address
@@ -341,8 +411,9 @@ local_resource(
         "LOCAL_DEV_LOG_RETENTION": log_retention_period,
         "LOCAL_DEV_KEYCLOAK_IMAGE": keycloak_image,
         # Gates the per-app resources added since enabled_apps existed (the
-        # ocw-studio namespace/databases and the RustFS object store). The four
-        # original apps are still provisioned unconditionally.
+        # ocw-studio namespace/databases, the RustFS object store and the
+        # data-platform lake). The four original apps are still provisioned
+        # unconditionally.
         "LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps),
         "LOCAL_DEV_HOST_GATEWAY": host_gateway,
         "PULUMI_CONFIG_PASSPHRASE": "",
@@ -387,6 +458,36 @@ local_resource(
     labels=["infra"],
     resource_deps=["local-infra-core"],
 )
+
+# data-platform has no entry in APPS: it is infrastructure the core stack
+# deploys, with nothing to build. StarRocks speaks the MySQL protocol, which
+# APISIX does not route, so a host-side dbt or mysql client reaches it through
+# this forward. kubectl exits when the pod behind it goes away, hence the loop.
+#
+# The other two are for a host-side Iceberg writer, which is how ol-data-platform
+# runs a dlt source into the lake (DLT_PROFILE=dev): it commits through the REST
+# catalog and writes the files to RustFS itself.
+#
+# The host side of each is movable (lake_host_ports), because a forward whose
+# port something else holds fails in its loop while a client on that port talks
+# to the other process: an external MinIO on 9000 would take the lake's writes.
+if "data-platform" in enabled_apps:
+    lake_host_ports = {
+        kv.split("=")[0]: kv.split("=")[1]
+        for kv in cfg.get("lake_host_ports", [])
+        if "=" in kv
+    }
+    for name, service, port in [
+        ("starrocks-port-forward", "starrocks", 9030),
+        ("iceberg-catalog-port-forward", "gravitino", 9001),
+        ("lake-object-store-port-forward", "rustfs", 9000),
+    ]:
+        local_resource(
+            name,
+            serve_cmd="while true; do kubectl -n local-infra port-forward svc/{service} {host_port}:{port}; sleep 2; done".format(service=service, host_port=lake_host_ports.get(service, port), port=port),
+            labels=["infra"],
+            resource_deps=["local-infra-core"],
+        )
 
 # Seed the local-dev test users (admin / student / prof, password localdev123)
 # into the olapps realm. Pulumi provisions the realm and OIDC clients, but the

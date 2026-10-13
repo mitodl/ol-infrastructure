@@ -136,7 +136,7 @@ open_metadata_database_security_group = ec2.SecurityGroup(
             to_port=DEFAULT_POSTGRES_PORT,
             description="Access to postgres from open metadata servers.",
         ),
-        # TODO @Ardiea: switch to use pod-security-groups once implemented  # noqa: FIX002, E501
+        # TODO @Ardiea: switch to use pod-security-groups once implemented  # noqa: FIX002
         ec2.SecurityGroupIngressArgs(
             security_groups=[],
             protocol="tcp",
@@ -1103,7 +1103,7 @@ gateway_config = OLEKSGatewayConfig(
             hostname=open_metadata_config.require("domain"),
             port=8443,
             tls_mode="Terminate",
-            certificate_secret_name="openmetadata-tls",  # cert-manager will create this  # noqa: S106, E501  # pragma: allowlist secret
+            certificate_secret_name="openmetadata-tls",  # cert-manager will create this  # noqa: S106  # pragma: allowlist secret
             certificate_secret_namespace=open_metadata_namespace,
         ),
     ],

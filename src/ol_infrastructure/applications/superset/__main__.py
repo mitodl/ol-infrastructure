@@ -560,9 +560,7 @@ oidc_secret = OLVaultK8SSecret(
 # StarRocks only has QA and Production substructure stacks; skip on CI.
 starrocks_creds_secret_name: str | None = None
 if stack_info.name != "CI":
-    starrocks_creds_secret_name = (
-        "superset-starrocks-creds"  # pragma: allowlist secret  # noqa: S105
-    )
+    starrocks_creds_secret_name = "superset-starrocks-creds"  # pragma: allowlist secret  # noqa: S105
     starrocks_creds_secret = OLVaultK8SSecret(
         f"superset-starrocks-creds-{stack_info.env_suffix}",
         resource_config=OLVaultK8SDynamicSecretConfig(
@@ -876,7 +874,7 @@ gateway_config = OLEKSGatewayConfig(
             hostname=superset_domain,
             port=8443,
             tls_mode="Terminate",
-            certificate_secret_name="superset-tls",  # pragma: allowlist secret  # noqa: E501, S106
+            certificate_secret_name="superset-tls",  # pragma: allowlist secret  # noqa: S106
             certificate_secret_namespace=superset_namespace,
         ),
     ],

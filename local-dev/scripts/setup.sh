@@ -54,6 +54,8 @@ HOSTS=(
     "live.ocw.${ROOT_DOMAIN}"
     "test.ocw.${ROOT_DOMAIN}"
     "concourse.ocw.${ROOT_DOMAIN}"
+    # micromasters (only deployed when it is in enabled_apps)
+    "micromasters.${ROOT_DOMAIN}"
     # Shared S3-compatible object store (RustFS), deployed with ocw-studio
     "s3.${ROOT_DOMAIN}"
     # Keycloak SSO

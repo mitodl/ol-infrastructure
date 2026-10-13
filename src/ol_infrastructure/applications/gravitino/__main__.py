@@ -111,12 +111,8 @@ TLS_MOUNT_PATH = "/etc/gravitino/tls"
 # long-lived pod. Every certificate here lives as long as the CA instead.
 CERTIFICATE_DURATION = "87600h"
 CA_SECRET_NAME = "gravitino-ca"  # pragma: allowlist secret  # noqa: S105
-SERVER_TLS_SECRET_NAME = (
-    "gravitino-server-tls"  # pragma: allowlist secret  # noqa: S105
-)
-CLIENT_TLS_SECRET_NAME = (
-    "gravitino-reconcile-client-tls"  # pragma: allowlist secret  # noqa: S105
-)
+SERVER_TLS_SECRET_NAME = "gravitino-server-tls"  # pragma: allowlist secret  # noqa: S105
+CLIENT_TLS_SECRET_NAME = "gravitino-reconcile-client-tls"  # pragma: allowlist secret  # noqa: S105
 KEYSTORE_PASSWORD_SECRET_NAME = (
     "gravitino-keystore-password"  # pragma: allowlist secret  # noqa: S105
 )
@@ -128,9 +124,7 @@ DB_CREDS_SECRET_NAME = "gravitino-db-creds"  # pragma: allowlist secret  # noqa:
 # renders these placeholders, and the init script below replaces them from env
 # vars sourced from Secrets before exec'ing the image entrypoint (spec P3).
 JDBC_USER_PLACEHOLDER = "__GRAVITINO_JDBC_USER__"
-JDBC_PASSWORD_PLACEHOLDER = (
-    "__GRAVITINO_JDBC_PASSWORD__"  # pragma: allowlist secret  # noqa: S105
-)
+JDBC_PASSWORD_PLACEHOLDER = "__GRAVITINO_JDBC_PASSWORD__"  # pragma: allowlist secret  # noqa: S105
 KEYSTORE_PASSWORD_PLACEHOLDER = (
     "__GRAVITINO_KEYSTORE_PASSWORD__"  # pragma: allowlist secret  # noqa: S105
 )

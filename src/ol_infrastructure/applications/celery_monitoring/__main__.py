@@ -297,7 +297,7 @@ leek_broker_subscriptions_secret = OLVaultK8SSecret(
     f"celery-monitoring-broker-subscriptions-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=application_labels,
-        dest_secret_name="leek-broker-subscriptions",  # pragma: allowlist-secret # noqa: S106, E501
+        dest_secret_name="leek-broker-subscriptions",  # pragma: allowlist-secret # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=application_labels,
@@ -321,7 +321,7 @@ cert_manager_certificate = OLCertManagerCert(
         k8s_namespace=celery_monitoring_namespace,
         k8s_labels=application_labels,
         create_apisixtls_resource=True,
-        dest_secret_name="celery-monitoring-tls",  # pragma: allowlist-secret  # noqa: E501, S106
+        dest_secret_name="celery-monitoring-tls",  # pragma: allowlist-secret  # noqa: S106
         dns_names=[celery_monitoring_domain],
     ),
 )

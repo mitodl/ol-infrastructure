@@ -16,7 +16,6 @@ config:
   mitxonline:dev_shell_enabled: true
   mitxonline:learn_backend_domain: "api.learn.mit.edu"
   mitxonline:min_replicas: 4
-  mitxonline:use_granian: true
   mitxonline:web_memory_limit: 2000Mi
   mitxonline:granian_worker_startup_rss: 600
   mitxonline:vars:
