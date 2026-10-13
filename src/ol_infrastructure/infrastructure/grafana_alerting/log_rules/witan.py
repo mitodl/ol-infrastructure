@@ -99,6 +99,31 @@ WitanToolCallErrorRate instead, which is why neither rule is redundant with the
 other: this one is not traffic-dependent but only speaks at boot, and that one
 speaks continuously but only while there is traffic.
 
+WitanGraphBlockedAtStartup
+----------------------------
+The same detector for omnigraph 0.13, where the one above cannot fire. From
+0.12 on the server logs ``serving omnigraph ... graph_count=N`` BEFORE it loads
+any graph, and N is the number of graphs cluster.yaml DECLARES, so a graph that
+fails to open no longer lowers it. What 0.13 logs instead is one WARN line per
+graph it could not open:
+
+    graph blocked during startup graph_id=<id> error=open graph '<id>' at ...
+
+and /readyz stays 200 (``"status":"degraded"``, ``blocked_graph_count`` > 0)
+while at least one graph is ready. The rule counts those lines over the same 6h
+window, so it has the same "any degraded boot in the last 6 hours" meaning and
+the same limit 2 as ``WitanGraphQuarantined``. Limits 1 and 3 do not apply:
+there is no baseline to re-learn.
+
+A LINE FILTER, unlike every other omnigraph rule here, and deliberately. The
+escapes sit around field names and values, not inside the message text, so the
+message is contiguous on the wire. Filtering on it also avoids running
+``logfmt`` over the ``error`` field, which is unquoted and contains spaces,
+commas and colons.
+
+``WitanGraphQuarantined*`` stays until Production leaves 0.11. Once every
+environment serves 0.13 it is dead and should be deleted.
+
 WitanCodeBridgeNoBindings
 ---------------------------
 The cross-repo bridge going quiet, keyed on the OUTCOME rather than on an
@@ -227,6 +252,24 @@ quiet:
                         carrying 0 never fires. See metric_rules/witan.py's
                         ``_never_succeeded_expr`` for the revision of this PR
                         that got that wrong.
+
+``WitanGraphBlockedAtStartup`` was written 2026-10-13, before any environment
+ran 0.13, so it has NOT been seen to fire in Loki. What was checked instead:
+
+  The line itself, from the released 0.13.0 server booted locally on a
+  two-graph ``file://`` root with one graph's storage moved aside. On the wire
+  it is ``... graph blocked during startup <ESC>[3mgraph_id<ESC>[0m<ESC>[2m=
+  <ESC>[0mbeta ...``: the message text carries no escapes. The same boot
+  logged ``graph_count=2`` and answered /readyz 200 with
+  ``"ready_graph_count":1,"blocked_graph_count":1``.
+  That a line filter on message text matches this stream: the identical
+  expression with ``"serving omnigraph"`` returns 1 on the production tenant
+  for the hour after the 2026-10-12T18:58Z boot.
+  The expression as committed parses and returns nothing on the production
+  tenant (132,480 lines scanned).
+
+Re-run it against CI's first 0.13 boot with a graph deliberately blocked
+before relying on it.
 """
 
 from collections.abc import Callable
@@ -248,6 +291,9 @@ _GRAPH_BASELINE_WINDOW = "7d"
 # rather than "the newest boot". Outside the window there are no boot samples
 # at all and the rule evaluates to nothing.
 _GRAPH_RECENT_BOOT_WINDOW = "6h"
+
+# The message omnigraph 0.13 logs once per graph it could not open at startup.
+_GRAPH_BLOCKED_MESSAGE = "graph blocked during startup"
 
 _OMNIGRAPH_STREAM = 'namespace="omnigraph", container="omnigraph-server"'
 
@@ -302,6 +348,30 @@ _QUARANTINE_DESCRIPTION = (
     " If a graph was removed on purpose, silence this for a week while the"
     " baseline re-learns, and confirm the removal really was intended, because a"
     " graph lost during a storage migration looks exactly the same from here."
+)
+
+_GRAPH_BLOCKED_SUMMARY = (
+    "omnigraph in {{ $labels.cluster }} booted in the last 6h with a graph it"
+    " could not open ({{ $value }} blocked-graph lines)"
+)
+
+_GRAPH_BLOCKED_DESCRIPTION = (
+    "At least one omnigraph-server boot in cluster {{ $labels.cluster }} in the"
+    " last 6 hours logged `graph blocked during startup`. On omnigraph 0.13 a"
+    " graph that cannot be opened is blocked rather than fatal: the pod goes"
+    " Ready, /readyz returns 200 with status `degraded`, and only requests"
+    " against that graph fail (503 graph_unavailable). If the blocked graph is"
+    " `council`, every agent on the service is broken."
+    " Find which graph and why with"
+    ' `{namespace="omnigraph", container="omnigraph-server"} |='
+    ' "graph blocked during startup"`: each line carries graph_id and the open'
+    " error."
+    " This is an 'any degraded boot in 6 hours' alert, not a current-state one."
+    " Check the RUNNING pod before treating it as an active outage:"
+    " `kubectl -n omnigraph exec deploy/omnigraph-server -- curl -s"
+    " localhost:8080/readyz` reports blocked_graph_count. A restart that"
+    " already recovered keeps this firing until the degraded boot ages out of"
+    " the window."
 )
 
 
@@ -383,6 +453,27 @@ def _graph_quarantine_expr(cluster_filter: str) -> str:
         "  -\n"
         "  min by (cluster) (\n"
         f"    min_over_time({stream} {parsed} [{_GRAPH_RECENT_BOOT_WINDOW}])\n"
+        "  )\n"
+        ") > 0"
+    )
+
+
+def _graph_blocked_expr(cluster_filter: str) -> str:
+    """Blocked-graph lines logged at startup over the recent-boot window.
+
+    A line filter on the message, not a parsed label. See the module docstring
+    for why that is safe on this stream for message text and nothing else.
+
+    Grouped by ``cluster`` alone, like ``_cedar_denial_expr``: ``graph_id`` is
+    not in the notification policy's ``group_bies``. The value is the line
+    count, one per blocked graph per boot, so it is positive whenever a row
+    exists.
+    """
+    return (
+        "sum by (cluster) (\n"
+        "  count_over_time(\n"
+        f'    {{{_OMNIGRAPH_STREAM}, cluster=~"{cluster_filter}"}}\n'
+        f'    |= "{_GRAPH_BLOCKED_MESSAGE}" [{_GRAPH_RECENT_BOOT_WINDOW}]\n'
         "  )\n"
         ") > 0"
     )
@@ -537,6 +628,36 @@ def create(
                     "description": _NO_BINDINGS_DESCRIPTION,
                 },
                 datas=rd(_no_bindings_expr(_PROD_CLUSTERS)),
+            ),
+            # --- Blocked graph at boot, omnigraph 0.13 ---
+            # Last in the list so the rules above keep their positions.
+            # Same severities and pending period as WitanGraphQuarantined*,
+            # which it replaces once an environment serves 0.13.
+            alerting.RuleGroupRuleArgs(
+                name="WitanGraphBlockedAtStartupWarning",
+                condition="C",
+                for_="10m",
+                no_data_state="OK",
+                exec_err_state="OK",
+                labels={"severity": "warning", "environment": "non-production"},
+                annotations={
+                    "summary": _GRAPH_BLOCKED_SUMMARY,
+                    "description": _GRAPH_BLOCKED_DESCRIPTION,
+                },
+                datas=rd(_graph_blocked_expr(_NON_PROD_CLUSTERS)),
+            ),
+            alerting.RuleGroupRuleArgs(
+                name="WitanGraphBlockedAtStartupCritical",
+                condition="C",
+                for_="10m",
+                no_data_state="OK",
+                exec_err_state="KeepLast",
+                labels={"severity": "critical", "environment": "production"},
+                annotations={
+                    "summary": _GRAPH_BLOCKED_SUMMARY,
+                    "description": _GRAPH_BLOCKED_DESCRIPTION,
+                },
+                datas=rd(_graph_blocked_expr(_PROD_CLUSTERS)),
             ),
         ],
         opts=resource_opts,

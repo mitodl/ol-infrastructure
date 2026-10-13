@@ -52,6 +52,8 @@ Job first.
 ### When the window leaves the server down
 
 The Job exits non-zero and its log says which case it is.
+`WitanDataTierScaledToZero*` fires once the Deployment has declared 0 replicas
+for 45 minutes, which is longer than a window that ended normally.
 
 - `leaving omnigraph-server at 0 replicas (runbook: clear the lock, then scale
   up)`: the window could not remove its own `graph_operation` lock (it lost
