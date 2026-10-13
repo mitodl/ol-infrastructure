@@ -131,6 +131,13 @@ def test_deploy_job_pods_are_not_webapp_service_endpoints():
         _base_config(
             application_name="jobsel",
             post_deploy_commands=[("warm", ["python", "manage.py", "warm"])],
+            # A caller's global labels must not be able to put the Job pods back
+            # on the webapp selector.
+            k8s_global_labels={
+                "ol.mit.edu/environment": "qa",
+                "ol.mit.edu/component": "webapp",
+                "ol.mit.edu/process": "webapp",
+            },
         )
     )
     assert app.pre_deploy_job is not None

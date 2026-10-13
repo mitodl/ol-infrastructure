@@ -2343,10 +2343,8 @@ class OLApplicationK8s(ComponentResource):
             # looks healthy. mitxonline lost every granian_* metric this way.
             #
             # Namespace + application + component=webapp is enough to reach the webapp
-            # pods: celery and beat pods carry component=celery. The pre/post-deploy Job
-            # pods do stamp these same labels, but their containers declare no port named
-            # `metrics`, so service discovery yields no target for them -- give a Job
-            # container such a port and it would join this scrape pool.
+            # pods: celery and beat pods carry component=celery, and the pre/post-deploy
+            # Job pods component=deploy-job.
             #
             # Leaving the security group name out also stops a security group replacement
             # from silently breaking the scrape.
