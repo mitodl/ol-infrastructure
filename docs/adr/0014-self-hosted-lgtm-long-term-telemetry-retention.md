@@ -244,8 +244,13 @@ Cloud stack split and keeps a QA mistake from touching production history.
   across 3 AZs. Production Loki at 119 GB/day is past monolithic mode's ~20 GB/day
   guidance, and simple scalable mode is deprecated and removed in Loki 4.0. That
   leaves Loki in **microservices (distributed) mode** at the low end of its sizing.
-  For Mimir and Tempo (under 1M series and ~51 GB/day), pick between monolithic and
-  distributed from each project's guidance when implementation starts.
+  Tempo runs in **monolithic mode**. In Tempo 3.0, microservices mode requires Kafka
+  (or a Kafka-compatible log) between distributors and consumers, and monolithic mode
+  does not. At ~51 GB/day that is not worth taking on. Monolithic runs one replica,
+  not three across zones, so losing the pod loses only traces that have not been
+  flushed to S3 yet. A best-effort archive can accept that. For Mimir (under 1M
+  series), pick monolithic or distributed when implementation starts. The sizing
+  below assumes distributed, which makes it an upper bound.
 - **Storage**: one S3 bucket per backend per environment, with S3 Intelligent-Tiering.
   Retention is enforced by each compactor (`retention_period` /
   `compactor_blocks_retention_period` / `block_retention`), and an S3 lifecycle rule
@@ -373,16 +378,66 @@ writers), and compactor or retention failure. Neither ever pages.
   | Loki storage | $60–220 | 119 GB/day raw, 5–10× compression, 395 days, Intelligent-Tiering vs Standard |
   | Mimir storage | $15–25 | 8.1k samples/s at ~1.5–2 B/sample + index |
   | Tempo storage | $20–40 | 51 GB/day, 90 days |
-  | Compute | $700–1,200 | ~20–30 vCPU / 80–120 GiB total across the three, RF3, on-demand Graviton; less with the Compute Savings Plan |
+  | Compute | $1,050–1,500 | ~33 vCPU / 86–94 GiB of requests, on 9–10 dedicated 4-vCPU / 16 GiB nodes, on-demand (derived below) |
+  | Persistent volumes | ~$45 | ~550 GB gp3 for ingester and live-store WALs, store-gateway and compactor scratch, at $0.08/GB-month |
   | Cross-AZ replication | $150–250 | RF3 on ~5 TB/month ingest |
   | Cross-VPC transport | ≤ $110 | Internal NLB over peering (step 4) |
   | PDC query egress | ≤ $15 | ~$0.135/GB (NAT + internet transfer out) on an assumed ≤ 100 GB/month of query results (step 5) |
-  | **Total** | **~$1,050–1,800** | Option 2 removes roughly $250–400 of this |
+  | **Total** | **~$1,450–2,200** | Option 2 removes roughly $200–300 of this |
 
   S3 request charges are left out, because they are small at this write rate, but
   they should be checked against real bills after the first month. The same goes for
   PDC query egress, measured from the archive VPC's NAT `BytesOutToDestination`,
   since the 100 GB/month assumption is a guess about query habits, not a measurement.
+- **How the compute line is derived.** Each component is sized from its project's
+  published guidance, scaled down to replica floors (one per zone for anything
+  replicated, two for anything stateless) wherever our ingest is far below the
+  guidance's unit:
+
+  | System | Component | Replicas × CPU / memory | vCPU | GiB | Basis |
+  |--------|-----------|-------------------------|------|-----|-------|
+  | Loki | Ingester | 3 × 2 / 4 GiB | 6 | 12 | Loki's smallest tier (< 3 TB/day) uses 6 at this shape. We are at 4% of that tier, so one per zone. |
+  | | Distributor | 2 × 1 / 0.5 GiB | 2 | 1 | Tier uses 4 × 2 vCPU |
+  | | Index gateway | 2 × 0.5 / 2 GiB | 1 | 4 | Tier uses 4 |
+  | | Querier | 4 × 1 / 1 GiB | 4 | 4 | Tier uses 10. Queries are rare, but 13-month ranges are wide, so we keep some parallelism. |
+  | | Query-frontend | 2 × 1 / 2 GiB | 2 | 4 | As tier |
+  | | Query-scheduler | 2 × 0.5 / 0.5 GiB | 1 | 1 | Tier uses 1 vCPU each |
+  | | Compactor | 1 × 2 / 10 GiB | 2 | 10 | As tier (singleton) |
+  | Mimir | Distributor | 2 × 0.5 / 1 GiB | 1 | 2 | 1 core per 25k samples/s. At 8.1k samples/s, two replicas for HA. |
+  | | Ingester | 3 × 1.5 / 5.5 GiB | 4.5 | 16.5 | 416k series × RF3 = 1.25M in-memory series. 1 core and 2.5 GB per 300k, plus the 50% memory headroom Mimir recommends. |
+  | | Querier | 2 × 1 / 1.5 GiB | 2 | 3 | 1 core per 10 queries/s. Far below that, so two for HA. |
+  | | Query-frontend | 2 × 0.5 / 1 GiB | 1 | 2 | 1 core per 250 queries/s |
+  | | Store-gateway | 3 × 0.5 / 1.5 GiB | 1.5 | 4.5 | One per zone. 13 GB disk per 1M series. |
+  | | Compactor | 1 × 1 / 6 GiB | 1 | 6 | 1 core / 4 GB per 20M series, plus 50% headroom. 300 GB disk. |
+  | Tempo | Monolithic | 1 × 4 / 16–24 GiB | 4 | 16–24 | Sum of the per-component minimums at 0.59 MB/s: distributor 2 cores, live-store 1, querier 1, backend worker 0.5. Live-store and querier memory each run 4–20 GB depending on trace shape. |
+  | **Total** | | | **~33** | **86–94** | |
+
+  The PDC agent and any memcached caches add little on top of this. The total
+  ignores them, and also ignores the second tail sampler, which runs in each source
+  cluster rather than in the archive.
+
+  At 2.6–2.8 GiB per vCPU this is memory-heavy for the operations cluster's
+  existing `c8i-flex.xlarge` nodes (4 vCPU / 8 GiB), which would run out of memory
+  at 11–12 nodes while CPU sat idle. The archive therefore gets its own node group of
+  4 GiB-per-vCPU nodes. Nine 4-vCPU / 16 GiB nodes cover the requests exactly. Ten
+  leave about 20% for DaemonSets, kubelet reservations and bin-packing loss. Prices
+  per node-month (730 hours, us-east-1, AWS Price List API, 2026-10-13):
+
+  | Instance | On-demand | 3-yr Compute Savings Plan rate | 9–10 nodes on-demand | 9–10 nodes at SP rate |
+  |----------|-----------|--------------------------------|----------------------|-----------------------|
+  | `m7g.xlarge` (Graviton) | $119 | $51 | $1,070–1,190 | $460–510 |
+  | `m8i-flex.xlarge` (x86, matches the other clusters) | $147 | $63 | $1,320–1,470 | $560–630 |
+
+  The table above uses the on-demand range. Graviton is cheaper, but the cluster has
+  no arm64 node group today, and adding one means checking that the node-group code
+  in `infrastructure/aws/eks/__main__.py` can select an arm64 AMI.
+
+  Our Compute Savings Plans had $5,900–8,800 of commitment unused in every month
+  from April to September 2026 (Cost Explorer). While that slack lasts, the archive
+  would run at the Savings Plan rate inside commitment we already pay for, so the
+  real increase in the bill would be close to zero. We don't budget on it. The slack
+  shrank when a plan expired in September, and other new workloads will draw on it
+  too.
 - The implementation adds a new Pulumi project, a new S3 bucket set per environment,
   new IRSA roles and a PDC token in SOPS.
 
@@ -420,6 +475,10 @@ writers), and compactor or retention failure. Neither ever pages.
 - Loki retention and deletion: https://grafana.com/docs/loki/latest/operations/storage/retention/
 - Mimir sizing: https://grafana.com/docs/mimir/latest/manage/run-production-environment/planning-capacity/
 - Tempo sizing: https://grafana.com/docs/tempo/latest/operations/
+- Loki component sizing tiers: https://grafana.com/docs/loki/latest/setup/size/
+- Tempo component sizing: https://grafana.com/docs/tempo/latest/setup/size/
+- Tempo 3.0 deployment modes (Kafka only in microservices mode): https://grafana.com/docs/tempo/v3.0.x/reference-tempo-architecture/deployment-modes/
+- EC2 on-demand and Compute Savings Plan rates: AWS Price List API (`AmazonEC2`) and `savingsplans describe-savings-plans-offering-rates`, 2026-10-13
 
 ## Notes
 
