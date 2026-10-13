@@ -302,7 +302,7 @@ _SCALED_TO_ZERO_DESCRIPTION = (
     " server refuses to start under it."
     " An armed storage-format migration does too: `kubectl -n omnigraph get"
     " deploy omnigraph-server -o jsonpath='{.metadata.annotations}'` shows"
-    " ol.mit.edu/migration-armed at format 14, and"
+    " ol.mit.edu/migration-armed, and"
     " docs/omnigraph-storage-format-upgrade-runbook.md is the procedure. If a"
     " cutover is in progress this is expected, and can be silenced until it"
     " ends."

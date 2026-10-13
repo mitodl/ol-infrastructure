@@ -115,6 +115,13 @@ window, so it has the same "any degraded boot in the last 6 hours" meaning and
 the same limit 2 as ``WitanGraphQuarantined``. Limits 1 and 3 do not apply:
 there is no baseline to re-learn.
 
+It also resolves 6 hours after the boot while the graph is still blocked,
+because 0.13 does not retry a blocked graph until the next restart and so logs
+nothing more. At storage format 14 the nightly maintenance window restarts the
+server, so a graph that stays blocked fires for about 6 hours after each
+window and then goes quiet. Ongoing impact is WitanToolCallErrorRate's, as it
+is for the rule above.
+
 A LINE FILTER, unlike every other omnigraph rule here, and deliberately. The
 escapes sit around field names and values, not inside the message text, so the
 message is contiguous on the wire. Filtering on it also avoids running
@@ -368,10 +375,13 @@ _GRAPH_BLOCKED_DESCRIPTION = (
     " error."
     " This is an 'any degraded boot in 6 hours' alert, not a current-state one."
     " Check the RUNNING pod before treating it as an active outage:"
-    " `kubectl -n omnigraph exec deploy/omnigraph-server -- curl -s"
-    " localhost:8080/readyz` reports blocked_graph_count. A restart that"
-    " already recovered keeps this firing until the degraded boot ages out of"
-    " the window."
+    " `kubectl -n omnigraph port-forward deploy/omnigraph-server 8080` and then"
+    " `curl -s localhost:8080/readyz` reports blocked_graph_count (the image"
+    " has no curl to exec). A restart that already recovered keeps this firing"
+    " until the degraded boot ages out of the window."
+    " The reverse also holds: a graph that stays blocked is not retried until"
+    " the next restart, and this alert RESOLVES 6 hours after the boot anyway."
+    " Resolved does not mean recovered. Read blocked_graph_count."
 )
 
 
