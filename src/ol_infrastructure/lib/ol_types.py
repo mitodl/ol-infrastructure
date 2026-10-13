@@ -331,11 +331,12 @@ class K8sGlobalLabels(BaseModel):
         For a stack whose workloads share one label model but not one role. The
         result belongs on a pod template, never in a `spec.selector` or a
         `volumeClaimTemplate`: both are immutable, so a label added there
-        replaces the workload instead of rolling it.
+        replaces a Pulumi-managed workload and fails the upgrade of a Helm one.
 
         :param alert_tier: How far an alert about the workload may escalate.
         :param component: Its functional role. Omit it for a label key that
-            reaches workloads which do not share one.
+            reaches workloads which do not share one, and the model's own
+            component, if it has one, is kept.
         :returns: The label dict, keyed by `ol.mit.edu/<field>`.
         :rtype: dict[str, str]
         """

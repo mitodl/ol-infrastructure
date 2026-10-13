@@ -714,8 +714,8 @@ both stacks.
 
 #### 3.3.6 [2026-10-13] Five data-platform charts, and a subchart that puts pod labels in a volume claim
 
-Airbyte, Superset, Gravitino, OpenMetadata and Opik had 27 untiered pods on
-`data-production` on 2026-10-13. The first four already passed the stack's labels to
+Airbyte, Superset, Gravitino, OpenMetadata and Opik had 25 to 27 untiered pods on
+`data-production` on 2026-10-13 (the count moves with Job pods). The first four already passed the stack's labels to
 the chart, so their pods carried `service` and no `component` or `alert_tier`. Opik
 passed nothing. Keys verified by rendering each chart at its pinned version with a
 sentinel and checking every `spec.selector` and `volumeClaimTemplates`:
@@ -745,6 +745,7 @@ Three things the render showed.
 3. **Pods the chart does not render stay unlabeled.** The OMJob operator's pod
    template takes no labels, and the ingestion pods it launches (owner kind `OMJob`)
    and the sync pods Airbyte's workload launcher creates are built at runtime.
+   Airbyte's bootloader is a bare Pod and keeps the stack labels without a tier.
 
 The Gravitino posture and reconcile CronJobs and the schema Job are not tiered here:
 §3.5 counts Deployments, StatefulSets and DaemonSets.
