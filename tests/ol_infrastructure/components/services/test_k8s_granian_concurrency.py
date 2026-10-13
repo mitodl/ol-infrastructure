@@ -1,8 +1,9 @@
 """Tests for GranianConfig concurrency resolution.
 
 Covers the blocking_threads/backpressure resolution matrix (wsgi/asgi x
-None/explicit), the CLI defaults that track Granian's own, and the synth-time
-workers_max_rss derivation from the container memory limit.
+None/explicit), the CLI defaults that track Granian's own, the synth-time
+workers_max_rss derivation from the container memory limit, and the reload
+flags used on development clusters.
 """
 
 from __future__ import annotations
@@ -214,3 +215,41 @@ def test_respawn_interval_omitted_by_default():
 def test_respawn_interval_emitted():
     args = GranianConfig(respawn_interval=60).build_args()
     assert arg_value(args, "--respawn-interval") == "60.0"
+
+
+def test_reload_flags_omitted_by_default():
+    args = GranianConfig().build_args()
+
+    assert "--reload" not in args
+    assert "--reload-ignore-dirs" not in args
+    assert "--workers-kill-timeout" not in args
+
+
+def test_reload_flags_emitted_before_the_application_module():
+    args = GranianConfig(
+        reload=True,
+        reload_ignore_dirs=["frontend", "staticfiles"],
+        workers_kill_timeout=1,
+    ).build_args()
+
+    assert arg_value(args, "--workers-kill-timeout") == "1"
+    assert args[-8:] == [
+        "--reload",
+        "--reload-ignore-dirs",
+        "frontend",
+        "--reload-ignore-dirs",
+        "staticfiles",
+        "--log-level",
+        "warning",
+        "main.wsgi:application",
+    ]
+
+
+def test_reload_ignore_dirs_rejected_without_reload():
+    with pytest.raises(ValidationError, match="reload is False"):
+        GranianConfig(reload_ignore_dirs=["frontend"])
+
+
+def test_workers_kill_timeout_rejects_more_than_granian_accepts():
+    with pytest.raises(ValidationError):
+        GranianConfig(workers_kill_timeout=1801)

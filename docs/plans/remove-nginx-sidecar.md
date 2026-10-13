@@ -375,6 +375,10 @@ neither app overrides. So `web.conf_granian` (the file this stage's
 production; `web.conf_uwsgi` stays, since it's still the config the dormant
 `False` branch would load.
 
+Since then mitxonline has dropped the `use_granian` flag, the
+`import_nginx_config_path` argument and its `files/web.conf_uwsgi`, because no
+stack ran the `False` branch. The paragraph above still describes mit_learn.
+
 - **mit_learn**: `GranianConfig` gains `static_path_mounts=["/src/staticfiles"]`
   and `static_path_expires`. (As merged this was a two-mount config paired with
   `static_path_routes=["/static", "/media"]`; the `/media` pair was reverted

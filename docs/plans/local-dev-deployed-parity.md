@@ -162,28 +162,48 @@ route definitions. A local program cannot import any of it without AWS and
 Vault providers.
 
 Each application gets a definition module holding what is true in every
-environment, and takes the rest as an argument:
+environment, and takes the rest as an argument. mitxonline is the first
+(`src/ol_infrastructure/applications/mitxonline/definition.py`):
 
 ```python
-# src/ol_infrastructure/applications/mitxonline/definition.py
 class MitxonlineBindings(BaseModel):
-    hostnames: ...  # public hosts and cookie domain
-    database: ...  # host, name, credential source
-    cache: ...  # host, TLS, credential source
-    object_storage: ...  # bucket, endpoint, credential source
-    keycloak: ...  # base URL, realm, client
+    env_suffix: str  # names session cookies per environment
+    hostnames: MitxonlineHostnames  # api, frontend, learn_api
+    environment_variables: dict[str, Any]  # this environment's values
+    k8s_labels: dict[str, str]
     secret_names: list[str]  # Secrets mounted with envFrom
     cluster: ClusterCapabilities
+    celery_topology: Literal["per-queue", "merged"] = "per-queue"
+    granian_reload: bool = False
+    ...  # image, replicas, memory limit, dev shell, KEDA, celery Redis
 
 
-def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig: ...
-def routes(bindings: MitxonlineBindings) -> list[OLApisixRouteConfig]: ...
+def application_config(bindings) -> OLApplicationK8sConfig: ...
+def direct_oidc_config(bindings) -> OLApisixOIDCConfig: ...
+def prefixed_oidc_config(bindings) -> OLApisixOIDCConfig: ...
+def shared_plugins(bindings) -> list[OLApisixPluginConfig]: ...
+def direct_route_configs(bindings, oidc, shared_plugin_config_name): ...
+def prefixed_route_configs(bindings, oidc, shared_plugin_config_name): ...
 ```
 
 The deployed `__main__.py` builds bindings from the AWS resources it creates.
 A local program builds them from the local platform. Environment-invariant
-settings (the 37 duplicated mit-learn values, celery queue names, probe paths,
-Granian settings, route rules and priorities) exist once.
+settings (the 24 shared variables, celery queue names and sizes, Granian
+settings, route rules and priorities, OIDC session settings) exist once.
+
+The bindings are narrower than first sketched. Database, cache, object
+storage and Keycloak reach the application as environment variables and
+Secrets, not as structured fields: the deployed stacks already carry those
+values in `mitxonline:vars` and in VSO-rendered Secrets, and the definition
+computes nothing from them. Only values the definition derives something from
+are structured (hostnames, `env_suffix`). The one variable the routes read,
+`OPENEDX_API_BASE_URL` for the `frame-ancestors` header, is looked up in the
+merged environment and raises if a program's bindings omit it.
+
+The OIDC config functions still require `cluster.vault_auth_name`, because
+`OLApisixOIDCResources` reads its client credentials through Vault. That goes
+away with the secrets work below, and is what stops a local program from
+creating the routes today.
 
 `ClusterCapabilities` carries what the component needs to know about the
 cluster it renders for. The component change on this branch adds the knobs:
@@ -206,10 +226,13 @@ ID at module level. Those are now created on first use
 (`lib/aws/eks_helper.py`, `lib/aws/ec2_helper.py`, `lib/aws/aws_helper.py`),
 so a machine with no AWS configuration can load and render the component.
 
-Still missing from the component for local use, to be added as they are needed:
+`GranianConfig` has `reload`, `reload_ignore_dirs` and `workers_kill_timeout`
+for the development loop. Granian turns off its RSS monitor and metrics
+exporter while the reloader runs, so a local pod with `granian_reload` set
+exposes the metrics port and serves nothing on it.
 
-- Granian `--reload`, `--reload-ignore-dirs` and `--workers-kill-timeout`.
-  `GranianConfig` has no field for them.
+Still missing for local use:
+
 - Per-developer env overrides. The component writes inline `env`, and a
   ConfigMap mounted with `envFrom` cannot override inline `env`. The local
   program merges the developer's override file into the dict before handing it
@@ -414,6 +437,20 @@ ol_analytics_api, xpro, xqueue), plus `infrastructure/aws/eks` and
 Names that Pulumi generates are masked in the comparison. Four xqueue stacks
 have never been applied and their HPA has no explicit name, so its random
 suffix differs between any two previews, including two from `main`.
+
+The comparison is now a command, `bin/pulumi-preview-diff <project dir>
+--all-stacks`, which checks the baseline ref out to a temporary worktree and
+reports `IDENTICAL`, or the URNs and keys that differ.
+
+Result for the mitxonline definition split on 2026-10-07, against `main` at
+91289186c: CI, QA and Production plan identical steps. A deliberate change of
+`blocking_threads` from 16 to 17 was reported as a difference in the webapp
+Deployment's args, so the comparison does see the rendered config.
+
+Secret inputs are outside that result: `pulumi preview --json` prints them as
+`[secret]`, so the comparison cannot tell two secret values apart. The Redis
+password is the one secret that passes through the definition
+(`celery_redis`), and it is handed on unchanged.
 
 Local behaviour is covered by `test_k8s_local_cluster.py` and
 `test_k8s_without_aws.py` in `tests/ol_infrastructure/components/services/`. It
