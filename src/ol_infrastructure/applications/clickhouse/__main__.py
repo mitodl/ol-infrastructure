@@ -114,6 +114,19 @@ CLICKHOUSE_NAMESPACE = "clickhouse"
 # too -- followed by an apply. Each switch recreates the StatefulSets, so every
 # replica restarts once.
 EBS_GP3_IOPS_3000_VAC = "ebs-gp3-iops-3000"
+# The data volumes cannot be created under ebs-gp3-sc while they also name the
+# class above. At CreateVolume the EBS CSI driver overlays the class's `iops`
+# on the StorageClass parameters, keeps the StorageClass's `iopsPerGB`, and then
+# refuses the pair: `invalid StorageClass parameters; specify either IOPS or
+# IOPSPerGb, not both` (v1.66.0 pkg/driver/controller.go, pkg/cloud/cloud.go
+# CreateDisk; unchanged on master). The volumes that existed when the class was
+# added were unaffected because ModifyVolume never reads the StorageClass, so
+# this only shows when a replica is added or a volume is replaced: data-qa's
+# second replica sat Pending from 2026-10-01. This StorageClass is ebs-gp3-sc
+# with `iops: 3000` in place of the ratio, declared in infrastructure/aws/eks.
+# Existing PVCs keep ebs-gp3-sc (the field is immutable and the operator does
+# not reconcile it); only PVCs created from here on use this one.
+EBS_GP3_IOPS_3000_STORAGE_CLASS = "ebs-gp3-iops-3000-sc"
 # ClickHouse's conventional Prometheus port, used for both server and Keeper.
 CLICKHOUSE_METRICS_PORT = 9363
 
@@ -125,6 +138,9 @@ cluster_stack.require_output("namespaces").apply(
 hot_data_days = int(clickhouse_config.get("hot_data_days") or "7")
 hot_storage_size = clickhouse_config.get("hot_storage_size") or "100Gi"
 storage_class = stateful_workload_storage["storage_class"]
+data_storage_class = (
+    EBS_GP3_IOPS_3000_STORAGE_CLASS if storage_class == "ebs-gp3-sc" else storage_class
+)
 data_volume_attributes_class = (
     clickhouse_config.get("data_volume_attributes_class") or EBS_GP3_IOPS_3000_VAC
 )
@@ -822,7 +838,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                                     {
                                         "volumeAttributesClassName": data_volume_attributes_class
                                     }
-                                    if storage_class == "ebs-gp3-sc"
+                                    if storage_class == EBS_GP3_IOPS_3000_STORAGE_CLASS
                                     else {}
                                 ),
                                 "resources": {
@@ -1100,7 +1116,7 @@ clickhouse_installation = _create_clickhouse_installation(
     resources=ch_resources,
     ch_image=ch_image,
     use_io_optimized=use_io_optimized_nodes,
-    storage_class=storage_class,
+    storage_class=data_storage_class,
     data_volume_attributes_class=data_volume_attributes_class,
     hot_storage_size=hot_storage_size,
     cold_bucket_name=cold_bucket.bucket_v2.bucket,
