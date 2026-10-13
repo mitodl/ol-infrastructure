@@ -181,8 +181,8 @@ validate_internal_schema_version(STORAGE_PREFIX, INTERNAL_SCHEMA_VERSION)
 # next restart. The entrypoint refuses that apply unless the graph is listed
 # here. Set it in the same change that removes the graph and clear it
 # afterwards: data_tier refuses an entry for a graph that is still declared.
-GRAPH_REMOVAL_ALLOWLIST: list[str] = (
-    omnigraph_config.get_object("graph_removal_allowlist") or []
+GRAPH_REMOVAL_ALLOWLIST: list[str] = omnigraph_config.get_object(
+    "graph_removal_allowlist", []
 )
 
 # The image to migrate FROM — the one currently deployed, whose binary can

@@ -445,7 +445,8 @@ def create_data_tier(  # noqa: PLR0913
     # it, rather than replacing the whole directory.
     cluster_graphs = build_cluster_graphs(managed_repos)
     removable_graphs = validate_graph_removal_allowlist(
-        graph_removal_allowlist or [], list(cluster_graphs)
+        [] if graph_removal_allowlist is None else graph_removal_allowlist,
+        list(cluster_graphs),
     )
     # Whether the served format is 0.12+'s, where every writer keeps the
     # root's exclusive lock after it exits. Keyed on the served format rather

@@ -59,10 +59,15 @@ def test_an_allowlisted_graph_that_is_still_declared_is_refused() -> None:
         )
 
 
-def test_an_allowlist_that_is_not_a_list_is_refused() -> None:
-    """`pulumi config set` without `--path` stores a bare string."""
+@pytest.mark.parametrize("malformed", ["code-a", "", {}, 0, False, [1]])
+def test_an_allowlist_that_is_not_a_list_of_ids_is_refused(malformed: object) -> None:
+    """`pulumi config set` without `--path` stores a bare string.
+
+    The falsey values are here because the callers default only a missing
+    key, so these reach the check rather than reading as an empty list.
+    """
     with pytest.raises(ValueError, match="must be a list"):
-        validate_graph_removal_allowlist("code-a", ["council"])
+        validate_graph_removal_allowlist(malformed, ["council"])
 
 
 def test_an_allowlisted_graph_that_is_no_longer_declared_passes() -> None:
