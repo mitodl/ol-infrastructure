@@ -122,10 +122,12 @@ EBS_GP3_IOPS_3000_VAC = "ebs-gp3-iops-3000"
 # CreateDisk; unchanged on master). The volumes that existed when the class was
 # added were unaffected because ModifyVolume never reads the StorageClass, so
 # this only shows when a replica is added or a volume is replaced: data-qa's
-# second replica sat Pending from 2026-10-01. This StorageClass is ebs-gp3-sc
+# second replica sat Pending from 2026-09-30. This StorageClass is ebs-gp3-sc
 # with `iops: 3000` in place of the ratio, declared in infrastructure/aws/eks.
 # Existing PVCs keep ebs-gp3-sc (the field is immutable and the operator does
-# not reconcile it); only PVCs created from here on use this one.
+# not reconcile it); only PVCs created from here on use this one. That includes
+# a PVC stuck Pending on the old class: delete it and its pod by hand so the
+# StatefulSet recreates both.
 EBS_GP3_IOPS_3000_STORAGE_CLASS = "ebs-gp3-iops-3000-sc"
 # ClickHouse's conventional Prometheus port, used for both server and Keeper.
 CLICKHOUSE_METRICS_PORT = 9363
@@ -827,10 +829,11 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                             "spec": {
                                 "accessModes": ["ReadWriteOnce"],
                                 "storageClassName": storage_class,
-                                # ebs-gp3-sc derives IOPS from size (iopsPerGB), which
-                                # gave the 1500Gi production volumes 75,000 IOPS each
-                                # against a one-second peak under 2,000 ops/s. The class
-                                # pins them to gp3's free 3,000. The operator applies a
+                                # The existing volumes were created under ebs-gp3-sc,
+                                # which derives IOPS from size (iopsPerGB) and gave the
+                                # 1500Gi production volumes 75,000 IOPS each against a
+                                # one-second peak under 2,000 ops/s. The class pins
+                                # them to gp3's free 3,000. The operator applies a
                                 # template VAC to existing PVCs on reconcile (0.26.0
                                 # storage-reconciler.go reconcileVolumeAttributeClass),
                                 # and the CSI driver modifies the EBS volume online.
