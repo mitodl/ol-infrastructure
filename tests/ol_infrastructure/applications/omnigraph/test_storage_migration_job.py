@@ -99,8 +99,10 @@ def test_the_armed_job_can_check_and_snapshot_before_migrating():
             ),
         ),
         maintenance=OmnigraphMaintenance(
-            optimize=_cron_job("omnigraph-optimize"),
-            cleanup=_cron_job("omnigraph-cleanup"),
+            cron_jobs=[
+                _cron_job("omnigraph-optimize"),
+                _cron_job("omnigraph-cleanup"),
+            ]
         ),
     )
 

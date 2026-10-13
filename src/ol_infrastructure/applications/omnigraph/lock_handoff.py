@@ -25,6 +25,7 @@ imported, and so tested, without ``pulumi_aws``.
 from typing import NamedTuple
 
 import pulumi_kubernetes as kubernetes
+from pulumi import Output, Resource, ResourceOptions
 
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -37,6 +38,14 @@ PERSISTED_LOCK_MIN_FORMAT = 14
 
 UNLOCK_LEASE_NAME = "omnigraph-unlock"
 LOCK_HANDOFF_ROLE_NAME = "omnigraph-server-lock-handoff"
+
+# Set on the server Deployment while a storage-format migration is armed. The
+# maintenance window (agent-kit `docker/omnigraph_maintenance.py`) skips its
+# run when it sees it and does not scale the server back up if it appears
+# mid-window. Arming sets `replicas: 0` in the same update, and nothing
+# reconciles the count afterwards, so without the marker a window that had
+# already scaled the server down would restore it under an armed migration.
+MIGRATION_ARMED_ANNOTATION = "ol.mit.edu/migration-armed"
 
 
 def uses_persisted_lock(internal_schema_version: int | None) -> bool:
@@ -86,6 +95,29 @@ def validate_graph_removal_allowlist(
         )
         raise ValueError(msg)
     return allowlist
+
+
+def pod_selector_env(pod_selector: dict[str, str]) -> str:
+    """Render ``matchLabels`` as the label selector string the image reads."""
+    return ",".join(f"{key}={value}" for key, value in sorted(pod_selector.items()))
+
+
+def plan_env(
+    apply_actor: str, graph_removal_allowlist: list[str]
+) -> list[kubernetes.core.v1.EnvVarArgs]:
+    """Env for the image's plan check, shared by the entrypoint and the gate.
+
+    :param apply_actor: passed as ``--as`` to plan and apply. Required whenever
+        policy bundles are in the image.
+    :param graph_removal_allowlist: graph ids the plan may delete.
+    """
+    return [
+        kubernetes.core.v1.EnvVarArgs(name="OMNIGRAPH_APPLY_ACTOR", value=apply_actor),
+        kubernetes.core.v1.EnvVarArgs(
+            name="OMNIGRAPH_GRAPH_REMOVAL_ALLOWLIST",
+            value=",".join(graph_removal_allowlist),
+        ),
+    ]
 
 
 class OmnigraphLockHandoff(NamedTuple):
@@ -175,10 +207,7 @@ def create_lock_handoff(  # noqa: PLR0913
             name="OMNIGRAPH_UNLOCK_LEASE", value=UNLOCK_LEASE_NAME
         ),
         kubernetes.core.v1.EnvVarArgs(
-            name="OMNIGRAPH_POD_SELECTOR",
-            value=",".join(
-                f"{key}={value}" for key, value in sorted(pod_selector.items())
-            ),
+            name="OMNIGRAPH_POD_SELECTOR", value=pod_selector_env(pod_selector)
         ),
         kubernetes.core.v1.EnvVarArgs(
             name="POD_NAME",
@@ -188,10 +217,130 @@ def create_lock_handoff(  # noqa: PLR0913
                 )
             ),
         ),
-        kubernetes.core.v1.EnvVarArgs(name="OMNIGRAPH_APPLY_ACTOR", value=apply_actor),
-        kubernetes.core.v1.EnvVarArgs(
-            name="OMNIGRAPH_GRAPH_REMOVAL_ALLOWLIST",
-            value=",".join(graph_removal_allowlist),
-        ),
+        *plan_env(apply_actor, graph_removal_allowlist),
     ]
     return OmnigraphLockHandoff(lease=lease, role_binding=role_binding, env=env)
+
+
+def create_plan_gate(  # noqa: PLR0913
+    stack_info: StackInfo,
+    namespace: str,
+    k8s_global_labels: dict[str, str],
+    image: str | Output[str],
+    aws_region: str,
+    service_account_name: str,
+    cluster_configmap_name: str,
+    cluster_config_dir: str,
+    actor_tokens_secret_name: str,
+    actor_tokens_file: str,
+    apply_actor: str,
+    graph_removal_allowlist: list[str],
+    config_hash: Output[str],
+    depends_on: list[Resource],
+) -> kubernetes.batch.v1.Job:
+    """Provision the read-only pre-deploy plan gate.
+
+    The entrypoint applies schema and policy changes on boot, after
+    ``Recreate`` has stopped the old pod, so a change the apply refuses would
+    be found by a pod that cannot start. This Job runs the image's own plan
+    check (agent-kit ``docker/omnigraph_plan_gate.py``) against the served
+    root first. The Deployment depends on it, so the same refusal fails the
+    update while the old pod is still serving.
+
+    `cluster plan` takes no writer lock, so this is not a second writer
+    beside the running server, and it needs no Kubernetes access.
+
+    It does not replace the entrypoint's check. The ``cluster.yaml`` ConfigMap
+    is updated before this Job runs and a failed Job does not roll it back, so
+    the next restart for any reason plans the same configuration again.
+
+    :param actor_tokens_file: path of the actor-token map inside the mounted
+        Secret. Group membership is rendered from it before planning, as on
+        boot, so the plan is for the bundles the server would apply.
+    :param config_hash: of ``cluster.yaml`` and the image. A Job's pod template
+        is immutable, so a new hash replaces the Job, which is what makes it
+        run again.
+    """
+    tokens_dir = actor_tokens_file.rpartition("/")[0]
+    return kubernetes.batch.v1.Job(
+        f"omnigraph-plan-gate-{stack_info.env_suffix}",
+        # Unnamed, so the replacement is created before the old Job is removed.
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        spec=kubernetes.batch.v1.JobSpecArgs(
+            # Planning is read-only, so a retry is free and rides out a
+            # transient S3 or IRSA-credential failure.
+            backoff_limit=2,
+            ttl_seconds_after_finished=86400,
+            template=kubernetes.core.v1.PodTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                    labels={
+                        **k8s_global_labels,
+                        "app.kubernetes.io/name": "omnigraph-plan-gate",
+                    },
+                    annotations={"ol.mit.edu/config-hash": config_hash},
+                ),
+                spec=kubernetes.core.v1.PodSpecArgs(
+                    restart_policy="Never",
+                    # The server's IRSA identity, for read access to the
+                    # root it plans against.
+                    service_account_name=service_account_name,
+                    containers=[
+                        kubernetes.core.v1.ContainerArgs(
+                            name="plan-gate",
+                            image=image,
+                            command=["/usr/local/bin/omnigraph_plan_gate.py"],
+                            env=[
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="AWS_REGION", value=aws_region
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OMNIGRAPH_CLUSTER_DIR",
+                                    value=cluster_config_dir,
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OMNIGRAPH_SERVER_BEARER_TOKENS_FILE",
+                                    value=actor_tokens_file,
+                                ),
+                                *plan_env(apply_actor, graph_removal_allowlist),
+                            ],
+                            resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                requests={"cpu": "100m", "memory": "256Mi"},
+                                limits={"cpu": "1", "memory": "1Gi"},
+                            ),
+                            volume_mounts=[
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="cluster-config",
+                                    mount_path=f"{cluster_config_dir}/cluster.yaml",
+                                    sub_path="cluster.yaml",
+                                    read_only=True,
+                                ),
+                                kubernetes.core.v1.VolumeMountArgs(
+                                    name="actor-tokens",
+                                    mount_path=tokens_dir,
+                                    read_only=True,
+                                ),
+                            ],
+                        )
+                    ],
+                    volumes=[
+                        kubernetes.core.v1.VolumeArgs(
+                            name="cluster-config",
+                            config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                                name=cluster_configmap_name,
+                            ),
+                        ),
+                        kubernetes.core.v1.VolumeArgs(
+                            name="actor-tokens",
+                            secret=kubernetes.core.v1.SecretVolumeSourceArgs(
+                                secret_name=actor_tokens_secret_name,
+                            ),
+                        ),
+                    ],
+                ),
+            ),
+        ),
+        opts=ResourceOptions(depends_on=depends_on),
+    )

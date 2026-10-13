@@ -26,7 +26,7 @@ script needs.
 
 A second initContainer snapshots the old root's ``__cluster`` ledger into the
 bucket's ``backups/`` prefix, and the script's pre-flight waits on the server
-and on all four writer CronJobs, two of which the witan stack owns. Hence the
+and on every writer CronJob, two of which the witan stack owns. Hence the
 read-only Roles in both namespaces.
 
 WHAT IT WILL NOT DO. It does not repoint the live cluster. That is
@@ -202,7 +202,9 @@ def create_storage_migration(  # noqa: PLR0913
     ``omnigraph:storage_prefix`` at cutover; it names the Job so
     ``kubectl get jobs`` says which rebuild this was.
 
-    ``maintenance`` is the pair of sweeps to order this Job behind. They write
+    ``maintenance`` is this stack's maintenance CronJobs (the optimize and
+    cleanup sweeps, or from format 14 the one stop window) to order this Job
+    behind. They write
     directly to the store, so a tick between the export and the verification
     mutates a root the migration has declared frozen — and Pulumi would
     otherwise be free to create the Job in parallel with the updates that
@@ -219,7 +221,7 @@ def create_storage_migration(  # noqa: PLR0913
     zero replicas and no live pod.
 
     ``witan_namespace`` and ``witan_writer_cronjobs`` name the two writers this
-    stack does not own. Together with ``maintenance`` they are the four
+    stack does not own. Together with ``maintenance`` they are the writer
     CronJobs the Job's pre-flight waits on (suspended, nothing active) before it
     takes a baseline, which is why it gets read access to Jobs and CronJobs in
     both namespaces, and to the Deployment and pods in its own, for as long as
@@ -240,9 +242,7 @@ def create_storage_migration(  # noqa: PLR0913
         opts=opts,
     )
 
-    own_writers = (
-        [maintenance.optimize, maintenance.cleanup] if maintenance is not None else []
-    )
+    own_writers = maintenance.cron_jobs if maintenance is not None else []
     writers = [
         *(Output.concat(namespace, "/", cj.metadata.name) for cj in own_writers),
         *(f"{witan_namespace}/{name}" for name in witan_writer_cronjobs),

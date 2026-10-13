@@ -61,6 +61,7 @@ from ol_infrastructure.applications.omnigraph.cluster_config import (
 )
 from ol_infrastructure.applications.omnigraph.council_probe import (
     DEFAULT_PROBE_SCHEDULE,
+    MAINTENANCE_WINDOW_PROBE_SCHEDULE,
     create_council_probe,
 )
 from ol_infrastructure.applications.omnigraph.data_tier import (
@@ -71,10 +72,16 @@ from ol_infrastructure.applications.omnigraph.data_tier import (
     create_data_tier,
     omnigraph_server_addr,
 )
+from ol_infrastructure.applications.omnigraph.lock_handoff import (
+    uses_persisted_lock,
+)
 from ol_infrastructure.applications.omnigraph.maintenance import (
+    DEFAULT_CLEANUP_ISO_WEEKDAY,
     DEFAULT_CLEANUP_OLDER_THAN,
     DEFAULT_CLEANUP_SCHEDULE,
+    DEFAULT_MAINTENANCE_SCHEDULE,
     DEFAULT_OPTIMIZE_SCHEDULE,
+    MAINTENANCE_SERVICE_ACCOUNT_NAME,
 )
 from ol_infrastructure.applications.omnigraph.storage import (
     validate_internal_schema_version,
@@ -315,8 +322,38 @@ OPTIMIZE_SCHEDULE = (
     omnigraph_config.get("optimize_schedule") or DEFAULT_OPTIMIZE_SCHEDULE
 )
 CLEANUP_SCHEDULE = omnigraph_config.get("cleanup_schedule") or DEFAULT_CLEANUP_SCHEDULE
-COUNCIL_PROBE_SCHEDULE = (
-    omnigraph_config.get("council_probe_schedule") or DEFAULT_PROBE_SCHEDULE
+# From format 14 the optimize and cleanup sweeps are one nightly stop window
+# (maintenance.create_maintenance_window), and the two schedules above are
+# unused. The probe skips the window's hour there.
+MAINTENANCE_SCHEDULE = (
+    omnigraph_config.get("maintenance_schedule") or DEFAULT_MAINTENANCE_SCHEDULE
+)
+CLEANUP_ISO_WEEKDAY = (
+    omnigraph_config.get_int("cleanup_iso_weekday") or DEFAULT_CLEANUP_ISO_WEEKDAY
+)
+if not 1 <= CLEANUP_ISO_WEEKDAY <= 7:  # noqa: PLR2004
+    msg = (
+        "omnigraph:cleanup_iso_weekday must be 1 (Monday) to 7 (Sunday), got "
+        f"{CLEANUP_ISO_WEEKDAY}"
+    )
+    raise ValueError(msg)
+if (
+    uses_persisted_lock(INTERNAL_SCHEMA_VERSION)
+    and omnigraph_config.get("maintenance_schedule")
+    and not omnigraph_config.get("council_probe_schedule")
+):
+    # The probe's default skips the default window's hour. A moved window
+    # would otherwise fail the probe every night in its new hour.
+    msg = (
+        "omnigraph:maintenance_schedule is set without "
+        "omnigraph:council_probe_schedule. The council probe has to skip the "
+        "hour the data tier is stopped for maintenance; set both."
+    )
+    raise ValueError(msg)
+COUNCIL_PROBE_SCHEDULE = omnigraph_config.get("council_probe_schedule") or (
+    MAINTENANCE_WINDOW_PROBE_SCHEDULE
+    if uses_persisted_lock(INTERNAL_SCHEMA_VERSION)
+    else DEFAULT_PROBE_SCHEDULE
 )
 CLEANUP_OLDER_THAN = (
     omnigraph_config.get("cleanup_older_than") or DEFAULT_CLEANUP_OLDER_THAN
@@ -885,7 +922,13 @@ omnigraph_auth_binding = OLEKSAuthBinding(
         cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
-        irsa_service_account_name="omnigraph-server",
+        # The maintenance window needs the server's S3 access and is a
+        # separate ServiceAccount for its Kubernetes access: it may scale the
+        # server Deployment, which the server itself must not (maintenance.py).
+        irsa_service_account_name=[
+            "omnigraph-server",
+            MAINTENANCE_SERVICE_ACCOUNT_NAME,
+        ],
         create_irsa_service_account=True,
         # Must match the ServiceAccount OLVaultK8SResources creates for the VSO
         # to authenticate with, which is always f"{application_name}-vault".
@@ -1040,7 +1083,9 @@ data_tier = create_data_tier(
     per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist=GRAPH_REMOVAL_ALLOWLIST,
-    # Arming a migration suspends both maintenance sweeps for its duration.
+    maintenance_schedule=MAINTENANCE_SCHEDULE,
+    cleanup_iso_weekday=CLEANUP_ISO_WEEKDAY,
+    # Arming a migration suspends the maintenance CronJobs for its duration.
     # They write directly to the store, so scaling the Deployment to zero does
     # not stop them, and `optimize` rewriting fragments between the export and
     # the verification is a write to a root the migration needs frozen. Tied to

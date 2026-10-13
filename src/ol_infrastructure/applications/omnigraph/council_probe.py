@@ -56,6 +56,16 @@ SCRIPT_FILENAME = "check_council_health.py"
 # rule long before a single missed run would be.
 DEFAULT_PROBE_SCHEDULE = "*/15 * * * *"
 
+# On a format whose writers keep the cluster lock (14 and later) the data tier
+# is stopped nightly for maintenance (maintenance.py, 03:20 UTC by default),
+# and the 03:30 and 03:45 runs would fail every night. This pod carries no
+# Kubernetes credential to read a window marker with, so the schedule skips
+# the hour instead. The 04:00 run stays, as the check that the window ended:
+# a window that left the server down fails it. Moving
+# `omnigraph:maintenance_schedule` out of this hour means setting
+# `omnigraph:council_probe_schedule` to match.
+MAINTENANCE_WINDOW_PROBE_SCHEDULE = "*/15 0-2,4-23 * * *"
+
 # The deadline is DERIVED from the script's own query list and client
 # timeout, and is imported rather than restated here so the two cannot drift
 # — see PROBE_ACTIVE_DEADLINE_SECONDS in check_council_health.py for the

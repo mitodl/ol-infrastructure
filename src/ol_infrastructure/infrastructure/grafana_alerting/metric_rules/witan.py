@@ -161,7 +161,14 @@ _DAILY_STALE_SECONDS = 129600
 # namespaces. Validate a new entry against its `schedule` label on
 # kube_cronjob_info before adding it, the same discipline eks_general.py's
 # bucket membership asks for.
-_DAILY_MAINTENANCE_CRONJOBS = "omnigraph-optimize|witan-view-reaper"
+#
+# `omnigraph-maintenance` replaces `omnigraph-optimize` (and the weekly
+# `omnigraph-cleanup`) once an environment serves storage format 14, on the
+# same `20 3 * * *` schedule. It does not exist anywhere yet, so its series
+# is unvalidated and matches nothing until the first cutover.
+_DAILY_MAINTENANCE_CRONJOBS = (
+    "omnigraph-optimize|omnigraph-maintenance|witan-view-reaper"
+)
 
 # Longer than the longest cadence in these namespaces (weekly), so a newly
 # created CronJob is not reported before it could plausibly have succeeded.

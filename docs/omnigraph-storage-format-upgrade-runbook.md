@@ -118,8 +118,9 @@ number → continue.
 
   **You do not need to check for running writer Jobs by hand.** The migration
   Job's pre-flight does it before taking a baseline: it waits, for up to 30
-  minutes, until all four writer CronJobs (`omnigraph-optimize`,
-  `omnigraph-cleanup`, `witan-ci-indexer`, `witan-view-reaper`) show
+  minutes, until every writer CronJob (`omnigraph-optimize` and
+  `omnigraph-cleanup`, or `omnigraph-maintenance` on an environment already at
+  format 14, plus `witan-ci-indexer` and `witan-view-reaper`) show
   `suspend: true` and none owns a Job that lacks a `Complete` or `Failed`
   condition. `suspend` stops the next schedule, not a run already in progress,
   which is why both conditions are checked. A Job counts as running until it
@@ -854,9 +855,9 @@ own success output prints all four commands as one block for exactly this
 reason. Clearing `migrate_from_image` also un-suspends the `optimize` and
 `cleanup` CronJobs in this same `pulumi up`, earlier than step 7 describes
 below — safe, since suspension was never gated on step 6's verification,
-only on `migrate_from_image` being set. That holds up to format 9. From
-`internal_schema_version` 14 both stay suspended after the cutover, by design:
-see step 7.
+only on `migrate_from_image` being set. That holds up to format 9. Setting
+`internal_schema_version` to 14 deletes both and creates the
+`omnigraph-maintenance` stop window in their place: see step 7.
 
 (The manual procedure never sets these two knobs at all, so this step does
 not apply if you did not take the automated path — `pulumi config rm` on an
@@ -999,15 +1000,14 @@ with nothing pointing back at the migration that caused either. If you
 suspended by hand instead, un-patch by hand.
 
 **From `internal_schema_version` 14, `omnigraph-optimize` and
-`omnigraph-cleanup` stay suspended and must read `True`.** Do not un-suspend
-them, by hand or otherwise. Both write directly to the store. Beside a serving
-0.12+ server every run is refused with `state_lock_held`, and a run that
-starts while the server is down leaves a `graph_operation` lock that the
-server's entrypoint refuses at boot, so the pod crashloops until someone
-force-unlocks it. They are replaced by a stop-window maintenance CronJob,
-which is not built yet; until it is, a format-14 environment gets no
-compaction or version cleanup. The two witan CronJobs are unaffected and
-still have to read `False`.
+`omnigraph-cleanup` no longer exist.** Both write directly to the store, and
+beside a serving 0.12+ server every run is refused with `state_lock_held`.
+The cutover `pulumi up` deletes them and creates `omnigraph-maintenance`,
+which stops the server for a nightly window
+([store maintenance runbook](omnigraph-store-maintenance-runbook.md)). It has
+to read `False` like the two witan CronJobs. Do not run `optimize` or
+`cleanup` by hand on this format: a run that starts while the server is down
+leaves a `graph_operation` lock that the server's entrypoint refuses at boot.
 
 The old root itself waits. **Not the same day** — leave `$OLD_ROOT/graphs/`
 untouched through at least one full soak (a week for Production), because it is
@@ -1115,13 +1115,21 @@ because it looks like success.
 **Traversals log `falls back to a full edge scan ... reason=no BTREE index`
 after cutover.** The rebuilt root was never optimized, so it has no edge
 BTREEs. Results are correct and only latency suffers, so this does not need
-a rollback. `optimize` is safe against a serving fleet
+a rollback. Up to format 9, `optimize` is safe against a serving fleet
 ([store maintenance runbook](omnigraph-store-maintenance-runbook.md)); run
 the CronJob now instead of waiting for its nightly tick:
 
 ```shell
 kubectl -n omnigraph create job --from=cronjob/omnigraph-optimize optimize-after-cutover
 kubectl -n omnigraph logs -f job/optimize-after-cutover
+```
+
+On format 14 `optimize` needs the server stopped. Either wait for the 03:20
+UTC window, or accept the outage and run it now:
+
+```shell
+kubectl -n omnigraph create job --from=cronjob/omnigraph-maintenance maintenance-after-cutover
+kubectl -n omnigraph logs -f job/maintenance-after-cutover
 ```
 
 A different `reason`, such as `a fragment is missing physical_rows` or
