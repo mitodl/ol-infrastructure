@@ -107,7 +107,14 @@ config:
   edxapp:backend_preview_domain: preview-backend.learn.mit.edu
   edxapp:enable_auto_language_selection: "true"
   edxapp:autoscaling_lms_requests_threshold: "20"
-  edxapp:autoscaling_lms_cpu_threshold: "70"
+  # LMS runs one Granian worker per pod, so every request in a pod shares one GIL.
+  # Since the 2 -> 1 worker change on 2026-09-17 the GIL wait per request roughly
+  # doubled (7-9ms -> 13-29ms) and upstream p95 went from 840-1020ms to 1150-1550ms
+  # at the same request rate. A lower cpu target spreads the same load over more
+  # pods. Total LMS cpu over the 12d to 2026-10-13 was p50 3.9, p95 7.2 and max 10.9
+  # cores, which at 50% of the 500m request is 16, 29 and 44 pods, so the ceiling
+  # below moves from 30 to 45 with it.
+  edxapp:autoscaling_lms_cpu_threshold: "50"
   edxapp:autoscaling_cms_requests_threshold: "20"
   edxapp:autoscaling_cms_cpu_threshold: "70"
   # LMS leaves the Granian holding pins (2 workers x 32 blocking threads, backpressure
@@ -126,7 +133,7 @@ config:
   edxapp:k8s_replicas:
     webapp:
       lms:
-        max: 30
+        max: 45
         min: 4
       cms:
         max: 10
