@@ -717,7 +717,9 @@ def _build_learner_progress():
             certified = status == "certified"
             rows.append(
                 {
-                    "learner_id": f"kc-{1000 + n}",
+                    # One id per learner, as in the real MV, where every
+                    # enrollment of a dim_user row carries its user_global_id.
+                    "learner_id": f"kc-{1000 + i}",
                     "email": email,
                     "full_name": full_name,
                     "courserun_readable_id": run["courserun_readable_id"],
@@ -865,20 +867,20 @@ def _needs_attention_row():
     `needs_attention` filter, as the real query-time aggregate does.
 
     Counts distinct learners, not enrollments: a learner behind in two runs
-    counts once. Keyed on email because the fixture's `learner_id` is unique
-    per row rather than per learner. Active enrollments only, matching the
-    real endpoint and `learner-progress`'s `include_inactive=false` default.
+    counts once, keyed on `learner_id` as the real query is. Active
+    enrollments only, matching the real endpoint and `learner-progress`'s
+    `include_inactive=false` default.
     Not floored: the fixture's counts sit well above the real API's floor.
     """
     active = [r for r in LEARNER_PROGRESS if r["enrollment_is_active"]]
     return {
         "contract_id": int(_VIEWED_CONTRACT["contract_id"]),
-        "learners_considered": len({r["email"] for r in active}),
+        "learners_considered": len({r["learner_id"] for r in active}),
         "learners_needing_attention": len(
-            {r["email"] for r in active if r["needs_attention"]}
+            {r["learner_id"] for r in active if r["needs_attention"]}
         ),
         "learners_outcomes_withheld": len(
-            {r["email"] for r in active if not r["outcomes_shared"]}
+            {r["learner_id"] for r in active if not r["outcomes_shared"]}
         ),
     }
 
