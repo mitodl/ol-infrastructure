@@ -273,42 +273,47 @@ projected Kubernetes token, so there is no key material at rest.
 
 ## OCW YouTube Analytics for HighSystems
 
-`mitol-ocw-yt-analytics` exists so Data Collaborative's HighSystems database can
+`ocw-yt-analytics-o7v08r` exists so Data Collaborative's HighSystems database can
 pull per-video engaged-view stats for OCW's YouTube channel
 ([mitodl/hq#13305](https://github.com/mitodl/hq/issues/13305)). The stack enables
 the YouTube Analytics and YouTube Reporting APIs; everything else is manual.
 
-Steps 1 and 2 must be done before the stack config naming this project
-merges. `pulumi preview` plans the service creates without reading the project,
-so it passes either way, but `pulumi up` fails on a missing or ungranted project
-and that blocks every other change in this one stack.
+Step 1 must be done before the stack config naming this project merges.
+`pulumi preview` plans the service creates without reading the project, so it
+passes either way, but `pulumi up` fails on an ungranted project and that blocks
+every other change in this one stack.
 
-1. Request the project through MIT Cloud Accounts against an OCW cost object.
-   It is a separate project so its OAuth consent screen does not constrain
-   `mitol01`'s.
-2. As a project Owner, enable the bootstrap APIs and grant the automation
-   account on the new project. `serviceUsageAdmin` alone is not enough: after
-   enabling a service the provider reads the project back
-   (`resourcemanager.projects.get`), which `roles/browser` supplies.
+MIT Cloud Accounts created the project on 2026-10-09 (project number
+`715788942366`, cost object `2010196`) in the same folder as `mitol01`, and
+assigned the id suffix. It is a separate project so its OAuth consent screen
+does not constrain `mitol01`'s. Cloud Accounts granted the requester
+`roles/editor` and `roles/resourcemanager.projectIamAdmin`, not Owner, and
+enabled no APIs.
+
+1. Enable the bootstrap APIs (`roles/editor`) and grant the automation account
+   on the new project (`roles/resourcemanager.projectIamAdmin`).
+   `serviceUsageAdmin` alone is not enough: after enabling a service the
+   provider reads the project back (`resourcemanager.projects.get`), which
+   `roles/browser` supplies.
 
    ```bash
    gcloud services enable serviceusage.googleapis.com \
-     cloudresourcemanager.googleapis.com --project=mitol-ocw-yt-analytics
+     cloudresourcemanager.googleapis.com --project=ocw-yt-analytics-o7v08r
    for role in roles/serviceusage.serviceUsageAdmin roles/browser; do
-     gcloud projects add-iam-policy-binding mitol-ocw-yt-analytics \
+     gcloud projects add-iam-policy-binding ocw-yt-analytics-o7v08r \
        --member=serviceAccount:pulumi-gcp@mitol01.iam.gserviceaccount.com \
        --role="$role" --condition=None
    done
    ```
 
-3. Deploy this stack.
-4. Console > Google Auth Platform > Branding/Audience: configure the consent
+2. Deploy this stack.
+3. Console > Google Auth Platform > Branding/Audience: configure the consent
    screen. User type follows the Google account that owns the OCW channel:
    _Internal_ if it is an `mit.edu` account (no verification needed),
    otherwise _External_, published to production. An External app left in
    _Testing_ issues refresh tokens that expire after 7 days, which breaks a
    scheduled sync.
-5. Console > Clients > Web application, with Data Collaborative's redirect URI.
+4. Console > Clients > Web application, with Data Collaborative's redirect URI.
    The secret is shown once; capture it into
    `src/bridge/secrets/gcp/` immediately, then hand the client id, secret and
    project id to Data Collaborative over a secure channel.

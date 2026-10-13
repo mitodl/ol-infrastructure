@@ -169,7 +169,7 @@ config:
     # branding and verification status with every OAuth client consolidated
     # into mitol01. The consent screen and the OAuth client are hand-made (see
     # README.md); this entry only covers the APIs.
-  - project_id: mitol-ocw-yt-analytics
+  - project_id: ocw-yt-analytics-o7v08r
     business_unit: open-courseware
     enabled_services:
     - youtubeanalytics.googleapis.com
