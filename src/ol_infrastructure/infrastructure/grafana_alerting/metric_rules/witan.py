@@ -161,7 +161,14 @@ _DAILY_STALE_SECONDS = 129600
 # namespaces. Validate a new entry against its `schedule` label on
 # kube_cronjob_info before adding it, the same discipline eks_general.py's
 # bucket membership asks for.
-_DAILY_MAINTENANCE_CRONJOBS = "omnigraph-optimize|witan-view-reaper"
+#
+# `omnigraph-maintenance` replaces `omnigraph-optimize` (and the weekly
+# `omnigraph-cleanup`) once an environment serves storage format 14, on the
+# same `20 3 * * *` schedule. It does not exist anywhere yet, so its series
+# is unvalidated and matches nothing until the first cutover.
+_DAILY_MAINTENANCE_CRONJOBS = (
+    "omnigraph-optimize|omnigraph-maintenance|witan-view-reaper"
+)
 
 # Longer than the longest cadence in these namespaces (weekly), so a newly
 # created CronJob is not reported before it could plausibly have succeeded.
@@ -203,9 +210,20 @@ _DAILY_STALE_SUMMARY = (
 _DAILY_STALE_DESCRIPTION = (
     "The daily maintenance CronJob {{ $labels.cronjob }} in namespace"
     " {{ $labels.namespace }}, cluster {{ $labels.cluster }}, has not completed"
-    " successfully for over 36 hours. Neither of these jobs fails loudly when it"
+    " successfully for over 36 hours. None of these jobs fails loudly when it"
     " stops -- that is why they need a window sized to their cadence rather than"
     " eks_general.py's 15-day slow bucket."
+    " omnigraph-maintenance exists only where the data tier serves storage"
+    " format 14, in place of omnigraph-optimize. It STOPS omnigraph-server every"
+    " night at 03:20 UTC to compact and clean the store, and scales it back up."
+    " If this alert names it, first check that the server is running"
+    " (`kubectl -n omnigraph get deploy omnigraph-server`): a window that could"
+    " not remove its own lock leaves the Deployment at 0 replicas on purpose."
+    " The last Job's log says which case it is, and"
+    " docs/omnigraph-store-maintenance-runbook.md (When the window leaves the"
+    " server down) is the recovery. A Job that failed with the server back up"
+    " names the graphs it did not reach; a suspended CronJob means a"
+    " storage-format migration is armed."
     " omnigraph-optimize is Lance compaction: every commit adds fragments, reads"
     " degrade by roughly 21x on an uncompacted store, and the store keeps serving"
     " while it gets slower. Its sweep is per-graph and continues past a failure,"
