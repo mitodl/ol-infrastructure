@@ -423,8 +423,9 @@ async def _check_release_gate(app_name: str, cfg) -> str:
     except Exception:
         log.exception("Failed to force release-gate check for %s", app_name)
         return (
-            "⚠️ Could not make Concourse check the release gate now, so the "
-            f"Production deploy starts on its next poll: {url}"
+            "⚠️ Could not make Concourse check the release gate, so no "
+            "Production deploy was triggered. One starts only after a later "
+            f"check of the gate succeeds: {url}"
         )
     return f"Production deploy triggered: {url}"
 

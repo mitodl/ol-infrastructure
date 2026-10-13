@@ -2247,7 +2247,7 @@ async def test_promote_command_links_the_production_deploy_job(
 async def test_promote_does_not_claim_a_deploy_started_when_the_gate_check_failed(
     repos, slack, promote_api
 ):
-    """The issue is closed either way; only the timing of the deploy changes."""
+    """The issue is closed either way, but no deploy is promised."""
     promote_api.open_release_issues.return_value = [
         {"number": 7, "title": "Release my-app 2026.9.5.1", "body": ""}
     ]
@@ -2259,5 +2259,6 @@ async def test_promote_does_not_claim_a_deploy_started_when_the_gate_check_faile
 
     said = slack.said
     assert "promoted" in said
-    assert "triggered" not in said
-    assert "starts on its next poll" in said
+    assert "Production deploy triggered" not in said
+    assert "no Production deploy was triggered" in said
+    assert "only after a later check of the gate succeeds" in said
