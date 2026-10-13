@@ -722,7 +722,7 @@ write() {  # run one direct write, then release the lock it reports
   [ $rc -eq 0 ] || return $rc
   id=$(grep -oE '(Admission lock: |lock_id=)[0-9A-Z]{26}' /tmp/step.err \
     | grep -oE '[0-9A-Z]{26}$')
-  omnigraph cluster force-unlock --config /tmp/rebuild "$id"
+  omnigraph cluster force-unlock --config /tmp/rebuild "$id" >&2
 }
 ```
 
