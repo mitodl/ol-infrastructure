@@ -328,8 +328,13 @@ CLEANUP_SCHEDULE = omnigraph_config.get("cleanup_schedule") or DEFAULT_CLEANUP_S
 MAINTENANCE_SCHEDULE = (
     omnigraph_config.get("maintenance_schedule") or DEFAULT_MAINTENANCE_SCHEDULE
 )
+# `is None`, not `or`: a configured 0 has to reach the range check below
+# rather than read as "unset" and become the default.
+_configured_cleanup_weekday = omnigraph_config.get_int("cleanup_iso_weekday")
 CLEANUP_ISO_WEEKDAY = (
-    omnigraph_config.get_int("cleanup_iso_weekday") or DEFAULT_CLEANUP_ISO_WEEKDAY
+    DEFAULT_CLEANUP_ISO_WEEKDAY
+    if _configured_cleanup_weekday is None
+    else _configured_cleanup_weekday
 )
 if not 1 <= CLEANUP_ISO_WEEKDAY <= 7:  # noqa: PLR2004
     msg = (

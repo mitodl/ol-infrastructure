@@ -722,14 +722,27 @@ def create_data_tier(  # noqa: PLR0913
             name=OMNIGRAPH_SERVER_SERVICE_NAME,
             namespace=namespace,
             labels=omnigraph_pod_labels,
-            # Set in the update that takes `replicas` to 0 below, so a
-            # maintenance window that had already scaled the server down does
-            # not scale it back up. See MIGRATION_ARMED_ANNOTATION.
-            # `None`, not `{}`, when unarmed: an empty map is still a new
-            # input and would show as an update on every stack.
-            annotations=(
-                {MIGRATION_ARMED_ANNOTATION: "true"} if migration_armed else None
-            ),
+            # The armed marker is set in the update that takes `replicas` to
+            # 0 below, so a maintenance window that had already scaled the
+            # server down does not scale it back up. See
+            # MIGRATION_ARMED_ANNOTATION.
+            #
+            # patchForce, where a maintenance window exists: the window writes
+            # `spec.replicas` through the scale subresource, which makes its
+            # client a second field manager of that field. Server-side apply
+            # then refuses a Pulumi update that changes the count, and the
+            # update that does is the one arming a migration. Forcing means a
+            # `pulumi up` during a window scales the server back to 1; the new
+            # pod finds the unlock Lease held and exits until the window ends,
+            # and the window does not restore a count that is no longer 0.
+            #
+            # `None`, not `{}`, when there is neither: an empty map is still a
+            # new input and would show as an update on every format-9 stack.
+            annotations={
+                **({MIGRATION_ARMED_ANNOTATION: "true"} if migration_armed else {}),
+                **({"pulumi.com/patchForce": "true"} if persisted_lock else {}),
+            }
+            or None,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             # Single writer, deliberately. omnigraph's own deployment contract
