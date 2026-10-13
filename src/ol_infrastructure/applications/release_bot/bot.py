@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import re
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from functools import partial
@@ -25,6 +26,10 @@ log = logging.getLogger(__name__)
 # A module global is safe here: Socket Mode connections are not multiplexed,
 # so this process runs exactly one AsyncApp (see __main__.py's replicas=1).
 _slack_app: AsyncApp | None = None
+
+# Slack's ack and respond callables as the handlers receive them; respond may
+# be the _in_channel wrapper rather than slack_bolt's own AsyncRespond.
+_SlackCallable = Callable[..., Awaitable[Any]]
 
 
 # app name -> Slack user id of whoever last ran `/doof release` for it, so the
@@ -950,7 +955,13 @@ async def _hotfix(respond, app_name, cfg, ref, context):
     )
 
 
-async def _cmd_help(repos, ack, respond, _command, _context):
+async def _cmd_help(
+    repos: dict[str, config.AppConfig],
+    ack: _SlackCallable,
+    respond: _SlackCallable,
+    _command: dict[str, Any],
+    _context: dict[str, Any],
+) -> None:
     await ack()
     # Name the apps too: the usage alone leaves <app> to guesswork, and a
     # guess at a legacy app is refused.
@@ -983,7 +994,13 @@ def _format_elapsed(elapsed: timedelta) -> str:
 _POLL_OVERDUE_INTERVALS = 3
 
 
-async def _cmd_uptime(_repos, ack, respond, _command, _context):
+async def _cmd_uptime(
+    _repos: dict[str, config.AppConfig],
+    ack: _SlackCallable,
+    respond: _SlackCallable,
+    _command: dict[str, Any],
+    _context: dict[str, Any],
+) -> None:
     """Report that the bot is up, since when, and whether its pollers run.
 
     Doof's `uptime` mattered because Doof fell over; this bot's failure is
@@ -1021,7 +1038,7 @@ async def _cmd_uptime(_repos, ack, respond, _command, _context):
     await respond("\n".join(lines))
 
 
-async def _deployment_line(cfg, environment: str) -> str:
+async def _deployment_line(cfg: config.AppConfig, environment: str) -> str:
     """Describe what *cfg*'s app runs in *environment*, and any newer attempt.
 
     A Deployment is marked successful only when its whole QA or Production
@@ -1051,7 +1068,7 @@ async def _deployment_line(cfg, environment: str) -> str:
     return line
 
 
-def _describe_deployment(cfg, deployment) -> str:
+def _describe_deployment(cfg: config.AppConfig, deployment: dict[str, Any]) -> str:
     version = deployment["version"]
     if deployment["url"]:
         # The github-deployments resource points this at the Concourse build.
@@ -1062,7 +1079,13 @@ def _describe_deployment(cfg, deployment) -> str:
     return f"{version} · {commit} · deployed {age} ago"
 
 
-async def _cmd_version(repos, ack, respond, command, _context):
+async def _cmd_version(
+    repos: dict[str, config.AppConfig],
+    ack: _SlackCallable,
+    respond: _SlackCallable,
+    command: dict[str, Any],
+    _context: dict[str, Any],
+) -> None:
     """Report the release version and commit RC and Production are running.
 
     Replaces Doof's `version` (what production runs) and `hash <rc|prod>`
