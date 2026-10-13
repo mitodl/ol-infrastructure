@@ -114,3 +114,45 @@ def test_pre_deploy_job_uses_its_own_resources_when_set():
         _job_resources(app),
         app.application_deployment.spec.template,
     ).apply(check)
+
+
+def _assert_not_selected(selector: dict[str, str], pod_labels: dict[str, str]) -> None:
+    assert any(pod_labels.get(key) != value for key, value in selector.items())
+
+
+@pulumi.runtime.test
+def test_deploy_job_pods_are_not_webapp_service_endpoints():
+    """A Job pod has no readiness probe, so matching the Service makes it an endpoint.
+
+    Nothing in it listens on the app port, so the connections it is sent are refused
+    for as long as the Job runs.
+    """
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="jobsel",
+            post_deploy_commands=[("warm", ["python", "manage.py", "warm"])],
+        )
+    )
+    assert app.pre_deploy_job is not None
+    assert app.post_deploy_job is not None
+
+    def check(args):
+        service_selector, deployment_selector, pre_template, post_template = args
+        for job, template in (
+            ("pre-deploy", pre_template),
+            ("post-deploy", post_template),
+        ):
+            pod_labels = template["metadata"]["labels"]
+            _assert_not_selected(service_selector, pod_labels)
+            _assert_not_selected(deployment_selector["match_labels"], pod_labels)
+            assert pod_labels["ol.mit.edu/job"] == job
+            # The SecurityGroupPolicy selects on this, and without it the Job has
+            # no route to the database it migrates.
+            assert pod_labels["ol.mit.edu/pod-security-group"] == "myapp-sg"
+
+    return pulumi.Output.all(
+        app.application_service.spec.selector,
+        app.application_deployment.spec.selector,
+        app.pre_deploy_job.spec.template,
+        app.post_deploy_job.spec.template,
+    ).apply(check)
