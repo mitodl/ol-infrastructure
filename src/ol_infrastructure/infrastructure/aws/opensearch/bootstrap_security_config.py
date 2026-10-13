@@ -63,12 +63,8 @@ read_only_role = {
     "cluster_permissions": ["cluster_composite_ops_ro"],
     "index_permissions": [
         {
-            "index_patterns": [
-                "*"
-            ],  # TODO: Define actual indices  # noqa: FIX002, TD002
-            "allowed_actions": [
-                "read"
-            ],  # TODO: Confirm this is all that is needed  # noqa: FIX002, TD002
+            "index_patterns": ["*"],  # TODO: Define actual indices  # noqa: FIX002, TD002
+            "allowed_actions": ["read"],  # TODO: Confirm this is all that is needed  # noqa: FIX002, TD002
         }
     ],
 }
@@ -86,9 +82,7 @@ read_write_role = {
     ],
     "index_permissions": [
         {
-            "index_patterns": [
-                "*"
-            ],  # TODO: Define actual indices  # noqa: FIX002, TD002
+            "index_patterns": ["*"],  # TODO: Define actual indices  # noqa: FIX002, TD002
             "allowed_actions": ["*"],
         }
     ],

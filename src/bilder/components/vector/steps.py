@@ -88,7 +88,7 @@ def install_vector(vector_config: VectorConfig):
 
     # Special permissions and configuration for running with dockerized services.
     # Make sure you install vector AFTER installing docker, when applicable.
-    # TODO: MD 20230131 Split docker config out to its own private function.  # noqa: E501, FIX002, TD002
+    # TODO: MD 20230131 Split docker config out to its own private function.  # noqa: FIX002, TD002
     if vector_config.is_docker:
         server.shell(
             name="Add vector user to docker group",
@@ -131,7 +131,7 @@ def configure_vector(vector_config: VectorConfig):
     # Validate the vector configuration files that were laid down
     # and confirm that vector starts without issue.
     #
-    # TODO MD 20230127 This won't work once we switch the sink config to be  # noqa: E501, FIX002, TD002, TD004
+    # TODO MD 20230127 This won't work once we switch the sink config to be  # noqa: FIX002, TD002, TD004
     # consul/vault templates. Need to come up with something else or remove
     # this entirely. Vector now offers unit tests so perhaps we can use that.
     server.shell(

@@ -940,7 +940,7 @@ dagster_static_secrets = OLVaultK8SSecret(
     f"dagster-k8s-static-secrets-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-static-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-static-secrets",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=k8s_global_labels.model_dump(),
@@ -962,7 +962,7 @@ dagster_dbt_secrets = OLVaultK8SSecret(
     f"dagster-k8s-dbt-secrets-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-dbt-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-dbt-secrets",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=k8s_global_labels.model_dump(),
@@ -1044,7 +1044,7 @@ dagster_sentry_secrets = OLVaultK8SSecret(
     f"dagster-k8s-sentry-secrets-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-sentry-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-sentry-secrets",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=k8s_global_labels.model_dump(),
@@ -1069,7 +1069,7 @@ dagster_db_secret = OLVaultK8SSecret(
     f"dagster-k8s-db-secret-{stack_info.env_suffix}",
     resource_config=OLVaultK8SDynamicSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-postgresql-secret",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-postgresql-secret",  # pragma: allowlist secret  # noqa: S106
         labels=k8s_global_labels.model_dump(),
         mount="postgres-dagster",
         name="dagster-postgresql-secret",
@@ -2580,7 +2580,7 @@ edxorg_gcp_secret = OLVaultK8SSecret(
     f"dagster-k8s-edxorg-gcp-secrets-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-edxorg-gcp-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-edxorg-gcp-secrets",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=k8s_global_labels.model_dump(),
@@ -3285,7 +3285,7 @@ dagster_k8s_image_config = {
 dagster_helm_values = {
     "global": {
         "serviceAccountName": "dagster",
-        "postgresqlSecretName": "dagster-postgresql-secret",  # pragma: allowlist secret  # noqa: E501
+        "postgresqlSecretName": "dagster-postgresql-secret",  # pragma: allowlist secret
     },
     "dagster-user-deployments": {"enabled": True, "enableSubchart": False},
     "serviceAccount": {

@@ -148,9 +148,7 @@ image_repository = (
 )
 bot_image_name = format_docker_image_ref(image_repository, "RELEASE_BOT")
 
-secret_resource_name = (
-    "release-bot-secret-production"  # pragma: allowlist secret  # noqa: S105
-)
+secret_resource_name = "release-bot-secret-production"  # pragma: allowlist secret  # noqa: S105
 bot_secret = kubernetes.core.v1.Secret(
     "release-bot-secret-production",  # pragma: allowlist secret
     metadata=kubernetes.meta.v1.ObjectMetaArgs(

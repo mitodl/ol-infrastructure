@@ -776,9 +776,7 @@ static_secrets = OLVaultK8SSecret(
 # into a K8s secret via VSO and expose them to the app as the OPIK_KEYCLOAK_*
 # env vars. The token endpoint is derived from the realm ``url`` key so it stays
 # correct across environments (sso-ci / sso-qa / sso) without hardcoding.
-opik_keycloak_secret_name = (
-    "learn-ai-opik-keycloak"  # pragma: allowlist secret  # noqa: S105
-)
+opik_keycloak_secret_name = "learn-ai-opik-keycloak"  # pragma: allowlist secret  # noqa: S105
 opik_keycloak_secret = OLVaultK8SSecret(
     name=f"learn-ai-{stack_info.env_suffix}-opik-keycloak-secret",
     resource_config=OLVaultK8SStaticSecretConfig(

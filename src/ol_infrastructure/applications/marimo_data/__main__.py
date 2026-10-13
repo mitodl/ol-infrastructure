@@ -163,7 +163,7 @@ marimo_app_trino_secret = OLVaultK8SSecret(
     f"marimo-app-trino-secret-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels,
-        dest_secret_name="marimo-app-oidc-secret",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="marimo-app-oidc-secret",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         includes=["client_id", "client_secret"],
