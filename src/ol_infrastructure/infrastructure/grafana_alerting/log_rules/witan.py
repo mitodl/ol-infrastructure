@@ -359,7 +359,7 @@ _QUARANTINE_DESCRIPTION = (
 
 _GRAPH_BLOCKED_SUMMARY = (
     "omnigraph in {{ $labels.cluster }} booted in the last 6h with a graph it"
-    " could not open ({{ $value }} blocked-graph lines)"
+    " could not open"
 )
 
 _GRAPH_BLOCKED_DESCRIPTION = (
