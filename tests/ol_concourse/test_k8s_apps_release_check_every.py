@@ -39,8 +39,12 @@ def test_release_resource_is_checked(app):
 
 
 @pytest.mark.parametrize("app", RELEASE_APPS)
-def test_a_check_cannot_trigger_anything_by_itself(app):
-    """A check's candidate is not a release build's output, so it must not trigger."""
+def test_every_triggering_get_goes_through_the_release_build(app):
+    """A check cannot bypass the release build: every trigger is `passed:` it.
+
+    This does not prove a check starts nothing. A re-emitted cut that the
+    release build produced and QA never ran still triggers QA.
+    """
     pipeline = json.loads(build_app_pipeline(app).model_dump_json())
     for job in pipeline["jobs"]:
         for get in _gets_of(job["plan"], f"{app}-release"):

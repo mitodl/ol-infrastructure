@@ -972,12 +972,12 @@ def _define_release_resources(
         # history has never been checked, has no versions, or last failed to
         # check. So this costs a check after a fresh history starts and an
         # hourly retry while checks fail, not a check every hour.
-        # A check cannot start a build: QA triggers on
-        # this resource (pulumi_jobs_chain turns the first stack's
-        # dependencies into triggers) but only through `passed:` the release
-        # build, which a check's candidate never satisfies. A re-emitted cut
-        # is normally a version QA has already run, so it is not new to QA
-        # either. The exception: when the newest cut is gone or its build
+        # A check cannot bypass the release build: QA triggers on this
+        # resource (pulumi_jobs_chain turns the first stack's dependencies
+        # into triggers) but only through `passed:` the release build, so it
+        # runs only a version that build produced. A re-emitted cut is
+        # normally a version QA has already run, so it starts nothing. The
+        # exception: when the newest cut is gone or its build
         # failed, QA falls back to the cut before it and runs it if it never
         # had, deploying a release that passed the build to QA.
         update={"check_every": Duration("1h")}
