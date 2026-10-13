@@ -269,7 +269,7 @@ class OLVaultAWSSecretsEngine(ComponentResource):
         resource_options = ResourceOptions(parent=self).merge(opts)
 
         self.aws_secrets_engine = aws.SecretBackend(
-            # TODO verify app_name exists based on Apps class in ol_types  # noqa: E501, FIX002, TD002, TD004
+            # TODO verify app_name exists based on Apps class in ol_types  # noqa: FIX002, TD002, TD004
             f"aws-{engine_config.app_name}",
             access_key=engine_config.aws_access_key,
             secret_key=engine_config.aws_secret_key,

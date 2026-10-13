@@ -184,9 +184,7 @@ vault_k8s_resources = xqwatcher_app.vault_k8s_resources
 # ── Default (MIT-hosted) xqueue server ──────────────────────────────────────
 # Credentials live at secret-<env>/edx-xqueue alongside the xqueue and edxapp
 # deployments.  Only xqwatcher_password is needed here.
-xqueue_servers_secret_name = (
-    "xqwatcher-xqueue-servers"  # pragma: allowlist secret  # noqa: S105
-)
+xqueue_servers_secret_name = "xqwatcher-xqueue-servers"  # pragma: allowlist secret  # noqa: S105
 xqueue_servers_template = json.dumps(
     {
         "default": {
@@ -224,9 +222,7 @@ xqueue_servers_secret = OLVaultK8SSecret(
 # Credentials are entirely separate from the MIT-hosted instance and live at
 # secret-<env>/edxorg-xqueue.  Only created for stacks that watch edx.org
 # queues (edxorg_xqueue_enabled = true in stack config).
-edxorg_servers_secret_name = (
-    "xqwatcher-edxorg-servers"  # pragma: allowlist secret  # noqa: S105
-)
+edxorg_servers_secret_name = "xqwatcher-edxorg-servers"  # pragma: allowlist secret  # noqa: S105
 edxorg_servers_template = json.dumps(
     {
         "edxorg": {
