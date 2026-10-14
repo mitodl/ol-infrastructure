@@ -9,5 +9,6 @@ config:
   open_metadata:service_name_airbyte: Airbyte
   open_metadata:service_name_superset: Superset
   open_metadata:enable_airbyte_connector: "true"
+  open_metadata:starrocks_host_port: lakehouse-starrocks-fe-service.starrocks.svc.cluster.local:9030
   open_metadata:enable_trino_lineage: "true"
   open_metadata:trino_profiler_schema_pattern: '^ol_warehouse_production_.*$'
