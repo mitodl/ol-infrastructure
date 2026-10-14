@@ -1,7 +1,7 @@
 """Trino (Starburst Galaxy) data profiler workflow.
 
 Collects table and column statistics (row count, null %, distinct %, min/max,
-mean/std) for all production dbt layer schemas (ol_warehouse_production_*).
+mean/std) for the schemas matching OM_PROFILER_SCHEMA_PATTERN.
 Uses a 10% PERCENTAGE sample to keep Starburst query costs manageable.
 
 Runs weekly (Sunday) rather than daily given the size of the lakehouse.
@@ -28,7 +28,7 @@ config = {
             "config": {
                 "type": "Profiler",
                 "schemaFilterPattern": {
-                    "includes": [r"^ol_warehouse_production_.*$"],
+                    "includes": [os.environ["OM_PROFILER_SCHEMA_PATTERN"]],
                 },
                 # sampleConfigType defaults to DYNAMIC, so STATIC has to be
                 # explicit for the fixed 10% sample to apply.
