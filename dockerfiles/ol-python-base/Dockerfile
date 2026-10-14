@@ -42,8 +42,10 @@ FROM dhi.io/python:${PYTHON_VERSION}-debian13-dev
 LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 
 # Common-core apt packages shared across the Python services. App-specific
-# extras (chromium, libcairo2-dev, operator tooling, ...) stay in each app's
-# own Dockerfile / apt.txt.
+# extras (chromium, libcairo2, operator tooling, ...) stay in each app's own
+# Dockerfile / apt.txt. Prefer runtime libraries over -dev packages there: some
+# -dev packages depend on `python3`, which replaces this image's interpreter
+# (see UV_PYTHON_DOWNLOADS below).
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       # adduser is absent from the DHI dev image's curated package set
@@ -89,6 +91,15 @@ RUN adduser --disabled-password --gecos "" mitodl && \
 # Python + uv environment. UV_CACHE_DIR points at a stable location so app
 # builds can mount a BuildKit cache there for fast `uv sync`.
 #
+# UV_PYTHON_DOWNLOADS=never keeps every venv on DHI's interpreter. Without it,
+# uv silently downloads its own CPython (python-build-standalone, with its own
+# OpenSSL, sqlite, zlib, ...) whenever the system Python doesn't satisfy the
+# project's requires-python, and DHI rebuilds never patch that copy. The usual
+# trigger is an app apt package that depends on `python3`: DHI's python-X.Y
+# package doesn't provide it, so apt swaps in python-3.13 and removes this
+# image's interpreter (e.g. libcairo2-dev via libglib2.0-dev-bin). With this
+# set, that build fails with "No interpreter found" instead.
+#
 # UV_COMPILE_BYTECODE makes each app's `uv sync` write .pyc files into the
 # venv at build time. uv skips that step by default, and
 # PYTHONDONTWRITEBYTECODE stops Python caching bytecode at runtime, so without
@@ -102,6 +113,7 @@ ENV PYTHONUNBUFFERED=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_CACHE_DIR=/opt/uv-cache \
+    UV_PYTHON_DOWNLOADS=never \
     PATH=/opt/venv/bin:$PATH
 
 RUN mkdir -p /opt/uv-cache && chown -R mitodl:mitodl /opt/uv-cache
