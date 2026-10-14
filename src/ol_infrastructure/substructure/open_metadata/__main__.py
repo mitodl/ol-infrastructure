@@ -589,21 +589,27 @@ _make_cronjob(
 #
 # Lineage for Iceberg-backed tables is also captured here since Trino is
 # the query engine that reads and writes them.
+#
+# Disabled in QA: galaxy_telemetry is not attached to the QA Galaxy cluster,
+# so every run fails with CATALOG_NOT_FOUND.
 
-_make_cronjob(
-    name="trino-lineage",
-    schedule="0 6 * * *",
-    python_script=(Path(__file__).parent / "scripts" / "trino_lineage.py").read_text(),
-    extra_env=[
-        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
-        _plain_env("OM_SERVICE_NAME", service_name_trino),
-        _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
-        _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
-        _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
-        _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
-    ],
-    bot_secret_name="om-lineage-bot",  # noqa: S106  # pragma: allowlist secret
-)
+if om_config.require_bool("enable_trino_lineage"):
+    _make_cronjob(
+        name="trino-lineage",
+        schedule="0 6 * * *",
+        python_script=(
+            Path(__file__).parent / "scripts" / "trino_lineage.py"
+        ).read_text(),
+        extra_env=[
+            _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+            _plain_env("OM_SERVICE_NAME", service_name_trino),
+            _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
+            _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
+            _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
+            _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
+        ],
+        bot_secret_name="om-lineage-bot",  # noqa: S106  # pragma: allowlist secret
+    )
 
 # ---------------------------------------------------------------------------
 # Glue Data Catalog metadata ingestion
@@ -706,7 +712,10 @@ _make_cronjob(
 )
 
 
-# distinct %, min/max, mean/std) for all ol_warehouse_production_* schemas.
+# Trino data profiler: collects table and column statistics (row count, null %,
+# distinct %, min/max, mean/std) for the schemas matching the stack's
+# trino_profiler_schema_pattern. QA reads the production catalog on a smaller
+# Galaxy cluster, so it profiles one small schema rather than all of them.
 # Uses a 10% row sample; runs weekly (Sunday 07:00 UTC) to control cost.
 _make_cronjob(
     name="trino-profiler",
@@ -715,13 +724,17 @@ _make_cronjob(
     extra_env=[
         _plain_env("OM_SERVER_URL", OM_SERVER_URL),
         _plain_env("OM_SERVICE_NAME", service_name_trino),
+        _plain_env(
+            "OM_PROFILER_SCHEMA_PATTERN",
+            om_config.require("trino_profiler_schema_pattern"),
+        ),
         _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
         _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
         _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
         _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
     ],
     bot_secret_name="om-profiler-bot",  # noqa: S106  # pragma: allowlist secret
-    # Profiler queries all production schemas with 10% sample; increase memory
+    # Production profiles every warehouse schema with a 10% sample; increase memory
     # above default 4Gi to avoid OOM kills observed in recent runs (exit 137).
     resources={
         "requests": {"cpu": "500m", "memory": "2Gi"},
