@@ -1092,7 +1092,8 @@ edxapp_fastly_service = fastly.ServiceVcl(
         ),
         fastly.ServiceVclConditionArgs(
             name="Django Admin Route",
-            statement='req.url ~ "^/admin"',
+            # Anchored so it doesn't also match the /admin-console/ MFE assets.
+            statement='req.url.path ~ "^/admin(/|$)"',
             type="CACHE",
         ),
         fastly.ServiceVclConditionArgs(
