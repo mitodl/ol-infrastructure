@@ -14,6 +14,12 @@ data:
   # mitxonline.odl.local:8013 host, which doesn't resolve in this stack.
   MITXONLINE_NEW_USER_LOGIN_URL: "https://mitxonline.mit.dev/create-profile"
 
+  # Base of most Learn links and redirects mitxonline builds, such as the
+  # post-purchase dashboard redirect. The default maps MITX_ONLINE_ENVIRONMENT
+  # to a Learn host and falls back to https://learn.mit.edu, so "local" would
+  # send them to production Learn.
+  MIT_LEARN_BASE_URL: "https://learn.mit.dev"
+
   # The trailing "&" is deliberate: the view appends "?redirect_url=..." to this
   # value, and it keeps no_redirect parsing as exactly "1".
   # If the openedx app is ever enabled here, change this to
