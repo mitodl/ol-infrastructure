@@ -2150,6 +2150,7 @@ class OLApplicationK8s(ComponentResource):
             None
         )
 
+        worker_deployment_options = resource_options
         if pre_deploy_commands := ol_app_k8s_config.pre_deploy_commands:
             self.pre_deploy_job = kubernetes.batch.v1.Job(
                 f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
@@ -2220,6 +2221,9 @@ class OLApplicationK8s(ComponentResource):
                 opts=resource_options,
             )
             deployment_options = deployment_options.merge(
+                ResourceOptions(depends_on=[self.pre_deploy_job])
+            )
+            worker_deployment_options = resource_options.merge(
                 ResourceOptions(depends_on=[self.pre_deploy_job])
             )
 
@@ -2895,7 +2899,7 @@ class OLApplicationK8s(ComponentResource):
                         ),
                     ),
                 ),
-                opts=resource_options,
+                opts=worker_deployment_options,
             )
             self.celery_deployments.append(_celery_deployment)
 
@@ -3012,7 +3016,7 @@ class OLApplicationK8s(ComponentResource):
                         ),
                     ),
                 ),
-                opts=resource_options,
+                opts=worker_deployment_options,
             )
 
         for scheduled_job in ol_app_k8s_config.scheduled_jobs:
