@@ -176,11 +176,12 @@ tika_helm_release = kubernetes.helm.v3.Release(
             # auto-invokes the `tesseract` binary as a native subprocess for
             # scanned/image PDF pages, and that subprocess's memory isn't
             # bounded by any JAVA_TOOL_OPTIONS flag.
-            # 2026-10-14: heap 1152m->2g, limit 4Gi->6Gi. With the 1152m heap
-            # the forked parser died on "OutOfMemoryError: Java heap space"
-            # 128 times on 2026-10-02, and container RSS peaked at ~3970Mi of
-            # 4Gi in the 30 days to 2026-10-14, so the heap could only grow if
-            # the limit did. The extra 2Gi covers the 896Mi heap increase and
+            # 2026-10-14: heap 1152m->2g, limit 4Gi->6Gi. With the 1152m heap,
+            # on 2026-10-02 the watchdog restarted the forked parser 128 times
+            # with status ERROR and Tika logged 276 "OutOfMemoryError: Java
+            # heap space" lines. Container RSS peaked at ~3970Mi of 4Gi in the
+            # 30 days to 2026-10-14, so the heap could only grow if the limit
+            # did. The extra 2Gi covers the 896Mi heap increase and
             # keeps the ~2.3Gi non-JVM headroom the 4Gi limit was sized for.
             "env": [
                 {
