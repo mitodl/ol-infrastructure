@@ -694,10 +694,11 @@ _SKIP_EVERY = 4
 def _build_learner_progress():
     """Deterministic so the stub's fixture is stable across pod restarts.
 
-    Roughly one enrollment in nine has withheld consent (outcomes_shared
-    False, every outcome field null) and one in twelve is deactivated, so
-    both the consent banner and `include_inactive` have something to show
-    without any per-request randomness.
+    Roughly one learner in nine has withheld consent (outcomes_shared False,
+    every outcome field null) across all of their enrollments, since consent
+    is recorded per learner per contract in the real API. One enrollment in
+    twelve is deactivated, so both the consent banner and `include_inactive`
+    have something to show without any per-request randomness.
     """
     named = []
     for i, first in enumerate(_LEARNER_FIRST_NAMES):
@@ -712,7 +713,7 @@ def _build_learner_progress():
             # has "not enrolled" cells and not just status variety.
             if (i * 3 + run_index) % _SKIP_EVERY == _SKIP_EVERY - 1:
                 continue
-            shared = n % 9 != 0
+            shared = i % 9 != 0
             status = _LEARNER_STATUSES[n % len(_LEARNER_STATUSES)]
             certified = status == "certified"
             rows.append(
