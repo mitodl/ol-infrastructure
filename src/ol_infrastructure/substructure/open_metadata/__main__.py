@@ -394,6 +394,8 @@ def _make_cronjob(  # noqa: PLR0913
     opts: ResourceOptions | None = None,
     bot_secret_name: str = "om-ingestion-bot",  # noqa: S107
     resources: dict[str, object] | None = None,
+    *,
+    long_running: bool = False,
 ) -> kubernetes.apiextensions.CustomResource:
     """Create a CronOMJob custom resource.
 
@@ -415,7 +417,19 @@ def _make_cronjob(  # noqa: PLR0913
     :param resources: Pod resource requests/limits. Defaults to
         ``_POD_RESOURCES`` (500m/1Gi request, 2/4Gi limit). Override for
         connectors that require more memory (e.g. Trino full-catalog ingestion).
+    :param long_running: Run the main pod on on-demand capacity and exempt it
+        from Karpenter disruption. The operator never retries a main pod that
+        disappears, so a spot interruption or consolidation ends the run as
+        "Main pod not found after timeout". Use for jobs that run for hours.
     """
+    main_pod_placement: dict[str, object] = (
+        {
+            "annotations": {"karpenter.sh/do-not-disrupt": "true"},
+            "nodeSelector": {"karpenter.sh/capacity-type": "on-demand"},
+        }
+        if long_running
+        else {}
+    )
     env = [_bot_jwt_env(bot_secret_name), _LOG_FORMAT_ENV, *(extra_env or [])]
     command = Output.from_input(python_script).apply(lambda s: ["python", "-c", s])
 
@@ -437,6 +451,7 @@ def _make_cronjob(  # noqa: PLR0913
                     "env": env,
                     "resources": resources or _POD_RESOURCES,
                     "securityContext": _POD_SECURITY_CONTEXT,
+                    **main_pod_placement,
                 },
                 "exitHandlerSpec": _EXIT_HANDLER_SPEC,
             },
@@ -576,21 +591,27 @@ _make_cronjob(
 #
 # Lineage for Iceberg-backed tables is also captured here since Trino is
 # the query engine that reads and writes them.
+#
+# Disabled in QA: galaxy_telemetry is not attached to the QA Galaxy cluster,
+# so every run fails with CATALOG_NOT_FOUND.
 
-_make_cronjob(
-    name="trino-lineage",
-    schedule="0 6 * * *",
-    python_script=(Path(__file__).parent / "scripts" / "trino_lineage.py").read_text(),
-    extra_env=[
-        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
-        _plain_env("OM_SERVICE_NAME", service_name_trino),
-        _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
-        _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
-        _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
-        _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
-    ],
-    bot_secret_name="om-lineage-bot",  # noqa: S106  # pragma: allowlist secret
-)
+if om_config.require_bool("enable_trino_lineage"):
+    _make_cronjob(
+        name="trino-lineage",
+        schedule="0 6 * * *",
+        python_script=(
+            Path(__file__).parent / "scripts" / "trino_lineage.py"
+        ).read_text(),
+        extra_env=[
+            _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+            _plain_env("OM_SERVICE_NAME", service_name_trino),
+            _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
+            _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
+            _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
+            _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
+        ],
+        bot_secret_name="om-lineage-bot",  # noqa: S106  # pragma: allowlist secret
+    )
 
 # ---------------------------------------------------------------------------
 # Glue Data Catalog metadata ingestion
@@ -787,7 +808,10 @@ _make_cronjob(
 )
 
 
-# distinct %, min/max, mean/std) for all ol_warehouse_production_* schemas.
+# Trino data profiler: collects table and column statistics (row count, null %,
+# distinct %, min/max, mean/std) for the schemas matching the stack's
+# trino_profiler_schema_pattern. QA reads the production catalog on a smaller
+# Galaxy cluster, so it profiles one small schema rather than all of them.
 # Uses a 10% row sample; runs weekly (Sunday 07:00 UTC) to control cost.
 _make_cronjob(
     name="trino-profiler",
@@ -796,18 +820,25 @@ _make_cronjob(
     extra_env=[
         _plain_env("OM_SERVER_URL", OM_SERVER_URL),
         _plain_env("OM_SERVICE_NAME", service_name_trino),
+        _plain_env(
+            "OM_PROFILER_SCHEMA_PATTERN",
+            om_config.require("trino_profiler_schema_pattern"),
+        ),
         _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
         _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
         _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
         _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
     ],
     bot_secret_name="om-profiler-bot",  # noqa: S106  # pragma: allowlist secret
-    # Profiler queries all production schemas with 10% sample; increase memory
+    # Production profiles every warehouse schema with a 10% sample; increase memory
     # above default 4Gi to avoid OOM kills observed in recent runs (exit 137).
     resources={
         "requests": {"cpu": "500m", "memory": "2Gi"},
         "limits": {"cpu": "2", "memory": "8Gi"},
     },
+    # A full pass takes about 28h. The scheduled runs on 2026-09-27, 10-04 and
+    # 10-11 were all lost to spot interruptions.
+    long_running=True,
 )
 
 # Trino PII auto-classifier — uses OM's built-in AutoClassificationWorkflow,

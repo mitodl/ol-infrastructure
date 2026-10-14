@@ -42,8 +42,10 @@ FROM dhi.io/python:${PYTHON_VERSION}-debian13-dev
 LABEL maintainer="ODL DevOps <mitx-devops@mit.edu>"
 
 # Common-core apt packages shared across the Python services. App-specific
-# extras (chromium, libcairo2-dev, operator tooling, ...) stay in each app's
-# own Dockerfile / apt.txt.
+# extras (chromium, libcairo2, operator tooling, ...) stay in each app's own
+# Dockerfile / apt.txt. Prefer runtime libraries over -dev packages there: some
+# -dev packages depend on `python3`, which replaces this image's interpreter
+# (see UV_PYTHON_DOWNLOADS below).
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       # adduser is absent from the DHI dev image's curated package set
@@ -78,6 +80,19 @@ RUN apt-get update && \
 # its own.
 RUN command -v python >/dev/null 2>&1 || ln -s "$(command -v python3)" /usr/local/bin/python
 
+# Restore `which`. DHI's debianutils ships /usr/bin/which.debianutils but not
+# the /usr/bin/which alternative that stock Debian's debianutils postinst
+# registers. Many maintainer scripts test `which <tool>` and silently skip
+# their work when it's missing. The visible casualty was ca-certificates-java
+# ("No JRE found. Skipping Java certificates setup."), which left any image that
+# installs a JRE without /etc/ssl/certs/java/cacerts, so every Java HTTPS call
+# failed with "trustAnchors parameter must be non-empty" (mit-learn since the
+# DHI rebase on 2026-09-03). This only adds a symlink to an already-installed
+# file. No package is added or replaced. Guarded so it's a no-op once DHI ships
+# the alternative itself.
+RUN command -v which >/dev/null 2>&1 || \
+    update-alternatives --install /usr/bin/which which /usr/bin/which.debianutils 0
+
 # Install uv (pinned via the upstream tag; bump deliberately).
 COPY --from=ghcr.io/astral-sh/uv:0.13.0@sha256:cdc6093146eb3ff6a40107b38f008b789e050e77ad87865e381d9917da55a168 /uv /uvx /usr/local/bin/
 
@@ -88,10 +103,30 @@ RUN adduser --disabled-password --gecos "" mitodl && \
 
 # Python + uv environment. UV_CACHE_DIR points at a stable location so app
 # builds can mount a BuildKit cache there for fast `uv sync`.
+#
+# UV_PYTHON_DOWNLOADS=never keeps every venv on DHI's interpreter. Without it,
+# uv silently downloads its own CPython (python-build-standalone, with its own
+# OpenSSL, sqlite, zlib, ...) whenever the system Python doesn't satisfy the
+# project's requires-python, and DHI rebuilds never patch that copy. The usual
+# trigger is an app apt package that depends on `python3`: DHI's python-X.Y
+# package doesn't provide it, so apt swaps in python-3.13 and removes this
+# image's interpreter (e.g. libcairo2-dev via libglib2.0-dev-bin). With this
+# set, that build fails with "No interpreter found" instead.
+#
+# UV_COMPILE_BYTECODE makes each app's `uv sync` write .pyc files into the
+# venv at build time. uv skips that step by default, and
+# PYTHONDONTWRITEBYTECODE stops Python caching bytecode at runtime, so without
+# UV_COMPILE_BYTECODE every process start compiles each imported dependency
+# from source.
+# PYTHONDONTWRITEBYTECODE only blocks runtime writes, not reads; it stays so a
+# container with the source bind-mounted (docker compose) leaves no
+# __pycache__ in the host checkout.
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    UV_COMPILE_BYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_CACHE_DIR=/opt/uv-cache \
+    UV_PYTHON_DOWNLOADS=never \
     PATH=/opt/venv/bin:$PATH
 
 RUN mkdir -p /opt/uv-cache && chown -R mitodl:mitodl /opt/uv-cache

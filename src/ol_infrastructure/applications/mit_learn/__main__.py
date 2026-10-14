@@ -1241,7 +1241,9 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             name="handle domain redirect",
             content=textwrap.dedent(
                 rf"""
-                set req.http.orig-req-url = req.url;
+                if (req.restarts == 0) {{
+                  set req.http.orig-req-url = req.url;
+                }}
                 unset req.http.Cookie;
 
                 # If the request is for the old DNS name, redirect
@@ -1397,6 +1399,13 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             .parent.joinpath("snippets/set_media_content_type.vcl")
             .read_text(),
             type="fetch",
+        ),
+        vcl_snippet(
+            name="Serve Learn 404 page for OCW requests",
+            content=Path(__file__)
+            .parent.joinpath("snippets/ocw_404_deliver.vcl")
+            .read_text(),
+            type="deliver",
         ),
         vcl_snippet(
             name="Strip noindex header from NextJS backend",
