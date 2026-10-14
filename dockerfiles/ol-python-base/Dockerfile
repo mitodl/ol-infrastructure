@@ -88,8 +88,18 @@ RUN adduser --disabled-password --gecos "" mitodl && \
 
 # Python + uv environment. UV_CACHE_DIR points at a stable location so app
 # builds can mount a BuildKit cache there for fast `uv sync`.
+#
+# UV_COMPILE_BYTECODE makes each app's `uv sync` write .pyc files into the
+# venv at build time. uv skips that step by default, and
+# PYTHONDONTWRITEBYTECODE stops Python caching bytecode at runtime, so without
+# UV_COMPILE_BYTECODE every process start compiles each imported dependency
+# from source.
+# PYTHONDONTWRITEBYTECODE only blocks runtime writes, not reads; it stays so a
+# container with the source bind-mounted (docker compose) leaves no
+# __pycache__ in the host checkout.
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    UV_COMPILE_BYTECODE=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_CACHE_DIR=/opt/uv-cache \
     PATH=/opt/venv/bin:$PATH
