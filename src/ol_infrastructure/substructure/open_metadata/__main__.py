@@ -393,6 +393,8 @@ def _make_cronjob(  # noqa: PLR0913
     opts: ResourceOptions | None = None,
     bot_secret_name: str = "om-ingestion-bot",  # noqa: S107
     resources: dict[str, object] | None = None,
+    *,
+    long_running: bool = False,
 ) -> kubernetes.apiextensions.CustomResource:
     """Create a CronOMJob custom resource.
 
@@ -414,7 +416,19 @@ def _make_cronjob(  # noqa: PLR0913
     :param resources: Pod resource requests/limits. Defaults to
         ``_POD_RESOURCES`` (500m/1Gi request, 2/4Gi limit). Override for
         connectors that require more memory (e.g. Trino full-catalog ingestion).
+    :param long_running: Run the main pod on on-demand capacity and exempt it
+        from Karpenter disruption. The operator never retries a main pod that
+        disappears, so a spot interruption or consolidation ends the run as
+        "Main pod not found after timeout". Use for jobs that run for hours.
     """
+    main_pod_placement: dict[str, object] = (
+        {
+            "annotations": {"karpenter.sh/do-not-disrupt": "true"},
+            "nodeSelector": {"karpenter.sh/capacity-type": "on-demand"},
+        }
+        if long_running
+        else {}
+    )
     env = [_bot_jwt_env(bot_secret_name), _LOG_FORMAT_ENV, *(extra_env or [])]
     command = Output.from_input(python_script).apply(lambda s: ["python", "-c", s])
 
@@ -436,6 +450,7 @@ def _make_cronjob(  # noqa: PLR0913
                     "env": env,
                     "resources": resources or _POD_RESOURCES,
                     "securityContext": _POD_SECURITY_CONTEXT,
+                    **main_pod_placement,
                 },
                 "exitHandlerSpec": _EXIT_HANDLER_SPEC,
             },
@@ -712,6 +727,9 @@ _make_cronjob(
         "requests": {"cpu": "500m", "memory": "2Gi"},
         "limits": {"cpu": "2", "memory": "8Gi"},
     },
+    # A full pass takes about 28h. The scheduled runs on 2026-09-27, 10-04 and
+    # 10-11 were all lost to spot interruptions.
+    long_running=True,
 )
 
 # Trino PII auto-classifier — uses OM's built-in AutoClassificationWorkflow,
