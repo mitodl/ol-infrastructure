@@ -627,6 +627,23 @@ _NAMELESS_LEARNERS = [
     ("   ", "sso.user.4471@example.edu"),
 ]
 
+# Learners who have not completed any course: every enrollment is `not_started`
+# or `in_progress`, consent is shared and none is deactivated. Filtering the
+# grid by Passed or Certified drops all of them, so the row count visibly
+# shrinks.
+_NO_COMPLETION_LEARNERS = [
+    ("Beatrix Holloway", "beatrix.holloway@example.edu"),
+    ("Cormac Idowu", "cormac.idowu@example.edu"),
+    ("Dalia Fenwick", "dalia.fenwick@example.edu"),
+    ("Emeka Lindqvist", "emeka.lindqvist@example.edu"),
+    ("Farah Castellano", "farah.castellano@example.edu"),
+    ("Gideon Marchetti", "gideon.marchetti@example.edu"),
+    ("Hana Oyelaran", "hana.oyelaran@example.edu"),
+    ("Idris Vandermeer", "idris.vandermeer@example.edu"),
+    ("Joon Abernathy", "joon.abernathy@example.edu"),
+    ("Katya Mbeki", "katya.mbeki@example.edu"),
+]
+
 
 # Anchored to AS_OF rather than the wall clock, so the column is stable across
 # pod restarts and screenshots (same reason AS_OF itself is frozen).
@@ -706,15 +723,22 @@ def _build_learner_progress():
         named.append((f"{first} {last}", f"{first.lower()}.{last.lower()}@example.edu"))
 
     rows = []
-    for i, (full_name, email) in enumerate(named + _NAMELESS_LEARNERS):
+    everyone = named + _NAMELESS_LEARNERS + _NO_COMPLETION_LEARNERS
+    first_no_completion = len(everyone) - len(_NO_COMPLETION_LEARNERS)
+    for i, (full_name, email) in enumerate(everyone):
+        no_completion = i >= first_no_completion
         for run_index, run in enumerate(_ENROLLED_COURSERUNS):
             n = i * len(_ENROLLED_COURSERUNS) + run_index
             # About a quarter of the runs are skipped per learner, so the grid
             # has "not enrolled" cells and not just status variety.
             if (i * 3 + run_index) % _SKIP_EVERY == _SKIP_EVERY - 1:
                 continue
-            shared = i % 9 != 0
-            status = _LEARNER_STATUSES[n % len(_LEARNER_STATUSES)]
+            shared = no_completion or i % 9 != 0
+            status = (
+                _LEARNER_STATUSES[n % 2]
+                if no_completion
+                else _LEARNER_STATUSES[n % len(_LEARNER_STATUSES)]
+            )
             certified = status == "certified"
             rows.append(
                 {
@@ -728,7 +752,7 @@ def _build_learner_progress():
                     "courserun_start_on": run["courserun_start_on"],
                     "courserun_end_on": run["courserun_end_on"],
                     "enrolled_on": "2026-01-12T00:00:00Z",
-                    "enrollment_is_active": n % 12 != 0,
+                    "enrollment_is_active": no_completion or n % 12 != 0,
                     "enrollment_mode": "audit" if n % 4 == 0 else "verified",
                     "outcomes_shared": shared,
                     "completion_status": status if shared else None,
@@ -891,6 +915,7 @@ def _needs_attention_row():
 # of going through RESOURCES.
 CONTRACT_ONLY = {
     "learner-progress": "_handle_learner_progress",
+    "learners": "_handle_learners",
     "course-runs": "_handle_course_runs",
 }
 
@@ -1040,6 +1065,81 @@ class Handler(BaseHTTPRequestHandler):
                 "completion_status_counts": completion_status_counts,
                 "needs_attention_count": needs_attention_count,
                 "data": page,
+            },
+        )
+
+    def _handle_learners(self, org, qs):
+        """learners: the same filters as `learner-progress`, but paged by
+        learner. A learner is listed when one active enrollment matches every
+        filter at once, and then all their active enrollments come back,
+        matching or not. `limit` is capped at the real API's 25.
+        """
+        search = (qs.get("search", [""])[0] or "").strip().lower()
+        statuses = qs.get("completion_status", [])
+        needs_attention = qs.get("needs_attention", [None])[0]
+
+        def matches(r):
+            if search and not (
+                search in (r["full_name"] or "").lower()
+                or search in r["email"].lower()
+            ):
+                return False
+            if statuses and not (
+                r["completion_status"] in statuses
+                or (r["completion_status"] is None and "unknown" in statuses)
+            ):
+                return False
+            if needs_attention is not None:
+                return r["needs_attention"] is (needs_attention.lower() == "true")
+            return True
+
+        active = [r for r in LEARNER_PROGRESS if r["enrollment_is_active"]]
+        matched = {r["learner_id"] for r in active if matches(r)}
+        learners = {}
+        for r in active:
+            if r["learner_id"] not in matched:
+                continue
+            learner = learners.setdefault(
+                r["learner_id"],
+                {
+                    "learner_id": r["learner_id"],
+                    "email": r["email"],
+                    "full_name": r["full_name"],
+                    "enrollments": [],
+                },
+            )
+            learner["enrollments"].append(
+                {
+                    k: v
+                    for k, v in r.items()
+                    if k not in ("learner_id", "email", "full_name")
+                }
+            )
+
+        # Name, then email, then id, with missing names last.
+        rows = sorted(
+            learners.values(),
+            key=lambda l: (
+                l["full_name"] is None,
+                l["full_name"] or "",
+                l["email"] or "",
+                l["learner_id"],
+            ),
+        )
+
+        offset, limit = self._parse_offset_limit(qs)
+        limit = 25 if limit is None else limit
+        if limit > 25:
+            self._send_json(422, {"detail": "limit must be at most 25"})
+            return
+
+        self._send_json(
+            200,
+            {
+                "organization_id": org,
+                "as_of": AS_OF,
+                "total_count": len(rows),
+                "data": rows[offset : offset + limit],
             },
         )
 
