@@ -3049,16 +3049,30 @@ for location in code_locations:
 
     # Add higher resources for lakehouse deployment (runs dbt)
     if name == "lakehouse":
+        lakehouse_cpu_limit = 4
         deployment["resources"] = {
             "requests": {
                 "cpu": "1000m",
                 "memory": "2Gi",
             },
             "limits": {
-                "cpu": "4000m",
+                "cpu": f"{lakehouse_cpu_limit * 1000}m",
                 "memory": "8Gi",
             },
         }
+        # The multiprocess executor otherwise starts multiprocessing.cpu_count()
+        # steps at once, which is the node's vCPU count, not this pod's CPU
+        # limit, and each step subprocess imports the whole code location.
+        # Lakehouse run workers died about 40s after a dbt build fanned out to
+        # its Superset steps on 2026-10-12, with the working set climbing toward
+        # the 8Gi limit. The env reaches run workers through the container
+        # context the chart builds from this env list.
+        deployment["env"].append(
+            {
+                "name": "DAGSTER_MULTIPROCESS_EXECUTOR_MAX_CONCURRENT",
+                "value": str(lakehouse_cpu_limit),
+            }
+        )
         # Lakehouse has slow definitions loading (~19s) due to Airbyte+dbt integration.
         # Increase startup probe delays to prevent race condition when webserver tries
         # to connect before the code location has finished initializing.
