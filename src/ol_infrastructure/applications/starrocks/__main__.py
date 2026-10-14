@@ -1025,7 +1025,7 @@ starrocks_release = kubernetes.helm.v3.Release(
 # unfiltered, and StarRocks emits ~700 series per FE and ~2,350 per CN (a third
 # of the CN's are per-RPC-method brpc bvars). Unfiltered, prod would be ~49k
 # series with CN at its HPA max of 20, so each endpoint keeps only the families
-# the StarRocks dashboards and alerts use (~63 per FE, ~171 per CN, measured
+# the StarRocks dashboards and alerts use (~84 per FE, ~191 per CN, measured
 # against prod /metrics on 2026-10-14). A family missing here is dropped at
 # scrape time: add it to the list before building a panel or rule on it.
 #
@@ -1038,6 +1038,10 @@ STARROCKS_FE_KEEP_METRICS = [
     "node_info",
     "starrocks_fe_query_(total|success|err|err_rate|internal_err|analysis_err|timeout)",
     "starrocks_fe_query_latency_ms(_sum|_count)?",
+    # Iceberg query latency only shows up per catalog; the query_latency_ms
+    # family above reads ~1ms on prod while Iceberg p75 is ~1.6s.
+    "starrocks_fe_catalog_query_(total|success|err|internal_err|analysis_err)",
+    "starrocks_fe_catalog_query_latency_ms(_sum|_count)?",
     "starrocks_fe_query_queue_(pending|total|timeout|slot_pending|slot_running)",
     "starrocks_fe_(connection_total|qps|rps|slow_query)",
     "starrocks_fe_(max_journal_id|max_journal_replay_lag|meta_replay_lag_second)",
@@ -1055,7 +1059,7 @@ STARROCKS_CN_KEEP_METRICS = [
     "starrocks_be_process_(fd_num_used|fd_num_limit_soft|thread_num)",
     "starrocks_be_cpu",
     "starrocks_be_datacache_(disk|mem)_(quota|used)_bytes",
-    "starrocks_be_block_cache_(hit|miss)(_bytes)?",
+    "starrocks_be_block_cache_(hit|miss)_(bytes|count)",
     "starrocks_be_query_scan_(bytes|rows)",
     "starrocks_be_(fragment_requests_total|pip_query_ctx_cnt)",
     "starrocks_be_pipe_(driver_queue_len|scan_pending_tasks)",
@@ -1068,7 +1072,10 @@ STARROCKS_CN_KEEP_METRICS = [
     "lake_vacuum_del_file_fails",
     "fslib_s3_(single|multi)_upload_latency(_bucket|_sum|_count)?",
     "fslib_(read|write)_io_latency(_bucket|_sum|_count)?",
-    "fslib_(qps_limit_error|file_replicate_fail)",
+    "fslib_(read|write)_io_size_(sum|count)",
+    "fslib_s3_(single|multi)_upload_size_(sum|count)",
+    "fslib_qps_limit_error",
+    "fslib_file_replicate(_fail)?_count",
     "starlet_get_shard_info_rpc(_fail)?_count",
     "threadpool_task_exception_total",
     "starrocks_be_engine_requests_total",
