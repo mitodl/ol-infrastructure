@@ -190,4 +190,4 @@ LOKI_VERSION = "3.7.8"
 # renovate: datasource=docker depName=alloy packageName=grafana/alloy
 ALLOY_VERSION = "v1.20.1"
 # renovate: datasource=docker depName=grafana packageName=grafana/grafana
-GRAFANA_VERSION = "11.6.16"
+GRAFANA_VERSION = "13.2.2"
