@@ -1018,6 +1018,122 @@ starrocks_release = kubernetes.helm.v3.Release(
     ),
 )
 
+############################################################
+# Monitoring — ServiceMonitors for FE and CN
+#
+# Alloy's prometheusOperatorObjects ships every ServiceMonitor to Grafana Cloud
+# unfiltered, and StarRocks emits ~700 series per FE and ~2,350 per CN (a third
+# of the CN's are per-RPC-method brpc bvars). Unfiltered, prod would be ~49k
+# series with CN at its HPA max of 20, so each endpoint keeps only the families
+# the StarRocks dashboards and alerts use (~63 per FE, ~169 per CN, measured
+# against prod /metrics on 2026-10-14). A family missing here is dropped at
+# scrape time: add it to the list before building a panel or rule on it.
+#
+# The chart's own ServiceMonitors (metrics.serviceMonitor) stay disabled: its
+# template has no metricRelabelings hook.
+############################################################
+STARROCKS_FE_KEEP_METRICS = [
+    "jvm_(heap|non_heap)_size_bytes",
+    "jvm_thread",
+    "node_info",
+    "starrocks_fe_query_(total|success|err|err_rate|internal_err|analysis_err|timeout)",
+    "starrocks_fe_query_latency_ms(_sum|_count)?",
+    "starrocks_fe_query_queue_(pending|total|timeout|slot_pending|slot_running)",
+    "starrocks_fe_(connection_total|qps|rps|slow_query)",
+    "starrocks_fe_(max_journal_id|max_journal_replay_lag|meta_replay_lag_second)",
+    "starrocks_fe_(editlog_stacked_num|safe_mode)",
+    "starrocks_fe_lake_compaction_(failed|running|running_tasks|success)",
+    "starrocks_fe_max_tablet_compaction_score",
+    "starrocks_fe_txn_(begin|success|failed|reject|running)",
+    "starrocks_fe_(tablet_num|total_data_size_bytes)",
+    "starrocks_fe_thrift_server_rejected_connections_total",
+    "starrocks_fe_mv_global_refresh_(failed_jobs_total|jobs_total)",
+]
+STARROCKS_CN_KEEP_METRICS = [
+    "starrocks_be_(process|query|load|compaction|metadata)_mem_bytes",
+    "starrocks_be_memory_pool_bytes_total",
+    "starrocks_be_process_(fd_num_used|fd_num_limit_soft|thread_num)",
+    "starrocks_be_cpu",
+    "starrocks_be_datacache_(disk|mem)_(quota|used)_bytes",
+    "starrocks_be_block_cache_(hit|miss)(_bytes)?",
+    "starrocks_be_query_scan_(bytes|rows)",
+    "starrocks_be_(fragment_requests_total|pip_query_ctx_cnt)",
+    "starrocks_be_pipe_(driver_queue_len|scan_pending_tasks)",
+    "starrocks_be_query_spill_bytes_(read|write)_total",
+    "starrocks_be_spill_disk_bytes_used",
+    "starrocks_be_resource_group_(cpu_use_ratio|inuse_cpu_cores|mem_inuse_bytes)",
+    "starrocks_be_tablet_(base|cumulative|update)_max_compaction_score",
+    "lake_aggregate_compaction_(failed|total)_tasks",
+    "lake_(aggregate_)?publish_version_failed_tasks",
+    "lake_vacuum_del_file_fails",
+    "fslib_s3_(single|multi)_upload_latency(_bucket|_sum|_count)?",
+    "fslib_(read|write)_io_latency(_bucket|_sum|_count)?",
+    "fslib_(qps_limit_error|file_replicate_fail)",
+    "starlet_get_shard_info_rpc(_fail)?_count",
+    "threadpool_task_exception_total",
+    "starrocks_be_engine_requests_total",
+    "starrocks_be_network_(receive|send)_bytes",
+]
+
+starrocks_cluster_name = f"{stack_info.env_prefix}-starrocks"
+for component, port, keep_metrics in (
+    ("fe", "http", STARROCKS_FE_KEEP_METRICS),
+    ("cn", "webserver", STARROCKS_CN_KEEP_METRICS),
+):
+    kubernetes.apiextensions.CustomResource(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-{component}-service-monitor",
+        api_version="monitoring.coreos.com/v1",
+        kind="ServiceMonitor",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{starrocks_cluster_name}-{component}",
+            namespace=namespace,
+            labels={**k8s_app_labels.model_dump(), "release": "prometheus"},
+        ),
+        spec={
+            # The headless -search Services carry the same labels but not the
+            # metrics port, so selecting on the port name keeps one target per
+            # pod.
+            "selector": {
+                "matchLabels": {
+                    "app.starrocks.ownerreference/name": starrocks_cluster_name,
+                    "app.kubernetes.io/component": component,
+                },
+            },
+            "namespaceSelector": {"matchNames": [namespace]},
+            "endpoints": [
+                {
+                    "port": port,
+                    "path": "/metrics",
+                    "scheme": "http",
+                    "interval": "30s",
+                    "scrapeTimeout": "10s",
+                    "relabelings": [
+                        {
+                            "targetLabel": "job",
+                            "replacement": f"starrocks-{component}",
+                        },
+                        {
+                            "sourceLabels": ["__meta_kubernetes_pod_name"],
+                            "targetLabel": "pod",
+                        },
+                        {
+                            "sourceLabels": ["__meta_kubernetes_namespace"],
+                            "targetLabel": "namespace",
+                        },
+                    ],
+                    "metricRelabelings": [
+                        {
+                            "sourceLabels": ["__name__"],
+                            "regex": "|".join(keep_metrics),
+                            "action": "keep",
+                        },
+                    ],
+                }
+            ],
+        },
+        opts=ResourceOptions(depends_on=[starrocks_release]),
+    )
+
 if stack_info.name == "Production":
     # Backstop for any voluntary-eviction path other than Karpenter (e.g. a
     # manual `kubectl drain`, an EKS-managed node group upgrade) that respects
