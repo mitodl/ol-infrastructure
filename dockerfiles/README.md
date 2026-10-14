@@ -24,6 +24,13 @@ package that depends on it (for example `libcairo2-dev`, through
 `/var/log/apt/history.log` for `Remove: python-X.Y`, and install the runtime
 library instead of the `-dev` package.
 
+The image also restores `/usr/bin/which` (DHI ships only `which.debianutils`).
+Without it, Debian maintainer scripts that test `which <tool>` skip their setup
+silently. For example, `ca-certificates-java` never builds
+`/etc/ssl/certs/java/cacerts`, so Java can't make HTTPS calls. An app that
+installs a JRE gets its Java trust store from the next `update-ca-certificates`
+run, which the app Dockerfiles already do after copying `certs/`.
+
 App image builds that consume this base must set `OUTPUT_OCI: "true"` (see
 `src/ol_concourse/pipelines/infrastructure/k8s_apps/pipeline.py`) so DHI's zstd-compressed
 layers stay correctly labeled through single-platform builds — see
