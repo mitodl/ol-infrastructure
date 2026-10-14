@@ -574,21 +574,27 @@ _make_cronjob(
 #
 # Lineage for Iceberg-backed tables is also captured here since Trino is
 # the query engine that reads and writes them.
+#
+# Disabled in QA: galaxy_telemetry is not attached to the QA Galaxy cluster,
+# so every run fails with CATALOG_NOT_FOUND.
 
-_make_cronjob(
-    name="trino-lineage",
-    schedule="0 6 * * *",
-    python_script=(Path(__file__).parent / "scripts" / "trino_lineage.py").read_text(),
-    extra_env=[
-        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
-        _plain_env("OM_SERVICE_NAME", service_name_trino),
-        _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
-        _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
-        _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
-        _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
-    ],
-    bot_secret_name="om-lineage-bot",  # noqa: S106  # pragma: allowlist secret
-)
+if om_config.require_bool("enable_trino_lineage"):
+    _make_cronjob(
+        name="trino-lineage",
+        schedule="0 6 * * *",
+        python_script=(
+            Path(__file__).parent / "scripts" / "trino_lineage.py"
+        ).read_text(),
+        extra_env=[
+            _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+            _plain_env("OM_SERVICE_NAME", service_name_trino),
+            _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
+            _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
+            _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
+            _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
+        ],
+        bot_secret_name="om-lineage-bot",  # noqa: S106  # pragma: allowlist secret
+    )
 
 # ---------------------------------------------------------------------------
 # Glue Data Catalog metadata ingestion
