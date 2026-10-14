@@ -149,13 +149,19 @@ tika_helm_release = kubernetes.helm.v3.Release(
                 "type": "ClusterIP",
                 "port": 9998,
             },
+            # Idle most of the day, then batch jobs pin every pod. The chart's
+            # default limits.cpu of 2 merges under these values unless
+            # overridden; at 2 cores pods were CFS-throttled in ~60% of
+            # periods during the 2026-10-02 backfill and the parser watchdog
+            # restarted the forked JVM on TIMEOUT. 4 cores lets a burst finish.
             "resources": {
                 "requests": {
-                    "cpu": "10m",  # does nothing most of the time
-                    "memory": "4Gi",  # java never gives it back
+                    "cpu": "1",
+                    "memory": "6Gi",  # java never gives it back
                 },
                 "limits": {
-                    "memory": "4Gi",
+                    "cpu": "4",
+                    "memory": "6Gi",
                 },
             },
             # By default the JVM's container-aware ergonomics only give the
@@ -164,24 +170,24 @@ tika_helm_release = kubernetes.helm.v3.Release(
             # unbounded. That combination lets a single large document balloon
             # off-heap and get the whole container OOMKilled by the kernel
             # rather than the JVM raising a catchable OutOfMemoryError.
-            # Budget the JVM at 1152Mi heap + 320Mi metaspace + 320Mi direct
-            # memory (1792Mi total, unchanged). The container limit is raised
-            # to 4Gi (2026-08-15: 3Gi->4Gi, rather than sized to exactly match
-            # the JVM budget) to leave ~2304Mi of headroom outside the JVM
-            # entirely: Tika's default PDF OCR strategy is AUTO, which
+            # Budget the JVM at 2048Mi heap + 320Mi metaspace + 320Mi direct
+            # memory (2688Mi). The rest of the container limit is headroom
+            # outside the JVM: Tika's default PDF OCR strategy is AUTO, which
             # auto-invokes the `tesseract` binary as a native subprocess for
             # scanned/image PDF pages, and that subprocess's memory isn't
-            # bounded by any JAVA_TOOL_OPTIONS flag. The prior 1280Mi of
-            # headroom was chronically sitting at 1-6% free (peaking
-            # 2900-3066Mi against the 3Gi cap) once OCR_PDF_MAX_PAGE_THRESHOLD
-            # was raised to 20 (mit_learn PR #5305), causing repeated
-            # production OOMKills during the daily OLX ingestion job.
+            # bounded by any JAVA_TOOL_OPTIONS flag.
+            # 2026-10-14: heap 1152m->2g, limit 4Gi->6Gi. With the 1152m heap,
+            # on 2026-10-02 the watchdog restarted the forked parser 128 times
+            # with status ERROR and Tika logged 276 "OutOfMemoryError: Java
+            # heap space" lines. Container RSS peaked at ~3970Mi of 4Gi in the
+            # 30 days to 2026-10-14, so the heap could only grow if the limit
+            # did. The extra 2Gi covers the 896Mi heap increase and
+            # keeps the ~2.3Gi non-JVM headroom the 4Gi limit was sized for.
             "env": [
                 {
                     "name": "JAVA_TOOL_OPTIONS",
                     "value": (
-                        "-Xmx1152m -XX:MaxMetaspaceSize=320m "
-                        "-XX:MaxDirectMemorySize=320m"
+                        "-Xmx2g -XX:MaxMetaspaceSize=320m -XX:MaxDirectMemorySize=320m"
                     ),
                 },
             ],
