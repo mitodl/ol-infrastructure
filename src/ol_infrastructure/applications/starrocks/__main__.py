@@ -1025,7 +1025,7 @@ starrocks_release = kubernetes.helm.v3.Release(
 # unfiltered, and StarRocks emits ~700 series per FE and ~2,350 per CN (a third
 # of the CN's are per-RPC-method brpc bvars). Unfiltered, prod would be ~49k
 # series with CN at its HPA max of 20, so each endpoint keeps only the families
-# the StarRocks dashboards and alerts use (~63 per FE, ~169 per CN, measured
+# the StarRocks dashboards and alerts use (~63 per FE, ~171 per CN, measured
 # against prod /metrics on 2026-10-14). A family missing here is dropped at
 # scrape time: add it to the list before building a panel or rule on it.
 #
