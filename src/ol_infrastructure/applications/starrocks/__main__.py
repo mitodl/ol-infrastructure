@@ -1025,8 +1025,10 @@ starrocks_release = kubernetes.helm.v3.Release(
 # unfiltered, and StarRocks emits ~700 series per FE and ~2,350 per CN (a third
 # of the CN's are per-RPC-method brpc bvars). Unfiltered, prod would be ~49k
 # series with CN at its HPA max of 20, so each endpoint keeps only the families
-# the StarRocks dashboards and alerts use (~84 per FE, ~191 per CN, measured
-# against prod /metrics on 2026-10-14). A family missing here is dropped at
+# the StarRocks dashboards and alerts use (~84 per FE, ~181 per CN, measured
+# against prod /metrics on 2026-10-14 with 2 CNs; FE's tablet_num adds one
+# series per CN). CN CPU comes from cadvisor: starrocks_be_cpu is whole-node
+# /proc/stat, not the container. A family missing here is dropped at
 # scrape time: add it to the list before building a panel or rule on it.
 #
 # The chart's own ServiceMonitors (metrics.serviceMonitor) stay disabled: its
@@ -1057,7 +1059,6 @@ STARROCKS_CN_KEEP_METRICS = [
     "starrocks_be_(process|query|load|compaction|metadata)_mem_bytes",
     "starrocks_be_memory_pool_bytes_total",
     "starrocks_be_process_(fd_num_used|fd_num_limit_soft|thread_num)",
-    "starrocks_be_cpu",
     "starrocks_be_datacache_(disk|mem)_(quota|used)_bytes",
     "starrocks_be_block_cache_(hit|miss)_(bytes|count)",
     "starrocks_be_query_scan_(bytes|rows)",
