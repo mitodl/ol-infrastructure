@@ -52,9 +52,14 @@ vacuum or load-rejection failures at all.
 
 Severity and routing
 --------------------
-Conditions that stop StarRocks serving or loading get a production-only
-Critical rule plus a Warning for CI/QA; the rest are Warning everywhere. Every
-rule carries ``service="starrocks"`` for the Rootly service route.
+Every rule is Warning, in every environment, until Rootly routes
+``service="starrocks"`` to its own service. The routing spec tiers StarRocks
+at ``notify``, and a Critical here would page at Rootly's default High urgency
+before that route exists. The first five rules (quorum lost, no FE scraped,
+safe mode, FE volume full, compaction score past 500) are the ones that mean
+StarRocks has stopped serving or loading, and are the candidates for a
+production Critical once it does. Each Grafana stack only sees its own
+environment's metrics, so an unfiltered rule is per environment already.
 """
 
 from collections.abc import Callable
@@ -62,8 +67,7 @@ from collections.abc import Callable
 from pulumi import Input, ResourceOptions
 from pulumiverse_grafana import alerting
 
-_NON_PROD_CLUSTERS = ".*-(ci|qa)"
-_PROD_CLUSTERS = ".*-(production)"
+_ALL_CLUSTERS = ".+"
 _LABELS = {"service": "starrocks"}
 _FE = 'job="starrocks-fe"'
 _CN = 'job="starrocks-cn"'
@@ -125,38 +129,6 @@ def _compaction_score_very_high(clusters: str) -> str:
     )
 
 
-def _paired(
-    name: str,
-    expr: Callable[[str], str],
-    for_: str,
-    description: str,
-    rd: Callable[[str], list[alerting.RuleGroupRuleDataArgs]],
-) -> list[alerting.RuleGroupRuleArgs]:
-    """Build a Warning (CI/QA) and Critical (production) pair of one rule."""
-    return [
-        alerting.RuleGroupRuleArgs(
-            name=f"{name}Warning",
-            condition="C",
-            for_=for_,
-            no_data_state="OK",
-            exec_err_state="OK",
-            labels={**_LABELS, "severity": "warning"},
-            annotations={"description": description},
-            datas=rd(expr(_NON_PROD_CLUSTERS)),
-        ),
-        alerting.RuleGroupRuleArgs(
-            name=f"{name}Critical",
-            condition="C",
-            for_=for_,
-            no_data_state="OK",
-            exec_err_state="KeepLast",
-            labels={**_LABELS, "severity": "critical"},
-            annotations={"description": description},
-            datas=rd(expr(_PROD_CLUSTERS)),
-        ),
-    ]
-
-
 def _warning(
     name: str,
     expr: str,
@@ -189,37 +161,37 @@ def create(
         interval_seconds=60,
         rules=[
             # --- Not serving or not loading ---
-            *_paired(
+            _warning(
                 "StarRocksFEQuorumLost",
-                _fe_quorum_lost,
+                _fe_quorum_lost(_ALL_CLUSTERS),
                 "2m",
                 "StarRocks in cluster {{ $labels.cluster }} has {{ $value }} FE members down, too few left for a majority. No leader can be elected, so DDL and load commits are stopped.",
                 rd,
             ),
-            *_paired(
+            _warning(
                 "StarRocksFEAllDown",
-                _fe_all_down,
+                _fe_all_down(_ALL_CLUSTERS),
                 "5m",
                 "No StarRocks FE in cluster {{ $labels.cluster }} is being scraped. Either every FE is down or the starrocks-fe ServiceMonitor has stopped matching, and every other FE rule in this group is blind until it is back.",
                 rd,
             ),
-            *_paired(
+            _warning(
                 "StarRocksSafeMode",
-                _safe_mode,
+                _safe_mode(_ALL_CLUSTERS),
                 "5m",
                 "StarRocks in cluster {{ $labels.cluster }} is in safe mode: it rejects every load and aborts running transactions. The leader FE enters it when a backend disk falls below min(10%, 50GB) free.",
                 rd,
             ),
-            *_paired(
+            _warning(
                 "StarRocksFEVolumeAlmostFull",
-                _fe_volume_full,
+                _fe_volume_full(_ALL_CLUSTERS),
                 "10m",
                 "StarRocks FE volume {{ $labels.persistentvolumeclaim }} in cluster {{ $labels.cluster }} is {{ $value | humanizePercentage }} full. An FE that cannot write its metadata journal stops.",
                 rd,
             ),
-            *_paired(
+            _warning(
                 "StarRocksCompactionScoreVeryHigh",
-                _compaction_score_very_high,
+                _compaction_score_very_high(_ALL_CLUSTERS),
                 "15m",
                 "StarRocks in cluster {{ $labels.cluster }} has a partition at compaction score {{ $value }}. Loads into it are being slowed, StarRocks' docs say a score past 500 may need manual intervention, and at 2000 loads are rejected.",
                 rd,
