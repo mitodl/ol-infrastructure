@@ -470,6 +470,10 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         valid_redirect_uris=[
             f"https://learn.{root_domain}/*",
             f"https://api.learn.{root_domain}/*",
+            # mitxonline's deployed gateway routes authenticate through this
+            # client (sso/mitlearn), so rendering them locally needs its hosts.
+            f"https://mitxonline.{root_domain}/*",
+            f"https://api.mitxonline.{root_domain}/*",
         ],
         web_origins=["+"],
         opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
