@@ -101,12 +101,12 @@ def _dashboard_json(
                 unit="percentunit",
             ),
             stat_panel(
-                title="Iceberg p95 Latency (worst FE)",
+                title="Iceberg p95 Latency (now, worst FE)",
                 expr=(
                     "max(starrocks_fe_catalog_query_latency_ms"
                     f'{{{_FE}, catalog_type="iceberg", quantile="0.95"}}'
                     "\nand on (pod) (increase(starrocks_fe_catalog_query_latency_ms_count"
-                    f'{{{_FE}, catalog_type="iceberg"}}[$__range]) > 0))'
+                    f'{{{_FE}, catalog_type="iceberg"}}{_RATE}) > 0))'
                 ),
                 grid_pos={"h": 4, "w": 4, "x": 16, "y": 1},
                 unit="ms",
