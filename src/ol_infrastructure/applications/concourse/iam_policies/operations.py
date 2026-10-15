@@ -35,6 +35,15 @@ policy_definition = {
             ],
         },
         {
+            # The OpenMetadata contracts sync resolves dbt bindings with the
+            # production manifest that Dagster uploads nightly for OpenMetadata.
+            "Effect": "Allow",
+            "Action": "s3:GetObject",
+            "Resource": (
+                "arn:aws:s3:::dagster-data-production/openmetadata/dbt-artifacts/manifest.json"
+            ),
+        },
+        {
             "Effect": "Allow",
             "Action": "s3:ListBucketVersions",
             "Resource": "arn:aws:s3:::*",
