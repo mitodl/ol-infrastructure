@@ -51,6 +51,7 @@ from ol_infrastructure.components.services.apisix import (
     FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -2168,10 +2169,12 @@ mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",
-        vaultauth=vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     ),
 )
 mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
@@ -2192,10 +2195,12 @@ mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",
-        vaultauth=vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     ),
 )
 

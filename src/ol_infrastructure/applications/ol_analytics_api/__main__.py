@@ -83,6 +83,7 @@ from ol_infrastructure.components.applications.eks import (
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -686,10 +687,12 @@ ol_analytics_api_oidc_resources = OLApisixOIDCResources(
         oidc_logout_path="/logout/oidc",
         oidc_post_logout_redirect_uri=f"https://{ol_analytics_api_domain}/",
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/ol-analytics-api",
-        vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/ol-analytics-api",
+            vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
+        ),
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
@@ -738,10 +741,12 @@ if ol_analytics_api_learn_domain:
                 stack_info.env_suffix,
             ),
             oidc_use_session_secret=True,
-            vault_mount="secret-operations",
-            vault_mount_type="kv-v1",
-            vault_path="sso/mitlearn",
-            vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
+            credentials=OLApisixOIDCVaultCredentials(
+                mount="secret-operations",
+                mount_type="kv-v1",
+                path="sso/mitlearn",
+                vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
+            ),
         ),
         opts=ResourceOptions(
             delete_before_replace=True,

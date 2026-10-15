@@ -18,6 +18,7 @@ from ol_infrastructure.components.applications.eks import (
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -341,10 +342,12 @@ celery_monitoring_oidc_resources = OLApisixOIDCResources(
         oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
         oidc_scope="openid profile email",
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/leek",
-        vaultauth=celery_monitoring_auth_binding.vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/leek",
+            vaultauth=celery_monitoring_auth_binding.vault_k8s_resources.auth_name,
+        ),
     ),
 )
 
