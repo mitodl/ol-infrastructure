@@ -929,6 +929,12 @@ learn_ai_app_k8s = OLApplicationK8s(
             # bump, since pyproject allows granian<3 and a lockfile refresh alone moves
             # it (mit-learn#4024).
             respawn_interval=60,
+            # Fresh pods sit at 523-595MiB container RSS (7d to 2026-10-15). On an
+            # RSS respawn the old worker keeps draining long-lived streamed responses
+            # beside the new one (up to ~22 minutes observed), so the cap has to leave
+            # room for both. All 3 OOMKills in the 14 days to 2026-10-15 came 65-90s
+            # into a respawn, two of them at the 1536Mi floor limit.
+            worker_startup_rss=600,
             runtime_mode=None,
             # Holding pin: the component default dropped to 1. asgi forces
             # blocking_threads=1 regardless, so this is the only axis on which the
@@ -964,8 +970,14 @@ learn_ai_app_k8s = OLApplicationK8s(
         # imports litellm, so exec'ing a shell or running a management command
         # in a live pod has no headroom against a 1000Mi limit. Keep the
         # request where actual usage sits and raise the limit for burst room.
+        # The limit is also the lowest one the memory VPA admits a pod with (it
+        # keeps the request:limit ratio and floors the request), so it sets the
+        # Granian RSS cap: (0.9 * 2048 - worker_startup_rss 600) = 1243MiB. That is
+        # close to the 1382MiB cap 1536Mi gave without the reservation, so respawns
+        # stay about as frequent (34 in 14 days). The p90 pod peaked at 1312MiB
+        # container RSS over the 7 days to 2026-10-15.
         resource_requests={"cpu": "100m", "memory": "1000Mi"},
-        resource_limits={"memory": "1536Mi"},
+        resource_limits={"memory": "2048Mi"},
         init_migrations=True,
         init_collectstatic=True,  # Assuming createcachetable is not needed or handled elsewhere
         # Both queues run --concurrency=2 prefork (component default), so each
