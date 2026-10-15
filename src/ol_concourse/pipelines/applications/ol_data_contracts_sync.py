@@ -17,12 +17,26 @@ from ol_concourse.lib.resources import git_repo, schedule
 
 from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
+# A commit that changes contracts/ triggers a sync, and the contracts are read
+# from this resource's checkout, which is always the commit that last changed
+# them. ol-dbt-cli runs from the unfiltered checkout below: a path-filtered
+# resource only has versions for commits under its paths, so its CLI code and
+# uv.lock would be as old as the last contracts/ commit. (Reading the contracts
+# from the unfiltered checkout instead could miss the triggering commit, since
+# the two resources are checked independently.)
+contracts_changes = git_repo(
+    name=Identifier("ol-data-platform-contracts"),
+    uri="https://github.com/mitodl/ol-data-platform",
+    branch="main",
+    check_every="60s",
+    paths=["contracts/"],
+)
+
 ol_data_platform_repo = git_repo(
     name=Identifier("ol-data-platform-repository"),
     uri="https://github.com/mitodl/ol-data-platform",
     branch="main",
     check_every="60s",
-    paths=["contracts/"],
 )
 
 # Also daily, after the 03:00 UTC om-ingest-dbt run and the 04:00 UTC manifest
@@ -55,11 +69,12 @@ boto3.client("s3").download_file(
 '
 uv run --frozen --package ol-dbt-cli ol-dbt contracts sync \\
     --service "Starburst Galaxy" \\
-    --manifest /tmp/manifest.json
+    --manifest /tmp/manifest.json \\
+    --contracts-dir ../ol-data-platform-contracts/contracts
 """
 
 sync_pipeline = Pipeline(
-    resources=[ol_data_platform_repo, daily_sync],
+    resources=[contracts_changes, ol_data_platform_repo, daily_sync],
     jobs=[
         Job(
             name=Identifier("sync-data-contracts-to-openmetadata"),
@@ -68,8 +83,9 @@ sync_pipeline = Pipeline(
             # and put stale contracts back.
             serial=True,
             plan=[
-                GetStep(get=ol_data_platform_repo.name, trigger=True),
+                GetStep(get=contracts_changes.name, trigger=True),
                 GetStep(get=daily_sync.name, trigger=True),
+                GetStep(get=ol_data_platform_repo.name),
                 TaskStep(
                     task=Identifier("ol-dbt-contracts-sync"),
                     config=TaskConfig(
@@ -83,7 +99,10 @@ sync_pipeline = Pipeline(
                                 tag="python3.13-bookworm",
                             ),
                         ),
-                        inputs=[Input(name=ol_data_platform_repo.name)],
+                        inputs=[
+                            Input(name=contracts_changes.name),
+                            Input(name=ol_data_platform_repo.name),
+                        ],
                         params={
                             "AWS_DEFAULT_REGION": "us-east-1",
                             "OM_SERVER_URL": "((openmetadata_contracts_bot.server_url))",  # noqa: E501
