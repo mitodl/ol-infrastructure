@@ -187,6 +187,8 @@ ingress = create_ingress(
     apisix_viewer_key=apisix_viewer_key,
     cert_manager_version=CERT_MANAGER_CHART_VERSION,
     apisix_version=APISIX_CHART_VERSION,
+    trusted_ca_secret=tls.apisix_trusted_ca,
+    trusted_ca_checksum=tls.apisix_trusted_ca_checksum,
 )
 
 # ---------------------------------------------------------------------------
