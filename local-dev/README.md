@@ -445,7 +445,6 @@ The infrastructure is split across two Pulumi stacks:
 | Key | Default | Description |
 |-----|---------|-------------|
 | `*_client_secret` | `local-dev-*-secret` | OIDC client secrets (change if needed) |
-| `apisix_oidc_session_secret` | `local-dev-oidc-session-secret-32chars!` | Session encryption key (kept for reference) |
 
 ---
 
