@@ -13,7 +13,7 @@ from ol_concourse.lib.models.pipeline import (
     TaskConfig,
     TaskStep,
 )
-from ol_concourse.lib.resources import git_repo
+from ol_concourse.lib.resources import git_repo, schedule
 
 from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
@@ -25,12 +25,20 @@ ol_data_platform_repo = git_repo(
     paths=["contracts/"],
 )
 
+# Also daily, after the 03:00 UTC om-ingest-dbt run and the 04:00 UTC manifest
+# upload, so a contract that failed because its model was new succeeds once the
+# model is in both. A PUT of an unchanged contract changes nothing but its
+# updatedAt.
+daily_sync = schedule(Identifier("daily-after-manifest"), start="05:00", stop="06:00")
+
 # Publishes every contract in ol-data-platform's contracts/ to production
 # OpenMetadata. dbt bindings (e.g. `dbt_model: dim_user`) resolve against the
 # manifest Dagster uploads nightly for OpenMetadata, so a contract merged with a
-# brand new model fails here until that model has been built and ingested; the
-# sync exits non-zero rather than skipping it. There is no validate step: the
-# OpenMetadata server validates every contract daily.
+# brand new model fails here (the sync exits non-zero rather than skipping it)
+# until the daily trigger runs after that model is built and ingested. The sync
+# stops at the first binding it cannot resolve, so contracts after it in the
+# directory wait too. There is no validate step: the OpenMetadata server
+# validates every contract daily.
 #
 # The bot credentials are written to Vault by the open_metadata Pulumi stack
 # (secret-concourse/infrastructure/openmetadata_contracts_bot).
@@ -51,12 +59,13 @@ uv run --frozen --package ol-dbt-cli ol-dbt contracts sync \\
 """
 
 sync_pipeline = Pipeline(
-    resources=[ol_data_platform_repo],
+    resources=[ol_data_platform_repo, daily_sync],
     jobs=[
         Job(
             name=Identifier("sync-data-contracts-to-openmetadata"),
             plan=[
                 GetStep(get=ol_data_platform_repo.name, trigger=True),
+                GetStep(get=daily_sync.name, trigger=True),
                 TaskStep(
                     task=Identifier("ol-dbt-contracts-sync"),
                     config=TaskConfig(
