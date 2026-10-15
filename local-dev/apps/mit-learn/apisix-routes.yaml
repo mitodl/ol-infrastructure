@@ -95,8 +95,11 @@ spec:
           # /mitxonline/* routes on this host read the same cookie.
           cookie_name: mitlearn_apisix_session_dev
           cookie_domain: ".learn.mit.dev"
-          # 0 disables lua-resty-session's 900s idling / 3600s rolling
-          # defaults, as the deployed OIDC config does.
+          # 14 days, as deployed mit-learn sets; the /mitxonline/* reader in
+          # local-dev/apps/mitxonline/apisix-routes.yaml uses the same value,
+          # as deployed. 0 disables lua-resty-session's 900s idling / 3600s
+          # rolling defaults, leaving absolute_timeout in charge.
+          absolute_timeout: 1209600
           idling_timeout: 0
           rolling_timeout: 0
         ssl_verify: false
@@ -150,8 +153,11 @@ spec:
           # /mitxonline/* routes on this host read the same cookie.
           cookie_name: mitlearn_apisix_session_dev
           cookie_domain: ".learn.mit.dev"
-          # 0 disables lua-resty-session's 900s idling / 3600s rolling
-          # defaults, as the deployed OIDC config does.
+          # 14 days, as deployed mit-learn sets; the /mitxonline/* reader in
+          # local-dev/apps/mitxonline/apisix-routes.yaml uses the same value,
+          # as deployed. 0 disables lua-resty-session's 900s idling / 3600s
+          # rolling defaults, leaving absolute_timeout in charge.
+          absolute_timeout: 1209600
           idling_timeout: 0
           rolling_timeout: 0
         ssl_verify: false
@@ -206,8 +212,11 @@ spec:
           # /mitxonline/* routes on this host read the same cookie.
           cookie_name: mitlearn_apisix_session_dev
           cookie_domain: ".learn.mit.dev"
-          # 0 disables lua-resty-session's 900s idling / 3600s rolling
-          # defaults, as the deployed OIDC config does.
+          # 14 days, as deployed mit-learn sets; the /mitxonline/* reader in
+          # local-dev/apps/mitxonline/apisix-routes.yaml uses the same value,
+          # as deployed. 0 disables lua-resty-session's 900s idling / 3600s
+          # rolling defaults, leaving absolute_timeout in charge.
+          absolute_timeout: 1209600
           idling_timeout: 0
           rolling_timeout: 0
         ssl_verify: false
@@ -267,8 +276,11 @@ spec:
           # /mitxonline/* routes on this host read the same cookie.
           cookie_name: mitlearn_apisix_session_dev
           cookie_domain: ".learn.mit.dev"
-          # 0 disables lua-resty-session's 900s idling / 3600s rolling
-          # defaults, as the deployed OIDC config does.
+          # 14 days, as deployed mit-learn sets; the /mitxonline/* reader in
+          # local-dev/apps/mitxonline/apisix-routes.yaml uses the same value,
+          # as deployed. 0 disables lua-resty-session's 900s idling / 3600s
+          # rolling defaults, leaving absolute_timeout in charge.
+          absolute_timeout: 1209600
           idling_timeout: 0
           rolling_timeout: 0
         ssl_verify: false

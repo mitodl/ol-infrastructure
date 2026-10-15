@@ -252,14 +252,17 @@ spec:
         scope: "openid profile email ol-profile"
         ssl_verify: false
         renew_access_token_on_expiry: true
-        # Reads the session cookie mit-learn's routes issue: same name and
-        # domain as local-dev/apps/mit-learn/apisix-routes.yaml, same
-        # session.secret through the ol-mitlearn-oidc Secret.
+        # Reads the session cookie mit-learn's routes issue: same name, domain
+        # and timeout as local-dev/apps/mit-learn/apisix-routes.yaml, same
+        # session.secret through the ol-mitlearn-oidc Secret. lua-resty-session
+        # checks a cookie's age against the reader's own absolute_timeout, so
+        # a shorter value here would drop Learn sessions Learn still accepts.
         session:
           cookie_name: mitlearn_apisix_session_dev
           cookie_domain: ".learn.mit.dev"
+          absolute_timeout: 1209600
           # 0 disables lua-resty-session's 900s idling / 3600s rolling
-          # defaults, as the deployed OIDC config does.
+          # defaults, leaving absolute_timeout in charge, as deployed.
           idling_timeout: 0
           rolling_timeout: 0
         unauth_action: pass
