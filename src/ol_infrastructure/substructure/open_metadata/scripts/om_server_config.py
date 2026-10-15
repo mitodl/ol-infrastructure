@@ -28,6 +28,9 @@ Teams are declared in ``TEAM_CONFIG``.  Each is created as a ``Group`` (the
 only team type that can own assets and hold users) under ``Organization``.
 Membership is not managed here: it is assigned in the OpenMetadata UI, so a
 team that already exists is never sent a ``users`` list.
+
+Domains are declared in ``DOMAIN_CONFIG``.  Which assets belong to each is set
+from ol-data-platform's dbt manifest, not here.
 """
 
 import os
@@ -121,6 +124,69 @@ TEAM_CONFIG: dict[str, dict[str, str]] = {
 
 _TEAM_TYPE = "Group"
 
+# Desired state for each domain, keyed by domain name.  Domains split the
+# warehouse by business area rather than source platform, because dim_user and
+# the combined marts span every platform.  Assets are assigned to them by the
+# rules in ol-data-platform src/ol_dbt/openmetadata_domains.yml, which refer to
+# these names; the om-ingest-dbt job skips a name that does not exist here.
+# Every domain is "Aggregate": each holds raw tables from the source apps as
+# well as the models built for consumers.
+DOMAIN_CONFIG: dict[str, dict[str, str]] = {
+    "learners-identity": {
+        "displayName": "Learners & Identity",
+        "description": (
+            "Who our learners are: user accounts on each platform, profiles, "
+            "and the cross-platform identity in dim_user."
+        ),
+    },
+    "courses-content": {
+        "displayName": "Courses & Content",
+        "description": (
+            "Courses, runs, programs and their content: catalog pages, course "
+            "structure, videos, problems, instructors, topics, and the "
+            "resources published to MIT Learn."
+        ),
+    },
+    "enrollments-progress": {
+        "displayName": "Enrollments & Progress",
+        "description": (
+            "Enrollments in course runs and programs, grades, certificates and "
+            "learner progress."
+        ),
+    },
+    "commerce": {
+        "displayName": "Commerce",
+        "description": (
+            "Products, orders, payments, discounts, coupons and financial assistance."
+        ),
+    },
+    "b2b": {
+        "displayName": "B2B",
+        "description": (
+            "Organizations, contracts and their learners, and corporate sales."
+        ),
+    },
+    "feedback": {
+        "displayName": "Feedback",
+        "description": (
+            "Learner feedback from support tickets, forums, chatbot ratings and "
+            "content feedback, with its categories and sentiment."
+        ),
+    },
+    "engagement": {
+        "displayName": "Engagement",
+        "description": (
+            "What learners do in courses and on MIT Learn: tracking events, "
+            "video, problem, discussion and navigation activity, and chatbot use."
+        ),
+    },
+}
+
+_DOMAIN_TYPE = "Aggregate"
+
+# displayName is create-only for the same reason as teams.
+_DOMAIN_PATCHABLE_FIELDS: list[str] = ["description", "domainType"]
+
 # displayName is set when a team is created and never patched afterwards:
 # IngestionBotPolicy, which this job's token carries, denies EditDisplayName
 # on every resource.
@@ -173,6 +239,24 @@ def _reconcile_tag(fqn: str, desired: dict[str, Any]) -> None:
     _apply_patch(fqn, f"{OM_SERVER_URL}/v1/tags/{tag['id']}", ops)
 
 
+def _get_by_name(collection: str, name: str) -> dict[str, Any] | None:
+    """Fetch an entity by name, or None if it does not exist.
+
+    :param collection: The API collection, e.g. ``"teams"``.
+    :param name: The entity's name.
+    :raises requests.HTTPError: On any non-2xx response other than 404.
+    """
+    get_resp = requests.get(
+        f"{OM_SERVER_URL}/v1/{collection}/name/{name}",
+        headers=_AUTH_HEADER,
+        timeout=30,
+    )
+    if get_resp.status_code == requests.codes.not_found:
+        return None
+    get_resp.raise_for_status()
+    return get_resp.json()
+
+
 def _reconcile_team(name: str, desired: dict[str, str]) -> None:
     """Create the team if it is missing, else PATCH the fields that differ.
 
@@ -185,12 +269,8 @@ def _reconcile_team(name: str, desired: dict[str, str]) -> None:
     :raises requests.HTTPError: On any unexpected non-2xx response from the OM API.
     :raises ValueError: If the team exists with a type other than ``Group``.
     """
-    get_resp = requests.get(
-        f"{OM_SERVER_URL}/v1/teams/name/{name}",
-        headers=_AUTH_HEADER,
-        timeout=30,
-    )
-    if get_resp.status_code == requests.codes.not_found:
+    team = _get_by_name("teams", name)
+    if team is None:
         post_resp = requests.post(
             f"{OM_SERVER_URL}/v1/teams",
             headers=_AUTH_HEADER,
@@ -207,8 +287,6 @@ def _reconcile_team(name: str, desired: dict[str, str]) -> None:
         post_resp.raise_for_status()
         print(f"[done] team {name}: created")  # noqa: T201
         return
-    get_resp.raise_for_status()
-    team = get_resp.json()
 
     # The server refuses to change a Group's type, and a non-Group team cannot
     # own assets, so this needs a person to sort out.
@@ -227,8 +305,37 @@ def _reconcile_team(name: str, desired: dict[str, str]) -> None:
     _apply_patch(f"team {name}", f"{OM_SERVER_URL}/v1/teams/{team['id']}", ops)
 
 
+def _reconcile_domain(name: str, desired: dict[str, str]) -> None:
+    """Create the domain if it is missing, else PATCH the fields that differ.
+
+    :param name: Domain name, e.g. ``"commerce"``.
+    :param desired: Mapping of domain field names to desired values.
+    :raises requests.HTTPError: On any non-2xx response from the OM API.
+    """
+    wanted = {**desired, "domainType": _DOMAIN_TYPE}
+    domain = _get_by_name("domains", name)
+    if domain is None:
+        post_resp = requests.post(
+            f"{OM_SERVER_URL}/v1/domains",
+            headers=_AUTH_HEADER,
+            json={"name": name, **wanted},
+            timeout=30,
+        )
+        post_resp.raise_for_status()
+        print(f"[done] domain {name}: created")  # noqa: T201
+        return
+
+    ops = [
+        {"op": "add", "path": f"/{field}", "value": wanted[field]}
+        for field in _DOMAIN_PATCHABLE_FIELDS
+        if domain.get(field) != wanted[field]
+    ]
+
+    _apply_patch(f"domain {name}", f"{OM_SERVER_URL}/v1/domains/{domain['id']}", ops)
+
+
 def main() -> None:
-    """Reconcile every tag and team; exit non-zero if any step fails."""
+    """Reconcile every tag, team and domain; exit non-zero if any step fails."""
     errors: list[str] = []
 
     steps: list[tuple[str, Callable[[], None]]] = [
@@ -236,6 +343,10 @@ def main() -> None:
         *(
             (f"team {name}", partial(_reconcile_team, name, team))
             for name, team in TEAM_CONFIG.items()
+        ),
+        *(
+            (f"domain {name}", partial(_reconcile_domain, name, domain))
+            for name, domain in DOMAIN_CONFIG.items()
         ),
     ]
     for label, step in steps:
