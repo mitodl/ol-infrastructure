@@ -919,6 +919,16 @@ learn_ai_app_k8s = OLApplicationK8s(
         granian_config=GranianConfig(
             interface="asgi",
             workers=1,
+            # Above the measured cold start: RSS respawns in production took 14.7-19.5s
+            # from "Spawning worker-1" to "Started worker-1" (2026-10-14). On the 2.7.x
+            # the image ships today the main process holds the listener, so this only
+            # lets the old worker keep serving through the import instead of
+            # connections queueing for it. On 2.8.x the old worker is stopped after
+            # this interval whether or not the new one is listening, so Granian's 3.5s
+            # default would refuse connections for ~15s per respawn. Set ahead of the
+            # bump, since pyproject allows granian<3 and a lockfile refresh alone moves
+            # it (mit-learn#4024).
+            respawn_interval=60,
             runtime_mode=None,
             # Holding pin: the component default dropped to 1. asgi forces
             # blocking_threads=1 regardless, so this is the only axis on which the

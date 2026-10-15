@@ -245,6 +245,15 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
             blocking_threads=16,
             blocking_threads_idle_timeout=120,
             worker_startup_rss=bindings.granian_worker_startup_rss,
+            # On the 2.7.x the image ships today the main process holds the listener,
+            # so this only lets the old worker keep serving through the new one's
+            # import instead of connections queueing. On 2.8.x each worker binds its
+            # own socket after importing the app and the old one is stopped after this
+            # interval regardless, so at one worker anything shorter than the import
+            # refuses connections. Set ahead of the bump, since pyproject allows
+            # granian<3 and a lockfile refresh alone moves it (mit-learn#4024 did).
+            # 60s matches edxapp; the reserved worker_startup_rss covers the overlap.
+            respawn_interval=60,
             enable_metrics=True,
             # Serve /static/* from Granian's Rust layer instead of the sidecar
             # (docs/plans/remove-nginx-sidecar.md, stage 5), same shape as
