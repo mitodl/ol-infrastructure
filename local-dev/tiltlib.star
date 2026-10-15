@@ -95,7 +95,7 @@ def _stamp_deployments(content, fingerprint, image_tags):
     docs = [d for d in decode_yaml_stream(content) if d != None]
     stamped = False
     for d in docs:
-        if d.get("kind") == "Deployment":
+        if d.get("kind") in ("Deployment", "StatefulSet"):
             template = d.setdefault("spec", {}).setdefault("template", {})
             annotations = template.setdefault("metadata", {}).setdefault("annotations", {})
             annotations[_CONFIG_HASH_ANNOTATION] = fingerprint
@@ -105,7 +105,7 @@ def _stamp_deployments(content, fingerprint, image_tags):
         return None
     return encode_yaml_stream(docs)
 
-def k8s_yaml_local(paths, local_overrides=None):
+def k8s_yaml_local(paths, local_overrides=None, substitutions=None):
     """Apply k8s YAML with root-domain substitution and a pod-template
     fingerprint annotation covering every applied ConfigMap/Secret, including
     an optional gitignored ConfigMap of per-developer overrides (see module
@@ -134,6 +134,12 @@ def k8s_yaml_local(paths, local_overrides=None):
         content = str(read_file(p))
         if rd != _ROOT_DOMAIN_DEFAULT:
             content = content.replace(_ROOT_DOMAIN_DEFAULT, rd)
+        # Caller-supplied literal replacements, applied after the root-domain
+        # pass so a token cannot be mangled by it. Use these for values that
+        # vary per developer and are not simply the root domain -- a hostname
+        # that collides with something the developer already runs, say.
+        for token in (substitutions or {}):
+            content = content.replace(token, substitutions[token])
         contents.append((p, content))
 
     fingerprint = _config_fingerprint(contents)
