@@ -51,6 +51,7 @@ from ol_infrastructure.lib.aws.iam_helper import (
 )
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
@@ -97,14 +98,15 @@ vault_config = Config("vault")
 
 setup_vault_provider(stack_info)
 
-k8s_global_labels = K8sAppLabels(
+k8s_labels = K8sAppLabels(
     application=Application.open_metadata,
     product=Product.data,
     service=Services.open_metadata,
     ou=BusinessUnit.data,
     source_repository="https://github.com/open-metadata/OpenMetadata",
     stack=stack_info,
-).model_dump()
+)
+k8s_global_labels = k8s_labels.model_dump()
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
@@ -834,7 +836,11 @@ open_metadata_application = kubernetes.helm.v3.Release(
             repo="https://helm.open-metadata.org",
         ),
         values={
-            "commonLabels": k8s_global_labels,
+            # commonLabels is the chart's only label key. It reaches the server
+            # pods, the two CronJobs' pods and the OMJob operator Deployment's
+            # metadata, which do not share a role, so it carries the tier and no
+            # component. The operator's pod template takes no labels at all.
+            "commonLabels": k8s_labels.workload_labels(alert_tier=AlertTier.notify),
             "openmetadata": {
                 "config": {
                     # Ref: https://docs.open-metadata.org/latest/deployment/security/keycloak/kubernetes
