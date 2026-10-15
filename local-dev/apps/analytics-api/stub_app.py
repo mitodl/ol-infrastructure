@@ -713,7 +713,9 @@ def _build_learner_progress():
 
     Roughly one learner in nine has withheld consent (outcomes_shared False,
     every outcome field null) across all of their enrollments, since consent
-    is recorded per learner per contract in the real API. One enrollment in
+    is recorded per learner per contract in the real API. Half of those read
+    `declined` and half `not_recorded`, so the UI has both to tell apart.
+    One enrollment in
     twelve is deactivated, so both the consent banner and `include_inactive`
     have something to show without any per-request randomness.
     """
@@ -740,6 +742,10 @@ def _build_learner_progress():
                 else _LEARNER_STATUSES[n % len(_LEARNER_STATUSES)]
             )
             certified = status == "certified"
+            if shared:
+                consent_status = "consented"
+            else:
+                consent_status = "declined" if i % 18 == 0 else "not_recorded"
             rows.append(
                 {
                     # One id per learner, as in the real MV, where every
@@ -754,6 +760,7 @@ def _build_learner_progress():
                     "enrolled_on": "2026-01-12T00:00:00Z",
                     "enrollment_is_active": no_completion or n % 12 != 0,
                     "enrollment_mode": "audit" if n % 4 == 0 else "verified",
+                    "outcomes_consent_status": consent_status,
                     "outcomes_shared": shared,
                     "completion_status": status if shared else None,
                     "is_passing": (status in ("passed", "certified"))
