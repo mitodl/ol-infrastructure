@@ -2070,3 +2070,316 @@ async def test_a_broken_message_edit_does_not_stop_the_promotion(repos, promote_
         "my-app-pipeline", "my-app-release-gate"
     )
     assert "promoted `my-app`" in str(say.call_args.args[0])
+
+
+# ---------------------------------------------------------------------------
+# /doof help, /doof version, /doof uptime
+# ---------------------------------------------------------------------------
+
+
+async def test_help_is_a_subcommand_not_only_a_parse_failure(mixed_repos, slack):
+    await bot._cmd_doof(mixed_repos, slack.ack, slack.respond, _command("help"), {})
+
+    said = slack.said
+    # The apps too, so <app> is not guesswork -- and a legacy one is flagged.
+    assert "Apps: my-app" in said
+    assert "Still on the legacy pipeline, released by Doof: legacy-app" in said
+    for subcommand in ("release", "version", "uptime", "help"):
+        assert f"/doof {subcommand}" in said
+    # Every subcommand the dispatcher accepts is listed in the usage text.
+    for subcommand in bot._SUBCOMMANDS:
+        assert f"/doof {subcommand}" in bot._USAGE
+
+
+def _live_deployment(version, sha, environment, url="", age=timedelta(hours=5)):
+    return {
+        "id": 1,
+        "version": version,
+        "sha": sha,
+        "environment": environment,
+        "deployed_at": datetime.now(tz=UTC) - age,
+        "url": url,
+    }
+
+
+def _report(success=None, newer=None):
+    return {"success": success, "newer": newer}
+
+
+async def test_version_reports_production_and_rc(repos, slack, monkeypatch):
+    reports = {
+        "Production": _report(
+            _live_deployment(
+                "2026.10.8.1", "a" * 40, "Production", url="https://ci/builds/27"
+            )
+        ),
+        "RC": _report(
+            _live_deployment("2026.10.9.1", "b" * 40, "RC", age=timedelta(minutes=3))
+        ),
+    }
+
+    async def _deployment_report(repo, environment):
+        assert repo == "mitodl/my-app"
+        return reports[environment]
+
+    monkeypatch.setattr(bot.github, "deployment_report", _deployment_report)
+
+    await bot._cmd_version(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    said = slack.said
+    assert (
+        "• Production: <https://ci/builds/27|2026.10.8.1> · "
+        f"<https://github.com/mitodl/my-app/commit/{'a' * 40}|aaaaaaa> · "
+        "deployed 5h ago"
+    ) in said
+    # No build link recorded: the version is shown bare.
+    assert "• RC: 2026.10.9.1 · " in said
+    assert "deployed 3m ago" in said
+    assert said.index("Production") < said.index("RC")
+    assert "newer" not in said
+
+
+async def test_version_names_a_newer_deployment_that_did_not_succeed(
+    repos, slack, monkeypatch
+):
+    """A job that deployed and then failed leaves RC running something newer."""
+    newer = {
+        "version": "2026.10.9.1",
+        "sha": "c" * 40,
+        "created_at": datetime.now(tz=UTC) - timedelta(minutes=20),
+        "state": "failure",
+    }
+
+    async def _deployment_report(_repo, environment):
+        if environment == "RC":
+            return _report(_live_deployment("2026.10.8.1", "a" * 40, "RC"), newer)
+        return _report(newer=dict(newer, state="no status"))
+
+    monkeypatch.setattr(bot.github, "deployment_report", _deployment_report)
+
+    await bot._cmd_version(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    said = slack.said
+    assert "• RC: 2026.10.8.1 · " in said
+    assert (
+        "↳ newer: 2026.10.9.1 · "
+        f"<https://github.com/mitodl/my-app/commit/{'c' * 40}|ccccccc> started 20m"
+        " ago, not successful (failure)"
+    ) in said
+    # Even with no success in the scanned window, the attempt is reported.
+    assert "• Production: no successful deployment recorded" in said
+    assert "not successful (no status)" in said
+
+
+async def test_version_without_an_app_covers_every_migrated_app(
+    mixed_repos, slack, monkeypatch
+):
+    """Legacy apps record no Deployments; they are named, not queried."""
+    seen = []
+
+    async def _deployment_report(repo, _environment):
+        seen.append(repo)
+        return _report()
+
+    monkeypatch.setattr(bot.github, "deployment_report", _deployment_report)
+
+    await bot._cmd_version(mixed_repos, slack.ack, slack.respond, _command(""), {})
+
+    said = slack.said
+    assert set(seen) == {"mitodl/my-app"}
+    assert "*my-app*" in said
+    assert "no successful deployment recorded" in said
+    assert "Not shown -- the legacy pipeline records no deployments: legacy-app" in said
+
+
+async def test_version_reports_one_environment_failing_without_hiding_the_other(
+    repos, slack, monkeypatch
+):
+    async def _deployment_report(_repo, environment):
+        if environment == "RC":
+            msg = "GitHub is down"
+            raise RuntimeError(msg)
+        return _report(_live_deployment("2026.10.8.1", "a" * 40, "Production"))
+
+    monkeypatch.setattr(bot.github, "deployment_report", _deployment_report)
+
+    await bot._cmd_version(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    assert "• Production: 2026.10.8.1" in slack.said
+    assert "• RC: ⚠️ could not read its deployments" in slack.said
+
+
+async def test_version_refuses_a_legacy_app(mixed_repos, slack, monkeypatch):
+    report = AsyncMock()
+    monkeypatch.setattr(bot.github, "deployment_report", report)
+
+    await bot._cmd_version(
+        mixed_repos, slack.ack, slack.respond, _command("legacy-app"), {}
+    )
+
+    report.assert_not_awaited()
+    assert "legacy" in slack.said
+
+
+async def test_help_and_uptime_reply_privately_release_state_does_not(
+    repos, slack, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.github, "deployment_report", AsyncMock(return_value=_report())
+    )
+    for text in ("help", "uptime", "version my-app"):
+        slack.respond.reset_mock()
+        await bot._cmd_doof(repos, slack.ack, slack.respond, _command(text), {})
+        kwargs = slack.respond.call_args.kwargs
+        if text == "version my-app":
+            assert kwargs.get("response_type") == "in_channel"
+        else:
+            assert "response_type" not in kwargs
+
+
+@pytest.mark.parametrize(
+    ("elapsed", "expected"),
+    [
+        (timedelta(0), "0s"),
+        (timedelta(seconds=42), "42s"),
+        (timedelta(minutes=5, seconds=2), "5m 2s"),
+        (timedelta(hours=2, minutes=5, seconds=9), "2h 5m"),
+        (timedelta(days=3, hours=4, minutes=1), "3d 4h"),
+        (timedelta(days=1, minutes=7), "1d 7m"),
+        (timedelta(seconds=-5), "0s"),
+    ],
+)
+def test_format_elapsed(elapsed, expected):
+    assert bot._format_elapsed(elapsed) == expected
+
+
+@pytest.fixture
+def _clean_heartbeats():
+    bot._poll_heartbeats.clear()
+    yield
+    bot._poll_heartbeats.clear()
+
+
+@pytest.mark.usefixtures("_clean_heartbeats")
+async def test_uptime_reports_process_age_and_each_poller(repos, slack, monkeypatch):
+    now = datetime.now(tz=UTC)
+    monkeypatch.setattr(bot, "_started_at", now - timedelta(days=2, hours=3))
+    monkeypatch.setenv("HOSTNAME", "release-bot-production-abc")
+    bot._poll_heartbeats["ready-to-promote"] = (now - timedelta(seconds=30), True)
+    bot._poll_heartbeats["release-progress"] = (now - timedelta(minutes=1), False)
+
+    await bot._cmd_uptime(repos, slack.ack, slack.respond, _command(""), {})
+
+    said = slack.said
+    assert "Up 2d 3h" in said
+    assert "`release-bot-production-abc`" in said
+    assert "ready-to-promote poller: last pass 30s ago" in said
+    assert "release-progress poller: last pass 1m" in said
+    assert "some of its calls failed; see the bot's logs" in said
+    assert "overdue" not in said
+
+
+@pytest.mark.usefixtures("_clean_heartbeats")
+async def test_uptime_flags_a_wedged_poller(repos, slack, monkeypatch):
+    """A loop stuck inside an await stops beating; say so."""
+    # Freshly started, so the poller that has not beaten yet is not overdue.
+    monkeypatch.setattr(bot, "_started_at", datetime.now(tz=UTC))
+    stale = datetime.now(tz=UTC) - timedelta(
+        seconds=bot._READY_TO_PROMOTE_POLL_SECONDS * bot._POLL_OVERDUE_INTERVALS + 60
+    )
+    bot._poll_heartbeats["ready-to-promote"] = (stale, True)
+
+    await bot._cmd_uptime(repos, slack.ack, slack.respond, _command(""), {})
+
+    said = slack.said
+    assert "ready-to-promote poller: last pass" in said
+    assert "overdue (runs every 2m)" in said
+    assert "release-progress poller: has not finished a pass yet" in said
+    # Freshly started: not having finished a pass yet is not a fault.
+    assert said.count("overdue") == 1
+
+
+@pytest.mark.usefixtures("_clean_heartbeats")
+async def test_uptime_flags_a_first_pass_that_never_finished(repos, slack, monkeypatch):
+    """A first pass wedged inside an await never beats at all."""
+    monkeypatch.setattr(bot, "_started_at", datetime.now(tz=UTC) - timedelta(days=3))
+
+    await bot._cmd_uptime(repos, slack.ack, slack.respond, _command(""), {})
+
+    said = slack.said
+    assert "ready-to-promote poller: has not finished a pass yet ⚠️ overdue" in said
+    assert "release-progress poller: has not finished a pass yet ⚠️ overdue" in said
+
+
+@pytest.mark.usefixtures("_clean_heartbeats")
+async def test_poll_loops_record_a_heartbeat_even_when_an_iteration_fails(
+    repos, monkeypatch
+):
+    monkeypatch.setattr(
+        bot, "_notify_ready_to_promote", AsyncMock(side_effect=RuntimeError("boom"))
+    )
+    monkeypatch.setattr(bot, "_announce_deployments", AsyncMock(return_value=True))
+    monkeypatch.setattr(bot, "_nag_stuck_releases", AsyncMock(return_value=True))
+
+    async def _stop(_seconds):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(bot.asyncio, "sleep", _stop)
+
+    for loop in (bot._poll_ready_to_promote_loop, bot._poll_release_progress_loop):
+        with pytest.raises(asyncio.CancelledError):
+            await loop(MagicMock(), repos)
+
+    assert bot._poll_heartbeats["ready-to-promote"][1] is False
+    assert bot._poll_heartbeats["release-progress"][1] is True
+
+
+@pytest.mark.usefixtures("_clean_heartbeats")
+async def test_a_pass_whose_per_app_calls_all_failed_is_not_reported_healthy(
+    repos, monkeypatch
+):
+    """Per-app failures are caught so one app cannot starve the rest.
+
+    That is exactly why nothing raises when *every* call fails -- a revoked
+    GitHub App key, GitHub down -- and the step's own result has to carry it.
+    """
+    monkeypatch.setattr(
+        bot.github,
+        "open_release_issues",
+        AsyncMock(side_effect=RuntimeError("401 Bad credentials")),
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "latest_successful_deployment",
+        AsyncMock(side_effect=RuntimeError("401 Bad credentials")),
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(side_effect=RuntimeError("401 Bad credentials")),
+    )
+
+    async def _stop(_seconds):
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(bot.asyncio, "sleep", _stop)
+
+    for loop in (bot._poll_ready_to_promote_loop, bot._poll_release_progress_loop):
+        with pytest.raises(asyncio.CancelledError):
+            await loop(MagicMock(), repos)
+
+    assert bot._poll_heartbeats["ready-to-promote"][1] is False
+    assert bot._poll_heartbeats["release-progress"][1] is False
+
+
+async def test_a_clean_pass_reports_success(repos, monkeypatch):
+    monkeypatch.setattr(bot.github, "open_release_issues", AsyncMock(return_value=[]))
+    monkeypatch.setattr(
+        bot.github, "latest_successful_deployment", AsyncMock(return_value=None)
+    )
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+    state = bot.ReleaseProgressState()
+
+    assert await bot._notify_ready_to_promote(MagicMock(), repos) is True
+    assert await bot._announce_deployments(MagicMock(), repos, state) is True
+    assert await bot._nag_stuck_releases(MagicMock(), repos, state) is True

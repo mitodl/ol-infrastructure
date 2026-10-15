@@ -225,6 +225,7 @@ class _FakeDeployment:
         self.ref = ref
         self.sha = sha
         self.environment = environment
+        self.created_at = datetime(2026, 9, 2, 11, 0, tzinfo=UTC)
         self._statuses = statuses
 
     def get_statuses(self):
@@ -494,6 +495,52 @@ def test_next_release_version_ignores_other_days():
         github.next_release_version(["2026.8.12.7", "2026.8.11.9"], date(2026, 8, 13))
         == "2026.8.13.1"
     )
+
+
+def test_deployment_report_names_a_newer_failed_attempt(fake_repo):
+    fake_repo(
+        _FakeRepo(
+            deployments=[
+                _FakeDeployment(
+                    3, "2026.9.3.1", "RC", [_FakeDeploymentStatus("failure")], "ccc"
+                ),
+                _FakeDeployment(
+                    2, "2026.9.2.1", "RC", [_FakeDeploymentStatus("success")], "bbb"
+                ),
+            ]
+        )
+    )
+    report = github._deployment_report_sync("mitodl/thing", "RC")
+    assert report["success"]["version"] == "2026.9.2.1"
+    assert report["newer"]["version"] == "2026.9.3.1"
+    assert report["newer"]["state"] == "failure"
+
+
+def test_deployment_report_has_no_newer_when_the_newest_succeeded(fake_repo):
+    fake_repo(
+        _FakeRepo(
+            deployments=[
+                _FakeDeployment(
+                    2, "2026.9.2.1", "RC", [_FakeDeploymentStatus("success")]
+                ),
+                _FakeDeployment(1, "2026.9.1.1", "RC", []),
+            ]
+        )
+    )
+    report = github._deployment_report_sync("mitodl/thing", "RC")
+    assert report["success"]["version"] == "2026.9.2.1"
+    assert report["newer"] is None
+
+
+def test_deployment_report_with_no_success_still_reports_the_attempt(fake_repo):
+    fake_repo(
+        _FakeRepo(
+            deployments=[_FakeDeployment(1, "2026.9.1.1", "Production", [])],
+        )
+    )
+    report = github._deployment_report_sync("mitodl/thing", "Production")
+    assert report["success"] is None
+    assert report["newer"]["state"] == "no status"
 
 
 # ---------------------------------------------------------------------------
