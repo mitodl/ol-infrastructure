@@ -26,7 +26,13 @@ Metric quirks this dashboard works around:
 - The FE's `query_queue_*` families are typed `counter` but hold current
   levels, so they are read raw. The CN's `lake_*` failure families are typed
   `gauge` but are brpc `bvar::Adder`s that only grow, so they are read with
-  `increase()`.
+  `rate()`/`increase()` like counters.
+- Failure counts are graphed as per-minute rates rather than
+  `increase(...[$__interval])`: at a 60s step over a 30s scrape each window
+  holds about two samples, so increments falling between windows vanish and
+  the rest are extrapolated (prod's first ~45 minutes: compaction successes
+  summed per interval to 2 against an `increase()` of ~5 over the same
+  span). Totals come from `increase(...[$__range])`.
 - `fslib_*_latency` histograms are in microseconds.
 - `starrocks_be_pipe_scan_pending_tasks` is kept by the allowlist but is not
   charted: prod's six-day-old CNs report it at about -300, which no queue
@@ -88,7 +94,8 @@ def _dashboard_json(
                 title="Query Error % (selected range)",
                 expr=(
                     f"sum(increase(starrocks_fe_query_err{{{_FE}}}[$__range]))\n/\n"
-                    f"sum(increase(starrocks_fe_query_total{{{_FE}}}[$__range]))"
+                    "clamp_min(sum(increase(starrocks_fe_query_total"
+                    f"{{{_FE}}}[$__range])), 1)"
                 ),
                 grid_pos={"h": 4, "w": 4, "x": 12, "y": 1},
                 unit="percentunit",
@@ -530,49 +537,65 @@ def _dashboard_json(
                 legend_calc="mean",
             ),
             timeseries_panel(
-                title="Storage Errors (per interval)",
+                title="Storage Errors (per min)",
                 description=(
-                    "Each series is a count of failures in the graph interval. "
-                    "Any sustained non-zero line here means the CN is struggling "
-                    "to read, write or clean up shared-data files in S3."
+                    "Failures per minute. Any sustained non-zero line means the "
+                    "CN is struggling to read, write or clean up shared-data "
+                    "files in S3; the stat beside it has the exact count for "
+                    "the selected range."
                 ),
                 queries=[
                     {
                         "expr": (
-                            f"sum(increase(fslib_qps_limit_error{{{_CN}}}[$__interval]))"
+                            f"sum(rate(fslib_qps_limit_error{{{_CN}}}{_RATE})) * 60"
                         ),
                         "legend_format": "S3 throttled",
                     },
                     {
                         "expr": (
-                            "sum(increase(fslib_file_replicate_fail_count"
-                            f"{{{_CN}}}[$__interval]))"
+                            "sum(rate(fslib_file_replicate_fail_count"
+                            f"{{{_CN}}}{_RATE})) * 60"
                         ),
                         "legend_format": "file replicate failed",
                     },
                     {
                         "expr": (
-                            "sum(increase(starlet_get_shard_info_rpc_fail_count"
-                            f"{{{_CN}}}[$__interval]))"
+                            "sum(rate(starlet_get_shard_info_rpc_fail_count"
+                            f"{{{_CN}}}{_RATE})) * 60"
                         ),
                         "legend_format": "shard info RPC failed",
                     },
                     {
                         "expr": (
-                            "sum(increase(lake_vacuum_del_file_fails"
-                            f"{{{_CN}}}[$__interval]))"
+                            "sum(rate(lake_vacuum_del_file_fails"
+                            f"{{{_CN}}}{_RATE})) * 60"
                         ),
                         "legend_format": "vacuum delete failed",
                     },
                     {
                         "expr": (
-                            "sum(increase(lake_publish_version_failed_tasks"
-                            f"{{{_CN}}}[$__interval]))"
+                            "sum(rate(lake_publish_version_failed_tasks"
+                            f"{{{_CN}}}{_RATE})) * 60"
                         ),
                         "legend_format": "publish version failed",
                     },
                 ],
-                grid_pos={"h": 8, "w": 24, "x": 0, "y": 81},
+                grid_pos={"h": 8, "w": 18, "x": 0, "y": 81},
+                legend_calc="mean",
+            ),
+            stat_panel(
+                title="Storage Errors (selected range)",
+                expr=" +\n".join(
+                    f"sum(increase({metric}{{{_CN}}}[$__range]))"
+                    for metric in (
+                        "fslib_qps_limit_error",
+                        "fslib_file_replicate_fail_count",
+                        "starlet_get_shard_info_rpc_fail_count",
+                        "lake_vacuum_del_file_fails",
+                        "lake_publish_version_failed_tasks",
+                    )
+                ),
+                grid_pos={"h": 8, "w": 6, "x": 18, "y": 81},
                 decimals=0,
             ),
             row_panel(title="Compaction & materialized views", y=89),
@@ -589,53 +612,53 @@ def _dashboard_json(
                 legend_calc="max",
             ),
             timeseries_panel(
-                title="Compaction Tasks (per interval)",
+                title="Compaction Tasks (per min)",
                 queries=[
                     {
                         "expr": (
-                            "sum(increase(starrocks_fe_lake_compaction_success"
-                            f"{{{_FE}}}[$__interval]))"
+                            "sum(rate(starrocks_fe_lake_compaction_success"
+                            f"{{{_FE}}}{_RATE})) * 60"
                         ),
                         "legend_format": "succeeded",
                     },
                     {
                         "expr": (
-                            "sum(increase(starrocks_fe_lake_compaction_failed"
-                            f"{{{_FE}}}[$__interval]))"
+                            "sum(rate(starrocks_fe_lake_compaction_failed"
+                            f"{{{_FE}}}{_RATE})) * 60"
                         ),
                         "legend_format": "failed",
                     },
                     {
                         "expr": (
-                            "sum(increase(lake_aggregate_compaction_failed_tasks"
-                            f"{{{_CN}}}[$__interval]))"
+                            "sum(rate(lake_aggregate_compaction_failed_tasks"
+                            f"{{{_CN}}}{_RATE})) * 60"
                         ),
                         "legend_format": "failed on CN",
                     },
                 ],
                 grid_pos={"h": 8, "w": 8, "x": 8, "y": 90},
-                decimals=0,
+                legend_calc="mean",
             ),
             timeseries_panel(
-                title="MV Refresh Jobs (per interval)",
+                title="MV Refresh Jobs (per min)",
                 queries=[
                     {
                         "expr": (
-                            "sum(increase(starrocks_fe_mv_global_refresh_jobs_total"
-                            f"{{{_FE}}}[$__interval]))"
+                            "sum(rate(starrocks_fe_mv_global_refresh_jobs_total"
+                            f"{{{_FE}}}{_RATE})) * 60"
                         ),
                         "legend_format": "started",
                     },
                     {
                         "expr": (
-                            "sum(increase(starrocks_fe_mv_global_refresh_failed_jobs_total"
-                            f"{{{_FE}}}[$__interval]))"
+                            "sum(rate(starrocks_fe_mv_global_refresh_failed_jobs_total"
+                            f"{{{_FE}}}{_RATE})) * 60"
                         ),
                         "legend_format": "failed",
                     },
                 ],
                 grid_pos={"h": 8, "w": 8, "x": 16, "y": 90},
-                decimals=0,
+                legend_calc="mean",
             ),
         ],
     }
