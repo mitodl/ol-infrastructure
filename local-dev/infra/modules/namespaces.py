@@ -21,7 +21,7 @@ APP_NAMESPACES = (
 # Concourse install along with it. micromasters is here because it was added
 # after per-app gating existed, so an unconditional namespace would churn
 # every stack for an app most developers do not run.
-OPTIONAL_APP_NAMESPACES = ("ocw-studio", "micromasters")
+OPTIONAL_APP_NAMESPACES = ("ocw-studio", "micromasters", "gitlab")
 
 
 def app_namespaces_for(enabled_apps: Iterable[str]) -> tuple[str, ...]:

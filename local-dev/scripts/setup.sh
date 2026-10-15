@@ -58,6 +58,11 @@ HOSTS=(
     "micromasters.${ROOT_DOMAIN}"
     # Shared S3-compatible object store (RustFS), deployed with ocw-studio
     "s3.${ROOT_DOMAIN}"
+    # GitLab (optional; only deployed when enabled_apps includes gitlab, but
+    # a hosts entry for an app you have not enabled costs nothing).
+    # Follows LOCAL_DEV_GITLAB_HOSTNAME so this never shadows an external
+    # GitLab a developer already runs on gitlab.<root domain>.
+    "${LOCAL_DEV_GITLAB_HOSTNAME:-gitlab.${ROOT_DOMAIN}}"
     # Keycloak SSO
     "sso.ol.${ROOT_DOMAIN}"
     # Mailpit (captured outbound email)
