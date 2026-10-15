@@ -162,5 +162,26 @@ config:
         api_targets:
         - service: youtube.googleapis.com
       protect: true
+    # OCW's YouTube Analytics feed into the HighSystems course-records database
+    # built by Data Collaborative (mitodl/hq#13305). Its own project rather than
+    # mitol01 because the OAuth consent screen is one per project: a vendor
+    # client requesting yt-analytics.readonly would otherwise share user type,
+    # branding and verification status with every OAuth client consolidated
+    # into mitol01. The consent screen and the OAuth client are hand-made (see
+    # README.md); this entry only covers the APIs.
+  - project_id: ocw-yt-analytics-o7v08r
+    business_unit: open-courseware
+    enabled_services:
+    - youtubeanalytics.googleapis.com
+    - youtubereporting.googleapis.com
+      # No proven consumer yet. reports.query needs the youtube.readonly
+      # scope, and a client holding that scope can only spend it on the Data
+      # API (e.g. video titles for the ids a report returns) if it is on.
+    - youtube.googleapis.com
+      # Bootstrap, enabled out of band before the first apply (README.md): the
+      # provider lists services through serviceusage and reads the project
+      # back through cloudresourcemanager after enabling one.
+    - serviceusage.googleapis.com
+    - cloudresourcemanager.googleapis.com
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwGRkMYEkiqtkOL1cUu3weJtAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMbjOKl/yNcSE3NH/OAgEQgDuLw4Tl0f+DTV6qFsA/BXRSwJsDLRiZRVUabJWffa9XDGRcXOzB+cIkBiVmb6jcZ+rc5y3brL6PU9RtfA==

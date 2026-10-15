@@ -46,6 +46,7 @@ from pulumi import Config, ResourceOptions
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
 )
@@ -163,7 +164,7 @@ marimo_app_trino_secret = OLVaultK8SSecret(
     f"marimo-app-trino-secret-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels,
-        dest_secret_name="marimo-app-oidc-secret",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="marimo-app-oidc-secret",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         includes=["client_id", "client_secret"],
@@ -196,9 +197,11 @@ marimo_oidc = OLApisixOIDCResources(
         oidc_scope="openid profile email",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
-        vault_mount="secret-operations",
-        vault_path="sso/marimo",
-        vaultauth=marimo_vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            path="sso/marimo",
+            vaultauth=marimo_vault_k8s_resources.auth_name,
+        ),
     ),
 )
 

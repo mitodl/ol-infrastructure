@@ -9,7 +9,7 @@ HTTP listener, a TLS listener without client auth, or a server certificate the
 probe cannot verify must each fail.
 """
 
-import datetime
+import datetime as dt
 import socket
 import ssl
 import threading
@@ -108,7 +108,7 @@ def test_enabled_cors_filter_fails_whatever_its_case():
 def pki(tmp_path_factory):
     """Build a CA, a localhost server certificate it signs, and an unrelated CA."""
     directory = tmp_path_factory.mktemp("pki")
-    now = datetime.datetime.now(datetime.UTC)
+    now = dt.datetime.now(dt.UTC)
 
     def _name(common_name):
         return x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
@@ -122,7 +122,7 @@ def pki(tmp_path_factory):
             .public_key(key.public_key())
             .serial_number(x509.random_serial_number())
             .not_valid_before(now)
-            .not_valid_after(now + datetime.timedelta(days=1))
+            .not_valid_after(now + dt.timedelta(days=1))
             .add_extension(
                 x509.BasicConstraints(ca=True, path_length=None), critical=True
             )
@@ -158,7 +158,7 @@ def pki(tmp_path_factory):
         .public_key(server_key.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(now)
-        .not_valid_after(now + datetime.timedelta(days=1))
+        .not_valid_after(now + dt.timedelta(days=1))
         .add_extension(
             x509.SubjectAlternativeName([x509.DNSName("localhost")]), critical=False
         )

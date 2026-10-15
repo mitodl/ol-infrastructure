@@ -18,6 +18,7 @@ from ol_infrastructure.components.applications.eks import (
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -297,7 +298,7 @@ leek_broker_subscriptions_secret = OLVaultK8SSecret(
     f"celery-monitoring-broker-subscriptions-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=application_labels,
-        dest_secret_name="leek-broker-subscriptions",  # pragma: allowlist-secret # noqa: S106, E501
+        dest_secret_name="leek-broker-subscriptions",  # pragma: allowlist-secret # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=application_labels,
@@ -321,7 +322,7 @@ cert_manager_certificate = OLCertManagerCert(
         k8s_namespace=celery_monitoring_namespace,
         k8s_labels=application_labels,
         create_apisixtls_resource=True,
-        dest_secret_name="celery-monitoring-tls",  # pragma: allowlist-secret  # noqa: E501, S106
+        dest_secret_name="celery-monitoring-tls",  # pragma: allowlist-secret  # noqa: S106
         dns_names=[celery_monitoring_domain],
     ),
 )
@@ -341,10 +342,12 @@ celery_monitoring_oidc_resources = OLApisixOIDCResources(
         oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
         oidc_scope="openid profile email",
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/leek",
-        vaultauth=celery_monitoring_auth_binding.vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/leek",
+            vaultauth=celery_monitoring_auth_binding.vault_k8s_resources.auth_name,
+        ),
     ),
 )
 

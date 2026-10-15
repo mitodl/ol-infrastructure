@@ -44,6 +44,7 @@ pulumi.runtime.set_mocks(K8sMocks())
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
 )
 from tests.apisix_integration.conftest import (  # noqa: E402
     TEST_SESSION_SECRET,
@@ -87,8 +88,10 @@ def pkce_apisix(tmp_path_factory):
         oidc_config=OLApisixOIDCConfig(
             application_name="pkce-integration",
             k8s_namespace="pkce-integration",
-            vault_path="sso/pkce-integration",
-            vaultauth="pkce-integration",
+            credentials=OLApisixOIDCVaultCredentials(
+                path="sso/pkce-integration",
+                vaultauth="pkce-integration",
+            ),
         ),
     )
     openid_connect = {

@@ -994,6 +994,35 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             depends_on=[ebs_csi_driver_role, *node_groups],
         ),
     )
+    # A PVC cannot be created under ebs-gp3-sc while naming any of the classes
+    # above that set `iops`. At CreateVolume the driver overlays the class's
+    # `iops` on the StorageClass parameters, keeps `iopsPerGB`, and rejects the
+    # pair (`specify either IOPS or IOPSPerGb, not both`), so the classes only
+    # work on volumes that already exist. This is ebs-gp3-sc with a fixed 3,000
+    # IOPS in place of the ratio, for workloads whose PVC template carries one
+    # of those classes: a new volume is born at the baseline and the class on
+    # the PVC stays valid. ClickHouse data volumes use it.
+    kubernetes.storage.v1.StorageClass(
+        resource_name=f"{cluster_name}-ebs-gp3-iops-3000-storageclass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="ebs-gp3-iops-3000-sc",
+            labels=k8s_global_labels,
+        ),
+        provisioner="ebs.csi.aws.com",
+        volume_binding_mode="WaitForFirstConsumer",
+        # ref: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/parameters.md
+        parameters={
+            "csi.storage.k8s.io/fstype": "xfs",
+            "type": "gp3",
+            "iops": "3000",
+            "throughput": "125",
+            "encrypted": "true",
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[ebs_csi_driver_role, *node_groups],
+        ),
+    )
     # Rollback targets for the class above, following the throughput-125 pattern:
     # clearing volumeAttributesClassName never calls ec2:ModifyVolume, so the only
     # way back to the geometry `iopsPerGB: 50` gave the ClickHouse data volumes is

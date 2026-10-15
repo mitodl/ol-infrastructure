@@ -136,7 +136,7 @@ open_metadata_database_security_group = ec2.SecurityGroup(
             to_port=DEFAULT_POSTGRES_PORT,
             description="Access to postgres from open metadata servers.",
         ),
-        # TODO @Ardiea: switch to use pod-security-groups once implemented  # noqa: FIX002, E501
+        # TODO @Ardiea: switch to use pod-security-groups once implemented  # noqa: FIX002
         ec2.SecurityGroupIngressArgs(
             security_groups=[],
             protocol="tcp",
@@ -469,6 +469,38 @@ superset_connector_secret = OLVaultK8SSecret(
     ),
 )
 connector_secrets.append(superset_connector_secret)
+
+# Read-only StarRocks credentials for the StarRocks ingestion job, issued by
+# Vault's `database-starrocks` mount. The mount name is not environment
+# qualified: QA and Production each run their own Vault server. The jobs that
+# read it live in the substructure stack, which has no CI stack, so skip on CI.
+#
+# Like the Superset secret, only CronOMJob pods read this one, so it stays out
+# of the server's envFrom and has no restart target. Vault rotates the lease on
+# its own and each job pod reads the current value at start.
+if stack_info.name != "CI":
+    starrocks_connector_secret = OLVaultK8SSecret(
+        f"open-metadata-{stack_info.name}-connector-starrocks-secret",
+        OLVaultK8SDynamicSecretConfig(
+            name="openmetadata-connector-starrocks",
+            namespace=open_metadata_namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name="om-connector-starrocks",  # noqa: S106  # pragma: allowlist secret
+            labels=k8s_global_labels,
+            mount="database-starrocks",
+            path="creds/readonly",
+            templates={
+                "OM_STARROCKS_USERNAME": '{{ get .Secrets "username" }}',
+                "OM_STARROCKS_PASSWORD": '{{ get .Secrets "password" }}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            parent=vault_k8s_resources,
+        ),
+    )
+    connector_secrets.append(starrocks_connector_secret)
 
 # OM ships with several system bots, each with its own JWT used by a specific
 # workflow type.  All known bots are listed here (SOPS key → OM hyphenated name).
@@ -1103,7 +1135,7 @@ gateway_config = OLEKSGatewayConfig(
             hostname=open_metadata_config.require("domain"),
             port=8443,
             tls_mode="Terminate",
-            certificate_secret_name="openmetadata-tls",  # cert-manager will create this  # noqa: S106, E501  # pragma: allowlist secret
+            certificate_secret_name="openmetadata-tls",  # cert-manager will create this  # noqa: S106  # pragma: allowlist secret
             certificate_secret_namespace=open_metadata_namespace,
         ),
     ],

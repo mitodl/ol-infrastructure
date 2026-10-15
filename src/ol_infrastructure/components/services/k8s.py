@@ -452,8 +452,8 @@ class GranianConfig(BaseModel):
     The supported subset of granian CLI options is: interface, host, port, workers,
     runtime_mode, runtime_threads, blocking_threads, backpressure, no_ws,
     workers_max_rss, blocking_threads_idle_timeout, respawn_failed_workers,
-    respawn_interval, backlog, log_level, application_module, and metrics-related
-    flags.
+    respawn_interval, backlog, log_level, application_module, reload,
+    reload_ignore_dirs, workers_kill_timeout, and metrics-related flags.
 
     **Concurrency defaults:** ``workers``, ``runtime_threads`` and ``runtime_mode`` track
     Granian's own CLI defaults (1 / 1 / auto); scale horizontally with replicas rather
@@ -548,6 +548,23 @@ class GranianConfig(BaseModel):
     ``blocking_threads`` are resolved explicitly this no longer feeds Granian's own
     derivations, so it means only what it says: how many connections queue outside the
     workers."""
+    reload: bool = False
+    """Restart the workers when a file under the working directory changes (granian
+    ``--reload``). For development clusters, where source is synced into the running
+    container. The image needs the ``granian[reload]`` extra; without it Granian logs
+    an error and exits at startup.
+
+    Granian turns off the RSS monitor, worker lifetime and the metrics exporter while
+    the reloader runs (granian/server/common.py, verified at v2.7.4), so
+    ``--workers-max-rss`` and ``--metrics`` are accepted and ignored."""
+    reload_ignore_dirs: list[str] = Field(default_factory=list)
+    """Directory names whose changes do not trigger a reload (granian
+    ``--reload-ignore-dirs``, one flag per entry). Added to the watchfiles defaults."""
+    workers_kill_timeout: Annotated[int, Field(ge=1, le=1800)] | None = None
+    """Seconds to wait before killing a worker that did not stop gracefully (granian
+    ``--workers-kill-timeout``, 1 to 1800). Omitted when ``None``, which leaves Granian
+    waiting indefinitely. Every reload waits this long for a worker whose application
+    threads keep it alive."""
     log_level: str = "warning"
     application_module: str = "main.wsgi:application"
     enable_metrics: bool = True
@@ -633,6 +650,17 @@ class GranianConfig(BaseModel):
         return self
 
     @model_validator(mode="after")
+    def validate_reload_ignore_dirs(self) -> "GranianConfig":
+        """Reject ignore dirs that no reloader would read."""
+        if self.reload_ignore_dirs and not self.reload:
+            msg = (
+                "granian_config.reload_ignore_dirs is set but reload is False, so "
+                "nothing watches for changes. Set reload=True or remove it."
+            )
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
     def resolve_concurrency(self) -> "GranianConfig":
         """Resolve blocking_threads/backpressure at config time, not at build_args time.
 
@@ -701,6 +729,14 @@ class GranianConfig(BaseModel):
             raise ValueError(msg)
         return self.model_copy(update={"workers_max_rss": cap})
 
+    def _reload_args(self) -> list[str]:
+        if not self.reload:
+            return []
+        args = ["--reload"]
+        for directory in self.reload_ignore_dirs:
+            args += ["--reload-ignore-dirs", directory]
+        return args
+
     def build_args(self) -> list[str]:
         """Build the granian CLI argument list from this configuration."""
         args = [
@@ -723,6 +759,7 @@ class GranianConfig(BaseModel):
             ("--workers-max-rss", self.workers_max_rss),
             ("--blocking-threads-idle-timeout", self.blocking_threads_idle_timeout),
             ("--respawn-interval", self.respawn_interval),
+            ("--workers-kill-timeout", self.workers_kill_timeout),
         ):
             if value is not None:
                 args += [flag, str(value)]
@@ -749,6 +786,7 @@ class GranianConfig(BaseModel):
             args += ["--static-path-mount", path]
         if self.static_path_expires is not None:
             args += ["--static-path-expires", str(self.static_path_expires)]
+        args += self._reload_args()
         args += ["--log-level", self.log_level, self.application_module]
         return args
 
@@ -1155,8 +1193,7 @@ class OLApplicationK8sConfig(BaseModel):
             "Resource requests for the pre-deploy Job's containers, defaulting to "
             "resource_requests. Set it when a migration needs more memory than a "
             "serving pod, so sizing the webapp down cannot OOMKill the Job that "
-            "gates the rollout. Include cpu: the Job's pods carry the webapp "
-            "selector, and a container without a cpu request stalls its HPA."
+            "gates the rollout."
         ),
     )
     pre_deploy_resource_limits: dict[str, str] | None = Field(
@@ -2006,6 +2043,24 @@ class OLApplicationK8s(ComponentResource):
                 ol_app_k8s_config.slack_channel
             )
 
+        # Deliberately NOT application_labels: those are the webapp Service's
+        # selector, and a Job pod has no readiness probe, so one carrying them is a
+        # Service endpoint from the moment its containers start. Nothing in it listens
+        # on the app port, so the share of new connections kube-proxy sends it is
+        # refused for as long as the Job runs. They are also the webapp Deployment's
+        # selector, which is what its HPA/KEDA and PDB count pods by. The
+        # pod-security-group label stays so the SecurityGroupPolicy below gives the
+        # Job the same RDS/Redis reachability as the webapp.
+        deploy_job_pod_labels = ol_app_k8s_config.k8s_global_labels | {
+            "ol.mit.edu/component": "deploy-job",
+            "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",
+            **security_group_labels,
+        }
+        if ol_app_k8s_config.slack_channel:
+            deploy_job_pod_labels["ol.mit.edu/slack-channel"] = (
+                ol_app_k8s_config.slack_channel
+            )
+
         # Never on the selector, which is immutable. kube_pod_labels reads the pod
         # template and kube_deployment_labels the Deployment's own metadata, and
         # alert rules join on both.
@@ -2081,6 +2136,7 @@ class OLApplicationK8s(ComponentResource):
         self.dev_shell_deployment_name: str | None = None
         self.dev_shell_deployment: kubernetes.apps.v1.Deployment | None = None
         self.pre_deploy_job: kubernetes.batch.v1.Job | None = None
+        self.post_deploy_job: kubernetes.batch.v1.Job | None = None
         self.scheduled_job_names: list[str] = []
         self.scheduled_jobs: list[kubernetes.batch.v1.CronJob] = []
         self.webapp_pod_monitor: kubernetes.apiextensions.CustomResource | None = None
@@ -2094,6 +2150,7 @@ class OLApplicationK8s(ComponentResource):
             None
         )
 
+        worker_deployment_options = resource_options
         if pre_deploy_commands := ol_app_k8s_config.pre_deploy_commands:
             self.pre_deploy_job = kubernetes.batch.v1.Job(
                 f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
@@ -2112,7 +2169,8 @@ class OLApplicationK8s(ComponentResource):
                     ttl_seconds_after_finished=60 * 30,
                     template=kubernetes.core.v1.PodTemplateSpecArgs(
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                            labels=application_labels,
+                            labels=deploy_job_pod_labels
+                            | {"ol.mit.edu/job": "pre-deploy"},
                         ),
                         spec=kubernetes.core.v1.PodSpecArgs(
                             service_account_name=ol_app_k8s_config.application_service_account_name,
@@ -2143,15 +2201,6 @@ class OLApplicationK8s(ComponentResource):
                                     image_pull_policy=image_pull_policy,
                                     env=application_deployment_env_vars,
                                     env_from=application_deployment_envfrom,
-                                    # This pod template carries `application_labels`,
-                                    # which is also the webapp Deployment's selector, so
-                                    # the HPA includes these pods when computing
-                                    # utilization. A container without cpu/memory
-                                    # requests makes the HPA fail closed with
-                                    # FailedGetResourceMetric ("missing request for cpu
-                                    # in container <name>"), reporting <unknown> for
-                                    # *every* metric and suspending all scaling until
-                                    # the Job is garbage collected.
                                     resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                         requests=ol_app_k8s_config.pre_deploy_resource_requests
                                         or ol_app_k8s_config.resource_requests,
@@ -2172,6 +2221,9 @@ class OLApplicationK8s(ComponentResource):
                 opts=resource_options,
             )
             deployment_options = deployment_options.merge(
+                ResourceOptions(depends_on=[self.pre_deploy_job])
+            )
+            worker_deployment_options = resource_options.merge(
                 ResourceOptions(depends_on=[self.pre_deploy_job])
             )
 
@@ -2295,10 +2347,8 @@ class OLApplicationK8s(ComponentResource):
             # looks healthy. mitxonline lost every granian_* metric this way.
             #
             # Namespace + application + component=webapp is enough to reach the webapp
-            # pods: celery and beat pods carry component=celery. The pre/post-deploy Job
-            # pods do stamp these same labels, but their containers declare no port named
-            # `metrics`, so service discovery yields no target for them -- give a Job
-            # container such a port and it would join this scrape pool.
+            # pods: celery and beat pods carry component=celery, and the pre/post-deploy
+            # Job pods component=deploy-job.
             #
             # Leaving the security group name out also stops a security group replacement
             # from silently breaking the scrape.
@@ -2334,7 +2384,7 @@ class OLApplicationK8s(ComponentResource):
 
         if post_deploy_commands := ol_app_k8s_config.post_deploy_commands:
             # Create post-deployment job
-            _post_deploy_job = kubernetes.batch.v1.Job(
+            self.post_deploy_job = kubernetes.batch.v1.Job(
                 f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-post-deploy-job",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
                     name=f"{_application_deployment_name}-post-deploy",
@@ -2351,7 +2401,8 @@ class OLApplicationK8s(ComponentResource):
                     ttl_seconds_after_finished=60 * 30,
                     template=kubernetes.core.v1.PodTemplateSpecArgs(
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                            labels=application_labels,
+                            labels=deploy_job_pod_labels
+                            | {"ol.mit.edu/job": "post-deploy"},
                         ),
                         spec=kubernetes.core.v1.PodSpecArgs(
                             service_account_name=ol_app_k8s_config.application_service_account_name,
@@ -2848,7 +2899,7 @@ class OLApplicationK8s(ComponentResource):
                         ),
                     ),
                 ),
-                opts=resource_options,
+                opts=worker_deployment_options,
             )
             self.celery_deployments.append(_celery_deployment)
 
@@ -2965,17 +3016,16 @@ class OLApplicationK8s(ComponentResource):
                         ),
                     ),
                 ),
-                opts=resource_options,
+                opts=worker_deployment_options,
             )
 
         for scheduled_job in ol_app_k8s_config.scheduled_jobs:
             # Deliberately NOT application_labels: those are the webapp Deployment's
             # selector, so a job pod carrying them is counted by the webapp's HPA/KEDA
-            # while it runs. The pre-deploy Job has to accept that because it is
-            # short-lived and gated on the rollout; a job that runs on a schedule and
-            # can be slow must not perturb webapp scaling. The pod-security-group label
-            # is kept because the SecurityGroupPolicy below selects on it, and without
-            # it the job has no route to RDS/Mongo/the search cluster.
+            # while it runs, and a job that runs on a schedule and can be slow must
+            # not perturb webapp scaling. The pod-security-group label is kept because
+            # the SecurityGroupPolicy below selects on it, and without it the job has
+            # no route to RDS/Mongo/the search cluster.
             scheduled_job_labels = ol_app_k8s_config.k8s_global_labels | {
                 "ol.mit.edu/component": "scheduled-job",
                 "ol.mit.edu/application": f"{ol_app_k8s_config.application_name}",

@@ -2,8 +2,8 @@
 
 Downloads manifest.json, catalog.json, and the recent run_results.json files
 from the Dagster S3 bucket (uploaded by DbtS3ArtifactsResource from the
-lakehouse code location) and enriches the existing
-Trino service tables in OpenMetadata with:
+lakehouse code location) and enriches the existing tables of one database
+service in OpenMetadata (Trino, or StarRocks for the StarRocks manifest) with:
   - Model and column descriptions from dbt YAML docs
   - dbt model tags (stored under the "dbtTags" classification)
   - Test results (dbt test outcomes surfaced as OM test cases)
@@ -29,7 +29,7 @@ IRSA provides ambient S3 and AWS credentials — no credential secret is needed.
 
 Environment variables
 ---------------------
-OM_SERVICE_NAME       OM database service to enrich (Trino / Starburst Galaxy).
+OM_SERVICE_NAME       OM database service to enrich.
 OM_SERVER_URL         OpenMetadata API host:port.
 OM_BOT_JWT_TOKEN      Ingestion-bot JWT (from om-ingestion-bot secret).
 OM_AWS_REGION         AWS region for the S3 client.
@@ -38,6 +38,10 @@ OM_DBT_PREFIX         Key prefix (default: openmetadata/dbt-artifacts).
 OM_DBT_RUN_RESULTS_LOOKBACK_HOURS
                       How far back to read run_results files (default: 48,
                       two schedule intervals, so one failed night loses nothing).
+OM_DBT_SCHEMA_INCLUDES
+                      JSON list of schema regexes whose dbt nodes are ingested
+                      (default: the production dbt layer schemas).  A manifest
+                      built for another engine names different schemas.
 """
 
 import json
@@ -56,6 +60,20 @@ _PREFIX = os.environ.get("OM_DBT_PREFIX", "openmetadata/dbt-artifacts").rstrip("
 _REGION = os.environ["OM_AWS_REGION"]
 _RUN_RESULTS_LOOKBACK_HOURS = int(
     os.environ.get("OM_DBT_RUN_RESULTS_LOOKBACK_HOURS", "48")
+)
+
+# Restrict to production dbt layer schemas to avoid attempting to resolve
+# dev-namespace model names that don't exist in OM.
+_SCHEMA_INCLUDES: list[str] = json.loads(
+    os.environ.get(
+        "OM_DBT_SCHEMA_INCLUDES",
+        json.dumps(
+            [
+                r"ol_warehouse_[a-z]+_(dimensional|external|intermediate|irx|mart|migration|raw|reporting|staging)$",
+                r"ol_data_lake_[a-z]+",
+            ]
+        ),
+    )
 )
 
 s3 = boto3.client("s3", region_name=_REGION)
@@ -153,9 +171,9 @@ with tempfile.TemporaryDirectory() as tmpdir:
     config = {
         "source": {
             "type": "dbt",
-            # Trino (Starburst Galaxy) is the query engine that owns the Iceberg
-            # tables dbt writes to. Glue also catalogs the same tables, but OM
-            # must match the service name the tables were ingested under.
+            # OM must match the service name the tables were ingested under.
+            # For the lake that is Trino (Starburst Galaxy), the engine dbt
+            # writes the Iceberg tables with; Glue catalogs the same tables.
             "serviceName": os.environ["OM_SERVICE_NAME"],
             "sourceConfig": {
                 "config": {
@@ -171,16 +189,14 @@ with tempfile.TemporaryDirectory() as tmpdir:
                         else None,
                     },
                     "dbtUpdateDescriptions": True,
-                    "dbtUpdateOwners": False,
+                    # A table with no owner takes the one its dbt node declares
+                    # (meta.openmetadata.owner) whatever this is set to.  True
+                    # also replaces an existing owner on a model's table, so
+                    # one set in the UI lasts until the next run.  A source's
+                    # table is never overwritten.
+                    "dbtUpdateOwners": True,
                     "includeTags": True,
-                    # Restrict to production dbt layer schemas to avoid attempting
-                    # to resolve dev-namespace model names that don't exist in OM.
-                    "schemaFilterPattern": {
-                        "includes": [
-                            r"ol_warehouse_[a-z]+_(dimensional|external|intermediate|irx|mart|migration|raw|reporting|staging)$",
-                            r"ol_data_lake_[a-z]+",
-                        ],
-                    },
+                    "schemaFilterPattern": {"includes": _SCHEMA_INCLUDES},
                 }
             },
         },

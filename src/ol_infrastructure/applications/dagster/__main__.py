@@ -46,6 +46,7 @@ from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -940,7 +941,7 @@ dagster_static_secrets = OLVaultK8SSecret(
     f"dagster-k8s-static-secrets-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-static-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-static-secrets",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=k8s_global_labels.model_dump(),
@@ -962,7 +963,7 @@ dagster_dbt_secrets = OLVaultK8SSecret(
     f"dagster-k8s-dbt-secrets-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-dbt-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-dbt-secrets",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=k8s_global_labels.model_dump(),
@@ -1044,7 +1045,7 @@ dagster_sentry_secrets = OLVaultK8SSecret(
     f"dagster-k8s-sentry-secrets-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-sentry-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-sentry-secrets",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=k8s_global_labels.model_dump(),
@@ -1069,7 +1070,7 @@ dagster_db_secret = OLVaultK8SSecret(
     f"dagster-k8s-db-secret-{stack_info.env_suffix}",
     resource_config=OLVaultK8SDynamicSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-postgresql-secret",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-postgresql-secret",  # pragma: allowlist secret  # noqa: S106
         labels=k8s_global_labels.model_dump(),
         mount="postgres-dagster",
         name="dagster-postgresql-secret",
@@ -2451,10 +2452,12 @@ dagster_oidc_resources = OLApisixOIDCResources(
         oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
         oidc_scope="openid profile email",
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/dagster",
-        vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/dagster",
+            vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
+        ),
     ),
     opts=ResourceOptions(depends_on=[dagster_auth_binding]),
 )
@@ -2580,7 +2583,7 @@ edxorg_gcp_secret = OLVaultK8SSecret(
     f"dagster-k8s-edxorg-gcp-secrets-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-edxorg-gcp-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-edxorg-gcp-secrets",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=k8s_global_labels.model_dump(),
@@ -3049,16 +3052,30 @@ for location in code_locations:
 
     # Add higher resources for lakehouse deployment (runs dbt)
     if name == "lakehouse":
+        lakehouse_cpu_limit = 4
         deployment["resources"] = {
             "requests": {
                 "cpu": "1000m",
                 "memory": "2Gi",
             },
             "limits": {
-                "cpu": "4000m",
+                "cpu": f"{lakehouse_cpu_limit * 1000}m",
                 "memory": "8Gi",
             },
         }
+        # The multiprocess executor otherwise starts multiprocessing.cpu_count()
+        # steps at once, which is the node's vCPU count, not this pod's CPU
+        # limit, and each step subprocess imports the whole code location.
+        # Lakehouse run workers died about 40s after a dbt build fanned out to
+        # its Superset steps on 2026-10-12, with the working set climbing toward
+        # the 8Gi limit. The env reaches run workers through the container
+        # context the chart builds from this env list.
+        deployment["env"].append(
+            {
+                "name": "DAGSTER_MULTIPROCESS_EXECUTOR_MAX_CONCURRENT",
+                "value": str(lakehouse_cpu_limit),
+            }
+        )
         # Lakehouse has slow definitions loading (~19s) due to Airbyte+dbt integration.
         # Increase startup probe delays to prevent race condition when webserver tries
         # to connect before the code location has finished initializing.
@@ -3285,7 +3302,7 @@ dagster_k8s_image_config = {
 dagster_helm_values = {
     "global": {
         "serviceAccountName": "dagster",
-        "postgresqlSecretName": "dagster-postgresql-secret",  # pragma: allowlist secret  # noqa: E501
+        "postgresqlSecretName": "dagster-postgresql-secret",  # pragma: allowlist secret
     },
     "dagster-user-deployments": {"enabled": True, "enableSubchart": False},
     "serviceAccount": {

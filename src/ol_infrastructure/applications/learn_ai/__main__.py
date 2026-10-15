@@ -38,6 +38,7 @@ from ol_infrastructure.components.services import appdb
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -156,11 +157,11 @@ ol_zone_id = dns_stack.require_output("ol")["id"]
 # Frontend storage bucket
 learn_ai_app_storage_bucket_name = f"ol-mit-learn-ai-{stack_info.env_suffix}"
 
-# CI pilots SigV4-signed Fastly->S3 requests, so the bucket can be fully private
-# instead of public-read (hq#13287 item 1; mit-learn runs the same pattern in
-# every environment). QA and Production stay on the public-read policy until CI
-# has been validated.
-_learn_ai_bucket_is_sigv4_piloted = stack_info.env_suffix == "ci"
+# CI and QA use SigV4-signed Fastly->S3 requests, so the bucket can be fully
+# private instead of public-read (hq#13287 item 1; mit-learn runs the same
+# pattern in every environment). Production stays on the public-read policy
+# until QA has been validated.
+_learn_ai_bucket_is_sigv4_piloted = stack_info.env_suffix in {"ci", "qa"}
 
 learn_ai_app_storage_bucket_config = S3BucketConfig(
     bucket_name=learn_ai_app_storage_bucket_name,
@@ -776,9 +777,7 @@ static_secrets = OLVaultK8SSecret(
 # into a K8s secret via VSO and expose them to the app as the OPIK_KEYCLOAK_*
 # env vars. The token endpoint is derived from the realm ``url`` key so it stays
 # correct across environments (sso-ci / sso-qa / sso) without hardcoding.
-opik_keycloak_secret_name = (
-    "learn-ai-opik-keycloak"  # pragma: allowlist secret  # noqa: S105
-)
+opik_keycloak_secret_name = "learn-ai-opik-keycloak"  # pragma: allowlist secret  # noqa: S105
 opik_keycloak_secret = OLVaultK8SSecret(
     name=f"learn-ai-{stack_info.env_suffix}-opik-keycloak-secret",
     resource_config=OLVaultK8SStaticSecretConfig(
@@ -921,6 +920,22 @@ learn_ai_app_k8s = OLApplicationK8s(
         granian_config=GranianConfig(
             interface="asgi",
             workers=1,
+            # Above the measured cold start: RSS respawns in production took 14.7-19.5s
+            # from "Spawning worker-1" to "Started worker-1" (2026-10-14). On the 2.7.x
+            # the image ships today the main process holds the listener, so this only
+            # lets the old worker keep serving through the import instead of
+            # connections queueing for it. On 2.8.x the old worker is stopped after
+            # this interval whether or not the new one is listening, so Granian's 3.5s
+            # default would refuse connections for ~15s per respawn. Set ahead of the
+            # bump, since pyproject allows granian<3 and a lockfile refresh alone moves
+            # it (mit-learn#4024).
+            respawn_interval=60,
+            # Fresh pods sit at 523-595MiB container RSS (7d to 2026-10-15). On an
+            # RSS respawn the old worker keeps draining long-lived streamed responses
+            # beside the new one (up to ~22 minutes observed), so the cap has to leave
+            # room for both. All 3 OOMKills in the 14 days to 2026-10-15 came 65-90s
+            # into a respawn, two of them at the 1536Mi floor limit.
+            worker_startup_rss=600,
             runtime_mode=None,
             # Holding pin: the component default dropped to 1. asgi forces
             # blocking_threads=1 regardless, so this is the only axis on which the
@@ -956,8 +971,14 @@ learn_ai_app_k8s = OLApplicationK8s(
         # imports litellm, so exec'ing a shell or running a management command
         # in a live pod has no headroom against a 1000Mi limit. Keep the
         # request where actual usage sits and raise the limit for burst room.
+        # The limit is also the lowest one the memory VPA admits a pod with (it
+        # keeps the request:limit ratio and floors the request), so it sets the
+        # Granian RSS cap: (0.9 * 2048 - worker_startup_rss 600) = 1243MiB. That is
+        # close to the 1382MiB cap 1536Mi gave without the reservation, so respawns
+        # stay about as frequent (34 in 14 days). The p90 pod peaked at 1312MiB
+        # container RSS over the 7 days to 2026-10-15.
         resource_requests={"cpu": "100m", "memory": "1000Mi"},
-        resource_limits={"memory": "1536Mi"},
+        resource_limits={"memory": "2048Mi"},
         init_migrations=True,
         init_collectstatic=True,  # Assuming createcachetable is not needed or handled elsewhere
         # Both queues run --concurrency=2 prefork (component default), so each
@@ -1118,10 +1139,12 @@ learn_ai_oidc_resources = OLApisixOIDCResources(
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",  # Use mitlearn SSO config
-        vaultauth=vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",  # Use mitlearn SSO config
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     ),
     opts=ResourceOptions(delete_before_replace=True, parent=vault_k8s_resources),
 )
@@ -1206,10 +1229,12 @@ learn_ai_mit_learn_oidc_resources = OLApisixOIDCResources(
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",  # Use mitlearn SSO config
-        vaultauth=vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",  # Use mitlearn SSO config
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     ),
     opts=ResourceOptions(delete_before_replace=True, parent=vault_k8s_resources),
 )

@@ -51,6 +51,7 @@ from ol_infrastructure.components.services.apisix import (
     FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -993,6 +994,10 @@ CACHE_KEY_QUERY_PARAM_WHITELIST = [
     "account_action",
     "account_action_status",
     "is_new_user",
+    "status",
+    "module",
+    "needs_attention",
+    "view",
     # LearningResourceDrawer params (not in mit-learn's registry).
     "syllabus",
     "syllabus_only",
@@ -1237,7 +1242,9 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             name="handle domain redirect",
             content=textwrap.dedent(
                 rf"""
-                set req.http.orig-req-url = req.url;
+                if (req.restarts == 0) {{
+                  set req.http.orig-req-url = req.url;
+                }}
                 unset req.http.Cookie;
 
                 # If the request is for the old DNS name, redirect
@@ -1393,6 +1400,13 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             .parent.joinpath("snippets/set_media_content_type.vcl")
             .read_text(),
             type="fetch",
+        ),
+        vcl_snippet(
+            name="Serve Learn 404 page for OCW requests",
+            content=Path(__file__)
+            .parent.joinpath("snippets/ocw_404_deliver.vcl")
+            .read_text(),
+            type="deliver",
         ),
         vcl_snippet(
             name="Strip noindex header from NextJS backend",
@@ -2039,6 +2053,11 @@ mitlearn_k8s_app = OLApplicationK8s(
             # worker at 1500Mi of a 3.5Gi pod. See the stage 4 task in
             # docs/plans/granian-configuration-overhaul.md.
             #
+            # The image runs granian 2.8.3 since mit-learn 0.81.8 (mit-learn#4024). On
+            # 2.8 each worker owns its listener, so a respawn is covered only by the
+            # other worker. Moving to workers=1 also needs respawn_interval set above
+            # the worker cold start, or every respawn refuses connections.
+            #
             # This is one value across all stacks, while the VPA floor it is sized
             # against is production-only (CI/QA keep the 256Mi default). That is not
             # the protection gap it looks like: a cap only guards anything when
@@ -2150,10 +2169,12 @@ mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",
-        vaultauth=vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     ),
 )
 mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
@@ -2174,10 +2195,12 @@ mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",
-        vaultauth=vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     ),
 )
 

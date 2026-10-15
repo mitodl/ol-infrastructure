@@ -102,9 +102,7 @@ def create_meilisearch_resources(
     # a Secret that the chart mounts through auth.existingMasterKeySecret. The
     # chart's ServiceMonitor reads its bearer token from the same Secret, and the
     # chart only creates that Secret itself when no master key is supplied.
-    master_key_secret_name = (
-        "meilisearch-master-key"  # pragma: allowlist secret  # noqa: S105
-    )
+    master_key_secret_name = "meilisearch-master-key"  # pragma: allowlist secret  # noqa: S105
     master_key_secret = kubernetes.core.v1.Secret(
         f"ol-{stack_info.env_prefix}-edxapp-meilisearch-master-key-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(

@@ -43,9 +43,7 @@ SCRIPT_FILENAME = "reconcile_gravitino_grants.py"
 DESIRED_STATE_MOUNT_PATH = "/etc/gravitino-reconcile"
 DESIRED_STATE_FILENAME = "desired-state.json"
 CLIENT_TLS_MOUNT_PATH = "/etc/gravitino-client-tls"
-KEYCLOAK_SECRET_NAME = (
-    "gravitino-reconcile-keycloak"  # pragma: allowlist secret  # noqa: S105
-)
+KEYCLOAK_SECRET_NAME = "gravitino-reconcile-keycloak"  # pragma: allowlist secret  # noqa: S105
 
 # Every 15 minutes, per the authorization spec (A7). Keep it in the fast bucket
 # of the ScheduledJobStale rules in infrastructure/grafana_alerting/metric_rules/

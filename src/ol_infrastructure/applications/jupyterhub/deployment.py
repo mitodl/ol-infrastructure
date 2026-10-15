@@ -19,6 +19,7 @@ from ol_infrastructure.components.aws.eks import OLEKSTrustRole
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixRoute,
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
@@ -254,9 +255,11 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
             oidc_session_rolling_timeout=0,
             oidc_use_session_secret=True,
             oidc_scope="openid email",
-            vault_mount="secret-operations",
-            vault_path="sso/mitlearn",
-            vaultauth=vault_k8s_resources.auth_name,
+            credentials=OLApisixOIDCVaultCredentials(
+                mount="secret-operations",
+                path="sso/mitlearn",
+                vaultauth=vault_k8s_resources.auth_name,
+            ),
         ),
     )
 

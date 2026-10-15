@@ -60,9 +60,19 @@ from ol_infrastructure.applications.omnigraph.image_schema import (
     ImageSchemaUnavailableError,
     read_image_internal_schema,
 )
+from ol_infrastructure.applications.omnigraph.lock_handoff import (
+    MIGRATION_ARMED_ANNOTATION,
+    create_lock_handoff,
+    create_plan_gate,
+    uses_persisted_lock,
+    validate_graph_removal_allowlist,
+)
 from ol_infrastructure.applications.omnigraph.maintenance import (
+    DEFAULT_CLEANUP_ISO_WEEKDAY,
+    DEFAULT_MAINTENANCE_SCHEDULE,
     OmnigraphMaintenance,
     create_maintenance,
+    create_maintenance_window,
 )
 from ol_infrastructure.applications.omnigraph.storage import (
     storage_uri_for,
@@ -224,6 +234,17 @@ DEFAULT_PER_ACTOR_BYTES_MAX = 256 * 1024 * 1024
 # below is on it because upstream names it the readiness endpoint, not
 # because it detects quarantine.
 #
+# Nor does 0.13's. It is 503 while any graph is still loading, and after
+# startup it is 200 as long as one graph is ready. Measured on 0.13.0 with one
+# of four graphs' storage missing: 200, `"status":"degraded"`,
+# `ready_graph_count` 3, `blocked_graph_count` 1 (the 0.11 field
+# `quarantined_graph_count` is gone). So one blocked code graph still leaves
+# the pod Ready, which is the blast radius chosen above. Two things did
+# change: a blocked graph is not retried until the next restart, and the
+# startup line's `graph_count` now counts declared graphs, blocked ones
+# included, so it no longer drops. The per-graph signal is the WARN line
+# `graph blocked during startup graph_id=<id>`.
+#
 # REVISIT IF: the cluster ever collapses back to serving `council` alone, or
 # the server grows a per-graph health signal a readiness probe can reach
 # unauthenticated.
@@ -258,6 +279,10 @@ class OmnigraphDataTier(NamedTuple):
     # depends_on it, so creating it during a migration guarantees a failed
     # update. It comes back at cutover, when the new root is what is served.
     cluster_apply_job: kubernetes.batch.v1.Job | None
+    # The read-only `cluster plan` gate that takes the apply Job's place on a
+    # format whose writers keep the lock. ``None`` on an older format, and
+    # while a migration is armed, for the reason above.
+    plan_gate_job: kubernetes.batch.v1.Job | None
     maintenance: OmnigraphMaintenance
     # The resolved cluster storage root (bucket + any storage_prefix), so the
     # program can export what is actually being served rather than the config
@@ -287,6 +312,9 @@ def create_data_tier(  # noqa: PLR0913
     migrate_to_prefix: str = "",
     per_actor_inflight_max: int = DEFAULT_PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max: int = DEFAULT_PER_ACTOR_BYTES_MAX,
+    graph_removal_allowlist: list[str] | None = None,
+    maintenance_schedule: str = DEFAULT_MAINTENANCE_SCHEDULE,
+    cleanup_iso_weekday: int = DEFAULT_CLEANUP_ISO_WEEKDAY,
     *,
     suspend_maintenance: bool = False,
     migration_armed: bool = False,
@@ -313,6 +341,15 @@ def create_data_tier(  # noqa: PLR0913
     different knee, and the write cost itself is expected to move (upstream
     task tk-upstream-omnigraph-a-single-row-insert-costs-a-f-eeeae3). Retuning
     should be a `pulumi config set` away, not a code change.
+
+    ``graph_removal_allowlist`` names the graphs the server entrypoint may
+    delete when ``cluster.yaml`` stops declaring them. Only read once the
+    served format is one whose binaries delete on apply (0.13, format 14).
+
+    ``maintenance_schedule`` and ``cleanup_iso_weekday`` set the nightly stop
+    window that replaces the optimize and cleanup sweeps on that format, and
+    ``optimize_schedule`` / ``cleanup_schedule`` are then unused. See
+    ``maintenance.create_maintenance_window``.
     """
     # The bucket is named for its tenant (witan's graphs), not the omnigraph
     # service — omnigraph is generic and a future second instance would get its
@@ -423,6 +460,15 @@ def create_data_tier(  # noqa: PLR0913
     # ``cluster.yaml`` file and leaves those baked-in schemas visible alongside
     # it, rather than replacing the whole directory.
     cluster_graphs = build_cluster_graphs(managed_repos)
+    removable_graphs = validate_graph_removal_allowlist(
+        [] if graph_removal_allowlist is None else graph_removal_allowlist,
+        list(cluster_graphs),
+    )
+    # Whether the served format is 0.12+'s, where every writer keeps the
+    # root's exclusive lock after it exits. Keyed on the served format rather
+    # than on a separate switch: `internal_schema_version` moves to 14 in the
+    # cutover change, with the image that needs all of this.
+    persisted_lock = uses_persisted_lock(internal_schema_version)
     # Storage root. Normally the bucket root; `omnigraph:storage_prefix` moves
     # it to a prefix *inside* that same bucket, which is what a storage-format
     # migration needs (docs/omnigraph-storage-format-upgrade-runbook.md).
@@ -521,9 +567,16 @@ def create_data_tier(  # noqa: PLR0913
     # outside the target list (hit on Production, whose state had no
     # cluster-apply resource). At cutover the knobs clear, this is created,
     # and it converges the schemas against the new root.
+    #
+    # ★ NOR ON A FORMAT WHOSE WRITERS KEEP THE LOCK (0.12 and later). There the
+    # running server holds the root's exclusive lock, so a direct apply beside
+    # it is refused with `state_lock_held` and this Job could only fail the
+    # deploy. The entrypoint applies instead, on every boot, under the lock it
+    # has just taken over (lock_handoff.py). `plan_gate_job` below takes this
+    # slot there.
     cluster_apply_job = (
         None
-        if migration_armed
+        if migration_armed or persisted_lock
         else kubernetes.batch.v1.Job(
             f"omnigraph-cluster-apply-{stack_info.env_suffix}",
             # Deliberately unnamed (Pulumi auto-naming): a Job's pod template is
@@ -615,16 +668,81 @@ def create_data_tier(  # noqa: PLR0913
         )
     )
 
+    # Not while a migration is armed, for the apply Job's reason: the new
+    # image cannot read the old root, so the plan could only fail the update.
+    plan_gate_job = (
+        create_plan_gate(
+            stack_info=stack_info,
+            namespace=namespace,
+            k8s_global_labels=k8s_global_labels,
+            image=omnigraph_server_image,
+            aws_region=aws_config.region,
+            service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
+            cluster_configmap_name=CLUSTER_CONFIGMAP_NAME,
+            cluster_config_dir=CLUSTER_CONFIG_DIR,
+            actor_tokens_secret_name=actor_tokens_secret_name,
+            actor_tokens_file=f"{ACTOR_TOKENS_MOUNT_PATH}/{ACTOR_TOKENS_FILENAME}",
+            apply_actor=CLUSTER_APPLY_ACTOR,
+            graph_removal_allowlist=removable_graphs,
+            config_hash=cluster_apply_hash,
+            depends_on=[
+                cluster_configmap,
+                actor_tokens_secret,
+                *auth_binding.irsa_service_accounts,
+            ],
+        )
+        if persisted_lock and not migration_armed
+        else None
+    )
+    pre_deploy_jobs = [
+        job for job in (cluster_apply_job, plan_gate_job) if job is not None
+    ]
+
     omnigraph_pod_labels = {
         **k8s_global_labels,
         "app.kubernetes.io/name": OMNIGRAPH_SERVER_SERVICE_NAME,
     }
+    omnigraph_pod_selector = {"app.kubernetes.io/name": OMNIGRAPH_SERVER_SERVICE_NAME}
+    lock_handoff = (
+        create_lock_handoff(
+            stack_info=stack_info,
+            namespace=namespace,
+            k8s_global_labels=k8s_global_labels,
+            service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
+            pod_selector=omnigraph_pod_selector,
+            apply_actor=CLUSTER_APPLY_ACTOR,
+            graph_removal_allowlist=removable_graphs,
+        )
+        if persisted_lock
+        else None
+    )
     omnigraph_deployment = kubernetes.apps.v1.Deployment(
         f"omnigraph-omnigraph-server-deployment-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=OMNIGRAPH_SERVER_SERVICE_NAME,
             namespace=namespace,
             labels=omnigraph_pod_labels,
+            # The armed marker is set in the update that takes `replicas` to
+            # 0 below, so a maintenance window that had already scaled the
+            # server down does not scale it back up. See
+            # MIGRATION_ARMED_ANNOTATION.
+            #
+            # patchForce, where a maintenance window exists: the window writes
+            # `spec.replicas` through the scale subresource, which makes its
+            # client a second field manager of that field. Server-side apply
+            # then refuses a Pulumi update that changes the count, and the
+            # update that does is the one arming a migration. Forcing means a
+            # `pulumi up` during a window scales the server back to 1; the new
+            # pod finds the unlock Lease held and exits until the window ends,
+            # and the window does not restore a count that is no longer 0.
+            #
+            # `None`, not `{}`, when there is neither: an empty map is still a
+            # new input and would show as an update on every format-9 stack.
+            annotations={
+                **({MIGRATION_ARMED_ANNOTATION: "true"} if migration_armed else {}),
+                **({"pulumi.com/patchForce": "true"} if persisted_lock else {}),
+            }
+            or None,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             # Single writer, deliberately. omnigraph's own deployment contract
@@ -632,6 +750,8 @@ def create_data_tier(  # noqa: PLR0913
             # and lists it under Don't; concurrent writers rely on a single
             # server's in-process CAS, not cross-process coordination. Do NOT add
             # an HPA or bump replicas without validating multi-writer safety.
+            # From 0.12 this is enforced rather than only unsupported: a
+            # second server is refused at startup by the first one's lock.
             #
             # ZERO WHILE A MIGRATION IS ARMED, which is what makes an armed
             # window survive a plain `pulumi up`. Arming means the rebuild has
@@ -654,7 +774,7 @@ def create_data_tier(  # noqa: PLR0913
             # runbook — Recreate only covers same-format restarts.)
             strategy=kubernetes.apps.v1.DeploymentStrategyArgs(type="Recreate"),
             selector=kubernetes.meta.v1.LabelSelectorArgs(
-                match_labels={"app.kubernetes.io/name": OMNIGRAPH_SERVER_SERVICE_NAME}
+                match_labels=omnigraph_pod_selector
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -779,6 +899,9 @@ def create_data_tier(  # noqa: PLR0913
                                     name="OMNIGRAPH_SHUTDOWN_GRACE_SECONDS",
                                     value="30",
                                 ),
+                                # What the 0.13 entrypoint reads to take over
+                                # the previous pod's lock. See lock_handoff.py.
+                                *(lock_handoff.env if lock_handoff else []),
                             ],
                             ports=[
                                 kubernetes.core.v1.ContainerPortArgs(
@@ -955,8 +1078,17 @@ def create_data_tier(  # noqa: PLR0913
                 # Converge the graphs' schemas before the server restarts into
                 # them — omnigraph only serves the applied revision after a
                 # restart, so this ordering is what makes the new schema live.
-                # Absent while a migration is armed (see cluster_apply_job).
-                *([cluster_apply_job] if cluster_apply_job is not None else []),
+                # On a format whose writers keep the lock this is the plan
+                # gate, and the entrypoint applies. Absent while a migration
+                # is armed (see cluster_apply_job).
+                *pre_deploy_jobs,
+                # Without the Lease and the Role the entrypoint's first API
+                # call fails and the pod exits before serving.
+                *(
+                    [lock_handoff.lease, lock_handoff.role_binding]
+                    if lock_handoff
+                    else []
+                ),
                 # The pod's service_account_name is the IRSA SA this stack
                 # creates via auth_binding (create_irsa_service_account=True);
                 # wait for it so the initial apply doesn't transiently fail
@@ -996,24 +1128,54 @@ def create_data_tier(  # noqa: PLR0913
     # Ordered behind the converge Job because a graph that has not been applied
     # yet is a hard error for `optimize --graph <id>` ("graph `X` is not applied
     # in cluster ..."), which would fail the first sweep of every new graph.
-    omnigraph_maintenance = create_maintenance(
-        stack_info=stack_info,
-        namespace=namespace,
-        k8s_global_labels=k8s_global_labels,
-        image=omnigraph_server_image,
-        service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
-        aws_region=aws_config.region,
-        storage_uri=storage_uri,
-        graph_ids=list(cluster_graphs),
-        optimize_schedule=optimize_schedule,
-        cleanup_schedule=cleanup_schedule,
-        cleanup_older_than=cleanup_older_than,
-        depends_on=[
-            *([cluster_apply_job] if cluster_apply_job is not None else []),
-            *auth_binding.irsa_service_accounts,
-        ],
-        suspend=suspend_maintenance,
-    )
+    if persisted_lock:
+        # Both sweeps are direct writers, so beside a serving 0.12+ server
+        # every run is refused with `state_lock_held`. One CronJob stops the
+        # server for a nightly window instead, under its own ServiceAccount.
+        omnigraph_maintenance = OmnigraphMaintenance(
+            cron_jobs=[
+                create_maintenance_window(
+                    stack_info=stack_info,
+                    namespace=namespace,
+                    k8s_global_labels=k8s_global_labels,
+                    image=omnigraph_server_image,
+                    aws_region=aws_config.region,
+                    cluster_configmap_name=CLUSTER_CONFIGMAP_NAME,
+                    cluster_config_dir=CLUSTER_CONFIG_DIR,
+                    server_deployment_name=OMNIGRAPH_SERVER_SERVICE_NAME,
+                    schedule=maintenance_schedule,
+                    cleanup_older_than=cleanup_older_than,
+                    cleanup_iso_weekday=cleanup_iso_weekday,
+                    # Behind the Deployment: the window needs the Lease the
+                    # Deployment already waits for, and a graph the first boot
+                    # has not applied yet fails its `optimize`.
+                    depends_on=[
+                        omnigraph_deployment,
+                        *auth_binding.irsa_service_accounts,
+                    ],
+                    suspend=suspend_maintenance,
+                ).cron_job
+            ]
+        )
+    else:
+        omnigraph_maintenance = create_maintenance(
+            stack_info=stack_info,
+            namespace=namespace,
+            k8s_global_labels=k8s_global_labels,
+            image=omnigraph_server_image,
+            service_account_name=OMNIGRAPH_SERVICE_ACCOUNT_NAME,
+            aws_region=aws_config.region,
+            storage_uri=storage_uri,
+            graph_ids=list(cluster_graphs),
+            optimize_schedule=optimize_schedule,
+            cleanup_schedule=cleanup_schedule,
+            cleanup_older_than=cleanup_older_than,
+            depends_on=[
+                *pre_deploy_jobs,
+                *auth_binding.irsa_service_accounts,
+            ],
+            suspend=suspend_maintenance,
+        )
 
     return OmnigraphDataTier(
         bucket=omnigraph_bucket,
@@ -1021,6 +1183,7 @@ def create_data_tier(  # noqa: PLR0913
         service=omnigraph_service,
         deployment=omnigraph_deployment,
         cluster_apply_job=cluster_apply_job,
+        plan_gate_job=plan_gate_job,
         maintenance=omnigraph_maintenance,
         storage_uri=storage_uri,
         server_image=omnigraph_server_image,

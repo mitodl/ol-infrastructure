@@ -35,6 +35,7 @@ from ol_infrastructure.components.applications.eks import (
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -432,10 +433,12 @@ opik_oidc = OLApisixOIDCResources(
         oidc_scope="openid profile email",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/opik",
-        vaultauth=opik_app.vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/opik",
+            vaultauth=opik_app.vault_k8s_resources.auth_name,
+        ),
     ),
     opts=ResourceOptions(depends_on=opik_app.vault_k8s_resources),
 )

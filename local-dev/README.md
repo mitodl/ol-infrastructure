@@ -38,6 +38,7 @@ This environment runs the MIT Learn application stack as Kubernetes workloads in
 | learn-ai | `https://ai.learn.mit.dev` | Django AI proxy service |
 | mitxonline | `https://mitxonline.mit.dev` | MITx Online LMS (Django/uwsgi) |
 | odl-video-service | `https://video.odl.mit.dev` | ODL Video Service (Django/uwsgi) |
+| micromasters | `https://micromasters.mit.dev` | MicroMasters (Django/granian), opt-in, see [MicroMasters](#micromasters) |
 | Keycloak SSO | `https://sso.ol.mit.dev` | Identity provider (olapps realm) |
 | Mailpit | `https://mail.mit.dev` | Captured outbound email (web UI) |
 | Grafana | `https://grafana.mit.dev` | Logs from every service in the cluster (1-week retention) |
@@ -193,11 +194,13 @@ Edit `tilt_config.json`:
 }
 ```
 
-Only the listed apps will be deployed. Shared infrastructure always runs, with one
-exception: the RustFS object store is deployed only when an app that needs it is
-enabled, because it is too heavy to run for developers who have no use for it. The
-Tiltfile forwards `enabled_apps` to both Pulumi stacks as `LOCAL_DEV_ENABLED_APPS`
-so they can make that call.
+Only the listed apps will be deployed. Shared infrastructure always runs, with two
+exceptions: the RustFS object store is deployed only when an app that needs it is
+enabled, and the data lake only when `data-platform` is listed (see
+[Data lake](#data-lake-gravitino--starrocks)), because both are too heavy to run for
+developers who have no use for them. The
+Tiltfile forwards `enabled_apps` to both Pulumi stacks and to the app Tiltfiles as
+`LOCAL_DEV_ENABLED_APPS` so they can make that call.
 
 ### Open edX
 
@@ -233,7 +236,7 @@ With an app repo checked out next to `ol-infrastructure`, Tilt live-syncs your e
 
 - **Django apps:** granian runs with `--reload` and restarts its workers on each change — the new code serves once Django finishes re-importing (roughly 10–30 s depending on the app). Watch for `Changes detected, reloading workers..` in the app logs. Celery workers and beat don't auto-reload — restart those resources from the Tilt UI after changing task code. When `pyproject.toml` or `uv.lock` changes, Tilt runs `uv sync` inside the container first.
 - **Next.js frontend:** Tilt builds the `local-dev` stage of `Dockerfile.web`, which runs `next dev` (Turbopack). Changes under `frontends/` hot-reload in roughly a second (the first request to each page after a pod start pays a one-time on-demand compile). HMR websockets are proxied through apisix, so the browser hot-updates on `https://learn.mit.dev` too. `NEXT_PUBLIC_*` values are runtime env vars (see its `configmaps/app-env.yaml`), not build args, so changing them needs no rebuild. When `yarn.lock` changes, Tilt runs `yarn install` inside the container.
-- **No checkout:** Tilt deploys the pre-built Docker Hub image (`mitodl/<app>-app`) at the tag listed in `tilt_config.json` under `prebuilt_tags`. It works, but does not hot-reload — you can work on mit-learn without having learn-ai checked out.
+- **No checkout:** Tilt deploys the pre-built Docker Hub image (`mitodl/<app>-app:latest`). To run a specific release instead, add `"<app>=<tag>"` to `prebuilt_tags` in `tilt_config.json` (the Next.js frontend's key is `mit-learn-nextjs`). It works, but does not hot-reload — you can work on mit-learn without having learn-ai checked out.
 
 ### Access logs
 
@@ -339,6 +342,9 @@ tilt trigger seed-mit-learn-fixtures
 | mitxonline | `seed-mitxonline-course-data` | Populate test course data |
 | mitxonline | `seed-mitxonline-income-thresholds` | Load country income thresholds |
 | odl-video-service | `seed-ovs-presets` | Create encoding presets (requires real AWS creds) |
+| micromasters | `seed-micromasters-superuser` | Create or reset the `admin` / `admin` superuser |
+| micromasters | `seed-micromasters-data` | Load seed programs, course runs and learners, then rebuild the search index |
+| micromasters | `seed-micromasters-opensearch` | Recreate the OpenSearch indices |
 
 ---
 
@@ -372,12 +378,13 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 
 ## Configuration Reference
 
-`tilt_config.json` is your copy of [`tilt_config.json.example`](../tilt_config.json.example) — the example file is the canonical starting point (its image tags move over time; this doc doesn't repeat them). Keys:
+`tilt_config.json` is your copy of [`tilt_config.json.example`](../tilt_config.json.example) — the example file is the canonical starting point. Keys:
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). |
-| `prebuilt_tags` | see example file | `["app=tag"]` list of image tags used when the app repo is not checked out locally. |
+| `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). Neither is `micromasters` — see [MicroMasters](#micromasters). `data-platform` is not an app but switches on the [data lake](#data-lake-gravitino--starrocks). |
+| `prebuilt_tags` | `[]` (run `latest`) | `["app=tag"]` list of published image tags to run in place of `latest` when the app repo is not checked out locally. An entry for an app that has a checkout is ignored. Entries were not applied before this setting was wired up, so a `tilt_config.json` copied from an older example file carries release tags from early 2026: clear the list unless you want those releases. |
+| `lake_host_ports` | `starrocks=9030`, `gravitino=9001`, `rustfs=9000` | `["service=port"]` list moving the host side of a [data lake](#data-lake-gravitino--starrocks) forward off a port something else on your machine holds. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
 | `log_retention_period` | `168h` | How long Grafana/Loki keeps logs — see [Log retention](#log-retention). |
 | `keycloak_image` | published `mitodl/keycloak` digest | Keycloak server image for the core stack — see [Testing a local ol-keycloakify build](#testing-a-local-ol-keycloakify-build). |
@@ -524,7 +531,7 @@ cp local-dev/apps/mitxonline/configmaps/app-env.local.yaml.example \
 #   FEATURE_IGNORE_EDX_FAILURES: "True"
 ```
 
-How it works — plain Kubernetes, visible in each app's `deployment.yaml`: every container's `envFrom` list references the override ConfigMap (`mitxonline-env-local` etc.) **last** and with `optional: true`. Kubernetes resolves duplicate `envFrom` keys by letting the last source win, so your overrides beat both the tracked ConfigMap *and* the tracked Secret — secret values are fine in this file, it never leaves your machine. `optional: true` means no file → no ConfigMap → no-op for everyone else.
+How it works — plain Kubernetes, visible in each app's `deployment.yaml`: every container's `envFrom` list references the override ConfigMap (`mitxonline-env-local` etc.) **last** and with `optional: true`. Kubernetes resolves duplicate `envFrom` keys by letting the last source win, so your overrides beat the tracked ConfigMaps *and* the tracked Secret — secret values are fine in this file, it never leaves your machine. `optional: true` means no file → no ConfigMap → no-op for everyone else.
 
 Day-to-day behavior:
 
@@ -595,7 +602,8 @@ server is effectively frozen.
 
 It is **not** deployed by default. The core Pulumi stack brings it up only when
 `enabled_apps` contains an app listed in `OBJECT_STORE_APPS`
-(`local-dev/infra/modules/objectstore.py`), which today means `ocw-studio`.
+(`local-dev/infra/modules/objectstore.py`), which today means `ocw-studio` or
+`data-platform`.
 
 Two addresses, and apps generally need both:
 
@@ -607,14 +615,14 @@ Two addresses, and apps generally need both:
 Credentials are the fixed local-dev pair `localdevaccess` / `localdevsecret123`,
 defined in `objectstore.py` and repeated in each app's `secrets.yaml`.
 
-A bootstrap Job creates the buckets and grants each one anonymous read with a bucket
-policy. The policy matters: RustFS does not implement S3 ACLs, so the canned
+A bootstrap Job creates the buckets of every enabled app. ocw-studio's are each
+granted anonymous read with a bucket policy; the data lake's bucket is left private. The policy matters: RustFS does not implement S3 ACLs, so the canned
 `public-read` header boto3 sends is accepted and ignored, and a bucket policy is the
 only grant that actually takes effect. Published sites are served with no credentials,
 so without it every page would 403.
 
-To add buckets for another app, extend `OCW_STUDIO_BUCKETS` (or pass your own
-`buckets` tuple) and add the app to `OBJECT_STORE_APPS`.
+To add buckets for another app, add it to `OBJECT_STORE_BUCKETS` with an
+`AppBuckets` saying which of its buckets are public, private or versioned.
 
 Removing the last such app from `enabled_apps` tears the object store back down on the
 next reconcile. The objects survive: the StatefulSet's `data-rustfs-0` PVC is not
@@ -642,6 +650,307 @@ AWS_S3_CUSTOM_DOMAIN: "172.17.0.1:9000/ol-ocw-studio-app-local"
 AWS_ACCESS_KEY_ID: "minioadmin"  # pragma: allowlist secret
 AWS_SECRET_ACCESS_KEY: "minioadmin"  # pragma: allowlist secret
 ```
+
+### Data lake (Gravitino + StarRocks)
+
+Add `data-platform` to `enabled_apps` to get a local stand-in for the data lake:
+
+```json
+{
+  "enabled_apps": ["mit-learn", "data-platform"]
+}
+```
+
+It is not an app. The core Pulumi stack deploys, all in `local-infra`:
+
+- RustFS with a private `ol-data-lake-local` bucket (see above).
+- [Apache Gravitino](https://gravitino.apache.org) as the Iceberg REST catalog, with
+  its state in two databases (`gravitino`, `iceberg`) on the shared Postgres cluster.
+- StarRocks, the single-pod `allin1` image at the version the deployed clusters run,
+  with an external catalog `ol_data_lake_local` pointing at Gravitino and an empty
+  `ol_warehouse_local` schema in it for dbt to connect to. It also gets two empty
+  databases of its own, `b2b_analytics` and `b2b_learner_records`, for the b2b
+  materialized views.
+
+Budget about 2GB of memory, a 3GB image pull and a 20Gi volume for StarRocks.
+
+| What | Address |
+|------|---------|
+| StarRocks, from your machine | `mysql -h 127.0.0.1 -P 9030 -u root` (Tilt keeps the port-forward open as `starrocks-port-forward`) |
+| StarRocks, inside the cluster | `starrocks.local-infra.svc.cluster.local:9030`, user `root`, no password |
+| Iceberg REST catalog, inside the cluster | `http://gravitino.local-infra.svc.cluster.local:9001/iceberg` |
+| Iceberg REST catalog, from your machine | `http://localhost:9001/iceberg` (`iceberg-catalog-port-forward`) |
+| RustFS, from your machine, for an Iceberg writer | `http://localhost:9000` (`lake-object-store-port-forward`) |
+| Gravitino management API and UI | `kubectl -n local-infra port-forward svc/gravitino 8090:8090` |
+
+```sql
+CREATE DATABASE ol_data_lake_local.scratch;
+CREATE TABLE ol_data_lake_local.scratch.t (id int, name string);
+INSERT INTO ol_data_lake_local.scratch.t VALUES (1, 'a');
+SELECT * FROM ol_data_lake_local.scratch.t;
+```
+
+dbt builds onto it from an [ol-data-platform](https://github.com/mitodl/ol-data-platform)
+checkout, with no Vault login. Run these from its repository root:
+
+```bash
+# Once per checkout: install the `ol-dbt` CLI into .venv.
+uv sync
+
+# In each new shell: put it on PATH. Without this, write each `ol-dbt`
+# in this README as `uv run ol-dbt`.
+source .venv/bin/activate
+
+# Once per checkout: install the dbt packages.
+(cd src/ol_dbt && uv run dbt deps)
+
+ol-dbt fixtures load
+ol-dbt starrocks build --env dev --select +integrations__learn__ocw_courses
+```
+
+`--env dev` is the `starrocks_local` dbt profile: catalog `ol_data_lake_local`, schema
+`ol_warehouse_local`, over the port-forward above. Models land in
+`ol_warehouse_local_<layer>` (`_staging`, `_intermediate`, `_integrations`, ...), and
+the sources read `ol_warehouse_local_raw`. `ol-dbt fixtures load` fills that schema from
+the fixture files committed in ol-data-platform, and a model whose raw tables have no
+fixture fails on the missing source table. See
+[docs/LOCAL_LAKE.md](https://github.com/mitodl/ol-data-platform/blob/main/docs/LOCAL_LAKE.md)
+there for the fixture format and how to add one.
+
+A dlt source in that checkout writes raw tables from a local app database into the same
+schema, over the catalog and RustFS forwards above plus one to Postgres
+(`kubectl -n local-infra port-forward svc/local-pg-rw 5432:5432`):
+
+```bash
+cd src/ol_dlt && uv run python -m ol_dlt.sources.keycloak
+```
+
+`ol-dbt ingest local`, from the repository root, runs every source the ingestion
+inventory marks `strategies.local: ingest` the same way. Today those are Keycloak and MITx
+Online, so enable `mitxonline` and run its `seed-mitxonline-course-data` seed first: the
+MITx Online source has no courses to load until it has run. `--unit mitxonline/app_postgres`
+runs one. See "Raw tables from a local app database" in docs/LOCAL_LAKE.md there.
+
+The three forwards take host ports 9030, 9001 and 9000. An external MinIO on your host
+(above) also binds 9000: the RustFS forward then fails in its loop, and the dlt run
+talks to the MinIO in its place. Move the forward in `tilt_config.json` and give dlt the
+same address:
+
+```json
+"lake_host_ports": ["rustfs=9100"]
+```
+
+```bash
+export PYICEBERG_CATALOG__OL_DATA_LAKE_LOCAL__S3__ENDPOINT=http://localhost:9100
+```
+
+A moved Gravitino forward takes `PYICEBERG_CATALOG__OL_DATA_LAKE_LOCAL__URI`. The
+`starrocks_local` dbt profile has port 9030 written in, so a moved StarRocks forward
+means editing that profile.
+
+The catalog tells every client to use RustFS's in-cluster address, so any other
+host-side Iceberg writer has to keep its own endpoint the way `ol_dlt/local_lake.py`
+does.
+
+The b2b materialized views are StarRocks tables, not lake tables, so they have a
+profile of their own, `starrocks_local_b2b`. It writes `default_catalog.b2b_analytics`
+and `default_catalog.b2b_learner_records` and reads
+`ol_data_lake_local.ol_warehouse_local_dimensional`, which nothing fills yet. A bare
+`dagster dev` in the lakehouse code location builds on it, and so does:
+
+```bash
+ol-dbt starrocks build --env dev --target starrocks_local_b2b --select tag:starrocks
+```
+
+MIT Learn's warehouse tasks are pointed at the local lake with no further setup. With
+both `mit-learn` and `data-platform` enabled, its pods get `STARROCKS_HOST`,
+`STARROCKS_USER`, `WAREHOUSE_CATALOG` and `WAREHOUSE_SCHEMA` from
+`local-dev/apps/mit-learn/configmaps/warehouse-env.yaml`. Build the
+`integrations__learn__*` tables a task reads before running it: the one its
+`table_name` names, and any other its `fetch_and_upsert` reads (the xPRO course task
+also reads the runs table and refuses to run when either is empty).
+
+From a fixture row to a course in the local MIT Learn, with xPRO as the example. The
+first two commands run from the ol-data-platform repository root, the rest here:
+
+```bash
+ol-dbt fixtures load
+ol-dbt starrocks build --env dev --select \
+  "+integrations__learn__xpro_courses +integrations__learn__xpro_runs +integrations__learn__xpro_programs"
+
+kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
+from learning_resources.models import ETLSourceOwnership
+from learning_resources.tasks import SyncXproCoursesTask, SyncXproProgramsTask
+
+for resource_type in ("course", "program"):
+    ETLSourceOwnership.objects.update_or_create(
+        etl_source="xpro", resource_type=resource_type, defaults={"owner": "warehouse"}
+    )
+print(SyncXproCoursesTask.run(full_refresh=True))
+print(SyncXproProgramsTask.run(full_refresh=True))
+PY
+kubectl -n mit-learn exec deploy/mitlearn-webapp -c app -- python manage.py clear_cache
+
+curl -sk "https://api.learn.mit.dev/api/v1/courses/?platform=xpro"
+```
+
+- The xPRO tasks are in [mit-learn #4054](https://github.com/mitodl/mit-learn/pull/4054),
+  which is not merged. Check that branch out in the sibling `mit-learn` directory and Tilt
+  builds the image from it. If Tilt was already running, the webapp pod picks the
+  change up and the Celery workers do not until they are restarted, which does not
+  matter for a task run from the shell as here. On MIT Learn's main branch the only warehouse task is
+  `profiles.tasks.SyncProgramCertificatesTask`, and the table it reads,
+  `integrations__learn__program_certificates`, has no raw fixture.
+- A task writes nothing until `ETLSourceOwnership` names the warehouse for what it
+  loads. Without the rows it logs `Skipping warehouse write for xpro` and returns 0. See
+  `docs/how-to/etl-source-cutover.md` in mit-learn.
+- Celery beat is off locally, so run the task by hand. The task modules bind each name
+  to a registered task instance, so call `run` on it directly.
+- The list endpoints are cached for a day and the beat task that clears the cache does
+  not run, so a second sync is not visible through the API until `clear_cache`.
+
+To see a change, edit the fixture or the model, then repeat the load (for a fixture
+edit), the build, the task and `clear_cache`. An edit that takes a published course or
+program away makes the next sync fail before it writes: the tasks refuse to unpublish
+more than 10% of a source's resources, which a handful of fixture rows exceeds with one
+removal. The cutover document above covers `allow_mass_unpublish`.
+
+Things that will trip you up:
+
+- **A Postgres cluster created before 2026-07-08 needs one grant first.** The
+  `lakehouse-databases` Job creates its databases as the `app` role, and `CREATEDB` is
+  only granted when the cluster is first initialized. If the Job fails with
+  `permission denied to create database`, run this once and re-run `local-infra-core`:
+
+  ```bash
+  kubectl -n local-infra exec local-pg-1 -- psql -U postgres -c 'ALTER ROLE app CREATEDB'
+  ```
+
+- **A plain pyiceberg client on your machine cannot write to the lake.** The catalog
+  tells every client to use the in-cluster RustFS address, overriding whatever endpoint
+  the client was given, so the client creates the table and then fails the data write
+  with `Could not resolve host: rustfs.local-infra.svc.cluster.local`. The dlt sources
+  in ol-data-platform do write from the host: `ol_dlt/local_lake.py` keeps the
+  forwarded endpoint.
+- **pyiceberg needs HTTP Basic auth configured**: an `auth` property of type `basic`
+  with any username and any non-empty password. The username becomes the Gravitino
+  principal and the password is not checked. Gravitino accepts a request with no
+  `Authorization` header and refuses a Bearer one; pyiceberg 0.12.0 with no auth
+  configured got a 401.
+- **Most changed catalog properties do not reach an existing catalog.** The
+  `lakehouse-catalogs` Job only creates what is missing. Drop the catalog (in StarRocks,
+  in Gravitino, or both), delete the Job (`kubectl -n local-infra delete job
+  lakehouse-catalogs`; it also expires by itself after ten minutes) and re-run
+  `local-infra-core`. The exception is `STARROCKS_CATALOG_SETTINGS` in
+  `infra/modules/lakehouse.py`: the Job sets those on the StarRocks catalog with `ALTER
+  CATALOG` every time it runs, so a change there needs only the Job deleted and
+  `local-infra-core` re-run.
+
+This matches the deployed lake in engine, engine version and catalog protocol, and
+differs from it in ways that can hide a problem:
+
+| | Local | QA / Production |
+|---|---|---|
+| Catalog authentication | none (Gravitino `simple` authenticator, plain HTTP) | Keycloak JWT per user, HTTPS |
+| Catalog authorization | off | grants per governance role |
+| Iceberg views | work (JDBC catalog backend) | not available (Glue backend), so a view-materialized dbt model builds locally and fails in QA |
+| S3 credentials | the RustFS root key, static | vended per table from an IAM role |
+| StarRocks storage | shared-nothing, internal tables on the pod's volume | shared-data, internal tables on S3 |
+
+Removing `data-platform` from `enabled_apps` tears all of it down on the next
+reconcile. The `data-starrocks-0` and `data-rustfs-0` PVCs and the two Postgres
+databases are left behind, so re-enabling it picks the lake back up. To start clean
+(leave `data-rustfs-0` alone if ocw-studio is enabled, it holds those buckets too):
+
+```bash
+kubectl -n local-infra delete pvc data-starrocks-0 data-rustfs-0
+kubectl -n local-infra exec local-pg-1 -- psql -U postgres -c 'DROP DATABASE gravitino WITH (FORCE)' -c 'DROP DATABASE iceberg WITH (FORCE)'
+```
+
+#### Rehearsing a webhook cutover
+
+The other way a source reaches MIT Learn is the data platform's webhook push: a Dagster
+delivery asset reads an `integrations__learn__*` table and posts it to
+`/api/v1/webhooks/learning_resources/`. With `DBT_MODEL_LOCAL_LAKE=1` the asset reads
+the table your local build made, so the whole flip in mit-learn's
+`docs/how-to/etl-source-cutover.md` (legacy load, comparison, flip, first delivery, roll
+back) can be run here before it is run anywhere that has a catalog to lose.
+
+Open Learning Library is the source to rehearse with. Its legacy pipeline and its dlt
+source read the same CSV, so both sides load real rows with no credentials. The baseline:
+
+```bash
+kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
+from learning_resources.etl import pipelines
+from learning_resources.models import LearningResource
+
+print(len(pipelines.oll_etl()))
+print(*sorted(LearningResource.objects.filter(
+    etl_source="oll", resource_type="course", published=True
+).values_list("readable_id", flat=True)), sep="\n")
+PY
+```
+
+What the webhook would deliver, from the ol-data-platform repository root:
+
+```bash
+(cd src/ol_dlt && uv run python -m ol_dlt.sources.oll)
+ol-dbt starrocks build --env dev --select +integrations__learn__oll_courses
+
+mysql -h 127.0.0.1 -P 9030 -u root -N -e "SELECT readable_id FROM
+  ol_data_lake_local.ol_warehouse_local_integrations.integrations__learn__oll_courses ORDER BY 1"
+```
+
+Every id in the first list and not in the second is unpublished by the first delivery.
+The flip and the delivery:
+
+```bash
+kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
+from learning_resources.models import ETLSourceOwnership
+
+ETLSourceOwnership.objects.update_or_create(
+    etl_source="oll", resource_type="course", defaults={"owner": "webhook"}
+)
+PY
+
+cd dg_projects/delivery   # in ol-data-platform
+unset DBT_MODEL_FIXTURE_DIR
+export VAULT_OIDC_NONINTERACTIVE=1 DBT_MODEL_LOCAL_LAKE=1
+export MIT_LEARN_BASE_URL=https://api.learn.mit.dev
+export MIT_LEARN_WEBHOOK_SECRET=local-dev-mitlearn-insecure-webhook-secret  # pragma: allowlist secret
+uv run dagster asset materialize -m delivery.definitions --select "mit_learn_delivery/oll_webhook"
+
+curl -sk "https://api.learn.mit.dev/api/v1/courses/?platform=oll&limit=1" | jq .count
+```
+
+To roll back, give the pair back to the legacy pipeline, run it and clear the cache:
+
+```bash
+kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
+from learning_resources.etl import pipelines
+from learning_resources.models import ETLSourceOwnership
+
+ETLSourceOwnership.objects.filter(etl_source="oll", resource_type="course").update(owner="legacy")
+print(len(pipelines.oll_etl()))
+PY
+kubectl -n mit-learn exec deploy/mitlearn-webapp -c app -- python manage.py clear_cache
+```
+
+- Before the flip the delivery fails with `409` on every attempt of its retry policy and
+  MIT Learn logs `learning_resources webhook rejected`. After it, MIT Learn logs
+  `learning_resources webhook processed` with the count loaded, and `oll_etl()` returns
+  an empty list and logs `Skipping legacy write for oll`.
+- The webhook clears the API cache itself. The legacy pipeline run from a shell does not,
+  which is why the roll back needs `clear_cache`.
+- A delivery is a full sync with no limit on what it unpublishes. The warehouse tasks
+  in mit-learn #4054 refuse to unpublish more than 10% of a source, and the webhook has
+  no such check: a model edit that left 14 of 58 rows unpublished the other 44 in one
+  run. A model that builds with no rows at all gets a `400` from this asset and changes
+  nothing.
+- As of 2026-10-11 the comparison is not empty for this source: the legacy pipeline
+  publishes 63 courses and the model has 58. The sheet marks six rows as offered by
+  OCW. The staging model drops all six, and the legacy pipeline skips one and loads
+  the other five under a `readable_id` of another form.
 
 ### OCW Studio
 
@@ -691,6 +1000,39 @@ Two things that differ from the other apps:
   rather than `granian[reload]`, so the app container cannot run with `--reload`. Tilt
   syncs the code; restart `ocwstudio-webapp` from the Tilt UI to pick it up, the same
   as the celery workers.
+
+### MicroMasters
+
+MicroMasters is opt-in. It is here so the data platform's `micromasters` ingestion has
+a local Postgres database to read, and most developers do not need it running:
+
+```json
+{
+  "enabled_apps": ["mit-learn", "micromasters"]
+}
+```
+
+Enabling it creates the `micromasters` database on the shared Postgres cluster and
+deploys the web app at `https://micromasters.mit.dev` plus one celery worker. Re-run
+`./local-dev/scripts/setup.sh` first if your `/etc/hosts` predates the app; the
+existing `*.<domain>` certificate already covers the hostname.
+
+Run `seed-micromasters-superuser` and then `seed-micromasters-data` from the Tilt UI.
+The first gives you a login, the second fills the database with 2 programs and 120
+learners and rebuilds the search index.
+
+What differs from the other apps:
+
+- **Log in at `/admin/` as `admin` / `admin`.** Learner sign-in is OAuth against edX
+  or MITx Online, and the tracked config has credentials for neither.
+  `local-dev/apps/micromasters/configmaps/app-env.local.yaml.example` lists the
+  settings to fill in if you need it.
+- **Every code change rebuilds the image.** The image has no `watchfiles`, so granian
+  cannot reload, and the frontend bundles are baked in by the Dockerfile's
+  `node_builder` stage. Tilt rebuilds automatically when the sibling `micromasters`
+  checkout changes.
+- **Nothing scheduled runs.** There is no celery beat deployment, so the edX and MIT
+  Learn syncs never fire.
 
 ### OCW theme development (ocw-hugo-themes)
 
@@ -857,7 +1199,7 @@ Already-pushed images pull fine on the new nodes without a rebuild — the regis
 
 The Next.js build needs ~4 GB of memory. If it OOMs:
 - Increase the Docker VM memory allocation (see [Prerequisites](#prerequisites))
-- Or use a prebuilt image by removing `mit-learn` from `enabled_apps` in `tilt_config.json` and letting Tilt use the `prebuilt_tags` value instead
+- Or skip the build: with no `mit-learn` checkout next to `ol-infrastructure`, Tilt runs the published `mitodl/mit-learn-nextjs-app` image (and the published backend image) instead of building
 
 ### Image push retries forever on the last layer
 

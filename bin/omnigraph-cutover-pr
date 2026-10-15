@@ -251,34 +251,21 @@ def render_body(verdict: Verdict, cutover: Cutover, verdict_location: str) -> st
     graphs = verdict["graphs"]
     rows = []
     total_before = total_after = 0
-    collapsed_total: dict[str, int] = {}
     for graph in sorted(graphs):
         report = graphs[graph]
         before = sum(report["before"].values())
         after = sum(report["after"].values())
         total_before += before
         total_after += after
-        collapsed = report["collapsed_duplicates"]
-        for table, count in collapsed.items():
-            collapsed_total[table] = collapsed_total.get(table, 0) + count
-        detail = ", ".join(f"{t} {n}" for t, n in sorted(collapsed.items())) or "-"
-        rows.append(f"| {graph} | {before:,} | {after:,} | {detail} |")
-
-    if collapsed_total:
-        difference = (
-            "The difference is duplicate keyed edges collapsed by the rebuild ("
-            + ", ".join(f"{t} {n}" for t, n in sorted(collapsed_total.items()))
-            + "), not loss."
-        )
-    else:
-        difference = "Every graph matched its baseline exactly."
+        rows.append(f"| {graph} | {before:,} | {after:,} |")
 
     return "\n".join(
         [
             f"The storage-format migration Job rebuilt all {len(graphs)} "
             f"{cutover.env} graphs into `{cutover.new_root}` and verified them: "
             f"every graph ok, format {cutover.old_schema} -> {cutover.new_schema} "
-            f"uniformly. {total_before:,} -> {total_after:,} rows. {difference}",
+            f"uniformly. {total_before:,} -> {total_after:,} rows, every table "
+            "matching its baseline.",
             "",
             "This sets `omnigraph:storage_prefix` and "
             "`omnigraph:internal_schema_version` to the new root and removes "
@@ -291,8 +278,8 @@ def render_body(verdict: Verdict, cutover: Cutover, verdict_location: str) -> st
             f"The old root `{cutover.old_root}` is untouched and stays the "
             f"rollback until {cutover.env} has soaked.",
             "",
-            "| Graph | Rows before | Rows after | Collapsed duplicates |",
-            "| --- | ---: | ---: | --- |",
+            "| Graph | Rows before | Rows after |",
+            "| --- | ---: | ---: |",
             *rows,
             "",
             f"Verdict: `{verdict_location}`, finished {verdict['finished_at']}.",

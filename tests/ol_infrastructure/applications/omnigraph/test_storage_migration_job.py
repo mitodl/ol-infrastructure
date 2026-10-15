@@ -60,7 +60,9 @@ def _cron_job(name: str) -> kubernetes.batch.v1.CronJob:
 
 @pulumi.runtime.test
 def test_the_armed_job_can_check_and_snapshot_before_migrating():
-    """Roles in both namespaces, all four writers named, snapshot first."""
+    """Roles in both namespaces, the server and all four writers named,
+    snapshot first.
+    """
     mocks = _Mocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
 
@@ -86,9 +88,21 @@ def test_the_armed_job_can_check_and_snapshot_before_migrating():
         aws_cli_image="aws-cli:test",
         witan_namespace="witan",
         witan_writer_cronjobs=["witan-ci-indexer", "witan-view-reaper"],
+        server_deployment=kubernetes.apps.v1.Deployment(
+            "omnigraph-server",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="omnigraph-server", namespace="omnigraph"
+            ),
+            spec=kubernetes.apps.v1.DeploymentSpecArgs(
+                selector=kubernetes.meta.v1.LabelSelectorArgs(),
+                template=kubernetes.core.v1.PodTemplateSpecArgs(),
+            ),
+        ),
         maintenance=OmnigraphMaintenance(
-            optimize=_cron_job("omnigraph-optimize"),
-            cleanup=_cron_job("omnigraph-cleanup"),
+            cron_jobs=[
+                _cron_job("omnigraph-optimize"),
+                _cron_job("omnigraph-cleanup"),
+            ]
         ),
     )
 
@@ -98,14 +112,24 @@ def test_the_armed_job_can_check_and_snapshot_before_migrating():
             "omnigraph",
             "witan",
         ]
-        for role in roles:
-            assert role["rules"] == [
-                {
-                    "apiGroups": ["batch"],
-                    "resources": ["cronjobs", "jobs"],
-                    "verbs": ["get", "list"],
-                }
-            ]
+        writer_rule = {
+            "apiGroups": ["batch"],
+            "resources": ["cronjobs", "jobs"],
+            "verbs": ["get", "list"],
+        }
+        rules = {r["metadata"]["namespace"]: r["rules"] for r in roles}
+        assert rules["witan"] == [writer_rule]
+        # The server's Deployment and pods are only in this stack's namespace.
+        assert rules["omnigraph"] == [
+            writer_rule,
+            {
+                "apiGroups": ["apps"],
+                "resources": ["deployments"],
+                "resourceNames": ["omnigraph-server"],
+                "verbs": ["get"],
+            },
+            {"apiGroups": [""], "resources": ["pods"], "verbs": ["list"]},
+        ]
         bindings = _of_type(
             mocks, "kubernetes:rbac.authorization.k8s.io/v1:RoleBinding"
         )
@@ -145,6 +169,9 @@ def test_the_armed_job_can_check_and_snapshot_before_migrating():
             "witan/witan-ci-indexer",
             "witan/witan-view-reaper",
         ]
+        assert migrate_env["OMNIGRAPH_SERVER_DEPLOYMENT"] == (
+            "omnigraph/omnigraph-server"
+        )
 
     return migration.job.urn.apply(check)
 

@@ -25,9 +25,9 @@ image, including ones predating the ``python3-minimal`` the main container's
 script needs.
 
 A second initContainer snapshots the old root's ``__cluster`` ledger into the
-bucket's ``backups/`` prefix, and the script's pre-flight waits on all four
-graph writers, two of which the witan stack owns. Hence the read-only Roles
-in both namespaces.
+bucket's ``backups/`` prefix, and the script's pre-flight waits on the server
+and on every writer CronJob, two of which the witan stack owns. Hence the
+read-only Roles in both namespaces.
 
 WHAT IT WILL NOT DO. It does not repoint the live cluster. That is
 ``omnigraph:storage_prefix`` — Pulumi config — and this pod holds no Pulumi
@@ -58,9 +58,9 @@ OLD_BINARY_PATH = f"{SHARED_BIN_PATH}/omnigraph-old"
 # staged from these, so it declares the same schemas the running cluster does.
 SCHEMA_DIR = "/etc/omnigraph/cluster"
 
-# The break-glass maintenance principal (ADR-0005 path b). `cluster import` and
-# `cluster apply` are actor-bound, and this is the account the Cedar bundles
-# grant those to.
+# The break-glass maintenance principal (ADR-0005 path b). `cluster apply`
+# takes an actor, and this is the account the rebuild's writes are attributed
+# to.
 MIGRATION_ACTOR = "svc-witan-admin"
 
 # A rebuild reads and rewrites every graph in the cluster. Six hours is far
@@ -82,14 +82,13 @@ TTL_SECONDS_AFTER_FINISHED = 604800
 # requested so the scheduler places this pod somewhere that can hold them, and
 # capped so an overrun evicts this pod rather than the node.
 #
-# PEAK IS ONE COPY OF EVERY EXPORT, PLUS ONE GRAPH'S REWRITE. Step 1 exports
+# PEAK IS ONE COPY OF EVERY EXPORT, PLUS ONE GRAPH'S BATCHES. Step 1 exports
 # all graphs before any rebuild starts, so every raw export coexists. On top of
-# that, the graph being rebuilt right now also holds its normalized copy and,
-# when a table exceeds the keyed-write cap, its batch files — but `rebuild`
-# deletes all three as soon as that graph's loads succeed, so the extra is one
-# graph's worth at a time rather than the whole cluster's. Without that
-# reclaim the peak is roughly double, which is what this volume is NOT sized
-# for.
+# that, a graph over a load cap is split into batch files while it is being
+# rebuilt, but `rebuild` deletes the export and its batches as soon as that
+# graph's loads succeed, so the extra is one graph's worth at a time rather
+# than the whole cluster's. Without that reclaim the peak is roughly double,
+# which is what this volume is NOT sized for.
 #
 # 20Gi is a deliberate over-provision against a cluster whose graphs the
 # upgrade runbook records as effectively unpopulated as of 2026-08-05. It is
@@ -180,8 +179,8 @@ def create_storage_migration(  # noqa: PLR0913
     aws_cli_image: str,
     witan_namespace: str,
     witan_writer_cronjobs: list[str],
+    server_deployment: kubernetes.apps.v1.Deployment,
     maintenance: OmnigraphMaintenance | None = None,
-    server_deployment: kubernetes.apps.v1.Deployment | None = None,
     opts: ResourceOptions | None = None,
 ) -> OmnigraphStorageMigration:
     """Provision the one-shot rebuild Job.
@@ -203,7 +202,9 @@ def create_storage_migration(  # noqa: PLR0913
     ``omnigraph:storage_prefix`` at cutover; it names the Job so
     ``kubectl get jobs`` says which rebuild this was.
 
-    ``maintenance`` is the pair of sweeps to order this Job behind. They write
+    ``maintenance`` is this stack's maintenance CronJobs (the optimize and
+    cleanup sweeps, or from format 14 the one stop window) to order this Job
+    behind. They write
     directly to the store, so a tick between the export and the verification
     mutates a root the migration has declared frozen — and Pulumi would
     otherwise be free to create the Job in parallel with the updates that
@@ -211,17 +212,20 @@ def create_storage_migration(  # noqa: PLR0913
 
     ``server_deployment`` is ordered ahead of the Job for the same reason and
     is the larger of the two writers. Arming the migration takes it to zero
-    replicas, but nothing in the Job's own definition references it, so without
-    this edge Pulumi creates the Job concurrently with the scale-down: the
-    baseline and the export would then read a root a live server is still
-    writing, which is the "baseline of a moving target" the runbook's
-    step-1-first rule exists for.
+    replicas, but without this edge Pulumi creates the Job concurrently with
+    the scale-down: the baseline and the export would then read a root a live
+    server is still writing, which is the "baseline of a moving target" the
+    runbook's step-1-first rule exists for. The edge only orders the two
+    updates. The pod the Deployment had keeps committing until it exits, so
+    the Job's pre-flight also reads the Deployment and its pods and waits for
+    zero replicas and no live pod.
 
     ``witan_namespace`` and ``witan_writer_cronjobs`` name the two writers this
-    stack does not own. Together with ``maintenance`` they are the four
+    stack does not own. Together with ``maintenance`` they are the writer
     CronJobs the Job's pre-flight waits on (suspended, nothing active) before it
     takes a baseline, which is why it gets read access to Jobs and CronJobs in
-    both namespaces for as long as the migration is armed.
+    both namespaces, and to the Deployment and pods in its own, for as long as
+    the migration is armed.
 
     ``backup_root`` is ``s3://<bucket>/backups``; the ``__cluster`` snapshot
     lands under a timestamped ``pre-<prefix>-`` directory there, copied by
@@ -238,9 +242,7 @@ def create_storage_migration(  # noqa: PLR0913
         opts=opts,
     )
 
-    own_writers = (
-        [maintenance.optimize, maintenance.cleanup] if maintenance is not None else []
-    )
+    own_writers = maintenance.cron_jobs if maintenance is not None else []
     writers = [
         *(Output.concat(namespace, "/", cj.metadata.name) for cj in own_writers),
         *(f"{witan_namespace}/{name}" for name in witan_writer_cronjobs),
@@ -250,6 +252,24 @@ def create_storage_migration(  # noqa: PLR0913
     # migration config is cleared. Bound to the server's ServiceAccount because
     # that is the identity carrying the IRSA grant the Job needs anyway; the
     # server is scaled to zero for exactly the window this exists.
+    writer_rule = kubernetes.rbac.v1.PolicyRuleArgs(
+        api_groups=["batch"],
+        resources=["cronjobs", "jobs"],
+        verbs=["get", "list"],
+    )
+    # RBAC cannot scope `list` to a label selector, so this is every pod in the
+    # namespace, for as long as the migration is armed.
+    server_rules = [
+        kubernetes.rbac.v1.PolicyRuleArgs(
+            api_groups=["apps"],
+            resources=["deployments"],
+            resource_names=[server_deployment.metadata.name],
+            verbs=["get"],
+        ),
+        kubernetes.rbac.v1.PolicyRuleArgs(
+            api_groups=[""], resources=["pods"], verbs=["list"]
+        ),
+    ]
     role_bindings = []
     for role_namespace in (namespace, witan_namespace):
         role = kubernetes.rbac.v1.Role(
@@ -260,11 +280,8 @@ def create_storage_migration(  # noqa: PLR0913
                 labels=k8s_global_labels,
             ),
             rules=[
-                kubernetes.rbac.v1.PolicyRuleArgs(
-                    api_groups=["batch"],
-                    resources=["cronjobs", "jobs"],
-                    verbs=["get", "list"],
-                )
+                writer_rule,
+                *(server_rules if role_namespace == namespace else []),
             ],
             opts=opts,
         )
@@ -303,7 +320,7 @@ def create_storage_migration(  # noqa: PLR0913
         ResourceOptions(
             depends_on=[
                 *own_writers,
-                *([server_deployment] if server_deployment is not None else []),
+                server_deployment,
                 # Without these the pre-flight's first API call is a 403.
                 *role_bindings,
             ]
@@ -464,6 +481,12 @@ def create_storage_migration(  # noqa: PLR0913
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="OMNIGRAPH_WRITER_CRONJOBS",
                                     value=Output.all(*writers).apply(" ".join),
+                                ),
+                                kubernetes.core.v1.EnvVarArgs(
+                                    name="OMNIGRAPH_SERVER_DEPLOYMENT",
+                                    value=Output.concat(
+                                        namespace, "/", server_deployment.metadata.name
+                                    ),
                                 ),
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="AWS_REGION", value="us-east-1"
