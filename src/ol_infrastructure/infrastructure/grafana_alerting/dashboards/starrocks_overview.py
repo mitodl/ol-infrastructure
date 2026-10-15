@@ -12,14 +12,14 @@ Metric quirks this dashboard works around:
 - Query latency is a per-FE Dropwizard summary (`quantile` label), so
   quantiles cannot be combined across FEs. Quantile panels show the worst FE
   (`max`); the mean comes from `_sum`/`_count`, which does aggregate.
-- The summary's reservoir only changes when a query lands, so an idle FE
-  keeps reporting the quantiles of its last queries indefinitely (prod showed
-  an Iceberg p95 of 2136ms through a week with no Iceberg queries at all).
-  Quantile panels therefore keep only FEs whose `_count` moved in the window.
-- The mean and the quantiles can disagree by orders of magnitude: a handful
-  of very long statements (MV refreshes, large INSERTs) dominate `_sum` while
-  barely touching the reservoir's percentiles. Both are shown for that
-  reason.
+- An FE that stops receiving a catalog's queries keeps reporting that
+  catalog's old quantiles: prod held an Iceberg p95 of 2136ms, unchanged,
+  while its Iceberg `_count` stayed flat. Quantile panels therefore keep only
+  FEs whose `_count` moved in the window.
+- The mean and the quantiles can disagree by orders of magnitude: prod's
+  default catalog averaged ~16s per query over an hour while its p99 read
+  48ms, so a few long statements dominate `_sum` without moving the
+  reservoir's percentiles. Both are shown for that reason.
 - `starrocks_fe_query_latency_ms` is not split by catalog, so its quantiles
   are swamped by the default catalog's ~1ms statements; Iceberg latency is
   read from `starrocks_fe_catalog_query_latency_ms{catalog_type="iceberg"}`.
@@ -29,8 +29,8 @@ Metric quirks this dashboard works around:
   `increase()`.
 - `fslib_*_latency` histograms are in microseconds.
 - `starrocks_be_pipe_scan_pending_tasks` is kept by the allowlist but is not
-  charted: it sits at a constant negative value on every CN (about -300 in
-  prod over a week), so it does not track anything.
+  charted: prod's six-day-old CNs report it at about -300, which no queue
+  length can be, so it does not track anything usable.
 - Leader-only state (compaction score, transactions, compaction tasks) is
   reported by every FE, but the followers report 0, so `max`/`sum` read the
   leader without needing its pod name.
@@ -281,7 +281,7 @@ def _dashboard_json(
                 description=(
                     "How far each follower's metadata image trails the leader. "
                     "A follower that keeps falling behind serves stale catalog "
-                    "state and is the first casualty when quorum is lost."
+                    "state."
                 ),
                 expr=f"max by (pod) (starrocks_fe_meta_replay_lag_second{{{_FE}}})",
                 legend_format="{{pod}}",
@@ -471,8 +471,9 @@ def _dashboard_json(
             timeseries_panel(
                 title="Read Latency p99 by Filesystem",
                 description=(
-                    "`s3` is a read that went to object storage, `cachefs` one "
-                    "served through the data cache, `srposix` the local disk."
+                    "Split by the filesystem layer StarRocks reports the read "
+                    "against: `s3`, `cachefs` (the data-cache layer) or "
+                    "`srposix` (local files)."
                 ),
                 expr=(
                     "histogram_quantile(0.99, sum by (le, fstype) "
@@ -571,8 +572,8 @@ def _dashboard_json(
                 title="Max Tablet Compaction Score (leader)",
                 description=(
                     "Highest pending-compaction score across all partitions. "
-                    "Scores climbing past ~100 mean ingest is outrunning "
-                    "compaction and query performance will degrade."
+                    "A score that keeps climbing means ingest is outrunning "
+                    "compaction."
                 ),
                 expr=f"max(starrocks_fe_max_tablet_compaction_score{{{_FE}}})",
                 legend_format="score",
