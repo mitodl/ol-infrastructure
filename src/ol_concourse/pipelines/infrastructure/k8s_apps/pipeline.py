@@ -1712,8 +1712,10 @@ def _build_release_resource_app_pipeline(
     # The ol-infra commit Production deploys, fetched again under its own name
     # so the gate check can read it before anything deploys: pulumi_job puts
     # its own code get after every dependency. Both gets take ol-infra with
-    # `passed:` QA, as do the release and image gets, so Concourse resolves all
-    # of them from one QA build and the two gets name the same commit.
+    # `passed:` QA, as do the release and image gets. Concourse pins inputs
+    # that share a `passed:` job to the outputs of one build of that job and
+    # rejects any build whose version differs, so the two gets name the same
+    # commit.
     infra_revision = Identifier(f"{ol_infra_repo.name}-revision")
     qa_job_name = f"deploy-{project_name}-qa"
     qa_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [

@@ -102,10 +102,15 @@ def test_legacy_pipelines_are_untouched():
     assert ASSERT_GATE_TASK_NAME not in json.dumps(pipeline)
 
 
+CLOSED_AT = "2026-10-15T19:43:38Z"
+
+
 class _FakeGitHub(BaseHTTPRequestHandler):
     """The two GitHub calls the check makes: an installation token, one issue."""
 
     body: ClassVar[str | None] = ""
+    closed_at: ClassVar[str | None] = CLOSED_AT
+    last_edited_at: ClassVar[str | None] = "2026-10-15T19:33:53Z"
     calls: ClassVar[list[tuple[str, str]]] = []
 
     def log_message(self, *_args: Any) -> None:
@@ -121,21 +126,29 @@ class _FakeGitHub(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         self.calls.append(("POST", self.path))
-        assert self.path == "/app/installations/456/access_tokens"
-        assert self.headers["Authorization"].startswith("Bearer ")
-        self._reply({"token": "installation-token"})
-
-    def do_GET(self) -> None:
-        self.calls.append(("GET", self.path))
-        assert self.path == f"/repos/{REPO}/issues/{GATE_NUMBER}"
-        assert self.headers["Authorization"] == "token installation-token"
-        self._reply({"number": GATE_NUMBER, "body": self.body})
+        if self.path == "/app/installations/456/access_tokens":
+            assert self.headers["Authorization"].startswith("Bearer ")
+            self._reply({"token": "installation-token"})
+            return
+        assert self.path == "/graphql"
+        assert self.headers["Authorization"] == "bearer installation-token"
+        length = int(self.headers["Content-Length"])
+        variables = json.loads(self.rfile.read(length))["variables"]
+        assert variables == {"owner": "mitodl", "name": APP, "number": GATE_NUMBER}
+        issue = {
+            "body": self.body,
+            "closedAt": self.closed_at,
+            "lastEditedAt": self.last_edited_at,
+        }
+        self._reply({"data": {"repository": {"issue": issue}}})
 
 
 @pytest.fixture
 def fake_github():
     """Serve the fake GitHub API on a free local port."""
     _FakeGitHub.body = f"<!-- ol-infrastructure-revision: {SHA} -->\n## Release x\n"
+    _FakeGitHub.closed_at = CLOSED_AT
+    _FakeGitHub.last_edited_at = "2026-10-15T19:33:53Z"
     _FakeGitHub.calls = []
     server = HTTPServer(("127.0.0.1", 0), _FakeGitHub)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -260,7 +273,37 @@ def test_script_allows_only_the_previewed_ol_infra_commit(  # noqa: PLR0913
 
     assert (result.returncode == 0) is allowed, result.stderr
     assert message in (result.stdout + result.stderr)
-    assert ("GET", f"/repos/{REPO}/issues/{GATE_NUMBER}") in _FakeGitHub.calls
+    assert ("POST", "/graphql") in _FakeGitHub.calls
+
+
+@pytest.mark.parametrize(
+    ("closed_at", "last_edited_at", "allowed"),
+    [
+        # Edited before the close: the body is the one that was approved.
+        (CLOSED_AT, "2026-10-15T19:33:53Z", True),
+        # Never edited after creation.
+        (CLOSED_AT, None, True),
+        # A QA put found the just-closed issue through the lagging search
+        # index and rewrote its body, marker included.
+        (CLOSED_AT, "2026-10-15T19:43:50Z", False),
+        # Same second as the close: cannot be ordered, so not trusted.
+        (CLOSED_AT, CLOSED_AT, False),
+        # Reopened since the gate saw it closed.
+        (None, "2026-10-15T19:33:53Z", False),
+    ],
+)
+def test_script_refuses_a_body_edited_after_the_close(  # noqa: PLR0913
+    tmp_path, fake_github, private_key, closed_at, last_edited_at, allowed
+):
+    """The marker counts only in the body the issue was closed with."""
+    _FakeGitHub.closed_at = closed_at
+    _FakeGitHub.last_edited_at = last_edited_at
+    gate = {"issue_title": f"Release {APP} 2026.9.22.1"}
+    result = _run(tmp_path, fake_github, private_key, gate, "2026.9.22.1")
+
+    assert (result.returncode == 0) is allowed, result.stderr
+    if not allowed:
+        assert "edited at or after it was closed" in result.stderr
 
 
 def test_script_refuses_a_ref_that_is_not_a_commit(tmp_path, fake_github, private_key):

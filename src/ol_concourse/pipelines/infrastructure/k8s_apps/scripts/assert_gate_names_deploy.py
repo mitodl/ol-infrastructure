@@ -15,7 +15,14 @@ newer commit after the issue is closed, or fail after posting the issue so that
 the issue describes a commit no successful QA build produced. So the issue body
 must also carry the revision marker ``classify_promotion.py`` writes, naming
 the commit this job is about to deploy. The body is read from the GitHub API
-because the gate get records only the title.
+because the gate get records the issue's title and number but not its body.
+
+The body has to be the one the issue was closed with. The issue put finds the
+issue to update through the search API, whose index lags, so a QA run that
+lands just after the issue is closed can still rewrite the closed issue's
+body, marker included. So the issue is refused if its body was edited at or
+after it was closed. Renaming the title, which the gate get does to consume
+the issue, is not a body edit.
 
 ``pipeline.py`` inlines this file's text into the task (``python3 -c``), so it
 must stay standard-library only and self-contained. It authenticates as the
@@ -43,6 +50,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +58,13 @@ from typing import Any
 _REVISION_MARKER = re.compile(r"<!-- ol-infrastructure-revision: ([0-9a-f]{40}) -->")
 _SHA = re.compile(r"[0-9a-f]{40}")
 _ATTEMPTS = 3
+_ISSUE_QUERY = """
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    issue(number: $number) { body closedAt lastEditedAt }
+  }
+}
+"""
 
 
 def approved_version(app: str, title: str) -> str | None:
@@ -104,11 +119,12 @@ def app_jwt(app_id: str, private_key: str) -> str:
     return f"{header}.{payload}.{_b64(signature)}"
 
 
-def _request(api_url: str, method: str, path: str, auth: str) -> Any:
+def _request(api_url: str, method: str, path: str, auth: str, body: Any = None) -> Any:
     """Send one GitHub API request, retrying transport errors and 5xx."""
     request = urllib.request.Request(  # noqa: S310
         f"{api_url.rstrip('/')}{path}",
         method=method,
+        data=None if body is None else json.dumps(body).encode(),
         headers={
             "Accept": "application/vnd.github+json",
             "Authorization": auth,
@@ -131,8 +147,28 @@ def _request(api_url: str, method: str, path: str, auth: str) -> Any:
     raise AssertionError(msg)
 
 
-def issue_body(api_url: str, repo: str, number: int) -> str:
-    """Return the body of issue *number* in *repo*, read as the release App."""
+def edited_after_close(issue: dict[str, Any]) -> bool:
+    """Return whether *issue*'s body may differ from the one it was closed with.
+
+    True when it is not closed, or its body was last edited at or after the
+    close: timestamps have one-second resolution, so an edit in the same
+    second as the close cannot be ordered and is not trusted.
+    """
+    closed = issue.get("closedAt")
+    if not closed:
+        return True
+    edited = issue.get("lastEditedAt")
+    if not edited:
+        return False
+    return _timestamp(edited) >= _timestamp(closed)
+
+
+def _timestamp(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def fetch_issue(api_url: str, repo: str, number: int) -> dict[str, Any]:
+    """Return issue *number*'s body, closedAt and lastEditedAt, as the release App."""
     jwt = app_jwt(os.environ["GITHUB_APP_ID"], os.environ["GITHUB_APP_PRIVATE_KEY"])
     installation = os.environ["GITHUB_APP_INSTALLATION_ID"]
     token = _request(
@@ -141,8 +177,25 @@ def issue_body(api_url: str, repo: str, number: int) -> str:
         f"/app/installations/{installation}/access_tokens",
         f"Bearer {jwt}",
     )["token"]
-    issue = _request(api_url, "GET", f"/repos/{repo}/issues/{number}", f"token {token}")
-    return issue.get("body") or ""
+    owner, name = repo.split("/", 1)
+    result = _request(
+        api_url,
+        "POST",
+        "/graphql",
+        f"bearer {token}",
+        {
+            "query": _ISSUE_QUERY,
+            "variables": {"owner": owner, "name": name, "number": number},
+        },
+    )
+    if result.get("errors"):
+        msg = f"GitHub GraphQL errors reading #{number}: {result['errors']}"
+        raise RuntimeError(msg)
+    issue = ((result.get("data") or {}).get("repository") or {}).get("issue")
+    if issue is None:
+        msg = f"issue #{number} was not found in {repo}"
+        raise RuntimeError(msg)
+    return issue
 
 
 def main() -> None:
@@ -175,8 +228,17 @@ def main() -> None:
         )
     number = int(gate.get("issue_number") or 0)
     api_url = os.environ.get("GITHUB_API_URL") or "https://api.github.com"
-    body = issue_body(api_url, os.environ["GITHUB_REPOSITORY"], number)
-    previewed = approved_revision(body)
+    issue = fetch_issue(api_url, os.environ["GITHUB_REPOSITORY"], number)
+    if edited_after_close(issue):
+        sys.exit(
+            f"Refusing to deploy {app} {deploying}: gate issue #{number} "
+            f"({title!r}) is not closed, or its body was edited at or after it "
+            f"was closed (closed {issue.get('closedAt')}, last edited "
+            f"{issue.get('lastEditedAt')}), so it may not show what was "
+            "approved. Nothing was deployed. Re-run the QA job to post an issue "
+            "for what would deploy now, and close that one."
+        )
+    previewed = approved_revision(issue.get("body") or "")
     if previewed is None:
         sys.exit(
             f"Refusing to deploy {app} {deploying}: gate issue #{number} "
