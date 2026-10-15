@@ -1288,11 +1288,11 @@ async def test_release_refuses_an_app_still_on_the_legacy_pipeline(
 async def test_preview_refuses_a_legacy_app_rather_than_answering_wrongly(
     mixed_repos, slack, monkeypatch
 ):
-    """A repo with no calver tag reads as never-released.
+    """A legacy app's releases are not calver-tagged.
 
-    `release_preview` would then report the whole commit history as the next
-    release's contents -- a confidently wrong answer, which is worse than the
-    404 the mutating commands get.
+    `release_preview` would then name a calver version the legacy pipeline
+    will never cut -- a confidently wrong answer, which is worse than the 404
+    the mutating commands get.
     """
     preview = AsyncMock()
     monkeypatch.setattr(bot.github, "release_preview", preview)
