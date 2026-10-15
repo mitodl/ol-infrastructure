@@ -25,10 +25,14 @@ log = logging.getLogger(__name__)
 # Month and day are NOT zero-padded: the release resource emits PEP 440
 # calver (2026.8.3.1, not 2026.08.03.1) because uv and other modern Python
 # tooling reject leading zeros. This pattern required \d{2} for both, so it
-# matched no tag any current release has ever produced -- _latest_release_tag()
+# matched no tag any current release has ever produced -- _release_baseline()
 # returned None and release notes silently degraded to "the last 50 commits of
 # all history". The old fixtures hid it by testing with padded tags.
 _RELEASE_TAG_RE = re.compile(r"^(\d{4})\.(\d{1,2})\.(\d{1,2})\.(\d+)$")
+# The legacy release-script's tags (v0.37.3), which the release resource falls
+# back to as a baseline until an app's first calver release. Same pattern as
+# the resource's SEMVER_PATTERN.
+_SEMVER_TAG_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
 # Commits the release resource authors for a release, excluded from release
 # notes so a finished release does not read as unreleased work.
 _RELEASE_MACHINERY_RE = re.compile(
@@ -114,8 +118,16 @@ def release_tag_sort_key(tag: str) -> tuple[int, int, int, int]:
     return tuple(int(part) for part in match.groups())  # type: ignore[return-value]
 
 
-def _release_tags(repo: Any) -> list[str]:
-    """Return every YYYY.M.D.N tag on *repo*, up to `_TAG_SCAN_LIMIT`.
+def _semver_sort_key(tag: str) -> tuple[int, int, int]:
+    """Return a sortable tuple for a vX.Y.Z or X.Y.Z tag, or zeros if unparseable."""
+    match = _SEMVER_TAG_RE.match(tag)
+    if not match:
+        return (0, 0, 0)
+    return tuple(int(part) for part in match.groups())  # type: ignore[return-value]
+
+
+def _release_tags(repo: Any) -> tuple[list[str], list[str]]:
+    """Return *repo*'s YYYY.M.D.N tags and its semver tags, up to `_TAG_SCAN_LIMIT`.
 
     Ordering from `get_tags()` is not documented to be chronological, so the
     whole listing has to be considered before picking a maximum -- a truncated
@@ -124,25 +136,37 @@ def _release_tags(repo: Any) -> list[str]:
     """
     scanned = 0
     tags = []
+    semver_tags = []
     for tag in itertools.islice(repo.get_tags(), _TAG_SCAN_LIMIT):
         scanned += 1
         if _RELEASE_TAG_RE.match(tag.name):
             tags.append(tag.name)
+        elif _SEMVER_TAG_RE.match(tag.name):
+            semver_tags.append(tag.name)
     if scanned == _TAG_SCAN_LIMIT:
         log.warning(
             "Stopped scanning tags at the %s-tag cap; the release baseline may "
             "be wrong because GitHub's tag order is not version-ordered",
             _TAG_SCAN_LIMIT,
         )
-    return tags
+    return tags, semver_tags
 
 
-def _latest_release_tag(repo: Any) -> str | None:
-    """Return the highest YYYY.M.D.N tag, or None if none exists."""
-    tags = _release_tags(repo)
-    if not tags:
-        return None
-    return max(tags, key=release_tag_sort_key)
+def _release_baseline(repo: Any) -> str | None:
+    """Return the tag the next release is cut against, or None if none exists.
+
+    That is the highest YYYY.M.D.N tag, or before an app's first calver release,
+    its highest semver tag. The fallback mirrors the release resource's
+    ``semver_tag_fallback``, which k8s_apps sets for every release-resource app.
+    Without it a repo moving off the legacy pipeline reads as never released,
+    and the preview lists its whole history as the next release.
+    """
+    tags, semver_tags = _release_tags(repo)
+    if tags:
+        return max(tags, key=release_tag_sort_key)
+    if semver_tags:
+        return max(semver_tags, key=_semver_sort_key)
+    return None
 
 
 def next_release_version(tags: list[str], today: date) -> str:
@@ -197,7 +221,7 @@ def _commits_since_last_tag_sync(repo_slug: str) -> dict[str, Any]:
     "range" is the whole history, and only the cap's worth is fetched.
     """
     repo = _get_client().get_repo(repo_slug)
-    latest_tag = _latest_release_tag(repo)
+    latest_tag = _release_baseline(repo)
 
     omitted: int | None
     if latest_tag:
@@ -228,7 +252,7 @@ def _commits_since_last_tag_sync(repo_slug: str) -> dict[str, Any]:
         # finished release reads as two commits waiting to be released.
         if not _is_release_machinery(c.commit.message)
     ]
-    return {"commits": commits, "omitted": omitted}
+    return {"commits": commits, "omitted": omitted, "since": latest_tag}
 
 
 def _in_flight_release_sync(repo_slug: str) -> dict[str, Any] | None:
@@ -275,12 +299,11 @@ def _branch_commit_date(branch: Any) -> datetime | None:
 def _release_preview_sync(repo_slug: str) -> dict[str, Any]:
     """Return what the next release would contain, without creating anything."""
     repo = _get_client().get_repo(repo_slug)
-    tags = _release_tags(repo)
-    latest_tag = max(tags, key=release_tag_sort_key) if tags else None
+    tags, _ = _release_tags(repo)
     unreleased = _commits_since_last_tag_sync(repo_slug)
     return {
         "version": next_release_version(tags, datetime.now(tz=UTC).date()),
-        "since": latest_tag,
+        "since": unreleased["since"],
         "commits": unreleased["commits"],
         "omitted": unreleased["omitted"],
         "in_flight": _in_flight_release_sync(repo_slug),
@@ -298,10 +321,11 @@ async def release_preview(repo_slug: str) -> dict[str, Any]:
 
 
 async def commits_since_last_tag(repo_slug: str) -> dict[str, Any]:
-    """Return commits on the default branch since the most recent YYYY.MM.DD.N tag.
+    """Return commits on the default branch since the release baseline.
 
-    The result is ``{"commits": [...], "omitted": int | None}``; see
-    :func:`_commits_since_last_tag_sync` for what ``omitted`` means.
+    The result is ``{"commits": [...], "omitted": int | None, "since": str |
+    None}``; see :func:`_commits_since_last_tag_sync` for what ``omitted``
+    means and :func:`_release_baseline` for how ``since`` is chosen.
 
     Uses the compare API (base=tag, head=branch) so only commits *after* the
     tag are returned -- get_commits(sha=...) walks history *starting from*

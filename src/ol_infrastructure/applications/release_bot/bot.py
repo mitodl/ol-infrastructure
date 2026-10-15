@@ -148,12 +148,11 @@ def _resolve_app(repos, app_name):
     app is offered in the command surface, but the jobs and artifacts these
     handlers reach for -- `build-<app>-release-image`, `<app>-release-gate`,
     the `releases/<version>` branch, the release issue, the calver tags
-    `release_preview` counts commits against -- exist only in the modernized
-    pipeline shape. Against a legacy app the mutating commands 404 in
-    Concourse with no hint as to why, and the read-only ones are worse: they
-    return confidently wrong answers, because a repo with no calver tag reads
-    as "never released" and `/doof preview` then reports the entire history as
-    the next release's contents.
+    `release_preview` numbers the next version from -- exist only in the
+    modernized pipeline shape. Against a legacy app the mutating commands 404
+    in Concourse with no hint as to why, and the read-only ones are worse:
+    they return confidently wrong answers, e.g. `/doof preview` names a calver
+    version the legacy pipeline will never cut.
     """
     if app_name not in repos:
         return None, f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}"
