@@ -162,15 +162,11 @@ def setup_external_dns(
                 # carried on the external-dns hostname annotation. Legacy ingress
                 # is intentionally absent.
                 #
-                # Those hostname/target annotations are written with BOTH the
-                # "alpha" and the GA prefix, because v0.22.0 changed the default
-                # annotation prefix from external-dns.alpha.kubernetes.io/ to
-                # external-dns.kubernetes.io/ with no fallback. A version reads
-                # only its own prefix, so a single-prefix annotation plus the
-                # "sync" policy above means an upgrade (or rollback) across that
-                # boundary yields an empty desired set and a plan to delete every
-                # owned record. This bit us on 2026-09-14; see the "Annotation
-                # prefix" section of APISIX_STANDALONE_SETUP.md.
+                # Those annotations must use the GA external-dns.kubernetes.io/
+                # prefix. From v0.22.0 the "alpha" prefix is ignored with no
+                # fallback, so an alpha-only annotation plus the "sync" policy
+                # above drops out of the desired set and its records get deleted.
+                # See the "Annotation prefix" section of APISIX_STANDALONE_SETUP.md.
                 "sources": [
                     "service",
                     "gateway-udproute",
