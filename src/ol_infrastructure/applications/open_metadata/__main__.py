@@ -552,6 +552,27 @@ for _bot_key, _bot_name in _OM_BOTS.items():
     )
     connector_secret_names.append(_k8s_secret_name)
 
+# The contracts sync pipeline (ol_concourse/pipelines/applications/
+# ol_data_contracts_sync.py) publishes ol-data-platform's contracts/ to
+# production OpenMetadata as the ingestion bot. Concourse reads only
+# secret-concourse/<team>/*, so the token is copied there from the same SOPS
+# key, which keeps a rotation to one place. Concourse shares this Vault.
+if stack_info.env_suffix == "production":
+    vault.generic.Secret(
+        f"open-metadata-concourse-contracts-bot-secret-{stack_info.env_suffix}",
+        path="secret-concourse/infrastructure/openmetadata_contracts_bot",
+        data_json=Output.secret(
+            json.dumps(
+                {
+                    "token": open_metadata_connector_secrets["ingestion_bot"]["token"],
+                    "server_url": (
+                        f"https://{open_metadata_config.require('domain')}/api"
+                    ),
+                }
+            )
+        ),
+    )
+
 # IRSA trust role granting the OpenMetadata server pod read access to AWS Glue and S3.
 # Uses OLEKSTrustRole directly (rather than OLEKSAuthBinding) because Vault K8s
 # auth is already managed above via OLVaultK8SResources; OLEKSAuthBinding would
