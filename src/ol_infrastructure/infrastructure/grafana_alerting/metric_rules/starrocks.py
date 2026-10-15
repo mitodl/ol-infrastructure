@@ -45,10 +45,12 @@ Compaction-score thresholds are StarRocks' own: ingestion is slowed above
 above 500 one that may need manual intervention
 (docs/en/administration/management/compaction.md). The rest were set against
 data-qa (about a day of history) and data-production (about 90 minutes) on
-2026-10-15, where every one of these signals sat at zero or well inside its
+2026-10-15, where every signal but one sat at zero or well inside its
 threshold: worst 15-minute internal-error share 1.8%, compaction score 10, FE
 volumes under 6% used, CN memory under 30% of its limit, and no S3, publish,
-vacuum or load-rejection failures at all.
+vacuum or load-rejection failures at all. The exception is data-production's
+FE membership: lakehouse-starrocks-fe-0 had been Pending for days, leaving 2
+of 3 FEs alive, so StarRocksFENodeDown fires there from its first evaluation.
 
 Severity and routing
 --------------------
