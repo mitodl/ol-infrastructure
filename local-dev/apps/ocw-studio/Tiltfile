@@ -7,10 +7,22 @@ load("../../tiltlib.star", "k8s_yaml_local")
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "ocw-studio")
 IMAGE = 'mitodl/ocw-studio-app'
+TEST_IMAGE = 'mitodl/ocw-studio-test'
 NAMESPACE = 'ocw-studio'
 DEPLOY_NAME = 'ocwstudio-webapp'
+TEST_DEPLOY_NAME = 'ocwstudio-test'
 
-if os.path.exists(os.path.join(APP_DIR, '.git')):
+# Code paths live-updated into both the app and the test container.
+_SYNC_DIRS = [
+    'main', 'content_sync', 'websites', 'users', 'videos', 'gdrive_sync',
+    'news', 'localdev', 'external_resources', 'ocw_import', 'templates',
+]
+
+# No published mitodl/ocw-studio-test exists, so the test container is only
+# deployed when the repo is checked out and we can build it ourselves.
+APP_CHECKED_OUT = os.path.exists(os.path.join(APP_DIR, '.git'))
+
+if APP_CHECKED_OUT:
     docker_build(
         IMAGE,
         context=APP_DIR,
@@ -33,6 +45,26 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
             sync(APP_DIR + '/external_resources', '/src/external_resources'),
             sync(APP_DIR + '/ocw_import', '/src/ocw_import'),
             sync(APP_DIR + '/templates', '/src/templates'),
+            run(
+                'cd /src && uv sync --frozen',
+                trigger=[APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock'],
+            ),
+        ],
+    )
+
+    # The same repo built at the `development` target: `runtime` plus a
+    # `uv sync` that installs the dev dependency group. It shares every other
+    # layer with the production build above, so the marginal cost is one
+    # cached layer. `production` has no pytest-django, which the project's
+    # pytest addopts (--ds=main.settings) require, so tests cannot run there.
+    docker_build(
+        TEST_IMAGE,
+        context=APP_DIR,
+        dockerfile=APP_DIR + '/Dockerfile',
+        target='development',
+        live_update=[
+            sync(APP_DIR + '/' + d, '/src/' + d) for d in _SYNC_DIRS
+        ] + [
             run(
                 'cd /src && uv sync --frozen',
                 trigger=[APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock'],
@@ -67,6 +99,16 @@ k8s_resource(
 )
 
 k8s_resource('ocwstudio-celery', labels=['ocw-studio'], resource_deps=['local-infra-apps'])
+
+# Idle container for running the test suite:
+#   kubectl exec -n ocw-studio deploy/ocwstudio-test -- pytest <paths>
+if APP_CHECKED_OUT:
+    k8s_yaml_local(['test-runner.yaml'])
+    k8s_resource(
+        TEST_DEPLOY_NAME,
+        labels=['ocw-studio'],
+        resource_deps=['local-infra-apps'],
+    )
 
 # objects= is explicit on purpose. Left to its own devices Tilt groups every
 # ConfigMap in the applied YAML onto the first workload that references one,

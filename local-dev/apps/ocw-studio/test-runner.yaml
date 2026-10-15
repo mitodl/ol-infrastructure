@@ -1,0 +1,80 @@
+---
+# A pytest-capable ocw-studio container.
+#
+# The webapp deployment deliberately builds the Dockerfile's `production`
+# target, which is the only one that runs the node_builder stage -- without
+# those bundles Studio renders unstyled. `production` carries no dev
+# dependency group, so it has no pytest-django, and `--ds=main.settings` in the
+# project's pytest addopts cannot even load there.
+#
+# The `development` target is `runtime` plus one `uv sync` layer, sharing every
+# other layer with `production`, so having both costs one cached layer and a
+# container that does nothing but sleep.
+#
+# Run the suite with:
+#   kubectl exec -n ocw-studio deploy/ocwstudio-test -- pytest <paths>
+# or from the Tilt UI via the ocwstudio-test resource.
+#
+# It reads the same config as the webapp so DATABASE_URL and friends match.
+# pytest-django builds its own `test_*` database and never touches the
+# development one; the `app` role has CREATEDB for that purpose.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ocwstudio-test
+  namespace: ocw-studio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ocwstudio
+      component: test
+  template:
+    metadata:
+      labels:
+        app: ocwstudio
+        component: test
+    spec:
+      containers:
+      - name: test
+        image: mitodl/ocw-studio-test:latest
+        imagePullPolicy: IfNotPresent
+        workingDir: /src
+        # Idle. The container exists to be exec'd into, not to serve anything.
+        command: ["sleep", "infinity"]
+        envFrom:
+        - configMapRef:
+            name: ocwstudio-env
+        - secretRef:
+            name: ocwstudio-secrets
+        - secretRef:
+            name: ol-ocw-studio-oidc
+        - configMapRef:
+            name: ocwstudio-env-local
+            optional: true
+        env:
+        # Keep test runs off the real services even if the shared config points
+        # at them: a stray publish or sync from a test would hit a real git
+        # host and a real bucket.
+        - name: CONTENT_SYNC_BACKEND
+          value: ""
+        - name: OCW_STUDIO_USE_S3
+          value: "False"
+        # The app config points this at the mkcert bundle that the webapp's
+        # ca-bundle-merge init container writes; nothing mounts it here, and
+        # the tests have no reason to trust local-dev's CA. Point it at the
+        # image's own bundle rather than clearing it: botocore rejects an
+        # empty value outright ("resolved to an empty or whitespace-only
+        # string"), even though requests treats it as unset.
+        - name: REQUESTS_CA_BUNDLE
+          value: /etc/ssl/certs/ca-certificates.crt
+        resources:
+          # Requests stay tiny because the container idles between runs; the
+          # limit is what a full pytest run needs, and the suite OOMKilled at
+          # 4Gi. A limit is a ceiling, not a reservation, so this costs
+          # nothing while no tests are running.
+          requests:
+            cpu: 50m
+            memory: 256Mi
+          limits:
+            memory: 12Gi
