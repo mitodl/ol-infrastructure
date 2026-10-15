@@ -63,6 +63,10 @@ sync_pipeline = Pipeline(
     jobs=[
         Job(
             name=Identifier("sync-data-contracts-to-openmetadata"),
+            # Each build publishes its own checkout, so two overlapping builds
+            # (a merge during the daily run) could let the older one finish last
+            # and put stale contracts back.
+            serial=True,
             plan=[
                 GetStep(get=ol_data_platform_repo.name, trigger=True),
                 GetStep(get=daily_sync.name, trigger=True),
