@@ -454,7 +454,7 @@ def test_release_tag_re_rejects_non_release_tags(tag):
     assert not github._RELEASE_TAG_RE.match(tag)
 
 
-def test_latest_release_tag_finds_unpadded_calver(fake_repo):
+def test_release_baseline_finds_unpadded_calver(fake_repo):
     """The regression that silently broke release notes.
 
     The pattern required zero-padded month and day, but the release resource
@@ -464,10 +464,10 @@ def test_latest_release_tag_finds_unpadded_calver(fake_repo):
     """
     repo = _FakeRepo(tags=[_FakeTag("2026.8.3.1"), _FakeTag("not-a-release-tag")])
     fake_repo(repo)
-    assert github._latest_release_tag(repo) == "2026.8.3.1"
+    assert github._release_baseline(repo) == "2026.8.3.1"
 
 
-def test_latest_release_tag_picks_highest_not_first(fake_repo):
+def test_release_baseline_picks_highest_not_first(fake_repo):
     """Tag order from the GitHub API is not documented to be chronological."""
     repo = _FakeRepo(
         tags=[
@@ -477,20 +477,58 @@ def test_latest_release_tag_picks_highest_not_first(fake_repo):
         ]
     )
     fake_repo(repo)
-    assert github._latest_release_tag(repo) == "2026.8.3.1"
+    assert github._release_baseline(repo) == "2026.8.3.1"
 
 
-def test_latest_release_tag_compares_numerically_not_lexically(fake_repo):
+def test_release_baseline_compares_numerically_not_lexically(fake_repo):
     """2026.8.3.1 is newer than 2026.12.1.1 lexically but older numerically."""
     repo = _FakeRepo(tags=[_FakeTag("2026.8.3.1"), _FakeTag("2026.12.1.1")])
     fake_repo(repo)
-    assert github._latest_release_tag(repo) == "2026.12.1.1"
+    assert github._release_baseline(repo) == "2026.12.1.1"
 
 
-def test_latest_release_tag_returns_none_without_release_tags(fake_repo):
-    repo = _FakeRepo(tags=[_FakeTag("v1.0.0")])
+def test_release_baseline_returns_none_without_release_tags(fake_repo):
+    repo = _FakeRepo(tags=[_FakeTag("not-a-release-tag"), _FakeTag("v1.0")])
     fake_repo(repo)
-    assert github._latest_release_tag(repo) is None
+    assert github._release_baseline(repo) is None
+
+
+def test_release_baseline_falls_back_to_the_highest_semver_tag(fake_repo):
+    """Before its first calver release, an app's baseline is its last semver tag.
+
+    The release resource does the same (semver_tag_fallback). Without it a
+    repo moving off the legacy pipeline reads as never released and the
+    preview lists its whole history.
+    """
+    repo = _FakeRepo(
+        tags=[_FakeTag("v0.9.2"), _FakeTag("v0.37.3"), _FakeTag("v0.37.1")]
+    )
+    fake_repo(repo)
+    assert github._release_baseline(repo) == "v0.37.3"
+
+
+def test_release_baseline_prefers_calver_over_a_higher_semver_tag(fake_repo):
+    """The fallback applies only until the first calver release exists."""
+    repo = _FakeRepo(tags=[_FakeTag("v99.0.0"), _FakeTag("2026.10.15.1")])
+    fake_repo(repo)
+    assert github._release_baseline(repo) == "2026.10.15.1"
+
+
+def test_release_preview_counts_from_the_semver_baseline(fake_repo, monkeypatch):
+    """The first calver release lists only the commits since the last semver tag."""
+    monkeypatch.setattr(github, "_in_flight_release_sync", lambda _slug: None)
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("v0.37.3"), _FakeTag("v0.37.2")],
+            comparison=_FakeComparison(
+                "ahead", [_FakeCommit("abc123", "fix: bug", "me", "https://x/abc123")]
+            ),
+        )
+    )
+    preview = github._release_preview_sync("mitodl/thing")
+    assert preview["since"] == "v0.37.3"
+    assert [c["sha"] for c in preview["commits"]] == ["abc123"]
+    assert preview["omitted"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -843,7 +881,7 @@ def test_release_tags_scans_the_whole_listing(fake_repo):
     tags.append(_FakeTag("2026.12.31.9"))
     repo = _FakeRepo(tags=tags)
     fake_repo(repo)
-    assert github._latest_release_tag(repo) == "2026.12.31.9"
+    assert github._release_baseline(repo) == "2026.12.31.9"
 
 
 def test_release_tags_warns_when_the_scan_cap_is_reached(
