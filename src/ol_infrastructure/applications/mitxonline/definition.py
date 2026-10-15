@@ -27,6 +27,8 @@ from bridge.lib.magic_numbers import STATIC_ASSET_MAX_AGE_SECONDS
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCSecretCredentials,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRouteConfig,
     oidc_gateway_pre_function_plugin,
@@ -141,6 +143,13 @@ class MitxonlineBindings(BaseModel):
     carry ``OPENEDX_API_BASE_URL``, which the routes read for a response header."""
     k8s_labels: dict[str, str]
     secret_names: list[str]
+    oidc_secret_name: str | None = None
+    """A Secret in the namespace holding the gateway's OIDC client credentials,
+    for clusters without Vault (``cluster.vault_auth_name`` unset). It stands in
+    for Vault's ``sso/mitlearn``: the shared mit-learn Keycloak client, with the
+    ``session.secret`` mit-learn's own routes use, since the prefixed routes
+    read Learn's session cookie. It has to carry the plugin keys
+    ``bridge.lib.constants.oidc_secret_data`` returns."""
     application_docker_tag: str | None = None
     application_image_digest: str | None = None
     cluster: ClusterCapabilities
@@ -313,25 +322,37 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
     )
 
 
-def _oidc_config(bindings: MitxonlineBindings, **settings: Any) -> OLApisixOIDCConfig:
+def _oidc_credentials(
+    bindings: MitxonlineBindings,
+) -> OLApisixOIDCVaultCredentials | OLApisixOIDCSecretCredentials:
     vault_auth_name = bindings.cluster.vault_auth_name
-    if vault_auth_name is None:
-        msg = (
-            "OLApisixOIDCResources reads the OIDC client credentials through Vault, "
-            "so the routes need cluster.vault_auth_name."
+    secret_name = bindings.oidc_secret_name
+    if secret_name is not None and vault_auth_name is None:
+        return OLApisixOIDCSecretCredentials(secret_name=secret_name)
+    if vault_auth_name is not None and secret_name is None:
+        return OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",
+            vaultauth=vault_auth_name,
         )
-        raise ValueError(msg)
+    msg = (
+        "The OIDC routes need exactly one credential source: "
+        "cluster.vault_auth_name (from Vault) or oidc_secret_name "
+        "(a Secret already in the namespace)."
+    )
+    raise ValueError(msg)
+
+
+def _oidc_config(bindings: MitxonlineBindings, **settings: Any) -> OLApisixOIDCConfig:
     return OLApisixOIDCConfig(
         k8s_labels=bindings.k8s_labels,
         k8s_namespace=NAMESPACE,
+        credentials=_oidc_credentials(bindings),
         oidc_session_absolute_timeout=60 * 20160,
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",
-        vaultauth=vault_auth_name,
         **settings,
     )
 

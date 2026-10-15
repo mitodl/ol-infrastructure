@@ -200,10 +200,10 @@ are structured (hostnames, `env_suffix`). The one variable the routes read,
 `OPENEDX_API_BASE_URL` for the `frame-ancestors` header, is looked up in the
 merged environment and raises if a program's bindings omit it.
 
-The OIDC config functions still require `cluster.vault_auth_name`, because
-`OLApisixOIDCResources` reads its client credentials through Vault. That goes
-away with the secrets work below, and is what stops a local program from
-creating the routes today.
+The OIDC config functions take their client credentials from exactly one of
+`cluster.vault_auth_name` (Vault) or `MitxonlineBindings.oidc_secret_name` (a
+Secret that already exists, on a cluster without Vault); setting both or
+neither is an error.
 
 `ClusterCapabilities` carries what the component needs to know about the
 cluster it renders for. The component change on this branch adds the knobs:
@@ -212,7 +212,7 @@ cluster it renders for. The component change on this branch adds the knobs:
 |---|---|---|
 | ECR image rewrite (app and nginx) | `registry` | `"direct"` |
 | `SecurityGroupPolicy` and pod label | `application_security_group_id`, `application_security_group_name` | unset |
-| Vault auth name (required, never read) | `vault_k8s_resource_auth_name` | unset |
+| Vault auth name (`vault_k8s_resource_auth_name`, required by the workload component and never read there; the definition reads it to pick the Vault OIDC credentials) | `vault_auth_name` | unset |
 | Webapp HPA or KEDA `ScaledObject` | `manage_webapp_autoscaler` | `False` |
 | Celery KEDA `ScaledObject` per worker | `manage_celery_autoscalers` | `False` |
 | `PodMonitor` | `manage_pod_monitor` | `False` |
@@ -263,9 +263,12 @@ The second was chosen. It removes the duplication without adding a stateful
 service to every developer's laptop, and VSO behaviour (refresh, rollout
 restart) is operations territory that local-dev does not need to reproduce.
 
-`OLApisixOIDCResources` needs the same treatment: it creates an
-`OLVaultK8SSecret` unconditionally (`apisix.py:586-602`) and must accept a
-plain Secret as its credential source.
+`OLApisixOIDCResources` already takes its credential source as data:
+`OLApisixOIDCConfig.credentials` is either `OLApisixOIDCVaultCredentials`
+(deployed; the component writes the Secret through VSO) or
+`OLApisixOIDCSecretCredentials` (a Secret that already exists; nothing is
+created), and `bridge.lib.constants.oidc_secret_data` defines the keys that
+Secret carries, the same ones the deployed VSO templates write.
 
 ### Celery topology
 

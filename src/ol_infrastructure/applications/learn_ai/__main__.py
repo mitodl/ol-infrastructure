@@ -38,6 +38,7 @@ from ol_infrastructure.components.services import appdb
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -1138,10 +1139,12 @@ learn_ai_oidc_resources = OLApisixOIDCResources(
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",  # Use mitlearn SSO config
-        vaultauth=vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",  # Use mitlearn SSO config
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     ),
     opts=ResourceOptions(delete_before_replace=True, parent=vault_k8s_resources),
 )
@@ -1226,10 +1229,12 @@ learn_ai_mit_learn_oidc_resources = OLApisixOIDCResources(
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",  # Use mitlearn SSO config
-        vaultauth=vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",  # Use mitlearn SSO config
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     ),
     opts=ResourceOptions(delete_before_replace=True, parent=vault_k8s_resources),
 )

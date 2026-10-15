@@ -35,6 +35,7 @@ from pydantic import ValidationError  # noqa: E402
 from ol_infrastructure.applications.mitxonline import definition  # noqa: E402
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
 )
 from ol_infrastructure.components.services.k8s import (  # noqa: E402
     OLApplicationK8s,
@@ -43,6 +44,7 @@ from ol_infrastructure.components.services.k8s import (  # noqa: E402
 
 LOCAL_IMAGE_TAG = "tilt-abc123"
 OPENEDX_BASE_URL = "https://lms.mit.dev"
+LOCAL_OIDC_SECRET = "ol-mitlearn-oidc"  # noqa: S105  # pragma: allowlist secret
 
 
 def _local_bindings(**overrides) -> definition.MitxonlineBindings:
@@ -258,6 +260,42 @@ def test_session_cookies_are_named_for_the_environment():
     assert prefixed.oidc_session_cookie_domain == ".learn.mit.dev"
 
 
-def test_oidc_needs_vault_until_it_can_read_a_plain_secret():
-    with pytest.raises(ValueError, match="vault_auth_name"):
-        definition.direct_oidc_config(_local_bindings())
+def test_deployed_routes_read_oidc_credentials_from_the_mitlearn_vault_client():
+    """Both route groups authenticate through the shared mit-learn Keycloak
+    client, whose credentials live at sso/mitlearn in Vault.
+    """
+    direct = definition.direct_oidc_config(_deployed_bindings())
+    prefixed = definition.prefixed_oidc_config(_deployed_bindings())
+
+    expected = OLApisixOIDCVaultCredentials(
+        mount="secret-operations",
+        mount_type="kv-v1",
+        path="sso/mitlearn",
+        vaultauth="mitxonline-auth",
+    )
+    assert direct.credentials == expected
+    assert prefixed.credentials == expected
+
+
+def test_local_routes_read_oidc_credentials_from_the_bound_secret():
+    bindings = _local_bindings(oidc_secret_name=LOCAL_OIDC_SECRET)
+
+    direct, prefixed = _route_groups(bindings)
+
+    for route in (direct[0], prefixed[0]):
+        [oidc_plugin] = [
+            plugin for plugin in route.plugins if plugin.name == "openid-connect"
+        ]
+        assert oidc_plugin.secret_ref == LOCAL_OIDC_SECRET
+
+
+@pytest.mark.parametrize(
+    "bindings",
+    [
+        pytest.param(_local_bindings(), id="neither"),
+        pytest.param(_deployed_bindings(oidc_secret_name=LOCAL_OIDC_SECRET), id="both"),
+    ],
+)
+def test_oidc_credentials_come_from_exactly_one_source(bindings):
+    with pytest.raises(ValueError, match="oidc_secret_name"):
+        definition.direct_oidc_config(bindings)

@@ -7,7 +7,8 @@ This module verifies:
 3. The ApisixUpstream resource is named after the target Service, per the
    apisix-ingress-controller name-matching contract documented on the class
 4. OLApisixOIDCResources renders the flat lua-resty-session 4.x session.*
-   keys the pinned APISIX expects, and omits them when unset
+   keys the pinned APISIX expects, and omits them when unset; it takes its
+   client credentials from Vault or from a Secret that already exists
 5. The session cookie names derived by bridge.lib.constants, and the stale
    cookie cleanup plugin's generated Lua
 6. The identity-header strip plugin's wiring: the Lua it ships, the phase it
@@ -50,12 +51,15 @@ from bridge.lib.constants import (  # noqa: E402
     GATEWAY_IDENTITY_HEADERS,
     apisix_oidc_session_cookie_name,
     mit_learn_session_cookie_name,
+    oidc_secret_data,
 )
 from ol_infrastructure.components.services import apisix as apisix_module  # noqa: E402
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
     FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCSecretCredentials,
+    OLApisixOIDCVaultCredentials,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
     OLApisixSharedPluginsVariant,
@@ -66,6 +70,9 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     oidc_gateway_pre_function_plugin,
     ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
+)
+from ol_infrastructure.components.services.vault import (  # noqa: E402
+    OLVaultK8SStaticSecretConfig,
 )
 from tests.ol_infrastructure.applications.test_apisix_bearer_passthrough import (  # noqa: E402
     BEARER_VALIDATION_OPTIONS,
@@ -208,18 +215,142 @@ def test_resource_name_matches_service_name():
 # ─── OLApisixOIDCResources session config ──────────────────────────────────────
 
 
+VAULT_SECRET_NAME = "ol-apisix-myapp-oidc-secrets"  # noqa: S105  # pragma: allowlist secret
+LOCAL_SECRET_NAME = "local-oidc"  # noqa: S105  # pragma: allowlist secret
+
+
+def oidc_config(**overrides) -> OLApisixOIDCConfig:
+    """Build an OIDC config with the fields every deployed caller supplies."""
+    settings = {
+        "application_name": "myapp",
+        "k8s_namespace": "myapp-ns",
+        "credentials": OLApisixOIDCVaultCredentials(
+            path="sso/myapp", vaultauth="myapp-vaultauth"
+        ),
+        **overrides,
+    }
+    return OLApisixOIDCConfig(**settings)
+
+
 def oidc_resources(name: str, **overrides) -> OLApisixOIDCResources:
-    """Build an OIDC component with the fields every caller has to supply."""
-    return OLApisixOIDCResources(
-        name,
-        oidc_config=OLApisixOIDCConfig(
+    """Build an OIDC component from ``oidc_config(**overrides)``."""
+    return OLApisixOIDCResources(name, oidc_config=oidc_config(**overrides))
+
+
+@pytest.fixture
+def vault_secrets_requested(
+    monkeypatch,
+) -> list[tuple[str, OLVaultK8SStaticSecretConfig, pulumi.ResourceOptions | None]]:
+    """Record each Vault-backed Secret the OIDC component asks for, as
+    ``(resource name, OLVaultK8SStaticSecretConfig, ResourceOptions)``, instead
+    of creating it.
+    """
+    requested: list[
+        tuple[str, OLVaultK8SStaticSecretConfig, pulumi.ResourceOptions | None]
+    ] = []
+    monkeypatch.setattr(
+        apisix_module,
+        "OLVaultK8SSecret",
+        lambda name, resource_config, opts=None: requested.append(
+            (name, resource_config, opts)
+        ),
+    )
+    return requested
+
+
+def test_vault_mode_writes_the_plugin_secret_through_vso(vault_secrets_requested):
+    """Deployed stacks get their OIDC client credentials from Vault: one
+    Vault-backed Secret renders the keys the openid-connect plugin reads, and
+    the plugin's secretRef names it. Every input is pinned, since this is what
+    stands in for a preview of each deployed stack.
+    """
+    oidc = oidc_resources("test-oidc-vault-mode")
+
+    [(name, vault_secret, opts)] = vault_secrets_requested
+    assert name == "myapp-oidc-secrets"
+    assert vault_secret == OLVaultK8SStaticSecretConfig(
+        dest_secret_labels={},
+        dest_secret_name=VAULT_SECRET_NAME,
+        exclude_raw=True,
+        excludes=[".*"],
+        labels={},
+        mount="secret-operations",
+        mount_type="kv-v1",
+        name=VAULT_SECRET_NAME,
+        namespace="myapp-ns",
+        path="sso/myapp",
+        refresh_after="1m",
+        templates={
+            "client_id": '{{ get .Secrets "client_id" }}',
+            "client_secret": '{{ get .Secrets "client_secret" }}',
+            "realm": '{{ get .Secrets "realm_name" }}',
+            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
+            "session.secret": '{{ get .Secrets "secret" }}',
+        },
+        vaultauth="myapp-vaultauth",
+    )
+    assert opts.parent is oidc
+    assert opts.delete_before_replace is True
+    plugin = oidc.get_full_oidc_plugin_config(unauth_action="auth")
+    assert plugin["secretRef"] == VAULT_SECRET_NAME
+
+
+def test_existing_secret_mode_reads_the_named_secret_without_vault(
+    vault_secrets_requested,
+):
+    """Clusters without Vault hand the component a Secret they already made;
+    nothing Vault-backed is created and the plugin reads that Secret.
+    """
+    oidc = oidc_resources(
+        "test-oidc-existing-secret",
+        credentials=OLApisixOIDCSecretCredentials(secret_name=LOCAL_SECRET_NAME),
+    )
+
+    assert vault_secrets_requested == []
+    plugin = oidc.get_full_oidc_plugin_config(unauth_action="auth")
+    assert plugin["secretRef"] == LOCAL_SECRET_NAME
+
+
+def test_oidc_config_requires_a_credential_source():
+    """A caller passing only the old flat Vault fields fails on the missing
+    ``credentials`` field, so no call site can be left behind silently.
+    """
+    with pytest.raises(ValidationError, match="credentials"):
+        OLApisixOIDCConfig(
             application_name="myapp",
             k8s_namespace="myapp-ns",
             vault_path="sso/myapp",
             vaultauth="myapp-vaultauth",
-            **overrides,
-        ),
-    )
+        )
+
+
+def test_a_credential_variant_rejects_the_other_variants_fields():
+    """Both sources at once cannot even be written: a Vault variant given a
+    ``secret_name`` is an error, not a silently dropped field.
+    """
+    with pytest.raises(ValidationError, match="secret_name"):
+        OLApisixOIDCVaultCredentials(
+            path="sso/myapp",
+            vaultauth="myapp-vaultauth",
+            secret_name=LOCAL_SECRET_NAME,
+        )
+
+
+def test_oidc_secret_data_derives_the_plugin_keys_from_vault_fields():
+    fields = {
+        "client_id": "my-client",
+        "client_secret": "s3cret",  # pragma: allowlist secret
+        "realm_name": "olapps",
+        "url": "https://sso.example/realms/olapps",
+        "secret": "cookie-key",  # pragma: allowlist secret
+    }
+
+    assert oidc_secret_data(fields, include_session_secret=False) == {
+        "client_id": "my-client",
+        "client_secret": "s3cret",  # pragma: allowlist secret
+        "realm": "olapps",
+        "discovery": "https://sso.example/realms/olapps/.well-known/openid-configuration",
+    }
 
 
 def test_session_cookie_name_is_emitted_flat():

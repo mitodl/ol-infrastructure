@@ -46,6 +46,7 @@ from pulumi import Config, ResourceOptions
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
 )
@@ -196,9 +197,11 @@ marimo_oidc = OLApisixOIDCResources(
         oidc_scope="openid profile email",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
-        vault_mount="secret-operations",
-        vault_path="sso/marimo",
-        vaultauth=marimo_vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            path="sso/marimo",
+            vaultauth=marimo_vault_k8s_resources.auth_name,
+        ),
     ),
 )
 
