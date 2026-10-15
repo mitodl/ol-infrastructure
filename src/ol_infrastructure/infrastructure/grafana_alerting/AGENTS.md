@@ -103,6 +103,7 @@ Rootly). That path is independent of Grafana and is managed in
 | `dashboards/journeys.py` | The journey definitions (`Journey` / `JourneyStep`). Append here to cover another product capability. |
 | `dashboards/keycloak_overview.py` | General service-health overview across all realms: logins, JVM, HTTP, DB pool, GC, JDBC cache, plus raw error/warning log tails. |
 | `dashboards/keycloak_olapps_realm.py` | Holistic authentication-activity view for just the olapps realm -- logins, registrations, token flows, and a per-identity-provider breakdown (success + failure) from Loki. For devs/management, not hardware/JVM. |
+| `dashboards/starrocks_overview.py` | StarRocks lakehouse service health: FE quorum and JVM, queries/errors/latency by catalog, CN capacity and data cache, and the shared-data S3 path. Reads only the families kept by the ServiceMonitor allowlists in `applications/starrocks/__main__.py`; a panel on any other StarRocks family renders empty until that allowlist grows. |
 | `pingdom_checks.py` | Pingdom uptime checks via Pulumi dynamic provider. Runs in the production stack only. |
 | `AGENTS.md` | This file. |
 
@@ -393,10 +394,10 @@ returns no data rather than erroring.
 4. Dashboards are filed in per-subject folders, created in `base.create()`:
    `"Keycloak"` (`keycloak-dashboards`), `"Application Performance"`
    (`application-performance-dashboards`), `"ClickHouse"`
-   (`clickhouse-dashboards`) and `"User Journeys"`
-   (`user-journey-dashboards`). If a new dashboard belongs to none of them,
-   add another `Folder` there rather than widening an existing one to hold
-   something it has nothing to do with.
+   (`clickhouse-dashboards`), `"StarRocks"` (`starrocks-dashboards`) and
+   `"User Journeys"` (`user-journey-dashboards`). If a new dashboard belongs
+   to none of them, add another `Folder` there rather than widening an
+   existing one to hold something it has nothing to do with.
 
    "User Journeys" is scoped by user-facing capability rather than by system,
    so a dashboard belongs there only if its subject is a product capability
