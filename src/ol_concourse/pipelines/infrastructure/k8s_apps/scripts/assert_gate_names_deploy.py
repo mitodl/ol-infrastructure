@@ -61,7 +61,7 @@ _ATTEMPTS = 3
 _ISSUE_QUERY = """
 query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
-    issue(number: $number) { body closedAt lastEditedAt }
+    issue(number: $number) { body closed closedAt lastEditedAt }
   }
 }
 """
@@ -130,6 +130,7 @@ def _request(api_url: str, method: str, path: str, auth: str, body: Any = None) 
             "Authorization": auth,
             "X-GitHub-Api-Version": "2022-11-28",
             "User-Agent": "ol-concourse-assert-gate-names-deploy",
+            **({} if body is None else {"Content-Type": "application/json"}),
         },
     )
     for attempt in range(1, _ATTEMPTS + 1):
@@ -150,12 +151,13 @@ def _request(api_url: str, method: str, path: str, auth: str, body: Any = None) 
 def edited_after_close(issue: dict[str, Any]) -> bool:
     """Return whether *issue*'s body may differ from the one it was closed with.
 
-    True when it is not closed, or its body was last edited at or after the
-    close: timestamps have one-second resolution, so an edit in the same
-    second as the close cannot be ordered and is not trusted.
+    True when it is not closed (``closed`` is read directly, so this does not
+    depend on what ``closedAt`` says after a reopen), or its body was last
+    edited at or after the close: timestamps have one-second resolution, so an
+    edit in the same second as the close cannot be ordered and is not trusted.
     """
     closed = issue.get("closedAt")
-    if not closed:
+    if issue.get("closed") is not True or not closed:
         return True
     edited = issue.get("lastEditedAt")
     if not edited:
@@ -168,7 +170,7 @@ def _timestamp(value: str) -> datetime:
 
 
 def fetch_issue(api_url: str, repo: str, number: int) -> dict[str, Any]:
-    """Return issue *number*'s body, closedAt and lastEditedAt, as the release App."""
+    """Return issue *number*'s body and close/edit state, read as the release App."""
     jwt = app_jwt(os.environ["GITHUB_APP_ID"], os.environ["GITHUB_APP_PRIVATE_KEY"])
     installation = os.environ["GITHUB_APP_INSTALLATION_ID"]
     token = _request(

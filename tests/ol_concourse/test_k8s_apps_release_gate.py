@@ -109,7 +109,10 @@ class _FakeGitHub(BaseHTTPRequestHandler):
     """The two GitHub calls the check makes: an installation token, one issue."""
 
     body: ClassVar[str | None] = ""
+    closed: ClassVar[bool] = True
     closed_at: ClassVar[str | None] = CLOSED_AT
+    # Replaces the whole GraphQL response when set.
+    graphql_response: ClassVar[dict[str, Any] | None] = None
     last_edited_at: ClassVar[str | None] = "2026-10-15T19:33:53Z"
     calls: ClassVar[list[tuple[str, str]]] = []
 
@@ -132,11 +135,16 @@ class _FakeGitHub(BaseHTTPRequestHandler):
             return
         assert self.path == "/graphql"
         assert self.headers["Authorization"] == "bearer installation-token"
+        assert self.headers["Content-Type"] == "application/json"
         length = int(self.headers["Content-Length"])
         variables = json.loads(self.rfile.read(length))["variables"]
         assert variables == {"owner": "mitodl", "name": APP, "number": GATE_NUMBER}
+        if self.graphql_response is not None:
+            self._reply(self.graphql_response)
+            return
         issue = {
             "body": self.body,
+            "closed": self.closed,
             "closedAt": self.closed_at,
             "lastEditedAt": self.last_edited_at,
         }
@@ -147,7 +155,9 @@ class _FakeGitHub(BaseHTTPRequestHandler):
 def fake_github():
     """Serve the fake GitHub API on a free local port."""
     _FakeGitHub.body = f"<!-- ol-infrastructure-revision: {SHA} -->\n## Release x\n"
+    _FakeGitHub.closed = True
     _FakeGitHub.closed_at = CLOSED_AT
+    _FakeGitHub.graphql_response = None
     _FakeGitHub.last_edited_at = "2026-10-15T19:33:53Z"
     _FakeGitHub.calls = []
     server = HTTPServer(("127.0.0.1", 0), _FakeGitHub)
@@ -277,25 +287,27 @@ def test_script_allows_only_the_previewed_ol_infra_commit(  # noqa: PLR0913
 
 
 @pytest.mark.parametrize(
-    ("closed_at", "last_edited_at", "allowed"),
+    ("closed", "closed_at", "last_edited_at", "allowed"),
     [
         # Edited before the close: the body is the one that was approved.
-        (CLOSED_AT, "2026-10-15T19:33:53Z", True),
+        (True, CLOSED_AT, "2026-10-15T19:33:53Z", True),
         # Never edited after creation.
-        (CLOSED_AT, None, True),
+        (True, CLOSED_AT, None, True),
         # A QA put found the just-closed issue through the lagging search
         # index and rewrote its body, marker included.
-        (CLOSED_AT, "2026-10-15T19:43:50Z", False),
+        (True, CLOSED_AT, "2026-10-15T19:43:50Z", False),
         # Same second as the close: cannot be ordered, so not trusted.
-        (CLOSED_AT, CLOSED_AT, False),
-        # Reopened since the gate saw it closed.
-        (None, "2026-10-15T19:33:53Z", False),
+        (True, CLOSED_AT, CLOSED_AT, False),
+        # Reopened since the gate saw it closed, whatever closedAt still says.
+        (False, CLOSED_AT, "2026-10-15T19:33:53Z", False),
+        (False, None, "2026-10-15T19:33:53Z", False),
     ],
 )
 def test_script_refuses_a_body_edited_after_the_close(  # noqa: PLR0913
-    tmp_path, fake_github, private_key, closed_at, last_edited_at, allowed
+    tmp_path, fake_github, private_key, closed, closed_at, last_edited_at, allowed
 ):
     """The marker counts only in the body the issue was closed with."""
+    _FakeGitHub.closed = closed
     _FakeGitHub.closed_at = closed_at
     _FakeGitHub.last_edited_at = last_edited_at
     gate = {"issue_title": f"Release {APP} 2026.9.22.1"}
@@ -304,6 +316,30 @@ def test_script_refuses_a_body_edited_after_the_close(  # noqa: PLR0913
     assert (result.returncode == 0) is allowed, result.stderr
     if not allowed:
         assert "edited at or after it was closed" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("response", "message"),
+    [
+        (
+            {"data": {"repository": {"issue": None}}, "errors": [{"type": "x"}]},
+            "GitHub GraphQL errors",
+        ),
+        ({"data": {"repository": {"issue": None}}}, "was not found"),
+        ({"data": {"repository": None}}, "was not found"),
+    ],
+)
+def test_script_fails_closed_when_the_issue_cannot_be_read(
+    tmp_path, fake_github, private_key, response, message
+):
+    """A GraphQL error or a missing issue is a red build, not a deploy."""
+    _FakeGitHub.graphql_response = response
+    gate = {"issue_title": f"Release {APP} 2026.9.22.1"}
+    result = _run(tmp_path, fake_github, private_key, gate, "2026.9.22.1")
+
+    assert result.returncode != 0
+    assert message in result.stderr
+    assert "approves deploying" not in result.stdout
 
 
 def test_script_refuses_a_ref_that_is_not_a_commit(tmp_path, fake_github, private_key):
