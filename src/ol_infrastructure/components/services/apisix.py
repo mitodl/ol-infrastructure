@@ -3,10 +3,10 @@
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal, assert_never
 
 import pulumi_kubernetes as kubernetes
-from pulumi import ComponentResource, Output, ResourceOptions
+from pulumi import ComponentResource, ResourceOptions
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -20,6 +20,8 @@ from pydantic import (
 from bridge.lib.constants import (
     DEFAULT_OIDC_SESSION_COOKIE_NAME,
     GATEWAY_IDENTITY_HEADERS,
+    OIDC_VAULT_FIELDS,
+    oidc_secret_data,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
@@ -579,21 +581,57 @@ class OLApisixRoute(ComponentResource):
         return routes
 
 
+class OLApisixOIDCVaultCredentials(BaseModel):
+    """The openid-connect plugin's client credentials come from Vault.
+
+    OLApisixOIDCResources writes them into a per-application Secret through
+    VSO (OLVaultK8SSecret), rendering the plugin keys from the Keycloak
+    client's fields at ``path``.
+    """
+
+    # forbid: a misspelled field, or a field of the other variant, is an error
+    # rather than a silently dropped value.
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["vault"] = "vault"
+    vaultauth: str = Field(min_length=1)
+    mount: str = "secret-operations"
+    mount_type: Literal["kv-v1", "kv-v2"] = "kv-v1"
+    path: str
+
+
+class OLApisixOIDCSecretCredentials(BaseModel):
+    """The openid-connect plugin's client credentials are in a Secret that
+    already exists in the application's namespace, for clusters without Vault.
+
+    Nothing checks its contents: whoever creates it has to write the plugin
+    keys ``bridge.lib.constants.oidc_secret_data`` returns, ``session.secret``
+    included when ``oidc_use_session_secret``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["existing_secret"] = "existing_secret"
+    secret_name: str = Field(min_length=1)
+
+
 class OLApisixOIDCConfig(BaseModel):
     """Configuration for APISIX OIDC authentication resources.
 
-    Holds Vault path details and OIDC plugin settings used to create the
-    per-application Kubernetes Secret (via OLVaultK8SSecret) and generate
-    the openid-connect plugin configuration block.
+    Holds the OIDC plugin settings and where the plugin's client credentials
+    come from. Either way the Secret the plugin reads has to carry the keys
+    ``bridge.lib.constants.oidc_secret_data`` returns (``client_id``,
+    ``client_secret``, ``realm``, ``discovery``, and ``session.secret`` when
+    ``oidc_use_session_secret``).
     """
 
     application_name: str
     k8s_labels: dict[str, str] = {}
     k8s_namespace: str
-    vault_mount: str = "secret-operations"
-    vault_mount_type: Literal["kv-v1", "kv-v2"] = "kv-v1"
-    vault_path: str
-    vaultauth: str
+    credentials: Annotated[
+        OLApisixOIDCVaultCredentials | OLApisixOIDCSecretCredentials,
+        Field(discriminator="source"),
+    ]
 
     oidc_bearer_only: bool = False
     oidc_introspection_endpoint_auth_method: str = "client_secret_basic"
@@ -632,9 +670,14 @@ class OLApisixOIDCConfig(BaseModel):
 
 class OLApisixOIDCResources(ComponentResource):
     """
-    OIDC configuration for apisix
-    Defines and creates an "OLVaultK8SSecret" resource in the k8s cluster
-    Also provides helper functions for creating config blocks for the oidc plugin
+    The client-credential Secret behind one application's APISIX
+    openid-connect routes, and the plugin block those routes attach.
+
+    Creates an OLVaultK8SSecret for OLApisixOIDCVaultCredentials; for
+    OLApisixOIDCSecretCredentials it creates nothing and points the plugin at
+    the named Secret. get_full_oidc_plugin_config() returns the openid-connect
+    entry for an OLApisixRoute's plugins; this component does not create the
+    routes.
     """
 
     def __init__(
@@ -650,37 +693,48 @@ class OLApisixOIDCResources(ComponentResource):
 
         resource_options = ResourceOptions(parent=self).merge(opts)
 
-        self.secret_name = f"ol-apisix-{oidc_config.application_name}-oidc-secrets"
-
-        __templates: dict[str, str | Output[str]] = {
-            "client_id": '{{ get .Secrets "client_id" }}',
-            "client_secret": '{{ get .Secrets "client_secret" }}',
-            "realm": '{{ get .Secrets "realm_name" }}',
-            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
-        }
-
-        if oidc_config.oidc_use_session_secret:
-            __templates["session.secret"] = '{{ get .Secrets "secret" }}'
-
-        self.oidc_secrets = OLVaultK8SSecret(
-            f"{oidc_config.application_name}-oidc-secrets",
-            resource_config=OLVaultK8SStaticSecretConfig(
-                dest_secret_labels=oidc_config.k8s_labels,
-                dest_secret_name=self.secret_name,
-                exclude_raw=True,
-                excludes=[".*"],
-                labels=oidc_config.k8s_labels,
-                mount=oidc_config.vault_mount,
-                mount_type=oidc_config.vault_mount_type,
-                name=self.secret_name,
-                namespace=oidc_config.k8s_namespace,
-                path=oidc_config.vault_path,
-                refresh_after="1m",
-                templates=__templates,
-                vaultauth=oidc_config.vaultauth,
-            ),
-            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
-        )
+        self.oidc_secrets: OLVaultK8SSecret | None = None
+        match oidc_config.credentials:
+            case OLApisixOIDCSecretCredentials(secret_name=secret_name):
+                self.secret_name = secret_name
+            case OLApisixOIDCVaultCredentials() as vault:
+                self.secret_name = (
+                    f"ol-apisix-{oidc_config.application_name}-oidc-secrets"
+                )
+                self.oidc_secrets = OLVaultK8SSecret(
+                    f"{oidc_config.application_name}-oidc-secrets",
+                    resource_config=OLVaultK8SStaticSecretConfig(
+                        dest_secret_labels=oidc_config.k8s_labels,
+                        dest_secret_name=self.secret_name,
+                        exclude_raw=True,
+                        excludes=[".*"],
+                        labels=oidc_config.k8s_labels,
+                        mount=vault.mount,
+                        mount_type=vault.mount_type,
+                        name=self.secret_name,
+                        namespace=oidc_config.k8s_namespace,
+                        path=vault.path,
+                        refresh_after="1m",
+                        # A fresh dict typed like the parameter (dict is
+                        # invariant, so the dict[str, str] oidc_secret_data
+                        # returns can't be passed as is).
+                        templates={
+                            **oidc_secret_data(
+                                {
+                                    field: f'{{{{ get .Secrets "{field}" }}}}'
+                                    for field in OIDC_VAULT_FIELDS
+                                },
+                                include_session_secret=oidc_config.oidc_use_session_secret,
+                            )
+                        },
+                        vaultauth=vault.vaultauth,
+                    ),
+                    opts=resource_options.merge(
+                        ResourceOptions(delete_before_replace=True)
+                    ),
+                )
+            case _ as unhandled:
+                assert_never(unhandled)
 
         session_config: dict[str, Any] = {}
         # Flat session.cookie_domain, per the openid-connect plugin's
