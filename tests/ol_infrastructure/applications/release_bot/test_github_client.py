@@ -166,11 +166,17 @@ class _FakeGitCommit:
         self.author = _FakeAuthor(author_name, commit_date)
 
 
+class _FakeParent:
+    def __init__(self, sha):
+        self.sha = sha
+
+
 class _FakeCommit:
-    def __init__(self, sha, message, author_name, url):
+    def __init__(self, sha, message, author_name, url, parents=()):
         self.sha = sha
         self.commit = _FakeGitCommit(message, author_name)
         self.html_url = url
+        self.parents = [_FakeParent(parent) for parent in parents]
 
 
 class _FakeTag:
@@ -579,6 +585,102 @@ def test_commits_since_last_tag_counts_what_the_cap_left_out(fake_repo, monkeypa
     unreleased = github._commits_since_last_tag_sync("mitodl/thing")
     assert [c["sha"] for c in unreleased["commits"]] == ["aaa", "bbb"]
     assert unreleased["omitted"] == 3
+
+
+def _merge_history():
+    """Micromasters since v0.254.0, as the compare API listed it on 2026-10-15."""
+    return [
+        _FakeCommit(
+            "0b10fcbe",
+            "fix(sentry): cap request bodies at 1KB (#5561)",
+            "dev",
+            "https://x/0b10fcbe",
+            parents=["f053061e"],
+        ),
+        _FakeCommit(
+            "321043c2",
+            "chore(release): track only the VERSION file in bumpversion",
+            "dev",
+            "https://x/321043c2",
+            parents=["0b10fcbe"],
+        ),
+        _FakeCommit(
+            "d88388e6",
+            "Merge pull request #5565 from mitodl/cpatti/bump\n\n"
+            "chore(release): track only the VERSION file in bumpversion",
+            "dev",
+            "https://x/d88388e6",
+            parents=["0b10fcbe", "321043c2"],
+        ),
+    ]
+
+
+def test_a_merged_pr_is_listed_once_not_with_the_commits_it_merged(fake_repo):
+    """The merge commit names the PR; the commit it merged would repeat it."""
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("v0.254.0")],
+            comparison=_FakeComparison("ahead", _merge_history()),
+        )
+    )
+    unreleased = github._commits_since_last_tag_sync("mitodl/thing")
+
+    assert [c["sha"] for c in unreleased["commits"]] == ["0b10fcbe", "d88388e6"]
+    assert [github.pull_request(c["message"])[0] for c in unreleased["commits"]] == [
+        5561,
+        5565,
+    ]
+    # Hiding a merged commit is not truncation.
+    assert unreleased["omitted"] == 0
+
+
+def test_a_merged_pr_hides_all_its_commits_but_not_what_main_had(fake_repo):
+    """A PR branch that merged main in carries main's commits; they stay."""
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("2026.10.1.1")],
+            comparison=_FakeComparison(
+                "ahead",
+                [
+                    _FakeCommit("m1", "fix: on main (#1)", "a", "u", ["base"]),
+                    _FakeCommit("b1", "feat: part one", "b", "u", ["base"]),
+                    _FakeCommit(
+                        "b2", "Merge branch 'main' into feat", "b", "u", ["b1", "m1"]
+                    ),
+                    _FakeCommit("b3", "feat: part two", "b", "u", ["b2"]),
+                    _FakeCommit(
+                        "pr",
+                        "Merge pull request #2 from mitodl/feat\n\nfeat: the thing",
+                        "b",
+                        "u",
+                        ["m1", "b3"],
+                    ),
+                ],
+            ),
+        )
+    )
+    unreleased = github._commits_since_last_tag_sync("mitodl/thing")
+
+    assert [c["sha"] for c in unreleased["commits"]] == ["m1", "pr"]
+
+
+def test_a_merge_without_a_pr_keeps_the_commits_it_merged(fake_repo):
+    """Its subject names a branch, not a change, so it cannot stand for them."""
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("2026.10.1.1")],
+            comparison=_FakeComparison(
+                "ahead",
+                [
+                    _FakeCommit("b1", "feat: thing", "b", "u", ["base"]),
+                    _FakeCommit("mg", "Merge branch 'feat'", "b", "u", ["base", "b1"]),
+                ],
+            ),
+        )
+    )
+    unreleased = github._commits_since_last_tag_sync("mitodl/thing")
+
+    assert [c["sha"] for c in unreleased["commits"]] == ["b1", "mg"]
 
 
 def test_commits_since_last_tag_omits_nothing_under_the_cap(fake_repo):
