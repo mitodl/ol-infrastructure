@@ -589,8 +589,7 @@ async def _cmd_publish(repos, ack, respond, command, _context):
 
     if not library:
         await respond(
-            f"Usage: `/doof publish <library> [package]`.\n"
-            f"Known libraries: {_known_libraries()}"
+            f"Usage: `{_syntax('publish')}`.\nKnown libraries: {_known_libraries()}"
         )
         return
 

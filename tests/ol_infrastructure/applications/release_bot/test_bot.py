@@ -2332,6 +2332,7 @@ async def test_a_mistyped_app_is_unknown_and_shows_usage(subcommand, repos, slac
 
     assert slack.said.startswith("Unknown app `my-ap`.")
     assert f"Usage: `{bot._syntax(subcommand)}`" in slack.said
+    assert f"e.g. `/doof {subcommand} my-app" in slack.said
 
 
 async def test_an_unknown_app_name_is_escaped(repos, slack):
