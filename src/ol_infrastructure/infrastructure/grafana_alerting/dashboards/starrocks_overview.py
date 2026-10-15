@@ -11,15 +11,15 @@ Metric quirks this dashboard works around:
 
 - Query latency is a per-FE Dropwizard summary (`quantile` label), so
   quantiles cannot be combined across FEs. Quantile panels show the worst FE
-  (`max`); the mean comes from `_sum`/`_count`, which does aggregate.
+  (`max`). Its `_sum` is not a counter: it is reported as `_count` times the
+  reservoir mean, so it falls whenever that mean does (prod: 31 resets in 6h
+  on one FE, against none for `_count`). `rate(_sum) / rate(_count)` reads
+  each fall as a counter reset and reported ~16s against a real ~1ms, so
+  there is no mean-latency panel.
 - An FE that stops receiving a catalog's queries keeps reporting that
   catalog's old quantiles: prod held an Iceberg p95 of 2136ms, unchanged,
   while its Iceberg `_count` stayed flat. Quantile panels therefore keep only
   FEs whose `_count` moved in the window.
-- The mean and the quantiles can disagree by orders of magnitude: prod's
-  default catalog averaged ~16s per query over an hour while its p99 read
-  48ms, so a few long statements dominate `_sum` without moving the
-  reservoir's percentiles. Both are shown for that reason.
 - `starrocks_fe_query_latency_ms` is not split by catalog, so its quantiles
   are swamped by the default catalog's ~1ms statements; Iceberg latency is
   read from `starrocks_fe_catalog_query_latency_ms{catalog_type="iceberg"}`.
@@ -159,17 +159,23 @@ def _dashboard_json(
                 legend_calc="mean",
             ),
             timeseries_panel(
-                title="Mean Query Latency by Catalog",
+                title="Query Latency p95 by Catalog (worst FE)",
+                description=(
+                    "Highest p95 across FEs, per catalog. FEs that served no "
+                    "query for a catalog in the step are left out, because an "
+                    "idle reservoir keeps reporting stale values."
+                ),
                 expr=(
-                    "sum by (catalog_type) (rate(starrocks_fe_catalog_query_latency_ms_sum"
-                    f"{{{_FE}}}{_RATE}))\n/\n"
-                    "sum by (catalog_type) (rate(starrocks_fe_catalog_query_latency_ms_count"
-                    f"{{{_FE}}}{_RATE}))"
+                    "max by (catalog_type) (starrocks_fe_catalog_query_latency_ms"
+                    f'{{{_FE}, quantile="0.95"}}'
+                    "\nand on (pod, catalog_type) "
+                    "(increase(starrocks_fe_catalog_query_latency_ms_count"
+                    f"{{{_FE}}}{_RATE}) > 0))"
                 ),
                 legend_format="{{catalog_type}}",
                 grid_pos={"h": 8, "w": 12, "x": 0, "y": 14},
                 unit="ms",
-                legend_calc="mean",
+                legend_calc="max",
             ),
             timeseries_panel(
                 title="Iceberg Query Latency Quantiles (worst FE)",
@@ -189,7 +195,7 @@ def _dashboard_json(
                 legend_format="p{{quantile}}",
                 grid_pos={"h": 8, "w": 12, "x": 12, "y": 14},
                 unit="ms",
-                legend_calc="mean",
+                legend_calc="max",
             ),
             timeseries_panel(
                 title="Query Queue",
@@ -482,6 +488,7 @@ def _dashboard_json(
                 legend_format="{{fstype}}",
                 grid_pos={"h": 8, "w": 8, "x": 0, "y": 73},
                 unit="µs",
+                legend_calc="max",
             ),
             timeseries_panel(
                 title="S3 Upload Latency p99",
@@ -498,6 +505,7 @@ def _dashboard_json(
                 ],
                 grid_pos={"h": 8, "w": 8, "x": 8, "y": 73},
                 unit="µs",
+                legend_calc="max",
             ),
             timeseries_panel(
                 title="I/O Throughput by Filesystem",
