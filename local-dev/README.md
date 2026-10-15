@@ -1052,8 +1052,8 @@ The reason localhost cannot do it is cookie scope, not CORS. mit-learn issues
 `csrftoken` with `Domain=.learn.<root_domain>`, and the theme reads that cookie
 out of `document.cookie` through axios (`xsrfCookieName`). A page on localhost
 cannot read another domain's cookie, so it never sends `X-CSRFToken` and every
-write fails; the APISIX session cookie is `SameSite=Lax` and host-only on
-`api.learn.<root_domain>`, so it is not sent from a cross-site origin either and
+write fails; the APISIX session cookie is `SameSite=Lax` on
+`.learn.<root_domain>`, so it is not sent from a cross-site origin either and
 the user reads as anonymous. An origin inside `.learn.<root_domain>` has neither
 problem.
 

@@ -252,9 +252,12 @@ spec:
         scope: "openid profile email ol-profile"
         ssl_verify: false
         renew_access_token_on_expiry: true
-        # No cookie name/domain override → default name "session" on host
-        # api.learn.mit.dev, matching the learn route that issued the cookie.
+        # Reads the session cookie mit-learn's routes issue: same name and
+        # domain as local-dev/apps/mit-learn/apisix-routes.yaml, same
+        # session.secret through the ol-mitlearn-oidc Secret.
         session:
+          cookie_name: mitlearn_apisix_session_dev
+          cookie_domain: ".learn.mit.dev"
           # 0 disables lua-resty-session's 900s idling / 3600s rolling
           # defaults, as the deployed OIDC config does.
           idling_timeout: 0
