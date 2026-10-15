@@ -200,10 +200,9 @@ are structured (hostnames, `env_suffix`). The one variable the routes read,
 `OPENEDX_API_BASE_URL` for the `frame-ancestors` header, is looked up in the
 merged environment and raises if a program's bindings omit it.
 
-The OIDC config functions still require `cluster.vault_auth_name`, because
-`OLApisixOIDCResources` reads its client credentials through Vault. That goes
-away with the secrets work below, and is what stops a local program from
-creating the routes today.
+The OIDC config functions take their client credentials from Vault when
+`cluster.vault_auth_name` is set, or from an existing Secret named by
+`MitxonlineBindings.oidc_secret_name` on a cluster without Vault.
 
 `ClusterCapabilities` carries what the component needs to know about the
 cluster it renders for. The component change on this branch adds the knobs:
@@ -263,9 +262,10 @@ The second was chosen. It removes the duplication without adding a stateful
 service to every developer's laptop, and VSO behaviour (refresh, rollout
 restart) is operations territory that local-dev does not need to reproduce.
 
-`OLApisixOIDCResources` needs the same treatment: it creates an
-`OLVaultK8SSecret` unconditionally (`apisix.py:586-602`) and must accept a
-plain Secret as its credential source.
+`OLApisixOIDCResources` already accepts a plain Secret: with
+`existing_secret_name` set it creates no `OLVaultK8SSecret`, and
+`bridge.lib.constants.oidc_secret_data` defines the keys that Secret carries,
+the same ones the deployed VSO templates write.
 
 ### Celery topology
 

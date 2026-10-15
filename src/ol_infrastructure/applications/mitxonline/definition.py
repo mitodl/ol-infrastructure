@@ -141,6 +141,11 @@ class MitxonlineBindings(BaseModel):
     carry ``OPENEDX_API_BASE_URL``, which the routes read for a response header."""
     k8s_labels: dict[str, str]
     secret_names: list[str]
+    oidc_secret_name: str | None = None
+    """A Secret in the namespace holding the gateway's OIDC client credentials,
+    for clusters without Vault (``cluster.vault_auth_name`` unset). It has to
+    carry the plugin keys ``bridge.lib.constants.oidc_secret_data`` returns,
+    ``session.secret`` included."""
     application_docker_tag: str | None = None
     application_image_digest: str | None = None
     cluster: ClusterCapabilities
@@ -305,13 +310,6 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
 
 
 def _oidc_config(bindings: MitxonlineBindings, **settings: Any) -> OLApisixOIDCConfig:
-    vault_auth_name = bindings.cluster.vault_auth_name
-    if vault_auth_name is None:
-        msg = (
-            "OLApisixOIDCResources reads the OIDC client credentials through Vault, "
-            "so the routes need cluster.vault_auth_name."
-        )
-        raise ValueError(msg)
     return OLApisixOIDCConfig(
         k8s_labels=bindings.k8s_labels,
         k8s_namespace=NAMESPACE,
@@ -322,7 +320,8 @@ def _oidc_config(bindings: MitxonlineBindings, **settings: Any) -> OLApisixOIDCC
         vault_mount="secret-operations",
         vault_mount_type="kv-v1",
         vault_path="sso/mitlearn",
-        vaultauth=vault_auth_name,
+        vaultauth=bindings.cluster.vault_auth_name,
+        existing_secret_name=bindings.oidc_secret_name,
         **settings,
     )
 

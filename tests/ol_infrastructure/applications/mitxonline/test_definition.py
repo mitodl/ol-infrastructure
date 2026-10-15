@@ -43,6 +43,7 @@ from ol_infrastructure.components.services.k8s import (  # noqa: E402
 
 LOCAL_IMAGE_TAG = "tilt-abc123"
 OPENEDX_BASE_URL = "https://lms.mit.dev"
+LOCAL_OIDC_SECRET = "ol-mitlearn-oidc"  # noqa: S105  # pragma: allowlist secret
 
 
 def _local_bindings(**overrides) -> definition.MitxonlineBindings:
@@ -258,6 +259,13 @@ def test_session_cookies_are_named_for_the_environment():
     assert prefixed.oidc_session_cookie_domain == ".learn.mit.dev"
 
 
-def test_oidc_needs_vault_until_it_can_read_a_plain_secret():
-    with pytest.raises(ValueError, match="vault_auth_name"):
-        definition.direct_oidc_config(_local_bindings())
+def test_local_routes_read_oidc_credentials_from_the_bound_secret():
+    bindings = _local_bindings(oidc_secret_name=LOCAL_OIDC_SECRET)
+
+    direct, prefixed = _route_groups(bindings)
+
+    for route in (direct[0], prefixed[0]):
+        [oidc_plugin] = [
+            plugin for plugin in route.plugins if plugin.name == "openid-connect"
+        ]
+        assert oidc_plugin.secret_ref == LOCAL_OIDC_SECRET
