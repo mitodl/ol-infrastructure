@@ -2052,6 +2052,11 @@ mitlearn_k8s_app = OLApplicationK8s(
             # worker at 1500Mi of a 3.5Gi pod. See the stage 4 task in
             # docs/plans/granian-configuration-overhaul.md.
             #
+            # The image runs granian 2.8.3 since mit-learn 0.81.8 (mit-learn#4024). On
+            # 2.8 each worker owns its listener, so a respawn is covered only by the
+            # other worker. Moving to workers=1 also needs respawn_interval set above
+            # the worker cold start, or every respawn refuses connections.
+            #
             # This is one value across all stacks, while the VPA floor it is sized
             # against is production-only (CI/QA keep the 256Mi default). That is not
             # the protection gap it looks like: a cap only guards anything when
