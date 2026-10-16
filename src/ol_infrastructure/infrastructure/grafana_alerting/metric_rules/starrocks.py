@@ -15,17 +15,20 @@ Not duplicated here: ``StatefulSetReplicasMissing*`` and
 ``HPAAtMaxReplicas*`` in eks_general.py already cover a missing FE/CN pod and
 the CN HPA pinned at its maximum.
 
-FE quorum
+FE leader
 ---------
 The FEs form a BDB-JE replication group. With fewer than a majority alive no
 leader can be elected and every metadata write (DDL, load commits) stops, so
-quorum loss is the one condition here that means StarRocks is down rather
-than degraded. ``node_info{type="fe_node_num"}`` reports the group's alive and
-total member counts from each FE's own view; ``max`` across FEs takes the most
-complete one. That relies on a surviving FE still reporting the group's state
-after quorum is lost, which has not been exercised here. If no FE is scraped
-at all there is no ``node_info`` to read, so ``StarRocksFEAllDown`` covers that
-case from kube-state-metrics.
+a missing leader is the one condition here that means StarRocks is down
+rather than degraded. ``StarRocksFENoLeader`` fires when an FE is scraped but
+none exports ``node_info{type="is_master"}``, which only the leader does
+(followers omit the series rather than report 0). It does not read
+``node_info{type="fe_node_num"}`` for this: the leader alone heartbeats the
+group and journals the result, so once the leader and another FE are gone
+the survivor keeps exporting its last, healthy, alive count. That count
+still drives ``StarRocksFENodeDown``, where a stale view only delays a
+warning. If no FE is scraped at all there is no ``node_info`` to read, so
+``StarRocksFEAllDown`` covers that case from kube-state-metrics.
 
 Leader-only series
 ------------------
@@ -57,7 +60,7 @@ Severity and routing
 Every rule is Warning, in every environment, until Rootly routes
 ``service="starrocks"`` to its own service. The routing spec tiers StarRocks
 at ``notify``, and a Critical here would page at Rootly's default High urgency
-before that route exists. The first five rules (quorum lost, no FE scraped,
+before that route exists. The first five rules (no leader, no FE scraped,
 safe mode, FE volume full, compaction score past 500) are the ones that mean
 StarRocks has stopped serving or loading, and are the candidates for a
 production Critical once it does. Each Grafana stack only sees its own
@@ -84,13 +87,12 @@ def _fe_nodes(clusters: str, state: str) -> str:
     )
 
 
-def _fe_quorum_lost(clusters: str) -> str:
-    # Dead members, firing once they reach ceil(total / 2): with 3 FEs that is
-    # 2 dead, the point where the survivor cannot form a majority.
-    total = _fe_nodes(clusters, "total")
+def _fe_no_leader(clusters: str) -> str:
     return (
-        f"({total} - on ({_BY_CLUSTER}) {_fe_nodes(clusters, 'alive')})\n"
-        f">= on ({_BY_CLUSTER}) ceil({total} / 2)"
+        f'max by ({_BY_CLUSTER}) (up{{{_FE}, cluster=~"{clusters}"}} == 1)\n'
+        f"unless on ({_BY_CLUSTER})\n"
+        f"max by ({_BY_CLUSTER}) (node_info"
+        f'{{{_FE}, cluster=~"{clusters}", type="is_master"}} == 1)'
     )
 
 
@@ -164,10 +166,10 @@ def create(
         rules=[
             # --- Not serving or not loading ---
             _warning(
-                "StarRocksFEQuorumLost",
-                _fe_quorum_lost(_ALL_CLUSTERS),
+                "StarRocksFENoLeader",
+                _fe_no_leader(_ALL_CLUSTERS),
                 "2m",
-                "StarRocks in cluster {{ $labels.cluster }} has {{ $values.B.Value }} FE members down, too few left for a majority. No leader can be elected, so DDL and load commits are stopped.",
+                "StarRocks in cluster {{ $labels.cluster }} has FEs running but no leader, so DDL and load commits are stopped. Usually the FE group has lost its majority and cannot elect one.",
                 rd,
             ),
             _warning(
@@ -305,7 +307,7 @@ def create(
                 f"unless on ({_BY_POD})\n"
                 f'max by ({_BY_POD}) (node_info{{{_FE}, type="fe_node_num"}})',
                 "15m",
-                "StarRocks FE {{ $labels.pod }} in cluster {{ $labels.cluster }} is being scraped but reports no node_info. The FE quorum rules cannot fire until metric_rules/starrocks.py and the ServiceMonitor allowlist match the new metric names.",
+                "StarRocks FE {{ $labels.pod }} in cluster {{ $labels.cluster }} is being scraped but reports no node_info. The FE leader and membership rules cannot fire until metric_rules/starrocks.py and the ServiceMonitor allowlist match the new metric names.",
                 rd,
             ),
         ],

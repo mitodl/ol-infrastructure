@@ -96,7 +96,7 @@ Sub-modules
                  disk, and the daily SQL backup's staleness. Off the Altinity
                  operator's exporter plus Keeper's own endpoint; see the
                  module docstring for which names were verified live.
-  starrocks    — New in 2026-10. The StarRocks lakehouse: FE quorum and
+  starrocks    — New in 2026-10. The StarRocks lakehouse: FE leader and
                  scrape loss, safe mode, FE volume, compaction score and
                  failures, query internal-error share, load rejections,
                  shared-data (S3) failures, replay lag and CN memory. Off the
