@@ -188,8 +188,12 @@ def prefixed_route_configs(bindings, oidc, shared_plugin_config_name): ...
 
 The deployed `__main__.py` builds bindings from the AWS resources it creates.
 A local program builds them from the local platform. Environment-invariant
-settings (the 24 shared variables, celery queue names and sizes, Granian
-settings, route rules and priorities, OIDC session settings) exist once.
+settings (celery queue names and sizes, Granian settings, route rules and
+priorities, OIDC session settings) exist once. Environment variables split
+by where they hold: the few that hold wherever the app runs, a developer's
+cluster included, are `LOCAL_AND_DEPLOYED_ENV` in the definition; values true
+of the deployed stacks alone are defaults in the deployed program, applied
+under each stack's `vars`, and never reach a local program.
 
 The bindings are narrower than first sketched. Database, cache, object
 storage and Keycloak reach the application as environment variables and
