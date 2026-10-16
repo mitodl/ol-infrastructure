@@ -1,0 +1,52 @@
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: gitlab-tls
+  namespace: gitlab
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - __GITLAB_HOSTNAME__
+  secret:
+    name: local-dev-tls
+    namespace: gitlab
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: gitlab-route
+  namespace: gitlab
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: gitlab
+    priority: 0
+    match:
+      hosts:
+      - __GITLAB_HOSTNAME__
+      paths:
+      - "/*"
+    backends:
+    - serviceName: gitlab
+      servicePort: 80
+    plugins:
+    - name: redirect
+      enable: true
+      config:
+        http_to_https: true
+    # Git pushes are not small, and the default body limit rejects them long
+    # before GitLab sees them.
+    - name: client-control
+      enable: true
+      config:
+        max_body_size: 0
+    - name: proxy-rewrite
+      enable: true
+      config:
+        headers:
+          set:
+            # GitLab builds absolute URLs from this; without it the external
+            # https URL and the plain-HTTP hop disagree and it emits
+            # http:// links and redirect loops.
+            X-Forwarded-Proto: https

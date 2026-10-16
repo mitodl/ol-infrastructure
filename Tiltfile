@@ -5,7 +5,7 @@
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
-config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
+config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters gitlab. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
 config.define_string_list("prebuilt_tags", usage="Published image tag to run for an app with no checkout, instead of latest, e.g. mit-learn=0.82.0 learn-ai=0.37.0")
 config.define_string_list("lake_host_ports", usage="Host ports for the data-platform lake forwards, e.g. rustfs=9100 gravitino=9101 (defaults: starrocks=9030 gravitino=9001 rustfs=9000). Move one that another process on your machine already holds.")
@@ -301,6 +301,17 @@ APPS = [
                 "cmd": "python manage.py upsert_theme_assets_pipeline",
             },
         ],
+    },
+    {
+        # Off by default, and the heaviest thing here by some margin. It
+        # exists so ocw-studio's GitLab content-sync backend has somewhere to
+        # push to without an external server. See the GitLab section of
+        # local-dev/README.md for what it costs to run.
+        "name": "gitlab",
+        "dir": "gitlab",
+        "namespace": "gitlab",
+        "deploy_name": "gitlab",
+        "tiltfile": "./local-dev/apps/gitlab/Tiltfile",
     },
     {
         # Off by default: it exists so the data platform's micromasters dlt

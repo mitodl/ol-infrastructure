@@ -382,7 +382,7 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). Neither is `micromasters` — see [MicroMasters](#micromasters). `data-platform` is not an app but switches on the [data lake](#data-lake-gravitino--starrocks). |
+| `enabled_apps` | the four original apps | Apps to deploy. Omit any to skip it entirely. `ocw-studio` is **not** in the default and must be added explicitly — see [OCW Studio](#ocw-studio). Neither is `micromasters` — see [MicroMasters](#micromasters). Nor `gitlab` — see [GitLab](#gitlab). `data-platform` is not an app but switches on the [data lake](#data-lake-gravitino--starrocks). |
 | `prebuilt_tags` | `[]` (run `latest`) | `["app=tag"]` list of published image tags to run in place of `latest` when the app repo is not checked out locally. An entry for an app that has a checkout is ignored. Entries were not applied before this setting was wired up, so a `tilt_config.json` copied from an older example file carries release tags from early 2026: clear the list unless you want those releases. |
 | `lake_host_ports` | `starrocks=9030`, `gravitino=9001`, `rustfs=9000` | `["service=port"]` list moving the host side of a [data lake](#data-lake-gravitino--starrocks) forward off a port something else on your machine holds. |
 | `disk_keep_tags`, `disk_buildcache_max_gb` | `3`, 10% of disk | Disk retention knobs — see [Disk Management](#disk-management). |
@@ -1032,6 +1032,94 @@ What differs from the other apps:
   checkout changes.
 - **Nothing scheduled runs.** There is no celery beat deployment, so the edX and MIT
   Learn syncs never fire.
+
+### GitLab
+
+Off by default. Add `gitlab` to `enabled_apps` to get a GitLab CE instance at
+`https://gitlab.<root_domain>`, so ocw-studio's GitLab content-sync backend has
+somewhere to push without an external server.
+
+**It is the heaviest thing in this repo.** Read the resource numbers below
+before switching it on, particularly if you already run several apps.
+
+Sign in as `root` with the password in `local-dev/apps/gitlab/secrets.yaml`.
+
+Publishing from ocw-studio to this instance works because Concourse's resource
+containers are given the local mkcert CA (`CONCOURSE_CERTS_DIR` in
+`local-dev/apps/ocw-studio/concourse.yaml`). Without it the git resource
+cannot verify a certificate issued for `*.<root domain>` and every clone
+fails. Note that this covers resource containers only, which is what checks
+and fetches use; task containers still reach local services over plain HTTP by
+design.
+
+A personal access token is seeded for you by the `gitlab-token` Tilt resource,
+with the fixed value also in that file, so an app can be configured against
+this instance before anyone has logged into it. Re-running that resource is
+safe; it updates the existing token rather than adding another.
+
+To point ocw-studio at it, create a group in the GitLab UI to push into, then
+uncomment the in-cluster block in
+`local-dev/apps/ocw-studio/configmaps/app-env.local.yaml.example` and copy it
+into your `app-env.local.yaml`.
+
+#### What it costs
+
+Measured on a settled instance with mit-learn, mitxonline and ocw-studio also
+running:
+
+| | |
+|---|---|
+| Memory at rest | **~2.6 GiB** |
+| CPU at rest | under 0.1 core |
+| CPU while booting | ~1.6 cores |
+| First start | ~13 minutes (database migrations) |
+| Later starts | ~80 seconds, reusing the volumes |
+| Disk | 20 GiB data + 1 GiB config PVC, plus a 1.5 GB image |
+
+Where the memory goes: two Ruby processes at roughly 1 GiB each (puma and
+sidekiq), Gitaly at ~345 MiB, the bundled PostgreSQL at ~140 MiB across its
+processes, and Workhorse at ~60 MiB.
+
+That is the single largest workload in local-dev. For comparison, the whole
+rest of the cluster with three apps running sits around 21 GiB across the
+three nodes, so GitLab is roughly an eighth of the total on its own. If you
+are near your memory ceiling, this is the first thing to turn off.
+
+#### Why it is configured the way it is
+
+Omnibus ships a full observability stack, a container registry, a Kubernetes
+agent server and Pages, none of which this setup uses, and each is a separate
+process holding memory. `configmaps/omnibus.yaml` turns them off and runs puma
+in single-process mode with a small sidekiq pool, which is what makes the
+footprint above achievable rather than the 4 GB GitLab asks for as a minimum.
+
+`nginx['listen_port'] = 80` and `nginx['listen_https'] = false` are both
+load-bearing. APISIX terminates TLS and forwards plain HTTP, but `external_url`
+has to be the public https URL or GitLab builds `http://` links and mangles
+API pagination. Set the https URL without those two and Omnibus serves 443
+itself and redirects http to https, which against a TLS-terminating proxy is an
+infinite redirect loop.
+
+GitLab keeps its own bundled PostgreSQL and Redis rather than using the shared
+cluster, unlike every other app here. Omnibus creates extensions at install
+time, which needs a superuser, and the shared `app` role is not one. The cost
+is that GitLab's data lives in its own PVC instead of alongside everything
+else in Postgres.
+
+#### Removing it
+
+Taking `gitlab` out of `enabled_apps` tears down the deployment on the next
+reconcile but deliberately leaves the volumes, so re-enabling it keeps your
+repositories. That is why the `gitlab` namespace is provisioned unconditionally
+while the workload is gated: deleting a namespace takes its
+PersistentVolumeClaims with it, and no amount of StatefulSet volume retention
+survives that.
+
+To reclaim the disk as well:
+
+```bash
+kubectl -n gitlab delete pvc data-gitlab-0 config-gitlab-0
+```
 
 ### OCW theme development (ocw-hugo-themes)
 
