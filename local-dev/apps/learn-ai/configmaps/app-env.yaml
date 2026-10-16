@@ -31,9 +31,11 @@ data:
   CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/9"
   CELERY_RESULT_BACKEND: "redis://valkey.local-infra.svc.cluster.local:6379/9"
 
-  # AI proxy (local LiteLLM in local-infra)
-  AI_PROXY_URL: "http://litellm.local-infra.svc.cluster.local:4000"
-  AI_PROXY_CLASS: "LiteLLMProxy"
+  # AI proxy (local LiteLLM in local-infra). Off by default to match RC and
+  # production, which call OpenAI directly with OPENAI_API_KEY (see
+  # secrets.yaml). To opt in, see app-env.local.yaml.example.
+  # AI_PROXY_URL: "http://litellm.local-infra.svc.cluster.local:4000"
+  # AI_PROXY_CLASS: "LiteLLMProxy"
 
   # mit-learn API (for AI to call back)
   MIT_LEARN_API_PROXY_BASE_URL: "http://mitlearn-webapp.mit-learn.svc.cluster.local:8060/api/"
