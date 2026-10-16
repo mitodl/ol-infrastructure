@@ -11,6 +11,9 @@ config:
   mitxonline:k8s_deploy: "true"
   mitxonline:dev_shell_enabled: false
   mitxonline:learn_backend_domain: "api.ci.learn.mit.edu"
+  mitxonline:openedx_login_gate:
+    lms_host: "courses.ci.learn.mit.edu"
+    lms_service_host: "mitxonline-ci-edxapp-lms-webapp.mitxonline-openedx.svc.cluster.local"
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-ci"
     CORS_ALLOWED_ORIGINS: "https://ci.mitxonline.mit.edu,https://ci.learn.mit.edu"
