@@ -212,6 +212,48 @@ def pull_request(message: str) -> tuple[int | None, str]:
     return None, subject
 
 
+def _merged_by_pull_requests(raw_commits: list[Any]) -> set[str]:
+    """Return the SHAs a PR merge commit in *raw_commits* brought in.
+
+    A merge commit's PR is listed under the merge commit itself (see
+    `pull_request`), but the range also holds the commits it merged, so the
+    change would be listed twice: once linked to the PR, once as a bare SHA.
+    Those commits are what is reachable from the merge's other parents but
+    not from its first, the branch it was merged into. Only commits in the
+    list are walked; `parents` comes with each commit, so this costs no API
+    calls.
+
+    Only the outermost PR merges count. Whatever a nested PR merge brought in
+    that its outer one also hides is hidden already, and the rest is on the
+    outer merge's first side: a PR syncing main into a feature branch brings
+    in main's own commits, which must stay listed.
+    """
+    parents = {c.sha: [p.sha for p in c.parents] for c in raw_commits}
+
+    def reachable(starts: list[str]) -> set[str]:
+        seen: set[str] = set()
+        stack = [sha for sha in starts if sha in parents]
+        while stack:
+            sha = stack.pop()
+            if sha not in seen:
+                seen.add(sha)
+                stack += [p for p in parents[sha] if p in parents]
+        return seen
+
+    brought_in: dict[str, set[str]] = {}
+    for commit in raw_commits:
+        subject = (commit.commit.message.splitlines() or [""])[0].strip()
+        commit_parents = parents[commit.sha]
+        # Other merges (a branch merged without a PR) keep their commits: the
+        # merge's own subject says nothing about what they contain.
+        if len(commit_parents) > 1 and _MERGE_PR_RE.match(subject):
+            brought_in[commit.sha] = reachable(commit_parents[1:]) - reachable(
+                commit_parents[:1]
+            )
+    nested = set().union(*brought_in.values())
+    return set().union(*(shas for sha, shas in brought_in.items() if sha not in nested))
+
+
 def _commits_since_last_tag_sync(repo_slug: str) -> dict[str, Any]:
     """Return up to ``_COMMIT_LIST_LIMIT`` unreleased commits, and how many more.
 
@@ -239,6 +281,7 @@ def _commits_since_last_tag_sync(repo_slug: str) -> dict[str, Any]:
         raw_commits = list(itertools.islice(repo.get_commits(), _COMMIT_LIST_LIMIT))
         omitted = None if len(raw_commits) == _COMMIT_LIST_LIMIT else 0
 
+    merged = _merged_by_pull_requests(raw_commits)
     commits = [
         {
             "sha": c.sha,
@@ -250,7 +293,7 @@ def _commits_since_last_tag_sync(repo_slug: str) -> dict[str, Any]:
         # "Release X" / "Merge releases/X" land on the default branch *after*
         # the tag (which sits on the pre-bump HEAD), so without this every
         # finished release reads as two commits waiting to be released.
-        if not _is_release_machinery(c.commit.message)
+        if not _is_release_machinery(c.commit.message) and c.sha not in merged
     ]
     return {"commits": commits, "omitted": omitted, "since": latest_tag}
 
