@@ -95,20 +95,27 @@ def _deployed_bindings(**overrides) -> definition.MitxonlineBindings:
 # ─── Environment ──────────────────────────────────────────────────────────────
 
 
-def test_bindings_override_the_shared_environment():
-    env = definition.environment_variables(_local_bindings())
+def test_the_environment_is_the_shared_values_under_the_bindings():
+    given = {"OPENEDX_API_BASE_URL": "https://lms.example", "SITE_NAME": "Overridden"}
+    env = definition.environment_variables(_local_bindings(environment_variables=given))
 
-    assert env["MITX_ONLINE_ADMIN_EMAIL"] == "admin@odl.local"
-    assert env["SITE_NAME"] == definition.ENVIRONMENT_VARIABLES["SITE_NAME"]
+    assert env["SITE_NAME"] == "Overridden"
+    assert env["USE_X_FORWARDED_HOST"] == "True"
+    assert set(env) == {
+        *definition.LOCAL_AND_DEPLOYED_ENV,
+        *given,
+        "OTEL_RESOURCE_ATTRIBUTES",
+    }
     assert "ol.mit.edu/application=mitxonline" in env["OTEL_RESOURCE_ATTRIBUTES"]
 
 
-def test_rendering_does_not_mutate_the_shared_environment():
-    before = dict(definition.ENVIRONMENT_VARIABLES)
+def test_rendering_does_not_mutate_the_bindings_environment():
+    given = {"OPENEDX_API_BASE_URL": "https://lms.example"}
+    bindings = _local_bindings(environment_variables=given)
 
-    definition.environment_variables(_local_bindings())
+    definition.environment_variables(bindings)
 
-    assert before == definition.ENVIRONMENT_VARIABLES
+    assert bindings.environment_variables == given
 
 
 # ─── Workloads ────────────────────────────────────────────────────────────────

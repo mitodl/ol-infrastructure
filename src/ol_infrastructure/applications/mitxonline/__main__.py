@@ -556,6 +556,25 @@ frontend_domain = mitxonline_config.require("frontend_domain")
 learn_backend_domain = mitxonline_config.require("learn_backend_domain")
 learn_frontend_domain = learn_backend_domain.removeprefix("api.")
 
+# Values shared by the CI, QA and Production stacks that a developer's cluster
+# does not want; each stack's `vars` config object is applied over them. What
+# holds everywhere, local-dev included, is `definition.LOCAL_AND_DEPLOYED_ENV`.
+DEPLOYED_ENV_DEFAULTS = {
+    "CRON_COURSERUN_SYNC_HOURS": "*",
+    "FEATURE_IGNORE_EDX_FAILURES": "True",
+    "FEATURE_SYNC_ON_DASHBOARD_LOAD": "False",
+    "HUBSPOT_PIPELINE_ID": "19817792",
+    "MITX_ONLINE_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
+    "MITX_ONLINE_DB_CONN_MAX_AGE": "0",
+    "MITX_ONLINE_USE_S3": "True",
+    "NODE_MODULES_CACHE": "False",
+    "OPENEDX_SERVICE_WORKER_USERNAME": "login_service_user",
+    "OPEN_EXCHANGE_RATES_URL": "https://openexchangerates.org/api/",
+    "POSTHOG_API_HOST": "https://ph.ol.mit.edu",
+    "POSTHOG_ENABLED": "True",
+    "ZENDESK_HELP_WIDGET_ENABLED": "True",
+}
+
 bindings = definition.MitxonlineBindings(
     env_suffix=stack_info.env_suffix,
     hostnames=definition.MitxonlineHostnames(
@@ -563,7 +582,10 @@ bindings = definition.MitxonlineBindings(
         frontend=frontend_domain,
         learn_api=learn_backend_domain,
     ),
-    environment_variables=mitxonline_config.get_object("vars"),
+    environment_variables={
+        **DEPLOYED_ENV_DEFAULTS,
+        **mitxonline_config.require_object("vars"),
+    },
     k8s_labels=k8s_app_labels,
     # Use the secret names returned by create_mitxonline_k8s_secrets
     secret_names=secret_names,
