@@ -1,10 +1,10 @@
 # ruff: noqa: E501
 """What MITx Online is in every environment it runs in.
 
-The environment variables, the ``OLApplicationK8sConfig`` and the APISIX routes
-that do not depend on where the application runs live here. Everything that
-does (hostnames, the Secrets to mount, the image, sizing, what the cluster can
-do) arrives as a ``MitxonlineBindings``. The deployed program builds its
+The ``OLApplicationK8sConfig`` and the APISIX routes that do not depend on
+where the application runs live here. Everything that does (the environment,
+hostnames, the Secrets to mount, the image, sizing, what the cluster can do)
+arrives as a ``MitxonlineBindings``. The deployed program builds its
 bindings from the AWS and Vault resources it creates. A local program builds
 them from the local platform. See docs/plans/local-dev-deployed-parity.md.
 
@@ -55,33 +55,6 @@ WEB_MEMORY_CEILING = "3Gi"
 
 # Directories Tilt syncs into the container that hold no Python.
 RELOAD_IGNORE_DIRS = ["frontend", "static", "staticfiles"]
-
-ENVIRONMENT_VARIABLES = {
-    "CRON_COURSERUN_SYNC_HOURS": "*",
-    "FEATURE_IGNORE_EDX_FAILURES": "True",
-    "FEATURE_SYNC_ON_DASHBOARD_LOAD": "False",
-    "HUBSPOT_PIPELINE_ID": "19817792",
-    "MITOL_GOOGLE_SHEETS_REFUNDS_COMPLETED_DATE_COL": "12",
-    "MITOL_GOOGLE_SHEETS_REFUNDS_ERROR_COL": "13",
-    "MITOL_GOOGLE_SHEETS_REFUNDS_SKIP_ROW_COL": "14",
-    "MITX_ONLINE_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
-    "MITX_ONLINE_DB_CONN_MAX_AGE": "0",
-    "MITX_ONLINE_DB_DISABLE_SSL": "True",  # pgbouncer buildpack uses stunnel to handle encryption
-    "MITX_ONLINE_FROM_EMAIL": "MIT Learn <mitlearn-support@mit.edu>",
-    "MITX_ONLINE_OAUTH_PROVIDER": "mitxonline-oauth2",
-    "MITX_ONLINE_REPLY_TO_ADDRESS": "MIT Learn <mitlearn-support@mit.edu>",
-    "MITX_ONLINE_SECURE_SSL_REDIRECT": "False",
-    "MITX_ONLINE_SUPPORT_EMAIL": "mitlearn-support@mit.edu",
-    "MITX_ONLINE_USE_S3": "True",
-    "NODE_MODULES_CACHE": "False",
-    "OPENEDX_SERVICE_WORKER_USERNAME": "login_service_user",
-    "OPEN_EXCHANGE_RATES_URL": "https://openexchangerates.org/api/",
-    "POSTHOG_API_HOST": "https://ph.ol.mit.edu",
-    "POSTHOG_ENABLED": "True",
-    "SITE_NAME": "MITx Online",
-    "USE_X_FORWARDED_HOST": "True",
-    "ZENDESK_HELP_WIDGET_ENABLED": "True",
-}
 
 
 class CeleryQueue(BaseModel):
@@ -139,7 +112,7 @@ class MitxonlineBindings(BaseModel):
     env_suffix: str
     hostnames: MitxonlineHostnames
     environment_variables: dict[str, Any]
-    """Values for this environment, applied over ``ENVIRONMENT_VARIABLES``. Must
+    """The app's non-secret environment; the definition adds none of its own. Must
     carry ``OPENEDX_API_BASE_URL``, which the routes read for a response header."""
     k8s_labels: dict[str, str]
     secret_names: list[str]
@@ -169,12 +142,15 @@ class MitxonlineBindings(BaseModel):
 def environment_variables(bindings: MitxonlineBindings) -> dict[str, Any]:
     """Return the application's environment for these bindings.
 
+    Exactly what the bindings supply, with the k8s labels folded into
+    ``OTEL_RESOURCE_ATTRIBUTES``. The definition holds no values of its own, so
+    a program rendering it gets nothing it did not pass in.
+
     :param bindings: The environment being rendered for.
-    :returns: Variable names mapped to values, with the k8s labels folded into
-        ``OTEL_RESOURCE_ATTRIBUTES``.
+    :returns: Variable names mapped to values.
     :rtype: dict[str, Any]
     """
-    env_vars = {**ENVIRONMENT_VARIABLES, **bindings.environment_variables}
+    env_vars = dict(bindings.environment_variables)
     # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
     # carries organizational metadata regardless of stack environment.
     merge_otel_resource_attributes(env_vars, bindings.k8s_labels)

@@ -556,6 +556,35 @@ frontend_domain = mitxonline_config.require("frontend_domain")
 learn_backend_domain = mitxonline_config.require("learn_backend_domain")
 learn_frontend_domain = learn_backend_domain.removeprefix("api.")
 
+# Values shared by the CI, QA and Production stacks; each stack's `vars` config
+# object is applied over them. The definition adds no environment values itself.
+DEPLOYED_ENV_DEFAULTS = {
+    "CRON_COURSERUN_SYNC_HOURS": "*",
+    "FEATURE_IGNORE_EDX_FAILURES": "True",
+    "FEATURE_SYNC_ON_DASHBOARD_LOAD": "False",
+    "HUBSPOT_PIPELINE_ID": "19817792",
+    "MITOL_GOOGLE_SHEETS_REFUNDS_COMPLETED_DATE_COL": "12",
+    "MITOL_GOOGLE_SHEETS_REFUNDS_ERROR_COL": "13",
+    "MITOL_GOOGLE_SHEETS_REFUNDS_SKIP_ROW_COL": "14",
+    "MITX_ONLINE_ADMIN_EMAIL": "cuddle-bunnies@mit.edu",
+    "MITX_ONLINE_DB_CONN_MAX_AGE": "0",
+    "MITX_ONLINE_DB_DISABLE_SSL": "True",  # pgbouncer buildpack uses stunnel to handle encryption
+    "MITX_ONLINE_FROM_EMAIL": "MIT Learn <mitlearn-support@mit.edu>",
+    "MITX_ONLINE_OAUTH_PROVIDER": "mitxonline-oauth2",
+    "MITX_ONLINE_REPLY_TO_ADDRESS": "MIT Learn <mitlearn-support@mit.edu>",
+    "MITX_ONLINE_SECURE_SSL_REDIRECT": "False",
+    "MITX_ONLINE_SUPPORT_EMAIL": "mitlearn-support@mit.edu",
+    "MITX_ONLINE_USE_S3": "True",
+    "NODE_MODULES_CACHE": "False",
+    "OPENEDX_SERVICE_WORKER_USERNAME": "login_service_user",
+    "OPEN_EXCHANGE_RATES_URL": "https://openexchangerates.org/api/",
+    "POSTHOG_API_HOST": "https://ph.ol.mit.edu",
+    "POSTHOG_ENABLED": "True",
+    "SITE_NAME": "MITx Online",
+    "USE_X_FORWARDED_HOST": "True",
+    "ZENDESK_HELP_WIDGET_ENABLED": "True",
+}
+
 bindings = definition.MitxonlineBindings(
     env_suffix=stack_info.env_suffix,
     hostnames=definition.MitxonlineHostnames(
@@ -563,7 +592,10 @@ bindings = definition.MitxonlineBindings(
         frontend=frontend_domain,
         learn_api=learn_backend_domain,
     ),
-    environment_variables=mitxonline_config.get_object("vars"),
+    environment_variables={
+        **DEPLOYED_ENV_DEFAULTS,
+        **mitxonline_config.require_object("vars"),
+    },
     k8s_labels=k8s_app_labels,
     # Use the secret names returned by create_mitxonline_k8s_secrets
     secret_names=secret_names,
