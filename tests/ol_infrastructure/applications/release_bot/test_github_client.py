@@ -664,6 +664,40 @@ def test_a_merged_pr_hides_all_its_commits_but_not_what_main_had(fake_repo):
     assert [c["sha"] for c in unreleased["commits"]] == ["m1", "pr"]
 
 
+def test_a_pr_syncing_main_into_a_branch_does_not_hide_main(fake_repo):
+    """A PR merge inside another PR's branch cannot hide what main already had."""
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("2026.10.1.1")],
+            comparison=_FakeComparison(
+                "ahead",
+                [
+                    _FakeCommit("m1", "fix: on main (#1)", "a", "u", ["base"]),
+                    _FakeCommit("b1", "feat: part one", "b", "u", ["base"]),
+                    _FakeCommit(
+                        "b2",
+                        "Merge pull request #3 from mitodl/main",
+                        "b",
+                        "u",
+                        ["b1", "m1"],
+                    ),
+                    _FakeCommit("b3", "feat: part two", "b", "u", ["b2"]),
+                    _FakeCommit(
+                        "pr",
+                        "Merge pull request #2 from mitodl/feat\n\nfeat: the thing",
+                        "b",
+                        "u",
+                        ["m1", "b3"],
+                    ),
+                ],
+            ),
+        )
+    )
+    unreleased = github._commits_since_last_tag_sync("mitodl/thing")
+
+    assert [c["sha"] for c in unreleased["commits"]] == ["m1", "pr"]
+
+
 def test_a_merge_without_a_pr_keeps_the_commits_it_merged(fake_repo):
     """Its subject names a branch, not a change, so it cannot stand for them."""
     fake_repo(

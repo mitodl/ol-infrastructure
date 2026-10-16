@@ -222,6 +222,11 @@ def _merged_by_pull_requests(raw_commits: list[Any]) -> set[str]:
     not from its first, the branch it was merged into. Only commits in the
     list are walked; `parents` comes with each commit, so this costs no API
     calls.
+
+    Only the outermost PR merges count. Whatever a nested PR merge brought in
+    that its outer one also hides is hidden already, and the rest is on the
+    outer merge's first side: a PR syncing main into a feature branch brings
+    in main's own commits, which must stay listed.
     """
     parents = {c.sha: [p.sha for p in c.parents] for c in raw_commits}
 
@@ -235,15 +240,18 @@ def _merged_by_pull_requests(raw_commits: list[Any]) -> set[str]:
                 stack += [p for p in parents[sha] if p in parents]
         return seen
 
-    merged: set[str] = set()
+    brought_in: dict[str, set[str]] = {}
     for commit in raw_commits:
         subject = (commit.commit.message.splitlines() or [""])[0].strip()
         commit_parents = parents[commit.sha]
         # Other merges (a branch merged without a PR) keep their commits: the
         # merge's own subject says nothing about what they contain.
         if len(commit_parents) > 1 and _MERGE_PR_RE.match(subject):
-            merged |= reachable(commit_parents[1:]) - reachable(commit_parents[:1])
-    return merged
+            brought_in[commit.sha] = reachable(commit_parents[1:]) - reachable(
+                commit_parents[:1]
+            )
+    nested = set().union(*brought_in.values())
+    return set().union(*(shas for sha, shas in brought_in.items() if sha not in nested))
 
 
 def _commits_since_last_tag_sync(repo_slug: str) -> dict[str, Any]:
