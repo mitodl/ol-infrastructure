@@ -732,7 +732,9 @@ def _create_grafana(
                                 "periodSeconds": 10,
                                 "failureThreshold": 30,
                             },
-                            "resources": {"limits": {"memory": "256Mi"}},
+                            # 256Mi was OOMKilled during start-up, while the
+                            # embedded API server registers its resource groups.
+                            "resources": {"limits": {"memory": "768Mi"}},
                             "volumeMounts": [
                                 {
                                     "name": "datasources",

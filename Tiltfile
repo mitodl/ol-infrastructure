@@ -401,7 +401,11 @@ host_gateway = str(local(
 # Core stack (operators, foundational services, Keycloak instance)
 local_resource(
     "local-infra-core",
-    cmd="bash -c 'pulumi stack init local-dev.core.Dev 2>/dev/null; pulumi refresh --yes --skip-preview --stack local-dev.core.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.core.Dev'",
+    # Tilt sets FORCE_COLOR=1 for local commands. Pulumi's Python host runs
+    # `uv export` and parses its stdout as TOML, and uv honours FORCE_COLOR
+    # even when piped, so the ANSI escapes break the parse ("TOML files cannot
+    # contain control characters: '0x1b'"). Unset it for the Pulumi run.
+    cmd="bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; pulumi stack init local-dev.core.Dev 2>/dev/null; pulumi refresh --yes --skip-preview --stack local-dev.core.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.core.Dev'",
     # Passed as environment rather than interpolated into the command string:
     # log_retention_period is developer-supplied, and a value containing shell
     # metacharacters would otherwise be interpreted here instead of reaching
@@ -449,7 +453,8 @@ local_resource(
 # flight at a time, which the path handles comfortably.
 local_resource(
     "local-infra-apps",
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c '{wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --refresh --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
+    # FORCE_COLOR is unset for the same reason as local-infra-core above.
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --refresh --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
     # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
     # the core stack only creates on demand.
     env={"LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps)},
