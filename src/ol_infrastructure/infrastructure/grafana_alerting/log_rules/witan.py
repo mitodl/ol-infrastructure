@@ -226,10 +226,13 @@ ran 0.13. What was checked then:
   tenant (132,480 lines scanned).
 
 It has since fired in QA. A ``graph blocked during startup`` line landed in the
-operations-qa stream in the hour to 2026-10-15T18:00Z, and the QA Grafana state
-history for ``WitanGraphBlockedAtStartupWarning`` shows Pending at 17:59:50Z,
-Alerting at 18:09:50Z (the 10m pending period) and Normal (NoData) at
-23:59:50Z, when the line aged out of the 6h window.
+operations-qa stream in the hour to 2026-10-15T18:00Z, and the QA alert state
+history (``grafanacloud-alert-state-history``, ``ruleUID="fg150cnb8owsga"``)
+shows Pending at 17:59:50Z, Alerting at 18:09:50Z (the 10m pending period) and
+Normal (NoData) at 23:59:50Z, when the line aged out of the 6h window. Rule
+identity in a group is positional and these rules set no ``uid``, so removing
+the quarantine pair moved this rule onto the quarantine rule's UID and deleted
+that one. Query the history by UID; the rule's own page will not show it.
 """
 
 from collections.abc import Callable
@@ -405,7 +408,8 @@ def _no_bindings_expr(cluster_filter: str) -> str:
 
     ``cluster_filter``: the indexer runs in every environment (see the module
     docstring), so this needs the same non-prod/prod split ``_cedar_denial_expr``
-    and ``_graph_blocked_expr`` already use -- an earlier revision omitted it, which would have hard-labeled a CI/QA-only outage as production.
+    and ``_graph_blocked_expr`` already use -- an earlier revision omitted it,
+    which would have hard-labeled a CI/QA-only outage as production.
     """
     matched = f'{{{_CI_INDEXER_STREAM}, cluster=~"{cluster_filter}"}} |= "bindings=" | regexp "bindings=(?P<bindings_written>[0-9]+)"'
     return (
