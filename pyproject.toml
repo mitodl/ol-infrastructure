@@ -323,6 +323,9 @@ extend_exclude = [
   "dockerfiles/",
   "scripts/helpers/",
   "scripts/openedx/",
+  # The Hindsight extension harness declares its dependencies inline
+  # (uv run --script) and runs against containers, not this environment.
+  "scripts/hindsight/",
   # Standalone services: the files below are the service runtime, built into
   # their own image against their own requirements.txt, so they import things
   # this project does not declare (flask, slack_bolt, aiohttp, github).
