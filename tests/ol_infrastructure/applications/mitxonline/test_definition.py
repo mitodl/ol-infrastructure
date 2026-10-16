@@ -172,6 +172,22 @@ def test_merged_topology_runs_one_worker_for_every_queue():
     ]
 
 
+def test_the_pre_deploy_job_migrates_then_creates_the_cache_table():
+    config = definition.application_config(_deployed_bindings())
+
+    assert config.pre_deploy_commands == [
+        (
+            "migrate",
+            [
+                "bash",
+                "-c",
+                "python manage.py migrate --noinput"
+                " && python manage.py createcachetable",
+            ],
+        ),
+    ]
+
+
 def test_reload_is_off_unless_the_bindings_ask_for_it():
     deployed = definition.application_config(_deployed_bindings())
     local = definition.application_config(_local_bindings(granian_reload=True))

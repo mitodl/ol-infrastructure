@@ -285,7 +285,19 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
         init_migrations=False,
         init_collectstatic=True,
         pre_deploy_commands=[
-            ("migrate", ["python", "manage.py", "migrate", "--noinput"])
+            # One shell, because the component runs each entry as its own
+            # container in the same pod, i.e. concurrently. createcachetable
+            # creates the table a fresh database lacks and is a no-op once it
+            # exists.
+            (
+                "migrate",
+                [
+                    "bash",
+                    "-c",
+                    "python manage.py migrate --noinput"
+                    " && python manage.py createcachetable",
+                ],
+            )
         ],
         # Sized on its own rather than inheriting the webapp's limit: two production
         # migrate runs on 2026-09-28 peaked at 2754MiB and 2766MiB working set, which
