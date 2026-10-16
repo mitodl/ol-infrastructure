@@ -1,0 +1,59 @@
+---
+# Local harness for the Hindsight memory service's OL extensions
+# (src/ol_infrastructure/applications/hindsight/ol_memory_ext). Runs the same
+# image, settings and database privileges as the deployed stack against a real
+# Keycloak. See README.md.
+name: hindsight-harness
+
+services:
+  db:
+    # Matches the RDS major the stack deploys.
+    image: pgvector/pgvector:0.8.1-pg18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: harness-only-password  # pragma: allowlist secret
+      POSTGRES_DB: hindsight
+    ports:
+    - 127.0.0.1:55432:5432
+    volumes:
+    - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres -d hindsight]
+      interval: 2s
+      retries: 30
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:${KEYCLOAK_VERSION:?}
+    command: [start-dev]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: harness-admin  # pragma: allowlist secret
+    ports:
+    - 127.0.0.1:8098:8080
+
+  embeddings:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-${TEXT_EMBEDDINGS_INFERENCE_VERSION:?}
+    platform: linux/amd64
+    command: [--json-output, --model-id, BAAI/bge-base-en-v1.5, --revision, a5beb1e3e68b9ab74eb54cfd186867f64f240e1a]  # pragma: allowlist secret
+    ports:
+    - 127.0.0.1:8090:80
+    volumes:
+    - model_cache:/data
+
+  hindsight:
+    image: ghcr.io/vectorize-io/hindsight-api:${HINDSIGHT_VERSION:?}
+    # Reaches the other services and Keycloak's issuer URL on 127.0.0.1, the
+    # same address the tests use, so token issuers match.
+    network_mode: host
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: hindsight.env
+    environment:
+      HINDSIGHT_API_DATABASE_URL: postgresql://v-harness-app:harness-only-password@127.0.0.1:55432/hindsight  # pragma: allowlist secret
+      HINDSIGHT_API_OPERATION_VALIDATOR_DATABASE_URL: postgresql://v-harness-app:harness-only-password@127.0.0.1:55432/hindsight  # pragma: allowlist secret
+    volumes:
+    - ../../src/ol_infrastructure/applications/hindsight/ol_memory_ext:/opt/ol_ext/ol_memory_ext:ro
+
+volumes:
+  model_cache:
