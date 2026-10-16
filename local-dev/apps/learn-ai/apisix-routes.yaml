@@ -188,3 +188,92 @@ spec:
           id_token: true
           user: true
         unauth_action: auth
+---
+# learn-ai under /ai/* on mit-learn's API host, as RC and production serve it
+# (src/ol_infrastructure/applications/learn_ai/__main__.py). Here the browser
+# sends mit-learn's gateway session cookie, so learn-ai sees the logged-in user;
+# on ai.learn.mit.dev it never gets that cookie and everyone is anonymous.
+#
+# The openid-connect config matches mit-learn's passauth (client, scope,
+# session settings, no cookie name/domain override), so this reads and writes
+# the same host-only "session" cookie. Its redirect and logout paths are left
+# out: none fall under /ai/*, and the reqauth login's callback is derived from
+# the original /ai/... URL. Same pattern as mitxonline-learn-proxy-route.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: learnai-mitlearn-route
+  namespace: learn-ai
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: passauth
+    priority: 0
+    match:
+      hosts:
+      - api.learn.mit.dev
+      paths:
+      - "/ai/*"
+    backends:
+    - serviceName: learnai-webapp
+      servicePort: 8000
+    plugin_config_name: learnai-shared-plugins
+    plugins:
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+        - "^/ai/(.*)"
+        - "/$1"
+    - name: openid-connect
+      enable: true
+      secretRef: ol-mitlearn-oidc  # pragma: allowlist secret
+      config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
+        bearer_only: false
+        realm: olapps
+        introspection_endpoint_auth_method: client_secret_post
+        scope: "openid profile email ol-profile"
+        unauth_action: pass
+        session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          idling_timeout: 0
+          rolling_timeout: 0
+        ssl_verify: false
+
+  - name: reqauth
+    priority: 10
+    match:
+      hosts:
+      - api.learn.mit.dev
+      paths:
+      - "/ai/admin/login/*"
+      - "/ai/http/login/*"
+    backends:
+    - serviceName: learnai-webapp
+      servicePort: 8000
+    plugin_config_name: learnai-shared-plugins
+    plugins:
+    - name: proxy-rewrite
+      enable: true
+      config:
+        regex_uri:
+        - "^/ai/(.*)"
+        - "/$1"
+    - name: openid-connect
+      enable: true
+      secretRef: ol-mitlearn-oidc  # pragma: allowlist secret
+      config:
+        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
+        use_jwks: true
+        bearer_only: false
+        realm: olapps
+        introspection_endpoint_auth_method: client_secret_post
+        scope: "openid profile email ol-profile"
+        unauth_action: auth
+        session:
+          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          idling_timeout: 0
+          rolling_timeout: 0
+        ssl_verify: false
