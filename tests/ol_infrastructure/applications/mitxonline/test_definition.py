@@ -67,7 +67,11 @@ def _local_bindings(**overrides) -> definition.MitxonlineBindings:
             registry="direct", autoscalers=False, pod_monitors=False
         ),
         "min_replicas": 1,
-        "web_memory_limit": "1Gi",
+        "sizing": definition.MitxonlineSizing(
+            web=definition.WorkloadResources(
+                requests={"cpu": "100m", "memory": "512Mi"}, limits={"memory": "1Gi"}
+            )
+        ),
         "celery_topology": "merged",
     }
     settings.update(overrides)
@@ -156,12 +160,6 @@ def test_bindings_reject_a_misspelled_field():
         _local_bindings(dev_shell_enabled=True)
 
 
-def test_merged_worker_is_sized_for_the_largest_queue():
-    (worker,) = definition.celery_worker_configs("merged")
-
-    assert worker.resource_limits == {"memory": "2Gi"}
-
-
 def test_deployed_topology_runs_one_worker_per_queue():
     config = definition.application_config(_deployed_bindings())
 
@@ -204,6 +202,100 @@ def test_reload_is_off_unless_the_bindings_ask_for_it():
     assert "--reload" in local.granian_config.build_args()
     assert local.granian_config.workers_kill_timeout == 1
     assert local.granian_config.reload_ignore_dirs == definition.RELOAD_IGNORE_DIRS
+
+
+def test_sizing_defaults_are_the_deployed_values():
+    config = definition.application_config(_deployed_bindings())
+
+    assert config.pre_deploy_resource_requests == {"cpu": "250m", "memory": "3Gi"}
+    assert config.pre_deploy_resource_limits == {"memory": "3Gi"}
+    assert config.celery_beat_config.resource_requests == {
+        "cpu": "10m",
+        "memory": "384Mi",
+    }
+    assert config.celery_beat_config.resource_limits == {"memory": "384Mi"}
+    assert {
+        w.worker_name: (w.resource_requests, w.resource_limits)
+        for w in config.celery_worker_configs
+    } == {
+        "celery": ({"cpu": "100m", "memory": "2Gi"}, {"memory": "2Gi"}),
+        "hubspot_sync": ({"cpu": "100m", "memory": "1Gi"}, {"memory": "1Gi"}),
+    }
+
+
+def test_sizing_reaches_every_workload():
+    sizing = definition.MitxonlineSizing(
+        web=definition.WorkloadResources(
+            requests={"cpu": "11m", "memory": "111Mi"}, limits={"memory": "112Mi"}
+        ),
+        pre_deploy=definition.WorkloadResources(
+            requests={"cpu": "22m", "memory": "222Mi"}, limits={"memory": "223Mi"}
+        ),
+        celery_beat=definition.WorkloadResources(
+            requests={"cpu": "33m", "memory": "333Mi"}, limits={"memory": "334Mi"}
+        ),
+        celery_queues={
+            "celery": definition.WorkloadResources(
+                requests={"cpu": "44m", "memory": "256Mi"}, limits={"memory": "256Mi"}
+            ),
+            "hubspot_sync": definition.WorkloadResources(
+                requests={"cpu": "55m", "memory": "768Mi"}, limits={"memory": "768Mi"}
+            ),
+        },
+    )
+
+    config = definition.application_config(_local_bindings(sizing=sizing))
+
+    assert config.resource_requests == sizing.web.requests
+    assert config.resource_limits == sizing.web.limits
+    assert config.pre_deploy_resource_requests == sizing.pre_deploy.requests
+    assert config.pre_deploy_resource_limits == sizing.pre_deploy.limits
+    assert config.celery_beat_config.resource_requests == sizing.celery_beat.requests
+    assert config.celery_beat_config.resource_limits == sizing.celery_beat.limits
+    (worker,) = config.celery_worker_configs
+    assert worker.resource_requests == sizing.celery_queues["hubspot_sync"].requests
+    assert worker.resource_limits == sizing.celery_queues["hubspot_sync"].limits
+
+
+def test_merged_worker_takes_an_uncapped_queue():
+    size = definition.WorkloadResources(requests={"memory": "1Gi"}, limits={})
+    sizing = definition.MitxonlineSizing(
+        web=size,
+        celery_queues={
+            "celery": definition.WorkloadResources(
+                requests={"memory": "2Gi"}, limits={"memory": "2Gi"}
+            ),
+            "hubspot_sync": size,
+        },
+    )
+
+    (worker,) = definition.celery_worker_configs("merged", sizing)
+
+    assert worker.resource_limits == {}
+
+
+@pytest.mark.parametrize(
+    ("queues", "complaint"),
+    [
+        (["celery"], r"missing \['hubspot_sync'\]"),
+        (["celery", "hubspot_sync", "extra"], r"unknown \['extra'\]"),
+    ],
+)
+def test_sizing_must_name_every_queue_exactly_once(queues, complaint):
+    size = definition.WorkloadResources(
+        requests={"memory": "1Gi"}, limits={"memory": "1Gi"}
+    )
+
+    with pytest.raises(ValidationError, match=complaint):
+        definition.MitxonlineSizing(web=size, celery_queues=dict.fromkeys(queues, size))
+
+
+def test_image_repository_binding_names_the_image():
+    config = definition.application_config(
+        _local_bindings(image_repository="localhost:5001/mitxonline-app")
+    )
+
+    assert config.application_image_repository == "localhost:5001/mitxonline-app"
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────

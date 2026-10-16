@@ -596,7 +596,12 @@ bindings = definition.MitxonlineBindings(
         vault_auth_name=vault_k8s_resources.auth_name,
     ),
     min_replicas=mitxonline_config.get_int("min_replicas") or 2,
-    web_memory_limit=mitxonline_web_memory_limit,
+    sizing=definition.MitxonlineSizing(
+        web=definition.WorkloadResources(
+            requests={"cpu": "250m", "memory": mitxonline_web_memory_limit},
+            limits={"memory": mitxonline_web_memory_limit},
+        )
+    ),
     granian_worker_startup_rss=mitxonline_config.get_int("granian_worker_startup_rss"),
     # Off in CI and QA, where nothing needs it.
     dev_shell=mitxonline_config.get_bool("dev_shell_enabled") or False,

@@ -116,6 +116,24 @@ def test_pre_deploy_job_uses_its_own_resources_when_set():
     ).apply(check)
 
 
+@pulumi.runtime.test
+def test_pre_deploy_job_keeps_explicitly_empty_resources():
+    """An empty map is a choice (no limit), not an absence to fill from the webapp."""
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="uncapped",
+            pre_deploy_resource_requests={"cpu": "100m", "memory": "3Gi"},
+            pre_deploy_resource_limits={},
+        )
+    )
+
+    def check(resources):
+        assert resources["requests"] == {"cpu": "100m", "memory": "3Gi"}
+        assert resources["limits"] == {}
+
+    return _job_resources(app).apply(check)
+
+
 def _assert_not_selected(selector: dict[str, str], pod_labels: dict[str, str]) -> None:
     assert any(pod_labels.get(key) != value for key, value in selector.items())
 

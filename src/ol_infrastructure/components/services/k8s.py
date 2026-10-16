@@ -1191,16 +1191,16 @@ class OLApplicationK8sConfig(BaseModel):
         default=None,
         description=(
             "Resource requests for the pre-deploy Job's containers, defaulting to "
-            "resource_requests. Set it when a migration needs more memory than a "
-            "serving pod, so sizing the webapp down cannot OOMKill the Job that "
-            "gates the rollout."
+            "resource_requests when unset ({} means none). Set it when a migration "
+            "needs more memory than a serving pod, so sizing the webapp down cannot "
+            "OOMKill the Job that gates the rollout."
         ),
     )
     pre_deploy_resource_limits: dict[str, str] | None = Field(
         default=None,
         description=(
             "Resource limits for the pre-deploy Job's containers, defaulting to "
-            "resource_limits."
+            "resource_limits when unset ({} means none)."
         ),
     )
     post_deploy_commands: list[tuple[str, list[str]]] | None = Field(
@@ -2151,6 +2151,18 @@ class OLApplicationK8s(ComponentResource):
         )
 
         worker_deployment_options = resource_options
+        # `is None`, not falsy: an explicit {} means none and must not inherit the
+        # webapp's resources.
+        pre_deploy_requests = (
+            ol_app_k8s_config.resource_requests
+            if ol_app_k8s_config.pre_deploy_resource_requests is None
+            else ol_app_k8s_config.pre_deploy_resource_requests
+        )
+        pre_deploy_limits = (
+            ol_app_k8s_config.resource_limits
+            if ol_app_k8s_config.pre_deploy_resource_limits is None
+            else ol_app_k8s_config.pre_deploy_resource_limits
+        )
         if pre_deploy_commands := ol_app_k8s_config.pre_deploy_commands:
             self.pre_deploy_job = kubernetes.batch.v1.Job(
                 f"{ol_app_k8s_config.application_name}-{stack_info.env_suffix}-pre-deploy-job",
@@ -2202,10 +2214,8 @@ class OLApplicationK8s(ComponentResource):
                                     env=application_deployment_env_vars,
                                     env_from=application_deployment_envfrom,
                                     resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                        requests=ol_app_k8s_config.pre_deploy_resource_requests
-                                        or ol_app_k8s_config.resource_requests,
-                                        limits=ol_app_k8s_config.pre_deploy_resource_limits
-                                        or ol_app_k8s_config.resource_limits,
+                                        requests=pre_deploy_requests,
+                                        limits=pre_deploy_limits,
                                     ),
                                     volume_mounts=ol_app_k8s_config.extra_volume_mounts
                                     or None,
