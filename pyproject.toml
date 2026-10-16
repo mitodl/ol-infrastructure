@@ -228,6 +228,9 @@ inline-quotes = "double"
 
 [tool.ruff.lint.per-file-ignores]
 "src/ol_concourse/**" = ["INP001"]
+# A local-dev app's Pulumi program is a script directory: an __init__.py there
+# would make it a package named `pulumi`, shadowing the SDK for mypy and isort.
+"local-dev/apps/*/pulumi/**" = ["INP001"]
 "scripts/**" = [
   "T201",
   "ERA001",
