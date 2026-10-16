@@ -54,6 +54,14 @@ data:
   # Cookie configuration
   MITOL_COOKIE_NAME: "learn-ai-auth"
   MITOL_COOKIE_DOMAIN: ".mit.dev"
+  # learn-ai is also served at api.learn.mit.dev/ai/* (apisix-routes.yaml), the
+  # host where mit-learn sets sessionid/csrftoken on .learn.mit.dev. Own names
+  # keep the two apps' Django cookies apart, as in RC and production. The CSRF
+  # cookie sits on .learn.mit.dev so the frontend on learn.mit.dev can read it.
+  SESSION_COOKIE_NAME: "session_learn_ai"
+  CSRF_COOKIE_NAME: "learn_ai_csrftoken"
+  CSRF_COOKIE_DOMAIN: ".learn.mit.dev"
+  CSRF_TRUSTED_ORIGINS: '["https://ai.learn.mit.dev","https://learn.mit.dev","https://api.learn.mit.dev"]'
 
   # Feature flags
   FEATURE_LEARN_AI_ENABLED: "True"
