@@ -8,12 +8,21 @@ from pulumi import ResourceOptions
 # Namespaces created regardless of what is enabled. These predate per-app
 # gating and cost almost nothing (an empty namespace plus a TLS secret), so
 # they stay unconditional rather than churning every developer's stack state.
+# gitlab is here rather than in OPTIONAL_APP_NAMESPACES despite being an
+# opt-in app. Gating the namespace would delete it when the app is switched
+# off, and deleting a namespace takes its PersistentVolumeClaims with it --
+# StatefulSet volume retention cannot survive that. GitLab holds the
+# repositories ocw-studio has pushed, which may be the only copy, so turning
+# the app off to reclaim memory must not silently destroy them. An empty
+# namespace and a TLS secret cost almost nothing; the volumes are reclaimed
+# explicitly, as documented in the GitLab section of local-dev/README.md.
 APP_NAMESPACES = (
     "mit-learn",
     "learn-ai",
     "mitxonline",
     "odl-video-service",
     "openedx",
+    "gitlab",
 )
 
 # Namespaces created only when the matching app is in enabled_apps, because
@@ -21,7 +30,7 @@ APP_NAMESPACES = (
 # Concourse install along with it. micromasters is here because it was added
 # after per-app gating existed, so an unconditional namespace would churn
 # every stack for an app most developers do not run.
-OPTIONAL_APP_NAMESPACES = ("ocw-studio", "micromasters", "gitlab")
+OPTIONAL_APP_NAMESPACES = ("ocw-studio", "micromasters")
 
 
 def app_namespaces_for(enabled_apps: Iterable[str]) -> tuple[str, ...]:

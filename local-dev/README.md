@@ -1045,6 +1045,14 @@ before switching it on, particularly if you already run several apps.
 
 Sign in as `root` with the password in `local-dev/apps/gitlab/secrets.yaml`.
 
+Publishing from ocw-studio to this instance works because Concourse's resource
+containers are given the local mkcert CA (`CONCOURSE_CERTS_DIR` in
+`local-dev/apps/ocw-studio/concourse.yaml`). Without it the git resource
+cannot verify a certificate issued for `*.<root domain>` and every clone
+fails. Note that this covers resource containers only, which is what checks
+and fetches use; task containers still reach local services over plain HTTP by
+design.
+
 A personal access token is seeded for you by the `gitlab-token` Tilt resource,
 with the fixed value also in that file, so an app can be configured against
 this instance before anyone has logged into it. Re-running that resource is
@@ -1103,7 +1111,12 @@ else in Postgres.
 
 Taking `gitlab` out of `enabled_apps` tears down the deployment on the next
 reconcile but deliberately leaves the volumes, so re-enabling it keeps your
-repositories. To reclaim the disk as well:
+repositories. That is why the `gitlab` namespace is provisioned unconditionally
+while the workload is gated: deleting a namespace takes its
+PersistentVolumeClaims with it, and no amount of StatefulSet volume retention
+survives that.
+
+To reclaim the disk as well:
 
 ```bash
 kubectl -n gitlab delete pvc data-gitlab-0 config-gitlab-0
