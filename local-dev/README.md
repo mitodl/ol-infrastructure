@@ -210,7 +210,7 @@ Open edX runs **in this cluster**, composed from the [lehrer](https://github.com
 tilt up -- --enabled_apps mit-learn --enabled_apps openedx
 ```
 
-Repeat `--enabled_apps` once per app. `enabled_apps` is a string list, so `--enabled_apps mit-learn,openedx` enables one app named `mit-learn,openedx`, which matches nothing. A running Tilt takes the same flags from `tilt args -- --enabled_apps mit-learn --enabled_apps openedx`.
+Repeat `--enabled_apps` once per app. `enabled_apps` is a string list, so `--enabled_apps mit-learn,openedx` is one entry named `mit-learn,openedx`. The Tiltfile matches it against no app and loads no app Tiltfile, but the Pulumi stacks split `LOCAL_DEV_ENABLED_APPS` on commas and still provision for both, which leaves the apps half set up. A running Tilt takes the same flags from `tilt args -- --enabled_apps mit-learn --enabled_apps openedx`, which replaces its whole list.
 
 It needs lehrer checked out next to this repo (or `MITOL_WORKSPACE_ROOT` pointing at the directory that holds it). Nothing else: the `openedx-secrets` Secret is created for you from lehrer's `local-dev/secret-defaults.yaml`, the same file `lehrer dev setup` reads.
 
