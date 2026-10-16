@@ -45,6 +45,7 @@ config:
   - "https://nb.learn.mit.edu/*"
   - "https://authoring.nb.learn.mit.edu/*"
   - "https://binder.learn.mit.edu/*"
+  - "https://courses.learn.mit.edu/auth/login/ol-oauth2/*"
   keycloak_realm:olapps-mitlearn-client-roles:
   - "https://learn.mit.edu/*"
   - "https://learn-ai.ol.mit.edu/*"

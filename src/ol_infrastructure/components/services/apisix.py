@@ -1362,8 +1362,9 @@ def ol_apisix_shared_plugins_variants(
 class OLApisixExternalUpstreamConfig(BaseModel):
     """Configuration for OLApisixExternalUpstream.
 
-    Defines an external (non-Kubernetes) upstream service to be proxied
-    through APISIX.
+    Defines an upstream APISIX reaches by DNS name rather than through a
+    Service in the route's own namespace: a host outside Kubernetes, or a
+    Service in another namespace named by its cluster DNS name.
     """
 
     application_name: str
@@ -1372,6 +1373,9 @@ class OLApisixExternalUpstreamConfig(BaseModel):
     k8s_namespace: str
     external_hostname: str
     scheme: str = "https"
+    # Unset means the scheme's default port, which is what a host outside the
+    # cluster serves on; a Service usually listens on its own port.
+    port: PositiveInt | None = None
 
 
 class OLApisixExternalUpstream(ComponentResource):
@@ -1411,6 +1415,11 @@ class OLApisixExternalUpstream(ComponentResource):
                         {
                             "type": "Domain",
                             "name": external_upstream_config.external_hostname,
+                            **(
+                                {"port": external_upstream_config.port}
+                                if external_upstream_config.port is not None
+                                else {}
+                            ),
                         },
                     ],
                 },
