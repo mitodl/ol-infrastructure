@@ -1735,7 +1735,24 @@ async def test_hotfix_requests_then_checks_then_triggers(repos, slack, hotfix_ap
 async def test_hotfix_rejects_something_that_is_not_a_sha(repos, slack, hotfix_api):
     await bot._cmd_hotfix(repos, slack.ack, slack.respond, _command("my-app main"), {})
 
-    assert slack.said.startswith("Usage:")
+    assert slack.said.startswith("`main` is not a commit SHA.")
+    assert "Usage: `/doof hotfix <app> <sha>`" in slack.said
+    assert hotfix_api.calls == []
+
+
+async def test_hotfix_without_a_sha_asks_for_one(repos, slack, hotfix_api):
+    await bot._cmd_hotfix(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    assert slack.said.startswith("`/doof hotfix` needs the commit to hotfix.")
+    assert "e.g. `/doof hotfix my-app 1a2b3c4`" in slack.said
+    assert hotfix_api.calls == []
+
+
+async def test_hotfix_checks_the_app_before_the_sha(repos, slack, hotfix_api):
+    """A mistyped app is the problem to report, not the SHA after it."""
+    await bot._cmd_hotfix(repos, slack.ack, slack.respond, _command("nope"), {})
+
+    assert slack.said.startswith("Unknown app `nope`.")
     assert hotfix_api.calls == []
 
 
@@ -2262,6 +2279,98 @@ async def test_promote_does_not_claim_a_deploy_started_when_the_gate_check_faile
     assert "Production deploy triggered" not in said
     assert "no Production deploy was triggered" in said
     assert "only after a later check of the gate succeeds" in said
+
+
+# ---------------------------------------------------------------------------
+# usage errors: a missing or mistyped app
+# ---------------------------------------------------------------------------
+
+# Every subcommand that requires an app. release-status and version take an
+# optional one, so they are not here.
+_PER_APP_COMMANDS = {
+    "release": bot._cmd_release,
+    "hotfix": bot._cmd_hotfix,
+    "preview": bot._cmd_preview,
+    "release-notes": bot._cmd_release_notes,
+    "wait-for-checkboxes": bot._cmd_wait_for_checkboxes,
+    "promote": bot._cmd_promote,
+    "abandon": bot._cmd_abandon,
+}
+
+
+def test_every_subcommand_that_needs_an_app_is_covered():
+    needs_app = {
+        name for name, (arguments, _) in bot._SYNTAX.items() if "<app>" in arguments
+    }
+    assert needs_app == set(_PER_APP_COMMANDS)
+    for name, handler in _PER_APP_COMMANDS.items():
+        assert bot._SUBCOMMANDS[name] is handler
+
+
+@pytest.mark.parametrize("subcommand", sorted(_PER_APP_COMMANDS))
+async def test_a_command_without_an_app_shows_its_usage(subcommand, mixed_repos, slack):
+    """It used to reply "Unknown app ``", naming no app and no syntax."""
+    await _PER_APP_COMMANDS[subcommand](
+        mixed_repos, slack.ack, slack.respond, _command(""), {}
+    )
+
+    said = slack.said
+    assert said.startswith(f"`/doof {subcommand}` needs an app.")
+    assert "Unknown app" not in said
+    assert f"Usage: `{bot._syntax(subcommand)}`" in said
+    # The example names an app the bot can drive, never a legacy one.
+    assert f"e.g. `/doof {subcommand} my-app" in said
+    assert "Apps: my-app\n" in said
+    assert "Still on the legacy pipeline, released by Doof: legacy-app" in said
+
+
+@pytest.mark.parametrize("subcommand", sorted(_PER_APP_COMMANDS))
+async def test_a_mistyped_app_is_unknown_and_shows_usage(subcommand, repos, slack):
+    await _PER_APP_COMMANDS[subcommand](
+        repos, slack.ack, slack.respond, _command("my-ap"), {}
+    )
+
+    assert slack.said.startswith("Unknown app `my-ap`.")
+    assert f"Usage: `{bot._syntax(subcommand)}`" in slack.said
+    assert f"e.g. `/doof {subcommand} my-app" in slack.said
+
+
+async def test_an_unknown_app_name_is_escaped(repos, slack):
+    await bot._cmd_release(repos, slack.ack, slack.respond, _command("<!here>"), {})
+
+    assert "Unknown app `&lt;!here&gt;`." in slack.said
+    assert "<!here>" not in slack.said
+
+
+async def test_usage_has_no_example_when_no_app_is_migrated(slack):
+    legacy_only = {
+        "legacy-app": bot_config.AppConfig(
+            pipeline="legacy-app-pipeline", repo="mitodl/legacy-app", branch="main"
+        )
+    }
+    await bot._cmd_release(legacy_only, slack.ack, slack.respond, _command(""), {})
+
+    assert "Usage: `/doof release <app>`\n" in slack.said
+    assert "e.g." not in slack.said
+    assert "Apps: none yet" in slack.said
+
+
+@pytest.mark.parametrize("text", ["release", "release nope", "release legacy-app"])
+async def test_a_refused_command_replies_only_to_whoever_ran_it(
+    text, mixed_repos, slack
+):
+    """/doof posts release state to the channel; a mistyped command is not that."""
+    await bot._cmd_doof(mixed_repos, slack.ack, slack.respond, _command(text), {})
+
+    assert slack.respond.call_args.kwargs["response_type"] == "ephemeral"
+
+
+async def test_the_promote_button_reports_an_unknown_app_without_usage():
+    """Its app comes from the bot's own message, so usage would mislead."""
+    _, error = bot._resolve_app({}, "gone-app")
+
+    assert error.startswith("Unknown app `gone-app`.")
+    assert "Usage" not in error
 
 
 # ---------------------------------------------------------------------------

@@ -25,9 +25,9 @@ log = logging.getLogger(__name__)
 # Month and day are NOT zero-padded: the release resource emits PEP 440
 # calver (2026.8.3.1, not 2026.08.03.1) because uv and other modern Python
 # tooling reject leading zeros. This pattern required \d{2} for both, so it
-# matched no tag any current release has ever produced -- _release_baseline()
-# returned None and release notes silently degraded to "the last 50 commits of
-# all history". The old fixtures hid it by testing with padded tags.
+# matched no tag any current release has ever produced -- the baseline lookup
+# found no calver tag and release notes silently degraded to "the last 50
+# commits of all history". The old fixtures hid it by testing with padded tags.
 _RELEASE_TAG_RE = re.compile(r"^(\d{4})\.(\d{1,2})\.(\d{1,2})\.(\d+)$")
 # The legacy release-script's tags (v0.37.3), which the release resource falls
 # back to as a baseline until an app's first calver release. Same pattern as
