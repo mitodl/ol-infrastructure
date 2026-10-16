@@ -1,0 +1,9 @@
+---
+name: ol-application-hindsight
+runtime: python
+description: >
+  Deploy Hindsight on the applications EKS cluster as the shared memory service
+  (one memory per learner shared across apps, plus general memory), with RDS
+  Postgres and pgvector and an in-cluster embeddings server.
+backend:
+  url: s3://mitol-pulumi-state/

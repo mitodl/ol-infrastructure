@@ -318,6 +318,8 @@ extend_exclude = [
   # Runs in marimo single-user pods from a postStart hook; tomlkit comes with
   # marimo there.
   "src/ol_infrastructure/applications/jupyterhub_data/marimo_ai_defaults\\.py",
+  # Hindsight extensions, mounted into the Hindsight image and imported there.
+  "src/ol_infrastructure/applications/hindsight/ol_memory_ext/",
   "dockerfiles/",
   "scripts/helpers/",
   "scripts/openedx/",
