@@ -15,6 +15,9 @@ config:
   mitxonline:k8s_deploy: "true"
   mitxonline:dev_shell_enabled: false
   mitxonline:learn_backend_domain: "api.rc.learn.mit.edu"
+  mitxonline:openedx_login_gate:
+    lms_host: "courses.rc.learn.mit.edu"
+    lms_service_host: "mitxonline-qa-edxapp-lms-webapp.mitxonline-openedx.svc.cluster.local"
   mitxonline:min_replicas: 2
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-qa"
