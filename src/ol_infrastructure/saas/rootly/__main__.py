@@ -1153,6 +1153,20 @@ service_llmops_clickhouse = rootly.Service(
     opts=rootly_opts,
 )
 
+# Created here rather than imported, like LLMOps - ClickHouse above. The
+# Grafana Production Service Route attributes every alert from
+# grafana_alerting/metric_rules/starrocks.py to it through service="starrocks".
+service_data_platform_starrocks = rootly.Service(
+    "data-platform-starrocks",
+    color="#D7F5E1",
+    description="StarRocks lakehouse query engine on data EKS (namespace starrocks)",
+    environment_ids=["afe3e34e-62e7-4534-bb4c-de57d24e6a59"],
+    escalation_policy_id=escalation_policy_data_platform.id,
+    name="Data Platform - StarRocks",
+    owner_group_ids=[team_data_platform.id],
+    opts=rootly_opts,
+)
+
 # Built in the Rootly UI and adopted here only to move them to the data
 # platform policy. The Pingdom Service Route below attributes the Dagster and
 # Airbyte checks to these two services.
@@ -3433,6 +3447,19 @@ alerts_source_grafana_prometheus_production = rootly.AlertsSource(
             "operator": "is",
             "value": "warning",
         },
+        # StarRocks is tiered `notify` (docs/plans/rootly-label-routing-
+        # implementation-spec.md §1.2): its production Criticals post to
+        # #devops-warnings through the data platform policy's Medium path and
+        # page nobody. Its warnings are Low by the rule above, which that
+        # policy also sends only to #devops-warnings, so the two rules agree
+        # whichever Rootly applies to a StarRocks warning.
+        {
+            "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
+            "jsonPath": "$.commonLabels.service",
+            "kind": "payload",
+            "operator": "is",
+            "value": "starrocks",
+        },
         {
             "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
             "conditionableId": "39b50c54-efa8-47fc-acc6-90f1455a8834",
@@ -4477,14 +4504,40 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             "name": "clickhouse service label to LLMOps - ClickHouse",
             "position": 10,
         },
-        # Everything else on data-production. After the ClickHouse rule so
-        # ClickHouse alerts keep their service attribution (that service uses
-        # the same policy). No earlier rule matches a data-production
+        # Same shape for grafana_alerting/metric_rules/starrocks.py, whose
+        # rules all carry service="starrocks".
+        {
+            "conditionGroups": [
+                {
+                    "conditions": [
+                        {
+                            "propertyFieldConditionType": "contains",
+                            "propertyFieldName": "$.commonLabels.service",
+                            "propertyFieldType": "payload",
+                            "propertyFieldValue": "starrocks",
+                        },
+                    ],
+                    "position": 1,
+                },
+            ],
+            "destinations": [
+                {
+                    "targetId": service_data_platform_starrocks.id,
+                    "targetType": "Service",
+                },
+            ],
+            "fallbackRule": False,
+            "name": "starrocks service label to Data Platform - StarRocks",
+            "position": 11,
+        },
+        # Everything else on data-production. After the ClickHouse and
+        # StarRocks rules so their alerts keep their service attribution (both
+        # services use the same policy). No earlier rule matches a data-production
         # namespace: they are airbyte, clickhouse, dagster, jupyter-data,
         # marimo, ol-analytics, open-metadata, opik, qdrant, starrocks,
         # superset, and cluster system namespaces as of 2026-09-18.
         *data_platform_route_rules(
-            "$.commonLabels.cluster", DATA_PLATFORM_GRAFANA_CLUSTERS, 11
+            "$.commonLabels.cluster", DATA_PLATFORM_GRAFANA_CLUSTERS, 12
         ),
         {
             "destinations": [
@@ -4495,7 +4548,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Grafana Production Service Route",
-            "position": 11 + len(DATA_PLATFORM_GRAFANA_CLUSTERS),
+            "position": 12 + len(DATA_PLATFORM_GRAFANA_CLUSTERS),
         },
     ],
     opts=rootly_imported_route_opts("e7b002f8-e13f-4b63-b0df-af1c78aee890"),
