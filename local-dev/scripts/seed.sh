@@ -9,7 +9,7 @@
 # Examples:
 #   ./local-dev/scripts/seed.sh --app mit-learn
 #   ./local-dev/scripts/seed.sh --app mit-learn --cmd "loaddata platforms schools departments offered_by"
-#   ./local-dev/scripts/seed.sh --app mitxonline --cmd "configure_instance"
+#   ./local-dev/scripts/seed.sh --app mitxonline --cmd "populate_course_data"
 #   ./local-dev/scripts/seed.sh --app mit-learn --cmd "backpopulate_ocw_data"
 #
 # The script delegates execution to `kubectl exec` — the target namespace and
@@ -33,7 +33,7 @@ declare -A APP_NAMESPACE=(
 declare -A APP_DEPLOY=(
     [mit-learn]="mitlearn-webapp"
     [learn-ai]="learnai-webapp"
-    [mitxonline]="mitxonline-webapp"
+    [mitxonline]="mitxonline-app"
     [odl-video-service]="odlvideo-webapp"
     [ocw-studio]="ocwstudio-webapp"
     [micromasters]="micromasters-webapp"
@@ -53,9 +53,9 @@ python manage.py prune_subscription_queries"
 RUN_DATA_MIGRATIONS=true python manage.py migrate --noinput
 python manage.py createcachetable"
 
-    [mitxonline]="python manage.py migrate --noinput
-python manage.py configure_wagtail
-python manage.py configure_instance"
+    # No mitxonline default: its pre-deploy Job runs migrate and configure_wagtail
+    # on every apply, and `tilt trigger mitxonline-app` recreates the stack, Job
+    # included, so it re-runs them.
 
     [odl-video-service]="python manage.py migrate --noinput
 python manage.py createpresets"
@@ -165,6 +165,7 @@ if [[ -n "$CUSTOM_CMD" ]]; then
     log "Running custom command in ${APP}..."
     exec_in_pod "${NS}" "${DEPLOY}" "${CUSTOM_CMD}"
 else
+    [[ -z "${APP_DEFAULT_SEED[$APP]+_}" ]] && err "No default seed for '${APP}'. Pass --cmd."
     # Run the full default seed sequence for this app, one command at a time
     log "Running default seed sequence for ${APP}..."
     while IFS= read -r cmd; do

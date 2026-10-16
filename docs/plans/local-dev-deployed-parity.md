@@ -46,14 +46,8 @@ Every platform version in `local-dev/infra` now comes from
 moves both columns. The nginx sidecar tags in the hand-written app manifests
 are still hardcoded; the sidecar goes away with the app definitions.
 
-Three of these change behaviour an application developer depends on.
+Two of these change behaviour an application developer depends on.
 
-- APISIX 3.15 vs 3.18. `src/ol_infrastructure/components/services/apisix.py:604-612`
-  records that the nested `session.cookie.*` form is a silent no-op from 3.17.
-  Local mitxonline routes use the nested form
-  (`local-dev/apps/mitxonline/apisix-routes.yaml:90-94`) and deployed routes use
-  the flat form. A session cookie change tested locally exercises a code path
-  that does not exist in RC.
 - No `Gateway` locally. `OLApisixHTTPRoute` attaches to the `apisix` Gateway
   (`src/ol_infrastructure/components/services/apisix_gateway_api.py:220-221`),
   so apps already migrated to Gateway API (ocw_studio, xpro) cannot use their

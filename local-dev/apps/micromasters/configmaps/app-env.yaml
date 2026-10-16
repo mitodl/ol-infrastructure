@@ -29,9 +29,9 @@ data:
 
   # Valkey
   # Each app needs its own Valkey DBs, or Celery picks up another app's tasks.
-  # The allocation is listed next to the Valkey settings in
-  # apps/mitxonline/configmaps/app-env.yaml. The Django cache shares the
-  # broker DB because settings.py points CACHES at CELERY_BROKER_URL.
+  # The allocation is listed under Shared Valkey in local-dev/ARCHITECTURE.md.
+  # The Django cache shares the broker DB because settings.py points CACHES at
+  # CELERY_BROKER_URL.
   CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/13"
   CELERY_RESULT_BACKEND: "redis://valkey.local-infra.svc.cluster.local:6379/14"
 
