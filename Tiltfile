@@ -19,7 +19,15 @@ cfg = config.parse()
 # store and a privileged Concourse worker along with it, which is a lot of
 # machine for a developer who is not working on OCW — add it to enabled_apps
 # in tilt_config.json to switch it on.
-enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
+# Split each entry on commas, because the Pulumi stacks split
+# LOCAL_DEV_ENABLED_APPS on commas. Without this, `--enabled_apps a,b` is one
+# entry here (loading no app Tiltfile) but two apps to Pulumi.
+enabled_apps = [
+    app.strip()
+    for entry in cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
+    for app in entry.split(",")
+    if app.strip()
+]
 per_app_databases = cfg.get("per_app_databases", False)
 
 # An included Tiltfile shares no variables with this one, so an app that
@@ -242,7 +250,7 @@ APPS = [
         # Open edX, composed from the lehrer repo rather than built here — its
         # Tiltfile calls lehrer's setup() and passes this cluster's topology.
         # Off by default: the platform image build is long enough that it should
-        # be opted into, with `tilt up -- --enabled_apps mit-learn --enabled_apps openedx`.
+        # be opted into, with `tilt up -- --enabled_apps mit-learn,openedx`.
         "name": "openedx",
         "dir": "openedx",
         "namespace": "openedx",
