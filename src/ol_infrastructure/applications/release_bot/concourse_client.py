@@ -129,6 +129,32 @@ async def pipeline_is_paused(pipeline: str, team: str | None = None) -> bool:
     return bool(body.get("paused"))
 
 
+async def active_build_url(
+    pipeline: str, job: str, team: str | None = None
+) -> str | None:
+    """Return the URL of *job*'s pending or running build, or None if idle.
+
+    Concourse reports it as the job's `next_build`: the build that has not
+    finished yet. A job with several in flight reports only one of them,
+    which is all a "is anything running" question needs.
+    """
+    token = await _get_token()
+    url = (
+        f"{CONCOURSE_URL}/api/v1/teams/{team or CONCOURSE_TEAM}"
+        f"/pipelines/{pipeline}/jobs/{job}"
+    )
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(url, headers={"Authorization": f"Bearer {token}"}) as resp,
+    ):
+        resp.raise_for_status()
+        body = await resp.json()
+    build = body.get("next_build")
+    if not build:
+        return None
+    return f"{CONCOURSE_URL}/builds/{build['id']}"
+
+
 _CHECK_POLL_SECONDS = 2
 _CHECK_TIMEOUT_SECONDS = 180
 _TERMINAL_BUILD_STATUSES = frozenset({"succeeded", "failed", "errored", "aborted"})

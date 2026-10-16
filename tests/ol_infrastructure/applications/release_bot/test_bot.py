@@ -77,6 +77,12 @@ def _record_trigger(calls: list[tuple[str, str, str]]):
 
 
 @pytest.fixture(autouse=True)
+def _no_running_release_build(monkeypatch):
+    """Default to an idle release job; a running build changes /doof release."""
+    monkeypatch.setattr(bot.concourse, "active_build_url", AsyncMock(return_value=None))
+
+
+@pytest.fixture(autouse=True)
 def _no_pending_hotfix(monkeypatch):
     """Default to no pending hotfix, since one changes what /doof release does."""
     monkeypatch.setattr(
@@ -168,7 +174,7 @@ async def test_release_asks_before_superseding_an_in_flight_release(
     said = slack.said
     assert "2026.8.3.1" in said
     assert "cut 9d ago" in said
-    assert "/doof release my-app supersede" in said
+    assert "/doof release my-app supersede 2026.8.3.1" in said
     # Not release state, so it is for whoever typed the command.
     assert slack.respond.call_args.kwargs["response_type"] == "ephemeral"
     # A refused command must not claim ownership of the next ready message.
@@ -186,7 +192,7 @@ async def test_release_supersede_confirms_and_warns_what_was_discarded(
     monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
 
     await bot._cmd_release(
-        repos, slack.ack, slack.respond, _command("my-app supersede"), {}
+        repos, slack.ack, slack.respond, _command("my-app supersede 2026.8.3.1"), {}
     )
 
     trigger.assert_awaited_once()
@@ -205,7 +211,7 @@ async def test_release_supersede_with_nothing_in_flight_just_releases(
     monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
 
     await bot._cmd_release(
-        repos, slack.ack, slack.respond, _command("my-app supersede"), {}
+        repos, slack.ack, slack.respond, _command("my-app supersede 2026.8.3.1"), {}
     )
 
     trigger.assert_awaited_once()
@@ -233,20 +239,119 @@ async def test_release_refuses_when_the_in_flight_lookup_fails(
     assert "Refusing to trigger" in slack.said
 
 
-async def test_release_rejects_an_unrecognised_option(repos, slack, monkeypatch):
-    """A typo for `supersede` must not be read as plain `/doof release`."""
-    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
-    trigger = AsyncMock()
+async def test_release_supersede_must_name_what_is_in_flight_now(
+    repos, slack, monkeypatch
+):
+    """A confirmation for the release the person saw must not discard another."""
+    monkeypatch.setattr(
+        bot.github, "in_flight_release", AsyncMock(return_value=_stale_in_flight())
+    )
+    trigger = AsyncMock(return_value="http://build/1")
+    monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
     monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
 
     await bot._cmd_release(
-        repos, slack.ack, slack.respond, _command("my-app supercede"), {}
+        repos, slack.ack, slack.respond, _command("my-app supersede 2026.7.1.1"), {}
     )
 
     trigger.assert_not_called()
     said = slack.said
-    assert "Unrecognised option `supercede`" in said
-    assert "supersede" in said
+    assert "You confirmed `2026.7.1.1`" in said
+    assert "/doof release my-app supersede 2026.8.3.1" in said
+
+
+async def test_release_supersede_is_case_insensitive(repos, slack, monkeypatch):
+    monkeypatch.setattr(
+        bot.github, "in_flight_release", AsyncMock(return_value=_stale_in_flight())
+    )
+    monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
+    trigger = AsyncMock(return_value="http://build/1")
+    monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+
+    await bot._cmd_release(
+        repos, slack.ack, slack.respond, _command("my-app Supersede 2026.8.3.1"), {}
+    )
+
+    trigger.assert_awaited_once()
+
+
+@pytest.mark.parametrize(
+    "text", ["my-app supersede", "my-app supercede 2026.8.3.1", "my-app supersede a b"]
+)
+async def test_release_rejects_an_unrecognised_option(repos, slack, monkeypatch, text):
+    """A bare or mistyped `supersede` must not be read as a plain release."""
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+    trigger = AsyncMock()
+    monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+
+    await bot._cmd_release(repos, slack.ack, slack.respond, _command(text), {})
+
+    trigger.assert_not_called()
+    said = slack.said
+    assert "Unrecognised option" in said
+    assert "supersede <version>" in said
+
+
+async def test_release_refuses_while_a_release_build_is_running(
+    repos, slack, monkeypatch
+):
+    """The release branch does not exist until the build reaches `create`.
+
+    A second /doof release typed straight after the first finds nothing in
+    flight, and would supersede the first one's freshly cut release.
+    """
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+    running = AsyncMock(return_value="http://ci/builds/7")
+    monkeypatch.setattr(bot.concourse, "active_build_url", running)
+    check = AsyncMock()
+    trigger = AsyncMock(return_value="http://build/1")
+    monkeypatch.setattr(bot.concourse, "check_resource", check)
+    monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+
+    await bot._cmd_release(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    running.assert_awaited_once_with("my-app-pipeline", "build-my-app-release-image")
+    check.assert_not_called()
+    trigger.assert_not_called()
+    assert "http://ci/builds/7" in slack.said
+    assert slack.respond.call_args.kwargs["response_type"] == "ephemeral"
+
+
+async def test_release_refuses_when_the_running_build_lookup_fails(
+    repos, slack, monkeypatch
+):
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+    monkeypatch.setattr(
+        bot.concourse, "active_build_url", AsyncMock(side_effect=RuntimeError("boom"))
+    )
+    trigger = AsyncMock(return_value="http://build/1")
+    monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+
+    await bot._cmd_release(repos, slack.ack, slack.respond, _command("my-app"), {})
+
+    trigger.assert_not_called()
+    assert "Refusing to trigger" in slack.said
+
+
+async def test_release_supersede_is_not_blocked_by_the_release_that_is_running(
+    repos, slack, monkeypatch
+):
+    """With a branch in flight the confirmation is the guard, not the build."""
+    monkeypatch.setattr(
+        bot.github, "in_flight_release", AsyncMock(return_value=_stale_in_flight())
+    )
+    running = AsyncMock(return_value="http://ci/builds/7")
+    monkeypatch.setattr(bot.concourse, "active_build_url", running)
+    monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
+    trigger = AsyncMock(return_value="http://build/1")
+    monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+
+    await bot._cmd_release(
+        repos, slack.ack, slack.respond, _command("my-app supersede 2026.8.3.1"), {}
+    )
+
+    running.assert_not_called()
+    trigger.assert_awaited_once()
 
 
 async def test_release_rejects_an_unknown_app(repos, slack, monkeypatch):
@@ -1202,6 +1307,9 @@ async def test_a_release_deployed_to_production_but_unfinished_is_called_out(
     assert "30d" in text
     assert "never finished" in text
     assert "releases/2026.8.3.1" in text
+    # The message a manager sees when `finish` failed has to say how to move on.
+    assert "/doof release my-app supersede 2026.8.3.1" in text
+    assert "/doof abandon my-app" in text
     assert state.nagged_at[("my-app", "2026.8.3.1")] is not None
 
 

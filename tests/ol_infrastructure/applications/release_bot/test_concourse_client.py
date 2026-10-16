@@ -354,3 +354,16 @@ async def test_pipeline_is_paused_reports_the_paused_flag(monkeypatch):
 async def test_pipeline_is_paused_is_false_when_the_flag_is_absent(monkeypatch):
     _install(monkeypatch, _UrlRecordingSession({"name": "p"}))
     assert await concourse.pipeline_is_paused("mit-learn-api-client", "main") is False
+
+
+async def test_active_build_url_reports_the_jobs_unfinished_build(monkeypatch):
+    """Concourse calls the build that has not finished the job's `next_build`."""
+    session = _UrlRecordingSession({"name": "j", "next_build": {"id": 42}})
+    _install(monkeypatch, session)
+    url = await concourse.active_build_url("my-app-pipeline", "build-my-app-image")
+    assert url == f"{concourse.CONCOURSE_URL}/builds/42"
+
+
+async def test_active_build_url_is_none_when_the_job_is_idle(monkeypatch):
+    _install(monkeypatch, _UrlRecordingSession({"name": "j", "finished_build": {}}))
+    assert await concourse.active_build_url("p", "j") is None
