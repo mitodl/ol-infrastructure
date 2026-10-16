@@ -487,6 +487,20 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stages=["QA", "Production"],
         topology="preview-gated",
     ),
+    "hindsight": SimplePulumiParams(
+        app_name="hindsight",
+        pulumi_project_path="applications/hindsight/",
+        pulumi_project_name="ol-application-hindsight",
+        description=(
+            "Deploys Hindsight, the shared learner and general memory service, "
+            "with its embeddings server, via Pulumi."
+        ),
+        category="core-platform",
+        # QA only while the memory service is an experiment; only
+        # Pulumi.QA.yaml exists.
+        stages=["QA"],
+        topology="preview-gated",
+    ),
     "jupyterhub-data": SimplePulumiParams(
         app_name="jupyterhub-data",
         pulumi_project_path="applications/jupyterhub_data/",
