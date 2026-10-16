@@ -63,14 +63,12 @@ Sub-modules
   heroku       — Source: grafana-alerts/loki-rules/heroku-logs.yaml
   mit_learn    — Source: grafana-alerts/loki-rules/mit-learn.yaml
   vault        — Source: grafana-alerts/loki-rules/vault.yaml
-  witan        — Cedar denial rate, and the opened-graph count on
-                 omnigraph-server's boot line. Not a migration; written
-                 2026-08-24. Both parse with `decolorize` first, because
-                 omnigraph writes ANSI escapes between a field name and
-                 its value and a line filter on a field silently matches
-                 nothing. Also omnigraph 0.13's blocked-graph line at
-                 startup (2026-10-13), a line filter on message text, which
-                 carries no escapes.
+  witan        — Cedar denial rate. Not a migration; written 2026-08-24.
+                 Parses with `decolorize` first, because omnigraph writes
+                 ANSI escapes between a field name and its value and a line
+                 filter on a field silently matches nothing. Also omnigraph
+                 0.13's blocked-graph line at startup (2026-10-13), a line
+                 filter on message text, which carries no escapes.
                  Also the CI indexer writing zero cross-repo bindings across
                  a whole cycle (2026-09-01), which reads witan's own plain
                  stdout and needs no decolorize.

@@ -27,7 +27,7 @@ That is the right blast radius now that the cluster serves ``council``,
 would let a rebuildable per-repo code graph take down the memory graph every
 agent depends on. The residual risk is narrow and severe: if ``council``
 specifically fails to open, the pod stays Ready, /healthz returns 200, and
-every real request 404s.
+every real request against it fails.
 
 Neither health endpoint can close that. omnigraph's ``/healthz`` is flat by
 design, and witan's answers from process state alone on purpose -- a probe that
@@ -51,7 +51,7 @@ well clear of that and far below the ~1.0 a lost graph produces.
 calls in the window the ratio is 0/0 = NaN, which never satisfies the
 comparison, so a graph lost during a quiet period is not reported until someone
 tries to use it. The boot-time half of the signal is in
-log_rules/witan.py::WitanGraphQuarantined, which is not traffic-dependent but
+log_rules/witan.py::WitanGraphBlockedAtStartup, which is not traffic-dependent but
 only has something to say when a pod starts. Closing the remaining window needs
 an authenticated synthetic probe that asserts ``council`` is queryable; that is
 tracked separately and is not something an alert rule can do.
@@ -216,13 +216,13 @@ _ERROR_RATE_SUMMARY = (
 _ERROR_RATE_DESCRIPTION = (
     "witan in cluster {{ $labels.cluster }} is failing more than half of its MCP"
     " tool calls. A ratio near 1.0 with the pod still Ready is the signature of a"
-    " quarantined `council` graph: omnigraph skips a graph it cannot open rather"
+    " blocked `council` graph: omnigraph skips a graph it cannot open rather"
     " than refusing to start, so the process serves, /healthz returns 200, and"
-    " every request against the missing graph 404s. Check the omnigraph-server"
-    " boot line for the graph count it actually opened (`kubectl -n omnigraph"
-    " logs deploy/omnigraph-server | grep 'serving omnigraph'`) against what"
-    " cluster.yaml declares -- WitanGraphQuarantined in log_rules/witan.py"
-    " watches that same number. Then read witan's own mcp.tool_call lines"
+    " every request against the missing graph fails. Check the omnigraph-server"
+    " boot lines for a graph it could not open (`kubectl -n omnigraph logs"
+    " deploy/omnigraph-server | grep 'graph blocked during startup'`) --"
+    " WitanGraphBlockedAtStartup in log_rules/witan.py watches that same line."
+    " Then read witan's own mcp.tool_call lines"
     " (`kubectl -n witan logs deploy/witan-server`), which carry tool, outcome,"
     " duration_ms and actor_id, to see whether the failures are one tool or all"
     " of them. All of them means the graph; one of them means that tool. A"

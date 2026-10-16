@@ -46,90 +46,52 @@ grant looks identical to a policy deploy that removed one. That is why it is a
 warning even in production, and why the description says to read
 ``matched_rule_id`` rather than treating it as an outage.
 
-WitanGraphQuarantined
------------------------
-The quarantine detector, at the one moment quarantine is decidable: startup.
-omnigraph-server logs how many graphs it actually opened --
-
-    serving omnigraph bind=0.0.0.0:8080 mode="cluster" graph_count=16 ...
-
--- and a graph that failed to open is simply absent from that count while the
-process goes on serving. Comparing against the highest count seen over the past
-week makes this self-calibrating: adding a managed repo raises the maximum on
-the same boot that raises the current value, so growth never fires, and no
-declared-graph count has to be duplicated here where it would drift.
-
-★ WHAT THIS ACTUALLY MEASURES: "ANY REDUCED BOOT IN THE LAST 6 HOURS".
-Not "the newest boot", which an earlier revision of this docstring claimed and
-the expression never did. ``min_over_time`` takes the LOWEST count across every
-boot in the window, and LogQL has no way to pick the chronologically latest
-sample across series -- each boot is a different pod, so ``last_over_time`` is
-per-pod and taking a min across those pods lands back on the same value.
-Rather than approximate it, the rule is defined as the event it can actually
-detect, and the operational guidance below matches. Caught in review by
-copilot-pull-request-reviewer.
-
-That framing is also the more useful one. A boot that came up with a graph
-missing is worth investigating even if a later restart recovered -- the
-condition existed and can recur, and the recovering restart is exactly what
-would otherwise erase the evidence.
-
-The 6h side is empty except in the hours after a boot. That is deliberate --
-this is a transition detector, and outside that window there is no new evidence
-to evaluate.
-
-★ THREE KNOWN LIMITS, ALL DELIBERATE.
-1. A graph deliberately REMOVED from cluster.yaml fires this for a week until
-   the baseline re-learns. Production has done this once: the count stepped
-   17 -> 16 between 2026-08-09 and 2026-08-11, alongside the storage-format-6
-   cutover (#5372). Silence it for the week, or confirm the removal was
-   intended -- a graph that disappears across a storage migration is worth
-   confirming rather than assuming.
-2. It keeps firing for up to 6 hours after a recovering restart, because the
-   reduced boot stays in the window. That is the "any reduced boot" semantics
-   working as defined, not a bug to tune out. Check the boot lines before
-   assuming an active outage.
-3. A deploy that ADDS a graph can false-fire for up to 6 hours if a boot from
-   before the addition is still in the window: the older boot sets the minimum
-   while the newer one raises the week's maximum. It needs two boots within 6h
-   straddling the change, and clears itself.
-Conversely, a quarantine that survives a week of restarts stops firing once the
-baseline learns the lower count. Ongoing user-visible impact is covered by
-WitanToolCallErrorRate instead, which is why neither rule is redundant with the
-other: this one is not traffic-dependent but only speaks at boot, and that one
-speaks continuously but only while there is traffic.
-
 WitanGraphBlockedAtStartup
 ----------------------------
-The same detector for omnigraph 0.13, where the one above cannot fire. From
-0.12 on the server logs ``serving omnigraph ... graph_count=N`` BEFORE it loads
-any graph, and N is the number of graphs cluster.yaml DECLARES, so a graph that
-fails to open no longer lowers it. What 0.13 logs instead is one WARN line per
-graph it could not open:
+The blocked-graph detector, at the one moment it is decidable: startup. On
+omnigraph 0.13 a graph that fails to open is blocked rather than fatal, and the
+server logs one WARN line per graph it could not open:
 
     graph blocked during startup graph_id=<id> error=open graph '<id>' at ...
 
-and /readyz stays 200 (``"status":"degraded"``, ``blocked_graph_count`` > 0)
-while at least one graph is ready. The rule counts those lines over the same 6h
-window, so it has the same "any degraded boot in the last 6 hours" meaning and
-the same limit 2 as ``WitanGraphQuarantined``. Limits 1 and 3 do not apply:
-there is no baseline to re-learn.
+while /readyz stays 200 (``"status":"degraded"``, ``blocked_graph_count`` > 0)
+as long as at least one graph is ready. The rule counts those lines over a 6h
+window.
+
+It replaced ``WitanGraphQuarantined``, which compared the ``graph_count`` on the
+``serving omnigraph`` boot line against its weekly high. That worked on 0.11,
+where a graph that failed to open was absent from the count. From 0.12 on the
+line is logged BEFORE any graph loads and N is the number of graphs cluster.yaml
+DECLARES, so the comparison could not fire. It was deleted once every
+environment ran 0.13.
+
+★ WHAT THIS MEASURES: "ANY DEGRADED BOOT IN THE LAST 6 HOURS", not the newest
+boot. LogQL has no way to pick the chronologically latest sample across series
+(each boot is a different pod), so the rule is defined as the event it can
+detect. That is also the more useful framing: a boot that came up with a graph
+missing is worth investigating even if a later restart recovered, because the
+condition existed and can recur, and the recovering restart is exactly what
+would otherwise erase the evidence. It keeps firing for up to 6 hours after a
+recovering restart, so check the running pod before assuming an active outage.
+
+The window is empty except in the hours after a boot. That is deliberate: this
+is a transition detector, and outside that window there is no new evidence to
+evaluate.
 
 It also resolves 6 hours after the boot while the graph is still blocked,
 because 0.13 does not retry a blocked graph until the next restart and so logs
 nothing more. At storage format 14 the nightly maintenance window restarts the
 server, so a graph that stays blocked fires for about 6 hours after each
-window and then goes quiet. Ongoing impact is WitanToolCallErrorRate's, as it
-is for the rule above.
+window and then goes quiet. Ongoing user-visible impact is covered by
+WitanToolCallErrorRate instead, which is why neither rule is redundant with the
+other: this one is not traffic-dependent but only speaks at boot, and that one
+speaks continuously but only while there is traffic.
 
 A LINE FILTER, unlike every other omnigraph rule here, and deliberately. The
 escapes sit around field names and values, not inside the message text, so the
 message is contiguous on the wire. Filtering on it also avoids running
 ``logfmt`` over the ``error`` field, which is unquoted and contains spaces,
 commas and colons.
-
-``WitanGraphQuarantined*`` stays until Production leaves 0.11. Once every
-environment serves 0.13 it is dead and should be deleted.
 
 WitanCodeBridgeNoBindings
 ---------------------------
@@ -158,8 +120,8 @@ it un-suspended and on-schedule (``LAST SCHEDULE`` a few hours old) in
 ``operations-ci``, ``operations-qa`` AND ``operations-production`` alike. The
 expression below is therefore cluster-filtered and the rule is a
 non-prod/prod pair, the same shape as ``WitanCedarDenials*`` and
-``WitanGraphQuarantined*`` above -- omitting the split here was the mistake,
-not the norm. Caught in review by copilot-pull-request-reviewer.
+``WitanGraphBlockedAtStartup*`` above -- omitting the split here was the
+mistake, not the norm. Caught in review by copilot-pull-request-reviewer.
 
 ★ FLEET-WIDE, NEVER PER-REPO. A per-repo ``bindings=0`` rule would fire
 constantly on healthy runs. Measured over the two consecutive 2026-09-01 cycles
@@ -243,25 +205,13 @@ on 2026-09-01, in both directions rather than only for quiet:
   hand counts -- 932 at 16:00Z plus 850 at 20:00Z -- not the 850 from the
   20:00Z cycle alone. Caught in review by copilot-pull-request-reviewer.
 
-Both expressions written 2026-08-24 were evaluated against the production Loki
-tenant that day, and both were shown to be able to FIRE rather than only to be
-quiet:
-
-  WitanCedarDenials     returns nothing as committed; the identical expression
-                        with ``allowed="true"`` returned 5 change + 77 read
-                        over the same 10-minute window.
-  WitanGraphQuarantined returns a real 0 (both sides present, not an empty
-                        result) with the 7-day baseline committed here; with
-                        the baseline widened to 30 days it returns 1, correctly
-                        catching the 17 -> 16 step described above. Note the
-                        VALUE, not just the row: base.py's pipeline fires on
-                        ``last(A) > 0``, so an expression that returns a row
-                        carrying 0 never fires. See metric_rules/witan.py's
-                        ``_never_succeeded_expr`` for the revision of this PR
-                        that got that wrong.
+``WitanCedarDenials`` was evaluated against the production Loki tenant on
+2026-08-24 and shown to be able to FIRE rather than only to be quiet: it
+returns nothing as committed, and the identical expression with
+``allowed="true"`` returned 5 change + 77 read over the same 10-minute window.
 
 ``WitanGraphBlockedAtStartup`` was written 2026-10-13, before any environment
-ran 0.13, so it has NOT been seen to fire in Loki. What was checked instead:
+ran 0.13. What was checked then:
 
   The line itself, from the released 0.13.0 server booted locally on a
   two-graph ``file://`` root with one graph's storage moved aside. On the wire
@@ -275,8 +225,11 @@ ran 0.13, so it has NOT been seen to fire in Loki. What was checked instead:
   The expression as committed parses and returns nothing on the production
   tenant (132,480 lines scanned).
 
-Re-run it against CI's first 0.13 boot with a graph deliberately blocked
-before relying on it.
+It has since fired in QA. A ``graph blocked during startup`` line landed in the
+operations-qa stream in the hour to 2026-10-15T18:00Z, and the QA Grafana state
+history for ``WitanGraphBlockedAtStartupWarning`` shows Pending at 17:59:50Z,
+Alerting at 18:09:50Z (the 10m pending period) and Normal (NoData) at
+23:59:50Z, when the line aged out of the 6h window.
 """
 
 from collections.abc import Callable
@@ -287,16 +240,10 @@ from pulumiverse_grafana import alerting
 _NON_PROD_CLUSTERS = ".*-(ci|qa)"
 _PROD_CLUSTERS = ".*-(production)"
 
-# How far back to look for the highest graph count the fleet has served. Long
-# enough to span a weekend with no restarts; short enough that a deliberate
-# graph removal stops firing within a week rather than a month.
-_GRAPH_BASELINE_WINDOW = "7d"
-
-# How far back a boot still counts as "recent". Every boot inside this window
-# is considered, and the LOWEST count among them is what gets compared -- see
-# the module docstring on why this is "any reduced boot in the last 6 hours"
-# rather than "the newest boot". Outside the window there are no boot samples
-# at all and the rule evaluates to nothing.
+# How far back a boot still counts as "recent". Every blocked-graph line inside
+# this window counts -- see the module docstring on why this is "any degraded
+# boot in the last 6 hours" rather than "the newest boot". Outside the window
+# there are no such lines and the rule evaluates to nothing.
 _GRAPH_RECENT_BOOT_WINDOW = "6h"
 
 # The message omnigraph 0.13 logs once per graph it could not open at startup.
@@ -330,31 +277,6 @@ _CEDAR_DESCRIPTION = (
     " Note the decolorize: omnigraph writes ANSI escapes between a field name"
     " and its value, so a plain line filter for allowed=false silently matches"
     " nothing."
-)
-
-_QUARANTINE_SUMMARY = (
-    "omnigraph in {{ $labels.cluster }} booted in the last 6h serving"
-    " {{ $value }} fewer graphs than its weekly high"
-)
-
-_QUARANTINE_DESCRIPTION = (
-    "At least one omnigraph-server boot in cluster {{ $labels.cluster }} in the"
-    " last 6 hours came up serving fewer graphs than the most it has served in"
-    " the past week. OMNIGRAPH_REQUIRE_ALL_GRAPHS is deliberately unset, so a"
-    " graph that cannot be opened is quarantined rather than fatal: the pod goes"
-    " Ready, /healthz returns 200, and only requests against the missing graph"
-    " fail. If the missing graph is `council`, every agent on the service is"
-    " broken and no other signal reports it."
-    " ★ THIS IS AN 'ANY REDUCED BOOT IN 6 HOURS' ALERT, NOT A CURRENT-STATE ONE."
-    " Check whether the condition is still live before treating it as an active"
-    " outage: `kubectl -n omnigraph logs deploy/omnigraph-server | head -50` on"
-    " the RUNNING pod, and compare the graphs it names against the declared list"
-    " in cluster.yaml. A restart that already recovered will keep this firing"
-    " until the reduced boot ages out of the window, which is deliberate -- the"
-    " condition existed and can recur."
-    " If a graph was removed on purpose, silence this for a week while the"
-    " baseline re-learns, and confirm the removal really was intended, because a"
-    " graph lost during a storage migration looks exactly the same from here."
 )
 
 _GRAPH_BLOCKED_SUMMARY = (
@@ -439,35 +361,6 @@ def _cedar_denial_expr(cluster_filter: str) -> str:
     )
 
 
-def _graph_quarantine_expr(cluster_filter: str) -> str:
-    """Drop between the week's highest opened-graph count and the lowest recent one.
-
-    ``min_over_time`` over the recent-boot window, NOT the newest boot -- see
-    the module docstring for why LogQL cannot express the latter and why the
-    weaker statement is the more useful one anyway.
-
-    ``graph_count != ""`` selects only the one boot line that carries the
-    field, so ``unwrap`` never sees a line it cannot parse.
-
-    The subtraction is what propagates to base.py's ``last(A) > 0`` threshold,
-    so the value that fires is the size of the drop -- positive by
-    construction, and rendered by ``{{ $value }}`` in the summary.
-    """
-    stream = f'{{{_OMNIGRAPH_STREAM}, cluster=~"{cluster_filter}"}}'
-    parsed = '| decolorize | logfmt | graph_count != "" | unwrap graph_count'
-    return (
-        "(\n"
-        "  max by (cluster) (\n"
-        f"    max_over_time({stream} {parsed} [{_GRAPH_BASELINE_WINDOW}])\n"
-        "  )\n"
-        "  -\n"
-        "  min by (cluster) (\n"
-        f"    min_over_time({stream} {parsed} [{_GRAPH_RECENT_BOOT_WINDOW}])\n"
-        "  )\n"
-        ") > 0"
-    )
-
-
 def _graph_blocked_expr(cluster_filter: str) -> str:
     """Blocked-graph lines logged at startup over the recent-boot window.
 
@@ -510,8 +403,7 @@ def _no_bindings_expr(cluster_filter: str) -> str:
 
     ``cluster_filter``: the indexer runs in every environment (see the module
     docstring), so this needs the same non-prod/prod split ``_cedar_denial_expr``
-    and ``_graph_quarantine_expr`` already use -- an earlier revision omitted
-    it, which would have hard-labeled a CI/QA-only outage as production.
+    and ``_graph_blocked_expr`` already use -- an earlier revision omitted it, which would have hard-labeled a CI/QA-only outage as production.
     """
     matched = f'{{{_CI_INDEXER_STREAM}, cluster=~"{cluster_filter}"}} |= "bindings=" | regexp "bindings=(?P<bindings_written>[0-9]+)"'
     return (
@@ -569,36 +461,38 @@ def create(
                 },
                 datas=rd(_cedar_denial_expr(_PROD_CLUSTERS)),
             ),
-            # --- Quarantined graph, caught at boot ---
+            # --- Blocked graph, caught at boot ---
+            # In the slot the 0.11 WitanGraphQuarantined* pair held, so the
+            # rules after it keep their list positions.
             alerting.RuleGroupRuleArgs(
-                name="WitanGraphQuarantinedWarning",
+                name="WitanGraphBlockedAtStartupWarning",
                 condition="C",
                 for_="10m",
                 no_data_state="OK",
                 exec_err_state="OK",
                 labels={"severity": "warning", "environment": "non-production"},
                 annotations={
-                    "summary": _QUARANTINE_SUMMARY,
-                    "description": _QUARANTINE_DESCRIPTION,
+                    "summary": _GRAPH_BLOCKED_SUMMARY,
+                    "description": _GRAPH_BLOCKED_DESCRIPTION,
                 },
-                datas=rd(_graph_quarantine_expr(_NON_PROD_CLUSTERS)),
+                datas=rd(_graph_blocked_expr(_NON_PROD_CLUSTERS)),
             ),
             alerting.RuleGroupRuleArgs(
-                name="WitanGraphQuarantinedCritical",
+                name="WitanGraphBlockedAtStartupCritical",
                 condition="C",
                 for_="10m",
                 no_data_state="OK",
                 exec_err_state="KeepLast",
                 labels={"severity": "critical", "environment": "production"},
                 annotations={
-                    "summary": _QUARANTINE_SUMMARY,
-                    "description": _QUARANTINE_DESCRIPTION,
+                    "summary": _GRAPH_BLOCKED_SUMMARY,
+                    "description": _GRAPH_BLOCKED_DESCRIPTION,
                 },
-                datas=rd(_graph_quarantine_expr(_PROD_CLUSTERS)),
+                datas=rd(_graph_blocked_expr(_PROD_CLUSTERS)),
             ),
             # --- Cross-repo bridge wrote nothing for a whole cycle ---
             # A prod/non-prod pair, like WitanCedarDenials* and
-            # WitanGraphQuarantined* above: the CI indexer runs in every
+            # WitanGraphBlockedAtStartup* above: the CI indexer runs in every
             # environment (see the module docstring), so a rule with no
             # cluster filter would have hard-labeled a CI/QA-only outage as
             # production.
@@ -638,36 +532,6 @@ def create(
                     "description": _NO_BINDINGS_DESCRIPTION,
                 },
                 datas=rd(_no_bindings_expr(_PROD_CLUSTERS)),
-            ),
-            # --- Blocked graph at boot, omnigraph 0.13 ---
-            # Last in the list so the rules above keep their positions.
-            # Same severities and pending period as WitanGraphQuarantined*,
-            # which it replaces once an environment serves 0.13.
-            alerting.RuleGroupRuleArgs(
-                name="WitanGraphBlockedAtStartupWarning",
-                condition="C",
-                for_="10m",
-                no_data_state="OK",
-                exec_err_state="OK",
-                labels={"severity": "warning", "environment": "non-production"},
-                annotations={
-                    "summary": _GRAPH_BLOCKED_SUMMARY,
-                    "description": _GRAPH_BLOCKED_DESCRIPTION,
-                },
-                datas=rd(_graph_blocked_expr(_NON_PROD_CLUSTERS)),
-            ),
-            alerting.RuleGroupRuleArgs(
-                name="WitanGraphBlockedAtStartupCritical",
-                condition="C",
-                for_="10m",
-                no_data_state="OK",
-                exec_err_state="KeepLast",
-                labels={"severity": "critical", "environment": "production"},
-                annotations={
-                    "summary": _GRAPH_BLOCKED_SUMMARY,
-                    "description": _GRAPH_BLOCKED_DESCRIPTION,
-                },
-                datas=rd(_graph_blocked_expr(_PROD_CLUSTERS)),
             ),
         ],
         opts=resource_opts,

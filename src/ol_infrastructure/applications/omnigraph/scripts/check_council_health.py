@@ -8,7 +8,7 @@ while every BM25 caller is being refused. See `SEARCH_PROBE_QUERY` below.
 Carved out of tk-observability-for-shared-witan-service-ad3dba item 1
 (tk-an-authenticated-synthetic-probe-for-council-to--e89d8f). Two alert rules
 already cover a lost `council` graph from opposite directions —
-`WitanToolCallErrorRate` (needs live traffic) and `WitanGraphQuarantined`
+`WitanToolCallErrorRate` (needs live traffic) and `WitanGraphBlockedAtStartup`
 (needs a pod restart) — and a real window sits between them: `council` lost
 during a quiet period with no restart goes unreported until someone tries to
 use the service, which for a shared agent memory graph can be hours.
