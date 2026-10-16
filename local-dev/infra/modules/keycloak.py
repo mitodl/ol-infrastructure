@@ -493,8 +493,9 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         mitlearn_client_secret,
     )
     # Same mitlearn creds for the other apps' routes on api.learn that read
-    # mit-learn's session via secretRef: mitxonline-learn-proxy-route and
-    # learn-ai's /ai/* routes. Resource names unchanged for mitxonline.
+    # mit-learn's session via secretRef: both of mitxonline's rendered route
+    # groups (they authenticate through this client, as deployed) and learn-ai's
+    # /ai/* routes.
     for namespace in ("mitxonline", "learn-ai"):
         _make_oidc_secret(
             f"oidc-secret-mitlearn-in-{namespace}",
@@ -516,9 +517,10 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
         service_accounts_enabled=True,
+        # The deployed shape (substructure/keycloak Pulumi.*.yaml): Django's
+        # account-action return. Gateway login goes through the mit-learn client.
         valid_redirect_uris=[
-            f"https://mitxonline.{root_domain}/*",
-            f"https://api.mitxonline.{root_domain}/*",
+            f"https://mitxonline.{root_domain}/account/action/complete*"
         ],
         opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
     )
@@ -528,13 +530,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         client_id=mitxonline_client.id,
         default_scopes=DEFAULT_SCOPES,
         opts=kc_opts,
-    )
-    _make_oidc_secret(
-        "oidc-secret-mitxonline",
-        "mitxonline",
-        "ol-mitxonline-oidc",
-        mitxonline_client,
-        mitxonline_client_secret,
     )
 
     # --- ODL Video Service ---
