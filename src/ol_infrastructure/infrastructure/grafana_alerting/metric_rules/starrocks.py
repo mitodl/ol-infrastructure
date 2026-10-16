@@ -167,7 +167,7 @@ def create(
                 "StarRocksFEQuorumLost",
                 _fe_quorum_lost(_ALL_CLUSTERS),
                 "2m",
-                "StarRocks in cluster {{ $labels.cluster }} has {{ $value }} FE members down, too few left for a majority. No leader can be elected, so DDL and load commits are stopped.",
+                "StarRocks in cluster {{ $labels.cluster }} has {{ $values.B.Value }} FE members down, too few left for a majority. No leader can be elected, so DDL and load commits are stopped.",
                 rd,
             ),
             _warning(
@@ -188,14 +188,14 @@ def create(
                 "StarRocksFEVolumeAlmostFull",
                 _fe_volume_full(_ALL_CLUSTERS),
                 "10m",
-                "StarRocks FE volume {{ $labels.persistentvolumeclaim }} in cluster {{ $labels.cluster }} is {{ $value | humanizePercentage }} full. An FE that cannot write its metadata journal stops.",
+                "StarRocks FE volume {{ $labels.persistentvolumeclaim }} in cluster {{ $labels.cluster }} is {{ $values.B.Value | humanizePercentage }} full. An FE that cannot write its metadata journal stops.",
                 rd,
             ),
             _warning(
                 "StarRocksCompactionScoreVeryHigh",
                 _compaction_score_very_high(_ALL_CLUSTERS),
                 "15m",
-                "StarRocks in cluster {{ $labels.cluster }} has a partition at compaction score {{ $value }}. Loads into it are being slowed, StarRocks' docs say a score past 500 may need manual intervention, and at 2000 loads are rejected.",
+                "StarRocks in cluster {{ $labels.cluster }} has a partition at compaction score {{ $values.B.Value }}. Loads into it are being slowed, StarRocks' docs say a score past 500 may need manual intervention, and at 2000 loads are rejected.",
                 rd,
             ),
             # --- Degradation ---
@@ -204,7 +204,7 @@ def create(
                 f"{_fe_nodes('.+', 'total')} - on ({_BY_CLUSTER}) "
                 f"{_fe_nodes('.+', 'alive')} > 0",
                 "15m",
-                "StarRocks in cluster {{ $labels.cluster }} has {{ $value }} FE member(s) down. The group still has a majority, but one more loss stops metadata writes.",
+                "StarRocks in cluster {{ $labels.cluster }} has {{ $values.B.Value }} FE member(s) down. The group still has a majority, but one more loss stops metadata writes.",
                 rd,
             ),
             _warning(
@@ -214,7 +214,7 @@ def create(
                 f"- on ({_BY_CLUSTER}) max by ({_BY_CLUSTER}) "
                 f'(node_info{{{_FE}, type="cn_node_num", state="alive"}}) > 0',
                 "15m",
-                "StarRocks in cluster {{ $labels.cluster }} has {{ $value }} fewer CNs alive than the HPA is running. Those pods cost capacity but serve no queries.",
+                "StarRocks in cluster {{ $labels.cluster }} has {{ $values.B.Value }} fewer CNs alive than the HPA is running. Those pods cost capacity but serve no queries.",
                 rd,
             ),
             _warning(
@@ -227,21 +227,21 @@ def create(
                 f"and on ({_BY_CLUSTER})\n"
                 f"sum by ({_BY_CLUSTER}) (increase(starrocks_fe_query_total{{{_FE}}}[15m])) >= 20",
                 "15m",
-                "StarRocks in cluster {{ $labels.cluster }} failed {{ $value | humanizePercentage }} of queries with internal errors over the last 15 minutes.",
+                "StarRocks in cluster {{ $labels.cluster }} failed {{ $values.B.Value | humanizePercentage }} of queries with internal errors over the last 15 minutes.",
                 rd,
             ),
             _warning(
                 "StarRocksLoadsRejected",
                 f"sum by ({_BY_CLUSTER}) (increase(starrocks_fe_txn_reject{{{_FE}}}[15m])) > 0",
                 "0m",
-                "StarRocks in cluster {{ $labels.cluster }} refused to begin {{ $value }} load transactions in the last 15 minutes, for a reused load label or the per-database running-transaction limit (max_running_txn_num_per_db).",
+                "StarRocks in cluster {{ $labels.cluster }} refused to begin {{ $values.B.Value }} load transactions in the last 15 minutes, for a reused load label or the per-database running-transaction limit (max_running_txn_num_per_db).",
                 rd,
             ),
             _warning(
                 "StarRocksCompactionScoreHigh",
                 f"max by ({_BY_CLUSTER}) (starrocks_fe_max_tablet_compaction_score{{{_FE}}}) > 100",
                 "30m",
-                "StarRocks in cluster {{ $labels.cluster }} has a partition at compaction score {{ $value }}, past the point where it slows loads (lake_ingest_slowdown_threshold, 100). Compaction is not keeping up with ingest.",
+                "StarRocks in cluster {{ $labels.cluster }} has a partition at compaction score {{ $values.B.Value }}, past the point where it slows loads (lake_ingest_slowdown_threshold, 100). Compaction is not keeping up with ingest.",
                 rd,
             ),
             _warning(
@@ -250,7 +250,7 @@ def create(
                 f"+ on ({_BY_CLUSTER}) sum by ({_BY_CLUSTER}) "
                 f"(increase(lake_aggregate_compaction_failed_tasks{{{_CN}}}[30m])) > 0",
                 "15m",
-                "StarRocks in cluster {{ $labels.cluster }} had {{ $value }} failed compaction tasks in the last 30 minutes. Scores climb while compaction fails; see information_schema.be_cloud_native_compactions for the error.",
+                "StarRocks in cluster {{ $labels.cluster }} had {{ $values.B.Value }} failed compaction tasks in the last 30 minutes. Scores climb while compaction fails; see information_schema.be_cloud_native_compactions for the error.",
                 rd,
             ),
             _warning(
@@ -270,14 +270,14 @@ def create(
                 )
                 + " > 0",
                 "0m",
-                "StarRocks CNs in cluster {{ $labels.cluster }} hit {{ $value }} shared-data failures (S3 throttling, shard lookup, cache replication, version publish or vacuum) in the last 15 minutes. The Storage Errors panel on the StarRocks - Overview dashboard splits them by kind.",
+                "StarRocks CNs in cluster {{ $labels.cluster }} hit {{ $values.B.Value }} shared-data failures (S3 throttling, shard lookup, cache replication, version publish or vacuum) in the last 15 minutes. The Storage Errors panel on the StarRocks - Overview dashboard splits them by kind.",
                 rd,
             ),
             _warning(
                 "StarRocksFEReplayLag",
                 f"max by ({_BY_POD}) (starrocks_fe_meta_replay_lag_second{{{_FE}}}) > 300",
                 "10m",
-                "StarRocks follower FE {{ $labels.pod }} in cluster {{ $labels.cluster }} is {{ $value | humanizeDuration }} behind the leader's metadata, so queries it plans see stale catalog state.",
+                "StarRocks follower FE {{ $labels.pod }} in cluster {{ $labels.cluster }} is {{ $values.B.Value | humanizeDuration }} behind the leader's metadata, so queries it plans see stale catalog state.",
                 rd,
             ),
             _warning(
@@ -286,7 +286,7 @@ def create(
                 f"/ on ({_BY_POD}) max by ({_BY_POD}) (kube_pod_container_resource_limits"
                 '{namespace="starrocks", container="cn", resource="memory"}) > 0.85',
                 "10m",
-                "StarRocks CN {{ $labels.pod }} in cluster {{ $labels.cluster }} is using {{ $value | humanizePercentage }} of its memory limit. At the limit the container is OOM-killed and its queries fail.",
+                "StarRocks CN {{ $labels.pod }} in cluster {{ $labels.cluster }} is using {{ $values.B.Value | humanizePercentage }} of its memory limit. At the limit the container is OOM-killed and its queries fail.",
                 rd,
             ),
             _warning(
