@@ -71,7 +71,8 @@ Sub-modules
                  filter on message text, which carries no escapes.
                  Also the CI indexer writing zero cross-repo bindings across
                  a whole cycle (2026-09-01), which reads witan's own plain
-                 stdout and needs no decolorize.
+                 stdout and needs no decolorize. QA and Production stacks
+                 only: CI ships no logs to its Loki tenant.
 """
 
 import json

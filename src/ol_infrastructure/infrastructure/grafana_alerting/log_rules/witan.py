@@ -237,6 +237,8 @@ from collections.abc import Callable
 from pulumi import Input, ResourceOptions
 from pulumiverse_grafana import alerting
 
+from ol_infrastructure.lib.pulumi_helper import parse_stack
+
 _NON_PROD_CLUSTERS = ".*-(ci|qa)"
 _PROD_CLUSTERS = ".*-(production)"
 
@@ -424,7 +426,15 @@ def create(
     rd: Callable[[str], list[alerting.RuleGroupRuleDataArgs]],
     resource_opts: ResourceOptions,
 ) -> None:
-    """Create the witan log-derived alert rule group."""
+    """Create the witan log-derived alert rule group, on QA and Production only.
+
+    operations-ci runs no log collector, so CI's Loki tenant receives nothing
+    and these rules would sit at Normal on NoData however CI is doing. QA is
+    where they are exercised.
+    """
+    if parse_stack().env_suffix == "ci":
+        return
+
     alerting.RuleGroup(
         "loki-witan-service",
         name="witan-service",
