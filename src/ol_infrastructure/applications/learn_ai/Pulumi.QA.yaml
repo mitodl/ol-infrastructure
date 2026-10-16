@@ -34,6 +34,8 @@ config:
     DEV_ENV: "false"
     LANGSMITH_PROJECT: "learn-ai-rc"
     LANGSMITH_TRACING: "true"
+    LOGIN_REDIRECT_ALLOWED_HOSTS: '["learn-ai-qa.ol.mit.edu", "rc.learn.mit.edu",
+      "courses.rc.learn.mit.edu", "rc.mitxonline.mit.edu"]'
     MIT_LEARN_API_PROXY_BASE_URL: "https://api.rc.learn.mit.edu/api/"
     MITOL_APP_BASE_URL: "https://learn-ai-qa.ol.mit.edu"
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
