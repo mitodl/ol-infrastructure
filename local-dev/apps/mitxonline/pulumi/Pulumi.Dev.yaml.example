@@ -1,0 +1,27 @@
+# Per-developer configuration for the local mitxonline stack.
+#
+# The real file, Pulumi.Dev.yaml, is gitignored and appears next to this one on
+# the first apply (it starts with just an encryptionsalt).
+# Add a config: block to it; Tilt re-applies the program when it changes and the
+# pods roll. `vars` and `web_memory_limit` are the deployed stacks' keys (compare
+# src/ol_infrastructure/applications/mitxonline/Pulumi.Production.yaml); the
+# other three memory limits are local keys in the same style:
+#
+#   mitxonline:vars                     env merged over LOCAL_ENV_DEFAULTS into
+#                                       each container's env:, which beats the
+#                                       tracked Secret's envFrom. Values must be
+#                                       strings: quote "True" and "8080".
+#   mitxonline:web_memory_limit         the webapp's memory limit (default 1Gi)
+#   mitxonline:worker_memory_limit      the celery worker's (1Gi)
+#   mitxonline:pre_deploy_memory_limit  the migrate Job's (2Gi)
+#   mitxonline:beat_memory_limit        celery beat's (384Mi)
+#   ol-local-dev-mitxonline:kubeconfig  the kubeconfig holding the local-dev
+#                                       context (default ~/.kube/config; the
+#                                       KUBECONFIG variable is not read)
+#
+# Edit the file rather than `pulumi config set`, which quotes values a second
+# time. Secret values are fine here: the file never leaves your machine.
+config:
+  mitxonline:vars:
+    FEATURE_IGNORE_EDX_FAILURES: "True"
+  mitxonline:web_memory_limit: 2Gi

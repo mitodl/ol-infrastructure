@@ -207,6 +207,8 @@ The whole stack is roughly 2.9GB and can be switched off with `observability_ena
 
 **Shared database cluster:** All apps share one CloudNativePG (CNPG) cluster in the `local-infra` namespace with isolated databases (`mitlearn`, `learnai`, `mitxonline`, `odlvideo`, `keycloak`, `litellm`). This keeps memory usage low.
 
+**Shared Valkey:** one Valkey in `local-infra`; each app gets its own logical DBs, or Celery and RedBeat pick up another app's tasks. In use: mit-learn 0-2, Open edX 3 (cache) and 12 (broker), ocw-studio 4-5, mitxonline 6-7, learn-ai 8-9, odl-video-service 10-11, micromasters 13-14.
+
 **TLS:** mkcert issues one certificate whose wildcard SANs (`*.mit.test`, `*.learn.mit.test`, …) cover every local hostname under the root domain (`mit.test` by default). The cert is read by Pulumi at stack evaluation time and stored as `local-dev-tls` Kubernetes Secrets in every app namespace. APISIX's `ApisixTls` CRs reference these secrets.
 
 **Keycloak realm:** The `olapps` realm mirrors production, including the fake-Touchstone SAML IdP, all OIDC clients, and organizations support. Test accounts are listed in the [README](README.md#test-accounts).
