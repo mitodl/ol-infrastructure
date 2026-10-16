@@ -242,7 +242,7 @@ APPS = [
         # Open edX, composed from the lehrer repo rather than built here — its
         # Tiltfile calls lehrer's setup() and passes this cluster's topology.
         # Off by default: the platform image build is long enough that it should
-        # be opted into, with `tilt up -- --enabled_apps mit-learn,openedx`.
+        # be opted into, with `tilt up -- --enabled_apps mit-learn --enabled_apps openedx`.
         "name": "openedx",
         "dir": "openedx",
         "namespace": "openedx",

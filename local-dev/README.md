@@ -207,8 +207,10 @@ Tiltfile forwards `enabled_apps` to both Pulumi stacks and to the app Tiltfiles 
 Open edX runs **in this cluster**, composed from the [lehrer](https://github.com/mitodl/lehrer) repo — not as a second k3d cluster alongside it. It is off by default because the platform image build is long:
 
 ```bash
-tilt up -- --enabled_apps mit-learn,openedx
+tilt up -- --enabled_apps mit-learn --enabled_apps openedx
 ```
+
+Repeat `--enabled_apps` once per app. `enabled_apps` is a string list, so `--enabled_apps mit-learn,openedx` enables one app named `mit-learn,openedx`, which matches nothing. A running Tilt takes the same flags from `tilt args -- --enabled_apps mit-learn --enabled_apps openedx`.
 
 It needs lehrer checked out next to this repo (or `MITOL_WORKSPACE_ROOT` pointing at the directory that holds it). Nothing else: the `openedx-secrets` Secret is created for you from lehrer's `local-dev/secret-defaults.yaml`, the same file `lehrer dev setup` reads.
 
