@@ -52,11 +52,11 @@ This is the closest thing to Vagrant: Vagrant gave you a disposable VM that beha
 
 ### k8s manifests + apisix — the declarative "compose file"
 
-The manifests live in `local-dev/apps/*` (Deployments, Services, ConfigMaps, Secrets) and `apisix-routes.yaml`. This is the big conceptual leap from compose; see [Compose → Kubernetes](#docker-compose--kubernetes-translated) below.
+The manifests live in `local-dev/apps/*` (Deployments, Services, ConfigMaps, Secrets) and `apisix-routes.yaml`; mitxonline's Deployments and routes are rendered by a Pulumi program instead. This is the big conceptual leap from compose; see [Compose → Kubernetes](#docker-compose--kubernetes-translated) below.
 
 ### Pulumi — the shared-services installer
 
-Pulumi is an infrastructure-as-code tool (same family as Terraform): you describe resources in a real programming language and `pulumi up` creates or updates the real thing to match. It's what this repo uses to define OL's rc/prod cloud infrastructure — which is why application engineers usually meet it as "the place env vars go to affect rc/prod." It does **not** play that role in local-dev: per-developer env vars go in a gitignored [`app-env.local.yaml` override](README.md#local-configuration-overrides) instead. Here Pulumi's job is smaller — a Python program under `local-dev/infra/` installs the shared in-cluster services every app needs (PostgreSQL, Valkey, Keycloak, APISIX, OpenSearch, …). Tilt runs `pulumi up` for you at startup and whenever the infra files change; the only time you touch it is to change shared infrastructure (see [EXTENDING.md](EXTENDING.md)).
+Pulumi is an infrastructure-as-code tool (same family as Terraform): you describe resources in a real programming language and `pulumi up` creates or updates the real thing to match. It's what this repo uses to define OL's rc/prod cloud infrastructure — which is why application engineers usually meet it as "the place env vars go to affect rc/prod." In local-dev that role is small: per-developer env vars for the YAML-applied apps go in a gitignored [`app-env.local.yaml` override](README.md#local-configuration-overrides), and for mitxonline in the gitignored stack file of its program (`mitxonline:vars`, the same key the deployed stacks use). Pulumi's jobs here are two: Python programs under `local-dev/infra/` install the shared in-cluster services every app needs (PostgreSQL, Valkey, Keycloak, APISIX, OpenSearch, …), and `local-dev/apps/mitxonline/pulumi/` renders the app itself and its gateway routes from the deployed definition in `src/`, so local-dev runs what RC and production run (see `docs/plans/local-dev-deployed-parity.md`). Tilt runs `pulumi up` for you at startup and whenever those files change; you touch Pulumi to change shared infrastructure or a rendered app's local bindings (see [EXTENDING.md](EXTENDING.md)).
 
 ### Tilt — the dev loop
 
@@ -130,6 +130,7 @@ flowchart TB
     browser["Browser<br/>https://learn.mit.test"] --> lb
     lb --> api
     tilt -->|kubectl apply| api
+    tilt -->|pulumi up (mitxonline)| api
     tilt -->|build| docker
     docker -->|push changed layers| reg
     reg -.->|pull on pod create| k0 & k1
@@ -164,7 +165,7 @@ Inside the cluster, workloads are grouped into namespaces: one per app, plus `lo
 │  ┌────▼──────┐  ┌───────────┐  ┌──────────┐  ┌────────┐ │   │
 │  │ mit-learn │  │ learn-ai  │  │mitxonline│  │  odl-  │ │   │
 │  │  (ns)     │  │   (ns)    │  │   (ns)   │  │ video  │ │   │
-│  │ Next.js   │  │ granian   │  │  uwsgi   │  │  uwsgi │ │   │
+│  │ Next.js   │  │ granian   │  │ granian  │  │  uwsgi │ │   │
 │  │ Django    │  │ Celery×2  │  │  Celery  │  │ Celery │ │   │
 │  │ Celery×3  │  │           │  │          │  │        │ │   │
 │  └───────────┘  └───────────┘  └──────────┘  └────────┘ │   │
@@ -288,6 +289,13 @@ Then, for each enabled app (apps deploy independently of each other):
 │     initContainer: migrate + collectstatic + data-specific seeds
 └── kubectl apply apisix-routes.yaml
       APISIX picks up new routes → app reachable at its mit.test URL
+
+mitxonline instead:
+├── docker build (as above)
+└── pulumi up (local-dev/apps/mitxonline/pulumi, run by Tilt as a custom deploy)
+      pre-deploy Job: migrate, then createcachetable, then (local only) re-assert the
+        OAuth2 Application the composed Open edX signs in through
+      Deployments, Service, ApisixPluginConfig, ApisixRoutes from the deployed definition
 ```
 
 ## The raw k8s dev flow (what Tilt automates)
@@ -307,4 +315,4 @@ Tilt collapses all of that into a file-watch + in-container sync, and shows the 
 - [README.md](README.md) — setup and day-to-day usage
 - [EXTENDING.md](EXTENDING.md) — adding a new app, modifying shared infrastructure
 - `local-dev/apps/*/Tiltfile` — per-app build + live_update config
-- `local-dev/apps/*/deployment.yaml` — per-app k8s manifests
+- `local-dev/apps/*/deployment.yaml` — per-app k8s manifests (mitxonline's come from `local-dev/apps/mitxonline/pulumi/`)
