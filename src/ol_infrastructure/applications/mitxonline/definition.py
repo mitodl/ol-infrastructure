@@ -817,8 +817,8 @@ def openedx_login_gate_route_configs(
     in front of Open edX's login start: with no MIT Learn session, the plugin
     sends the learner to Keycloak and writes the session on the callback, then
     returns them to the same URL and the Open edX login carries on unchanged.
-    MITx Online's own Keycloak step then finds a Keycloak session and passes
-    silently.
+    MITx Online's own Keycloak step then runs against the Keycloak session the
+    learner just created, so it should not prompt again.
 
     It uses ``oidc`` from ``prefixed_oidc_config``, whose cookie name, domain
     and session timeouts already match mit-learn's, and whose credentials are
