@@ -41,8 +41,10 @@ HOSTS=(
     # ocw-hugo-themes dev server, run on the host and fronted by APISIX so it
     # has an origin inside .learn.${ROOT_DOMAIN} (see apps/mit-learn/ocw-hugo-dev.yaml)
     "ocw-dev.learn.${ROOT_DOMAIN}"
-    # mitxonline
+    # mitxonline's routes serve the api host too, and its post-logout
+    # redirect goes there
     "mitxonline.${ROOT_DOMAIN}"
+    "api.mitxonline.${ROOT_DOMAIN}"
     # odl-video-service
     "video.odl.${ROOT_DOMAIN}"
     # ocw-studio: the CMS, the draft/live/test published-site hosts, and

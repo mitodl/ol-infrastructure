@@ -45,3 +45,16 @@ k8s_resource(
 k8s_resource('learnai-celery-default', labels=['learn-ai'], resource_deps=['local-infra-apps'])
 k8s_resource('learnai-celery-edx-content', labels=['learn-ai'], resource_deps=['local-infra-apps'])
 k8s_resource('learnai-celery-beat', labels=['learn-ai'], resource_deps=['local-infra-apps'])
+
+# The route reads discovery and session.secret from a Secret local-infra-apps
+# writes; see the mitlearn-routes resource in local-dev/apps/mit-learn/Tiltfile.
+k8s_resource(
+    new_name='learnai-routes',
+    objects=[
+        'learnai-shared-plugins:apisixpluginconfig',
+        'learnai-tls:apisixtls',
+        'learnai-route:apisixroute',
+    ],
+    labels=['learn-ai'],
+    resource_deps=['local-infra-apps'],
+)

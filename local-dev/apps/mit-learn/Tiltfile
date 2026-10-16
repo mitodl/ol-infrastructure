@@ -104,6 +104,22 @@ k8s_resource(
     ],
 )
 
+# The routes' openid-connect blocks take discovery and session.secret from the
+# ol-*-oidc Secrets local-infra-apps writes. Applied against Secrets without
+# them, a route fails APISIX's schema check, APISIX rejects the whole config
+# push, and an APISIX pod that local-infra-core is rolling never becomes ready.
+k8s_resource(
+    new_name="mitlearn-routes",
+    objects=[
+        "mitlearn-shared-plugins:apisixpluginconfig",
+        "mitlearn-tls:apisixtls",
+        "mitlearn-route-no-prefix:apisixroute",
+        "mitlearn-route-prefix:apisixroute",
+    ],
+    labels=["mit-learn"],
+    resource_deps=["local-infra-apps"],
+)
+
 k8s_resource(
     new_name="ocw-hugo-dev",
     objects=[

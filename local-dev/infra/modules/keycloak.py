@@ -13,16 +13,21 @@ seeded by local-dev/scripts/kc-seed-users.sh, which the root Tiltfile runs
 automatically (the "kc-seed-users" resource) after this realm is applied.
 """
 
-import json
-
 import pulumi_keycloak as keycloak
 import pulumi_kubernetes as k8s
 from pulumi import InvokeOptions, Output, ResourceOptions
 
+from bridge.lib.constants import oidc_secret_data
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_browser_flows,
     create_organization_first_broker_login_flows,
 )
+
+# The session.secret every gateway OIDC Secret carries. It has to be one value
+# across Secrets: mit-learn's routes and mitxonline's /mitxonline/* routes on
+# api.learn.<domain> read different Secrets but decrypt one shared session
+# cookie.
+LOCAL_OIDC_SESSION_SECRET = "local-dev-oidc-session-secret-32chars!"  # noqa: S105  # pragma: allowlist secret
 
 
 def create_olapps_dev_realm(  # noqa: PLR0913
@@ -354,12 +359,16 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         client: keycloak.openid.Client,
         client_secret_value: Output,
     ) -> k8s.core.v1.Secret:
-        """Create a k8s Secret with OIDC credentials for APISIX secretRef.
+        """Create the Secret an APISIX openid-connect plugin reads via secretRef.
 
-        Only client_id and client_secret are stored here; session.secret is
-        set inline in each ApisixRoute config so that APISIX does not treat it
-        as a plugin config key during secretRef merging (which would override
-        the JWT verification key and break RS256 token validation).
+        It carries the keys oidc_secret_data returns, the same ones deployed
+        stacks' VSO templates write from Vault (see OLApisixOIDCResources):
+        client_id, client_secret, realm, discovery and session.secret. The
+        ingress controller merges these over the route's inline plugin config,
+        so the routes do not repeat them. session.secret is lua-resty-session's
+        cookie encryption key; every Secret carries LOCAL_OIDC_SESSION_SECRET so
+        the two ol-mitlearn-oidc copies agree (mit-learn's routes write the
+        Learn cookie, mitxonline's /mitxonline/* proxy route reads it).
         """
         return k8s.core.v1.Secret(
             resource_name,
@@ -367,27 +376,18 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             string_data=Output.all(
                 client_id=client.client_id,
                 client_secret=client_secret_value,
-                realm_id=client.realm_id,
-                realm_name="olapps",
-                url=client.realm_id.apply(lambda rid: f"{keycloak_url}/realms/{rid}"),
+                realm=client.realm_id,
             ).apply(
-                lambda args: {
-                    "client_id": args["client_id"],
-                    "client_secret": args["client_secret"],
-                    "realm_id": args["realm_id"],
-                    "realm_name": args["realm_name"],
-                    "url": args["url"],
-                    # Convenience composite JSON for apps that read it as one value.
-                    "oidc_credentials": json.dumps(
-                        {
-                            "client_id": args["client_id"],
-                            "client_secret": args["client_secret"],
-                            "realm_id": args["realm_id"],
-                            "realm_name": args["realm_name"],
-                            "url": args["url"],
-                        }
-                    ),
-                }
+                lambda args: oidc_secret_data(
+                    {
+                        "client_id": args["client_id"],
+                        "client_secret": args["client_secret"],
+                        "realm_name": args["realm"],
+                        "url": f"{keycloak_url}/realms/{args['realm']}",
+                        "secret": LOCAL_OIDC_SESSION_SECRET,
+                    },
+                    include_session_secret=True,
+                )
             ),
             opts=k8s_opts,
         )
@@ -470,6 +470,10 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         valid_redirect_uris=[
             f"https://learn.{root_domain}/*",
             f"https://api.learn.{root_domain}/*",
+            # mitxonline's deployed gateway routes authenticate through this
+            # client (sso/mitlearn), so rendering them locally needs its hosts.
+            f"https://mitxonline.{root_domain}/*",
+            f"https://api.mitxonline.{root_domain}/*",
         ],
         web_origins=["+"],
         opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
