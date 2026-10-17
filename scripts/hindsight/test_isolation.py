@@ -29,6 +29,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 sys.path.insert(0, str(Path(__file__).parent))
+import memory_client
 from keycloak import (
     AUDIENCE,
     AUDIENCE_SCOPE,
@@ -401,6 +402,17 @@ async def test_app_cannot_edit_a_memory_unit(seeded, body):
         ).json()["items"]
     assert r.status_code == FORBIDDEN, (body, r.text)
     assert after["text"] == "The learner has 30 minutes per weekday.", after
+
+
+async def test_get_reads_past_one_page(seeded, monkeypatch):
+    """get() returns every note, not only the first page."""
+    a, _, lai, _ = seeded
+    monkeypatch.setattr(memory_client, "MEMORIES_PAGE_SIZE", 1)
+    notes = await lai.get(a.token("learn-ai"))
+    assert {(n.app, n.key) for n in notes} == {
+        ("learn-ai", "pace"),
+        ("mit-learn", "goal"),
+    }, notes
 
 
 @pytest.mark.parametrize(
