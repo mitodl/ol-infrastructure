@@ -10,6 +10,7 @@ import asyncio
 import re
 import time
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 import jwt
@@ -20,6 +21,7 @@ DRAIN_TIMEOUT_SECONDS = 600.0
 FORGET_ATTEMPTS = 5
 FORGET_BACKOFF_SECONDS = 2.0
 HTTP_TIMEOUT_SECONDS = 30
+MEMORIES_PAGE_SIZE = 100
 OPERATIONS_PAGE_SIZE = 100
 _KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
 
@@ -44,8 +46,15 @@ def bank_for(learner_id: str) -> str:
     return f"{BANK_PREFIX}{learner_id}"
 
 
-def _note(item: dict[str, object], score: float | None = None) -> Note:
-    app, _, key = str(item["document_id"]).partition(".")
+def _note(item: dict[str, Any], score: float | None = None) -> Note:
+    # The writer is the app tag the server enforces on every app write. The
+    # server also requires the document id to start with that app's name.
+    apps = [t.removeprefix("app:") for t in item["tags"] or [] if t.startswith("app:")]
+    if len(apps) != 1:
+        msg = f"memory {item['id']} has app tags {apps}, not exactly one"
+        raise ValueError(msg)
+    [app] = apps
+    key = str(item["document_id"]).removeprefix(f"{app}.")
     return Note(key=key, text=str(item["text"]), app=app, score=score)
 
 
@@ -99,13 +108,20 @@ class MemoryClient:
     async def get(self, learner_token: str) -> list[Note]:
         """Return every app's notes for the token's learner."""
         base, headers = self._route(learner_token)
-        response = await self._http.get(
-            f"{base}/memories/list", headers=headers, params={"limit": 100}
-        )
-        if response.status_code == httpx.codes.NOT_FOUND:
-            return []
-        response.raise_for_status()
-        return [_note(item) for item in response.json()["items"]]
+        notes: list[Note] = []
+        while True:
+            response = await self._http.get(
+                f"{base}/memories/list",
+                headers=headers,
+                params={"limit": MEMORIES_PAGE_SIZE, "offset": len(notes)},
+            )
+            if response.status_code == httpx.codes.NOT_FOUND:
+                return notes
+            response.raise_for_status()
+            page = response.json()
+            notes.extend(_note(item) for item in page["items"])
+            if not page["items"] or len(notes) >= page["total"]:
+                return notes
 
     async def search(self, learner_token: str, query: str) -> list[Note]:
         """Return the learner's notes most relevant to ``query``."""
