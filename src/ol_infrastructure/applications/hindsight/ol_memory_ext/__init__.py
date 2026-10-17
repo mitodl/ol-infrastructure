@@ -100,13 +100,14 @@ DEFAULT_FENCE_SECONDS = 3600
 JWKS_CACHE_SECONDS = 600
 
 # The bank writes an app or general-grant caller may make, beyond retain: its
-# own notes, changed or removed. Everything else (knowledge pages and folders,
-# directives, mental models, webhooks, config, imports, consolidation) is
-# refused. A delete stays allowed while the bank is fenced.
+# own notes, retagged or removed. Everything else (memory unit edits, knowledge
+# pages and folders, directives, mental models, webhooks, config, imports,
+# consolidation) is refused. Memory Defense screens only retain, so a unit edit
+# would store its text unredacted; an app replaces a note by retaining it again.
+# A delete stays allowed while the bank is fenced.
 _APP_WRITES = {
     BankWriteOperation.DELETE_DOCUMENT,
     BankWriteOperation.UPDATE_DOCUMENT,
-    BankWriteOperation.UPDATE_MEMORY_UNIT,
 }
 _FENCE_EXEMPT_WRITES = {BankWriteOperation.DELETE_DOCUMENT}
 
@@ -271,9 +272,9 @@ class KeycloakTenantExtension(TenantExtension):
         }
         self.general_scope = config.get("general_scope", DEFAULT_GENERAL_SCOPE)
         self.schema = config.get("schema", "public")
-        self._jwks = jwt.PyJWKClient(
-            config["jwks_url"], cache_keys=True, lifespan=JWKS_CACHE_SECONDS
-        )
+        # No per-key cache: it never expires, so a key Keycloak removed would
+        # stay trusted. The JWKS set cache's lifespan bounds that instead.
+        self._jwks = jwt.PyJWKClient(config["jwks_url"], lifespan=JWKS_CACHE_SECONDS)
 
     async def authenticate(self, context: RequestContext) -> TenantContext:
         """Verify the bearer token and record the app and learner it acts for."""
@@ -497,12 +498,25 @@ class LearnerBankValidator(OperationValidatorExtension):
         Notes are text. Attachment bytes live in a table with no bank_id, out of
         the fence trigger's reach, and refusing here reclaims bytes the engine
         has already stored.
+
+        An app's document ids carry its name, so one app cannot take a key
+        another app will write: the engine refuses to replace a document under
+        another app's tag.
         """
         if ctx.attachments:
             return ValidationResult.reject(
                 "attachments are not enabled", status_code=403
             )
-        return await self._write(ctx.bank_id, ctx.request_context)
+        rc = ctx.request_context
+        prefix = f"{rc.tenant_id}."
+        if not rc.internal and not all(
+            str(item.get("document_id") or "").startswith(prefix)
+            for item in ctx.contents
+        ):
+            return ValidationResult.reject(
+                f"document ids must start with {prefix!r}", status_code=403
+            )
+        return await self._write(ctx.bank_id, rc)
 
     async def validate_recall(self, ctx: RecallContext) -> ValidationResult:
         """Allow a recall from a bank the caller may read."""
@@ -564,7 +578,10 @@ class LearnerBankValidator(OperationValidatorExtension):
     async def validate_memory_update(
         self, ctx: MemoryUpdateContext
     ) -> ValidationResult:
-        """Allow updating a memory in a writable, unfenced bank."""
+        """Allow an internal memory update in a writable, unfenced bank.
+
+        validate_bank_write has already refused the update for apps.
+        """
         return await self._write(ctx.bank_id, ctx.request_context)
 
     async def resolve_write_tag_scope(self, ctx: TagScopeContext) -> list[str] | None:

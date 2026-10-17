@@ -351,6 +351,59 @@ async def test_app_cannot_overwrite_or_delete_another_apps_note(seeded):
 
 
 @pytest.mark.parametrize(
+    "item",
+    [
+        {"content": "x", "document_id": "mit-learn.y", "tags": ["app:learn-ai"]},
+        {"content": "x", "document_id": "y", "tags": ["app:learn-ai"]},
+        {"content": "x", "tags": ["app:learn-ai"]},
+    ],
+)
+async def test_app_document_ids_carry_its_own_name(seeded, item):
+    """An app cannot write under a key that names another app, or no app."""
+    a, _, _, _ = seeded
+    async with http(a.token("learn-ai")) as c:
+        r = await c.post(f"{a.bank}/memories", json={"items": [item]})
+    assert r.status_code == FORBIDDEN, (item, r.text)
+
+
+@pytest.mark.parametrize("tags", [[], ["app:mit-learn"]])
+async def test_app_cannot_retag_its_note_away_from_itself(seeded, tags):
+    """A retag that would drop the app's own tag is refused."""
+    a, _, lai, _ = seeded
+    async with http(a.token("learn-ai")) as c:
+        r = await c.patch(f"{a.bank}/documents/learn-ai.pace", json={"tags": tags})
+    assert r.status_code == FORBIDDEN, (tags, r.text)
+    notes = await lai.get(a.token("learn-ai"))
+    assert ("learn-ai", "pace") in {(n.app, n.key) for n in notes}, notes
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"text": "Email me at a.learner@example.org"},
+        {"state": "invalidated", "reason": "call +1 617 555 0142"},
+    ],
+)
+async def test_app_cannot_edit_a_memory_unit(seeded, body):
+    """Unit edits bypass redaction, so apps replace a note by retaining it."""
+    a, _, _, _ = seeded
+    async with http(a.token("learn-ai")) as c:
+        [unit] = (
+            await c.get(
+                f"{a.bank}/memories/list", params={"document_id": "learn-ai.pace"}
+            )
+        ).json()["items"]
+        r = await c.patch(f"{a.bank}/memories/{unit['id']}", json=body)
+        [after] = (
+            await c.get(
+                f"{a.bank}/memories/list", params={"document_id": "learn-ai.pace"}
+            )
+        ).json()["items"]
+    assert r.status_code == FORBIDDEN, (body, r.text)
+    assert after["text"] == "The learner has 30 minutes per weekday.", after
+
+
+@pytest.mark.parametrize(
     ("method", "path", "body"),
     [
         ("patch", "/config", {"updates": {"audit_log_enabled": True}}),
