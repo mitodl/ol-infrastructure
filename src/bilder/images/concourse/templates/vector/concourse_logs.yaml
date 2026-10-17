@@ -19,9 +19,12 @@ transforms:
       if event != null {
         .,err = merge(., event)
         .@timestamp = .timestamp
-        .labels = ["concourse", "${ENVIRONMENT}"]
-        .environment = "${ENVIRONMENT}"
       }
+      .labels = ["concourse", "${ENVIRONMENT}"]
+      .environment = "${ENVIRONMENT}"
+      # concourse-web or concourse-worker; the sink's application label is
+      # shared by both node types.
+      .node_application = "${APPLICATION}"
 
   drop_unwanted_logs:
     type: remap
