@@ -17,6 +17,7 @@ from ol_infrastructure.substructure.keycloak.learner_records import (
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_browser_flows,
     create_organization_first_broker_login_flows,
+    create_organization_reset_credentials_flow,
     create_organization_scope,
 )
 from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
@@ -859,15 +860,24 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     ol_browser_flow = create_organization_browser_flows(
         ol_apps_realm.id, "olapps", opts=resource_options
     )
-    # Bind the flow to the olapps realm for browser login.
+    # OL - browser flow [END]
+
+    # OL - reset credentials flow [START]
+    # Denies the forgot-password form to any user with a live IdP link.
+    ol_reset_credentials_flow = create_organization_reset_credentials_flow(
+        ol_apps_realm.id, "olapps", opts=resource_options
+    )
+    # OL - reset credentials flow [END]
+
+    # Bind the flows to the olapps realm.
     keycloak.authentication.Bindings(
         "ol-apps-flow-bindings",
         realm_id=ol_apps_realm.id,
         browser_flow=ol_browser_flow.alias,
         first_broker_login_flow=ol_first_login_flow.alias,
+        reset_credentials_flow=ol_reset_credentials_flow.alias,
         opts=resource_options,
     )
-    # OL - browser flow [END]
     # Ensure organization scope is present
     create_organization_scope(ol_apps_realm.id, "olapps", resource_options)
     # Touchstone SAML [START]
