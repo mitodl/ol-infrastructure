@@ -12,12 +12,13 @@ Nothing in this module may read Pulumi config, a stack reference, or a cloud
 API, so that importing it needs no provider.
 """
 
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
 
 from kubernetes.utils.quantity import parse_quantity
 from pulumi import Output
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from bridge.lib.constants import (
     apisix_oidc_session_cookie_name,
@@ -84,26 +85,9 @@ ENVIRONMENT_VARIABLES = {
 }
 
 
-class CeleryQueue(BaseModel):
-    """A queue the application routes tasks to, and what its worker is given."""
-
-    name: str
-    resource_requests: dict[str, str]
-    resource_limits: dict[str, str]
-
-
-CELERY_QUEUES = [
-    CeleryQueue(
-        name="celery",
-        resource_requests={"cpu": "100m", "memory": "2Gi"},
-        resource_limits={"memory": "2Gi"},
-    ),
-    CeleryQueue(
-        name="hubspot_sync",
-        resource_requests={"cpu": "100m", "memory": "1Gi"},
-        resource_limits={"memory": "1Gi"},
-    ),
-]
+# The queues the application routes tasks to. Routing is app code, so the names
+# are part of the definition; what each worker is given is a binding.
+CELERY_QUEUE_NAMES = ["celery", "hubspot_sync"]
 
 
 class MitxonlineHostnames(BaseModel):
@@ -112,6 +96,62 @@ class MitxonlineHostnames(BaseModel):
     api: str
     frontend: str
     learn_api: str
+
+
+class WorkloadResources(BaseModel):
+    """Requests and limits for one workload, in the component's shape."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    requests: dict[str, str]
+    limits: dict[str, str]
+
+
+class MitxonlineSizing(BaseModel):
+    """Requests and limits per workload. The defaults are the deployed stacks'."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    web: WorkloadResources
+    # Sized on its own rather than inheriting the webapp's limit: two production
+    # migrate runs on 2026-09-28 peaked at 2754MiB and 2766MiB working set, which
+    # the webapp's 2000Mi would OOMKill, and the Deployment waits on this Job.
+    pre_deploy: WorkloadResources = Field(
+        default_factory=lambda: WorkloadResources(
+            requests={"cpu": "250m", "memory": "3Gi"}, limits={"memory": "3Gi"}
+        )
+    )
+    celery_beat: WorkloadResources = Field(
+        default_factory=lambda: WorkloadResources(
+            requests={"cpu": "10m", "memory": "384Mi"}, limits={"memory": "384Mi"}
+        )
+    )
+    celery_queues: dict[str, WorkloadResources] = Field(
+        validate_default=True,
+        default_factory=lambda: {
+            "celery": WorkloadResources(
+                requests={"cpu": "100m", "memory": "2Gi"}, limits={"memory": "2Gi"}
+            ),
+            "hubspot_sync": WorkloadResources(
+                requests={"cpu": "100m", "memory": "1Gi"}, limits={"memory": "1Gi"}
+            ),
+        },
+    )
+
+    @field_validator("celery_queues")
+    @classmethod
+    def _every_queue_once(
+        cls, queues: dict[str, WorkloadResources]
+    ) -> dict[str, WorkloadResources]:
+        expected = set(CELERY_QUEUE_NAMES)
+        if set(queues) != expected:
+            msg = (
+                f"celery_queues must size exactly {sorted(expected)}: "
+                f"missing {sorted(expected - set(queues))}, "
+                f"unknown {sorted(set(queues) - expected)}"
+            )
+            raise ValueError(msg)
+        return queues
 
 
 class ClusterCapabilities(BaseModel):
@@ -154,7 +194,10 @@ class MitxonlineBindings(BaseModel):
     application_image_digest: str | None = None
     cluster: ClusterCapabilities
     min_replicas: int
-    web_memory_limit: str
+    # The deployed stacks pull the published image; a cluster that serves the
+    # app from its own registry names the repository here.
+    image_repository: str = "mitodl/mitxonline-app"
+    sizing: MitxonlineSizing
     granian_worker_startup_rss: int | None = None
     granian_reload: bool = False
     dev_shell: bool = False
@@ -183,36 +226,45 @@ def environment_variables(bindings: MitxonlineBindings) -> dict[str, Any]:
 
 def celery_worker_configs(
     topology: Literal["per-queue", "merged"],
+    sizing: MitxonlineSizing,
 ) -> list[OLApplicationK8sCeleryWorkerConfig]:
     """Return the celery workers for a topology.
 
     :param topology: ``per-queue`` for one Deployment per queue, ``merged`` for
         one Deployment consuming all of them.
+    :param sizing: What each queue's worker is given; a merged worker takes the
+        requests and limits of the queue with the largest memory limit.
     :returns: Worker configs for ``OLApplicationK8sConfig.celery_worker_configs``.
     :rtype: list[OLApplicationK8sCeleryWorkerConfig]
     """
     if topology == "merged":
+
+        def memory_limit(resources: WorkloadResources) -> Decimal:
+            # A queue with no memory limit is unbounded, so it is the largest.
+            limit = resources.limits.get("memory")
+            return Decimal("Infinity") if limit is None else parse_quantity(limit)
+
         largest = max(
-            CELERY_QUEUES,
-            key=lambda queue: parse_quantity(queue.resource_limits["memory"]),
+            (sizing.celery_queues[name] for name in CELERY_QUEUE_NAMES),
+            key=memory_limit,
         )
         return [
             OLApplicationK8sCeleryWorkerConfig(
                 # Explicit because the name lands in the Deployment name and a
                 # label value, where the comma in queue_name is not valid.
                 worker_name="all",
-                queue_name=",".join(queue.name for queue in CELERY_QUEUES),
-                resource_requests=largest.resource_requests,
-                resource_limits=largest.resource_limits,
+                queue_name=",".join(CELERY_QUEUE_NAMES),
+                resource_requests=largest.requests,
+                resource_limits=largest.limits,
             )
         ]
     return [
         OLApplicationK8sCeleryWorkerConfig(
-            queue_name=queue.name,
-            resource_requests=queue.resource_requests,
-            resource_limits=queue.resource_limits,
+            queue_name=name,
+            resource_requests=sizing.celery_queues[name].requests,
+            resource_limits=sizing.celery_queues[name].limits,
         )
-        for queue in CELERY_QUEUES
+        for name in CELERY_QUEUE_NAMES
     ]
 
 
@@ -224,6 +276,7 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
     :rtype: OLApplicationK8sConfig
     """
     cluster = bindings.cluster
+    sizing = bindings.sizing
     return OLApplicationK8sConfig(
         project_root=Path(__file__).parent,
         application_config=environment_variables(bindings),
@@ -236,7 +289,7 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
         env_from_secret_names=bindings.secret_names,
         application_security_group_id=cluster.security_group_id,
         application_security_group_name=cluster.security_group_name,
-        application_image_repository="mitodl/mitxonline-app",
+        application_image_repository=bindings.image_repository,
         application_docker_tag=bindings.application_docker_tag,
         application_image_digest=bindings.application_image_digest,
         application_cmd_array=["uwsgi"],
@@ -287,16 +340,13 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
         pre_deploy_commands=[
             ("migrate", ["python", "manage.py", "migrate", "--noinput"])
         ],
-        # Sized on its own rather than inheriting the webapp's limit: two production
-        # migrate runs on 2026-09-28 peaked at 2754MiB and 2766MiB working set, which
-        # the webapp's 2000Mi would OOMKill, and the Deployment waits on this Job.
-        pre_deploy_resource_requests={"cpu": "250m", "memory": "3Gi"},
-        pre_deploy_resource_limits={"memory": "3Gi"},
+        pre_deploy_resource_requests=sizing.pre_deploy.requests,
+        pre_deploy_resource_limits=sizing.pre_deploy.limits,
         celery_redis_config=bindings.celery_redis,
-        celery_worker_configs=celery_worker_configs(bindings.celery_topology),
+        celery_worker_configs=celery_worker_configs(bindings.celery_topology, sizing),
         celery_beat_config=OLApplicationK8sCeleryBeatConfig(
-            resource_requests={"cpu": "10m", "memory": "384Mi"},
-            resource_limits={"memory": "384Mi"},
+            resource_requests=sizing.celery_beat.requests,
+            resource_limits=sizing.celery_beat.limits,
         ),
         # An unrouted, launch-on-request pod in the app image for developers to
         # run manage.py commands without being OOMKilled or scaled away. Created
@@ -307,8 +357,8 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
         dev_shell_config=OLApplicationK8sDevShellConfig()
         if bindings.dev_shell
         else None,
-        resource_requests={"cpu": "250m", "memory": bindings.web_memory_limit},
-        resource_limits={"memory": bindings.web_memory_limit},
+        resource_requests=sizing.web.requests,
+        resource_limits=sizing.web.limits,
         # Memory is managed vertically by the component's webapp VPA, between the
         # declared limit above and the ceiling below. Horizontal scaling is KEDA-driven,
         # so hpa_scaling_metrics is unused -- the component builds a ScaledObject
