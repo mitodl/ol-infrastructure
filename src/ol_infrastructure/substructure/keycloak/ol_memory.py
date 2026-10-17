@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
-from pulumi import Output, ResourceOptions
+from pulumi import Input, Output, ResourceOptions
 
 AUDIENCE_CLIENT_ID = "ol-memory-client"
 AUDIENCE_SCOPE_NAME = "ol-memory-audience"
@@ -182,16 +182,43 @@ def create_ol_memory_resources(
         ),
     )
 
-    keycloak.openid.ClientOptionalScopes(
+    attach_memory_audience(
         "olapps-learn-ai-client-optional-scopes",
         realm_id=realm_id,
-        client_id=learn_ai_client.id,
-        optional_scopes=[*REALM_DEFAULT_OPTIONAL_SCOPES, audience_scope.name],
-        # Deleting it would detach every listed scope, the realm defaults
-        # included.
-        opts=resource_options.merge(ResourceOptions(retain_on_delete=True)),
+        client=learn_ai_client,
+        audience_scope=audience_scope,
+        resource_options=resource_options,
     )
 
     return OLMemoryScopes(
         audience=audience_scope, learn_ai_audience=learn_ai_audience_scope
+    )
+
+
+def attach_memory_audience(
+    resource_name: str,
+    *,
+    realm_id: Input[str],
+    client: keycloak.openid.Client,
+    audience_scope: keycloak.openid.ClientScope,
+    resource_options: ResourceOptions,
+) -> keycloak.openid.ClientOptionalScopes:
+    """Offer the memory audience to an app client as an optional scope.
+
+    :param resource_name: Pulumi name of the client's optional-scope set.
+    :param realm_id: The client's realm.
+    :param client: The app client.
+    :param audience_scope: The memory audience scope.
+    :param resource_options: Options carrying the Keycloak provider.
+    :returns: The client's optional-scope set.
+    :rtype: keycloak.openid.ClientOptionalScopes
+    """
+    return keycloak.openid.ClientOptionalScopes(
+        resource_name,
+        realm_id=realm_id,
+        client_id=client.id,
+        optional_scopes=[*REALM_DEFAULT_OPTIONAL_SCOPES, audience_scope.name],
+        # Deleting it would detach every listed scope, the realm defaults
+        # included.
+        opts=resource_options.merge(ResourceOptions(retain_on_delete=True)),
     )

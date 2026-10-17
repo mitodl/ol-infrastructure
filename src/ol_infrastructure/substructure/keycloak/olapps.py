@@ -15,7 +15,7 @@ from ol_infrastructure.substructure.keycloak.learner_records import (
     parse_learner_records_clients,
 )
 from ol_infrastructure.substructure.keycloak.ol_memory import (
-    REALM_DEFAULT_OPTIONAL_SCOPES,
+    attach_memory_audience,
     create_ol_memory_resources,
 )
 from ol_infrastructure.substructure.keycloak.org_flows import (
@@ -602,17 +602,12 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             ],
         )
         if ol_memory_scopes:
-            keycloak.openid.ClientOptionalScopes(
+            attach_memory_audience(
                 "olapps-mitlearn-client-optional-scopes",
                 realm_id="olapps",
-                client_id=olapps_mitlearn_client.id,
-                optional_scopes=[
-                    *REALM_DEFAULT_OPTIONAL_SCOPES,
-                    ol_memory_scopes.audience.name,
-                ],
-                # Deleting it would detach every listed scope, the realm
-                # defaults included.
-                opts=resource_options.merge(ResourceOptions(retain_on_delete=True)),
+                client=olapps_mitlearn_client,
+                audience_scope=ol_memory_scopes.audience,
+                resource_options=resource_options,
             )
         olapps_mitlearn_client_roles = keycloak_realm_config.get_object(
             "olapps-mitlearn-client-roles"
