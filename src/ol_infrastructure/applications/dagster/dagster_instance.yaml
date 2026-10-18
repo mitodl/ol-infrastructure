@@ -447,11 +447,24 @@ event_log_storage:
 # rationale there. It is a placeholder rather than a literal because run
 # concurrency has to be sized against the environment's PgBouncer connection
 # budget, and QA's is 5.5x smaller than production's.
+#
+# tag_concurrency_limits caps runs by tag where a pool cannot. Dagster's instance
+# config has no per-pool limit (only pools.default_limit, which would bind every
+# pool at once), so a pool's limit exists only if someone set it by hand.
+#   courseware/model_calls: every run ol-data-platform's courseware_automation_sensor
+#     launches (claim extraction, concept resolution and description, each making
+#     several concurrent model calls and committing to shared Iceberg tables, and
+#     the concept graph, which calls no model but shares those tables).
+#     Promoting a batch of course runs in courseware_extraction_allowlist would
+#     otherwise start one extraction run per course run at once.
 run_coordinator:
   module: dagster.core.run_coordinator
   class: QueuedRunCoordinator
   config:
     max_concurrent_runs: MAX_CONCURRENT_RUNS
+    tag_concurrency_limits:
+    - key: courseware/model_calls
+      limit: 3
 
 # Configures how long Dagster waits for code locations
 # to load before timing out.
