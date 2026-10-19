@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock
 import aiohttp
 import concourse_client as concourse
 import pytest
+from yarl import URL
 
 
 @pytest.fixture(autouse=True)
@@ -356,14 +357,105 @@ async def test_pipeline_is_paused_is_false_when_the_flag_is_absent(monkeypatch):
     assert await concourse.pipeline_is_paused("mit-learn-api-client", "main") is False
 
 
-async def test_active_build_url_reports_the_jobs_unfinished_build(monkeypatch):
-    """Concourse calls the build that has not finished the job's `next_build`."""
-    session = _UrlRecordingSession({"name": "j", "next_build": {"id": 42}})
-    _install(monkeypatch, session)
+class _PagedResponse(_FakeResponse):
+    """A page of the job's build list, linking to the older page if any."""
+
+    def __init__(self, builds, older_to):
+        super().__init__(builds)
+        # Concourse writes its own external URL into the header, which need
+        # not be the URL the bot was configured with.
+        self.links = (
+            {"next": {"url": URL(f"https://elsewhere/builds?to={older_to}&limit=100")}}
+            if older_to is not None
+            else {}
+        )
+
+
+class _PagedSession:
+    """Serves the job's build list one page per GET, recording each request."""
+
+    def __init__(self, pages):
+        self.pages = list(pages)
+        self.requests: list[tuple[str, dict[str, str]]] = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    def get(self, url, *, params, **_kwargs):
+        self.requests.append((url, dict(params)))
+        return _PagedResponse(*self.pages.pop(0))
+
+
+async def test_active_build_url_finds_an_old_rerun_on_a_later_page(monkeypatch):
+    """The case `next_build` misses.
+
+    Concourse 8.3.1 leaves reruns of older builds out of `next_build`, and the
+    build list sorts a rerun beside the build it reruns, so a running rerun of
+    an old build can sit pages behind newer finished builds.
+    """
+    session = _install(
+        monkeypatch,
+        _PagedSession(
+            [
+                (
+                    [{"id": 30, "status": "succeeded"}, {"id": 29, "status": "failed"}],
+                    5,
+                ),
+                ([{"id": 31, "status": "started", "rerun_of": {"id": 5}}], None),
+            ]
+        ),
+    )
     url = await concourse.active_build_url("my-app-pipeline", "build-my-app-image")
+
+    assert url == f"{concourse.CONCOURSE_URL}/builds/31"
+    first, second = session.requests
+    assert first[0] == (
+        f"{concourse.CONCOURSE_URL}/api/v1/teams/{concourse.CONCOURSE_TEAM}"
+        "/pipelines/my-app-pipeline/jobs/build-my-app-image/builds"
+    )
+    assert "to" not in first[1]
+    # The cursor from the header, sent to the configured URL, not the header's.
+    assert second == (first[0], {"limit": "100", "to": "5"})
+
+
+async def test_active_build_url_reports_a_pending_build(monkeypatch):
+    _install(monkeypatch, _PagedSession([([{"id": 42, "status": "pending"}], 41)]))
+    url = await concourse.active_build_url("p", "j")
     assert url == f"{concourse.CONCOURSE_URL}/builds/42"
 
 
-async def test_active_build_url_is_none_when_the_job_is_idle(monkeypatch):
-    _install(monkeypatch, _UrlRecordingSession({"name": "j", "finished_build": {}}))
+async def test_active_build_url_is_none_once_every_page_is_finished(monkeypatch):
+    session = _install(
+        monkeypatch,
+        _PagedSession(
+            [
+                ([{"id": 9, "status": "aborted"}], 8),
+                ([{"id": 8, "status": "errored"}], None),
+            ]
+        ),
+    )
     assert await concourse.active_build_url("p", "j") is None
+    assert len(session.requests) == 2
+
+
+async def test_active_build_url_is_none_for_a_job_that_never_ran(monkeypatch):
+    _install(monkeypatch, _PagedSession([([], None)]))
+    assert await concourse.active_build_url("p", "j") is None
+
+
+async def test_active_build_url_stops_on_a_cursor_that_does_not_move(monkeypatch):
+    """Reading the list holds the app lock, so a stuck cursor must not spin."""
+    _install(
+        monkeypatch,
+        _PagedSession(
+            [
+                ([{"id": 9, "status": "succeeded"}], 8),
+                ([{"id": 8, "status": "succeeded"}], 8),
+            ]
+        ),
+    )
+    with pytest.raises(RuntimeError, match="repeated page"):
+        await concourse.active_build_url("p", "j")

@@ -4,6 +4,7 @@ import asyncio
 import os
 import time
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import aiohttp
 
@@ -129,30 +130,56 @@ async def pipeline_is_paused(pipeline: str, team: str | None = None) -> bool:
     return bool(body.get("paused"))
 
 
+_BUILDS_PAGE_LIMIT = 100
+_ACTIVE_BUILD_STATUSES = frozenset({"pending", "started"})
+
+
+def _older_page_cursor(link: object) -> str | None:
+    """Return the `to` build id of a `Link: rel="next"` URL, or None."""
+    return parse_qs(urlsplit(str(link)).query).get("to", [None])[0]
+
+
 async def active_build_url(
     pipeline: str, job: str, team: str | None = None
 ) -> str | None:
-    """Return the URL of *job*'s pending or running build, or None if idle.
+    """Return the URL of a pending or running build of *job*, or None if idle.
 
-    Concourse reports it as the job's `next_build`: the build that has not
-    finished yet. A job with several in flight reports only one of them,
-    which is all a "is anything running" question needs.
+    Not the job's `next_build`. Concourse 8.3.1 leaves out reruns of any build
+    older than the latest non-rerun one (`updateNextBuildForJob` in
+    atc/db/build.go), so an old rerun can be running while it is empty. The
+    job's build list includes them, but sorts each rerun beside the build it
+    reruns rather than by when it started, so every page is read.
+
+    Pages are followed by the `to` cursor in the `Link: rel="next"` header,
+    sent back to `CONCOURSE_URL` rather than to the URL in the header, so the
+    token only goes where every other call sends it.
+
+    :raises RuntimeError: If the cursor does not move to older builds.
     """
     token = await _get_token()
     url = (
         f"{CONCOURSE_URL}/api/v1/teams/{team or CONCOURSE_TEAM}"
-        f"/pipelines/{pipeline}/jobs/{job}"
+        f"/pipelines/{pipeline}/jobs/{job}/builds"
     )
-    async with (
-        aiohttp.ClientSession() as session,
-        session.get(url, headers={"Authorization": f"Bearer {token}"}) as resp,
-    ):
-        resp.raise_for_status()
-        body = await resp.json()
-    build = body.get("next_build")
-    if not build:
-        return None
-    return f"{CONCOURSE_URL}/builds/{build['id']}"
+    params: dict[str, str] = {"limit": str(_BUILDS_PAGE_LIMIT)}
+    async with aiohttp.ClientSession() as session:
+        while True:
+            async with session.get(
+                url, headers={"Authorization": f"Bearer {token}"}, params=params
+            ) as resp:
+                resp.raise_for_status()
+                builds = await resp.json()
+                older = resp.links.get("next")
+            for build in builds or []:
+                if build.get("status") in _ACTIVE_BUILD_STATUSES:
+                    return f"{CONCOURSE_URL}/builds/{build['id']}"
+            cursor = _older_page_cursor(older["url"]) if older else None
+            if cursor is None:
+                return None
+            if cursor == params.get("to"):
+                msg = f"Build list of {pipeline}/{job} repeated page to={cursor}."
+                raise RuntimeError(msg)
+            params = {"limit": str(_BUILDS_PAGE_LIMIT), "to": cursor}
 
 
 _CHECK_POLL_SECONDS = 2
