@@ -1556,6 +1556,14 @@ async def _milestone_text(app_name, cfg, environment, deployment, client) -> str
         # The milestone still goes out without the link; "what is in this
         # release" is one click worse, not missing.
         log.exception("Failed to find the release issue for %s %s", app_name, version)
+    if issue is None and environment == github.RC_ENVIRONMENT:
+        # Nobody is chased for a release whose issue was not found, and the
+        # version is recorded as announced, so leave a trace.
+        log.warning(
+            "No release issue found for %s %s; its authors were not mentioned",
+            app_name,
+            version,
+        )
     link = f" <{issue['url']}|Release issue>" if issue else ""
     if environment == github.PRODUCTION_ENVIRONMENT:
         return f"🎉 `{app_name}` {version} is live in production.{link}"

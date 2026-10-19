@@ -986,6 +986,18 @@ async def test_rc_announcement_mentions_each_author_with_unchecked_items_once(
     assert "carol" not in text
 
 
+async def test_rc_announcement_cannot_be_made_to_ping_the_channel(
+    repos, slack_app, monkeypatch
+):
+    """A backtick must not close the code span and expose a <!channel> token."""
+    body = "- [ ] **A** (#1) by x`<!channel>`@example.com\n"
+
+    text = await _announce_rc(repos, slack_app, monkeypatch, _issue(body))
+
+    assert "<!channel>" not in text
+    assert "Still waiting on: `x!channel`" in text
+
+
 async def test_rc_announcement_falls_back_to_a_name_without_a_slack_match(
     repos, slack_app, monkeypatch
 ):
