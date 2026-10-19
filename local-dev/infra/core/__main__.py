@@ -162,7 +162,7 @@ k8s_provider_opts: dict[str, Any] = {}
 if kubeconfig_path:
     k8s_provider_opts["kubeconfig"] = kubeconfig_path
 
-k8s_provider = k8s.Provider("k3d-local", **k8s_provider_opts)
+k8s_provider = k8s.Provider("k3d-local", context="local-dev", **k8s_provider_opts)
 _k8s = make_resource_opts(k8s_provider)
 
 # ---------------------------------------------------------------------------

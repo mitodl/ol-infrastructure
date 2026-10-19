@@ -92,7 +92,7 @@ ok "TLS certificates found."
 # kube-system's UID is assigned at bootstrap, so it changes with the cluster.
 # The marker sits under .pulumi so wiping the state wipes the claim too.
 CLUSTER_ID_FILE="${REPO_ROOT}/local-dev/infra/.pulumi/cluster-id"
-live_cluster_id="$(kubectl get namespace kube-system -o jsonpath='{.metadata.uid}' 2>/dev/null)" || true
+live_cluster_id="$(kubectl --context local-dev get namespace kube-system -o jsonpath='{.metadata.uid}' 2>/dev/null)" || true
 
 if [[ -z "${live_cluster_id}" ]]; then
 	warn "Could not read the cluster's identity; skipping the replaced-cluster check."
@@ -172,4 +172,4 @@ log "    ./local-dev/scripts/teardown.sh"
 log ""
 
 # Pass all arguments to tilt up (allows --port, --host, etc.)
-exec tilt up "$@"
+exec tilt up --context local-dev "$@"

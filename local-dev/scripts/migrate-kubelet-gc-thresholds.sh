@@ -16,7 +16,7 @@
 # Usage: ./local-dev/scripts/migrate-kubelet-gc-thresholds.sh
 set -euo pipefail
 
-CTX=k3d-local-dev
+CTX=local-dev
 NODES=(k3d-local-dev-agent-0 k3d-local-dev-agent-1 k3d-local-dev-server-0)
 
 for node in "${NODES[@]}"; do

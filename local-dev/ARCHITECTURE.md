@@ -74,7 +74,7 @@ Kubernetes splits *deciding what should run* from *actually running it*.
 - **Data plane** = the workers (the `agent-*` nodes). Each runs a **kubelet** (takes orders from the control plane) and **containerd** (actually starts and stops containers). Your app pods run here.
 
 ```
-$ kubectl get nodes
+$ kubectl --context local-dev get nodes
 NAME                     ROLES                  ...
 k3d-local-dev-agent-0    <none>                 # worker (data plane)
 k3d-local-dev-agent-1    <none>                 # worker (data plane)
@@ -294,9 +294,9 @@ If you did it by hand, each change would be:
 
 1. `docker build -t mitodl/mit-learn-app --target local-dev .`
 2. `k3d image import mitodl/mit-learn-app -c local-dev` (get the image into the cluster — Tilt instead pushes to the local registry, which transfers only changed layers; `image import` copies every layer into every node each time)
-3. `kubectl rollout restart deploy/mitlearn-webapp -n mit-learn`
-4. `kubectl rollout status deploy/mitlearn-webapp -n mit-learn` (wait for the new pod)
-5. `kubectl logs -f deploy/mitlearn-webapp -n mit-learn` (watch it come up)
+3. `kubectl --context local-dev rollout restart deploy/mitlearn-webapp -n mit-learn`
+4. `kubectl --context local-dev rollout status deploy/mitlearn-webapp -n mit-learn` (wait for the new pod)
+5. `kubectl --context local-dev logs -f deploy/mitlearn-webapp -n mit-learn` (watch it come up)
 
 Tilt collapses all of that into a file-watch + in-container sync, and shows the status/logs in one dashboard. The manual commands are still useful to know for debugging when something is stuck.
 

@@ -1,6 +1,21 @@
 # MIT Learn Stack — Local Development Entry Point
-# Run: tilt up
+# Run: ./local-dev/scripts/start.sh (or tilt up --context local-dev)
 # Docs: local-dev/README.md
+
+# Tilt applies to, and `tilt down` deletes from, the kubeconfig's current
+# context unless --context overrides it. Its own guard stops only contexts it
+# does not recognize as local: an orbstack or docker-desktop context passes it
+# and would receive the stack, while every kubectl command here targets
+# local-dev.
+if k8s_context() != "local-dev":
+    # k8s_context() is empty when no current context is set or the requested
+    # context is not in the kubeconfig.
+    fail(
+        ("Tilt is pointed at kube context '%s', not 'local-dev'." % k8s_context()
+         if k8s_context() else
+         "Tilt has no usable kube context: none is set, or the one requested is not in your kubeconfig.") +
+        "\n  Run ./local-dev/scripts/start.sh, or pass --context local-dev to tilt up / tilt down."
+    )
 
 # ---------------------------------------------------------------------------
 # Developer configuration
@@ -489,7 +504,7 @@ if "data-platform" in enabled_apps:
     ]:
         local_resource(
             name,
-            serve_cmd="while true; do kubectl -n local-infra port-forward svc/{service} {host_port}:{port}; sleep 2; done".format(service=service, host_port=lake_host_ports.get(service, port), port=port),
+            serve_cmd="while true; do kubectl --context local-dev -n local-infra port-forward svc/{service} {host_port}:{port}; sleep 2; done".format(service=service, host_port=lake_host_ports.get(service, port), port=port),
             labels=["infra"],
             resource_deps=["local-infra-core"],
         )
@@ -538,7 +553,7 @@ for app in [a for a in APPS if a["name"] in enabled_apps]:
     #   ./local-dev/scripts/seed.sh --app <app> --cmd <label>
     for seed in app.get("seed_commands", []):
         exec_cmd = (
-            "kubectl exec -n {ns} deploy/{deploy} -- {cmd}".format(
+            "kubectl --context local-dev exec -n {ns} deploy/{deploy} -- {cmd}".format(
                 ns=app["namespace"],
                 deploy=app["deploy_name"],
                 cmd=seed["cmd"],
