@@ -9,7 +9,7 @@ CONSUL_VERSION = "2.1.0"
 # renovate: datasource=github-releases depName=dagger packageName=dagger/dagger
 DAGGER_VERSION = "v0.21.11"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
-KEYCLOAK_VERSION = "26.7.4"
+KEYCLOAK_VERSION = "26.8.1"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
 LEEK_VERSION = "0.7.7"
 # renovate: datasource=docker depName=meilisearch packageName=getmeili/meilisearch
@@ -111,7 +111,7 @@ NGINX_VERSION = "1.31.8"
 # renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
 PROMETHEUS_OPERATOR_CRD_VERSION = "v0.94.2"
 # renovate: datasource=github-tags depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
-KEYCLOAK_OPERATOR_CRD_VERSION = "26.7.4"
+KEYCLOAK_OPERATOR_CRD_VERSION = "26.8.1"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
 JUPYTERHUB_CHART_VERSION = "4.4.4"
 # renovate: datasource=github-releases depName=marimo-operator packageName=marimo-team/marimo-operator
