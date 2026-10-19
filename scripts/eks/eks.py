@@ -31,7 +31,7 @@ AWS_DEFAULT_REGION = "us-east-1"
 CACHE_DIR = Path.home() / ".cache" / "ol-infrastructure" / "eks"
 EXEC_DEBUG_LOG_PATH = CACHE_DIR / "exec-debug.log"
 EXEC_DEBUG_ENV_VAR = "OL_EKS_DEBUG_EXEC"
-KUBECONFIG_DEFAULT_PATH = Path.home() / ".kube" / "config"
+KUBECONFIG_DEFAULT_PATH = Path.home() / ".kube" / "ol-eks.yaml"
 OIDC_CALLBACK_PORT = 8250
 # The caller holds the Vault token and AWS credential cache locks while it waits
 # for the browser login, so any other eks.py run that needs fresh credentials for
@@ -784,6 +784,9 @@ def setup(
     print(
         f"  Current context    : {current_context or 'none'}"
         + ("" if current_context else " (pass --context <cluster> to kubectl)")
+    )
+    print(
+        f"  Use with           : KUBECONFIG={output_path} kubectl --context <cluster> ..."
     )
 
 
