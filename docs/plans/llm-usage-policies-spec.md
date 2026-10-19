@@ -51,8 +51,10 @@ In phase one:
   `model`, `environment`). Dollars are computed in Prometheus from those counters and a
   price table kept with the model catalog (§2), joined on `provider` and `model` because
   catalog ids are `provider:model` and the same model name can carry a different price from
-  another provider (OpenAI direct vs. Azure OpenAI). Grafana alerts go to Rootly at 50, 80,
-  and 100 percent of a monthly figure per app once the baseline supplies one.
+  another provider (OpenAI direct vs. Azure OpenAI). A model the catalog does not list has no
+  price there, and a `group_left` join drops its tokens silently, so the spend
+  dashboard must report unpriced tokens separately (§2.2 item 3). Grafana alerts go to
+  Rootly at 50, 80, and 100 percent of a monthly figure per app once the baseline supplies one.
 - Vendor invoices are the accounting record and are reconciled monthly. Opik's per-trace cost
   is a debugging aid, not a ledger.
 - What already bounds usage stays: learn-ai's per-user request throttles, Celery rate limits,
@@ -116,21 +118,34 @@ to an Opik pricing provider by hand (`ml/resources/opik_auth.py:206-213`).
 
 ### 2.2 Decision
 
-Decided 2026-10-01: items 1 to 7 below.
+Decided 2026-10-01: items 1 to 7 below. Items 2, 3, and 6 amended 2026-10-19: the catalog is a
+record of each model's status and price, not an allowlist. Requiring an entry before a model
+could be called tied every new model to an `ol-llm` pull request, a release, and a Renovate bump
+in each app, which is slower than models change.
 
 1. One catalog, a data file in the `ol-llm` repository, released with the library. Each entry
    has the id in PydanticAI form (`provider:model`), the route (a gateway route or direct,
    and whether that route falls back on its own), a status (`allowed`, `deprecated` with a
    retirement date, `retired`), whether the id is pinned or a floating alias, the name Opik
    prices it under, and input and output prices.
-2. `build_model` accepts only catalog ids. A deprecated id works and tags the trace; a retired
-   id raises at build time. App-side lists (learn-ai's `LLMModel` rows, mit-learn's
-   configuration rows) hold catalog ids and are checked against the catalog in CI.
+2. `build_model` builds an id the catalog does not list and logs a warning, and a run through
+   the library's entry points tags its trace `model_status:uncataloged`. A deprecated id works
+   and the run's trace is tagged `model_status:deprecated`; a retired id, or one not in
+   `provider:model` form, raises at build time. App-side lists (learn-ai's `LLMModel` rows,
+   mit-learn's configuration rows) are checked against the catalog in CI, which fails on a
+   retired or malformed id and warns on a deprecated or unlisted one.
 3. Adding or changing an entry is a pull request to `ol-llm`, approved by the catalog owner
    (§6). It needs: the provider covered by the data-handling policy (§3) once that exists, a price in
    `genai-prices` and in Opik or added to both, and for a use case switching to it, an
    evaluation run (lifecycle spec §5; while that use case's gate is advisory the run informs
-   the review and does not block it).
+   the review and does not block it). The entry is a record, not a gate on first use: a model
+   can run in production before it has one. Until it does, its tokens have no price in the
+   spend rules (§1.2). The spend dashboard and alerts
+   (`tk-decide-the-cost-source-of-truth-and-build-the-ll-b9fbda`, not built yet) must show
+   unpriced tokens by app and model and alert on them, so a model that stays in use gets an
+   entry. When the data-handling
+   policy or a blocking evaluation gate is adopted, it needs its own check on uncataloged
+   models (e.g. an Opik rule on the tag), because the catalog no longer stops the call.
 4. Floating aliases (`mistral-large-latest`) and preview models (`gemini-3-pro-preview`) are
    allowed for any use case. The catalog records that an id floats, because such a model can
    change behavior with no catalog change and no evaluation. Restricting them to
@@ -138,12 +153,14 @@ Decided 2026-10-01: items 1 to 7 below.
 5. Bedrock entries use inference-profile ids, since that is what the IAM policies grant and
    what the callers send.
 6. Deprecation reaches apps as a library release through Renovate. Retirement is a release
-   that fails CI for any app still naming the id.
+   that fails CI for any app still naming the id. A new model needs no release.
 7. The initial catalog is the §2.1 table. The stale learn-ai seed rows are not carried over.
 
 The alternatives considered were the gateway's route configuration (it cannot describe traffic that
 bypasses the gateway), Opik (it has no such object), and a catalog service (a new thing to
-run for a list that changes a few times a year).
+run for a list that changes a few times a year). The 2026-10-19 amendment kept the released
+data file: with unlisted ids building, a release is needed to price, deprecate, or retire a
+model, not to call one.
 
 
 ## 3. Data handling and retention
