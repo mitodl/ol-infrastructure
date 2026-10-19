@@ -21,3 +21,7 @@ data:
   NEXT_PUBLIC_MITX_ONLINE_BASE_URL: "https://api.learn.mit.dev/mitxonline"
   NEXT_PUBLIC_MITX_ONLINE_LEGACY_BASE_URL: "https://mitxonline.mit.dev"
   NEXT_PUBLIC_MITX_ONLINE_CSRF_COOKIE_NAME: "csrf_mitxonline"
+  # learn-ai chat endpoints. Unset, the chat widgets POST to learn.mit.dev/api/chat and 404.
+  NEXT_PUBLIC_LEARN_AI_RECOMMENDATION_ENDPOINT: "https://ai.learn.mit.dev/http/recommendation_agent/"
+  NEXT_PUBLIC_LEARN_AI_SYLLABUS_ENDPOINT: "https://ai.learn.mit.dev/http/syllabus_agent/"
+  NEXT_PUBLIC_LEARN_AI_SEARCH_SUMMARY_ENDPOINT: "https://ai.learn.mit.dev/http/search_summary_agent/"
