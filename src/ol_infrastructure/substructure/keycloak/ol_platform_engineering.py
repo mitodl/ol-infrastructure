@@ -274,11 +274,12 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     # Revisit if Keycloak's upstream CIMD work (Client ID Metadata Document,
     # tracked alongside RFC 8707 resource indicators in
     # https://github.com/keycloak/keycloak/issues/51413, explicitly scoped for
-    # "AI tools like Claude and ChatGPT", targeted at milestone 26.8.0 — not
-    # shipped as of KEYCLOAK_VERSION 26.7.2) lands AND MCP client tooling adopts
-    # it: CIMD resolves a client_id as a URL the client hosts itself rather than
-    # a value Keycloak persists from an anonymous write, which is a genuinely
-    # different, spam-resistant trust model — unlike an Initial Access Token,
+    # "AI tools like Claude and ChatGPT"; shipped in 26.8 as the experimental
+    # `cimd` feature, which our image build does not enable) is supported AND
+    # MCP client tooling adopts it: CIMD resolves a client_id as a URL the
+    # client hosts itself rather than a value Keycloak persists from an
+    # anonymous write, which is a genuinely different, spam-resistant trust
+    # model — unlike an Initial Access Token,
     # not just a reframing of the same static-client tradeoff.
     if stack_info.env_suffix == "production":
         toolhive_swe_resource_url = "https://toolhive-swe.ol.mit.edu"
@@ -326,10 +327,9 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
-    # Keycloak 26.7.2 (this repo's pinned KEYCLOAK_VERSION) does not implement RFC
-    # 8707 resource indicators — confirmed via the upstream keycloak/keycloak issue
-    # tracker (#51413), where support is tracked as in-progress for milestone
-    # 26.8.0, not yet shipped. So the token minted for this client carries no
+    # Keycloak ships RFC 8707 resource indicators only as the experimental
+    # `resource-indicators` feature (26.8, keycloak/keycloak#51413), which our
+    # image build does not enable. So the token minted for this client carries no
     # `aud` matching the vMCP's resource URL unless stamped in explicitly. Because
     # this is a single Pulumi-managed client (unlike the DCR design this replaced,
     # which had no fixed client_id to attach a mapper to), that stamping is a
@@ -535,9 +535,9 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     # here too. CIMD is additionally not viable yet regardless of that
     # tradeoff: it needs RFC 8707 resource indicators to stamp `aud: witan`
     # onto a token minted for a client Keycloak provisions on the fly, and
-    # that combination is tracked as unshipped, target milestone 26.8.0
-    # (keycloak/keycloak#51413) — not available as of KEYCLOAK_VERSION
-    # 26.7.2. Revisit once that lands; until then a static client is the
+    # both shipped in 26.8 only as experimental features
+    # (keycloak/keycloak#51413) that our image build does not enable.
+    # Revisit once they are supported; until then a static client is the
     # only way to get `aud: witan` onto a desktop app's token at all.
     ol_platform_engineering_witan_desktop_client = keycloak.openid.Client(
         "ol-platform-engineering-witan-desktop-client",
