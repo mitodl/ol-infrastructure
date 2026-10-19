@@ -1773,3 +1773,42 @@ def test_cors_origins_are_not_required_without_defaults():
     )
 
     assert config.cors_allow_origins is None
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "**",
+        "*",
+        "null",
+        "https://learn.mit.edu/",
+        "https://learn.mit.edu/learn",
+        "https://Learn.mit.edu",
+        "learn.mit.edu",
+        "https://*.mit.edu",
+    ],
+)
+def test_cors_origins_must_be_bare_origins(origin):
+    """APISIX matches allow_origins by exact equality with the Origin header, so
+    a wildcard brings back reflect-any with credentials and anything with a path
+    or upper case never matches and silently blocks that frontend.
+    """
+    with pytest.raises(ValidationError, match="must be bare origins"):
+        OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+            cors_allow_origins=["https://ocw.mit.edu", origin],
+        )
+
+
+def test_cors_origins_accept_a_port_and_plain_http():
+    config = OLApisixSharedPluginsConfig(
+        application_name="myapp",
+        k8s_namespace="myapp-ns",
+        cors_allow_origins=["http://localhost:8063", "https://api.ci.learn.mit.edu"],
+    )
+
+    assert config.cors_allow_origins == [
+        "http://localhost:8063",
+        "https://api.ci.learn.mit.edu",
+    ]
