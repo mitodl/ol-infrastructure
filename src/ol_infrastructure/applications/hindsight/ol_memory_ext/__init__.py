@@ -146,11 +146,10 @@ _PRECHECK_REFUSED = {
 # It goes on every table with a bank_id except bookkeeping: the operation log,
 # audit log and stats cache the forget sequence writes, and the maintenance
 # queues a note delete writes. A content table added by a later migration is
-# covered without a change here; it is reapplied on every start. In public,
-# beside Hindsight's own tables, because the deployed role can create tables and
-# triggers there but not schemas. The lock timeout keeps the DDL, which locks
-# each table, from queueing behind long writes and stalling the request that
-# runs it; it fails and is retried on the next use instead.
+# covered without a change here; it is reapplied on every start. The fence table
+# sits in public, beside the tables it guards. The lock timeout keeps the DDL,
+# which locks each table, from queueing behind long writes and stalling the
+# request that runs it; it fails and is retried on the next use instead.
 _FENCE_SCHEMA_SQL = """
 SET lock_timeout = '5s';
 CREATE TABLE IF NOT EXISTS public.ol_memory_bank_fence (
