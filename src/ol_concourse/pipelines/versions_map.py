@@ -75,6 +75,7 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/keycloak/": ["KEYCLOAK_OPERATOR_CRD_VERSION"],
     "applications/kubewatch/": ["KUBEWATCH_CHART_VERSION"],
     "applications/kubewatch_webhook_handler/": [],
+    "applications/label_studio/": ["LABEL_STUDIO_CHART_VERSION"],
     "applications/learn_ai/": ["NGINX_VERSION"],
     "applications/mailgun/": [],
     "applications/marimo_data/": [],

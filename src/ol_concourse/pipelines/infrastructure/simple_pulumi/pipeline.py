@@ -499,6 +499,18 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
+    "label-studio": SimplePulumiParams(
+        app_name="label-studio",
+        pulumi_project_path="applications/label_studio/",
+        pulumi_project_name="ol-application-label-studio",
+        description=(
+            "Deploys Label Studio Community, the annotation tool for the "
+            "courseware gold set, via Pulumi."
+        ),
+        category="data-platform",
+        stages=["QA"],
+        topology="preview-gated",
+    ),
     "marimo-data": SimplePulumiParams(
         app_name="marimo-data",
         pulumi_project_path="applications/marimo_data/",
