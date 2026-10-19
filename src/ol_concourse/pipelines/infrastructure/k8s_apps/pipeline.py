@@ -1806,10 +1806,10 @@ def _build_release_resource_app_pipeline(
         #
         # Deliberately NOT wrapped in a `try`. It used to be, because this job
         # can be retriggered by an infra-only merge (QA re-runs on any change
-        # under the watched Pulumi paths, and its release_issue put edits the
-        # already-closed release_gate issue, which Concourse's version="every"
-        # get treats as a new trigger here) with no new app release -- and
-        # finish then failed trying to fetch a release branch that a prior
+        # under the watched Pulumi paths and opens a fresh release_gate issue
+        # for the same version once the earlier one is closed; closing that
+        # one is a new trigger for Concourse's version="every" get here) with
+        # no new app release -- and finish then failed trying to fetch a release branch that a prior
         # finish had already deleted. The release resource now no-ops in that
         # case instead of failing, so the `try` buys nothing and costs
         # everything: it equally swallowed *genuine* finish failures. That is
