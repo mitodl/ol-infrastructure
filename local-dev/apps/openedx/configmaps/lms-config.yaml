@@ -107,6 +107,12 @@ data:
   # step entirely when this key is absent -- which is how lehrer standalone,
   # with no upstream to accept enrollments from, declines it.
   #
-  # Without it mitxonline's enrollment push fails silently: the learner is
-  # enrolled in mitxonline with edx_enrolled=False and simply has no courseware.
-  OPENEDX_SERVICE_WORKER_API_TOKEN: "local-dev-openedx-service-worker-token" # pragma: allowlist secret
+  # Without it -- or with a value that does not match mitxonline's --
+  # mitxonline's enrollment push fails authentication silently: the learner is
+  # enrolled in mitxonline with edx_enrolled=False and simply has no courseware,
+  # even though login succeeded.
+  #
+  # The literal is mitxonline's, verbatim. It is named "stub" there from when
+  # there was no local LMS to accept an enrollment; it is a working token now,
+  # and the two sides have to stay in lockstep.
+  OPENEDX_SERVICE_WORKER_API_TOKEN: "local-dev-stub-token" # pragma: allowlist secret
