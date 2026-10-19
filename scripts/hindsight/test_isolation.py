@@ -741,6 +741,26 @@ async def test_store_refuses_a_write_to_a_forgotten_bank_from_any_writer(seeded)
     await connection.close()
 
 
+async def test_forget_prunes_expired_fences(seeded):
+    """A forget clears fences that have expired, so no bank id outlives one."""
+    a, _, _, _ = seeded
+    stale = bank_for(str(uuid.uuid4()))
+    connection = await asyncpg.connect(SUPERUSER_DSN)
+    await connection.execute(
+        "INSERT INTO ol_memory_bank_fence VALUES ($1, now() - interval '1 minute')",
+        stale,
+    )
+    forget = ForgetClient(BASE, admin_token())
+    await forget.forget_user(a.id)
+    await forget.aclose()
+    remaining = await connection.fetch(
+        "SELECT bank_id FROM ol_memory_bank_fence WHERE bank_id = ANY($1::text[])",
+        [stale, bank_for(a.id)],
+    )
+    await connection.close()
+    assert [row["bank_id"] for row in remaining] == [bank_for(a.id)]
+
+
 @pytest.mark.parametrize("delay", [0.0, 0.1, 0.3, 0.5, 0.8, 1.0, 1.5, 2.0, 3.0, 5.0])
 async def test_forget_with_async_retain_in_flight_leaves_nothing(delay):
     """Forget racing an async retain leaves no rows behind."""

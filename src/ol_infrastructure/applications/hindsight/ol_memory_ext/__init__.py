@@ -494,9 +494,15 @@ class LearnerBankValidator(OperationValidatorExtension):
             bank_id,
         )
 
+    # Expired fences are pruned on the way, so a forgotten learner's bank id does
+    # not outlive the fence. The bank being fenced is left to the upsert.
     async def _raise_fence(self, bank_id: str) -> None:
         await (await self._db()).execute(
             """
+            WITH expired AS (
+                DELETE FROM public.ol_memory_bank_fence
+                WHERE fenced_until <= now() AND bank_id <> $1
+            )
             INSERT INTO public.ol_memory_bank_fence (bank_id, fenced_until)
             VALUES ($1, now() + $2)
             ON CONFLICT (bank_id) DO UPDATE SET fenced_until = EXCLUDED.fenced_until
