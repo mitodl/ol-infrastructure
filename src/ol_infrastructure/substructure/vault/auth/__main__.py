@@ -195,6 +195,28 @@ aws.AuthBackendRole(
     opts=ResourceOptions(delete_before_replace=True),
 )
 
+# AWS secrets engine that issues IAM users and STS credentials for applications and
+# the shared EKS roles below. It authenticates with the Vault server's instance
+# profile. The endpoints need an explicit https:// scheme: Vault 2.2.0's
+# aws-sdk-go-v2 client treats a bare hostname as a URL path and fails every call.
+# Lease TTLs and listing visibility differ per environment and are left as tuned.
+# Deleting this mount would revoke every lease it has issued, so it is protected
+# and retained.
+aws_mitx_secrets_backend = aws.SecretBackend(
+    "vault-aws-mitx-secrets-backend",
+    path="aws-mitx",
+    description="Backend to dynamically create IAM credentials",
+    region=aws_config.region,
+    iam_endpoint="https://iam.amazonaws.com",
+    sts_endpoint="https://sts.amazonaws.com",
+    opts=ResourceOptions(
+        import_="aws-mitx",
+        protect=True,
+        retain_on_delete=True,
+        ignore_changes=["listingVisibility"],
+    ),
+)
+
 # These are the shared roles assumed by users via Vault-generated AWS credentials
 if stack_info.name == "Production":
     shared_assume_role_policy = vault_stack.require_output("vault_server").apply(
@@ -248,7 +270,7 @@ if stack_info.name == "Production":
     aws.SecretBackendRole(
         "eks-cluster-shared-readonly-role-vault-backend-role",
         name="eks-cluster-shared-readonly-role",
-        backend="aws-mitx",
+        backend=aws_mitx_secrets_backend.path,
         credential_type="assumed_role",
         default_sts_ttl=EIGHT_HOURS_SECONDS,
         max_sts_ttl=EIGHT_HOURS_SECONDS,
@@ -272,7 +294,7 @@ if stack_info.name == "Production":
     aws.SecretBackendRole(
         "eks-cluster-shared-developer-role-vault-backend-role",
         name="eks-cluster-shared-developer-role",
-        backend="aws-mitx",
+        backend=aws_mitx_secrets_backend.path,
         credential_type="assumed_role",
         default_sts_ttl=EIGHT_HOURS_SECONDS,
         max_sts_ttl=EIGHT_HOURS_SECONDS,
