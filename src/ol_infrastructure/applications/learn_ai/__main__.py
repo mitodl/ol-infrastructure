@@ -1082,19 +1082,21 @@ learn_ai_deployment_envfrom = [
 # This shared config is attached to routes on both of learn-ai's hosts (the
 # legacy api-learn-ai.ol.mit.edu and the /ai/* paths on
 # api.<env>.learn.mit.edu), so it has to cover every frontend that calls either
-# one: learn-ai's own UI, and mit-learn, which embeds the chat widget.
+# one: learn-ai's own UI and hosts, plus every other frontend that embeds the
+# chat widget, listed per stack in cors_frontend_origins: mit-learn, and each
+# Open edX LMS whose ol-openedx-chat aside calls /ai/* on
+# api.<env>.learn.mit.edu from the learning MFE.
 #
-# Derived from the domains rather than read out of the stack's
-# CSRF_ALLOWED_ORIGINS -- that list names the same four origins on QA and
-# Production but omits the learn.mit.edu pair on CI, even though learn-ai serves
-# api.ci.learn.mit.edu there. The gateway's headers are what the browser
-# enforces, so a gap here silently breaks the widget rather than Django's CSRF
-# check.
+# Not read out of the stack's CSRF_ALLOWED_ORIGINS -- that list names the same
+# four origins on QA and Production but omits the learn.mit.edu pair on CI, even
+# though learn-ai serves api.ci.learn.mit.edu there. The gateway's headers are
+# what the browser enforces, so a gap here silently breaks the widget rather
+# than Django's CSRF check.
 learn_ai_cors_allow_origins = [
     f"https://{learn_ai_frontend_domain}",
     f"https://{learn_ai_config.require('backend_domain')}",
     f"https://{learn_ai_config.require('learn_backend_domain')}",
-    f"https://{learn_ai_config.require('learn_backend_domain').removeprefix('api.')}",
+    *learn_ai_config.require_object("cors_frontend_origins"),
 ]
 
 # Instantiate shared plugins component

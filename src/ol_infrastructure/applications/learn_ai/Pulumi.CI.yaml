@@ -4,6 +4,14 @@ encryptedkey: AQICAHi3MZ/Pjy2dahB1Qm+zKkKDPV1b9MYPGp7k649HPjmOHAGzwYvKdv8btlpNoW
 config:
   aws:region: us-east-1
   learn_ai:backend_domain: "api-learn-ai-ci.ol.mit.edu"
+  # Browser origins outside learn-ai's own hosts that call it with credentials.
+  # The gateway's cors plugin answers for all of them (see __main__.py).
+  learn_ai:cors_frontend_origins:
+  - "https://ci.learn.mit.edu"   # MIT Learn, which embeds the chat widget
+  - "https://courses.ci.learn.mit.edu"   # MITx Online LMS: ol-openedx-chat (AskTIM) in the learning MFE
+  - "https://lms-ci.mitx.mit.edu"   # MITx LMS: ol-openedx-chat
+  - "https://staging-ci.mitx.mit.edu"   # MITx Staging LMS: ol-openedx-chat
+  - "https://courses-ci.xpro.mit.edu"   # xPRO LMS: ol-openedx-chat
   learn_ai:db_password:
     secure: v1:LPQWUf68siLqkk30:JHBZ8gREGp0fRcAWH4ER7ExID5d3LVbn8BoFZ8o7tOBj43Jf+Jqh2c9acA/im/p9+W4c15appQNpC1hMHo4+hrIks3UIhC8a8+SV6GzO908=
   learn_ai:enable_azure_openai: true
