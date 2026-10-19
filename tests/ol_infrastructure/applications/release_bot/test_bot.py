@@ -333,25 +333,41 @@ async def test_release_refuses_when_the_running_build_lookup_fails(
     assert "Refusing to trigger" in slack.said
 
 
-async def test_release_supersede_is_not_blocked_by_the_release_that_is_running(
+async def test_release_supersede_waits_for_a_running_release_build(
     repos, slack, monkeypatch
 ):
-    """With a branch in flight the confirmation is the guard, not the build."""
+    """A confirmation does not skip the running-build check.
+
+    Two `supersede 2026.8.3.1` commands sent before the first replacement build
+    reaches `create`: GitHub still shows 2026.8.3.1 in flight, so both
+    confirmations match. The first one's build is pending in Concourse by the
+    time the second command gets the app lock, and it must refuse, or its
+    create would supersede the first build's new release without asking.
+    """
     monkeypatch.setattr(
         bot.github, "in_flight_release", AsyncMock(return_value=_stale_in_flight())
     )
-    running = AsyncMock(return_value="http://ci/builds/7")
+    builds: list[str] = []
+    running = AsyncMock(side_effect=lambda *_a: builds[-1] if builds else None)
     monkeypatch.setattr(bot.concourse, "active_build_url", running)
     monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
-    trigger = AsyncMock(return_value="http://build/1")
+
+    async def _trigger(*_a):
+        builds.append("http://ci/builds/7")
+        return builds[-1]
+
+    trigger = AsyncMock(side_effect=_trigger)
     monkeypatch.setattr(bot.concourse, "trigger_job", trigger)
+    confirm = _command("my-app supersede 2026.8.3.1")
 
-    await bot._cmd_release(
-        repos, slack.ack, slack.respond, _command("my-app supersede 2026.8.3.1"), {}
-    )
+    await bot._cmd_release(repos, slack.ack, slack.respond, confirm, {})
+    await bot._cmd_release(repos, slack.ack, slack.respond, confirm, {})
 
-    running.assert_not_called()
     trigger.assert_awaited_once()
+    assert running.await_count == 2
+    refusal = slack.respond.call_args
+    assert "already running: http://ci/builds/7" in refusal.args[0]
+    assert refusal.kwargs["response_type"] == "ephemeral"
 
 
 async def test_release_rejects_an_unknown_app(repos, slack, monkeypatch):

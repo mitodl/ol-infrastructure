@@ -309,32 +309,36 @@ async def _guard_release_start(
             f"• `/doof abandon {app_name}` drops it without a new release",
         )
         return False, None
-    if in_flight is None:
-        # The release branch only appears when the build reaches
-        # `action: create`, so a second `/doof release` typed right after the
-        # first finds nothing in flight -- and its create supersedes the first.
-        job = f"build-{app_name}-release-image"
-        try:
-            running = await concourse.active_build_url(cfg.pipeline, job)
-        except Exception:
-            log.exception("Failed to check for a running release build: %s", app_name)
-            await _refuse(
-                respond,
-                f"❌ Could not check whether a release build for `{app_name}` is "
-                "already running. Refusing to trigger — a second one would "
-                "supersede the first.",
-            )
-            return False, None
-        if running:
-            await _refuse(
-                respond,
-                f"🚧 A release build for `{app_name}` is already running: "
-                f"{running}. It has not cut its release branch yet, so a second "
-                "release now would supersede it. Try again once it has (see "
-                f"`/doof release-status {app_name}`), or abort the build in "
-                "Concourse if it is stuck.",
-            )
-            return False, None
+    # The release branch only appears when the build reaches `action: create`,
+    # so GitHub cannot see a release that has been triggered but not cut. A
+    # second `/doof release` typed right after the first finds nothing in
+    # flight, and a second `supersede <version>` still finds the release the
+    # first one is replacing; either way its create supersedes the first
+    # build's cut without asking, so this is checked after a confirmation too.
+    # `_app_lock` serializes the commands, and the first one's build exists
+    # (pending) before the lock is released, so the second one sees it.
+    job = f"build-{app_name}-release-image"
+    try:
+        running = await concourse.active_build_url(cfg.pipeline, job)
+    except Exception:
+        log.exception("Failed to check for a running release build: %s", app_name)
+        await _refuse(
+            respond,
+            f"❌ Could not check whether a release build for `{app_name}` is "
+            "already running. Refusing to trigger — a second one would "
+            "supersede whatever the first one cuts.",
+        )
+        return False, None
+    if running:
+        await _refuse(
+            respond,
+            f"🚧 A release build for `{app_name}` is already running: "
+            f"{running}. A release started now would supersede whatever it cuts, "
+            "without asking. Try again once it finishes (see "
+            f"`/doof release-status {app_name}`), or abort the build in "
+            "Concourse if it is stuck.",
+        )
+        return False, None
     return True, in_flight
 
 
