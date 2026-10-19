@@ -180,6 +180,14 @@ else:
             "dagger --progress=plain call mfe build-legacy-configured" +
             " --slot-config " + _mfe_slot_config +
             " --release-name master" +
+            # build-legacy-configured defaults node_version to 20
+            # (lehrer src/lehrer/core/mfe.py) and does not derive it from
+            # --release-name. The master release is Node 24
+            # (OpenEdxSupportedRelease.master, src/bridge/settings/openedx/
+            # types.py), which is also what frontend-app-learning's .nvmrc
+            # asks for, so pass it explicitly or the local build runs on a
+            # runtime production never uses.
+            " --node-version 24" +
             " --mfe-name learning" +
             " --mfe-repo https://github.com/openedx/frontend-app-learning" +
             " --mfe-branch master" +
