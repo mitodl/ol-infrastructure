@@ -189,11 +189,17 @@ else:
         # Below here: required by the header/footer components via
         # frontend-platform's ensureConfig, which only logs -- these do not
         # break the app, they just fill the console with "App configuration
-        # error: X is required by Y" and render a degraded footer. Production
-        # supplies all of them from the same pipeline.py.
-        "SUPPORT_EMAIL=mitlearn-support@mit.edu",
+        # error: X is required by Y" and render a degraded footer.
+        #
+        # All of them come from mfe_params() in
+        # ol_concourse/pipelines/open_edx/mfe/pipeline.py in production except
+        # SUPPORT_EMAIL and ENABLE_ACCESSIBILITY_PAGE, which have no entry
+        # there and are set here only to quiet those two warnings locally.
+        # Treat those two as local-only, not as a record of what production
+        # sends.
+        "SUPPORT_EMAIL=mitlearn-support@mit.edu",  # local-only, not in mfe_params()
         "SUPPORT_URL=https://mitxonline." + _rd + "/support",
-        "ENABLE_ACCESSIBILITY_PAGE=true",
+        "ENABLE_ACCESSIBILITY_PAGE=true",  # local-only, not in mfe_params()
         "ACCESSIBILITY_URL=https://accessibility.mit.edu/",
         "TERMS_OF_SERVICE_URL=https://mitxonline." + _rd + "/terms",
         "PRIVACY_POLICY_URL=https://mitxonline." + _rd + "/privacy",
