@@ -559,6 +559,21 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
                 "name": "spi-events-listener--jboss-logging--success-level",
                 "value": "info",
             },
+            # 26.8 deprecates "Full scope allowed" and logs a WARN on every
+            # token issuance for each client that has it on, which is every
+            # client we manage. Silence that category until the clients move to
+            # explicit scope mappings. This has to go through the list form of
+            # log-level: the operator passes options as KC_* env vars, and the
+            # log-level-<category> form loses the category's case and hyphens
+            # on the way back from the env var.
+            {
+                "name": "log-level",
+                "value": (
+                    "info,"
+                    "org.keycloak.protocol.oidc.endpoints.TokenEndpoint"
+                    ".full-scope-allowed:error"
+                ),
+            },
         ],
         "tracing": tracing_config,
         "hostname": {
