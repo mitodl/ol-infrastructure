@@ -31,8 +31,8 @@ finishes, for every witan user. The command is in the server image (agent-kit
 2. takes the `omnigraph-unlock` Lease, scales `omnigraph-server` to 0 and
    waits for its pods to exit;
 3. force-unlocks the `serve` lock the server left;
-4. runs `optimize` on every graph in `cluster.yaml`, and on
-   `omnigraph:cleanup_iso_weekday` (default 7, Sunday) also
+4. runs `optimize` on every graph in `cluster.yaml`, then on the days in
+   `omnigraph:cleanup_iso_weekdays` (default every day) also
    `cleanup --older-than <cleanup_older_than>`, force-unlocking after each;
 5. scales the Deployment back to the replica count it found and releases the
    Lease.
@@ -41,8 +41,14 @@ No new command starts after 25 minutes, a single command is stopped after 10,
 and the Job's deadline is 36 minutes, so the window is over before the CI
 indexer's 04:00 run. Graphs it did not reach are named in the log and fail the
 Job, and nothing is left locked. Every graph is optimized before any is
-cleaned, and the cleanup pass starts at a different graph each week, so a
-window that runs out delays a graph's cleanup to a later week.
+cleaned, and the cleanup pass starts at a different graph each night, so a
+window that runs out delays a graph's cleanup to a later night. That does not
+help a graph whose cleanup alone takes more than 10 minutes. Cleanup plans
+every version present before it deletes any, so a run stopped by the timeout
+deletes nothing, and that graph is stopped every night, never cleaned, and its
+backlog grows. Clear it once with [a longer
+run](#clearing-a-cleanup-backlog), and see "Why retention is an age, not a
+version count" for why nightly at 2d keeps it from coming back.
 
 The council probe does not run between 03:00 and 03:59 on this format. Its
 04:00 run is the check that the window ended, so a failed
@@ -100,6 +106,51 @@ To recover:
 The next night's window skips while the Deployment is at 0, so this does not
 heal on its own.
 
+### Clearing a cleanup backlog
+
+A graph whose cleanup log says `` `omnigraph cleanup ... --graph <id> ...` did
+not finish in 600s `` night after night has more versions than one command can
+plan. Size it before you schedule the run. A cleanup costs about 0.14s per
+table version present (measured on S3, 2026-10-18), and the count is the
+number of manifests under `_versions/`:
+
+```bash
+aws s3 ls --recursive s3://ol-data-witan-<env>/<storage_prefix>/graphs/<id>.omni/ \
+  | grep -c '/_versions/'
+```
+
+The run is the nightly window with a longer budget, so the data tier is down
+for every witan user until it ends. Announce it, and keep it clear of the
+03:20 window and the CI indexer's runs. Create a one-off Job from the CronJob
+with the window's limits raised. `activeDeadlineSeconds` has to stay above the
+window plus one command's timeout, or the deadline fires before the command
+closes its own window:
+
+```bash
+kubectl -n omnigraph create job omnigraph-backlog-cleanup \
+  --from=cronjob/omnigraph-maintenance --dry-run=client -o json \
+  | jq '.spec.activeDeadlineSeconds = 7500
+        | .spec.template.spec.containers[0].env |= map(
+            if .name == "OMNIGRAPH_WINDOW_SECONDS" then .value = "5400"
+            elif .name == "OMNIGRAPH_COMMAND_TIMEOUT_SECONDS" then .value = "1800"
+            elif .name == "OMNIGRAPH_CLEANUP_ISO_WEEKDAY" then .value = "1,2,3,4,5,6,7"
+            elif .name == "OMNIGRAPH_CLEANUP_OLDER_THAN" then .value = "2d"
+            else . end)' \
+  | kubectl apply -f -
+kubectl -n omnigraph logs -f job/omnigraph-backlog-cleanup
+```
+
+A 1800s command timeout covers about 12,000 versions on one graph. For a
+larger count raise it and `activeDeadlineSeconds` together: a deadline that
+fires mid-plan stops the run with nothing deleted. An image that predates
+comma lists in `OMNIGRAPH_CLEANUP_ISO_WEEKDAY` refuses `1,2,3,4,5,6,7` before
+it stops anything; give it today's ISO weekday (`date -u +%u`) instead. The
+Job ends with `maintenance window complete: all graphs maintained` and the
+server back at its replica count. Anything else is the
+section above. Delete the Job afterwards
+(`kubectl -n omnigraph delete job omnigraph-backlog-cleanup`), because a
+failed Job keeps `WorkloadJobFailed*` firing for as long as it exists.
+
 ## What runs on its own
 
 Two CronJobs in the `omnigraph` namespace on format 9, both defined in
@@ -108,7 +159,7 @@ Two CronJobs in the `omnigraph` namespace on format 9, both defined in
 | CronJob | Default schedule | What it does | Destructive |
 |---|---|---|---|
 | `omnigraph-optimize` | `20 3 * * *` (nightly) | Compacts small Lance fragments in every table of every graph | No |
-| `omnigraph-cleanup` | `20 4 * * 0` (Sundays) | Removes Lance versions older than 30d | **Yes** |
+| `omnigraph-cleanup` | `20 4 * * 0` (Sundays) | Removes Lance versions older than `cleanup_older_than` (2d) | **Yes** |
 
 Both run the `omnigraph` CLI baked into the `omnigraph-server` image, as the
 `omnigraph-server` IRSA service account, **against the S3 store directly** —
@@ -122,7 +173,7 @@ retries rather than corrupting anything.
 Per-environment overrides (`pulumi config set omnigraph:<key>`):
 
 - `optimize_schedule`, `cleanup_schedule` — cron expressions, in UTC.
-- `cleanup_older_than` — a Go-style duration (`30d`, `72h`).
+- `cleanup_older_than` — a Go-style duration (`2d`, `72h`).
 
 Keep the two schedules apart. Each is `concurrencyPolicy: Forbid` against
 *itself*, but Kubernetes cannot express "forbid against that other CronJob", so
@@ -162,17 +213,26 @@ the graph.
 
 ## Why retention is an age, not a version count
 
-`cleanup` accepts `--keep <N>` and `--older-than <duration>`. The CLI reports a
-combined policy without stating whether it intersects or unions them — and the
-two readings differ in safety, because a union would let `--keep` delete
-versions younger than the age cutoff. The CronJob passes `--older-than` alone,
-which is safe either way.
+`cleanup` accepts `--keep <N>` and `--older-than <duration>`, and a graph
+commit either one retains survives. `--keep` counts commits per live branch,
+and the code graphs carry a branch per writer, so the window passes
+`--older-than` alone.
 
-30d is sized against what actually needs the history: witan-code's per-writer
-WIP branch views, which are per-session/per-git-branch and measured in days,
-plus margin for time-travel reads. The cost is that a heavily-written graph
-carries up to 30 days of dead versions — bounded storage. Query latency is
-driven by fragment count, which the nightly optimize handles.
+The default, 2d, run every night, is sized by the stop window. On format 14
+cleanup runs with the server down, and before it deletes anything it opens
+every table version present, retained or about to be removed. QA's code-bridge
+took 488s to remove 12 of 3,522 versions on 2026-10-18. A nightly run at 2d
+sees about three days of writes: Production's code-bridge writes about 800
+versions a day, so about 2,400 versions and 6 minutes. A Sunday-only run at 2d
+would see nine days, over the 10-minute command limit, and at 30d it would see
+37. witan's own code needs no older versions. Every live branch head is kept
+regardless of age, which covers witan-code's per-writer WIP views, and witan
+makes no time-travel reads. What 2d gives up is the operator's undelete: a
+hard-deleted witan row is readable through `omnigraph query --snapshot` only
+for as long as the commit before the delete is retained. Past that, and for a
+bad cleanup, the restore is the bucket's noncurrent object versions (30 days)
+or an `aws s3 sync` backup.
+Query latency is driven by fragment count, which the nightly optimize handles.
 
 ## Reading a failed run
 

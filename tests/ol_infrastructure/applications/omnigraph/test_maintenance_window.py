@@ -66,7 +66,7 @@ def _window(*, suspend: bool = False):
         server_deployment_name="omnigraph-server",
         schedule="20 3 * * *",
         cleanup_older_than="30d",
-        cleanup_iso_weekday=7,
+        cleanup_iso_weekdays=(1, 3, 7),
         depends_on=[],
         suspend=suspend,
     )
@@ -169,7 +169,7 @@ def test_the_cron_job_runs_the_images_window_command_with_its_env():
             "OMNIGRAPH_UNLOCK_LEASE": "omnigraph-unlock",
             "POD_NAME": None,
             "OMNIGRAPH_CLEANUP_OLDER_THAN": "30d",
-            "OMNIGRAPH_CLEANUP_ISO_WEEKDAY": "7",
+            "OMNIGRAPH_CLEANUP_ISO_WEEKDAY": "1,3,7",
             "OMNIGRAPH_WINDOW_SECONDS": str(MAINTENANCE_WINDOW_SECONDS),
             "OMNIGRAPH_COMMAND_TIMEOUT_SECONDS": str(COMMAND_TIMEOUT_SECONDS),
         }

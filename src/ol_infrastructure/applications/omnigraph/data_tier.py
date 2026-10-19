@@ -68,7 +68,7 @@ from ol_infrastructure.applications.omnigraph.lock_handoff import (
     validate_graph_removal_allowlist,
 )
 from ol_infrastructure.applications.omnigraph.maintenance import (
-    DEFAULT_CLEANUP_ISO_WEEKDAY,
+    DEFAULT_CLEANUP_ISO_WEEKDAYS,
     DEFAULT_MAINTENANCE_SCHEDULE,
     OmnigraphMaintenance,
     create_maintenance,
@@ -314,7 +314,7 @@ def create_data_tier(  # noqa: PLR0913
     per_actor_bytes_max: int = DEFAULT_PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist: list[str] | None = None,
     maintenance_schedule: str = DEFAULT_MAINTENANCE_SCHEDULE,
-    cleanup_iso_weekday: int = DEFAULT_CLEANUP_ISO_WEEKDAY,
+    cleanup_iso_weekdays: tuple[int, ...] = DEFAULT_CLEANUP_ISO_WEEKDAYS,
     *,
     suspend_maintenance: bool = False,
     migration_armed: bool = False,
@@ -346,7 +346,7 @@ def create_data_tier(  # noqa: PLR0913
     delete when ``cluster.yaml`` stops declaring them. Only read once the
     served format is one whose binaries delete on apply (0.13, format 14).
 
-    ``maintenance_schedule`` and ``cleanup_iso_weekday`` set the nightly stop
+    ``maintenance_schedule`` and ``cleanup_iso_weekdays`` set the nightly stop
     window that replaces the optimize and cleanup sweeps on that format, and
     ``optimize_schedule`` / ``cleanup_schedule`` are then unused. See
     ``maintenance.create_maintenance_window``.
@@ -1145,7 +1145,7 @@ def create_data_tier(  # noqa: PLR0913
                     server_deployment_name=OMNIGRAPH_SERVER_SERVICE_NAME,
                     schedule=maintenance_schedule,
                     cleanup_older_than=cleanup_older_than,
-                    cleanup_iso_weekday=cleanup_iso_weekday,
+                    cleanup_iso_weekdays=cleanup_iso_weekdays,
                     # Behind the Deployment: the window needs the Lease the
                     # Deployment already waits for, and a graph the first boot
                     # has not applied yet fails its `optimize`.

@@ -128,23 +128,34 @@ DEFAULT_CLEANUP_SCHEDULE = "20 4 * * 0"
 
 # Version retention for `cleanup`, expressed as an age rather than a count.
 #
-# `--keep <N>` and `--older-than <duration>` can both be passed, but the CLI
-# only reports the combined policy ("keep 2 versions, remove anything older
-# than 2592000s") without stating whether it intersects or unions them. An
-# intersection is more conservative than either alone; a union would let
-# `--keep` delete versions younger than the age cutoff. Since the difference is
-# unverified upstream and only one of the two readings is safe, this passes
-# `--older-than` ALONE, which is safe under both: nothing younger than the
-# cutoff can be removed no matter how the flags combine.
+# `--older-than` is passed alone. `--keep <N>` counts graph commits per live
+# branch, and the code graphs carry one branch per writer, so a count bounds
+# nothing useful here. (The two combine as a union: a commit either one retains
+# survives. omnigraph v0.13.0 docs/user/operations/maintenance.md#cleanup.)
 #
-# 30d is chosen against what actually needs the history — witan-code's
-# per-writer WIP branch views, which are per-session/per-git-branch and
-# measured in days — plus a wide margin for time-travel reads over the recent
-# past. The cost of the generous window is that a heavily-written graph carries
-# up to 30 days of dead versions; that is bounded storage, and fragment bloat
-# (the thing that actually degrades query latency) is handled nightly by
-# optimize, not by this.
-DEFAULT_CLEANUP_OLDER_THAN = "30d"
+# The age is sized by how long the stop window takes, not by storage. From
+# format 14 cleanup runs with the server stopped, and before it deletes
+# anything it opens every table version present, retained or not
+# (omnigraph v0.13.0 collector.rs discover_published and plan_sweep, run in
+# full by optimize.rs cleanup_detached_only before any sweep). One run costs
+# about 0.14s per present version on S3: QA's code-bridge took 488s to remove
+# 12 of its 3,522 versions on 2026-10-18. A run stopped during that plan
+# deletes nothing. Run nightly (DEFAULT_CLEANUP_ISO_WEEKDAYS) at 2d, each run
+# sees about three days of writes. Production's code-bridge writes about 800
+# table versions a day (S3 listing of _versions/, 2026-10-17 to 10-19), so
+# that is about 2,400 versions, about 6 minutes. A Sunday-only run sees nine
+# days at 2d and 37 at 30d.
+#
+# witan's own code needs no older versions. The current head of every live
+# branch is always retained whatever its age, as is a named branch's oldest
+# commit, so witan-code's per-writer WIP branch views do not depend on this,
+# and witan makes no time-travel reads. The cost is the operator's undelete:
+# a hard-deleted witan row stays readable through `omnigraph query --snapshot`
+# only while the commit before the delete is retained, so 2 days instead of
+# 30. Past that, and for a bad cleanup run, the restore is the bucket's
+# noncurrent object versions (data_tier.py, 30 days) or the runbooks'
+# `aws s3 sync` backups.
+DEFAULT_CLEANUP_OLDER_THAN = "2d"
 
 # Both jobs are S3-bound, single-threaded per graph, and run over a store whose
 # graphs are small. An hour without finishing means a wedged S3 connection or a
@@ -431,8 +442,10 @@ MAINTENANCE_WINDOW_NAME = "omnigraph-maintenance"
 # indexer's 04:00 run, which is the first writer to arrive afterwards.
 DEFAULT_MAINTENANCE_SCHEDULE = DEFAULT_OPTIMIZE_SCHEDULE
 
-# The old weekly cleanup ran on Sunday (DEFAULT_CLEANUP_SCHEDULE).
-DEFAULT_CLEANUP_ISO_WEEKDAY = 7
+# Every night. A cleanup's time grows with the versions written since the last
+# one, so a weekly run plans a week of writes on top of the retained ones (see
+# DEFAULT_CLEANUP_OLDER_THAN).
+DEFAULT_CLEANUP_ISO_WEEKDAYS = (1, 2, 3, 4, 5, 6, 7)
 
 # THE TIME BUDGET, from the 03:20 start:
 #
@@ -446,17 +459,20 @@ DEFAULT_CLEANUP_ISO_WEEKDAY = 7
 # scale back up) and the deadline never fires. When it does fire the pod gets
 # SIGTERM and the grace period to do the same.
 #
-# Sized against Production's sweeps beside a live 0.11 server over the 30 days
-# to 2026-10-13 (kube_job_status_completion_time - start_time): optimize took
-# 55s to 163s for all graphs. cleanup took 329s to 1552s and the last three
-# runs were the longest, so a Sunday window can run out before every graph has
-# been cleaned. Graphs it did not reach are logged and fail the Job, and
-# nothing is left locked. The command optimizes every graph first and starts
-# the cleanup pass at a different graph each week, so a short window delays a
-# graph's cleanup and does not starve it. Both numbers need re-measuring on
-# 0.13 with the server stopped (CI, then QA) before Production's cutover. If
-# cleanup does not fit, these constants and the start time have to move
-# together: an earlier `omnigraph:maintenance_schedule` alone adds no time.
+# Measured on 0.13 in the first cleanup window (2026-10-18, from the Job logs):
+# optimize took 50s (QA) and 57s (Production) for all 18 graphs. QA's cleanup
+# took 880s. Production's ran out: three graphs hit COMMAND_TIMEOUT_SECONDS and
+# four were never reached, on a weekly cleanup at 30d. What a cleanup costs is
+# set by how many versions are present, see DEFAULT_CLEANUP_OLDER_THAN. Graphs
+# a window did not reach are logged and fail the Job, and nothing is left
+# locked. The command optimizes every graph first and starts the cleanup pass
+# at a different graph each night, so a short window delays a graph's cleanup.
+# That holds only for a graph whose cleanup fits in COMMAND_TIMEOUT_SECONDS:
+# one that never does is stopped every night and never cleaned, and its
+# backlog grows. Clearing a backlog that large is the runbook's one-off
+# cleanup with a longer timeout. If cleanup does not fit, these constants and
+# the start time have to move together: an earlier
+# `omnigraph:maintenance_schedule` alone adds no time.
 MAINTENANCE_WINDOW_SECONDS = 1500
 COMMAND_TIMEOUT_SECONDS = 600
 WINDOW_ACTIVE_DEADLINE_SECONDS = 2160
@@ -490,7 +506,7 @@ def create_maintenance_window(  # noqa: PLR0913
     server_deployment_name: str,
     schedule: str,
     cleanup_older_than: str,
-    cleanup_iso_weekday: int,
+    cleanup_iso_weekdays: tuple[int, ...],
     depends_on: list[Resource],
     *,
     suspend: bool = False,
@@ -509,7 +525,8 @@ def create_maintenance_window(  # noqa: PLR0913
     :param server_deployment_name: the Deployment the window stops. The
         command reads its pod selector from it, so there is no second copy of
         the selector here to drift.
-    :param cleanup_iso_weekday: UTC day ``cleanup`` also runs on (1 is Monday).
+    :param cleanup_iso_weekdays: UTC days ``cleanup`` also runs on (1 is
+        Monday), rendered as the comma list the image parses.
     :param suspend: hold the window off while a storage-format migration is
         armed. The command also skips on the Deployment's migration-armed
         annotation, which covers a run that started before the suspend landed.
@@ -643,7 +660,9 @@ def create_maintenance_window(  # noqa: PLR0913
                                         ),
                                         kubernetes.core.v1.EnvVarArgs(
                                             name="OMNIGRAPH_CLEANUP_ISO_WEEKDAY",
-                                            value=str(cleanup_iso_weekday),
+                                            value=",".join(
+                                                str(day) for day in cleanup_iso_weekdays
+                                            ),
                                         ),
                                         kubernetes.core.v1.EnvVarArgs(
                                             name="OMNIGRAPH_WINDOW_SECONDS",
