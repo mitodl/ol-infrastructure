@@ -55,13 +55,21 @@ def test_the_production_finish_names_the_gate_issue_file():
     assert finish["params"]["state"] == "success"
 
 
-def test_the_gate_the_comment_reads_is_an_input_of_the_job():
-    """The file named above exists in the build only if the gate is fetched."""
-    plan = _plan("-production")
+def test_the_gate_the_comment_reads_is_fetched_before_the_finish():
+    """The file named above exists in the build only if the gate is fetched first."""
+    plan = list(_walk(_plan("-production")))
 
-    gets = [step for step in _walk(plan) if step.get("get")]
+    gate = next(
+        i for i, step in enumerate(plan) if step.get("get") == f"{APP}-release-gate"
+    )
+    finish = next(
+        i
+        for i, step in enumerate(plan)
+        if step.get("put") == f"{APP}-deployment-production"
+        and step["params"].get("action") == "finish"
+    )
 
-    assert f"{APP}-release-gate" in {step["get"] for step in gets}
+    assert gate < finish
 
 
 def test_the_rc_finish_does_not_comment():
