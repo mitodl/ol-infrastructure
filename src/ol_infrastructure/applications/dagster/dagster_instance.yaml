@@ -457,6 +457,10 @@ event_log_storage:
 #     the concept graph, which calls no model but shares those tables).
 #     Promoting a batch of course runs in courseware_extraction_allowlist would
 #     otherwise start one extraction run per course run at once.
+#   ocw/content_load: ol-data-platform's daily OCW content sweep and the scoped
+#     loads ocw_content_publish_sensor requests. Every load restores and saves the
+#     source's single dlt state, so two at once overwrite each other's course
+#     versions and unpublish bookkeeping. Limit 1 queues the second.
 run_coordinator:
   module: dagster.core.run_coordinator
   class: QueuedRunCoordinator
@@ -465,6 +469,8 @@ run_coordinator:
     tag_concurrency_limits:
     - key: courseware/model_calls
       limit: 3
+    - key: ocw/content_load
+      limit: 1
 
 # Configures how long Dagster waits for code locations
 # to load before timing out.
