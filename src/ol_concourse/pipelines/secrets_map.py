@@ -98,6 +98,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "applications/keycloak/": ["keycloak/"],
     "applications/kubewatch/": ["kubewatch/"],
     "applications/kubewatch_webhook_handler/": ["kubewatch/"],
+    "applications/label_studio/": [],
     "applications/learn_ai/": [
         "fastly.yaml",
         "learn_ai/",
