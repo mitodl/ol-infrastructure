@@ -47,13 +47,18 @@ import asyncio
 import logging
 import re
 from datetime import timedelta
+from typing import Any
 
 import asyncpg
 import jwt
 from hindsight_api.extensions.builtin.memory_defense_regex import (
     MemoryDefenseRegexExtension,
 )
-from hindsight_api.extensions.memory_defense import DefenseAction, DefenseDecision
+from hindsight_api.extensions.memory_defense import (
+    DefenseAction,
+    DefenseDecision,
+    apply_redaction,
+)
 from hindsight_api.extensions.operation_validator import (
     BankListScope,
     BankReadContext,
@@ -218,6 +223,38 @@ _CONTACT_PATTERNS = [
 
 def _parse_map(raw: str) -> dict[str, str]:
     return dict(pair.split("=", 1) for pair in raw.split(",") if pair)
+
+
+def _redact(text: str) -> str:
+    """Apply the built-in secret and card screen, then the contact patterns."""
+    text = apply_redaction(text).content
+    for label, pattern in _CONTACT_PATTERNS:
+        text = pattern.sub(f"[REDACTED:{label}]", text)
+    return text
+
+
+def _redact_item(item: dict[str, Any]) -> dict[str, Any]:
+    """Redact every caller-written text field of a retain item.
+
+    Memory Defense screens only ``content``, and only in the worker: a retain's
+    ``context``, ``metadata`` and ``entities`` are stored as given, and an async
+    retain's items wait in its operation row before the worker sees them.
+    """
+    item = dict(item)
+    for field in ("content", "context"):
+        if isinstance(item.get(field), str):
+            item[field] = _redact(item[field])
+    if item.get("metadata"):
+        item["metadata"] = {
+            _redact(str(key)): _redact(value) if isinstance(value, str) else value
+            for key, value in item["metadata"].items()
+        }
+    if item.get("entities"):
+        item["entities"] = [
+            {**entity, "text": _redact(str(entity.get("text", "")))}
+            for entity in item["entities"]
+        ]
+    return item
 
 
 class OLMemoryDefense(MemoryDefenseRegexExtension):
@@ -502,6 +539,9 @@ class LearnerBankValidator(OperationValidatorExtension):
         An app's document ids carry its name, so one app cannot take a key
         another app will write: the engine refuses to replace a document under
         another app's tag.
+
+        Every item is redacted here, before the engine stores anything: Memory
+        Defense runs later and screens only ``content``.
         """
         if ctx.attachments:
             return ValidationResult.reject(
@@ -516,7 +556,12 @@ class LearnerBankValidator(OperationValidatorExtension):
             return ValidationResult.reject(
                 f"document ids must start with {prefix!r}", status_code=403
             )
-        return await self._write(ctx.bank_id, rc)
+        result = await self._write(ctx.bank_id, rc)
+        if not result.allowed:
+            return result
+        return ValidationResult.accept_with(
+            contents=[_redact_item(item) for item in ctx.contents]
+        )
 
     async def validate_recall(self, ctx: RecallContext) -> ValidationResult:
         """Allow a recall from a bank the caller may read."""

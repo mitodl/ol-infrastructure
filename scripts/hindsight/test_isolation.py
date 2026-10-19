@@ -521,6 +521,58 @@ async def test_contact_details_and_secrets_are_redacted_before_storage():
     await lai.aclose()
 
 
+async def _rows_containing(bank_id: str, needle: str) -> dict[str, int]:
+    """Count, per table with a bank_id, the bank's rows whose text has ``needle``."""
+    connection = await asyncpg.connect(SUPERUSER_DSN)
+    tables = await connection.fetch(
+        "SELECT c.table_name FROM information_schema.columns c"
+        " JOIN information_schema.tables t USING (table_schema, table_name)"
+        " WHERE c.table_schema = 'public' AND c.column_name = 'bank_id'"
+        " AND t.table_type = 'BASE TABLE'"
+    )
+    found = {}
+    for (table,) in tables:
+        count = await connection.fetchval(
+            f'SELECT count(*) FROM public."{table}" t'  # noqa: S608
+            " WHERE t.bank_id = $1 AND t::text LIKE '%' || $2 || '%'",
+            bank_id,
+            needle,
+        )
+        if count:
+            found[table] = count
+    await connection.close()
+    return found
+
+
+@pytest.mark.parametrize("run_async", [False, True])
+async def test_every_retain_field_is_redacted_before_storage(run_async):
+    """Context, metadata and entities are redacted too, sync or async."""
+    # Memory Defense screens only content, in the worker; an async retain's
+    # items are stored in its operation row before the worker runs.
+    a = new_learner()
+    async with http(a.token("learn-ai")) as c:
+        r = await c.post(
+            f"{a.bank}/memories",
+            json={
+                "async": run_async,
+                "items": [
+                    {
+                        "content": "Reach me at c.learner@example.org.",
+                        "context": "From c.learner@example.org",
+                        "metadata": {"contact": "c.learner@example.org"},
+                        "entities": [{"text": "c.learner@example.org"}],
+                        "document_id": "learn-ai.contact",
+                        "tags": ["app:learn-ai"],
+                    }
+                ],
+            },
+        )
+        assert r.status_code == OK, r.text
+        if run_async:
+            await asyncio.sleep(SETTLE_SECONDS)
+    assert await _rows_containing(bank_for(a.id), "example.org") == {}
+
+
 # -- general memory: a separate grant, readable by every app ---------------------------
 
 
