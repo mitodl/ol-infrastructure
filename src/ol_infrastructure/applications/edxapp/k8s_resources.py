@@ -2320,9 +2320,10 @@ def create_k8s_resources(  # noqa: C901
             k8s_labels=k8s_global_labels,
             enable_defaults=True,
             # Same source as Django's CORS_ORIGIN_WHITELIST in
-            # k8s_configmaps.py.  The gateway emits the Access-Control-* headers
-            # the browser enforces, so Django's own list only takes effect if
-            # this one allows the origin first.
+            # k8s_configmaps.py.  The gateway answers CORS preflights itself, so
+            # an origin missing here is blocked on every preflighted request
+            # whatever Django allows; simple requests still carry Django's own
+            # headers through.
             cors_allow_origins=browser_origins(stack_info, edxapp_config),
         ),
     )

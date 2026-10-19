@@ -122,6 +122,20 @@ def test_rendering_does_not_mutate_the_bindings_environment():
     assert bindings.environment_variables == given
 
 
+def test_gateway_cors_origins_are_djangos_cors_allowed_origins():
+    bindings = _local_bindings(
+        environment_variables={
+            "OPENEDX_API_BASE_URL": OPENEDX_BASE_URL,
+            "CORS_ALLOWED_ORIGINS": "https://mitxonline.mit.dev, https://learn.mit.dev,",
+        }
+    )
+
+    assert definition.cors_allow_origins(bindings) == [
+        "https://mitxonline.mit.dev",
+        "https://learn.mit.dev",
+    ]
+
+
 # ─── Workloads ────────────────────────────────────────────────────────────────
 
 

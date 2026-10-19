@@ -483,11 +483,11 @@ def cors_allow_origins(bindings: MitxonlineBindings) -> list[str]:
     """Return the origins allowed to read either route group cross-origin.
 
     The same origins Django is given as ``CORS_ALLOWED_ORIGINS``: the gateway
-    sets the Access-Control-* headers the browser enforces, so
-    django-cors-headers' answer never reaches it.  The shared config is attached
-    to routes on api.mitxonline.mit.edu, mitxonline.mit.edu *and* the
-    /mitxonline/* paths on api.<env>.learn.mit.edu, so the list has to cover
-    every frontend that calls any of them.
+    answers CORS preflights itself, so an origin missing here is blocked on
+    every preflighted request whatever django-cors-headers allows.  The shared
+    config is attached to routes on api.mitxonline.mit.edu, mitxonline.mit.edu
+    *and* the /mitxonline/* paths on api.<env>.learn.mit.edu, so the list has to
+    cover every frontend that calls any of them.
 
     :param bindings: The environment being rendered for.
     :returns: Origins for ``OLApisixSharedPluginsConfig.cors_allow_origins``.
@@ -495,9 +495,7 @@ def cors_allow_origins(bindings: MitxonlineBindings) -> list[str]:
     """
     return [
         origin.strip()
-        for origin in environment_variables(bindings)["CORS_ALLOWED_ORIGINS"].split(
-            ","
-        )
+        for origin in environment_variables(bindings)["CORS_ALLOWED_ORIGINS"].split(",")
         if origin.strip()
     ]
 
