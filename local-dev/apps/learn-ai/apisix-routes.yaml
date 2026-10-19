@@ -195,8 +195,8 @@ spec:
 # on ai.learn.mit.dev it never gets that cookie and everyone is anonymous.
 #
 # The openid-connect config matches mit-learn's passauth (client, scope,
-# session settings, no cookie name/domain override), so this reads and writes
-# the same host-only "session" cookie. Its redirect and logout paths are left
+# session settings), so this reads and writes the same
+# mitlearn_apisix_session_dev cookie. Its redirect and logout paths are left
 # out: none fall under /ai/*, and the reqauth login's callback is derived from
 # the original /ai/... URL. Same pattern as mitxonline-learn-proxy-route.
 apiVersion: apisix.apache.org/v2
@@ -229,15 +229,17 @@ spec:
       enable: true
       secretRef: ol-mitlearn-oidc  # pragma: allowlist secret
       config:
-        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
         use_jwks: true
         bearer_only: false
-        realm: olapps
         introspection_endpoint_auth_method: client_secret_post
         scope: "openid profile email ol-profile"
         unauth_action: pass
         session:
-          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          # Same as mit-learn's routes (local-dev/apps/mit-learn/apisix-routes.yaml),
+          # so this reads mit-learn's login session.
+          cookie_name: mitlearn_apisix_session_dev
+          cookie_domain: ".learn.mit.dev"
+          absolute_timeout: 1209600
           idling_timeout: 0
           rolling_timeout: 0
         ssl_verify: false
@@ -265,15 +267,17 @@ spec:
       enable: true
       secretRef: ol-mitlearn-oidc  # pragma: allowlist secret
       config:
-        discovery: "http://keycloak-service.local-infra.svc.cluster.local:8080/realms/olapps/.well-known/openid-configuration"
         use_jwks: true
         bearer_only: false
-        realm: olapps
         introspection_endpoint_auth_method: client_secret_post
         scope: "openid profile email ol-profile"
         unauth_action: auth
         session:
-          secret: "local-dev-oidc-session-secret-32chars!"  # pragma: allowlist secret
+          # Same as mit-learn's routes (local-dev/apps/mit-learn/apisix-routes.yaml),
+          # so this reads mit-learn's login session.
+          cookie_name: mitlearn_apisix_session_dev
+          cookie_domain: ".learn.mit.dev"
+          absolute_timeout: 1209600
           idling_timeout: 0
           rolling_timeout: 0
         ssl_verify: false
