@@ -78,7 +78,10 @@ _RELEASE_PROGRESS_POLLER = "release-progress"
 # subcommand -> (its arguments, what it does). Both `/doof help` and the
 # per-command usage errors are rendered from this, so they cannot drift.
 _SYNTAX: dict[str, tuple[str, str]] = {
-    "release": ("<app>", "cut a release"),
+    "release": (
+        "<app>",
+        "cut a release (to replace one already in flight, add `supersede <version>`)",
+    ),
     "hotfix": ("<app> <sha>", "cut what production runs plus one commit"),
     "preview": (
         "<app>",
@@ -231,18 +234,120 @@ def _resolve_app(repos, app_name, subcommand=None):
     return cfg, None
 
 
+# The word that confirms discarding an in-flight release: `/doof release <app>
+# supersede <version>`. A plain word, not a `--flag`, because Slack clients may
+# rewrite a leading `--` to a dash. The version is the release the person was
+# warned about, so a confirmation cannot be applied to a different release cut
+# in the meantime.
+_SUPERSEDE = "supersede"
+
+
 async def _cmd_release(repos, ack, respond, command, context):
     await ack()
-    app_name = command["text"].strip()
+    parts = command["text"].split()
+    app_name, options = (parts[0], parts[1:]) if parts else ("", [])
     cfg, error = _resolve_app(repos, app_name, "release")
     if cfg is None:
         await _refuse(respond, error)
         return
+    confirmed_version = None
+    if options:
+        if len(options) != 2 or options[0].lower() != _SUPERSEDE:  # noqa: PLR2004
+            await _refuse(
+                respond,
+                f"Unrecognised option `{_slack_escape(' '.join(options))}`. "
+                f"{_usage_hint(repos, 'release')}\n"
+                f"To replace a release that is already in flight, add "
+                f"`{_SUPERSEDE} <version>` naming it.",
+            )
+            return
+        confirmed_version = options[1]
     async with _app_lock(app_name):
-        await _release(respond, app_name, cfg, context)
+        await _release(respond, app_name, cfg, context, supersede=confirmed_version)
 
 
-async def _release(respond, app_name, cfg, context):
+async def _guard_release_start(
+    respond, app_name, cfg, supersede: str | None
+) -> tuple[bool, dict[str, Any] | None]:
+    """Decide whether `/doof release` may go ahead.
+
+    Returns (proceed, in_flight). When not proceeding, the person has already
+    been told why.
+    """
+    # A release that was cut but never finished. Cutting a new one supersedes
+    # it on action=create, deleting its branch (and possibly its tag). Doof
+    # refused outright and people type `/doof release` twice by reflex, so
+    # that is only done when asked for.
+    try:
+        in_flight = await github.in_flight_release(cfg.repo)
+    except Exception:
+        log.exception("Failed to check in-flight release for %s", app_name)
+        await _refuse(
+            respond,
+            f"❌ Could not check whether `{app_name}` has a release in flight. "
+            "Refusing to trigger — a new release would supersede it, deleting "
+            "its branch, without asking.",
+        )
+        return False, None
+    if in_flight and supersede != in_flight["version"]:
+        version = in_flight["version"]
+        changed = (
+            f"You confirmed `{_slack_escape(supersede)}`, but that is not what is "
+            "in flight now. "
+            if supersede is not None
+            else ""
+        )
+        await _refuse(
+            respond,
+            f"🚧 {changed}`{app_name}` already has release "
+            f"{_describe_in_flight(in_flight)} in flight. A new release supersedes "
+            "it: its release branch is deleted, and its tag too if it never "
+            "reached production.\n"
+            f"• `/doof release {app_name} {_SUPERSEDE} {version}` discards it and "
+            "cuts a new release\n"
+            f"• `/doof release-status {app_name}` shows where it stands\n"
+            f"• `/doof abandon {app_name}` drops it without a new release",
+        )
+        return False, None
+    # The release branch only appears when the build reaches `action: create`,
+    # so GitHub cannot see a release that has been triggered but not cut. A
+    # second `/doof release` typed right after the first finds nothing in
+    # flight, and a second `supersede <version>` still finds the release the
+    # first one is replacing; either way its create supersedes the first
+    # build's cut without asking, so this is checked after a confirmation too.
+    # `_app_lock` serializes the commands, and the first one's build exists
+    # (pending) before the lock is released, so the second one sees it.
+    job = f"build-{app_name}-release-image"
+    try:
+        running = await concourse.active_build_url(cfg.pipeline, job)
+    except Exception:
+        log.exception("Failed to check for a running release build: %s", app_name)
+        await _refuse(
+            respond,
+            f"❌ Could not check whether a release build for `{app_name}` is "
+            "already running. Refusing to trigger — a second one would "
+            "supersede whatever the first one cuts.",
+        )
+        return False, None
+    if running:
+        await _refuse(
+            respond,
+            f"🚧 A release build for `{app_name}` is already running: "
+            f"{running}. A release started now would supersede whatever it cuts, "
+            "without asking. Try again once it finishes (see "
+            f"`/doof release-status {app_name}`), or abort the build in "
+            "Concourse if it is stuck.",
+        )
+        return False, None
+    return True, in_flight
+
+
+async def _release(respond, app_name, cfg, context, *, supersede: str | None = None):
+    """Trigger a release.
+
+    `supersede` is the version of the in-flight release the caller confirmed
+    discarding; it only counts if that is still the release in flight.
+    """
     # While a hotfix request is pending the release resource offers that
     # hotfix, not the tracked branch, so this build would cut it instead.
     try:
@@ -263,14 +368,9 @@ async def _release(respond, app_name, cfg, context):
         )
         return
 
-    # Report a release that was cut but never finished. Cutting a new one
-    # supersedes it on action=create, so say so rather than letting a branch
-    # (and possibly a tag) be deleted silently.
-    in_flight = None
-    try:
-        in_flight = await github.in_flight_release(cfg.repo)
-    except Exception:
-        log.exception("Failed to check in-flight release for %s", app_name)
+    proceed, in_flight = await _guard_release_start(respond, app_name, cfg, supersede)
+    if not proceed:
+        return
 
     try:
         # The release resource is configured `check_every: never` with no
@@ -366,7 +466,9 @@ async def _cmd_preview(repos, ack, respond, command, _context):
     if preview["in_flight"]:
         lines.append(
             f"⚠️ In flight: {_describe_in_flight(preview['in_flight'])} — cut but "
-            "not finished. Cutting a new release supersedes it."
+            "not finished. Cutting a new release supersedes it, and "
+            f"`/doof release {app_name} {_SUPERSEDE} "
+            f"{preview['in_flight']['version']}` is how you ask for that."
         )
     if commits:
         lines += [_commit_line(cfg.repo, c) for c in commits]
@@ -1637,7 +1739,9 @@ async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta) -> str:
         state_line = "It has not reached RC."
     return (
         f"⏳ `{app_name}` {version} was cut {_format_age(age)} ago and is not "
-        f"finished. {state_line} <{in_flight['url']}|{in_flight['branch']}>"
+        f"finished. {state_line} <{in_flight['url']}|{in_flight['branch']}>\n"
+        f"`/doof release {app_name} {_SUPERSEDE} {version}` replaces it with a "
+        f"new release; `/doof abandon {app_name}` drops it."
     )
 
 
