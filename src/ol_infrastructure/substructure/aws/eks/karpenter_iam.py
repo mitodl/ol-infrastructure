@@ -122,7 +122,7 @@ def get_cluster_karpenter_iam_policy_document(  # noqa: PLR0913
                     },
                     "StringLike": {"aws:ResourceTag/karpenter.sh/nodepool": "*"},
                     "StringEqualsIfExists": {
-                        "aws:RequestTag/eks:eks-cluster-name": "{cluster_name}"
+                        "aws:RequestTag/eks:eks-cluster-name": f"{cluster_name}"
                     },
                     "ForAllValues:StringEquals": {
                         "aws:TagKeys": [
@@ -140,7 +140,11 @@ def get_cluster_karpenter_iam_policy_document(  # noqa: PLR0913
                     f"arn:{aws_partition}:ec2:{aws_region}:*:instance/*",
                     f"arn:{aws_partition}:ec2:{aws_region}:*:launch-template/*",
                 ],
-                "Action": ["ec2:TerminateInstances", "ec2:DeleteLaunchTemplate"],
+                "Action": [
+                    "ec2:TerminateInstances",
+                    "ec2:RebootInstances",
+                    "ec2:DeleteLaunchTemplate",
+                ],
                 "Condition": {
                     "StringEquals": {
                         f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned"
@@ -209,8 +213,8 @@ def get_cluster_karpenter_iam_policy_document(  # noqa: PLR0913
                 "Condition": {
                     "StringEquals": {
                         f"aws:RequestTag/kubernetes.io/cluster/{cluster_name}": "owned",
-                        "aws:RequestTag/eks:eks-cluster-name": "{cluster_name}",
-                        "aws:RequestTag/topology.kubernetes.io/region": "{aws_region}",
+                        "aws:RequestTag/eks:eks-cluster-name": f"{cluster_name}",
+                        "aws:RequestTag/topology.kubernetes.io/region": f"{aws_region}",
                     },
                     "StringLike": {
                         "aws:RequestTag/karpenter.k8s.aws/ec2nodeclass": "*"
@@ -225,10 +229,10 @@ def get_cluster_karpenter_iam_policy_document(  # noqa: PLR0913
                 "Condition": {
                     "StringEquals": {
                         f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned",
-                        "aws:ResourceTag/topology.kubernetes.io/region": "{aws_region}",
+                        "aws:ResourceTag/topology.kubernetes.io/region": f"{aws_region}",
                         f"aws:RequestTag/kubernetes.io/cluster/{cluster_name}": "owned",
-                        "aws:RequestTag/eks:eks-cluster-name": "{cluster_name}",
-                        "aws:RequestTag/topology.kubernetes.io/region": "{aws_region}",
+                        "aws:RequestTag/eks:eks-cluster-name": f"{cluster_name}",
+                        "aws:RequestTag/topology.kubernetes.io/region": f"{aws_region}",
                     },
                     "StringLike": {
                         "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass": "*",
@@ -248,7 +252,7 @@ def get_cluster_karpenter_iam_policy_document(  # noqa: PLR0913
                 "Condition": {
                     "StringEquals": {
                         f"aws:ResourceTag/kubernetes.io/cluster/{cluster_name}": "owned",
-                        "aws:ResourceTag/topology.kubernetes.io/region": "{aws_region}",
+                        "aws:ResourceTag/topology.kubernetes.io/region": f"{aws_region}",
                     },
                     "StringLike": {
                         "aws:ResourceTag/karpenter.k8s.aws/ec2nodeclass": "*"
@@ -272,6 +276,17 @@ def get_cluster_karpenter_iam_policy_document(  # noqa: PLR0913
                 "Effect": "Allow",
                 "Resource": f"arn:{aws_partition}:eks:{aws_region}:{aws_account_id}:cluster/{cluster_name}",
                 "Action": "eks:DescribeCluster",
+            },
+            {
+                "Sid": "AllowZonalShiftStatusReadOnly",
+                "Effect": "Allow",
+                "Resource": "*",
+                "Action": "arc-zonal-shift:GetManagedResource",
+                "Condition": {
+                    "StringEquals": {
+                        "arc-zonal-shift:ResourceIdentifier": f"arn:{aws_partition}:eks:{aws_region}:{aws_account_id}:cluster/{cluster_name}"
+                    }
+                },
             },
         ],
     }
