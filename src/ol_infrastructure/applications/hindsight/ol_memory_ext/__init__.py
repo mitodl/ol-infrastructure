@@ -650,8 +650,12 @@ class LearnerBankValidator(OperationValidatorExtension):
         """List only the learner's own bank.
 
         General banks are addressed by name, not discovered, so no caller lists
-        them.
+        them. The admin client lists nothing: the list reads bank profiles, and
+        the forget sequence does not need them.
         """
-        if request_context.api_key_id == GENERAL_PRINCIPAL:
+        if (
+            request_context.api_key_id == GENERAL_PRINCIPAL
+            or request_context.tenant_id == ADMIN_APP
+        ):
             return BankListScope(bank_ids=[])
         return BankListScope(bank_ids=[f"{BANK_PREFIX}{request_context.api_key_id}"])

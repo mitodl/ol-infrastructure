@@ -694,6 +694,15 @@ async def test_admin_client_cannot_read_or_write_memory(seeded, method, path, bo
     assert r.status_code == FORBIDDEN, (path, r.status_code, r.text)
 
 
+async def test_admin_client_lists_no_banks(seeded):
+    """The admin client lists no banks, not even the learner it names."""
+    a, _, _, _ = seeded
+    async with http(admin_token(), **{"x-ol-learner": a.id}) as c:
+        r = await c.get("/v1/default/banks")
+    assert r.status_code == OK, r.text
+    assert r.json()["banks"] == [], r.text
+
+
 async def test_learner_token_cannot_use_the_admin_path(seeded):
     """Only the admin client deletes a bank."""
     a, _, _, _ = seeded
