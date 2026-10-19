@@ -1140,6 +1140,8 @@ def test_release_issue_for_version_matches_the_checklist_header(fake_repo):
     )
     issue = github._release_issue_for_version_sync("mitodl/thing", "2026.7.22.1")
     assert issue["number"] == 8
+    # The RC announcement reads the checklist from this to name who is outstanding.
+    assert issue["body"] == CHECKLIST_BODY
 
 
 def test_release_issue_for_version_finds_a_closed_issue(fake_repo):

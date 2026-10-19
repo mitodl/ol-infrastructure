@@ -940,6 +940,121 @@ async def test_new_rc_deployment_announces_version_and_release_issue(
     assert "https://github.com/mitodl/my-app/issues/12" in text
 
 
+_RC_ISSUE_URL = "https://github.com/mitodl/my-app/issues/12"
+_MIXED_CHECKLIST = (
+    "## Release 2026.9.2.1\n\n"
+    "- [ ] **A** (#1) by alice@example.com\n"
+    "- [ ] **B** (#2) by alice@example.com\n"
+    "- [ ] **C** (#3) by bob@example.com\n"
+    "- [x] **D** (#4) by carol@example.com\n"
+)
+
+
+async def _announce_rc(repos, slack_app, monkeypatch, issue, environment="RC"):
+    """Announce a new *environment* deployment of 2026.9.2.1; return the text."""
+    slack_app.client = _slack_client(
+        {"alice@example.com": "UALICE", "bob@example.com": "UBOB"}
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "latest_successful_deployment",
+        _deployments_by_environment(
+            {environment: _deployment(7, "2026.9.2.1", environment)}
+        ),
+    )
+    monkeypatch.setattr(
+        bot.github, "release_issue_for_version", AsyncMock(return_value=issue)
+    )
+    state = bot.ReleaseProgressState(last_version={("my-app", environment): "old"})
+    await bot._announce_deployments(slack_app, repos, state)
+    return slack_app.client.chat_postMessage.call_args.kwargs["text"]
+
+
+def _issue(body):
+    return {"number": 12, "url": _RC_ISSUE_URL, "title": "Release", "body": body}
+
+
+async def test_rc_announcement_mentions_each_author_with_unchecked_items_once(
+    repos, slack_app, monkeypatch
+):
+    text = await _announce_rc(repos, slack_app, monkeypatch, _issue(_MIXED_CHECKLIST))
+
+    assert "Still waiting on: <@UALICE>, <@UBOB>" in text
+    assert text.count("<@UALICE>") == 1
+    assert "alice@example.com" not in text
+    # carol checked her only item, so she is not chased.
+    assert "carol" not in text
+
+
+async def test_rc_announcement_falls_back_to_a_name_without_a_slack_match(
+    repos, slack_app, monkeypatch
+):
+    body = "- [ ] **A** (#1) by stranger@example.com\n"
+
+    text = await _announce_rc(repos, slack_app, monkeypatch, _issue(body))
+
+    assert "Still waiting on: `stranger`" in text
+    assert "stranger@example.com" not in text
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "- [x] **A** (#1) by alice@example.com\n",
+        "## Release 2026.9.2.1\n\nNo checklist items.",
+        "",
+    ],
+    ids=["all checked", "no items", "empty body"],
+)
+async def test_rc_announcement_names_nobody_when_nothing_is_outstanding(
+    repos, slack_app, monkeypatch, body
+):
+    text = await _announce_rc(repos, slack_app, monkeypatch, _issue(body))
+
+    assert "Still waiting on" not in text
+    assert _RC_ISSUE_URL in text
+
+
+async def test_rc_announcement_still_goes_out_without_a_release_issue(
+    repos, slack_app, monkeypatch
+):
+    """The issue can be missing, e.g. when a lookup found nothing."""
+    text = await _announce_rc(repos, slack_app, monkeypatch, None)
+
+    assert "2026.9.2.1" in text
+    assert "Still waiting on" not in text
+
+
+async def test_rc_announcement_survives_a_failure_rendering_the_authors(
+    repos, slack_app, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.slack_users, "format_authors", AsyncMock(side_effect=RuntimeError("x"))
+    )
+
+    text = await _announce_rc(repos, slack_app, monkeypatch, _issue(_MIXED_CHECKLIST))
+
+    assert "2026.9.2.1" in text
+    assert _RC_ISSUE_URL in text
+    assert "Still waiting on" not in text
+
+
+async def test_production_announcement_does_not_chase_authors(
+    repos, slack_app, monkeypatch
+):
+    """Promotion is authorized; unchecked boxes are no longer anyone's to-do."""
+    text = await _announce_rc(
+        repos,
+        slack_app,
+        monkeypatch,
+        _issue(_MIXED_CHECKLIST),
+        environment="Production",
+    )
+
+    assert "live in production" in text
+    assert "Still waiting on" not in text
+
+
 @pytest.mark.usefixtures("_no_release_issue")
 async def test_production_deployment_announces_separately(
     repos, slack_app, monkeypatch
