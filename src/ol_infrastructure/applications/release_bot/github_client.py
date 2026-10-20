@@ -554,7 +554,12 @@ def _release_issue_for_version_sync(
     )
     for issue in itertools.islice(issues, _RELEASE_ISSUE_SCAN_LIMIT):
         if extract_version(issue.body or "") == version:
-            return {"number": issue.number, "url": issue.html_url, "title": issue.title}
+            return {
+                "number": issue.number,
+                "url": issue.html_url,
+                "title": issue.title,
+                "body": issue.body or "",
+            }
     return None
 
 

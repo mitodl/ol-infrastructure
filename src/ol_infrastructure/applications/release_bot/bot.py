@@ -1627,7 +1627,28 @@ def _format_age(age: timedelta) -> str:
     return f"{hours}h" if hours < 24 else f"{hours // 24}d"  # noqa: PLR2004
 
 
-async def _milestone_text(app_name, cfg, environment, deployment) -> str:
+async def _outstanding_mentions(client, issue) -> str:
+    """Render the authors with unchecked items on *issue*, or "" for none.
+
+    The RC announcement is how an engineer learns their commit is on RC and
+    needs verifying, so it names them rather than leaving every author to
+    notice a channel message. An author with several items is named once, and
+    one whose items are all checked is not named. A lookup failure drops the
+    names, not the announcement.
+    """
+    if not issue or not issue.get("body"):
+        return ""
+    outstanding = github.unchecked_authors(issue["body"])
+    if not outstanding:
+        return ""
+    try:
+        return await slack_users.format_authors(client, outstanding)
+    except Exception:
+        log.exception("Failed to render the outstanding authors of %s", issue["url"])
+        return ""
+
+
+async def _milestone_text(app_name, cfg, environment, deployment, client) -> str:
     """Render the Slack message for a deployment that just reached success."""
     version = deployment["version"]
     issue = None
@@ -1637,13 +1658,24 @@ async def _milestone_text(app_name, cfg, environment, deployment) -> str:
         # The milestone still goes out without the link; "what is in this
         # release" is one click worse, not missing.
         log.exception("Failed to find the release issue for %s %s", app_name, version)
+    if issue is None and environment == github.RC_ENVIRONMENT:
+        # Nobody is chased for a release whose issue was not found, and the
+        # version is recorded as announced, so leave a trace.
+        log.warning(
+            "No release issue found for %s %s; its authors were not mentioned",
+            app_name,
+            version,
+        )
     link = f" <{issue['url']}|Release issue>" if issue else ""
     if environment == github.PRODUCTION_ENVIRONMENT:
         return f"🎉 `{app_name}` {version} is live in production.{link}"
-    return (
+    text = (
         f"🚢 `{app_name}` {version} is deployed to RC.{link}"
         " Check off your items once you have verified them."
     )
+    if mentions := await _outstanding_mentions(client, issue):
+        text += f"\nStill waiting on: {mentions}"
+    return text
 
 
 async def _announce_deployments(app, repos, state: ReleaseProgressState) -> bool:
@@ -1704,7 +1736,9 @@ async def _announce_deployments(app, repos, state: ReleaseProgressState) -> bool
             try:
                 await app.client.chat_postMessage(
                     channel=await slack_channels.resolve(app.client, channel),
-                    text=await _milestone_text(app_name, cfg, environment, deployment),
+                    text=await _milestone_text(
+                        app_name, cfg, environment, deployment, app.client
+                    ),
                 )
             except Exception:
                 ok = False
