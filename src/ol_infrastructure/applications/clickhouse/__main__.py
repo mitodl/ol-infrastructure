@@ -136,19 +136,6 @@ CLICKHOUSE_METRICS_PORT = 9363
 COLD_TIER_HOT_KEEP_FREE_SPACE_BYTES = 10 * 1024**3
 
 
-def _gibibytes(quantity: str) -> int:
-    """Convert a Kubernetes quantity in Gi (e.g. ``1500Gi``) to bytes.
-
-    :param quantity: Storage size with a ``Gi`` suffix.
-    :returns: The size in bytes.
-    :rtype: int
-    """
-    if not quantity.endswith("Gi"):
-        msg = f"expected a storage size in Gi, got {quantity!r}"
-        raise ValueError(msg)
-    return int(quantity.removesuffix("Gi")) * 1024**3
-
-
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(CLICKHOUSE_NAMESPACE, ns)
 )
@@ -582,7 +569,9 @@ def _create_clickhouse_installation(  # noqa: PLR0913
         )
     )
 
-    cold_cache_max_size_bytes = _gibibytes(hot_storage_size) // 10
+    # hot_storage_size is a Kubernetes quantity in Gi, e.g. "1500Gi"; anything
+    # else fails the int() conversion.
+    cold_cache_max_size_bytes = int(hot_storage_size.removesuffix("Gi")) * 1024**3 // 10
     storage_config_xml = Output.all(cold_bucket_name, backup_bucket_name).apply(
         lambda buckets: dedent(f"""\
             <clickhouse>
@@ -639,22 +628,6 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                   </backups>
                 </disks>
                 <policies>
-                  <!-- No table uses this policy (all are on the built-in
-                       "default" policy). It stays until the v2 cutover is
-                       done because a live config reload refuses to drop a
-                       policy ("Storage policy ... is missing in new
-                       configuration"). -->
-                  <tiered>
-                    <volumes>
-                      <hot>
-                        <disk>default</disk>
-                      </hot>
-                      <cold>
-                        <disk>cold_s3</disk>
-                        <prefer_not_to_merge>true</prefer_not_to_merge>
-                      </cold>
-                    </volumes>
-                  </tiered>
                   <!-- The Opik chart's tieredStorage policy, under the name
                        its TTL job attaches (ALTER TABLE ... MODIFY SETTING
                        storage_policy = 'tiered_replicated', then MODIFY TTL
