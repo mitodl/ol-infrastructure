@@ -861,10 +861,16 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                 },
                 "configuration": {
                     "zookeeper": {
+                        # Over TLS. The operator applies zookeeper changes
+                        # without a restart, so every replica reconnects at
+                        # about the same time; if the handshake fails they
+                        # all lose Keeper together and go read-only. Revert
+                        # this block to recover.
                         "nodes": [
                             {
                                 "host": f"keeper-clickhouse.{namespace}.svc.cluster.local",
-                                "port": 2181,
+                                "port": KEEPER_TLS_PORT,
+                                "secure": "yes",
                             }
                         ]
                     },
