@@ -98,9 +98,11 @@ def create(
                         "description": "Certificate {{ $labels.namespace }}/{{ $labels.name }} (issuer {{ $labels.issuer_name }}) in {{ $labels.cluster }} passed its renewal time over 2 days ago and has not been renewed. It keeps serving until it expires, but renewal is failing repeatedly.",
                         "resolution": "kubectl -n {{ $labels.namespace }} describe certificate {{ $labels.name }} and follow the newest CertificateRequest, Order and Challenge. Check CertManagerClusterIssuerNotReady for the same cluster first.",
                     },
+                    # The metric is 0 for a Certificate with no renewalTime (never
+                    # issued); CertificateNotReady covers those.
                     datas=rd(
                         "count by (cluster, namespace, name, issuer_name) ("
-                        f"time() - certmanager_certificate_renewal_timestamp_seconds{{cluster=~{cluster_re}}}"
+                        f"time() - (certmanager_certificate_renewal_timestamp_seconds{{cluster=~{cluster_re}}} > 0)"
                         " > 2 * 86400)"
                     ),
                 ),

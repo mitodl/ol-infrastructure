@@ -25,6 +25,7 @@ def setup_cert_manager(
     k8s_provider: kubernetes.Provider,
     operations_namespace: kubernetes.core.v1.Namespace,
     node_groups: list[eks.NodeGroupV2],
+    prometheus_operator_crds: kubernetes.yaml.v2.ConfigGroup,
     k8s_global_labels: dict[str, str],
     operations_tolerations: list[dict[str, str]],
     versions: dict[str, str],
@@ -40,6 +41,7 @@ def setup_cert_manager(
     :param k8s_provider: The Kubernetes provider for Pulumi.
     :param operations_namespace: The operations namespace object.
     :param node_groups: A list of EKS node groups.
+    :param prometheus_operator_crds: The Prometheus Operator CRDs, needed for the ServiceMonitor.
     :param k8s_global_labels: A dictionary of global labels to apply to Kubernetes resources.
     :param operations_tolerations: A list of tolerations for scheduling on operations nodes.
     :param versions: A dictionary of component versions.
@@ -197,7 +199,7 @@ def setup_cert_manager(
         opts=ResourceOptions(
             provider=k8s_provider,
             parent=operations_namespace,
-            depends_on=[cluster, *node_groups],
+            depends_on=[cluster, *node_groups, prometheus_operator_crds],
             delete_before_replace=True,
         ),
     )
