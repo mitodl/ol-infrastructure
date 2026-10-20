@@ -145,6 +145,76 @@ baked_search() {
 	awk '/^search/ {$1=""; print substr($0,2); exit}' <<<"$1"
 }
 
+# ---------------------------------------------------------------------------
+# Memo of readings a restart proved us wrong about
+# ---------------------------------------------------------------------------
+# Detection compares a container's config against the *host's* and probes
+# suspect resolvers *from the host*. On macOS both of those run on the Mac,
+# while the container's resolvers belong to the Docker VM — so a VM-internal
+# forwarder (OrbStack's 0.250.250.200, Docker Desktop's 192.168.65.7) is
+# neither in the Mac's list nor reachable from it, and reads as drift on every
+# single run. Docker Desktop no longer copies the host's search domain either,
+# which flags the dagger engine the same way. The restart then re-bakes a
+# byte-identical file, confirm_restart recognises the false positive — and the
+# next run repeats the whole thing, so every start and every wake bounces the
+# cluster for nothing.
+#
+# So record the verdict rather than rediscovering it. A reading that survived a
+# restart unchanged is a permanent feature of this setup, not a leftover from
+# the previous network, and is skipped on later runs.
+#
+# What keeps this from masking real drift is the fingerprint: the memo is
+# scoped to the host resolver config it was formed under. Change networks and
+# the fingerprint no longer matches, the memo is discarded wholesale, and every
+# reading is judged fresh again — which is exactly the moment this script needs
+# to be believed.
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/ol-local-dev"
+MEMO_FILE="${HEAL_DNS_MEMO:-$STATE_DIR/heal-dns-false-positives}"
+
+# Lines are "ns <address>" or "search <domain>".
+KNOWN_OK=""
+
+memo_has() { [[ -n "$KNOWN_OK" ]] && grep -qxF "$1" <<<"$KNOWN_OK"; }
+memo_add() { memo_has "$1" || KNOWN_OK+="${KNOWN_OK:+$'\n'}$1"; }
+
+host_fingerprint() {
+	printf '%s|%s\n' "$(tr '\n' ',' <<<"$HOST_NS")" "$HOST_SEARCH"
+}
+
+load_memo() {
+	[[ -r "$MEMO_FILE" ]] || return 0
+	[[ "$(head -n1 "$MEMO_FILE")" == "$(host_fingerprint)" ]] || return 0
+	KNOWN_OK="$(tail -n +2 "$MEMO_FILE")"
+}
+
+save_memo() {
+	[[ -n "$KNOWN_OK" ]] || return 0
+	mkdir -p "$(dirname "$MEMO_FILE")" 2>/dev/null || return 0
+	{
+		host_fingerprint
+		printf '%s\n' "$KNOWN_OK"
+	} >"$MEMO_FILE" 2>/dev/null || true
+}
+
+# Record what we misjudged about a container that came back unchanged. Only
+# resolvers the host does not list are worth remembering — those are the ones
+# that reached the drift-candidate branch in the first place.
+remember_false_positives() {
+	local conf="$1" ns their_search
+	local -a upstreams
+	mapfile -t upstreams < <(baked_upstreams "$conf")
+	for ns in "${upstreams[@]:-}"; do
+		[[ -z "$ns" ]] && continue
+		grep -qxF "$ns" <<<"$HOST_NS" && continue
+		memo_add "ns $ns"
+	done
+	their_search="$(baked_search "$conf")"
+	[[ "$their_search" != "$HOST_SEARCH" ]] && memo_add "search $their_search"
+	return 0
+}
+
+load_memo
+
 # Does this resolver actually answer? Used to confirm that a resolver missing
 # from the host's list is genuinely unreachable, rather than merely unfamiliar.
 resolver_answers() {
@@ -181,6 +251,7 @@ upstreams_stale() {
 	for ns in "${upstreams[@]}"; do
 		grep -qxF "$ns" <<<"$HOST_NS" && continue
 		grep -qxF "$ns" <<<"$DOCKER_FALLBACK_NS" && continue
+		memo_has "ns $ns" && continue
 		# Present in the container, absent from the host: a drift candidate.
 		if ! $HAVE_DIG || ! resolver_answers "$ns"; then
 			found_stale=true
@@ -216,7 +287,11 @@ search_stale() {
 	local conf="$1" their_search
 	[[ -z "$conf" ]] && return 1
 	their_search="$(baked_search "$conf")"
-	[[ "$their_search" != "$HOST_SEARCH" ]]
+	[[ "$their_search" == "$HOST_SEARCH" ]] && return 1
+	# A mismatch a previous restart could not change is this platform's normal
+	# output, not drift — see the memo above.
+	memo_has "search $their_search" && return 1
+	return 0
 }
 
 # ---------------------------------------------------------------------------
@@ -257,7 +332,8 @@ confirm_restart() {
 		return 0
 	fi
 	if [[ -n "$before" && "$after" == "$before" ]]; then
-		warn "'$name' came back with an unchanged resolv.conf, so it already matches what this host produces now; treating the earlier stale reading as a false positive."
+		remember_false_positives "$after"
+		warn "'$name' came back with an unchanged resolv.conf, so it already matches what this host produces now; treating the earlier stale reading as a false positive and skipping it until the host's DNS changes."
 		return 0
 	fi
 	warn "Still stale after restart: $name"
@@ -422,6 +498,10 @@ for eng in "${stale_dagger[@]:-}"; do
 	fi
 	confirm_restart "$eng" true || failed+=("$eng")
 done
+
+# Persist anything learned above before reporting, so a run that ends in
+# failure still spares the next one the restarts it already proved pointless.
+save_memo
 
 if [[ ${#failed[@]} -gt 0 ]]; then
 	warn "Could not heal: ${failed[*]}"
