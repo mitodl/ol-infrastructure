@@ -76,7 +76,7 @@ from ol_infrastructure.applications.omnigraph.lock_handoff import (
     uses_persisted_lock,
 )
 from ol_infrastructure.applications.omnigraph.maintenance import (
-    DEFAULT_CLEANUP_ISO_WEEKDAY,
+    DEFAULT_CLEANUP_ISO_WEEKDAYS,
     DEFAULT_CLEANUP_OLDER_THAN,
     DEFAULT_CLEANUP_SCHEDULE,
     DEFAULT_MAINTENANCE_SCHEDULE,
@@ -328,18 +328,27 @@ CLEANUP_SCHEDULE = omnigraph_config.get("cleanup_schedule") or DEFAULT_CLEANUP_S
 MAINTENANCE_SCHEDULE = (
     omnigraph_config.get("maintenance_schedule") or DEFAULT_MAINTENANCE_SCHEDULE
 )
-# `is None`, not `or`: a configured 0 has to reach the range check below
-# rather than read as "unset" and become the default.
-_configured_cleanup_weekday = omnigraph_config.get_int("cleanup_iso_weekday")
-CLEANUP_ISO_WEEKDAY = (
-    DEFAULT_CLEANUP_ISO_WEEKDAY
-    if _configured_cleanup_weekday is None
-    else _configured_cleanup_weekday
-)
-if not 1 <= CLEANUP_ISO_WEEKDAY <= 7:  # noqa: PLR2004
+# `is None`, not `or`: a configured empty list has to reach the check below
+# rather than read as "unset" and become the default. A bare `7` (the old
+# cleanup_iso_weekday shape) and a boolean (an int subclass the image would
+# refuse at start) are both rejected here, at preview.
+_configured_cleanup_weekdays = omnigraph_config.get_object("cleanup_iso_weekdays")
+if _configured_cleanup_weekdays is None:
+    CLEANUP_ISO_WEEKDAYS = DEFAULT_CLEANUP_ISO_WEEKDAYS
+elif (
+    isinstance(_configured_cleanup_weekdays, list)
+    and _configured_cleanup_weekdays
+    and all(
+        type(day) is int and 1 <= day <= 7  # noqa: PLR2004
+        for day in _configured_cleanup_weekdays
+    )
+    and len(set(_configured_cleanup_weekdays)) == len(_configured_cleanup_weekdays)
+):
+    CLEANUP_ISO_WEEKDAYS = tuple(_configured_cleanup_weekdays)
+else:
     msg = (
-        "omnigraph:cleanup_iso_weekday must be 1 (Monday) to 7 (Sunday), got "
-        f"{CLEANUP_ISO_WEEKDAY}"
+        "omnigraph:cleanup_iso_weekdays must be a non-empty list of distinct "
+        f"days from 1 (Monday) to 7 (Sunday), got {_configured_cleanup_weekdays!r}"
     )
     raise ValueError(msg)
 if (
@@ -1089,7 +1098,7 @@ data_tier = create_data_tier(
     per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist=GRAPH_REMOVAL_ALLOWLIST,
     maintenance_schedule=MAINTENANCE_SCHEDULE,
-    cleanup_iso_weekday=CLEANUP_ISO_WEEKDAY,
+    cleanup_iso_weekdays=CLEANUP_ISO_WEEKDAYS,
     # Arming a migration suspends the maintenance CronJobs for its duration.
     # They write directly to the store, so scaling the Deployment to zero does
     # not stop them, and `optimize` rewriting fragments between the export and
