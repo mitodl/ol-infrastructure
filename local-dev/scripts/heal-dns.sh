@@ -134,7 +134,8 @@ resolver_answers() {
 # (8.8.8.8, 8.8.4.4) that answer from any network. The failure is not that
 # every resolver is dead; it is that the *dead ones come first* and burn the
 # client's entire timeout budget before the working fallback is ever reached.
-# containerd and dagger both give up at ~20s. So one unreachable stale entry is
+# dagger logs the resolve being abandoned at ~20s; containerd reports the same
+# failure as a bare `Try again` (EAI_AGAIN). So one unreachable stale entry is
 # enough to break image pulls, even with a working resolver behind it.
 upstreams_stale() {
 	local conf="$1" ns found_stale=false

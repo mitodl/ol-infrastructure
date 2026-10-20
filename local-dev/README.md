@@ -1266,7 +1266,7 @@ read udp 10.87.0.1:47380->10.87.0.1:53: i/o timeout
 
 **Why:** Docker writes a container's `/etc/resolv.conf` when the container *starts*, from the host's resolver config at that moment, and never revisits it. Move the host between networks — home wifi to the office, VPN up or down — and every long-running container keeps forwarding DNS to resolvers that are no longer reachable. Nothing in the repo is broken, which is what makes this one confusing: the containers stay up, the nodes report `Ready`, and only name resolution is dead.
 
-A detail worth knowing, because it misleads: Docker appends public fallbacks (`8.8.8.8`, `8.8.4.4`) that *do* answer from any network. The failure is not that every resolver is dead — it's that the dead ones come first and burn the client's whole timeout budget before the fallback is reached. containerd and dagger both give up at ~20s.
+A detail worth knowing, because it misleads: Docker appends public fallbacks (`8.8.8.8`, `8.8.4.4`) that *do* answer from any network. The failure is not that every resolver is dead — it's that the dead ones come first and burn the client's whole timeout budget before the fallback is reached. dagger's own logs show it abandoning the resolve at ~20s; containerd surfaces the same thing as a bare `Try again` (`EAI_AGAIN`).
 
 To confirm, compare a container against the host — a stale one shows the old network's search domain and upstreams:
 
