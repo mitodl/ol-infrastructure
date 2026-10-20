@@ -956,8 +956,11 @@ itself is wrong (e.g. a parameter the model no longer takes). Any other `LLMReje
 403, 404, other statuses, or a transport error with no status) opens the circuit at once.
 `LLMRateLimited` and `LLMUnavailable` count toward a separate threshold of three, and
 `LLMInvalidOutput`, `LLMContentFiltered`, and `LLMBudgetExceeded` are failures of that row
-only. Decided 2026-10-20: one oversized or filtered row stopped the whole batch when every
-rejection opened the circuit.
+only. When a run of row rejections opens the circuit, or every row a batch attempted was
+rejected for its input (a batch shorter than the threshold), the batch report lists those
+rows: each was persisted as not to retry, and a fixed request parameter does not change the
+key, so the caller clears their skip marks once the request is fixed. Decided 2026-10-20: one
+oversized or filtered row stopped the whole batch when every rejection opened the circuit.
 
 ### 6.8 Usage limits
 
