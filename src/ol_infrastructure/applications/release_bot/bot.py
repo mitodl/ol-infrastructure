@@ -75,24 +75,48 @@ _READY_TO_PROMOTE_POLLER = "ready-to-promote"
 _RELEASE_PROGRESS_POLLER = "release-progress"
 
 
-_USAGE = (
-    "Usage:\n"
-    "• `/doof release <app>` — cut a release\n"
-    "• `/doof hotfix <app> <sha>` — cut what production runs plus one commit\n"
-    "• `/doof preview <app>` — show what the next release would contain "
-    "(changes nothing)\n"
-    "• `/doof release-notes <app>` — show unreleased commits\n"
-    "• `/doof release-status [app]` — check release issue status\n"
-    "• `/doof wait-for-checkboxes <app>` — watch a release checklist and "
-    "report progress\n"
-    "• `/doof promote <app>` — promote to production\n"
-    "• `/doof publish <library> [package]` — publish a library to PyPI or npm "
-    "(no argument lists them)\n"
-    "• `/doof abandon <app>` — abandon an in-progress release\n"
-    "• `/doof version [app]` — show what RC and Production are running\n"
-    "• `/doof uptime` — check the bot is alive and its pollers are running\n"
-    "• `/doof help` — show this message\n"
+# subcommand -> (its arguments, what it does). Both `/doof help` and the
+# per-command usage errors are rendered from this, so they cannot drift.
+_SYNTAX: dict[str, tuple[str, str]] = {
+    "release": (
+        "<app>",
+        "cut a release (to replace one already in flight, add `supersede <version>`)",
+    ),
+    "hotfix": ("<app> <sha>", "cut what production runs plus one commit"),
+    "preview": (
+        "<app>",
+        "show what the next release would contain (changes nothing)",
+    ),
+    "release-notes": ("<app>", "show unreleased commits"),
+    "release-status": ("[app]", "check release issue status"),
+    "wait-for-checkboxes": (
+        "<app>",
+        "watch a release checklist and report progress",
+    ),
+    "promote": ("<app>", "promote to production"),
+    "publish": (
+        "<library> [package]",
+        "publish a library to PyPI or npm (no argument lists them)",
+    ),
+    "abandon": ("<app>", "abandon an in-progress release"),
+    "version": ("[app]", "show what RC and Production are running"),
+    "uptime": ("", "check the bot is alive and its pollers are running"),
+    "help": ("", "show this message"),
+}
+
+
+def _syntax(subcommand: str) -> str:
+    """Return a subcommand's invocation, e.g. `/doof release <app>`."""
+    arguments = _SYNTAX[subcommand][0]
+    return f"/doof {subcommand} {arguments}".rstrip()
+
+
+_USAGE = "Usage:\n" + "".join(
+    f"• `{_syntax(subcommand)}` — {what}\n" for subcommand, (_, what) in _SYNTAX.items()
 )
+
+# Stands in for <sha> in usage examples. Any 7+ hex digits read as a SHA.
+_EXAMPLE_SHA = "1a2b3c4"
 
 
 def _describe_in_flight(in_flight: dict[str, Any]) -> str:
@@ -141,8 +165,47 @@ def _omitted_note(omitted: int | None) -> str | None:
     return None
 
 
-def _resolve_app(repos, app_name):
+def _app_lists(repos: dict[str, config.AppConfig]) -> str:
+    """Name the apps the bot drives, and separately the ones Doof still does."""
+    migrated = list(config.release_workflow_apps(repos))
+    legacy = [name for name, cfg in repos.items() if not cfg.release_workflow]
+    text = f"Apps: {', '.join(migrated) or 'none yet'}"
+    if legacy:
+        text += f"\nStill on the legacy pipeline, released by Doof: {', '.join(legacy)}"
+    return text
+
+
+def _usage_hint(repos: dict[str, config.AppConfig], subcommand: str) -> str:
+    """Return a subcommand's usage line plus an example naming a real app."""
+    hint = f"Usage: `{_syntax(subcommand)}`"
+    # An app the bot can drive, so copying the example does something.
+    example_app = next(iter(config.release_workflow_apps(repos)), None)
+    if example_app is not None:
+        example = (
+            _syntax(subcommand)
+            .replace("<app>", example_app)
+            .replace("[app]", example_app)
+            .replace("<sha>", _EXAMPLE_SHA)
+        )
+        hint += f", e.g. `{example}`"
+    return hint
+
+
+async def _refuse(respond: _SlackCallable, message: str) -> None:
+    """Reply to a command that did nothing, visibly only to whoever ran it.
+
+    _in_channel makes release state visible to the whole channel. A mistyped
+    or refused command is not release state, so it does not need an audience.
+    """
+    await respond(message, response_type="ephemeral")
+
+
+def _resolve_app(repos, app_name, subcommand=None):
     """Return (cfg, None) for an app this bot can drive, else (None, error).
+
+    `subcommand` names the command being run, so a missing or mistyped app
+    gets that command's usage line. The promote button passes none: its app
+    comes from the bot's own message, not from anything a person typed.
 
     Refusing a legacy-pipeline app here is the whole point. Every registered
     app is offered in the command surface, but the jobs and artifacts these
@@ -155,7 +218,12 @@ def _resolve_app(repos, app_name):
     version the legacy pipeline will never cut.
     """
     if app_name not in repos:
-        return None, f"Unknown app `{app_name}`. Known apps: {', '.join(repos)}"
+        if app_name or subcommand is None:
+            problem = f"Unknown app `{_slack_escape(app_name)}`."
+        else:
+            problem = f"`/doof {subcommand}` needs an app."
+        hint = f"\n{_usage_hint(repos, subcommand)}" if subcommand else ""
+        return None, f"{problem}{hint}\n{_app_lists(repos)}"
     cfg = repos[app_name]
     if not cfg.release_workflow:
         return None, (
@@ -166,18 +234,120 @@ def _resolve_app(repos, app_name):
     return cfg, None
 
 
+# The word that confirms discarding an in-flight release: `/doof release <app>
+# supersede <version>`. A plain word, not a `--flag`, because Slack clients may
+# rewrite a leading `--` to a dash. The version is the release the person was
+# warned about, so a confirmation cannot be applied to a different release cut
+# in the meantime.
+_SUPERSEDE = "supersede"
+
+
 async def _cmd_release(repos, ack, respond, command, context):
     await ack()
-    app_name = command["text"].strip()
-    cfg, error = _resolve_app(repos, app_name)
+    parts = command["text"].split()
+    app_name, options = (parts[0], parts[1:]) if parts else ("", [])
+    cfg, error = _resolve_app(repos, app_name, "release")
     if cfg is None:
-        await respond(error)
+        await _refuse(respond, error)
         return
+    confirmed_version = None
+    if options:
+        if len(options) != 2 or options[0].lower() != _SUPERSEDE:  # noqa: PLR2004
+            await _refuse(
+                respond,
+                f"Unrecognised option `{_slack_escape(' '.join(options))}`. "
+                f"{_usage_hint(repos, 'release')}\n"
+                f"To replace a release that is already in flight, add "
+                f"`{_SUPERSEDE} <version>` naming it.",
+            )
+            return
+        confirmed_version = options[1]
     async with _app_lock(app_name):
-        await _release(respond, app_name, cfg, context)
+        await _release(respond, app_name, cfg, context, supersede=confirmed_version)
 
 
-async def _release(respond, app_name, cfg, context):
+async def _guard_release_start(
+    respond, app_name, cfg, supersede: str | None
+) -> tuple[bool, dict[str, Any] | None]:
+    """Decide whether `/doof release` may go ahead.
+
+    Returns (proceed, in_flight). When not proceeding, the person has already
+    been told why.
+    """
+    # A release that was cut but never finished. Cutting a new one supersedes
+    # it on action=create, deleting its branch (and possibly its tag). Doof
+    # refused outright and people type `/doof release` twice by reflex, so
+    # that is only done when asked for.
+    try:
+        in_flight = await github.in_flight_release(cfg.repo)
+    except Exception:
+        log.exception("Failed to check in-flight release for %s", app_name)
+        await _refuse(
+            respond,
+            f"❌ Could not check whether `{app_name}` has a release in flight. "
+            "Refusing to trigger — a new release would supersede it, deleting "
+            "its branch, without asking.",
+        )
+        return False, None
+    if in_flight and supersede != in_flight["version"]:
+        version = in_flight["version"]
+        changed = (
+            f"You confirmed `{_slack_escape(supersede)}`, but that is not what is "
+            "in flight now. "
+            if supersede is not None
+            else ""
+        )
+        await _refuse(
+            respond,
+            f"🚧 {changed}`{app_name}` already has release "
+            f"{_describe_in_flight(in_flight)} in flight. A new release supersedes "
+            "it: its release branch is deleted, and its tag too if it never "
+            "reached production.\n"
+            f"• `/doof release {app_name} {_SUPERSEDE} {version}` discards it and "
+            "cuts a new release\n"
+            f"• `/doof release-status {app_name}` shows where it stands\n"
+            f"• `/doof abandon {app_name}` drops it without a new release",
+        )
+        return False, None
+    # The release branch only appears when the build reaches `action: create`,
+    # so GitHub cannot see a release that has been triggered but not cut. A
+    # second `/doof release` typed right after the first finds nothing in
+    # flight, and a second `supersede <version>` still finds the release the
+    # first one is replacing; either way its create supersedes the first
+    # build's cut without asking, so this is checked after a confirmation too.
+    # `_app_lock` serializes the commands, and the first one's build exists
+    # (pending) before the lock is released, so the second one sees it.
+    job = f"build-{app_name}-release-image"
+    try:
+        running = await concourse.active_build_url(cfg.pipeline, job)
+    except Exception:
+        log.exception("Failed to check for a running release build: %s", app_name)
+        await _refuse(
+            respond,
+            f"❌ Could not check whether a release build for `{app_name}` is "
+            "already running. Refusing to trigger — a second one would "
+            "supersede whatever the first one cuts.",
+        )
+        return False, None
+    if running:
+        await _refuse(
+            respond,
+            f"🚧 A release build for `{app_name}` is already running: "
+            f"{running}. A release started now would supersede whatever it cuts, "
+            "without asking. Try again once it finishes (see "
+            f"`/doof release-status {app_name}`), or abort the build in "
+            "Concourse if it is stuck.",
+        )
+        return False, None
+    return True, in_flight
+
+
+async def _release(respond, app_name, cfg, context, *, supersede: str | None = None):
+    """Trigger a release.
+
+    `supersede` is the version of the in-flight release the caller confirmed
+    discarding; it only counts if that is still the release in flight.
+    """
     # While a hotfix request is pending the release resource offers that
     # hotfix, not the tracked branch, so this build would cut it instead.
     try:
@@ -198,14 +368,9 @@ async def _release(respond, app_name, cfg, context):
         )
         return
 
-    # Report a release that was cut but never finished. Cutting a new one
-    # supersedes it on action=create, so say so rather than letting a branch
-    # (and possibly a tag) be deleted silently.
-    in_flight = None
-    try:
-        in_flight = await github.in_flight_release(cfg.repo)
-    except Exception:
-        log.exception("Failed to check in-flight release for %s", app_name)
+    proceed, in_flight = await _guard_release_start(respond, app_name, cfg, supersede)
+    if not proceed:
+        return
 
     try:
         # The release resource is configured `check_every: never` with no
@@ -256,9 +421,9 @@ async def _cmd_preview(repos, ack, respond, command, _context):
     """Show what the next release would contain, without triggering anything."""
     await ack()
     app_name = command["text"].strip()
-    cfg, error = _resolve_app(repos, app_name)
+    cfg, error = _resolve_app(repos, app_name, "preview")
     if cfg is None:
-        await respond(error)
+        await _refuse(respond, error)
         return
     # While a hotfix request is pending the release resource offers that
     # hotfix, not the tracked branch's calver-next version -- same check
@@ -301,7 +466,9 @@ async def _cmd_preview(repos, ack, respond, command, _context):
     if preview["in_flight"]:
         lines.append(
             f"⚠️ In flight: {_describe_in_flight(preview['in_flight'])} — cut but "
-            "not finished. Cutting a new release supersedes it."
+            "not finished. Cutting a new release supersedes it, and "
+            f"`/doof release {app_name} {_SUPERSEDE} "
+            f"{preview['in_flight']['version']}` is how you ask for that."
         )
     if commits:
         lines += [_commit_line(cfg.repo, c) for c in commits]
@@ -316,9 +483,9 @@ async def _cmd_preview(repos, ack, respond, command, _context):
 async def _cmd_release_notes(repos, ack, respond, command, _context):
     await ack()
     app_name = command["text"].strip()
-    cfg, error = _resolve_app(repos, app_name)
+    cfg, error = _resolve_app(repos, app_name, "release-notes")
     if cfg is None:
-        await respond(error)
+        await _refuse(respond, error)
         return
     try:
         unreleased = await github.commits_since_last_tag(cfg.repo)
@@ -342,9 +509,9 @@ async def _cmd_release_status(repos, ack, respond, command, _context):
     await ack()
     app_filter = command["text"].strip() or None
     if app_filter:
-        cfg, error = _resolve_app(repos, app_filter)
+        cfg, error = _resolve_app(repos, app_filter, "release-status")
         if cfg is None:
-            await respond(error)
+            await _refuse(respond, error)
             return
         targets = {app_filter: cfg}
     else:
@@ -393,9 +560,9 @@ async def _cmd_release_status(repos, ack, respond, command, _context):
 async def _cmd_promote(repos, ack, respond, command, context):
     await ack()
     app_name = command["text"].strip()
-    cfg, error = _resolve_app(repos, app_name)
+    cfg, error = _resolve_app(repos, app_name, "promote")
     if cfg is None:
-        await respond(error)
+        await _refuse(respond, error)
         return
     try:
         issues = await github.open_release_issues(cfg.repo)
@@ -524,8 +691,7 @@ async def _cmd_publish(repos, ack, respond, command, _context):
 
     if not library:
         await respond(
-            f"Usage: `/doof publish <library> [package]`.\n"
-            f"Known libraries: {_known_libraries()}"
+            f"Usage: `{_syntax('publish')}`.\nKnown libraries: {_known_libraries()}"
         )
         return
 
@@ -577,9 +743,9 @@ async def _cmd_publish(repos, ack, respond, command, _context):
 async def _cmd_abandon(repos, ack, respond, command, _context):
     await ack()
     app_name = command["text"].strip()
-    cfg, error = _resolve_app(repos, app_name)
+    cfg, error = _resolve_app(repos, app_name, "abandon")
     if cfg is None:
-        await respond(error)
+        await _refuse(respond, error)
         return
     async with _app_lock(app_name):
         await _abandon(respond, app_name, cfg)
@@ -845,7 +1011,7 @@ def _checkbox_watch_preflight(repos, app_name):
     caller, so the `_slack_app is None` check below is what narrows the type
     for everything downstream.
     """
-    cfg, error = _resolve_app(repos, app_name)
+    cfg, error = _resolve_app(repos, app_name, "wait-for-checkboxes")
     if cfg is None:
         return None, None, error
     channel = cfg.channel or os.environ.get("RELEASE_ANNOUNCE_CHANNEL")
@@ -875,7 +1041,7 @@ async def _cmd_wait_for_checkboxes(repos, ack, respond, command, _context):
     app_name = command["text"].strip()
     app, channel, error = _checkbox_watch_preflight(repos, app_name)
     if error or app is None:
-        await respond(error)
+        await _refuse(respond, error)
         return
     cfg = repos[app_name]
 
@@ -969,12 +1135,17 @@ async def _cmd_hotfix(repos, ack, respond, command, context):
     await ack()
     app_name, _, ref = command["text"].strip().partition(" ")
     ref = ref.strip().lower()
-    if not app_name or not _COMMIT_SHA_RE.match(ref):
-        await respond("Usage: `/doof hotfix <app> <commit sha>`")
-        return
-    cfg, error = _resolve_app(repos, app_name)
+    cfg, error = _resolve_app(repos, app_name, "hotfix")
     if cfg is None:
-        await respond(error)
+        await _refuse(respond, error)
+        return
+    if not _COMMIT_SHA_RE.match(ref):
+        problem = (
+            f"`{_slack_escape(ref)}` is not a commit SHA."
+            if ref
+            else "`/doof hotfix` needs the commit to hotfix."
+        )
+        await _refuse(respond, f"{problem}\n{_usage_hint(repos, 'hotfix')}")
         return
     async with _app_lock(app_name):
         await _hotfix(respond, app_name, cfg, ref, context)
@@ -1021,14 +1192,7 @@ async def _cmd_help(
     await ack()
     # Name the apps too: the usage alone leaves <app> to guesswork, and a
     # guess at a legacy app is refused.
-    migrated = list(config.release_workflow_apps(repos))
-    legacy = [name for name, cfg in repos.items() if not cfg.release_workflow]
-    lines = [_USAGE, f"Apps: {', '.join(migrated) or 'none yet'}"]
-    if legacy:
-        lines.append(
-            f"Still on the legacy pipeline, released by Doof: {', '.join(legacy)}"
-        )
-    await respond("\n".join(lines))
+    await respond(f"{_USAGE}\n{_app_lists(repos)}")
 
 
 def _format_elapsed(elapsed: timedelta) -> str:
@@ -1153,9 +1317,9 @@ async def _cmd_version(
     await ack()
     app_filter = command["text"].strip()
     if app_filter:
-        cfg, error = _resolve_app(repos, app_filter)
+        cfg, error = _resolve_app(repos, app_filter, "version")
         if cfg is None:
-            await respond(error)
+            await _refuse(respond, error)
             return
         targets = {app_filter: cfg}
     else:
@@ -1463,7 +1627,28 @@ def _format_age(age: timedelta) -> str:
     return f"{hours}h" if hours < 24 else f"{hours // 24}d"  # noqa: PLR2004
 
 
-async def _milestone_text(app_name, cfg, environment, deployment) -> str:
+async def _outstanding_mentions(client, issue) -> str:
+    """Render the authors with unchecked items on *issue*, or "" for none.
+
+    The RC announcement is how an engineer learns their commit is on RC and
+    needs verifying, so it names them rather than leaving every author to
+    notice a channel message. An author with several items is named once, and
+    one whose items are all checked is not named. A lookup failure drops the
+    names, not the announcement.
+    """
+    if not issue or not issue.get("body"):
+        return ""
+    outstanding = github.unchecked_authors(issue["body"])
+    if not outstanding:
+        return ""
+    try:
+        return await slack_users.format_authors(client, outstanding)
+    except Exception:
+        log.exception("Failed to render the outstanding authors of %s", issue["url"])
+        return ""
+
+
+async def _milestone_text(app_name, cfg, environment, deployment, client) -> str:
     """Render the Slack message for a deployment that just reached success."""
     version = deployment["version"]
     issue = None
@@ -1473,13 +1658,24 @@ async def _milestone_text(app_name, cfg, environment, deployment) -> str:
         # The milestone still goes out without the link; "what is in this
         # release" is one click worse, not missing.
         log.exception("Failed to find the release issue for %s %s", app_name, version)
+    if issue is None and environment == github.RC_ENVIRONMENT:
+        # Nobody is chased for a release whose issue was not found, and the
+        # version is recorded as announced, so leave a trace.
+        log.warning(
+            "No release issue found for %s %s; its authors were not mentioned",
+            app_name,
+            version,
+        )
     link = f" <{issue['url']}|Release issue>" if issue else ""
     if environment == github.PRODUCTION_ENVIRONMENT:
         return f"🎉 `{app_name}` {version} is live in production.{link}"
-    return (
+    text = (
         f"🚢 `{app_name}` {version} is deployed to RC.{link}"
         " Check off your items once you have verified them."
     )
+    if mentions := await _outstanding_mentions(client, issue):
+        text += f"\nStill waiting on: {mentions}"
+    return text
 
 
 async def _announce_deployments(app, repos, state: ReleaseProgressState) -> bool:
@@ -1540,7 +1736,9 @@ async def _announce_deployments(app, repos, state: ReleaseProgressState) -> bool
             try:
                 await app.client.chat_postMessage(
                     channel=await slack_channels.resolve(app.client, channel),
-                    text=await _milestone_text(app_name, cfg, environment, deployment),
+                    text=await _milestone_text(
+                        app_name, cfg, environment, deployment, app.client
+                    ),
                 )
             except Exception:
                 ok = False
@@ -1575,7 +1773,9 @@ async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta) -> str:
         state_line = "It has not reached RC."
     return (
         f"⏳ `{app_name}` {version} was cut {_format_age(age)} ago and is not "
-        f"finished. {state_line} <{in_flight['url']}|{in_flight['branch']}>"
+        f"finished. {state_line} <{in_flight['url']}|{in_flight['branch']}>\n"
+        f"`/doof release {app_name} {_SUPERSEDE} {version}` replaces it with a "
+        f"new release; `/doof abandon {app_name}` drops it."
     )
 
 

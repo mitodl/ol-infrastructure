@@ -19,6 +19,9 @@ Sub-modules
     Tempo-derived spanmetrics.
   clickhouse_altinity — Altinity's operator and Keeper dashboards for the
     shared LLMOps ClickHouse cluster, vendored as upstream JSON in vendor/.
+  starrocks_overview — Service health for the StarRocks lakehouse (FE quorum,
+    queries by catalog, CN capacity, shared-data S3 path), limited to the
+    metric families its ServiceMonitors keep.
   user_journey — Renders one dashboard per entry in `journeys`, scoped to a
     single user-facing capability rather than to a service, and split by
     `service_version` so a release can be compared against the one before it.
@@ -27,9 +30,9 @@ Sub-modules
     there; no change to `user_journey` or to this module is needed.
 
 Dashboards live in per-subject folders (Keycloak, Application Performance,
-ClickHouse, User Journeys) so an unrelated dashboard is not filed under a
-service it has nothing to do with; add a new Folder in `create()` rather than
-widening an existing one.
+ClickHouse, StarRocks, User Journeys) so an unrelated dashboard is not filed
+under a service it has nothing to do with; add a new Folder in `create()`
+rather than widening an existing one.
 """
 
 import json
@@ -46,6 +49,7 @@ from ol_infrastructure.infrastructure.grafana_alerting.dashboards import (
     keycloak_olapps_realm,
     keycloak_overview,
     service_red,
+    starrocks_overview,
     user_journey,
 )
 from ol_infrastructure.infrastructure.grafana_alerting.dashboards.datasources import (
@@ -615,6 +619,22 @@ def create(resource_opts: ResourceOptions) -> None:
 
     clickhouse_altinity.create(
         clickhouse_folder.uid,
+        _create_dashboard,
+        resource_opts,
+    )
+
+    starrocks_folder = Folder(
+        "starrocks-dashboards-folder",
+        title="StarRocks",
+        uid="starrocks-dashboards",
+        opts=resource_opts,
+    )
+
+    starrocks_overview.create(
+        starrocks_folder.uid,
+        _timeseries_panel,
+        _stat_panel,
+        _row_panel,
         _create_dashboard,
         resource_opts,
     )

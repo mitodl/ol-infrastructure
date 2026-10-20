@@ -152,7 +152,12 @@ core_node_selector = {"ol.mit.edu/core_node": "true"}
 # The scheduling room now comes from capacity instead: the core nodegroup runs
 # one more node than there are FE replicas, and FE's cpu_request is sized to
 # observed usage rather than the docs' sizing recommendation, so FE fits in the
-# gaps left by other workloads. The CRD does support `tolerations`, so if
+# gaps left by other workloads. That headroom is per zone, not cluster-wide:
+# each FE's meta/log PVCs are EBS volumes pinned to one AZ, and the core
+# nodegroup normally runs one node per AZ, so a spare node in another zone
+# cannot take a displaced FE (incident 2026-10-09, fe-0 in us-east-1b). CN is
+# kept off core nodes for the
+# same reason (see starrocksCnSpec). The CRD does support `tolerations`, so if
 # capacity headroom proves insufficient the next step is a NoSchedule taint on
 # the core nodegroup plus a matching toleration here.
 
@@ -623,7 +628,28 @@ if starrocks_config.get_bool("use_cn"):
         "image": {"tag": STARROCKS_VERSION},
         "serviceAccount": "starrocks",
         "runAsNonRoot": True,
-        "affinity": _starrocks_pod_anti_affinity("cn", required=False),
+        # Incident 2026-10-09 (prod): with no node constraint, both CN pods
+        # landed on core nodes, and cn-1 took 16Gi on the only core node in
+        # fe-0's EBS zone. fe-0 sat Pending for days. CN is stateless, so keep
+        # it on the Karpenter fleet and leave core capacity for FE.
+        "affinity": {
+            **_starrocks_pod_anti_affinity("cn", required=False),
+            "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                    "nodeSelectorTerms": [
+                        {
+                            "matchExpressions": [
+                                {
+                                    "key": "ol.mit.edu/core_node",
+                                    "operator": "NotIn",
+                                    "values": ["true"],
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+        },
         "resources": {
             "requests": {
                 # StarRocks recommends 16 CPU cores and 64 GB RAM per CN node.

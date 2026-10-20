@@ -253,15 +253,12 @@ def test_append_exec_debug_event_is_disabled_by_default(
 
 
 @pytest.mark.unit
-def test_build_kubeconfig_developer_current_context_is_operator(
-    eks_module, two_clusters
-):
-    """Default current-context should be the operator context, not the readonly one."""
+def test_build_kubeconfig_sets_no_current_context_by_default(eks_module, two_clusters):
+    """No cluster becomes the default kubectl target unless one is requested."""
     kubeconfig = eks_module.build_kubeconfig(
         two_clusters, eks_module.AccessMode.DEVELOPER, None
     )
-    # PREFERRED_DEFAULT_CONTEXT is "applications-qa"
-    assert kubeconfig["current-context"] == "applications-qa"
+    assert "current-context" not in kubeconfig
 
 
 # ---------------------------------------------------------------------------
@@ -358,31 +355,6 @@ def test_build_kubeconfig_readonly_mode_produces_single_contexts(
     context_names = [ctx["name"] for ctx in kubeconfig["contexts"]]
     assert context_names == ["applications-qa", "data-production"]
     assert not any("-readonly" in name for name in context_names)
-
-
-# ---------------------------------------------------------------------------
-# resolve_current_context
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-def test_resolve_current_context_falls_back_to_first_cluster(eks_module):
-    """The first cluster should be used when the preferred default is absent."""
-    clusters = [
-        eks_module.ClusterConfig(
-            cluster_name="operations-ci",
-            server="https://operations-ci.example.invalid",
-            certificate_authority_data="ca1",
-            admin_role_arn="",
-        ),
-        eks_module.ClusterConfig(
-            cluster_name="data-ci",
-            server="https://data-ci.example.invalid",
-            certificate_authority_data="ca2",
-            admin_role_arn="",
-        ),
-    ]
-    assert eks_module.resolve_current_context(clusters, None) == "operations-ci"
 
 
 # ---------------------------------------------------------------------------

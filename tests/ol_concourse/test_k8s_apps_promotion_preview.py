@@ -22,7 +22,10 @@ from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
     CLASSIFY_TASK_NAME,
     build_app_pipeline,
 )
-from ol_concourse.pipelines.infrastructure.k8s_apps.scripts import classify_promotion
+from ol_concourse.pipelines.infrastructure.k8s_apps.scripts import (
+    assert_gate_names_deploy,
+    classify_promotion,
+)
 
 APP = "ol-analytics-api"
 PULUMI = f"pulumi-ol-application-{APP}"
@@ -30,6 +33,8 @@ DOCKER_TAG_ENV = "OL_ANALYTICS_API_DOCKER_TAG"
 RELEASE_APPS = ("ol-analytics-api", "learn-ai", "micromasters")
 VERSION = "2026.10.2.1"
 LIVE = "2026.10.1.1"
+SHA = "c" * 40
+MARKER = f"<!-- ol-infrastructure-revision: {SHA} -->"
 
 
 def _job(app_name: str, job_suffix: str) -> dict[str, Any]:
@@ -114,6 +119,19 @@ def test_classify_reads_the_fresh_production_state_and_the_preview():
     assert params["PRODUCTION_STATE_FILE"] == f"{APP}-release-current/production_state"
     assert params["PREVIEW_SUMMARY_FILE"] == f"{PULUMI}/preview_summary.md"
     assert params["NO_CHANGES_MARKER_FILE"] == f"{PULUMI}/preview_summary.md.no-changes"
+
+
+def test_classify_reads_the_ol_infra_commit_qa_previewed():
+    """The commit in the body is the checkout the Production preview ran from."""
+    plan = _job(APP, "-qa")["plan"]
+    task = plan[_index(plan, "task", CLASSIFY_TASK_NAME)]
+    params = task["config"]["params"]
+    code_get = _index(plan, "get", f"ol-infra-{APP}")
+
+    assert code_get < _index(plan, "put", PULUMI, nth=1)
+    assert params["INFRA_REF_FILE"] == f"ol-infra-{APP}/.git/ref"
+    assert params["INFRA_REPO_URL"] == "https://github.com/mitodl/ol-infrastructure"
+    assert f"ol-infra-{APP}" in {i["name"] for i in task["config"]["inputs"]}
 
 
 def test_issue_put_carries_the_composed_body_and_skip_marker():
@@ -239,8 +257,10 @@ def _classify(  # noqa: PLR0913
     summary: str | None,
     no_changes: bool,
     version: str = VERSION,
+    revision: str = SHA,
 ) -> tuple[subprocess.CompletedProcess[str], Path]:
     (tmp_path / "version").write_text(version + "\n")
+    (tmp_path / "ref").write_text(revision + "\n")
     (tmp_path / "production_version").write_text(production)
     (tmp_path / "production_state").write_text(state)
     (tmp_path / "checklist.md").write_text(f"## Release {version}\n\n- [ ] a by b\n")
@@ -260,6 +280,8 @@ def _classify(  # noqa: PLR0913
             "CHECKLIST_FILE": str(tmp_path / "checklist.md"),
             "PREVIEW_SUMMARY_FILE": str(tmp_path / "preview_summary.md"),
             "NO_CHANGES_MARKER_FILE": str(tmp_path / "preview_summary.md.no-changes"),
+            "INFRA_REF_FILE": str(tmp_path / "ref"),
+            "INFRA_REPO_URL": "https://github.com/mitodl/ol-infrastructure",
             "OUTPUT_DIR": str(out),
         },
         capture_output=True,
@@ -270,7 +292,7 @@ def _classify(  # noqa: PLR0913
 
 
 def test_classify_release_with_a_diff_leads_with_the_checklist(tmp_path):
-    """The checklist leads so its version header stays at the top."""
+    """The checklist leads, after the hidden marker, so its header shows first."""
     result, out = _classify(
         tmp_path,
         production=LIVE,
@@ -281,7 +303,9 @@ def test_classify_release_with_a_diff_leads_with_the_checklist(tmp_path):
 
     assert result.returncode == 0, result.stderr
     body = (out / "body.md").read_text()
-    assert body.startswith(f"## Release {VERSION}")
+    marker, rest = body.split("\n\n", 1)
+    assert marker == MARKER
+    assert rest.startswith(f"## Release {VERSION}")
     assert "+ 1 to update" in body
     assert not (out / "skip").exists()
     # The put posts it only while the release is still alive.
@@ -389,4 +413,44 @@ def test_classify_fails_closed_without_a_preview_summary(tmp_path):
 
     assert result.returncode != 0
     assert "left no summary" in result.stderr
+    assert not (out / "title").exists()
+
+
+@pytest.mark.parametrize(("production", "no_changes"), [(LIVE, True), (VERSION, False)])
+def test_classify_body_opens_with_the_previewed_revision(
+    tmp_path, production, no_changes
+):
+    """Every posted body names the previewed commit first.
+
+    First, because the issue put truncates an oversized body from the end. The
+    Production job's gate check refuses to deploy any other commit under it.
+    """
+    result, out = _classify(
+        tmp_path,
+        production=production,
+        state="known",
+        summary="+ 1 to update",
+        no_changes=no_changes,
+    )
+
+    assert result.returncode == 0, result.stderr
+    body = (out / "body.md").read_text()
+    assert body.startswith(MARKER + "\n")
+    assert f"/commit/{SHA})" in body
+    assert assert_gate_names_deploy.approved_revision(body) == SHA
+
+
+def test_classify_fails_closed_without_a_commit_sha(tmp_path):
+    """An issue that cannot name its commit could never be deployed; post none."""
+    result, out = _classify(
+        tmp_path,
+        production=LIVE,
+        state="known",
+        summary="+ 1 to update",
+        no_changes=False,
+        revision="main",
+    )
+
+    assert result.returncode != 0
+    assert "not a full commit SHA" in result.stderr
     assert not (out / "title").exists()

@@ -1193,28 +1193,43 @@ ASSERT_GATE_TASK_NAME = "assert-gate-names-deploy"
 
 
 def _assert_gate_names_deploy_task(
-    app_name: str, release_gate: Resource, version_input: Resource
+    app_name: str,
+    github_repo: str,
+    release_gate: Resource,
+    version_input: Resource,
+    infra_input: Identifier,
 ) -> TaskStep:
-    """Fail the job unless the closed gate issue names the version it deploys.
+    """Fail the job unless the closed gate issue names what it deploys.
 
     Accepts ``Release <app> <version>`` and ``Release <app> infrastructure @
     <version>``, and requires ``<version>`` to equal the contents of
     ``<version_input>/version``, which has to be the same file the job's
-    ``DOCKER_TAG`` comes from. The gate get has already tombstoned the issue,
-    so a refused issue does not fire again. A failure here means nothing
-    deployed, which turns gate/deploy drift into a red build instead of an
-    unapproved release.
+    ``DOCKER_TAG`` comes from. The issue body's revision marker must also name
+    the ol-infrastructure commit in ``<infra_input>``, which has to resolve to
+    the same commit the job's Pulumi code get does. The gate get has already
+    tombstoned the issue, so a refused issue does not fire again. A failure
+    here means nothing deployed, which turns gate/deploy drift into a red build
+    instead of an unapproved release.
     """
     return TaskStep(
         task=Identifier(ASSERT_GATE_TASK_NAME),
         config=TaskConfig(
             platform=Platform.linux,
             image_resource=TASK_IMAGE,
-            inputs=[Input(name=release_gate.name), Input(name=version_input.name)],
+            inputs=[
+                Input(name=release_gate.name),
+                Input(name=version_input.name),
+                Input(name=infra_input),
+            ],
             params={
                 "APP_NAME": app_name,
                 "GATE_FILE": f"{release_gate.name}/gh_issue.json",
                 "VERSION_FILE": f"{version_input.name}/version",
+                "INFRA_REF_FILE": f"{infra_input}/.git/ref",
+                "GITHUB_REPOSITORY": github_repo,
+                "GITHUB_APP_ID": GITHUB_APP_ID,
+                "GITHUB_APP_INSTALLATION_ID": GITHUB_APP_INSTALLATION_ID,
+                "GITHUB_APP_PRIVATE_KEY": GITHUB_APP_PRIVATE_KEY,
             },
             run=Command(path="python3", args=["-c", _ASSERT_GATE_SCRIPT]),
         ),
@@ -1258,8 +1273,13 @@ def _classify_promotion_task(
     release_res: Resource,
     current_release: Identifier,
     pulumi_resource: Resource,
+    pulumi_code: Resource,
 ) -> TaskStep:
-    """Compose the release issue's title and body from the Production preview."""
+    """Compose the release issue's title and body from the Production preview.
+
+    *pulumi_code* is the ol-infrastructure checkout the preview ran from; its
+    commit goes into the body for the Production job to check.
+    """
     return TaskStep(
         task=Identifier(CLASSIFY_TASK_NAME),
         config=TaskConfig(
@@ -1269,6 +1289,7 @@ def _classify_promotion_task(
                 Input(name=release_res.name),
                 Input(name=current_release),
                 Input(name=pulumi_resource.name),
+                Input(name=pulumi_code.name),
             ],
             outputs=[Output(name=Identifier(PROMOTION_DIR))],
             params={
@@ -1283,6 +1304,8 @@ def _classify_promotion_task(
                 "NO_CHANGES_MARKER_FILE": (
                     f"{pulumi_resource.name}/{PREVIEW_NO_CHANGES_MARKER}"
                 ),
+                "INFRA_REF_FILE": f"{pulumi_code.name}/.git/ref",
+                "INFRA_REPO_URL": pulumi_code.source["uri"],
                 "OUTPUT_DIR": PROMOTION_DIR,
             },
             run=Command(path="python3", args=["-c", _CLASSIFY_SCRIPT]),
@@ -1686,6 +1709,15 @@ def _build_release_resource_app_pipeline(
     project_name = f"ol-application-{app_name}"
     docker_tag_env = f"{app_name.replace('-', '_').upper()}_DOCKER_TAG"
     release_current = Identifier(f"{app_name}-release-current")
+    # The ol-infra commit Production deploys, fetched again under its own name
+    # so the gate check can read it before anything deploys: pulumi_job puts
+    # its own code get after every dependency. Both gets take ol-infra with
+    # `passed:` QA, as do the release and image gets. Concourse pins inputs
+    # that share a `passed:` job to the outputs of one build of that job and
+    # rejects any build whose version differs, so the two gets name the same
+    # commit.
+    infra_revision = Identifier(f"{ol_infra_repo.name}-revision")
+    qa_job_name = f"deploy-{project_name}-qa"
     qa_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
         # Preview Production at the tag it would deploy, then fold that diff
         # and the app checklist into one release issue, so a single approval
@@ -1712,7 +1744,7 @@ def _build_release_resource_app_pipeline(
             params={"cache_bust": "((.:cache_bust))"},
         ),
         _classify_promotion_task(
-            app_name, release_res, release_current, pulumi_resource
+            app_name, release_res, release_current, pulumi_resource, ol_infra_repo
         ),
         # Open (or update) the GitHub Release Issue. The title names the
         # version it ships, or the live version for an infrastructure-only
@@ -1760,13 +1792,18 @@ def _build_release_resource_app_pipeline(
         ),
     ]
     prod_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
-        # Mark the Production GitHub Deployment as successful.
+        # Mark the Production GitHub Deployment as successful, and say so on the
+        # release issue. Closing that issue authorizes the promotion; it does
+        # not show the release is live, and a closed issue is easy to misread as
+        # "shipped". The comment links the Deployment, which is what records
+        # what is live. The gate's get already put gh_issue.json in the job.
         PutStep(
             put=deployment_prod.name,
             params={
                 "action": "finish",
                 "deployment_file": f"{deployment_prod.name}/deployment.json",
                 "state": "success",
+                "comment_on_issue_file": f"{release_gate.name}/gh_issue.json",
             },
         ),
         # Merge the release branch back into the main branch and delete it so
@@ -1774,10 +1811,10 @@ def _build_release_resource_app_pipeline(
         #
         # Deliberately NOT wrapped in a `try`. It used to be, because this job
         # can be retriggered by an infra-only merge (QA re-runs on any change
-        # under the watched Pulumi paths, and its release_issue put edits the
-        # already-closed release_gate issue, which Concourse's version="every"
-        # get treats as a new trigger here) with no new app release -- and
-        # finish then failed trying to fetch a release branch that a prior
+        # under the watched Pulumi paths and opens a fresh release_gate issue
+        # for the same version once the earlier one is closed; closing that
+        # one is a new trigger for Concourse's version="every" get here) with
+        # no new app release -- and finish then failed trying to fetch a release branch that a prior
         # finish had already deleted. The release resource now no-ops in that
         # case instead of failing, so the `try` buys nothing and costs
         # everything: it equally swallowed *genuine* finish failures. That is
@@ -1870,9 +1907,18 @@ def _build_release_resource_app_pipeline(
             ],
             1: [
                 GetStep(get=release_gate.name, trigger=True, version="every"),
+                GetStep(
+                    get=infra_revision,
+                    resource=ol_infra_repo.name,
+                    trigger=False,
+                    passed=[qa_job_name],
+                ),
                 # Before the deployment record or the deploy itself: the
-                # issue that fired must name the version being deployed.
-                _assert_gate_names_deploy_task(app_name, release_gate, release_res),
+                # issue that fired must name the version and the ol-infra
+                # commit being deployed.
+                _assert_gate_names_deploy_task(
+                    app_name, github_repo, release_gate, release_res, infra_revision
+                ),
                 # main_repo is needed by the action=finish post-step.
                 GetStep(
                     get=main_repo.name,

@@ -3,7 +3,8 @@
 Bootstraps the Grafana provider and delegates to submodules:
   alertmanager  — contact points + notification policy (all stacks)
   metric_rules  — Prometheus/Mimir metric alert rule groups (all stacks)
-  log_rules     — Loki log-based alert rule groups (all stacks)
+  log_rules     — Loki log-based alert rule groups (all stacks; witan's on
+                  QA and Production only)
   dashboards    — Grafana dashboards (all stacks)
   pingdom_checks — Pingdom uptime checks via dynamic provider (production stack only)
 

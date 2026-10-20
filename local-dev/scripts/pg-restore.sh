@@ -49,12 +49,12 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$DIR" ] && [ -d "$DIR" ] || err "usage: pg-restore.sh DIR [--yes] (DIR must be a pg-backup.sh output directory)"
 
-PG=(kubectl -n local-infra exec local-pg-1 -c postgres --)
-PGI=(kubectl -n local-infra exec -i local-pg-1 -c postgres --)
+PG=(kubectl --context local-dev -n local-infra exec local-pg-1 -c postgres --)
+PGI=(kubectl --context local-dev -n local-infra exec -i local-pg-1 -c postgres --)
 # sql DB "STATEMENT" — quiet, unaligned, tuples-only; every error is fatal.
 sql() { "${PG[@]}" psql -U postgres -qAt -v ON_ERROR_STOP=1 -d "$1" -c "$2"; }
 
-kubectl -n local-infra wait --for=condition=Ready pod/local-pg-1 --timeout=60s > /dev/null \
+kubectl --context local-dev -n local-infra wait --for=condition=Ready pod/local-pg-1 --timeout=60s > /dev/null \
     || err "pod local-pg-1 is not Ready"
 
 # --- Validate every archive before touching the cluster ---------------------

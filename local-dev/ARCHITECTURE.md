@@ -74,7 +74,7 @@ Kubernetes splits *deciding what should run* from *actually running it*.
 - **Data plane** = the workers (the `agent-*` nodes). Each runs a **kubelet** (takes orders from the control plane) and **containerd** (actually starts and stops containers). Your app pods run here.
 
 ```
-$ kubectl get nodes
+$ kubectl --context local-dev get nodes
 NAME                     ROLES                  ...
 k3d-local-dev-agent-0    <none>                 # worker (data plane)
 k3d-local-dev-agent-1    <none>                 # worker (data plane)
@@ -197,7 +197,7 @@ Grafana's **Logs Drilldown** app (`Drilldown → Logs`) is the intended entry po
 
 Alloy also exposes an OTLP receiver on 4317/4318 forwarding to Loki's native OTLP endpoint (`http://alloy.operations.svc.cluster.local:4318`). **Nothing emits to it yet** — it exists so an app can opt into production-style OTLP export by setting the `OTEL_*` env vars used in the deployed environments, and so Keycloak's `OTEL_SDK_DISABLED=true` workaround in `identity_core.py` (added precisely because no receiver existed) can be lifted.
 
-The whole stack is roughly 1.3GB and can be switched off with `observability_enabled: "false"`; nothing else depends on it.
+The whole stack is roughly 1.9GB and can be switched off with `observability_enabled: "false"`; nothing else depends on it.
 
 ## Design decisions
 
@@ -294,9 +294,9 @@ If you did it by hand, each change would be:
 
 1. `docker build -t mitodl/mit-learn-app --target local-dev .`
 2. `k3d image import mitodl/mit-learn-app -c local-dev` (get the image into the cluster — Tilt instead pushes to the local registry, which transfers only changed layers; `image import` copies every layer into every node each time)
-3. `kubectl rollout restart deploy/mitlearn-webapp -n mit-learn`
-4. `kubectl rollout status deploy/mitlearn-webapp -n mit-learn` (wait for the new pod)
-5. `kubectl logs -f deploy/mitlearn-webapp -n mit-learn` (watch it come up)
+3. `kubectl --context local-dev rollout restart deploy/mitlearn-webapp -n mit-learn`
+4. `kubectl --context local-dev rollout status deploy/mitlearn-webapp -n mit-learn` (wait for the new pod)
+5. `kubectl --context local-dev logs -f deploy/mitlearn-webapp -n mit-learn` (watch it come up)
 
 Tilt collapses all of that into a file-watch + in-container sync, and shows the status/logs in one dashboard. The manual commands are still useful to know for debugging when something is stuck.
 

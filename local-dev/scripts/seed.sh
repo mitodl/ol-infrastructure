@@ -88,8 +88,8 @@ exec_in_pod() {
     local deploy="$2"
     local cmd="$3"
 
-    log "kubectl exec -n ${namespace} deploy/${deploy} -- bash -c '${cmd}'"
-    kubectl exec -n "${namespace}" "deploy/${deploy}" -- bash -c "${cmd}"
+    log "kubectl --context local-dev exec -n ${namespace} deploy/${deploy} -- bash -c '${cmd}'"
+    kubectl --context local-dev exec -n "${namespace}" "deploy/${deploy}" -- bash -c "${cmd}"
 }
 
 list_apps() {
@@ -156,7 +156,7 @@ NS="${APP_NAMESPACE[$APP]}"
 DEPLOY="${APP_DEPLOY[$APP]}"
 
 # Verify the deployment is available
-if ! kubectl get deploy "${DEPLOY}" -n "${NS}" &>/dev/null; then
+if ! kubectl --context local-dev get deploy "${DEPLOY}" -n "${NS}" &>/dev/null; then
     err "Deployment '${DEPLOY}' not found in namespace '${NS}'. Is the stack running?"
 fi
 

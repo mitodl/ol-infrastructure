@@ -69,14 +69,14 @@ Sub-modules
                  others it takes no folder_uid: its rules live in the Synthetic
                  Monitoring plugin's folder, not the one created here.
   witan        — New in 2026-08. The shared witan MCP service: the share of tool
-                 calls that fail (the only continuous signal for a quarantined
+                 calls that fail (the only continuous signal for a lost
                  `council` graph, since neither health endpoint can see one),
                  the nightly omnigraph compaction, CronJobs that have never
                  succeeded at all -- the gap eks_general.py's staleness rules
                  document and deliberately leave open -- and omnigraph-server
                  left scaled to 0 replicas, which DeploymentUnavailable*
                  excludes. Pairs with
-                 log_rules/witan.py, which catches the same quarantine at boot
+                 log_rules/witan.py, which catches the same lost graph at boot
                  without needing traffic.
   otel_service_red
                — New in 2026-09. Whole-service p95 latency and 5xx-ratio

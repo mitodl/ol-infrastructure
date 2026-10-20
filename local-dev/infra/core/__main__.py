@@ -82,7 +82,7 @@ keycloak_url = config.get("keycloak_url") or f"https://{keycloak_hostname}"
 apisix_admin_key = config.require_secret("apisix_admin_key")
 apisix_viewer_key = config.require_secret("apisix_viewer_key")
 
-# Observability (Grafana + Loki + Alloy). Roughly 1.3GB of workloads, so it is
+# Observability (Grafana + Loki + Alloy). Roughly 1.9GB of workloads, so it is
 # opt-out for developers on a constrained Docker VM.
 observability_enabled = config.get_bool("observability_enabled") is not False
 
@@ -162,7 +162,7 @@ k8s_provider_opts: dict[str, Any] = {}
 if kubeconfig_path:
     k8s_provider_opts["kubeconfig"] = kubeconfig_path
 
-k8s_provider = k8s.Provider("k3d-local", **k8s_provider_opts)
+k8s_provider = k8s.Provider("k3d-local", context="local-dev", **k8s_provider_opts)
 _k8s = make_resource_opts(k8s_provider)
 
 # ---------------------------------------------------------------------------
@@ -187,6 +187,8 @@ ingress = create_ingress(
     apisix_viewer_key=apisix_viewer_key,
     cert_manager_version=CERT_MANAGER_CHART_VERSION,
     apisix_version=APISIX_CHART_VERSION,
+    trusted_ca_secret=tls.apisix_trusted_ca,
+    trusted_ca_checksum=tls.apisix_trusted_ca_checksum,
 )
 
 # ---------------------------------------------------------------------------

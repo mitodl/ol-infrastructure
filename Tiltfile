@@ -1,6 +1,21 @@
 # MIT Learn Stack — Local Development Entry Point
-# Run: tilt up
+# Run: ./local-dev/scripts/start.sh (or tilt up --context local-dev)
 # Docs: local-dev/README.md
+
+# Tilt applies to, and `tilt down` deletes from, the kubeconfig's current
+# context unless --context overrides it. Its own guard stops only contexts it
+# does not recognize as local: an orbstack or docker-desktop context passes it
+# and would receive the stack, while every kubectl command here targets
+# local-dev.
+if k8s_context() != "local-dev":
+    # k8s_context() is empty when no current context is set or the requested
+    # context is not in the kubeconfig.
+    fail(
+        ("Tilt is pointed at kube context '%s', not 'local-dev'." % k8s_context()
+         if k8s_context() else
+         "Tilt has no usable kube context: none is set, or the one requested is not in your kubeconfig.") +
+        "\n  Run ./local-dev/scripts/start.sh, or pass --context local-dev to tilt up / tilt down."
+    )
 
 # ---------------------------------------------------------------------------
 # Developer configuration
@@ -19,7 +34,15 @@ cfg = config.parse()
 # store and a privileged Concourse worker along with it, which is a lot of
 # machine for a developer who is not working on OCW — add it to enabled_apps
 # in tilt_config.json to switch it on.
-enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
+# Split each entry on commas, because the Pulumi stacks split
+# LOCAL_DEV_ENABLED_APPS on commas. Without this, `--enabled_apps a,b` is one
+# entry here (loading no app Tiltfile) but two apps to Pulumi.
+enabled_apps = [
+    app.strip()
+    for entry in cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
+    for app in entry.split(",")
+    if app.strip()
+]
 per_app_databases = cfg.get("per_app_databases", False)
 
 # An included Tiltfile shares no variables with this one, so an app that
@@ -401,7 +424,11 @@ host_gateway = str(local(
 # Core stack (operators, foundational services, Keycloak instance)
 local_resource(
     "local-infra-core",
-    cmd="bash -c 'pulumi stack init local-dev.core.Dev 2>/dev/null; pulumi refresh --yes --skip-preview --stack local-dev.core.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.core.Dev'",
+    # Tilt sets FORCE_COLOR=1 for local commands. Pulumi's Python host runs
+    # `uv export` and parses its stdout as TOML, and uv honours FORCE_COLOR
+    # even when piped, so the ANSI escapes break the parse ("TOML files cannot
+    # contain control characters: '0x1b'"). Unset it for the Pulumi run.
+    cmd="bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; pulumi stack init local-dev.core.Dev 2>/dev/null; pulumi refresh --yes --skip-preview --stack local-dev.core.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.core.Dev'",
     # Passed as environment rather than interpolated into the command string:
     # log_retention_period is developer-supplied, and a value containing shell
     # metacharacters would otherwise be interpreted here instead of reaching
@@ -449,7 +476,8 @@ local_resource(
 # flight at a time, which the path handles comfortably.
 local_resource(
     "local-infra-apps",
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c '{wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --refresh --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
+    # FORCE_COLOR is unset for the same reason as local-infra-core above.
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --refresh --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
     # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
     # the core stack only creates on demand.
     env={"LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps)},
@@ -484,7 +512,7 @@ if "data-platform" in enabled_apps:
     ]:
         local_resource(
             name,
-            serve_cmd="while true; do kubectl -n local-infra port-forward svc/{service} {host_port}:{port}; sleep 2; done".format(service=service, host_port=lake_host_ports.get(service, port), port=port),
+            serve_cmd="while true; do kubectl --context local-dev -n local-infra port-forward svc/{service} {host_port}:{port}; sleep 2; done".format(service=service, host_port=lake_host_ports.get(service, port), port=port),
             labels=["infra"],
             resource_deps=["local-infra-core"],
         )
@@ -533,7 +561,7 @@ for app in [a for a in APPS if a["name"] in enabled_apps]:
     #   ./local-dev/scripts/seed.sh --app <app> --cmd <label>
     for seed in app.get("seed_commands", []):
         exec_cmd = (
-            "kubectl exec -n {ns} deploy/{deploy} -- {cmd}".format(
+            "kubectl --context local-dev exec -n {ns} deploy/{deploy} -- {cmd}".format(
                 ns=app["namespace"],
                 deploy=app["deploy_name"],
                 cmd=seed["cmd"],

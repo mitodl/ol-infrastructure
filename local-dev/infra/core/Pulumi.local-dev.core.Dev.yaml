@@ -1,6 +1,7 @@
 ---
 config:
-  # Path to the kubeconfig for the k3d cluster.
+  # Path to a kubeconfig holding the k3d cluster as context `local-dev`; the
+  # provider always targets that context name.
   # Defaults to ${HOME}/.kube/config if not set.
   ol-local-dev-core:kubeconfig: ""
   # Path to the mkcert-generated TLS certificate and key.
@@ -12,7 +13,7 @@ config:
   # APISIX secrets for core infrastructure
   ol-local-dev-core:apisix_admin_key: "local-dev-apisix-admin-key"
   ol-local-dev-core:apisix_viewer_key: "local-dev-apisix-viewer-key"
-  # Observability (Grafana + Loki + Alloy, ~1.3GB of workloads).
+  # Observability (Grafana + Loki + Alloy, ~1.9GB of workloads).
   # Set to false to skip it on a constrained Docker VM.
   ol-local-dev-core:observability_enabled: "true"
   # log_retention_period: unset on purpose. Pinning it here would override
