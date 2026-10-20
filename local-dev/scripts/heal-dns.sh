@@ -44,6 +44,7 @@ PROBE_TIMEOUT=2 # seconds per dig attempt against a suspect resolver
 # Overridable so the detection logic can be exercised against a fixture file
 # without touching the real one.
 HOST_RESOLV="${HOST_RESOLV:-/etc/resolv.conf}"
+SYSTEMD_RESOLV="${SYSTEMD_RESOLV:-/run/systemd/resolve/resolv.conf}"
 
 log() { echo "▶ $*"; }
 ok() { echo "  ✓ $*"; }
@@ -77,13 +78,37 @@ fi
 # Host resolver config — the reference every container is compared against
 # ---------------------------------------------------------------------------
 
-# Loopback resolvers (systemd-resolved's 127.0.0.53 stub, dnsmasq on 127.0.0.1)
-# are meaningless inside a container: Docker drops them and substitutes its own
-# public defaults. Comparing a container against a loopback-only host list
-# would therefore read Docker's defaults as drift and restart everything, every
-# run. Filter them out, and bail below if nothing survives.
+all_nameservers() {
+	awk '/^nameserver/ {print $2}' "$1" 2>/dev/null
+}
+
+# Pick the host file the same way Docker does. On systemd-resolved hosts — the
+# Ubuntu and Fedora default — /etc/resolv.conf is a stub listing only
+# 127.0.0.53, which is useless inside a container, so moby reads
+# /run/systemd/resolve/resolv.conf instead (Path() in
+# daemon/libnetwork/internal/resolvconf/resolvconf_path.go). That file's
+# upstreams are what actually get baked into containers, and they change across
+# networks like any others. Reading the stub here would make this script bail
+# out below on precisely the hosts that most need checking.
+#
+# The condition mirrors moby's exactly — a single nameserver equal to
+# 127.0.0.53 — on purpose. A looser "loopback-only" rule would send us to a
+# file Docker itself never read.
+if [[ "$(all_nameservers "$HOST_RESOLV")" == "127.0.0.53" ]]; then
+	if [[ -r "$SYSTEMD_RESOLV" ]]; then
+		HOST_RESOLV="$SYSTEMD_RESOLV"
+	else
+		warn "${HOST_RESOLV} is a systemd-resolved stub but ${SYSTEMD_RESOLV} is unreadable, so the upstreams Docker bakes are not visible from here."
+	fi
+fi
+
+# Loopback resolvers (the 127.0.0.53 stub, dnsmasq on 127.0.0.1) address the
+# host's own loopback, so they can never be what a container ends up talking
+# to and are not a meaningful reference to compare against. Drop them; the
+# redirect above has already handled the one case where the real upstreams
+# live elsewhere. Bail below if nothing survives.
 host_nameservers() {
-	awk '/^nameserver/ {print $2}' "$HOST_RESOLV" |
+	all_nameservers "$HOST_RESOLV" |
 		grep -vE '^(127\.|::1$)' || true
 }
 
