@@ -82,6 +82,7 @@ config:
   - "ol_instructor"
   - "ol_business_analyst"
   keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://open-metadata-qa.ol.mit.edu/*"]
+  keycloak_realm:ol-data-platform-label-studio-redirect-uris: ["https://label-studio-qa.ol.mit.edu/*"]
   keycloak_realm:ol-data-platform-openmetadata-client-roles:
   - "open_metadata_admin"
   - "open_metadata_user"
