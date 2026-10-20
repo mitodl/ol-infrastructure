@@ -389,27 +389,27 @@ upgrade goes to QA first.
 If Keeper pods are unhealthy:
 ```bash
 # Check Keeper status
-kubectl exec -n clickhouse clickhouse-keeper-0 -- \
+kubectl exec -n clickhouse chk-clickhouse-cluster1-0-0-0 -- \
   bash -c "echo ruok | nc localhost 2181"
 
 # Check Keeper logs
-kubectl logs -n clickhouse clickhouse-keeper-0 --tail=100
+kubectl logs -n clickhouse chk-clickhouse-cluster1-0-0-0 --tail=100
 
 # Force pod restart (Keeper uses Raft; majority must be healthy before restart)
-kubectl delete pod -n clickhouse clickhouse-keeper-2
+kubectl delete pod -n clickhouse chk-clickhouse-cluster1-0-2-0
 ```
 
 ### ClickHouseInstallation not ready
 
 ```bash
 # Check operator logs
-kubectl logs -n clickhouse-operator -l app=clickhouse-operator --tail=50
+kubectl logs -n kube-system deploy/clickhouse-operator -c clickhouse-operator --tail=50
 
 # Check CHI status
 kubectl get chi -n clickhouse clickhouse -o yaml | grep -A20 status:
 
 # Check pod events
-kubectl describe pod -n clickhouse chi-clickhouse-default-0-0
+kubectl describe pod -n clickhouse chi-clickhouse-default-0-0-0
 ```
 
 ### Replica pod Pending on its data volume
@@ -421,7 +421,8 @@ template doesn't fix a PVC that is already Pending. Check why it is stuck:
 kubectl -n clickhouse describe pvc clickhouse-data-chi-clickhouse-default-0-<n>-0
 ```
 
-`specify either IOPS or IOPSPerGb, not both` means the PVC predates #6361 and
+`specify either IOPS or IOPSPerGb, not both` means the PVC predates
+https://github.com/mitodl/ol-infrastructure/pull/6361 and
 sits under `ebs-gp3-sc` with the `ebs-gp3-iops-3000` VolumeAttributesClass.
 Confirm the StatefulSet's template now names `ebs-gp3-iops-3000-sc`, otherwise
 the recreated PVC fails the same way:
@@ -440,8 +441,30 @@ kubectl -n clickhouse delete pvc clickhouse-data-chi-clickhouse-default-0-<n>-0 
 kubectl -n clickhouse delete pod chi-clickhouse-default-0-<n>-0
 ```
 
-The new replica fetches every replicated table from the others. It is caught up
-when `system.replicas` on it lists the same number of tables as replica 0 with
+The pod comes back with an empty data volume. The operator does not create the
+schema on it, because it already counted that host as part of the CHI (on QA on
+2026-10-20 the recreated replica started with only the `default` database and
+an empty `system.replicas`). Compare the two counts from step 3 of the
+[Upgrade Canary](#upgrade-canary-qa) on both replicas. If the new one is short,
+copy each replicated table's DDL from replica 0. The engine arguments use the
+`{shard}`/`{replica}` macros, so the same statement registers the new replica in
+Keeper and it fetches the parts:
+
+```bash
+K="kubectl -n clickhouse exec"
+SRC=chi-clickhouse-default-0-0-0; DST=chi-clickhouse-default-0-<n>-0
+$K "$DST" -- clickhouse-client -q "CREATE DATABASE IF NOT EXISTS opik_db ENGINE = Atomic"
+for t in $($K "$SRC" -- clickhouse-client -q "SELECT database || '.' || name FROM system.tables
+    WHERE database IN ('opik_db', 'default') AND engine LIKE 'Replicated%'"); do
+  $K "$SRC" -- clickhouse-client -q "SHOW CREATE TABLE $t FORMAT TSVRaw" \
+    | sed 's/^CREATE TABLE/CREATE TABLE IF NOT EXISTS/' \
+    | $K -i "$DST" -- clickhouse-client --multiquery
+done
+```
+
+Check first that `opik_db` holds only `Replicated*` tables (no views or
+dictionaries), since this loop copies nothing else. The replica is caught up
+when its `system.replicas` lists the same number of tables as replica 0 with
 `absolute_delay = 0` and `queue_size = 0`.
 
 ### VSO not syncing users.xml
