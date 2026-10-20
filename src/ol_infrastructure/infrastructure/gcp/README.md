@@ -33,6 +33,92 @@ YouTube quota is the one gap config cannot close. `mitol01` starts at the defaul
 another project, so a high-volume YouTube consumer needs the increase granted
 on `mitol01` first (see `docs/plans/gcp-consolidation-into-mitol01.md`).
 
+### Watching the legacy projects for new credentials
+
+The rule above has no enforcement. We hold no organization-level control over
+the legacy projects (they have no parent organization), so the backstop is
+detection: `bin/gcp-credential-usage diff` lists service accounts,
+user-managed service-account keys, API keys and reCAPTCHA keys in each project
+and reports any that are missing from `legacy-credential-baseline.json` in this
+directory. It exits 1 when it finds one, and 2 when a project could not be
+read.
+
+```bash
+bin/gcp-credential-usage diff                      # projects in the baseline
+bin/gcp-credential-usage diff --all-projects       # also catch a new project
+bin/gcp-credential-usage diff --since 2026-08-10   # also flag baselined keys
+```
+
+Generic OAuth clients are not covered, because Google has no API that lists
+them. reCAPTCHA keys are only listed where `recaptchaenterprise.googleapis.com`
+is already enabled (four projects today); the command never enables an API, and
+reports the rest as not checked. A service account has no creation time in the
+IAM API, so a new one shows up only as missing from the baseline.
+
+Once a finding is understood (moved, deleted, or accepted as a known exception),
+regenerate the baseline and commit it:
+
+```bash
+bin/gcp-credential-usage snapshot $(jq -r '.projects[]' \
+  src/ol_infrastructure/infrastructure/gcp/legacy-credential-baseline.json) \
+  --output src/ol_infrastructure/infrastructure/gcp/legacy-credential-baseline.json
+```
+
+`snapshot` refuses to write a baseline if any read fails, because a partial
+baseline would turn every credential it missed into a false "new" finding.
+The baseline holds no key material. API keys are recorded by uid,
+service-account keys by key id, and reCAPTCHA keys by a digest of the resource
+name, which ends in the site key. `mitx-pipeline-main-dc29` is listable by the
+account that owns the other legacy projects but not readable by it, so it is
+not in the baseline.
+
+#### Running it on a schedule
+
+This is not wired into Concourse yet, because no identity Concourse can assume
+can read the legacy projects. The production `infra` worker federates to
+`pulumi-gcp@mitol01`, and no `mitol01` identity holds any role on the legacy
+projects (checked against all 19 project IAM policies on 2026-10-19). Those
+projects have no organization, so only their owner can grant access, and
+nothing in this stack can do it.
+
+Wiring it up needs:
+
+1. A read-only service account in `mitol01`, e.g. `gcp-credential-watch`,
+   declared in `Pulumi.Production.yaml` with the same
+   `roles/iam.workloadIdentityUser` binding that `pulumi-gcp` has. Granting the
+   legacy read to `pulumi-gcp` would also work with no new resources, but every
+   GCP Pulumi run would then carry it, and removing it later would mean
+   editing the deploy identity.
+2. The owner of the legacy projects granting that account
+   `roles/iam.securityReviewer` on each project in the baseline:
+
+   ```bash
+   for project in $(jq -r '.projects[]' legacy-credential-baseline.json); do
+     gcloud projects add-iam-policy-binding "$project" \
+       --member=serviceAccount:gcp-credential-watch@mitol01.iam.gserviceaccount.com \
+       --role=roles/iam.securityReviewer --condition=None
+   done
+   ```
+
+   `securityReviewer` holds every permission the command uses
+   (`iam.serviceAccounts.list`, `iam.serviceAccountKeys.list`,
+   `apikeys.keys.list`, `recaptchaenterprise.keys.list`,
+   `serviceusage.services.list`). Do not substitute `roles/viewer`: it also
+   holds `apikeys.keys.getKeyString`, which reads every API key string in the
+   project.
+3. A token in the task. The command takes its token from
+   `gcloud auth print-access-token`, and the `mitodl/ol-infrastructure` image
+   has neither `gcloud` nor `google-auth`. `gcloud auth login --cred-file`
+   accepts an `external_account` document like the one in
+   `src/bridge/secrets/gcp/credentials.yaml`, pointed at the new account's
+   impersonation URL, so the task needs the Google Cloud CLI available.
+
+With those in place the pipeline has the same shape as
+`src/ol_concourse/pipelines/infrastructure/alerting_drift/`: run `diff` nightly,
+write its text output to a report, and open or update a pull request when the
+report changes. The text output contains no timestamps from the run itself, so
+an unchanged estate produces an unchanged report.
+
 ## Stack layout
 
 One stack, `Production`.
