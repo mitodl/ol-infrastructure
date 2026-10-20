@@ -44,8 +44,9 @@ STARROCKS_SHARED_REALM_ROLES = frozenset(
 # login (authorizer useRolesFromProvider): "Admin" sets the user's isAdmin flag,
 # and every other name must be an OpenMetadata Role, which replaces the roles
 # the user had. The custom roles are defined in substructure/open_metadata's
-# om_server_config.py. ol-instructor is left out because instructors get no
-# OpenMetadata access.
+# om_server_config.py. ol-instructor is left out, so instructors get no
+# OpenMetadata role of their own. That is not no access: they can still log in,
+# and they inherit DataConsumer from the Organization team like every user.
 OPEN_METADATA_ROLE_BY_REALM_ROLE = {
     "ol-platform-admin": "Admin",
     "ol-data-engineer": "DataEngineer",

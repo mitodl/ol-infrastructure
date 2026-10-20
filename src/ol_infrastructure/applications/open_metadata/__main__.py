@@ -117,8 +117,18 @@ open_metadata_service_account_name = "openmetadata"
 # Users' roles come from the `roles` claim that the ol-open_metadata-client
 # Keycloak client sends (substructure/keycloak ol_data_platform.py
 # OPEN_METADATA_ROLE_BY_REALM_ROLE). `Admin` in the claim only ever promotes:
-# OpenMetadata never clears isAdmin when it is absent, so taking ol-platform-admin
-# away from someone also needs their isAdmin unset in OpenMetadata.
+# OpenMetadata never clears isAdmin when it is absent.
+#
+# Tokens OpenMetadata issues itself (session JWTs, personal access tokens) carry
+# a snapshot of the user's roles, `Admin` included, and GET
+# /users/loggedInUser resyncs the user from that snapshot. An old personal
+# access token can therefore make a demoted user an admin again, or drop a role
+# they were given after it was issued, until they next log in.
+#
+# To demote an admin: take ol-platform-admin away in Keycloak, remove them from
+# initialAdmins below and from adminPrincipals in the authorizerConfiguration
+# row, unset isAdmin on their OpenMetadata user, and revoke their personal
+# access tokens.
 open_metadata_use_roles_from_provider = True
 # Used both for the chart's own ingestion pods and for the om-auth-config Job,
 # which borrows it for psycopg2 rather than carrying a second image.
@@ -894,9 +904,14 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "enabled": True,
                         "className": "org.openmetadata.service.security.DefaultAuthorizer",  # noqa: E501
                         "containerRequestFilter": "org.openmetadata.service.security.JwtFilter",  # noqa: E501
-                        # Bootstrap only. The Keycloak realm role ol-platform-admin
-                        # is the list of record: it puts `Admin` in the roles
-                        # claim, which makes the user an admin at login.
+                        # Not bootstrap-only. The chart renders this into
+                        # adminPrincipals, which the authorizerConfiguration row
+                        # keeps (om_auth_config.py merges around it), and every
+                        # OIDC login makes anyone in adminPrincipals an admin
+                        # again (AuthenticationCodeFlowHandler.getOrCreateOidcUser).
+                        # Everyone else is an admin through ol-platform-admin, which
+                        # puts `Admin` in the roles claim. See the demotion steps at
+                        # open_metadata_use_roles_from_provider.
                         "initialAdmins": [
                             "tmacey",
                             "shaidar",
