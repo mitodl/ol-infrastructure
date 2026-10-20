@@ -327,8 +327,8 @@ The channel is owned by `mitopencourseware@gmail.com`, so the app is
 _External_ and published, as "OCW HighSystems". It is unverified, so the owner
 clicks through an unverified-app warning once when connecting HighSystems. The
 registered redirect URI carries an `accessToken` query parameter that Google
-matches exactly, so if Data Collaborative changes that token the client has to
-be updated to match.
+matches exactly, so if Data Collaborative changes that token the client and the
+`redirect_uri` in the SOPS file have to be updated to match.
 
 The channel owner then completes the OAuth flow in HighSystems with
 `yt-analytics.readonly` and `youtube.readonly`. The second is not optional:
