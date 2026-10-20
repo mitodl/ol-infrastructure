@@ -345,8 +345,9 @@ missing (inventory, 2026-09-10).
 7. Batch isolates rows. A row failure records its class and does not fail the chunk;
    rejected-class failures of the account or model open the circuit immediately, since
    retrying a config bug burns budget; a rejection of one row's input fails that row, and
-   opens the circuit only after a threshold of them in a row; unavailable-class failures
-   open it after a threshold. ol-data-platform's summarize module is the reference.
+   opens the circuit only after a threshold of them with no accepted request between them;
+   unavailable-class failures open it after a threshold of their own (§6.7).
+   ol-data-platform's summarize module is the reference.
 
 ### 3.3 Decision
 
@@ -951,16 +952,23 @@ type, and an exception it raises reaches the caller unchanged.
 
 For the batch helpers (§3.2 rule 7): `LLMRejected` with a 400, 413, or 422 rejects one row's
 input (too long, malformed, or filtered on the way in) and is a failure of that row only, not
-retried under the same key; ten of them in a row open the circuit, because then the request
-itself is wrong (e.g. a parameter the model no longer takes). Any other `LLMRejected` (401,
-403, 404, other statuses, or a transport error with no status) opens the circuit at once.
-`LLMRateLimited` and `LLMUnavailable` count toward a separate threshold of three, and
-`LLMInvalidOutput`, `LLMContentFiltered`, and `LLMBudgetExceeded` are failures of that row
-only. When a run of row rejections opens the circuit, or every row a batch attempted was
-rejected for its input (a batch shorter than the threshold), the batch report lists those
-rows: each was persisted as not to retry, and a fixed request parameter does not change the
-key, so the caller clears their skip marks once the request is fixed. Decided 2026-10-20: one
-oversized or filtered row stopped the whole batch when every rejection opened the circuit.
+retried under the same key (a hash of the row's input, the prompt name and template, and the
+use case's primary model); ten of them with no accepted request between them open the circuit,
+because then the request itself is wrong (e.g. a parameter the model no longer takes). Any
+other `LLMRejected` (401, 403, 404, other statuses, or a transport error with no status) opens
+the circuit at once. `LLMRateLimited` and `LLMUnavailable` count toward a separate threshold
+of three in a row, and `LLMInvalidOutput`, `LLMContentFiltered`, and `LLMBudgetExceeded` are
+failures of that row only. The counts belong to one batch call (or to a breaker the caller
+passes to several) and take rows in the order they finish, across workers. A success or a
+row's own failure shows the provider accepted the request and resets both counts. A rate limit
+or an outage says nothing about the request, so it leaves the rejection count alone (400s
+alternating with 503s still reach ten); a row rejection resets the transient count. Once the
+circuit is open, rows still in flight do not clear the rejection run. When a run of row
+rejections opens the circuit, or every row a batch attempted was rejected for its input (a
+batch shorter than the threshold), the batch report lists those rows: each was persisted as
+not to retry, and a fixed request parameter does not change the key, so the caller clears
+their skip marks once the request is fixed. Decided 2026-10-20: one oversized or filtered row
+stopped the whole batch when every rejection opened the circuit.
 
 ### 6.8 Usage limits
 
