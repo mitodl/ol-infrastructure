@@ -861,11 +861,15 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                 },
                 "configuration": {
                     "zookeeper": {
-                        # Over TLS. The operator applies zookeeper changes
-                        # without a restart, so every replica reconnects at
-                        # about the same time; if the handshake fails they
-                        # all lose Keeper together and go read-only. Revert
-                        # this block to recover.
+                        # Over TLS. The operator writes this into each host's
+                        # own configd ConfigMap and does not restart for it;
+                        # the server reloads it and opens a new Keeper session.
+                        # If that connect fails, the reload errors out and the
+                        # next session is started from the old one's settings
+                        # (Context::getZooKeeper -> startNewSession), so the
+                        # replica silently stays on 2181 until it restarts.
+                        # Check system.zookeeper_connection on every replica
+                        # after an apply.
                         "nodes": [
                             {
                                 "host": f"keeper-clickhouse.{namespace}.svc.cluster.local",
