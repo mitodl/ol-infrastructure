@@ -140,6 +140,40 @@ CLICKHOUSE_METRICS_PORT = 9363
 # parts there; the Opik chart's tieredStorage.hot.keepFreeSpaceBytes default.
 COLD_TIER_HOT_KEEP_FREE_SPACE_BYTES = 10 * 1024**3
 CLICKHOUSE_INTERSERVER_USER = "interserver"
+# Set on every server pod from the VSO-synced Secret, whether or not the
+# credentials file below is rendered; see INTERSERVER_CREDENTIALS_XML.
+CLICKHOUSE_INTERSERVER_PASSWORD_ENV = "CLICKHOUSE_INTERSERVER_PASSWORD"  # noqa: S105  # pragma: allowlist secret
+# Replicas authenticate to each other's interserver port (9009) when fetching
+# parts. Without credentials anything that can reach 9009 can pull table data,
+# and ClickHouse documents them as the guard against a server being made to
+# fetch from an attacker.
+#
+# Rolled out in two applies so no replica ever holds a different password from
+# its peers for longer than a kubelet ConfigMap sync:
+#   1. The env var above reaches every pod. That is a pod template change, so
+#      the operator restarts each replica, but nothing reads the variable yet.
+#   2. clickhouse:interserver_credentials_enabled renders this file. The
+#      operator puts `files` in the shared configd ConfigMap before touching
+#      any host, and its restart policy (`files/config.d/*no_restart*: "no"`,
+#      the last matching rule) does not restart for this name. Each server's
+#      config reloader then picks the file up and replaces its interserver
+#      credentials live (Server.cpp updateInterserverCredentials).
+# Setting the password through the operator's settings secretKeyRef instead
+# does both in one apply and breaks replication for the whole roll: the
+# ConfigMap reaches pods that have not restarted yet, where the operator's env
+# var does not exist and from_env resolves to an empty password.
+#
+# Between the first and last pod picking up the file, fetches between a
+# replica that has the credentials and one that does not are refused in both
+# directions and retried from the replication queue.
+INTERSERVER_CREDENTIALS_XML = dedent(f"""\
+    <clickhouse>
+      <interserver_http_credentials>
+        <user>{CLICKHOUSE_INTERSERVER_USER}</user>
+        <password from_env="{CLICKHOUSE_INTERSERVER_PASSWORD_ENV}"/>
+      </interserver_http_credentials>
+    </clickhouse>
+""")
 CLICKHOUSE_LOOPBACK_NETWORKS = ("127.0.0.1", "::1")
 
 cluster_stack.require_output("namespaces").apply(
@@ -503,7 +537,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     backup_bucket_name: "Output[str]",
     users_secret_name: str,
     interserver_secret_name: str,
-    interserver_allow_empty: bool,
+    interserver_credentials_enabled: bool,
     client_networks: "Output[list[str]]",
     irsa_role_arn: "Output[str]",
     keeper_installation: "Output[kubernetes.apiextensions.CustomResource]",
@@ -794,6 +828,13 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     "files": {
                         "config.d/storage.xml": kwargs["storage_config"],
                         "config.d/system_log_tables.xml": SYSTEM_LOG_TABLES_XML,
+                        **(
+                            {
+                                "config.d/interserver_credentials_no_restart.xml": INTERSERVER_CREDENTIALS_XML
+                            }
+                            if interserver_credentials_enabled
+                            else {}
+                        ),
                     },
                     "settings": {
                         # No default_storage_policy here: it is not a server
@@ -827,36 +868,6 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                         "shutdown_wait_unfinished": str(
                             CLICKHOUSE_SHUTDOWN_WAIT_QUERIES_SECONDS
                         ),
-                        # Replicas authenticate to each other's interserver
-                        # port (9009) when fetching parts. Without credentials
-                        # anything that can reach 9009 can pull table data, and
-                        # ClickHouse's config documents them as the guard
-                        # against a server being made to fetch from an
-                        # attacker. The operator turns the secretKeyRef into
-                        # an env var read with from_env, so it is a pod
-                        # template change and rolls every replica.
-                        #
-                        # A replica without credentials rejects a fetch that
-                        # carries them, and one with them rejects a fetch
-                        # without them unless allow_empty is set. allow_empty
-                        # covers the second case during the roll that
-                        # introduces the credentials; the first still applies,
-                        # so a restarted replica cannot fetch from the ones not
-                        # yet restarted and lags until the next one restarts.
-                        # Turn allow_empty off in a second apply once every
-                        # replica has restarted.
-                        "interserver_http_credentials/user": CLICKHOUSE_INTERSERVER_USER,
-                        "interserver_http_credentials/password": {
-                            "valueFrom": {
-                                "secretKeyRef": {
-                                    "name": interserver_secret_name,
-                                    "key": "password",
-                                }
-                            }
-                        },
-                        "interserver_http_credentials/allow_empty": str(
-                            interserver_allow_empty
-                        ).lower(),
                     },
                     # Users, profiles, and quotas are managed by the operator
                     # (merged into its generated usersd configmap) rather than
@@ -925,6 +936,15 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                                                 "name": "AWS_WEB_IDENTITY_TOKEN_FILE",
                                                 "value": "/var/run/secrets/eks.amazonaws.com/serviceaccount/token",
                                             },
+                                            {
+                                                "name": CLICKHOUSE_INTERSERVER_PASSWORD_ENV,
+                                                "valueFrom": {
+                                                    "secretKeyRef": {
+                                                        "name": interserver_secret_name,
+                                                        "key": "password",
+                                                    }
+                                                },
+                                            },
                                         ],
                                     }
                                 ],
@@ -989,11 +1009,28 @@ opik_password = _require_password(
     or Output.secret("changeme"),  # pragma: allowlist secret
     "opik",
 )
-interserver_password = clickhouse_config.require_secret("interserver_password")
-# True only while the apply that introduces interserver credentials rolls out;
-# see interserver_http_credentials in the CHI settings.
-interserver_allow_empty = (
-    clickhouse_config.get_bool("interserver_credentials_allow_empty") or False
+
+# from_env substitutes the variable's value into the config as XML, so a
+# password containing markup characters would corrupt or reshape the config.
+_XML_SPECIAL_CHARACTERS = frozenset("<>&'\"")
+
+
+def _require_xml_safe(password: str) -> str:
+    if _XML_SPECIAL_CHARACTERS.intersection(password):
+        msg = (
+            "clickhouse:interserver_password must not contain any of "
+            f"{''.join(sorted(_XML_SPECIAL_CHARACTERS))}"
+        )
+        raise ValueError(msg)
+    return password
+
+
+interserver_password = clickhouse_config.require_secret("interserver_password").apply(
+    _require_xml_safe
+)
+# Second step of the interserver credentials rollout (INTERSERVER_CREDENTIALS_XML).
+interserver_credentials_enabled = clickhouse_config.require_bool(
+    "interserver_credentials_enabled"
 )
 
 ############################################################
@@ -1150,7 +1187,7 @@ aws.iam.RolePolicyAttachment(
 ############################################################
 # Vault KV Secrets — store credentials in Vault
 ############################################################
-vault.kv.SecretV2(
+clickhouse_credentials_kv = vault.kv.SecretV2(
     f"clickhouse-vault-kv-secrets-{stack_info.env_suffix}",
     mount=clickhouse_vault_kv_path,
     name="credentials",
@@ -1223,9 +1260,11 @@ interserver_secret = OLVaultK8SSecret(
         refresh_after="1h",
         vaultauth=clickhouse_app.vault_k8s_resources.auth_name,
     ),
+    # The KV write adds the interserver key. Synced before it, the template
+    # renders an empty password into the Secret.
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=clickhouse_app.vault_k8s_resources,
+        depends_on=[clickhouse_app.vault_k8s_resources, clickhouse_credentials_kv],
     ),
 )
 
@@ -1278,7 +1317,7 @@ clickhouse_installation = _create_clickhouse_installation(
     backup_bucket_name=backup_bucket.bucket_v2.bucket,
     users_secret_name=users_secret_name,
     interserver_secret_name=interserver_secret_name,
-    interserver_allow_empty=interserver_allow_empty,
+    interserver_credentials_enabled=interserver_credentials_enabled,
     client_networks=data_pod_subnet_cidrs,
     irsa_role_arn=clickhouse_app.irsa_role.arn,
     keeper_installation=keeper_installation,

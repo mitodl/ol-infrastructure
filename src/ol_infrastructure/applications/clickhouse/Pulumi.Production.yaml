@@ -40,9 +40,8 @@ config:
     secure: v1:0YujLV7roc1zswg9:ox0Z4DETZ/LbiUgtBVe6rZv8uytuXkA33GnYRcwNauHglXKz3OaK7sZqsuqEpnMYZWppNBEwQrM=
   clickhouse:interserver_password:
     secure: v1:+DjkW8BtVkEq/axg:jiuaq5r7vTdvD+dGd/nalC8j0XQ33+BDBB+SJSyLsc0nb/Yq/wbom7f8VtHAefRISEZutCUdL8PfjkY=
-  # Transitional: lets replicas that have not restarted yet fetch from ones
-  # that have. Remove after the apply that adds interserver_password has
-  # rolled every replica.
-  clickhouse:interserver_credentials_allow_empty: "true"
+  # Set to "true" only after the apply that adds interserver_password has
+  # restarted every replica (see INTERSERVER_CREDENTIALS_XML in __main__.py).
+  clickhouse:interserver_credentials_enabled: "false"
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAHLtEgrQCjsmuo8KCBdgudpAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMxIEgSqVA8a3Tn4V6AgEQgDsUrzePlDlRE3LsXGQFZyYL8ydnDXuwV+uBRwua0UHc7xdUZxcCGUISGouz5NLtQeQ5AhlfyjsTrQAtWQ==
