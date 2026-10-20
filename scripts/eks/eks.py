@@ -6,6 +6,7 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import shutil
 import subprocess
 import sys
 import urllib.parse
@@ -32,6 +33,9 @@ CACHE_DIR = Path.home() / ".cache" / "ol-infrastructure" / "eks"
 EXEC_DEBUG_LOG_PATH = CACHE_DIR / "exec-debug.log"
 EXEC_DEBUG_ENV_VAR = "OL_EKS_DEBUG_EXEC"
 KUBECONFIG_DEFAULT_PATH = Path.home() / ".kube" / "ol-eks.yaml"
+# Where kubectl looks when KUBECONFIG is unset, and where local-dev registers its
+# cluster.
+KUBECTL_DEFAULT_KUBECONFIG_PATH = Path.home() / ".kube" / "config"
 OIDC_CALLBACK_PORT = 8250
 # The caller holds the Vault token and AWS credential cache locks while it waits
 # for the browser login, so any other eks.py run that needs fresh credentials for
@@ -483,6 +487,24 @@ def build_kubeconfig(
     return kube_config
 
 
+def is_eks_exec_user(user: dict[str, Any]) -> bool:
+    """Return whether a kubeconfig user entry authenticates through this script."""
+    exec_config = (user.get("user") or {}).get("exec") or {}
+    args = exec_config.get("args") or []
+    return (
+        len(args) >= 2
+        and str(args[0]).endswith("scripts/eks/eks.py")
+        and args[1] == "exec-credential"
+    )
+
+
+def load_kubeconfig(path: Path) -> dict[str, Any]:
+    """Return the kubeconfig at ``path``, or an empty one when the file is absent."""
+    if not path.exists():
+        return {}
+    return yaml.safe_load(path.read_text()) or {}
+
+
 def login_oidc_get_token() -> str:
     """Wait for the Vault OIDC callback and return the authorization code."""
     try:
@@ -756,6 +778,17 @@ def setup(
       # Readonly only — for automation or read-only users
       uv run python scripts/eks/eks.py setup --mode readonly
     """
+    default_path = KUBECTL_DEFAULT_KUBECONFIG_PATH
+    if output_path.resolve() != default_path.resolve() and any(
+        is_eks_exec_user(user)
+        for user in load_kubeconfig(default_path).get("users") or []
+    ):
+        msg = (
+            f"{default_path} holds EKS contexts from eks.py. Remove them with: "
+            "uv run python scripts/eks/eks.py prune-default-kubeconfig"
+        )
+        raise RuntimeError(msg)
+
     clusters = fetch_all_cluster_configs(mode)
     if not clusters:
         print("Warning: No EKS clusters found in this AWS account.", file=sys.stderr)
@@ -788,6 +821,53 @@ def setup(
     print(
         f"  Use with           : KUBECONFIG={output_path} kubectl --context <cluster> ..."
     )
+
+
+@app.command(name="prune-default-kubeconfig")
+def prune_default_kubeconfig(path: Path = KUBECTL_DEFAULT_KUBECONFIG_PATH) -> None:
+    """Remove ``eks.py``-generated EKS entries from ``~/.kube/config``.
+
+    Those entries mint credentials from the shared cache, so a bare kubectl can
+    reach a deployed cluster, and they shadow ``~/.kube/ol-eks.yaml`` when both
+    files are on KUBECONFIG. Every other entry, local-dev included, is kept, and
+    a cluster stays while any remaining context uses it. The file is backed up
+    first. This command makes no network calls.
+    """
+    kube_config = load_kubeconfig(path)
+    users = kube_config.get("users") or []
+    contexts = kube_config.get("contexts") or []
+    clusters = kube_config.get("clusters") or []
+
+    eks_users = {user["name"] for user in users if is_eks_exec_user(user)}
+    if not eks_users:
+        print(f"No EKS entries in {path}; nothing to remove.")
+        return
+
+    eks_contexts = [
+        ctx for ctx in contexts if (ctx.get("context") or {}).get("user") in eks_users
+    ]
+    eks_context_names = {ctx["name"] for ctx in eks_contexts}
+    kept_contexts = [ctx for ctx in contexts if ctx["name"] not in eks_context_names]
+    clusters_in_use = {
+        (ctx.get("context") or {}).get("cluster") for ctx in kept_contexts
+    }
+    eks_clusters = {ctx["context"]["cluster"] for ctx in eks_contexts} - clusters_in_use
+
+    kube_config["users"] = [user for user in users if user["name"] not in eks_users]
+    kube_config["contexts"] = kept_contexts
+    kube_config["clusters"] = [
+        cluster for cluster in clusters if cluster["name"] not in eks_clusters
+    ]
+    if kube_config.get("current-context") in eks_context_names:
+        del kube_config["current-context"]
+
+    # copy2 keeps the file mode: local-dev's entry carries a client key.
+    backup_path = path.with_name(f"{path.name}.bak-{json_datetime_now():%Y%m%dT%H%M%S}")
+    shutil.copy2(path, backup_path)
+    path.write_text(yaml.safe_dump(kube_config, sort_keys=False))
+    removed = sorted(eks_context_names | eks_users | eks_clusters)
+    print(f"Removed EKS entries from {path}: {', '.join(removed)}")
+    print(f"  Backup             : {backup_path}")
 
 
 @app.command(name="exec-credential")

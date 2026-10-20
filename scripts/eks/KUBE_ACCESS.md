@@ -42,8 +42,18 @@ KUBECONFIG=~/.kube/ol-eks.yaml headlamp           # Headlamp on linux
 Avoid Headlamp's "Add Cluster" for these clusters: it stores a copy of the
 kubeconfig, and the copy keeps the old access mode after you run `setup` again.
 
-If an earlier `setup` wrote EKS entries into `~/.kube/config`, delete its
-contexts, clusters and users there, so `~/.kube/config` holds only local-dev.
+Earlier versions of `setup` wrote EKS entries into `~/.kube/config`. While
+those remain, `setup` and `local-dev/scripts/start.sh` both refuse to run.
+Remove them, keeping everything else in the file (it is copied to
+`~/.kube/config.bak-<timestamp>` first):
+
+```bash
+uv run python scripts/eks/eks.py prune-default-kubeconfig
+```
+
+`setup --output-path ~/.kube/config` still works: it replaces that whole file,
+local-dev's entries included, with no backup, and `start.sh` then refuses to
+start.
 
 By default `setup` creates a **developer** (read/write) kubeconfig. You can also
 choose an access mode at setup time:
