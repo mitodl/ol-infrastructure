@@ -126,6 +126,16 @@ resolver_answers() {
 	dig "@$1" +time="$PROBE_TIMEOUT" +tries=1 +short "$PROBE_NAME" >/dev/null 2>&1
 }
 
+# Docker substitutes its own public defaults when the host offers it no usable
+# (non-loopback) nameserver, so these can appear in a container's upstream list
+# without ever having been a host resolver. They are never the stale
+# previous-network upstream this script hunts: they answer from any network with
+# egress, so a container still pointing at them is not the breakage we are here
+# to fix. Counting them as drift would restart healthy containers — and since a
+# restart re-bakes the very same defaults, the confirmation below would then
+# fail every run. Exclude them from the candidate set.
+DOCKER_FALLBACK_NS=$'8.8.8.8\n8.8.4.4\n2001:4860:4860::8888\n2001:4860:4860::8844'
+
 # A container is stale when it is still pointing at a resolver that the host has
 # since dropped AND that no longer answers.
 #
@@ -145,6 +155,7 @@ upstreams_stale() {
 
 	for ns in "${upstreams[@]}"; do
 		grep -qxF "$ns" <<<"$HOST_NS" && continue
+		grep -qxF "$ns" <<<"$DOCKER_FALLBACK_NS" && continue
 		# Present in the container, absent from the host: a drift candidate.
 		if ! $HAVE_DIG || ! resolver_answers "$ns"; then
 			found_stale=true
@@ -177,6 +188,47 @@ search_stale() {
 # ---------------------------------------------------------------------------
 # Restart helpers
 # ---------------------------------------------------------------------------
+
+# Each container's resolv.conf as it looked when we judged it stale, so the
+# confirmation below can tell "the restart changed nothing" apart from "the
+# restart did not fix it".
+declare -A PRE_RESTART_CONF
+
+# Confirm a restart actually achieved what it was for. Returns non-zero only
+# when the container still needs healing that we failed to deliver.
+#
+# An unreadable resolv.conf must not read as success: every staleness test
+# returns false on empty input, so skipping this check would report "Healed"
+# for a container we never managed to inspect.
+#
+# A container that comes back byte-identical is a third outcome, distinct from
+# both. The restart re-baked resolv.conf from the host's config as it stands
+# now, so an unchanged result means this *is* what the host currently produces
+# — our detector objected to a permanent feature of this setup, not to a
+# leftover from the previous network. No restart can change that, so failing
+# the run on it would just turn a false positive into a recurring error.
+confirm_restart() {
+	local name="$1" check_search="$2" before after
+	# Separate statements: `local` expands every argument before it assigns any
+	# of them, so a `before=${PRE_RESTART_CONF[$name]}` on the line above would
+	# subscript with an as-yet-unset `name` and always read empty.
+	before="${PRE_RESTART_CONF[$name]-}"
+	after="$(container_resolv "$name")"
+	if [[ -z "$after" ]]; then
+		warn "Could not re-read /etc/resolv.conf in '$name' after restart; cannot confirm."
+		return 1
+	fi
+	if ! upstreams_stale "$after" && { [[ "$check_search" != true ]] || ! search_stale "$after"; }; then
+		ok "Healed: $name"
+		return 0
+	fi
+	if [[ -n "$before" && "$after" == "$before" ]]; then
+		warn "'$name' came back with an unchanged resolv.conf, so it already matches what this host produces now; treating the earlier stale reading as a false positive."
+		return 0
+	fi
+	warn "Still stale after restart: $name"
+	return 1
+}
 
 # docker restart with retries; surface docker's actual stderr on failure so a
 # wake-time failure is diagnosable instead of silent.
@@ -256,6 +308,7 @@ for node in "${NODES[@]:-}"; do
 	if upstreams_stale "$conf"; then
 		warn "stale DNS: $node"
 		stale_nodes+=("$node")
+		PRE_RESTART_CONF["$node"]="$conf"
 	else
 		ok "DNS current: $node"
 	fi
@@ -274,6 +327,7 @@ for eng in "${DAGGER[@]:-}"; do
 	if upstreams_stale "$conf" || search_stale "$conf"; then
 		warn "stale DNS: $eng"
 		stale_dagger+=("$eng")
+		PRE_RESTART_CONF["$eng"]="$conf"
 	else
 		ok "DNS current: $eng"
 	fi
@@ -322,20 +376,7 @@ for node in "${ordered_nodes[@]:-}"; do
 			warn "Node '$node' not Ready within $READY_TIMEOUT after restart; continuing."
 		fi
 	fi
-	# Confirm the restart actually achieved what it was for. An unreadable
-	# resolv.conf must not read as success: every staleness test returns false
-	# on empty input, so skipping this check would report "Healed" for a
-	# container we never managed to inspect.
-	conf="$(container_resolv "$node")"
-	if [[ -z "$conf" ]]; then
-		warn "Could not re-read /etc/resolv.conf in '$node' after restart; cannot confirm."
-		failed+=("$node")
-	elif upstreams_stale "$conf"; then
-		warn "Still stale after restart: $node"
-		failed+=("$node")
-	else
-		ok "Healed: $node"
-	fi
+	confirm_restart "$node" false || failed+=("$node")
 done
 
 for eng in "${stale_dagger[@]:-}"; do
@@ -345,16 +386,7 @@ for eng in "${stale_dagger[@]:-}"; do
 		failed+=("$eng")
 		continue
 	fi
-	conf="$(container_resolv "$eng")"
-	if [[ -z "$conf" ]]; then
-		warn "Could not re-read /etc/resolv.conf in '$eng' after restart; cannot confirm."
-		failed+=("$eng")
-	elif upstreams_stale "$conf" || search_stale "$conf"; then
-		warn "Still stale after restart: $eng"
-		failed+=("$eng")
-	else
-		ok "Healed: $eng"
-	fi
+	confirm_restart "$eng" true || failed+=("$eng")
 done
 
 if [[ ${#failed[@]} -gt 0 ]]; then
