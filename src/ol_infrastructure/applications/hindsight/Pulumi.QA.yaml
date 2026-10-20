@@ -11,7 +11,7 @@ config:
   # Keycloak client id -> the app name stamped on that client's writes.
   hindsight:app_clients:
     ol-learn-ai-client: learn-ai
-    ol-mitlearn-client: mit-learn
+    ol-mitlearn-memory-client: mit-learn
   hindsight:db_instance_size: db.t4g.small
   hindsight:db_password:
     secure: v1:Ep+LTdZKB58zndUE:MEOpl0FUzJ1kIBWRp9Oa8TnEk8+EoGNwYS/LLHex7g9qOFUye5bEZOl4u1AgvmBuflQIjqEHpa4=
