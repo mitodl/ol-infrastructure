@@ -343,9 +343,10 @@ missing (inventory, 2026-09-10).
    value and `opik.metadata.degraded` plus a reason on the trace. The translation plugins'
    silent keep-source behavior becomes a marked partial result.
 7. Batch isolates rows. A row failure records its class and does not fail the chunk;
-   rejected-class failures open the circuit immediately, since retrying a config bug burns
-   budget; unavailable-class failures open it after a threshold. ol-data-platform's
-   summarize module is the reference.
+   rejected-class failures of the account or model open the circuit immediately, since
+   retrying a config bug burns budget; a rejection of one row's input fails that row, and
+   opens the circuit only after a threshold of them in a row; unavailable-class failures
+   open it after a threshold. ol-data-platform's summarize module is the reference.
 
 ### 3.3 Decision
 
@@ -948,9 +949,15 @@ trace are marked together. `LLMResult` is frozen and the trace is closed once th
 returns, so a check done after the call cannot mark either. `postprocess` keeps the output
 type, and an exception it raises reaches the caller unchanged.
 
-For the batch helpers (§3.2 rule 7): `LLMRejected` opens the circuit at once,
-`LLMRateLimited` and `LLMUnavailable` count toward its threshold, and `LLMInvalidOutput`,
-`LLMContentFiltered`, and `LLMBudgetExceeded` are failures of that row only.
+For the batch helpers (§3.2 rule 7): `LLMRejected` with a 400, 413, or 422 rejects one row's
+input (too long, malformed, or filtered on the way in) and is a failure of that row only, not
+retried under the same key; ten of them in a row open the circuit, because then the request
+itself is wrong (e.g. a parameter the model no longer takes). Any other `LLMRejected` (401,
+403, 404, other statuses, or a transport error with no status) opens the circuit at once.
+`LLMRateLimited` and `LLMUnavailable` count toward a separate threshold of three, and
+`LLMInvalidOutput`, `LLMContentFiltered`, and `LLMBudgetExceeded` are failures of that row
+only. Decided 2026-10-20: one oversized or filtered row stopped the whole batch when every
+rejection opened the circuit.
 
 ### 6.8 Usage limits
 
