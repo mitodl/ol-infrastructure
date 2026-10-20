@@ -1034,7 +1034,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
                             "AZURE_OPENAI_API_VERSION": edxapp_config.get(
                                 "azure_openai_api_version"
                             )
-                            or "2024-10-21",
+                            or "v1",
                             "AZURE_OPENAI_DEFAULT_DEPLOYMENT": edxapp_config.get(
                                 "azure_openai_default_deployment"
                             )
