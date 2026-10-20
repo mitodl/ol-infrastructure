@@ -70,6 +70,13 @@ A month of history is not enough for:
 
 ### Options Considered
 
+The three signals do not have to share a backend. Options 1 and 2 cover all three
+with a Grafana-native mirror. Options 3 and 4 are **log archives only**: they replace
+the Loki part of Option 1 or 2 and are combined with its metrics part. Option 5 is a
+later step that applies to any of them, and Option 6 is the baseline we are trying
+to avoid. Logs are 119 GB/day of the ~175 GB/day total and drive almost all of the
+storage and compute, so the choice of log backend is the one that decides the cost.
+
 #### Option 1: Full mirror. Dual-write every signal to a self-hosted LGTM backend and query it from Grafana Cloud. *(proposed design)*
 
 Each shipper gets a second destination that carries the same data, after the same
@@ -91,18 +98,35 @@ Grafana Cloud. Nothing has to be exposed to the internet.
                  S3 (13mo logs/metrics, 90d traces)
 ```
 
+**Metrics backend.** Mimir is the default because it is the same engine as Grafana
+Cloud Metrics, so recording rules and query behaviour carry over unchanged. Thanos
+(`thanos-receive` accepting the same remote-write) is the one alternative worth
+naming. It has one feature Mimir lacks: **downsampling** to 5m and 1h blocks, which is
+what makes a 13-month or year-over-year PromQL query cheap. Mimir reads raw samples
+for the whole range and leans on the store-gateway, so every long-range trend we care
+about has to be pre-declared as a recording rule. At 416k series and 8.1k samples/s
+either system runs in monolithic mode on two or three replicas. Neither should be run
+distributed at this volume.
+
+**Replication.** The archive is best-effort by constraint. The design below for Tempo
+already accepts a single replica and the loss of unflushed data when a pod dies. Loki
+and Mimir should be sized on the same basis: RF1 or RF2 in a single AZ, with
+monolithic or simple-scalable Loki if the version we pin still offers it. Zone-aware
+RF3 is an HA serving-tier choice, not an archive choice, and it roughly doubles the
+compute and adds the cross-AZ replication line in the cost table.
+
 - Pros:
   - The archive receives the same shipper-processed streams and uses the same query
     languages. Most queries can be reused by switching datasource, but Cloud-derived
     data, independently sampled traces and translated OTLP metrics may differ.
   - Every query language and tool people already know (LogQL, PromQL, TraceQL) works
-    on the archive.
+    on the archive, including Logs Drilldown and the other Explore apps.
   - It needs no inbound exposure, because PDC dials out from our side.
   - The archive comes up empty, with nothing to migrate. It starts filling from the
     day it is turned on.
 - Cons:
   - We take on three stateful distributed systems, plus their upgrades, sizing and
-    on-call surface.
+    on-call surface. Loki at 119 GB/day is the largest of them by far.
   - Collectors carry more load: a second WAL and queue for each destination and, for
     traces, a second tail sampler (see Decision).
   - Data that Grafana Cloud *derives* is absent from the archive. That covers Tempo's
@@ -112,6 +136,8 @@ Grafana Cloud. Nothing has to be exposed to the internet.
   - Grafana Cloud does not handle any cross-datasource stitching for us. Trace-to-logs
     links, exemplars and correlations have to be configured a second time for the
     archive datasources.
+  - It is always-on compute for a system that is idle most of the week. Even at
+    best-effort sizing the compute line is several times the storage line.
 
 #### Option 2: Tiered mirror. Archive logs and metrics only, and keep traces in Cloud.
 
@@ -130,28 +156,125 @@ else.
   - Adding traces later means the same work as Option 1's trace phase, with no
     savings.
 
-#### Option 3: Cold archive. Dual-write raw telemetry to S3 with no query engine.
+#### Option 3: ClickHouse log archive. Dual-write logs to ClickHouse and query it from Grafana Cloud with SQL. *(logs only; pairs with the metrics part of Option 1 or 2)*
 
-The second destination writes compressed, partitioned objects straight to S3. Alloy's
-`otelcol.exporter.awss3` and Vector's `aws_s3` sink both do this. The Alloy component is still experimental. Nothing runs all the
-time. To answer a question we either query with Athena (or with StarRocks, through a
-Glue table over the prefix), or "rehydrate" a time range into a temporary Loki.
+Logs go to a ClickHouse `MergeTree` table instead of Loki. This is the design that
+SigNoz, HyperDX and ClickHouse's own ClickStack use, and we already run ClickHouse on
+the data EKS cluster (ADR-0007). Grafana Cloud queries it through the official
+**Grafana ClickHouse datasource** over PDC.
+
+Write path:
+
+- **vector-log-proxy and EC2 Vector**: add a `clickhouse` sink with the same `inputs`
+  as the existing global Loki sink. The sink is mature and batches by itself.
+- **k8s-monitoring pod logs**: Alloy has no ClickHouse exporter. The pod-log stream
+  is forked after `loki.process` into `otelcol.receiver.loki`, which converts Loki
+  entries to OTLP log records, and exported with `otelcol.exporter.otlphttp` to
+  vector-log-proxy's `opentelemetry` source. From there it uses the same `clickhouse`
+  sink as everything else, so there is **one writer** for all logs and one place to
+  bound its retries and queue.
+
+Storage and shape:
+
+- A **separate ClickHouse deployment** in the archive namespace, not the ADR-0007
+  cluster, which the data team sized for their own workload. 119 GB/day of ingest is
+  ~1.4 MB/s, which a single 4 vCPU / 16 GiB node handles with large headroom. A second
+  replica (and ClickHouse Keeper) is optional and doubles the compute.
+- Tiered storage: a hot gp3 volume for the last 14–30 days and an S3-backed disk for
+  the rest, moved by `TTL ... TO VOLUME`. Retention is a `TTL ... DELETE` on the table,
+  backstopped by an S3 lifecycle rule as in Option 1.
+- Logs compress 10–20× in ClickHouse, so 13 months is roughly 2.5–5 TB in S3.
+- Schema: `timestamp`, `env`, `cluster`, `namespace`, `service`, `level`, `body`, plus
+  a `Map(String, String)` for the remaining labels. Labels that are queried often are
+  promoted to columns later with `ALTER TABLE ADD COLUMN ... MATERIALIZED`.
 
 - Pros:
-  - The cheapest by a wide margin: S3 storage plus a little shipper CPU, with no
-    service to keep up.
-  - It fits tooling the data platform team already runs (Glue, Athena, StarRocks).
-  - Retention costs next to nothing. Glacier tiers make multi-year retention cheap.
+  - Cheapest *queryable* log archive here: one or two nodes, no ring, no compactor
+    scheduling, no per-component sizing. The compute line is ~$150–300/month on
+    demand, against Loki's share of the Option 1 compute.
+  - Fast over long ranges. A 13-month query over one service is a column scan over
+    sorted, compressed parts, not a fetch of 395 days of chunks.
+  - SQL. The data platform team can query it from StarRocks (JDBC catalog) and from
+    Dagster without learning LogQL, and trend analysis is a `GROUP BY`.
+  - Deletion for erasure requests is a lightweight `DELETE` or a partition drop,
+    which is simpler and faster than Loki's compactor-driven delete API.
+  - One stateful system per signal class we already know how to run (ADR-0007), with
+    an upgrade cadence the data team already keeps.
 - Cons:
-  - It cannot be queried from Grafana at all. Every investigation becomes a SQL or
-    rehydration exercise, which in practice means only one or two people ever use it.
-  - Metrics stored as raw OTLP or remote-write objects are close to unqueryable in
-    SQL at any useful scale.
-  - Labels, query semantics and every link back to Grafana Cloud are lost.
+  - **No LogQL.** Saved Cloud queries do not port by switching datasource, Logs
+    Drilldown and the Explore apps do not work against it, and trace-to-logs links
+    have to be rewritten as SQL templates.
+  - We design a schema instead of inheriting labels, and schema changes are ours to
+    manage.
+  - Query memory is the limit, not storage: a careless `SELECT *` over 13 months will
+    hit `max_memory_usage`. Query-time limits need to be set per Grafana user.
+  - PDC support in the ClickHouse plugin (secure SOCKS proxy) has to be confirmed
+    against the plugin version Cloud ships before acceptance.
+  - Another engine in the stack for a team that mostly thinks in Grafana terms.
 
-#### Option 4: Self-hosted as the long-term store, with Cloud trimmed to fund it.
+#### Option 4: Observability lake. Dual-write logs to S3 as Parquet/Iceberg through Dagster, and query them with Athena or StarRocks. *(logs only; pairs with the metrics part of Option 1 or 2)*
 
-Build Option 1, then use the archive to cut Cloud spend. Drop or aggregate
+Logs land in S3 and are compacted into a columnar table by the data platform we
+already run. Nothing is always-on except what the data team already pays for.
+
+Write path:
+
+- **Vector is the only S3 writer.** vector-log-proxy and EC2 Vector add an `aws_s3`
+  sink (gzip NDJSON, `key_prefix` of `env={{env}}/dt={{ %Y-%m-%d }}/hour={{ %H }}/`).
+  Pod logs reach Vector through the same `otelcol.receiver.loki` → OTLP fork as in
+  Option 3. Alloy's own `otelcol.exporter.awss3` stays out because it is still
+  experimental.
+- **A Dagster asset** runs hourly on the data cluster: read the hour's NDJSON, write
+  zstd Parquet sorted by `(service, timestamp)`, commit it to an **Iceberg** table
+  catalogued in Glue, and let a 7-day lifecycle rule remove the raw objects. Daily
+  partitions by `dt` and `service`. Retention is Iceberg snapshot expiry plus partition
+  drops, backstopped by an S3 lifecycle rule at retention plus 7 days.
+- The most recent hour exists only as raw NDJSON. A second Glue table over the raw
+  prefix keeps it queryable, so there is no gap, only a slower tail.
+
+Query path:
+
+- **Athena** from Grafana Cloud through the official **Athena datasource**. Athena is
+  a public AWS API reached with an IAM role and external ID, so this path needs **no
+  PDC** and no cross-VPC transport for queries.
+- **StarRocks** (ADR-0012) through its Iceberg/Glue external catalog, from Grafana via
+  the MySQL datasource over PDC, or directly from the data team's tools.
+- **Dagster and dbt** for the capacity and cost trend work in the Problem Statement,
+  which is an analytics question better answered in SQL than in LogQL.
+
+- Pros:
+  - The cheapest option by a wide margin, and the only one whose cost is almost all
+    storage. At 8–12× Parquet compression, 13 months is 4–6 TB, about $60–140/month
+    on S3 Standard or Infrequent Access. Athena charges $5/TB scanned, so a one-day,
+    one-service query costs a fraction of a cent and a full 13-month scan of one
+    service about $1. Compaction is a few minutes of a small Dagster pod per hour.
+  - Nothing to keep up. There is no service whose outage loses data: Vector's S3 sink
+    retries against S3, and a failed compaction run is re-run from the raw prefix.
+  - It fits tooling the data platform team already runs (Dagster, Glue, Iceberg,
+    StarRocks), and makes logs a first-class table next to the rest of their data.
+  - Multi-year retention is a lifecycle rule and a Glacier tier away, at near-zero
+    marginal cost, if the records-retention question in Notes asks for it.
+  - Deletion for erasure requests is an Iceberg `DELETE` or a partition drop.
+  - Two independent query engines over the same files, so a StarRocks outage does not
+    remove access.
+- Cons:
+  - **No LogQL**, no Logs Drilldown, no label-based Explore. Investigations in the
+    archive are SQL. The Athena datasource has a Logs visualisation, but the workflow
+    is query-and-read, not browse-and-filter.
+  - Latency is seconds to a minute, not sub-second. That is inside the stated
+    assumption of tens of seconds for long ranges, but it is a different feel from
+    Cloud.
+  - Two-stage ingest: the last hour is slower to query and compaction is a second
+    thing that can fail, though it fails safe.
+  - Label semantics become columns and a map, as in Option 3.
+  - Metrics do not belong here. Raw samples in Parquet are as unqueryable as the
+    original Option 3 said. 1m or 5m rollups exported from Mimir or Thanos are fine
+    for trend analysis, but the TSDB stays the home for PromQL.
+  - Cross-datasource links back to Cloud are lost, as in Options 1 and 3.
+
+#### Option 5: Self-hosted as the long-term store, with Cloud trimmed to fund it.
+
+Build Option 1, 3 or 4, then use the archive to cut Cloud spend. Drop or aggregate
 high-volume, low-value streams before the *Cloud* destination only, for example
 debug-level logs, Traefik and APISIX access logs beyond what alerting needs, and
 high-cardinality series that only feed long-range analysis. The archive keeps
@@ -159,24 +282,50 @@ everything.
 
 - Pros:
   - The archive could pay for itself or better. Production logs are 119 GB/day, and
-    even a modest cut there is real money every month.
+    even a modest cut there is real money every month. With Option 3 or 4 as the log
+    archive the break-even is a small fraction of the Cloud log bill.
 - Cons:
   - Cloud and the archive then disagree about what exists. "It isn't in Cloud, check
     the archive" becomes a habit people have to learn, and the archive becomes
     something we depend on rather than a convenience.
   - This adds the per-destination processing that Option 1 deliberately avoids.
 
-This option is a later step after Option 1, not an alternative to it, and is listed
-so the door is left open.
+This option is a later step after one of the others, not an alternative to them, and
+is listed so the door is left open.
 
-#### Option 5: Buy longer retention from Grafana Cloud.
+#### Option 6: Buy longer retention from Grafana Cloud.
 
 - Pros:
   - It needs no new infrastructure at all.
 - Cons:
   - It is ruled out on cost by the constraints above. We should still get a current
     quote, including any bring-your-own-bucket or export offering, so that Options
-    1–3 are compared with a real number rather than an assumed one.
+    1–4 are compared with a real number rather than an assumed one.
+
+#### Summary
+
+Order-of-magnitude monthly cost for the **log** archive alone, 13 months of
+production at 119 GB/day. Metrics (Mimir or Thanos, monolithic, 2–3 replicas) add
+roughly $150–300 of compute plus $15–25 of storage to each row; traces add Option 1's
+Tempo line.
+
+| | Loki (Option 1/2, as proposed) | Loki (Option 1/2, best-effort sizing) | ClickHouse (Option 3) | Lake (Option 4) |
+|---|---|---|---|---|
+| Query from Cloud | LogQL via PDC | LogQL via PDC | SQL via PDC | SQL, Athena direct (no PDC) or StarRocks via PDC |
+| Logs Drilldown / Explore apps | Yes | Yes | No | No |
+| Saved Cloud queries reusable | Yes | Yes | No | No |
+| Always-on compute | ~$700–1,000 (Loki's share of 9–10 nodes, RF3) | ~$300–450 (RF1–2, single AZ, monolithic/SSD) | ~$150–300 (1–2 nodes) | ~$0 (Dagster hour-slots we already run) |
+| Storage | $60–220 | $60–220 | $60–120 | $60–140 |
+| Cross-AZ replication | $150–250 | $0 | $0 | $0 |
+| Query cost | Included | Included | Included | ~$5/TB scanned |
+| Usable by data platform tools | No | No | Yes (SQL, JDBC) | Yes (Iceberg table) |
+| Erasure requests | Compactor delete API | Compactor delete API | `DELETE` / drop partition | Iceberg `DELETE` / drop partition |
+| New stateful system to own | Loki, microservices | Loki, monolithic/SSD | ClickHouse (known from ADR-0007) | None |
+
+The compute figures are the ADR's own node pricing split by component. The best-effort
+Loki column is an estimate to be re-derived in the Consequences table if that path is
+chosen; the other two are from the component descriptions above and should be checked
+in QA before Production, as the rest of the cost table says.
 
 ## Decision
 
