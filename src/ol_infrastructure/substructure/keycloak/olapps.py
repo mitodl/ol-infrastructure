@@ -31,6 +31,9 @@ from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
     onboard_oidc_org,
     onboard_saml_org,
 )
+from ol_infrastructure.substructure.keycloak.registration_flow import (
+    create_recaptcha_registration_flow,
+)
 
 
 def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
@@ -890,15 +893,30 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     ol_browser_flow = create_organization_browser_flows(
         ol_apps_realm.id, "olapps", opts=resource_options
     )
-    # Bind the flow to the olapps realm for browser login.
+    # OL - browser flow [END]
+    # OL - registration flow [START]
+    ol_registration_flow, ol_registration_recaptcha_config = (
+        create_recaptcha_registration_flow(
+            ol_apps_realm.id,
+            "ol-registration",
+            recaptcha_site_key=keycloak_realm_config.require_secret("captcha_site_key"),
+            recaptcha_secret_key=keycloak_realm_config.require_secret(
+                "captcha_secret_key"
+            ),
+            opts=resource_options,
+        )
+    )
+    # OL - registration flow [END]
     keycloak.authentication.Bindings(
         "ol-apps-flow-bindings",
         realm_id=ol_apps_realm.id,
         browser_flow=ol_browser_flow.alias,
         first_broker_login_flow=ol_first_login_flow.alias,
-        opts=resource_options,
+        registration_flow=ol_registration_flow.alias,
+        opts=resource_options.merge(
+            ResourceOptions(depends_on=[ol_registration_recaptcha_config])
+        ),
     )
-    # OL - browser flow [END]
     # Ensure organization scope is present
     create_organization_scope(ol_apps_realm.id, "olapps", resource_options)
     # Touchstone SAML [START]
