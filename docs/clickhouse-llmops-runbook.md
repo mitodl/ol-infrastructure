@@ -339,7 +339,12 @@ QA runs 2 ClickHouse replicas and 3 Keeper nodes, so it exercises replication
 and Keeper quorum the way production does. Every server, Keeper and operator
 upgrade goes to QA first.
 
-1. Confirm QA's latest `clickhouse-backup` job succeeded.
+1. Confirm QA's latest `clickhouse-backup` job succeeded, and that
+   `kubectl -n clickhouse get pods` shows both `chi-clickhouse-default-0-*`
+   pods and all three `chk-clickhouse-cluster1-0-*` pods Ready. Don't go by the
+   CHI status: it reported `Completed` for the three weeks QA ran one replica
+   with the second Pending (see
+   [Replica pod Pending on its data volume](#replica-pod-pending-on-its-data-volume)).
 2. Change the version for QA only, and apply the stack that owns it:
    - Server: `clickhouse:version` in `Pulumi.QA.yaml`, applied with the
      `applications/clickhouse` QA stack.
@@ -406,6 +411,38 @@ kubectl get chi -n clickhouse clickhouse -o yaml | grep -A20 status:
 # Check pod events
 kubectl describe pod -n clickhouse chi-clickhouse-default-0-0
 ```
+
+### Replica pod Pending on its data volume
+
+A PVC keeps the StorageClass it was created with, so fixing the claim
+template doesn't fix a PVC that is already Pending. Check why it is stuck:
+
+```bash
+kubectl -n clickhouse describe pvc clickhouse-data-chi-clickhouse-default-0-<n>-0
+```
+
+`specify either IOPS or IOPSPerGb, not both` means the PVC predates #6361 and
+sits under `ebs-gp3-sc` with the `ebs-gp3-iops-3000` VolumeAttributesClass.
+Confirm the StatefulSet's template now names `ebs-gp3-iops-3000-sc`, otherwise
+the recreated PVC fails the same way:
+
+```bash
+kubectl -n clickhouse get sts chi-clickhouse-default-0-<n> \
+  -o jsonpath='{.spec.volumeClaimTemplates[*].spec.storageClassName}'
+```
+
+Then delete the Pending PVC and pod, and the StatefulSet recreates both from the
+template. Only do this for a PVC with no volume bound (`kubectl get pvc` shows
+`Pending` and an empty `VOLUME`); a bound PVC holds that replica's data.
+
+```bash
+kubectl -n clickhouse delete pvc clickhouse-data-chi-clickhouse-default-0-<n>-0 --wait=false
+kubectl -n clickhouse delete pod chi-clickhouse-default-0-<n>-0
+```
+
+The new replica fetches every replicated table from the others. It is caught up
+when `system.replicas` on it lists the same number of tables as replica 0 with
+`absolute_delay = 0` and `queue_size = 0`.
 
 ### VSO not syncing users.xml
 
