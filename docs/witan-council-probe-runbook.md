@@ -11,8 +11,8 @@ directions, and a real window sits between them:
 
 - `WitanToolCallErrorRate` (`metric_rules/witan.py`) needs live MCP traffic to
   say anything — with none in the window it is `0/0 = NaN` and never fires.
-- `WitanGraphQuarantined` (`log_rules/witan.py`) needs a pod restart — it reads
-  `graph_count` off omnigraph-server's own boot line.
+- `WitanGraphBlockedAtStartup` (`log_rules/witan.py`) needs a pod restart — it
+  reads the `graph blocked during startup` line omnigraph-server logs at boot.
 
 `council` lost during a quiet period with no restart is invisible to both
 until someone tries to use the service, which for a shared agent memory graph

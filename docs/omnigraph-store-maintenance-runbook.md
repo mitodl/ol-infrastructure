@@ -413,9 +413,10 @@ witan break-glass pod (agent-kit ADR-0005 path b) is the wrong path despite
 - **A storage-format bump.** That cannot be done by restart or by any command
   here; it needs the offline export → rebuild → repoint procedure. Tracked
   separately (`tk-runbook-adr-addendum-omnigraph-storage-format-bu-a2032d`).
-- **A quarantined graph.** By default the server logs a graph that fails to open
+- **A blocked graph.** By default the server logs a graph that fails to open
   and serves the rest, and `/healthz` and `/readyz` stay 200 throughout
-  (`/readyz` reports only a `quarantined_graph_count`) — so a quarantined
-  `council` is a silent brownout that no probe catches. `OMNIGRAPH_REQUIRE_ALL_GRAPHS`
+  (`/readyz` reports `"status":"degraded"` and a `blocked_graph_count`, not
+  which graph) — so a blocked `council` is a silent brownout that no probe
+  catches. `OMNIGRAPH_REQUIRE_ALL_GRAPHS`
   is deliberately left unset (see the rationale in `data_tier.py`); detecting it
   belongs with the service's monitoring.
