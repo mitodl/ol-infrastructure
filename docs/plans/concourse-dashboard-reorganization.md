@@ -310,7 +310,7 @@ data stack; it is still `release_bot`-referenced and must not be renamed.
    `mit-learn-api-client`, `mitxonline-api-client`
 5. **apps-misc** (4) — `platform-engineering-site`, `edx-sysadmin`,
    `sign-and-verify`, `google-ads-optimization`
-6. **deprecated** (1) — `publish-ol-django-pypi`, parked pending archive (§4.4)
+6. **deprecated** — was `publish-ol-django-pypi`, since removed (§4.4)
 
 The canonical ordering lists live in `bin/` (see §6) so they can be re-applied
 idempotently rather than being one-shot shell history.
@@ -567,6 +567,15 @@ cluster into a new `deprecated` cluster at the bottom of the `main` ordering, an
 joins the Phase 2 archive candidates (§4.1 covers the `infrastructure` ones). A
 replacement for mitol-django publishing, if wanted, is a rewrite filed
 separately — not a repair of this pipeline.
+
+**Update 2026-10-20: removed.** The generator (`ol_django.py`) and the
+`set-ol-django-pipeline` job in `publish-python-packages-meta` are deleted, along
+with the `ol-django` entry in `bridge.settings.libraries` and the `deprecated`
+cluster in `bin/concourse-order-pipelines`. `mitodl/ol-django` publishes itself:
+since ol-django#561 (2026-08-28), a version bump merged to `main` is built and
+uploaded by the `publish` job in its own `ci.yml`, using PyPI trusted publishing.
+Removing the generator does not destroy the live `publish-ol-django-pypi`
+pipeline; `fly destroy-pipeline` it on team `main` after this merges.
 
 ### 4.5 The Concourse SOPS file is not a complete secret inventory
 
