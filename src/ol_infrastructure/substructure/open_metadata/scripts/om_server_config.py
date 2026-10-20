@@ -35,7 +35,10 @@ from ol-data-platform's dbt manifest, not here.
 The business glossary is declared in ``GLOSSARY_CONFIG`` and ``GLOSSARY_TERMS``.
 The glossary and each term are created when missing and never patched, so a
 steward's edits in the OpenMetadata UI are kept: once a term exists, change its
-definition there, not here.  Which columns carry each term is set from
+definition there, not here.  A term a steward soft-deletes or moves under
+another parent is left alone too.  Renaming a term or hard-deleting it frees
+its name, so the next run creates it again: rename or remove it in
+``GLOSSARY_TERMS`` as well.  Which columns carry each term is set from
 ol-data-platform's dbt column meta (``meta.openmetadata.glossary``).
 """
 
@@ -279,9 +282,11 @@ GLOSSARY_TERMS: list[dict[str, Any]] = [
             "users, not learners.\n\n"
             "`afact_learner_courserun_progress` has one row per learner and course "
             "run, for course enrollments whose `user_fk` and `courserun_fk` both "
-            "resolved. `afact_learner_courserun_daily_activity` has one row per "
-            "learner, course run and day with tracked activity.\n\n"
-            "See Active learner for learners who did something."
+            "resolved. `afact_learner_courserun_daily_activity` is built from "
+            "tracked events, not enrollments, so it also holds users with activity "
+            "but no enrollment (e.g. staff previewing a course); join it to "
+            "`tfact_enrollment` to keep learners only.\n\n"
+            "See Active learner."
         ),
     },
     {
@@ -295,8 +300,10 @@ GLOSSARY_TERMS: list[dict[str, Any]] = [
             "Type 2 (filter on `is_current`). A course has one or more course "
             "runs; enrollments, grades and certificates belong to the runs.\n\n"
             "edX.org, Emeritus and Global Alumni have no course table, so their "
-            "courses are built from course runs. OCW courses are in `dim_course` "
-            "but have no runs or enrollments in the dimensional models."
+            "courses are built from course runs. Residential has no courses in "
+            "`dim_course`, so its runs have a null `course_fk`. OCW courses are in "
+            "`dim_course` but have no runs or enrollments in the dimensional "
+            "models."
         ),
     },
     {
@@ -324,10 +331,11 @@ GLOSSARY_TERMS: list[dict[str, Any]] = [
             "`bridge_program_course` lists its courses and whether each is "
             "required. Programs have no runs.\n\n"
             "A program enrollment is a `tfact_enrollment` row with "
-            "`enrollment_type = 'program'`. MicroMasters has no program enrollment "
-            "records, so on a MicroMasters course enrollment `program_fk` is looked "
-            "up from the run's program membership. On an xPRO course enrollment "
-            "it is the program the course was bought under."
+            "`enrollment_type = 'program'`, and the fact holds MITx Online program "
+            "enrollments only: xPRO, edX.org and MicroMasters program enrollments "
+            "are not in it. On a MicroMasters course enrollment `program_fk` is "
+            "looked up from the run's program membership, and on an xPRO course "
+            "enrollment it is the program the course was bought under."
         ),
     },
     {
@@ -343,8 +351,8 @@ GLOSSARY_TERMS: list[dict[str, Any]] = [
             "for current enrollments (see Active enrollment).\n\n"
             "A learner can hold several enrollments in one run after refunds, "
             "deferrals or transfers; `afact_learner_courserun_progress` reports "
-            "the active one, else the newest. An xPRO program purchase creates a "
-            "program enrollment and a course enrollment for each of its courses."
+            "the active one, else the newest. Program enrollments in the fact are "
+            "MITx Online only (see Program)."
         ),
     },
     {
@@ -368,9 +376,12 @@ GLOSSARY_TERMS: list[dict[str, Any]] = [
         "displayName": "Active learner",
         "synonyms": ["engaged learner"],
         "description": (
-            "A learner with tracked course activity in a period: a row in "
+            "A user with tracked course activity in a period: a row in "
             "`afact_learner_courserun_daily_activity` for that day, month or "
-            "course run. Activity is a video play, problem check, course "
+            "course run. The table is built from events, not enrollments, so it "
+            "also counts users who never enrolled (e.g. staff previewing a "
+            "course); join to `tfact_enrollment` to count enrolled learners "
+            "only. Activity is a video play, problem check, course "
             "navigation, discussion event or Open edX chatbot submit; enrolling "
             "and earning a certificate are not activity. "
             "`afact_learner_courserun_progress.last_active_on` is the latest such "
@@ -389,10 +400,12 @@ GLOSSARY_TERMS: list[dict[str, Any]] = [
         "synonyms": ["is_active"],
         "description": (
             "A platform account that has not been deactivated: the "
-            "`dim_user.user_is_active_on_<platform>` flags, copied from each "
-            "platform's account `is_active` flag, which the applications use to "
-            "soft-delete accounts. Null when the user has no account on that "
-            "platform.\n\n"
+            "`dim_user.user_is_active_on_<platform>` flags. On MITx Online, xPRO, "
+            "Residential, Bootcamps and MIT Learn the flag is the account's own "
+            "`is_active`, which the applications use to soft-delete accounts. On "
+            "edX.org it is derived instead: false when the account's email or "
+            "username starts with `retired__user` (a retired account), else true. "
+            "Null when the user has no account on that platform.\n\n"
             "It is not a measure of use: an account can be active without ever "
             "being used. See Active learner."
         ),
@@ -416,9 +429,12 @@ GLOSSARY_TERMS: list[dict[str, Any]] = [
             "Two related uses.\n\n"
             "As an enrollment mode, `enrollment_mode = 'verified'` is the "
             "certificate track a learner pays for, as opposed to `audit`. The "
-            "warehouse also sets it on DEDP course enrollments on MITx Online and "
-            "edX.org that a fulfilled MITx Online or MicroMasters order paid for, "
-            "whatever mode the platform recorded.\n\n"
+            "warehouse also sets it on some DEDP course enrollments, whatever mode "
+            "the platform recorded. On edX.org it does so when a fulfilled "
+            "MicroMasters order paid for the run. On MITx Online it does so only "
+            "for an enrollment with no `enrollment_status`, paid for by a "
+            "fulfilled MicroMasters order for the 3T2021, 1T2022 and 2T2022 runs "
+            "and by a fulfilled MITx Online order for any other run.\n\n"
             "As a certificate type, `dim_certificate_type.certificate_type_code = "
             "'verified'`. `tfact_certificate` gives it to every MITx Online course "
             "and program certificate, MicroMasters course certificate, edX.org "
@@ -611,16 +627,21 @@ def _reconcile_tag(fqn: str, desired: dict[str, Any]) -> None:
     _apply_patch(fqn, f"{OM_SERVER_URL}/v1/tags/{tag['id']}", ops)
 
 
-def _get_by_name(collection: str, name: str) -> dict[str, Any] | None:
+def _get_by_name(
+    collection: str, name: str, include: str | None = None
+) -> dict[str, Any] | None:
     """Fetch an entity by name, or None if it does not exist.
 
     :param collection: The API collection, e.g. ``"teams"``.
     :param name: The entity's name.
+    :param include: ``"all"`` to also find a soft-deleted entity; by default
+        the server returns only entities that are not deleted.
     :raises requests.HTTPError: On any non-2xx response other than 404.
     """
     get_resp = requests.get(
         f"{OM_SERVER_URL}/v1/{collection}/name/{name}",
         headers=_AUTH_HEADER,
+        params={"include": include} if include else None,
         timeout=30,
     )
     if get_resp.status_code == requests.codes.not_found:
@@ -1041,8 +1062,7 @@ def _reconcile_glossary() -> None:
     :raises ValueError: If the owning team does not exist.
     """
     label = f"glossary {GLOSSARY_NAME}"
-    if _get_by_name("glossaries", GLOSSARY_NAME) is not None:
-        print(f"[ok]   {label}: exists — skipping")  # noqa: T201
+    if _exists_in_om(label, "glossaries", GLOSSARY_NAME):
         return
 
     team = _get_by_name("teams", _GLOSSARY_TEAM)
@@ -1062,25 +1082,58 @@ def _reconcile_glossary() -> None:
     )
 
 
+def _exists_in_om(label: str, collection: str, fqn: str) -> bool:
+    """Whether the entity exists, soft-deleted or not, logging which.
+
+    A soft-deleted glossary or term was deleted by a steward, so it is left
+    alone rather than recreated (the server would refuse the name anyway).
+
+    :param label: What is being reconciled, for the log line.
+    :param collection: The API collection, e.g. ``"glossaryTerms"``.
+    :param fqn: The entity's fully-qualified name.
+    :raises requests.HTTPError: On any non-2xx response other than 404.
+    """
+    entity = _get_by_name(collection, fqn, include="all")
+    if entity is None:
+        return False
+    if entity.get("deleted"):
+        print(f"[skip] {label}: deleted in OpenMetadata — left alone")  # noqa: T201
+    else:
+        print(f"[ok]   {label}: exists — skipping")  # noqa: T201
+    return True
+
+
 def _reconcile_glossary_term(term: dict[str, Any]) -> None:
     """Create the glossary term if it is missing.
 
     :param term: An entry of ``GLOSSARY_TERMS``.
-    :raises requests.HTTPError: On any non-2xx response from the OM API.
+    :raises requests.HTTPError: On any non-2xx response from the OM API other
+        than the server's refusal of a name the glossary already holds.
     """
     parent_fqn = GLOSSARY_NAME
     if parent := term.get("parent"):
         parent_fqn = f"{GLOSSARY_NAME}.{parent}"
     fqn = f"{parent_fqn}.{term['name']}"
     label = f"glossary term {fqn}"
-    if _get_by_name("glossaryTerms", fqn) is not None:
-        print(f"[ok]   {label}: exists — skipping")  # noqa: T201
+    if _exists_in_om(label, "glossaryTerms", fqn):
         return
 
     body = {k: v for k, v in term.items() if k != "parent"}
     if parent:
         body["parent"] = parent_fqn
-    _create("glossaryTerms", label, {"glossary": GLOSSARY_NAME, **body})
+    try:
+        _create("glossaryTerms", label, {"glossary": GLOSSARY_NAME, **body})
+    except requests.HTTPError as exc:
+        # Term names are unique across a glossary, case-insensitively.  A term
+        # a steward moved under another parent is missing at this FQN but
+        # still holds the name, and the server answers 400.
+        if (
+            exc.response is None
+            or exc.response.status_code != requests.codes.bad_request
+            or "already exists" not in exc.response.text
+        ):
+            raise
+        print(f"[skip] {label}: name held elsewhere in the glossary — left alone")  # noqa: T201
 
 
 def main() -> None:
