@@ -127,7 +127,7 @@ flowchart TB
         end
     end
 
-    browser["Browser<br/>https://learn.mit.dev"] --> lb
+    browser["Browser<br/>https://learn.mit.test"] --> lb
     lb --> api
     tilt -->|kubectl apply| api
     tilt -->|build| docker
@@ -207,7 +207,7 @@ The whole stack is roughly 1.9GB and can be switched off with `observability_ena
 
 **Shared database cluster:** All apps share one CloudNativePG (CNPG) cluster in the `local-infra` namespace with isolated databases (`mitlearn`, `learnai`, `mitxonline`, `odlvideo`, `keycloak`, `litellm`). This keeps memory usage low.
 
-**TLS:** mkcert generates a wildcard certificate for all `.dev` domains. The cert is read by Pulumi at stack evaluation time and stored as `local-dev-tls` Kubernetes Secrets in every app namespace. APISIX's `ApisixTls` CRs reference these secrets.
+**TLS:** mkcert issues one certificate whose wildcard SANs (`*.mit.test`, `*.learn.mit.test`, …) cover every local hostname under the root domain (`mit.test` by default). The cert is read by Pulumi at stack evaluation time and stored as `local-dev-tls` Kubernetes Secrets in every app namespace. APISIX's `ApisixTls` CRs reference these secrets.
 
 **Keycloak realm:** The `olapps` realm mirrors production, including the fake-Touchstone SAML IdP, all OIDC clients, and organizations support. Test accounts are listed in the [README](README.md#test-accounts).
 
@@ -221,14 +221,14 @@ sequenceDiagram
     participant SV as Service (mit-learn)
     participant PO as Pod (next dev / granian)
 
-    B->>LB: GET https://learn.mit.dev
+    B->>LB: GET https://learn.mit.test
     LB->>AP: forward by hostname
     AP->>SV: route matches host → Service
     SV->>PO: load-balance to a pod
     PO-->>B: response (serving live-synced code)
 ```
 
-In words: your hosts/DNS points `*.mit.dev` at the k3d `serverlb` → **apisix** matches the hostname and routes to the right **Service** → the Service load-balances to a **Pod** running `next dev` (frontend) or `granian` (Django) → that pod is serving code Tilt **live-synced** from your checkout seconds ago. Edit a file, HMR/reload repaints, no rebuild.
+In words: your hosts/DNS points `*.mit.test` at the k3d `serverlb` → **apisix** matches the hostname and routes to the right **Service** → the Service load-balances to a **Pod** running `next dev` (frontend) or `granian` (Django) → that pod is serving code Tilt **live-synced** from your checkout seconds ago. Edit a file, HMR/reload repaints, no rebuild.
 
 ## Why Tilt exists
 
@@ -285,7 +285,7 @@ Then, for each enabled app (apps deploy independently of each other):
 ├── kubectl apply configmaps/ secrets.yaml deployment.yaml
 │     initContainer: migrate + collectstatic + data-specific seeds
 └── kubectl apply apisix-routes.yaml
-      APISIX picks up new routes → app reachable at its .dev URL
+      APISIX picks up new routes → app reachable at its mit.test URL
 ```
 
 ## The raw k8s dev flow (what Tilt automates)

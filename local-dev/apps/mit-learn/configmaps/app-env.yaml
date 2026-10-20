@@ -26,54 +26,54 @@ data:
   SECURE_CROSS_ORIGIN_OPENER_POLICY: "None"
   NODE_MODULES_CACHE: "False"
   # Required — ImproperlyConfigured raised if unset.
-  MITOL_APP_BASE_URL: "https://learn.mit.dev"
-  MITOL_API_BASE_URL: "https://api.learn.mit.dev"
+  MITOL_APP_BASE_URL: "https://learn.mit.test"
+  MITOL_API_BASE_URL: "https://api.learn.mit.test"
   # Redirect target for first-time OIDC logins; defaults to a legacy open.odl.local host.
-  MITOL_NEW_USER_LOGIN_URL: "https://learn.mit.dev/onboarding"
+  MITOL_NEW_USER_LOGIN_URL: "https://learn.mit.test/onboarding"
 
   # mkcert root CA — trusts the local wildcard TLS cert for inter-pod HTTPS
-  # (e.g. Django OIDC token exchange with Keycloak at sso.ol.mit.dev)
+  # (e.g. Django OIDC token exchange with Keycloak at sso.ol.mit.test)
   REQUESTS_CA_BUNDLE: "/etc/ssl/local-dev/rootCA.pem"
   SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
 
   # ── Domain / CORS / CSRF ───────────────────────────────────────────────────
   # Scoped to .learn, not the whole root domain. These cookies use Django's
-  # default names, so at .mit.dev the browser sent mit-learn's csrftoken and
-  # sessionid to every sibling app -- each of which sets its own cookie of the
-  # same name. Two same-named cookies reach the app, and the two sides read
-  # different ones: JS that walks document.cookie takes the first match, while
-  # Django's request.COOKIES dict keeps the last. ocw-studio's publish and
-  # logout POSTs failed CSRF intermittently because of exactly that.
+  # default names, so scoped to .mit.test the browser would send mit-learn's
+  # csrftoken and sessionid to every sibling app -- each of which sets its own
+  # cookie of the same name. Two same-named cookies reach the app, and the two
+  # sides read different ones: JS that walks document.cookie takes the first
+  # match, while Django's request.COOKIES dict keeps the last. ocw-studio's
+  # publish and logout POSTs failed CSRF intermittently because of exactly that.
   #
   # .learn still covers both of mit-learn's own hosts, learn and api.learn
   # (and ai.learn, as before), which are also its only CSRF_TRUSTED_ORIGINS.
   # Nothing needs these at mitxonline: that integration is served under
-  # api.learn.mit.dev/mitxonline/* and keeps its session on the learn host.
+  # api.learn.mit.test/mitxonline/* and keeps its session on the learn host.
   #
   # MITOL_COOKIE_DOMAIN below is deliberately left alone -- it carries a
   # distinctly named cookie (mitlearn-auth), so it collides with nothing.
-  CSRF_COOKIE_DOMAIN: ".learn.mit.dev"
-  SESSION_COOKIE_DOMAIN: ".learn.mit.dev"
+  CSRF_COOKIE_DOMAIN: ".learn.mit.test"
+  SESSION_COOKIE_DOMAIN: ".learn.mit.test"
   MITOL_COOKIE_NAME: "mitlearn-auth"
-  MITOL_COOKIE_DOMAIN: ".mit.dev"
+  MITOL_COOKIE_DOMAIN: ".mit.test"
   # ocw-dev is the OCW hugo dev server (see ocw-hugo-dev.yaml). Without it
   # reads succeed and every write fails the Origin check.
-  CSRF_TRUSTED_ORIGINS: '["https://learn.mit.dev","https://api.learn.mit.dev","https://ocw-dev.learn.mit.dev"]'
-  CORS_ALLOWED_ORIGINS: '["https://learn.mit.dev","https://api.learn.mit.dev","https://sso.ol.mit.dev"]'
-  MITOL_CORS_ORIGIN_WHITELIST: '["https://learn.mit.dev","https://api.learn.mit.dev"]'
+  CSRF_TRUSTED_ORIGINS: '["https://learn.mit.test","https://api.learn.mit.test","https://ocw-dev.learn.mit.test"]'
+  CORS_ALLOWED_ORIGINS: '["https://learn.mit.test","https://api.learn.mit.test","https://sso.ol.mit.test"]'
+  MITOL_CORS_ORIGIN_WHITELIST: '["https://learn.mit.test","https://api.learn.mit.test"]'
   CORS_ALLOWED_ORIGIN_REGEXES: "[]"
-  ALLOWED_REDIRECT_HOSTS: '["learn.mit.dev","api.learn.mit.dev"]'
-  MITOL_AXIOS_BASE_PATH: "https://learn.mit.dev"
+  ALLOWED_REDIRECT_HOSTS: '["learn.mit.test","api.learn.mit.test"]'
+  MITOL_AXIOS_BASE_PATH: "https://learn.mit.test"
 
   # ── SSO / Keycloak ─────────────────────────────────────────────────────────
   SOCIAL_AUTH_OL_OIDC_KEY: "ol-mitlearn-client"
   KEYCLOAK_REALM_NAME: "olapps"
-  KEYCLOAK_BASE_URL: "https://sso.ol.mit.dev/"
-  OIDC_ENDPOINT: "https://sso.ol.mit.dev/realms/olapps"
-  SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT: "https://sso.ol.mit.dev/realms/olapps"
-  ACCESS_TOKEN_URL: "https://sso.ol.mit.dev/realms/olapps/protocol/openid-connect/token"
-  AUTHORIZATION_URL: "https://sso.ol.mit.dev/realms/olapps/protocol/openid-connect/auth"
-  USERINFO_URL: "https://sso.ol.mit.dev/realms/olapps/protocol/openid-connect/userinfo"
+  KEYCLOAK_BASE_URL: "https://sso.ol.mit.test/"
+  OIDC_ENDPOINT: "https://sso.ol.mit.test/realms/olapps"
+  SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT: "https://sso.ol.mit.test/realms/olapps"
+  ACCESS_TOKEN_URL: "https://sso.ol.mit.test/realms/olapps/protocol/openid-connect/token"
+  AUTHORIZATION_URL: "https://sso.ol.mit.test/realms/olapps/protocol/openid-connect/auth"
+  USERINFO_URL: "https://sso.ol.mit.test/realms/olapps/protocol/openid-connect/userinfo"
 
   # ── Storage (local — no S3) ────────────────────────────────────────────────
   MITOL_USE_S3: "False"
@@ -84,13 +84,13 @@ data:
   MITOL_EMAIL_HOST: "mailpit.local-infra.svc.cluster.local"
   MITOL_EMAIL_PORT: "1025"
   MITOL_EMAIL_TLS: "False"
-  MITOL_FROM_EMAIL: "MIT Learn <noreply@mit.dev>"
+  MITOL_FROM_EMAIL: "MIT Learn <noreply@mit.test>"
   MITOL_NOTIFICATION_EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
   # Mailgun settings are required by settings.py even when using SMTP.
   # Stub values prevent ImproperlyConfigured at startup; actual Mailgun
   # is not used in local dev (Mailpit handles all outbound email).
-  MAILGUN_SENDER_DOMAIN: "ol.mit.dev"
-  MAILGUN_FROM_EMAIL: "MIT Learn <noreply@ol.mit.dev>"
+  MAILGUN_SENDER_DOMAIN: "ol.mit.test"
+  MAILGUN_FROM_EMAIL: "MIT Learn <noreply@ol.mit.test>"
 
   # ── Database ───────────────────────────────────────────────────────────────
   # DATABASE_URL is set in secrets (contains password).
@@ -145,10 +145,10 @@ data:
   # in-cluster instance directly, matching mit-learn-nextjs's
   # NEXT_PUBLIC_MITX_ONLINE_LEGACY_BASE_URL (its primary
   # NEXT_PUBLIC_MITX_ONLINE_BASE_URL instead routes through the API gateway:
-  # https://api.learn.mit.dev/mitxonline).
-  MITX_ONLINE_BASE_URL: "https://mitxonline.mit.dev"
-  MITX_ONLINE_COURSES_API_URL: "https://mitxonline.mit.dev/api/v2/courses/"
-  MITX_ONLINE_PROGRAMS_API_URL: "https://mitxonline.mit.dev/api/v2/programs/"
+  # https://api.learn.mit.test/mitxonline).
+  MITX_ONLINE_BASE_URL: "https://mitxonline.mit.test"
+  MITX_ONLINE_COURSES_API_URL: "https://mitxonline.mit.test/api/v2/courses/"
+  MITX_ONLINE_PROGRAMS_API_URL: "https://mitxonline.mit.test/api/v2/programs/"
   PROLEARN_CATALOG_API_URL: "https://prolearn.mit.edu/graphql"
   CSAIL_BASE_URL: "https://cap.csail.mit.edu/"
   MITPE_BASE_URL: "https://professional.mit.edu/"

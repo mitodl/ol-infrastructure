@@ -43,7 +43,7 @@ from ol_infrastructure.components.services.k8s import (  # noqa: E402
 )
 
 LOCAL_IMAGE_TAG = "tilt-abc123"
-OPENEDX_BASE_URL = "https://lms.mit.dev"
+OPENEDX_BASE_URL = "https://lms.mit.test"
 LOCAL_OIDC_SECRET = "ol-mitlearn-oidc"  # noqa: S105  # pragma: allowlist secret
 
 
@@ -52,9 +52,9 @@ def _local_bindings(**overrides) -> definition.MitxonlineBindings:
     settings = {
         "env_suffix": "dev",
         "hostnames": definition.MitxonlineHostnames(
-            api="api.mitxonline.mit.dev",
-            frontend="mitxonline.mit.dev",
-            learn_api="api.learn.mit.dev",
+            api="api.mitxonline.mit.test",
+            frontend="mitxonline.mit.test",
+            learn_api="api.learn.mit.test",
         ),
         "environment_variables": {
             "OPENEDX_API_BASE_URL": OPENEDX_BASE_URL,
@@ -323,9 +323,9 @@ def test_routes_follow_the_bound_hostnames():
     direct, prefixed = _route_groups(_deployed_bindings())
 
     assert {tuple(route.hosts) for route in direct} == {
-        ("api.mitxonline.mit.dev", "mitxonline.mit.dev")
+        ("api.mitxonline.mit.test", "mitxonline.mit.test")
     }
-    assert {tuple(route.hosts) for route in prefixed} == {("api.learn.mit.dev",)}
+    assert {tuple(route.hosts) for route in prefixed} == {("api.learn.mit.test",)}
     assert [route.route_name for route in direct] == [
         "passauth",
         "logout-redirect",
@@ -371,8 +371,8 @@ def test_session_cookies_are_named_for_the_environment():
     assert direct.oidc_session_cookie_name != prefixed.oidc_session_cookie_name
     assert bindings.env_suffix in direct.oidc_session_cookie_name
     assert bindings.env_suffix in prefixed.oidc_session_cookie_name
-    assert direct.oidc_session_cookie_domain == ".mitxonline.mit.dev"
-    assert prefixed.oidc_session_cookie_domain == ".learn.mit.dev"
+    assert direct.oidc_session_cookie_domain == ".mitxonline.mit.test"
+    assert prefixed.oidc_session_cookie_domain == ".learn.mit.test"
 
 
 def test_deployed_routes_read_oidc_credentials_from_the_mitlearn_vault_client():

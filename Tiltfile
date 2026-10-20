@@ -50,9 +50,10 @@ per_app_databases = cfg.get("per_app_databases", False)
 os.putenv("LOCAL_DEV_ENABLED_APPS", ",".join(enabled_apps))
 
 # Every service hostname, CORS origin, APISIX route, and Keycloak redirect URI
-# derives from this value. local-dev/tiltlib.star reads the same environment
-# variable when applying app manifests.
-root_domain = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
+# derives from this value, the same one local-dev/tiltlib.star substitutes into
+# app manifests.
+load("./local-dev/tiltlib.star", "current_root_domain")
+root_domain = current_root_domain()
 
 # The TLS certificate covers only this domain, so an unresolvable hostname means
 # nothing the stack serves is reachable. DNS and /etc/hosts both satisfy this.
@@ -67,7 +68,7 @@ if str(local(
          "  Fix by either:\n" +
          "    - running ./local-dev/scripts/setup.sh (adds 127.0.0.1 entries to /etc/hosts), or\n" +
          "    - pointing DNS for *.%s at this host, or\n" +
-         "    - unsetting LOCAL_DEV_ROOT_DOMAIN to use the mit.dev default.")
+         "    - unsetting LOCAL_DEV_ROOT_DOMAIN to use the mit.test default.")
         % (_probe_host, root_domain, root_domain)
     )
 
@@ -474,10 +475,15 @@ local_resource(
 # path (even while Keycloak itself is idle) and a batch of them trip
 # "context deadline exceeded" together. Serialising keeps one admin request in
 # flight at a time, which the path handles comfortably.
+#
+# `--run-program` makes the refresh use the Keycloak provider settings the
+# program computes now. Without it, refresh uses the ones recorded in state,
+# so after a root-domain change every resource fails to refresh against the
+# old hostname before the new URL can be applied.
 local_resource(
     "local-infra-apps",
     # FORCE_COLOR is unset for the same reason as local-infra-core above.
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --refresh --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --refresh --run-program --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
     # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
     # the core stack only creates on demand.
     env={"LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps)},

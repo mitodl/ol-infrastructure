@@ -6,7 +6,7 @@ metadata:
   namespace: learn-ai
 data:
   DJANGO_SETTINGS_MODULE: "main.settings"
-  MITOL_APP_BASE_URL: "https://ai.learn.mit.dev"
+  MITOL_APP_BASE_URL: "https://ai.learn.mit.test"
   MITOL_DB_DISABLE_SSL: "True"
   MITOL_USE_S3: "False"
   DEBUG: "True"
@@ -19,7 +19,7 @@ data:
   SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
 
   # Keycloak/OIDC
-  KEYCLOAK_BASE_URL: "https://sso.ol.mit.dev"
+  KEYCLOAK_BASE_URL: "https://sso.ol.mit.test"
   KEYCLOAK_REALM_NAME: "olapps"
 
   # Valkey (cluster-local)
@@ -47,21 +47,21 @@ data:
   MITOL_EMAIL_TLS: "False"
   # Mailgun settings are required unconditionally by settings.py even when
   # using SMTP. Stub values — Mailpit handles all email in local dev.
-  MAILGUN_SENDER_DOMAIN: "ol.mit.dev"
-  MAILGUN_FROM_EMAIL: "MIT Learn AI <noreply@ol.mit.dev>"
+  MAILGUN_SENDER_DOMAIN: "ol.mit.test"
+  MAILGUN_FROM_EMAIL: "MIT Learn AI <noreply@ol.mit.test>"
   MAILGUN_KEY: "local-dev-mailgun-stub"
 
   # Cookie configuration
   MITOL_COOKIE_NAME: "learn-ai-auth"
-  MITOL_COOKIE_DOMAIN: ".mit.dev"
-  # learn-ai is also served at api.learn.mit.dev/ai/* (apisix-routes.yaml), the
-  # host where mit-learn sets sessionid/csrftoken on .learn.mit.dev. Own names
+  MITOL_COOKIE_DOMAIN: ".mit.test"
+  # learn-ai is also served at api.learn.mit.test/ai/* (apisix-routes.yaml), the
+  # host where mit-learn sets sessionid/csrftoken on .learn.mit.test. Own names
   # keep the two apps' Django cookies apart, as in RC and production. The CSRF
-  # cookie sits on .learn.mit.dev so the frontend on learn.mit.dev can read it.
+  # cookie sits on .learn.mit.test so the frontend on learn.mit.test can read it.
   SESSION_COOKIE_NAME: "session_learn_ai"
   CSRF_COOKIE_NAME: "learn_ai_csrftoken"
-  CSRF_COOKIE_DOMAIN: ".learn.mit.dev"
-  CSRF_TRUSTED_ORIGINS: '["https://ai.learn.mit.dev","https://learn.mit.dev","https://api.learn.mit.dev"]'
+  CSRF_COOKIE_DOMAIN: ".learn.mit.test"
+  CSRF_TRUSTED_ORIGINS: '["https://ai.learn.mit.test","https://learn.mit.test","https://api.learn.mit.test"]'
 
   # Feature flags
   FEATURE_LEARN_AI_ENABLED: "True"

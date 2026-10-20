@@ -14,7 +14,7 @@ DEPLOY_NAME = 'mitxonline-webapp'
 if os.path.exists(os.path.join(APP_DIR, '.git')):
     # Build the `local-dev` target: `production` (the only target that bakes in
     # the compiled webpack frontend, which checkout needs since that flow still
-    # runs through mitxonline.mit.dev) plus dev deps (pytest, ipdb, ...) and
+    # runs through mitxonline.mit.test) plus dev deps (pytest, ipdb, ...) and
     # watchfiles so granian can --reload (see deployment.yaml).
     docker_build(
         IMAGE,

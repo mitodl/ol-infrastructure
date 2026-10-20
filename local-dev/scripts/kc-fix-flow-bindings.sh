@@ -23,7 +23,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-_ROOT_DOMAIN="${LOCAL_DEV_ROOT_DOMAIN:-mit.dev}"
+_ROOT_DOMAIN="${LOCAL_DEV_ROOT_DOMAIN:-mit.test}"
 KC_URL="${KC_URL:-https://sso.ol.${_ROOT_DOMAIN}}"
 REALM="olapps"
 KC_USER="admin"

@@ -61,7 +61,7 @@ data:
   # PUBLISH_POSTHOG_PROJECT_API_KEY: "phc_..."  # pragma: allowlist secret
 
   # ── Open catalog webhooks (back into MIT Learn) ───────────────────────────
-  # OPEN_CATALOG_URLS: "https://api.learn.mit.dev/api/v1/ocw_next_webhook/"
+  # OPEN_CATALOG_URLS: "https://api.learn.mit.test/api/v1/ocw_next_webhook/"
   # OPEN_CATALOG_WEBHOOK_KEY: "..."
 
   # ── YouTube upload ────────────────────────────────────────────────────────

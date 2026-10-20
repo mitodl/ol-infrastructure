@@ -59,7 +59,7 @@ spec:
           # cannot run here: invoked without a platform argument it parses
           # platform as None, fails its `gateway is None` check and exit(-1)s
           # before it reaches the OAuth step. It also builds redirect URIs from
-          # hardcoded devstack/tutor hosts, none of which is lms.mit.dev.
+          # hardcoded devstack/tutor hosts, none of which is lms.mit.test.
           #
           # openedx/migrations/0001_add_oauth_application creates this row, but
           # only on a fresh database, with a random secret and a redirect URI
