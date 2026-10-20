@@ -174,14 +174,23 @@ upstreams_stale() {
 #     # Based on host file: '/etc/resolv.conf' (legacy)
 #
 # The search domain is the only usable signal, so fall back to it. It is a
-# weaker test — two networks with no search domain are indistinguishable — but
-# a dagger restart costs seconds and its build cache lives in a named volume
-# that survives, so an occasional needless restart is cheap. When either side
-# has no search domain there is nothing to compare, so say so rather than guess.
+# weaker test — two networks that both lack a search domain are
+# indistinguishable — but a dagger restart costs seconds and its build cache
+# lives in a named volume that survives, so an occasional needless restart is
+# cheap.
+#
+# "No search domain" is itself a configuration, not a missing reading: moving
+# between a network that sets one and a network that does not is exactly the
+# host network change this script exists to catch, and skipping that comparison
+# would leave the dagger engine — whose upstreams are invisible, so this is the
+# only test it gets — pointing at the previous network's resolvers. So compare
+# empty against non-empty too. The one case with genuinely nothing to compare is
+# an unreadable container config, which callers already screen for; guard it
+# here as well so this is never read as "current" by mistake.
 search_stale() {
-	local their_search
-	their_search="$(baked_search "$1")"
-	[[ -z "$HOST_SEARCH" || -z "$their_search" ]] && return 1
+	local conf="$1" their_search
+	[[ -z "$conf" ]] && return 1
+	their_search="$(baked_search "$conf")"
 	[[ "$their_search" != "$HOST_SEARCH" ]]
 }
 
