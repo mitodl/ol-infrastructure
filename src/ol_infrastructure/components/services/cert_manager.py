@@ -27,6 +27,10 @@ class OLCertManagerCertConfig(BaseModel):
     # (truststore.p12) to the TLS secret. The keystore password is read from the named
     # K8s Secret. Required for StarRocks SSL (which uses Java's JSSE / PKCS12 format).
     pkcs12_keystore_password_secret_name: str | None = None
+    # Hold the Pulumi operation until cert-manager reports the Certificate
+    # Ready, so dependents see the Secret populated. Without it the resource
+    # completes as soon as the API server accepts the object.
+    wait_for_ready: bool = False
     pkcs12_keystore_password_secret_key: str = "password"  # noqa: S105
     usages: list[
         Literal[
@@ -126,6 +130,11 @@ class OLCertManagerCert(pulumi.ComponentResource):
                 "name": self.resource_name,
                 "namespace": cert_config.k8s_namespace,
                 "labels": cert_config.k8s_labels,
+                **(
+                    {"annotations": {"pulumi.com/waitFor": "condition=Ready"}}
+                    if cert_config.wait_for_ready
+                    else {}
+                ),
             },
             spec=cert_spec,
             opts=resource_options,

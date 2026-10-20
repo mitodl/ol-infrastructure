@@ -1443,6 +1443,8 @@ clickhouse_server_certificate = OLCertManagerCert(
         k8s_namespace=CLICKHOUSE_NAMESPACE,
         k8s_labels=k8s_global_labels,
         issuer_name="clickhouse-ca",
+        # The CHI and CHK mount the Secret; gate their update on issuance.
+        wait_for_ready=True,
         dest_secret_name=clickhouse_tls_secret_name,
         dns_names=[
             "localhost",
@@ -1470,6 +1472,8 @@ keeper_server_certificate = OLCertManagerCert(
         k8s_namespace=CLICKHOUSE_NAMESPACE,
         k8s_labels=k8s_global_labels,
         issuer_name="clickhouse-ca",
+        # The CHI and CHK mount the Secret; gate their update on issuance.
+        wait_for_ready=True,
         dest_secret_name=keeper_tls_secret_name,
         dns_names=[
             "localhost",
