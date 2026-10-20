@@ -13,7 +13,6 @@ token from the ``om-ingestion-bot`` K8s secret, and to data sources via
 connector-specific K8s secrets (``om-connector-{name}``).
 """
 
-import ast
 import hashlib
 import json
 from pathlib import Path
@@ -34,6 +33,7 @@ from ol_infrastructure.lib.aws.iam_helper import (
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.substructure.open_metadata.teams import declared_team_names
 
 stack_info = parse_stack()
 om_config = Config("open_metadata")
@@ -965,28 +965,6 @@ kubernetes.batch.v1.Job(
 # add the Keycloak memberships back into OpenMetadata and undo removals made
 # there.
 
-
-def _declared_team_names(server_config_script: str) -> list[str]:
-    """Return the team names om_server_config.py creates.
-
-    Read from the script's source because importing it reads the job's
-    environment variables.
-
-    :param server_config_script: The source of om_server_config.py.
-    :raises ValueError: If the script no longer assigns ``TEAM_CONFIG``.
-    """
-    for node in ast.parse(server_config_script).body:
-        if (
-            isinstance(node, ast.AnnAssign)
-            and isinstance(node.target, ast.Name)
-            and node.target.id == "TEAM_CONFIG"
-            and node.value is not None
-        ):
-            return sorted(ast.literal_eval(node.value))
-    msg = "om_server_config.py no longer assigns TEAM_CONFIG"
-    raise ValueError(msg)
-
-
 _make_cronjob(
     name="team-keycloak-sync",
     schedule="17 * * * *",
@@ -995,7 +973,7 @@ _make_cronjob(
     ).read_text(),
     extra_env=[
         _plain_env("OM_SERVER_URL", OM_SERVER_URL),
-        _plain_env("OM_TEAMS", json.dumps(_declared_team_names(_server_config_script))),
+        _plain_env("OM_TEAMS", json.dumps(declared_team_names(_server_config_script))),
         *(
             _secret_env("om-team-keycloak-sync", key)
             for key in (

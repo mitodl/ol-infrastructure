@@ -501,9 +501,9 @@ OLVaultK8SSecret(
         dest_secret_labels=k8s_global_labels,
         dest_secret_name="om-team-keycloak-sync",  # noqa: S106  # pragma: allowlist secret
         labels=k8s_global_labels,
-        mount="secret-operations",
-        mount_type="kv-v1",
-        path="sso/openmetadata-team-sync",
+        mount="secret-openmetadata",
+        mount_type="kv-v2",
+        path="keycloak-team-sync",
         templates={
             "KEYCLOAK_REALM_URL": '{{ get .Secrets "url" }}',
             "KEYCLOAK_ADMIN_URL": '{{ get .Secrets "admin_url" }}',

@@ -73,10 +73,13 @@ def create_openmetadata_team_sync_resources(
     )
 
     # Read by the open_metadata application stack into the om-team-keycloak-sync
-    # Kubernetes secret.
+    # Kubernetes secret. Filed in OpenMetadata's own kv mount, which that stack
+    # creates, rather than secret-operations/sso/ with the other clients:
+    # application policies read secret-operations/* (e.g. odl_video_service),
+    # and this secret can edit any user in the realm.
     vault.generic.Secret(
         "ol-data-platform-openmetadata-team-sync-vault-credentials",
-        path="secret-operations/sso/openmetadata-team-sync",
+        path="secret-openmetadata/keycloak-team-sync",
         data_json=Output.all(
             url=f"{keycloak_url}/realms/{REALM_NAME}",
             admin_url=f"{keycloak_url}/admin/realms/{REALM_NAME}",
