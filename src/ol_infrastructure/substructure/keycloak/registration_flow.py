@@ -17,14 +17,13 @@ def create_recaptcha_registration_flow(
     ``registration`` flow (same executions and priorities) as a custom flow for the
     realm's registration binding.
 
-    Keycloak returns the secret as ``**********`` on read, so the provider would see
-    drift on every preview. The secret is ignored after creation, and an update that
-    sends the mask back leaves the stored secret untouched
-    (``AuthenticationManagementResource.updateAuthenticatorConfig``). A new reCAPTCHA
-    key changes the site key, which replaces the config and writes the new secret.
-    Rotating only the secret needs ``pulumi up --replace`` on the config resource.
-    The replace deletes the old config first (Keycloak allows one per execution), and
-    registration errors until the new one is created.
+    Keycloak returns the secret as ``**********`` on read, so every preview shows the
+    config updating ``secret.key`` and every apply writes the configured secret back.
+    The secret is not in ``ignore_changes`` because Pulumi creates a replacement from
+    the ignored path's stored value, which would pair a new site key with the old or
+    masked secret. A new site key replaces the config; the replace deletes the old
+    config first (Keycloak allows one per execution), and registration errors until
+    the new one is created. A new secret alone updates in place.
 
     To stop managing the flow, bind the realm back to the built-in ``registration``
     flow in one apply and remove this flow in the next. Keycloak refuses to delete a
@@ -107,9 +106,6 @@ def create_recaptcha_registration_flow(
                 # Every execution is created before the config, so a binding that
                 # depends on the config sees the whole form.
                 depends_on=[user_creation, password_validation],
-                # The bridge matches ignore paths as strings in its own format,
-                # which puts a dot before a bracketed map key.
-                ignore_changes=['config.["secret.key"]'],
                 replace_on_changes=['config["site.key"]'],
                 delete_before_replace=True,
             ),
