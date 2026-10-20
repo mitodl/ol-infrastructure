@@ -12,8 +12,9 @@
 #      export LOCAL_DEV_ROOT_DOMAIN=mycompany.test && tilt up
 #
 # 2. Config-change rollouts. Kubernetes does not restart pods when a
-#    ConfigMap/Secret they reference changes, so every Deployment applied in
-#    the same call gets a pod-template annotation fingerprinting the combined
+#    ConfigMap/Secret they reference changes, so every Deployment and
+#    StatefulSet applied in the same call gets a pod-template annotation
+#    fingerprinting the combined
 #    data/stringData of every ConfigMap and Secret passed in — editing any of
 #    them (the tracked app-env.yaml/secrets.yaml, or an optional gitignored
 #    local_overrides ConfigMap passed for per-developer overrides — see
@@ -87,7 +88,7 @@ def _pin_images(pod_spec, image_tags):
         if name in image_tags:
             c["image"] = "%s:%s" % (name, image_tags[name])
 
-def _stamp_deployments(content, fingerprint, image_tags):
+def _stamp_workloads(content, fingerprint, image_tags):
     """Add the config-fingerprint annotation to every Deployment pod
     template in a (possibly multi-doc) manifest text, so changing any
     applied ConfigMap/Secret rolls the pods, and apply image_tags to its
@@ -109,7 +110,12 @@ def k8s_yaml_local(paths, local_overrides=None, substitutions=None):
     """Apply k8s YAML with root-domain substitution and a pod-template
     fingerprint annotation covering every applied ConfigMap/Secret, including
     an optional gitignored ConfigMap of per-developer overrides (see module
-    docstring)."""
+    docstring).
+
+    substitutions is an optional dict of literal token -> value replacements,
+    applied after the root-domain pass so a token cannot be mangled by it. Use
+    it for a value that varies per developer for some reason other than the
+    root domain."""
     rd = current_root_domain()
 
     # read_file(default=...) also registers a watch on the override path —
@@ -146,5 +152,5 @@ def k8s_yaml_local(paths, local_overrides=None, substitutions=None):
     image_tags = decode_json(os.environ.get(_PREBUILT_IMAGE_TAGS_ENV, "{}"))
 
     for p, content in contents:
-        stamped = _stamp_deployments(content, fingerprint, image_tags)
+        stamped = _stamp_workloads(content, fingerprint, image_tags)
         k8s_yaml(stamped if stamped != None else blob(content))

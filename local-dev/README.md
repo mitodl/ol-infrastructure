@@ -202,6 +202,11 @@ developers who have no use for them. The
 Tiltfile forwards `enabled_apps` to both Pulumi stacks and to the app Tiltfiles as
 `LOCAL_DEV_ENABLED_APPS` so they can make that call.
 
+Disabling an app only takes effect while Tilt is running: Tilt is what removes
+the workloads, so editing `enabled_apps` with Tilt stopped leaves them up until
+the next `tilt up`. Worth knowing for GitLab in particular, which holds ~2.6
+GiB, though the behaviour is not specific to it.
+
 ### Open edX
 
 Open edX runs **in this cluster**, composed from the [lehrer](https://github.com/mitodl/lehrer) repo — not as a second k3d cluster alongside it. It is off by default because the platform image build is long:
@@ -1075,7 +1080,7 @@ running:
 | Memory at rest | **~2.6 GiB** |
 | CPU at rest | under 0.1 core |
 | CPU while booting | ~1.6 cores |
-| First start | ~13 minutes (database migrations) |
+| First start | ~2 minutes, from empty volumes |
 | Later starts | ~80 seconds, reusing the volumes |
 | Disk | 20 GiB data + 1 GiB config PVC, plus a 1.5 GB image |
 
@@ -1123,6 +1128,11 @@ To reclaim the disk as well:
 ```bash
 kubectl -n gitlab delete pvc data-gitlab-0 config-gitlab-0
 ```
+
+That loses GitLab's git history and means another first boot, but not the
+content itself: Studio's copy is in the shared Postgres, and it can rebuild
+the repositories with `reset_sync_states --create_backends` followed by
+`sync_website_to_backend --force-create`.
 
 ### OCW theme development (ocw-hugo-themes)
 

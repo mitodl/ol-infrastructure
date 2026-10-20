@@ -37,12 +37,11 @@ k8s_resource(
         'gitlab-route:apisixroute',
     ],
     labels=['gitlab'],
-    # local-infra-core creates the gitlab namespace (it is in
-    # OPTIONAL_APP_NAMESPACES) and writes the TLS secret into it, so applying
-    # these manifests any earlier fails with "namespaces gitlab not found".
-    # local-infra-apps is listed too because the route is useless before
-    # APISIX exists.
-    resource_deps=['local-infra-core', 'local-infra-apps'],
+    # local-infra-apps runs after local-infra-core, which provisions the
+    # gitlab namespace and its TLS secret, and it installs APISIX, which the
+    # route needs. Applying any earlier fails with "namespaces gitlab not
+    # found".
+    resource_deps=['local-infra-apps'],
     links=[link('https://' + GITLAB_HOSTNAME, 'GitLab')],
 )
 

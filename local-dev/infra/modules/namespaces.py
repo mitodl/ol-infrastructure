@@ -5,17 +5,21 @@ from collections.abc import Callable, Iterable
 import pulumi_kubernetes as k8s
 from pulumi import ResourceOptions
 
-# Namespaces created regardless of what is enabled. These predate per-app
+# Namespaces created regardless of what is enabled. Most predate per-app
 # gating and cost almost nothing (an empty namespace plus a TLS secret), so
 # they stay unconditional rather than churning every developer's stack state.
 # gitlab is here rather than in OPTIONAL_APP_NAMESPACES despite being an
 # opt-in app. Gating the namespace would delete it when the app is switched
 # off, and deleting a namespace takes its PersistentVolumeClaims with it --
-# StatefulSet volume retention cannot survive that. GitLab holds the
-# repositories ocw-studio has pushed, which may be the only copy, so turning
-# the app off to reclaim memory must not silently destroy them. An empty
-# namespace and a TLS secret cost almost nothing; the volumes are reclaimed
-# explicitly, as documented in the GitLab section of local-dev/README.md.
+# StatefulSet volume retention cannot survive that.
+#
+# What that would cost is GitLab's own git history and a ~13 minute first
+# boot on every re-enable. It is not the only copy of the content: Studio's
+# is in the shared Postgres, and it can rebuild a repo from there with
+# reset_sync_states --create_backends and sync_website_to_backend
+# --force-create. Avoiding that rebuild, and the boot, is the reason this
+# namespace is unconditional; the volumes are reclaimed explicitly, as
+# documented in the GitLab section of local-dev/README.md.
 APP_NAMESPACES = (
     "mit-learn",
     "learn-ai",

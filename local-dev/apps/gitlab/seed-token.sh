@@ -19,9 +19,12 @@ fi
 
 echo "Seeding the root personal access token..."
 
-# validate: false because GitLab rejects a token whose plaintext we set
-# ourselves; the digest it stores is what authenticates, and the format check
-# is the only thing in the way.
+# Plain save!, no validate: false. PersonalAccessToken validates name,
+# scopes and expiry, none of which a preset token trips: it has no length or
+# format validation at all, and the "20 characters" in GitLab's docs
+# describes the tokens it generates rather than a constraint. Verified
+# against 19.4.2 by saving exactly these values. Skipping validation would
+# only hide a bad scope or an over-long expiry.
 kubectl -n "${NAMESPACE}" exec statefulset/gitlab -- gitlab-rails runner "
   user = User.find_by_username('root')
   abort('root user not found; is GitLab finished migrating?') if user.nil?
@@ -31,7 +34,7 @@ kubectl -n "${NAMESPACE}" exec statefulset/gitlab -- gitlab-rails runner "
   token.scopes = ['api', 'write_repository']
   token.expires_at = 365.days.from_now
   token.set_token('${TOKEN}')
-  token.save!(validate: false)
+  token.save!
 
   puts \"seeded token id=#{token.id} scopes=#{token.scopes.join(',')} expires=#{token.expires_at}\"
 "

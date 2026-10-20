@@ -67,7 +67,11 @@ spec:
             path: /-/readiness
             port: 80
           periodSeconds: 10
-          failureThreshold: 90
+          # 30 minutes, against a measured ~2 minute first boot on this
+          # machine. The headroom is for slower ones: a container restarted
+          # mid-migration leaves /etc/gitlab inconsistent, and a generous
+          # ceiling on a probe that passes in two minutes costs nothing.
+          failureThreshold: 180
         readinessProbe:
           httpGet:
             path: /-/readiness
