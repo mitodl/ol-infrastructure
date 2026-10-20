@@ -15,7 +15,6 @@ from ol_infrastructure.substructure.keycloak.learner_records import (
     parse_learner_records_clients,
 )
 from ol_infrastructure.substructure.keycloak.ol_memory import (
-    attach_memory_audience,
     create_ol_memory_resources,
 )
 from ol_infrastructure.substructure.keycloak.org_flows import (
@@ -34,7 +33,7 @@ from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
 )
 
 
-def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
+def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
     keycloak_url: str,
     env_name: str,
@@ -575,7 +574,6 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             standard_flow_enabled=True,
             implicit_flow_enabled=False,
             service_accounts_enabled=False,
-            standard_token_exchange_enabled=ol_memory_enabled or None,
             valid_redirect_uris=keycloak_realm_config.get_object(
                 "olapps-mitlearn-client-redirect-uris"
             ),
@@ -594,21 +592,19 @@ def create_olapps_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                 "web-origins",
                 "ol-profile",
                 "organization",
+                # This client's secret is shared by several apps, so it never
+                # gets memory tokens itself. Its tokens name the clients that
+                # exchange them for memory tokens instead.
                 *(
-                    [ol_memory_scopes.learn_ai_audience.name]
+                    [
+                        ol_memory_scopes.learn_ai_audience.name,
+                        ol_memory_scopes.mitlearn_memory_audience.name,
+                    ]
                     if ol_memory_scopes
                     else []
                 ),
             ],
         )
-        if ol_memory_scopes:
-            attach_memory_audience(
-                "olapps-mitlearn-client-optional-scopes",
-                realm_id="olapps",
-                client=olapps_mitlearn_client,
-                audience_scope=ol_memory_scopes.audience,
-                resource_options=resource_options,
-            )
         olapps_mitlearn_client_roles = keycloak_realm_config.get_object(
             "olapps-mitlearn-client-roles"
         )
