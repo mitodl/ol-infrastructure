@@ -92,7 +92,8 @@ currently slated for deletion.
 **`mitx-residential` "Server key 1" → edxapp MITx Residential video block.** Chain:
 
 - `secrets_builder.py:117-125` sets `YOUTUBE_API_KEY` for **only** the `mitx` and
-  `mitx-staging` env prefixes. No other deployment gets it.
+  `mitx-staging` env prefixes. No other deployment gets it. (True on 2026-08-10. mitxonline
+  was wired to the same key on 2026-09-04 in 93ea3d324, see `secrets_builder.py:116`.)
 - `Pulumi.mitx.Production.yaml` carries `edxapp:product: residential`. The GCP project
   is named `mitx-residential`. The key dates from 2015-07-21, the era of that deployment.
 - In edx-platform, `settings.YOUTUBE_API_KEY` is used in exactly one place —
@@ -163,8 +164,8 @@ across all 20 visible projects, 42-day window.
 | idle | ocw-studio-qa | OCW Studio RC | 2021-10-13 | NONE |
 | idle | ovs-youtube-qa | API key 1 | 2019-12-19 | NONE |
 
-Six keys carry **no restriction of any kind**, including the only unrestricted key that is
-actually live. Restricting them is worth doing independently of the migration.
+Seven keys carried **no restriction of any kind**, including the only unrestricted key that is
+actually live. The six idle ones were restricted on 2026-10-20 (see below). Restricting them is worth doing independently of the migration.
 
 **OAuth clients — 3 genuinely live.** (`32555940559.apps.googleusercontent.com` also appears
 in the data; that is the gcloud CLI's own public client — our own queries, not a consumer.
@@ -316,7 +317,7 @@ Five open questions closed by the project owner. These narrow the scope substant
    Manageability differs per type and must be designed per type:
    - **Service accounts, IAM, enabled APIs** — fully Pulumi-manageable.
    - **API keys** — Pulumi-manageable (`gcp.projects.ApiKey`). Bring them under IaC *with*
-     restrictions; six currently have none.
+     restrictions. Only `mitx-residential` "Server key 1" still has none (2026-10-20).
    - **reCAPTCHA keys** — Pulumi-manageable (`gcp.recaptcha.EnterpriseKey`), but the site
      key is embedded in production frontends, so a change is a coordinated app deploy.
    - **Generic OAuth clients** — not manageable by any API or IaC tool
@@ -358,10 +359,12 @@ Not deletable, despite the 2026-07-21 list:
 ## Idle unrestricted API keys, restricted 2026-10-20
 
 These six keys had no restriction of any kind and zero calls in the 45 days before the
-change. Each now allows only `apikeys.googleapis.com`, which can't be called with an API key,
-so they no longer work against any real API. Each carries the annotations `ol-restricted-on`
-and `ol-restricted-reason`. A consumer we missed would show up as HTTP 403s in
-`bin/gcp-credential-usage report`. After about two weeks with none, delete them.
+change. Each now allows only `apikeys.googleapis.com`. That API takes OAuth credentials, not API
+keys, so the keys no longer work against any real API. Each carries the annotations
+`ol-restricted-on` and `ol-restricted-reason`. A consumer we missed would get HTTP 403s. It is
+unverified whether `bin/gcp-credential-usage report` attributes a key-restriction rejection to
+that key's credential, so also check Sentry and app logs for the consumers named in this doc
+before deleting. After about two weeks with no sign of a consumer, delete them.
 
 | Project | Key | Created |
 |---|---|---|
@@ -372,9 +375,13 @@ and `ol-restricted-reason`. A consumer we missed would show up as HTTP 403s in
 | `ocw-studio-qa` | OCW Studio RC | 2021-10-13 |
 | `ovs-youtube-qa` | API key 1 | 2019-12-19 |
 
-To revert one: `gcloud services api-keys update <uid> --project <project> --clear-restrictions`.
+To revert one, point it at the API the consumer needs:
+`gcloud services api-keys update <uid> --project <project> --api-target=service=<api>.googleapis.com`.
+gcloud has no flag that clears restrictions. To drop them entirely, send a `PATCH` to
+`https://apikeys.googleapis.com/v2/projects/<project>/locations/global/keys/<uid>?updateMask=restrictions`
+with an empty JSON body.
 
-`mitx-residential` "Server key 1" is still unrestricted and live (about 800 to 1,500
+`mitx-residential` "Server key 1" is still unrestricted and live (about 700 to 1,500
 `Videos.List` calls/day). mitxonline moved to the mitol01 key on 2026-10-14. MITx Residential
 and mitx-staging move when their Production edxapp stacks next apply. The edxapp pipeline
 deploys Production only on a manual trigger.
