@@ -674,8 +674,8 @@ _make_cronjob(
 # through its external catalogs are the lake tables the Trino and Glue
 # services already hold, and are not ingested a second time.
 #
-# open_metadata:starrocks_host_port unset (CI, where there is no StarRocks
-# cluster) creates none of the three jobs.  Credentials come from the
+# open_metadata:starrocks_host_port unset (a stack with no StarRocks cluster)
+# creates none of the three jobs.  Credentials come from the
 # om-connector-starrocks secret, a Vault-issued read-only user created by the
 # application stack.
 #
