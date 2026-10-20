@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import pulumi_kubernetes as k8s
 from pulumi import Output, ResourceOptions
 
+from .tls import APISIX_TRUSTED_CA_FILENAME
+
 
 @dataclass
 class IngressResources:
@@ -13,13 +15,15 @@ class IngressResources:
     apisix: k8s.helm.v3.Release
 
 
-def create_ingress(
+def create_ingress(  # noqa: PLR0913
     _k8s: Callable[..., ResourceOptions],
     namespaces: dict[str, k8s.core.v1.Namespace],
     apisix_admin_key: Output,
     apisix_viewer_key: Output,
     cert_manager_version: str,
     apisix_version: str,
+    trusted_ca_secret: k8s.core.v1.Secret,
+    trusted_ca_checksum: str,
 ) -> IngressResources:
     """Deploy cert-manager and APISIX into the operations namespace."""
     operations_ns = namespaces["operations"]
@@ -60,6 +64,7 @@ def create_ingress(
             values=Output.all(
                 admin=apisix_admin_key,
                 viewer=apisix_viewer_key,
+                trusted_ca=trusted_ca_secret.metadata.name,
             ).apply(
                 lambda args: {
                     "service": {
@@ -94,6 +99,12 @@ def create_ingress(
                         "ssl": {
                             "enabled": True,
                             "listenPort": 9443,
+                            # The chart mounts this file and points
+                            # ssl_trusted_certificate at it, so openid-connect
+                            # can verify Keycloak's mkcert certificate with the
+                            # deployed default ssl_verify=true (see tls.py).
+                            "existingCASecret": args["trusted_ca"],
+                            "certCAFilename": APISIX_TRUSTED_CA_FILENAME,
                         },
                         "admin": {
                             "enabled": True,
@@ -170,6 +181,9 @@ def create_ingress(
                     },
                     "autoscaling": {"enabled": False},
                     "replicaCount": 1,
+                    # APISIX reads the trusted CA file only at startup, through
+                    # a subPath mount, so a new bundle has to roll the pod.
+                    "podAnnotations": {"checksum/trusted-ca": trusted_ca_checksum},
                 }
             ),
         ),

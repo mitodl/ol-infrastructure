@@ -1,6 +1,6 @@
 # Developer EKS Access
 
-See https://pe.ol.mit.edu/how_to/developer_eks_access/ for initial setup and
+See https://engineering.ol.mit.edu/getting_started_and_how_tos/eks_access_setup/ for initial setup and
 background on access requirements.
 
 ## Preferred workflow
@@ -14,8 +14,8 @@ Generate a kubeconfig for all clusters:
 uv run python scripts/eks/eks.py setup
 ```
 
-By default this creates a **readonly** kubeconfig. You can also choose an
-access mode at setup time:
+By default this creates a **developer** (read/write) kubeconfig. You can also
+choose an access mode at setup time:
 
 ```bash
 uv run python scripts/eks/eks.py setup --mode readonly
@@ -23,7 +23,9 @@ uv run python scripts/eks/eks.py setup --mode developer
 uv run python scripts/eks/eks.py setup --mode admin
 ```
 
-Optional current context:
+The kubeconfig sets no current context, so `kubectl` reaches these clusters
+only when you name one (`kubectl --context applications-qa ...`). To set one
+anyway:
 
 ```bash
 uv run python scripts/eks/eks.py setup --mode readonly --current-context applications-qa
@@ -59,9 +61,3 @@ The generated kubeconfig uses an `exec` plugin that calls back into
 > Note: admin mode still relies on the existing AWS assume-role path for the
 > cluster admin role. Readonly and developer modes are the primary OIDC-first,
 > cached flows.
-
-## Legacy helper
-
-`scripts/eks/eks.sh` is still present for compatibility, but it represents the
-older workflow that required generating shell AWS credentials separately. Prefer
-`uv run python scripts/eks/eks.py setup ...` for new usage.

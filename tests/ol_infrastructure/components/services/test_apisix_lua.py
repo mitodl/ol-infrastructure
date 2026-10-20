@@ -15,8 +15,11 @@ pattern silently matches nothing.
 from __future__ import annotations
 
 import lupa
+import pytest
 
 from ol_infrastructure.components.services.apisix import (
+    OIDC_RECOVERY_SHARED_DICT,
+    gateway_global_pre_function_plugin,
     oidc_gateway_pre_function_plugin,
 )
 
@@ -31,8 +34,25 @@ package.loaded["apisix.core"] = {
     request = { get_uri_args = function() return captured.args end },
 }
 
+-- ngx.shared.DICT:incr(key, value, init, init_ttl).  Nothing expires here, so
+-- the TTL each key was created with is recorded for the tests to assert on.
+local function shared_dict()
+    local counts = {}
+    local dict = {ttls = {}}
+    function dict.incr(_, key, value, init, init_ttl)
+        if counts[key] == nil then
+            table.insert(dict.ttls, init_ttl)
+        end
+        counts[key] = (counts[key] or init) + value
+        return counts[key]
+    end
+    return dict
+end
+
 ngx = {
     var = {},
+    shared = {},
+    md5 = function(value) return "md5:" .. value end,
     header = setmetatable({}, {
         __newindex = function(_, key, value) captured.headers[key] = value end,
     }),
@@ -40,6 +60,15 @@ ngx = {
         captured.redirect = {uri = uri, code = code}
     end,
 }
+
+function define_shared_dict(name)
+    ngx.shared[name] = shared_dict()
+    return ngx.shared[name]
+end
+
+function set_host(host)
+    ngx.var.host = host
+end
 
 function run(fn, conf, uri, args, ctx_vars)
     captured = {args = args, headers = {}, redirect = nil}
@@ -67,6 +96,7 @@ class Harness:
     # silently test the wrong function if the order changed.
     FUNCTION_MARKER = "oidc_error_recovery"
     EXTRA_LUA = ""
+    BUILDER = staticmethod(oidc_gateway_pre_function_plugin)
 
     def __init__(self, **plugin_kwargs):
         self.lua = lupa.LuaRuntime(unpack_returned_tuples=True)
@@ -74,12 +104,16 @@ class Harness:
         # ngx.redirect stub closes over, so a runner defined in a separate
         # execute() would assign to a fresh global and capture nothing.
         self.lua.execute(LUA_STUBS + self.EXTRA_LUA)
-        plugin_config = oidc_gateway_pre_function_plugin(**plugin_kwargs).config
+        plugin_config = self.BUILDER(**plugin_kwargs).config
         (source,) = [
             fn for fn in plugin_config["functions"] if self.FUNCTION_MARKER in fn
         ]
         self.fn = self.lua.execute(source)
         self.conf = self._to_lua(plugin_config)
+
+    def define_shared_dict(self, name=OIDC_RECOVERY_SHARED_DICT):
+        """Give the gateway the lua_shared_dict the restart counter lives in."""
+        return self.lua.globals().define_shared_dict(name)
 
     def _to_lua(self, value):
         """Deep-convert Python containers to Lua tables."""
@@ -341,6 +375,129 @@ def test_guard_cookie_stops_a_second_missing_session_recovery():
     assert uri is None
 
 
+NO_COOKIE_CALLBACK = {"code": "abc123", "state": "xyz", "session_state": "kc-session"}
+
+
+def test_a_browser_storing_no_cookies_is_restarted_once_per_session_state():
+    """The loop seen in production: the guard cookie never comes back, so each
+    hop looks like a first attempt.  Every hop carries the same session_state.
+    """
+    harness = Harness(session_cookie_names=SESSION_COOKIES)
+    harness.define_shared_dict()
+
+    hops = [
+        harness.callback("/login/.apisix/redirect", NO_COOKIE_CALLBACK)[0]
+        for _ in range(3)
+    ]
+
+    assert hops == ["/login/", None, None]
+
+
+def test_restart_limit_is_configurable():
+    harness = Harness(
+        session_cookie_names=SESSION_COOKIES, max_restarts_per_session_state=2
+    )
+    harness.define_shared_dict()
+
+    hops = [
+        harness.callback("/login/.apisix/redirect", NO_COOKIE_CALLBACK)[0]
+        for _ in range(3)
+    ]
+
+    assert hops == ["/login/", "/login/", None]
+
+
+def test_restart_counter_is_per_session_state():
+    harness = Harness(session_cookie_names=SESSION_COOKIES)
+    harness.define_shared_dict()
+    harness.callback("/login/.apisix/redirect", NO_COOKIE_CALLBACK)
+    harness.callback("/login/.apisix/redirect", NO_COOKIE_CALLBACK)
+
+    uri, _, _ = harness.callback(
+        "/login/.apisix/redirect",
+        {**NO_COOKIE_CALLBACK, "session_state": "another-login"},
+    )
+
+    assert uri == "/login/"
+
+
+def test_restart_counter_is_per_host():
+    """The dict serves every host on the pod, and one Keycloak SSO session can
+    need a recovery on two of them inside the window.
+    """
+    harness = Harness(session_cookie_names=SESSION_COOKIES)
+    harness.define_shared_dict()
+    set_host = harness.lua.globals().set_host
+
+    set_host("api.learn.mit.edu")
+    first = harness.callback("/login/.apisix/redirect", NO_COOKIE_CALLBACK)[0]
+    set_host("nb.learn.mit.edu")
+    second = harness.callback("/login/.apisix/redirect", NO_COOKIE_CALLBACK)[0]
+    third = harness.callback("/login/.apisix/redirect", NO_COOKIE_CALLBACK)[0]
+
+    assert (first, second, third) == ("/login/", "/login/", None)
+
+
+def test_restart_counter_expires_with_the_guard_window():
+    """Without a TTL a session_state would be refused until the pod restarted."""
+    harness = Harness(session_cookie_names=SESSION_COOKIES, guard_max_age=90)
+    restarts = harness.define_shared_dict()
+
+    harness.callback("/login/.apisix/redirect", NO_COOKIE_CALLBACK)
+
+    assert list(restarts.ttls.values()) == [90]
+
+
+@pytest.mark.parametrize(
+    "kwargs", [{"guard_max_age": 0}, {"max_restarts_per_session_state": 0}]
+)
+def test_settings_that_would_disable_or_pin_the_counter_are_rejected(kwargs):
+    with pytest.raises(ValueError, match="must be at least 1"):
+        oidc_gateway_pre_function_plugin(**kwargs)
+
+
+def test_restart_limit_applies_to_error_callbacks_too():
+    harness = Harness()
+    harness.define_shared_dict()
+    args = {"error": "temporarily_unavailable", "session_state": "kc-session"}
+
+    hops = [harness.callback("/login/.apisix/redirect", args)[0] for _ in range(2)]
+
+    assert hops == ["/login/", None]
+
+
+def test_repeated_session_state_parameter_is_handled():
+    harness = Harness(session_cookie_names=SESSION_COOKIES)
+    harness.define_shared_dict()
+    args = {**NO_COOKIE_CALLBACK, "session_state": ["kc-session", "other"]}
+
+    hops = [harness.callback("/login/.apisix/redirect", args)[0] for _ in range(2)]
+
+    assert hops == ["/login/", None]
+
+
+def test_a_gateway_without_the_shared_dict_keeps_the_cookie_only_bound():
+    """App stacks can apply before the EKS stack defines the dict."""
+    harness = Harness(session_cookie_names=SESSION_COOKIES)
+
+    hops = [
+        harness.callback("/login/.apisix/redirect", NO_COOKIE_CALLBACK)[0]
+        for _ in range(2)
+    ]
+
+    assert hops == ["/login/", "/login/"]
+
+
+def test_callbacks_without_a_session_state_are_not_counted():
+    harness = Harness(session_cookie_names=SESSION_COOKIES)
+    harness.define_shared_dict()
+    args = {"code": "abc123", "state": "xyz"}
+
+    hops = [harness.callback("/login/.apisix/redirect", args)[0] for _ in range(2)]
+
+    assert hops == ["/login/", "/login/"]
+
+
 def test_unrecoverable_error_is_not_rescued_by_the_session_branch():
     """access_denied carries no code, so a missing session must not turn a
     Cancel into a redirect loop.
@@ -369,13 +526,13 @@ class OriginHarness(Harness):
 
     FUNCTION_MARKER = "canonical_https_redirect"
     EXTRA_LUA = """
-    function run_origin(fn, conf, scheme, host, http_host, request_uri)
+    function run_origin(fn, conf, scheme, host, http_host, request_uri, route)
         captured = {args = {}, headers = {}, redirect = nil}
         ngx.var.scheme = scheme
         ngx.var.host = host
         ngx.var.http_host = http_host
         ngx.var.request_uri = request_uri
-        fn(conf, {var = ngx.var})
+        fn(conf, {var = ngx.var, matched_route = route})
         local redirect = captured.redirect
         return redirect and redirect.uri or nil, redirect and redirect.code or nil
     end
@@ -386,8 +543,21 @@ class OriginHarness(Harness):
     MIRROR_HOST = object()
 
     def request(
-        self, scheme="https", host="learn.mit.edu", http_host=MIRROR_HOST, uri="/"
+        self,
+        scheme="https",
+        host="learn.mit.edu",
+        http_host=MIRROR_HOST,
+        uri="/",
+        route_plugins=None,
     ):
+        """``route_plugins`` is the matched route's plugin map; ``None`` means
+        no route matched, which is how a global rule sees a 404.
+        """
+        route = (
+            None
+            if route_plugins is None
+            else self._to_lua({"value": {"plugins": route_plugins}})
+        )
         return self.lua.globals().run_origin(
             self.fn,
             self.conf,
@@ -395,6 +565,7 @@ class OriginHarness(Harness):
             host,
             host if http_host is self.MIRROR_HOST else http_host,
             uri,
+            route,
         )
 
 
@@ -471,3 +642,62 @@ def test_origin_normalisation_runs_before_error_recovery():
 
     assert "canonical_https_redirect" in sources[0]
     assert "oidc_error_recovery" in sources[1]
+
+
+class GlobalOriginHarness(OriginHarness):
+    """The same function, configured as the cluster-wide global rule ships it."""
+
+    BUILDER = staticmethod(gateway_global_pre_function_plugin)
+
+
+OIDC_ROUTE_PLUGINS = {"openid-connect": {"bearer_only": False}, "cors": {}}
+
+
+def test_global_rule_upgrades_plain_http_on_an_oidc_route():
+    """The production gap: airbyte, dagster, opik and others carry
+    openid-connect but never attached the per-application function.
+    """
+    uri, status = GlobalOriginHarness().request(
+        scheme="http",
+        host="pipelines.odl.mit.edu",
+        uri="/",
+        route_plugins=OIDC_ROUTE_PLUGINS,
+    )
+
+    assert (uri, status) == ("https://pipelines.odl.mit.edu/", 308)
+
+
+def test_global_rule_strips_an_explicit_port_on_an_oidc_route():
+    uri, status = GlobalOriginHarness().request(
+        host="opik.ol.mit.edu",
+        http_host="opik.ol.mit.edu:443",
+        route_plugins=OIDC_ROUTE_PLUGINS,
+    )
+
+    assert (uri, status) == ("https://opik.ol.mit.edu/", 308)
+
+
+def test_global_rule_leaves_non_oidc_routes_alone():
+    """Every other route keeps whatever its own config does with plain HTTP,
+    normally the redirect plugin's http_to_https.
+    """
+    assert GlobalOriginHarness().request(
+        scheme="http", route_plugins={"redirect": {"http_to_https": True}}
+    ) == (None, None)
+
+
+def test_global_rule_leaves_unmatched_requests_alone():
+    """Global rules also run when no route matched, ahead of APISIX's 404."""
+    assert GlobalOriginHarness().request(scheme="http", route_plugins=None) == (
+        None,
+        None,
+    )
+
+
+def test_per_application_attachment_is_not_scoped_to_oidc_routes():
+    """Unchanged behaviour for the applications that attach it themselves: the
+    gate is opt-in, so their non-OIDC routes keep being normalised too.
+    """
+    uri, _ = OriginHarness().request(scheme="http", route_plugins={})
+
+    assert uri == "https://learn.mit.edu/"

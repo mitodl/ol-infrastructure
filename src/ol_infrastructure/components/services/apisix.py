@@ -3,10 +3,10 @@
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal, assert_never
 
 import pulumi_kubernetes as kubernetes
-from pulumi import ComponentResource, Output, ResourceOptions
+from pulumi import ComponentResource, ResourceOptions
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -20,6 +20,8 @@ from pydantic import (
 from bridge.lib.constants import (
     DEFAULT_OIDC_SESSION_COOKIE_NAME,
     GATEWAY_IDENTITY_HEADERS,
+    OIDC_VAULT_FIELDS,
+    oidc_secret_data,
 )
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
@@ -46,6 +48,13 @@ STRIP_CLIENT_IDENTITY_HEADERS_LUA = (
 # The only statuses ngx.redirect accepts; anything else is a Lua error at
 # request time (ngx_http_lua_control.c:209-219).
 NGX_REDIRECT_STATUSES = (301, 302, 303, 307, 308)
+
+# lua_shared_dict that oidc_error_callback_recovery.lua counts restarts in.  The
+# gateway has to define it (apisix.nginx.customLuaSharedDicts in
+# infrastructure/aws/eks/apisix_official.py); where it is absent the function
+# falls back to the guard cookie alone.
+OIDC_RECOVERY_SHARED_DICT = "ol-oidc-recovery"
+OIDC_RECOVERY_SHARED_DICT_SIZE = "1m"
 
 
 class OLApisixPluginConfig(BaseModel):
@@ -142,6 +151,7 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
     guard_cookie_name: str = "apisix_oidc_recovery",
     guard_max_age: int = 60,
     *,
+    max_restarts_per_session_state: int = 1,
     canonical_https_redirect: bool = True,
     canonical_redirect_status: Literal[301, 302, 303, 307, 308] = 308,
 ) -> OLApisixPluginConfig:
@@ -241,10 +251,27 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
     uses.  Recovery happens only when *none* of them is present, so listing a
     name too many is harmless, but omitting one would divert every successful
     login on the routes that use it.  An empty sequence (the default) turns the
-    branch off.  The same guard cookie bounds it to one attempt per window.  A
-    browser that drops this host's cookies while keeping Keycloak's would drop
-    the guard too, and ends at the browser's own redirect limit instead of the
-    500 page -- no worse for someone whose login could not have succeeded.
+    branch off.  The same guard cookie bounds it to one attempt per window.
+
+    **Restart bound for browsers that store no cookies.**  A browser that drops
+    this host's cookies while keeping Keycloak's drops the guard too, so every
+    callback is restarted and it loops through Keycloak until the browser's own
+    redirect limit.  Production saw two such loops in the 20h to 2026-10-01
+    13:17Z: 35 restarts in 23s for one api.learn.mit.edu client and 7 in under
+    5s for one nb.learn.mit.edu client.  Every hop of a loop carries the same
+    Keycloak ``session_state``, so the function also counts restarts per
+    ``session_state`` in the ``OIDC_RECOVERY_SHARED_DICT`` lua_shared_dict and
+    lets the callback fall through to the 500 past
+    ``max_restarts_per_session_state``.  A browser that does keep cookies never
+    reaches the counter a second time: its second callback carries either the
+    session cookie or the guard.  The dict is per APISIX pod, so the effective
+    bound is that many restarts per replica per host.
+
+    This covers the ``code`` branch only in practice.  Keycloak sends no
+    ``session_state`` with ``error=temporarily_unavailable`` (none of the 2,027
+    such callbacks in the 24h to 2026-10-07 16:59Z carried one), so a
+    cookie-less browser on the error branch is still bounded only by its own
+    redirect limit.
 
     Both functions live in ``files/`` and are shipped verbatim -- nothing is
     interpolated into them.  Tunables travel as ``oidc_error_recovery`` and
@@ -266,7 +293,10 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
         them is restarted rather than left to fail.  Empty disables this.
     :param guard_cookie_name: Name of the loop-breaker cookie.
     :param guard_max_age: Seconds the guard cookie lives, bounding how often one
-        browser can be sent back through login.
+        browser can be sent back through login.  Also the lifetime of the
+        per-``session_state`` restart counter.
+    :param max_restarts_per_session_state: Restarts allowed for one Keycloak
+        ``session_state`` per ``guard_max_age`` window, per APISIX pod.
     :param canonical_https_redirect: Whether to send non-canonical origins to
         ``https://<bare host>`` before openid-connect runs.  ``False`` drops the
         function entirely, for a host that must keep answering on plain HTTP.
@@ -290,6 +320,18 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
         msg = (
             f"canonical_redirect_status must be one of {NGX_REDIRECT_STATUSES}, "
             f"got {canonical_redirect_status}: ngx.redirect rejects anything else."
+        )
+        raise ValueError(msg)
+
+    # guard_max_age is the counter's init_ttl, and ngx.shared.DICT treats 0 as
+    # "never expires": a session_state would stay refused until the pod restarts.
+    if guard_max_age < 1:
+        msg = f"guard_max_age must be at least 1 second, got {guard_max_age}."
+        raise ValueError(msg)
+    if max_restarts_per_session_state < 1:
+        msg = (
+            "max_restarts_per_session_state must be at least 1, got "
+            f"{max_restarts_per_session_state}: 0 would refuse every recovery."
         )
         raise ValueError(msg)
 
@@ -324,15 +366,37 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
                 "session_cookie_names": list(session_cookie_names),
                 "guard_cookie_name": guard_cookie_name,
                 "guard_max_age": guard_max_age,
+                "restart_dict_name": OIDC_RECOVERY_SHARED_DICT,
+                "max_restarts": max_restarts_per_session_state,
             },
         },
     )
 
 
-def identity_header_strip_plugin(
+def gateway_global_pre_function_plugin(
     header_names: Sequence[str] = GATEWAY_IDENTITY_HEADERS,
 ) -> OLApisixPluginConfig:
-    """Clear the gateway's own identity headers when a client supplies them.
+    """Build the cluster's one global ``serverless-pre-function``.
+
+    The ingress controller flattens every ApisixGlobalRule into a single
+    plugin-name-keyed map, so anything that has to run on every route ahead of
+    openid-connect goes into this function list rather than a second rule.
+
+    **Canonical origin on OIDC routes** (``canonical_https_redirect.lua`` with
+    ``require_openid_connect``).  ``oidc_gateway_pre_function_plugin`` runs the
+    same function, but only for applications that attach it.  As of 2026-10-01
+    the production OIDC routes of airbyte, dagster, ol-analytics, opik, gwarek,
+    celery-monitoring and learn-ai did not, and the hosts probed answered plain
+    HTTP with an OIDC session cookie over cleartext and without ``Secure``, and
+    sent Keycloak an ``http://`` redirect_uri.  Running it here covers every
+    OIDC route in the cluster, including routes created outside Pulumi.  It is
+    scoped to routes carrying openid-connect because those are the ones that
+    mint a session and a redirect_uri from the request origin; leaving every
+    other route alone means this changes nothing that was not broken.  The
+    status is the 308 the per-application function also defaults to.
+
+    **Identity-header strip** (``strip_client_identity_headers.lua``).  Clears
+    the gateway's own identity headers when a client supplies them.
 
     The openid-connect plugin sets X-Userinfo, X-ID-Token, X-Raw-ID-Token and
     X-Refresh-Token from a verified session, and clears any inbound copy before
@@ -389,7 +453,16 @@ def identity_header_strip_plugin(
             # phase would run after openid-connect had already read the
             # request.
             "phase": "rewrite",
-            "functions": [STRIP_CLIENT_IDENTITY_HEADERS_LUA],
+            # Redirect first: serverless/init.lua stops at the first function
+            # returning a code, and a redirected request needs no header strip.
+            "functions": [
+                CANONICAL_HTTPS_REDIRECT_LUA,
+                STRIP_CLIENT_IDENTITY_HEADERS_LUA,
+            ],
+            "canonical_https_redirect": {
+                "status": 308,
+                "require_openid_connect": True,
+            },
             "identity_header_strip": {"headers": list(header_names)},
         },
     )
@@ -550,21 +623,57 @@ class OLApisixRoute(ComponentResource):
         return routes
 
 
+class OLApisixOIDCVaultCredentials(BaseModel):
+    """The openid-connect plugin's client credentials come from Vault.
+
+    OLApisixOIDCResources writes them into a per-application Secret through
+    VSO (OLVaultK8SSecret), rendering the plugin keys from the Keycloak
+    client's fields at ``path``.
+    """
+
+    # forbid: a misspelled field, or a field of the other variant, is an error
+    # rather than a silently dropped value.
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["vault"] = "vault"
+    vaultauth: str = Field(min_length=1)
+    mount: str = "secret-operations"
+    mount_type: Literal["kv-v1", "kv-v2"] = "kv-v1"
+    path: str
+
+
+class OLApisixOIDCSecretCredentials(BaseModel):
+    """The openid-connect plugin's client credentials are in a Secret that
+    already exists in the application's namespace, for clusters without Vault.
+
+    Nothing checks its contents: whoever creates it has to write the plugin
+    keys ``bridge.lib.constants.oidc_secret_data`` returns, ``session.secret``
+    included when ``oidc_use_session_secret``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["existing_secret"] = "existing_secret"
+    secret_name: str = Field(min_length=1)
+
+
 class OLApisixOIDCConfig(BaseModel):
     """Configuration for APISIX OIDC authentication resources.
 
-    Holds Vault path details and OIDC plugin settings used to create the
-    per-application Kubernetes Secret (via OLVaultK8SSecret) and generate
-    the openid-connect plugin configuration block.
+    Holds the OIDC plugin settings and where the plugin's client credentials
+    come from. Either way the Secret the plugin reads has to carry the keys
+    ``bridge.lib.constants.oidc_secret_data`` returns (``client_id``,
+    ``client_secret``, ``realm``, ``discovery``, and ``session.secret`` when
+    ``oidc_use_session_secret``).
     """
 
     application_name: str
     k8s_labels: dict[str, str] = {}
     k8s_namespace: str
-    vault_mount: str = "secret-operations"
-    vault_mount_type: Literal["kv-v1", "kv-v2"] = "kv-v1"
-    vault_path: str
-    vaultauth: str
+    credentials: Annotated[
+        OLApisixOIDCVaultCredentials | OLApisixOIDCSecretCredentials,
+        Field(discriminator="source"),
+    ]
 
     oidc_bearer_only: bool = False
     oidc_introspection_endpoint_auth_method: str = "client_secret_basic"
@@ -592,14 +701,25 @@ class OLApisixOIDCConfig(BaseModel):
     oidc_session_idling_timeout: NonNegativeInt | None = None
     oidc_session_rolling_timeout: NonNegativeInt | None = None
     oidc_ssl_verify: bool = True
+    # Sends code_challenge (S256) on the authorization request and
+    # code_verifier on the token request. Keycloak accepts both from a client
+    # that does not require PKCE, so this has to be on, and deployed in every
+    # stack sharing a client, before that client gets
+    # pkce_code_challenge_method="S256".
+    oidc_use_pkce: bool = True
     oidc_use_session_secret: bool = True
 
 
 class OLApisixOIDCResources(ComponentResource):
     """
-    OIDC configuration for apisix
-    Defines and creates an "OLVaultK8SSecret" resource in the k8s cluster
-    Also provides helper functions for creating config blocks for the oidc plugin
+    The client-credential Secret behind one application's APISIX
+    openid-connect routes, and the plugin block those routes attach.
+
+    Creates an OLVaultK8SSecret for OLApisixOIDCVaultCredentials; for
+    OLApisixOIDCSecretCredentials it creates nothing and points the plugin at
+    the named Secret. get_full_oidc_plugin_config() returns the openid-connect
+    entry for an OLApisixRoute's plugins; this component does not create the
+    routes.
     """
 
     def __init__(
@@ -615,37 +735,48 @@ class OLApisixOIDCResources(ComponentResource):
 
         resource_options = ResourceOptions(parent=self).merge(opts)
 
-        self.secret_name = f"ol-apisix-{oidc_config.application_name}-oidc-secrets"
-
-        __templates: dict[str, str | Output[str]] = {
-            "client_id": '{{ get .Secrets "client_id" }}',
-            "client_secret": '{{ get .Secrets "client_secret" }}',
-            "realm": '{{ get .Secrets "realm_name" }}',
-            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
-        }
-
-        if oidc_config.oidc_use_session_secret:
-            __templates["session.secret"] = '{{ get .Secrets "secret" }}'
-
-        self.oidc_secrets = OLVaultK8SSecret(
-            f"{oidc_config.application_name}-oidc-secrets",
-            resource_config=OLVaultK8SStaticSecretConfig(
-                dest_secret_labels=oidc_config.k8s_labels,
-                dest_secret_name=self.secret_name,
-                exclude_raw=True,
-                excludes=[".*"],
-                labels=oidc_config.k8s_labels,
-                mount=oidc_config.vault_mount,
-                mount_type=oidc_config.vault_mount_type,
-                name=self.secret_name,
-                namespace=oidc_config.k8s_namespace,
-                path=oidc_config.vault_path,
-                refresh_after="1m",
-                templates=__templates,
-                vaultauth=oidc_config.vaultauth,
-            ),
-            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
-        )
+        self.oidc_secrets: OLVaultK8SSecret | None = None
+        match oidc_config.credentials:
+            case OLApisixOIDCSecretCredentials(secret_name=secret_name):
+                self.secret_name = secret_name
+            case OLApisixOIDCVaultCredentials() as vault:
+                self.secret_name = (
+                    f"ol-apisix-{oidc_config.application_name}-oidc-secrets"
+                )
+                self.oidc_secrets = OLVaultK8SSecret(
+                    f"{oidc_config.application_name}-oidc-secrets",
+                    resource_config=OLVaultK8SStaticSecretConfig(
+                        dest_secret_labels=oidc_config.k8s_labels,
+                        dest_secret_name=self.secret_name,
+                        exclude_raw=True,
+                        excludes=[".*"],
+                        labels=oidc_config.k8s_labels,
+                        mount=vault.mount,
+                        mount_type=vault.mount_type,
+                        name=self.secret_name,
+                        namespace=oidc_config.k8s_namespace,
+                        path=vault.path,
+                        refresh_after="1m",
+                        # A fresh dict typed like the parameter (dict is
+                        # invariant, so the dict[str, str] oidc_secret_data
+                        # returns can't be passed as is).
+                        templates={
+                            **oidc_secret_data(
+                                {
+                                    field: f'{{{{ get .Secrets "{field}" }}}}'
+                                    for field in OIDC_VAULT_FIELDS
+                                },
+                                include_session_secret=oidc_config.oidc_use_session_secret,
+                            )
+                        },
+                        vaultauth=vault.vaultauth,
+                    ),
+                    opts=resource_options.merge(
+                        ResourceOptions(delete_before_replace=True)
+                    ),
+                )
+            case _ as unhandled:
+                assert_never(unhandled)
 
         session_config: dict[str, Any] = {}
         # Flat session.cookie_domain, per the openid-connect plugin's
@@ -693,6 +824,7 @@ class OLApisixOIDCResources(ComponentResource):
             "renew_access_token_on_expiry": oidc_config.oidc_renew_access_token_on_expiry,
             "logout_path": oidc_config.oidc_logout_path,
             "post_logout_redirect_uri": oidc_config.oidc_post_logout_redirect_uri,
+            "use_pkce": oidc_config.oidc_use_pkce,
             **session_config,
         }
 
@@ -811,8 +943,12 @@ class OLApisixSharedPlugins(ComponentResource):
       The v1alpha1 schema only accepts ``name`` and ``config`` per plugin;
       ``enable: false`` plugins are omitted entirely and ``secretRef`` is dropped.
 
-    Callers can use ``self.resource_name`` in both ``OLApisixRouteConfig`` (legacy)
-    and ``OLApisixHTTPRouteConfig`` (Gateway API) without any distinction.
+    Legacy callers pass ``self.resource_name`` to ``OLApisixRouteConfig``;
+    Gateway API callers pass the component itself to
+    ``OLApisixHTTPRouteConfig(shared_plugins=...)``, which reads
+    ``self.plugin_list`` to merge these defaults into each route's own plugins
+    (HTTPRoute allows only one ExtensionRef per rule, so the merge has to happen
+    here rather than in APISIX).
     """
 
     def __init__(
@@ -1010,6 +1146,14 @@ class OLApisixSharedPlugins(ComponentResource):
         self.resource_name = (
             f"{plugin_config.application_name}-{plugin_config.resource_suffix}"
         )
+        # The rendered plugin list, exposed so OLApisixHTTPRoute can merge these
+        # defaults into a route's own plugins.  A single HTTPRoute rule accepts
+        # only one ExtensionRef filter, so a Gateway API route cannot reference
+        # this config *and* its own PluginConfig the way a legacy ApisixRoute
+        # can -- the two lists have to be combined before the CRD is written.
+        self.plugin_list: list[OLApisixPluginConfig] = [
+            OLApisixPluginConfig(**p) for p in plugins
+        ]
         # v2/ApisixPluginConfig — consumed by legacy ApisixRoute/Ingress resources
         # via ``plugin_config_name`` in the route spec.
         self.shared_plugin_apisix_pluginconfig_resource = (
@@ -1061,12 +1205,13 @@ class OLApisixSharedPlugins(ComponentResource):
         )
 
 
-# User-Agent prefix of the first-party server-side callers that must not be
-# treated as browsers.  ``axios/`` is what the mit-learn Next.js SSR layer
-# sends (frontends/api/package.json); it is a default the application does not
-# set deliberately, so this is a floor, not a guarantee -- see
-# browser_traffic_match_exprs.
-FIRST_PARTY_SERVICE_CLIENT_UA_REGEX = r"^axios/"
+# User-Agent of the first-party server-side callers that must not be treated
+# as browsers.  ``mit-learn-ssr`` is what the mit-learn Next.js SSR layer sets
+# on purpose (frontends/main/src/bootstrap/api.ts), with or without a
+# ``/<version>`` suffix.  ``axios/`` is the HTTP client default it sent before
+# that, kept until every environment runs a release that sends the explicit
+# one -- see browser_traffic_match_exprs.
+FIRST_PARTY_SERVICE_CLIENT_UA_REGEX = r"^(?:axios/|mit-learn-ssr(?:/|$))"
 
 
 def browser_traffic_match_exprs(

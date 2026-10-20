@@ -52,7 +52,7 @@
 --   arrive as HTTP_X_RAW_ID_TOKEN. Upstream's own clear in openid-connect.lua
 --   names one spelling each; this expands them.
 --
--- See `identity_header_strip_plugin` in ../apisix.py for the deployment
+-- See `gateway_global_pre_function_plugin` in ../apisix.py for the deployment
 -- reasoning and t/strip_client_identity_headers.t for the behavioural tests.
 
 -- Memoised across requests: the configured names are a fixed short list, and

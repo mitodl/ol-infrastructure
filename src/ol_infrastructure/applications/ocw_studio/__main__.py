@@ -37,7 +37,11 @@ from ol_infrastructure.components.aws.mediaconvert import (
     OLMediaConvert,
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
-from ol_infrastructure.components.services.apisix import OLApisixPluginConfig
+from ol_infrastructure.components.services.apisix import (
+    OLApisixPluginConfig,
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -50,6 +54,7 @@ from ol_infrastructure.components.services.k8s import (
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
+    OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
 )
@@ -69,6 +74,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
 from ol_infrastructure.lib.github_helper import setup_github_provider
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
@@ -612,6 +618,8 @@ ocw_studio_k8s_app = OLApplicationK8s(
         application_lb_service_port_name="http",
         application_min_replicas=ocw_studio_config.get_int("min_replicas") or 2,
         k8s_global_labels=k8s_app_labels,
+        # An internal authoring tool, used during business hours.
+        webapp_alert_tier=AlertTier.notify,
         env_from_secret_names=secret_names,
         application_security_group_id=ocw_studio_app_security_group.id,
         application_security_group_name=ocw_studio_app_security_group.name,
@@ -654,25 +662,23 @@ ocw_studio_k8s_app = OLApplicationK8s(
         # request == limit == 768Mi the default queue rode at ~694Mi and OOMKilled
         # on publish/batch bursts, taking the deployment unavailable; the request
         # still reflects steady-state use, the limit now absorbs the spike.
+        celery_redis_config=OLApplicationK8sCeleryRedisConfig(
+            host=redis_cache.address,
+            password=redis_config.require("password"),
+        ),
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="default",
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "50m", "memory": "768Mi"},
                 resource_limits={"memory": "1536Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="publish",
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "50m", "memory": "768Mi"},
                 resource_limits={"memory": "1536Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="batch",
-                redis_host=redis_cache.address,
-                redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "50m", "memory": "768Mi"},
                 resource_limits={"memory": "1536Mi"},
             ),
@@ -704,6 +710,21 @@ cert_manager_certificate = OLCertManagerCert(
     ),
 )
 
+# Shared plugin defaults for every route below: prometheus (per-route series),
+# opentelemetry (OTLP spans), gzip (these routes served every response
+# uncompressed), cors, the http->https redirect and Referrer-Policy. Each route
+# also keeps its own plugins -- OLApisixHTTPRoute merges the two lists, with the
+# route's entries winning by name.
+ocw_studio_shared_plugins = OLApisixSharedPlugins(
+    f"ocw-studio-{stack_info.env_suffix}-ol-shared-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name="ocw-studio",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=ocw_studio_namespace,
+        k8s_labels=k8s_app_labels,
+    ),
+)
+
 # The `location` blocks that used to live in the nginx sidecar. HTTPRoute has no
 # priority field -- APISix resolves overlapping rules by longest matching path
 # prefix -- so /static/hash.txt outranks /static, which outranks /*, which is the
@@ -726,6 +747,7 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
         # is the closer translation.
         OLApisixHTTPRouteConfig(
             route_name="static-hash",
+            shared_plugins=ocw_studio_shared_plugins,
             hosts=[app_domain],
             paths=["/static/hash.txt"],
             backend_service_name=ocw_studio_k8s_app.application_lb_service_name,
@@ -740,12 +762,13 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
             ],
         ),
         # Granian serves static without a CORS header; the sidecar added a
-        # blanket one. Preserved rather than dropped because this app has no
-        # shared plugin config supplying `cors`, so removing the sidecar would
-        # otherwise silently take the header away from cross-origin font and
-        # asset loads.
+        # blanket one. Kept even though the shared config now supplies `cors`:
+        # that plugin only answers requests that carry an Origin, while this
+        # header went out unconditionally, and static assets are exactly the
+        # thing a cross-origin font or stylesheet load fetches without one.
         OLApisixHTTPRouteConfig(
             route_name="static",
+            shared_plugins=ocw_studio_shared_plugins,
             hosts=[app_domain],
             paths=["/static/*"],
             backend_service_name=ocw_studio_k8s_app.application_lb_service_name,
@@ -776,6 +799,7 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
         # route never serves anything.
         OLApisixHTTPRouteConfig(
             route_name="dnt-policy",
+            shared_plugins=ocw_studio_shared_plugins,
             hosts=[app_domain],
             paths=["/.well-known/dnt-policy.txt"],
             path_match_type="Exact",
@@ -797,6 +821,7 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
         ),
         OLApisixHTTPRouteConfig(
             route_name="passthrough",
+            shared_plugins=ocw_studio_shared_plugins,
             hosts=[app_domain],
             paths=["/*"],
             backend_service_name=ocw_studio_k8s_app.application_lb_service_name,

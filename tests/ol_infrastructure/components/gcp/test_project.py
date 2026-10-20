@@ -348,6 +348,30 @@ class TestAdoption:
         assert component.service_accounts["legacy-sa"]._protect is not True
         assert component.api_keys["legacy-key"]._protect is not True
 
+    @pulumi.runtime.test
+    def test_created_api_key_can_be_protected(self):
+        component = OLGCPProject(
+            "test-protect-created-key",
+            OLGCPProjectConfig(
+                project_id="test-project",
+                project_number="123456789012",
+                labels=valid_labels(),
+                # Enabled so the key takes the depends_on merge, as in the stack.
+                enabled_services=["youtube.googleapis.com"],
+                api_keys=[
+                    OLGCPAPIKeyConfig(
+                        key_name="created-key",
+                        display_name="Created key",
+                        restrictions={
+                            "api_targets": [{"service": "youtube.googleapis.com"}]
+                        },
+                        protect=True,
+                    )
+                ],
+            ),
+        )
+        assert component.api_keys["created-key"]._protect is True
+
 
 class TestWorkloadIdentityPools:
     """Federation from EKS clusters into one pool."""

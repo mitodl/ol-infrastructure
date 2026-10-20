@@ -31,6 +31,7 @@ from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -181,6 +182,7 @@ gwarek_db_security_group = ec2.SecurityGroup(
 )
 
 rds_defaults = defaults(stack_info)["rds"]
+rds_defaults["read_replica"] = None
 gwarek_db_config = OLPostgresDBConfig(
     instance_name=f"gwarek-db-{stack_info.env_suffix}",
     # .require(), not .require_secret() -- OLPostgresDBConfig.password is a
@@ -603,10 +605,12 @@ gwarek_oidc_resources = OLApisixOIDCResources(
         oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
         oidc_scope="openid profile email",
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/gwarek",
-        vaultauth=gwarek_vaultauth,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/gwarek",
+            vaultauth=gwarek_vaultauth,
+        ),
     ),
 )
 

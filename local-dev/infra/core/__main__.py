@@ -12,6 +12,8 @@ Provisions the foundational layer for the local k3d development environment:
   - AI services (Qdrant, Tika, LiteLLM)
   - Messaging (Mailpit)
   - Observability (Loki, Alloy, Grafana) — optional, see observability_enabled
+  - Object store (RustFS) and data lake (Gravitino, StarRocks) — optional,
+    see enabled_apps
 
 The apps-infra stack depends on this core stack being deployed first.
 It provisions the Keycloak realm and any other app-specific resources.
@@ -34,6 +36,14 @@ from modules.database import create_database
 from modules.helpers import make_resource_opts
 from modules.identity_core import create_identity_core
 from modules.ingress import create_ingress
+from modules.lakehouse import (
+    CATALOG,
+    DATA_PLATFORM_APP,
+    ICEBERG_REST_URL,
+    STARROCKS_HOST,
+    STARROCKS_QUERY_PORT,
+    create_lakehouse,
+)
 from modules.messaging import create_messaging
 from modules.namespaces import create_namespaces
 from modules.objectstore import OBJECT_STORE_APPS, create_object_store
@@ -41,6 +51,14 @@ from modules.observability import create_observability
 from modules.search import create_search
 from modules.tls import create_tls_resources
 from pulumi import Config
+
+from bridge.lib.versions import (
+    APISIX_CHART_VERSION,
+    CERT_MANAGER_CHART_VERSION,
+    CNPG_CHART_VERSION,
+    CNPG_POSTGRES_VERSION,
+    KEYCLOAK_OPERATOR_CRD_VERSION,
+)
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -64,7 +82,7 @@ keycloak_url = config.get("keycloak_url") or f"https://{keycloak_hostname}"
 apisix_admin_key = config.require_secret("apisix_admin_key")
 apisix_viewer_key = config.require_secret("apisix_viewer_key")
 
-# Observability (Grafana + Loki + Alloy). Roughly 1.3GB of workloads, so it is
+# Observability (Grafana + Loki + Alloy). Roughly 1.9GB of workloads, so it is
 # opt-out for developers on a constrained Docker VM.
 observability_enabled = config.get_bool("observability_enabled") is not False
 
@@ -98,7 +116,8 @@ if _enabled_apps is None:
         "enabled_apps is not set. Tilt passes LOCAL_DEV_ENABLED_APPS on every "
         "run; a hand-run `pulumi up` has to say so itself, because defaulting "
         "to none would destroy the resources of any optional app you have "
-        "enabled (the ocw-studio namespace and the RustFS object store).\n"
+        "enabled (the ocw-studio namespace, the RustFS object store, the data "
+        "lake).\n"
         "  LOCAL_DEV_ENABLED_APPS=mit-learn,ocw-studio pulumi up --stack "
         "local-dev.core.Dev\n"
         "Pass an empty value if you really do run no optional apps:\n"
@@ -113,11 +132,6 @@ enabled_apps = tuple(app.strip() for app in _enabled_apps.split(",") if app.stri
 host_gateway = (
     config.get("host_gateway") or os.environ.get("LOCAL_DEV_HOST_GATEWAY") or ""
 )
-
-cert_manager_version = config.get("cert_manager_version") or "v1.16.2"
-cnpg_version = config.get("cnpg_version") or "0.23.0"
-apisix_version = config.get("apisix_version") or "2.13.0"
-keycloak_operator_version = config.get("keycloak_operator_version") or "26.0.7"
 
 # Keycloak server image. The default is the published image the hosted
 # environments run, pinned by digest; local-dev/scripts/kc-theme-image.sh reads
@@ -148,7 +162,7 @@ k8s_provider_opts: dict[str, Any] = {}
 if kubeconfig_path:
     k8s_provider_opts["kubeconfig"] = kubeconfig_path
 
-k8s_provider = k8s.Provider("k3d-local", **k8s_provider_opts)
+k8s_provider = k8s.Provider("k3d-local", context="local-dev", **k8s_provider_opts)
 _k8s = make_resource_opts(k8s_provider)
 
 # ---------------------------------------------------------------------------
@@ -171,8 +185,10 @@ ingress = create_ingress(
     namespaces=namespaces,
     apisix_admin_key=apisix_admin_key,
     apisix_viewer_key=apisix_viewer_key,
-    cert_manager_version=cert_manager_version,
-    apisix_version=apisix_version,
+    cert_manager_version=CERT_MANAGER_CHART_VERSION,
+    apisix_version=APISIX_CHART_VERSION,
+    trusted_ca_secret=tls.apisix_trusted_ca,
+    trusted_ca_checksum=tls.apisix_trusted_ca_checksum,
 )
 
 # ---------------------------------------------------------------------------
@@ -277,20 +293,36 @@ if observability_enabled:
     )
 
 # Create database cluster (needed by Keycloak, LiteLLM)
-db = create_database(_k8s, namespaces["local-infra"], cnpg_version)
+db = create_database(
+    _k8s, namespaces["local-infra"], CNPG_CHART_VERSION, CNPG_POSTGRES_VERSION
+)
 
 create_ai_services(_k8s, namespaces["local-infra"], db.cluster, _infra_dir)
 
 # S3-compatible object storage (RustFS). Roughly a 1GB workload with a 20Gi
-# volume, and only ocw-studio uses it today, so it is deployed on demand
-# rather than as unconditional shared infrastructure.
-if set(enabled_apps) & set(OBJECT_STORE_APPS):
-    create_object_store(
+# volume, and only optional apps use it, so it is deployed on demand rather
+# than as unconditional shared infrastructure.
+object_store_apps = [app for app in OBJECT_STORE_APPS if app in enabled_apps]
+if object_store_apps:
+    object_store = create_object_store(
         _k8s,
         namespaces["local-infra"],
         apisix_release=ingress.apisix,
         tls_secret=tls.tls_secret,
         s3_hostname=f"s3.{root_domain}",
+        apps=object_store_apps,
+    )
+
+# Local data lake: Gravitino (Iceberg REST catalog) and StarRocks, about 2GB
+# resident and a 3GB image, so opt-in like the object store it sits on.
+data_platform_enabled = DATA_PLATFORM_APP in enabled_apps
+if data_platform_enabled:
+    create_lakehouse(
+        _k8s,
+        namespaces["local-infra"],
+        db_cluster=db.cluster,
+        object_store_bootstrap=object_store.bootstrap_job,
+        postgres_version=CNPG_POSTGRES_VERSION,
     )
 
 # Deploy Keycloak operator and instance (but not realm — that's in apps-infra)
@@ -300,7 +332,7 @@ identity = create_identity_core(
     local_infra_ns=namespaces["local-infra"],
     apisix_release=ingress.apisix,
     tls_secret=tls.tls_secret,
-    keycloak_operator_version=keycloak_operator_version,
+    keycloak_operator_version=KEYCLOAK_OPERATOR_CRD_VERSION,
     keycloak_image=keycloak_image,
     keycloak_hostname=keycloak_hostname,
     keycloak_url=keycloak_url,
@@ -324,6 +356,12 @@ pulumi.export(
 pulumi.export("tika_url", "http://tika.local-infra.svc.cluster.local:9998")
 pulumi.export("litellm_url", "http://litellm.local-infra.svc.cluster.local:4000")
 pulumi.export("mailpit_ui_url", "http://mailpit.local-infra.svc.cluster.local:8025")
+
+if data_platform_enabled:
+    pulumi.export("iceberg_rest_url", ICEBERG_REST_URL)
+    pulumi.export("starrocks_host", STARROCKS_HOST)
+    pulumi.export("starrocks_query_port", STARROCKS_QUERY_PORT)
+    pulumi.export("lake_catalog", CATALOG)
 
 if observability_enabled:
     pulumi.export("grafana_url", f"https://grafana.{root_domain}")

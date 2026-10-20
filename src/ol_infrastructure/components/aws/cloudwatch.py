@@ -26,7 +26,7 @@ class OLCloudWatchAlarmSimpleConfig(BaseModel):
     treat_missing_data_as: str = "missing"
     unit: str | None = None
 
-    # TODO: MD 20230315 refactor to accomodate anomaly detection alerts  # noqa: E501, FIX002, TD002
+    # TODO: MD 20230315 refactor to accomodate anomaly detection alerts  # noqa: FIX002, TD002
     @field_validator("comparison_operator")
     @classmethod
     def is_valid_comparison_operator(

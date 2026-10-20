@@ -345,6 +345,16 @@ run_monitoring:
   max_resume_run_attempts: 3
   poll_interval_seconds: 120
   max_runtime_seconds: 0
+  # A run worker killed mid-step leaves its step's pool claim behind. Once
+  # max_resume_run_attempts is spent the run is marked failed with the claim
+  # still recorded, and on a pool with a limit of 1 every retry and every later
+  # scheduled run then queues behind a run that no longer exists. Unset, the
+  # daemon never frees those claims (dagster/_daemon/monitoring/concurrency.py
+  # returns early), so the pool stays blocked until someone frees the slot by
+  # hand or deletes the run. Only runs in a finished state are considered, so a
+  # run that is still being resumed keeps its slot. A run force-marked failed
+  # while its pod is still alive loses its slot too, which is the cost.
+  free_slots_after_run_end_seconds: 300
 
 run_retries:
   enabled: true

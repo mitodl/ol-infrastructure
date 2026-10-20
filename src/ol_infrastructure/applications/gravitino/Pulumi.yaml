@@ -1,0 +1,9 @@
+---
+name: ol-application-gravitino
+runtime: python
+description: >
+  Deploy Apache Gravitino on the data EKS cluster as the authorizing,
+  credential-vending Iceberg REST catalog in front of the data lake's Glue
+  tables. See docs/plans/gravitino-deployment-spec.md.
+backend:
+  url: s3://mitol-pulumi-state/

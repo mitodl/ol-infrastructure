@@ -46,6 +46,7 @@ from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -81,9 +82,11 @@ from ol_infrastructure.lib.azure_workload_identity import (
     azure_identity_token_volume,
 )
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
+    Component,
     K8sAppLabels,
     Product,
     Services,
@@ -135,6 +138,13 @@ keycloak_stack = (
 # it holds nothing from the QA app.
 mitxonline_stack = (
     make_stack_reference(projects.MITXONLINE, stack_info.name)
+    if stack_info.env_suffix in ("ci", "qa", "production")
+    else None
+)
+# xPro is deployed to CI/QA/Production only, like MITx Online. Its app database
+# is what the xpro_app dlt source reads (RFC 12711).
+xpro_stack = (
+    make_stack_reference(projects.XPRO, stack_info.name)
     if stack_info.env_suffix in ("ci", "qa", "production")
     else None
 )
@@ -214,6 +224,26 @@ dagster_selector_labels = {
     for key, value in k8s_global_labels.model_dump().items()
     if key in DAGSTER_SELECTOR_LABEL_KEYS
 }
+
+
+def dagster_workload_labels(component: Component) -> dict[str, str]:
+    """Label one Dagster workload with its role and alert tier.
+
+    For workload metadata and pod templates only, never a selector (see
+    DAGSTER_SELECTOR_LABEL_KEYS above).
+
+    Every workload in this stack is tier notify. Dagster retries and backfills,
+    so a degraded control plane or a dead run worker costs freshness and is
+    worked in business hours, the same call the Rootly stack already makes for
+    Dagster's database alarms and Pingdom check.
+
+    :param component: The workload's functional role.
+    :returns: The stack's ol.mit.edu labels plus component and alert_tier.
+    """
+    return k8s_global_labels.model_copy(
+        update={"component": component, "alert_tier": AlertTier.notify}
+    ).model_dump()
+
 
 aws_account = get_caller_identity()
 dagster_namespace = "dagster"
@@ -911,7 +941,7 @@ dagster_static_secrets = OLVaultK8SSecret(
     f"dagster-k8s-static-secrets-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-static-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-static-secrets",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=k8s_global_labels.model_dump(),
@@ -933,7 +963,7 @@ dagster_dbt_secrets = OLVaultK8SSecret(
     f"dagster-k8s-dbt-secrets-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-dbt-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-dbt-secrets",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=k8s_global_labels.model_dump(),
@@ -989,6 +1019,25 @@ if stack_info.env_suffix == "production":
         opts=ResourceOptions(delete_before_replace=True),
     )
 
+# MIT Learn's YouTube Data API key, for the data_loading YouTube dlt source. The
+# source reads it from Vault in the qa and production dlt profiles only, so the
+# other stacks don't get it. Copied out of the mitlearn SOPS file rather than
+# granting this policy MIT Learn's own mount, so the two share one key (and its
+# daily quota) without dagster being able to read the rest of Learn's secrets.
+if stack_info.env_suffix in ("qa", "production"):
+    vault.generic.Secret(
+        f"dagster-youtube-{stack_info.env_suffix}",
+        path="secret-data/pipelines/youtube",
+        data_json=json.dumps(
+            {
+                "developer_key": read_yaml_secrets(
+                    Path(f"mitlearn/secrets.{stack_info.env_suffix}.yaml")
+                )["youtube_developer_key"]
+            }
+        ),
+        opts=ResourceOptions(delete_before_replace=True),
+    )
+
 # Sentry DSN for the code locations and run workers. Kept as its own secret
 # rather than folded into dagster-static-secrets because an OLVaultK8SSecret
 # reads a single Vault path, and the DSN is owned by the sentry stack.
@@ -996,7 +1045,7 @@ dagster_sentry_secrets = OLVaultK8SSecret(
     f"dagster-k8s-sentry-secrets-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-sentry-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-sentry-secrets",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=k8s_global_labels.model_dump(),
@@ -1021,7 +1070,7 @@ dagster_db_secret = OLVaultK8SSecret(
     f"dagster-k8s-db-secret-{stack_info.env_suffix}",
     resource_config=OLVaultK8SDynamicSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-postgresql-secret",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-postgresql-secret",  # pragma: allowlist secret  # noqa: S106
         labels=k8s_global_labels.model_dump(),
         mount="postgres-dagster",
         name="dagster-postgresql-secret",
@@ -1384,7 +1433,7 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="dagster-pgbouncer",
         namespace=dagster_namespace,
-        labels=k8s_global_labels.model_dump(),
+        labels=dagster_workload_labels(Component.pgbouncer),
         annotations={
             "pulumi.com/patchForce": "true",
         },
@@ -1414,7 +1463,7 @@ pgbouncer_deployment = kubernetes.apps.v1.Deployment(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 labels={
                     "component": "pgbouncer",
-                    **k8s_global_labels.model_dump(),
+                    **dagster_workload_labels(Component.pgbouncer),
                 },
                 # Rolls these pods when the pgbouncer ConfigMap changes; without it a
                 # config edit never reaches the running processes. See the annotation's
@@ -2177,7 +2226,7 @@ sql_exporter_deployment = kubernetes.apps.v1.Deployment(
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="dagster-sql-exporter",
         namespace=dagster_namespace,
-        labels=k8s_global_labels.model_dump(),
+        labels=dagster_workload_labels(Component.exporter),
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
         # One replica, deliberately. A second would double every gauge's cardinality
@@ -2194,7 +2243,7 @@ sql_exporter_deployment = kubernetes.apps.v1.Deployment(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 labels={
                     "component": "sql-exporter",
-                    **k8s_global_labels.model_dump(),
+                    **dagster_workload_labels(Component.exporter),
                 },
                 annotations=sql_exporter_config_checksum_annotation,
             ),
@@ -2403,10 +2452,12 @@ dagster_oidc_resources = OLApisixOIDCResources(
         oidc_session_rolling_timeout=0,
         oidc_use_session_secret=True,
         oidc_scope="openid profile email",
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/dagster",
-        vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/dagster",
+            vaultauth=dagster_auth_binding.vault_k8s_resources.auth_name,
+        ),
     ),
     opts=ResourceOptions(depends_on=[dagster_auth_binding]),
 )
@@ -2532,7 +2583,7 @@ edxorg_gcp_secret = OLVaultK8SSecret(
     f"dagster-k8s-edxorg-gcp-secrets-{stack_info.env_suffix}",
     resource_config=OLVaultK8SStaticSecretConfig(
         dest_secret_labels=k8s_global_labels.model_dump(),
-        dest_secret_name="dagster-edxorg-gcp-secrets",  # pragma: allowlist secret  # noqa: E501, S106
+        dest_secret_name="dagster-edxorg-gcp-secrets",  # pragma: allowlist secret  # noqa: S106
         exclude_raw=True,
         excludes=[".*"],
         labels=k8s_global_labels.model_dump(),
@@ -2813,6 +2864,12 @@ for location in code_locations:
             "tag": image_tag_or_digest,
             "pullPolicy": "IfNotPresent",
         },
+        # The chart puts these on the Deployment and its pod template, and copies
+        # them into the container context of every run the location launches
+        # (dagster_k8s K8sContainerContext, where the code location's value wins
+        # over the run launcher's). The chart has no run-only labels key, so a
+        # code server and its run workers share one label set.
+        "labels": dagster_workload_labels(Component.worker),
         # Chart key is deploymentStrategy, not strategy.
         "deploymentStrategy": {
             "type": "RollingUpdate",
@@ -2928,6 +2985,14 @@ for location in code_locations:
             }
         )
 
+    if name == "data_loading" and xpro_stack is not None:
+        deployment["env"].append(
+            {
+                "name": "XPRO_APP_DB_HOST",
+                "value": xpro_stack.require_output("xpro")["rds_host"],
+            }
+        )
+
     # ml's Opik tracing and Prompt Library. Only the non-secret settings live
     # here: the code reads the Keycloak client-credentials from Vault at
     # secret-operations/sso/opik itself (dagster_server_policy.hcl), the same
@@ -2962,11 +3027,9 @@ for location in code_locations:
     # code server. No other code location mounts it, which is what keeps this identity
     # to ml while every location shares the dagster-user-code ServiceAccount.
     #
-    # LLM_AZURE_ENDPOINT is the name ml's definitions.py reads. ml cannot use this
-    # identity yet: its azure_openai client authenticates with AZURE_OPENAI_API_KEY,
-    # and these accounts disable key auth. It needs a token provider built on
-    # azure-identity's WorkloadIdentityCredential before SUMMARY_PROVIDER=azure_openai
-    # works.
+    # LLM_AZURE_ENDPOINT is the name ml's definitions.py reads. Its azure_openai client
+    # authenticates with an Entra token from DefaultAzureCredential, and only when
+    # SUMMARY_PROVIDER=azure_openai selects it, so this wiring alone changes no calls.
     if name == "ml" and azure_openai_stack is not None:
         deployment.setdefault("volumes", []).append(azure_identity_token_volume())
         deployment.setdefault("volumeMounts", []).append(azure_identity_token_mount())
@@ -2989,16 +3052,30 @@ for location in code_locations:
 
     # Add higher resources for lakehouse deployment (runs dbt)
     if name == "lakehouse":
+        lakehouse_cpu_limit = 4
         deployment["resources"] = {
             "requests": {
                 "cpu": "1000m",
                 "memory": "2Gi",
             },
             "limits": {
-                "cpu": "4000m",
+                "cpu": f"{lakehouse_cpu_limit * 1000}m",
                 "memory": "8Gi",
             },
         }
+        # The multiprocess executor otherwise starts multiprocessing.cpu_count()
+        # steps at once, which is the node's vCPU count, not this pod's CPU
+        # limit, and each step subprocess imports the whole code location.
+        # Lakehouse run workers died about 40s after a dbt build fanned out to
+        # its Superset steps on 2026-10-12, with the working set climbing toward
+        # the 8Gi limit. The env reaches run workers through the container
+        # context the chart builds from this env list.
+        deployment["env"].append(
+            {
+                "name": "DAGSTER_MULTIPROCESS_EXECUTOR_MAX_CONCURRENT",
+                "value": str(lakehouse_cpu_limit),
+            }
+        )
         # Lakehouse has slow definitions loading (~19s) due to Airbyte+dbt integration.
         # Increase startup probe delays to prevent race condition when webserver tries
         # to connect before the code location has finished initializing.
@@ -3225,7 +3302,7 @@ dagster_k8s_image_config = {
 dagster_helm_values = {
     "global": {
         "serviceAccountName": "dagster",
-        "postgresqlSecretName": "dagster-postgresql-secret",  # pragma: allowlist secret  # noqa: E501
+        "postgresqlSecretName": "dagster-postgresql-secret",  # pragma: allowlist secret
     },
     "dagster-user-deployments": {"enabled": True, "enableSubchart": False},
     "serviceAccount": {
@@ -3238,6 +3315,10 @@ dagster_helm_values = {
     # Dagster webserver (UI)
     "dagsterWebserver": {
         "annotations": dagster_instance_checksum_annotation,
+        # deploymentLabels is the Deployment's metadata and labels its pod
+        # template. Neither reaches spec.selector.
+        "deploymentLabels": dagster_workload_labels(Component.webapp),
+        "labels": dagster_workload_labels(Component.webapp),
         "image": dagster_k8s_image_config,
         "workspace": {
             "enabled": True,
@@ -3324,6 +3405,8 @@ dagster_helm_values = {
     # Dagster daemon (background job scheduler)
     "dagsterDaemon": {
         "annotations": dagster_instance_checksum_annotation,
+        "deploymentLabels": dagster_workload_labels(Component.controller),
+        "labels": dagster_workload_labels(Component.controller),
         "image": dagster_k8s_image_config,
         "env": [
             {

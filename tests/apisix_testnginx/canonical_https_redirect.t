@@ -145,3 +145,67 @@ GET /t/
 --- error_code: 308
 --- response_headers
 Location: https://nb.learn.mit.edu/t/
+
+
+
+=== TEST 7: require_openid_connect redirects a route that carries openid-connect
+--- config
+    location /t {
+        rewrite_by_lua_block {
+            local canonical = require("apisix.plugins.ol.canonical_https_redirect")
+            canonical({canonical_https_redirect = {status = 308, require_openid_connect = true}},
+                      {var = {}, matched_route = {value = {plugins = {["openid-connect"] = {}}}}})
+        }
+        content_by_lua_block {
+            ngx.say("not reached")
+        }
+    }
+--- more_headers
+Host: pipelines.odl.mit.edu
+--- request
+GET /t/
+--- error_code: 308
+--- response_headers
+Location: https://pipelines.odl.mit.edu/t/
+
+
+
+=== TEST 8: require_openid_connect leaves a route without openid-connect alone
+--- config
+    location /t {
+        rewrite_by_lua_block {
+            local canonical = require("apisix.plugins.ol.canonical_https_redirect")
+            canonical({canonical_https_redirect = {status = 308, require_openid_connect = true}},
+                      {var = {}, matched_route = {value = {plugins = {redirect = {http_to_https = true}}}}})
+        }
+        content_by_lua_block {
+            ngx.say("passed through")
+        }
+    }
+--- more_headers
+Host: pipelines.odl.mit.edu
+--- request
+GET /t/
+--- response_body
+passed through
+
+
+
+=== TEST 9: require_openid_connect leaves an unmatched request alone
+--- config
+    location /t {
+        rewrite_by_lua_block {
+            local canonical = require("apisix.plugins.ol.canonical_https_redirect")
+            canonical({canonical_https_redirect = {status = 308, require_openid_connect = true}},
+                      {var = {}})
+        }
+        content_by_lua_block {
+            ngx.say("passed through")
+        }
+    }
+--- more_headers
+Host: pipelines.odl.mit.edu
+--- request
+GET /t/
+--- response_body
+passed through

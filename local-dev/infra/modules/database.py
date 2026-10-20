@@ -19,6 +19,7 @@ def create_database(
     _k8s: Callable[..., ResourceOptions],
     local_infra_ns: k8s.core.v1.Namespace,
     cnpg_version: str,
+    postgres_version: str,
 ) -> DatabaseResources:
     """Deploy the CloudNativePG operator and a shared PostgreSQL cluster.
 
@@ -68,6 +69,7 @@ def create_database(
         },
         spec={
             "instances": 1,
+            "imageName": f"ghcr.io/cloudnative-pg/postgresql:{postgres_version}",
             "storage": {"size": "10Gi"},
             "bootstrap": {
                 "initdb": {

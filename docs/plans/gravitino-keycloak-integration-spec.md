@@ -154,13 +154,14 @@ tokens** until this is fixed.
 that its `client_credentials` token carries the claim. The same mechanism gives a machine
 identity group membership in Gravitino without a per-machine grant in the catalog.
 
-**M16. StarRocks' own principal mapping is already inconsistent, and this spec inherits it.**
-`applications/starrocks/__main__.py:763-764` writes
-`oauth2_principal_field = preferred_username` and `jwt_principal_field = preferred_username` into
-fe.conf, while both security integrations set `"principal_field" = "starrocks_username"`
-(`substructure/starrocks/__main__.py:649` and `:745`). fe.conf governs manually-created
-`IDENTIFIED WITH authentication_jwt` users; the integration governs auto-provisioned ones. This is
-the divergence already tracked by `tk-verify-first-then-fix-keycloak-group-sync-writes-c1bbf7`.
+**M16. StarRocks' own principal mapping was inconsistent until 2026-10-07.**
+`applications/starrocks/__main__.py` wrote `oauth2_principal_field = preferred_username` and
+`jwt_principal_field = preferred_username` into fe.conf, while both security integrations set
+`"principal_field" = "starrocks_username"` (`substructure/starrocks/__main__.py`). fe.conf governs
+manually-created `IDENTIFIED WITH authentication_jwt` users; the integration governs everyone else.
+Measured in QA on 2026-10-07 (4.1.6): a hand-made `authentication_jwt` user `tmacey` was refused
+with "Login name tmacey is not matched to user tmacey@mit.edu". fe.conf now names
+`starrocks_username` for both keys.
 
 ## D1: audience
 

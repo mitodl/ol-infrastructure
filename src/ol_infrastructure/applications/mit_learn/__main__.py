@@ -1,7 +1,6 @@
 # ruff: noqa: ERA001, FIX002, E501
 """Pulumi program for deploying the MIT Learn application to Kubernetes."""
 
-import base64
 import json
 import mimetypes
 import textwrap
@@ -32,7 +31,6 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_POSTGRES_PORT,
     DEFAULT_REDIS_PORT,
-    ONE_MEGABYTE_BYTE,
     STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -53,6 +51,7 @@ from ol_infrastructure.components.services.apisix import (
     FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -71,6 +70,7 @@ from ol_infrastructure.components.services.k8s import (
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
+    OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
     application_deployment_names,
@@ -97,10 +97,10 @@ from ol_infrastructure.lib.azure_workload_identity import (
     azure_openai_env,
 )
 from ol_infrastructure.lib.fastly import (
-    build_fastly_log_format_string,
     get_fastly_provider,
     vcl_snippet,
 )
+from ol_infrastructure.lib.fastly_logging import fastly_logging_args
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -141,10 +141,6 @@ data_vpc = network_stack.require_output("data_vpc")
 operations_vpc = network_stack.require_output("operations_vpc")
 k8s_pod_subnet_cidrs = apps_vpc["k8s_pod_subnet_cidrs"]
 
-vector_log_proxy_stack = make_stack_reference(
-    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
-)
-monitoring_stack = make_stack_reference(projects.MONITORING, "default")
 dns_stack = make_stack_reference(projects.DNS, "default")
 ocw_site_stack = make_stack_reference(
     projects.OCW_SITE, stack_info.name if stack_info.name != "CI" else "QA"
@@ -274,13 +270,13 @@ s3.BucketPolicy(
 
 mitlearn_app_storage_bucket_name = f"ol-mitlearn-app-storage-{app_env_suffix}"
 
-# CI and QA pilot SigV4-signed Fastly->S3 requests (see the IAM user/Vault
-# secret below and the signing VCL on the media-storage backend). CI
-# validated live on 2026-09-15; QA added 2026-09-29 after several weeks of
-# clean CI operation, to soak on a higher-traffic environment before
-# Production. Production stays on the pre-existing public-read policy until
-# this is rolled out there too.
-_mitlearn_bucket_is_sigv4_piloted = stack_info.env_suffix in ("ci", "qa")
+# CI, QA, and Production all use SigV4-signed Fastly->S3 requests (see the
+# IAM user/Vault secret below and the signing VCL on the media-storage
+# backend). CI validated live on 2026-09-15; QA added 2026-09-29 after
+# several weeks of clean CI operation; Production added 2026-10-07 after
+# several weeks of clean QA operation on a higher-traffic, more
+# content-rich environment.
+_mitlearn_bucket_is_sigv4_piloted = stack_info.env_suffix in ("ci", "qa", "production")
 
 mitlearn_application_storage_bucket_config = S3BucketConfig(
     bucket_name=mitlearn_app_storage_bucket_name,
@@ -900,23 +896,6 @@ mitlearn_vault_backend_config = OLVaultPostgresDatabaseConfig(
 mitlearn_vault_backend = OLVaultDatabaseBackend(mitlearn_vault_backend_config)
 
 
-vector_log_proxy_secrets = read_yaml_secrets(
-    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
-)
-fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
-encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
-).decode("utf8")
-vector_log_proxy_domain = vector_log_proxy_stack.require_output(
-    "vector_log_proxy_domain"
-)
-
-fastly_access_logging_bucket = monitoring_stack.require_output(
-    "fastly_access_logging_bucket"
-)
-fastly_access_logging_iam_role = monitoring_stack.require_output(
-    "fastly_access_logging_iam_role"
-)
 gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
 for k, v in mimetypes.types_map.items():
     if k in (
@@ -1015,6 +994,10 @@ CACHE_KEY_QUERY_PARAM_WHITELIST = [
     "account_action",
     "account_action_status",
     "is_new_user",
+    "status",
+    "module",
+    "needs_attention",
+    "view",
     # LearningResourceDrawer params (not in mit-learn's registry).
     "syllabus",
     "syllabus_only",
@@ -1259,7 +1242,9 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             name="handle domain redirect",
             content=textwrap.dedent(
                 rf"""
-                set req.http.orig-req-url = req.url;
+                if (req.restarts == 0) {{
+                  set req.http.orig-req-url = req.url;
+                }}
                 unset req.http.Cookie;
 
                 # If the request is for the old DNS name, redirect
@@ -1417,32 +1402,24 @@ mitlearn_fastly_service = fastly.ServiceVcl(
             type="fetch",
         ),
         vcl_snippet(
+            name="Serve Learn 404 page for OCW requests",
+            content=Path(__file__)
+            .parent.joinpath("snippets/ocw_404_deliver.vcl")
+            .read_text(),
+            type="deliver",
+        ),
+        vcl_snippet(
             name="Strip noindex header from NextJS backend",
             content="unset resp.http.X-Robots-Tag;",
             type="deliver",
         ),
     ],
-    logging_https=[
-        fastly.ServiceVclLoggingHttpArgs(
-            url=Output.all(domain=vector_log_proxy_domain).apply(
-                lambda kwargs: f"https://{kwargs['domain']}/fastly"
-            ),
-            name=f"fastly-mit_learn-{stack_info.env_suffix}-https-logging-args",
-            content_type="application/json",
-            format=build_fastly_log_format_string(
-                additional_static_fields={
-                    "application": Application.mit_learn,
-                    "environment": stack_info.env_suffix,
-                }
-            ),
-            format_version=2,
-            header_name="Authorization",
-            header_value=f"Basic {encoded_fastly_proxy_credentials}",
-            json_format="0",
-            method="POST",
-            request_max_bytes=ONE_MEGABYTE_BYTE,
-        )
-    ],
+    **fastly_logging_args(
+        name=f"fastly-mit_learn-{stack_info.env_suffix}",
+        application=Application.mit_learn,
+        environment=stack_info.env_suffix,
+        s3_path=f"/{Application.mit_learn}/{stack_info.env_suffix}/",
+    ),
     opts=ResourceOptions.merge(
         fastly_provider,
         ResourceOptions(
@@ -1462,7 +1439,10 @@ path_redirects_dict_id = mitlearn_fastly_service.dictionaries.apply(
 mitlearn_redirects_dictionary = fastly.ServiceDictionaryItems(
     "mitlearn-redirects-dictionary",
     dictionary_id=path_redirects_dict_id,
-    items={"/dashboard/organization/mit": "/dashboard/organization/mit-universal-ai"},
+    items={
+        "/dashboard/organization/mit": "/dashboard/organization/mit-universal-ai",
+        "/universal-learning/ai": "/organizational-learning",
+    },
     service_id=mitlearn_fastly_service.id,
     manage_items=True,
     opts=fastly_provider,
@@ -1519,7 +1499,6 @@ env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 # Values that are generally unchanging across environments
 env_vars = {
     "ALLOWED_HOSTS": '["*"]',
-    "OVS_ALLOWED_MEDIA_HOSTS": '[".cloudfront.net"]',
     "AWS_STORAGE_BUCKET_NAME": f"ol-mitlearn-app-storage-{env_name}",
     "CANVAS_PDF_TRANSCRIPTION_MODEL": "gpt-4o",
     "CONTENT_FILE_EMBEDDING_CHUNK_OVERLAP": 51,
@@ -1642,7 +1621,7 @@ if mitlearn_config.get_bool("enable_azure_openai"):
         azure_openai_env(
             azure_openai_stack,
             "mitlearn",
-            api_version=mitlearn_config.get("azure_openai_api_version") or "2024-10-21",
+            api_version=mitlearn_config.get("azure_openai_api_version") or "v1",
             default_deployment=mitlearn_config.get("azure_openai_default_deployment")
             or "gpt-4o",
         )
@@ -1935,8 +1914,6 @@ mitlearn_celery_worker_configs = [
     OLApplicationK8sCeleryWorkerConfig(
         queue_name="default",
         max_replicas=20,
-        redis_host=redis_cache.address,
-        redis_password=redis_config.require("password"),
         resource_requests=celery_default_resource_requests,
         resource_limits=celery_default_resource_limits,
         # 640Mi. A healthy child on this queue sits at ~165Mi (observed
@@ -1960,8 +1937,6 @@ mitlearn_celery_worker_configs = [
     ),
     OLApplicationK8sCeleryWorkerConfig(
         queue_name="edx_content",
-        redis_host=redis_cache.address,
-        redis_password=redis_config.require("password"),
         resource_requests=celery_edx_content_resource_requests,
         resource_limits=celery_edx_content_resource_limits,
     ),
@@ -1971,8 +1946,6 @@ mitlearn_celery_worker_configs = [
         # KEDA holds this at or near 30 replicas through backlogs, so a deploy
         # that waits for all 30 to be available at once fails under spot churn.
         skip_rollout_await=True,
-        redis_host=redis_cache.address,
-        redis_password=redis_config.require("password"),
         resource_requests=celery_embeddings_resource_requests,
         resource_limits=celery_embeddings_resource_limits,
     ),
@@ -2079,6 +2052,11 @@ mitlearn_k8s_app = OLApplicationK8s(
             # worker at 1500Mi of a 3.5Gi pod. See the stage 4 task in
             # docs/plans/granian-configuration-overhaul.md.
             #
+            # The image runs granian 2.8.3 since mit-learn 0.81.8 (mit-learn#4024). On
+            # 2.8 each worker owns its listener, so a respawn is covered only by the
+            # other worker. Moving to workers=1 also needs respawn_interval set above
+            # the worker cold start, or every respawn refuses connections.
+            #
             # This is one value across all stacks, while the VPA floor it is sized
             # against is production-only (CI/QA keep the 256Mi default). That is not
             # the protection gap it looks like: a cap only guards anything when
@@ -2130,6 +2108,10 @@ mitlearn_k8s_app = OLApplicationK8s(
         init_migrations=False,
         init_collectstatic=True,  # Assuming Django app needs collectstatic
         pre_deploy_commands=[("migrate", ["scripts/heroku-release-phase.sh"])],
+        celery_redis_config=OLApplicationK8sCeleryRedisConfig(
+            host=redis_cache.address,
+            password=redis_config.require("password"),
+        ),
         celery_worker_configs=mitlearn_celery_worker_configs,
         celery_beat_config=mitlearn_celery_beat_config,
         resource_requests=webapp_resource_requests,
@@ -2186,10 +2168,12 @@ mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",
-        vaultauth=vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     ),
 )
 mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
@@ -2210,10 +2194,12 @@ mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",
-        vaultauth=vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     ),
 )
 

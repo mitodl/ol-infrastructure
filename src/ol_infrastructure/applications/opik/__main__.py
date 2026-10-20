@@ -35,6 +35,7 @@ from ol_infrastructure.components.applications.eks import (
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -55,8 +56,10 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     AWSBase,
     BusinessUnit,
+    Component,
     K8sGlobalLabels,
     Services,
 )
@@ -232,6 +235,22 @@ opik_helm_release = kubernetes.helm.v3.Release(
             # single-shard, non-Distributed deployments, and it is `critical`,
             # so enabling it here would pull every backend out of rotation.
             "partitionMetrics": {"enabled": True},
+            # Opik is internal LLM tracing, so everything is notify. commonLabels
+            # reaches the backend, python-backend and frontend Deployments and
+            # their pods, which do not share a role, so it carries no component.
+            "commonLabels": k8s_labels.workload_labels(alert_tier=AlertTier.notify),
+            "mysql": {
+                "primary": {
+                    "podLabels": k8s_labels.workload_labels(
+                        alert_tier=AlertTier.notify, component=Component.database
+                    ),
+                },
+            },
+            "minio": {
+                "podLabels": k8s_labels.workload_labels(alert_tier=AlertTier.notify),
+            },
+            # No redis.podLabels: that subchart copies it into the StatefulSet's
+            # volumeClaimTemplates, which are immutable.
             "component": {
                 "backend": {
                     # Two replicas so a rollout, a node loss, or a single wedged
@@ -432,10 +451,12 @@ opik_oidc = OLApisixOIDCResources(
         oidc_scope="openid profile email",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/opik",
-        vaultauth=opik_app.vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/opik",
+            vaultauth=opik_app.vault_k8s_resources.auth_name,
+        ),
     ),
     opts=ResourceOptions(depends_on=opik_app.vault_k8s_resources),
 )

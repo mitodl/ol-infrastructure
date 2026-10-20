@@ -5,10 +5,12 @@ the cert+key into every namespace that needs TLS termination, and distributes
 the mkcert root CA so containers can trust local HTTPS endpoints (e.g. Keycloak).
 """
 
+import hashlib
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+import certifi
 import pulumi_kubernetes as k8s
 from pulumi import ResourceOptions
 
@@ -26,6 +28,15 @@ class TlsResources:
     """Per-app-namespace TLS secrets keyed by namespace name."""
     app_ca_configmaps: dict[str, k8s.core.v1.ConfigMap]
     """Per-app-namespace mkcert CA ConfigMaps keyed by namespace name."""
+    apisix_trusted_ca: k8s.core.v1.Secret
+    """CA bundle APISIX verifies upstream TLS against, in the operations
+    namespace; its file is ``APISIX_TRUSTED_CA_FILENAME``."""
+    apisix_trusted_ca_checksum: str
+    """SHA-256 of that bundle, for a pod annotation that rolls APISIX when it
+    changes."""
+
+
+APISIX_TRUSTED_CA_FILENAME = "ca-bundle.pem"
 
 
 def create_tls_resources(
@@ -85,9 +96,26 @@ def create_tls_resources(
         for ns in app_namespaces
     }
 
+    # Setting APISIX's trusted CA replaces its default (the system store), so
+    # the file carries a full public bundle as well as the mkcert root. The
+    # mkcert root is what lets openid-connect verify Keycloak: the discovery
+    # document's token and JWKS endpoints are on sso.ol.<domain>, which the
+    # CoreDNS override sends back through APISIX's own mkcert certificate.
+    trusted_ca_bundle = Path(certifi.where()).read_text() + "\n" + ca_cert_content
+    apisix_trusted_ca = k8s.core.v1.Secret(
+        "apisix-trusted-ca",
+        metadata={"name": "apisix-trusted-ca", "namespace": "operations"},
+        string_data={APISIX_TRUSTED_CA_FILENAME: trusted_ca_bundle},
+        opts=_k8s(parent=namespaces["operations"]),
+    )
+
     return TlsResources(
         tls_secret=tls_secret,
         tls_secret_ops=tls_secret_ops,
         app_tls_secrets=app_tls_secrets,
         app_ca_configmaps=app_ca_configmaps,
+        apisix_trusted_ca=apisix_trusted_ca,
+        apisix_trusted_ca_checksum=hashlib.sha256(
+            trusted_ca_bundle.encode()
+        ).hexdigest(),
     )

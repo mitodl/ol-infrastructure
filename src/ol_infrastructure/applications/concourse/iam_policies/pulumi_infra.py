@@ -204,7 +204,9 @@ policy_definition = {
                 "ecr:PutImage",
                 "ecr:PutImageScanningConfiguration",
                 "ecr:PutLifecyclePolicy",
+                "ecr:SetRepositoryPolicy",
                 "ecr:TagResource",
+                "ecr:UpdateRepositoryCreationTemplate",
                 "ecr:UploadLayerPart",
                 "eks:DescribeAccessEntry",
                 "eks:DescribeAddonVersions",
@@ -300,6 +302,10 @@ policy_definition = {
                 "iam:ListAttachedUserPolicies",
                 "iam:ListEntitiesForPolicy",
                 "iam:ListGroupsForUser",
+                # The provider lists a role's instance profiles before every
+                # DeleteRole and fails on AccessDenied, so without this the
+                # worker can't delete or replace any role it manages.
+                "iam:ListInstanceProfilesForRole",
                 "iam:ListPolicyTags",
                 "iam:ListPolicyVersions",
                 "iam:ListRolePolicies",
@@ -345,6 +351,10 @@ policy_definition = {
                 # runs create, switchover, and old-instance deletion in a single
                 # apply, so all of them are needed together or the same update
                 # just fails one step later each retry.
+                # A new aws:rds/instance with no snapshot or replica source.
+                # Never observed in use because no stack had created an
+                # instance through this role; gravitino QA is the first.
+                "rds:CreateDBInstance",
                 "rds:CreateDBInstanceReadReplica",
                 "rds:CreateDBParameterGroup",
                 "rds:CreateDBSnapshot",
@@ -368,6 +378,10 @@ policy_definition = {
                 "rds:ListTagsForResource",
                 "rds:ModifyDBCluster",
                 "rds:ModifyDBInstance",
+                # aws:rds/parameterGroup applies its parameters with Modify after
+                # Create, so a stack that creates a new parameter group fails
+                # without it (gravitino QA, deploy #1).
+                "rds:ModifyDBParameterGroup",
                 "rds:ModifyDBSubnetGroup",
                 "rds:PromoteReadReplica",
                 "rds:PromoteReadReplicaDBCluster",
@@ -383,6 +397,7 @@ policy_definition = {
                 "route53:ListTagsForResource",
                 "s3:CreateBucket",
                 "s3:DeleteBucket",
+                "s3:DeleteBucketPolicy",
                 "s3:DeleteBucketWebsite",
                 "s3:GetAccelerateConfiguration",
                 "s3:GetBucketAcl",

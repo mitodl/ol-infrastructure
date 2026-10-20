@@ -1,19 +1,30 @@
 """Rebuild every cluster graph at a new storage root, in-cluster, in one pod.
 
-omnigraph storage is strict-single-version: a binary reads exactly one
-internal-schema, there is no in-place migration, and the gate is enforced in
-both directions including read-only opens. So a release that bumps the format
-cannot be rolled out — every graph has to be exported by the OLD binary and
-reloaded by the NEW one, at a DIFFERENT root, with the old root left
-byte-for-byte intact as the rollback.
+omnigraph storage is strict-single-version: a binary serves exactly one
+internal-schema, and the gate is enforced in both directions including
+read-only opens. `omnigraph upgrade` converts a standalone store in place but
+refuses a cluster-managed root, which is what every deployed graph is. So a
+release that bumps the format cannot be rolled out — every graph has to be
+exported by the OLD binary and reloaded by the NEW one, at a DIFFERENT root,
+with the old root left byte-for-byte intact as the rollback.
 
 ``docs/omnigraph-storage-format-upgrade-runbook.md`` is the procedure this
 automates, and it stays the reference for everything around it — pausing the
 Concourse pipeline, scaling the Deployment down, the cutover, retiring the old
 root. This script is steps 2, 3, 4 and 6 of that runbook: baseline, export,
 rebuild, verify. Before any of them it waits for every direct writer of the
-graphs to be suspended and idle (``wait_for_writers``), because nothing else in
-the Job can stop one writing through the export.
+graphs to be suspended and idle and for the server to be gone
+(``wait_for_writers``), because nothing else in the Job can stop one writing
+through the export.
+
+THE NEW ROOT IS LEFT UNLOCKED. From omnigraph 0.12 every direct write on a
+cluster root (``cluster apply``, ``load``, ``optimize``) takes the root's
+exclusive lock and keeps it after the command exits, and the next writer is
+refused until that exact lock id is force-unlocked. This Job is the only
+process that knows the new root exists, so it releases each lock it created as
+soon as the command that created it has exited (``run_and_unlock``), and fails
+if the root is still locked at the end: a lock left behind would refuse the
+server's first boot on the new root.
 
 WHY IN ONE POD. The runbook runs two ``kubectl run`` pods and moves every
 export through the operator's workstation with ``kubectl exec ... > file``,
@@ -66,7 +77,7 @@ NEW_ROOT_RE = re.compile(r"^s3://[a-z0-9.-]+/fmt[0-9]+$")
 
 # `entities=` counts out of `omnigraph snapshot`, e.g.
 # `node type 'Memory' published_dataset_version=2 native_dataset_branch=main
-# entities=41` (one line), as printed by both 0.10 and 0.11. 0.8 printed
+# entities=41` (one line), as printed by 0.10, 0.11 and 0.13. 0.8 printed
 # `node:Memory v2 branch=main rows=41`, and matching only that shape made the
 # Job stop at its first graph against a 0.10 root. Compared PER TABLE between
 # old and new: a total-row check would pass a rebuild that put every row in
@@ -95,10 +106,25 @@ KEYED_ROW_CAP = 8192
 # Rows per batch, under the cap with headroom — the cap belongs to a binary
 # this script does not control, and the cost of headroom is one extra commit.
 LOAD_ROW_BATCH = 8000
+# omnigraph 0.13 also refuses a keyed write whose parsed rows for one table
+# exceed this many bytes ("resource limit exceeded for keyed parsed entity
+# bytes ... limit 33554432", measured on 0.13.0 with 32 rows of 1 MiB).
+KEYED_BYTE_CAP = 32 * 1024 * 1024
+# JSONL bytes per batch. The cap counts parsed values, not JSONL text: the
+# measurement above came to exactly the string bytes loaded, and how other
+# types are counted is not measured. So this is half the cap, and counts every
+# table's rows together.
+LOAD_BYTE_BATCH = KEYED_BYTE_CAP // 2
+
+# The id of the lock a direct write on a cluster root leaves behind, as the
+# command reports it: `cluster apply` prints `Admission lock: <id>`, and
+# `load` and `optimize` print `cluster admission retained: ... lock_id=<id>`.
+LOCK_ID_RE = re.compile(r"(?:Admission lock: |\block_id=)(?P<id>[0-9A-Z]{26})\b")
 
 # The in-cluster API, read with the pod's own ServiceAccount token. Only for
-# the writer pre-flight, and only read verbs: the Role this runs under grants
-# get/list on cronjobs and jobs and nothing else (storage_migration.py).
+# the writer pre-flight, and only read verbs: the Roles this runs under grant
+# get/list on cronjobs and jobs, get on deployments and list on pods, and
+# nothing else (storage_migration.py).
 K8sObject = dict[str, Any]
 K8S_API = "https://kubernetes.default.svc"
 SA_DIR = Path("/var/run/secrets/kubernetes.io/serviceaccount")
@@ -178,6 +204,52 @@ def parse_writer_cronjobs(spec: str) -> list[tuple[str, str]]:
     return writers
 
 
+def parse_server_deployment(spec: str) -> tuple[str, str]:
+    """Parse ``OMNIGRAPH_SERVER_DEPLOYMENT``: one ``<namespace>/<name>``."""
+    namespace, sep, name = spec.strip().partition("/")
+    if not sep or not namespace or not name or "/" in name:
+        sys.exit(f"!!! server {spec!r} is not <namespace>/<deployment>")
+    return namespace, name
+
+
+def server_blockers(
+    namespace: str, name: str, get: Callable[[str], K8sObject | None]
+) -> list[str]:
+    """Say why the server Deployment ``namespace/name`` could still write, if it can.
+
+    Arming the migration sets ``replicas: 0``, but the pod it had keeps
+    committing for up to its termination grace, and Pulumi does not reconcile
+    ``replicas`` after writing it, so something else can scale it back up. So
+    both are read: the declared count, and the pods behind the Deployment's
+    own selector. A pod counts as live unless its phase is ``Failed`` or
+    ``Succeeded``, which is when its containers have exited; a Terminating pod
+    is still ``Running``, and ``Unknown`` (a lost node) is not proof of exit.
+
+    An absent Deployment IS a blocker, unlike an absent writer CronJob: the
+    server exists in every environment, so not finding it means this was
+    pointed at the wrong name and has checked nothing.
+    """
+    path = f"/apis/apps/v1/namespaces/{namespace}/deployments/{name}"
+    deployment = get(path)
+    if deployment is None:
+        return [f"deployment {namespace}/{name} not found"]
+    blockers = []
+    replicas = deployment["spec"].get("replicas", 1)
+    if replicas:
+        blockers.append(f"deployment {namespace}/{name} declares {replicas} replica(s)")
+    labels = deployment["spec"]["selector"]["matchLabels"]
+    selector = urllib.parse.quote(
+        ",".join(f"{key}={value}" for key, value in sorted(labels.items()))
+    )
+    pods = get(f"/api/v1/namespaces/{namespace}/pods?labelSelector={selector}") or {}
+    blockers.extend(
+        f"pod {namespace}/{pod['metadata']['name']} is {pod['status'].get('phase')}"
+        for pod in pods.get("items", [])
+        if pod["status"].get("phase") not in {"Failed", "Succeeded"}
+    )
+    return blockers
+
+
 def writer_blockers(
     namespace: str, name: str, cronjob: K8sObject | None, jobs: list[K8sObject]
 ) -> list[str]:
@@ -245,11 +317,13 @@ def k8s_get(path: str) -> K8sObject | None:
 
 
 def current_writer_blockers(
-    writers: list[tuple[str, str]], get: Callable[[str], K8sObject | None]
+    writers: list[tuple[str, str]],
+    server: tuple[str, str],
+    get: Callable[[str], K8sObject | None],
 ) -> list[str]:
     """Collect every writer's blockers, listing each namespace's Jobs once."""
     jobs_by_namespace: dict[str, list[K8sObject]] = {}
-    blockers = []
+    blockers = server_blockers(*server, get)
     for namespace, name in writers:
         if namespace not in jobs_by_namespace:
             listed = get(f"/apis/batch/v1/namespaces/{namespace}/jobs")
@@ -263,6 +337,7 @@ def current_writer_blockers(
 
 def wait_for_writers(  # noqa: PLR0913
     writers: list[tuple[str, str]],
+    server: tuple[str, str],
     *,
     get: Callable[[str], K8sObject | None] = k8s_get,
     wait_seconds: float = WRITER_WAIT_SECONDS,
@@ -281,13 +356,13 @@ def wait_for_writers(  # noqa: PLR0913
         # Job has no retries, and a blip mid-poll would otherwise end the
         # migration before it started. It still ends it at the deadline.
         try:
-            blockers = current_writer_blockers(writers, get)
+            blockers = current_writer_blockers(writers, server, get)
         except (OSError, urllib.error.URLError) as exc:
             blockers = [f"kubernetes API read failed: {exc}"]
         if not blockers:
             LOG.info(
                 "writer pre-flight clear: %s",
-                ", ".join(f"{ns}/{name}" for ns, name in writers),
+                ", ".join(f"{ns}/{name}" for ns, name in [server, *writers]),
             )
             return
         if clock() >= deadline:
@@ -297,7 +372,9 @@ def wait_for_writers(  # noqa: PLR0913
                 + "\n  ".join(blockers)
                 + "\nA CronJob that is not suspended usually means the witan "
                 "stack has not been deployed since the migration was armed. An "
-                "active Job can be waited out or deleted. Once the writers are "
+                "active Job can be waited out or deleted. A server that is "
+                "still declared or still has a pod means the omnigraph stack's "
+                "scale-down has not finished or was undone. Once the writers are "
                 "quiet, re-create this Job with `pulumi up --replace` on its URN "
                 "(docs/omnigraph-storage-format-upgrade-runbook.md)."
             )
@@ -560,15 +637,15 @@ def check_format_moved(
 
 
 def chunk_export(export: Path) -> list[Path]:
-    """Split one graph's export into loads omnigraph 0.9 will accept.
+    """Split one graph's export into loads omnigraph will accept.
 
-    0.9 caps a keyed write at ``KEYED_ROW_CAP`` rows PER TABLE, enforced by the
-    engine on local and remote stores alike. One `load` of a populated graph
-    therefore fails outright — the same cap that forced row-bounded chunking
-    into agent-kit's ``witan_core.chunking``
-    (https://github.com/mitodl/agent-kit/pull/217).
+    A keyed write is capped PER TABLE, by the engine, on local and remote
+    stores alike: ``KEYED_ROW_CAP`` rows since 0.9 and ``KEYED_BYTE_CAP`` parsed
+    bytes since 0.13. One `load` of a populated graph therefore fails outright
+    — the same caps that forced bounded chunking into agent-kit's
+    ``witan_core.chunking`` (https://github.com/mitodl/agent-kit/pull/217).
 
-    EVERY NODE BEFORE ANY EDGE, and that ordering outranks the row bound. An
+    EVERY NODE BEFORE ANY EDGE, and that ordering outranks both bounds. An
     edge resolves against nodes already persisted or present in the same batch;
     an endpoint in neither fails the whole load with ``dst '...' not found``.
     Exports are not sorted, and a graph's edges routinely point at nodes
@@ -578,13 +655,13 @@ def chunk_export(export: Path) -> list[Path]:
     Returns the original path unchanged when nothing needs splitting, so the
     common case stays a single load with no temporary files.
 
-    STREAMED, for the same reason ``normalize_export`` is: holding the rows
-    while deciding how to group them puts a whole graph's export in memory
-    inside a 4 GiB container, which is the failure this chunking exists to
-    prevent rather than one it should introduce. The first pass counts rows
-    per table and keeps no bodies; the two that follow re-read the file and
-    write each row straight into the batch it belongs to. Peak memory is one
-    line and the per-table counters, whatever the export weighs.
+    STREAMED: holding the rows while deciding how to group them puts a whole
+    graph's export in memory inside a 4 GiB container, which is the failure
+    this chunking exists to prevent rather than one it should introduce. The
+    first pass counts rows per table and keeps no bodies; the two that follow
+    re-read the file and write each row straight into the batch it belongs to.
+    Peak memory is one line and the per-table counters, whatever the export
+    weighs.
     """
     per_table: Counter[str] = Counter()
     with export.open() as fh:
@@ -594,13 +671,19 @@ def chunk_export(export: Path) -> list[Path]:
             record = json.loads(line)
             per_table[record.get("type") or record.get("edge") or ""] += 1
 
-    if not per_table or max(per_table.values()) <= LOAD_ROW_BATCH:
+    size = export.stat().st_size
+    if not per_table or (
+        max(per_table.values()) <= LOAD_ROW_BATCH and size <= LOAD_BYTE_BATCH
+    ):
         return [export]
 
     LOG.info(
-        "     splitting: largest table has %d rows (cap %d per keyed write)",
+        "     splitting: largest table has %d rows (cap %d per keyed write), "
+        "export is %d bytes (cap %d parsed bytes per table)",
         max(per_table.values()),
         KEYED_ROW_CAP,
+        size,
+        KEYED_BYTE_CAP,
     )
     batches: list[Path] = []
     # Nodes first, then edges — two separate passes so the ordering above
@@ -626,214 +709,39 @@ def _rows_of_kind(export: Path, *, nodes: bool) -> Iterator[str]:
 
 
 def _write_batches(rows: Iterable[str], export: Path, batches: list[Path]) -> None:
-    """Append ``rows`` to numbered batch files of ``LOAD_ROW_BATCH`` rows each.
+    """Append ``rows`` to numbered batch files, each inside both load bounds.
+
+    A batch closes at ``LOAD_ROW_BATCH`` rows or before the row that would
+    take it past ``LOAD_BYTE_BATCH``. A single row over the byte bound still
+    gets a batch of its own: it cannot be split, and whether it loads is the
+    engine's to say.
 
     ``batches`` is appended to rather than returned so the numbering continues
     across both groups: the loader runs them in list order, and a restarted
     count would have edge batches overwriting node ones.
     """
     handle = None
-    written = 0
+    written = size = 0
     try:
         for line in rows:
-            if handle is None or written == LOAD_ROW_BATCH:
+            line_size = len(line.encode())
+            if (
+                handle is None
+                or written == LOAD_ROW_BATCH
+                or size + line_size > LOAD_BYTE_BATCH
+            ):
                 if handle is not None:
                     handle.close()
                 part = export.with_name(f"{export.stem}.{len(batches):03d}.jsonl")
                 handle = part.open("w")
                 batches.append(part)
-                written = 0
+                written = size = 0
             handle.write(line)
             written += 1
+            size += line_size
     finally:
         if handle is not None:
             handle.close()
-
-
-# `edge Name: From -> To` with an optional `{ ... }` body. omnigraph 0.11 only
-# accepts a key inside the body, so a bodiless edge is never keyed.
-EDGE_DECL_RE = re.compile(
-    r"\bedge\s+(?P<name>\w+)\s*:\s*\w+\s*->\s*\w+\s*(?:\{(?P<body>[^}]*)\})?"
-)
-EDGE_KEY_RE = re.compile(r"@key\(\s*(?P<parts>[^)]*)\)")
-ENDPOINT_KEY = ["@dst", "@src"]
-CONFIDENCE_RANK = {"asserted": 2, "inferred": 1}
-
-
-def schema_files_by_graph(cluster_yaml: Path) -> dict[str, str]:
-    """Return each declared graph's ``schema:`` file, as cluster.yaml names it.
-
-    The same indentation-aware scan as ``graph_ids_from_cluster_config``, for
-    the same reason. Which edge types are keyed is a property of each graph's
-    own schema, so council's keys must never be applied to a code graph.
-    """
-    schemas: dict[str, str] = {}
-    in_graphs = False
-    current: str | None = None
-    for raw in cluster_yaml.read_text().splitlines():
-        line = raw.rstrip()
-        if not line or line.lstrip().startswith("#"):
-            continue
-        if not line[:1].isspace():
-            in_graphs = line.startswith("graphs:")
-            current = None
-            continue
-        if not in_graphs:
-            continue
-        if re.fullmatch(r"  [A-Za-z0-9][A-Za-z0-9._-]*:", line):
-            current = line.strip().rstrip(":")
-        elif current and (match := re.fullmatch(r"\s{3,}schema:\s*(\S+)", line)):
-            schemas[current] = match.group(1).strip("'\"")
-    return schemas
-
-
-def keyed_edge_types(schema: Path) -> set[str]:
-    """Return the edge types ``schema`` keys on their endpoint pair.
-
-    omnigraph 0.11 derives a keyed edge's id from ``@key(@src, @dst)``, which
-    changes what a 0.10 export must look like before it loads (see
-    ``normalize_export``). Only a key of exactly the two endpoints is handled:
-    a wider key keeps apart rows that a pair-wise collapse would merge, so it
-    stops the migration rather than guessing.
-    """
-    text = re.sub(r"//[^\n]*", "", schema.read_text())
-    keyed: set[str] = set()
-    for edge in EDGE_DECL_RE.finditer(text):
-        for key in EDGE_KEY_RE.finditer(edge["body"] or ""):
-            parts = sorted(part.strip() for part in key["parts"].split(","))
-            if parts != ENDPOINT_KEY:
-                sys.exit(
-                    f"!!! edge {edge['name']} in {schema} is keyed on "
-                    f"{key['parts']!r}; this migration only collapses keys on "
-                    "(@src, @dst)"
-                )
-            keyed.add(edge["name"])
-    return keyed
-
-
-def _instant(value: object) -> float | None:
-    """Return an exported DateTime as epoch seconds, or ``None`` when unset.
-
-    0.10 exports DateTime as epoch milliseconds and 0.11 as an ISO string with
-    no zone, which omnigraph means as UTC.
-    """
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int | float):
-        return value / 1000
-    if isinstance(value, str):
-        try:
-            parsed = datetime.fromisoformat(value)
-        except ValueError:
-            return None
-        return parsed.replace(tzinfo=parsed.tzinfo or UTC).timestamp()
-    return None
-
-
-def _edge_rank(data: object, position: int) -> tuple[int, bool, float, int]:
-    """Order the duplicate rows of one keyed edge; the highest survives."""
-    fields = data if isinstance(data, dict) else {}
-    instant = _instant(fields.get("created_at"))
-    confidence = fields.get("confidence")
-    return (
-        CONFIDENCE_RANK.get(confidence, 0) if isinstance(confidence, str) else 0,
-        instant is not None,
-        instant or 0.0,
-        position,
-    )
-
-
-def _collapse_plan(
-    export: Path, keyed_edges: set[str]
-) -> tuple[set[int], Counter[str], Counter[str]]:
-    """Pass 1 of the collapse: which keyed-edge rows win, and how many there are.
-
-    Keeps ONE rank per distinct keyed pair and nothing else — never a row body
-    — so memory scales with the number of pairs rather than with the export.
-    Returns the winning line numbers, the rows seen per keyed table, and the
-    survivors per keyed table (``normalize_export`` subtracts one from the
-    other to report what the collapse removed).
-    """
-    winners: dict[tuple[str, str, str], tuple[int, bool, float, int]] = {}
-    seen: Counter[str] = Counter()
-    with export.open() as fh:
-        for position, line in enumerate(fh):
-            if not line.strip():
-                continue
-            record = json.loads(line)
-            edge = record.get("edge")
-            if edge not in keyed_edges:
-                continue
-            seen[edge] += 1
-            pair = (edge, record["from"], record["to"])
-            rank = _edge_rank(record.get("data"), position)
-            if pair not in winners or rank > winners[pair]:
-                winners[pair] = rank
-    # `_edge_rank` carries the line number last, so the winning positions fall
-    # out of the ranks themselves rather than needing a second mapping.
-    return (
-        {rank[-1] for rank in winners.values()},
-        seen,
-        Counter(edge for edge, _, _ in winners),
-    )
-
-
-def normalize_export(
-    export: Path, keyed_edges: set[str]
-) -> tuple[Path, dict[str, int]]:
-    """Rewrite a 0.10 export into rows omnigraph 0.11 will load.
-
-    Three changes, each checked against the 0.11.0 binary:
-
-    - A node row's ``data.id`` moves to a top-level ``id``. 0.11 refuses
-      ``data.id`` ("move data.id to the top-level 'id' field"). An unkeyed
-      edge's id moves the same way.
-    - A keyed edge row loses its id entirely. 0.10 gave every edge a ULID, and
-      0.11 refuses one that does not match the id its key derives.
-    - Duplicate rows of a keyed edge collapse to one. 0.10 appended a row on
-      every re-link, and two rows for one key in a load fail the WHOLE load
-      ("@unique violation"). The survivor is one whole existing row, never a
-      composite: highest confidence (asserted, then inferred, then unset), then
-      newest ``created_at`` (unset oldest), then the later row in the export.
-      agent-kit's witan_core export normalisation applies the same rule, so a
-      graph rebuilt here and a local store migrated there keep the same edge.
-
-    Collapse needs the whole file, since duplicates are not adjacent, which is
-    also why this runs before ``chunk_export`` splits anything. Returns the
-    rewritten file and, per keyed edge table, how many rows the collapse
-    removed, which ``verify`` subtracts from the 0.10 baseline.
-
-    ★ TWO PASSES, BECAUSE THE WHOLE FILE IS NOT THE WHOLE FILE IN MEMORY.
-    Needing every row to pick a winner does not mean holding every row: pass 1
-    keeps one rank and one line number per DISTINCT keyed pair, and pass 2
-    re-reads the export and streams each surviving row straight out. Buffering
-    the rewritten rows — or joining them into one string to write — scales with
-    the export instead, and this runs in a container capped at 4Gi
-    (``storage_migration.py``), so a large but otherwise valid export would OOM
-    here before ``chunk_export`` could bound anything. Peak memory is now the
-    number of distinct keyed pairs, not the export's size.
-    """
-    surviving, seen, survivors = _collapse_plan(export, keyed_edges)
-
-    target = export.with_name(f"{export.stem}.normalized.jsonl")
-    with export.open() as fh, target.open("w") as out:
-        for position, line in enumerate(fh):
-            if not line.strip():
-                continue
-            record = json.loads(line)
-            data = record.get("data")
-            if record.get("edge") in keyed_edges:
-                if position not in surviving:
-                    continue
-                record.pop("id", None)
-                if isinstance(data, dict):
-                    data.pop("id", None)
-            elif "id" not in record and isinstance(data, dict) and "id" in data:
-                record["id"] = data.pop("id")
-            out.write(f"{json.dumps(record)}\n")
-
-    removed = {table: seen[table] - survivors[table] for table in seen}
-    return target, {table: count for table, count in removed.items() if count}
 
 
 def graph_ids_from_cluster_config(cluster_yaml: Path) -> list[str]:
@@ -958,6 +866,54 @@ def baseline_and_export(
     return baseline
 
 
+def run_and_unlock(
+    binary: str, args: list[str], rebuild_dir: Path
+) -> subprocess.CompletedProcess[str]:
+    """Run a direct write on the new root, then release the lock it left.
+
+    The lock is released by the exact id the command itself reported, never
+    by whatever ``cluster status`` shows: the id is the evidence that the lock
+    is this step's, and ``force-unlock`` refuses an id that is not the one
+    held. By the time ``run`` returns the command has exited, so its I/O is
+    terminal, which is upstream's condition for unlocking.
+
+    A FAILED COMMAND KEEPS ITS LOCK. ``run`` exits on a non-zero status before
+    the unlock, and 0.13 reports a failed load's effects as unknown. The root
+    then stays locked against a server booting onto a half-built rebuild; the
+    runbook covers clearing the prefix before a re-run.
+    """
+    result = run([binary, *args])
+    lock_ids = {
+        match["id"] for match in LOCK_ID_RE.finditer(result.stdout + result.stderr)
+    }
+    if len(lock_ids) != 1:
+        sys.exit(
+            f"!!! expected `{' '.join(args[:2])}` to report the one lock it "
+            f"left on the new root, found {sorted(lock_ids) or 'none'}. Not "
+            "unlocking a lock this step cannot name.\n"
+            f"--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
+        )
+    run(
+        [
+            binary,
+            "cluster",
+            "force-unlock",
+            "--config",
+            str(rebuild_dir),
+            lock_ids.pop(),
+        ]
+    )
+    return result
+
+
+def cluster_lock(binary: str, rebuild_dir: Path) -> dict[str, Any]:
+    """Return the lock ``cluster status`` reports on the root ``rebuild_dir`` names."""
+    out = run(
+        [binary, "cluster", "status", "--config", str(rebuild_dir), "--json"]
+    ).stdout
+    return json.loads(out)["state_observations"]
+
+
 def rebuild(  # noqa: PLR0913
     new_binary: str,
     new_root: str,
@@ -967,56 +923,38 @@ def rebuild(  # noqa: PLR0913
     cluster_yaml: Path,
     schema_dir: Path,
     actor: str,
-) -> dict[str, dict[str, int]]:
+) -> None:
     """Create the graphs at ``new_root``, load every export, and index them.
 
-    Returns, per graph, how many rows ``normalize_export`` collapsed away from
-    each keyed edge table, which ``verify`` needs to know what the rebuilt
-    counts should be.
+    THE EXPORTS ARE LOADED AS WRITTEN. A 0.11.0 export (top-level ``id``, a
+    keyed edge's id derived from its endpoints, millisecond DateTime) loads
+    into 0.13.0 unchanged and re-exports identically, so there is no rewrite
+    step between the two binaries. The 0.10 to 0.11 rebuild needed one and it
+    lived here; ``git log`` has it if a future format does too.
     """
     LOG.info("=== 2/3 rebuild (new binary)")
     config = build_rebuild_config(cluster_yaml, rebuild_dir, schema_dir, new_root)
     LOG.info("  staged %s -> storage: %s", config, new_root)
     run([new_binary, "cluster", "validate", "--config", str(rebuild_dir)])
 
-    # `import` BEFORE `apply`, and both are required. A fresh root has no
-    # `__cluster/state.json`, and `apply` refuses to create one
-    # (`state_missing ... run cluster import to bootstrap state`). This bites
-    # only on the first apply against a new root — which is exactly what this
-    # is, at the point of no return.
-    # `import` TAKES NO `--as`; `apply` DOES. omnigraph 0.9 validates scope
-    # flags per verb — "a flag a command never reads is rejected instead of
-    # silently ignored" — and `cluster import` is one that never read it. 0.8.1
-    # accepted the flag and ignored it, so the runbook's manual procedure
-    # carries `--as` on both lines and worked; on 0.9 the import fails with
-    # "`cluster` is a cluster control command; --as ... does not apply".
-    #
-    # `apply` keeps it: the deploy-time cluster-apply Job runs
-    # `cluster apply --config ... --as svc-witan-admin` against this same 0.9
-    # image successfully, and the actor is what attributes its writes.
-    run([new_binary, "cluster", "import", "--config", str(rebuild_dir)])
-    run([new_binary, "cluster", "apply", "--config", str(rebuild_dir), "--as", actor])
+    # `apply` ALONE CREATES THE LEDGER. Through 0.11 a fresh root needed
+    # `cluster import` first; 0.12 removed that command, and a direct apply on
+    # an empty root now writes `__cluster` itself. `--as` attributes the
+    # writes; a direct apply authorizes as the storage owner whatever the
+    # bundles' group membership says, which is why the image's fixture groups
+    # are good enough here. The server's entrypoint renders the real
+    # membership and re-applies on its first boot at the new root.
+    run_and_unlock(
+        new_binary,
+        ["cluster", "apply", "--config", str(rebuild_dir), "--as", actor],
+        rebuild_dir,
+    )
 
-    # Keyed edge types come from the schema each graph is rebuilt WITH, as
-    # staged beside the config, not from the export: only the new schema can
-    # say which edges 0.11 derives ids for.
-    schemas = schema_files_by_graph(config)
-    collapsed: dict[str, dict[str, int]] = {}
     for graph in graphs:
         LOG.info("  -- %s", graph)
-        if graph not in schemas:
-            sys.exit(
-                f"!!! {graph} declares no schema: in {config}, so its keyed edge "
-                "types are unknown and its export cannot be normalised"
-            )
-        normalized, collapsed[graph] = normalize_export(
-            export_dir / f"{graph}.jsonl",
-            keyed_edge_types(rebuild_dir / schemas[graph]),
-        )
-        if collapsed[graph]:
-            LOG.info("     collapsed duplicate keyed edges: %s", collapsed[graph])
+        export = export_dir / f"{graph}.jsonl"
         store = f"{new_root}/graphs/{graph}.omni"
-        batches = chunk_export(normalized)
+        batches = chunk_export(export)
         # `merge` into a freshly-created empty graph is a full load and is the
         # safe choice: `overwrite` is destructive and buys nothing against an
         # empty table. `--yes` because a non-local destructive write refuses
@@ -1024,9 +962,9 @@ def rebuild(  # noqa: PLR0913
         for batch, path in enumerate(batches):
             if batch:
                 LOG.info("     batch %d", batch + 1)
-            run(
+            run_and_unlock(
+                new_binary,
                 [
-                    new_binary,
                     "load",
                     "--store",
                     store,
@@ -1035,24 +973,35 @@ def rebuild(  # noqa: PLR0913
                     "--mode",
                     "merge",
                     "--yes",
-                ]
+                ],
+                rebuild_dir,
             )
-        if pending := build_indexes(new_binary, store):
+        if pending := build_indexes(new_binary, store, rebuild_dir):
             LOG.warning("     indexes deferred by optimize: %s", pending)
         # RECLAIM THIS GRAPH'S COPIES, AND ONLY AFTER ITS LOADS SUCCEEDED. The
-        # raw export, its normalized rewrite and any batch files are three
-        # copies of one graph's rows; carrying all three for every graph to the
-        # end of the loop roughly doubles peak disk against a volume sized for
-        # one copy of each export, and can evict the Job even when the exports
-        # themselves fit. Ordering matters as much as the deletion: `run`
-        # raises on a failed load, so a failure leaves every file in place for
-        # the operator, which the no-retry contract depends on.
-        for spent in {export_dir / f"{graph}.jsonl", normalized, *batches}:
+        # raw export and any batch files are two copies of one graph's rows;
+        # carrying both for every graph to the end of the loop roughly doubles
+        # peak disk against a volume sized for one copy of each export, and
+        # can evict the Job even when the exports themselves fit. Ordering
+        # matters as much as the deletion: `run` raises on a failed load, so a
+        # failure leaves every file in place for the operator, which the
+        # no-retry contract depends on.
+        for spent in {export, *batches}:
             spent.unlink(missing_ok=True)
-    return collapsed
+
+    # Every step above released its own lock, so anything still held was not
+    # taken by this Job, and the server's first boot would be refused by it.
+    lock = cluster_lock(new_binary, rebuild_dir)
+    if lock["locked"]:
+        sys.exit(
+            f"!!! {new_root} is still locked after the rebuild (lock id "
+            f"{lock['lock_id']}, operation {lock['lock_operation']}). This Job "
+            "released every lock it took, so another process has written to "
+            "the new root. Not verifying a root something else is writing."
+        )
 
 
-def build_indexes(binary: str, store: str) -> list[dict[str, str]]:
+def build_indexes(binary: str, store: str, rebuild_dir: Path) -> list[dict[str, str]]:
     """Build ``store``'s declared indexes, returning any it had to defer.
 
     ``load`` builds none. omnigraph 0.11 moved index builds off every write
@@ -1061,15 +1010,17 @@ def build_indexes(binary: str, store: str) -> list[dict[str, str]]:
     ``__id``/``__src``/``__dst``. Nothing fails: traversals fall back to a full
     edge scan per hop, which is what Production's council did after the
     2026-09-16 fmt9 cutover (``no BTREE index on '__src'`` on every WorksOn
-    traversal). The nightly optimize CronJob would get there eventually, but it
-    is suspended for the whole migration, so the rebuild does it instead of
+    traversal). The maintenance CronJob would get there eventually, but it is
+    suspended for the whole migration, so the rebuild does it instead of
     serving unindexed until the next 03:20 tick.
 
     Deferred indexes (a vector property with no vectors yet, full-text coverage
     that needs an explicit rebuild) are reported, not fatal: neither is an edge
     BTREE, and neither stops the graph serving correctly.
     """
-    out = run([binary, "optimize", "--store", store, "--json"]).stdout
+    out = run_and_unlock(
+        binary, ["optimize", "--store", store, "--json"], rebuild_dir
+    ).stdout
     return [
         pending
         for dataset in json.loads(out)["datasets"]
@@ -1082,14 +1033,8 @@ def verify(
     new_root: str,
     graphs: list[str],
     baseline: dict[str, dict[str, int]],
-    collapsed: dict[str, dict[str, int]],
 ) -> tuple[dict[str, GraphReport], list[str]]:
-    """Compare per-table row counts at the new root against what was loaded.
-
-    Expected is the old baseline minus the duplicate keyed-edge rows
-    ``normalize_export`` removed; that baseline counts every duplicate, so
-    strict equality with it would fail each graph that had any. Every other
-    table must still match the baseline exactly.
+    """Compare per-table row counts at the new root against the old baseline.
 
     A table the rebuild schema declares but the old graph never had is
     expected EMPTY rather than absent: the export cannot contain rows for it,
@@ -1103,17 +1048,12 @@ def verify(
     for graph in graphs:
         after = snapshot_tables(new_binary, f"{new_root}/graphs/{graph}.omni")
         before = baseline[graph]
-        removed = collapsed.get(graph, {})
-        expected = {
-            table: rows - removed.get(table, 0) for table, rows in before.items()
-        }
-        new_tables = sorted(set(after) - set(expected))
-        expected |= dict.fromkeys(new_tables, 0)
+        new_tables = sorted(set(after) - set(before))
+        expected = before | dict.fromkeys(new_tables, 0)
         ok = after == expected
         report[graph] = {
             "ok": ok,
             "before": before,
-            "collapsed_duplicates": removed,
             "expected": expected,
             "after": after,
             "new_tables": new_tables,
@@ -1172,7 +1112,10 @@ def main() -> int:
 
     bucket, key = claim_verdict_key(old_root, new_root, env("AWS_REGION"))
 
-    wait_for_writers(parse_writer_cronjobs(env("OMNIGRAPH_WRITER_CRONJOBS")))
+    wait_for_writers(
+        parse_writer_cronjobs(env("OMNIGRAPH_WRITER_CRONJOBS")),
+        parse_server_deployment(env("OMNIGRAPH_SERVER_DEPLOYMENT")),
+    )
 
     binaries: dict[str, str] = {}
     for label, binary in (("old", old_binary), ("new", new_binary)):
@@ -1185,7 +1128,7 @@ def main() -> int:
     LOG.info("%d graph(s) to rebuild: %s", len(graphs), ", ".join(graphs))
 
     baseline = baseline_and_export(old_binary, old_root, graphs, export_dir)
-    collapsed = rebuild(
+    rebuild(
         new_binary,
         new_root,
         graphs,
@@ -1195,7 +1138,7 @@ def main() -> int:
         schema_dir,
         actor,
     )
-    report, mismatched = verify(new_binary, new_root, graphs, baseline, collapsed)
+    report, mismatched = verify(new_binary, new_root, graphs, baseline)
 
     # THE FORMAT MUST HAVE ACTUALLY MOVED, on EVERY graph. Recording one
     # graph's version and never comparing it — which is what this did — lets

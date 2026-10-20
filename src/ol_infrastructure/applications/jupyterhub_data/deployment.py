@@ -138,6 +138,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     service_trust_role: OLEKSTrustRole,
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
+    workload_labels: dict[str, dict[str, str]],
     service_account_name: str,
     jupyterhub_data_config: Config,
 ) -> kubernetes.helm.v3.Release:
@@ -327,16 +328,11 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     )
 
     # APISIX shared plugins (cors, redirect, response-rewrite, prometheus,
-    # opentelemetry, request-id) — creates both v2 ApisixPluginConfig (legacy)
-    # and v1alpha1 PluginConfig (Gateway API) resources under the same name so
-    # OLApisixHTTPRoute can reference it via ExtensionRef.
-    #
-    # OLApisixHTTPRoute attaches only the shared PluginConfig via ExtensionRef
-    # when shared_plugin_config_name is set, ignoring the route's own
-    # `plugins` list entirely -- including the request-id plugin
-    # OLApisixHTTPRouteConfig's validator would otherwise add. request-id is
-    # not part of OLApisixSharedPlugins' defaults, so it's added explicitly
-    # here to keep request tracing/correlation working.
+    # opentelemetry, gzip) — creates both v2 ApisixPluginConfig (legacy) and
+    # v1alpha1 PluginConfig (Gateway API) resources under the same name.
+    # OLApisixHTTPRoute merges this list into each referencing route's own
+    # plugins, so request-id (added by OLApisixHTTPRouteConfig's validator) no
+    # longer has to be restated here.
     shared_plugins = OLApisixSharedPlugins(
         name=f"ol-{base_name}-external-service-apisix-plugins",
         plugin_config=OLApisixSharedPluginsConfig(
@@ -345,13 +341,6 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
             k8s_namespace=namespace,
             k8s_labels=application_labels,
             enable_defaults=True,
-            plugins=[
-                {
-                    "name": "request-id",
-                    "enable": True,
-                    "config": {"include_in_response": True},
-                },
-            ],
         ),
     )
 
@@ -382,8 +371,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
         route_configs=[
             OLApisixHTTPRouteConfig(
                 route_name=base_name,
-                shared_plugin_config_name=shared_plugins.resource_name,
-                plugins=[],
+                shared_plugins=shared_plugins,
                 hosts=[domain_name],
                 paths=["/*"],
                 backend_service_name="proxy-public",
@@ -482,6 +470,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "users": False,
                 },
                 "proxy": {
+                    "labels": workload_labels["proxy"],
                     "service": {
                         "type": "ClusterIP",
                     },
@@ -495,8 +484,14 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                 },
                 "scheduling": {
                     "podPriority": {"enabled": True},
+                    # Zero replicas by chart default. Labeled so that raising
+                    # the count does not bring up untiered pods.
+                    "userPlaceholder": {
+                        "labels": workload_labels["user_placeholder"],
+                    },
                     "userScheduler": {
                         "enabled": True,
+                        "labels": workload_labels["user_scheduler"],
                         # This scheduler's informer caches scale with the total
                         # object count of the whole cluster, not with this
                         # namespace. data-production routinely carries several
@@ -508,6 +503,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     },
                 },
                 "hub": {
+                    "labels": workload_labels["hub"],
                     "db": {"type": "postgres"},
                     "extraEnv": [
                         {
@@ -562,6 +558,7 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
                     "hook": {"enabled": False},
                 },
                 "singleuser": {
+                    "extraLabels": workload_labels["singleuser"],
                     "serviceAccountName": service_account_name,
                     "image": {
                         "name": "ghcr.io/mitodl/marimo-jupyterlab",

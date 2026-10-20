@@ -3,9 +3,106 @@
 What keeps the witan graph store from degrading, what runs on a schedule, and
 what to do by hand when it drifts.
 
+## Which model an environment is on
+
+It depends on the storage format the environment serves
+(`omnigraph:internal_schema_version`).
+
+- Format 9 (omnigraph 0.11): two CronJobs sweep the store beside the running
+  server. "What runs on its own" below describes them.
+- Format 14 (omnigraph 0.12 and later): every writer of the storage root
+  keeps an exclusive lock, so `optimize` and `cleanup` are refused with
+  `state_lock_held` while the server is up. One CronJob stops the server for a
+  nightly window instead. See "The nightly stop window (format 14)". On this
+  format, do not run `optimize`, `cleanup` or `repair` by hand against a
+  serving store. The statements below that compaction is safe beside a serving
+  server apply to format 9 only.
+
+## The nightly stop window (format 14)
+
+`omnigraph-maintenance` runs at `20 3 * * *` UTC
+(`omnigraph:maintenance_schedule`) as the `omnigraph-maintenance`
+ServiceAccount. The data tier is down from the start of the run until it
+finishes, for every witan user. The command is in the server image (agent-kit
+`docker/omnigraph_maintenance.py`), and it:
+
+1. skips the run if the Deployment carries `ol.mit.edu/migration-armed` or is
+   at 0 replicas;
+2. takes the `omnigraph-unlock` Lease, scales `omnigraph-server` to 0 and
+   waits for its pods to exit;
+3. force-unlocks the `serve` lock the server left;
+4. runs `optimize` on every graph in `cluster.yaml`, and on
+   `omnigraph:cleanup_iso_weekday` (default 7, Sunday) also
+   `cleanup --older-than <cleanup_older_than>`, force-unlocking after each;
+5. scales the Deployment back to the replica count it found and releases the
+   Lease.
+
+No new command starts after 25 minutes, a single command is stopped after 10,
+and the Job's deadline is 36 minutes, so the window is over before the CI
+indexer's 04:00 run. Graphs it did not reach are named in the log and fail the
+Job, and nothing is left locked. Every graph is optimized before any is
+cleaned, and the cleanup pass starts at a different graph each week, so a
+window that runs out delays a graph's cleanup to a later week.
+
+The council probe does not run between 03:00 and 03:59 on this format. Its
+04:00 run is the check that the window ended, so a failed
+`witan-council-probe` at 04:00 means: look at the last `omnigraph-maintenance`
+Job first.
+
+### When the window leaves the server down
+
+The Job exits non-zero and its log says which case it is.
+`WitanDataTierScaledToZero*` fires once the Deployment has declared 0 replicas
+for 45 minutes, which is longer than a window that ended normally.
+
+- `leaving omnigraph-server at 0 replicas (runbook: clear the lock, then scale
+  up)`: the window could not remove its own `graph_operation` lock (it lost
+  the Lease, or `cluster status` / `force-unlock` failed). A server started on
+  that root refuses to boot.
+- `omnigraph-server is still at 0 replicas (runbook: scale it back up)`: the
+  root is unlocked and only the scale-up failed. Skip to step 3.
+- No closing line at all: the pod was killed (OOM, lost node). Treat it as the
+  first case.
+
+To recover:
+
+1. Confirm nothing is writing: no `omnigraph-maintenance` pod and no
+   `omnigraph-server` pod.
+
+   ```bash
+   kubectl -n omnigraph get pods
+   kubectl -n omnigraph get lease omnigraph-unlock -o yaml
+   ```
+
+   A Lease whose `renewTime` is older than 65 seconds, or whose
+   `holderIdentity` is empty, is not held.
+
+2. Read the lock and remove exactly that id, from a pod of the server image
+   with the server's S3 access:
+
+   ```bash
+   omnigraph cluster status --cluster <storage root> --json
+   omnigraph cluster force-unlock --cluster <storage root> <lock_id>
+   ```
+
+   `<storage root>` is the stack's `storage_uri` output
+   (`s3://ol-data-witan-<env>/<storage_prefix>`).
+
+   `force-unlock` has no conditional delete. Running it while a writer is
+   alive removes that writer's lock under it.
+
+3. Scale the server back up. Its entrypoint takes the Lease and boots.
+
+   ```bash
+   kubectl -n omnigraph scale deployment omnigraph-server --replicas=1
+   ```
+
+The next night's window skips while the Deployment is at 0, so this does not
+heal on its own.
+
 ## What runs on its own
 
-Two CronJobs in the `omnigraph` namespace, both defined in
+Two CronJobs in the `omnigraph` namespace on format 9, both defined in
 `src/ol_infrastructure/applications/omnigraph/maintenance.py`:
 
 | CronJob | Default schedule | What it does | Destructive |
@@ -316,9 +413,10 @@ witan break-glass pod (agent-kit ADR-0005 path b) is the wrong path despite
 - **A storage-format bump.** That cannot be done by restart or by any command
   here; it needs the offline export → rebuild → repoint procedure. Tracked
   separately (`tk-runbook-adr-addendum-omnigraph-storage-format-bu-a2032d`).
-- **A quarantined graph.** By default the server logs a graph that fails to open
+- **A blocked graph.** By default the server logs a graph that fails to open
   and serves the rest, and `/healthz` and `/readyz` stay 200 throughout
-  (`/readyz` reports only a `quarantined_graph_count`) — so a quarantined
-  `council` is a silent brownout that no probe catches. `OMNIGRAPH_REQUIRE_ALL_GRAPHS`
+  (`/readyz` reports `"status":"degraded"` and a `blocked_graph_count`, not
+  which graph) — so a blocked `council` is a silent brownout that no probe
+  catches. `OMNIGRAPH_REQUIRE_ALL_GRAPHS`
   is deliberately left unset (see the rationale in `data_tier.py`); detecting it
   belongs with the service's monitoring.

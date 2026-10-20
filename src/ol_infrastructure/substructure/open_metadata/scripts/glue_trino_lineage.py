@@ -31,7 +31,6 @@ import logging
 import os
 import re
 import sys
-from http import HTTPStatus
 
 from metadata.generated.schema.api.lineage.addLineage import AddLineageRequest
 from metadata.generated.schema.entity.data.table import Table
@@ -48,14 +47,16 @@ from metadata.generated.schema.type.entityLineage import (
 )
 from metadata.generated.schema.type.entityLineage import Source as LineageSource
 from metadata.generated.schema.type.entityReference import EntityReference
-from metadata.ingestion.ometa.client import APIError
 from metadata.ingestion.ometa.ometa_api import OpenMetadata
 from metadata.utils import fqn
 
+# Importing ``metadata`` already configured the root logger at WARNING, so
+# without ``force`` this call is a no-op and every INFO line is dropped.
 logging.basicConfig(
     stream=sys.stdout,
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s - %(message)s",
+    force=True,
 )
 log = logging.getLogger("glue-trino-lineage")
 
@@ -146,30 +147,6 @@ def _add_edge(from_table: Table, to_table: Table) -> None:
         raise
 
 
-def _remove_self_edge(table: Table) -> bool:
-    """Delete the X → X edge that runs before the indexing fix wrote.
-
-    Only an ``ExternalTableLineage`` self-edge is removed, so a legitimate one
-    from another source (e.g. query lineage for a self-referencing MERGE)
-    survives. Uses the client directly because ``delete_lineage_edge`` logs
-    the 404 for an absent edge at ERROR, and absent is the normal case.
-
-    :returns: whether an edge was removed.
-    """
-    table_id = table.id.root
-    try:
-        found = metadata.client.get(f"/lineage/getLineageEdge/{table_id}/{table_id}")
-    except APIError as err:
-        if err.status_code == HTTPStatus.NOT_FOUND:
-            return False
-        raise
-    if found["edge"].get("source") != LineageSource.ExternalTableLineage.value:
-        return False
-    metadata.client.delete(f"/lineage/table/{table_id}/table/{table_id}")
-    log.info("Removed self-edge on %s", table.fullyQualifiedName)
-    return True
-
-
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -189,18 +166,6 @@ log.info(
 )
 
 errors = 0
-
-# Before the indexing fix every indexed table, matched or not, could carry a
-# self-edge, so the cleanup covers both indexes rather than only the pairs.
-removed = 0
-for table in [*glue_index.values(), *trino_index.values()]:
-    try:
-        removed += _remove_self_edge(table)
-    except Exception:
-        log.exception("Failed to remove self-edge on %s", table.fullyQualifiedName)
-        errors += 1
-log.info("Removed %d stale self-edges", removed)
-
 linked = 0
 for key in sorted(common_keys):
     glue_table = glue_index[key]

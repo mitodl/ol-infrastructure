@@ -7,6 +7,7 @@ config:
   dagster:db_password:
     secure: v1:XI74KBKUpbjHPTtE:3ZRZk+kvQ9w92TJPRRC4qw6kdK3etaumBDAgnySVagHjzYgRPfr8MhSeag==
   dagster:domain: pipelines-qa.odl.mit.edu
+  dagster:enable_azure_openai: true
   dagster:db_instance_type: db.m7g.large
   dagster:edx_pipeline_gcs_courses_bucket_name: edxorg-qa-edxapp-courses
   dagster:edx_pipeline_micromasters_bucket_name: ol-data-lake-mit-open-qa

@@ -27,7 +27,13 @@ from ol_infrastructure.components.services.vault import (
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import cached_image_uri, setup_k8s_provider
-from ol_infrastructure.lib.ol_types import AWSBase, K8sGlobalLabels, Services
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    AWSBase,
+    Component,
+    K8sGlobalLabels,
+    Services,
+)
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
@@ -178,9 +184,7 @@ vault_k8s_resources = xqwatcher_app.vault_k8s_resources
 # ── Default (MIT-hosted) xqueue server ──────────────────────────────────────
 # Credentials live at secret-<env>/edx-xqueue alongside the xqueue and edxapp
 # deployments.  Only xqwatcher_password is needed here.
-xqueue_servers_secret_name = (
-    "xqwatcher-xqueue-servers"  # pragma: allowlist secret  # noqa: S105
-)
+xqueue_servers_secret_name = "xqwatcher-xqueue-servers"  # pragma: allowlist secret  # noqa: S105
 xqueue_servers_template = json.dumps(
     {
         "default": {
@@ -218,9 +222,7 @@ xqueue_servers_secret = OLVaultK8SSecret(
 # Credentials are entirely separate from the MIT-hosted instance and live at
 # secret-<env>/edxorg-xqueue.  Only created for stacks that watch edx.org
 # queues (edxorg_xqueue_enabled = true in stack config).
-edxorg_servers_secret_name = (
-    "xqwatcher-edxorg-servers"  # pragma: allowlist secret  # noqa: S105
-)
+edxorg_servers_secret_name = "xqwatcher-edxorg-servers"  # pragma: allowlist secret  # noqa: S105
 edxorg_servers_template = json.dumps(
     {
         "edxorg": {
@@ -409,14 +411,20 @@ xqwatcher_grader_rolebinding = kubernetes.rbac.v1.RoleBinding(
 ##         Deployment           ##
 ##################################
 
-app_labels = {**k8s_global_labels.model_dump(), "app": "xqwatcher"}
+# A stalled watcher delays external grading and does not take courseware down, so
+# it does not page. The Deployments select on `app` alone, so these labels stay
+# off the selectors.
+workload_labels = k8s_global_labels.model_copy(
+    update={"component": Component.worker, "alert_tier": AlertTier.notify}
+).model_dump()
+app_labels = {**workload_labels, "app": "xqwatcher"}
 
 xqwatcher_deployment = kubernetes.apps.v1.Deployment(
     f"xqwatcher-{env_name}-deployment",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="xqwatcher",
         namespace=namespace,
-        labels=k8s_global_labels.model_dump(),
+        labels=workload_labels,
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
         replicas=min_replicas,
@@ -532,7 +540,7 @@ xqwatcher_deployment = kubernetes.apps.v1.Deployment(
                             timeout_seconds=10,
                         ),
                         resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={"cpu": "250m", "memory": "256Mi"},
+                            requests={"cpu": "100m", "memory": "256Mi"},
                             limits={"memory": "512Mi"},
                         ),
                         security_context=kubernetes.core.v1.SecurityContextArgs(
@@ -693,14 +701,14 @@ if min_replicas > 0:
 # its own ConfigMap and VaultStaticSecret so the edxorg credentials are never
 # co-located with the MIT-hosted xqueue credentials.
 if edxorg_xqueue_enabled and edxorg_servers_secret and xqwatcher_edxorg_configmap:
-    edxorg_app_labels = {**k8s_global_labels.model_dump(), "app": "xqwatcher-edxorg"}
+    edxorg_app_labels = {**workload_labels, "app": "xqwatcher-edxorg"}
 
     xqwatcher_edxorg_deployment = kubernetes.apps.v1.Deployment(
         f"xqwatcher-{env_name}-edxorg-deployment",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name="xqwatcher-edxorg",
             namespace=namespace,
-            labels=k8s_global_labels.model_dump(),
+            labels=workload_labels,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             replicas=min_replicas,
@@ -794,7 +802,7 @@ if edxorg_xqueue_enabled and edxorg_servers_secret and xqwatcher_edxorg_configma
                                 timeout_seconds=10,
                             ),
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                                requests={"cpu": "250m", "memory": "256Mi"},
+                                requests={"cpu": "100m", "memory": "256Mi"},
                                 limits={"memory": "512Mi"},
                             ),
                             security_context=kubernetes.core.v1.SecurityContextArgs(

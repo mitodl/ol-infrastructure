@@ -6,6 +6,33 @@ APIs. This is the landing point for the work tracked in
 convention below is argued out. The credential inventory those decisions rest
 on is `docs/plans/gcp-service-account-consumer-map.md`.
 
+## Where new credentials go
+
+New Google credentials of any type (service account, API key, OAuth client,
+reCAPTCHA key) go in `mitol01`. Do not create them in the legacy projects
+(`mit-open`, `ocw-studio-qa`, `mitx-residential` and the rest of the inventory
+in `docs/plans/gcp-service-account-consumer-map.md`), even when the existing key
+for that application lives there.
+
+Service accounts, API keys and reCAPTCHA keys cannot be moved between
+projects, so each one created in a legacy project has to be re-created in
+`mitol01` later, with a new email or key string, its external grants re-issued
+by hand and a deploy of the application that holds it. The reCAPTCHA keys for
+learn.mit.edu and rc.learn.mit.edu were created in `mit-open` in April 2026 and
+are now two more keys to re-create.
+
+Service accounts and API keys are declared in `Pulumi.Production.yaml` (see
+[Configuration](#configuration)). OAuth clients and reCAPTCHA keys are created
+by hand in `mitol01` for now (see
+[What this does not manage](#what-this-does-not-manage)). If `mitol01` is
+missing an API you need, add it to `enabled_services`. A gap in `mitol01` is
+something to fix here, not a reason to use a legacy project.
+
+YouTube quota is the one gap config cannot close. `mitol01` starts at the default
+10,000 units a day, and a granted increase does not follow a consumer to
+another project, so a high-volume YouTube consumer needs the increase granted
+on `mitol01` first (see `docs/plans/gcp-consolidation-into-mitol01.md`).
+
 ## Stack layout
 
 One stack, `Production`.
@@ -128,6 +155,10 @@ config:
 it". Adopted resources are automatically marked `protect=True` — see
 `adoption_opts` in `components/gcp/project.py` for why.
 
+An API key created by this stack starts unprotected. Set `protect: true` on it
+once a consumer holds the key string, because a replacement mints a new string
+and breaks that consumer.
+
 In practice `import_id` applies only to resources already resident in
 `mitol01`. Service accounts, API keys and reCAPTCHA keys **cannot be moved
 between GCP projects**, so consolidating one from a legacy project means
@@ -239,6 +270,70 @@ projected Kubernetes token, so there is no key material at rest.
 - The binding is per Kubernetes service account, not per pod. Anything that
   runs as that service account can project the token, so scope the Kubernetes
   service account as narrowly as the Google grant should be.
+
+## OCW YouTube Analytics for HighSystems
+
+`ocw-yt-analytics-o7v08r` exists so Data Collaborative's HighSystems database can
+pull per-video engaged-view stats for OCW's YouTube channel
+([mitodl/hq#13305](https://github.com/mitodl/hq/issues/13305)). The stack enables
+the YouTube Analytics, YouTube Reporting and YouTube Data APIs; everything else
+is manual.
+
+Step 1 must be done before the stack config naming this project merges.
+`pulumi preview` plans the service creates without reading the project, so it
+passes either way, but `pulumi up` fails on an ungranted project and that blocks
+every other change in this one stack.
+
+MIT Cloud Accounts created the project on 2026-10-09 (project number
+`715788942366`, cost object `2010196`) in the same folder as `mitol01`, and
+assigned the id suffix. It is a separate project so its OAuth consent screen
+does not constrain `mitol01`'s. Cloud Accounts granted the requester
+`roles/editor` and `roles/resourcemanager.projectIamAdmin`, not Owner, and
+enabled no APIs.
+
+1. Enable the bootstrap APIs (`roles/editor`) and grant the automation account
+   on the new project (`roles/resourcemanager.projectIamAdmin`).
+   `serviceUsageAdmin` alone is not enough: after enabling a service the
+   provider reads the project back (`resourcemanager.projects.get`), which
+   `roles/browser` supplies.
+
+   ```bash
+   gcloud services enable serviceusage.googleapis.com \
+     cloudresourcemanager.googleapis.com --project=ocw-yt-analytics-o7v08r
+   for role in roles/serviceusage.serviceUsageAdmin roles/browser; do
+     gcloud projects add-iam-policy-binding ocw-yt-analytics-o7v08r \
+       --member=serviceAccount:pulumi-gcp@mitol01.iam.gserviceaccount.com \
+       --role="$role" --condition=None
+   done
+   ```
+
+2. Deploy this stack.
+3. Console > Google Auth Platform > Branding/Audience: configure the consent
+   screen. User type follows the Google account that owns the OCW channel:
+   _Internal_ if it is an `mit.edu` account (no verification needed),
+   otherwise _External_, published to production. An External app left in
+   _Testing_ issues refresh tokens that expire after 7 days, which breaks a
+   scheduled sync.
+4. Console > Clients > Web application, with Data Collaborative's redirect URI.
+   The secret is shown once; capture it into
+   `src/bridge/secrets/gcp/` immediately, then hand the client id, secret and
+   project id to Data Collaborative over a secure channel.
+
+The channel owner then completes the OAuth flow in HighSystems with
+`yt-analytics.readonly` and `youtube.readonly`. The second is not optional:
+`reports.query` has required it since Google's 2018-06-18 revision, so a token
+with only the analytics scope is rejected. An OAuth client with no token
+requests for six months is deleted by Google, so a stalled integration loses
+its client.
+
+The consent screen's scope list does not limit what a client can request. With
+an _Internal_ app there is also no Google review and no unverified-app warning,
+so whoever holds the client secret and controls a registered redirect URI can
+ask any `mit.edu` user for any scope under an MIT-branded screen. Keep the
+redirect URIs to Data Collaborative's single callback. Name the OL owner of the
+client in its description. To cut access, rotate or delete the client secret
+in the console, and have the channel owner revoke HighSystems at
+<https://myaccount.google.com/permissions>.
 
 ## What this does not manage
 

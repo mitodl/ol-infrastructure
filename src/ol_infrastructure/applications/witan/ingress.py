@@ -28,6 +28,10 @@ from ol_infrastructure.applications.witan.deployment import (
     WITAN_PORT,
     WITAN_SERVICE_NAME,
 )
+from ol_infrastructure.components.services.apisix import (
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -69,25 +73,44 @@ def create_ingress_resources(
     #
     # The visible consequence is that `/health` becomes publicly reachable and
     # reports witan's version. It carries no graph data and no per-actor state,
-    # and the kubelet reaches it via the pod IP rather than through here, so
-    # narrowing this later costs nothing operationally — a follow-up worth
-    # taking once this cutover has settled.
-    #
-    # Whoever narrows it must keep more than `/mcp`: `/ui/*` serves the web UI
-    # and its /ui/config.json (the page logs in through the `witan-ui` Keycloak
-    # client, then calls /mcp from the same origin), and
+    # and the kubelet reaches it via the pod IP rather than through here. Any
+    # future narrowing must keep more than `/mcp`: `/ui/*` serves the web UI
+    # and its `/ui/config.json` (the page logs in through the `witan-ui` Keycloak
+    # client, then calls `/mcp` from the same origin), and
     # `/.well-known/oauth-protected-resource*` is the RFC 9728 metadata MCP
     # clients discover the issuer from.
+
+    # Observability defaults for the route below: prometheus (per-route series),
+    # opentelemetry (OTLP spans), gzip and request-id. The route referenced no
+    # plugin config at all before, so witan's public host appeared on no
+    # gateway dashboard and produced no spans.
+    #
+    # enable_cors=False: callers are MCP clients holding a Keycloak-issued
+    # bearer token, not browser pages making cross-origin calls, so picking up
+    # the observability plugins must not also grant the host a wildcard origin.
+    # ``text/event-stream`` is not in the gzip plugin's type list, so FastMCP's
+    # streaming responses are not held behind a compression buffer.
+    witan_shared_plugins = OLApisixSharedPlugins(
+        f"witan-{stack_info.env_suffix}-ol-shared-plugins",
+        plugin_config=OLApisixSharedPluginsConfig(
+            application_name="witan",
+            resource_suffix="ol-shared-plugins",
+            k8s_namespace=namespace,
+            k8s_labels=k8s_global_labels,
+            enable_cors=False,
+        ),
+    )
+
     witan_httproute = OLApisixHTTPRoute(
         f"witan-apisix-httproute-{stack_info.env_suffix}",
         route_configs=[
             OLApisixHTTPRouteConfig(
                 route_name="witan",
+                shared_plugins=witan_shared_plugins,
                 hosts=[witan_domain],
                 paths=["/*"],
                 backend_service_name=WITAN_SERVICE_NAME,
                 backend_service_port=WITAN_PORT,
-                plugins=[],
             ),
         ],
         k8s_namespace=namespace,

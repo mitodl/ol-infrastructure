@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
-# Poll the EC2 instance metadata service for spot rebalance recommendations and
-# interruption notices, and react appropriately to each:
+# Poll the EC2 instance metadata service for spot interruption notices and
+# drain the worker when one arrives (2 min lead time) so in-flight builds get
+# a chance to finish before AWS reclaims the instance.
 #
-#   - Rebalance recommendation (advisory, ~10-30 min lead time): the instance is
-#     at elevated risk of interruption but is NOT guaranteed to be reclaimed.
-#     Proactively mark it Unhealthy so the Auto Scaling Group replaces it through
-#     the existing termination lifecycle hook — that drains gracefully (up to
-#     10 min) AND launches a replacement, keeping desired capacity intact. This
-#     avoids both a risky last-second 2-minute drain and the capacity erosion of
-#     simply parking the worker.
-#
-#   - Interruption notice (authoritative, 2 min): AWS will reclaim the instance
-#     regardless, so drain immediately to let in-flight builds finish, then wait
-#     for the OS to shut down.
+# Rebalance recommendations are logged but deliberately NOT acted on. Replacing
+# the instance on each one (marking it Unhealthy so the ASG swaps it) was the
+# single largest cause of worker churn: in the six weeks to 2026-10-16 it
+# replaced a median 18-28 workers per weekday in each of QA OCW and the three
+# Production pools (peaks of 40-57), 1.6-1.8x the real interruption count.
+# The recommendation is advisory -- AWS does not promise an interruption
+# follows -- while every replacement throws away running builds and the
+# baggageclaim cache. Builds on a reclaimed worker are retried via
+# enable_rerun_when_worker_disappears.
 set -euo pipefail
 
 POLL_INTERVAL=${POLL_INTERVAL:-5}
@@ -46,38 +45,6 @@ imds_status() {
     fi
 }
 
-imds_get() {
-    local path="$1"
-    local token="$2"
-    curl -s -H "X-aws-ec2-metadata-token: ${token}" \
-        --connect-timeout 2 --max-time 5 \
-        "${METADATA_BASE}/${path}" 2>/dev/null || echo ""
-}
-
-# Identity used to ask the ASG to replace this instance on a rebalance signal.
-TOKEN=$(get_imds_token)
-INSTANCE_ID=$(imds_get "instance-id" "${TOKEN}")
-REGION=$(imds_get "placement/region" "${TOKEN}")
-
-handle_rebalance() {
-    log "EC2 rebalance recommendation received"
-    if [ -n "${INSTANCE_ID}" ] && [ -n "${REGION}" ] && \
-       aws autoscaling set-instance-health \
-            --instance-id "${INSTANCE_ID}" \
-            --health-status Unhealthy \
-            --region "${REGION}" 2>/dev/null; then
-        log "Marked instance Unhealthy; ASG will drain via lifecycle hook and launch a replacement"
-    else
-        # Could not reach the ASG API (or no identity) — fall back to draining
-        # locally so in-flight builds still finish before any interruption.
-        log "set-instance-health unavailable; draining locally as a fallback"
-        /usr/local/bin/concourse-worker-drain
-    fi
-    # We've acted on the signal; stop watching so we don't repeatedly react to
-    # the (sticky) rebalance endpoint. systemd stops this service at shutdown.
-    sleep infinity
-}
-
 handle_interruption() {
     log "Spot interruption notice detected — initiating graceful worker retirement"
     /usr/local/bin/concourse-worker-drain
@@ -90,8 +57,11 @@ log "Starting spot interruption watch (poll interval: ${POLL_INTERVAL}s)"
 while true; do
     TOKEN=$(get_imds_token)
 
-    if [ "$(imds_status "${REBALANCE_URL}" "${TOKEN}")" = "200" ]; then
-        handle_rebalance
+    # The endpoint stays 200 once set, so log it only the first time.
+    if [ -z "${REBALANCE_SEEN:-}" ] && \
+       [ "$(imds_status "${REBALANCE_URL}" "${TOKEN}")" = "200" ]; then
+        log "EC2 rebalance recommendation received; not acting on it"
+        REBALANCE_SEEN=1
     fi
 
     if [ "$(imds_status "${TERMINATION_TIME_URL}" "${TOKEN}")" = "200" ]; then

@@ -4,10 +4,6 @@ encryptedkey: AQICAHg/+QzF9hGIaoayDitgnEVHEhuaANONVQQOnqpkIsol1gFFfGbP/Lpm9oWTOI
 config:
   aws:region: us-east-1
   consul:address: https://consul-apps-production.odl.mit.edu
-  tika:auto_scale:
-    desired: 2
-    max: 3
-    min: 2
   tika:business_unit: operations
   tika:k8s_domain: tika-production.ol.mit.edu
   tika:target_vpc: applications_vpc

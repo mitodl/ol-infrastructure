@@ -197,6 +197,9 @@ def _build_interpolated_config_dict(
         "PAYMENT_SUPPORT_EMAIL": edxapp_config.require("sender_email_address"),
         "PREVIEW_LMS_BASE": domains["preview"],
         "SENTRY_ENVIRONMENT": env_name,
+        # Stated here rather than left to the ol_openedx_sentry default: with it on,
+        # the SDK sends cookies, client IP and user identity with every event.
+        "SENTRY_SEND_DEFAULT_PII": False,
         "SESSION_COOKIE_DOMAIN": f".{domains['lms'].split('.', 1)[-1]}",
         "UNIVERSITY_EMAIL": edxapp_config.require("sender_email_address"),
         "OPENEDX_TELEMETRY": ["edx_django_utils.monitoring.OpenTelemetryBackend"],
@@ -318,10 +321,15 @@ def _build_interpolated_config_dict(
         config.update(
             {
                 "CANVAS_BASE_URL": edxapp_config.require("canvas_base_url"),
+                # No MKTG_URLS ROOT: since openedx-platform#38720 the LMS index
+                # redirects to ROOT whenever it differs from LMS_ROOT_URL, and
+                # residential has no separate marketing site to send users to.
+                # For the same reason any COURSES value makes /courses redirect
+                # to it, so point it at this LMS's dashboard.
                 "MKTG_URL_OVERRIDES": {
-                    "COURSES": f"https://{marketing_domain}/",
+                    "COURSES": f"https://{domains['lms']}/dashboard",
                     "PRIVACY": f"https://{marketing_domain}/privacy",
-                    "TOS": f"https://{marketing_domain}/terms",
+                    "TOS": f"https://{marketing_domain}/tos",
                     "ABOUT": f"https://{marketing_domain}/about",
                     "HONOR": f"https://{marketing_domain}/honor-code/",
                     "ACCESSIBILITY": "https://accessibility.mit.edu/",
@@ -333,9 +341,6 @@ def _build_interpolated_config_dict(
                     f"https://{domains['studio']}/logout",
                     f"https://{edxapp_config.require('mit_learn_api_domain')}/logout",
                 ],
-                "MKTG_URLS": {
-                    "ROOT": f"https://{marketing_domain}/",
-                },
             }
         )
         # Match the legacy MITx (residential) footer: only Terms of Service +
@@ -997,8 +1002,11 @@ def create_k8s_configmaps(  # noqa: PLR0915
     # second `TRANSLATIONS_PROVIDERS:` block. The init container concatenates the
     # config sources with `cat` instead of deep-merging them, so a second file emitting
     # that key would silently clobber the deepl / openai / gemini / mistral providers --
-    # last one wins, no error anywhere. The edx-extensions plugin folds these into
-    # TRANSLATIONS_PROVIDERS in Python, at Django settings load.
+    # last one wins, no error anywhere. ol-openedx-course-translations (0.11.0 and
+    # later, from mitodl/open-edx-plugins) folds these into TRANSLATIONS_PROVIDERS in
+    # Python, from its production plugin settings hook. The `v1` API version needs
+    # 0.12.1 or later: earlier releases pin litellm 1.83.0, whose v1 client path
+    # drops the Entra token provider.
     azure_openai_config_name: str | None = None
     azure_openai_config_map = None
     if azure_openai_stack is not None:
@@ -1028,7 +1036,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
                             "AZURE_OPENAI_API_VERSION": edxapp_config.get(
                                 "azure_openai_api_version"
                             )
-                            or "2024-10-21",
+                            or "v1",
                             "AZURE_OPENAI_DEFAULT_DEPLOYMENT": edxapp_config.get(
                                 "azure_openai_default_deployment"
                             )

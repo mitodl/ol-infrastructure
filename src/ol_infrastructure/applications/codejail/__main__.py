@@ -13,7 +13,9 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     BusinessUnit,
+    Component,
     K8sGlobalLabels,
     Services,
 )
@@ -35,11 +37,12 @@ edxapp_stack = make_stack_reference(
 
 env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
 
-k8s_global_labels = K8sGlobalLabels(
+codejail_labels = K8sGlobalLabels(
     service=Services.codejail,
     ou=BusinessUnit(codejail_config.require("business_unit")),
     stack=stack_info,
-).model_dump()
+)
+k8s_global_labels = codejail_labels.model_dump()
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
@@ -59,12 +62,22 @@ codejail_image = cached_image_uri(f"mitodl/codejail@{CODEJAIL_DOCKER_IMAGE_DIGES
 app_labels = k8s_global_labels | {
     "ol.mit.edu/application": "codejail",
 }
+# app_labels is the Deployment and Service selector, and a Deployment selector is
+# immutable, so the component and alert tier go on the Deployment's metadata and
+# pod template only. Code problems cannot be graded while codejail is down, so it
+# pages.
+workload_labels = (
+    app_labels
+    | codejail_labels.model_copy(
+        update={"component": Component.api, "alert_tier": AlertTier.page}
+    ).model_dump()
+)
 
 codejail_deployment = kubernetes.apps.v1.Deployment(
     f"codejail-deployment-{env_name}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name="codejail",
-        labels=app_labels,
+        labels=workload_labels,
         namespace=namespace,
     ),
     spec=kubernetes.apps.v1.DeploymentSpecArgs(
@@ -74,7 +87,7 @@ codejail_deployment = kubernetes.apps.v1.Deployment(
         ),
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                labels=app_labels,
+                labels=workload_labels,
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
                 containers=[

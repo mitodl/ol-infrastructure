@@ -191,6 +191,15 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             # label rejections on two routes of one host would arrive as one
             # notification group.
             "route",
+            # metric_rules/dagster_control_plane.py aggregates its daemon
+            # heartbeat rules by `daemon_type`, its tick-failure rules by
+            # `tick_type` and its ID-window rule by `relation`. Without these, a
+            # SENSOR daemon going stale while SCHEDULER already is lands in the
+            # same group, and Rootly's groupKey dedup folds it into the open
+            # alert instead of raising it.
+            "daemon_type",
+            "tick_type",
+            "relation",
         ],
         # "1m", not "60s" — Grafana normalizes durations to the largest unit and
         # a mismatched spelling shows as a perpetual diff on every preview.

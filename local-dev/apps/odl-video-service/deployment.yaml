@@ -35,9 +35,16 @@ spec:
         image: mitodl/odl-video-service-app:latest
         imagePullPolicy: IfNotPresent
         command:
-        - /bin/sh
+        # /bin/bash, not /bin/sh: this image's python:*-bullseye base points
+        # /bin/sh at dash, which rejects `set -o pipefail` outright.
+        - /bin/bash
         - -c
         - |
+          # Without this the script's exit status is the *last* command's, so a
+          # failed `migrate` is swallowed and the pod comes up serving a
+          # half-migrated schema. Same guard as apps/mit-learn and
+          # apps/ocw-studio.
+          set -eo pipefail
           python manage.py collectstatic --noinput --clear
           python manage.py migrate --noinput
         envFrom:

@@ -80,6 +80,7 @@ config:
     secure: v1:IqXRArQveCV+9lkE:cRaraFuN2dDmI29PD4QifOU7MrRFdszOoaUb7o3pDJordt4TSjw8fIxldWfMzNhZRLC+NS291DorO1IuN6ASdCbt5d53aMvHVt+3hA6wyuI11OFjk7U=
   edxapp:elb_healthcheck_interval: "30"
   edxapp:enable_courseware_index: "true"
+  edxapp:elasticsearch_enabled: "false"
   edxapp:enabled_mfes:
     admin_console: admin-console
     authoring: authoring
@@ -153,7 +154,6 @@ config:
         cpu_limit: "500m"
         memory_request: "2Gi"
         memory_limit: "4Gi"
-  redis:instance_type: cache.r7g.large
   mongodb:atlas_project_id: 61a8fd80284fd30a660f2699
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

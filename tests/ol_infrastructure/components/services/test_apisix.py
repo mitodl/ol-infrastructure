@@ -7,7 +7,8 @@ This module verifies:
 3. The ApisixUpstream resource is named after the target Service, per the
    apisix-ingress-controller name-matching contract documented on the class
 4. OLApisixOIDCResources renders the flat lua-resty-session 4.x session.*
-   keys the pinned APISIX expects, and omits them when unset
+   keys the pinned APISIX expects, and omits them when unset; it takes its
+   client credentials from Vault or from a Secret that already exists
 5. The session cookie names derived by bridge.lib.constants, and the stale
    cookie cleanup plugin's generated Lua
 6. The identity-header strip plugin's wiring: the Lua it ships, the phase it
@@ -50,22 +51,28 @@ from bridge.lib.constants import (  # noqa: E402
     GATEWAY_IDENTITY_HEADERS,
     apisix_oidc_session_cookie_name,
     mit_learn_session_cookie_name,
+    oidc_secret_data,
 )
 from ol_infrastructure.components.services import apisix as apisix_module  # noqa: E402
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
     FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCSecretCredentials,
+    OLApisixOIDCVaultCredentials,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
     OLApisixSharedPluginsVariant,
     OLApisixUpstream,
     OLApisixUpstreamConfig,
     browser_traffic_match_exprs,
-    identity_header_strip_plugin,
+    gateway_global_pre_function_plugin,
     oidc_gateway_pre_function_plugin,
     ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
+)
+from ol_infrastructure.components.services.vault import (  # noqa: E402
+    OLVaultK8SStaticSecretConfig,
 )
 from tests.ol_infrastructure.applications.test_apisix_bearer_passthrough import (  # noqa: E402
     BEARER_VALIDATION_OPTIONS,
@@ -208,18 +215,142 @@ def test_resource_name_matches_service_name():
 # ─── OLApisixOIDCResources session config ──────────────────────────────────────
 
 
+VAULT_SECRET_NAME = "ol-apisix-myapp-oidc-secrets"  # noqa: S105  # pragma: allowlist secret
+LOCAL_SECRET_NAME = "local-oidc"  # noqa: S105  # pragma: allowlist secret
+
+
+def oidc_config(**overrides) -> OLApisixOIDCConfig:
+    """Build an OIDC config with the fields every deployed caller supplies."""
+    settings = {
+        "application_name": "myapp",
+        "k8s_namespace": "myapp-ns",
+        "credentials": OLApisixOIDCVaultCredentials(
+            path="sso/myapp", vaultauth="myapp-vaultauth"
+        ),
+        **overrides,
+    }
+    return OLApisixOIDCConfig(**settings)
+
+
 def oidc_resources(name: str, **overrides) -> OLApisixOIDCResources:
-    """Build an OIDC component with the fields every caller has to supply."""
-    return OLApisixOIDCResources(
-        name,
-        oidc_config=OLApisixOIDCConfig(
+    """Build an OIDC component from ``oidc_config(**overrides)``."""
+    return OLApisixOIDCResources(name, oidc_config=oidc_config(**overrides))
+
+
+@pytest.fixture
+def vault_secrets_requested(
+    monkeypatch,
+) -> list[tuple[str, OLVaultK8SStaticSecretConfig, pulumi.ResourceOptions | None]]:
+    """Record each Vault-backed Secret the OIDC component asks for, as
+    ``(resource name, OLVaultK8SStaticSecretConfig, ResourceOptions)``, instead
+    of creating it.
+    """
+    requested: list[
+        tuple[str, OLVaultK8SStaticSecretConfig, pulumi.ResourceOptions | None]
+    ] = []
+    monkeypatch.setattr(
+        apisix_module,
+        "OLVaultK8SSecret",
+        lambda name, resource_config, opts=None: requested.append(
+            (name, resource_config, opts)
+        ),
+    )
+    return requested
+
+
+def test_vault_mode_writes_the_plugin_secret_through_vso(vault_secrets_requested):
+    """Deployed stacks get their OIDC client credentials from Vault: one
+    Vault-backed Secret renders the keys the openid-connect plugin reads, and
+    the plugin's secretRef names it. Every input is pinned, since this is what
+    stands in for a preview of each deployed stack.
+    """
+    oidc = oidc_resources("test-oidc-vault-mode")
+
+    [(name, vault_secret, opts)] = vault_secrets_requested
+    assert name == "myapp-oidc-secrets"
+    assert vault_secret == OLVaultK8SStaticSecretConfig(
+        dest_secret_labels={},
+        dest_secret_name=VAULT_SECRET_NAME,
+        exclude_raw=True,
+        excludes=[".*"],
+        labels={},
+        mount="secret-operations",
+        mount_type="kv-v1",
+        name=VAULT_SECRET_NAME,
+        namespace="myapp-ns",
+        path="sso/myapp",
+        refresh_after="1m",
+        templates={
+            "client_id": '{{ get .Secrets "client_id" }}',
+            "client_secret": '{{ get .Secrets "client_secret" }}',
+            "realm": '{{ get .Secrets "realm_name" }}',
+            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
+            "session.secret": '{{ get .Secrets "secret" }}',
+        },
+        vaultauth="myapp-vaultauth",
+    )
+    assert opts.parent is oidc
+    assert opts.delete_before_replace is True
+    plugin = oidc.get_full_oidc_plugin_config(unauth_action="auth")
+    assert plugin["secretRef"] == VAULT_SECRET_NAME
+
+
+def test_existing_secret_mode_reads_the_named_secret_without_vault(
+    vault_secrets_requested,
+):
+    """Clusters without Vault hand the component a Secret they already made;
+    nothing Vault-backed is created and the plugin reads that Secret.
+    """
+    oidc = oidc_resources(
+        "test-oidc-existing-secret",
+        credentials=OLApisixOIDCSecretCredentials(secret_name=LOCAL_SECRET_NAME),
+    )
+
+    assert vault_secrets_requested == []
+    plugin = oidc.get_full_oidc_plugin_config(unauth_action="auth")
+    assert plugin["secretRef"] == LOCAL_SECRET_NAME
+
+
+def test_oidc_config_requires_a_credential_source():
+    """A caller passing only the old flat Vault fields fails on the missing
+    ``credentials`` field, so no call site can be left behind silently.
+    """
+    with pytest.raises(ValidationError, match="credentials"):
+        OLApisixOIDCConfig(
             application_name="myapp",
             k8s_namespace="myapp-ns",
             vault_path="sso/myapp",
             vaultauth="myapp-vaultauth",
-            **overrides,
-        ),
-    )
+        )
+
+
+def test_a_credential_variant_rejects_the_other_variants_fields():
+    """Both sources at once cannot even be written: a Vault variant given a
+    ``secret_name`` is an error, not a silently dropped field.
+    """
+    with pytest.raises(ValidationError, match="secret_name"):
+        OLApisixOIDCVaultCredentials(
+            path="sso/myapp",
+            vaultauth="myapp-vaultauth",
+            secret_name=LOCAL_SECRET_NAME,
+        )
+
+
+def test_oidc_secret_data_derives_the_plugin_keys_from_vault_fields():
+    fields = {
+        "client_id": "my-client",
+        "client_secret": "s3cret",  # pragma: allowlist secret
+        "realm_name": "olapps",
+        "url": "https://sso.example/realms/olapps",
+        "secret": "cookie-key",  # pragma: allowlist secret
+    }
+
+    assert oidc_secret_data(fields, include_session_secret=False) == {
+        "client_id": "my-client",
+        "client_secret": "s3cret",  # pragma: allowlist secret
+        "realm": "olapps",
+        "discovery": "https://sso.example/realms/olapps/.well-known/openid-configuration",
+    }
 
 
 def test_session_cookie_name_is_emitted_flat():
@@ -285,6 +416,23 @@ def test_default_plugin_config_does_not_validate_bearer_tokens():
     config = oidc.get_full_oidc_plugin_config(unauth_action="pass")["config"]
 
     assert not {option for option in BEARER_VALIDATION_OPTIONS if config.get(option)}
+
+
+def test_plugin_config_sends_pkce_by_default():
+    """A Keycloak client can only require PKCE once every route using it sends
+    it, so the helper has to emit use_pkce without each caller opting in.
+    """
+    oidc = oidc_resources("test-oidc-pkce-default")
+
+    config = oidc.get_full_oidc_plugin_config(unauth_action="auth")["config"]
+
+    assert config["use_pkce"] is True
+
+
+def test_pkce_can_be_turned_off_per_application():
+    oidc = oidc_resources("test-oidc-pkce-off", oidc_use_pkce=False)
+
+    assert oidc.base_oidc_config["use_pkce"] is False
 
 
 # ─── Session cookie naming ─────────────────────────────────────────────────────
@@ -677,6 +825,8 @@ def test_recovery_plugin_renders_into_the_v2_plugin_config():
             "session_cookie_names": [],
             "guard_cookie_name": "apisix_oidc_recovery",
             "guard_max_age": 60,
+            "restart_dict_name": "ol-oidc-recovery",
+            "max_restarts": 1,
         }
 
     return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
@@ -837,7 +987,7 @@ def test_cors_disabled_reaches_the_gateway_api_plugin_config():
     return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
 
 
-# ─── identity_header_strip_plugin wiring ──────────────────────────────────────
+# ─── gateway_global_pre_function_plugin wiring ────────────────────────────────
 #
 # The test-nginx suite drives the Lua directly with a hand-built config, so it
 # cannot catch a Python-side regression: a builder that shipped the wrong file,
@@ -850,7 +1000,7 @@ def test_identity_strip_plugin_runs_in_rewrite_before_openid_connect():
     rewrite phase runs ahead of the matched route's.  In the access phase this
     would land after openid-connect had already read the request.
     """
-    plugin = identity_header_strip_plugin()
+    plugin = gateway_global_pre_function_plugin()
 
     assert plugin.name == "serverless-pre-function"
     assert plugin.config["phase"] == "rewrite"
@@ -860,16 +1010,31 @@ def test_identity_strip_plugin_ships_the_lua_verbatim():
     """The function body is the checked-in .lua file -- the header list travels
     as config and is read off ``conf``, not interpolated into the source.
     """
-    plugin = identity_header_strip_plugin(header_names=["X-Interpolation-Canary"])
+    plugin = gateway_global_pre_function_plugin(header_names=["X-Interpolation-Canary"])
 
     assert plugin.config["functions"] == [
-        apisix_module.STRIP_CLIENT_IDENTITY_HEADERS_LUA
+        apisix_module.CANONICAL_HTTPS_REDIRECT_LUA,
+        apisix_module.STRIP_CLIENT_IDENTITY_HEADERS_LUA,
     ]
-    assert "X-Interpolation-Canary" not in plugin.config["functions"][0]
+    assert not [
+        fn for fn in plugin.config["functions"] if "X-Interpolation-Canary" in fn
+    ]
+
+
+def test_global_canonical_redirect_is_scoped_to_openid_connect_routes():
+    """The global rule runs on every route in the cluster.  Unscoped, it would
+    also redirect routes that never had the bug, e.g. a plain-HTTP in-cluster
+    caller of a non-OIDC route.
+    """
+    conf = gateway_global_pre_function_plugin().config["canonical_https_redirect"]
+
+    assert conf == {"status": 308, "require_openid_connect": True}
 
 
 def test_identity_strip_plugin_defaults_to_the_gateway_identity_headers():
-    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+    headers = gateway_global_pre_function_plugin().config["identity_header_strip"][
+        "headers"
+    ]
 
     assert headers == list(GATEWAY_IDENTITY_HEADERS)
 
@@ -878,7 +1043,9 @@ def test_identity_strip_plugin_covers_everything_openid_connect_mints():
     """openid-connect.lua clears-then-sets these four (3.18.0, lines 1174-1177
     and 1482-1500).  Dropping one silently reopens the hole under that name.
     """
-    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+    headers = gateway_global_pre_function_plugin().config["identity_header_strip"][
+        "headers"
+    ]
 
     assert set(headers) == {
         "X-Userinfo",
@@ -896,14 +1063,16 @@ def test_identity_strip_plugin_leaves_the_tika_shared_secret_alone():
     application reads it as an identity claim.  Authorization is out for the
     same reason at much larger scale.
     """
-    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+    headers = gateway_global_pre_function_plugin().config["identity_header_strip"][
+        "headers"
+    ]
 
     assert "X-Access-Token" not in headers
     assert "Authorization" not in headers
 
 
 def test_identity_strip_plugin_honours_a_custom_header_list():
-    headers = identity_header_strip_plugin(
+    headers = gateway_global_pre_function_plugin(
         header_names=["X-Custom-Identity"],
     ).config["identity_header_strip"]["headers"]
 
@@ -914,7 +1083,9 @@ def test_identity_strip_plugin_emits_a_list_not_a_tuple():
     """The config is rendered into a CRD spec, and a tuple round-trips through
     the Pulumi/Kubernetes provider differently from a list.
     """
-    headers = identity_header_strip_plugin().config["identity_header_strip"]["headers"]
+    headers = gateway_global_pre_function_plugin().config["identity_header_strip"][
+        "headers"
+    ]
 
     assert isinstance(headers, list)
 
@@ -1385,6 +1556,9 @@ def test_no_application_hand_writes_two_shared_plugin_configs():
 # send the site's own Origin, so the Origin match alone does not separate them
 # from a browser -- which is the whole reason the User-Agent clause exists.
 MIT_LEARN_SSR_UA = "axios/1.12.2"
+# What mit-learn sets once its SSR layer names itself; the bare form is sent
+# when NEXT_PUBLIC_VERSION is unset.
+MIT_LEARN_SSR_EXPLICIT_UAS = ["mit-learn-ssr/v0.61.2", "mit-learn-ssr"]
 BROWSER_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
@@ -1427,14 +1601,19 @@ def test_browser_traffic_match_exprs_requires_the_site_origin():
     assert not re.search(origin["value"], "https://learn.mit.edu.evil.com")
 
 
-def test_browser_traffic_match_exprs_excludes_the_first_party_ssr_client():
+@pytest.mark.parametrize(
+    "ssr_user_agent", [MIT_LEARN_SSR_UA, *MIT_LEARN_SSR_EXPLICIT_UAS]
+)
+def test_browser_traffic_match_exprs_excludes_the_first_party_ssr_client(
+    ssr_user_agent,
+):
     """The SSR layer aggregates every end user behind four egress addresses, so
     a per-browser bucket would throttle the whole population at once. It is
     kept out on purpose rather than by axios happening to send no Origin.
     """
     user_agent = expr_for_header(browser_exprs(), "User-Agent")
     assert user_agent["op"] == "RegexNotMatch"
-    assert re.search(user_agent["value"], MIT_LEARN_SSR_UA), (
+    assert re.search(user_agent["value"], ssr_user_agent), (
         "the SSR User-Agent must match the RegexNotMatch value, which is what "
         "excludes it from the rate-limited routes"
     )
@@ -1460,6 +1639,9 @@ def test_browser_traffic_match_exprs_ua_regex_is_anchored():
     assert FIRST_PARTY_SERVICE_CLIENT_UA_REGEX.startswith("^")
     user_agent = expr_for_header(browser_exprs(), "User-Agent")
     assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {MIT_LEARN_SSR_UA}")
+    for explicit_ua in MIT_LEARN_SSR_EXPLICIT_UAS:
+        assert not re.search(user_agent["value"], f"Mozilla/5.0 (X11) {explicit_ua}")
+    assert not re.search(user_agent["value"], "mit-learn-ssr-lookalike/1.0")
 
 
 def test_browser_traffic_match_exprs_requires_an_explicit_ua_regex():

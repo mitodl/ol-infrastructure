@@ -576,22 +576,6 @@ escalation_policy_default_escalation_policy = rootly.EscalationPolicy(
     opts=rootly_opts,
 )
 
-escalation_policy_exampledeleteme_escalationpolicy = rootly.EscalationPolicy(
-    "exampledeleteme-escalationpolicy",
-    business_hours={
-        "days": ["F", "M", "R", "T", "W"],
-        "endTime": "17:00",
-        "startTime": "09:00",
-        "timeZone": "America/New_York",
-    },
-    created_by_user_id=100683,
-    description="Example escalation policy \u2013 safe to delete",
-    last_updated_by_user_id=100683,
-    name="exampleDeleteMe-EscalationPolicy",
-    repeat_count=1,
-    opts=rootly_opts,
-)
-
 # The two escalation paths on the Default Escalation Policy that predate this
 # stack. Both were built in the Rootly UI (2025-05-09 and 2025-05-10) and were
 # left unmanaged through the initial migration, so their levels were modeled
@@ -1166,6 +1150,20 @@ service_llmops_clickhouse = rootly.Service(
     escalation_policy_id=escalation_policy_data_platform.id,
     name="LLMOps - ClickHouse",
     owner_group_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
+    opts=rootly_opts,
+)
+
+# Created here rather than imported, like LLMOps - ClickHouse above. The
+# Grafana Production Service Route attributes every alert from
+# grafana_alerting/metric_rules/starrocks.py to it through service="starrocks".
+service_data_platform_starrocks = rootly.Service(
+    "data-platform-starrocks",
+    color="#D7F5E1",
+    description="StarRocks lakehouse query engine on data EKS (namespace starrocks)",
+    environment_ids=["afe3e34e-62e7-4534-bb4c-de57d24e6a59"],
+    escalation_policy_id=escalation_policy_data_platform.id,
+    name="Data Platform - StarRocks",
+    owner_group_ids=[team_data_platform.id],
     opts=rootly_opts,
 )
 
@@ -3420,7 +3418,10 @@ alerts_source_grafana_prometheus_ci = rootly.AlertsSource(
     # urgency-demote, before changing this. See
     # tk-make-severity-mean-something-split-warning-criti-27f976.
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
+    # Keyed on groupKey for the reason given on the QA source below.
+    deduplicate_alerts_by_key=True,
     deduplication_key_kind="payload",
+    deduplication_key_path="$.groupKey",
     name="Grafana Prometheus - CI",
     secret=Output.secret(
         rootly_secrets["alert_source_secrets"]["grafana_prometheus_ci"]
@@ -3445,6 +3446,19 @@ alerts_source_grafana_prometheus_production = rootly.AlertsSource(
             "kind": "payload",
             "operator": "is",
             "value": "warning",
+        },
+        # StarRocks is tiered `notify` (docs/plans/rootly-label-routing-
+        # implementation-spec.md §1.2): its production Criticals post to
+        # #devops-warnings through the data platform policy's Medium path and
+        # page nobody. Its warnings are Low by the rule above, which that
+        # policy also sends only to #devops-warnings, so the two rules agree
+        # whichever Rootly applies to a StarRocks warning.
+        {
+            "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
+            "jsonPath": "$.commonLabels.service",
+            "kind": "payload",
+            "operator": "is",
+            "value": "starrocks",
         },
         {
             "alertUrgencyId": "fce5c971-6660-4ad9-90eb-e75122055f50",
@@ -3498,7 +3512,10 @@ alerts_source_grafana_prometheus_production = rootly.AlertsSource(
         # on-call during the day.
     ],
     alert_urgency_id="5d357977-9dbe-42ad-b647-5a442cab3d96",
+    # Keyed on groupKey for the reason given on the QA source below.
+    deduplicate_alerts_by_key=True,
     deduplication_key_kind="payload",
+    deduplication_key_path="$.groupKey",
     name="Grafana Prometheus - Production",
     secret=Output.secret(
         rootly_secrets["alert_source_secrets"]["grafana_prometheus_production"]
@@ -3517,7 +3534,23 @@ alerts_source_grafana_prometheus_qa = rootly.AlertsSource(
         {"alertFieldId": "45a09cf3-b0f2-43cf-b596-34aaab9279dc"},
     ],
     alert_urgency_id="fce5c971-6660-4ad9-90eb-e75122055f50",
+    # Without a key, Rootly drops a re-sent notification only when the payload
+    # is unchanged, so a long-firing group mints a new alert whenever anything
+    # in it moves: a member joins, a value changes, or Grafana Cloud ships a new
+    # build (appVersion). 172 of 385 QA alerts from 2026-09-01 to 10-01 were
+    # opened while one for the same groupKey was still open. groupKey is
+    # Alertmanager's identity for a notification group and stays fixed through
+    # all of that, though an edit to the notification policy's routes or
+    # group_bies does change it for groups already open. The CloudWatch
+    # reasoning above runs the other way here: this source's native external
+    # ID is the alertname, which is coarser than groupKey, not finer. A resolved
+    # payload still closes the keyed alert, and a multi-member group stays open
+    # until its last member clears. Alerts already open when the key was
+    # switched on were not resolved afterwards in QA: close those by hand.
+    # See tk-rootly-mints-a-new-alert-on-each-alertmanager-re-c6e1a7.
+    deduplicate_alerts_by_key=True,
     deduplication_key_kind="payload",
+    deduplication_key_path="$.groupKey",
     name="Grafana Prometheus - QA",
     secret=Output.secret(
         rootly_secrets["alert_source_secrets"]["grafana_prometheus_qa"]
@@ -3572,13 +3605,65 @@ escalation_level_ci_qa_slack_notifications = rootly.EscalationLevel(
     opts=rootly_opts,
 )
 
+
+def mitx_qa_elasticache_route_rule(position: int) -> dict[str, Any]:
+    """Build the alert route rule that sends mitx-qa ElastiCache alarms to Slack.
+
+    "mitx-qa" is residential MITx QA (edxapp-redis-mitx-qa-*), not MITx Online.
+    These alarms used to target the "MITx Online QA - Open edX - Redis" service,
+    created outside this stack, whose "QA Non-Paging Escalation Policy" had zero
+    levels and so notified nobody. That service and policy were deleted on
+    2026-10-07. Both CloudWatch routes on the Critical source carry this rule for
+    the reason given in `data_platform_route_rules`: a route without it hands
+    the alarm to its fallback. Rootly delivers once when two routes resolve to
+    the same policy (alert dQCXUA on 2026-09-29).
+
+    As of 2026-10-01 the mitx-qa ElastiCache alarms have no AlarmActions, so
+    nothing reaches either route yet.
+
+    :param position: Route position of the rule.
+    :returns: Alert route rule dict targeting the CI/QA Slack policy.
+    """
+    return {
+        "conditionGroups": [
+            {
+                "conditions": [
+                    {
+                        "propertyFieldConditionType": "contains",
+                        "propertyFieldName": "$.Message.AlarmName",
+                        "propertyFieldType": "payload",
+                        "propertyFieldValue": "mitx-qa",
+                    },
+                    {
+                        "propertyFieldConditionType": "contains",
+                        "propertyFieldName": "$.Message.AlarmName",
+                        "propertyFieldType": "payload",
+                        "propertyFieldValue": "elasticache",
+                    },
+                ],
+                "position": 1,
+            },
+        ],
+        "destinations": [
+            {
+                "targetId": escalation_policy_ci_qa_slack_notifications.id,
+                "targetType": "EscalationPolicy",
+            },
+        ],
+        "fallbackRule": False,
+        "name": "mitx-qa elasticache AlarmName to CI/QA Slack Notifications",
+        "position": position,
+    }
+
+
 # `AlertRouteRuleArgs` has no `enabled` field, so Pulumi cannot manage or
 # detect whether the fallback rule below is toggled on. It shipped disabled
 # on both this route and the QA one below (2026-07-22), which made the
 # Slack diversion a no-op until 2026-08-18 -- CI/QA alerts fell through to
-# the paging default policy the whole time. Re-verify via `GET
-# /v1/alert_routes` -> `.rules[].enabled == true` for these two routes if
-# CI/QA paging noise reappears.
+# the paging default policy the whole time. If CI/QA paging noise reappears,
+# check which rule a recent CI/QA alert's `data.routing_rules` names (e.g.
+# K4eHHA on 2026-10-01 matched the QA fallback), not `.rules[].enabled`; see
+# the Service Routes comment below for why the flag is unreliable.
 alert_route_grafana_prometheus_ci_slack_warnings_route = rootly.AlertRoute(
     "grafana-prometheus-ci-slack-warnings-route",
     alerts_source_ids=[alerts_source_grafana_prometheus_ci.id],
@@ -3752,6 +3837,7 @@ alert_route_cloudwatch_catch_all_route = rootly.AlertRoute(
         *data_platform_route_rules(
             "$.Message.AlarmName", DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES, 1
         ),
+        mitx_qa_elasticache_route_rule(len(DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES) + 1),
         {
             "destinations": [
                 {
@@ -3761,7 +3847,7 @@ alert_route_cloudwatch_catch_all_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Cloudwatch Catch-All Route",
-            "position": len(DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES) + 1,
+            "position": len(DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES) + 2,
         },
     ],
     opts=rootly_opts,
@@ -3847,11 +3933,12 @@ alert_route_platform_engineering_team_email_monitor_route = rootly.AlertRoute(
 #
 # Caveat on individual rules: the provider models a rule as exactly
 # (condition_groups, destinations, fallback_rule, name, position). Rootly's API
-# also returns a per-rule "enabled" flag, but there is no Pulumi field for it, so
-# a rule disabled in the UI stays disabled through an apply -- and equally, that
-# state cannot be enforced from here. Three fallback rules are disabled live
-# today (the Cloudwatch, Grafana Prometheus CI, and Grafana Prometheus QA
-# catch-alls); if that matters it has to be asserted outside this stack.
+# also returns a per-rule "enabled" flag, but there is no Pulumi field for it.
+# Every rule recreated by an apply reads enabled=false, yet still matches: the
+# 2026-09-18 apply recreated this route's rules, and alert zvGhEm on 2026-10-01
+# was routed by rule f2e388ed (ol-etl-db-production), which reads
+# enabled=false. Check alert attribution, not the flag, before calling a rule
+# dead.
 alert_route_cloudwatch_service_route = rootly.AlertRoute(
     "cloudwatch-service-route",
     alerts_source_ids=[
@@ -4110,36 +4197,7 @@ alert_route_cloudwatch_service_route = rootly.AlertRoute(
             "name": "xpro AlarmName to MIT XPro Django Webapp",
             "position": 9,
         },
-        {
-            "conditionGroups": [
-                {
-                    "conditions": [
-                        {
-                            "propertyFieldConditionType": "contains",
-                            "propertyFieldName": "$.Message.AlarmName",
-                            "propertyFieldType": "payload",
-                            "propertyFieldValue": "mitx-qa",
-                        },
-                        {
-                            "propertyFieldConditionType": "contains",
-                            "propertyFieldName": "$.Message.AlarmName",
-                            "propertyFieldType": "payload",
-                            "propertyFieldValue": "elasticache",
-                        },
-                    ],
-                    "position": 1,
-                },
-            ],
-            "destinations": [
-                {
-                    "targetId": "cc36d725-ecfe-4d37-94f3-55d4e2ef91be",
-                    "targetType": "Service",
-                },
-            ],
-            "fallbackRule": False,
-            "name": "mitx-qa elasticache AlarmName to MITx Online QA - Open edX - Redis",  # noqa: E501
-            "position": 10,
-        },
+        mitx_qa_elasticache_route_rule(10),
         # None of the alarm names above contain these, so after them is safe.
         *data_platform_route_rules(
             "$.Message.AlarmName", DATA_PLATFORM_CLOUDWATCH_ALARM_NAMES, 11
@@ -4446,14 +4504,40 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             "name": "clickhouse service label to LLMOps - ClickHouse",
             "position": 10,
         },
-        # Everything else on data-production. After the ClickHouse rule so
-        # ClickHouse alerts keep their service attribution (that service uses
-        # the same policy). No earlier rule matches a data-production
+        # Same shape for grafana_alerting/metric_rules/starrocks.py, whose
+        # rules all carry service="starrocks".
+        {
+            "conditionGroups": [
+                {
+                    "conditions": [
+                        {
+                            "propertyFieldConditionType": "contains",
+                            "propertyFieldName": "$.commonLabels.service",
+                            "propertyFieldType": "payload",
+                            "propertyFieldValue": "starrocks",
+                        },
+                    ],
+                    "position": 1,
+                },
+            ],
+            "destinations": [
+                {
+                    "targetId": service_data_platform_starrocks.id,
+                    "targetType": "Service",
+                },
+            ],
+            "fallbackRule": False,
+            "name": "starrocks service label to Data Platform - StarRocks",
+            "position": 11,
+        },
+        # Everything else on data-production. After the ClickHouse and
+        # StarRocks rules so their alerts keep their service attribution (both
+        # services use the same policy). No earlier rule matches a data-production
         # namespace: they are airbyte, clickhouse, dagster, jupyter-data,
         # marimo, ol-analytics, open-metadata, opik, qdrant, starrocks,
         # superset, and cluster system namespaces as of 2026-09-18.
         *data_platform_route_rules(
-            "$.commonLabels.cluster", DATA_PLATFORM_GRAFANA_CLUSTERS, 11
+            "$.commonLabels.cluster", DATA_PLATFORM_GRAFANA_CLUSTERS, 12
         ),
         {
             "destinations": [
@@ -4464,7 +4548,7 @@ alert_route_grafana_production_service_route = rootly.AlertRoute(
             ],
             "fallbackRule": True,
             "name": "Fallback Rule for Grafana Production Service Route",
-            "position": 11 + len(DATA_PLATFORM_GRAFANA_CLUSTERS),
+            "position": 12 + len(DATA_PLATFORM_GRAFANA_CLUSTERS),
         },
     ],
     opts=rootly_imported_route_opts("e7b002f8-e13f-4b63-b0df-af1c78aee890"),
@@ -5116,22 +5200,4 @@ alert_route_sentry_service_route = rootly.AlertRoute(
         },
     ],
     opts=rootly_imported_route_opts("57544c42-bef8-40f2-99bb-9e5041c0927f"),
-)
-
-# Adopted ONLY so that Pulumi can destroy it. "sh-test" is leftover scratch
-# config from 2026-07-22 with zero rules, which makes it inert -- its source
-# (Grafana Prometheus - CI) is still routed by the Slack Warnings Route above.
-# Pulumi cannot delete a resource it does not manage, so removing it takes two
-# applies: this one adopts it, then a follow-up drops this block and the next
-# apply destroys it. Delete this resource, do not extend it.
-alert_route_sh_test = rootly.AlertRoute(
-    "sh-test",
-    alerts_source_ids=[alerts_source_grafana_prometheus_ci.id],
-    enabled=True,
-    name="sh-test",
-    owning_team_ids=[
-        "9f00e9f1-2f13-470e-a856-50ab5003f260",
-    ],
-    rules=[],
-    opts=rootly_imported_route_opts("08b6b334-1bb4-4f93-830a-0cb99b9b270d"),
 )

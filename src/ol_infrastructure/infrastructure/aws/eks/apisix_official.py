@@ -18,7 +18,9 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
 )
 from ol_infrastructure.components.services.apisix import (
-    identity_header_strip_plugin,
+    OIDC_RECOVERY_SHARED_DICT,
+    OIDC_RECOVERY_SHARED_DICT_SIZE,
+    gateway_global_pre_function_plugin,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
@@ -509,19 +511,6 @@ def setup_apisix(
                 "service": {
                     "type": "LoadBalancer",
                     "annotations": {
-                        # Both prefixes are set on purpose. external-dns v0.22.0
-                        # moved the default annotation prefix from the "alpha" form
-                        # to the GA one with NO fallback, so each version reads
-                        # exactly one of these and ignores the other: <=v0.21.0 the
-                        # alpha key, >=v0.22.0 the GA key. Carrying both is what
-                        # makes the upgrade (and a rollback) a no-op rather than an
-                        # outage -- under --policy=sync a version that matches no
-                        # annotation sees an empty desired state and plans to delete
-                        # every record it owns. Drop the alpha key only once every
-                        # cluster is past v0.22.0.
-                        "external-dns.alpha.kubernetes.io/hostname": ",".join(
-                            apisix_domains
-                        ),
                         "external-dns.kubernetes.io/hostname": ",".join(apisix_domains),
                         "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-apache-apisix"[
                             :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
@@ -633,6 +622,14 @@ def setup_apisix(
                         "workerProcesses": "auto",
                         "enableCPUAffinity": True,
                         "workerConnections": "10620",
+                        # Counts OIDC login restarts per Keycloak session_state;
+                        # see oidc_gateway_pre_function_plugin.
+                        "customLuaSharedDicts": [
+                            {
+                                "name": OIDC_RECOVERY_SHARED_DICT,
+                                "size": OIDC_RECOVERY_SHARED_DICT_SIZE,
+                            },
+                        ],
                         "logs": {
                             "enableAccessLog": True,
                             "accessLog": "/dev/stdout",
@@ -1047,7 +1044,12 @@ def setup_apisix(
         ),
     )
 
-    # Refuse the gateway's own identity headers from a client, on every route.
+    # Everything that has to run on every route ahead of openid-connect: send
+    # OIDC routes to their canonical https origin, and refuse the gateway's own
+    # identity headers from a client.  See gateway_global_pre_function_plugin.
+    #
+    # The canonical redirect is here because per-application attachment left
+    # most OIDC hosts answering plain HTTP with a cleartext session cookie.
     #
     # The openid-connect plugin clears an inbound X-Userinfo / X-ID-Token /
     # X-Raw-ID-Token / X-Refresh-Token before setting its own, but only where
@@ -1070,8 +1072,11 @@ def setup_apisix(
     # so this is the cluster's only global ``serverless-pre-function``: a
     # second one anywhere would silently replace it rather than run alongside.
     # Anything else that has to run globally before openid-connect belongs in
-    # ``strip_client_identity_headers.lua``'s ``functions`` list, the same way
-    # ``oidc_gateway_pre_function_plugin`` stacks its two.
+    # ``gateway_global_pre_function_plugin``'s ``functions`` list.
+    #
+    # The resource and object keep their original identity-header-strip name:
+    # renaming would replace the rule (delete_before_replace), leaving a
+    # window with no strip at all.
     kubernetes.apiextensions.CustomResource(
         f"{cluster_name}-apisix-identity-header-strip-global-rule",
         api_version="apisix.apache.org/v2",
@@ -1084,7 +1089,7 @@ def setup_apisix(
         spec={
             "ingressClassName": "apache-apisix",
             "plugins": [
-                identity_header_strip_plugin().model_dump(
+                gateway_global_pre_function_plugin().model_dump(
                     by_alias=True, exclude_none=True
                 )
             ],
@@ -1182,7 +1187,7 @@ def setup_apisix(
     #
     # Upstream issue: https://github.com/apache/apisix-ingress-controller/issues/2643
     #
-    # Solution: Use external-dns.alpha.kubernetes.io/target annotation on Gateway resource.
+    # Solution: Use external-dns.kubernetes.io/target annotation on Gateway resource.
     # ExternalDNS checks this annotation first before looking at status.addresses.
     # See: https://github.com/kubernetes-sigs/external-dns/blob/master/docs/sources/gateway-api.md
     #
@@ -1197,9 +1202,6 @@ def setup_apisix(
                 "namespace": "operations",
                 "annotations": {
                     "pulumi.com/patchForce": "true",
-                    # Both prefixes on purpose -- see the gateway Service
-                    # annotations above for why.
-                    "external-dns.alpha.kubernetes.io/target": hostname,
                     "external-dns.kubernetes.io/target": hostname,
                 },
             }

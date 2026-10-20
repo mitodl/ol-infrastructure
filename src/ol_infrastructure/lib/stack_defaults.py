@@ -17,7 +17,7 @@ production_defaults = {
         "performance_insights_retention_period": 7,
     },
     "redis": {
-        "instance_type": CacheInstanceTypes.high_mem_large,
+        "instance_type": CacheInstanceTypes.large,
         "monitoring_profile_name": "production",
     },
     "opensearch": {
@@ -41,7 +41,7 @@ qa_defaults = {
     },
     "opensearch": {
         "instance_type": SearchInstanceTypes.medium.value,
-        "instance_count": 3,
+        "instance_count": 1,
     },
 }
 
@@ -60,7 +60,7 @@ ci_defaults = {
     },
     "opensearch": {
         "instance_type": SearchInstanceTypes.medium.value,
-        "instance_count": 3,
+        "instance_count": 1,
     },
 }
 

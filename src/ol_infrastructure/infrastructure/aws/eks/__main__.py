@@ -24,6 +24,7 @@ from pulumi import (
 
 from bridge.lib.magic_numbers import (
     DEFAULT_EFS_PORT,
+    DEFAULT_HTTPS_PORT,
     IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
 )
 from bridge.lib.versions import (
@@ -383,12 +384,12 @@ cluster = eks.Cluster(
     access_entries=access_entries,
     authentication_mode=eks.AuthenticationMode("API"),
     create_oidc_provider=True,
-    enabled_cluster_log_types=[
-        "api",
-        "audit",
-        "authenticator",
-    ],
-    endpoint_private_access=False,
+    # GuardDuty EKS_AUDIT_LOGS reads the audit stream directly, not from
+    # CloudWatch, so trimming these outside production costs no detection.
+    enabled_cluster_log_types=["api", "audit", "authenticator"]
+    if stack_info.env_suffix == "production"
+    else ["authenticator"],
+    endpoint_private_access=True,
     endpoint_public_access=True,
     fargate=False,
     ip_family="ipv4",
@@ -442,6 +443,18 @@ def __create_apiserver_security_group_rules(pod_subnet_cidrs):
 
 
 pod_ip_blocks.apply(__create_apiserver_security_group_rules)
+
+# Vault and Concourse run on EC2 in the operations VPCs and call the API server.
+# They need this before private endpoint access is enabled, when in-VPC lookups
+# of the endpoint start resolving to the control-plane ENIs.
+aws.vpc.SecurityGroupIngressRule(
+    f"{cluster_name}-eks-apiserver-443-vpc-sg-rule",
+    security_group_id=cluster.cluster_security_group_id,
+    cidr_ipv4=target_vpc["cidr"],
+    from_port=DEFAULT_HTTPS_PORT,
+    to_port=DEFAULT_HTTPS_PORT,
+    ip_protocol="tcp",
+)
 
 export("cluster_name", cluster_name)
 export("kube_config", cluster.kubeconfig)
@@ -975,6 +988,35 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             "type": "gp3",
             "iops": "3000",
             "throughput": "125",
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[ebs_csi_driver_role, *node_groups],
+        ),
+    )
+    # A PVC cannot be created under ebs-gp3-sc while naming any of the classes
+    # above that set `iops`. At CreateVolume the driver overlays the class's
+    # `iops` on the StorageClass parameters, keeps `iopsPerGB`, and rejects the
+    # pair (`specify either IOPS or IOPSPerGb, not both`), so the classes only
+    # work on volumes that already exist. This is ebs-gp3-sc with a fixed 3,000
+    # IOPS in place of the ratio, for workloads whose PVC template carries one
+    # of those classes: a new volume is born at the baseline and the class on
+    # the PVC stays valid. ClickHouse data volumes use it.
+    kubernetes.storage.v1.StorageClass(
+        resource_name=f"{cluster_name}-ebs-gp3-iops-3000-storageclass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="ebs-gp3-iops-3000-sc",
+            labels=k8s_global_labels,
+        ),
+        provisioner="ebs.csi.aws.com",
+        volume_binding_mode="WaitForFirstConsumer",
+        # ref: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/parameters.md
+        parameters={
+            "csi.storage.k8s.io/fstype": "xfs",
+            "type": "gp3",
+            "iops": "3000",
+            "throughput": "125",
+            "encrypted": "true",
         },
         opts=ResourceOptions(
             provider=k8s_provider,

@@ -58,6 +58,7 @@ from ol_infrastructure.components.services.k8s import (  # noqa: E402
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
+    OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
     OLApplicationK8sKedaWebappScalingConfig,
@@ -88,6 +89,10 @@ def _base_config(**overrides) -> OLApplicationK8sConfig:
             "ol.mit.edu/application": "myapp",
             "ol.mit.edu/environment": "qa",
         },
+        "celery_redis_config": OLApplicationK8sCeleryRedisConfig(
+            host=pulumi.Output.from_input("redis.example.com"),
+            password="hunter2",  # pragma: allowlist secret
+        ),
     }
     defaults.update(overrides)
     return OLApplicationK8sConfig(**defaults)
@@ -406,8 +411,6 @@ def test_app_config_extra_init_volume_mounts_accepts_mount_list():
 def test_celery_worker_config_default_application_name():
     cfg = OLApplicationK8sCeleryWorkerConfig(
         queue_name="default",
-        redis_host=pulumi.Output.from_input("redis.example.com"),
-        redis_password="secret",  # pragma: allowlist secret
     )
     assert cfg.application_name == "main.celery:app"
 
@@ -416,8 +419,6 @@ def test_celery_worker_config_custom_application_name():
     cfg = OLApplicationK8sCeleryWorkerConfig(
         queue_name="default",
         application_name="lms.celery:app",
-        redis_host=pulumi.Output.from_input("redis.example.com"),
-        redis_password="secret",  # pragma: allowlist secret
     )
     assert cfg.application_name == "lms.celery:app"
 
@@ -1010,6 +1011,100 @@ def test_container_security_context_skips_nginx_sidecar():
     return app.application_deployment.spec.template.spec.containers.apply(check)
 
 
+# ─── webapp preStop sleep ─────────────────────────────────────────────────────
+
+
+@pulumi.runtime.test
+def test_prestop_sleep_on_app_and_nginx_with_extended_grace_period():
+    """Every container that accepts traffic sleeps, and the drain budget stays 30s."""
+    project_root = Path(tempfile.mkdtemp())
+    (project_root / "files").mkdir()
+    (project_root / "files" / "web.conf").write_text("server { listen 8071; }\n")
+
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="prestop",
+            project_root=project_root,
+            import_nginx_config=True,
+        )
+    )
+
+    def check(pod_spec):
+        containers = pod_spec["containers"]
+        nginx = next(c for c in containers if c["name"] == "nginx")
+        for container in (nginx, _app_container(containers, "prestop")):
+            assert container["lifecycle"]["pre_stop"]["sleep"]["seconds"] == 10
+        assert pod_spec["termination_grace_period_seconds"] == 40
+
+    return app.application_deployment.spec.template.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_prestop_sleep_on_sidecars_unless_they_set_their_own_lifecycle():
+    """A log shipper must not stop while the app is still serving and writing logs."""
+    own_lifecycle = kubernetes.core.v1.LifecycleArgs(
+        pre_stop=kubernetes.core.v1.LifecycleHandlerArgs(
+            sleep=kubernetes.core.v1.SleepActionArgs(seconds=25)
+        )
+    )
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="sidecars",
+            extra_sidecar_containers=[
+                kubernetes.core.v1.ContainerArgs(name="vector", image="vector:1"),
+                kubernetes.core.v1.ContainerArgs(
+                    name="custom", image="custom:1", lifecycle=own_lifecycle
+                ),
+            ],
+        )
+    )
+
+    def check(containers):
+        by_name = {c["name"]: c for c in containers}
+        assert by_name["vector"]["image"] == "vector:1"
+        assert by_name["vector"]["lifecycle"]["pre_stop"]["sleep"]["seconds"] == 10
+        assert by_name["custom"]["lifecycle"]["pre_stop"]["sleep"]["seconds"] == 25
+
+    return app.application_deployment.spec.template.spec.containers.apply(check)
+
+
+@pulumi.runtime.test
+def test_prestop_sleep_does_not_reach_celery_worker_pods():
+    app = OLApplicationK8s(
+        _base_config(
+            application_name="prestopcelery",
+            extra_sidecar_containers=[
+                kubernetes.core.v1.ContainerArgs(name="vector", image="vector:1")
+            ],
+            celery_worker_configs=[
+                OLApplicationK8sCeleryWorkerConfig(
+                    application_name="prestopcelery",
+                    worker_name="default",
+                )
+            ],
+        )
+    )
+
+    def check(pod_spec):
+        assert "termination_grace_period_seconds" not in pod_spec
+        assert not any("lifecycle" in c for c in pod_spec["containers"])
+
+    return app.celery_deployments[0].spec.template.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_prestop_sleep_zero_disables_hook_and_keeps_default_grace_period():
+    app = OLApplicationK8s(
+        _base_config(application_name="noprestop", webapp_prestop_sleep_seconds=0)
+    )
+
+    def check(pod_spec):
+        assert "lifecycle" not in _app_container(pod_spec["containers"], "noprestop")
+        assert "termination_grace_period_seconds" not in pod_spec
+
+    return app.application_deployment.spec.template.spec.apply(check)
+
+
 @pulumi.runtime.test
 def test_container_security_context_applied_to_celery_worker():
     app = OLApplicationK8s(
@@ -1020,8 +1115,6 @@ def test_container_security_context_applied_to_celery_worker():
                 OLApplicationK8sCeleryWorkerConfig(
                     application_name="hardenedcelery",
                     worker_name="default",
-                    redis_host=pulumi.Output.from_input("redis.example.com"),
-                    redis_password="hunter2",  # pragma: allowlist secret
                 )
             ],
         )
@@ -1141,8 +1234,6 @@ def _celery_worker_config(**overrides) -> OLApplicationK8sCeleryWorkerConfig:
     defaults = {
         "application_name": "memcapped",
         "worker_name": "default",
-        "redis_host": pulumi.Output.from_input("redis.example.com"),
-        "redis_password": "hunter2",  # pragma: allowlist secret
     }
     defaults.update(overrides)
     return OLApplicationK8sCeleryWorkerConfig(**defaults)

@@ -32,6 +32,7 @@ from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -61,9 +62,11 @@ from ol_infrastructure.lib.aws.iam_helper import (
     lint_iam_policy,
 )
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
+    Component,
     K8sAppLabels,
     Product,
     Services,
@@ -107,14 +110,29 @@ aws_config = AWSBase(
     }
 )
 
-k8s_global_labels = K8sAppLabels(
+k8s_labels = K8sAppLabels(
     application=Application.airbyte,
     product=Product.data,
     service=Services.airbyte,
     ou=BusinessUnit.data,
     source_repository="https://github.com/airbytehq/airbyte",
     stack=stack_info,
-).model_dump()
+)
+k8s_global_labels = k8s_labels.model_dump()
+
+
+def workload_labels(component: Component) -> dict[str, str]:
+    """Label one Airbyte Deployment's pods with its role and alert tier.
+
+    Everything here is notify: a sync that stops is late data, picked up in
+    working hours. The chart's podLabels reaches the pod template only.
+
+    :param component: The Deployment's functional role.
+    :returns: The stack's ol.mit.edu labels plus component and alert_tier.
+    """
+    return k8s_labels.workload_labels(alert_tier=AlertTier.notify, component=component)
+
+
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 airbyte_namespace = "airbyte"
 
@@ -305,7 +323,7 @@ data_lake_policy = iam.Policy(
 )
 
 # Create IAM policy for Airbyte to read from S3 source buckets
-# TODO: Turn this into a stack reference after exporting the bucket names from the  # noqa: E501, FIX002, TD002
+# TODO: Turn this into a stack reference after exporting the bucket names from the  # noqa: FIX002, TD002
 # edxapp Pulumi project. (TMM 2023-06-02)
 s3_source_buckets = [
     f"{edxapp_deployment}-{stack_info.env_suffix}-edxapp-tracking"
@@ -649,7 +667,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 # Disabling this for now, but leaving it for documentation about how to
                 # customize the host reported in `next` parameters for API
                 # requests. (TMM 2025-09-29)
-                # "api": {"host": f"https://{airbyte_config.require('api_host_domain')}"},  # noqa: E501, ERA001
+                # "api": {"host": f"https://{airbyte_config.require('api_host_domain')}"},  # noqa: ERA001
                 # "server": {  # noqa: ERA001
                 #     "host": f"https://{airbyte_config.require('web_host_domain')}"
                 # },
@@ -755,7 +773,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "enabled": True,
                 "replicaCount": 2,
                 "deploymentStrategyType": "RollingUpdate",
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.api),
                 "resources": {
                     "requests": {"memory": "1Gi", "cpu": "300m"},
                     "limits": {"memory": "2Gi", "cpu": "500m"},
@@ -768,7 +786,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             "worker": {
                 "enabled": True,
                 "hpa": {"enabled": True},
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.worker),
                 "resources": {
                     "requests": {"memory": "500Mi", "cpu": "100m"},
                     "limits": {"memory": "1Gi", "cpu": "200m"},
@@ -778,7 +796,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             "workloadLauncher": {
                 "enabled": True,
                 "hpa": {"enabled": True},
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.controller),
                 "resources": {
                     "requests": {"memory": "500Mi", "cpu": "100m"},
                     "limits": {"memory": "1Gi", "cpu": "200m"},
@@ -798,24 +816,24 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             "temporal": {
                 "enabled": True,
                 "replicaCount": 1,
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.queue),
                 "resources": default_resources_definition,
             },
             "cron": {
                 "enabled": True,
                 "replicaCount": 1,
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.worker),
                 "resources": default_resources_definition,
             },
             # manifestServer replaces connectorBuilderServer in chart 2.1+
             # (connectorBuilderServer was removed; manifestServer is now enabled)
             "manifestServer": {
                 "enabled": True,
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.api),
                 "resources": default_resources_definition,
             },
             "workloadApiServer": {
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.api),
                 "resources": default_resources_definition,
             },
         },
@@ -876,10 +894,12 @@ airbyte_oidc_resources = OLApisixOIDCResources(
         oidc_scope="openid profile email",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/airbyte",
-        vaultauth=vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/airbyte",
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     ),
     opts=ResourceOptions(
         depends_on=[airbyte_helm_release],
@@ -888,9 +908,7 @@ airbyte_oidc_resources = OLApisixOIDCResources(
 )
 
 # TLS certificate configuration for web interface
-airbyte_web_tls_secret_name = (
-    "airbyte-webapp-tls"  # pragma: allowlist secret # noqa: S105
-)
+airbyte_web_tls_secret_name = "airbyte-webapp-tls"  # pragma: allowlist secret # noqa: S105
 cert_manager_certificate_web = OLCertManagerCert(
     f"airbyte-web-cert-manager-certificate-{stack_info.env_suffix}",
     cert_config=OLCertManagerCertConfig(

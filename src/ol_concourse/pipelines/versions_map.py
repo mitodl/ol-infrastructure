@@ -61,6 +61,11 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     ],
     "applications/fastly_redirector/": [],
     "applications/google_ads_optimization/": [],
+    "applications/gravitino/": [
+        "GRAVITINO_CHART_VERSION",
+        "GRAVITINO_SCHEMA_VERSION",
+        "GRAVITINO_VERSION",
+    ],
     "applications/gwarek/": [],
     "applications/jupyterhub/": ["JUPYTERHUB_CHART_VERSION"],
     "applications/jupyterhub_data/": [

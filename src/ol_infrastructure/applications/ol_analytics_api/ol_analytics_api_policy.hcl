@@ -30,8 +30,8 @@ path "secret-operations/sso/mitlearn" {
 
 # The MITx Online OAuth2 client-credentials pair backing the org-manager check
 # (mitodl/mitxonline#3807). Read by the vault-secrets-operator at runtime and
-# templated into the app's env, so the credential never passes through Pulumi
-# state. secret-operations is a kv-v1 mount, so there is no /data/ sub-path to
+# templated into the app's env (see __main__.py for how the entry gets written).
+# secret-operations is a kv-v1 mount, so there is no /data/ sub-path to
 # grant alongside it. Temporary -- remove with the round-trip it authenticates
 # once org-manager status is visible in the Keycloak token (mitodl/hq#10594).
 path "secret-operations/ol-analytics-api/mitxonline-oauth" {

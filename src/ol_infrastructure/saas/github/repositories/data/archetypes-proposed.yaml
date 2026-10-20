@@ -116,12 +116,14 @@ archived:
 - ol-keycloak-customization
 - ol-npm-libraries
 - ol-openedx-mfe-overrides
+- ol-rootly-manager
 - open-discussions-client
 - open-widget-framework
 - open-widget-sample-app
 - openedx-course-test
 - orcoursetrion
 - pgbouncer-formula
+- pre-commit-ci-config
 - pulsar-formula
 - pycaption
 - pylti
@@ -140,6 +142,7 @@ archived:
 - social-auth-mitxpro
 - sso-django-prototype
 - standalone-course-prototype
+- superset-marimo
 - teachersportal
 - tika-formula
 - travisfail
@@ -232,7 +235,6 @@ fork:
 - openedx-events
 - openedx-ledger
 - opentelemetry-python-contrib
-- pre-commit-ci-config
 - pre-commit-packer
 - py-tree-sitter
 - pycassa
@@ -299,7 +301,6 @@ library:
 - ol-keycloak
 - ol-keycloakify
 - ol-notebook-extensions
-- ol-rootly-manager
 - oldevops-scratch
 - open-collaboration
 - open-edx-plugins
@@ -314,7 +315,6 @@ library:
 - redux-asserts
 - redux-hammock
 - smoot-design
-- superset-marimo
 - superset-nl-explorer
 - tech-talk-slides
 - template-mit-demo

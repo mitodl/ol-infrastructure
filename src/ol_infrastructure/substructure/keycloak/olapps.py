@@ -7,6 +7,13 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.client_policies import (
+    create_pkce_client_policy,
+)
+from ol_infrastructure.substructure.keycloak.learner_records import (
+    create_learner_records_clients,
+    parse_learner_records_clients,
+)
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_browser_flows,
     create_organization_first_broker_login_flows,
@@ -39,6 +46,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     resource_options = ResourceOptions(provider=keycloak_provider)
     keycloak_realm_config = Config("keycloak_realm")
     captcha_domain = "www.recaptcha.net"
+    mitlearn_domain = keycloak_realm_config.require("learn_domain")
     ol_apps_realm = keycloak.Realm(
         "olapps",
         # Labeled "Client Login Timeout" in the admin console's Tokens tab
@@ -58,6 +66,13 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         access_code_lifespan_user_action="15m",
         attributes={
             "business_unit": f"operations-{env_name}",
+            # Where the login theme sends someone who has finished a flow it
+            # cannot return them from -- confirming an email change from their
+            # inbox arrives with no client session, so Keycloak has no
+            # application to offer. Read by the ol-keycloak SPI's
+            # OLSettingsBean, which substitutes "#" when this is unset, and
+            # rendered as the "Back to MIT Learn" link on info.ftl.
+            "olCanonicalHomeUrl": f"https://{mitlearn_domain}/",
         },
         display_name="MIT Learn",
         display_name_html="<b>MIT Learn</b>",
@@ -170,6 +185,8 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         enabled=True,
         opts=resource_options,
     )
+
+    create_pkce_client_policy(ol_apps_realm.id, "olapps", resource_options)
 
     keycloak.RealmUserProfile(
         "olapps-user-profile",
@@ -448,7 +465,18 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     # defines olapps-ol-analytics-api-client-secret/-redirect-uris. Without
     # this guard, `pulumi up` against the CI keycloak stack would create a
     # CONFIDENTIAL client with a null secret and null valid_redirect_uris.
-    if keycloak_realm_config.get("olapps-ol-analytics-api-client-secret"):
+    learner_records_clients = parse_learner_records_clients(
+        keycloak_realm_config.get_object("olapps-learner-records-clients")
+    )
+    if not keycloak_realm_config.get("olapps-ol-analytics-api-client-secret"):
+        if learner_records_clients:
+            msg = (
+                "olapps-learner-records-clients is set but "
+                "olapps-ol-analytics-api-client-secret is not, so those clients "
+                "would silently not be created"
+            )
+            raise ValueError(msg)
+    else:
         olapps_ol_analytics_api_client = keycloak.openid.Client(
             "olapps-ol-analytics-api-client",
             name="ol-analytics-api-client",
@@ -500,6 +528,16 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                     fetch_realm_public_key_partial
                 ),
             ).apply(json.dumps),
+        )
+        # Machine-to-machine clients for the learner-records tenant, one per
+        # contracted integration. See learner_records.py.
+        create_learner_records_clients(
+            realm_id=ol_apps_realm.id,
+            realm_name="olapps",
+            api_client_id=olapps_ol_analytics_api_client.client_id,
+            clients=learner_records_clients,
+            keycloak_url=keycloak_url,
+            opts=resource_options,
         )
     # OL ANALYTICS API [END]
 
@@ -832,7 +870,6 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     # OL - browser flow [END]
     # Ensure organization scope is present
     create_organization_scope(ol_apps_realm.id, "olapps", resource_options)
-    mitlearn_domain = keycloak_realm_config.require("learn_domain")
     # Touchstone SAML [START]
     mit_mail_domains = [
         "broad.mit.edu",
@@ -1155,6 +1192,43 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 resource_options=resource_options,
             ),
         )
+        onboard_saml_org(
+            SamlIdpConfig(
+                idp_alias="UKM",
+                idp_display_name="Universiti Kebangsaan Malaysia",
+                org_saml_metadata_url="https://sso.ukm.my/saml2/idp/metadata.php",
+                # UKM gave one value per field for "attribute name and friendly
+                # name", so the plain name (SimpleSAMLphp's basic format) is
+                # the identifier; matching on the Name attribute works whether
+                # or not a FriendlyName is also sent.
+                principal_type="ATTRIBUTE",
+                principal_attribute="mail",
+                keycloak_url=keycloak_url,
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                attribute_name_map={
+                    "email": "mail",
+                    "fullName": "displayName",
+                },
+                mapper_extra_config={
+                    attr: {"attribute.name.format": "ATTRIBUTE_FORMAT_BASIC"}
+                    for attr in ("email", "fullName")
+                },
+            ),
+            org=OrgConfig(
+                org_domains=[
+                    "ukm.edu.my",
+                    "siswa.ukm.edu.my",
+                    "ppukm.ukm.edu.my",
+                ],
+                org_name="Universiti Kebangsaan Malaysia",
+                org_alias="UKM",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
         istanbul_aydin_org = create_org_for_learn(
             OrgConfig(
                 org_domains=[
@@ -1171,6 +1245,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         onboard_saml_org(
             SamlIdpConfig(
                 idp_alias="istanbul_aydin_staff",
+                org_domain="aydin.edu.tr",
                 idp_display_name="Istanbul Aydin University - Staff",
                 org_saml_metadata_url="https://login.microsoftonline.com/dafbbeb4-3113-49c7-bce6-faeb84139bf6/federationmetadata/2007-06/federationmetadata.xml?appid=3b4d02b1-8482-4837-b8c4-2db32d8a93ee",
                 principal_type="SUBJECT",
@@ -1195,6 +1270,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         onboard_saml_org(
             SamlIdpConfig(
                 idp_alias="istanbul_aydin_students",
+                org_domain="stu.aydin.edu.tr",
                 idp_display_name="Istanbul Aydin University - Students",
                 org_saml_metadata_url="https://login.microsoftonline.com/1220f94e-b228-4761-9501-da9e83e540ac/federationmetadata/2007-06/federationmetadata.xml?appid=d134d48b-ca70-46fd-a008-ab83b9a565fe",
                 principal_type="SUBJECT",
@@ -1232,6 +1308,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         onboard_saml_org(
             SamlIdpConfig(
                 idp_alias="cyprus_aydin_staff",
+                org_domain="cau.edu.tr",
                 idp_display_name="Cyprus Aydin University - Staff",
                 org_saml_metadata_url="https://login.microsoftonline.com/b250b687-5037-48da-a6d7-7471164c4b43/federationmetadata/2007-06/federationmetadata.xml?appid=09b2e0c2-79e9-4498-bf8f-560a6647d53d",
                 principal_type="SUBJECT",
@@ -1256,6 +1333,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         onboard_saml_org(
             SamlIdpConfig(
                 idp_alias="cyprus_aydin_students",
+                org_domain="stu.cau.edu.tr",
                 idp_display_name="Cyprus Aydin University - Students",
                 org_saml_metadata_url="https://login.microsoftonline.com/7b2d4163-41c3-478f-8911-e9117b736dfb/federationmetadata/2007-06/federationmetadata.xml?appid=59324ddf-cc35-40c2-a91b-fa7c0def6e78",
                 principal_type="SUBJECT",
@@ -1690,6 +1768,81 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             },
             opts=resource_options,
         )
+
+        # BOARD INFINITY [START]
+        # Same private_key_jwt pattern as Masai School (no client_secret ->
+        # onboard_oidc_org configures private_key_jwt automatically, verified
+        # against their discovery doc's token_endpoint_auth_methods_supported).
+        # Board Infinity additionally requires PKCE S256 on every client,
+        # confirmed by their discovery doc's code_challenge_methods_supported;
+        # that's not a first-class field on this provider's IdentityProvider
+        # resource, so it goes through extra_config.
+        board_infinity_oidc_identity_provider = onboard_oidc_org(
+            OIDCIdpConfig(
+                idp_alias="BOARDINFINITY",
+                idp_display_name="Board Infinity",
+                org_oidc_metadata_url="https://platform.boardinfinity.com/auth-api/oidc/.well-known/openid-configuration",
+                realm_id=ol_apps_realm.id,
+                first_login_flow=ol_first_login_flow,
+                resource_options=resource_options,
+                client_id="mit-learn",
+                extra_config={
+                    "pkceEnabled": "true",
+                    "pkceMethod": "S256",
+                },
+            ),
+            org=OrgConfig(
+                # Same as upGrad/Masai School/Apply7: learners reach MIT
+                # Learn via a direct kc_idp_hint link from Board Infinity's
+                # own student panel, using personal email addresses, so
+                # domain-based home-realm discovery can't route them --
+                # no domain is needed to gate access.
+                org_domains=[],
+                org_name="Board Infinity",
+                org_alias="BOARDINFINITY",
+                learn_domain=mitlearn_domain,
+                realm_id=ol_apps_realm.id,
+                resource_options=resource_options,
+            ),
+        )
+        # Board Infinity's ID token carries name, given_name and family_name.
+        # Without these the first-broker-login review-profile step (set to
+        # "missing") finds fullName/firstName/lastName empty and shows the
+        # "Update Account Information" form.
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-boardinfinity-oidc-full-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="name",
+            identity_provider_alias=board_infinity_oidc_identity_provider.alias,
+            user_attribute="fullName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-boardinfinity-oidc-first-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="given_name",
+            identity_provider_alias=board_infinity_oidc_identity_provider.alias,
+            user_attribute="firstName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        keycloak.AttributeImporterIdentityProviderMapper(
+            "map-boardinfinity-oidc-last-name-attribute",
+            realm=ol_apps_realm.id,
+            claim_name="family_name",
+            identity_provider_alias=board_infinity_oidc_identity_provider.alias,
+            user_attribute="lastName",
+            extra_config={
+                "syncMode": "INHERIT",
+            },
+            opts=resource_options,
+        )
+        # BOARD INFINITY [END]
 
     # B2B Organizations [END]
 

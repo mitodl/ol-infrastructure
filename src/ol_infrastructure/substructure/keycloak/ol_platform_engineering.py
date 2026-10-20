@@ -6,6 +6,17 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Alias, Config, InvokeOptions, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.client_policies import (
+    PKCE_REQUIRED_CLIENT_ARGS,
+    create_pkce_client_policy,
+)
+from ol_infrastructure.substructure.keycloak.org_flows import (
+    create_staff_organizations,
+)
+from ol_infrastructure.substructure.keycloak.passkey_flow import (
+    create_passkey_browser_flow,
+)
+
 
 def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
@@ -100,6 +111,14 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         opts=resource_options,
     )
 
+    create_staff_organizations(
+        "ol-platform-engineering",
+        {"Arbisoft": "arbisoft.com", "MIT": "mit.edu"},
+        resource_options.merge(
+            ResourceOptions(depends_on=[ol_platform_engineering_realm])
+        ),
+    )
+
     keycloak.RealmEvents(
         "ol-platform-engineering-realm-events",
         realm_id=ol_platform_engineering_realm.realm,
@@ -126,6 +145,10 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         name="developer",
         description="OL Platform Engineering Developer role",
         opts=resource_options,
+    )
+
+    create_pkce_client_policy(
+        ol_platform_engineering_realm.id, "ol-platform-engineering", resource_options
     )
 
     # AIRBYTE [START] # noqa: ERA001
@@ -295,7 +318,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         # to complete the authorization-code exchange with no verifier at all,
         # reopening the interception attack PKCE exists to close. Same setting,
         # same reasoning as ol-platform-engineering-grafana-client below.
-        pkce_code_challenge_method="S256",
+        **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=[
             "http://localhost:8080/callback",
             "http://127.0.0.1:8080/callback",
@@ -530,7 +553,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         # Same PKCE reasoning as `toolhive-swe-cli` and
         # `ol-platform-engineering-grafana-client`: a PUBLIC client has no
         # other proof of possession, so it must be server-enforced.
-        pkce_code_challenge_method="S256",
+        **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=[
             # Claude Desktop / claude.ai custom connectors: the fixed
             # callback documented at
@@ -595,7 +618,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         implicit_flow_enabled=False,
         direct_access_grants_enabled=False,
         service_accounts_enabled=False,
-        pkce_code_challenge_method="S256",
+        **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=[f"{witan_ui_origin}/ui/"],
         # Where oidc-spa sends the browser after an idle-session logout.
         valid_post_logout_redirect_uris=[f"{witan_ui_origin}/ui/"],
@@ -711,6 +734,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
         service_accounts_enabled=False,
+        **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-platform-engineering-concourse-redirect-uris"
         ),
@@ -903,6 +927,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
         service_accounts_enabled=False,
+        **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-platform-engineering-vault-redirect-uris"
         ),
@@ -946,7 +971,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         implicit_flow_enabled=False,
         direct_access_grants_enabled=True,
         service_accounts_enabled=False,
-        pkce_code_challenge_method="S256",
+        **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-platform-engineering-grafana-redirect-uris"
         ),
@@ -1091,86 +1116,9 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
 
     # OL Platform Engineering Realm - Authentication Flows[START]
     # OL - browser flow [START]
-    # username-form -> ol-auth-username-password-form
-
-    ol_browser_platform_engineering_flow = keycloak.authentication.Flow(
-        "ol-browser-platform-engineering-flow",
-        realm_id=ol_platform_engineering_realm.id,
-        alias="ol-browser-platform-engineering-flow",
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-platform-engineering-auth-cookie",
-        realm_id=ol_platform_engineering_realm.id,
-        parent_flow_alias=ol_browser_platform_engineering_flow.alias,
-        authenticator="auth-cookie",
-        requirement="ALTERNATIVE",
-        priority=10,
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-platform-engineering-idp-redirector",
-        realm_id=ol_platform_engineering_realm.id,
-        parent_flow_alias=ol_browser_platform_engineering_flow.alias,
-        authenticator="identity-provider-redirector",
-        requirement="ALTERNATIVE",
-        priority=20,
-        opts=resource_options,
-    )
-    ol_browser_platform_engineering_flow_org = keycloak.authentication.Subflow(
-        "ol-browser-platform-engineering-flow-org",
-        realm_id=ol_platform_engineering_realm.id,
-        alias="ol-browser-platform-engineering-flow-org",
-        parent_flow_alias=ol_browser_platform_engineering_flow.alias,
-        provider_id="basic-flow",
-        requirement="ALTERNATIVE",
-        priority=30,
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-platform-engineering-flow-org-user-configured",
-        realm_id=ol_platform_engineering_realm.id,
-        parent_flow_alias=ol_browser_platform_engineering_flow_org.alias,
-        authenticator="conditional-user-configured",
-        priority=40,
-        requirement="REQUIRED",
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-platform-engineering-flow-org-identity-first",
-        realm_id=ol_platform_engineering_realm.id,
-        parent_flow_alias=ol_browser_platform_engineering_flow_org.alias,
-        authenticator="organization",
-        priority=50,
-        requirement="ALTERNATIVE",
-        opts=resource_options,
-    )
-    ol_browser_platform_engineering_passkey_flow = keycloak.authentication.Subflow(
-        "ol-browser-platform-engineering-passkey-flow",
-        realm_id=ol_platform_engineering_realm.id,
-        alias="ol-browser-platform-engineering-passkey-flow",
-        parent_flow_alias=ol_browser_platform_engineering_flow.alias,
-        provider_id="basic-flow",
-        priority=60,
-        requirement="REQUIRED",
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-platform-engineering-flow-username-form",
-        realm_id=ol_platform_engineering_realm.id,
-        parent_flow_alias=ol_browser_platform_engineering_passkey_flow.alias,
-        authenticator="auth-username-form",
-        requirement="REQUIRED",
-        priority=70,
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-platform-engineering-webauthn-authenticator-flow",
-        realm_id=ol_platform_engineering_realm.id,
-        parent_flow_alias=ol_browser_platform_engineering_passkey_flow.alias,
-        authenticator="webauthn-authenticator-passwordless",
-        requirement="REQUIRED",
-        priority=80,
+    ol_browser_platform_engineering_flow = create_passkey_browser_flow(
+        ol_platform_engineering_realm.id,
+        "ol-browser-platform-engineering",
         opts=resource_options,
     )
     # Bind the flow to the ol-platform-engineering realm for browser login.

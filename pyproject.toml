@@ -30,7 +30,7 @@ dependencies = [
   "pyinfra~=3.0",
   "pulumi-mongodbatlas>=4,<5",
   "bcrypt>=5,<6",
-  "pulumi-keycloak>=6.0.0,<7",
+  "pulumi-keycloak>=6.14.0,<7",
   "pydantic-settings>=2.0.1,<3",
   "pulumiverse-heroku>=1.0.3,<2",
   "pulumi-eks>=4,<5",
@@ -43,7 +43,7 @@ dependencies = [
   "pulumi-qdrant-cloud",
   "pulumi-rootly",
   "pulumi-command>=1.0,<2",
-  "ol-concourse>=0.18,<0.19",
+  "ol-concourse>=0.20,<0.21",
   "pulumiverse-grafana>=2.0.0,<3",
   "pulumiverse-sentry==0.0.9",
   "pyjwt[crypto]>=2.9,<3",
@@ -64,7 +64,7 @@ Repository = "https://github.com/mitodl/ol-infrastructure"
 
 [dependency-groups]
 # CI installs only this group (.github/workflows/autofix.yml); `dev` includes it.
-prek = ["prek==0.5.4"]
+prek = ["prek==0.5.5"]
 dev = [
   { include-group = "prek" },
   "copier",
@@ -373,10 +373,9 @@ exclude-newer = "7d"
 required-version = ">=0.9.17"
 
 [tool.uv.exclude-newer-package]
-# prek is pinned exactly in the `prek` group to the release the org's autofix.ci
-# contract names (mitodl/ol-github-workflows); Renovate's minimumReleaseAge
-# still gates each bump of that pin.
-prek = "0d"
+# 6.14.0 (2026-10-06) is the first release that works against Keycloak 26.8.
+# Taken inside the 7-day window on purpose; remove this line after 2026-10-13.
+pulumi-keycloak = "0d"
 ol-concourse = "0d"
 django-aqueduct = "0d"
 edx-sysadmin = "0d"

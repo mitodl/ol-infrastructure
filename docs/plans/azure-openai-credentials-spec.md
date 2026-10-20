@@ -168,7 +168,7 @@ is non-secret configuration.
 
 ### 5.1 Pod specification, all three consumers
 
-Each workload needs a projected ServiceAccount token and four environment variables:
+Each workload needs a projected ServiceAccount token and five environment variables:
 
 ```yaml
 volumes:
@@ -188,6 +188,7 @@ env:
   AZURE_TENANT_ID: <tenant id>
   AZURE_FEDERATED_TOKEN_FILE: /var/run/secrets/azure/tokens/azure-identity-token
   AZURE_AUTHORITY_HOST: https://login.microsoftonline.com/
+  AZURE_TOKEN_CREDENTIALS: WorkloadIdentityCredential
 ```
 
 The audience on the projected token is deliberately not IRSA's `sts.amazonaws.com`. The two
@@ -328,7 +329,7 @@ exactly the credential this design exists to eliminate.
 - After the per-app deploys: `kubectl exec` to confirm the four `AZURE_*` variables and the
   projected token file are present, **and** that `OPENAI_API_KEY` is still present and
   unchanged.
-- `pre-commit run --all-files` and `mypy` on all touched files.
+- `prek run --all-files` and `mypy` on all touched files.
 
 ## 9. Rejected alternative: Vault's Azure secrets engine
 

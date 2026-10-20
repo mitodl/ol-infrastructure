@@ -45,9 +45,11 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
+    Component,
     K8sAppLabels,
     Product,
     Services,
@@ -100,6 +102,18 @@ k8s_labels = K8sAppLabels(
     stack=stack_info,
 )
 k8s_global_labels = k8s_labels.model_dump()
+
+
+def workload_labels(component: Component) -> dict[str, str]:
+    """Label one Superset Deployment with its role and alert tier.
+
+    Superset is an internal BI tool, so every workload is notify.
+
+    :param component: The Deployment's functional role.
+    :returns: The stack's ol.mit.edu labels plus component and alert_tier.
+    """
+    return k8s_labels.workload_labels(alert_tier=AlertTier.notify, component=component)
+
 
 aws_account = get_caller_identity()
 superset_domain = superset_config.require("domain")
@@ -347,6 +361,7 @@ rds_defaults = defaults(stack_info)["rds"]
 rds_defaults["enhanced_monitoring_interval"] = 0
 rds_defaults["performance_insights_enabled"] = False
 rds_defaults["use_blue_green"] = False
+rds_defaults["read_replica"] = None
 superset_db_config = OLPostgresDBConfig(
     instance_name=f"ol-superset-db-{stack_info.env_suffix}",
     password=superset_config.require("db_password"),
@@ -559,9 +574,7 @@ oidc_secret = OLVaultK8SSecret(
 # StarRocks only has QA and Production substructure stacks; skip on CI.
 starrocks_creds_secret_name: str | None = None
 if stack_info.name != "CI":
-    starrocks_creds_secret_name = (
-        "superset-starrocks-creds"  # pragma: allowlist secret  # noqa: S105
-    )
+    starrocks_creds_secret_name = "superset-starrocks-creds"  # pragma: allowlist secret  # noqa: S105
     starrocks_creds_secret = OLVaultK8SSecret(
         f"superset-starrocks-creds-{stack_info.env_suffix}",
         resource_config=OLVaultK8SDynamicSecretConfig(
@@ -705,7 +718,8 @@ superset_chart = kubernetes.helm.v3.Release(
                 "port": str(DEFAULT_REDIS_PORT),
             },
             "supersetNode": {
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.webapp),
+                "deploymentLabels": workload_labels(Component.webapp),
                 "replicas": {"enabled": False},
                 # CPU is the only HPA metric. A gunicorn web pod's memory is a
                 # resident baseline that does not fall when replicas are added,
@@ -742,12 +756,23 @@ superset_chart = kubernetes.helm.v3.Release(
                 "podDisruptionBudget": {"enabled": True, "minAvailable": 1},
             },
             "supersetWorker": {
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.celery),
+                "deploymentLabels": workload_labels(Component.celery),
                 "replicas": {"enabled": True, "replicaCount": 1},
+                # The chart's default command plus --without-gossip: gossip
+                # leaks an orphan celeryev.<uuid> queue on the Redis broker
+                # for every worker start (see the celery worker command in
+                # components/services/k8s.py for the mechanism).
+                "command": [
+                    "/bin/sh",
+                    "-c",
+                    ". /app/pythonpath/superset_bootstrap.sh; exec celery"
+                    " --app=superset.tasks.celery_app:app worker --without-gossip",
+                ],
             },
             "supersetCeleryBeat": {
                 "enabled": True,
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.beat),
             },
             # MCP server for AI clients (Claude Desktop, Claude Code, etc.) to
             # interact with dashboards, datasets, and SQL Lab. Shares the same
@@ -757,7 +782,8 @@ superset_chart = kubernetes.helm.v3.Release(
             "supersetMcp": {
                 "enabled": True,
                 "replicaCount": 2,
-                "podLabels": k8s_global_labels | {"ol.mit.edu/process": "mcp"},
+                "podLabels": workload_labels(Component.api)
+                | {"ol.mit.edu/process": "mcp"},
                 "resources": {
                     "limits": {"cpu": "500m", "memory": "512Mi"},
                     "requests": {"cpu": "100m", "memory": "256Mi"},
@@ -865,7 +891,7 @@ gateway_config = OLEKSGatewayConfig(
             hostname=superset_domain,
             port=8443,
             tls_mode="Terminate",
-            certificate_secret_name="superset-tls",  # pragma: allowlist secret  # noqa: E501, S106
+            certificate_secret_name="superset-tls",  # pragma: allowlist secret  # noqa: S106
             certificate_secret_namespace=superset_namespace,
         ),
     ],

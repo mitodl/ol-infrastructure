@@ -291,21 +291,29 @@ oidc_enabled = starrocks_config.get_bool("oidc_enabled") or False
 # DROP CATALOG below.
 #
 # CREATE IF NOT EXISTS is idempotent: it is a no-op when the catalog
-# already exists with any set of properties.  StarRocks has no ALTER CATALOG
-# statement for updating properties in-place; the only way to change catalog
-# properties after creation is to DROP and re-CREATE the catalog.  If
-# properties need to change, manually run
-#   DROP CATALOG IF EXISTS <name>;
-# against the FE, then run `pulumi up` to recreate it via this command.
+# already exists with any set of properties.  Do not change _catalog_sql to
+# change a property: its hash is the Command's trigger, so a change replaces
+# the Command, which runs DROP CATALOG, and dropping a catalog also drops
+# every grant on it.  roles_setup_cmd would not re-run to restore them
+# because its own SQL is unchanged.  Properties that have to change after
+# creation go in _catalog_mutable_props below, applied in place with
+# ALTER CATALOG ... SET.
 #
-# Credential chain: use_instance_profile=false with no explicit key/role
-# instructs StarRocks to fall through to the AWS SDK default credential
-# chain.  On EKS with IRSA the pod already has AWS_ROLE_ARN +
-# AWS_WEB_IDENTITY_TOKEN_FILE injected; the SDK resolves them automatically
-# without a second sts:AssumeRole call.  Setting iam_role_arn here would
+# Credential chain: on EKS with IRSA the pod already has AWS_ROLE_ARN +
+# AWS_WEB_IDENTITY_TOKEN_FILE injected, and the AWS SDK default chain resolves
+# them without a second sts:AssumeRole call.  Setting iam_role_arn here would
 # cause StarRocks to attempt a nested AssumeRole and fail with a 403.
+#
+# use_instance_profile=false with no explicit key only reaches that chain for
+# the Glue client and Iceberg's own S3 FileIO.  StarRocks treats the S3
+# credential as unset (AwsCloudCredential.validate() is false), so it never
+# configures the Hadoop S3A filesystem the FE uses to stat a location, and
+# CREATE DATABASE ... PROPERTIES("location" = ...) fails with a 403 on
+# getFileStatus.  aws.s3.use_aws_sdk_default_behavior names the default chain
+# explicitly so both paths use the IRSA role.
 _DATA_LAKE_ENVS = readable_data_lake_environments(stack_info.env_suffix)
 catalog_setups: list[command.local.Command] = []
+_catalog_mutable_props = {"aws.s3.use_aws_sdk_default_behavior": "true"}
 _iceberg_roles_sql = ""
 if enable_data_lake:
     aws_region = starrocks_config.get("aws_region") or "us-east-1"
@@ -345,6 +353,26 @@ if enable_data_lake:
                     depends_on=[starrocks_db_connection],
                 ),
             )
+        )
+        _catalog_props_sql = (
+            f"ALTER CATALOG {_catalog_name} SET ("
+            + ", ".join(
+                f'"{key}" = "{value}"' for key, value in _catalog_mutable_props.items()
+            )
+            + ");"
+        )
+        command.local.Command(
+            f"starrocks-{stack_info.env_suffix}-catalog-properties-{_catalog_env}",
+            create=_exec_sql,
+            update=_exec_sql,
+            environment={**_mysql_env, "STARROCKS_SQL": _catalog_props_sql},
+            # The catalog's hash is here so that a replaced (dropped and
+            # re-created) catalog gets its properties applied again.
+            triggers=[
+                hashlib.sha256(_catalog_props_sql.encode()).hexdigest(),
+                hashlib.sha256(_catalog_sql.encode()).hexdigest(),
+            ],
+            opts=ResourceOptions(depends_on=[catalog_setups[-1]]),
         )
         _iceberg_roles_sql += (
             f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE readonly;"
@@ -627,17 +655,58 @@ command.local.Command(
 # property changes (e.g. a client secret rotation) are applied correctly.
 # StarRocks has no ALTER SECURITY INTEGRATION for OAuth2 core properties.
 #
-# Users authenticate via the browser-based OAuth2 Authorization Code flow.
-# Each human user must also be pre-created in StarRocks with:
-#   CREATE USER 'preferred_username'@'%' IDENTIFIED WITH authentication_oauth2;
-# and assigned an appropriate role.  Use starrocks:oidc_users in the stack
-# config to manage these accounts through Pulumi; users not listed there
-# must be created manually after the cluster is deployed.
+# Users authenticate via the browser-based OAuth2 Authorization Code flow,
+# driven by the JDBC driver; the FE exchanges the code server-side.
+#
+# A login that resolves through this integration does NOT create a user row.
+# On 4.1.6 AuthenticationHandler.authenticateWithSecurityIntegration() returns
+# UserIdentity.createEphemeralUserIdent(), which lives for the connection and
+# is persisted nowhere, and no source file under com/starrocks/authentication
+# reads the "auto_provision_user" property set below. Durable role assignment
+# therefore comes from the group provider (see the group-sync block), not from
+# an account the integration leaves behind.
+#
+# Most users need no account at all, per the paragraph above. Where a durable
+# one IS wanted (a per-user GRANT, visibility to SHOW GRANTS, a role other than
+# the group provider's), it uses `IDENTIFIED WITH authentication_jwt` -- that is
+# what starrocks:oidc_users below emits, with its GRANT and DEFAULT ROLE
+# statements. Create one by hand the same way (see that block for the full SQL).
+#
+# Do NOT create them with `IDENTIFIED WITH authentication_oauth2`. A user whose
+# persisted auth plugin is authentication_oauth2 is accepted by the FE HTTP
+# port (8030) under Basic auth with ANY password, including an empty one.
+# Measured on 4.1.6 (2026-10-06): such a user reached /system, /session,
+# /api/show_proc, /api/v1/catalogs/.../sql and _stream_load, and the stream
+# load committed rows. Reading the 4.1.6 source for the cause:
+# BaseAction.checkPassword() authenticates against a fresh ConnectContext that
+# carries no client auth plugin, so OAuth2AuthenticationProvider.authenticate()
+# returns success at its AUTHENTICATION_OAUTH2_CLIENT guard and defers the real
+# check to checkLoginSuccess(), which no HTTP code path calls. The MySQL
+# protocol is unaffected (it refuses with ERROR 5207), and authentication_jwt
+# users are refused correctly. Upstream: StarRocks#67702, closed stale and
+# never fixed.
+#
+# Scope if one is ever created by hand: port 8030 is not published to the
+# internet. The APISIX route exposes only the exact path /api/oauth2 and the FE
+# NLB only 9030, so the reachable surface is in-cluster and port-forward.
 #
 # Service-account (application) access continues to use Vault dynamic
 # credentials (native StarRocks auth) and is unaffected by OIDC config.
 _OIDC_SECURITY_INTEGRATION_NAME = "keycloak_oauth2"
 _JWT_SECURITY_INTEGRATION_NAME = "keycloak_jwt"
+_GROUP_PROVIDER_NAME = "keycloak_file_groups"
+_PERMITTED_GROUPS = ",".join(sorted(_GOVERNANCE_ROLES))
+# Both integrations are created with these, not only ALTERed to them afterwards.
+# An integration with no permitted_groups admits any realm user whose token
+# carries a starrocks_username, and one with no group_provider gives nobody a
+# role. Creating without them leaves that open from the CREATE until the group
+# provider setup runs, and for good if that command does not re-run: QA was found
+# in that state on 2026-10-07. permitted_groups with the provider not yet created
+# refuses every login, which is the safe direction.
+_INTEGRATION_GROUP_PROPERTIES = (
+    f'    "group_provider" = "{_GROUP_PROVIDER_NAME}",\n'
+    f'    "permitted_groups" = "{_PERMITTED_GROUPS}",\n'
+)
 
 if oidc_enabled:
     # Read OIDC credentials from Vault. The client_secret is explicitly
@@ -681,6 +750,7 @@ if oidc_enabled:
             '/protocol/openid-connect/certs",\n'
             '    "principal_field" = "starrocks_username",\n'
             '    "auto_provision_user" = "true",\n'
+            f"{_INTEGRATION_GROUP_PROPERTIES}"
             f'    "required_issuer" = "{issuer}"\n'
             ");"
         )
@@ -777,6 +847,7 @@ if oidc_enabled:
             f'    "jwks_url" = "{issuer}/protocol/openid-connect/certs",\n'
             '    "principal_field" = "starrocks_username",\n'
             '    "auto_provision_user" = "true",\n'
+            f"{_INTEGRATION_GROUP_PROPERTIES}"
             f'    "required_issuer" = "{issuer}"\n'
             ");"
         )
@@ -859,7 +930,7 @@ if oidc_enabled:
     # would eliminate the sync entirely:
     # https://github.com/StarRocks/starrocks/issues/75224
     _sync_script = str(Path(__file__).parent / "keycloak_group_sync.py")
-    _group_provider_name = "keycloak_file_groups"
+    _group_provider_name = _GROUP_PROVIDER_NAME
     _group_file_cm = f"{stack_info.env_prefix}-starrocks-oidc-groups"
     _group_file_path = "groups/groups.txt"
     _k8s_namespace = "starrocks"
@@ -904,7 +975,7 @@ if oidc_enabled:
         ),
     )
 
-    _permitted = ",".join(sorted(_GOVERNANCE_ROLES))
+    _permitted = _PERMITTED_GROUPS
     _group_provider_setup_sql = (
         f"CREATE GROUP PROVIDER IF NOT EXISTS {_group_provider_name}\n"
         f"PROPERTIES (\n"
@@ -944,7 +1015,18 @@ if oidc_enabled:
             "STARROCKS_SQL": _group_provider_setup_sql,
             "STARROCKS_DELETE_SQL": _group_provider_drop_sql,
         },
-        triggers=[hashlib.sha256(_group_provider_setup_sql.encode()).hexdigest()],
+        # Both integration commands DROP and CREATE their integration. Their
+        # SQL is in the triggers so this re-runs whenever either one does, which
+        # re-creates the group provider and repeats the ALTERs. The integrations
+        # now carry both properties from their own CREATE as well (see
+        # _INTEGRATION_GROUP_PROPERTIES); before that, a recreate left QA with
+        # neither property on either integration.
+        triggers=pulumi.Output.all(_integration_sql, _jwt_integration_sql).apply(
+            lambda sqls: [
+                hashlib.sha256(sql.encode()).hexdigest()
+                for sql in (_group_provider_setup_sql, *sqls)
+            ]
+        ),
         opts=ResourceOptions(
             delete_before_replace=True,
             # roles_setup_cmd: GRANT <role> TO EXTERNAL GROUP requires the roles
@@ -959,10 +1041,14 @@ if oidc_enabled:
     )
 
     # Pre-create OIDC-authenticated user accounts from config.
-    # With auto_provision_user=true and the file group provider in place,
-    # accounts and roles are normally handled automatically on first login.
-    # Entries here are only needed for edge-case overrides (e.g. a user who
-    # needs a different role than the one assigned via their Keycloak groups).
+    # A first login needs no entry here: the security integration authenticates
+    # an unknown username against Keycloak and the file group provider supplies
+    # the role, so entries are only needed for edge-case overrides (e.g. a user
+    # who needs a different role than their Keycloak groups give them).
+    # Note that no account is persisted by that path -- the integration's
+    # identity is ephemeral and "auto_provision_user" is not read on 4.1.6 (see
+    # the OAuth2 security integration block) -- so an entry here is also how an
+    # account becomes visible to SHOW GRANTS and to per-user GRANT statements.
     #
     # Each entry must supply:
     #   username    - the starrocks_username claim value (local part of the Keycloak

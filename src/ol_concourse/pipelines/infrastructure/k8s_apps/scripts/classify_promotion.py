@@ -1,0 +1,198 @@
+"""Turn a Production preview into the release issue the gate waits on.
+
+Runs in the QA job after it previews Production. One issue carries one
+approval for everything the Production deploy would change: the app commits
+(when a release is waiting) and the infrastructure diff (when there is one).
+
+    new release? | Production diff | issue
+    yes          | non-empty       | ``Release <app> <version>``: checklist + diff
+    yes          | empty           | ``Release <app> <version>``: checklist only
+    no           | non-empty       | ``Release <app> infrastructure @ <live>``: diff
+    no           | empty           | none: ``skip`` is written and the put posts nothing
+
+The title keeps the ``Release <app>`` prefix so the release gate, which
+matches on it, still sees every row.
+
+A release is new when the latest cut version is not the one Production is
+running. What Production is running comes from the release resource's
+``production_version`` and ``production_state``, and this refuses to decide
+when the state is ``unknown``: guessing would either open an issue for a
+release that is already live or hide one that is not. ``none`` (Production has
+never had a successful deployment) is a first release.
+
+A new release is only approvable while its version tag is still there, and
+this writes the tag to ``release_tag`` for the issue put's
+``skip_if_tag_missing``. Until a newer release is built, the latest cut version
+is still one that may have been abandoned, so an infrastructure merge that
+re-runs QA would otherwise open an issue for it, and closing that issue would
+deploy a release whose branch and tag are gone. The tag, not the
+``releases/<version>`` branch, because abandoning deletes both while finishing
+deletes only the branch: a finished release is new again once Production rolls
+back past it, and must still get its issue. ``release_tag`` is empty for an
+infrastructure-only issue, which needs no check.
+
+The body opens with a hidden marker naming the ol-infrastructure commit that
+was previewed. Closing the issue approves that diff, and the Production job's
+``assert-gate-names-deploy`` refuses to deploy any other commit under it. The
+marker leads the body because the issue put truncates an oversized body from
+the end.
+
+``pipeline.py`` inlines this file's text into the task (``python3 -c``), so it
+must stay standard-library only and self-contained.
+
+Environment:
+    APP_NAME: the app.
+    VERSION_FILE: ``<release>/version``, the latest cut release.
+    PRODUCTION_VERSION_FILE: ``production_version`` from a fresh release get.
+    PRODUCTION_STATE_FILE: ``production_state`` from the same get.
+    CHECKLIST_FILE: ``<release>/checklist.md`` from the release resource.
+    PREVIEW_SUMMARY_FILE: the Production preview's markdown summary.
+    NO_CHANGES_MARKER_FILE: written next to the summary when it found no changes.
+    INFRA_REF_FILE: ``<ol-infra>/.git/ref``, the commit that was previewed.
+    INFRA_REPO_URL: the ol-infrastructure repository's web URL, for the link.
+    OUTPUT_DIR: directory to write ``title``, ``release_tag``, ``body.md``
+        and maybe ``skip`` into.
+"""
+
+import os
+import re
+import sys
+from pathlib import Path
+
+NO_INFRA_CHANGES = "No infrastructure changes: Production already matches this code."
+#: Kept in step with ``approved_revision`` in ``assert_gate_names_deploy.py``.
+REVISION_MARKER = "<!-- ol-infrastructure-revision: {sha} -->"
+_SHA = re.compile(r"[0-9a-f]{40}")
+
+
+def infra_revision(ref: str) -> str:
+    """Return the previewed commit SHA, or raise ValueError if *ref* is not one."""
+    if not _SHA.fullmatch(ref):
+        msg = f"the ol-infrastructure ref {ref!r} is not a full commit SHA"
+        raise ValueError(msg)
+    return ref
+
+
+def is_new_release(version: str, production_version: str, state: str) -> bool:
+    """Return whether *version* is waiting to be approved.
+
+    Raises ValueError when that cannot be decided.
+    """
+    if not version:
+        msg = "the release resource published no version"
+        raise ValueError(msg)
+    if state == "none":
+        return True
+    if state == "known" and production_version:
+        return version != production_version
+    msg = (
+        "the release resource could not tell what Production is running "
+        f"(state {state!r}, version {production_version!r})"
+    )
+    raise ValueError(msg)
+
+
+def classify(
+    app: str,
+    version: str,
+    *,
+    new_release: bool,
+    has_diff: bool,
+) -> tuple[str, bool]:
+    """Return ``(issue title, skip)``; the title is empty when skipping."""
+    if new_release:
+        return f"Release {app} {version}", False
+    if has_diff:
+        return f"Release {app} infrastructure @ {version}", False
+    return "", True
+
+
+def compose_body(  # noqa: PLR0913
+    checklist: str,
+    summary: str,
+    *,
+    new_release: bool,
+    has_diff: bool,
+    revision: str,
+    repo_url: str,
+) -> str:
+    """Compose the issue body: the revision marker, then the checklist, then the diff.
+
+    The marker is an HTML comment, so the checklist's version header is still
+    the first thing a reader sees.
+    """
+    parts = [REVISION_MARKER.format(sha=revision)]
+    if new_release:
+        parts.append(checklist.rstrip())
+    parts.append(
+        "## Infrastructure changes (Production preview)\n\n"
+        f"Previewed at ol-infrastructure [`{revision[:8]}`]"
+        f"({repo_url.rstrip('/')}/commit/{revision}). Closing this issue "
+        "approves that commit: if a newer one reaches QA first, Production "
+        "refuses to deploy and QA posts a new issue to approve.\n\n"
+        + (summary.strip() if has_diff else NO_INFRA_CHANGES)
+    )
+    return "\n\n".join(parts) + "\n"
+
+
+def _read(name: str) -> str:
+    return Path(os.environ[name]).read_text().strip()
+
+
+def main() -> None:
+    """Decide the issue and write its title, body and skip marker."""
+    app = os.environ["APP_NAME"]
+    version = _read("VERSION_FILE")
+    try:
+        new_release = is_new_release(
+            version,
+            _read("PRODUCTION_VERSION_FILE"),
+            _read("PRODUCTION_STATE_FILE"),
+        )
+    except (ValueError, OSError) as error:
+        sys.exit(f"Refusing to classify {app}: {error}. No issue was posted.")
+
+    summary_file = Path(os.environ["PREVIEW_SUMMARY_FILE"])
+    if not summary_file.is_file():
+        # No summary means the preview did not report; guessing "no changes"
+        # here would let an unreviewed diff through or hide one.
+        sys.exit(
+            f"Refusing to classify {app}: the Production preview left no "
+            f"summary at {summary_file}."
+        )
+    has_diff = not Path(os.environ["NO_CHANGES_MARKER_FILE"]).exists()
+    try:
+        revision = infra_revision(_read("INFRA_REF_FILE"))
+    except (ValueError, OSError) as error:
+        sys.exit(f"Refusing to classify {app}: {error}. No issue was posted.")
+
+    title, skip = classify(app, version, new_release=new_release, has_diff=has_diff)
+    output = Path(os.environ["OUTPUT_DIR"])
+    output.mkdir(parents=True, exist_ok=True)
+    # load_var needs both files to read even when nothing is posted.
+    (output / "title").write_text(title or f"Release {app} infrastructure @ {version}")
+    # The release resource tags each release with its bare version.
+    (output / "release_tag").write_text(version if new_release else "")
+    if skip:
+        (output / "skip").write_text("nothing to approve\n")
+        print(f"{app}: new release no, infrastructure diff no. Nothing to approve.")  # noqa: T201
+        return
+
+    checklist = Path(os.environ["CHECKLIST_FILE"]).read_text() if new_release else ""
+    body = compose_body(
+        checklist,
+        summary_file.read_text(),
+        new_release=new_release,
+        has_diff=has_diff,
+        revision=revision,
+        repo_url=os.environ["INFRA_REPO_URL"],
+    )
+    (output / "body.md").write_text(body)
+    print(  # noqa: T201
+        f"{app}: new release {'yes' if new_release else 'no'}, "
+        f"infrastructure diff {'yes' if has_diff else 'no'}. Issue: {title!r}."
+    )
+
+
+if __name__ == "__main__":
+    main()

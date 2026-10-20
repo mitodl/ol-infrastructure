@@ -46,12 +46,36 @@ ecr_policy = aws.iam.get_policy_document(
         }
     ]
 )
+
+# Cached images are deployed by digest, so nearly all are untagged and an
+# "expire untagged" rule would delete live images. Expiry by push age is safe for
+# a cache: a miss re-fetches from upstream. ECR's sinceImagePulled can only
+# archive, and archived images cannot be pulled.
+pull_through_cache_lifecycle_policy = json.dumps(
+    {
+        "rules": [
+            {
+                "rulePriority": 1,
+                "description": "Expire cached images pushed more than 90 days ago",
+                "selection": {
+                    "tagStatus": "any",
+                    "countType": "sinceImagePushed",
+                    "countUnit": "days",
+                    "countNumber": 90,
+                },
+                "action": {"type": "expire"},
+            }
+        ]
+    }
+)
+
 default_repository_creation_template = aws.ecr.RepositoryCreationTemplate(
     "aws-ecr-default-repository-template",
     description="Default template for ECR repositories",
     image_tag_mutability="MUTABLE",
     applied_fors=["PULL_THROUGH_CACHE"],
     repository_policy=ecr_policy.json,
+    lifecycle_policy=pull_through_cache_lifecycle_policy,
     prefix="ROOT",
 )
 
@@ -76,6 +100,8 @@ ecr_registry_policy = aws.ecr.RegistryPolicy(
     ),
 )
 
+
+pull_through_cache_prefixes = ("dockerhub/", "ecr-public/")
 
 aws.ecr.PullThroughCacheRule(
     "aws-ecr-public-pull-through-cache-rule",
@@ -108,6 +134,20 @@ aws.ecr.PullThroughCacheRule(
     ecr_repository_prefix="dockerhub",
     credential_arn=dockerhub_credential.arn,
 )
+
+# The creation template only applies to repositories created after it changes, so
+# the cache repositories that already exist get the policy attached directly.
+# Bitnami removed its versioned tags from Docker Hub, so the cache holds the only
+# copies of those tags and expiring them would be unrecoverable.
+for repository_name in aws.ecr.get_repositories().names:
+    if repository_name.startswith(
+        pull_through_cache_prefixes
+    ) and not repository_name.startswith("dockerhub/bitnami/"):
+        aws.ecr.LifecyclePolicy(
+            f"ecr-pull-through-cache-lifecycle-{repository_name.replace('/', '-')}",
+            repository=repository_name,
+            policy=pull_through_cache_lifecycle_policy,
+        )
 
 ecr_private_repository = aws.ecr.Repository(
     "aws-ecr-private-repository", name="ol-course-notebooks"

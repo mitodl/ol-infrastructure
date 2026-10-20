@@ -47,7 +47,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-PG=(kubectl -n local-infra exec local-pg-1 -c postgres --)
+PG=(kubectl --context local-dev -n local-infra exec local-pg-1 -c postgres --)
 
 if [ -e "$OUT" ] && [ -n "$(ls -A "$OUT")" ]; then
     err "refusing to write into non-empty $OUT"
@@ -80,7 +80,7 @@ log "Exporting olapps realm users"
 # own them. Realm roles are exported by name, default-roles-olapps included:
 # partialImport grants only the roles listed, so leaving it out would strip
 # the imported users of it.
-kubectl -n local-infra exec -i local-pg-1 -c postgres -- \
+kubectl --context local-dev -n local-infra exec -i local-pg-1 -c postgres -- \
     psql -U postgres -qAt -v ON_ERROR_STOP=1 -d keycloak -f - > "$OUT/keycloak-users.json" <<'SQL'
 SELECT coalesce(json_agg(json_build_object(
   'id', u.id,

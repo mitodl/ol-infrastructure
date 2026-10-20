@@ -26,23 +26,25 @@ can produce the local app manifests) to the whole stack.
 
 | Service | Local | Deployed | Shared code |
 |---|---|---|---|
-| APISIX | chart 2.13.0 (APISIX 3.15.0, controller chart 1.1.1) | chart 2.17.0 (APISIX 3.18.0, controller chart 1.3.0) | none |
+| APISIX | chart 2.17.0 (APISIX 3.18.0, controller chart 1.3.0) | chart 2.17.0 (APISIX 3.18.0, controller chart 1.3.0) | version pin |
 | Gateway API | no `GatewayClass` or `Gateway` | `GatewayClass`/`Gateway` `apisix`, CRDs v1.6.2 | none |
-| cert-manager | v1.16.2, installed, used by nothing | v1.21.2, `ClusterIssuer` per environment | none |
-| Keycloak operator | 26.0.7, CR `v2alpha1`, behind APISIX over HTTP | 26.7.4, CR `v2beta1`, behind Traefik over HTTPS | none |
+| cert-manager | v1.21.2, installed, used by nothing | v1.21.2, `ClusterIssuer` per environment | version pin |
+| Keycloak operator | 26.7.4, CR `v2beta1`, behind APISIX over HTTP | 26.7.4, CR `v2beta1`, behind Traefik over HTTPS | version pin, CRD list helper |
 | Keycloak realm | 861 lines, credentials in k8s Secrets | about 1800 lines, credentials in Vault | flow builders |
 | Postgres | CloudNativePG 1.25.0, one shared cluster, version unpinned | RDS per app, major 15 (mit_learn, mitxonline) or 18 | none |
-| Valkey | `8-alpine`, no TLS, no auth, shared | ElastiCache Valkey 7.2, TLS and auth token, per app | none |
+| Valkey | `7.2.14-alpine`, no TLS, no auth, shared | ElastiCache Valkey 7.2, TLS and auth token, per app | none |
 | OpenSearch | chart 3.4.0, security plugin off | AWS OpenSearch 3.3 | none |
 | Qdrant | v1.19.1, one pod, no API key | Qdrant Cloud v1.19.1, API key | version pin |
-| Tika | image 3.0.0.0, no auth | chart 3.2.2, access token, behind APISIX | none |
-| Object storage | RustFS 1.0.0-rc.6, ocw-studio only | S3, IAM credentials issued by Vault | none |
+| Tika | image from chart 3.2.2 (`3.2.2.0-full`), no auth | chart 3.2.2, access token, behind APISIX | version pin |
+| Object storage | RustFS 1.0.0, ocw-studio only | S3, IAM credentials issued by Vault | none |
 | Secrets | committed plain Secrets | Vault and Vault Secrets Operator 1.6.0 | none |
 | Observability | Loki, Alloy v1.7.5, Grafana, logs only | k8s-monitoring 4.5.2 to Grafana Cloud | none |
 | nginx sidecar | 1.25 and 1.27 in four apps | removed from all five counterparts | none |
 
-Local versions are hardcoded or default in `local-dev/infra/core/__main__.py`.
-Renovate tracks `src/bridge/lib/versions.py`, so only the deployed column moves.
+Every platform version in `local-dev/infra` now comes from
+`src/bridge/lib/versions.py` (step 2 of the order of work below), so Renovate
+moves both columns. The nginx sidecar tags in the hand-written app manifests
+are still hardcoded; the sidecar goes away with the app definitions.
 
 Three of these change behaviour an application developer depends on.
 
@@ -160,28 +162,53 @@ route definitions. A local program cannot import any of it without AWS and
 Vault providers.
 
 Each application gets a definition module holding what is true in every
-environment, and takes the rest as an argument:
+environment, and takes the rest as an argument. mitxonline is the first
+(`src/ol_infrastructure/applications/mitxonline/definition.py`):
 
 ```python
-# src/ol_infrastructure/applications/mitxonline/definition.py
 class MitxonlineBindings(BaseModel):
-    hostnames: ...  # public hosts and cookie domain
-    database: ...  # host, name, credential source
-    cache: ...  # host, TLS, credential source
-    object_storage: ...  # bucket, endpoint, credential source
-    keycloak: ...  # base URL, realm, client
+    env_suffix: str  # names session cookies per environment
+    hostnames: MitxonlineHostnames  # api, frontend, learn_api
+    environment_variables: dict[str, Any]  # this environment's values
+    k8s_labels: dict[str, str]
     secret_names: list[str]  # Secrets mounted with envFrom
     cluster: ClusterCapabilities
+    celery_topology: Literal["per-queue", "merged"] = "per-queue"
+    granian_reload: bool = False
+    ...  # image, replicas, memory limit, dev shell, KEDA, celery Redis
 
 
-def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig: ...
-def routes(bindings: MitxonlineBindings) -> list[OLApisixRouteConfig]: ...
+def application_config(bindings) -> OLApplicationK8sConfig: ...
+def direct_oidc_config(bindings) -> OLApisixOIDCConfig: ...
+def prefixed_oidc_config(bindings) -> OLApisixOIDCConfig: ...
+def shared_plugins(bindings) -> list[OLApisixPluginConfig]: ...
+def direct_route_configs(bindings, oidc, shared_plugin_config_name): ...
+def prefixed_route_configs(bindings, oidc, shared_plugin_config_name): ...
 ```
 
 The deployed `__main__.py` builds bindings from the AWS resources it creates.
 A local program builds them from the local platform. Environment-invariant
-settings (the 37 duplicated mit-learn values, celery queue names, probe paths,
-Granian settings, route rules and priorities) exist once.
+settings (celery queue names, Granian settings, route rules and priorities,
+OIDC session settings) exist once; what each workload is given is a binding
+whose defaults are the deployed sizes. Environment variables split by where
+they hold: the few that hold wherever the app runs, a developer's cluster
+included, are `LOCAL_AND_DEPLOYED_ENV` in the definition; values true of the
+deployed stacks alone are defaults in the deployed program, applied under
+each stack's `vars`, and never reach a local program.
+
+The bindings are narrower than first sketched. Database, cache, object
+storage and Keycloak reach the application as environment variables and
+Secrets, not as structured fields: the deployed stacks already carry those
+values in `mitxonline:vars` and in VSO-rendered Secrets, and the definition
+computes nothing from them. Only values the definition derives something from
+are structured (hostnames, `env_suffix`). The one variable the routes read,
+`OPENEDX_API_BASE_URL` for the `frame-ancestors` header, is looked up in the
+merged environment and raises if a program's bindings omit it.
+
+The OIDC config functions take their client credentials from exactly one of
+`cluster.vault_auth_name` (Vault) or `MitxonlineBindings.oidc_secret_name` (a
+Secret that already exists, on a cluster without Vault); setting both or
+neither is an error.
 
 `ClusterCapabilities` carries what the component needs to know about the
 cluster it renders for. The component change on this branch adds the knobs:
@@ -190,7 +217,7 @@ cluster it renders for. The component change on this branch adds the knobs:
 |---|---|---|
 | ECR image rewrite (app and nginx) | `registry` | `"direct"` |
 | `SecurityGroupPolicy` and pod label | `application_security_group_id`, `application_security_group_name` | unset |
-| Vault auth name (required, never read) | `vault_k8s_resource_auth_name` | unset |
+| Vault auth name (`vault_k8s_resource_auth_name`, required by the workload component and never read there; the definition reads it to pick the Vault OIDC credentials) | `vault_auth_name` | unset |
 | Webapp HPA or KEDA `ScaledObject` | `manage_webapp_autoscaler` | `False` |
 | Celery KEDA `ScaledObject` per worker | `manage_celery_autoscalers` | `False` |
 | `PodMonitor` | `manage_pod_monitor` | `False` |
@@ -204,10 +231,13 @@ ID at module level. Those are now created on first use
 (`lib/aws/eks_helper.py`, `lib/aws/ec2_helper.py`, `lib/aws/aws_helper.py`),
 so a machine with no AWS configuration can load and render the component.
 
-Still missing from the component for local use, to be added as they are needed:
+`GranianConfig` has `reload`, `reload_ignore_dirs` and `workers_kill_timeout`
+for the development loop. Granian turns off its RSS monitor and metrics
+exporter while the reloader runs, so a local pod with `granian_reload` set
+exposes the metrics port and serves nothing on it.
 
-- Granian `--reload`, `--reload-ignore-dirs` and `--workers-kill-timeout`.
-  `GranianConfig` has no field for them.
+Still missing for local use:
+
 - Per-developer env overrides. The component writes inline `env`, and a
   ConfigMap mounted with `envFrom` cannot override inline `env`. The local
   program merges the developer's override file into the dict before handing it
@@ -238,9 +268,12 @@ The second was chosen. It removes the duplication without adding a stateful
 service to every developer's laptop, and VSO behaviour (refresh, rollout
 restart) is operations territory that local-dev does not need to reproduce.
 
-`OLApisixOIDCResources` needs the same treatment: it creates an
-`OLVaultK8SSecret` unconditionally (`apisix.py:586-602`) and must accept a
-plain Secret as its credential source.
+`OLApisixOIDCResources` already takes its credential source as data:
+`OLApisixOIDCConfig.credentials` is either `OLApisixOIDCVaultCredentials`
+(deployed; the component writes the Secret through VSO) or
+`OLApisixOIDCSecretCredentials` (a Secret that already exists; nothing is
+created), and `bridge.lib.constants.oidc_secret_data` defines the keys that
+Secret carries, the same ones the deployed VSO templates write.
 
 ### Celery topology
 
@@ -248,9 +281,10 @@ Decided 2026-09-28: local-dev runs one celery worker Deployment consuming
 every queue by default, and a developer can switch an app to the deployed
 topology (one Deployment per queue).
 
-The application definition lists its queues once, with the resources each
-deployed worker gets. The deployed program turns that list into one
-`OLApplicationK8sCeleryWorkerConfig` per queue, as today. The local program
+The application definition lists its queues once; the resources each worker
+gets are a per-queue binding, defaulting to the deployed sizes. The deployed
+program turns that list into one `OLApplicationK8sCeleryWorkerConfig` per
+queue, as today. The local program
 reads a per-app setting:
 
 - `merged` (default): one worker config with `worker_name="all"` and
@@ -413,6 +447,20 @@ Names that Pulumi generates are masked in the comparison. Four xqueue stacks
 have never been applied and their HPA has no explicit name, so its random
 suffix differs between any two previews, including two from `main`.
 
+The comparison is now a command, `bin/pulumi-preview-diff <project dir>
+--all-stacks`, which checks the baseline ref out to a temporary worktree and
+reports `IDENTICAL`, or the URNs and keys that differ.
+
+Result for the mitxonline definition split on 2026-10-07, against `main` at
+91289186c: CI, QA and Production plan identical steps. A deliberate change of
+`blocking_threads` from 16 to 17 was reported as a difference in the webapp
+Deployment's args, so the comparison does see the rendered config.
+
+Secret inputs are outside that result: `pulumi preview --json` prints them as
+`[secret]`, so the comparison cannot tell two secret values apart. The Redis
+password is the one secret that passes through the definition
+(`celery_redis`), and it is handed on unchanged.
+
 Local behaviour is covered by `test_k8s_local_cluster.py` and
 `test_k8s_without_aws.py` in `tests/ol_infrastructure/components/services/`. It
 has not been applied to a k3d cluster; that happens with the first local
@@ -464,7 +512,5 @@ Not part of this work. Each needs its own check before acting on it.
 - odl_video_service's broker URL uses Redis database 0
   (`odl_video_service/k8s_secrets.py:168`) while its KEDA trigger reads the
   worker config default, database 1. Read from code, not observed.
-- `prebuilt_tags` in `tilt_config.json` is consumed by nothing; every local
-  manifest pins `:latest`. `local-dev/README.md` documents it as working.
 - `local-dev/scripts/setup.sh:280-284` recommends 8 GB for the full stack;
   `local-dev/README.md:62` says 12 to 16 GB.

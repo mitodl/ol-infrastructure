@@ -15,7 +15,7 @@ import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import iam
 
-from bridge.settings.openedx.types import OpenEdxSupportedRelease
+from bridge.settings.openedx.types import EnvStage, OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.applications.edxapp.k8s_autoscaling import (
     build_cms_webapp_keda_config,
@@ -50,6 +50,7 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
+    ALERT_TIER_LABEL,
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sConfig,
@@ -73,6 +74,7 @@ from ol_infrastructure.lib.azure_workload_identity import (
 )
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
@@ -327,6 +329,21 @@ def create_k8s_resources(  # noqa: C901
 
     # Look up what what release to deploy for this stack
     release_info = OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
+    openedx_release = release_info.release_by_env(cast("EnvStage", stack_info.name))
+
+    # Celery added --disable-prefetch in 5.6. release/ulmo pins Celery 5.5.3, whose
+    # worker exits on the unknown option.
+    celery_prefetch_args = (
+        []
+        if openedx_release == OpenEdxSupportedRelease.ulmo
+        else ["--disable-prefetch"]
+    )
+
+    # The "--" stops opentelemetry-instrument's argparse from reading the wrapped
+    # command's flags as its own. Without it, Python 3.11 (release/ulmo) treats
+    # granian's --metrics as an ambiguous abbreviation of --metrics_exporter and
+    # exits before granian starts. Python 3.12 does not, so master/verawood hid it.
+    otel_wrapper = ["opentelemetry-instrument", "--"]
 
     # Environments that have retired their OpenSearch domain set
     # edxapp:elasticsearch_enabled to false. The stack reference has to be
@@ -764,15 +781,20 @@ def create_k8s_resources(  # noqa: C901
                     "--active",
                     "--warning",
                 ],
-                # Tracks the CMS celery worker: the sweep walks the modulestore in
-                # process rather than fanning out to celery, so it wants comparable
-                # headroom.
+                # Tracks the CMS celery worker by default: the sweep walks the
+                # modulestore in process rather than fanning out to celery, so it
+                # wants comparable headroom. Memory grows with every course the
+                # sweep visits and is never released, so a large catalog needs its
+                # own override (mitxonline Production: ~5.2Gi at start plus ~1Mi
+                # per course across ~4,300 courses).
                 resource_requests={
                     "cpu": resources_dict["celery"]["cms"]["cpu_request"],
-                    "memory": resources_dict["celery"]["cms"]["memory_request"],
+                    "memory": edxapp_config.get("courseware_reindex_memory_request")
+                    or resources_dict["celery"]["cms"]["memory_request"],
                 },
                 resource_limits={
-                    "memory": resources_dict["celery"]["cms"]["memory_limit"],
+                    "memory": edxapp_config.get("courseware_reindex_memory_limit")
+                    or resources_dict["celery"]["cms"]["memory_limit"],
                 },
                 # No active_deadline_seconds: runtime scales with the size of the
                 # course catalog, and a wrong guess converts a slow sweep into a
@@ -978,7 +1000,7 @@ def create_k8s_resources(  # noqa: C901
             # installed in the image -- see mitodl/lehrer#177. Do not deploy this
             # ahead of that PR's image, or granian fails to start (missing
             # executable).
-            command_prefix=["opentelemetry-instrument"],
+            command_prefix=otel_wrapper,
             granian_config=GranianConfig(
                 application_module="lms.wsgi:application",
                 port=8000,
@@ -1341,7 +1363,7 @@ def create_k8s_resources(  # noqa: C901
             # installed in the image -- see mitodl/lehrer#177. Do not deploy this
             # ahead of that PR's image, or granian fails to start (missing
             # executable).
-            command_prefix=["opentelemetry-instrument"],
+            command_prefix=otel_wrapper,
             granian_config=GranianConfig(
                 application_module="cms.wsgi:application",
                 port=8000,
@@ -1482,6 +1504,12 @@ def create_k8s_resources(  # noqa: C901
 
     celery_volume_mounts = common_extra_volume_mounts
 
+    # A stuck or restarting worker delays tasks and does not take the site down, so
+    # none of these pods page. The tier goes on each Deployment's metadata and pod
+    # template only: the selectors are immutable, and nothing reads a tier from the
+    # ScaledObjects that share the *_labels dicts.
+    celery_alert_tier_label = {ALERT_TIER_LABEL: str(AlertTier.notify)}
+
     # Selector labels must match the existing Deployment's spec.selector (immutable).
     # The old SGP label (pod-security-group) is kept in the selector; the new
     # edxapp-celery-sg label is added only to the pod template so the
@@ -1498,7 +1526,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=f"{lms_celery_deployment_name}",
             namespace=namespace,
-            labels=lms_celery_labels,
+            labels=lms_celery_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             selector=kubernetes.meta.v1.LabelSelectorArgs(
@@ -1506,7 +1534,7 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_celery_labels,
+                    labels=lms_celery_labels | celery_alert_tier_label,
                     annotations=lms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
@@ -1596,7 +1624,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--exclude-queues=edx.cms.core.default",
                                 "--concurrency=2",
                                 "--prefetch-multiplier=1",
-                                "--disable-prefetch",
+                                *celery_prefetch_args,
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -1681,7 +1709,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=lms_high_mem_celery_deployment_name,
             namespace=namespace,
-            labels=lms_high_mem_celery_labels,
+            labels=lms_high_mem_celery_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             selector=kubernetes.meta.v1.LabelSelectorArgs(
@@ -1702,7 +1730,7 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_high_mem_celery_labels,
+                    labels=lms_high_mem_celery_labels | celery_alert_tier_label,
                     annotations={
                         # Keep Karpenter and the cluster autoscaler from reclaiming the
                         # node underneath a running report.
@@ -1788,7 +1816,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--exclude-queues=edx.cms.core.default",
                                 "--concurrency=1",
                                 "--prefetch-multiplier=1",
-                                "--disable-prefetch",
+                                *celery_prefetch_args,
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -1870,7 +1898,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=lms_beat_deployment_name,
             namespace=namespace,
-            labels=lms_beat_labels,
+            labels=lms_beat_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             replicas=1,
@@ -1879,7 +1907,7 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_beat_labels,
+                    labels=lms_beat_labels | celery_alert_tier_label,
                     annotations=lms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
@@ -1980,7 +2008,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=f"{env_name}-edxapp-lms-process-scheduled-emails",
             namespace=namespace,
-            labels=lms_process_scheduled_emails_labels,
+            labels=lms_process_scheduled_emails_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             replicas=1,
@@ -1989,7 +2017,8 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_process_scheduled_emails_labels,
+                    labels=lms_process_scheduled_emails_labels
+                    | celery_alert_tier_label,
                     annotations=lms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
@@ -2095,7 +2124,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=f"{cms_celery_deployment_name}",
             namespace=namespace,
-            labels=cms_celery_labels,
+            labels=cms_celery_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             selector=kubernetes.meta.v1.LabelSelectorArgs(
@@ -2103,7 +2132,7 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=cms_celery_labels,
+                    labels=cms_celery_labels | celery_alert_tier_label,
                     annotations=cms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
@@ -2183,7 +2212,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--exclude-queues=edx.lms.core.default,edx.lms.core.high,edx.lms.core.high_mem",
                                 "--prefetch-multiplier=1",
                                 "--concurrency=2",
-                                "--disable-prefetch",
+                                *celery_prefetch_args,
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -2264,9 +2293,7 @@ def create_k8s_resources(  # noqa: C901
 
     # APISIX ingress configuration and setup
     apisix_ingress_class = edxapp_config.get("apisix_ingress_class") or "apisix"
-    tls_secret_name = (
-        "shared-backend-tls-pair"  # pragma: allowlist secret  # noqa: S105
-    )
+    tls_secret_name = "shared-backend-tls-pair"  # pragma: allowlist secret  # noqa: S105
     cert_manager_certificate = OLCertManagerCert(
         f"ol-{stack_info.env_prefix}-edxapp-tls-cert-{stack_info.env_suffix}",
         cert_config=OLCertManagerCertConfig(

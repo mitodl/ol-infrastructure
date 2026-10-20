@@ -76,6 +76,12 @@ config:
   edxapp:edx_forum_secrets:
     secure: v1:qzfe99Jb8n0TnEQS:Y6fSOS8lksj7WvED+V7kCtV7arDtwx7184Fw330Mwh9JDHW72rVd8y7Nm0fF8ANCcFCwDV5EwSU2Fcc+X47NHDOLCOQv16lyB6jWOF2mTr/veRax6MbXY9NlLmsfp9EBQesDCitULbkz9hyHcHT3GPI=
   edxapp:enable_courseware_index: "true"
+  # Every weekly sweep peaked at 5.7-6.0Gi against the 6Gi CMS celery limit and
+  # failed. A full run is projected at ~9.5Gi. The request sits near that peak so
+  # the pod only lands on a node that can hold it; a lower request lets it grow
+  # into node memory pressure before it ever reaches the limit.
+  edxapp:courseware_reindex_memory_request: 10Gi
+  edxapp:courseware_reindex_memory_limit: 12Gi
   edxapp:enabled_mfes:
     admin_console: admin-console
     authoring: authoring
@@ -100,7 +106,21 @@ config:
   edxapp:backend_studio_domain: studio-backend.learn.mit.edu
   edxapp:backend_preview_domain: preview-backend.learn.mit.edu
   edxapp:enable_auto_language_selection: "true"
-  edxapp:autoscaling_lms_requests_threshold: "20"
+  # LMS runs one Granian worker per pod, so every request in a pod shares one GIL.
+  # Since the 2 -> 1 worker change on 2026-09-17 the GIL wait per request roughly
+  # doubled (7-9ms -> 13-29ms) and upstream p95 went from 840-1020ms to 1150-1550ms
+  # at the same request rate, so LMS is sized at ~50% of the 500m cpu request.
+  # Total LMS cpu over the 12d to 2026-10-13 was p50 3.9, p95 7.2 and max 10.9
+  # cores, which at that density is 16, 29 and 44 pods, hence the ceiling of 45.
+  #
+  # Request rate carries that target, not cpu. An LMS request cost 0.17
+  # core-seconds at p50 and 0.20 at p95 over the 7d to 2026-10-14, so 1.25 req/s
+  # per pod is ~50% of the cpu request. The request trigger reads a 5m rate; the
+  # cpu trigger reads metrics-server's short window, and as the 50% target one
+  # 3-minute burst took LMS from 30 to 35 pods on 2026-10-14 when the 30-minute
+  # average needed 26, which the 25-minute scale-down then held. cpu goes back to
+  # 70 as a backstop, because the HPA follows whichever trigger asks for more pods.
+  edxapp:autoscaling_lms_requests_threshold: "1.25"
   edxapp:autoscaling_lms_cpu_threshold: "70"
   edxapp:autoscaling_cms_requests_threshold: "20"
   edxapp:autoscaling_cms_cpu_threshold: "70"
@@ -120,7 +140,7 @@ config:
   edxapp:k8s_replicas:
     webapp:
       lms:
-        max: 30
+        max: 45
         min: 4
       cms:
         max: 10
@@ -190,7 +210,7 @@ config:
         memory_request: "4Gi"
         memory_limit: "6Gi"
   mongodb:atlas_project_id: 61f0a63f8bc1f86a073a7148
-  redis:instance_type: cache.r7g.4xlarge
+  redis:instance_type: cache.r7g.large
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   edxapp:edx_xqueue_secrets:
@@ -209,7 +229,12 @@ config:
   typesense:deploy: "true"
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
-  typesense:forum_search_enabled: "false"
+  typesense:forum_search_enabled: "true"
+  # Steady state reached ~500Mi in Sept 2026 against the 512Mi default, and a
+  # restarting node needs more than that while it reloads its index from disk,
+  # so it OOMs on startup and never rejoins.
+  typesense:memory_request: 1536Mi
+  typesense:memory_limit: 1536Mi
   edxapp:site_project:
     deployment: mitxonline
     mfe_apps:

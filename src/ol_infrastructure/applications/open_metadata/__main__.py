@@ -51,6 +51,7 @@ from ol_infrastructure.lib.aws.iam_helper import (
 )
 from ol_infrastructure.lib.aws.rds_helper import DBInstanceTypes
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
@@ -97,14 +98,15 @@ vault_config = Config("vault")
 
 setup_vault_provider(stack_info)
 
-k8s_global_labels = K8sAppLabels(
+k8s_labels = K8sAppLabels(
     application=Application.open_metadata,
     product=Product.data,
     service=Services.open_metadata,
     ou=BusinessUnit.data,
     source_repository="https://github.com/open-metadata/OpenMetadata",
     stack=stack_info,
-).model_dump()
+)
+k8s_global_labels = k8s_labels.model_dump()
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
@@ -136,7 +138,7 @@ open_metadata_database_security_group = ec2.SecurityGroup(
             to_port=DEFAULT_POSTGRES_PORT,
             description="Access to postgres from open metadata servers.",
         ),
-        # TODO @Ardiea: switch to use pod-security-groups once implemented  # noqa: FIX002, E501
+        # TODO @Ardiea: switch to use pod-security-groups once implemented  # noqa: FIX002
         ec2.SecurityGroupIngressArgs(
             security_groups=[],
             protocol="tcp",
@@ -470,6 +472,38 @@ superset_connector_secret = OLVaultK8SSecret(
 )
 connector_secrets.append(superset_connector_secret)
 
+# Read-only StarRocks credentials for the StarRocks ingestion job, issued by
+# Vault's `database-starrocks` mount. The mount name is not environment
+# qualified: QA and Production each run their own Vault server. The jobs that
+# read it live in the substructure stack, which has no CI stack, so skip on CI.
+#
+# Like the Superset secret, only CronOMJob pods read this one, so it stays out
+# of the server's envFrom and has no restart target. Vault rotates the lease on
+# its own and each job pod reads the current value at start.
+if stack_info.name != "CI":
+    starrocks_connector_secret = OLVaultK8SSecret(
+        f"open-metadata-{stack_info.name}-connector-starrocks-secret",
+        OLVaultK8SDynamicSecretConfig(
+            name="openmetadata-connector-starrocks",
+            namespace=open_metadata_namespace,
+            dest_secret_labels=k8s_global_labels,
+            dest_secret_name="om-connector-starrocks",  # noqa: S106  # pragma: allowlist secret
+            labels=k8s_global_labels,
+            mount="database-starrocks",
+            path="creds/readonly",
+            templates={
+                "OM_STARROCKS_USERNAME": '{{ get .Secrets "username" }}',
+                "OM_STARROCKS_PASSWORD": '{{ get .Secrets "password" }}',
+            },
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            parent=vault_k8s_resources,
+        ),
+    )
+    connector_secrets.append(starrocks_connector_secret)
+
 # OM ships with several system bots, each with its own JWT used by a specific
 # workflow type.  All known bots are listed here (SOPS key → OM hyphenated name).
 # Any bot whose token appears in the SOPS file gets its own Vault secret and a
@@ -517,6 +551,37 @@ for _bot_key, _bot_name in _OM_BOTS.items():
         ),
     )
     connector_secret_names.append(_k8s_secret_name)
+
+# Copies of the ingestion bot token for consumers that read only their own Vault
+# mounts. Each copy reads the same SOPS key, which keeps a rotation to one place.
+# Concourse shares this Vault.
+# - The contracts sync pipeline (ol_concourse/pipelines/applications/
+#   ol_data_contracts_sync.py) publishes ol-data-platform's contracts/ to
+#   production OpenMetadata. Concourse reads only secret-concourse/<team>/*.
+# - ol-data-platform's lakehouse code location pushes Dagster asset check
+#   results to production OpenMetadata as test cases. Dagster's Vault policy
+#   reads secret-data/pipelines/*. Its sensor is registered only in production,
+#   since the tables it names come from the production dbt manifest.
+if stack_info.env_suffix == "production":
+    _ingestion_bot_api_secret = Output.secret(
+        json.dumps(
+            {
+                "token": open_metadata_connector_secrets["ingestion_bot"]["token"],
+                "server_url": f"https://{open_metadata_config.require('domain')}/api",
+            }
+        )
+    )
+    for _consumer, _vault_path in {
+        "concourse-contracts": (
+            "secret-concourse/infrastructure/openmetadata_contracts_bot"
+        ),
+        "dagster": "secret-data/pipelines/openmetadata",
+    }.items():
+        vault.generic.Secret(
+            f"open-metadata-{_consumer}-bot-secret-{stack_info.env_suffix}",
+            path=_vault_path,
+            data_json=_ingestion_bot_api_secret,
+        )
 
 # IRSA trust role granting the OpenMetadata server pod read access to AWS Glue and S3.
 # Uses OLEKSTrustRole directly (rather than OLEKSAuthBinding) because Vault K8s
@@ -802,7 +867,11 @@ open_metadata_application = kubernetes.helm.v3.Release(
             repo="https://helm.open-metadata.org",
         ),
         values={
-            "commonLabels": k8s_global_labels,
+            # commonLabels is the chart's only label key. It reaches the server
+            # pods, the two CronJobs' pods and the OMJob operator Deployment's
+            # metadata, which do not share a role, so it carries the tier and no
+            # component. The operator's pod template takes no labels at all.
+            "commonLabels": k8s_labels.workload_labels(alert_tier=AlertTier.notify),
             "openmetadata": {
                 "config": {
                     # Ref: https://docs.open-metadata.org/latest/deployment/security/keycloak/kubernetes
@@ -1103,7 +1172,7 @@ gateway_config = OLEKSGatewayConfig(
             hostname=open_metadata_config.require("domain"),
             port=8443,
             tls_mode="Terminate",
-            certificate_secret_name="openmetadata-tls",  # cert-manager will create this  # noqa: S106, E501  # pragma: allowlist secret
+            certificate_secret_name="openmetadata-tls",  # cert-manager will create this  # noqa: S106  # pragma: allowlist secret
             certificate_secret_namespace=open_metadata_namespace,
         ),
     ],

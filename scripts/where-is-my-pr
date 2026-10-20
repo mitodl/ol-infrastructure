@@ -40,6 +40,14 @@ traced the same way as SOPS files: every live Concourse job that runs a
 Pulumi update for that project is discovered, and its last successful build
 is checked for whether it deployed this commit.
 
+Repos with no app pipeline (e.g. ``ol-keycloakify``, published as a GitHub
+release and baked into the Keycloak image) are traced through any live
+pipeline with a ``git`` or ``github-release`` resource for that repo. Each
+job fed by that resource -- directly, or through ``passed`` constraints -- has
+its last successful build traced back through the artifacts it used (e.g. the
+deployed image -> the image build that fetched the release), and the source
+version found there is compared with the PR's commit.
+
 SOPS files under ``src/bridge/secrets/`` are mapped to candidate Pulumi consumers
 using ``PROJECT_SECRETS`` (including shared files and provider-credential
 exceptions). Live Concourse configurations supply the actual project, stack,
@@ -505,6 +513,27 @@ def _plan_steps(plan: Any) -> Iterator[dict[str, Any]]:
             yield from _plan_steps(nested)
 
 
+GITHUB_URI_PREFIXES = (
+    "https://github.com/",
+    "git@github.com:",
+    "ssh://git@github.com/",
+)
+
+
+def _resource_github_repo(resource: dict[str, Any]) -> str | None:
+    """Return the lowercased ``owner/repo`` a git or github-release resource fetches."""
+    source = resource.get("source") or {}
+    if resource.get("type") == "github-release":
+        owner, repo = source.get("owner"), source.get("repository")
+        return f"{owner}/{repo}".lower() if owner and repo else None
+    if resource.get("type") == "git":
+        uri = str(source.get("uri", "")).removesuffix("/").removesuffix(".git")
+        for prefix in GITHUB_URI_PREFIXES:
+            if uri.startswith(prefix):
+                return uri.removeprefix(prefix).lower()
+    return None
+
+
 def _routes_from_config(
     pipeline: str, config: dict[str, Any], instance_query: str = ""
 ) -> list[SecretsRoute]:
@@ -543,17 +572,10 @@ def _routes_from_config(
             git_resource = resources.get(
                 git_get.get("resource", git_get.get("get")), {}
             )
-            uri = (
-                git_resource.get("source", {})
-                .get("uri", "")
-                .removesuffix(".git")
-                .rstrip("/")
-            )
-            if git_resource.get("type") != "git" or uri not in {
-                f"https://github.com/{OL_INFRA_REPO}",
-                f"git@github.com:{OL_INFRA_REPO}",
-                f"ssh://git@github.com/{OL_INFRA_REPO}",
-            }:
+            if (
+                git_resource.get("type") != "git"
+                or _resource_github_repo(git_resource) != OL_INFRA_REPO
+            ):
                 continue
             if params.get("preview") is True or params.get("action") == "preview":
                 previews.add(job["name"])
@@ -578,10 +600,19 @@ def _routes_from_config(
     ]
 
 
-def _read_pipeline_routes(
+@dataclass
+class PipelineConfig:
+    """A live pipeline's config plus the instance selector needed to address it."""
+
+    name: str
+    instance_query: str
+    config: dict[str, Any]
+
+
+def _read_pipeline_config(
     pipeline: dict[str, Any],
-) -> tuple[list[SecretsRoute], str | None]:
-    """Fetch one pipeline, retaining only non-secret routing metadata."""
+) -> tuple[PipelineConfig | None, str | None]:
+    """Fetch one pipeline's config, or return its name as a failure."""
     query = urlencode(
         {
             f"vars.{key}": json.dumps(value)
@@ -594,22 +625,47 @@ def _read_pipeline_routes(
     if not isinstance(data, dict) or not isinstance(data.get("config"), dict):
         # The selector is needed for the request, but not for diagnostics.
         # Do not echo arbitrary instance-variable values on an error path.
-        return [], str(pipeline["name"])
-    return _routes_from_config(pipeline["name"], data["config"], query), None
+        return None, str(pipeline["name"])
+    return PipelineConfig(pipeline["name"], query, data["config"]), None
+
+
+def _read_pipeline_routes(
+    pipeline: dict[str, Any],
+) -> tuple[list[SecretsRoute], str | None]:
+    """Fetch one pipeline, retaining only non-secret routing metadata."""
+    found, failure = _read_pipeline_config(pipeline)
+    if found is None:
+        return [], failure
+    return _routes_from_config(found.name, found.config, found.instance_query), None
+
+
+@cache
+def _pipeline_configs() -> tuple[list[PipelineConfig], list[str]]:
+    """Fetch every team pipeline's config once per run, with bounded API reads."""
+    pipelines = _fly_curl(f"/api/v1/teams/{CONCOURSE_TEAM}/pipelines")
+    if not isinstance(pipelines, list):
+        return [], ["pipeline list unavailable"]
+    # Archived pipelines have no config to serve and deploy nothing.
+    active = [p for p in pipelines if not p.get("archived")]
+    configs: list[PipelineConfig] = []
+    failures: list[str] = []
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for found, failure in pool.map(_read_pipeline_config, active):
+            if found is not None:
+                configs.append(found)
+            if failure:
+                failures.append(failure)
+    return configs, failures
 
 
 def _discover_pulumi_routes() -> tuple[list[SecretsRoute], list[str]]:
     """Discover Pulumi routing metadata, not secret values, with bounded API reads."""
-    pipelines = _fly_curl(f"/api/v1/teams/{CONCOURSE_TEAM}/pipelines")
-    if not isinstance(pipelines, list):
-        return [], ["pipeline list unavailable"]
-    routes: list[SecretsRoute] = []
-    failures: list[str] = []
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        for found, failure in pool.map(_read_pipeline_routes, pipelines):
-            routes.extend(found)
-            if failure:
-                failures.append(failure)
+    configs, failures = _pipeline_configs()
+    routes = [
+        route
+        for found in configs
+        for route in _routes_from_config(found.name, found.config, found.instance_query)
+    ]
     return routes, failures
 
 
@@ -871,6 +927,294 @@ def _report_app(pr: PullRequest, app_name: str) -> None:
         )
 
 
+# Hops from a deploy build back to the build that fetched the PR's repo
+# (e.g. deploy -> image build -> release), bounding the API reads per stage.
+UPSTREAM_TRACE_DEPTH = 3
+
+
+@dataclass
+class UpstreamSource:
+    """A live pipeline resource fetching the PR's repo, and the jobs fed by it.
+
+    ``consumers`` is every job that gets the resource directly (``direct``) or
+    gets anything ``passed`` through an existing consumer -- e.g. a Pulumi
+    deploy taking an image built from a release of the PR's repo.
+    """
+
+    pipeline: PipelineConfig
+    resource: str
+    resource_type: str
+    direct: set[str]
+    consumers: set[str]
+    # job -> input alias -> (resource name, upstream jobs it must have passed)
+    inputs: dict[str, dict[str, tuple[str, set[str]]]]
+    # Resources that consumer jobs put, i.e. artifacts derived from the source.
+    produced: set[str]
+
+    def url(self, tail: str = "", params: list[tuple[str, str]] | None = None) -> str:
+        """Return a Concourse path within this pipeline, with its instance selector."""
+        query = self.pipeline.instance_query
+        if params:
+            query += ("&" if query else "?") + urlencode(params)
+        return f"{_pipeline_path(self.pipeline.name, tail)}{query}"
+
+    def versions_api(
+        self, resource: str, tail: str = "", params: list[tuple[str, str]] | None = None
+    ) -> str:
+        """Return the API path for a resource's versions (or one version's ``tail``)."""
+        return "/api/v1" + self.url(
+            f"/resources/{quote(resource, safe='')}/versions{tail}", params
+        )
+
+
+def _upstream_sources(pr: PullRequest, found: PipelineConfig) -> list[UpstreamSource]:
+    """Find resources in one pipeline that fetch the PR's repo, and their consumers."""
+    config = found.config
+    target = f"{pr.owner}/{pr.repo}".lower()
+    inputs: dict[str, dict[str, tuple[str, set[str]]]] = {}
+    puts: dict[str, set[str]] = {}
+    for job in config.get("jobs", []):
+        steps = list(_plan_steps(job.get("plan", [])))
+        inputs[job["name"]] = {
+            s["get"]: (s.get("resource", s["get"]), set(s.get("passed", [])))
+            for s in steps
+            if "get" in s
+        }
+        puts[job["name"]] = {s.get("resource", s["put"]) for s in steps if "put" in s}
+    sources = []
+    for resource in config.get("resources", []):
+        if _resource_github_repo(resource) != target:
+            continue
+        name = resource["name"]
+        direct = {
+            job
+            for job, gets in inputs.items()
+            if any(res == name for res, _ in gets.values())
+        }
+        consumers = set(direct)
+        while True:
+            more = {
+                job
+                for job, gets in inputs.items()
+                if job not in consumers
+                and any(passed & consumers for _, passed in gets.values())
+            }
+            if not more:
+                break
+            consumers |= more
+        sources.append(
+            UpstreamSource(
+                pipeline=found,
+                resource=name,
+                resource_type=resource["type"],
+                direct=direct,
+                consumers=consumers,
+                inputs=inputs,
+                produced={r for job in consumers for r in puts.get(job, set())},
+            )
+        )
+    return sources
+
+
+def _resource_version(
+    source: UpstreamSource, resource: str, version: dict[str, Any]
+) -> dict[str, Any] | None:
+    """Look up a resource version's Concourse id and metadata by its exact fields."""
+    filters = [("filter", f"{k}:{v}") for k, v in sorted(version.items())]
+    data = _fly_curl(source.versions_api(resource, params=filters))
+    if not isinstance(data, list):
+        return None
+    return next((v for v in data if v.get("version") == version), None)
+
+
+def _passed_ancestry(
+    source: UpstreamSource, resource: str, passed: set[str]
+) -> set[str]:
+    """Return every job a ``resource`` version must have passed to reach a get.
+
+    Follows the ``passed`` constraints of each upstream job's own get of the
+    same resource, so pass-through jobs (e.g. a preview that only gets the
+    image) lead back to the job that put it.
+    """
+    ancestry: set[str] = set()
+    frontier = list(passed)
+    while frontier:
+        job = frontier.pop()
+        if job in ancestry:
+            continue
+        ancestry.add(job)
+        for upstream_resource, upstream in source.inputs.get(job, {}).values():
+            if upstream_resource == resource:
+                frontier.extend(upstream)
+    return ancestry
+
+
+def _traced_version(
+    source: UpstreamSource, build_id: int, job: str, depth: int = UPSTREAM_TRACE_DEPTH
+) -> dict[str, Any] | None:
+    """Return the source resource version a build used, directly or via artifacts.
+
+    When the build didn't fetch the source itself, follow each input that was
+    ``passed`` through a consumer job back to the build that output it (e.g. a
+    deploy's image -> the image build), and look there instead.
+    """
+    data = _fly_curl(f"/api/v1/builds/{build_id}/resources")
+    if not isinstance(data, dict):
+        return None
+    gets = source.inputs.get(job, {})
+    build_inputs = data.get("inputs", [])
+    for build_input in build_inputs:
+        resource, _ = gets.get(build_input["name"], (build_input["name"], set()))
+        if resource == source.resource:
+            return build_input["version"]
+    if depth <= 0:
+        return None
+    candidates = [
+        (gets[i["name"]][0], i["version"], gets[i["name"]][1])
+        for i in build_inputs
+        if i["name"] in gets and gets[i["name"]][1] & source.consumers
+    ]
+    # Derived artifacts (e.g. an image built from the source) first: they
+    # usually resolve in one hop, unlike inputs merely passed alongside them.
+    candidates.sort(key=lambda candidate: candidate[0] not in source.produced)
+    for resource, version, passed in candidates:
+        entry = _resource_version(source, resource, version)
+        if entry is None:
+            continue
+        # Another branch may have output the same version (e.g. an identical
+        # image digest); only producers this input passed through count.
+        producers = _passed_ancestry(source, resource, passed) & source.consumers
+        builds = _fly_curl(source.versions_api(resource, f"/{entry['id']}/output_of"))
+        for build in builds if isinstance(builds, list) else []:
+            if build.get("status") != "succeeded":
+                continue
+            if build.get("job_name") not in producers:
+                continue
+            found = _traced_version(source, build["id"], build["job_name"], depth - 1)
+            if found is not None:
+                return found
+    return None
+
+
+def _version_commit(
+    source: UpstreamSource, version: dict[str, Any]
+) -> tuple[str, str] | None:
+    """Resolve a source version to (commit sha, human-readable description).
+
+    Release tags are resolved from the commit recorded by Concourse when it
+    checked the release, never by asking GitHub what a tag points at now: a
+    moving tag (such as ``latest``) would then claim a deploy it never had.
+    """
+    ref = version.get("ref") or version.get("commit")
+    if ref and COMMIT_SHA_RE.match(ref):
+        return ref, ref[:8]
+    tag = version.get("tag")
+    entry = _resource_version(source, source.resource, version) if tag else None
+    if entry is None:
+        return None
+    metadata = {m.get("name"): m.get("value") for m in entry.get("metadata") or []}
+    sha = metadata.get("commit_sha")
+    if not sha or not COMMIT_SHA_RE.match(sha):
+        return None
+    return sha, f"{tag} @ {sha[:8]}"
+
+
+def _report_upstream_stage(
+    pr: PullRequest, source: UpstreamSource, label: str, job: str
+) -> None:
+    """Report which version of the PR's repo a job's last successful build used."""
+    build = _latest_successful_build(
+        source.pipeline.name, job, source.pipeline.instance_query
+    )
+    if build is None:
+        print(f"    ?  {label:<12} no successful {job} build found")
+        return
+    build_path = f"/jobs/{quote(job, safe='')}/builds/{quote(build['name'], safe='')}"
+    build_url = f"       {CONCOURSE_URL}{source.url(build_path)}"
+    version = _traced_version(source, build["id"], job)
+    resolved = _version_commit(source, version) if version else None
+    if resolved is None:
+        print(
+            f"    ?  {label:<12} could not trace {job} #{build['name']} "
+            f"to a {source.resource} version"
+        )
+        print(build_url)
+        return
+    commit, description = resolved
+    reached = _is_ancestor(_compare_status(pr.owner, pr.repo, pr.commit, commit))
+    print(
+        _format_stage(
+            label, reached, f"{job} #{build['name']} used {pr.repo} {description}"
+        )
+    )
+    print(build_url)
+
+
+def _report_upstream_source(pr: PullRequest, source: UpstreamSource) -> None:
+    """Report a pipeline that consumes the PR's repo as an upstream input."""
+    pipeline = source.pipeline
+    print(
+        f"\n=== {pipeline.name} ({source.resource_type} resource {source.resource}) ==="
+    )
+    print(f"    {CONCOURSE_URL}{source.url()}")
+
+    if source.resource_type == "github-release":
+        latest = _fly_curl(
+            source.versions_api(source.resource, params=[("limit", "1")])
+        )
+        resolved = (
+            _version_commit(source, latest[0]["version"])
+            if isinstance(latest, list) and latest
+            else None
+        )
+        if resolved is None:
+            print(f"    ?  {'Release':<12} could not resolve the latest release")
+        else:
+            commit, description = resolved
+            reached = _is_ancestor(
+                _compare_status(pr.owner, pr.repo, pr.commit, commit)
+            )
+            print(_format_stage("Release", reached, f"latest is {description}"))
+
+    routes = sorted(
+        (
+            r
+            for r in _routes_from_config(
+                pipeline.name, pipeline.config, pipeline.instance_query
+            )
+            if r.job in source.consumers
+        ),
+        key=_route_order,
+    )
+    deploy_jobs = {r.job for r in routes}
+    previews = {p for r in routes for p in r.previews}
+    for job in sorted(source.direct - deploy_jobs - previews):
+        _report_upstream_stage(pr, source, "Build", job)
+    for route in routes:
+        label = route.stack.rpartition(".")[2] or route.stack
+        _report_upstream_stage(pr, source, label, route.job)
+    if not routes:
+        print("    ?  No Pulumi deploy job consumes this resource.")
+
+
+def _report_upstream_pipelines(pr: PullRequest) -> bool:
+    """Trace a repo with no app pipeline through live pipelines that consume it.
+
+    Returns whether any consuming pipeline was found.
+    """
+    configs, failures = _pipeline_configs()
+    for failure in failures:
+        print(f"    ?  Could not inspect {failure}; discovery is incomplete.")
+    sources = [
+        source
+        for found in sorted(configs, key=lambda c: (c.name, c.instance_query))
+        for source in _upstream_sources(pr, found)
+    ]
+    for source in sources:
+        _report_upstream_source(pr, source)
+    return bool(sources)
+
+
 @app.default
 def where_is_my_pr(pr_url: str) -> None:
     """Show which ol-infrastructure deployment pipeline stages a GitHub PR has reached.
@@ -893,6 +1237,15 @@ def where_is_my_pr(pr_url: str) -> None:
 
     matching = _matching_apps(pr.owner, pr.repo)
     if not matching:
+        print(
+            f"\n{pr.owner}/{pr.repo} has no app pipeline; looking for Concourse "
+            "pipelines that consume it."
+        )
+        if not _fly_ready():
+            _print_fly_login_hint("discover pipelines that consume this repo")
+            return
+        if _report_upstream_pipelines(pr):
+            return
         known = ", ".join(f"{name} ({github_repo(name)})" for name in sorted(APPS))
         print(
             f"\nNo known deployment pipeline maps to {pr.owner}/{pr.repo}.\n"

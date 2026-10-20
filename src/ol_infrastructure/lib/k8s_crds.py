@@ -150,6 +150,32 @@ def fetch_helm_chart_crds(
     return sorted(crds, key=lambda crd: crd["metadata"]["name"])
 
 
+def keycloak_operator_crd_urls(manifests_base_url: str) -> list[str]:
+    """List the CRD manifest URLs of one keycloak-k8s-resources release.
+
+    Read from the release's own ``kustomization.yml`` rather than hardcoded,
+    because the filenames go stale whenever the operator adds a CRD (e.g. the
+    SAML/OIDC client CRDs added in 26.7.0), and an operator started without one
+    of its CRDs crashes. Everything the kustomization lists except
+    ``kubernetes.yml`` (the operator itself) is a CRD.
+
+    :param manifests_base_url: The release's ``kubernetes/`` directory, e.g.
+        ``https://raw.githubusercontent.com/keycloak/keycloak-k8s-resources/26.7.4/kubernetes``.
+    :returns: Absolute URLs of the CRD manifests.
+    :rtype: list[str]
+    """
+    with urllib.request.urlopen(  # noqa: S310
+        f"{manifests_base_url}/kustomization.yml",
+        timeout=CHART_FETCH_TIMEOUT_SECONDS,
+    ) as response:
+        kustomization = pyyaml.safe_load(response.read())
+    return [
+        f"{manifests_base_url}/{resource}"
+        for resource in kustomization["resources"]
+        if resource != "kubernetes.yml"
+    ]
+
+
 def _adoption_resource_options(
     opts: ResourceOptions | None, crd_provider: kubernetes.Provider
 ) -> ResourceOptions:

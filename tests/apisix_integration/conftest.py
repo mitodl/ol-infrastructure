@@ -18,6 +18,7 @@ import socket
 import subprocess
 import sys
 import time
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -25,30 +26,40 @@ import urllib3
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+    from pathlib import Path
 
 from ol_infrastructure.components.services.apisix import (
+    OIDC_RECOVERY_SHARED_DICT,
+    OIDC_RECOVERY_SHARED_DICT_SIZE,
+    gateway_global_pre_function_plugin,
     oidc_gateway_pre_function_plugin,
 )
 
 # Must track the APISIX shipped by the chart pinned in bridge.lib.versions
-# (APISIX_CHART 2.16.x => APISIX 3.17.x).  A mismatch here is the difference
+# (APISIX_CHART 2.17.x => APISIX 3.18.x).  A mismatch here is the difference
 # between testing what runs in production and testing something else -- which is
 # also why the override is an explicit environment variable rather than a
 # default that could drift: set APISIX_IT_IMAGE to rehearse a version bump
 # against this suite before moving the chart pin.
-APISIX_IMAGE = os.environ.get("APISIX_IT_IMAGE", "apache/apisix:3.17.0-debian")
+APISIX_IMAGE = os.environ.get("APISIX_IT_IMAGE", "apache/apisix:3.18.0-debian")
 CONTAINER_NAME = "ol-apisix-integration-test"
 READY_TIMEOUT_SECONDS = 60
 # The OIDC session cookie the recovery routes are configured to look for.
 SESSION_COOKIE = "ol_test_apisix_session"
+# openid-connect's schema requires one (>= 16 chars) when bearer_only is false.
+TEST_SESSION_SECRET = "integration-test-session-secret"  # noqa: S105  # pragma: allowlist secret
 
 # Standalone (yaml) config provider, so no etcd is needed.  Mirrors the
 # provider the ingress controller drives in the cluster
 # (provider.type: apisix-standalone in infrastructure/aws/eks/apisix_official.py).
-CONFIG_YAML = """
+CONFIG_YAML = f"""
 apisix:
   node_listen: 9080
   enable_admin: false
+nginx_config:
+  http:
+    custom_lua_shared_dict:
+      {OIDC_RECOVERY_SHARED_DICT}: {OIDC_RECOVERY_SHARED_DICT_SIZE}
 deployment:
   role: data_plane
   role_data_plane:
@@ -56,6 +67,7 @@ deployment:
 plugins:
   - serverless-pre-function
   - serverless-post-function
+  - openid-connect
 """
 
 
@@ -103,9 +115,86 @@ def apisix_routes() -> dict[str, Any]:
         session_cookie_names=[SESSION_COOKIE],
     )
     full = oidc_gateway_pre_function_plugin()
+    global_pre_function = gateway_global_pre_function_plugin()
     dead_upstream = {"type": "roundrobin", "nodes": {"127.0.0.1:1": 1}}
+    # Never contacted: the global rule redirects before openid-connect runs,
+    # and the non-redirected cases below never reach this route.  It only has
+    # to pass the plugin's schema check.
+    openid_connect = {
+        "client_id": "ol-integration-test",
+        "client_secret": "not-a-secret",  # pragma: allowlist secret
+        "discovery": "https://sso.invalid/.well-known/openid-configuration",
+        "session": {"secret": TEST_SESSION_SECRET},
+    }
     return {
+        # The ingress controller renders ApisixGlobalRules into exactly this
+        # shape, and flattens each ApisixRoute's plugin config into its route's
+        # own plugin map, as the routes below are written.
+        "global_rules": [
+            {
+                "id": "gateway-pre-function",
+                "plugins": {global_pre_function.name: global_pre_function.config},
+            }
+        ],
+        # An HTTPRoute's ExtensionRef PluginConfig lands on the APISIX service,
+        # not the route (apisix-ingress-controller
+        # internal/adc/translator/httproute.go), so the global rule only sees
+        # openid-connect there if APISIX merges the service into the matched
+        # route first.
+        "services": [
+            {
+                "id": "global-oidc-service",
+                "upstream": dead_upstream,
+                "plugins": {"openid-connect": openid_connect},
+            }
+        ],
+        "plugin_configs": [
+            {
+                "id": "global-oidc-plugin-config",
+                "plugins": {"openid-connect": openid_connect},
+            }
+        ],
         "routes": [
+            {
+                "id": "global-oidc",
+                "uri": "/global-oidc/*",
+                "upstream": dead_upstream,
+                "plugins": {"openid-connect": openid_connect},
+            },
+            {
+                "id": "global-oidc-via-service",
+                "uri": "/global-oidc-via-service/*",
+                "service_id": "global-oidc-service",
+            },
+            {
+                "id": "global-oidc-via-plugin-config",
+                "uri": "/global-oidc-via-plugin-config/*",
+                "upstream": dead_upstream,
+                "plugin_config_id": "global-oidc-plugin-config",
+            },
+            {
+                "id": "global-plain",
+                "uri": "/global-plain/*",
+                "upstream": dead_upstream,
+            },
+            # Answers with the X-Userinfo the route's own rewrite phase sees,
+            # which runs after the global rule's.  Proves the strip still runs
+            # once the canonical function ahead of it has fallen through.
+            {
+                "id": "global-strip-echo",
+                "uri": "/global-strip-echo/*",
+                "upstream": dead_upstream,
+                "plugins": {
+                    "serverless-pre-function": {
+                        "phase": "rewrite",
+                        "functions": [
+                            "return function() "
+                            "ngx.say(tostring(ngx.req.get_headers()['X-Userinfo'])) "
+                            "ngx.exit(200) end"
+                        ],
+                    }
+                },
+            },
             {
                 "id": "login-prefix",
                 "uri": "/login/*",
@@ -127,24 +216,23 @@ def apisix_routes() -> dict[str, Any]:
                 "upstream": dead_upstream,
                 "plugins": {full.name: full.config},
             },
-        ]
+        ],
     }
 
 
-@pytest.fixture(scope="session")
-def apisix(tmp_path_factory, apisix_routes) -> Generator[str]:
-    """Start APISIX on a free port and yield its base URL."""
-    conf_dir = tmp_path_factory.mktemp("apisix-conf")
+@contextmanager
+def run_apisix(
+    conf_dir: Path, routes: dict[str, Any], container_name: str = CONTAINER_NAME
+) -> Generator[str]:
+    """Start APISIX on a free port with ``routes`` and yield its base URL."""
     (conf_dir / "config.yaml").write_text(CONFIG_YAML)
     # APISIX's standalone loader requires the #END terminator.  JSON is a YAML
     # subset, so dumping the document avoids depending on a YAML writer here.
-    (conf_dir / "apisix.yaml").write_text(
-        json.dumps(apisix_routes, indent=2) + "\n#END\n"
-    )
+    (conf_dir / "apisix.yaml").write_text(json.dumps(routes, indent=2) + "\n#END\n")
 
     port = _free_port()
     subprocess.run(  # noqa: S603
-        ["docker", "rm", "-f", CONTAINER_NAME],  # noqa: S607
+        ["docker", "rm", "-f", container_name],  # noqa: S607
         capture_output=True,
         check=False,
     )
@@ -154,7 +242,7 @@ def apisix(tmp_path_factory, apisix_routes) -> Generator[str]:
             "run",
             "-d",
             "--name",
-            CONTAINER_NAME,
+            container_name,
             "-p",
             f"127.0.0.1:{port}:9080",
             "-v",
@@ -176,13 +264,13 @@ def apisix(tmp_path_factory, apisix_routes) -> Generator[str]:
         yield base_url
     finally:
         logs = subprocess.run(  # noqa: S603
-            ["docker", "logs", CONTAINER_NAME],  # noqa: S607
+            ["docker", "logs", container_name],  # noqa: S607
             capture_output=True,
             text=True,
             check=False,
         )
         subprocess.run(  # noqa: S603
-            ["docker", "rm", "-f", CONTAINER_NAME],  # noqa: S607
+            ["docker", "rm", "-f", container_name],  # noqa: S607
             capture_output=True,
             check=False,
         )
@@ -190,6 +278,13 @@ def apisix(tmp_path_factory, apisix_routes) -> Generator[str]:
         # shows up in APISIX's error log, not in the HTTP response.
         if logs.stdout or logs.stderr:
             sys.stdout.write(f"\n--- APISIX logs ---\n{logs.stdout}{logs.stderr}")
+
+
+@pytest.fixture(scope="session")
+def apisix(tmp_path_factory, apisix_routes) -> Generator[str]:
+    """Start APISIX on a free port and yield its base URL."""
+    with run_apisix(tmp_path_factory.mktemp("apisix-conf"), apisix_routes) as base_url:
+        yield base_url
 
 
 def _wait_until_ready(base_url: str) -> None:

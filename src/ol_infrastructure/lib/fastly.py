@@ -1,4 +1,5 @@
 import re
+import textwrap
 from pathlib import Path
 
 import pulumi
@@ -45,6 +46,111 @@ def vcl_snippet(
         type=type,
         priority=priority,
     )
+
+
+# The SHA256 hash of an empty string -- a fixed, public constant (not a secret),
+# used as the payload hash for unsigned-body GET requests in AWS SigV4 signing.
+_SHA256_EMPTY_STRING = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"  # pragma: allowlist secret
+
+
+def fastly_backend_identifier(backend_name: str) -> str:
+    """Return the VCL identifier (`F_...`) Fastly generates for a backend name."""
+    return "F_" + re.sub(r"[^A-Za-z0-9_]", "_", backend_name)
+
+
+def s3_sigv4_signing_vcl(
+    access_key_id: str,
+    secret_access_key: str,
+    bucket_host: str,
+    backend_name: str,
+) -> str:
+    """Build VCL that signs requests to one S3 backend with AWS SigV4.
+
+    Install the result as a `miss` snippet and again as a `pass` snippet. It is
+    wrapped in a `req.backend` guard so the signature (and the key it embeds) is
+    only ever applied to requests bound for `backend_name`.
+
+    Four things learned the hard way on the mit-learn pilot, kept in the body:
+    - `%0A` is Fastly's hex escape for a newline in a double-quoted string; `\\n`
+      is a literal backslash and `n`.
+    - There are deliberately no VCL `#` comments in the body: one containing a
+      double quote breaks Fastly's parser.
+    - `bereq.http.host` is set explicitly. The backend's `override_host` is not
+      reflected in it yet when a `miss` snippet runs, so signing whatever it held
+      produced SignatureDoesNotMatch.
+    - The canonical query string is hardcoded empty, so the query string is
+      stripped from the backend request before signing.
+
+    The region in the credential scope is fixed at us-east-1, and `bucket_host`
+    must be a us-east-1 endpoint. Every bucket behind a Fastly service in this
+    repo lives there (their backends are addressed at `s3.us-east-1`), so it is not
+    a parameter; a bucket in another region would need one, or S3 would answer
+    SignatureDoesNotMatch.
+
+    The canonical URI is the S3-style percent-encoded path, and that same encoded
+    path is what is sent to S3, so what is signed always equals what is requested.
+    Browsers send characters like `( ) [ ] @ + ! *` literally but S3 canonicalizes
+    them as `%XX`, so signing the raw path gets a 403 for any key containing them.
+    The encoding is `urlencode(urldecode(path))`, with three details (measured in
+    a Fastly Fiddle, since the function docs don't say):
+    - `urlencode` leaves exactly A-Za-z0-9 - _ . ~ alone and uses uppercase hex,
+      which is the set S3 expects. Decoding first stops `%28` becoming `%2528`.
+    - `urldecode` turns `+` into a space, so a literal `+` is shielded as `%2B`
+      first. `%252B` and `%252[Ff]` are used because `%25` is the double-quoted
+      string escape for a literal `%`, and a bare `%2B` or `%2[` is read as a hex
+      escape (`%2[` is a lint error).
+    - `urlencode` also encodes `/`, so the separators are restored afterwards.
+    """
+    body = textwrap.dedent(
+        f"""\
+        declare local var.aws_access_key_id STRING;
+        declare local var.aws_secret_access_key STRING;
+        declare local var.date_stamp STRING;
+        declare local var.amz_date STRING;
+        declare local var.payload_hash STRING;
+        declare local var.canonical_uri STRING;
+        declare local var.canonical_headers STRING;
+        declare local var.signed_headers STRING;
+        declare local var.canonical_request STRING;
+        declare local var.hashed_canonical_request STRING;
+        declare local var.credential_scope STRING;
+        declare local var.string_to_sign STRING;
+        declare local var.signature STRING;
+
+        set var.aws_access_key_id = "{access_key_id}";
+        set var.aws_secret_access_key = "{secret_access_key}";
+
+        set bereq.url = querystring.remove(bereq.url);
+        set var.canonical_uri = regsuball(bereq.url.path, "\\+", "%252B");
+        set var.canonical_uri = urlencode(urldecode(var.canonical_uri));
+        set var.canonical_uri = regsuball(var.canonical_uri, "%252[Ff]", "/");
+        set bereq.url = var.canonical_uri;
+
+        set var.date_stamp = strftime({{"%Y%m%d"}}, now);
+        set var.amz_date = strftime({{"%Y%m%dT%H%M%SZ"}}, now);
+        set var.payload_hash = "{_SHA256_EMPTY_STRING}";
+
+        set bereq.http.host = "{bucket_host}";
+        unset bereq.http.Authorization;
+        set bereq.http.x-amz-date = var.amz_date;
+        set bereq.http.x-amz-content-sha256 = var.payload_hash;
+
+        set var.signed_headers = "host;x-amz-content-sha256;x-amz-date";
+        set var.canonical_headers = "host:" + bereq.http.host + "%0A" + "x-amz-content-sha256:" + var.payload_hash + "%0A" + "x-amz-date:" + var.amz_date + "%0A";
+
+        set var.canonical_request = "GET" + "%0A" + var.canonical_uri + "%0A" + "" + "%0A" + var.canonical_headers + "%0A" + var.signed_headers + "%0A" + var.payload_hash;
+        set var.hashed_canonical_request = digest.hash_sha256(var.canonical_request);
+
+        set var.credential_scope = var.date_stamp + "/us-east-1/s3/aws4_request";
+        set var.string_to_sign = "AWS4-HMAC-SHA256" + "%0A" + var.amz_date + "%0A" + var.credential_scope + "%0A" + var.hashed_canonical_request;
+
+        set var.signature = digest.awsv4_hmac(var.aws_secret_access_key, var.date_stamp, "us-east-1", "s3", var.string_to_sign);
+
+        set bereq.http.Authorization = "AWS4-HMAC-SHA256 Credential=" + var.aws_access_key_id + "/" + var.credential_scope + ", SignedHeaders=" + var.signed_headers + ", Signature=" + var.signature;
+        """
+    )
+    guard = fastly_backend_identifier(backend_name)
+    return f"if (req.backend == {guard}) {{\n" + textwrap.indent(body, "  ") + "}"
 
 
 # Documentation:

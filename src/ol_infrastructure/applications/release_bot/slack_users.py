@@ -40,6 +40,7 @@ _cache: dict[str, tuple[str, float]] = {}
 # fail the same way, and the checkbox watcher polls every 60s per author.
 _lookups_disabled = False
 
+_SLACK_MARKUP_RE = re.compile(r"[`<>&]")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+$")
 # GitHub's no-reply addresses carry the account handle: both the legacy
 # "handle@users.noreply.github.com" and the current
@@ -63,6 +64,10 @@ def _fallback(author: str) -> str:
     A GitHub handle is more use to a human than an address, and the address
     is what Doof never put in the channel in the first place.
     """
+    # An author is text from a commit or an edited issue body. A backtick would
+    # close the code span and let a following `<!channel>` ping the channel, so
+    # drop the characters Slack treats as markup before wrapping it.
+    author = _SLACK_MARKUP_RE.sub("", author)
     noreply = _GITHUB_NOREPLY_RE.match(author)
     if noreply:
         return f"`{noreply.group('handle')}`"

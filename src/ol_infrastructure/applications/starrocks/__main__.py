@@ -15,6 +15,10 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBindingConfig,
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.apisix import (
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -152,7 +156,12 @@ core_node_selector = {"ol.mit.edu/core_node": "true"}
 # The scheduling room now comes from capacity instead: the core nodegroup runs
 # one more node than there are FE replicas, and FE's cpu_request is sized to
 # observed usage rather than the docs' sizing recommendation, so FE fits in the
-# gaps left by other workloads. The CRD does support `tolerations`, so if
+# gaps left by other workloads. That headroom is per zone, not cluster-wide:
+# each FE's meta/log PVCs are EBS volumes pinned to one AZ, and the core
+# nodegroup normally runs one node per AZ, so a spare node in another zone
+# cannot take a displaced FE (incident 2026-10-09, fe-0 in us-east-1b). CN is
+# kept off core nodes for the
+# same reason (see starrocksCnSpec). The CRD does support `tolerations`, so if
 # capacity headroom proves insufficient the next step is a NoSchedule taint on
 # the core nodegroup plus a matching toleration here.
 
@@ -623,7 +632,28 @@ if starrocks_config.get_bool("use_cn"):
         "image": {"tag": STARROCKS_VERSION},
         "serviceAccount": "starrocks",
         "runAsNonRoot": True,
-        "affinity": _starrocks_pod_anti_affinity("cn", required=False),
+        # Incident 2026-10-09 (prod): with no node constraint, both CN pods
+        # landed on core nodes, and cn-1 took 16Gi on the only core node in
+        # fe-0's EBS zone. fe-0 sat Pending for days. CN is stateless, so keep
+        # it on the Karpenter fleet and leave core capacity for FE.
+        "affinity": {
+            **_starrocks_pod_anti_affinity("cn", required=False),
+            "nodeAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": {
+                    "nodeSelectorTerms": [
+                        {
+                            "matchExpressions": [
+                                {
+                                    "key": "ol.mit.edu/core_node",
+                                    "operator": "NotIn",
+                                    "values": ["true"],
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+        },
         "resources": {
             "requests": {
                 # StarRocks recommends 16 CPU cores and 64 GB RAM per CN node.
@@ -696,9 +726,14 @@ if starrocks_config.get_bool("use_cn"):
 # support (CSI ephemeral inline volumes); the fe.conf config block is
 # byte-identical.
 #
-# NOTE: The SSL keystore password appears in fe.conf (→ K8s ConfigMap). This is
-# an inherent limitation of StarRocks' SSL design; the password protects the
-# keystore file itself, not user credentials. Keep it scoped as a Pulumi secret.
+# fe.conf is rendered into a ConfigMap, which the shared cluster readonly role
+# can read, so no secret value goes into it. The FE's config loader
+# (ConfigBase.replacedByEnv) replaces ${NAME} in any property value with the
+# environment variable of that name and refuses to start when it is unset, so
+# the keystore password and the OAuth2 client secret are written as references
+# to the env vars below, which feEnvVars fills from Kubernetes Secrets.
+FE_ENV_KEYSTORE_CREDENTIAL = "FE_SSL_KEYSTORE_PASSWORD"
+FE_ENV_OAUTH2_CREDENTIAL = "FE_OAUTH2_CLIENT_SECRET"
 if (
     ssl_enabled
     or starrocks_config.get_bool("use_cn")
@@ -780,21 +815,24 @@ _FE_CONFIG_BASE = (
     "background_refresh_metadata_enable = true\n"
     "background_refresh_metadata_interval_millis"
     f" = {fe_background_refresh_interval_ms}\n"
-    # Keycloak exposes preferred_username (human-readable) rather than sub (UUID).
-    # Set FE-level defaults so both the OAuth2 browser-redirect flow and the JWT
-    # client-plugin flow map to the same username regardless of per-user settings.
-    "oauth2_principal_field = preferred_username\n"
-    "jwt_principal_field = preferred_username\n"
+    # The claim a login name is compared with. These FE-level values are what a
+    # user created with an explicit auth plugin is checked against (it skips the
+    # security integrations), so they have to name the same claim the
+    # integrations do. StarRocks user names are the short starrocks_username
+    # (saml_uid); with preferred_username here, which is an email address in
+    # this realm, `CREATE USER 'tmacey' IDENTIFIED WITH authentication_jwt` was
+    # refused with "Login name tmacey is not matched to user tmacey@mit.edu".
+    "oauth2_principal_field = starrocks_username\n"
+    "jwt_principal_field = starrocks_username\n"
 )
 
 
 def _build_fe_config(  # noqa: PLR0913
-    pwd: str | None,
+    ssl: bool,  # noqa: FBT001
     force_str: str,
     bucket_name: str | None,
     oidc_issuer_url: str | None = None,
     oidc_client_id: str | None = None,
-    oidc_client_secret: str | None = None,
     oidc_redirect_url: str | None = None,
 ) -> str:
     """Assemble a complete fe.conf from optional SSL, shared-data, and OIDC sections.
@@ -809,34 +847,40 @@ def _build_fe_config(  # noqa: PLR0913
     under a different mode — StarRocks aborts on startup when run_mode in
     fe.conf disagrees with the mode recorded in its BDB metadata.
 
-    SSL keystore password is validated here to prevent fe.conf corruption:
-    StarRocks' config parser is line-oriented, so embedded newlines or
-    leading/trailing whitespace would silently break the generated file and
-    prevent FE startup.
+    The SSL keystore password and the OAuth2 client secret are written as
+    ${ENV_VAR} references, never as values; see FE_ENV_KEYSTORE_CREDENTIAL.
 
     When oidc_issuer_url is provided, the full set of oauth2_* FE params is
-    written. Those serve locally-created `IDENTIFIED WITH authentication_oauth2`
-    users and the JDBC driver's browser authorization-code flow; they do not
-    add an "OAuth2 Login" button to the FE web dashboard, which has no OIDC
-    entry point (StarRocks#75370).
-    The client secret ends up in a ConfigMap (StarRocks Helm chart limitation);
-    access is RBAC-gated and marked as a Pulumi secret so it is not stored
-    in plaintext Pulumi state.
+    written. These are not redundant with the security integration's copies:
+    OAuth2SecurityIntegration resolves every setting as
+    `propertyMap.getOrDefault(<property>, Config.oauth2_<property>)`, so the
+    integration's value wins where it sets one and these globals are the
+    fallback where it does not. Our integration omits `required_audience`,
+    which makes `oauth2_required_audience` here the live audience check for
+    authentication_chain logins. They do not add an "OAuth2 Login" button to
+    the FE web dashboard, which has no OIDC entry point (StarRocks#75370).
     """
     conf = _FE_CONFIG_BASE
 
     if oidc_issuer_url is not None:
         _oidc_base = f"{oidc_issuer_url}/protocol/openid-connect"
         conf += (
-            # oauth2_* — read by locally-created authentication_oauth2 users
-            # and by the JDBC driver's browser authorization-code flow.
+            # oauth2_* -- both the globals read for a user created with an
+            # explicit authentication_oauth2 plugin AND the per-property
+            # fallback for the security integration, which resolves each
+            # setting as getOrDefault(<property>, Config.oauth2_<property>).
+            # The integration sets principal_field to the same claim as the
+            # default above; it omits
+            # required_audience, so the value below is what actually validates
+            # the audience on authentication_chain logins. Do not drop
+            # oauth2_required_audience without replacing it in the integration.
             # StarRocks FE exchanges the authorization code server-side using
             # these credentials; the id_token is stored on the connection context
             # and forwarded to Iceberg REST catalogs when security = JWT.
             f"oauth2_auth_server_url = {_oidc_base}/auth\n"
             f"oauth2_token_server_url = {_oidc_base}/token\n"
             f"oauth2_client_id = {oidc_client_id}\n"
-            f"oauth2_client_secret = {oidc_client_secret}\n"
+            f"oauth2_client_secret = ${{{FE_ENV_OAUTH2_CREDENTIAL}}}\n"
             f"oauth2_redirect_url = {oidc_redirect_url}\n"
             f"oauth2_jwks_url = {_oidc_base}/certs\n"
             f"oauth2_required_issuer = {oidc_issuer_url}\n"
@@ -846,7 +890,7 @@ def _build_fe_config(  # noqa: PLR0913
             # and sends it over the MySQL wire using the
             # authentication_openid_connect_client plugin (MySQL 9.2+).
             # No client_secret needed; the server verifies the JWT signature
-            # against the JWKS and maps preferred_username to the SR identity.
+            # against the JWKS and maps starrocks_username to the SR identity.
             f"jwt_jwks_url = {_oidc_base}/certs\n"
             f"jwt_required_issuer = {oidc_issuer_url}\n"
             # authentication_chain must be in fe.conf — ADMIN SET FRONTEND CONFIG
@@ -888,18 +932,11 @@ def _build_fe_config(  # noqa: PLR0913
         # against accidental run_mode migration if use_cn is ever toggled.
         conf += "run_mode = shared_nothing\n"
 
-    if pwd is not None:
-        if "\n" in pwd or "\r" in pwd:
-            msg = "starrocks:ssl_keystore_password must not contain newline characters"
-            raise ValueError(msg)
-        pwd = pwd.strip()
-        if not pwd:
-            msg = "starrocks:ssl_keystore_password must not be empty or whitespace-only"
-            raise ValueError(msg)
+    if ssl:
         conf += (
             "ssl_keystore_location = /etc/starrocks/ssl/keystore.p12\n"
-            f"ssl_keystore_password = {pwd}\n"
-            f"ssl_key_password = {pwd}\n"
+            f"ssl_keystore_password = ${{{FE_ENV_KEYSTORE_CREDENTIAL}}}\n"
+            f"ssl_key_password = ${{{FE_ENV_KEYSTORE_CREDENTIAL}}}\n"
             f"ssl_force_secure_transport = {force_str}\n"
         )
 
@@ -917,10 +954,17 @@ if _needs_fe_config:
     _domain = starrocks_config.require("domain")
 
     # Pull OIDC client credentials from Vault when OIDC is enabled so the
-    # oauth2_* keys can go into fe.conf. Those are what a locally-created
-    # `CREATE USER ... IDENTIFIED WITH authentication_oauth2` account
-    # authenticates against -- the security integration alone is not sufficient
-    # for a user created that way, which is how starrocks:oidc_users works.
+    # oauth2_* keys can go into fe.conf. They are read on two paths: directly
+    # by a user created with an explicit auth plugin (which skips the security
+    # integration, the same rule by which oidc_users' `authentication_jwt`
+    # accounts read the jwt_* keys below), and as the integration's
+    # per-property fallback for anything it omits. The second is the one that
+    # matters operationally, because the integration omits required_audience.
+    #
+    # No CREATE USER statement in this repo uses authentication_oauth2, and
+    # none should: such an account is accepted on the FE HTTP port under Basic
+    # auth with any password. See the OAuth2 security integration block in
+    # substructure/starrocks for the measurement and StarRocks#67702.
     # They do NOT put an "OAuth2 Login" button on the FE web dashboard: it
     # answers with `WWW-Authenticate: Basic` unconditionally and has no OIDC
     # entry point at all (StarRocks#75370). The browser redirect belongs to the
@@ -933,43 +977,53 @@ if _needs_fe_config:
             opts=InvokeOptions(provider=_vault_provider),
         ).data
 
-    if ssl_enabled and ssl_keystore_password is not None:
+    _fe_secret_env_vars: list[dict[str, Any]] = []
+    if ssl_enabled:
         fe_spec["secrets"] = [
             {"name": starrocks_tls_secret_name, "mountPath": "/etc/starrocks/ssl"}
         ]
-        if _oidc_vault_data is not None:
-            fe_spec["config"] = Output.all(
-                pwd=ssl_keystore_password, oidc=_oidc_vault_data
-            ).apply(
-                lambda args: _build_fe_config(
-                    args["pwd"],
-                    _force_str,
-                    shared_data_bucket_name,
-                    oidc_issuer_url=args["oidc"]["url"],
-                    oidc_client_id=args["oidc"]["client_id"],
-                    oidc_client_secret=args["oidc"]["client_secret"],
-                    oidc_redirect_url=f"https://{_domain}/api/oauth2",
-                )
-            )
-        else:
-            fe_spec["config"] = ssl_keystore_password.apply(
-                lambda pwd: _build_fe_config(pwd, _force_str, shared_data_bucket_name)
-            )
-    elif _oidc_vault_data is not None:
+        _fe_secret_env_vars.append(
+            {
+                "name": FE_ENV_KEYSTORE_CREDENTIAL,
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": ssl_keystore_password_secret_name,
+                        "key": "password",
+                    }
+                },
+            }
+        )
+    if _oidc_vault_data is not None:
+        # The Vault-synced Secret names the FE StatefulSet as its restart
+        # target. Not confirmed: that the restart survives the operator's
+        # reconcile. After rotating the client secret, check that the FEs rolled.
+        _fe_secret_env_vars.append(
+            {
+                "name": FE_ENV_OAUTH2_CREDENTIAL,
+                "valueFrom": {
+                    "secretKeyRef": {
+                        "name": oidc_config_secret_name,
+                        "key": "OIDC_CLIENT_SECRET",
+                    }
+                },
+            }
+        )
         fe_spec["config"] = _oidc_vault_data.apply(
             lambda oidc: _build_fe_config(
-                None,
+                ssl_enabled,
                 _force_str,
                 shared_data_bucket_name,
                 oidc_issuer_url=oidc["url"],
                 oidc_client_id=oidc["client_id"],
-                oidc_client_secret=oidc["client_secret"],
                 oidc_redirect_url=f"https://{_domain}/api/oauth2",
             )
         )
     else:
-        # CN-only path (no SSL, no OIDC): no Output dependencies, build synchronously.
-        fe_spec["config"] = _build_fe_config(None, _force_str, shared_data_bucket_name)
+        fe_spec["config"] = _build_fe_config(
+            ssl_enabled, _force_str, shared_data_bucket_name
+        )
+    if _fe_secret_env_vars:
+        fe_spec["feEnvVars"] = [*fe_spec.get("feEnvVars", []), *_fe_secret_env_vars]
 
 starrocks_release = kubernetes.helm.v3.Release(
     f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-helm-release",
@@ -993,6 +1047,130 @@ starrocks_release = kubernetes.helm.v3.Release(
         ],
     ),
 )
+
+############################################################
+# Monitoring — ServiceMonitors for FE and CN
+#
+# Alloy's prometheusOperatorObjects ships every ServiceMonitor to Grafana Cloud
+# unfiltered, and StarRocks emits ~700 series per FE and ~2,350 per CN (a third
+# of the CN's are per-RPC-method brpc bvars). Unfiltered, prod would be ~49k
+# series with CN at its HPA max of 20, so each endpoint keeps only the families
+# the StarRocks dashboards and alerts use (~84 per FE, ~181 per CN, measured
+# against prod /metrics on 2026-10-14 with 2 CNs; FE's tablet_num adds one
+# series per CN). CN CPU comes from cadvisor: starrocks_be_cpu is whole-node
+# /proc/stat, not the container. A family missing here is dropped at
+# scrape time: add it to the list before building a panel or rule on it.
+#
+# The chart's own ServiceMonitors (metrics.serviceMonitor) stay disabled: its
+# template has no metricRelabelings hook.
+############################################################
+STARROCKS_FE_KEEP_METRICS = [
+    "jvm_(heap|non_heap)_size_bytes",
+    "jvm_thread",
+    "node_info",
+    "starrocks_fe_query_(total|success|err|err_rate|internal_err|analysis_err|timeout)",
+    "starrocks_fe_query_latency_ms(_sum|_count)?",
+    # Iceberg query latency only shows up per catalog; the query_latency_ms
+    # family above reads ~1ms on prod while Iceberg p75 is ~1.6s.
+    "starrocks_fe_catalog_query_(total|success|err|internal_err|analysis_err)",
+    "starrocks_fe_catalog_query_latency_ms(_sum|_count)?",
+    "starrocks_fe_query_queue_(pending|total|timeout|slot_pending|slot_running)",
+    "starrocks_fe_(connection_total|qps|rps|slow_query)",
+    "starrocks_fe_(max_journal_id|max_journal_replay_lag|meta_replay_lag_second)",
+    "starrocks_fe_(editlog_stacked_num|safe_mode)",
+    "starrocks_fe_lake_compaction_(failed|running|running_tasks|success)",
+    "starrocks_fe_max_tablet_compaction_score",
+    "starrocks_fe_txn_(begin|success|failed|reject|running)",
+    "starrocks_fe_(tablet_num|total_data_size_bytes)",
+    "starrocks_fe_thrift_server_rejected_connections_total",
+    "starrocks_fe_mv_global_refresh_(failed_jobs_total|jobs_total)",
+]
+STARROCKS_CN_KEEP_METRICS = [
+    "starrocks_be_(process|query|load|compaction|metadata)_mem_bytes",
+    "starrocks_be_memory_pool_bytes_total",
+    "starrocks_be_process_(fd_num_used|fd_num_limit_soft|thread_num)",
+    "starrocks_be_datacache_(disk|mem)_(quota|used)_bytes",
+    "starrocks_be_block_cache_(hit|miss)_(bytes|count)",
+    "starrocks_be_query_scan_(bytes|rows)",
+    "starrocks_be_(fragment_requests_total|pip_query_ctx_cnt)",
+    "starrocks_be_pipe_(driver_queue_len|scan_pending_tasks)",
+    "starrocks_be_query_spill_bytes_(read|write)_total",
+    "starrocks_be_spill_disk_bytes_used",
+    "starrocks_be_resource_group_(cpu_use_ratio|inuse_cpu_cores|mem_inuse_bytes)",
+    "starrocks_be_tablet_(base|cumulative|update)_max_compaction_score",
+    "lake_aggregate_compaction_(failed|total)_tasks",
+    "lake_(aggregate_)?publish_version_failed_tasks",
+    "lake_vacuum_del_file_fails",
+    "fslib_s3_(single|multi)_upload_latency(_bucket|_sum|_count)?",
+    "fslib_(read|write)_io_latency(_bucket|_sum|_count)?",
+    "fslib_(read|write)_io_size_(sum|count)",
+    "fslib_s3_(single|multi)_upload_size_(sum|count)",
+    "fslib_qps_limit_error",
+    "fslib_file_replicate(_fail)?_count",
+    "starlet_get_shard_info_rpc(_fail)?_count",
+    "threadpool_task_exception_total",
+    "starrocks_be_engine_requests_total",
+    "starrocks_be_network_(receive|send)_bytes",
+]
+
+starrocks_cluster_name = f"{stack_info.env_prefix}-starrocks"
+for component, port, keep_metrics in (
+    ("fe", "http", STARROCKS_FE_KEEP_METRICS),
+    ("cn", "webserver", STARROCKS_CN_KEEP_METRICS),
+):
+    kubernetes.apiextensions.CustomResource(
+        f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-{component}-service-monitor",
+        api_version="monitoring.coreos.com/v1",
+        kind="ServiceMonitor",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=f"{starrocks_cluster_name}-{component}",
+            namespace=namespace,
+            labels={**k8s_app_labels.model_dump(), "release": "prometheus"},
+        ),
+        spec={
+            # The headless -search Services carry the same labels but not the
+            # metrics port, so selecting on the port name keeps one target per
+            # pod.
+            "selector": {
+                "matchLabels": {
+                    "app.starrocks.ownerreference/name": starrocks_cluster_name,
+                    "app.kubernetes.io/component": component,
+                },
+            },
+            "namespaceSelector": {"matchNames": [namespace]},
+            "endpoints": [
+                {
+                    "port": port,
+                    "path": "/metrics",
+                    "scheme": "http",
+                    "interval": "30s",
+                    "scrapeTimeout": "10s",
+                    "relabelings": [
+                        {
+                            "targetLabel": "job",
+                            "replacement": f"starrocks-{component}",
+                        },
+                        {
+                            "sourceLabels": ["__meta_kubernetes_pod_name"],
+                            "targetLabel": "pod",
+                        },
+                        {
+                            "sourceLabels": ["__meta_kubernetes_namespace"],
+                            "targetLabel": "namespace",
+                        },
+                    ],
+                    "metricRelabelings": [
+                        {
+                            "sourceLabels": ["__name__"],
+                            "regex": "|".join(keep_metrics),
+                            "action": "keep",
+                        },
+                    ],
+                }
+            ],
+        },
+        opts=ResourceOptions(depends_on=[starrocks_release]),
+    )
 
 if stack_info.name == "Production":
     # Backstop for any voluntary-eviction path other than Karpenter (e.g. a
@@ -1039,11 +1217,31 @@ cert_manager_certificate = OLCertManagerCert(
     ),
 )
 
+# The OAuth2 callback below referenced no plugin config at all, so it emitted
+# no prometheus series and no OTLP span -- the one internet-facing path of a
+# query engine, invisible on every dashboard.
+#
+# enable_cors=False: the only client is a JDBC driver completing a token
+# exchange, not a browser making a cross-origin call, so referencing this config
+# for prometheus/opentelemetry/gzip must not also hand the host a wildcard
+# origin grant.
+starrocks_shared_plugins = OLApisixSharedPlugins(
+    f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-ol-shared-plugins",
+    plugin_config=OLApisixSharedPluginsConfig(
+        application_name=f"{stack_info.env_prefix}-starrocks",
+        resource_suffix="ol-shared-plugins",
+        k8s_namespace=namespace,
+        k8s_labels=k8s_app_labels.model_dump(),
+        enable_cors=False,
+    ),
+)
+
 starrocks_apisix_httproute = OLApisixHTTPRoute(
     f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-apisix-httproute",
     route_configs=[
         OLApisixHTTPRouteConfig(
             route_name=f"{stack_info.env_prefix}-starrocks",
+            shared_plugins=starrocks_shared_plugins,
             hosts=[starrocks_config.require("domain")],
             # Publish ONLY the OAuth2 callback. The JDBC OAuth2 flow completes
             # its token exchange at this path, and nothing else on the FE's HTTP
@@ -1170,17 +1368,6 @@ fe_mysql_nlb_service = kubernetes.core.v1.Service(
             # internal, so the record resolves to VPC-private addresses; it is
             # reachable only from the peered VPCs the security group above
             # admits.
-            #
-            # Both prefixes are set on purpose. external-dns v0.22.0 moved the
-            # default annotation prefix from the "alpha" form to the GA one with
-            # NO fallback, so each version reads exactly one of these and ignores
-            # the other: <=v0.21.0 the alpha key, >=v0.22.0 the GA key. Carrying
-            # both is what makes the upgrade (and a rollback) a no-op rather than
-            # an outage -- under --policy=sync a version that matches no
-            # annotation sees an empty desired state and plans to delete every
-            # record it owns. Drop the alpha key only once every cluster is past
-            # v0.22.0.
-            "external-dns.alpha.kubernetes.io/hostname": fe_mysql_domain,
             "external-dns.kubernetes.io/hostname": fe_mysql_domain,
         },
     ),

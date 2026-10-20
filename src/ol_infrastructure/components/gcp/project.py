@@ -117,6 +117,9 @@ class OLGCPAPIKeyConfig(BaseModel):
     display_name: str
     restrictions: dict[str, Any]
     import_id: str | None = None
+    # For a key this stack created. Set it once a consumer holds the key
+    # string: a replacement mints a new string and breaks that consumer.
+    protect: bool = False
 
     @model_validator(mode="after")
     def enforce_restrictions(self) -> "OLGCPAPIKeyConfig":
@@ -352,6 +355,8 @@ class OLGCPProject(ComponentResource):
                 if target["service"] in self.services
             ]
             key_opts = adoption_opts(child_opts, api_key.import_id)
+            if api_key.protect:
+                key_opts = key_opts.merge(ResourceOptions(protect=True))
             if target_services:
                 key_opts = key_opts.merge(ResourceOptions(depends_on=target_services))
             self.api_keys[api_key.key_name] = gcp.projects.ApiKey(

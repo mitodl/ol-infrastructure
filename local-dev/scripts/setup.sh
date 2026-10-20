@@ -41,8 +41,10 @@ HOSTS=(
     # ocw-hugo-themes dev server, run on the host and fronted by APISIX so it
     # has an origin inside .learn.${ROOT_DOMAIN} (see apps/mit-learn/ocw-hugo-dev.yaml)
     "ocw-dev.learn.${ROOT_DOMAIN}"
-    # mitxonline
+    # mitxonline's routes serve the api host too, and its post-logout
+    # redirect goes there
     "mitxonline.${ROOT_DOMAIN}"
+    "api.mitxonline.${ROOT_DOMAIN}"
     # odl-video-service
     "video.odl.${ROOT_DOMAIN}"
     # ocw-studio: the CMS, the draft/live/test published-site hosts, and
@@ -54,6 +56,8 @@ HOSTS=(
     "live.ocw.${ROOT_DOMAIN}"
     "test.ocw.${ROOT_DOMAIN}"
     "concourse.ocw.${ROOT_DOMAIN}"
+    # micromasters (only deployed when it is in enabled_apps)
+    "micromasters.${ROOT_DOMAIN}"
     # Shared S3-compatible object store (RustFS), deployed with ocw-studio
     "s3.${ROOT_DOMAIN}"
     # Keycloak SSO
@@ -530,7 +534,7 @@ cat <<EOF
         see "Local Configuration Overrides" in local-dev/README.md)
 
     2. Start the full stack:
-         tilt up
+         ./local-dev/scripts/start.sh
 
     3. Tilt UI: http://localhost:10350
 
