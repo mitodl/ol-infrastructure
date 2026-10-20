@@ -39,6 +39,20 @@ STARROCKS_SHARED_REALM_ROLES = frozenset(
         "ol_business_analyst",
     }
 )
+# The OpenMetadata role each realm role grants. Each value is a client role on
+# ol-open_metadata-client, sent in the `roles` claim that OpenMetadata reads at
+# login (authorizer useRolesFromProvider): "Admin" sets the user's isAdmin flag,
+# and every other name must be an OpenMetadata Role, which replaces the roles
+# the user had. The custom roles are defined in substructure/open_metadata's
+# om_server_config.py. ol-instructor is left out because instructors get no
+# OpenMetadata access.
+OPEN_METADATA_ROLE_BY_REALM_ROLE = {
+    "ol-platform-admin": "Admin",
+    "ol-data-engineer": "DataEngineer",
+    "ol-researcher": "DataContributor",
+    "ol-data-analyst": "DataConsumer",
+    "ol-business-analyst": "DataConsumer",
+}
 
 
 def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
@@ -467,18 +481,36 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
-    ol_data_platform_openmetadata_client_roles = (
-        keycloak_realm_config.get_object("ol-data-platform-openmetadata-client-roles")
-        or []
-    )
-    for role in ol_data_platform_openmetadata_client_roles:
-        keycloak.Role(
+    ol_data_platform_openmetadata_client_role_refs = {
+        role: keycloak.Role(
             f"ol-data-platform-openmetadata-client-{role}",
             name=role,
-            realm_id="ol-data-platform",
+            realm_id=ol_data_platform_realm.id,
             client_id=ol_data_platform_openmetadata_client.id,
             opts=resource_options,
         )
+        for role in sorted(set(OPEN_METADATA_ROLE_BY_REALM_ROLE.values()))
+    }
+    # OpenMetadata reads a top-level `roles` claim from the ID token it gets at
+    # the login callback (AuthenticationCodeFlowHandler.syncRolesFromProvider),
+    # and from the access token when a provider token is presented directly
+    # (JwtFilter). A user with none of these client roles gets no claim, and
+    # OpenMetadata then leaves their roles alone. Team membership is not part
+    # of this claim.
+    keycloak.openid.UserClientRoleProtocolMapper(
+        "ol-data-platform-openmetadata-roles-mapper",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_openmetadata_client.id,
+        name="openmetadata-roles",
+        claim_name="roles",
+        claim_value_type="String",
+        client_id_for_role_mappings="ol-open_metadata-client",
+        multivalued=True,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
+        opts=resource_options,
+    )
     vault.generic.Secret(
         "ol-data-platform-openmetadata-client-vault-oidc-credentials",
         path="secret-operations/sso/open_metadata",
@@ -541,11 +573,12 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ol_data_platform_starrocks_client_role_refs[role] = role_ref
 
     # Realm roles are what people get assigned. Each one is a composite of the
-    # matching client role on ol-superset-client and, for the roles in
-    # STARROCKS_SHARED_REALM_ROLES, on ol-starrocks-client, so one assignment
-    # gives a person that role in both. They are created here, after both
-    # clients, because composite_roles needs both sets of client role ids. A
-    # stack with no StarRocks client roles configured (CI) gets Superset-only
+    # matching client role on ol-superset-client, for the roles in
+    # STARROCKS_SHARED_REALM_ROLES on ol-starrocks-client, and of its
+    # OpenMetadata role from OPEN_METADATA_ROLE_BY_REALM_ROLE, so one assignment
+    # gives a person that role in each. They are created here, after the
+    # clients, because composite_roles needs every set of client role ids. A
+    # stack with no StarRocks client roles configured (CI) gets no StarRocks
     # composites.
     for resource_name, realm_role, client_role, description in (
         (
@@ -601,6 +634,15 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                     [ol_data_platform_starrocks_client_role_refs[client_role].id]
                     if ol_data_platform_starrocks_client_role_refs
                     and client_role in STARROCKS_SHARED_REALM_ROLES
+                    else []
+                ),
+                *(
+                    [
+                        ol_data_platform_openmetadata_client_role_refs[
+                            OPEN_METADATA_ROLE_BY_REALM_ROLE[realm_role]
+                        ].id
+                    ]
+                    if realm_role in OPEN_METADATA_ROLE_BY_REALM_ROLE
                     else []
                 ),
             ],
