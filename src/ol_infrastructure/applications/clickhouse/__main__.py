@@ -597,6 +597,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     resources: dict[str, Any],
     tls_secret_name: str,
     tls_certificate: Any,
+    keeper_tls_enabled: bool,
 ) -> "Output[kubernetes.apiextensions.CustomResource]":
     """Build the ClickHouseInstallation CRD and return it wrapped in an Output.
 
@@ -861,20 +862,14 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                 },
                 "configuration": {
                     "zookeeper": {
-                        # Over TLS. The operator writes this into each host's
-                        # own configd ConfigMap and does not restart for it;
-                        # the server reloads it and opens a new Keeper session.
-                        # If that connect fails, the reload errors out and the
-                        # next session is started from the old one's settings
-                        # (Context::getZooKeeper -> startNewSession), so the
-                        # replica silently stays on 2181 until it restarts.
-                        # Check system.zookeeper_connection on every replica
-                        # after an apply.
                         "nodes": [
                             {
                                 "host": f"keeper-clickhouse.{namespace}.svc.cluster.local",
-                                "port": KEEPER_TLS_PORT,
-                                "secure": "yes",
+                                **(
+                                    {"port": KEEPER_TLS_PORT, "secure": "yes"}
+                                    if keeper_tls_enabled
+                                    else {"port": 2181}
+                                ),
                             }
                         ]
                     },
@@ -1136,6 +1131,18 @@ interserver_password = clickhouse_config.require_secret("interserver_password").
 interserver_credentials_enabled = clickhouse_config.require_bool(
     "interserver_credentials_enabled"
 )
+# Points the servers at Keeper's TLS port. Flip it per stack only after Keeper
+# is serving 9281 there. Operator 0.26 restarts a host for any zookeeper change
+# (isZookeeperChangeRequiresReboot is !a.Equals(b); the zookeeper/* "no" restart
+# rule is never consulted), so this rolls every replica in turn. A replica that
+# cannot complete the TLS handshake comes back with no Keeper session, its
+# replicated tables read-only, and the operator, which only waits for /ping,
+# moves on to the next one. Check system.zookeeper_connection and
+# system.replicas.is_readonly on the first restarted replica. The operator does
+# not abort an in-flight reconcile when the CHI changes, so to stop the roll,
+# scale kube-system/clickhouse-operator to 0, set this back to false, apply,
+# and scale the operator back up; it then writes 2181 back to that replica.
+keeper_tls_enabled = clickhouse_config.require_bool("keeper_tls_enabled")
 
 ############################################################
 # S3 Cold Storage Bucket
@@ -1560,6 +1567,7 @@ clickhouse_installation = _create_clickhouse_installation(
     vault_k8s_resources=clickhouse_app.vault_k8s_resources,
     tls_secret_name=clickhouse_tls_secret_name,
     tls_certificate=clickhouse_server_certificate,
+    keeper_tls_enabled=keeper_tls_enabled,
 )
 
 ############################################################
