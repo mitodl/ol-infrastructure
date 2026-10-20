@@ -91,7 +91,7 @@ currently slated for deletion.
 
 **`mitx-residential` "Server key 1" → edxapp MITx Residential video block.** Chain:
 
-- `secrets_builder.py:117-125` sets `YOUTUBE_API_KEY` for **only** the `mitx` and
+- `secrets_builder.py:123-131` sets `YOUTUBE_API_KEY` for **only** the `mitx` and
   `mitx-staging` env prefixes. No other deployment gets it. (True on 2026-08-10. mitxonline
   was wired to the same key on 2026-09-04 in 93ea3d324, see `secrets_builder.py:116`.)
 - `Pulumi.mitx.Production.yaml` carries `edxapp:product: residential`. The GCP project
@@ -165,7 +165,8 @@ across all 20 visible projects, 42-day window.
 | idle | ovs-youtube-qa | API key 1 | 2019-12-19 | NONE |
 
 Seven keys carried **no restriction of any kind**, including the only unrestricted key that is
-actually live. The six idle ones were restricted on 2026-10-20 (see below). Restricting them is worth doing independently of the migration.
+actually live. The six idle ones were restricted on 2026-10-20 (see below). Server key 1
+moves off when edxapp MITx Residential takes the mitol01 key.
 
 **OAuth clients — 3 genuinely live.** (`32555940559.apps.googleusercontent.com` also appears
 in the data; that is the gcloud CLI's own public client — our own queries, not a consumer.
@@ -359,12 +360,13 @@ Not deletable, despite the 2026-07-21 list:
 ## Idle unrestricted API keys, restricted 2026-10-20
 
 These six keys had no restriction of any kind and zero calls in the 45 days before the
-change. Each now allows only `apikeys.googleapis.com`. That API takes OAuth credentials, not API
-keys, so the keys no longer work against any real API. Each carries the annotations
-`ol-restricted-on` and `ol-restricted-reason`. A consumer we missed would get HTTP 403s. It is
-unverified whether `bin/gcp-credential-usage report` attributes a key-restriction rejection to
-that key's credential, so also check Sentry and app logs for the consumers named in this doc
-before deleting. After about two weeks with no sign of a consumer, delete them.
+change. Each now allows only `apikeys.googleapis.com`, the key-management API. An API key
+carries no principal, so it can't authorize key management, and the keys no longer work
+against any real API. Each carries the annotations `ol-restricted-on` and
+`ol-restricted-reason`. A consumer we missed would get HTTP 403s. It is unverified whether
+`bin/gcp-credential-usage report` attributes a key-restriction rejection to that key, so
+before deleting, look for any 403 in each key's project, whatever credential it is attributed
+to. After about two weeks with none, delete them.
 
 | Project | Key | Created |
 |---|---|---|
