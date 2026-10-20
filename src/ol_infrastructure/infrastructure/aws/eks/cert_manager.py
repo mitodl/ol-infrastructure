@@ -169,6 +169,7 @@ def setup_cert_manager(
                     "enabled": True,
                     "servicemonitor": {
                         "enabled": True,
+                        "honorLabels": True,
                     },
                 },
                 "config": {
