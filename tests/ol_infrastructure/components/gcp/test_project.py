@@ -6,6 +6,8 @@ violating: unrestricted API keys, and services that could be disabled out from
 under a consumer that emits no measurable traffic.
 """
 
+from typing import Any
+
 import pulumi
 import pulumi_gcp as gcp
 import pytest
@@ -15,6 +17,7 @@ from ol_infrastructure.components.gcp.project import (
     OLGCPOIDCProviderConfig,
     OLGCPProject,
     OLGCPProjectConfig,
+    OLGCPRecaptchaKeyConfig,
     OLGCPServiceAccountConfig,
     OLGCPWorkloadIdentityPoolConfig,
     adoption_opts,
@@ -371,6 +374,90 @@ class TestAdoption:
             ),
         )
         assert component.api_keys["created-key"]._protect is True
+
+
+class TestRecaptchaKeys:
+    """Web keys for classic reCAPTCHA integrations."""
+
+    @staticmethod
+    def key_config(**overrides) -> OLGCPRecaptchaKeyConfig:
+        return OLGCPRecaptchaKeyConfig(
+            **{
+                "key_name": "learn-rc",
+                "display_name": "Learn RC and CI",
+                "integration_type": "CHECKBOX",
+                "allowed_domains": ["rc.learn.mit.edu", "ci.learn.mit.edu"],
+                **overrides,
+            }
+        )
+
+    def test_key_without_domains_rejected(self):
+        # A site key is public; without a domain list it works on any site.
+        with pytest.raises(ValueError, match="at least one allowed domain"):
+            self.key_config(allowed_domains=[])
+
+    @pytest.mark.parametrize(
+        "domain",
+        ["https://rc.learn.mit.edu", "rc.learn.mit.edu/", "*.mit.edu", "RC.mit.edu"],
+    )
+    def test_non_bare_domain_rejected(self, domain):
+        with pytest.raises(ValueError, match="Invalid reCAPTCHA domain"):
+            self.key_config(allowed_domains=[domain])
+
+    def test_unknown_integration_type_rejected(self):
+        with pytest.raises(ValueError, match="integration_type"):
+            self.key_config(integration_type="POLICY_BASED_CHALLENGE")
+
+    @staticmethod
+    def build_component(**overrides) -> OLGCPProject:
+        return OLGCPProject(
+            "test-recaptcha",
+            OLGCPProjectConfig(
+                project_id="mitol01",
+                labels=valid_labels(),
+                enabled_services=["recaptchaenterprise.googleapis.com"],
+                recaptcha_keys=[TestRecaptchaKeys.key_config(**overrides)],
+            ),
+        )
+
+    @pulumi.runtime.test
+    def test_key_is_a_web_key_in_the_project(self):
+        component = self.build_component()
+        key = component.recaptcha_keys["learn-rc"]
+
+        def check(args):
+            project, web_settings = args
+            assert project == "mitol01"
+            assert web_settings["integration_type"] == "CHECKBOX"
+            assert web_settings["allowed_domains"] == [
+                "rc.learn.mit.edu",
+                "ci.learn.mit.edu",
+            ]
+
+        return pulumi.Output.all(key.project, key.web_settings).apply(check)
+
+    @pulumi.runtime.test
+    def test_key_depends_on_the_recaptcha_service(self, monkeypatch):
+        key_opts: list[pulumi.ResourceOptions] = []
+        real_key: Any = gcp.recaptcha.EnterpriseKey
+
+        def recording_key(*args, opts, **kwargs):
+            key_opts.append(opts)
+            return real_key(*args, opts=opts, **kwargs)
+
+        monkeypatch.setattr(gcp.recaptcha, "EnterpriseKey", recording_key)
+        component = self.build_component()
+        (opts,) = key_opts
+        assert isinstance(opts.depends_on, list)
+        assert component.services["recaptchaenterprise.googleapis.com"] in (
+            opts.depends_on
+        )
+
+    @pulumi.runtime.test
+    def test_created_key_unprotected_until_asked(self):
+        assert self.build_component().recaptcha_keys["learn-rc"]._protect is not True
+        protected = self.build_component(protect=True)
+        assert protected.recaptcha_keys["learn-rc"]._protect is True
 
 
 class TestWorkloadIdentityPools:
