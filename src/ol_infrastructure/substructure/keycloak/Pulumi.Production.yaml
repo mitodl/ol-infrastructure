@@ -94,6 +94,7 @@ config:
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   keycloak_realm:olapps_email_theme: ol-learn
+  keycloak_realm:olapps-ol-memory-enabled: "true"
   keycloak_realm:olapps-learn-ai-client-secret:
     secure: v1:MvvmStk26rnq2N4+:+Y2bvHkdIfHaWwJ/X7qQuPgffR6MzJOUv6fqoxTszk135voTcnJb6Dhz8dWT6Yhs
   keycloak_realm:olapps-mitlearn-client-secret:

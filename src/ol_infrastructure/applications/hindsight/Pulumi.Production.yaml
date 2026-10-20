@@ -1,0 +1,29 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-production
+encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwHMToGORRNtpDFN8dCuMrqlAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMrqijCeojYX+y+upEAgEQgDuLvuOVBjvpPE3EwH0AE8DYpxmaD2FWVDIhtDPrwLxrqkuzBSa8o2QAEoV35ApwseF9dDSbYxKepIAhiw==
+config:
+  hindsight:admin_clients:
+  - ol-memory-admin-client
+  hindsight:alert_tier: ticket
+  hindsight:api_cpu: 500m
+  hindsight:api_memory: 1Gi
+  hindsight:api_replicas: "1"
+  # Keycloak client id -> the app name stamped on that client's writes.
+  hindsight:app_clients:
+    ol-learn-ai-client: learn-ai
+    ol-mitlearn-memory-client: mit-learn
+  hindsight:db_instance_size: db.t4g.small
+  hindsight:db_password:
+    secure: v1:4AhDll6twrEtNQ7o:q1EYIpZXRoh6qFUmm146aIeIChrU6qYEif+bTF1fOo4VnE/BNCBykN0/GMnXuNs+OUB/5pzBGhU=
+  hindsight:embeddings_cpu: "2"
+  hindsight:embeddings_memory: 2Gi
+  # Not gated on Hugging Face, so the server downloads it without a token.
+  hindsight:embeddings_model: BAAI/bge-base-en-v1.5
+  # A Hugging Face commit sha, not a secret.
+  hindsight:embeddings_model_revision: a5beb1e3e68b9ab74eb54cfd186867f64f240e1a  # pragma: allowlist secret
+  hindsight:embeddings_replicas: "1"
+  hindsight:general_scope: ol-memory-general
+  hindsight:keycloak_audience: ol-memory-client
+  hindsight:keycloak_issuer: https://sso.ol.mit.edu/realms/olapps
+  vault:address: https://vault-production.odl.mit.edu
+  vault_server:env_namespace: operations.production

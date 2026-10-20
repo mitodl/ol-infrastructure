@@ -50,7 +50,8 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     keycloak_realm_config = Config("keycloak_realm")
     captcha_domain = "www.recaptcha.net"
     mitlearn_domain = keycloak_realm_config.require("learn_domain")
-    # The shared memory service (applications/hindsight) runs in QA only for now.
+    # The shared memory service (applications/hindsight) runs in QA and
+    # Production, not CI.
     # Off, the token exchange setting is left unmanaged rather than written as
     # false, so environments without the service see no change.
     ol_memory_enabled = (
