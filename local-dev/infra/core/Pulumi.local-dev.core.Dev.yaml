@@ -1,6 +1,7 @@
 ---
 config:
-  # Path to the kubeconfig for the k3d cluster.
+  # Path to a kubeconfig holding the k3d cluster as context `local-dev`; the
+  # provider always targets that context name.
   # Defaults to ${HOME}/.kube/config if not set.
   ol-local-dev-core:kubeconfig: ""
   # Path to the mkcert-generated TLS certificate and key.

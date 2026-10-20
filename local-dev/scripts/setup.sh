@@ -534,7 +534,7 @@ cat <<EOF
         see "Local Configuration Overrides" in local-dev/README.md)
 
     2. Start the full stack:
-         tilt up
+         ./local-dev/scripts/start.sh
 
     3. Tilt UI: http://localhost:10350
 

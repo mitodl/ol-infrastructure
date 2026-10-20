@@ -70,7 +70,7 @@ Install these tools before running setup. The install commands shown are Homebre
 | bash | ≥ 4 | `brew install bash` (stock macOS ships 3.2; the seeding and prune scripts use `mapfile`) |
 | uv | ≥ 0.9.3 | `brew install uv` |
 
-> **Docker memory:** Allocate at least 12 GB to the Docker VM; 16 GB is comfortable for the full stack (Docker Desktop: Settings → Resources; OrbStack allocates dynamically; Docker Engine on Linux uses host RAM directly — nothing to allocate). Usage scales with how many apps you enable and whether they run from source or prebuilt images: with just mit-learn (from source) and mitxonline enabled, measured pod usage is ~13 GB, the Next.js dev server alone accounting for 3–4 GB. To see what's actually using memory: `kubectl top pods -A | sort -k4 -hr | head`.
+> **Docker memory:** Allocate at least 12 GB to the Docker VM; 16 GB is comfortable for the full stack (Docker Desktop: Settings → Resources; OrbStack allocates dynamically; Docker Engine on Linux uses host RAM directly — nothing to allocate). Usage scales with how many apps you enable and whether they run from source or prebuilt images: with just mit-learn (from source) and mitxonline enabled, measured pod usage is ~13 GB, the Next.js dev server alone accounting for 3–4 GB. To see what's actually using memory: `kubectl --context local-dev top pods -A | sort -k4 -hr | head`.
 
 ### Windows (WSL2)
 
@@ -207,7 +207,7 @@ Tiltfile forwards `enabled_apps` to both Pulumi stacks and to the app Tiltfiles 
 Open edX runs **in this cluster**, composed from the [lehrer](https://github.com/mitodl/lehrer) repo — not as a second k3d cluster alongside it. It is off by default because the platform image build is long:
 
 ```bash
-tilt up -- --enabled_apps mit-learn,openedx
+tilt up --context local-dev -- --enabled_apps mit-learn,openedx
 ```
 
 It needs lehrer checked out next to this repo (or `MITOL_WORKSPACE_ROOT` pointing at the directory that holds it). Nothing else: the `openedx-secrets` Secret is created for you from lehrer's `local-dev/secret-defaults.yaml`, the same file `lehrer dev setup` reads.
@@ -240,17 +240,17 @@ With an app repo checked out next to `ol-infrastructure`, Tilt live-syncs your e
 
 ### Access logs
 
-For a single pod you already have in mind, `kubectl` is the shortest path:
+For a single pod you already have in mind, `kubectl` is the shortest path. Every command in this README passes `--context local-dev`: a bare `kubectl` goes to your kubeconfig's current context, which `eks.py setup` can leave pointed at a deployed cluster.
 
 ```bash
 # Web pod
-kubectl logs -n mit-learn deploy/mitlearn-webapp -c app -f
+kubectl --context local-dev logs -n mit-learn deploy/mitlearn-webapp -c app -f
 
 # Celery worker
-kubectl logs -n mit-learn deploy/mitlearn-worker-default -f
+kubectl --context local-dev logs -n mit-learn deploy/mitlearn-worker-default -f
 
 # APISIX ingress
-kubectl logs -n operations deploy/apisix -f
+kubectl --context local-dev logs -n operations deploy/apisix -f
 ```
 
 To search across services — or to follow a request from the ingress into the app and on into the worker that picked up the task — use **Grafana at [https://grafana.mit.dev](https://grafana.mit.dev)**. It opens straight into the UI with no login. Every pod in the cluster is collected, including the ones Tilt does not manage (Postgres, Valkey, OpenSearch, Keycloak, APISIX, Mailpit).
@@ -271,8 +271,8 @@ Available labels are `namespace`, `pod`, `container`, and `app`, plus `service_n
 ### Run management commands
 
 ```bash
-kubectl exec -it -n mit-learn deploy/mitlearn-webapp -c app -- python manage.py shell
-kubectl exec -it -n learn-ai deploy/learnai-webapp -c app -- python manage.py dbshell
+kubectl --context local-dev exec -it -n mit-learn deploy/mitlearn-webapp -c app -- python manage.py shell
+kubectl --context local-dev exec -it -n learn-ai deploy/learnai-webapp -c app -- python manage.py dbshell
 ```
 
 ### Run tests
@@ -280,7 +280,7 @@ kubectl exec -it -n learn-ai deploy/learnai-webapp -c app -- python manage.py db
 Python tests need the app's environment (database, settings), so run them inside the container — they run against the code Tilt has live-synced, so they see your latest edits:
 
 ```bash
-kubectl exec -it -n mit-learn deploy/mitlearn-webapp -c app -- pytest main/envs_test.py
+kubectl --context local-dev exec -it -n mit-learn deploy/mitlearn-webapp -c app -- pytest main/envs_test.py
 ```
 
 Frontend (jest) tests don't need the cluster at all — run them from your mit-learn checkout on the host, if you have its JS toolchain set up there (node + corepack + `yarn install`):
@@ -292,13 +292,13 @@ cd ../mit-learn && yarn test useToggle   # the argument is a jest pattern
 No host toolchain? The dev container has everything installed — run them there instead:
 
 ```bash
-kubectl exec -it -n mit-learn deploy/mitlearn-nextjs -- sh -c 'cd /app && yarn test useToggle'
+kubectl --context local-dev exec -it -n mit-learn deploy/mitlearn-nextjs -- sh -c 'cd /app && yarn test useToggle'
 ```
 
 ### Connect to PostgreSQL directly
 
 ```bash
-kubectl exec -it -n local-infra local-pg-1 -- psql -U app -d mitlearn
+kubectl --context local-dev exec -it -n local-infra local-pg-1 -- psql -U app -d mitlearn
 ```
 
 ### Inspect emails (Mailpit)
@@ -535,7 +535,7 @@ How it works — plain Kubernetes, visible in each app's `deployment.yaml`: ever
 Day-to-day behavior:
 
 - Creating or editing the file mid-session re-applies it — no Tilt restart. Pods roll automatically so new values actually take effect: because Kubernetes does not restart pods on ConfigMap/Secret changes, `tiltlib.star` stamps a fingerprint of every applied ConfigMap's and Secret's data onto each Deployment's pod template (the `ol.mit.edu/config-hash` annotation) — this covers edits to the tracked `app-env.yaml`/`secrets.yaml` too, not just this override file — which is also the idiomatic production pattern (cf. Helm `checksum/config` annotations).
-- Overridden key **names** (never values) are printed in the **Tiltfile resource's log** in the Tilt UI, and your full delta is inspectable in-cluster at any time: `kubectl get cm -n mitxonline mitxonline-env-local -o yaml`
+- Overridden key **names** (never values) are printed in the **Tiltfile resource's log** in the Tilt UI, and your full delta is inspectable in-cluster at any time: `kubectl --context local-dev get cm -n mitxonline mitxonline-env-local -o yaml`
 - Gotchas: the ConfigMap's `metadata.name` must match what `deployment.yaml` references (`<app>-env-local` — copy the example, don't type it), and all `data:` values must be YAML **strings** (quote things like `"True"` and `"8080"`). A typo'd key is applied but ignored by the app. If you *delete* the file mid-session, prefer emptying `data:` instead — the already-applied ConfigMap can linger in-cluster until `tilt down`.
 
 Every app supports this, including **mit-learn-nextjs** (e.g. per-developer PostHog credentials — see its `app-env.local.yaml.example`).
@@ -544,7 +544,7 @@ Scope notes:
 
 - **OpenAI key for LiteLLM** (`local-infra` namespace, Pulumi-managed) is separate from the app overlays — create the Secret directly (the deployment marks it optional, so this is safe to skip entirely):
   ```bash
-  kubectl create secret generic litellm-secrets -n local-infra \
+  kubectl --context local-dev create secret generic litellm-secrets -n local-infra \
     --from-literal=openai_api_key=sk-your-key  # pragma: allowlist secret
   ```
   (That `openai_api_key` Secret *data key* is unrelated to the old `tilt_config.json` key of the same name, which was never wired to anything and has been removed.)
@@ -579,7 +579,7 @@ The script builds the theme from the checkout's sources inside Docker (no Node, 
 Confirm the pod is on your tag, then log in again or trigger a password reset to see the login and email themes:
 
 ```bash
-kubectl -n local-infra get pod keycloak-0 -o jsonpath='{.spec.containers[0].image}'
+kubectl --context local-dev -n local-infra get pod keycloak-0 -o jsonpath='{.spec.containers[0].image}'
 ```
 
 Emails land in [Mailpit](#inspect-emails-mailpit); the olapps realm enables the `UPDATE_EMAIL` required action, so changing an email from the [account console](https://sso.ol.mit.dev/realms/olapps/account/) exercises the email-update confirmation template as well.
@@ -631,7 +631,7 @@ buckets are still there. Delete the PVC as well if you actually want the disk ba
 and note that this does discard the objects:
 
 ```bash
-kubectl -n local-infra delete pvc data-rustfs-0
+kubectl --context local-dev -n local-infra delete pvc data-rustfs-0
 ```
 
 **Using an external MinIO instead** — run it on your host and point an app at it via
@@ -681,7 +681,7 @@ Budget about 2GB of memory, a 3GB image pull and a 20Gi volume for StarRocks.
 | Iceberg REST catalog, inside the cluster | `http://gravitino.local-infra.svc.cluster.local:9001/iceberg` |
 | Iceberg REST catalog, from your machine | `http://localhost:9001/iceberg` (`iceberg-catalog-port-forward`) |
 | RustFS, from your machine, for an Iceberg writer | `http://localhost:9000` (`lake-object-store-port-forward`) |
-| Gravitino management API and UI | `kubectl -n local-infra port-forward svc/gravitino 8090:8090` |
+| Gravitino management API and UI | `kubectl --context local-dev -n local-infra port-forward svc/gravitino 8090:8090` |
 
 ```sql
 CREATE DATABASE ol_data_lake_local.scratch;
@@ -719,7 +719,7 @@ there for the fixture format and how to add one.
 
 A dlt source in that checkout writes raw tables from a local app database into the same
 schema, over the catalog and RustFS forwards above plus one to Postgres
-(`kubectl -n local-infra port-forward svc/local-pg-rw 5432:5432`):
+(`kubectl --context local-dev -n local-infra port-forward svc/local-pg-rw 5432:5432`):
 
 ```bash
 cd src/ol_dlt && uv run python -m ol_dlt.sources.keycloak
@@ -778,7 +778,7 @@ ol-dbt fixtures load
 ol-dbt starrocks build --env dev --select \
   "+integrations__learn__xpro_courses +integrations__learn__xpro_runs +integrations__learn__xpro_programs"
 
-kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
+kubectl --context local-dev -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
 from learning_resources.models import ETLSourceOwnership
 from learning_resources.tasks import SyncXproCoursesTask, SyncXproProgramsTask
 
@@ -789,7 +789,7 @@ for resource_type in ("course", "program"):
 print(SyncXproCoursesTask.run(full_refresh=True))
 print(SyncXproProgramsTask.run(full_refresh=True))
 PY
-kubectl -n mit-learn exec deploy/mitlearn-webapp -c app -- python manage.py clear_cache
+kubectl --context local-dev -n mit-learn exec deploy/mitlearn-webapp -c app -- python manage.py clear_cache
 
 curl -sk "https://api.learn.mit.dev/api/v1/courses/?platform=xpro"
 ```
@@ -823,7 +823,7 @@ Things that will trip you up:
   `permission denied to create database`, run this once and re-run `local-infra-core`:
 
   ```bash
-  kubectl -n local-infra exec local-pg-1 -- psql -U postgres -c 'ALTER ROLE app CREATEDB'
+  kubectl --context local-dev -n local-infra exec local-pg-1 -- psql -U postgres -c 'ALTER ROLE app CREATEDB'
   ```
 
 - **A plain pyiceberg client on your machine cannot write to the lake.** The catalog
@@ -839,7 +839,7 @@ Things that will trip you up:
   configured got a 401.
 - **Most changed catalog properties do not reach an existing catalog.** The
   `lakehouse-catalogs` Job only creates what is missing. Drop the catalog (in StarRocks,
-  in Gravitino, or both), delete the Job (`kubectl -n local-infra delete job
+  in Gravitino, or both), delete the Job (`kubectl --context local-dev -n local-infra delete job
   lakehouse-catalogs`; it also expires by itself after ten minutes) and re-run
   `local-infra-core`. The exception is `STARROCKS_CATALOG_SETTINGS` in
   `infra/modules/lakehouse.py`: the Job sets those on the StarRocks catalog with `ALTER
@@ -863,8 +863,8 @@ databases are left behind, so re-enabling it picks the lake back up. To start cl
 (leave `data-rustfs-0` alone if ocw-studio is enabled, it holds those buckets too):
 
 ```bash
-kubectl -n local-infra delete pvc data-starrocks-0 data-rustfs-0
-kubectl -n local-infra exec local-pg-1 -- psql -U postgres -c 'DROP DATABASE gravitino WITH (FORCE)' -c 'DROP DATABASE iceberg WITH (FORCE)'
+kubectl --context local-dev -n local-infra delete pvc data-starrocks-0 data-rustfs-0
+kubectl --context local-dev -n local-infra exec local-pg-1 -- psql -U postgres -c 'DROP DATABASE gravitino WITH (FORCE)' -c 'DROP DATABASE iceberg WITH (FORCE)'
 ```
 
 #### Rehearsing a webhook cutover
@@ -880,7 +880,7 @@ Open Learning Library is the source to rehearse with. Its legacy pipeline and it
 source read the same CSV, so both sides load real rows with no credentials. The baseline:
 
 ```bash
-kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
+kubectl --context local-dev -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
 from learning_resources.etl import pipelines
 from learning_resources.models import LearningResource
 
@@ -905,7 +905,7 @@ Every id in the first list and not in the second is unpublished by the first del
 The flip and the delivery:
 
 ```bash
-kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
+kubectl --context local-dev -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
 from learning_resources.models import ETLSourceOwnership
 
 ETLSourceOwnership.objects.update_or_create(
@@ -926,14 +926,14 @@ curl -sk "https://api.learn.mit.dev/api/v1/courses/?platform=oll&limit=1" | jq .
 To roll back, give the pair back to the legacy pipeline, run it and clear the cache:
 
 ```bash
-kubectl -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
+kubectl --context local-dev -n mit-learn exec -i deploy/mitlearn-webapp -c app -- python manage.py shell <<'PY'
 from learning_resources.etl import pipelines
 from learning_resources.models import ETLSourceOwnership
 
 ETLSourceOwnership.objects.filter(etl_source="oll", resource_type="course").update(owner="legacy")
 print(len(pipelines.oll_etl()))
 PY
-kubectl -n mit-learn exec deploy/mitlearn-webapp -c app -- python manage.py clear_cache
+kubectl --context local-dev -n mit-learn exec deploy/mitlearn-webapp -c app -- python manage.py clear_cache
 ```
 
 - Before the flip the delivery fails with `409` on every attempt of its retry policy and
@@ -1079,13 +1079,13 @@ workload in local-dev and the first thing to suspect when builds sit pending.
 Check the worker registered at all:
 
 ```bash
-kubectl -n ocw-studio logs deploy/ocwstudio-concourse -c worker | grep beacon.registered
+kubectl --context local-dev -n ocw-studio logs deploy/ocwstudio-concourse -c worker | grep beacon.registered
 ```
 
 Then confirm the web half agrees, from the Concourse UI's workers page or:
 
 ```bash
-kubectl -n ocw-studio logs deploy/ocwstudio-concourse -c web | grep forward-worker | tail -1
+kubectl --context local-dev -n ocw-studio logs deploy/ocwstudio-concourse -c web | grep forward-worker | tail -1
 ```
 
 If the worker registers but tasks fail to start, the baggageclaim driver is the usual
@@ -1112,7 +1112,7 @@ PULUMI_CONFIG_PASSPHRASE='' pulumi up --stack local-dev.apps-infra.Dev --logtost
 ```
 
 Common causes:
-- **kubeconfig not set:** Ensure `k3d kubeconfig merge local-dev --kubeconfig-merge-default` has been run. If your `~/.kube` directory is a symlink pointing to a Windows-side path (common in WSL2), see [WSL2: kubeconfig context not found](#wsl2-kubeconfig-context-not-found) below.
+- **kubeconfig not set:** The stacks target the `local-dev` context, so `kubectl config get-contexts local-dev` must succeed. If it does not, run `k3d kubeconfig merge local-dev --kubeconfig-merge-default`, then `kubectl config rename-context k3d-local-dev local-dev` (k3d names the context `k3d-local-dev`; `setup.sh` renames it). If your `~/.kube` directory is a symlink pointing to a Windows-side path (common in WSL2), see [WSL2: kubeconfig context not found](#wsl2-kubeconfig-context-not-found) below.
 - **Cert files missing:** Run `setup.sh --skip-hosts` to regenerate certs without touching `/etc/hosts`.
 
 ### `local-infra-apps` fails with `Missing required argument "client_id"`
@@ -1140,7 +1140,7 @@ The app databases in the new cluster are empty regardless: restore from a dump w
 The initContainer runs migrations; check its logs:
 
 ```bash
-kubectl logs -n <namespace> <pod-name> -c bootstrap
+kubectl --context local-dev logs -n <namespace> <pod-name> -c bootstrap
 ```
 
 Common causes:
@@ -1151,10 +1151,10 @@ Common causes:
 
 ```bash
 # Check that ApisixRoute was picked up
-kubectl get apisixroute -n <namespace>
+kubectl --context local-dev get apisixroute -n <namespace>
 
 # Check APISIX ingress controller logs
-kubectl logs -n operations deploy/apisix-ingress-controller -f
+kubectl --context local-dev logs -n operations deploy/apisix-ingress-controller -f
 ```
 
 The ingress controller watches for `ApisixRoute` CRDs and syncs them to the APISIX data plane. A restart of the ingress controller pod often resolves sync issues.
@@ -1164,8 +1164,8 @@ The ingress controller watches for `ApisixRoute` CRDs and syncs them to the APIS
 Keycloak takes 60–90 seconds to start on first boot (database schema migration). Check its readiness:
 
 ```bash
-kubectl get pod -n local-infra -l app=keycloak
-kubectl logs -n local-infra -l app=keycloak -f
+kubectl --context local-dev get pod -n local-infra -l app=keycloak
+kubectl --context local-dev logs -n local-infra -l app=keycloak -f
 ```
 
 Also verify the `olapps` realm was provisioned by Pulumi:
@@ -1186,7 +1186,7 @@ Then restart your browser. The cert was generated with the correct wildcard SANs
 ### App pods stuck in `ImagePullBackOff` with `number of layers and diffIDs don't match`
 
 ```bash
-kubectl -n mit-learn describe pods | grep diffIDs
+kubectl --context local-dev -n mit-learn describe pods | grep diffIDs
 # Failed to pull image "k3d-registry.localhost:5000/mitodl_mit-learn-app:tilt-...":
 #   ... number of layers and diffIDs don't match: 17 != 22
 ```
@@ -1320,6 +1320,8 @@ cp ~/kube-backup.yaml ~/.kube/config 2>/dev/null || true
 
 # Re-merge k3d kubeconfig
 k3d kubeconfig merge local-dev --kubeconfig-merge-default
+kubectl config delete-context local-dev 2>/dev/null || true  # a stale entry from an earlier cluster
+kubectl config rename-context k3d-local-dev local-dev
 kubectl config get-contexts local-dev   # Should now succeed
 ```
 
