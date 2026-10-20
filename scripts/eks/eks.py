@@ -39,7 +39,6 @@ OIDC_CALLBACK_PORT = 8250
 OIDC_CALLBACK_TIMEOUT_SECONDS = 180
 OIDC_REDIRECT_URI = f"http://localhost:{OIDC_CALLBACK_PORT}/oidc/callback"
 PRODUCTION_VAULT_ADDRESS = "https://vault-production.odl.mit.edu"
-PREFERRED_DEFAULT_CONTEXT = "applications-qa"
 
 # Truncation-safe prefix of the "eks-admin-role" infix that Pulumi uses when
 # naming the cluster admin IAM role.  Pulumi truncates IAM role names that would
@@ -356,23 +355,6 @@ def kubeconfig_exec_args(cluster: ClusterConfig, mode: AccessMode) -> list[str]:
     return args
 
 
-def resolve_current_context(
-    clusters: list[ClusterConfig], current_context: str | None
-) -> str | None:
-    """Choose an explicit or sensible default current context.
-
-    The default context is always an operator context (not a -readonly suffixed one).
-    """
-    if current_context:
-        return current_context
-    cluster_names = [cluster.cluster_name for cluster in clusters]
-    if PREFERRED_DEFAULT_CONTEXT in cluster_names:
-        return PREFERRED_DEFAULT_CONTEXT
-    if cluster_names:
-        return cluster_names[0]
-    return None
-
-
 def build_kubeconfig(
     clusters: list[ClusterConfig],
     operator_mode: AccessMode,
@@ -388,7 +370,8 @@ def build_kubeconfig(
     For readonly mode a single context per cluster is generated since there is
     no separate operator credential to pair it with.
 
-    The current-context always points to the operator (non-readonly) context.
+    ``current-context`` is set only when ``current_context`` is given, so the
+    kubeconfig never makes a deployed cluster the default target of a bare kubectl.
     """
     kube_clusters = []
     contexts = []
@@ -495,9 +478,8 @@ def build_kubeconfig(
         "contexts": contexts,
         "users": users,
     }
-    resolved_current_context = resolve_current_context(clusters, current_context)
-    if resolved_current_context:
-        kube_config["current-context"] = resolved_current_context
+    if current_context:
+        kube_config["current-context"] = current_context
     return kube_config
 
 
@@ -799,6 +781,10 @@ def setup(
                 "  Readonly contexts  : "
                 f"{', '.join(c.cluster_name + '-readonly' for c in clusters)}"
             )
+    print(
+        f"  Current context    : {current_context or 'none'}"
+        + ("" if current_context else " (pass --context <cluster> to kubectl)")
+    )
 
 
 @app.command(name="exec-credential")
