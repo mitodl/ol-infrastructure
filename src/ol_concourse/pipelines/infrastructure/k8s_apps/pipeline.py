@@ -1792,13 +1792,18 @@ def _build_release_resource_app_pipeline(
         ),
     ]
     prod_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
-        # Mark the Production GitHub Deployment as successful.
+        # Mark the Production GitHub Deployment as successful, and say so on the
+        # release issue. Closing that issue authorizes the promotion; it does
+        # not show the release is live, and a closed issue is easy to misread as
+        # "shipped". The comment links the Deployment, which is what records
+        # what is live. The gate's get already put gh_issue.json in the job.
         PutStep(
             put=deployment_prod.name,
             params={
                 "action": "finish",
                 "deployment_file": f"{deployment_prod.name}/deployment.json",
                 "state": "success",
+                "comment_on_issue_file": f"{release_gate.name}/gh_issue.json",
             },
         ),
         # Merge the release branch back into the main branch and delete it so
