@@ -12,28 +12,6 @@ NAMESPACE = 'mitxonline'
 DEPLOY_NAME = 'mitxonline-webapp'
 
 if os.path.exists(os.path.join(APP_DIR, '.git')):
-    # The local-dev stage gives the runtime user /src with `RUN chown -R` over
-    # ~140k files (mostly node_modules), which dominated the build. Taking
-    # ownership while copying is far cheaper (seconds), so swap that line for a
-    # COPY --chown of the same /src from the node stage. That copy misses files
-    # the node stage dropped (stale .yarn/cache entries from the checkout), so
-    # re-own just those. If mitxonline changes the line, nothing is replaced
-    # and the Dockerfile builds unmodified (slowly).
-    CHOWN_LINE = 'RUN chown -R mitodl:mitodl /src'
-    CHOWN_REPLACEMENT = '\n'.join([
-        'COPY --from=node --chown=mitodl:mitodl /src /src',
-        'RUN find /src -xdev ! -user mitodl -exec chown mitodl:mitodl {} +',
-    ])
-    dockerfile_lines = str(read_file(APP_DIR + '/Dockerfile')).split('\n')
-    if CHOWN_LINE in [line.strip() for line in dockerfile_lines]:
-        dockerfile_text = '\n'.join([
-            CHOWN_REPLACEMENT if line.strip() == CHOWN_LINE else line
-            for line in dockerfile_lines
-        ])
-    else:
-        print('mitxonline: Dockerfile no longer has %r; building it unmodified' % CHOWN_LINE)
-        dockerfile_text = '\n'.join(dockerfile_lines)
-
     # Build the `local-dev` target: `production` (the only target that bakes in
     # the compiled webpack frontend, which checkout needs since that flow still
     # runs through mitxonline.mit.test) plus dev deps (pytest, ipdb, ...) and
@@ -42,18 +20,9 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         IMAGE,
         context=APP_DIR,
         target='local-dev',
-        dockerfile_contents=dockerfile_text,
-        ignore=[
-            # Agent worktrees; syncing one into the pod restarted it in a loop.
-            '.claude/',
-            # The repo's .dockerignore only drops the root node_modules, so the
-            # host's frontend/*/node_modules (~1GB) went into the image. The
-            # node stage runs its own yarn install, so none of it is needed.
-            '**/node_modules',
-            # The host venv (~700MB) was copied into /src too; the image's
-            # own venv is /opt/venv, so it was never used.
-            '.venv/',
-        ],
+        dockerfile=APP_DIR + '/Dockerfile',
+        # .claude/ holds agent worktrees; syncing one into the pod restarted it in a loop.
+        ignore=['.claude/'],
         # Sync the whole repo: Django apps are top-level dirs (courses,
         # ecommerce, cms, ...). granian's --reload-ignore-dirs filters the
         # non-Python churn.
