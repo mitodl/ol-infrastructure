@@ -166,7 +166,13 @@ def create(
                 ),
             ),
             # --- StatefulSet replicas ---
-            # Fires when ready replicas / desired replicas < 1.0.
+            # Fires when fewer replicas are ready than desired. The value is the
+            # number missing, not the ready/desired ratio this used to compare
+            # against 1.0: base.py fires on a value > 0, so a ratio of 0 (no
+            # replica ready) never fired, and every single-replica StatefulSet
+            # was invisible when its only pod was down (data-qa's second
+            # ClickHouse replica has been Pending that way since 2026-09-30). ClickHouse and Keeper have their own rule in clickhouse.py,
+            # which carries the service label Rootly routes on.
             #
             # for_ is 20m, not the more typical 10m, because EBS-backed StatefulSets
             # (Typesense, etc.) can legitimately drop below full readiness for well
@@ -192,7 +198,7 @@ def create(
                     "description": "There is a mismatch between the requested number of instances for statefulset {{ $labels.statefulset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, statefulset) (kube_statefulset_status_replicas_ready{cluster=~".*-(ci|qa)"}) / sum by (cluster, namespace, statefulset) (kube_statefulset_replicas) < 1.0'
+                    'sum by (cluster, namespace, statefulset) (kube_statefulset_replicas{cluster=~".*-(ci|qa)", namespace!="clickhouse"}) - sum by (cluster, namespace, statefulset) (kube_statefulset_status_replicas_ready{cluster=~".*-(ci|qa)", namespace!="clickhouse"}) > 0'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -206,7 +212,7 @@ def create(
                     "description": "There is a mismatch between the requested number of instances for statefulset {{ $labels.statefulset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, statefulset) (kube_statefulset_status_replicas_ready{cluster=~".*-(production)"}) / sum by (cluster, namespace, statefulset) (kube_statefulset_replicas) < 1.0'
+                    'sum by (cluster, namespace, statefulset) (kube_statefulset_replicas{cluster=~".*-(production)", namespace!="clickhouse"}) - sum by (cluster, namespace, statefulset) (kube_statefulset_status_replicas_ready{cluster=~".*-(production)", namespace!="clickhouse"}) > 0'
                 ),
             ),
             # --- Node readiness ---
