@@ -1,7 +1,8 @@
 """The olapps registration flow must require reCAPTCHA with the config Keycloak reads.
 
 Keycloak 26 reads the secret from ``secret.key`` (``secret`` is the pre-26 name it
-migrates on first use), and an empty site key or secret makes the step skip itself.
+migrates on first use). With an empty site key or secret the page renders no widget
+and every registration fails the reCAPTCHA check.
 The realm's flow binding points at the flow alias, so a changed name replaces the
 bound flow.
 """

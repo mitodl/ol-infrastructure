@@ -23,6 +23,13 @@ def create_recaptcha_registration_flow(
     (``AuthenticationManagementResource.updateAuthenticatorConfig``). A new reCAPTCHA
     key changes the site key, which replaces the config and writes the new secret.
     Rotating only the secret needs ``pulumi up --replace`` on the config resource.
+    The replace deletes the old config first (Keycloak allows one per execution), and
+    registration errors until the new one is created.
+
+    To stop managing the flow, bind the realm back to the built-in ``registration``
+    flow in one apply and remove this flow in the next. Keycloak refuses to delete a
+    bound flow, and dropping ``registration_flow`` from the binding leaves the realm
+    bound to it.
 
     :param realm_id: The realm the flow belongs to.
     :param name_prefix: Prefix for the resource names and flow aliases, e.g.
@@ -32,8 +39,8 @@ def create_recaptcha_registration_flow(
     :param recaptcha_secret_key: The site key's secret, used for siteverify.
     :param opts: Resource options applied to every resource in the flow.
     :returns: The top-level flow, to bind as the realm's registration flow, and the
-        reCAPTCHA config, which the binding should depend on so the flow is complete
-        before it is bound.
+        reCAPTCHA config, the last resource created, which the binding should depend
+        on so the flow is complete before it is bound.
     :rtype: tuple[keycloak.authentication.Flow, keycloak.authentication.ExecutionConfig]
     """
     registration_flow = keycloak.authentication.Flow(
@@ -55,7 +62,7 @@ def create_recaptcha_registration_flow(
         priority=10,
         opts=opts,
     )
-    keycloak.authentication.Execution(
+    user_creation = keycloak.authentication.Execution(
         f"{name_prefix}-user-creation",
         realm_id=realm_id,
         parent_flow_alias=registration_form.alias,
@@ -64,7 +71,7 @@ def create_recaptcha_registration_flow(
         priority=20,
         opts=opts,
     )
-    keycloak.authentication.Execution(
+    password_validation = keycloak.authentication.Execution(
         f"{name_prefix}-password-validation",
         realm_id=realm_id,
         parent_flow_alias=registration_form.alias,
@@ -97,7 +104,12 @@ def create_recaptcha_registration_flow(
         opts=pulumi.ResourceOptions.merge(
             opts,
             pulumi.ResourceOptions(
-                ignore_changes=['config["secret.key"]'],
+                # Every execution is created before the config, so a binding that
+                # depends on the config sees the whole form.
+                depends_on=[user_creation, password_validation],
+                # The bridge matches ignore paths as strings in its own format,
+                # which puts a dot before a bracketed map key.
+                ignore_changes=['config.["secret.key"]'],
                 replace_on_changes=['config["site.key"]'],
                 delete_before_replace=True,
             ),
