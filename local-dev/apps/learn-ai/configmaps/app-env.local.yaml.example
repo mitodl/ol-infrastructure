@@ -18,6 +18,11 @@ data:
   # Needed for any AI feature. RC and production call OpenAI directly too.
   # OPENAI_API_KEY: "sk-..."  # pragma: allowlist secret
 
+  # Needed for the bots' course search (syllabus, content files, video
+  # transcripts), which calls production MIT Learn by default (the AI_MIT_*
+  # URLs). Without it, those calls fail with "Illegal header value b'Bearer '".
+  # LEARN_ACCESS_TOKEN: "..."  # pragma: allowlist secret
+
   # Opt-in: route AI calls through local-infra's LiteLLM instead (no
   # deployed environment does this). That LiteLLM needs its own key in the
   # litellm-secrets Secret; see local-dev/README.md.

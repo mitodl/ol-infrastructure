@@ -35,7 +35,7 @@ This environment runs the MIT Learn application stack as Kubernetes workloads in
 |-----|-----------|-------------|
 | mit-learn (frontend) | `https://learn.mit.dev` | Next.js frontend |
 | mit-learn (backend) | `https://api.learn.mit.dev` | Django/granian API |
-| learn-ai | `https://ai.learn.mit.dev` | Django AI proxy service |
+| learn-ai | `https://ai.learn.mit.dev`, `https://api.learn.mit.dev/ai/` | Django AI proxy service. The frontend uses the `/ai/` path, which shares mit-learn's login session. |
 | mitxonline | `https://mitxonline.mit.dev` | MITx Online LMS (Django/uwsgi) |
 | odl-video-service | `https://video.odl.mit.dev` | ODL Video Service (Django/uwsgi) |
 | micromasters | `https://micromasters.mit.dev` | MicroMasters (Django/granian), opt-in, see [MicroMasters](#micromasters) |
@@ -548,7 +548,7 @@ Scope notes:
     --from-literal=openai_api_key=sk-your-key  # pragma: allowlist secret
   ```
   (That `openai_api_key` Secret *data key* is unrelated to the old `tilt_config.json` key of the same name, which was never wired to anything and has been removed.)
-- **learn-ai calls OpenAI directly**, like RC and production, so the LiteLLM key above does not reach it. Set `OPENAI_API_KEY` in learn-ai's `app-env.local.yaml`. To route learn-ai through LiteLLM instead, copy the proxy block from `apps/learn-ai/configmaps/app-env.local.yaml.example` into your `app-env.local.yaml` and uncomment it.
+- **learn-ai calls OpenAI directly**, like RC and production, so the LiteLLM key above does not reach it. Set `OPENAI_API_KEY` in learn-ai's `app-env.local.yaml`, plus `LEARN_ACCESS_TOKEN` for the bots' course search (see `apps/learn-ai/configmaps/app-env.local.yaml.example`). To route learn-ai through LiteLLM instead, copy the proxy block from `apps/learn-ai/configmaps/app-env.local.yaml.example` into your `app-env.local.yaml` and uncomment it.
 
 ### GPU Support for Ollama
 
