@@ -473,6 +473,11 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
             },
         },
         "startOptimized": stack_info.name != "CI",
+        # CI starts non-optimized and re-augments at startup, so it does not
+        # inherit --features-disabled=scim-api from the image build
+        # (ol-keycloak#317). Repeat it here so CI serves SCIM from the plugin
+        # alone, as QA and Production do.
+        **({"features": {"disabled": ["scim-api"]}} if stack_info.name == "CI" else {}),
         "http": {
             "tlsSecret": keycloak_tls_secret_name,
         },
