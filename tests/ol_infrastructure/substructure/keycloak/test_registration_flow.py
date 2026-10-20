@@ -21,26 +21,15 @@ except RuntimeError:
 from ol_infrastructure.substructure.keycloak.registration_flow import (
     create_recaptcha_registration_flow,
 )
+from tests.ol_infrastructure.substructure.keycloak.recording_mocks import RecordingMocks
 
 PREFIX = "ol-registration"
-
-
-class _RecordingMocks(pulumi.runtime.Mocks):
-    def __init__(self) -> None:
-        self.resources: list[pulumi.runtime.MockResourceArgs] = []
-
-    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-        self.resources.append(args)
-        return [f"{args.name}_id", dict(args.inputs)]
-
-    def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
-        return {}
 
 
 @pytest.fixture
 def resources() -> dict[str, pulumi.runtime.MockResourceArgs]:
     """Register the flow and return its resources by Pulumi name."""
-    recording = _RecordingMocks()
+    recording = RecordingMocks()
     pulumi.runtime.set_mocks(recording, preview=False)
 
     # pulumi.runtime.test waits for every resource registration to finish
