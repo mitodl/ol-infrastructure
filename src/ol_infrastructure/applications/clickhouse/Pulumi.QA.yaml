@@ -28,5 +28,11 @@ config:
     secure: v1:aCDdZ/XQXLi1PjFu:JW3cgJ4QnmYADnRtbJyuUyC8o20RQzJmp9Zaxwyq2xTThaGiA9+iKi+DAvKgVWj59AihbaJYV+E=
   clickhouse:opik_password:
     secure: v1:welcw7aZeYvZE/P1:4a5YIKqFpx7DRcLqOf6HQEkSzj+Ur34KJHD3pZbrc6MePWPSkRSnRxjeFqm+bDXAJM8zBZMejbc=
+  # Transitional: lets replicas that have not restarted yet fetch from ones
+  # that have. Remove after the apply that adds interserver_password has
+  # rolled every replica.
+  clickhouse:interserver_credentials_allow_empty: "true"
+  clickhouse:interserver_password:
+    secure: v1:LD+fef8012oLTL3k:3h67AkUS7Nfi3uVH3q43ZmlLDck1a2Z6Ew7wuTMW7VXNTerZ9enwdc12ilM+1aD27MJ6tD2cs2B+YsUN
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQFJ5ilpKwEX1fFnZEcvabyvAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkiHCg5JwutG4bAb/AgEQgDvRQvEmWMj3/wmxQkcAhY9N/KfDJD2xcy+97xpIF8CzCM5r6eC/Hspei7YI4EPw4CosTwavWa0jl4bvEw==

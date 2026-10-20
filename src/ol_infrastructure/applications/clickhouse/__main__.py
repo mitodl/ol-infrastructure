@@ -70,9 +70,14 @@ vault_mount_stack = make_stack_reference(
     projects.VAULT_STATIC_MOUNTS, f"operations.{stack_info.name}"
 )
 cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 stateful_workload_storage = require_stack_output_value(
     cluster_stack, "stateful_workload_storage"
 )
+# Every pod on the data cluster, including Opik and the backup CronJob, gets its
+# address from these subnets (VPC CNI). Traffic from a peered VPC arrives
+# SNATed to a node in that VPC, so it falls outside them.
+data_pod_subnet_cidrs = network_stack.require_output("data_vpc")["k8s_pod_subnet_cidrs"]
 
 clickhouse_vault_kv_path = vault_mount_stack.require_output("clickhouse_kv")["path"]
 
@@ -134,7 +139,8 @@ CLICKHOUSE_METRICS_PORT = 9363
 # Free space the server keeps on the hot disk before TTL moves stop placing
 # parts there; the Opik chart's tieredStorage.hot.keepFreeSpaceBytes default.
 COLD_TIER_HOT_KEEP_FREE_SPACE_BYTES = 10 * 1024**3
-
+CLICKHOUSE_INTERSERVER_USER = "interserver"
+CLICKHOUSE_LOOPBACK_NETWORKS = ("127.0.0.1", "::1")
 
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(CLICKHOUSE_NAMESPACE, ns)
@@ -496,9 +502,13 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     cold_bucket_name: "Output[str]",
     backup_bucket_name: "Output[str]",
     users_secret_name: str,
+    interserver_secret_name: str,
+    interserver_allow_empty: bool,
+    client_networks: "Output[list[str]]",
     irsa_role_arn: "Output[str]",
     keeper_installation: "Output[kubernetes.apiextensions.CustomResource]",
     users_secret: Any,
+    interserver_secret: Any,
     vault_k8s_resources: Any,
     resources: dict[str, Any],
 ) -> "Output[kubernetes.apiextensions.CustomResource]":
@@ -677,58 +687,63 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     # Operator-native user definitions. Password hashes are referenced from the
     # Vault-synced K8s secret via secretKeyRef (keys: <user>_sha256); the
     # operator reads them at reconcile and bakes them into its usersd configmap.
-    # networks/ip is left open at the ClickHouse layer because the actual access
-    # boundary is the NetworkPolicy defined below (only the LLMOps namespaces +
-    # the clickhouse namespace can reach the data ports).
+    #
+    # networks/ip limits both users to loopback (kubectl exec clickhouse-client)
+    # and the data cluster's pod subnets. NetworkPolicy is not enforced on the
+    # data clusters, so without this any host routed into the VPC, including
+    # pods in peered VPCs, could log in with a leaked password. Users changes
+    # reload without a restart.
     def _secret_ref(key: str) -> dict[str, Any]:
         return {"valueFrom": {"secretKeyRef": {"name": users_secret_name, "key": key}}}
 
-    ch_users = {
-        "admin/password_sha256_hex": _secret_ref("admin_sha256"),
-        "admin/access_management": "1",
-        "admin/profile": "default",
-        "admin/quota": "default",
-        "admin/networks/ip": ["::/0", "0.0.0.0/0"],
-        "opik/password_sha256_hex": _secret_ref("opik_sha256"),
-        "opik/profile": "llmops_profile",
-        "opik/quota": "llmops_quota",
-        "opik/networks/ip": ["::/0", "0.0.0.0/0"],
-        # Explicit RBAC grants (rendered as <grants><query>…</query></grants> in
-        # the user's XML) instead of the legacy <allow_databases> whitelist.
-        # ``allow_databases`` restricts the user's grants to *only* the listed
-        # application databases, which denies opik the SELECT on ``system.parts``
-        # it needs to compute per-workspace/table storage metrics (Code: 497
-        # ACCESS_DENIED SELECT(...) ON system.parts). Enumerating grants lets us
-        # add that one system-table read without opening the whole ``system``
-        # database (preserving cross-tenant isolation vs. e.g. system.query_log).
-        #
-        # ``default`` is granted in addition to ``opik_db``: opik's Liquibase
-        # migrations hard-code the DATABASECHANGELOG / DATABASECHANGELOGLOCK
-        # bookkeeping tables (and the replicated ``...1`` shadow tables from
-        # 000017_change_tables_to_replicated) into the ``default`` database,
-        # while application tables live in ``opik_db``. ``default`` is otherwise
-        # an unused scratch database in this cluster.
-        #
-        # ``CLUSTER ON *.*`` is required because newer opik migrations issue
-        # distributed DDL with an explicit ``ON CLUSTER '{cluster}'`` clause
-        # (e.g. 000098_create_cipx_spend_blocks). Altinity 24.8 defaults
-        # ``on_cluster_queries_require_cluster_grant`` to true, and CLUSTER is a
-        # global-only privilege not implied by the database-scoped ``GRANT ALL``
-        # above (without it: Code 497 ACCESS_DENIED, grant CLUSTER ON *.*). This
-        # only permits *issuing* ON CLUSTER queries; the underlying object access
-        # stays constrained by the opik_db / default grants, so cross-tenant
-        # isolation is preserved.
-        "opik/grants/query": [
-            "GRANT ALL ON opik_db.*",
-            "GRANT ALL ON default.*",
-            "GRANT SELECT ON system.parts",
-            "GRANT CLUSTER ON *.*",
-        ],
-    }
+    def _users(networks: list[str]) -> dict[str, Any]:
+        return {
+            "admin/password_sha256_hex": _secret_ref("admin_sha256"),
+            "admin/access_management": "1",
+            "admin/profile": "default",
+            "admin/quota": "default",
+            "admin/networks/ip": networks,
+            "opik/password_sha256_hex": _secret_ref("opik_sha256"),
+            "opik/profile": "llmops_profile",
+            "opik/quota": "llmops_quota",
+            "opik/networks/ip": networks,
+            # Explicit RBAC grants (rendered as <grants><query>…</query></grants> in
+            # the user's XML) instead of the legacy <allow_databases> whitelist.
+            # ``allow_databases`` restricts the user's grants to *only* the listed
+            # application databases, which denies opik the SELECT on ``system.parts``
+            # it needs to compute per-workspace/table storage metrics (Code: 497
+            # ACCESS_DENIED SELECT(...) ON system.parts). Enumerating grants lets us
+            # add that one system-table read without opening the whole ``system``
+            # database (preserving cross-tenant isolation vs. e.g. system.query_log).
+            #
+            # ``default`` is granted in addition to ``opik_db``: opik's Liquibase
+            # migrations hard-code the DATABASECHANGELOG / DATABASECHANGELOGLOCK
+            # bookkeeping tables (and the replicated ``...1`` shadow tables from
+            # 000017_change_tables_to_replicated) into the ``default`` database,
+            # while application tables live in ``opik_db``. ``default`` is otherwise
+            # an unused scratch database in this cluster.
+            #
+            # ``CLUSTER ON *.*`` is required because newer opik migrations issue
+            # distributed DDL with an explicit ``ON CLUSTER '{cluster}'`` clause
+            # (e.g. 000098_create_cipx_spend_blocks). Altinity 24.8 defaults
+            # ``on_cluster_queries_require_cluster_grant`` to true, and CLUSTER is a
+            # global-only privilege not implied by the database-scoped ``GRANT ALL``
+            # above (without it: Code 497 ACCESS_DENIED, grant CLUSTER ON *.*). This
+            # only permits *issuing* ON CLUSTER queries; the underlying object access
+            # stays constrained by the opik_db / default grants, so cross-tenant
+            # isolation is preserved.
+            "opik/grants/query": [
+                "GRANT ALL ON opik_db.*",
+                "GRANT ALL ON default.*",
+                "GRANT SELECT ON system.parts",
+                "GRANT CLUSTER ON *.*",
+            ],
+        }
 
     return Output.all(
         storage_config=storage_config_xml,
         irsa_role_arn=irsa_role_arn,
+        client_networks=client_networks,
     ).apply(
         lambda kwargs: kubernetes.apiextensions.CustomResource(
             f"clickhouse-installation-{env_suffix}",
@@ -812,6 +827,36 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                         "shutdown_wait_unfinished": str(
                             CLICKHOUSE_SHUTDOWN_WAIT_QUERIES_SECONDS
                         ),
+                        # Replicas authenticate to each other's interserver
+                        # port (9009) when fetching parts. Without credentials
+                        # anything that can reach 9009 can pull table data, and
+                        # ClickHouse's config documents them as the guard
+                        # against a server being made to fetch from an
+                        # attacker. The operator turns the secretKeyRef into
+                        # an env var read with from_env, so it is a pod
+                        # template change and rolls every replica.
+                        #
+                        # A replica without credentials rejects a fetch that
+                        # carries them, and one with them rejects a fetch
+                        # without them unless allow_empty is set. allow_empty
+                        # covers the second case during the roll that
+                        # introduces the credentials; the first still applies,
+                        # so a restarted replica cannot fetch from the ones not
+                        # yet restarted and lags until the next one restarts.
+                        # Turn allow_empty off in a second apply once every
+                        # replica has restarted.
+                        "interserver_http_credentials/user": CLICKHOUSE_INTERSERVER_USER,
+                        "interserver_http_credentials/password": {
+                            "valueFrom": {
+                                "secretKeyRef": {
+                                    "name": interserver_secret_name,
+                                    "key": "password",
+                                }
+                            }
+                        },
+                        "interserver_http_credentials/allow_empty": str(
+                            interserver_allow_empty
+                        ).lower(),
                     },
                     # Users, profiles, and quotas are managed by the operator
                     # (merged into its generated usersd configmap) rather than
@@ -829,7 +874,9 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                         ),
                     },
                     "quotas": _LLMOPS_QUOTAS,
-                    "users": ch_users,
+                    "users": _users(
+                        [*CLICKHOUSE_LOOPBACK_NETWORKS, *kwargs["client_networks"]]
+                    ),
                 },
                 "templates": {
                     "podTemplates": [
@@ -923,6 +970,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                 depends_on=[
                     keeper_installation,
                     users_secret,
+                    interserver_secret,
                     vault_k8s_resources,
                 ],
             ),
@@ -940,6 +988,12 @@ opik_password = _require_password(
     clickhouse_config.get_secret("opik_password")
     or Output.secret("changeme"),  # pragma: allowlist secret
     "opik",
+)
+interserver_password = clickhouse_config.require_secret("interserver_password")
+# True only while the apply that introduces interserver credentials rolls out;
+# see interserver_http_credentials in the CHI settings.
+interserver_allow_empty = (
+    clickhouse_config.get_bool("interserver_credentials_allow_empty") or False
 )
 
 ############################################################
@@ -1103,6 +1157,7 @@ vault.kv.SecretV2(
     data_json=Output.all(
         admin=admin_password,
         opik=opik_password,
+        interserver=interserver_password,
     ).apply(json.dumps),
 )
 
@@ -1138,6 +1193,33 @@ users_secret = OLVaultK8SSecret(
         mount_type="kv-v2",
         path="credentials",
         templates=USERS_HASH_TEMPLATES,
+        refresh_after="1h",
+        vaultauth=clickhouse_app.vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=clickhouse_app.vault_k8s_resources,
+    ),
+)
+
+# Plaintext on purpose: the server reads it as the interserver password, not as
+# a user's hash. Kept out of clickhouse-users, whose keys are hashes only.
+interserver_secret_name = (
+    "clickhouse-interserver-credentials"  # pragma: allowlist secret  # noqa: S105
+)
+interserver_secret = OLVaultK8SSecret(
+    f"clickhouse-interserver-credentials-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="clickhouse-interserver-credentials",
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=interserver_secret_name,
+        dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+        mount=clickhouse_vault_kv_path,
+        mount_type="kv-v2",
+        path="credentials",
+        templates={"password": '{{- get .Secrets "interserver" -}}'},
         refresh_after="1h",
         vaultauth=clickhouse_app.vault_k8s_resources.auth_name,
     ),
@@ -1195,9 +1277,13 @@ clickhouse_installation = _create_clickhouse_installation(
     cold_bucket_name=cold_bucket.bucket_v2.bucket,
     backup_bucket_name=backup_bucket.bucket_v2.bucket,
     users_secret_name=users_secret_name,
+    interserver_secret_name=interserver_secret_name,
+    interserver_allow_empty=interserver_allow_empty,
+    client_networks=data_pod_subnet_cidrs,
     irsa_role_arn=clickhouse_app.irsa_role.arn,
     keeper_installation=keeper_installation,
     users_secret=users_secret,
+    interserver_secret=interserver_secret,
     vault_k8s_resources=clickhouse_app.vault_k8s_resources,
 )
 
