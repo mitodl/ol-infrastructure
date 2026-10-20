@@ -6,6 +6,33 @@ APIs. This is the landing point for the work tracked in
 convention below is argued out. The credential inventory those decisions rest
 on is `docs/plans/gcp-service-account-consumer-map.md`.
 
+## Where new credentials go
+
+New Google credentials of any type (service account, API key, OAuth client,
+reCAPTCHA key) go in `mitol01`. Do not create them in the legacy projects
+(`mit-open`, `ocw-studio-qa`, `mitx-residential` and the rest of the inventory
+in `docs/plans/gcp-service-account-consumer-map.md`), even when the existing key
+for that application lives there.
+
+Service accounts, API keys and reCAPTCHA keys cannot be moved between
+projects, so each one created in a legacy project has to be re-created in
+`mitol01` later, with a new email or key string, its external grants re-issued
+by hand and a deploy of the application that holds it. The reCAPTCHA keys for
+learn.mit.edu and rc.learn.mit.edu were created in `mit-open` in April 2026 and
+are now two more keys to re-create.
+
+Service accounts and API keys are declared in `Pulumi.Production.yaml` (see
+[Configuration](#configuration)). OAuth clients and reCAPTCHA keys are created
+by hand in `mitol01` for now (see
+[What this does not manage](#what-this-does-not-manage)). If `mitol01` is
+missing an API you need, add it to `enabled_services`. A gap in `mitol01` is
+something to fix here, not a reason to use a legacy project.
+
+YouTube quota is the one gap config cannot close. `mitol01` starts at the default
+10,000 units a day, and a granted increase does not follow a consumer to
+another project, so a high-volume YouTube consumer needs the increase granted
+on `mitol01` first (see `docs/plans/gcp-consolidation-into-mitol01.md`).
+
 ## Stack layout
 
 One stack, `Production`.
@@ -46,20 +73,43 @@ start.
 
 But the provider also needs APIs in order to **read** the resource types this
 stack manages: `iam.googleapis.com` to see service accounts,
-`apikeys.googleapis.com` to see API keys. Those have to be enabled *before* the
-first refresh, because a stack cannot enable the API it needs in order to look
-at itself. Refresh runs before create, so the plan never gets far enough to fix
-it.
+`apikeys.googleapis.com` to see API keys, `serviceusage.googleapis.com` to
+see which services are enabled (every `gcp.projects.Service` lists them before
+creating one), and `cloudresourcemanager.googleapis.com` to read and write the
+project IAM policy for `project_roles`. Those have to be enabled *before* the
+first apply, because a stack cannot enable the API it needs in order to look
+at itself.
+
+`pulumi preview` does not catch a missing one. A resource that is not yet in
+state is planned as a create without being read, so the 403 only appears
+during `pulumi up`. The first production deploy failed this way on
+`serviceusage.googleapis.com`.
 
 So the bootstrap is one out-of-band command per project:
 
 ```bash
-gcloud services enable iam.googleapis.com apikeys.googleapis.com --project=<project>
+gcloud services enable iam.googleapis.com apikeys.googleapis.com \
+  serviceusage.googleapis.com cloudresourcemanager.googleapis.com \
+  --project=<project>
 ```
 
 and then the same services are declared in `enabled_services` so they stay
 enabled and the fact is recorded. Add to that list whenever a new managed
 resource type brings its own API.
+
+The automation account's own project roles are bootstrap too. They are granted
+by a project Owner, never by the stack, so the account cannot widen its own
+access through a config change. `pulumi-gcp@mitol01` needs
+`iam.serviceAccountAdmin`, `resourcemanager.projectIamAdmin`,
+`serviceusage.apiKeysAdmin` and `serviceusage.serviceUsageAdmin` (granted
+before the stack existed), plus `iam.workloadIdentityPoolAdmin` once a project
+declares `workload_identity_pools`:
+
+```bash
+gcloud projects add-iam-policy-binding mitol01 \
+  --member=serviceAccount:pulumi-gcp@mitol01.iam.gserviceaccount.com \
+  --role=roles/iam.workloadIdentityPoolAdmin --condition=None
+```
 
 Note this is invisible from `gcloud`: `gcloud services api-keys list` succeeds
 against a project where `apikeys.googleapis.com` is not enabled, because the
@@ -104,6 +154,10 @@ config:
 `import_id` present means "adopt what is already there"; absent means "create
 it". Adopted resources are automatically marked `protect=True` — see
 `adoption_opts` in `components/gcp/project.py` for why.
+
+An API key created by this stack starts unprotected. Set `protect: true` on it
+once a consumer holds the key string, because a replacement mints a new string
+and breaks that consumer.
 
 In practice `import_id` applies only to resources already resident in
 `mitol01`. Service accounts, API keys and reCAPTCHA keys **cannot be moved
@@ -180,16 +234,106 @@ grant below exists. Owner is not a superset here.
 #### Getting access
 
 `roles/iam.serviceAccountTokenCreator` on `pulumi-gcp@mitol01` is what makes
-the command above work. It is granted to `group:odl-devops@mit.edu`, declared
-in `Pulumi.Production.yaml` under the `pulumi-gcp` account's `iam_members` —
-so onboarding an engineer is a group-membership change, not a Pulumi change,
-and no one needs to remember a `gcloud add-iam-policy-binding` incantation.
+the command above work. It belongs in `Pulumi.Production.yaml` under the
+`pulumi-gcp` account's `iam_members`, granted to a Google group so onboarding
+an engineer is a group-membership change rather than a Pulumi change.
 
-Both grants on that account are declared there: the `workloadIdentityUser`
-binding for the Concourse principal set, and the `serviceAccountTokenCreator`
-binding for people. Service-account-level IAM does not appear in the project's
-IAM policy, so if it is not written down here it exists only as a console click
+It is not declared today. The first attempt named `group:odl-devops@mit.edu`,
+and Google refused the binding with `Group odl-devops@mit.edu does not exist`,
+which failed the production deploy. It comes back once a group Google actually
+knows is chosen. Until then, anyone who needs a local preview gets the grant by
+hand, and it should be recorded here when they do.
+
+Service-account-level IAM does not appear in the project's IAM policy, so a
+grant that is not written down in stack config exists only as a console click
 nobody can reproduce.
+
+## Kubernetes workloads calling Google APIs
+
+The `eks-workloads` pool trusts each EKS cluster's service-account token
+issuer, one OIDC provider per cluster, resolved from the cluster's EKS stack
+(`eks_stack: data.Production`). A pod gets a Google token by exchanging a
+projected Kubernetes token, so there is no key material at rest.
+
+- The provider maps `google.subject` to `"<provider_id>::" + assertion.sub`.
+  Principals are pool-scoped, and every cluster issues the same `sub` for the
+  same namespace and service account, so without the prefix a grant meant for
+  production would also admit CI.
+- Grant `roles/iam.workloadIdentityUser` on a Google service account to
+  `principal://iam.googleapis.com/projects/32631020496/locations/global/workloadIdentityPools/eks-workloads/subject/<provider_id>::system:serviceaccount:<namespace>:<name>`.
+- The pod projects a token whose audience is
+  `https://iam.googleapis.com/` + the provider's `name` (exported as
+  `workload_identity_providers["<project>"]["<pool>/<provider>"]`), and points
+  `GOOGLE_APPLICATION_CREDENTIALS`
+  at an `external_account` document naming that token file. The Dagster stack's
+  `ml` code location is the worked example.
+- The binding is per Kubernetes service account, not per pod. Anything that
+  runs as that service account can project the token, so scope the Kubernetes
+  service account as narrowly as the Google grant should be.
+
+## OCW YouTube Analytics for HighSystems
+
+`ocw-yt-analytics-o7v08r` exists so Data Collaborative's HighSystems database can
+pull per-video engaged-view stats for OCW's YouTube channel
+([mitodl/hq#13305](https://github.com/mitodl/hq/issues/13305)). The stack enables
+the YouTube Analytics, YouTube Reporting and YouTube Data APIs; everything else
+is manual.
+
+Step 1 must be done before the stack config naming this project merges.
+`pulumi preview` plans the service creates without reading the project, so it
+passes either way, but `pulumi up` fails on an ungranted project and that blocks
+every other change in this one stack.
+
+MIT Cloud Accounts created the project on 2026-10-09 (project number
+`715788942366`, cost object `2010196`) in the same folder as `mitol01`, and
+assigned the id suffix. It is a separate project so its OAuth consent screen
+does not constrain `mitol01`'s. Cloud Accounts granted the requester
+`roles/editor` and `roles/resourcemanager.projectIamAdmin`, not Owner, and
+enabled no APIs.
+
+1. Enable the bootstrap APIs (`roles/editor`) and grant the automation account
+   on the new project (`roles/resourcemanager.projectIamAdmin`).
+   `serviceUsageAdmin` alone is not enough: after enabling a service the
+   provider reads the project back (`resourcemanager.projects.get`), which
+   `roles/browser` supplies.
+
+   ```bash
+   gcloud services enable serviceusage.googleapis.com \
+     cloudresourcemanager.googleapis.com --project=ocw-yt-analytics-o7v08r
+   for role in roles/serviceusage.serviceUsageAdmin roles/browser; do
+     gcloud projects add-iam-policy-binding ocw-yt-analytics-o7v08r \
+       --member=serviceAccount:pulumi-gcp@mitol01.iam.gserviceaccount.com \
+       --role="$role" --condition=None
+   done
+   ```
+
+2. Deploy this stack.
+3. Console > Google Auth Platform > Branding/Audience: configure the consent
+   screen. User type follows the Google account that owns the OCW channel:
+   _Internal_ if it is an `mit.edu` account (no verification needed),
+   otherwise _External_, published to production. An External app left in
+   _Testing_ issues refresh tokens that expire after 7 days, which breaks a
+   scheduled sync.
+4. Console > Clients > Web application, with Data Collaborative's redirect URI.
+   The secret is shown once; capture it into
+   `src/bridge/secrets/gcp/` immediately, then hand the client id, secret and
+   project id to Data Collaborative over a secure channel.
+
+The channel owner then completes the OAuth flow in HighSystems with
+`yt-analytics.readonly` and `youtube.readonly`. The second is not optional:
+`reports.query` has required it since Google's 2018-06-18 revision, so a token
+with only the analytics scope is rejected. An OAuth client with no token
+requests for six months is deleted by Google, so a stalled integration loses
+its client.
+
+The consent screen's scope list does not limit what a client can request. With
+an _Internal_ app there is also no Google review and no unverified-app warning,
+so whoever holds the client secret and controls a registered redirect URI can
+ask any `mit.edu` user for any scope under an MIT-branded screen. Keep the
+redirect URIs to Data Collaborative's single callback. Name the OL owner of the
+client in its description. To cut access, rotate or delete the client secret
+in the console, and have the channel owner revoke HighSystems at
+<https://myaccount.google.com/permissions>.
 
 ## What this does not manage
 

@@ -163,7 +163,7 @@ def test_pins_match_versions_file() -> None:
     }
     assert actual == expected, (
         "src/bridge/lib/version_pins/ is out of sync with versions.py. Run "
-        "`python src/bridge/lib/sync_version_pins.py` (pre-commit does this "
+        "`python src/bridge/lib/sync_version_pins.py` (the prek hook does this "
         "for you). Until it is back in sync, pipelines watching a stale pin "
         "will not redeploy when that version moves."
     )

@@ -23,14 +23,19 @@ data:
   KEYCLOAK_REALM_NAME: "olapps"
 
   # Valkey (cluster-local)
-  REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/0"
-  REDIS_DOMAIN: "redis://valkey.local-infra.svc.cluster.local:6379/0"
-  CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/1"
-  CELERY_RESULT_BACKEND: "redis://valkey.local-infra.svc.cluster.local:6379/1"
+  # Each app needs its own Valkey DBs, or Celery and RedBeat pick up another
+  # app's tasks. The allocation is listed next to the Valkey settings in
+  # apps/mitxonline/configmaps/app-env.yaml.
+  REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/8"
+  REDIS_DOMAIN: "redis://valkey.local-infra.svc.cluster.local:6379/8"
+  CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/9"
+  CELERY_RESULT_BACKEND: "redis://valkey.local-infra.svc.cluster.local:6379/9"
 
-  # AI proxy (local LiteLLM in local-infra)
-  AI_PROXY_URL: "http://litellm.local-infra.svc.cluster.local:4000"
-  AI_PROXY_CLASS: "LiteLLMProxy"
+  # AI proxy (local LiteLLM in local-infra). Off by default to match RC and
+  # production, which call OpenAI directly with OPENAI_API_KEY (see
+  # secrets.yaml). To opt in, see app-env.local.yaml.example.
+  # AI_PROXY_URL: "http://litellm.local-infra.svc.cluster.local:4000"
+  # AI_PROXY_CLASS: "LiteLLMProxy"
 
   # mit-learn API (for AI to call back)
   MIT_LEARN_API_PROXY_BASE_URL: "http://mitlearn-webapp.mit-learn.svc.cluster.local:8060/api/"
@@ -49,6 +54,14 @@ data:
   # Cookie configuration
   MITOL_COOKIE_NAME: "learn-ai-auth"
   MITOL_COOKIE_DOMAIN: ".mit.dev"
+  # learn-ai is also served at api.learn.mit.dev/ai/* (apisix-routes.yaml), the
+  # host where mit-learn sets sessionid/csrftoken on .learn.mit.dev. Own names
+  # keep the two apps' Django cookies apart, as in RC and production. The CSRF
+  # cookie sits on .learn.mit.dev so the frontend on learn.mit.dev can read it.
+  SESSION_COOKIE_NAME: "session_learn_ai"
+  CSRF_COOKIE_NAME: "learn_ai_csrftoken"
+  CSRF_COOKIE_DOMAIN: ".learn.mit.dev"
+  CSRF_TRUSTED_ORIGINS: '["https://ai.learn.mit.dev","https://learn.mit.dev","https://api.learn.mit.dev"]'
 
   # Feature flags
   FEATURE_LEARN_AI_ENABLED: "True"

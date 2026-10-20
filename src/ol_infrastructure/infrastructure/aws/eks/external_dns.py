@@ -152,11 +152,21 @@ def setup_external_dns(
                     },
                 },
                 "logLevel": "info",
+                # Required from chart 1.22.0 on (no default). "sync" means
+                # external-dns DELETES records it owns once they leave the desired
+                # set, so anything that empties the desired set is destructive --
+                # see the annotation-prefix note below.
                 "policy": "sync",
                 # Gateway API resources plus "service" -- the latter is load
                 # bearing: it publishes the apisix-gateway LoadBalancer hostnames
-                # carried on external-dns.alpha.kubernetes.io/hostname. Legacy
-                # ingress is intentionally absent.
+                # carried on the external-dns hostname annotation. Legacy ingress
+                # is intentionally absent.
+                #
+                # Those annotations must use the GA external-dns.kubernetes.io/
+                # prefix. From v0.22.0 the "alpha" prefix is ignored with no
+                # fallback, so an alpha-only annotation plus the "sync" policy
+                # above drops out of the desired set and its records get deleted.
+                # See the "Annotation prefix" section of APISIX_STANDALONE_SETUP.md.
                 "sources": [
                     "service",
                     "gateway-udproute",

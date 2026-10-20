@@ -31,8 +31,15 @@ from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
 )
-from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.aws.iam_helper import (
+    BEDROCK_PARLIAMENT_CONFIG,
+    IAM_POLICY_VERSION,
+    bedrock_invoke_statements,
+    lint_iam_policy,
+)
+from ol_infrastructure.lib.jupyterhub_config import jupyterhub_workload_labels
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
@@ -70,11 +77,15 @@ aws_config = AWSBase(
     tags={"OU": BusinessUnit.data, "Environment": stack_info.env_suffix}
 )
 
-k8s_global_labels = K8sGlobalLabels(
+k8s_label_model = K8sGlobalLabels(
     service=Services.notebooks,
     ou=BusinessUnit.data,
     stack=stack_info,
-).model_dump()
+)
+k8s_global_labels = k8s_label_model.model_dump()
+# Internal analyst notebooks, worked in business hours like the rest of the
+# data platform.
+workload_labels = jupyterhub_workload_labels(k8s_label_model, AlertTier.notify)
 
 application_labels = k8s_global_labels | {
     "ol.mit.edu/application": "jupyterhub-data",
@@ -181,6 +192,34 @@ iam.RolePolicyAttachment(
     role=jupyterhub_data_trust_role.role.name,
 )
 
+# Bedrock for both marimo's AI assistant (which runs in the user's own server)
+# and code in notebook cells. Not scoped to one vendor, so a notebook can use
+# e.g. an embedding model alongside Claude without an infra change. Every user
+# pod shares this role, so Bedrock usage is not attributable to a user in AWS.
+jupyterhub_data_bedrock_policy = iam.Policy(
+    f"jupyterhub-data-bedrock-iam-policy-{stack_info.env_suffix}",
+    path=(
+        f"/ol-applications/jupyterhub-data/{stack_info.env_suffix}/"
+        if not stack_info.env_prefix
+        else f"/{stack_info.env_prefix}/{stack_info.env_suffix}/"
+    ),
+    description="Bedrock model invocation for JupyterHub data notebook pods.",
+    policy=lint_iam_policy(
+        {
+            "Version": IAM_POLICY_VERSION,
+            "Statement": bedrock_invoke_statements(aws_account.account_id),
+        },
+        stringify=True,
+        parliament_config=BEDROCK_PARLIAMENT_CONFIG,
+    ),
+    tags=aws_config.tags,
+)
+iam.RolePolicyAttachment(
+    f"jupyterhub-data-bedrock-policy-attachment-{stack_info.env_suffix}",
+    policy_arn=jupyterhub_data_bedrock_policy.arn,
+    role=jupyterhub_data_trust_role.role.name,
+)
+
 # Dedicated RDS instance in the data VPC for JupyterHub session / user state
 rds_defaults = dict(defaults(stack_info)["rds"])
 rds_defaults["instance_size"] = (
@@ -255,6 +294,7 @@ provision_jupyterhub_data_deployment(
     cluster_stack=cluster_stack,
     application_labels=application_labels,
     k8s_global_labels=k8s_global_labels,
+    workload_labels=workload_labels,
     service_account_name=jupyterhub_data_service_account_name,
     service_trust_role=jupyterhub_data_trust_role,
     jupyterhub_data_config=jupyterhub_data_config,

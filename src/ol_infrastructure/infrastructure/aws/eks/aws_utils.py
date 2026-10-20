@@ -9,6 +9,7 @@ from pulumi import ResourceOptions
 
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
+from ol_infrastructure.lib.k8s_crds import adopt_helm_chart_crds
 from ol_infrastructure.lib.ol_types import (
     AlertTier,
     Component,
@@ -344,6 +345,25 @@ def setup_aws_integrations(
         opts=ResourceOptions(parent=aws_load_balancer_controller_role),
     )
 
+    # The chart ships crds/crds.yaml and crds/gateway-crds.yaml, which Helm only
+    # writes on install, so they froze at whatever chart version first landed on
+    # each cluster while AWS_LOAD_BALANCER_CONTROLLER_CHART was upgraded repeatedly.
+    #
+    # Unlike the other charts with this bug, TargetGroupBinding is written by the
+    # controller itself rather than by this repo, and the frozen schema is missing
+    # spec.targetGroupProtocol plus the whole status.conditions[] block. A
+    # controller writing status.conditions against a schema that has no such
+    # property gets it pruned, which quietly removes the health signal the newer
+    # controller reports -- closer to active degradation than a latent trap.
+    lb_controller_crds = adopt_helm_chart_crds(
+        f"{cluster_name}-aws-load-balancer-controller-crds",
+        kubeconfig=cluster.kubeconfig,
+        repo="https://aws.github.io/eks-charts",
+        chart="aws-load-balancer-controller",
+        version=versions["AWS_LOAD_BALANCER_CONTROLLER_CHART"],
+        opts=ResourceOptions(parent=cluster, depends_on=[cluster]),
+    )
+
     lb_controller = kubernetes.helm.v3.Release(
         f"{cluster_name}-aws-load-balancer-controller-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
@@ -353,6 +373,9 @@ def setup_aws_integrations(
             namespace="kube-system",
             cleanup_on_fail=True,
             timeout=600,
+            # The CRDs are applied above as their own Pulumi resource. Helm would
+            # only write them on a fresh install anyway, which is the bug.
+            skip_crds=True,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://aws.github.io/eks-charts",
             ),
@@ -412,6 +435,7 @@ def setup_aws_integrations(
                 cluster,
                 *node_groups,
                 cert_manager,
+                lb_controller_crds,
                 aws_load_balancer_controller_role,
                 aws_load_balancer_controller_policy,
             ],

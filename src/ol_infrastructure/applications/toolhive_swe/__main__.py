@@ -22,6 +22,10 @@ https://docs.stacklok.com/toolhive/guides-vmcp/authentication:
   Grafana Cloud MCP endpoint is not proxied instead), also joined to the group,
 - the per-stack optional ``context7``, ``sentry`` and ``aws`` ``MCPServer``s, each
   gated behind a ``toolhive_swe:<name>_enabled`` boolean (see mcp_servers.py),
+- the per-stack optional ``vantage`` ``MCPRemoteProxy`` — a proxy to Vantage's
+  hosted MCP server rather than a workload we run, gated the same way
+  (see mcp_servers.py for why it is a proxy and why its credential rides
+  ``headerForward`` instead of an ``MCPExternalAuthConfig``),
 - an ``MCPOIDCConfig`` (``swe-vmcp-oidc``) used to validate the JWTs Keycloak issues
   directly to MCP clients, and
 - a ``VirtualMCPServer`` (``swe-vmcp``) that aggregates every backend in the group
@@ -549,6 +553,12 @@ swe_virtualmcpserver = kubernetes.apiextensions.CustomResource(
                 "scopes": ["openid", "offline_access"],
             },
         },
+        # No outgoingAuth block: "discovered" is the CRD default, and in that
+        # mode the vMCP resolves each backend's externalAuthConfigRef at runtime
+        # off the Kubernetes API (hence the secrets read in its Role), so the
+        # grafana caller token reaches it without anything named here. Setting
+        # the block explicitly would only make the operator additionally mount
+        # that secret as an env var on this pod, where nothing reads it.
         "serviceType": "ClusterIP",
         # Spans and OTLP metrics for the OUTERMOST hop — the first thing a
         # client's request touches, and so the root of the trace. Unpacked from

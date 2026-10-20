@@ -39,7 +39,7 @@ The AGENTS.md instructions have been organized into focused documents. Read the 
 
 - Environment setup and dependency installation
 - Linting, formatting, and type checking commands
-- Pre-commit hooks and validation checklist
+- Hooks (prek) and validation checklist
 - Common build issues and solutions
 
 **Use when:** Setting up environment, validating code, or fixing build errors
@@ -135,7 +135,7 @@ uv run mypy src/                          # budget 75+ seconds
 packer fmt -recursive src/bilder/         # if bilder files changed
 pulumi preview                            # from inside the project dir
 uv run pytest tests/
-uv run pre-commit run --all-files         # optional; budget 2+ minutes
+uv run prek run --all-files               # CI runs this as the `prek` check
 ```
 
 ---
@@ -156,7 +156,7 @@ uv run pre-commit run --all-files         # optional; budget 2+ minutes
 ### Configuration Files
 
 - `pyproject.toml` — Dependencies and tool configuration
-- `.pre-commit-config.yaml` — Pre-commit hook definitions
+- `.pre-commit-config.yaml` — Hook definitions, run by prek
 - `.sops.yaml` — Secrets encryption rules
 - `uv.lock` — Locked dependency versions
 

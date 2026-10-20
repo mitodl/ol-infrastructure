@@ -9,12 +9,19 @@ in-cluster (e.g. ``http://mcp-fetch-proxy.<namespace>.svc.cluster.local:8080/mcp
 This is the module that grows as new tools are added to the SWE group: define
 each backend ``MCPServer`` here and append it to the ``servers`` list returned
 by :func:`create_mcp_servers` so the vMCP's ``depends_on`` wiring picks it up.
+
+A backend does not have to be a container we run. ``MCPRemoteProxy`` is the
+other member kind the vMCP's group discovery understands
+(``pkg/vmcp/workloads/k8s.go`` lists ``MCPServer``, ``MCPRemoteProxy`` and
+``MCPServerEntry``); the operator reconciles it into a proxy Deployment +
+Service exactly like an ``MCPServer``, except the workload it fronts lives at
+someone else's URL. The ``vantage`` backend below is the first of those.
 """
 
 from typing import NamedTuple
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, Resource, ResourceOptions, StackReference
+from pulumi import Config, Output, Resource, ResourceOptions, StackReference
 
 from bridge.lib.versions import (
     MCP_CONTEXT7_VERSION,
@@ -39,8 +46,10 @@ MCP_GROUP_NAME = "swe-tools"
 TOOLHIVE_SERVICE = "toolhive-swe"
 
 
-def _observability(stack_info: StackInfo, backend: str) -> dict[str, object]:
-    """Telemetry + audit fields every backend ``MCPServer`` here carries.
+def _observability(
+    stack_info: StackInfo, backend: str, *, audit: bool = True
+) -> dict[str, object]:
+    """Telemetry (and by default audit) fields a backend CR here carries.
 
     All the backends share ONE ``MCPTelemetryConfig`` — they need identical
     settings — and are told apart by the per-ref ``serviceName``, which
@@ -50,14 +59,22 @@ def _observability(stack_info: StackInfo, backend: str) -> dict[str, object]:
     ``__main__`` creates the CR this names and puts it in each server's
     ``depends_on``; the operator resolves the ref at reconcile time, so a
     dangling name is a degraded server rather than a retry.
+
+    ``audit=False`` omits the audit block while keeping telemetry. It exists
+    for backends whose upstream version this repo does NOT pin — see the
+    ``vantage`` block, and the hosted-backend note in
+    ``toolhive_mcpserver_audit``. Both fields are shaped identically on
+    ``MCPServer`` and ``MCPRemoteProxy``, so this helper serves both kinds.
     """
-    return {
+    observability: dict[str, object] = {
         "telemetryConfigRef": {
             "name": telemetry_config_name(TOOLHIVE_SERVICE, "backend"),
             "serviceName": toolhive_service_name(stack_info, TOOLHIVE_SERVICE, backend),
         },
-        "audit": toolhive_mcpserver_audit(),
     }
+    if audit:
+        observability["audit"] = toolhive_mcpserver_audit()
+    return observability
 
 
 # ServiceAccount the aws backend runs under. The OLEKSAuthBinding in __main__.py
@@ -78,6 +95,26 @@ AWS_MCP_ENDPOINT = "https://aws-mcp.us-east-1.api.aws/mcp"
 GRAFANA_TOKEN_SECRET_NAME = "toolhive-swe-grafana-token"  # noqa: S105  # pragma: allowlist secret
 GRAFANA_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 
+# K8s Secret holding the token CALLERS must present to the grafana workload. This
+# is a shared secret between the vMCP and mcp-grafana; it is unrelated to
+# GRAFANA_TOKEN_SECRET_NAME above, which is the credential mcp-grafana uses to
+# reach Grafana Cloud. It carries the same value under two keys because the two
+# consumers need different shapes of it:
+#   ``token``         - the bare token, injected into the workload as
+#                       MCP_GRAFANA_SERVER_TOKEN, which mcp-grafana compares
+#                       against the bearer credential a caller presents.
+#   ``authorization`` - the FULL header value (``Bearer <token>``), because the
+#                       vMCP's headerInjection writes the value verbatim, so the
+#                       scheme has to be part of it. Same reason as
+#                       VANTAGE_TOKEN_SECRET_KEY below.
+GRAFANA_CALLER_TOKEN_SECRET_NAME = "toolhive-swe-grafana-caller-token"  # noqa: S105  # pragma: allowlist secret
+GRAFANA_CALLER_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+GRAFANA_CALLER_AUTH_HEADER_KEY = "authorization"  # pragma: allowlist secret
+
+# MCPExternalAuthConfig telling the vMCP to present the caller token when it
+# calls the grafana backend. Named for the backend it fronts, not the mechanism.
+GRAFANA_CALLER_AUTH_CONFIG_NAME = "grafana-caller-auth"
+
 # K8s Secret holding the Sentry user auth token, materialised from encrypted stack
 # config and injected into the sentry MCPServer the same way as the Grafana token.
 SENTRY_TOKEN_SECRET_NAME = "toolhive-swe-sentry-token"  # noqa: S105  # pragma: allowlist secret
@@ -87,6 +124,16 @@ SENTRY_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
 # and injected into the context7 MCPServer the same way as the Grafana token.
 CONTEXT7_TOKEN_SECRET_NAME = "toolhive-swe-context7-token"  # noqa: S105  # pragma: allowlist secret
 CONTEXT7_TOKEN_SECRET_KEY = "token"  # noqa: S105  # pragma: allowlist secret
+
+# Vantage's hosted (remote) MCP server. Unlike every other backend here this is
+# NOT a workload we run — see the ``vantage`` block in ``create_mcp_servers``.
+VANTAGE_MCP_ENDPOINT = "https://mcp.vantage.sh/mcp"
+
+# K8s Secret holding the FULL ``Authorization`` header value for the Vantage
+# endpoint — i.e. ``Bearer <api token>``, not the bare token. ToolHive's
+# headerForward injects the value verbatim, so the scheme has to be part of it.
+VANTAGE_TOKEN_SECRET_NAME = "toolhive-swe-vantage-token"  # noqa: S105  # pragma: allowlist secret
+VANTAGE_TOKEN_SECRET_KEY = "authorization"  # noqa: S105  # pragma: allowlist secret
 
 
 class ToolhiveSWEMCPServers(NamedTuple):
@@ -191,6 +238,94 @@ def create_mcp_servers(  # noqa: PLR0913
         },
         opts=ResourceOptions(),
     )
+    # Caller authentication for the grafana workload. mcp-grafana serves on
+    # 0.0.0.0:8000 (the image ENTRYPOINT's --address, which we cannot narrow: the
+    # ToolHive proxy runs in a separate pod and reaches the workload over the
+    # cluster network, so a loopback bind would make it unreachable). Without a
+    # caller token, 1.5.1 logs at ERROR on every start that it is "serving on a
+    # non-loopback address with NO caller authentication" and that "this will
+    # become a startup error in a future release" -- so a routine Renovate bump
+    # would crashloop the workload with no change on our side. Setting the token
+    # now makes that release a no-op for us.
+    #
+    # EXPECTED NOISE, first five minutes of each workload pod's life: the
+    # proxyrunner's startup readiness probe (``waitForInitializeSuccess``) POSTs
+    # an unauthenticated ``initialize`` to its own listener every two seconds,
+    # and the workload answers 401. It counts a 401 as ready only when
+    # ``authExpected`` -- which is ``r.Config.OIDCConfig != nil``, and this
+    # backend sets no oidcConfigRef -- so the probe never passes, gives up after
+    # five minutes, logs "initialize not successful, but continuing" and carries
+    # on. Nothing is broken by it: the MCPServer reports Ready throughout, the
+    # vMCP's own calls carry the header and succeed the whole time, and the 401s
+    # stop for good the moment the probe gives up. Giving the probe a token
+    # would mean putting an oidcConfigRef on this backend, which would then
+    # reject the vMCP's static bearer as well.
+    #
+    # ★ ROTATION TAKES TWO POD RESTARTS, AND THE GAP BETWEEN THEM IS AN OUTAGE.
+    # Both consumers read the Secret once and never re-read it, for different
+    # reasons: the workload holds the bare token as a secretKeyRef env var, and
+    # the vMCP's backend reconciler deliberately does not watch Secrets ("Auth
+    # updates will trigger via ExternalAuthConfig changes or pod restarts").
+    # After replacing the config value, restart both:
+    #   kubectl rollout restart statefulset/grafana deployment/swe-vmcp \
+    #     -n toolhive-swe
+    # Order does not matter, but grafana tools 401 until the second one lands.
+    #
+    #   pulumi config set --secret toolhive_swe:grafana_caller_token -- <token>
+    grafana_caller_token = toolhive_swe_config.require_secret("grafana_caller_token")
+    grafana_caller_token_secret = kubernetes.core.v1.Secret(
+        f"toolhive-swe-grafana-caller-token-secret-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=GRAFANA_CALLER_TOKEN_SECRET_NAME,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        type="Opaque",
+        string_data={
+            GRAFANA_CALLER_TOKEN_SECRET_KEY: grafana_caller_token,
+            GRAFANA_CALLER_AUTH_HEADER_KEY: Output.concat(
+                "Bearer ", grafana_caller_token
+            ),
+        },
+        opts=ResourceOptions(),
+    )
+    # ``headerInjection``, not ``bearerToken``. The bearerToken type has no
+    # converter in the vMCP's registry (``pkg/vmcp/auth/converters``:
+    # tokenExchange, headerInjection, unauthenticated, upstreamInject, awsSts,
+    # obo, xaa) -- the same trap documented at length in the vantage block below.
+    #
+    # The vMCP reads this ref off ``MCPServer.spec.externalAuthConfigRef`` in
+    # outgoingAuth DISCOVERED mode (the CRD default) and resolves the Secret
+    # itself at runtime through the Kubernetes API.
+    #
+    # It does nothing on the grafana proxy today: MCPServer turns an
+    # externalAuthConfigRef into token-exchange and OBO env vars only, and
+    # ToolHive's headerInjection arm for MCPServer (``addHeaderInjectionConfig``)
+    # is an explicit no-op placeholder as of 0.50.0. That is upstream's
+    # not-yet-implemented, not a guarantee -- if a later release implements it,
+    # this ref starts meaning something proxy-side too, so re-read that arm when
+    # the operator moves.
+    grafana_caller_auth_config = kubernetes.apiextensions.CustomResource(
+        f"toolhive-swe-grafana-caller-auth-{stack_info.env_suffix}",
+        api_version="toolhive.stacklok.dev/v1beta1",
+        kind="MCPExternalAuthConfig",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=GRAFANA_CALLER_AUTH_CONFIG_NAME,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        spec={
+            "type": "headerInjection",
+            "headerInjection": {
+                "headerName": "Authorization",
+                "valueSecretRef": {
+                    "name": GRAFANA_CALLER_TOKEN_SECRET_NAME,
+                    "key": GRAFANA_CALLER_AUTH_HEADER_KEY,
+                },
+            },
+        },
+        opts=ResourceOptions(depends_on=[grafana_caller_token_secret]),
+    )
     grafana_mcpserver = kubernetes.apiextensions.CustomResource(
         f"toolhive-swe-grafana-mcpserver-{stack_info.env_suffix}",
         api_version="toolhive.stacklok.dev/v1beta1",
@@ -207,8 +342,12 @@ def create_mcp_servers(  # noqa: PLR0913
             # 0.0.0.0:8000``; these args are appended after it and Go stdlib flag
             # parsing lets the last occurrence win. Without the override the
             # container serves legacy SSE and the vMCP's streamable-http
-            # ``initialize`` POST fails with a 4xx. ``--endpoint-path`` defaults
-            # to ``/`` but the ToolHive proxy forwards ``/mcp`` verbatim.
+            # ``initialize`` POST fails with a 4xx. ``--endpoint-path`` is
+            # pinned rather than left to the default: the flag has defaulted to
+            # ``/mcp`` since it was added in 0.5.0, but upstream's README
+            # documented it as ``/`` as late as 0.17.0, which is where the wrong
+            # claim that used to sit here came from. Pinning it means a change
+            # to that default cannot move the endpoint out from under the proxy.
             #
             # ``--allowed-hosts *`` disables the Host-header (DNS-rebind) check
             # added in mcp-grafana 0.17.1 (upstream PR #957). That check defaults
@@ -231,14 +370,32 @@ def create_mcp_servers(  # noqa: PLR0913
             "mcpPort": 8000,
             "groupRef": {"name": MCP_GROUP_NAME},
             **_observability(stack_info, "grafana"),
-            "env": [{"name": "GRAFANA_URL", "value": grafana_url}],
+            # mcp-grafana 1.5 added anonymous usage reporting to Grafana Labs.
+            # It ships disabled, but upstream says the default flips to enabled
+            # in a later release (usagestats/mode.go), and a Renovate version
+            # bump would turn it on without a config change here.
+            "env": [
+                {"name": "GRAFANA_URL", "value": grafana_url},
+                {"name": "GRAFANA_USAGE_STATS", "value": "disabled"},
+            ],
             "secrets": [
                 {
                     "name": GRAFANA_TOKEN_SECRET_NAME,
                     "key": GRAFANA_TOKEN_SECRET_KEY,
                     "targetEnvName": "GRAFANA_SERVICE_ACCOUNT_TOKEN",
-                }
+                },
+                # The caller credential, checked against the Authorization
+                # header the vMCP injects. mcp-grafana strips the header once it
+                # validates, so this token never reaches Grafana Cloud.
+                {
+                    "name": GRAFANA_CALLER_TOKEN_SECRET_NAME,
+                    "key": GRAFANA_CALLER_TOKEN_SECRET_KEY,
+                    "targetEnvName": "MCP_GRAFANA_SERVER_TOKEN",
+                },
             ],
+            # Read by the vMCP, not by this server's own proxy -- see the
+            # MCPExternalAuthConfig above.
+            "externalAuthConfigRef": {"name": GRAFANA_CALLER_AUTH_CONFIG_NAME},
             # Needs outbound access to the Grafana Cloud stack. Tighten to an
             # allow-list profile (grafana_url host, port 443) once the builtin
             # profile proves out.
@@ -252,7 +409,14 @@ def create_mcp_servers(  # noqa: PLR0913
             },
         },
         opts=ResourceOptions(
-            depends_on=[swe_mcpgroup, grafana_token_secret, telemetry_config]
+            depends_on=[
+                swe_mcpgroup,
+                grafana_token_secret,
+                # The ref must resolve when the operator reconciles this
+                # MCPServer, or it goes Failed on a missing MCPExternalAuthConfig.
+                grafana_caller_auth_config,
+                telemetry_config,
+            ]
         ),
     )
 
@@ -526,6 +690,152 @@ def create_mcp_servers(  # noqa: PLR0913
             ),
         )
         servers.append(aws_mcpserver)
+
+    # Vantage backend: a PROXY to Vantage's hosted MCP server
+    # (https://mcp.vantage.sh/mcp), not a copy of it we run. Hence
+    # ``MCPRemoteProxy`` rather than ``MCPServer`` — the operator reconciles it
+    # into the same proxy Deployment + Service shape, and the vMCP's group
+    # discovery treats it as an ordinary backend
+    # (``pkg/vmcp/workloads/k8s.go``), so it aggregates and prefixes
+    # (``vantage_*``) like the rest.
+    #
+    # Self-hosting was the other option and was rejected on packaging: the
+    # self-hosted server ships only as the ``vantage-mcp-server`` npm package,
+    # there is no image for it in ToolHive's dockyard (verified against
+    # ghcr.io/stacklok/dockyard/npx) and none from Vantage, and the operator has
+    # no ``npx://`` protocol-scheme support — ``spec.image`` is a container image
+    # and nothing else. Taking that route means WE build and keep republishing a
+    # container around someone else's npm package. Proxying costs one CR and
+    # Vantage ships their own upgrades; the hosted and self-hosted servers are
+    # the same codebase either way.
+    #
+    # Unlike the hosted Grafana Cloud MCP endpoint (see the grafana note above),
+    # this one does not force a second browser login: OAuth 2.1 is its default
+    # but it also accepts a Vantage API token as a plain bearer credential
+    # (https://docs.vantage.sh/vantage_mcp). So user auth stays single-hop
+    # through the vMCP's Keycloak flow, and — exactly as with grafana and sentry
+    # — every user acts as the one API token, so scope it least-privilege.
+    #
+    # Auth mechanism is ``headerForward``, NOT ``externalAuthConfigRef``, even
+    # though a ``bearerToken``-typed ``MCPExternalAuthConfig`` looks like the
+    # purpose-built answer. That type has no converter registered in the vMCP's
+    # runtime registry (``pkg/vmcp/auth/converters``: tokenExchange,
+    # headerInjection, unauthenticated, upstreamInject, awsSts, obo, xaa — no
+    # bearerToken), and the vMCP resolves a backend's external-auth ref during
+    # discovery and DROPS the backend when resolution fails. The proxy pod would
+    # authenticate to Vantage correctly and the aggregate would still show no
+    # vantage tools. ``headerForward`` is applied by the proxy pod itself and
+    # carries no such ref. ``Authorization`` is deliberately permitted there —
+    # it is absent from ``middleware.RestrictedHeaders`` and the middleware logs
+    # a warning rather than refusing it — and the injection runs closer to the
+    # backend than strip-auth, so it overwrites rather than races with anything
+    # the vMCP forwarded inbound.
+    #
+    # No ``oidcConfigRef``: the proxy is a ClusterIP reachable only through the
+    # vMCP, which is where incoming auth is enforced. Same posture as every
+    # MCPServer backend here, which are likewise unauthenticated in-cluster.
+    #
+    # ★ AUDIT IS OFF HERE, AND ONLY HERE. Every other backend in this module
+    # enables it. The ``toolhive_mcpserver_audit`` gate is satisfiable for
+    # Vantage *today*: it is ``@modelcontextprotocol/sdk`` 1.29.0, whose
+    # CallTool handler catches EVERY error (including its own ``McpError``
+    # input-validation failures) and returns ``{content, isError: true}``,
+    # rethrowing only the ``UrlElicitationRequired`` control signal, which
+    # carries no payload text; and Vantage's own ``registerTool`` wrapper
+    # catches ``MCPUserError`` — the class carrying Vantage API error bodies —
+    # before that and likewise returns an ``isError`` result. So no top-level
+    # JSON-RPC error is reachable and ``jsonrpc_error_message`` would capture
+    # nothing.
+    #
+    # That analysis cannot be KEPT true. For every other backend the SDK is
+    # frozen by an image tag in ``bridge.lib.versions``, so a change to its
+    # error path is a deliberate edit to this repo that a reviewer sees. This
+    # backend is Vantage's hosted service: they can ship a new SDK or error
+    # shape whenever they like, and nothing here would notice. Audit's whole
+    # risk is that a top-level JSON-RPC error copies payload-derived text into
+    # Loki — where it is readable by anyone with Grafana access — so leaving it
+    # on would be trusting a point-in-time reading of someone else's deploy.
+    # Telemetry stays on; it carries no payload.
+    #
+    # ★ TOKEN ROTATION REQUIRES A POD RESTART. Replacing ``vantage_api_key`` and
+    # re-applying updates the Secret but does NOT reach the running proxy: the
+    # operator mounts the value through ``valueFrom.secretKeyRef``, which
+    # Kubernetes never refreshes in a live process, and the pod template's only
+    # trigger annotation is ``toolhive.stacklok.dev/runconfig-checksum``, hashed
+    # (``cmd/thv-operator/pkg/runconfig/configmap/checksum``) from the runconfig
+    # ConfigMap alone — and that ConfigMap holds the secret's IDENTIFIER, never
+    # its value, so the checksum does not move. Verified on operations-production
+    # 2026-09-11: one ReplicaSet spanned a token change. After rotating, run
+    # ``kubectl rollout restart deployment/vantage -n toolhive-swe`` or the
+    # revoked token stays in use. The same is true of the grafana, sentry and
+    # context7 tokens; it is called out here because this is the newest one.
+    #
+    # Gated per-stack like sentry/context7 (currently Production only):
+    #   pulumi config set --secret toolhive_swe:vantage_api_key -- <token>
+    #   pulumi config set toolhive_swe:vantage_enabled true
+    if toolhive_swe_config.get_bool("vantage_enabled"):
+        vantage_token_secret = kubernetes.core.v1.Secret(
+            f"toolhive-swe-vantage-token-secret-{stack_info.env_suffix}",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=VANTAGE_TOKEN_SECRET_NAME,
+                namespace=namespace,
+                labels=k8s_global_labels,
+            ),
+            type="Opaque",
+            string_data={
+                # Stored pre-prefixed because headerForward injects the Secret
+                # value as the whole header, with no scheme of its own. Config
+                # holds the bare token so it can be rotated by pasting exactly
+                # what the Vantage console hands out.
+                VANTAGE_TOKEN_SECRET_KEY: Output.concat(
+                    "Bearer ", toolhive_swe_config.require_secret("vantage_api_key")
+                ),
+            },
+            opts=ResourceOptions(),
+        )
+        vantage_remoteproxy = kubernetes.apiextensions.CustomResource(
+            f"toolhive-swe-vantage-remoteproxy-{stack_info.env_suffix}",
+            api_version="toolhive.stacklok.dev/v1beta1",
+            kind="MCPRemoteProxy",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name="vantage",
+                namespace=namespace,
+                labels=k8s_global_labels,
+            ),
+            spec={
+                "remoteUrl": VANTAGE_MCP_ENDPOINT,
+                "transport": "streamable-http",
+                "proxyPort": 8080,
+                "groupRef": {"name": MCP_GROUP_NAME},
+                **_observability(stack_info, "vantage", audit=False),
+                "headerForward": {
+                    "addHeadersFromSecret": [
+                        {
+                            "headerName": "Authorization",
+                            "valueSecretRef": {
+                                "name": VANTAGE_TOKEN_SECRET_NAME,
+                                "key": VANTAGE_TOKEN_SECRET_KEY,
+                            },
+                        }
+                    ],
+                },
+                # There is no permissionProfile here: MCPRemoteProxy has no such
+                # field. Egress to mcp.vantage.sh is the entire point of the
+                # workload rather than a capability granted to one.
+                "resources": {
+                    "requests": {"cpu": "50m", "memory": "128Mi"},
+                    "limits": {"cpu": "200m", "memory": "256Mi"},
+                },
+            },
+            opts=ResourceOptions(
+                depends_on=[
+                    swe_mcpgroup,
+                    vantage_token_secret,
+                    telemetry_config,
+                ]
+            ),
+        )
+        servers.append(vantage_remoteproxy)
 
     return ToolhiveSWEMCPServers(
         group=swe_mcpgroup,

@@ -14,3 +14,23 @@ metadata:
   namespace: learn-ai
 data:
   # DEBUG: "False"
+
+  # Needed for any AI feature. RC and production call OpenAI directly too.
+  # OPENAI_API_KEY: "sk-..."  # pragma: allowlist secret
+
+  # Needed for the bots' course search (syllabus, content files, video
+  # transcripts), which calls production MIT Learn by default (the AI_MIT_*
+  # URLs). Without it, those calls fail with "Illegal header value b'Bearer '".
+  # LEARN_ACCESS_TOKEN: "..."  # pragma: allowlist secret
+
+  # Opt-in: route AI calls through local-infra's LiteLLM instead (no
+  # deployed environment does this). That LiteLLM needs its own key in the
+  # litellm-secrets Secret; see local-dev/README.md.
+  # AI_PROXY_URL: "http://litellm.local-infra.svc.cluster.local:4000"
+  # AI_PROXY_CLASS: "LiteLLMProxy"
+  # AI_PROXY_AUTH_TOKEN: "local-dev-litellm-master-key"  # pragma: allowlist secret
+  # # litellm's litellm_proxy provider ignores the key learn-ai passes it
+  # LITELLM_PROXY_API_KEY: "local-dev-litellm-master-key"  # pragma: allowlist secret
+  # # LiteLLM's "*" route adds its own "openai/", so drop learn-ai's prefix
+  # AI_DEFAULT_MODEL: "gpt-4o-mini"
+  # AI_DEFAULT_TUTOR_MODEL: "gpt-4o"

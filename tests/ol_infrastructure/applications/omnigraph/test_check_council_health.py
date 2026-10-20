@@ -15,6 +15,11 @@ from typing import Any, ClassVar
 import pytest
 
 from ol_infrastructure.applications.omnigraph.scripts.check_council_health import (
+    HTTP_TIMEOUT_SECONDS,
+    PROBE_ACTIVE_DEADLINE_SECONDS,
+    PROBE_QUERIES,
+    PROBE_STARTUP_BUDGET_SECONDS,
+    SEARCH_PROBE_QUERY,
     ProbeError,
     main,
     run_probe,
@@ -28,6 +33,9 @@ class _StubHandler(BaseHTTPRequestHandler):
     #: Every request this handler has served, for tests that assert on how the
     #: probe called out rather than only on what came back.
     requests: ClassVar[list[dict[str, Any]]] = []
+    #: The ``Omnigraph-Http-Api`` value stamped on every response, as a 0.13
+    #: server does. ``None`` is a 0.11 server, which sends none.
+    stamp: ClassVar[str | None] = None
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -36,12 +44,15 @@ class _StubHandler(BaseHTTPRequestHandler):
             {
                 "path": self.path,
                 "authorization": self.headers.get("Authorization"),
+                "http_api": self.headers.get_all("Omnigraph-Http-Api"),
                 "body": json.loads(raw_body) if raw_body else None,
             }
         )
         status, body = self.routes.get(self.path, (404, {"error": "not found"}))
         payload = body.encode() if isinstance(body, str) else json.dumps(body).encode()
         self.send_response(status)
+        if self.stamp is not None:
+            self.send_header("Omnigraph-Http-Api", self.stamp)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
@@ -58,6 +69,7 @@ def stub_server():
     thread.start()
     _StubHandler.routes = {}
     _StubHandler.requests = []
+    _StubHandler.stamp = None
     yield server, f"http://127.0.0.1:{server.server_port}"
     server.shutdown()
 
@@ -76,6 +88,84 @@ def test_run_probe_sends_the_bearer_token_and_query_path(stub_server):
     assert seen["authorization"] == "Bearer t"
     assert seen["body"]["params"] == {}
     assert "match" in seen["body"]["query"]
+
+
+def test_run_probe_sends_the_http_api_contract_header(stub_server):
+    """omnigraph-server 0.13 answers 400 to a protected request without it."""
+    _, base = stub_server
+    _StubHandler.stamp = "0.13"
+    _StubHandler.routes = {"/graphs/council/query": (200, {"rows": [], "row_count": 0})}
+
+    run_probe(base, "council", "t")  # pragma: allowlist secret
+
+    [seen] = _StubHandler.requests
+    assert seen["http_api"] == ["0.13"]
+
+
+def test_a_contract_mismatch_is_reported_apart_from_an_auth_failure(stub_server):
+    """Both are refusals of a healthy graph, with different remedies: one is a
+    version skew between this script and the server, the other a credential.
+    The body is the 0.13.0 server's own.
+    """
+    _, base = stub_server
+    _StubHandler.stamp = "0.14"
+    _StubHandler.routes = {
+        "/graphs/council/query": (
+            400,
+            {
+                "error": (
+                    "exactly one omnigraph-http-api header with value 0.14 is required"
+                ),
+                "code": "api_contract_mismatch",
+            },
+        )
+    }
+
+    with pytest.raises(ProbeError, match=r"does not speak Omnigraph-Http-Api: 0\.13"):
+        run_probe(base, "council", "t")  # pragma: allowlist secret
+
+    _StubHandler.routes = {
+        "/graphs/council/query": (
+            401,
+            {"error": "invalid bearer token", "code": "unauthorized"},
+        )
+    }
+    with pytest.raises(ProbeError, match="HTTP 401") as excinfo:
+        run_probe(base, "council", "t")  # pragma: allowlist secret
+    assert "does not speak" not in str(excinfo.value)
+
+
+def test_a_success_stamped_with_another_contract_is_a_failure(stub_server):
+    _, base = stub_server
+    _StubHandler.stamp = "0.14"
+    _StubHandler.routes = {"/graphs/council/query": (200, {"rows": [], "row_count": 0})}
+
+    with pytest.raises(ProbeError, match=r"stamped Omnigraph-Http-Api: 0\.14"):
+        run_probe(base, "council", "t")  # pragma: allowlist secret
+
+
+def test_an_unstamped_success_is_accepted_from_a_0_11_server(stub_server):
+    _, base = stub_server
+    _StubHandler.routes = {"/graphs/council/query": (200, {"rows": [], "row_count": 0})}
+
+    assert run_probe(base, "council", "t")["rows"] == []  # pragma: allowlist secret
+
+
+def test_a_blocked_graph_fails_the_probe(stub_server):
+    """0.12+ answers 503 graph_unavailable for a graph that failed to open,
+    where 0.11 answered 404. Either way council is down.
+    """
+    _, base = stub_server
+    _StubHandler.stamp = "0.13"
+    _StubHandler.routes = {
+        "/graphs/council/query": (
+            503,
+            {"error": "graph is unavailable", "code": "graph_unavailable"},
+        )
+    }
+
+    with pytest.raises(ProbeError, match=r"HTTP 503.*graph_unavailable"):
+        run_probe(base, "council", "t")  # pragma: allowlist secret
 
 
 def test_run_probe_targets_the_graph_id_it_is_given(stub_server):
@@ -170,8 +260,66 @@ def test_main_succeeds_end_to_end(stub_server, monkeypatch):
     monkeypatch.delenv("OMNIGRAPH_GRAPH_ID", raising=False)
 
     assert main() == 0
-    [seen] = _StubHandler.requests
-    assert seen["path"] == "/graphs/council/query"
+    # TWO calls, not one: the ordinary read and the full-text read are
+    # separate failure modes and the probe has to exercise both.
+    ordinary, search = _StubHandler.requests
+    assert ordinary["path"] == "/graphs/council/query"
+    assert search["path"] == "/graphs/council/query"
+    assert "search(" not in ordinary["body"]["query"]
+    assert search["body"]["query"] == SEARCH_PROBE_QUERY
+
+
+def test_main_fails_when_the_full_text_index_needs_a_rebuild(stub_server, monkeypatch):
+    """The regression this probe was extended for.
+
+    On 2026-09-08 CI served every ordinary read happily while refusing every
+    `search()` with HTTP 409 `full_text_index_rebuild_required`, because it had
+    been skipped in the Lance 11 analyzer rebuild. The old probe passed
+    throughout. A stub that answers the first call and refuses the second is
+    that exact shape, and it must now exit non-zero.
+    """
+    _, base = stub_server
+    calls = {"n": 0}
+    ok = (200, {"rows": [{"m.slug": "x"}], "row_count": 1})
+    refused = (
+        409,
+        {
+            "error": "full-text index 'content_idx' requires rebuild: "
+            "analyzer certificate is missing",
+            "code": "full_text_index_rebuild_required",
+        },
+    )
+
+    class _Routes(dict[str, Any]):
+        def get(self, key: str, default: Any = None) -> Any:
+            if key != "/graphs/council/query":
+                return default
+            calls["n"] += 1
+            return ok if calls["n"] == 1 else refused
+
+    _StubHandler.routes = _Routes()
+    monkeypatch.setenv("OMNIGRAPH_SERVER_ADDR", base)
+    monkeypatch.setenv("OMNIGRAPH_BEARER_TOKEN", "t")  # pragma: allowlist secret
+    monkeypatch.delenv("OMNIGRAPH_GRAPH_ID", raising=False)
+
+    assert main() == 1
+    assert calls["n"] == 2  # it really did reach the search call
+
+
+def test_search_probe_tolerates_zero_hits(stub_server, monkeypatch):
+    """An empty result is a legitimate answer, not a failure.
+
+    Asserting on hit count would fail forever on an empty or freshly-cut-over
+    graph. What the probe asserts is that the full-text path ANSWERS — the
+    failure mode is a refusal, not a wrong result.
+    """
+    _, base = stub_server
+    _StubHandler.routes = {"/graphs/council/query": (200, {"rows": [], "row_count": 0})}
+    monkeypatch.setenv("OMNIGRAPH_SERVER_ADDR", base)
+    monkeypatch.setenv("OMNIGRAPH_BEARER_TOKEN", "t")  # pragma: allowlist secret
+    monkeypatch.delenv("OMNIGRAPH_GRAPH_ID", raising=False)
+
+    assert main() == 0
 
 
 def test_main_fails_on_a_probe_failure(stub_server, monkeypatch):
@@ -181,3 +329,30 @@ def test_main_fails_on_a_probe_failure(stub_server, monkeypatch):
     monkeypatch.setenv("OMNIGRAPH_BEARER_TOKEN", "t")  # pragma: allowlist secret
 
     assert main() == 1
+
+
+def test_active_deadline_is_derived_from_the_probe_query_list():
+    """The deadline must track the number of queries, not sit at a literal.
+
+    This is the regression Copilot caught on #5801: adding the search probe
+    doubled worst-case client time (15s -> 30s) against a hardcoded
+    `activeDeadlineSeconds = 60`, silently halving the headroom left for pod
+    scheduling and interpreter start. Deriving it means a third probe widens
+    the deadline instead of eating that headroom.
+    """
+    assert (
+        len(PROBE_QUERIES) * HTTP_TIMEOUT_SECONDS + PROBE_STARTUP_BUDGET_SECONDS
+    ) == PROBE_ACTIVE_DEADLINE_SECONDS
+    # The startup budget has to survive the worst case, or the backstop fires
+    # on a slow node instead of on a wedged run.
+    assert PROBE_STARTUP_BUDGET_SECONDS > 0
+    assert len(PROBE_QUERIES) * HTTP_TIMEOUT_SECONDS < PROBE_ACTIVE_DEADLINE_SECONDS
+
+
+def test_probe_queries_covers_both_read_paths():
+    """Ordinary and full-text reads fail independently; both must be probed."""
+    labels = [label for label, _ in PROBE_QUERIES]
+    assert labels == ["ordinary", "search"]
+    ordinary, search = (query for _, query in PROBE_QUERIES)
+    assert "search(" not in ordinary
+    assert "search(" in search

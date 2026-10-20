@@ -14,6 +14,7 @@ connector-specific K8s secrets (``om-connector-{name}``).
 """
 
 import hashlib
+import json
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
@@ -327,6 +328,24 @@ _POD_SECURITY_CONTEXT = {
     "runAsNonRoot": True,
 }
 
+# The omjob-operator always runs an exit-handler pod after the main pod and
+# dereferences exitHandlerSpec without a null check, so a CronOMJob without one
+# ends every run as Failed ("Cannot invoke ...getEnv() because podSpec is
+# null"). The operator injects pipelineStatus=success|failed from the main
+# pod's exit code, and the exit handler's own exit code sets the final phase.
+# This handler only turns that status back into an exit code, so phase
+# reflects the ingestion result. It runs as the namespace default service
+# account because it needs neither the ingestion IRSA role nor its RBAC.
+_EXIT_HANDLER_SPEC = {
+    "image": INGESTION_IMAGE,
+    "command": ["sh", "-c", 'test "$pipelineStatus" = success'],
+    "resources": {
+        "requests": {"cpu": "10m", "memory": "16Mi"},
+        "limits": {"cpu": "100m", "memory": "64Mi"},
+    },
+    "securityContext": _POD_SECURITY_CONTEXT,
+}
+
 # Enable JSON-structured logs from the Python ingestion-base container.
 # Supported by the ingestion-base image; passed through as LOG_FORMAT env var.
 _LOG_FORMAT_ENV = {"name": "LOG_FORMAT", "value": "json"}
@@ -375,6 +394,8 @@ def _make_cronjob(  # noqa: PLR0913
     opts: ResourceOptions | None = None,
     bot_secret_name: str = "om-ingestion-bot",  # noqa: S107
     resources: dict[str, object] | None = None,
+    *,
+    long_running: bool = False,
 ) -> kubernetes.apiextensions.CustomResource:
     """Create a CronOMJob custom resource.
 
@@ -396,7 +417,19 @@ def _make_cronjob(  # noqa: PLR0913
     :param resources: Pod resource requests/limits. Defaults to
         ``_POD_RESOURCES`` (500m/1Gi request, 2/4Gi limit). Override for
         connectors that require more memory (e.g. Trino full-catalog ingestion).
+    :param long_running: Run the main pod on on-demand capacity and exempt it
+        from Karpenter disruption. The operator never retries a main pod that
+        disappears, so a spot interruption or consolidation ends the run as
+        "Main pod not found after timeout". Use for jobs that run for hours.
     """
+    main_pod_placement: dict[str, object] = (
+        {
+            "annotations": {"karpenter.sh/do-not-disrupt": "true"},
+            "nodeSelector": {"karpenter.sh/capacity-type": "on-demand"},
+        }
+        if long_running
+        else {}
+    )
     env = [_bot_jwt_env(bot_secret_name), _LOG_FORMAT_ENV, *(extra_env or [])]
     command = Output.from_input(python_script).apply(lambda s: ["python", "-c", s])
 
@@ -418,7 +451,9 @@ def _make_cronjob(  # noqa: PLR0913
                     "env": env,
                     "resources": resources or _POD_RESOURCES,
                     "securityContext": _POD_SECURITY_CONTEXT,
+                    **main_pod_placement,
                 },
+                "exitHandlerSpec": _EXIT_HANDLER_SPEC,
             },
             "failedJobsHistoryLimit": 3,
             "successfulJobsHistoryLimit": 3,
@@ -434,6 +469,7 @@ service_name_trino = om_config.get("service_name_trino") or "Starburst Galaxy"
 service_name_airbyte = om_config.get("service_name_airbyte") or "Airbyte"
 service_name_superset = om_config.get("service_name_superset") or "Superset"
 service_name_glue = om_config.get("service_name_glue") or "Glue"
+service_name_starrocks = om_config.get("service_name_starrocks") or "StarRocks"
 # dbt enrichment targets the Trino (Starburst Galaxy) service — dbt writes
 # via Trino so the manifest database/schema values map directly to the Trino
 # OM entity FQNs (Starburst Galaxy.<catalog>.<schema>.<table>).
@@ -555,21 +591,27 @@ _make_cronjob(
 #
 # Lineage for Iceberg-backed tables is also captured here since Trino is
 # the query engine that reads and writes them.
+#
+# Disabled in QA: galaxy_telemetry is not attached to the QA Galaxy cluster,
+# so every run fails with CATALOG_NOT_FOUND.
 
-_make_cronjob(
-    name="trino-lineage",
-    schedule="0 6 * * *",
-    python_script=(Path(__file__).parent / "scripts" / "trino_lineage.py").read_text(),
-    extra_env=[
-        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
-        _plain_env("OM_SERVICE_NAME", service_name_trino),
-        _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
-        _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
-        _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
-        _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
-    ],
-    bot_secret_name="om-lineage-bot",  # noqa: S106  # pragma: allowlist secret
-)
+if om_config.require_bool("enable_trino_lineage"):
+    _make_cronjob(
+        name="trino-lineage",
+        schedule="0 6 * * *",
+        python_script=(
+            Path(__file__).parent / "scripts" / "trino_lineage.py"
+        ).read_text(),
+        extra_env=[
+            _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+            _plain_env("OM_SERVICE_NAME", service_name_trino),
+            _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
+            _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
+            _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
+            _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
+        ],
+        bot_secret_name="om-lineage-bot",  # noqa: S106  # pragma: allowlist secret
+    )
 
 # ---------------------------------------------------------------------------
 # Glue Data Catalog metadata ingestion
@@ -625,6 +667,100 @@ _make_cronjob(
 )
 
 # ---------------------------------------------------------------------------
+# StarRocks: metadata, dbt enrichment, and lineage from the lake
+# ---------------------------------------------------------------------------
+# Covers what StarRocks stores itself, i.e. the databases of default_catalog
+# that the tag:starrocks dbt models build into.  The Iceberg tables it reads
+# through its external catalogs are the lake tables the Trino and Glue
+# services already hold, and are not ingested a second time.
+#
+# open_metadata:starrocks_host_port is the single switch: unset (CI, where
+# there is no StarRocks cluster) creates none of the three jobs.  Credentials
+# come from the om-connector-starrocks secret, a Vault-issued read-only user
+# created by the application stack.
+#
+# The three run in order after b2b_analytics_starrocks_nightly, the Dagster
+# schedule that builds the models at 06:00 UTC and uploads their manifest and
+# run results:
+#   08:00  metadata          creates the tables in OM
+#   08:30  dbt enrichment    descriptions, tags, owners and test results
+#   09:00  lake lineage      edges from the lake tables each model reads
+starrocks_host_port = om_config.get("starrocks_host_port")
+
+# Name of the single service-level database OM files the StarRocks databases
+# under.  dbt-starrocks leaves a node's database empty, so nothing has to match
+# it; the catalog name says where the tables live.
+STARROCKS_OM_DATABASE_NAME = "default_catalog"
+
+# The StarRocks databases the dbt project builds into (dbt_project.yml in
+# ol-data-platform, the models tagged `starrocks`).  The StarRocks manifest
+# also holds every other model of the project under schema names that do not
+# exist in StarRocks; this keeps the dbt job from looking each of them up.
+STARROCKS_DBT_SCHEMAS = ["b2b_analytics", "b2b_learner_records"]
+
+if starrocks_host_port:
+    starrocks_dbt_artifacts_prefix = "openmetadata/dbt-artifacts/starrocks"
+
+    _make_cronjob(
+        name="starrocks",
+        schedule="0 8 * * *",
+        python_script=(
+            Path(__file__).parent / "scripts" / "starrocks_metadata.py"
+        ).read_text(),
+        extra_env=[
+            _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+            _plain_env("OM_SERVICE_NAME", service_name_starrocks),
+            _plain_env("OM_STARROCKS_HOST_PORT", starrocks_host_port),
+            _plain_env("OM_STARROCKS_DATABASE_NAME", STARROCKS_OM_DATABASE_NAME),
+            _secret_env("om-connector-starrocks", "OM_STARROCKS_USERNAME"),
+            _secret_env("om-connector-starrocks", "OM_STARROCKS_PASSWORD"),
+        ],
+    )
+
+    # Same script as the Trino dbt job, pointed at the StarRocks artifacts.
+    # The lake schemas are left out of the filter on purpose: the models'
+    # sources live there, and the dbt workflow would otherwise treat each
+    # source as the data model of the lake table it resolves to.  The lineage
+    # job below writes those edges.
+    _make_cronjob(
+        name="dbt-starrocks",
+        schedule="30 8 * * *",
+        python_script=(
+            Path(__file__).parent / "scripts" / "dbt_metadata.py"
+        ).read_text(),
+        extra_env=[
+            _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+            _plain_env("OM_SERVICE_NAME", service_name_starrocks),
+            _plain_env("OM_AWS_REGION", aws_region),
+            _plain_env("OM_DBT_BUCKET", dbt_artifacts_bucket),
+            _plain_env("OM_DBT_PREFIX", starrocks_dbt_artifacts_prefix),
+            _plain_env(
+                "OM_DBT_SCHEMA_INCLUDES",
+                json.dumps([f"^{schema}$" for schema in STARROCKS_DBT_SCHEMAS]),
+            ),
+        ],
+    )
+
+    _make_cronjob(
+        name="starrocks-dbt-lineage",
+        schedule="0 9 * * *",
+        python_script=(
+            Path(__file__).parent / "scripts" / "starrocks_dbt_lineage.py"
+        ).read_text(),
+        extra_env=[
+            _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+            _plain_env("OM_STARROCKS_SERVICE_NAME", service_name_starrocks),
+            _plain_env("OM_STARROCKS_DATABASE_NAME", STARROCKS_OM_DATABASE_NAME),
+            _plain_env("OM_LAKE_SERVICE_NAME", service_name_trino),
+            _plain_env("OM_AWS_REGION", aws_region),
+            _plain_env("OM_DBT_BUCKET", dbt_artifacts_bucket),
+            _plain_env("OM_DBT_PREFIX", starrocks_dbt_artifacts_prefix),
+            _plain_env("OM_DBT_SCHEMAS", json.dumps(STARROCKS_DBT_SCHEMAS)),
+        ],
+        bot_secret_name="om-lineage-bot",  # noqa: S106  # pragma: allowlist secret
+    )
+
+# ---------------------------------------------------------------------------
 # Dagster pipeline metadata ingestion
 # ---------------------------------------------------------------------------
 # Custom ingestion that replaces the manually-created Dagster OMJob.
@@ -672,7 +808,10 @@ _make_cronjob(
 )
 
 
-# distinct %, min/max, mean/std) for all ol_warehouse_production_* schemas.
+# Trino data profiler: collects table and column statistics (row count, null %,
+# distinct %, min/max, mean/std) for the schemas matching the stack's
+# trino_profiler_schema_pattern. QA reads the production catalog on a smaller
+# Galaxy cluster, so it profiles one small schema rather than all of them.
 # Uses a 10% row sample; runs weekly (Sunday 07:00 UTC) to control cost.
 _make_cronjob(
     name="trino-profiler",
@@ -681,18 +820,25 @@ _make_cronjob(
     extra_env=[
         _plain_env("OM_SERVER_URL", OM_SERVER_URL),
         _plain_env("OM_SERVICE_NAME", service_name_trino),
+        _plain_env(
+            "OM_PROFILER_SCHEMA_PATTERN",
+            om_config.require("trino_profiler_schema_pattern"),
+        ),
         _secret_env("om-connector-trino", "OM_TRINO_HOST_PORT"),
         _secret_env("om-connector-trino", "OM_TRINO_USERNAME"),
         _secret_env("om-connector-trino", "OM_TRINO_PASSWORD"),
         _secret_env("om-connector-trino", "OM_TRINO_CATALOG"),
     ],
     bot_secret_name="om-profiler-bot",  # noqa: S106  # pragma: allowlist secret
-    # Profiler queries all production schemas with 10% sample; increase memory
+    # Production profiles every warehouse schema with a 10% sample; increase memory
     # above default 4Gi to avoid OOM kills observed in recent runs (exit 137).
     resources={
         "requests": {"cpu": "500m", "memory": "2Gi"},
         "limits": {"cpu": "2", "memory": "8Gi"},
     },
+    # A full pass takes about 28h. The scheduled runs on 2026-09-27, 10-04 and
+    # 10-11 were all lost to spot interruptions.
+    long_running=True,
 )
 
 # Trino PII auto-classifier — uses OM's built-in AutoClassificationWorkflow,

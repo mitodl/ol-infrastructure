@@ -217,3 +217,26 @@ def test_addon_labels_never_overwrite_the_program_labels(stack_info):
     )
     assert labels["ol.mit.edu/stack"] == "substructure.aws.eks.operations.Production"
     assert labels["ol.mit.edu/alert_tier"] == "page"
+
+
+def test_workload_labels_add_the_tier_and_role_without_touching_the_model(stack_info):
+    base = K8sGlobalLabels(
+        ou=BusinessUnit.data, service=Services.opik, stack=stack_info
+    )
+    labels = base.workload_labels(
+        alert_tier=AlertTier.notify, component=Component.database
+    )
+    assert labels == base.model_dump() | {
+        "ol.mit.edu/component": "database",
+        "ol.mit.edu/alert_tier": "notify",
+    }
+    assert base.alert_tier is None
+
+
+def test_workload_labels_omit_a_role_the_caller_cannot_state(stack_info):
+    """A key that reaches several roles gets the tier and no invented component."""
+    shared = K8sGlobalLabels(
+        ou=BusinessUnit.data, service=Services.opik, stack=stack_info
+    ).workload_labels(alert_tier=AlertTier.notify)
+    assert "ol.mit.edu/component" not in shared
+    assert shared["ol.mit.edu/alert_tier"] == "notify"

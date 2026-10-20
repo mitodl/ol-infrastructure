@@ -35,6 +35,7 @@ from ol_infrastructure.components.applications.eks import (
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -55,8 +56,10 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     AWSBase,
     BusinessUnit,
+    Component,
     K8sGlobalLabels,
     Services,
 )
@@ -221,8 +224,98 @@ opik_helm_release = kubernetes.helm.v3.Release(
             # Fresh install — there is nothing to migrate from the legacy
             # Bitnami-based subcharts.
             "chartMigration": {"enabled": False},
+            # Polls system.parts (the opik user is granted SELECT on it in
+            # ol-application-clickhouse) every 5m for per-partition part counts
+            # and lightweight-delete masks on traces/spans; a distributed lock
+            # keeps it to one backend instance.
+            #
+            # clickhouse.sharding.enabled (which would also turn on the
+            # ANALYTICS_DB_CLUSTER_HEALTH_CHECK_ENABLED readiness check) stays
+            # off: opik's config.yml says to leave that check false for
+            # single-shard, non-Distributed deployments, and it is `critical`,
+            # so enabling it here would pull every backend out of rotation.
+            "partitionMetrics": {"enabled": True},
+            # Opik is internal LLM tracing, so everything is notify. commonLabels
+            # reaches the backend, python-backend and frontend Deployments and
+            # their pods, which do not share a role, so it carries no component.
+            "commonLabels": k8s_labels.workload_labels(alert_tier=AlertTier.notify),
+            "mysql": {
+                "primary": {
+                    "podLabels": k8s_labels.workload_labels(
+                        alert_tier=AlertTier.notify, component=Component.database
+                    ),
+                },
+            },
+            "minio": {
+                "podLabels": k8s_labels.workload_labels(alert_tier=AlertTier.notify),
+            },
+            # No redis.podLabels: that subchart copies it into the StatefulSet's
+            # volumeClaimTemplates, which are immutable.
             "component": {
                 "backend": {
+                    # Two replicas so a rollout, a node loss, or a single wedged
+                    # pod is not a total API outage. Note this does NOT protect
+                    # against the ClickHouse connection-pool leak described on the
+                    # liveness probe below: both replicas run the same periodic
+                    # jobs against the same ClickHouse and drain their pools at
+                    # the same rate, so that failure is correlated, not
+                    # independent.
+                    "replicaCount": 2,
+                    "podDisruptionBudget": {"enabled": True, "minAvailable": 1},
+                    # The chart ships only an ephemeral-storage request, which
+                    # leaves the pod BestEffort with no cgroup memory limit. That
+                    # matters because JAVA_OPTS carries -XX:MaxRAMPercentage=80:
+                    # with no limit the JVM resolves that against the *node*, and
+                    # on a 92.8Gi data-production node it sized MaxHeapSize at
+                    # 74.3Gi while actually using ~1.3Gi. A memory limit fixes
+                    # both ends at once -- the pod leaves BestEffort (so it is no
+                    # longer first to be evicted under node pressure) and the JVM
+                    # sizes the heap from the cgroup instead: 80% of the 6Gi limit
+                    # is a 4.8Gi ceiling, leaving ~1.2Gi for metaspace, thread
+                    # stacks and direct buffers. Generous against the ~1.3Gi the
+                    # pod actually uses; the limit is a ceiling, not a target.
+                    "resources": {
+                        "requests": {
+                            "cpu": "500m",
+                            "memory": "2Gi",
+                            "ephemeral-storage": "10Gi",
+                        },
+                        "limits": {"memory": "6Gi"},
+                    },
+                    # Liveness deliberately probes `type=ready`, not the chart's
+                    # `type=alive`. The ClickHouse checks are all `type=ready`, and
+                    # the backend's client-v2 connection pool can leak every one of
+                    # its 10 slots (opik never calls setMaxConnections /
+                    # setConnectionTTL, so connection_ttl=-1 and nothing evicts a
+                    # leaked lease). A pod in that state is unrecoverable without a
+                    # restart -- config.yml says so outright -- yet stays Running
+                    # forever at 0 restarts, which is how opik-backend sat out of
+                    # rotation for ~12h on 2026-09-23.
+                    #
+                    # Upstream leaves ClickHouse out of the liveness gate to avoid
+                    # restart-storming the fleet on a transient blip. Two things
+                    # bound that here: failureThreshold 30 x periodSeconds 10 means
+                    # only ~5 minutes of *sustained* unreadiness restarts anything,
+                    # and a liveness failure kills the container, not the pod, so it
+                    # is subject to the restart policy's exponential backoff
+                    # (CrashLoopBackOff) rather than hot-looping, and the
+                    # waitForClickhouse init container does not re-run -- init
+                    # containers execute once per pod sandbox, not per container
+                    # restart. initialDelaySeconds 120 is far above the measured
+                    # 21s container-start-to-Ready (migrations run in an init
+                    # container, so they are already done by then).
+                    "livenessProbe": {
+                        "httpGet": {
+                            "path": "/health-check?name=all&type=ready",
+                            "port": 8080,
+                            "httpHeaders": [
+                                {"name": "Accept", "value": "application/json"}
+                            ],
+                        },
+                        "initialDelaySeconds": 120,
+                        "periodSeconds": 10,
+                        "failureThreshold": 30,
+                    },
                     # Gate backend startup on the external ClickHouse being
                     # reachable over HTTP.
                     "waitForClickhouse": {
@@ -358,10 +451,12 @@ opik_oidc = OLApisixOIDCResources(
         oidc_scope="openid profile email",
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/opik",
-        vaultauth=opik_app.vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/opik",
+            vaultauth=opik_app.vault_k8s_resources.auth_name,
+        ),
     ),
     opts=ResourceOptions(depends_on=opik_app.vault_k8s_resources),
 )

@@ -11,8 +11,8 @@ directions, and a real window sits between them:
 
 - `WitanToolCallErrorRate` (`metric_rules/witan.py`) needs live MCP traffic to
   say anything — with none in the window it is `0/0 = NaN` and never fires.
-- `WitanGraphQuarantined` (`log_rules/witan.py`) needs a pod restart — it reads
-  `graph_count` off omnigraph-server's own boot line.
+- `WitanGraphBlockedAtStartup` (`log_rules/witan.py`) needs a pod restart — it
+  reads the `graph blocked during startup` line omnigraph-server logs at boot.
 
 `council` lost during a quiet period with no restart is invisible to both
 until someone tries to use the service, which for a shared agent memory graph
@@ -25,9 +25,19 @@ death — see `applications/witan/deployment.py`).
 So this is a separate, out-of-band, **authenticated** caller:
 `applications/omnigraph/council_probe.py` runs a CronJob
 (`check_council_health.py`) on its own schedule, in its own pod, carrying its
-own Cedar identity. It runs one trivial read against `council` and exits
-non-zero if that read did not come back — nothing more. See the script's own
-module docstring for the wire-level detail.
+own Cedar identity. It runs two trivial reads against `council` — an ordinary
+`match` and a full-text `search()` — and exits non-zero if either did not come
+back. Nothing more. See the script's own module docstring for the wire-level
+detail.
+
+The second read is not redundant. Ordinary and full-text reads fail
+independently: omnigraph's full-text rebuild-required guard refuses
+`search()`/`bm25()` while explicitly leaving ordinary reads working, so a
+probe that only did the first would report healthy through a total BM25
+outage — which is precisely what happened to CI on 2026-09-08, for a week,
+at a passing run every 15 minutes. It deliberately does not assert on the
+number of hits: an empty result is a legitimate answer, and the failure mode
+here is a refusal, not a wrong result.
 
 **It needs no new alert rule.** A failing run *is* the signal:
 `WitanScheduledJobNeverSucceeded` and `eks_general.py`'s `WorkloadJobFailed*`

@@ -35,13 +35,23 @@ uv run mypy src/
 
 **Note:** Expect ~1316 type errors and ~809 ruff errors in the codebase. Your changes should not introduce NEW errors.
 
-## Pre-commit Hooks
+## Hooks (prek)
+
+Hooks are defined in `.pre-commit-config.yaml` and run with [prek](https://prek.j178.dev/),
+which `uv sync` installs from the `prek` dependency group.
 
 ```bash
-# Run all pre-commit hooks (includes ruff, mypy, shellcheck, yamllint, etc.)
-# Note: hadolint may fail on existing Docker issues—ignore if unrelated to your changes
-uv run pre-commit run --all-files
+# Install the git hook (-f replaces a pre-commit hook installed earlier)
+uv run prek install -f
+
+# Run all hooks (includes ruff, mypy, shellcheck, yamllint, packer fmt, hadolint, etc.)
+# packer_fmt needs packer on PATH; hadolint-docker needs Docker
+uv run prek run --all-files
 ```
+
+CI runs the same hooks in `.github/workflows/autofix.yml` as the `prek` check. On a pull
+request, fixes the hooks can make are pushed back as one `autofix-ci[bot]` commit, except
+for files under `.github/`, which you have to fix locally.
 
 ## Testing
 
@@ -72,7 +82,7 @@ Before submitting changes:
 7. ✅ `uv run pytest tests/` — Run tests (if applicable)
 
 **Optional but recommended:**
-- `uv run pre-commit run --all-files` — Run all hooks (may take 2+ minutes)
+- `uv run prek run --all-files` — Run all hooks (CI runs them regardless)
 
 ## Common Build Issues
 
@@ -82,8 +92,8 @@ Before submitting changes:
 ### Issue: `ruff check` reports 809 errors
 **Solution:** Expected. Focus on not introducing NEW errors. Consider using `--fix` for auto-fixable issues.
 
-### Issue: pre-commit hook `hadolint-docker` fails with existing Docker warnings
-**Solution:** Ignore hadolint failures if your changes don't affect Dockerfiles. These are pre-existing issues.
+### Issue: hook `hadolint-docker` fails on a Dockerfile you changed
+**Solution:** Fix the finding, or add a `# hadolint ignore=<rule>` comment above the instruction when the rule does not apply (for example `DL3008`, unpinned apt packages on a floating base image). The hook passes on `main`, and CI runs it as the `prek` check.
 
 ### Issue: Timeout running commands
 **Solution:**

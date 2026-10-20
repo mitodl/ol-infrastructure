@@ -5,7 +5,8 @@ import pulumi_kubernetes as kubernetes
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
-from ol_infrastructure.lib.aws.eks_helper import ECR_DOCKERHUB_REGISTRY
+from ol_infrastructure.lib.aws.eks_helper import ecr_dockerhub_registry
+from ol_infrastructure.lib.k8s_crds import adopt_helm_chart_crds
 from ol_infrastructure.lib.ol_types import (
     AlertTier,
     AWSBase,
@@ -77,6 +78,26 @@ def setup_traefik(
         ),
     )
 
+    # The traefik chart ships 25 CRDs in crds/, which Helm only ever writes on
+    # install, so every one of them froze at whatever chart version first landed on
+    # the cluster while TRAEFIK_CHART was upgraded repeatedly. traefikservices was
+    # 161 schema properties behind and middlewares 50. That one is not theoretical:
+    # src/ol_infrastructure/components/services/traefik.py creates Middleware
+    # resources, and anything in the missing 50 -- spec.compress.encodings, the
+    # spec.encodedCharacters block, spec.errors.errorRequestHeaders -- would be
+    # accepted here and then dropped by schema pruning with no error.
+    #
+    # Note these are not the Gateway API CRDs applied above; the two sets do not
+    # overlap.
+    traefik_crds = adopt_helm_chart_crds(
+        f"{cluster_name}-traefik-crds",
+        kubeconfig=cluster.kubeconfig,
+        repo="https://traefik.github.io/charts",
+        chart="traefik",
+        version=versions["TRAEFIK_CHART"],
+        opts=ResourceOptions(parent=operations_namespace, depends_on=[cluster]),
+    )
+
     # This helm release installs the traefik k8s gateway api controller
     # which will server as the ingress point for ALL connections going into
     # the applications installed on the cluster. No other publically listening
@@ -97,7 +118,9 @@ def setup_traefik(
             chart="traefik",
             version=versions["TRAEFIK_CHART"],
             namespace="operations",
-            skip_crds=False,
+            # The CRDs are applied above as their own Pulumi resource. Helm would
+            # only write them on a fresh install anyway, which is the bug.
+            skip_crds=True,
             cleanup_on_fail=True,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 # helm.traefik.io was retired and now 404s on index.yaml, which
@@ -107,7 +130,7 @@ def setup_traefik(
             values={
                 "image": {
                     "pullPolicy": "Always",
-                    "registry": f"{ECR_DOCKERHUB_REGISTRY}/library",
+                    "registry": f"{ecr_dockerhub_registry()}/library",
                 },
                 # commonLabels reaches both the workload and the pod template
                 # in chart 41.x, and neither selector.
@@ -251,8 +274,9 @@ def setup_traefik(
                         # The HPA above scales on CPU utilization as a percentage of
                         # this request. Keep it near observed per-pod burst usage or
                         # every minor traffic burst pins the deployment at
-                        # maxReplicas.
-                        "cpu": eks_config.get("traefik_cpu_request") or "500m",
+                        # maxReplicas. Most clusters peak under 35m per pod;
+                        # applications-production bursts to ~370m and overrides this.
+                        "cpu": eks_config.get("traefik_cpu_request") or "150m",
                         "memory": "150Mi",
                     },
                     "limits": {
@@ -378,6 +402,7 @@ def setup_traefik(
                 *node_groups,
                 operations_namespace,
                 gateway_api_crds,
+                traefik_crds,
                 prometheus_operator_crds,
                 lb_controller,
             ],

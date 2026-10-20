@@ -122,9 +122,10 @@ The only urgency-conditioned path is `defer-medium-urgency-off-hours`
 urgency therefore pages exactly like High. The analysis's step 2 — "route warning to a
 Rootly low-urgency path" — would relabel alerts without silencing a single page.
 
-There is a real non-paging destination available: `QA Non-Paging Escalation Policy`
-(`d63b7456-0d9f-44e8-80a5-4fc3df7e986b`, zero escalation levels), plus the Slack-only
-`CI/QA Slack Notifications` policy (`b32c5938-4eb2-446f-a766-ab54970cf0bf`).
+There is a real non-paging destination available: the Slack-only
+`CI/QA Slack Notifications` policy (`b32c5938-4eb2-446f-a766-ab54970cf0bf`). The
+`QA Non-Paging Escalation Policy` (`d63b7456-0d9f-44e8-80a5-4fc3df7e986b`, zero
+escalation levels) this section originally listed beside it was deleted 2026-10-07.
 
 ### 0.6 `courses-backend.learn.mit.edu` at 33% is a near-idle host, not a chronic outage
 

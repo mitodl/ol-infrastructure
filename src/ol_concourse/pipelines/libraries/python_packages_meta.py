@@ -19,6 +19,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 OL_INFRASTRUCTURE_REPO = git_repo(
     name=Identifier("python-package-pipeline-definitions"),
@@ -172,9 +173,24 @@ def meta_pipeline() -> Pipeline:
 
 if __name__ == "__main__":
     pipeline = meta_pipeline()
+    output = pipeline_json_with_user_data(
+        pipeline,
+        user_data={
+            "description": (
+                "Self-managing meta pipeline for the Python-package publish "
+                "pipelines: regenerates and sets "
+                "`publish-open-edx-plugins-pypi` from `mitodl/open-edx-plugins` "
+                "and `publish-ol-django-pypi` from `mitodl/ol-django` (via "
+                "`ol_django.py`), each on any push to its source repo, and "
+                "re-sets itself on changes to its own generator code."
+            ),
+            "team": "main",
+            "category": "meta",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(pipeline.model_dump_json(indent=2))
-    sys.stdout.write(pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stderr.write("\n")
     sys.stderr.write(
         "fly -t pr-main sp -p publish-python-packages-meta -c definition.json\n"

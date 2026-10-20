@@ -19,8 +19,10 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import git_repo, registry_image, ssh_git_repo
 
+from bridge.lib.versions import OPENAPI_GENERATOR_VERSION
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
 from ol_concourse.pipelines.libraries.configuration import PIPELINE_CONFIGS
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 
 def _read_script(script_name: str) -> str:
@@ -35,7 +37,8 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     client_repo_name: str,
     client_repo_uri: str,
     client_repo_branch: str,
-    client_repo_subpath: str,
+    client_repo_subpath: str | list[str],
+    source_repo_tag_regex: str | None = None,
 ) -> Pipeline:
     """
     Generate a pipeline definition for building and publishing API clients.
@@ -43,20 +46,37 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     :param source_repo_name: The identifier for the source code repository resource.
     :param source_repo_uri: The URI of the source code repository (e.g., GitHub URL).
     :param source_repo_branch: The branch of the source code repository to track.
+        Ignored when *source_repo_tag_regex* is set.
     :param client_repo_name: The identifier for the generated client code repository
         resource.
     :param client_repo_uri: The URI of the client code repository (e.g., GitHub SSH
         URL).
     :param client_repo_branch: The branch of the client code repository to push to.
     :param client_repo_subpath: The subpath within the client repo where the generated
-        code resides (relative to src/typescript/).
+        code resides (relative to src/typescript/). Pass a list when the source repo
+        publishes several specs and each is packaged separately -- one npm package is
+        published per entry, all sharing the repo-root VERSION.
+    :param source_repo_tag_regex: Regenerate on tags matching this regex rather than
+        on spec changes landing on a branch. For a repo that cuts releases as tags
+        and has no long-lived release branch. Note the tradeoff: the git resource
+        consults ``paths`` only when versioning on commits, so under a tag regex
+        every matching tag rebuilds the client whether or not a spec actually
+        moved -- the "only when the interface changed" property comes from the
+        release cadence instead. ``branch`` stops applying too, so a matching tag
+        anywhere in the repo triggers it.
 
     :return: A Pipeline object representing the Concourse pipeline definition.
     """
+    client_repo_subpaths = (
+        [client_repo_subpath]
+        if isinstance(client_repo_subpath, str)
+        else client_repo_subpath
+    )
+
     # Define parameterized image tags
     python_image_tag = "3.12-slim"
     node_image_tag = "24-slim"
-    openapi_generator_tag = "v7.25.0"
+    openapi_generator_tag = OPENAPI_GENERATOR_VERSION
 
     # Define script names
     generate_script: str = "generate-inner.sh"
@@ -84,12 +104,33 @@ def generate_api_client_pipeline(  # noqa: PLR0913
     )
 
     # Define source and client repositories using parameters
-    source_repository = git_repo(
-        name=Identifier(source_repo_name),
-        uri=source_repo_uri,
-        branch=source_repo_branch,
-        paths=["openapi/specs/*.yaml"],
-    )
+    if source_repo_tag_regex:
+        source_repository = git_repo(
+            name=Identifier(source_repo_name),
+            uri=source_repo_uri,
+            version_type="tags",
+            fetch_tags=True,
+            tag_regex=source_repo_tag_regex,
+        )
+        # An ol-concourse without version_type support does not reject the
+        # argument: git_repo forwards it through **kwargs onto the Resource, so
+        # it lands as a top-level key, `source` never gets it, and the resource
+        # silently falls back to versioning commits on `main` with no paths
+        # filter -- republishing the client on every commit. Fail here instead.
+        if "version_type" not in source_repository.source:
+            msg = (
+                f"{source_repo_name} asked to version on tags, but the installed "
+                "ol-concourse dropped version_type from the resource source. "
+                "Upgrade ol-concourse to a release that supports it."
+            )
+            raise RuntimeError(msg)
+    else:
+        source_repository = git_repo(
+            name=Identifier(source_repo_name),
+            uri=source_repo_uri,
+            branch=source_repo_branch,
+            paths=["openapi/specs/*.yaml"],
+        )
 
     api_clients_repository = ssh_git_repo(
         name=Identifier(client_repo_name),
@@ -126,7 +167,12 @@ def generate_api_client_pipeline(  # noqa: PLR0913
             ),
             LoadVarStep(
                 load_var=Identifier(f"{source_repo_name}-git-rev"),
-                file=f"{source_repository.name}/.git/refs/heads/{source_repository.source['branch']}",
+                # .git/ref, not .git/refs/heads/<branch>: the git resource
+                # writes it under both version_types used here (commits and
+                # tags), and a tag checkout is detached, so there is no branch
+                # ref on disk to read. Note in_branches.sh does not write it,
+                # so this would need revisiting for a branches-based config.
+                file=f"{source_repository.name}/.git/ref",
                 reveal=True,
             ),
             TaskStep(
@@ -183,33 +229,43 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         ],
     )
 
-    # Define the 'publish' job
-    publish_job = Job(
-        name="publish",
-        plan=[
-            GetStep(get=node_image.name, trigger=True),
-            GetStep(
-                get=api_clients_repository.name,
-                passed=[generate_clients_job.name],
-                trigger=True,
-            ),
-            TaskStep(
-                task="publish-node",
-                image=node_image.name,
-                config=TaskConfig(
-                    platform="linux",
-                    inputs=[Input(name=api_clients_repository.name)],
-                    params={"NPM_TOKEN": "((npm_publish.npmjs_token))"},
-                    run=Command(
-                        path="sh",
-                        # Adjust dir based on which publish script is used
-                        dir=f"{api_clients_repository.name}/src/typescript/{client_repo_subpath}",
-                        args=["-xc", _read_script(publish_script)],
+    # One publish job per subpath, each gated on the same successful
+    # generate-clients run. A source repo publishing several specs generates
+    # several packages out of the one client repo, and each is published from
+    # its own directory; they share the repo-root VERSION the bump step
+    # wrote, so a release moves them together. Separate jobs (rather than
+    # sequential steps in one job) keep a failed package retryable on its
+    # own -- npm rejects republishing an already-published name/version, so
+    # retrying a single job that already published some packages would fail
+    # before reaching the one that didn't.
+    publish_jobs = [
+        Job(
+            name=Identifier(f"publish-{subpath}"),
+            plan=[
+                GetStep(get=node_image.name, trigger=True),
+                GetStep(
+                    get=api_clients_repository.name,
+                    passed=[generate_clients_job.name],
+                    trigger=True,
+                ),
+                TaskStep(
+                    task=Identifier(f"publish-node-{subpath}"),
+                    image=node_image.name,
+                    config=TaskConfig(
+                        platform="linux",
+                        inputs=[Input(name=api_clients_repository.name)],
+                        params={"NPM_TOKEN": "((npm_publish.npmjs_token))"},
+                        run=Command(
+                            path="sh",
+                            dir=f"{api_clients_repository.name}/src/typescript/{subpath}",
+                            args=["-xc", _read_script(publish_script)],
+                        ),
                     ),
                 ),
-            ),
-        ],
-    )
+            ],
+        )
+        for subpath in client_repo_subpaths
+    ]
 
     # Construct the final pipeline
     return Pipeline(
@@ -222,7 +278,7 @@ def generate_api_client_pipeline(  # noqa: PLR0913
         ],
         jobs=[
             generate_clients_job,
-            publish_job,
+            *publish_jobs,
         ],
     )
 
@@ -240,4 +296,20 @@ if __name__ == "__main__":
     variant_config = PIPELINE_CONFIGS[args.variant]
     pipeline = generate_api_client_pipeline(**variant_config)
     # Print the generated pipeline definition JSON to stdout
-    sys.stdout.write(pipeline.model_dump_json(indent=2))
+    sys.stdout.write(
+        pipeline_json_with_user_data(
+            pipeline,
+            user_data={
+                "description": (
+                    f"Generates the TypeScript API client for "
+                    f"`{variant_config['source_repo_name']}` from its OpenAPI "
+                    f"spec (`openapi/specs/*.yaml`) via openapi-generator, "
+                    f"bumps and commits the version in "
+                    f"`{variant_config['client_repo_name']}`, then publishes "
+                    "the package to npm."
+                ),
+                "team": "main",
+                "category": "package-publishing",
+            },
+        )
+    )

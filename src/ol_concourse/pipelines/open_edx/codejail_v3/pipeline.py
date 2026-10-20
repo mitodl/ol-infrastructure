@@ -23,6 +23,7 @@ from bridge.settings.openedx.types import DeploymentEnvRelease, OpenEdxSupported
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -163,10 +164,23 @@ def build_codejail_pipeline(
 
 if __name__ == "__main__":
     release_name = sys.argv[1]
-    pipeline_json = build_codejail_pipeline(
+    codejail_pipeline = build_codejail_pipeline(
         release_name,
         OpenLearningOpenEdxDeployment,
-    ).model_dump_json(indent=2)
+    )
+    pipeline_json = pipeline_json_with_user_data(
+        codejail_pipeline,
+        user_data={
+            "description": (
+                "Builds the codejail container image that sandboxes execution of "
+                "student-submitted code for code-response problem grading, then "
+                "deploys it via Pulumi to every mitodl Open edX deployment running "
+                f"the `{release_name}` release."
+            ),
+            "team": "infrastructure",
+            "category": "open-edx",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
         definition.write(pipeline_json)
     sys.stdout.write(pipeline_json)

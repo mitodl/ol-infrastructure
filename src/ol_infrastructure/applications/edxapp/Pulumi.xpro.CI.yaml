@@ -53,7 +53,6 @@ config:
   edxapp:web_instance_type: r7a.large
   edxapp:enable_courseware_index: "true"
   edxapp:elasticsearch_enabled: "false"
-  edxapp:enable_notes: "True"
   edxapp:enabled_mfes:
     admin_console: admin-console
     authoring: authoring
@@ -121,6 +120,11 @@ config:
   typesense:enabled: "true"
   typesense:course_search_enabled: "true"
   typesense:forum_search_enabled: "true"
+  # storage_size intentionally left at the 100Gi default. The 20Gi sizing from
+  # #5870 was sound, but it only takes effect via a StatefulSet recreate, and an
+  # unpaired CR/StatefulSet mismatch wedges the operator (see typesense.py).
+  # Reclaiming the capacity was not worth the recreate on these stacks; do not
+  # re-add this without running docs/nonprod-ebs-volume-right-sizing-runbook.md.
   edxapp:site_project:
     deployment: xpro
     mfe_apps:

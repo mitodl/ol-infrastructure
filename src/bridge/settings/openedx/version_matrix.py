@@ -67,154 +67,6 @@ ReleaseMap: dict[
     dict[OpenEdxDeploymentName, list[OpenEdxApplicationVersion]],
 ] = {
     "ulmo": {
-        "mitx": [
-            OpenEdxApplicationVersion(
-                application="codejail",
-                application_type="IDA",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="communications",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="authoring",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="discussions",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="edx-platform",
-                application_type="IDA",
-                release="ulmo",
-                branch_override="mitx/ulmo",
-                origin_override="https://github.com/mitodl/edx-platform",
-                runtime_version_override="3.11",
-            ),
-            OpenEdxApplicationVersion(
-                application="edxapp_theme",
-                application_type="IDA",
-                release="ulmo",
-                branch_override="ulmo",
-                origin_override="https://github.com/mitodl/mitx-theme",
-            ),
-            OpenEdxApplicationVersion(
-                application="gradebook",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="learner-dashboard",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="learning",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="notes-api",
-                application_type="IDA",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="ora-grading",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqueue",
-                application_type="IDA",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqwatcher",
-                application_type="IDA",
-                branch_override="master",
-                origin_override="https://github.com/mitodl/xqueue-watcher",
-                release="ulmo",
-            ),
-        ],
-        "mitx-staging": [
-            OpenEdxApplicationVersion(
-                application="codejail",
-                application_type="IDA",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="communications",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="authoring",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="discussions",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="edx-platform",
-                application_type="IDA",
-                release="ulmo",
-                branch_override="mitx/ulmo",
-                origin_override="https://github.com/mitodl/edx-platform",
-                runtime_version_override="3.11",
-            ),
-            OpenEdxApplicationVersion(
-                application="edxapp_theme",
-                application_type="IDA",
-                release="ulmo",
-                branch_override="ulmo",
-                origin_override="https://github.com/mitodl/mitx-theme",
-            ),
-            OpenEdxApplicationVersion(
-                application="gradebook",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="learning",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="learner-dashboard",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="notes-api",
-                application_type="IDA",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="ora-grading",
-                application_type="MFE",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqueue",
-                application_type="IDA",
-                release="ulmo",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqwatcher",
-                application_type="IDA",
-                branch_override="master",
-                origin_override="https://github.com/mitodl/xqueue-watcher",
-                release="ulmo",
-            ),
-        ],
         "xpro": [
             OpenEdxApplicationVersion(
                 application="codejail",
@@ -335,11 +187,6 @@ ReleaseMap: dict[
                 release="verawood",
             ),
             OpenEdxApplicationVersion(
-                application="xqueue",
-                application_type="IDA",
-                release="verawood",
-            ),
-            OpenEdxApplicationVersion(
                 application="xqwatcher",
                 application_type="IDA",
                 branch_override="master",
@@ -408,11 +255,6 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="ora-grading",
                 application_type="MFE",
-                release="verawood",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqueue",
-                application_type="IDA",
                 release="verawood",
             ),
             OpenEdxApplicationVersion(
@@ -489,6 +331,7 @@ ReleaseMap: dict[
                 application="admin-console",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="codejail",
@@ -530,6 +373,7 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="learning",
@@ -543,11 +387,6 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="ora-grading",
                 application_type="MFE",
-                release="master",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqueue",
-                application_type="IDA",
                 release="master",
             ),
             OpenEdxApplicationVersion(
@@ -566,6 +405,7 @@ ReleaseMap: dict[
                 application="admin-console",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="communications",
@@ -598,11 +438,13 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="learner-dashboard",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="learning",
@@ -617,11 +459,6 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="ora-grading",
                 application_type="MFE",
-                release="master",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqueue",
-                application_type="IDA",
                 release="master",
             ),
             OpenEdxApplicationVersion(
@@ -640,6 +477,7 @@ ReleaseMap: dict[
                 application="admin-console",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="communications",
@@ -672,6 +510,7 @@ ReleaseMap: dict[
                 application="gradebook",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="learning",
@@ -682,6 +521,7 @@ ReleaseMap: dict[
                 application="learner-dashboard",
                 application_type="MFE",
                 release="master",
+                branch_override="legacy-mfe",
             ),
             OpenEdxApplicationVersion(
                 application="notes-api",
@@ -691,11 +531,6 @@ ReleaseMap: dict[
             OpenEdxApplicationVersion(
                 application="ora-grading",
                 application_type="MFE",
-                release="master",
-            ),
-            OpenEdxApplicationVersion(
-                application="xqueue",
-                application_type="IDA",
                 release="master",
             ),
             OpenEdxApplicationVersion(

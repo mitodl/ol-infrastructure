@@ -2,14 +2,21 @@
 """Generate Concourse pipeline definitions for building and deploying dockerized applications to Kubernetes via Pulumi."""
 
 import sys
+from pathlib import Path
 from typing import Any
 
 from ol_concourse.lib.constants import REGISTRY_IMAGE
 from ol_concourse.lib.containers import container_build_task
+from ol_concourse.lib.jobs.infrastructure import (
+    PREVIEW_NO_CHANGES_MARKER,
+    PREVIEW_SUMMARY_FILENAME,
+    stack_serial_group,
+)
 from ol_concourse.lib.models.fragment import PipelineFragment
 from ol_concourse.lib.models.pipeline import (
     AnonymousResource,
     Command,
+    Duration,
     GetStep,
     Identifier,
     Input,
@@ -39,7 +46,7 @@ from ol_concourse.lib.resources import (
     registry_image,
     release_resource,
 )
-from ol_concourse.lib.tasks import bump_version_task
+from ol_concourse.lib.tasks import TASK_IMAGE, bump_version_task
 from pydantic import BaseModel, model_validator
 
 from bridge.settings.apps import github_repo as app_github_repo
@@ -52,7 +59,9 @@ from ol_concourse.pipelines.constants import (
     PULUMI_WATCHED_PATHS,
     dockerhub_ecr_image_uri,
 )
+from ol_concourse.pipelines.ecr import configure_ecr_repository_task
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -140,6 +149,8 @@ class AppPipelineParams(BaseModel):
     github_repo: str | None = None
     sentry_sourcemaps: SentrySourcemapsConfig | None = None
     refresh_stack: bool = True
+    description: str = ""
+    category: str = "applications"
 
     @model_validator(mode="after")
     def set_repo_name(self) -> "AppPipelineParams":
@@ -186,9 +197,13 @@ pipeline_params = {
         settings_dir="micromasters",
         version_file="VERSION",
         refresh_stack=False,
+        description="Builds the MicroMasters Django app image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
     ),
     "mitxonline": AppPipelineParams(
-        app_name="mitxonline", build_target="production", refresh_stack=False
+        app_name="mitxonline",
+        build_target="production",
+        refresh_stack=False,
+        description="Builds the MITx Online Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
     "mit-learn-nextjs": AppPipelineParams(
         app_name="mit-learn-nextjs",
@@ -210,6 +225,7 @@ pipeline_params = {
             auth_token_vault_key="((sentry.mitlearn_auth_token))",  # noqa: S106  # pragma: allowlist secret
             rootfs_asset_path="app/frontends/main/.next",
         ),
+        description="Builds the MIT Learn Next.js frontend image, deploys it to Kubernetes via Pulumi, purges the Fastly HTML-page cache on deploy, and uploads the build's source maps to Sentry.",
     ),
     "xpro": AppPipelineParams(
         app_name="xpro",
@@ -218,21 +234,36 @@ pipeline_params = {
         build_target="production",
         settings_dir="mitxpro",
         refresh_stack=False,
+        description="Builds the xPRO Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
-    "learn-ai": AppPipelineParams(app_name="learn-ai", refresh_stack=False),
-    "mit-learn": AppPipelineParams(app_name="mit-learn", refresh_stack=False),
+    "learn-ai": AppPipelineParams(
+        app_name="learn-ai",
+        refresh_stack=False,
+        description="Builds the Learn AI service image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
+    ),
+    "mit-learn": AppPipelineParams(
+        app_name="mit-learn",
+        refresh_stack=False,
+        description="Builds the MIT Learn Django/API backend image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
+    ),
     "ocw-studio": AppPipelineParams(
         app_name="ocw-studio",
         repo_main_branch=app_repo_main_branch("ocw-studio"),
         build_target="production",
+        description="Builds the OCW Studio Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
     "odl-video-service": AppPipelineParams(
         app_name="odl-video-service",
         repo_main_branch=app_repo_main_branch("odl-video-service"),
         build_target="production",
         settings_dir="odl_video",
+        description="Builds the ODL Video Service Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
-    "ol-analytics-api": AppPipelineParams(app_name="ol-analytics-api"),
+    "ol-analytics-api": AppPipelineParams(
+        app_name="ol-analytics-api",
+        description="Builds the OL Analytics API image and deploys it to Kubernetes via Pulumi.",
+        category="data-platform",
+    ),
 }
 
 
@@ -306,33 +337,59 @@ def _fastly_purge_params(purge_scope: str) -> dict[str, str]:
     return {"mode": "surrogate_key", "surrogate_key": purge_scope}
 
 
-def _ensure_ecr_repository_step(ecr_registry_image_resource: Resource) -> TaskStep:
-    """Return the shared 'create the ECR repo if it does not exist yet' step."""
-    return TaskStep(
-        task=Identifier("ensure-ecr-repository"),
-        config=TaskConfig(
-            platform=Platform.linux,
-            image_resource=AnonymousResource(
-                type="registry-image",
-                source={
-                    "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
-                    "tag": "latest",
-                    "aws_region": ECR_REGION,
+def _ensure_ecr_repository_step(
+    ecr_registry_image_resource: Resource,
+) -> list[TaskStep]:
+    """Return steps to create the ECR repo if missing, then apply its
+    scan-on-push + lifecycle-policy configuration.
+
+    Without the second step, every build permanently accumulates as its own
+    image in ECR -- Inspector re-scans and re-reports the same CVEs against
+    every old, unused build forever. Other pipeline generators
+    (witan, omnigraph, superset, ...) already pair ensure_ecr_task with
+    configure_ecr_repository_task; this generator's apps (mit-learn,
+    mitxonline, xpro, odl-video-service, and others sharing this step) were
+    missing the second half of that pairing, confirmed live via
+    `aws ecr describe-images` -- mit-learn-app alone had 1,204 accumulated
+    images, each carrying its own full copy of the same ~1,900 CVEs.
+    """
+    repo_name = ecr_registry_image_resource.source["repository"]
+    return [
+        TaskStep(
+            task=Identifier("ensure-ecr-repository"),
+            config=TaskConfig(
+                platform=Platform.linux,
+                image_resource=AnonymousResource(
+                    type="registry-image",
+                    source={
+                        "repository": dockerhub_ecr_image_uri("amazon/aws-cli"),
+                        "tag": "latest",
+                        "aws_region": ECR_REGION,
+                    },
+                ),
+                params={
+                    "REPO_NAME": repo_name,
+                    "AWS_PAGER": "cat",
                 },
-            ),
-            params={
-                "REPO_NAME": ecr_registry_image_resource.source["repository"],
-                "AWS_PAGER": "cat",
-            },
-            run=Command(
-                path="sh",
-                args=[
-                    "-exc",
-                    "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",
-                ],
+                run=Command(
+                    path="sh",
+                    args=[
+                        "-exc",
+                        "aws ecr describe-repositories --repository-names ${REPO_NAME} || aws ecr create-repository --repository-name ${REPO_NAME}",
+                    ],
+                ),
             ),
         ),
-    )
+        # expire_after_days, not keep_last_n_images: this repo is shared by
+        # independent CI (every main-branch commit) and release build jobs
+        # (see the registry_image() calls above/below using the same
+        # image_repository) -- a count-based policy would let CI churn
+        # push the still-deployed release image out of the "N most
+        # recent" window and delete it. Age-based means CI volume can't
+        # threaten a release image redeployed within any reasonable
+        # window. Flagged by Copilot review on PR #5728.
+        configure_ecr_repository_task(repo_name, expire_after_days=90),
+    ]
 
 
 # ============================================================================
@@ -615,7 +672,7 @@ def _build_image_job_legacy(
         put_params["version"] = f"((.:{version_var}))"
         put_params["bump_aliases"] = True
 
-    plan.append(_ensure_ecr_repository_step(ecr_registry_image_resource))
+    plan.extend(_ensure_ecr_repository_step(ecr_registry_image_resource))
     plan.append(PutStep(put=dockerhub_registry_image_resource.name, params=put_params))
     plan.append(PutStep(put=ecr_registry_image_resource.name, params=put_params))
 
@@ -865,6 +922,12 @@ def _define_git_resources(
     return main_repo, ol_infra_repo
 
 
+# The release GitHub App; see the comment in _define_release_resources.
+GITHUB_APP_ID = "((github_app.release_bot_app_id))"
+GITHUB_APP_INSTALLATION_ID = "((github_app.release_bot_app_installation_id))"
+GITHUB_APP_PRIVATE_KEY = "((github_app.release_bot_app_pem))"
+
+
 def _define_release_resources(
     app_name: str,
     github_repo: str,
@@ -882,9 +945,9 @@ def _define_release_resources(
     # team-scoped paths before the shared fallback, so a credential named
     # plain "github" here would silently resolve against the wrong
     # (team-scoped, fieldless) secret instead of ever reaching this one.
-    github_app_id = "((github_app.release_bot_app_id))"
-    github_app_installation_id = "((github_app.release_bot_app_installation_id))"
-    github_app_private_key = "((github_app.release_bot_app_pem))"
+    github_app_id = GITHUB_APP_ID
+    github_app_installation_id = GITHUB_APP_INSTALLATION_ID
+    github_app_private_key = GITHUB_APP_PRIVATE_KEY
     release_res = release_resource(
         name=Identifier(f"{app_name}-release"),
         uri=f"https://github.com/{github_repo}",
@@ -895,6 +958,29 @@ def _define_release_resources(
         private_ssh_key=github_app_private_key,
         repository=github_repo,
         semver_tag_fallback=True,
+    ).model_copy(
+        # Not the library's `never`. Rebuilding the release resource image
+        # gives this resource a fresh, empty version history on its next
+        # check or put (Concourse keys history on the custom type's version),
+        # and QA/Production take it with `passed:` the release build, which
+        # resolves only against the current history. The resource's check
+        # re-emits the newest cuts to repair that, but a put can start the
+        # fresh history too, and under `never` nothing would check it until
+        # the next `/doof release`. Concourse's periodic checker skips a
+        # `never` resource outright, and otherwise checks a resource that
+        # only triggers through `passed:`, like this one, only while its
+        # history has never been checked, has no versions, or last failed to
+        # check. So this costs a check after a fresh history starts and an
+        # hourly retry while checks fail, not a check every hour.
+        # A check cannot bypass the release build: QA triggers on this
+        # resource (pulumi_jobs_chain turns the first stack's dependencies
+        # into triggers) but only through `passed:` the release build, so it
+        # runs only a version that build produced. A re-emitted cut is
+        # normally a version QA has already run, so it starts nothing. The
+        # exception: when the newest cut is gone or its build
+        # failed, QA falls back to the cut before it and runs it if it never
+        # had, deploying a release that passed the build to QA.
+        update={"check_every": Duration("1h")}
     )
     # Closed release issues gate production deployments.
     release_gate = github_issues(
@@ -1014,9 +1100,13 @@ def _build_image_job(
     """
     job_name = f"build-{app_name}-image-from-{git_repo_resource.source['branch']}"
 
-    additional_build_params = {}
+    # OUTPUT_OCI keeps zstd layers inherited from the DHI-hardened base
+    # labeled as zstd; see _build_image_job_legacy and
+    # mitodl/ol-infrastructure#5714. This job uploads no source maps, so it
+    # never needs the legacy tarball output.
+    additional_build_params = {"OUTPUT_OCI": "true"}
     if build_target:
-        additional_build_params = {"TARGET": build_target}
+        additional_build_params["TARGET"] = build_target
 
     plan = [
         GetStep(get=git_repo_resource.name, trigger=True),
@@ -1040,24 +1130,265 @@ def _build_image_job(
             },
             build_args=[],
         ),
-        _ensure_ecr_repository_step(ecr_registry_image_resource),
+        *_ensure_ecr_repository_step(ecr_registry_image_resource),
         PutStep(
             put=dockerhub_registry_image_resource.name,
             params={
-                "image": "image/image.tar",
+                "image": "image/image",
                 "additional_tags": f"./{git_repo_resource.name}/.git/short_ref",
             },
         ),
         PutStep(
             put=ecr_registry_image_resource.name,
             params={
-                "image": "image/image.tar",
+                "image": "image/image",
                 "additional_tags": f"./{git_repo_resource.name}/.git/short_ref",
             },
         ),
     ]
 
     return Job(name=Identifier(job_name), build_log_retention={"builds": 10}, plan=plan)
+
+
+def _checkout_release_task(main_repo: Resource, output: Identifier) -> TaskStep:
+    """Check the cut `releases/<version>` branch out into *output*.
+
+    Also records the commit the version tag points at in
+    ``<output>/.git/release_ref``, which is what the image is stamped with.
+    The app repositories are public, as is ``main_repo``'s unauthenticated
+    https URI, so the fetch needs no credentials.
+    """
+    script = "\n".join(
+        [
+            f'cp -a "$REPO/." {output}/',
+            f"cd {output}",
+            "git fetch --quiet origin"
+            ' "+refs/heads/releases/$VERSION:refs/remotes/origin/releases/$VERSION"'
+            ' "+refs/tags/$VERSION:refs/tags/$VERSION"',
+            'git checkout --quiet --force --detach "origin/releases/$VERSION"',
+            "git clean --quiet -fdx",
+            'git rev-list -n1 "$VERSION" > .git/release_ref',
+        ]
+    )
+    return TaskStep(
+        task=Identifier("checkout-release"),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[Input(name=main_repo.name)],
+            outputs=[Output(name=output)],
+            params={"REPO": str(main_repo.name), "VERSION": "((.:release_version))"},
+            run=Command(path="sh", args=["-euc", script]),
+        ),
+    )
+
+
+# Inlined into the Production job's check task, so the generated pipeline
+# carries the script itself rather than fetching it at run time. See the
+# script's docstring for why the check exists.
+_ASSERT_GATE_SCRIPT = (
+    Path(__file__).parent / "scripts" / "assert_gate_names_deploy.py"
+).read_text()
+ASSERT_GATE_TASK_NAME = "assert-gate-names-deploy"
+
+
+def _assert_gate_names_deploy_task(
+    app_name: str,
+    github_repo: str,
+    release_gate: Resource,
+    version_input: Resource,
+    infra_input: Identifier,
+) -> TaskStep:
+    """Fail the job unless the closed gate issue names what it deploys.
+
+    Accepts ``Release <app> <version>`` and ``Release <app> infrastructure @
+    <version>``, and requires ``<version>`` to equal the contents of
+    ``<version_input>/version``, which has to be the same file the job's
+    ``DOCKER_TAG`` comes from. The issue body's revision marker must also name
+    the ol-infrastructure commit in ``<infra_input>``, which has to resolve to
+    the same commit the job's Pulumi code get does. The gate get has already
+    tombstoned the issue, so a refused issue does not fire again. A failure
+    here means nothing deployed, which turns gate/deploy drift into a red build
+    instead of an unapproved release.
+    """
+    return TaskStep(
+        task=Identifier(ASSERT_GATE_TASK_NAME),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[
+                Input(name=release_gate.name),
+                Input(name=version_input.name),
+                Input(name=infra_input),
+            ],
+            params={
+                "APP_NAME": app_name,
+                "GATE_FILE": f"{release_gate.name}/gh_issue.json",
+                "VERSION_FILE": f"{version_input.name}/version",
+                "INFRA_REF_FILE": f"{infra_input}/.git/ref",
+                "GITHUB_REPOSITORY": github_repo,
+                "GITHUB_APP_ID": GITHUB_APP_ID,
+                "GITHUB_APP_INSTALLATION_ID": GITHUB_APP_INSTALLATION_ID,
+                "GITHUB_APP_PRIVATE_KEY": GITHUB_APP_PRIVATE_KEY,
+            },
+            run=Command(path="python3", args=["-c", _ASSERT_GATE_SCRIPT]),
+        ),
+    )
+
+
+_CLASSIFY_SCRIPT = (
+    Path(__file__).parent / "scripts" / "classify_promotion.py"
+).read_text()
+CLASSIFY_TASK_NAME = "classify-promotion"
+PROMOTION_DIR = "promotion"
+CACHE_BUST_TASK_NAME = "cache-bust"
+CACHE_BUST_DIR = "cache-bust"
+
+
+def _cache_bust_task() -> TaskStep:
+    """Write a value that differs on every build, to defeat Concourse's get cache.
+
+    Concourse caches a ``get`` by resource, version and params, and what
+    Production is running is not part of the release resource's version, so a
+    repeated get of the same release would return the Production version it
+    first saw. A get that passes this value in ``cache_bust`` runs ``in`` again.
+    """
+    return TaskStep(
+        task=Identifier(CACHE_BUST_TASK_NAME),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            outputs=[Output(name=Identifier(CACHE_BUST_DIR))],
+            params={"OUTPUT_DIR": CACHE_BUST_DIR},
+            run=Command(
+                path="sh",
+                args=["-euc", 'date +%s%N > "$OUTPUT_DIR/value"'],
+            ),
+        ),
+    )
+
+
+def _classify_promotion_task(
+    app_name: str,
+    release_res: Resource,
+    current_release: Identifier,
+    pulumi_resource: Resource,
+    pulumi_code: Resource,
+) -> TaskStep:
+    """Compose the release issue's title and body from the Production preview.
+
+    *pulumi_code* is the ol-infrastructure checkout the preview ran from; its
+    commit goes into the body for the Production job to check.
+    """
+    return TaskStep(
+        task=Identifier(CLASSIFY_TASK_NAME),
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[
+                Input(name=release_res.name),
+                Input(name=current_release),
+                Input(name=pulumi_resource.name),
+                Input(name=pulumi_code.name),
+            ],
+            outputs=[Output(name=Identifier(PROMOTION_DIR))],
+            params={
+                "APP_NAME": app_name,
+                "VERSION_FILE": f"{release_res.name}/version",
+                "PRODUCTION_VERSION_FILE": f"{current_release}/production_version",
+                "PRODUCTION_STATE_FILE": f"{current_release}/production_state",
+                "CHECKLIST_FILE": f"{release_res.name}/checklist.md",
+                "PREVIEW_SUMMARY_FILE": (
+                    f"{pulumi_resource.name}/{PREVIEW_SUMMARY_FILENAME}"
+                ),
+                "NO_CHANGES_MARKER_FILE": (
+                    f"{pulumi_resource.name}/{PREVIEW_NO_CHANGES_MARKER}"
+                ),
+                "INFRA_REF_FILE": f"{pulumi_code.name}/.git/ref",
+                "INFRA_REPO_URL": pulumi_code.source["uri"],
+                "OUTPUT_DIR": PROMOTION_DIR,
+            },
+            run=Command(path="python3", args=["-c", _CLASSIFY_SCRIPT]),
+        ),
+    )
+
+
+_SUPERSEDE_SCRIPT = (
+    Path(__file__).parent / "scripts" / "supersede_gate_issues.py"
+).read_text()
+SUPERSEDE_TASK_NAME = "supersede-gate-issues"
+
+
+def _supersede_gate_issues_task(
+    app_name: str, github_repo: str, release_issue: Resource
+) -> TaskStep:
+    """Close, and label ``abandoned``, every open gate issue but the one just posted.
+
+    Runs after the release issue put, so the comment on each superseded issue
+    can name the issue that replaced it. See the script's docstring for which
+    issues count. Retried, because it is what keeps a stale issue from being
+    closed by mistake, and not wrapped in a ``try``: a failure is red.
+    """
+    return TaskStep(
+        task=Identifier(SUPERSEDE_TASK_NAME),
+        attempts=3,
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[
+                Input(name=Identifier(PROMOTION_DIR)),
+                Input(name=release_issue.name),
+            ],
+            params={
+                "APP_NAME": app_name,
+                "GITHUB_REPOSITORY": github_repo,
+                "PROMOTION_DIR": PROMOTION_DIR,
+                "ISSUE_FILE": f"{release_issue.name}/gh_issue.json",
+                "GITHUB_APP_ID": GITHUB_APP_ID,
+                "GITHUB_APP_INSTALLATION_ID": GITHUB_APP_INSTALLATION_ID,
+                "GITHUB_APP_PRIVATE_KEY": GITHUB_APP_PRIVATE_KEY,
+            },
+            run=Command(path="python3", args=["-c", _SUPERSEDE_SCRIPT]),
+        ),
+    )
+
+
+def _preview_production_step(
+    pulumi_resource: Resource,
+    pulumi_code: Resource,
+    docker_tag_env: str,
+    *,
+    refresh_stack: bool,
+) -> PutStep:
+    """Preview the Production stack at the image tag it would deploy.
+
+    Fail-closed, unlike the retired ``preview_next_stack``: the preview is the
+    content of the gate issue, so one that fails fails the job and no issue is
+    posted. It takes the Production stack lock, which is why the QA and
+    Production jobs share a serial group.
+    """
+    return PutStep(
+        put=pulumi_resource.name,
+        inputs="all",
+        no_get=False,
+        get_params={
+            "summary_file": PREVIEW_SUMMARY_FILENAME,
+            "read_outputs": False,
+            "preview_stack": "Production",
+        },
+        params={
+            "env_os": {
+                "AWS_DEFAULT_REGION": "us-east-1",
+                "PYTHONPATH": f"/usr/lib/:/tmp/build/put/{pulumi_code.name}/src/",
+                "GITHUB_TOKEN": "((github.public_repo_access_token))",
+                docker_tag_env: "((.:image_tag))",
+            },
+            "stack_name": "Production",
+            "preview": True,
+            "env_vars_from_files": {},
+            **({"refresh_stack": False} if not refresh_stack else {}),
+        },
+    )
 
 
 def _build_release_image_job(
@@ -1070,10 +1401,17 @@ def _build_release_image_job(
     build_target: str | None = None,
     sentry_sourcemaps: SentrySourcemapsConfig | None = None,
 ) -> Job:
-    """Generate an image build job triggered by the release resource.
+    """Generate the release image build job for an app.
+
+    Nothing schedules this job: the release bot checks the release resource
+    and then triggers the job explicitly, and a hotfix takes the same path
+    with the commit to cherry-pick carried in the resource's ``hotfix`` file,
+    since triggering a job carries no parameters.  Checking the resource does
+    not start a build, and neither does a `put` to it -- see the comment on
+    the first get for why that matters.
 
     This job:
-    1. Gets the release resource (trigger) and main repo source.
+    1. Gets the release resource and main repo source.
     2. Bumps the version in the app source using bumpver.
     3. Creates the release commit, branch, and tag via the release resource.
     4. Builds and pushes a versioned Docker image to DockerHub and ECR.
@@ -1083,12 +1421,19 @@ def _build_release_image_job(
     additional_build_params = {}
     if build_target:
         additional_build_params = {"TARGET": build_target}
+    # OUTPUT_OCI keeps zstd layers inherited from the DHI-hardened base
+    # labeled as zstd; see _build_image_job_legacy and
+    # mitodl/ol-infrastructure#5714. Skipped when uploading source maps,
+    # because oci-build-task's OCI output ignores UNPACK_ROOTFS.
+    if sentry_sourcemaps is None:
+        additional_build_params["OUTPUT_OCI"] = "true"
 
     # UNPACK_ROOTFS lets the upload step read the maps out of the built image.
     sourcemap_build_params = {"UNPACK_ROOTFS": "true"} if sentry_sourcemaps else {}
 
     put_params: dict[str, Any] = {
-        "image": "image/image.tar",
+        # Directory, not image.tar, whenever OUTPUT_OCI was set above.
+        "image": "image/image" if sentry_sourcemaps is None else "image/image.tar",
         # Use the version file as additional_tags so the calver tag is pushed
         # without triggering the registry-image resource's semver validation
         # (which rejects 4-part calver strings like 2026.6.15.1).
@@ -1097,25 +1442,46 @@ def _build_release_image_job(
         "additional_tags": f"{release_res.name}/version",
     }
 
+    release_source = Identifier("release-source")
     plan = [
-        GetStep(get=release_res.name, trigger=True),
+        # Deliberately not `trigger: true`. A `put` publishes a version of the
+        # resource, and Concourse schedules on a version it has not seen
+        # before whether that version came from a check or from a put. This
+        # job's own `action: create` put, the `action: finish` put at the end
+        # of deploy-production, and the `action: abandon` put therefore all
+        # re-triggered this job, each carrying the version just released:
+        #
+        #   create   the cut no-ops against the matching tag, but the image is
+        #            still rebuilt and re-pushed, and a digest differing from
+        #            the first build carries it back through the deploy chain
+        #   finish   fails, because the release branch has been merged back and
+        #            the commit a re-cut would tag is now the merge commit
+        #            ("Tag X already exists at <sha>, which does not match the
+        #            commit being released")
+        #   abandon  deletes the branch and the tag, so the re-cut finds no tag,
+        #            succeeds, and resurrects the abandoned release
+        #
+        # Nothing is lost by dropping the trigger. Concourse checks the
+        # resource on its own only to repair a fresh version history (see
+        # _define_release_resources), there is no webhook, and the release bot
+        # starts a release by checking the resource over the API and then
+        # triggering this job explicitly (see release_bot.bot._release), so
+        # the trigger could only ever fire on a put, on that repair, or race
+        # the bot's own build.
+        GetStep(get=release_res.name, trigger=False),
         GetStep(get=main_repo.name, trigger=False),
         LoadVarStep(
             load_var="release_version",
             file=f"{release_res.name}/version",
             reveal=True,
         ),
-        # The release resource's "create" out-action tags the pre-bumpver HEAD SHA
-        # as the release (see ol-concourse resources/release/README.md): it records
-        # main_repo's current HEAD *before* running bump_version_task, then commits
-        # the version bump separately. Capture git_ref from main_repo here -- before
-        # bump_version_task mutates the checkout -- so the built image is stamped
-        # with the exact commit the release tag points to. The release resource
-        # itself never writes a .git/ref file (only version/commits.json/
-        # checklist.md/changelog_entry.md), so loading it from there would fail.
+        # The commit a hotfix cherry-picks onto production, or empty for a
+        # normal release. The release resource's check sets it while a
+        # `hotfix/<sha>` request tag is pending, which is how `/doof hotfix`
+        # gets a SHA to a job whose trigger carries no parameters.
         LoadVarStep(
-            load_var="git_ref",
-            file=f"{main_repo.name}/.git/ref",
+            load_var="hotfix",
+            file=f"{release_res.name}/hotfix",
             reveal=True,
         ),
         bump_version_task(
@@ -1128,13 +1494,29 @@ def _build_release_image_job(
                 "action": "create",
                 "repo_dir": str(main_repo.name),
                 "version_file": f"{release_res.name}/version",
+                "commit_hash": "((.:hotfix))",
             },
         ),
+        # Build from the cut release, not from main_repo. A hotfix is
+        # production plus one commit, which main_repo does not hold, and
+        # Concourse does not document a put writing back to its inputs, so the
+        # put's checkout is not something later steps can rely on. For a normal
+        # release, releases/<version> is the tree main_repo holds after
+        # bump_version_task, unless main moved between the get and the put, in
+        # which case the branch is what was actually tagged.
+        _checkout_release_task(main_repo, release_source),
+        # The commit the version tag points at: the pre-bump HEAD for a normal
+        # release, the cherry-picked commit for a hotfix.
+        LoadVarStep(
+            load_var="git_ref",
+            file=f"{release_source}/.git/release_ref",
+            reveal=True,
+        ),
         container_build_task(
-            inputs=[Input(name=main_repo.name)],
+            inputs=[Input(name=release_source)],
             build_parameters={
-                "CONTEXT": main_repo.name,
-                "DOCKERFILE": f"{main_repo.name}/{dockerfile_path}",
+                "CONTEXT": str(release_source),
+                "DOCKERFILE": f"{release_source}/{dockerfile_path}",
                 "BUILD_ARG_GIT_REF": "((.:git_ref))",
                 # Some Dockerfiles (e.g. ol-analytics-api) declare ARG GIT_SHA
                 # instead of the GIT_REF convention above; pass both so either
@@ -1147,7 +1529,7 @@ def _build_release_image_job(
             },
             build_args=[],
         ),
-        _ensure_ecr_repository_step(ecr_registry_image_resource),
+        *_ensure_ecr_repository_step(ecr_registry_image_resource),
         PutStep(put=dockerhub_registry_image_resource.name, params=put_params),
         PutStep(put=ecr_registry_image_resource.name, params=put_params),
     ]
@@ -1167,6 +1549,7 @@ def _build_abandon_release_job(
     app_name: str,
     main_repo: Resource,
     release_res: Resource,
+    release_issue: Resource,
 ) -> Job:
     """Generate a manually-triggered job that abandons an in-flight release.
 
@@ -1174,6 +1557,13 @@ def _build_abandon_release_job(
     from the remote so that the next ``check`` sees no in-flight release and
     recomputes the next version normally.  Use it when a release was cut but
     must be cancelled before it reaches production.
+
+    It then labels the release's gate issue ``abandoned`` and closes it. That
+    label is what ``release_gate``'s ``skip_if_labeled`` looks for; without
+    it the open issue outlives the release it names, and closing it later
+    would deploy a version whose branch and tag are gone.  The issue step runs
+    only after the release put succeeds, so a refused abandon (a version that
+    is not in flight) leaves its issue alone.
     """
     return Job(
         name=Identifier(f"abandon-{app_name}-release"),
@@ -1181,12 +1571,25 @@ def _build_abandon_release_job(
         plan=[
             GetStep(get=release_res.name, trigger=False),
             GetStep(get=main_repo.name, trigger=False),
+            LoadVarStep(
+                load_var="abandoned_version",
+                file=f"{release_res.name}/version",
+                reveal=True,
+            ),
             PutStep(
                 put=release_res.name,
                 params={
                     "action": "abandon",
                     "repo_dir": str(main_repo.name),
                     "version_file": f"{release_res.name}/version",
+                },
+                no_get=True,
+            ),
+            PutStep(
+                put=release_issue.name,
+                params={
+                    "title_template": f"Release {app_name} ((.:abandoned_version))",
+                    "close_with_labels": ["abandoned"],
                 },
                 no_get=True,
             ),
@@ -1225,6 +1628,7 @@ def _build_release_resource_app_pipeline(
             fastly_domains=pipeline_parameters.fastly_domains,
         )
 
+    github_repo = pipeline_parameters.github_repo or f"mitodl/{app_name}"
     (
         release_res,
         release_gate,
@@ -1233,7 +1637,7 @@ def _build_release_resource_app_pipeline(
         deployment_prod,
     ) = _define_release_resources(
         app_name=app_name,
-        github_repo=pipeline_parameters.github_repo or f"mitodl/{app_name}",
+        github_repo=github_repo,
         repo_main_branch=pipeline_parameters.repo_main_branch,
     )
 
@@ -1259,6 +1663,7 @@ def _build_release_resource_app_pipeline(
         app_name=app_name,
         main_repo=main_repo,
         release_res=release_res,
+        release_issue=release_issue,
     )
 
     ci_post_steps: list[GetStep | PutStep | TaskStep] = []
@@ -1301,19 +1706,79 @@ def _build_release_resource_app_pipeline(
     )
 
     # Build per-stack additional_post_steps and custom_dependencies for QA+Production
+    project_name = f"ol-application-{app_name}"
+    docker_tag_env = f"{app_name.replace('-', '_').upper()}_DOCKER_TAG"
+    release_current = Identifier(f"{app_name}-release-current")
+    # The ol-infra commit Production deploys, fetched again under its own name
+    # so the gate check can read it before anything deploys: pulumi_job puts
+    # its own code get after every dependency. Both gets take ol-infra with
+    # `passed:` QA, as do the release and image gets. Concourse pins inputs
+    # that share a `passed:` job to the outputs of one build of that job and
+    # rejects any build whose version differs, so the two gets name the same
+    # commit.
+    infra_revision = Identifier(f"{ol_infra_repo.name}-revision")
+    qa_job_name = f"deploy-{project_name}-qa"
     qa_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
-        # Open a GitHub Release Issue with the checklist from the release resource.
-        # title_template embeds the release version (via the image_tag var
-        # loaded from release_res earlier in this job's plan) so each release
-        # gets its own distinct issue title instead of every version
-        # colliding on "Release {app_name}" -- Concourse resolves
-        # ((.:image_tag)) to a plain string before the resource ever sees it.
+        # Preview Production at the tag it would deploy, then fold that diff
+        # and the app checklist into one release issue, so a single approval
+        # covers everything the Production deploy would change. See
+        # _preview_production_step: this fails the job rather than posting a
+        # gate that does not show the diff.
+        _preview_production_step(
+            pulumi_resource,
+            ol_infra_repo,
+            docker_tag_env,
+            refresh_stack=pipeline_parameters.refresh_stack,
+        ),
+        # What Production is running has to be current, not whatever the first
+        # get of this release version wrote: see _cache_bust_task.
+        _cache_bust_task(),
+        LoadVarStep(
+            load_var="cache_bust",
+            file=f"{CACHE_BUST_DIR}/value",
+            reveal=True,
+        ),
+        GetStep(
+            get=release_current,
+            resource=release_res.name,
+            params={"cache_bust": "((.:cache_bust))"},
+        ),
+        _classify_promotion_task(
+            app_name, release_res, release_current, pulumi_resource, ol_infra_repo
+        ),
+        # Open (or update) the GitHub Release Issue. The title names the
+        # version it ships, or the live version for an infrastructure-only
+        # promotion, so each gets its own issue instead of every one colliding
+        # on "Release {app_name}" -- Concourse resolves ((.:promotion_title))
+        # to a plain string before the resource ever sees it. The skip marker
+        # is written when there is nothing to approve, and the put then posts
+        # nothing at all rather than closing an issue that approves something.
+        #
+        # release_tag is the version for a new release and empty for an
+        # infrastructure-only one. Until a newer release is built, this job
+        # still carries the last cut version, including an abandoned one, and
+        # the put searches only open issues, so it would open a gate issue for
+        # a release whose branch and tag are gone. The tag rather than the
+        # branch, which a finished release has lost too: see
+        # classify_promotion.py.
+        LoadVarStep(
+            load_var="promotion_title",
+            file=f"{PROMOTION_DIR}/title",
+            reveal=True,
+        ),
+        LoadVarStep(
+            load_var="release_tag",
+            file=f"{PROMOTION_DIR}/release_tag",
+            reveal=True,
+        ),
         PutStep(
             put=release_issue.name,
             params={
-                "body_file": f"{release_res.name}/checklist.md",
+                "body_file": f"{PROMOTION_DIR}/body.md",
                 "labels": ["release"],
-                "title_template": f"Release {app_name} ((.:image_tag))",
+                "title_template": "((.:promotion_title))",
+                "skip_if_file": f"{PROMOTION_DIR}/skip",
+                "skip_if_tag_missing": "((.:release_tag))",
             },
         ),
         # Mark the RC GitHub Deployment as successful.
@@ -1327,13 +1792,18 @@ def _build_release_resource_app_pipeline(
         ),
     ]
     prod_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
-        # Mark the Production GitHub Deployment as successful.
+        # Mark the Production GitHub Deployment as successful, and say so on the
+        # release issue. Closing that issue authorizes the promotion; it does
+        # not show the release is live, and a closed issue is easy to misread as
+        # "shipped". The comment links the Deployment, which is what records
+        # what is live. The gate's get already put gh_issue.json in the job.
         PutStep(
             put=deployment_prod.name,
             params={
                 "action": "finish",
                 "deployment_file": f"{deployment_prod.name}/deployment.json",
                 "state": "success",
+                "comment_on_issue_file": f"{release_gate.name}/gh_issue.json",
             },
         ),
         # Merge the release branch back into the main branch and delete it so
@@ -1341,10 +1811,10 @@ def _build_release_resource_app_pipeline(
         #
         # Deliberately NOT wrapped in a `try`. It used to be, because this job
         # can be retriggered by an infra-only merge (QA re-runs on any change
-        # under the watched Pulumi paths, and its release_issue put edits the
-        # already-closed release_gate issue, which Concourse's version="every"
-        # get treats as a new trigger here) with no new app release -- and
-        # finish then failed trying to fetch a release branch that a prior
+        # under the watched Pulumi paths and opens a fresh release_gate issue
+        # for the same version once the earlier one is closed; closing that
+        # one is a new trigger for Concourse's version="every" get here) with
+        # no new app release -- and finish then failed trying to fetch a release branch that a prior
         # finish had already deleted. The release resource now no-ops in that
         # case instead of failing, so the `try` buys nothing and costs
         # everything: it equally swallowed *genuine* finish failures. That is
@@ -1373,16 +1843,31 @@ def _build_release_resource_app_pipeline(
         additional_post_steps[1].append(
             PutStep(put=fastly_prod.name, params=purge_params, no_get=True)
         )
+    # Last in QA, after the RC deployment is marked and the cache purged, so
+    # a GitHub failure here leaves the job red without misreporting either.
+    additional_post_steps[0].append(
+        _supersede_gate_issues_task(app_name, github_repo, release_issue)
+    )
 
     # QA and Production Deployments
     qa_and_production_fragment = pulumi_jobs_chain(
         refresh_stack=pipeline_parameters.refresh_stack,
         pulumi_code=ol_infra_repo,
         stack_names=["QA", "Production"],
-        project_name=f"ol-application-{app_name}",
+        project_name=project_name,
         project_source_path=(
             f"src/ol_infrastructure/applications/{app_name.replace('-', '_')}"
         ),
+        # The QA job previews Production, which takes the Production stack
+        # lock; lock recovery will not cancel a lock under 15 minutes old, so
+        # without a shared group a live preview would fail a real deploy.
+        serial_groups={
+            0: [
+                stack_serial_group(project_name, "QA"),
+                stack_serial_group(project_name, "Production"),
+            ],
+            1: [stack_serial_group(project_name, "Production")],
+        },
         additional_post_steps=additional_post_steps,
         dependencies=[
             GetStep(
@@ -1422,6 +1907,18 @@ def _build_release_resource_app_pipeline(
             ],
             1: [
                 GetStep(get=release_gate.name, trigger=True, version="every"),
+                GetStep(
+                    get=infra_revision,
+                    resource=ol_infra_repo.name,
+                    trigger=False,
+                    passed=[qa_job_name],
+                ),
+                # Before the deployment record or the deploy itself: the
+                # issue that fired must name the version and the ol-infra
+                # commit being deployed.
+                _assert_gate_names_deploy_task(
+                    app_name, github_repo, release_gate, release_res, infra_revision
+                ),
                 # main_repo is needed by the action=finish post-step.
                 GetStep(
                     get=main_repo.name,
@@ -1523,11 +2020,20 @@ if __name__ == "__main__":
     if not app_name:
         msg = "Please provide an app name as a command line argument."
         raise ValueError(msg)
+    built_pipeline = build_app_pipeline(app_name=app_name)
+    app_params = pipeline_params.get(app_name)
+    output = pipeline_json_with_user_data(
+        built_pipeline,
+        user_data={
+            "description": (app_params.description if app_params else "")
+            or f"Builds `{app_name}` and deploys it to Kubernetes via Pulumi.",
+            "team": "infrastructure",
+            "category": app_params.category if app_params else "applications",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(
-            build_app_pipeline(app_name=app_name).model_dump_json(indent=2)
-        )
-    sys.stdout.write(build_app_pipeline(app_name=app_name).model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     # Note: The pipeline name generated below might need adjustment
     # if the app_name changes the resulting pipeline identifier.
     pipeline_name = f"docker-pulumi-{app_name}"

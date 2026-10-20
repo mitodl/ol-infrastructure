@@ -230,7 +230,7 @@ The gateway service is configured as type `LoadBalancer` to provision an AWS NLB
     "service": {  # Changed from "gateway" to "service" (correct helm chart key)
         "type": "LoadBalancer",
         "annotations": {
-            "external-dns.alpha.kubernetes.io/hostname": "<comma-separated-domains>",
+            "external-dns.kubernetes.io/hostname": "<comma-separated-domains>",
             "service.beta.kubernetes.io/aws-load-balancer-name": "applications-ci-apisix",
             "service.beta.kubernetes.io/aws-load-balancer-type": "external",
             "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
@@ -485,8 +485,28 @@ aws elbv2 describe-target-health \
 The external-dns controller automatically creates DNS records for all domains listed in the service annotation:
 
 ```yaml
-external-dns.alpha.kubernetes.io/hostname: "domain1.com,domain2.com,..."
+external-dns.kubernetes.io/hostname: "domain1.com,domain2.com,..."
 ```
+
+#### Annotation prefix
+
+⚠️ **Use only the GA `external-dns.kubernetes.io/` prefix.** external-dns v0.22.0
+changed the default annotation prefix from `external-dns.alpha.kubernetes.io/` to
+`external-dns.kubernetes.io/` **with no fallback**, so an `alpha` annotation is
+ignored. Upstream's release note for that version says the change "can _delete_
+**all** your DNS records."
+
+We run `--policy=sync`, which means external-dns deletes records it owns once they
+leave the desired set. A resource annotated with a prefix the running version does
+not read drops out of the desired set, and its records are deleted.
+
+This is not hypothetical. On 2026-09-14 the chart bump to 1.22.0 (app v0.22.0) met
+annotations that carried only the alpha prefix and put 8 of 12 clusters into a queued
+plan of 440+ pure deletions per cluster, including production Open edX hostnames.
+Nothing was destroyed only by luck: an unrelated `InvalidChangeBatch` error on the
+`a-`/`cname-` ownership-TXT migration made every Route53 batch invalid. We bridged the
+upgrade by writing both prefixes, then dropped the alpha keys once every cluster was
+on v0.23.0.
 
 **Expected Domains (CI environment):**
 - `api-pay-ci.ol.mit.edu`
@@ -587,6 +607,40 @@ Current configuration:
 
 Adjust based on traffic patterns and number of routes.
 
+### Vestigial etcd Artifacts (do not delete, do not read as live config)
+
+⚠️ **The chart still emits etcd scaffolding even though `etcd.enabled: False`.** None of it is
+wired to a real etcd — APISIX runs `role_traditional.config_provider: yaml` and never reads these
+values — but all three artifacts are present in every cluster and are Helm-managed:
+
+| Artifact | What it looks like | Why it is there |
+|---|---|---|
+| `etcd:` block in the `apache-apisix` ConfigMap | `host: - "http://etcd.host:2379"`, `user: "root"`, `password: "${{ APISIX_ETCD_PASSWORD }}"` | Chart templates the full `config.yaml` unconditionally. `etcd.host` is the upstream **placeholder default**, not an endpoint we ever ran. |
+| `etcd-apache-apisix` Secret (key `etcd-root-password`) | `app.kubernetes.io/managed-by: Helm` | Created by the chart alongside the release. |
+| `APISIX_ETCD_PASSWORD` env var on the `apache-apisix` Deployment | `secretKeyRef` -> the Secret above | Templated by the chart regardless of `etcd.enabled`. |
+
+**Do not delete the Secret.** The Deployment references it via `secretKeyRef`, so removing it puts
+new pods into `CreateContainerConfigError` on the next restart or rollout. The env var and the
+ConfigMap block are equally untouchable without overriding the chart's own templates.
+
+**Do not read the `etcd:` block as evidence of a live etcd.** There is no etcd StatefulSet, Service,
+or pod in any cluster. In September 2026 this block was misread as a live endpoint, producing a
+cleanup ticket whose stated premise ("APISIX etcd migrated from `ebs-gp3-sc` to `efs-sc`") was wrong
+— etcd was never migrated, it was removed outright in the October 2025 standalone cutover. The
+`data-apisix-etcd-{0,1,2}` PVCs left behind in `operations` across five clusters were leftovers of
+the pre-cutover StatefulSet and were deleted in September 2026.
+
+To confirm the current state rather than trusting the ConfigMap:
+
+```bash
+# Expect: no resources
+kubectl --context $CTX -n operations get sts,svc,pods | grep -i etcd
+
+# Expect: yaml
+kubectl --context $CTX -n operations get cm apache-apisix \
+  -o jsonpath='{.data.config\.yaml}' | grep -A2 role_traditional
+```
+
 ### Blue-Green Migration
 
 This deployment supports separate domains via `apisix_official_domains` config key, allowing gradual migration from the Bitnami chart deployment.
@@ -671,7 +725,7 @@ Before deploying or when troubleshooting, verify these critical settings:
     "annotations": {
         "service.beta.kubernetes.io/aws-load-balancer-type": "external",
         "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
-        "external-dns.alpha.kubernetes.io/hostname": "<domains>",
+        "external-dns.kubernetes.io/hostname": "<domains>",
         # ... other AWS annotations
     },
 }

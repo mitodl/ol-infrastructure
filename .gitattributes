@@ -1,6 +1,5 @@
 poetry.lock binary linguist-generated
 yarn.lock binary linguist-generated
-requirements.txt binary linguist-generated
 black.lockfile binary linguist-generated
 build-support-bin.lockfile binary linguist-generated
 flake8.lockfile binary linguist-generated

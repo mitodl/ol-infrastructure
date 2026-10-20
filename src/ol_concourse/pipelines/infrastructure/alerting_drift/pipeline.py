@@ -53,6 +53,7 @@ from ol_concourse.lib.models.pipeline import (
 from ol_concourse.lib.resources import git_repo, schedule
 
 from ol_concourse.pipelines.constants import ECR_REGION, dockerhub_ecr_image_uri
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 GITHUB_REPOSITORY = "mitodl/ol-infrastructure"
 GITHUB_APP_ID_VAULT_PATH = "((github.drift_pr_app_id))"
@@ -190,9 +191,23 @@ def alerting_drift_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
-    definition_json = alerting_drift_pipeline().model_dump_json(indent=2)
+    output = pipeline_json_with_user_data(
+        alerting_drift_pipeline(),
+        user_data={
+            "description": (
+                "Nightly job that asserts live Sentry metric alert rules, Sentry "
+                "client-key ingest health, Rootly route rules, and Grafana "
+                "contact-point delivery state against expectations recorded in "
+                "`bin/alerting-drift-check`, and opens or updates a pull request "
+                "with the diff when the report changes. Findings are not applied "
+                "automatically -- reconciling one is a human call."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(definition_json)
-    sys.stdout.write(definition_json)
+        definition.write(output)
+    sys.stdout.write(output)
     print()  # noqa: T201
     print("fly -t pr-inf sp -p alerting-drift -c definition.json")  # noqa: T201

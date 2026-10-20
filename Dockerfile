@@ -1,7 +1,9 @@
 FROM ghcr.io/astral-sh/uv:debian-slim as build
 ENV DEBIAN_FRONTEND=non-interactive
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install --no-install-recommends -y git && apt-get clean && rm -r /var/lib/apt/lists/* && \
     useradd -m app && mkdir /home/app/workspace && chown app:app /home/app/workspace
+# hadolint ignore=DL3066
 USER app
 WORKDIR /home/app/workspace
 ENV PATH /bin:/usr/bin/:/usr/local/bin:/home/app/.local/bin
@@ -14,5 +16,6 @@ COPY --from=build /home/app/workspace/pyproject.toml /opt/ol-infrastructure/
 COPY --from=build /home/app/workspace/uv.lock /opt/ol-infrastructure/
 COPY --from=build /home/app/workspace/README.md /opt/ol-infrastructure/
 COPY --from=build /home/app/workspace/sdks /opt/ol-infrastructure/sdks
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install --no-install-recommends -y git && apt-get clean && rm -r /var/lib/apt/lists/* && \
     pip install --no-cache-dir /tmp/*.whl

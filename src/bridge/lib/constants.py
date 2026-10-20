@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from ipaddress import IPv4Address
 
 FASTLY_CNAME_TLS_1_2 = "d.sni.global.fastly.net"
@@ -22,6 +23,36 @@ FASTLY_A_TLS_1_3 = [
 # behind in its users' browsers; see ``stale_session_cookie_cleanup_plugin`` in
 # ol_infrastructure.components.services.apisix for how they get evicted.
 DEFAULT_OIDC_SESSION_COOKIE_NAME = "session"  # pragma: allowlist secret
+
+
+# The request headers APISIX's openid-connect plugin mints once it holds a
+# verified session.  They are assertions the gateway makes about the caller, so
+# a copy arriving from a client is always a forgery -- mitol-apigateway's
+# middleware authenticates off X-Userinfo without asking where it came from.
+# The plugin clears inbound copies itself, but only on the routes it is
+# attached to; see ``gateway_global_pre_function_plugin`` in
+# ol_infrastructure.components.services.apisix for the cluster-wide rule that
+# covers the rest.
+#
+# This is openid-connect.lua's own clear-then-set list (3.18.0, lines 1174-1177
+# and 1482-1500) minus one entry.  X-Access-Token is *not* here even though the
+# plugin sets it: Tika's route uses that header name for a client-supplied
+# shared secret (applications/tika/__main__.py) which mit-learn sends on every
+# extraction request, and no application reads it as an identity claim.
+# Authorization is out for the same reason, on a much larger scale -- it carries
+# real API credentials on most of the fleet.
+#
+# Dash spellings only.  The underscore alias of each (``X_Userinfo``) has to be
+# cleared too -- APISIX runs nginx with ``underscores_in_headers on`` and Django
+# folds both spellings onto the same ``HTTP_X_USERINFO`` -- but that is a
+# transport alias of the same header rather than a header of its own, so the
+# Lua derives it instead of it being listed here twice.
+GATEWAY_IDENTITY_HEADERS = (
+    "X-Userinfo",
+    "X-ID-Token",
+    "X-Raw-ID-Token",
+    "X-Refresh-Token",
+)
 
 
 def apisix_oidc_session_cookie_name(application: str, env_suffix: str) -> str:
@@ -98,3 +129,37 @@ def mit_learn_session_cookie_name(env_suffix: str) -> str:
     :rtype: str
     """
     return apisix_oidc_session_cookie_name("mitlearn", env_suffix)
+
+
+# The fields of a Keycloak client's credentials in Vault
+# (secret-operations/sso/<client>) that the openid-connect plugin needs. `url`
+# is the realm URL (<keycloak>/realms/<realm>), not Keycloak's base URL: the
+# discovery document hangs off the realm.
+OIDC_VAULT_FIELDS = ("client_id", "client_secret", "realm_name", "url", "secret")
+
+
+def oidc_secret_data(
+    vault_fields: Mapping[str, str], *, include_session_secret: bool
+) -> dict[str, str]:
+    """Return the keys APISIX's openid-connect plugin reads from its ``secretRef``.
+
+    Given VSO template expressions for ``OIDC_VAULT_FIELDS`` it returns the
+    templates VSO renders the Secret from; given the fields' values it returns
+    the Secret's data. The values have to be plain strings: resolve Pulumi
+    Outputs first (inside an ``apply``), or the f-string below formats the
+    Output object instead of its value.
+
+    :param vault_fields: Each name in ``OIDC_VAULT_FIELDS`` mapped to its value.
+    :param include_session_secret: Add ``session.secret``, the key
+        lua-resty-session encrypts the session cookie with.
+    :returns: Plugin config keys mapped to their values.
+    """
+    data = {
+        "client_id": vault_fields["client_id"],
+        "client_secret": vault_fields["client_secret"],
+        "realm": vault_fields["realm_name"],
+        "discovery": f"{vault_fields['url']}/.well-known/openid-configuration",
+    }
+    if include_session_secret:
+        data["session.secret"] = vault_fields["secret"]
+    return data

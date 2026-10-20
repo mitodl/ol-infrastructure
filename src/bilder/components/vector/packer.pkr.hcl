@@ -15,6 +15,9 @@ source "amazon-ebs" "vector" {
   ami_virtualization_type = "hvm"
   force_deregister        = true
   instance_type           = "t3a.medium"
+  # Temporary mitigation for GHSA-r374-rxx8-8654 / CVE-2026-44405: use an
+  # Ed25519 session key so pyinfra's Paramiko SSH auth does not rely on RSA.
+  temporary_key_pair_type = "ed25519"
   run_volume_tags = {
     OU      = "${local.business_unit}"
     app     = "${local.app_name}"

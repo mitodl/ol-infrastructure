@@ -10,7 +10,6 @@
 - Create autoscale groups for web and worker instances
 """
 
-import base64
 import json
 import textwrap
 from pathlib import Path
@@ -28,7 +27,6 @@ from pulumi import (
     ResourceOptions,
     export,
 )
-from pulumi.invoke import InvokeOptions
 from pulumi_aws import (
     ec2,
     get_caller_identity,
@@ -42,7 +40,6 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_MYSQL_PORT,
     DEFAULT_REDIS_PORT,
-    ONE_MEGABYTE_BYTE,
 )
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
@@ -50,6 +47,10 @@ from ol_infrastructure.applications.edxapp.k8s_resources import create_k8s_resou
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLMariaDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.fastly import (
+    OLFastlyTLS,
+    OLFastlyTLSConfig,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultDatabaseBackend,
     OLVaultMysqlDatabaseConfig,
@@ -57,14 +58,11 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
-from ol_infrastructure.lib.aws.route53_helper import (
-    fastly_certificate_validation_records,
-)
 from ol_infrastructure.lib.fastly import (
-    build_fastly_log_format_string,
     get_fastly_provider,
     vcl_snippet,
 )
+from ol_infrastructure.lib.fastly_logging import fastly_logging_args
 from ol_infrastructure.lib.ol_types import AWSBase, Services
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
@@ -110,15 +108,27 @@ EDXAPP_SENTRY_DSN_OUTPUTS = {
     "mitxonline": "openedx_mitxonline_sentry_dsn",
     "xpro": "openedx_mitxpro_sentry_dsn",
 }
-monitoring_stack = make_stack_reference(projects.MONITORING, "default")
-vector_log_proxy_stack = make_stack_reference(
-    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
-)
 mongodb_atlas_stack = make_stack_reference(
     projects.MONGODB_ATLAS, f"{stack_info.env_prefix}.{stack_info.name}"
 )
 notes_stack = make_stack_reference(
     projects.EDX_NOTES, f"{stack_info.env_prefix}.{stack_info.name}"
+)
+# Azure OpenAI is provisioned for the mitxonline deployment only, and only in
+# environments where infrastructure/azure/openai has been deployed -- a StackReference
+# to a stack that does not exist fails the whole preview, so the config switch is
+# needed as well as the env_prefix check.
+#
+# Both conditions are load-bearing. The wiring below reads the "mitxonline" key out of
+# the azure stack's workload_identities, so setting the flag on any other edxapp
+# deployment would hand it mitxonline's client id while its own ServiceAccount subject
+# does not match that identity's federated credential -- token exchange would fail
+# every time, at runtime, with AADSTS70021 and no deploy-time signal.
+azure_openai_stack = (
+    make_stack_reference(projects.AZURE_OPENAI, stack_info.name)
+    if edxapp_config.get_bool("enable_azure_openai")
+    and stack_info.env_prefix == "mitxonline"
+    else None
 )
 
 #############
@@ -662,21 +672,6 @@ edxapp_mysql_role_statements["edxapp-csmh"] = {
     "renew": [],
     "rollback": [],
 }
-edxapp_mysql_role_statements["xqueue"] = {
-    "create": [
-        Template("""CREATE DATABASE IF NOT EXISTS xqueue;"""),
-        Template("""CREATE USER '{{name}}'@'%' IDENTIFIED BY '{{password}}';"""),
-        Template(
-            """
-            GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, INDEX, DROP, ALTER, REFERENCES,
-            CREATE TEMPORARY TABLES, LOCK TABLES ON xqueue.* TO '{{name}}'@'%';
-            """
-        ),
-    ],
-    "revoke": [Template("DROP USER '{{name}}';")],
-    "renew": [],
-    "rollback": [],
-}
 edxapp_mysql_role_statements["notes"] = {
     "create": [
         Template("""CREATE DATABASE IF NOT EXISTS edx_notes_api;"""),
@@ -934,38 +929,27 @@ cms_backend_ssl_hostname = edxapp_config.require("backend_studio_domain")
 preview_backend_address = edxapp_config.require("backend_preview_domain")
 preview_backend_ssl_hostname = edxapp_config.require("backend_preview_domain")
 
-vector_log_proxy_secrets = read_yaml_secrets(
-    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
-)
-fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
-encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
-).decode("utf8")
-
-vector_log_proxy_domain = vector_log_proxy_stack.require_output(
-    "vector_log_proxy_domain"
-)
-
-fastly_access_logging_bucket = monitoring_stack.require_output(
-    "fastly_access_logging_bucket"
-)
-fastly_access_logging_iam_role = monitoring_stack.require_output(
-    "fastly_access_logging_iam_role"
-)
-
 
 mfe_regex = "^/({})/".format("|".join(edxapp_mfe_paths))
 
 # OEP-65 Site Project routing (optional, additive — legacy MFE rules are unchanged).
-# Set edxapp:site_project in the stack YAML with two keys:
+# Set edxapp:site_project in the stack YAML with these keys:
 #   deployment — the Site Project deployment name (e.g. mitxonline)
-#   mfe_apps   — list of MFE app path names served by this Site Project (e.g. instructor-dashboard)
+#   mfe_apps   — list of MFE app path names served by this Site Project under
+#                /apps/<name> (e.g. instructor-dashboard)
+#   root_apps  — optional list of MFE app path names served by this Site Project
+#                at /<name>, the path the legacy MFE used (e.g. gradebook). For
+#                module libraries that register absolute route paths, which
+#                cannot be nested under /apps.
 site_project_config = edxapp_config.get_object("site_project")
 site_project_deployment = (
     site_project_config.get("deployment") if site_project_config else None
 )
 site_project_mfe_apps: list[str] = (
     list(site_project_config.get("mfe_apps", [])) if site_project_config else []
+)
+site_project_root_apps: list[str] = (
+    list(site_project_config.get("root_apps", [])) if site_project_config else []
 )
 
 # When a Site Project is active, recv snippets tag matching requests with
@@ -986,6 +970,30 @@ if site_project_deployment:
         raise ValueError(msg)
     _sp = site_project_deployment
     _apps_alt = "|".join(site_project_mfe_apps)
+    # gradebook's "back to dashboard" link resolves to the Site Project's
+    # /apps/instructor-dashboard route, which only loads if Fastly serves it.
+    if (
+        "gradebook" in site_project_root_apps
+        and "instructor-dashboard" not in site_project_mfe_apps
+    ):
+        msg = (
+            "edxapp:site_project.root_apps lists gradebook, which requires "
+            "instructor-dashboard in edxapp:site_project.mfe_apps"
+        )
+        raise ValueError(msg)
+    # root_apps keep the legacy MFE's own path. This recv rewrite runs before the
+    # backend is chosen, so a listed path is served the Site Project's
+    # index.html instead of the legacy build in the MFE bucket.
+    _root_apps_branch = ""
+    if site_project_root_apps:
+        _root_alt = "|".join(site_project_root_apps)
+        _root_apps_branch = (
+            f' else if (req.url.path ~ "^/({_root_alt})(/|$)") {{\n'
+            '  set req.http.X-Site-Project = "1";\n'
+            f'  set req.url = "/{_sp}-site/index.html";\n'
+            "  unset req.http.Cookie;\n"
+            "}"
+        )
     _site_project_snippets.append(
         vcl_snippet(
             content=textwrap.dedent(
@@ -1000,7 +1008,8 @@ if site_project_deployment:
                   set req.url = "/{_sp}-site/index.html";
                   unset req.http.Cookie;
                 }}"""
-            ),
+            )
+            + _root_apps_branch,
             name="Handle Site Project routing",
             priority=90,
             type="recv",
@@ -1083,7 +1092,8 @@ edxapp_fastly_service = fastly.ServiceVcl(
         ),
         fastly.ServiceVclConditionArgs(
             name="Django Admin Route",
-            statement='req.url ~ "^/admin"',
+            # Anchored so it doesn't also match the /admin-console/ MFE assets.
+            statement='req.url.path ~ "^/admin(/|$)"',
             type="CACHE",
         ),
         fastly.ServiceVclConditionArgs(
@@ -1155,6 +1165,15 @@ edxapp_fastly_service = fastly.ServiceVcl(
             content=textwrap.dedent(
                 """\
                 if (req.url.path ~ "^/asset-v1:") {
+                  # Fetch snippets run ahead of the default Cache-Control
+                  # checks, so apply them before returning early.
+                  if (beresp.http.Cache-Control ~ "(?:private|no-store)") {
+                    return (pass);
+                  }
+                  # The LMS attaches a session cookie to responses for new
+                  # visitors, which asset downloads don't need. Drop it so
+                  # public assets stay cacheable.
+                  unset beresp.http.Set-Cookie;
                   set beresp.ttl = 30s;
                   return (deliver);
                 }
@@ -1200,66 +1219,26 @@ edxapp_fastly_service = fastly.ServiceVcl(
             type="error",
         ),
     ],
-    logging_https=[
-        fastly.ServiceVclLoggingHttpArgs(
-            url=Output.all(domain=vector_log_proxy_domain).apply(
-                lambda kwargs: f"https://{kwargs['domain']}/fastly"
-            ),
-            name=f"fastly-{env_name}-https-logging-args",
-            content_type="application/json",
-            format=build_fastly_log_format_string(
-                additional_static_fields={
-                    "application": "edxapp",
-                    "environment": env_name,
-                }
-            ),
-            format_version=2,
-            header_name="Authorization",
-            header_value=f"Basic {encoded_fastly_proxy_credentials}",
-            json_format="0",
-            method="POST",
-            request_max_bytes=ONE_MEGABYTE_BYTE,
-        )
-    ],
-    logging_s3s=[
-        fastly.ServiceVclLoggingS3Args(
-            bucket_name=fastly_access_logging_bucket["bucket_name"],
-            name=f"fastly-{env_name}-s3-logging-args",
-            format=build_fastly_log_format_string(additional_static_fields={}),
-            gzip_level=3,
-            message_type="blank",
-            path=f"/edxapp/{stack_info.env_prefix}/{stack_info.env_suffix}/",
-            redundancy="standard",
-            s3_iam_role=fastly_access_logging_iam_role["role_arn"],
-        ),
-    ],
-    opts=fastly_provider,
-)
-
-tls_configuration = fastly.get_tls_configuration(
-    default=False,
-    name="TLS v1.3",
-    tls_protocols=["1.2", "1.3"],
-    opts=InvokeOptions(provider=fastly_provider.provider),
-)
-
-edxapp_fastly_tls = fastly.TlsSubscription(
-    f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
-    # valid values are certainly, lets-encrypt, or globalsign
-    certificate_authority="certainly",
-    domains=edxapp_fastly_service.domains.apply(
-        lambda domains: [domain.name for domain in domains]
+    **fastly_logging_args(
+        name=f"fastly-{env_name}",
+        application="edxapp",
+        environment=env_name,
+        s3_path=f"/edxapp/{stack_info.env_prefix}/{stack_info.env_suffix}/",
     ),
-    # Retrieved from 0https://manage.fastly.com/network/tls-configurations
-    configuration_id=tls_configuration.id,
     opts=fastly_provider,
 )
 
-edxapp_fastly_tls.managed_dns_challenges.apply(fastly_certificate_validation_records)
-
-validated_tls_subscription = fastly.TlsSubscriptionValidation(
-    "ol-redirect-service-tls-subscription-validation",
-    subscription_id=edxapp_fastly_tls.id,
+edxapp_fastly_tls = OLFastlyTLS(
+    f"edxapp-fastly-tls-{env_name}",
+    tls_config=OLFastlyTLSConfig(
+        subscription_resource_name=f"fastly-{stack_info.env_prefix}-{stack_info.env_suffix}-tls-subscription",
+        # The name was copied from the redirector stack and is kept because
+        # renaming it replaces the validation of a live certificate.
+        validation_resource_name="ol-redirect-service-tls-subscription-validation",
+        domains=edxapp_fastly_service.domains.apply(
+            lambda domains: [domain.name for domain in domains]
+        ),
+    ),
     opts=fastly_provider,
 )
 
@@ -1302,6 +1281,7 @@ k8s_resources = create_k8s_resources(
     stack_info=stack_info,
     vault_config=Config("vault"),
     vault_policy=edxapp_vault_policy,
+    azure_openai_stack=azure_openai_stack,
 )
 
 export_dict = {

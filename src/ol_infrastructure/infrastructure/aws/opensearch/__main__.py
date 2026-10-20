@@ -50,6 +50,9 @@ cluster_instance_type = (
     search_config.get("instance_type") or cluster_defaults["instance_type"]
 )
 disk_size = search_config.get_int("disk_size_gb") or 30
+# A zone-aware domain needs one node and one subnet per AZ, so a 1-node domain
+# must have zone awareness off and exactly one subnet.
+availability_zone_count = min(cluster_size, 3)
 
 is_public_web = search_config.get_bool("public_web") or False
 is_secured_cluster = search_config.get_bool("secured_cluster") or False
@@ -132,7 +135,7 @@ if is_public_web:
     )
 else:
     conditional_kwargs["vpc_options"] = aws.opensearch.DomainVpcOptionsArgs(
-        subnet_ids=target_vpc["subnet_ids"][:3],
+        subnet_ids=target_vpc["subnet_ids"][:availability_zone_count],
         security_group_ids=[search_security_group.id],
     )
 
@@ -179,10 +182,12 @@ search_domain = aws.opensearch.Domain(
     if not cluster_instance_type.startswith("t")
     else None,
     cluster_config=aws.opensearch.DomainClusterConfigArgs(
-        zone_awareness_enabled=True,
+        zone_awareness_enabled=availability_zone_count > 1,
         zone_awareness_config=aws.opensearch.DomainClusterConfigZoneAwarenessConfigArgs(
-            availability_zone_count=3
-        ),
+            availability_zone_count=availability_zone_count
+        )
+        if availability_zone_count > 1
+        else None,
         instance_count=cluster_size,
         instance_type=cluster_instance_type,
     ),

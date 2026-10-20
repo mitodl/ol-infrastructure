@@ -8,9 +8,12 @@ Everything else in the script is subprocess orchestration against a real
 cluster, which is what the runbook rehearsal covers.
 """
 
+import hashlib
 import importlib.util
 import json
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -179,22 +182,327 @@ def test_a_config_with_no_storage_line_is_refused(tmp_path: Path) -> None:
 def test_row_counts_are_parsed_per_table() -> None:
     """Verification compares per table. A total-row check would pass a rebuild
     that put every row in the wrong table.
+
+    The shape is verbatim `snapshot` output from omnigraph 0.10.0, and 0.11.0
+    prints the same per-table lines. The 0.8 `rows=N` shape this regex used to
+    expect matched nothing on either, so the Job stopped at its first graph.
     """
     snapshot = (
-        "branch: main\n"
-        "manifest_version: 4\n"
+        "graph_branch: main\n"
+        "graph_manifest_version: 5\n"
         "internal_schema_version: 6\n"
-        "edge:Supersedes v1 branch=main rows=0\n"
-        "node:Memory v2 branch=main rows=41\n"
-        "node:Task v1 branch=main rows=7\n"
+        "edge type 'Supersedes' published_dataset_version=1 "
+        "native_dataset_branch=main entities=0\n"
+        "node type 'Memory' published_dataset_version=2 "
+        "native_dataset_branch=main entities=41\n"
+        "node type 'Task' published_dataset_version=1 "
+        "native_dataset_branch=main entities=7\n"
     )
 
     counts = {
         m["table"]: int(m["rows"]) for m in migrate.SNAPSHOT_ROW_RE.finditer(snapshot)
     }
 
-    assert counts == {"edge:Supersedes": 0, "node:Memory": 41, "node:Task": 7}
+    assert counts == {"Supersedes": 0, "Memory": 41, "Task": 7}
     assert migrate.SNAPSHOT_SCHEMA_RE.search(snapshot).group(1) == "6"
+
+
+def test_the_0_13_snapshot_shape_is_parsed() -> None:
+    """Verbatim `snapshot` output from omnigraph 0.13.0 on a rebuilt store."""
+    snapshot = (
+        "graph_branch: main\n"
+        "graph_manifest_version: 2\n"
+        "internal_schema_version: 14\n"
+        "node type 'Node' published_dataset_version=2 "
+        "native_dataset_branch=main entities=2\n"
+    )
+
+    counts = {
+        m["table"]: int(m["rows"]) for m in migrate.SNAPSHOT_ROW_RE.finditer(snapshot)
+    }
+
+    assert counts == {"Node": 2}
+    assert migrate.SNAPSHOT_SCHEMA_RE.search(snapshot).group(1) == "14"
+
+
+# What omnigraph 0.13.0 prints when a direct write leaves its lock behind,
+# verbatim apart from the root: `cluster apply` on stderr after its receipt,
+# `load` and `optimize` on stderr before their result.
+APPLY_LOCK = "01M4S9NRTPN7CXM3V2BBJ3WSQ4"
+GRAPH_LOCK = "01M4S9NSVH9ND2JE5ED2CCDKKV"
+APPLY_STDERR = (
+    "Deployment-ID: 01M4S9NRSY003FZ4TR5SHVH3KN:1:01M4S9NRV33M95N9V8BFSAVNXV\n"
+    "Cluster-root: s3://b/fmt14\n"
+    f"Admission lock: {APPLY_LOCK}; retain until prior work is quiescent, "
+    "then exact-ID force-unlock\n"
+)
+GRAPH_STDERR = (
+    "omnigraph load → s3://b/fmt14/graphs/council.omni (direct)\n"
+    f"cluster admission retained: root=s3://b/fmt14 lock_id={GRAPH_LOCK}. After "
+    "stopping the owner and establishing graph/control I/O quiescence, use "
+    "exact-ID cluster force-unlock; command completion alone does not release "
+    "this lock.\n"
+)
+
+
+def _completed(argv: list[str], stdout: str = "", stderr: str = "") -> Any:
+    return migrate.subprocess.CompletedProcess(argv, 0, stdout, stderr)
+
+
+@pytest.mark.parametrize(
+    ("stderr", "lock_id"), [(APPLY_STDERR, APPLY_LOCK), (GRAPH_STDERR, GRAPH_LOCK)]
+)
+def test_a_direct_write_is_unlocked_by_the_id_it_reported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stderr: str, lock_id: str
+) -> None:
+    """0.13 keeps the root's lock after every direct write, and the next write
+    is refused until that exact id is released.
+    """
+    calls: list[list[str]] = []
+
+    def fake_run(argv: list[str], **_: Any) -> Any:
+        calls.append(argv)
+        return _completed(argv, stderr=stderr)
+
+    monkeypatch.setattr(migrate, "run", fake_run)
+
+    migrate.run_and_unlock("omnigraph", ["load", "--store", "s3://b/x"], tmp_path)
+
+    assert calls == [
+        ["omnigraph", "load", "--store", "s3://b/x"],
+        ["omnigraph", "cluster", "force-unlock", "--config", str(tmp_path), lock_id],
+    ]
+
+
+@pytest.mark.parametrize("stderr", ["", APPLY_STDERR + GRAPH_STDERR])
+def test_a_write_that_names_no_single_lock_is_not_unlocked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stderr: str
+) -> None:
+    """Unlocking whatever `cluster status` shows would release a lock this step
+    cannot prove is its own.
+    """
+    calls: list[list[str]] = []
+
+    def fake_run(argv: list[str], **_: Any) -> Any:
+        calls.append(argv)
+        return _completed(argv, stderr=stderr)
+
+    monkeypatch.setattr(migrate, "run", fake_run)
+
+    with pytest.raises(SystemExit):
+        migrate.run_and_unlock("omnigraph", ["load", "--store", "s3://b/x"], tmp_path)
+
+    assert [argv[1] for argv in calls] == ["load"]
+
+
+def test_indexes_are_built_on_the_rebuilt_store(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`load` builds no indexes in 0.11, so optimize has to run against the new
+    store; anything it defers is surfaced rather than dropped.
+    """
+    calls: list[list[str]] = []
+    optimize_out = {
+        "datasets": [
+            {"type_key": "edge:WorksOn", "pending_indexes": []},
+            {
+                "type_key": "node:Memory",
+                "pending_indexes": [
+                    {
+                        "type_key": "node:Memory",
+                        "property": "embedding",
+                        "reason": "property has no non-null vectors to train on yet",
+                    }
+                ],
+            },
+        ]
+    }
+
+    def fake_run(argv: list[str], **_: Any) -> Any:
+        calls.append(argv)
+        return _completed(argv, json.dumps(optimize_out), GRAPH_STDERR)
+
+    monkeypatch.setattr(migrate, "run", fake_run)
+
+    pending = migrate.build_indexes(
+        "omnigraph", "s3://b/fmt9/graphs/council.omni", tmp_path
+    )
+
+    assert calls == [
+        [
+            "omnigraph",
+            "optimize",
+            "--store",
+            "s3://b/fmt9/graphs/council.omni",
+            "--json",
+        ],
+        ["omnigraph", "cluster", "force-unlock", "--config", str(tmp_path), GRAPH_LOCK],
+    ]
+    assert [p["property"] for p in pending] == ["embedding"]
+
+
+def test_rebuild_optimizes_each_graph_once_after_its_last_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Optimizing before a graph's final batch would leave that batch's
+    fragments uncovered, and a skipped graph serves with no indexes at all.
+    """
+    calls: list[list[str]] = []
+    pending = {"type_key": "node:Memory", "property": "embedding", "reason": "x"}
+
+    def fake_run(argv: list[str], **_: Any) -> Any:
+        calls.append(argv)
+        out = ""
+        if argv[1] == "optimize":
+            deferred = [pending] if "council" in argv[3] else []
+            out = json.dumps({"datasets": [{"pending_indexes": deferred}]})
+        if argv[1:3] == ["cluster", "status"]:
+            out = json.dumps({"state_observations": {"locked": False}})
+        if argv[1:3] == ["cluster", "apply"]:
+            return _completed(argv, out, APPLY_STDERR)
+        return _completed(argv, out, GRAPH_STDERR)
+
+    graphs = ["council", "code-bridge"]
+    monkeypatch.setattr(migrate, "run", fake_run)
+    monkeypatch.setattr(
+        migrate, "build_rebuild_config", lambda *_: tmp_path / "cluster.yaml"
+    )
+    monkeypatch.setattr(
+        migrate,
+        "chunk_export",
+        lambda path: [path.with_suffix(".000.jsonl"), path.with_suffix(".001.jsonl")],
+    )
+
+    migrate.rebuild(
+        "omnigraph",
+        "s3://b/fmt9",
+        graphs,
+        tmp_path / "export",
+        tmp_path / "rebuild",
+        tmp_path / "cluster.yaml",
+        tmp_path / "schemas",
+        "svc-witan-admin",
+    )
+
+    per_graph = [
+        (argv[1], argv[3].rsplit("/", 1)[-1])
+        for argv in calls
+        if argv[1] in {"load", "optimize"}
+    ]
+    assert per_graph == [
+        ("load", "council.omni"),
+        ("load", "council.omni"),
+        ("optimize", "council.omni"),
+        ("load", "code-bridge.omni"),
+        ("load", "code-bridge.omni"),
+        ("optimize", "code-bridge.omni"),
+    ]
+    # 0.12 removed `cluster import`: apply creates the ledger, and every write
+    # is followed by the release of its own lock before the next one starts.
+    steps = [argv[2] if argv[1] == "cluster" else argv[1] for argv in calls]
+    assert steps == [
+        "validate",
+        "apply",
+        "force-unlock",
+        *(["load", "force-unlock"] * 2 + ["optimize", "force-unlock"]) * 2,
+        "status",
+    ]
+    unlocked = [argv[-1] for argv in calls if argv[2] == "force-unlock"]
+    assert unlocked == [APPLY_LOCK] + [GRAPH_LOCK] * 6
+    deferred_logs = [r for r in caplog.records if "indexes deferred" in r.message]
+    assert len(deferred_logs) == 1
+    assert "embedding" in deferred_logs[0].getMessage()
+
+
+def test_a_root_left_locked_fails_the_rebuild(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The server's first boot on the new root is refused by any lock, and one
+    this Job did not take means something else is writing there.
+    """
+
+    def fake_run(argv: list[str], **_: Any) -> Any:
+        if argv[1:3] == ["cluster", "status"]:
+            observed = {
+                "locked": True,
+                "lock_id": GRAPH_LOCK,
+                "lock_operation": "graph_operation",
+            }
+            return _completed(argv, json.dumps({"state_observations": observed}))
+        return _completed(argv, stderr=APPLY_STDERR)
+
+    monkeypatch.setattr(migrate, "run", fake_run)
+    monkeypatch.setattr(
+        migrate, "build_rebuild_config", lambda *_: tmp_path / "cluster.yaml"
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        migrate.rebuild(
+            "omnigraph",
+            "s3://b/fmt14",
+            [],
+            tmp_path / "export",
+            tmp_path / "rebuild",
+            tmp_path / "cluster.yaml",
+            tmp_path / "schemas",
+            "svc-witan-admin",
+        )
+
+    assert GRAPH_LOCK in str(exc.value)
+
+
+def test_verify_fails_a_short_rebuild(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every table has to match the baseline exactly."""
+    monkeypatch.setattr(
+        migrate, "snapshot_tables", lambda *_: {"Memory": 1, "Tagged": 3}
+    )
+
+    report, mismatched = migrate.verify(
+        "omnigraph",
+        "file:///new",
+        ["council"],
+        {"council": {"Memory": 2, "Tagged": 3}},
+    )
+
+    assert mismatched == ["council"]
+    assert report["council"]["changed_tables"] == ["Memory"]
+
+
+def test_verify_accepts_an_empty_table_the_new_schema_added(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A graph created before its schema grew a type has no baseline row for
+    that table, and the rebuild creates it empty. Found on a real local store
+    that predates TaskComment.
+    """
+    monkeypatch.setattr(
+        migrate, "snapshot_tables", lambda *_: {"Memory": 2, "TaskComment": 0}
+    )
+
+    report, mismatched = migrate.verify(
+        "omnigraph", "file:///new", ["council"], {"council": {"Memory": 2}}
+    )
+
+    assert mismatched == []
+    assert report["council"]["new_tables"] == ["TaskComment"]
+
+
+def test_verify_fails_a_new_table_that_has_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No export can put rows in a table the old graph lacked, so rows there
+    mean the rebuild loaded something the baseline never counted.
+    """
+    monkeypatch.setattr(
+        migrate, "snapshot_tables", lambda *_: {"Memory": 2, "TaskComment": 3}
+    )
+
+    report, mismatched = migrate.verify(
+        "omnigraph", "file:///new", ["council"], {"council": {"Memory": 2}}
+    )
+
+    assert mismatched == ["council"]
+    assert report["council"]["changed_tables"] == ["TaskComment"]
 
 
 def test_cutover_instructions_set_both_paired_config_values() -> None:
@@ -241,8 +549,8 @@ def test_a_small_export_is_loaded_whole(tmp_path: Path) -> None:
 
 
 def test_an_export_over_the_row_cap_is_split(tmp_path: Path) -> None:
-    """Omnigraph 0.9 caps a keyed write at 8,192 rows per table, so one `load`
-    of a populated graph fails outright.
+    """Omnigraph caps a keyed write at 8,192 rows per table (0.9 onwards), so
+    one `load` of a populated graph fails outright.
     """
     export = _export(tmp_path, nodes=migrate.KEYED_ROW_CAP + 100)
 
@@ -256,6 +564,35 @@ def test_an_export_over_the_row_cap_is_split(tmp_path: Path) -> None:
         len([ln for ln in b.read_text().splitlines() if ln.strip()]) for b in batches
     )
     assert total == migrate.KEYED_ROW_CAP + 100
+
+
+def test_an_export_over_the_byte_cap_is_split(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Omnigraph 0.13 also caps a keyed write at 32 MiB of parsed rows per
+    table, which a few thousand wide rows reach long before the row cap.
+    """
+    export = _export(tmp_path, nodes=100)
+    bound = export.stat().st_size // 3
+    monkeypatch.setattr(migrate, "LOAD_BYTE_BATCH", bound)
+
+    batches = migrate.chunk_export(export)
+
+    assert len(batches) == 4
+    assert all(b.stat().st_size <= bound for b in batches)
+    assert "".join(b.read_text() for b in batches) == export.read_text()
+
+
+def test_a_row_over_the_byte_bound_gets_a_batch_of_its_own(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One row cannot be split; whether it loads is the engine's to say."""
+    export = _export(tmp_path, nodes=3)
+    monkeypatch.setattr(migrate, "LOAD_BYTE_BATCH", 1)
+
+    batches = migrate.chunk_export(export)
+
+    assert [len(b.read_text().splitlines()) for b in batches] == [1, 1, 1]
 
 
 def test_every_node_precedes_every_edge_across_batches(tmp_path: Path) -> None:
@@ -275,6 +612,26 @@ def test_every_node_precedes_every_edge_across_batches(tmp_path: Path) -> None:
             else:
                 assert not seen_edge, "a node followed an edge across batches"
     assert seen_edge
+
+
+def test_batch_numbering_continues_across_the_node_and_edge_groups(
+    tmp_path: Path,
+) -> None:
+    """The two groups are written by separate passes, so their numbering has to
+    share a counter: restarting it for the edges would have edge batches
+    reopening the node batch files and silently dropping every node row.
+    """
+    export = _export(
+        tmp_path, nodes=migrate.KEYED_ROW_CAP + 10, edges=migrate.KEYED_ROW_CAP + 10
+    )
+
+    batches = migrate.chunk_export(export)
+
+    assert len(batches) == len({b.name for b in batches}), "a batch file was reused"
+    total = sum(
+        len([ln for ln in b.read_text().splitlines() if ln.strip()]) for b in batches
+    )
+    assert total == 2 * (migrate.KEYED_ROW_CAP + 10)
 
 
 def test_a_format_that_did_not_move_is_reported() -> None:
@@ -355,3 +712,420 @@ def test_the_source_cluster_yaml_never_shadows_the_repointed_one(
 
     assert "storage: s3://b/fmt6" in config.read_text().splitlines()
     assert "storage: s3://ol-data-witan-ci" not in config.read_text().splitlines()
+
+
+WRITERS = [
+    ("omnigraph", "omnigraph-optimize"),
+    ("witan", "witan-ci-indexer"),
+]
+SERVER = ("omnigraph", "omnigraph-server")
+
+
+def _deployment(*, replicas: int) -> dict[str, Any]:
+    return {
+        "spec": {
+            "replicas": replicas,
+            "selector": {"matchLabels": {"app.kubernetes.io/name": "omnigraph-server"}},
+        }
+    }
+
+
+def _pod(name: str, phase: str) -> dict[str, Any]:
+    return {"metadata": {"name": name}, "status": {"phase": phase}}
+
+
+def _cronjob(*, suspend: bool) -> dict[str, Any]:
+    return {"spec": {"suspend": suspend}}
+
+
+def _job(
+    name: str, owner: str, *, active: int | None, finished: str | None = None
+) -> dict[str, Any]:
+    status: dict[str, Any] = {} if active is None else {"active": active}
+    if finished is not None:
+        status["conditions"] = [{"type": finished, "status": "True"}]
+    return {
+        "metadata": {
+            "name": name,
+            "ownerReferences": [{"kind": "CronJob", "name": owner}],
+        },
+        "status": status,
+    }
+
+
+class _FakeApi:
+    """The API reads the pre-flight makes, answered from dicts.
+
+    The server is scaled down with no pods unless a test says otherwise.
+    """
+
+    def __init__(
+        self,
+        cronjobs: dict[tuple[str, str], dict[str, Any] | None],
+        jobs: dict[str, list[dict[str, Any]]],
+        deployment: dict[str, Any] | None = None,
+        pods: list[dict[str, Any]] | None = None,
+    ) -> None:
+        self.cronjobs = cronjobs
+        self.jobs = jobs
+        self.deployment = deployment or _deployment(replicas=0)
+        self.pods = pods or []
+        self.paths: list[str] = []
+
+    def get(self, path: str) -> dict[str, Any] | None:
+        self.paths.append(path)
+        parts = path.split("?", maxsplit=1)[0].split("/")
+        if parts[1] == "api":
+            return {"items": self.pods}
+        namespace = parts[5]
+        if parts[6] == "deployments":
+            return self.deployment
+        if parts[6] == "jobs":
+            return {"items": self.jobs.get(namespace, [])}
+        return self.cronjobs.get((namespace, parts[7]))
+
+
+def test_a_scaled_down_server_with_no_pods_does_not_block() -> None:
+    """Pods are listed by the Deployment's own selector, not a second copy of it."""
+    api = _FakeApi({}, {})
+
+    assert not migrate.server_blockers(*SERVER, api.get)
+    assert api.paths == [
+        "/apis/apps/v1/namespaces/omnigraph/deployments/omnigraph-server",
+        "/api/v1/namespaces/omnigraph/pods"
+        "?labelSelector=app.kubernetes.io/name%3Domnigraph-server",
+    ]
+
+
+def test_a_server_that_still_declares_replicas_blocks() -> None:
+    """Pulumi does not reconcile `replicas`, so something else can scale it up."""
+    api = _FakeApi({}, {}, deployment=_deployment(replicas=1))
+
+    assert migrate.server_blockers(*SERVER, api.get) == [
+        "deployment omnigraph/omnigraph-server declares 1 replica(s)"
+    ]
+
+
+def test_a_server_pod_blocks_until_its_containers_have_exited() -> None:
+    """A Terminating pod is still Running and can commit for its whole grace
+    period. Failed and Succeeded are the phases that mean it has exited; an
+    evicted pod stays behind as Failed.
+    """
+    api = _FakeApi(
+        {},
+        {},
+        pods=[
+            _pod("omnigraph-server-a", "Running"),
+            _pod("omnigraph-server-b", "Failed"),
+            _pod("omnigraph-server-c", "Succeeded"),
+            _pod("omnigraph-server-d", "Unknown"),
+        ],
+    )
+
+    assert migrate.server_blockers(*SERVER, api.get) == [
+        "pod omnigraph/omnigraph-server-a is Running",
+        "pod omnigraph/omnigraph-server-d is Unknown",
+    ]
+
+
+def test_a_missing_server_deployment_blocks() -> None:
+    """The server exists everywhere, so not finding it means the wrong name."""
+    assert migrate.server_blockers(*SERVER, lambda _: None) == [
+        "deployment omnigraph/omnigraph-server not found"
+    ]
+
+
+@pytest.mark.parametrize("bad", ["omnigraph-server", "omnigraph/", "/x", "a/b/c"])
+def test_a_server_without_a_namespace_is_refused(bad: str) -> None:
+    """The pre-flight has to be able to address the server it waits on."""
+    with pytest.raises(SystemExit):
+        migrate.parse_server_deployment(bad)
+
+
+def test_writer_specs_are_parsed_per_namespace() -> None:
+    """The env var the Job is given: space-separated <namespace>/<cronjob>."""
+    assert (
+        migrate.parse_writer_cronjobs(
+            "omnigraph/omnigraph-optimize  witan/witan-ci-indexer"
+        )
+        == WRITERS
+    )
+
+
+@pytest.mark.parametrize("bad", ["witan-ci-indexer", "witan/", "/x", "a/b/c"])
+def test_a_writer_without_a_namespace_is_refused(bad: str) -> None:
+    """A writer the pre-flight cannot address is a config error, not a skip."""
+    with pytest.raises(SystemExit):
+        migrate.parse_writer_cronjobs(bad)
+
+
+def test_an_unsuspended_writer_blocks() -> None:
+    """The case a skipped witan deploy leaves behind: nothing running yet, but
+    the next tick would start a writer mid-export.
+    """
+    blockers = migrate.writer_blockers(
+        "witan", "witan-ci-indexer", _cronjob(suspend=False), []
+    )
+
+    assert blockers == ["cronjob witan/witan-ci-indexer is not suspended"]
+
+
+def test_an_active_job_blocks_even_when_suspended() -> None:
+    """`suspend` stops the next schedule, not a run already in progress."""
+    blockers = migrate.writer_blockers(
+        "witan",
+        "witan-ci-indexer",
+        _cronjob(suspend=True),
+        [_job("witan-ci-indexer-29781", "witan-ci-indexer", active=1)],
+    )
+
+    assert blockers == ["job witan/witan-ci-indexer-29781 has 1 active pod(s)"]
+
+
+def test_finished_and_failed_jobs_do_not_block() -> None:
+    """A month-old failed Job has no `active` count. Treating it as work in
+    progress would hold the outage open until the pre-flight times out.
+    """
+    jobs = [
+        _job(
+            "witan-ci-indexer-old-failed",
+            "witan-ci-indexer",
+            active=None,
+            finished="Failed",
+        ),
+        _job(
+            "witan-ci-indexer-done", "witan-ci-indexer", active=0, finished="Complete"
+        ),
+    ]
+
+    assert not migrate.writer_blockers(
+        "witan", "witan-ci-indexer", _cronjob(suspend=True), jobs
+    )
+
+
+def test_a_job_the_controller_has_not_reconciled_blocks() -> None:
+    """A CronJob can create a Job just before suspension. Until the Job
+    controller fills in its status it reads `status: {}`, and its pod can start
+    writing after the pre-flight cleared.
+    """
+    blockers = migrate.writer_blockers(
+        "witan",
+        "witan-ci-indexer",
+        _cronjob(suspend=True),
+        [_job("witan-ci-indexer-29782", "witan-ci-indexer", active=None)],
+    )
+
+    assert blockers == ["job witan/witan-ci-indexer-29782 has not finished"]
+
+
+def test_another_cronjobs_active_job_is_not_attributed() -> None:
+    """Jobs are listed per namespace, so ownership decides which writer is busy."""
+    jobs = [_job("witan-view-reaper-1", "witan-view-reaper", active=1)]
+
+    assert not migrate.writer_blockers(
+        "witan", "witan-ci-indexer", _cronjob(suspend=True), jobs
+    )
+
+
+def test_an_undeclared_writer_does_not_block() -> None:
+    """The CI indexer does not exist in an environment with no managed repos."""
+    assert not migrate.writer_blockers("witan", "witan-ci-indexer", None, [])
+
+
+def test_the_preflight_waits_for_a_running_writer_to_finish() -> None:
+    """A busy writer is waited out, not treated as a failure."""
+    api = _FakeApi(
+        cronjobs={
+            ("omnigraph", "omnigraph-optimize"): _cronjob(suspend=True),
+            ("witan", "witan-ci-indexer"): _cronjob(suspend=True),
+        },
+        jobs={"witan": [_job("witan-ci-indexer-1", "witan-ci-indexer", active=1)]},
+    )
+    sleeps: list[float] = []
+
+    def finish_on_first_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        api.jobs["witan"] = [
+            _job(
+                "witan-ci-indexer-1", "witan-ci-indexer", active=0, finished="Complete"
+            )
+        ]
+
+    migrate.wait_for_writers(
+        WRITERS,
+        SERVER,
+        get=api.get,
+        wait_seconds=60,
+        poll_seconds=5,
+        sleep=finish_on_first_sleep,
+        clock=lambda: 0.0,
+    )
+
+    assert sleeps == [5]
+
+
+def test_the_preflight_gives_up_naming_every_blocker() -> None:
+    """At the deadline the Job exits before exporting, with the whole list."""
+    api = _FakeApi(
+        cronjobs={
+            ("omnigraph", "omnigraph-optimize"): _cronjob(suspend=True),
+            ("witan", "witan-ci-indexer"): _cronjob(suspend=False),
+        },
+        jobs={
+            "omnigraph": [_job("omnigraph-optimize-7", "omnigraph-optimize", active=1)]
+        },
+        pods=[_pod("omnigraph-server-a", "Running")],
+    )
+    now = iter([0.0, 100.0])
+
+    with pytest.raises(SystemExit) as exc:
+        migrate.wait_for_writers(
+            WRITERS,
+            SERVER,
+            get=api.get,
+            wait_seconds=60,
+            poll_seconds=5,
+            sleep=lambda _: None,
+            clock=lambda: next(now),
+        )
+
+    message = str(exc.value)
+    assert "omnigraph/omnigraph-optimize-7 has 1 active pod(s)" in message
+    assert "witan/witan-ci-indexer is not suspended" in message
+    assert "pod omnigraph/omnigraph-server-a is Running" in message
+
+
+def test_an_api_error_mid_poll_is_waited_out() -> None:
+    """The Job has no retries, so one failed read must not end the migration."""
+    api = _FakeApi(
+        cronjobs={
+            ("omnigraph", "omnigraph-optimize"): _cronjob(suspend=True),
+            ("witan", "witan-ci-indexer"): _cronjob(suspend=True),
+        },
+        jobs={},
+    )
+    calls = {"n": 0}
+
+    def flaky_get(path: str) -> dict[str, Any] | None:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            timeout_msg = "read timed out"
+            raise TimeoutError(timeout_msg)
+        return api.get(path)
+
+    sleeps: list[float] = []
+    migrate.wait_for_writers(
+        WRITERS,
+        SERVER,
+        get=flaky_get,
+        wait_seconds=60,
+        poll_seconds=5,
+        sleep=sleeps.append,
+        clock=lambda: 0.0,
+    )
+
+    assert sleeps == [5]
+
+
+def test_the_job_invalidates_the_same_key_the_script_writes() -> None:
+    """Two copies of the key template, one in the pod spec and one in the script."""
+    from ol_infrastructure.applications.omnigraph.storage_migration import (  # noqa: PLC0415
+        VERDICT_KEY_TEMPLATE,
+    )
+
+    assert VERDICT_KEY_TEMPLATE == migrate.VERDICT_KEY_TEMPLATE
+
+
+def test_the_verdict_is_keyed_by_the_target_prefix() -> None:
+    """A re-run of one migration overwrites its verdict; another format never does."""
+    assert migrate.verdict_object("s3://ol-data-witan-qa/fmt9") == (
+        "ol-data-witan-qa",
+        "migrations/fmt9/verdict.json",
+    )
+
+
+# AWS's published SigV4 example for an S3 PUT, from "Examples: Signature
+# Calculations in AWS Signature Version 4" in the S3 API reference.
+_AWS_EXAMPLE_SECRET = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"  # noqa: S105  # pragma: allowlist secret
+_AWS_EXAMPLE_KEY_ID = "AKIAIOSFODNN7EXAMPLE"  # pragma: allowlist secret
+
+
+def test_sigv4_matches_the_published_s3_put_example() -> None:
+    """Checks the signer against a signature AWS computed, not one we did."""
+    payload_hash = hashlib.sha256(b"Welcome to Amazon S3.").hexdigest()
+    authorization = migrate.sigv4_authorization(
+        method="PUT",
+        path="/test$file.text",
+        headers={
+            "Host": "examplebucket.s3.amazonaws.com",
+            "Date": "Fri, 24 May 2013 00:00:00 GMT",
+            "x-amz-date": "20130524T000000Z",
+            "x-amz-storage-class": "REDUCED_REDUNDANCY",
+            "x-amz-content-sha256": payload_hash,
+        },
+        payload_hash=payload_hash,
+        region="us-east-1",
+        service="s3",
+        access_key=_AWS_EXAMPLE_KEY_ID,
+        secret_key=_AWS_EXAMPLE_SECRET,
+    )
+
+    assert authorization == (
+        "AWS4-HMAC-SHA256 "
+        f"Credential={_AWS_EXAMPLE_KEY_ID}/20130524/us-east-1/s3/aws4_request, "
+        "SignedHeaders=date;host;x-amz-content-sha256;x-amz-date;"
+        "x-amz-storage-class, "
+        "Signature=98ad721746da40c64f1a55b78f14c238d841ea1380cd77a1b5971af0ece108bd"
+    )
+
+
+def test_sigv4_agrees_with_botocore_for_the_verdict_put(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The exact header set `put_object` sends, signed both ways."""
+    import botocore.auth  # noqa: PLC0415
+    from botocore.auth import S3SigV4Auth  # noqa: PLC0415
+    from botocore.awsrequest import AWSRequest  # noqa: PLC0415
+    from botocore.credentials import Credentials  # noqa: PLC0415
+
+    body = b'{"ok": true}'
+    payload_hash = hashlib.sha256(body).hexdigest()
+    host = "ol-data-witan-ci.s3.us-east-1.amazonaws.com"
+    headers = {
+        "host": host,
+        "content-type": "application/json",
+        "x-amz-content-sha256": payload_hash,
+        "x-amz-date": "20260930T120000Z",
+        "x-amz-security-token": "session-token",
+    }
+    ours = migrate.sigv4_authorization(
+        method="PUT",
+        path="/migrations/fmt9/verdict.json",
+        headers=headers,
+        payload_hash=payload_hash,
+        region="us-east-1",
+        service="s3",
+        access_key="AKIDEXAMPLE",
+        secret_key=_AWS_EXAMPLE_SECRET,
+    )
+
+    request = AWSRequest(
+        method="PUT",
+        url=f"https://{host}/migrations/fmt9/verdict.json",
+        data=body,
+        headers={k: v for k, v in headers.items() if k != "host"},
+    )
+    signer = S3SigV4Auth(
+        Credentials("AKIDEXAMPLE", _AWS_EXAMPLE_SECRET, "session-token"),
+        "s3",
+        "us-east-1",
+    )
+    # botocore stamps its own x-amz-date from the clock; pin it to ours.
+    monkeypatch.setattr(
+        botocore.auth,
+        "get_current_datetime",
+        lambda: datetime(2026, 9, 30, 12, 0, 0),  # noqa: DTZ001
+    )
+    signer.add_auth(request)
+
+    assert ours == request.headers["Authorization"]

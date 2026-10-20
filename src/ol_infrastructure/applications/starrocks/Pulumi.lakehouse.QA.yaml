@@ -25,8 +25,12 @@ config:
     # Raise optimizer timeout to tolerate slow AWS Glue metadata responses.
     # StarRocks default is 3000 ms.
     planner_optimize_timeout_ms: 30000
-    storage: 100Gi
-    log_storage: 100Gi
+    # Measured 2026-09-15 over 90 days: the meta volume sawtooths 1.1-3.0 GiB
+    # and the log volume 1.3-5.1 GiB, both rotation-bounded with no upward
+    # trend. data-ci has run FE on 20Gi for months at 3.5% / 12.5% used, so
+    # this is a size already proven on the same workload rather than a guess.
+    storage: 20Gi
+    log_storage: 20Gi
   starrocks:use_be: "false"
   starrocks:be_config:
     replicas: 3
@@ -40,9 +44,13 @@ config:
     min_replicas: 1
     max_replicas: 10
     cpu_target_utilization_percentage: 80
-    cpu_request: 4000m
-    memory_request: 8Gi
-    memory_limit: 8Gi
+    # Measured 2026-09-29 over 60 days: CN peaked at 0.02 cores and 2.8Gi.
+    # See the prod stack for why the request, not the limit, is what matters
+    # to the HPA.
+    cpu_request: 1000m
+    cpu_limit: 4000m
+    memory_request: 6Gi
+    memory_limit: 6Gi
   starrocks:enable_data_lake_integration: "true"
   starrocks:ssl_enabled: "true"
   # ssl_force_secure_transport is intentionally false: the StarRocks operator

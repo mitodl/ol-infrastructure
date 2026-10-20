@@ -24,6 +24,7 @@ from pulumi import (
 
 from bridge.lib.magic_numbers import (
     DEFAULT_EFS_PORT,
+    DEFAULT_HTTPS_PORT,
     IAM_ROLE_NAME_PREFIX_MAX_LENGTH,
 )
 from bridge.lib.versions import (
@@ -365,6 +366,17 @@ cluster_creation_aws_provider = aws.Provider(
         )
     ],
 )
+# EKS creates this group itself with never-expire retention the moment
+# control-plane logging is enabled. Declaring it first means EKS adopts ours
+# and the retention actually applies.
+control_plane_log_group = aws.cloudwatch.LogGroup(
+    f"{cluster_name}-eks-control-plane-log-group",
+    name=f"/aws/eks/{cluster_name}/cluster",
+    retention_in_days=90 if stack_info.env_suffix == "production" else 30,
+    tags=aws_config.tags,
+    opts=ResourceOptions(retain_on_delete=True),
+)
+
 # Actually make the cluster
 cluster = eks.Cluster(
     f"{cluster_name}-eks-cluster",
@@ -372,12 +384,12 @@ cluster = eks.Cluster(
     access_entries=access_entries,
     authentication_mode=eks.AuthenticationMode("API"),
     create_oidc_provider=True,
-    enabled_cluster_log_types=[
-        "api",
-        "audit",
-        "authenticator",
-    ],
-    endpoint_private_access=False,
+    # GuardDuty EKS_AUDIT_LOGS reads the audit stream directly, not from
+    # CloudWatch, so trimming these outside production costs no detection.
+    enabled_cluster_log_types=["api", "audit", "authenticator"]
+    if stack_info.env_suffix == "production"
+    else ["authenticator"],
+    endpoint_private_access=True,
     endpoint_public_access=True,
     fargate=False,
     ip_family="ipv4",
@@ -410,7 +422,7 @@ cluster = eks.Cluster(
     opts=ResourceOptions(
         provider=cluster_creation_aws_provider,
         parent=cluster_role,
-        depends_on=[cluster_role, administrator_role],
+        depends_on=[cluster_role, administrator_role, control_plane_log_group],
     ),
 )
 
@@ -431,6 +443,18 @@ def __create_apiserver_security_group_rules(pod_subnet_cidrs):
 
 
 pod_ip_blocks.apply(__create_apiserver_security_group_rules)
+
+# Vault and Concourse run on EC2 in the operations VPCs and call the API server.
+# They need this before private endpoint access is enabled, when in-VPC lookups
+# of the endpoint start resolving to the control-plane ENIs.
+aws.vpc.SecurityGroupIngressRule(
+    f"{cluster_name}-eks-apiserver-443-vpc-sg-rule",
+    security_group_id=cluster.cluster_security_group_id,
+    cidr_ipv4=target_vpc["cidr"],
+    from_port=DEFAULT_HTTPS_PORT,
+    to_port=DEFAULT_HTTPS_PORT,
+    ip_protocol="tcp",
+)
 
 export("cluster_name", cluster_name)
 export("kube_config", cluster.kubeconfig)
@@ -825,6 +849,37 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         opts=ResourceOptions(parent=ebs_csi_driver_role),
     )
 
+    # iopsPerGB is the ratio the EBS CSI driver multiplies requested size by to
+    # derive provisioned IOPS, clamped up to gp3's included 3,000 baseline. Every
+    # IOPS above that baseline bills at $0.005/month, so on a large volume the
+    # ratio, not the size, is what dominates the bill: at 50, a 100 GiB volume is
+    # $8 of storage and $10 of IOPS.
+    #
+    # Production keeps 50 because production measurably uses it. Over the fourteen
+    # days to 2026-09-15, mitxonline production Meilisearch peaked at 4,626 IOPS
+    # against the 5,000 that ratio provisions -- 93% of it. The 38% figure in the
+    # comment below predates the 500 MB/s VolumeAttributesClass; raising the
+    # throughput ceiling is what let IOPS become the binding constraint instead.
+    #
+    # CI and QA get 30, the ratio at which a 100 GiB volume -- the default size for
+    # typesense, starrocks FE and clickhouse -- lands exactly on the free 3,000
+    # baseline. Measured over the same fourteen days, the busiest non-prod volume
+    # above that baseline peaked at 639 IOPS (data-ci clickhouse), leaving 4.7x
+    # headroom, and the 24 non-prod typesense volumes peaked under 60 each.
+    # Volumes larger than 100 GiB still scale proportionally (200 GiB -> 6,000,
+    # 500 GiB -> 15,000), so this is a lower ratio rather than a flat cap.
+    #
+    # Editing this replaces the StorageClass instead of updating it -- parameters
+    # are immutable -- so the class is deleted and recreated, leaving the cluster
+    # without a default class for the fraction of a second in between. Preview
+    # reports `storageclasses.storage.k8s.io "ebs-gp3-sc" already exists` against
+    # the replacement; that is the provider dry-running the create while the old
+    # object is still there, not a plan that will fail. Verified against a k3d
+    # cluster: the delete is ordered first and the apply succeeds. Existing
+    # volumes are untouched regardless -- parameters apply at provisioning time
+    # only, and changing a live volume needs a VolumeAttributesClass.
+    ebs_iops_per_gb = "50" if stack_info.env_suffix == "production" else "30"
+
     # Default storageclass configured for nominal performance
     kubernetes.storage.v1.StorageClass(
         resource_name=f"{cluster_name}-ebs-gp3-storageclass",
@@ -839,7 +894,7 @@ if eks_config.get_bool("ebs_csi_provisioner"):
         parameters={
             "csi.storage.k8s.io/fstype": "xfs",
             "type": "gp3",
-            "iopsPerGB": "50",
+            "iopsPerGB": ebs_iops_per_gb,
             "throughput": "125",
             "encrypted": "true",
         },
@@ -907,6 +962,93 @@ if eks_config.get_bool("ebs_csi_provisioner"):
             depends_on=[ebs_csi_driver_role, *node_groups],
         ),
     )
+    # `iopsPerGB` is a ratio, so a volume large enough makes it run away: the
+    # three 1,500 GiB data-production ClickHouse volumes each carried 75,000
+    # provisioned IOPS ($360/mo apiece above the free 3,000). Over the fourteen
+    # days to 2026-09-21, ClickHouse's own one-second samples of the data device
+    # (system.asynchronous_metric_log BlockReadOps + BlockWriteOps) peaked at
+    # 1,983 ops/s combined, with p99.9 at 338 and a mean under 25; not one of the
+    # 1.28M seconds sampled exceeded 3,000. The ratio is right for the 100 GiB
+    # Meilisearch volumes it was measured against and 25x too generous for
+    # ClickHouse, whose MergeTree writes are large sequential merges, not small
+    # random I/O.
+    #
+    # This class pins a volume to gp3's included baseline regardless of size, so
+    # a workload can opt out of the ratio by name without lowering it for every
+    # other volume in the cluster. Throughput stays at the 125 MB/s default the
+    # StorageClass already provisions, so this changes only the IOPS billing line.
+    kubernetes.storage.v1.VolumeAttributesClass(
+        resource_name=f"{cluster_name}-ebs-gp3-iops-3000-volumeattributesclass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="ebs-gp3-iops-3000",
+            labels=k8s_global_labels,
+        ),
+        driver_name="ebs.csi.aws.com",
+        parameters={
+            "type": "gp3",
+            "iops": "3000",
+            "throughput": "125",
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[ebs_csi_driver_role, *node_groups],
+        ),
+    )
+    # A PVC cannot be created under ebs-gp3-sc while naming any of the classes
+    # above that set `iops`. At CreateVolume the driver overlays the class's
+    # `iops` on the StorageClass parameters, keeps `iopsPerGB`, and rejects the
+    # pair (`specify either IOPS or IOPSPerGb, not both`), so the classes only
+    # work on volumes that already exist. This is ebs-gp3-sc with a fixed 3,000
+    # IOPS in place of the ratio, for workloads whose PVC template carries one
+    # of those classes: a new volume is born at the baseline and the class on
+    # the PVC stays valid. ClickHouse data volumes use it.
+    kubernetes.storage.v1.StorageClass(
+        resource_name=f"{cluster_name}-ebs-gp3-iops-3000-storageclass",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="ebs-gp3-iops-3000-sc",
+            labels=k8s_global_labels,
+        ),
+        provisioner="ebs.csi.aws.com",
+        volume_binding_mode="WaitForFirstConsumer",
+        # ref: https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/parameters.md
+        parameters={
+            "csi.storage.k8s.io/fstype": "xfs",
+            "type": "gp3",
+            "iops": "3000",
+            "throughput": "125",
+            "encrypted": "true",
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            depends_on=[ebs_csi_driver_role, *node_groups],
+        ),
+    )
+    # Rollback targets for the class above, following the throughput-125 pattern:
+    # clearing volumeAttributesClassName never calls ec2:ModifyVolume, so the only
+    # way back to the geometry `iopsPerGB: 50` gave the ClickHouse data volumes is
+    # a class that states it. 75,000 is the 1,500 GiB data-production volumes;
+    # 25,000 is the 500 GiB data-qa volume. Rolling back means setting
+    # `clickhouse:data_volume_attributes_class` on that stack and applying; EBS
+    # accepts one modification per volume per six hours, so a rollback issued
+    # inside that window queues behind the change it reverts.
+    for rollback_iops in ("75000", "25000"):
+        kubernetes.storage.v1.VolumeAttributesClass(
+            resource_name=f"{cluster_name}-ebs-gp3-iops-{rollback_iops}-volumeattributesclass",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=f"ebs-gp3-iops-{rollback_iops}",
+                labels=k8s_global_labels,
+            ),
+            driver_name="ebs.csi.aws.com",
+            parameters={
+                "type": "gp3",
+                "iops": rollback_iops,
+                "throughput": "125",
+            },
+            opts=ResourceOptions(
+                provider=k8s_provider,
+                depends_on=[ebs_csi_driver_role, *node_groups],
+            ),
+        )
     aws_ebs_cni_driver_addon = eks.Addon(
         f"{cluster_name}-eks-addon-ebs-cni-driver-addon",
         cluster=cluster,

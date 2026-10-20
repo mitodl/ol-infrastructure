@@ -42,6 +42,7 @@ GCP = "ol-infrastructure-gcp"
 SFTP = "ol-infrastructure-aws-sftp"
 S3_SITES = "ol-infrastructure-aws-s3"
 GEMINI_API = "ol-infrastructure-gemini-api"
+AZURE_OPENAI = "ol-infrastructure-azure-openai"
 
 # ---------------------------------------------------------------------------
 # substructure/
@@ -104,7 +105,6 @@ OPEN_DISCUSSIONS = "ol-application-open-discussions"
 STARROCKS_APP = "ol-application-starrocks"
 TIKA = "ol-application-tika"
 XPRO = "ol-application-xpro"
-XQUEUE = "ol-application-xqueue"
 XQWATCHER = "ol-application-xqwatcher"
 TOOLHIVE_OPERATOR = "ol-application-toolhive-operator"
 TOOLHIVE_SWE = "ol-application-toolhive-swe"
@@ -202,6 +202,5 @@ LEGACY_STACK_REF_PREFIXES: dict[str, str] = {
     STARROCKS_APP: "applications.starrocks",
     TIKA: "applications.tika",
     XPRO: "applications.xpro",
-    XQUEUE: "applications.xqueue",
     XQWATCHER: "applications.xqwatcher",
 }

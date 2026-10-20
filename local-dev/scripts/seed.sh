@@ -26,6 +26,8 @@ declare -A APP_NAMESPACE=(
     [learn-ai]="learn-ai"
     [mitxonline]="mitxonline"
     [odl-video-service]="odl-video-service"
+    [ocw-studio]="ocw-studio"
+    [micromasters]="micromasters"
 )
 
 declare -A APP_DEPLOY=(
@@ -33,6 +35,8 @@ declare -A APP_DEPLOY=(
     [learn-ai]="learnai-webapp"
     [mitxonline]="mitxonline-webapp"
     [odl-video-service]="odlvideo-webapp"
+    [ocw-studio]="ocwstudio-webapp"
+    [micromasters]="micromasters-webapp"
 )
 
 # Default seed commands run when --app is given without --cmd.
@@ -55,6 +59,22 @@ python manage.py configure_instance"
 
     [odl-video-service]="python manage.py migrate --noinput
 python manage.py createpresets"
+
+    # No migrate: the ocw-studio deployment runs it in an init container.
+    # The superuser is what a Keycloak login associates to by email, so
+    # without it the first login lands as an unprivileged new user. Signing in
+    # before seeding creates exactly that user, and `createsuperuser` then
+    # fails on the unique email with no way forward short of exec'ing in and
+    # promoting by hand, so create-or-promote instead of create.
+    [ocw-studio]="python manage.py shell -c 'from django.contrib.auth import get_user_model; U = get_user_model(); u, created = U.objects.get_or_create(email=\"admin@odl.local\", defaults={\"username\": \"admin\", \"name\": \"Admin\"}); u.is_staff = True; u.is_superuser = True; u.save(); print((\"created\" if created else \"promoted\"), u.email)'
+python manage.py backpopulate_groups
+python manage.py import_website_starters https://github.com/mitodl/ocw-hugo-projects
+python manage.py upsert_theme_assets_pipeline"
+
+    # No migrate: the micromasters deployment runs it in an init container.
+    # seed_db rebuilds the search index itself and blocks on the celery worker.
+    [micromasters]="python manage.py shell -c 'from django.contrib.auth import get_user_model; U = get_user_model(); u, created = U.objects.get_or_create(username=\"admin\", defaults={\"email\": \"admin@odl.local\"}); u.is_staff = True; u.is_superuser = True; u.set_password(\"admin\"); u.save(); print((\"created\" if created else \"reset\"), u.username)'
+python manage.py seed_db"
 )
 
 # ---------------------------------------------------------------------------
@@ -68,8 +88,8 @@ exec_in_pod() {
     local deploy="$2"
     local cmd="$3"
 
-    log "kubectl exec -n ${namespace} deploy/${deploy} -- bash -c '${cmd}'"
-    kubectl exec -n "${namespace}" "deploy/${deploy}" -- bash -c "${cmd}"
+    log "kubectl --context local-dev exec -n ${namespace} deploy/${deploy} -- bash -c '${cmd}'"
+    kubectl --context local-dev exec -n "${namespace}" "deploy/${deploy}" -- bash -c "${cmd}"
 }
 
 list_apps() {
@@ -136,7 +156,7 @@ NS="${APP_NAMESPACE[$APP]}"
 DEPLOY="${APP_DEPLOY[$APP]}"
 
 # Verify the deployment is available
-if ! kubectl get deploy "${DEPLOY}" -n "${NS}" &>/dev/null; then
+if ! kubectl --context local-dev get deploy "${DEPLOY}" -n "${NS}" &>/dev/null; then
     err "Deployment '${DEPLOY}' not found in namespace '${NS}'. Is the stack running?"
 fi
 

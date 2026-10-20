@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 import pulumi
 import pulumi_keycloak as keycloak
@@ -86,6 +86,9 @@ class SamlIdpConfig(BaseModel):
         None  # Optional, comparison type for authn context
     )
     realm_name: str = "olapps"  # Used to construct the SP entity_id
+    # Org email domain routed to this IdP, or "ANY" for all of the org's
+    # domains. Set a specific domain when the org has more than one IdP.
+    org_domain: str = "ANY"
 
     @model_validator(mode="after")
     def ensure_principal_types(self):
@@ -125,6 +128,34 @@ def create_org_for_learn(org_config: OrgConfig) -> keycloak.Organization:
         attributes={"slug": org_config.org_alias},
         opts=org_config.resource_options,
     )
+
+
+def _org_routing_args(
+    keycloak_org: keycloak.Organization, org_domain: str
+) -> dict[str, Any]:
+    """Build the IdP arguments that link it to an org and route logins to it.
+
+    Keycloak 26.8 stores the email-domain redirect on the org's domains, each
+    of which routes to one IdP. Against 26.8 the provider rejects the redirect
+    on an IdP whose org has no domains, and rejects a second IdP claiming a
+    domain that already routes elsewhere. So the redirect is on only when the
+    org has domains, and an org with more than one IdP has to give each a
+    distinct ``org_domain``.
+
+    ``org_domain`` is also the only email domain Keycloak accepts from users
+    who arrive through that IdP, so an IdP pinned to one domain turns away a
+    first login whose email is in another of the org's domains.
+
+    :param keycloak_org: The organization the IdP is linked to.
+    :param org_domain: One of the org's domains, or "ANY" for all of them.
+    :returns: Keyword arguments for a SAML or OIDC ``IdentityProvider``.
+    :rtype: dict[str, Any]
+    """
+    return {
+        "org_domain": org_domain,
+        "org_redirect_mode_email_matches": keycloak_org.domains.apply(bool),
+        "organization_id": keycloak_org.id,
+    }
 
 
 def onboard_saml_org(  # noqa: C901
@@ -187,9 +218,7 @@ def onboard_saml_org(  # noqa: C901
         "first_broker_login_flow_alias": saml_config.first_login_flow.alias,
         "hide_on_login_page": True,
         "name_id_policy_format": saml_config.name_id_format,
-        "org_domain": "ANY",
-        "org_redirect_mode_email_matches": True,
-        "organization_id": keycloak_org.id,
+        **_org_routing_args(keycloak_org, saml_config.org_domain),
         "post_binding_authn_request": saml_config.post_binding_authn_request,
         "post_binding_response": True,
         "principal_type": saml_config.principal_type,
@@ -357,16 +386,33 @@ class OIDCIdpConfig(BaseModel):
     resource_options: pulumi.ResourceOptions
     client_id: str
     client_secret: str | None = None
+    extra_config: dict[str, str] | None = None  # Merged in, takes precedence
+    # Org email domain routed to this IdP, or "ANY" for all of the org's
+    # domains. Set a specific domain when the org has more than one IdP.
+    org_domain: str = "ANY"
 
 
 def onboard_oidc_org(
     oidc_config: OIDCIdpConfig,
     org: OrgConfig | keycloak.Organization,
-) -> None:
+) -> keycloak.oidc.IdentityProvider:
     """Create an OIDC IdP and link it to an org.
 
     Pass an OrgConfig to create the org, or an existing keycloak.Organization
     to attach a second IdP to an org that was already created.
+
+    Returns the created IdentityProvider so callers can attach
+    identity_provider_alias-scoped resources, e.g.
+    AttributeImporterIdentityProviderMapper, with a real Pulumi dependency
+    edge instead of a bare alias string.
+
+    :raises OidcDiscoveryError: propagated from
+        oidc_identity_provider_args_from_discovery_url if the discovery
+        document is inaccessible/unparseable, the provider is missing
+        required scopes (openid, email, profile), or it doesn't support the
+        selected client-auth method (client_secret_basic when
+        oidc_config.client_secret is set, private_key_jwt otherwise) -- this
+        fails the deploy rather than silently dropping the IdP resource.
     """
     keycloak_org = (
         org if isinstance(org, keycloak.Organization) else create_org_for_learn(org)
@@ -382,11 +428,19 @@ def onboard_oidc_org(
         oidc_config.org_oidc_metadata_url,
         client_secret=oidc_config.client_secret,
     )
-    oidc_idp_arg_map["extra_config"] = {
-        "jwtX509HeadersEnabled": True,
-    } | oidc_idp_arg_map.get("extra_config", {})
+    # Caller-supplied extra_config is merged first (lowest precedence) so it
+    # can add new keys (e.g. Board Infinity's PKCE settings) but can never
+    # override the helper-owned/validated ones that follow -- in particular
+    # clientAuthMethod, which oidc_identity_provider_args_from_discovery_url
+    # already validated against the discovery doc. Letting a caller clobber
+    # that would silently produce an IdP that can't exchange codes.
+    oidc_idp_arg_map["extra_config"] = (
+        (oidc_config.extra_config or {})
+        | {"jwtX509HeadersEnabled": "true"}
+        | oidc_idp_arg_map.get("extra_config", {})
+    )
     oidc_idp_arg_map["login_hint"] = True  # Preserve existing login_hint configuration
-    keycloak.oidc.IdentityProvider(
+    return keycloak.oidc.IdentityProvider(
         f"ol-apps-{resource_alias}-oidc-idp",
         alias=keycloak_alias,
         client_id=oidc_config.client_id,
@@ -396,10 +450,9 @@ def onboard_oidc_org(
         enabled=True,
         sync_mode="FORCE",
         hide_on_login_page=True,
-        org_domain="ANY",
-        org_redirect_mode_email_matches=True,
-        organization_id=keycloak_org.id,
         validate_signature=True,
         trust_email=True,
+        opts=oidc_config.resource_options,
+        **_org_routing_args(keycloak_org, oidc_config.org_domain),
         **oidc_idp_arg_map,
     )

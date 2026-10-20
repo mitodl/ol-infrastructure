@@ -6,7 +6,9 @@ from pathlib import Path
 
 import boto3
 import requests
-from requests_aws4auth import AWS4Auth
+from botocore.auth import SigV4Auth
+from botocore.awsrequest import AWSRequest
+from botocore.credentials import Credentials
 
 from bridge.secrets.sops import read_yaml_secrets
 
@@ -79,12 +81,10 @@ assume_role_response = (
     )
 )
 credentials = assume_role_response["Credentials"]
-awsauth = AWS4Auth(
+signing_credentials = Credentials(
     credentials["AccessKeyId"],
     credentials["SecretAccessKey"],
-    "us-east-1",
-    "es",
-    session_token=credentials["SessionToken"],
+    credentials["SessionToken"],
 )
 
 
@@ -126,11 +126,13 @@ logger.info("%s connector: %s", action, connector_name)
 headers = {"Content-Type": "application/json", "Connection": "close"}
 
 if not dry_run:
+    body = json.dumps(connector_payload)
+    signed_request = AWSRequest(method="POST", url=url, data=body, headers=headers)
+    SigV4Auth(signing_credentials, "es", "us-east-1").add_auth(signed_request)
     response = requests.post(  # noqa: S113
         url,
-        headers=headers,
-        auth=awsauth,
-        data=json.dumps(connector_payload),
+        headers=dict(signed_request.headers),
+        data=body,
     )
     if response.status_code in (200, 201):
         logger.info("Successfully created connector: %s", connector_name)

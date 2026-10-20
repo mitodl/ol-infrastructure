@@ -19,6 +19,7 @@ def create_database(
     _k8s: Callable[..., ResourceOptions],
     local_infra_ns: k8s.core.v1.Namespace,
     cnpg_version: str,
+    postgres_version: str,
 ) -> DatabaseResources:
     """Deploy the CloudNativePG operator and a shared PostgreSQL cluster.
 
@@ -68,12 +69,20 @@ def create_database(
         },
         spec={
             "instances": 1,
+            "imageName": f"ghcr.io/cloudnative-pg/postgresql:{postgres_version}",
             "storage": {"size": "10Gi"},
             "bootstrap": {
                 "initdb": {
                     "database": "app",
                     "owner": "app",
                     "secret": {"name": "pg-app-credentials"},
+                    # Deliberately not extended for optional apps. This block
+                    # only runs when initdb bootstraps an empty data directory,
+                    # so adding a database here would do nothing for anyone who
+                    # already has a cluster -- while still producing a spec diff
+                    # against an immutable initdb section. Apps added after this
+                    # point create their own databases from an init container
+                    # (see local-dev/apps/ocw-studio/deployment.yaml).
                     "postInitSQL": [
                         # Django test runners (and pytest-django) create and
                         # drop a throwaway test database, which requires the

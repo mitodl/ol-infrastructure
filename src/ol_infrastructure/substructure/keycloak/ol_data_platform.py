@@ -6,6 +6,40 @@ import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
+from ol_infrastructure.substructure.keycloak.client_policies import (
+    PKCE_REQUIRED_CLIENT_ARGS,
+    create_pkce_client_policy,
+)
+from ol_infrastructure.substructure.keycloak.org_flows import (
+    create_staff_organizations,
+)
+from ol_infrastructure.substructure.keycloak.passkey_flow import (
+    create_passkey_browser_flow,
+)
+
+# StarRocks forwards the user's ID token to the Iceberg REST catalog under
+# iceberg.catalog.security=JWT and never refreshes it, and Keycloak expires the ID
+# token with the access token. At the realm default of 5m every catalog call fails
+# about five minutes into a session. See
+# docs/plans/gravitino-keycloak-integration-spec.md D3.
+STARROCKS_TOKEN_LIFESPAN_SECONDS = 3600
+
+# eduPersonPrincipalName, e.g. "tmacey@mit.edu".
+TOUCHSTONE_EPPN_ATTRIBUTE = "urn:oid:1.3.6.1.4.1.5923.1.1.1.6"
+TOUCHSTONE_SCOPE = "mit.edu"
+# Shared realm roles whose holders also get the same client role on
+# ol-starrocks-client. ol_instructor and ol_researcher are left out: their
+# StarRocks grants are catalog-wide SELECT today, and their access will come
+# from dbt-level grants instead.
+STARROCKS_SHARED_REALM_ROLES = frozenset(
+    {
+        "ol_platform_admin",
+        "ol_data_engineer",
+        "ol_data_analyst",
+        "ol_business_analyst",
+    }
+)
+
 
 def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
@@ -101,6 +135,12 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         opts=resource_options,
     )
 
+    create_staff_organizations(
+        "ol-data-platform",
+        {"MIT": "mit.edu"},
+        resource_options.merge(ResourceOptions(depends_on=[ol_data_platform_realm])),
+    )
+
     keycloak.RealmEvents(
         "ol-data-platform-realm-events",
         realm_id=ol_data_platform_realm.realm,
@@ -112,6 +152,93 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         events_listeners=["jboss-logging"],
     )
 
+    # saml_uid has to be a managed attribute. With no unmanagedAttributePolicy
+    # the admin API omits unmanaged attributes from user representations
+    # (DefaultAttributes.isAllowUnmanagedAttribute), while protocol mappers
+    # read the user model directly. Without this,
+    # substructure/starrocks/keycloak_group_sync.py and the Gravitino grant
+    # reconciler, which read saml_uid through GET /users, could never see it.
+    #
+    # RealmUserProfile replaces the whole profile, so the first four attributes
+    # and the group restate Keycloak's keycloak-default-user-profile.json.
+    _user_and_admin = keycloak.RealmUserProfileAttributePermissionsArgs(
+        views=["admin", "user"], edits=["admin", "user"]
+    )
+    keycloak.RealmUserProfile(
+        "ol-data-platform-user-profile",
+        realm_id=ol_data_platform_realm.realm,
+        attributes=[
+            keycloak.RealmUserProfileAttributeArgs(
+                name="username",
+                display_name="${username}",
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="length", config={"min": "3", "max": "255"}
+                    ),
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="username-prohibited-characters", config={}
+                    ),
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="up-username-not-idn-homograph", config={}
+                    ),
+                ],
+                permissions=_user_and_admin,
+            ),
+            keycloak.RealmUserProfileAttributeArgs(
+                name="email",
+                display_name="${email}",
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="email", config={}
+                    ),
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="length", config={"max": "255"}
+                    ),
+                ],
+                required_for_roles=["user"],
+                permissions=_user_and_admin,
+            ),
+            *(
+                keycloak.RealmUserProfileAttributeArgs(
+                    name=name,
+                    display_name=f"${{{name}}}",
+                    validators=[
+                        keycloak.RealmUserProfileAttributeValidatorArgs(
+                            name="length", config={"max": "255"}
+                        ),
+                        keycloak.RealmUserProfileAttributeValidatorArgs(
+                            name="person-name-prohibited-characters", config={}
+                        ),
+                    ],
+                    required_for_roles=["user"],
+                    permissions=_user_and_admin,
+                )
+                for name in ("firstName", "lastName")
+            ),
+            keycloak.RealmUserProfileAttributeArgs(
+                name="saml_uid",
+                display_name="Touchstone uid",
+                group="user-metadata",
+                required_for_roles=[],
+                # Not editable by anyone: this value is the StarRocks principal,
+                # and only the Touchstone IdP mapper, which writes the user
+                # model directly, should set it. An editable attribute is also
+                # cleared by any admin API user update that omits it.
+                permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
+                    views=["admin"], edits=[]
+                ),
+            ),
+        ],
+        groups=[
+            keycloak.RealmUserProfileGroupArgs(
+                name="user-metadata",
+                display_header="User metadata",
+                display_description="Attributes, which refer to user metadata",
+            )
+        ],
+        opts=resource_options,
+    )
+
     keycloak.RequiredAction(
         "ol-data-verify-email",
         realm_id=ol_data_platform_realm.realm,
@@ -119,6 +246,10 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         default_action=False,
         enabled=False,
         opts=resource_options,
+    )
+
+    create_pkce_client_policy(
+        ol_data_platform_realm.id, "ol-data-platform", resource_options
     )
 
     # SUPERSET [START] # noqa: ERA001
@@ -233,95 +364,12 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         implicit_flow_enabled=False,
         direct_access_grants_enabled=False,
         service_accounts_enabled=False,
-        valid_redirect_uris=[
-            "http://localhost:8080/callback",  # CLI callback
-            "http://localhost:*/callback",  # Allow any localhost port
-            "http://127.0.0.1:8080/callback",
-        ],
-        web_origins=["+"],  # Allow all origins for CORS (CLI use)
+        **PKCE_REQUIRED_CLIENT_ARGS,
+        # superset-sup listens on this fixed port. A loopback redirect has to
+        # match exactly, so there is no wildcard-port entry.
+        valid_redirect_uris=["http://localhost:8080/callback"],
+        web_origins=["http://localhost:8080"],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
-    )
-
-    # Create realm roles for ol-data-platform
-    keycloak.Role(
-        "ol-platform-admin-role",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-platform-admin",
-        description=(
-            "Full administrative access to all data and platform resources - "
-            "maps to superset_admin"
-        ),
-        composite_roles=[
-            ol_data_platform_superset_client_role_refs["ol_platform_admin"].id
-        ],
-        opts=resource_options,
-    )
-
-    keycloak.Role(
-        "ol-researcher-role",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-researcher",
-        description=(
-            "Research role with ML capabilities and broad data access - "
-            "maps to superset_researcher"
-        ),
-        composite_roles=[
-            ol_data_platform_superset_client_role_refs["ol_researcher"].id
-        ],
-        opts=resource_options,
-    )
-
-    keycloak.Role(
-        "ol-data-engineer-role",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-data-engineer",
-        description=(
-            "Data engineering role with limited production access - "
-            "maps to superset_alpha"
-        ),
-        composite_roles=[
-            ol_data_platform_superset_client_role_refs["ol_data_engineer"].id
-        ],
-        opts=resource_options,
-    )
-
-    keycloak.Role(
-        "ol-data-analyst-role",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-data-analyst",
-        description=(
-            "Data analyst role with read-only access to production data - "
-            "maps to superset_gamma"
-        ),
-        composite_roles=[
-            ol_data_platform_superset_client_role_refs["ol_data_analyst"].id
-        ],
-        opts=resource_options,
-    )
-
-    keycloak.Role(
-        "ol-instructor",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-instructor",
-        description="Instructor role with limited access to educational data",
-        composite_roles=[
-            ol_data_platform_superset_client_role_refs["ol_instructor"].id
-        ],
-        opts=resource_options,
-    )
-
-    keycloak.Role(
-        "ol-business-analyst",
-        realm_id=ol_data_platform_realm.id,
-        name="ol-business-analyst",
-        description=(
-            "Business analyst role similar to existing business_intelligence "
-            "and finance roles"
-        ),
-        composite_roles=[
-            ol_data_platform_superset_client_role_refs["ol_business_analyst"].id
-        ],
-        opts=resource_options,
     )
 
     ol_data_platform_role_keys_openid_client_scope = keycloak.openid.ClientScope(
@@ -474,6 +522,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         implicit_flow_enabled=False,
         service_accounts_enabled=True,
         valid_redirect_uris=ol_data_platform_starrocks_redirect_uris,
+        access_token_lifespan=str(STARROCKS_TOKEN_LIFESPAN_SECONDS),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
     ol_data_platform_starrocks_client_roles = (
@@ -490,6 +539,73 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             opts=resource_options,
         )
         ol_data_platform_starrocks_client_role_refs[role] = role_ref
+
+    # Realm roles are what people get assigned. Each one is a composite of the
+    # matching client role on ol-superset-client and, for the roles in
+    # STARROCKS_SHARED_REALM_ROLES, on ol-starrocks-client, so one assignment
+    # gives a person that role in both. They are created here, after both
+    # clients, because composite_roles needs both sets of client role ids. A
+    # stack with no StarRocks client roles configured (CI) gets Superset-only
+    # composites.
+    for resource_name, realm_role, client_role, description in (
+        (
+            "ol-platform-admin-role",
+            "ol-platform-admin",
+            "ol_platform_admin",
+            "Full administrative access to all data and platform resources - "
+            "maps to superset_admin",
+        ),
+        (
+            "ol-researcher-role",
+            "ol-researcher",
+            "ol_researcher",
+            "Research role with ML capabilities and broad data access - "
+            "maps to superset_researcher",
+        ),
+        (
+            "ol-data-engineer-role",
+            "ol-data-engineer",
+            "ol_data_engineer",
+            "Data engineering role with limited production access - "
+            "maps to superset_alpha",
+        ),
+        (
+            "ol-data-analyst-role",
+            "ol-data-analyst",
+            "ol_data_analyst",
+            "Data analyst role with read-only access to production data - "
+            "maps to superset_gamma",
+        ),
+        (
+            "ol-instructor",
+            "ol-instructor",
+            "ol_instructor",
+            "Instructor role with limited access to educational data",
+        ),
+        (
+            "ol-business-analyst",
+            "ol-business-analyst",
+            "ol_business_analyst",
+            "Business analyst role similar to existing business_intelligence "
+            "and finance roles",
+        ),
+    ):
+        keycloak.Role(
+            resource_name,
+            realm_id=ol_data_platform_realm.id,
+            name=realm_role,
+            description=description,
+            composite_roles=[
+                ol_data_platform_superset_client_role_refs[client_role].id,
+                *(
+                    [ol_data_platform_starrocks_client_role_refs[client_role].id]
+                    if ol_data_platform_starrocks_client_role_refs
+                    and client_role in STARROCKS_SHARED_REALM_ROLES
+                    else []
+                ),
+            ],
+            opts=resource_options,
+        )
 
     vault.generic.Secret(
         "ol-data-platform-starrocks-client-vault-oidc-credentials",
@@ -529,7 +645,9 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             opts=resource_options,
         )
 
-    # Map composite realm roles to StarRocks client roles
+    # StarRocks-only realm roles, for someone who should have a StarRocks role
+    # without the matching Superset one. The shared ol-* realm roles above are
+    # the normal way to grant access.
     if "ol_platform_admin" in ol_data_platform_starrocks_client_role_refs:
         keycloak.Role(
             "ol-starrocks-platform-admin-composite",
@@ -651,8 +769,8 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     )
 
     # StarRocks 4.x rejects '@' in usernames.  Expose the Kerberos short username
-    # stored in the "saml_uid" user attribute (populated by the Touchstone SAML
-    # uid mapper above) as the "starrocks_username" JWT claim so that the
+    # stored in the "saml_uid" user attribute (populated by the Touchstone eppn
+    # mapper below) as the "starrocks_username" JWT claim so that the
     # StarRocks security integration principal_field can reference it.
     keycloak.openid.UserAttributeProtocolMapper(
         "ol-data-platform-starrocks-client-username-mapper",
@@ -683,12 +801,11 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         implicit_flow_enabled=False,
         direct_access_grants_enabled=False,
         service_accounts_enabled=False,
-        valid_redirect_uris=[
-            "http://localhost:18080/callback",
-            "http://localhost:*/callback",
-            "http://127.0.0.1:18080/callback",
-        ],
-        web_origins=["+"],
+        **PKCE_REQUIRED_CLIENT_ARGS,
+        # bin/starrocks-auth in ol-data-platform listens on this fixed port.
+        valid_redirect_uris=["http://localhost:18080/callback"],
+        web_origins=["http://localhost:18080"],
+        access_token_lifespan=str(STARROCKS_TOKEN_LIFESPAN_SECONDS),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
     keycloak.openid.ClientDefaultScopes(
@@ -718,7 +835,118 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         add_to_userinfo=True,
         opts=resource_options,
     )
+    # The interactive PKCE path issues through ol-starrocks-cli, so without this
+    # mapper role-driven policy downstream of the token (e.g. Gravitino groups)
+    # matched nothing for the tokens humans actually arrive with. It projects the
+    # same ol-starrocks-client roles as the confidential client's mapper.
+    # multivalued=True matters: Gravitino drops a non-list groups claim silently.
+    keycloak.openid.UserClientRoleProtocolMapper(
+        "ol-data-platform-starrocks-cli-role-keys-mapper",
+        claim_name="role_keys",
+        realm_id=ol_data_platform_realm.id,
+        add_to_access_token=True,
+        add_to_id_token=True,
+        add_to_userinfo=True,
+        claim_value_type="String",
+        client_id=ol_data_platform_starrocks_cli_client.id,
+        client_id_for_role_mappings="ol-starrocks-client",
+        multivalued=True,
+        name="starrocks-role-keys",
+        opts=resource_options,
+    )
     # STARROCKS [END] # noqa: ERA001
+
+    # GRAVITINO [START] # noqa: ERA001
+    # Bootstrap credential for StarRocks' CREATE EXTERNAL CATALOG. security=JWT
+    # alone cannot create the catalog: RESTSessionCatalog.initialize() runs with
+    # no user session, so GET /v1/config goes out unauthenticated. This
+    # credential is used at catalog init only; every per-user operation carries
+    # the end user's own token. Its client id is also the catalog's audience.
+    ol_data_platform_gravitino_catalog_client = keycloak.openid.Client(
+        "ol-data-platform-gravitino-catalog-client",
+        name="ol-data-platform-gravitino-catalog-client",
+        realm_id=ol_data_platform_realm.id,
+        client_id="ol-gravitino-catalog",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=False,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=True,
+        direct_access_grants_enabled=False,
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+
+    # Gravitino service admin, used by the reconciler that creates the metalake,
+    # catalog, groups, roles and grants through the management API. Its
+    # realm-management roles let it enumerate users and client roles when adding
+    # users to the metalake. See gravitino-authorization-spec.md A6-A8 in
+    # https://github.com/mitodl/ol-infrastructure/pull/5925
+    ol_data_platform_gravitino_admin_client = keycloak.openid.Client(
+        "ol-data-platform-gravitino-admin-client",
+        name="ol-data-platform-gravitino-admin-client",
+        realm_id=ol_data_platform_realm.id,
+        client_id="ol-gravitino-admin",
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=False,
+        implicit_flow_enabled=False,
+        service_accounts_enabled=True,
+        direct_access_grants_enabled=False,
+        opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    for resource_name, role in [
+        ("ol-gravitino-admin-service-account-view-users", "view-users"),
+        ("ol-gravitino-admin-service-account-view-clients", "view-clients"),
+    ]:
+        keycloak.openid.ClientServiceAccountRole(
+            resource_name,
+            realm_id=ol_data_platform_realm.id,
+            service_account_user_id=ol_data_platform_gravitino_admin_client.service_account_user_id,
+            client_id=realm_mgmt_client.id,
+            role=role,
+            opts=resource_options,
+        )
+
+    for vault_name, gravitino_client in (
+        ("gravitino-catalog", ol_data_platform_gravitino_catalog_client),
+        ("gravitino-admin", ol_data_platform_gravitino_admin_client),
+    ):
+        vault.generic.Secret(
+            f"ol-data-platform-{vault_name}-client-vault-credentials",
+            path=f"secret-operations/sso/{vault_name}",
+            data_json=Output.all(
+                url=gravitino_client.realm_id.apply(
+                    lambda realm_id: f"{keycloak_url}/realms/{realm_id}"
+                ),
+                client_id=gravitino_client.client_id,
+                client_secret=gravitino_client.client_secret,
+                realm_id=gravitino_client.realm_id,
+                realm_name="ol-data-platform",
+            ).apply(json.dumps),
+        )
+
+    # Gravitino accepts exactly one serviceAudience, so every client whose tokens
+    # reach it has to carry the same aud value. The two StarRocks paths forward
+    # the ID token; the service accounts only have an access token. Keycloak
+    # appends rather than replaces aud, and StarRocks checks aud by containment,
+    # so existing StarRocks logins are unaffected.
+    for mapper_name, audience_client in (
+        ("starrocks", ol_data_platform_starrocks_client),
+        ("starrocks-cli", ol_data_platform_starrocks_cli_client),
+        ("gravitino-catalog", ol_data_platform_gravitino_catalog_client),
+        ("gravitino-admin", ol_data_platform_gravitino_admin_client),
+    ):
+        keycloak.openid.AudienceProtocolMapper(
+            f"ol-data-platform-{mapper_name}-gravitino-audience-mapper",
+            realm_id=ol_data_platform_realm.id,
+            client_id=audience_client.id,
+            name="gravitino-audience",
+            included_client_audience=ol_data_platform_gravitino_catalog_client.client_id,
+            add_to_id_token=True,
+            add_to_access_token=True,
+            opts=resource_options,
+        )
+    # GRAVITINO [END] # noqa: ERA001
 
     # MARIMO [START] # noqa: ERA001
     # ol-marimo-client: used by JupyterHub GenericOAuthenticator (auth code flow)
@@ -743,6 +971,11 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
             "https://nb.data.ol.mit.edu/*",
             "https://nb-qa.data.ol.mit.edu/*",
             "https://nb-ci.data.ol.mit.edu/*",
+            # Published marimo apps (applications/marimo_data). APISIX derives
+            # redirect_uri from the request path, so this has to be a wildcard.
+            "https://apps.nb.data.ol.mit.edu/*",
+            "https://apps.nb-qa.data.ol.mit.edu/*",
+            "https://apps.nb-ci.data.ol.mit.edu/*",
         ],
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
@@ -810,86 +1043,9 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
 
     # OL Data Platform Realm - Authentication Flows[START]
     # OL - browser flow [START]
-    # username-form -> ol-auth-username-password-form
-
-    ol_browser_data_platform_flow = keycloak.authentication.Flow(
-        "ol-browser-data-platform-flow",
-        realm_id=ol_data_platform_realm.id,
-        alias="ol-browser-data-platform-flow",
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-data-platform-auth-cookie",
-        realm_id=ol_data_platform_realm.id,
-        parent_flow_alias=ol_browser_data_platform_flow.alias,
-        authenticator="auth-cookie",
-        requirement="ALTERNATIVE",
-        priority=10,
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-data-platform-idp-redirector",
-        realm_id=ol_data_platform_realm.id,
-        parent_flow_alias=ol_browser_data_platform_flow.alias,
-        authenticator="identity-provider-redirector",
-        requirement="ALTERNATIVE",
-        priority=20,
-        opts=resource_options,
-    )
-    ol_browser_data_platform_flow_org = keycloak.authentication.Subflow(
-        "ol-browser-data-platform-flow-org",
-        realm_id=ol_data_platform_realm.id,
-        alias="ol-browser-data-platform-flow-org",
-        parent_flow_alias=ol_browser_data_platform_flow.alias,
-        provider_id="basic-flow",
-        requirement="ALTERNATIVE",
-        priority=30,
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-data-platform_flow-org-user-configured",
-        realm_id=ol_data_platform_realm.id,
-        parent_flow_alias=ol_browser_data_platform_flow_org.alias,
-        authenticator="conditional-user-configured",
-        priority=40,
-        requirement="REQUIRED",
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-data-platform_flow-org-identity-first",
-        realm_id=ol_data_platform_realm.id,
-        parent_flow_alias=ol_browser_data_platform_flow_org.alias,
-        authenticator="organization",
-        priority=50,
-        requirement="ALTERNATIVE",
-        opts=resource_options,
-    )
-    ol_browser_data_platform_passkey_flow = keycloak.authentication.Subflow(
-        "ol-browser-data-platform-passkey-flow",
-        realm_id=ol_data_platform_realm.id,
-        alias="ol-browser-data-platform-passkey-flow",
-        parent_flow_alias=ol_browser_data_platform_flow.alias,
-        provider_id="basic-flow",
-        priority=60,
-        requirement="REQUIRED",
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-data-platform-flow-username-form",
-        realm_id=ol_data_platform_realm.id,
-        parent_flow_alias=ol_browser_data_platform_passkey_flow.alias,
-        authenticator="auth-username-form",
-        requirement="REQUIRED",
-        priority=70,
-        opts=resource_options,
-    )
-    keycloak.authentication.Execution(
-        "ol-browser-data-platform-webauthn-authenticator-flow",
-        realm_id=ol_data_platform_realm.id,
-        parent_flow_alias=ol_browser_data_platform_passkey_flow.alias,
-        authenticator="webauthn-authenticator-passwordless",
-        requirement="REQUIRED",
-        priority=80,
+    ol_browser_data_platform_flow = create_passkey_browser_flow(
+        ol_data_platform_realm.id,
+        "ol-browser-data-platform",
         opts=resource_options,
     )
     # Bind the flow to the ol-data-platform realm for browser login.
@@ -974,7 +1130,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         post_binding_response=True,
         post_binding_authn_request=True,
         principal_type="ATTRIBUTE",
-        principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
+        principal_attribute=TOUCHSTONE_EPPN_ATTRIBUTE,
         single_sign_on_service_url="https://idp.mit.edu/idp/profile/SAML2/POST/SSO",
         trust_email=True,
         validate_signature=True,
@@ -1038,19 +1194,37 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         },
         opts=resource_options,
     )
-    # MIT Touchstone sends the Kerberos short username (e.g. "tmacey") in the
-    # SAML "uid" attribute.  Store it as the "saml_uid" Keycloak user attribute
-    # so that protocol mappers on StarRocks clients can expose it as the
-    # "starrocks_username" claim (StarRocks 4.x rejects "@" in usernames).
-    keycloak.AttributeImporterIdentityProviderMapper(
-        "ol-data-platform-touchstone-saml-uid-attribute",
-        name="ol-data-platform-touchstone-saml-uid-attribute",
+    # Store the Kerberos short username (e.g. "tmacey") as the "saml_uid" user
+    # attribute, so that protocol mappers on StarRocks clients can expose it as
+    # the "starrocks_username" claim (StarRocks 4.x rejects "@" in usernames).
+    #
+    # Touchstone does not release a "uid" attribute by default, and an importer
+    # keyed on one left saml_uid unset for every user. It does send
+    # eduPersonPrincipalName ("tmacey@mit.edu"), which is already this IdP's
+    # principal attribute. The XPath importer wraps a plain value in <root>, so
+    # the expression takes the part before the "@". An eppn in any other scope
+    # yields the empty string, which the mapper discards: two people who share
+    # a local part across scopes must not become one principal.
+    #
+    # FORCE, so that existing users get the attribute at their next login
+    # whatever sync mode the IdP itself carries.
+    #
+    # The old "uid" importer had to go rather than sit beside this one: on a
+    # login where "uid" is absent it sets saml_uid to an empty list.
+    keycloak.CustomIdentityProviderMapping(
+        "ol-data-platform-touchstone-saml-uid-from-eppn",
+        name="ol-data-platform-touchstone-saml-uid-from-eppn",
         realm=ol_data_platform_realm.id,
-        attribute_name="uid",
         identity_provider_alias=ol_data_platform_touchstone_saml_identity_provider.alias,
-        user_attribute="saml_uid",
+        identity_provider_mapper="saml-xpath-attribute-idp-mapper",
         extra_config={
-            "syncMode": "INHERIT",
+            "attribute.name": TOUCHSTONE_EPPN_ATTRIBUTE,
+            "attribute.xpath": (
+                f"substring-before(/root[substring-after(., '@') = "
+                f"'{TOUCHSTONE_SCOPE}'], '@')"
+            ),
+            "user.attribute": "saml_uid",
+            "syncMode": "FORCE",
         },
         opts=resource_options,
     )

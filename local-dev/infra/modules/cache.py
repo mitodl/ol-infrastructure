@@ -5,6 +5,8 @@ from collections.abc import Callable
 import pulumi_kubernetes as k8s
 from pulumi import ResourceOptions
 
+from bridge.lib.versions import VALKEY_VERSION
+
 
 def create_cache(
     _k8s: Callable[..., ResourceOptions],
@@ -28,7 +30,7 @@ def create_cache(
                     "containers": [
                         {
                             "name": "valkey",
-                            "image": "valkey/valkey:8-alpine",
+                            "image": f"valkey/valkey:{VALKEY_VERSION}",
                             "ports": [{"containerPort": 6379}],
                             "resources": {
                                 "limits": {"memory": "128Mi"},

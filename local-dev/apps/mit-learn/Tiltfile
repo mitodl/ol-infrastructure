@@ -8,7 +8,7 @@ load("../../tiltlib.star", "k8s_yaml_local")
 
 NAMESPACE = "mit-learn"
 IMAGE = "mitodl/mit-learn-app"
-MIT_LEARN_DIR = os.path.join(config.main_dir, "../mit-learn")
+MIT_LEARN_DIR = os.path.join(os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/.."), "mit-learn")
 _MIT_LEARN_APP_DIR = os.path.join(config.main_dir, "local-dev/apps/mit-learn")
 _rd = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
 
@@ -36,6 +36,8 @@ if os.path.exists(os.path.join(MIT_LEARN_DIR, ".git")):
             "frontends/",
             ".yarn/",
             "**/node_modules",
+            # Agent worktrees; syncing one into the pod restarted it in a loop.
+            ".claude/",
         ],
         # Live update: sync source changes into the container; granian runs
         # with --reload (see deployment.yaml) and restarts workers on change.
@@ -59,14 +61,31 @@ if os.path.exists(os.path.join(MIT_LEARN_DIR, ".git")):
 # Kubernetes Resources
 # ─────────────────────────────────────────────────────────────
 
+# The warehouse settings go in with the rest so that enabling or disabling the
+# lake changes the config fingerprint and rolls the pods. Without the lake the
+# ConfigMap is applied empty: the host would not resolve, and MIT Learn
+# schedules its program certificates sync whenever beat is enabled and
+# STARROCKS_HOST and STARROCKS_USER are set.
+_warehouse_env = "warehouse-env-off.yaml"
+if "data-platform" in os.environ.get("LOCAL_DEV_ENABLED_APPS", "").split(","):
+    _warehouse_env = "warehouse-env.yaml"
+
 # Apply all manifests in order.
 k8s_yaml_local([
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/nginx.yaml"),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/app-env.yaml"),
+    os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/" + _warehouse_env),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/secrets.yaml"),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/deployment.yaml"),
     os.path.join(config.main_dir, "local-dev/apps/mit-learn/apisix-routes.yaml"),
 ], local_overrides=os.path.join(config.main_dir, "local-dev/apps/mit-learn/configmaps/app-env.local.yaml"))
+
+# Applied separately: these objects front a process on the developer's machine
+# rather than anything in this app, and none of them are ConfigMaps or Secrets,
+# so they have no business in mit-learn's config fingerprint.
+k8s_yaml_local([
+    os.path.join(config.main_dir, "local-dev/apps/mit-learn/ocw-hugo-dev.yaml"),
+])
 
 # ─────────────────────────────────────────────────────────────
 # Resource grouping + dependency declarations
@@ -82,6 +101,35 @@ k8s_resource(
     links=[
         link("https://api.learn.mit.dev", "MIT Learn API"),
         link("https://learn.mit.dev", "MIT Learn Frontend"),
+    ],
+)
+
+# The routes' openid-connect blocks take discovery and session.secret from the
+# ol-*-oidc Secrets local-infra-apps writes. Applied against Secrets without
+# them, a route fails APISIX's schema check, APISIX rejects the whole config
+# push, and an APISIX pod that local-infra-core is rolling never becomes ready.
+k8s_resource(
+    new_name="mitlearn-routes",
+    objects=[
+        "mitlearn-shared-plugins:apisixpluginconfig",
+        "mitlearn-tls:apisixtls",
+        "mitlearn-route-no-prefix:apisixroute",
+        "mitlearn-route-prefix:apisixroute",
+    ],
+    labels=["mit-learn"],
+    resource_deps=["local-infra-apps"],
+)
+
+k8s_resource(
+    new_name="ocw-hugo-dev",
+    objects=[
+        "ocw-hugo-dev:apisixupstream",
+        "ocw-hugo-dev-tls:apisixtls",
+        "ocw-hugo-dev-route:apisixroute",
+    ],
+    labels=["mit-learn"],
+    links=[
+        link("https://ocw-dev.learn." + _rd, "OCW theme dev server (bare metal)"),
     ],
 )
 

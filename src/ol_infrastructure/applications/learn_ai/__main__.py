@@ -1,7 +1,6 @@
 # ruff: noqa: E501
 """Learn AI application infrastructure deployment (Pulumi)."""
 
-import base64
 import json
 import mimetypes
 import textwrap
@@ -29,7 +28,6 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
     DEFAULT_REDIS_PORT,
     DEFAULT_WSGI_PORT,
-    ONE_MEGABYTE_BYTE,
     STATIC_ASSET_MAX_AGE_SECONDS,
 )
 from bridge.secrets.sops import read_yaml_secrets
@@ -40,6 +38,7 @@ from ol_infrastructure.components.services import appdb
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
@@ -55,6 +54,7 @@ from ol_infrastructure.components.services.k8s import (
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sCeleryBeatConfig,
+    OLApplicationK8sCeleryRedisConfig,
     OLApplicationK8sCeleryWorkerConfig,
     OLApplicationK8sConfig,
 )
@@ -73,16 +73,24 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import lint_iam_policy
+from ol_infrastructure.lib.azure_workload_identity import (
+    azure_identity_env,
+    azure_identity_token_mount,
+    azure_identity_token_volume,
+    azure_openai_env,
+)
 from ol_infrastructure.lib.fastly import (
-    build_fastly_log_format_string,
     get_fastly_provider,
+    s3_sigv4_signing_vcl,
     vcl_snippet,
 )
+from ol_infrastructure.lib.fastly_logging import fastly_logging_args
 from ol_infrastructure.lib.k8s_keda import (
     build_webapp_keda_config,
     create_webapp_prometheus_trigger_auth,
 )
 from ol_infrastructure.lib.ol_types import (
+    Application,
     AWSBase,
     BusinessUnit,
     K8sGlobalLabels,
@@ -108,16 +116,12 @@ cluster_substructure_stack = make_stack_reference(
     projects.EKS_SUB, f"applications.{stack_info.name}"
 )
 dns_stack = make_stack_reference(projects.DNS, "default")
-monitoring_stack = make_stack_reference(projects.MONITORING, "default")
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 opik_stack = make_stack_reference(projects.OPIK, stack_info.name)
 policy_stack = make_stack_reference(projects.POLICIES, "default")
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
 vault_stack = make_stack_reference(
     projects.VAULT_SERVER, f"operations.{stack_info.name}"
-)
-vector_log_proxy_stack = make_stack_reference(
-    projects.VECTOR_LOG_PROXY, f"operations.{stack_info.name}"
 )
 
 apps_vpc = network_stack.require_output("applications_vpc")
@@ -153,14 +157,20 @@ ol_zone_id = dns_stack.require_output("ol")["id"]
 # Frontend storage bucket
 learn_ai_app_storage_bucket_name = f"ol-mit-learn-ai-{stack_info.env_suffix}"
 
+# CI and QA use SigV4-signed Fastly->S3 requests, so the bucket can be fully
+# private instead of public-read (hq#13287 item 1; mit-learn runs the same
+# pattern in every environment). Production stays on the public-read policy
+# until QA has been validated.
+_learn_ai_bucket_is_sigv4_piloted = stack_info.env_suffix in {"ci", "qa"}
+
 learn_ai_app_storage_bucket_config = S3BucketConfig(
     bucket_name=learn_ai_app_storage_bucket_name,
     versioning_enabled=True,
     ownership_controls="BucketOwnerPreferred",
-    block_public_acls=False,
-    block_public_policy=False,
-    ignore_public_acls=False,
-    restrict_public_buckets=False,
+    block_public_acls=_learn_ai_bucket_is_sigv4_piloted,
+    block_public_policy=_learn_ai_bucket_is_sigv4_piloted,
+    ignore_public_acls=_learn_ai_bucket_is_sigv4_piloted,
+    restrict_public_buckets=_learn_ai_bucket_is_sigv4_piloted,
     intelligent_tiering_archive_access_days=None,  # Fastly backend
     intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
@@ -191,10 +201,69 @@ learn_ai_app_storage_bucket = OLBucket(
     ),
 )
 
-learn_ai_app_storage_bucket_policy = s3.BucketPolicy(
-    f"learn-ai-app-storage-bucket-policy-{stack_info.env_suffix}",
-    bucket=learn_ai_app_storage_bucket.bucket_v2.id,
-    policy=learn_ai_app_storage_bucket.bucket_v2.arn.apply(
+learn_ai_fastly_s3_signer_access_key = None
+if _learn_ai_bucket_is_sigv4_piloted:
+    # Dedicated identity for Fastly to authenticate to S3 with (SigV4), scoped to
+    # GetObject on just this bucket. It must live under /ol-applications/ and carry
+    # no tags: Concourse's deploy role only manages IAM users under that path, via
+    # managed-policy attach, and has no iam:TagUser (see the same note on the
+    # mit-learn signer).
+    learn_ai_fastly_s3_signer_user = iam.User(
+        f"ol-learn-ai-fastly-s3-signer-{stack_info.env_suffix}",
+        name=f"ol-learn-ai-{stack_info.env_suffix}-fastly-s3-signer",
+        path="/ol-applications/",
+    )
+    learn_ai_fastly_s3_signer_policy = iam.Policy(
+        f"ol-learn-ai-fastly-s3-signer-policy-{stack_info.env_suffix}",
+        path="/ol-applications/",
+        policy=json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": ["s3:GetObject"],
+                        "Resource": [
+                            f"arn:aws:s3:::{learn_ai_app_storage_bucket_name}/*"
+                        ],
+                    }
+                ],
+            }
+        ),
+    )
+    learn_ai_fastly_s3_signer_policy_attachment = iam.UserPolicyAttachment(
+        f"ol-learn-ai-fastly-s3-signer-policy-attachment-{stack_info.env_suffix}",
+        user=learn_ai_fastly_s3_signer_user.name,
+        policy_arn=learn_ai_fastly_s3_signer_policy.arn,
+    )
+    learn_ai_fastly_s3_signer_access_key = iam.AccessKey(
+        f"ol-learn-ai-fastly-s3-signer-access-key-{stack_info.env_suffix}",
+        user=learn_ai_fastly_s3_signer_user.name,
+        opts=ResourceOptions(depends_on=[learn_ai_fastly_s3_signer_policy_attachment]),
+    )
+    # The durable Vault copy of this key is created further down -- search for
+    # "fastly-s3-signer-vault-secret".
+    learn_ai_bucket_policy_document = Output.all(
+        arn=learn_ai_app_storage_bucket.bucket_v2.arn,
+        signer_arn=learn_ai_fastly_s3_signer_user.arn,
+    ).apply(
+        lambda args: json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "FastlySigV4Read",
+                        "Effect": "Allow",
+                        "Principal": {"AWS": args["signer_arn"]},
+                        "Action": "s3:GetObject",
+                        "Resource": f"{args['arn']}/*",
+                    }
+                ],
+            }
+        )
+    )
+else:
+    learn_ai_bucket_policy_document = learn_ai_app_storage_bucket.bucket_v2.arn.apply(
         lambda arn: json.dumps(
             {
                 "Version": "2012-10-17",
@@ -209,7 +278,12 @@ learn_ai_app_storage_bucket_policy = s3.BucketPolicy(
                 ],
             }
         )
-    ),
+    )
+
+learn_ai_app_storage_bucket_policy = s3.BucketPolicy(
+    f"learn-ai-app-storage-bucket-policy-{stack_info.env_suffix}",
+    bucket=learn_ai_app_storage_bucket.bucket_v2.id,
+    policy=learn_ai_bucket_policy_document,
 )
 
 parliament_config = {
@@ -289,24 +363,8 @@ learn_ai_service_account = kubernetes.core.v1.ServiceAccount(
 
 ################################################
 # Fastly configuration
-vector_log_proxy_secrets = read_yaml_secrets(
-    Path(f"vector/vector_log_proxy.{stack_info.env_suffix}.yaml")
-)
-fastly_proxy_credentials = vector_log_proxy_secrets["fastly"]
-encoded_fastly_proxy_credentials = base64.b64encode(
-    f"{fastly_proxy_credentials['username']}:{fastly_proxy_credentials['password']}".encode()
-).decode("utf8")
-vector_log_proxy_domain = vector_log_proxy_stack.require_output(
-    "vector_log_proxy_domain"
-)
 
 learn_ai_frontend_domain = learn_ai_config.require("frontend_domain")
-fastly_access_logging_bucket = monitoring_stack.require_output(
-    "fastly_access_logging_bucket"
-)
-fastly_access_logging_iam_role = monitoring_stack.require_output(
-    "fastly_access_logging_iam_role"
-)
 gzip_settings: dict[str, set[str]] = {"extensions": set(), "content_types": set()}
 for k, v in mimetypes.types_map.items():
     if k in (
@@ -325,6 +383,34 @@ for k, v in mimetypes.types_map.items():
     ):
         gzip_settings["extensions"].add(k.strip("."))
         gzip_settings["content_types"].add(v)
+learn_ai_backend_name = "learn-ai"
+
+learn_ai_s3_auth_snippets = []
+if _learn_ai_bucket_is_sigv4_piloted and learn_ai_fastly_s3_signer_access_key:
+    learn_ai_s3_backend_auth_vcl = Output.all(
+        access_key_id=learn_ai_fastly_s3_signer_access_key.id,
+        secret_access_key=learn_ai_fastly_s3_signer_access_key.secret,
+    ).apply(
+        lambda args: s3_sigv4_signing_vcl(
+            args["access_key_id"],
+            args["secret_access_key"],
+            f"{learn_ai_app_storage_bucket_name}.s3.amazonaws.com",
+            learn_ai_backend_name,
+        )
+    )
+    learn_ai_s3_auth_snippets = [
+        vcl_snippet(
+            name="Sign S3 miss requests with SigV4",
+            content=learn_ai_s3_backend_auth_vcl,
+            type="miss",
+        ),
+        vcl_snippet(
+            name="Sign S3 pass requests with SigV4",
+            content=learn_ai_s3_backend_auth_vcl,
+            type="pass",
+        ),
+    ]
+
 learn_ai_fastly_service = fastly.ServiceVcl(
     f"learn-ai-fastly-service-{stack_info.env_suffix}",
     name=f"Learn AI {stack_info.env_suffix}",
@@ -332,7 +418,7 @@ learn_ai_fastly_service = fastly.ServiceVcl(
     backends=[
         fastly.ServiceVclBackendArgs(
             address=learn_ai_app_storage_bucket.bucket_v2.bucket_domain_name,
-            name="learn-ai",
+            name=learn_ai_backend_name,
             override_host=learn_ai_app_storage_bucket.bucket_v2.bucket_domain_name,
             port=DEFAULT_HTTPS_PORT,
             ssl_cert_hostname=learn_ai_app_storage_bucket.bucket_v2.bucket_domain_name,
@@ -400,23 +486,14 @@ learn_ai_fastly_service = fastly.ServiceVcl(
             ),
             type="error",
         ),
+        *learn_ai_s3_auth_snippets,
     ],
-    logging_https=[
-        fastly.ServiceVclLoggingHttpArgs(
-            url=Output.all(domain=vector_log_proxy_domain).apply(
-                lambda kwargs: f"https://{kwargs['domain']}/fastly"
-            ),
-            name=f"fastly-learn_ai-{stack_info.env_suffix}-https-logging-args",
-            content_type="application/json",
-            format=build_fastly_log_format_string(additional_static_fields={}),
-            format_version=2,
-            header_name="Authorization",
-            header_value=f"Basic {encoded_fastly_proxy_credentials}",
-            json_format="0",
-            method="POST",
-            request_max_bytes=ONE_MEGABYTE_BYTE,
-        )
-    ],
+    **fastly_logging_args(
+        name=f"fastly-learn_ai-{stack_info.env_suffix}",
+        application=Application.learn_ai,
+        environment=stack_info.env_suffix,
+        s3_path=f"/{Application.learn_ai}/{stack_info.env_suffix}/",
+    ),
     opts=ResourceOptions.merge(fastly_provider, ResourceOptions()),
 )
 
@@ -456,6 +533,24 @@ learn_ai_vault_mount = vault.Mount(
     description="Secrets for the learn ai application.",
     opts=ResourceOptions(delete_before_replace=True),
 )
+if _learn_ai_bucket_is_sigv4_piloted and learn_ai_fastly_s3_signer_access_key:
+    # Durable copy in Vault for visibility/rotation tooling outside of Pulumi state.
+    # Pulumi (via the iam.AccessKey resource) is still the source of truth --
+    # rotating means replacing that resource, which updates this secret in the
+    # same apply.
+    # Deliberately NOT under secret-learn-ai: learn_ai_policy.hcl grants read on
+    # secret-learn-ai/*, and the Kubernetes auth role accepts every service account
+    # in the namespace, so any learn-ai workload could read the key. The app does
+    # not need it (only Fastly does), and the policy lists specific
+    # secret-operations paths, so a secret here is unreadable to the app role.
+    vault.generic.Secret(
+        f"learn-ai-fastly-s3-signer-vault-secret-{stack_info.env_suffix}",
+        path="secret-operations/learn-ai/fastly-s3-signer",
+        data_json=Output.all(
+            access_key_id=learn_ai_fastly_s3_signer_access_key.id,
+            secret_access_key=learn_ai_fastly_s3_signer_access_key.secret,
+        ).apply(json.dumps),
+    )
 learn_ai_static_vault_secrets = vault.generic.Secret(
     f"learn-ai-secrets-{stack_info.env_suffix}",
     path=learn_ai_vault_mount.path.apply("{}/secrets".format),
@@ -682,9 +777,7 @@ static_secrets = OLVaultK8SSecret(
 # into a K8s secret via VSO and expose them to the app as the OPIK_KEYCLOAK_*
 # env vars. The token endpoint is derived from the realm ``url`` key so it stays
 # correct across environments (sso-ci / sso-qa / sso) without hardcoding.
-opik_keycloak_secret_name = (
-    "learn-ai-opik-keycloak"  # pragma: allowlist secret  # noqa: S105
-)
+opik_keycloak_secret_name = "learn-ai-opik-keycloak"  # pragma: allowlist secret  # noqa: S105
 opik_keycloak_secret = OLVaultK8SSecret(
     name=f"learn-ai-{stack_info.env_suffix}-opik-keycloak-secret",
     resource_config=OLVaultK8SStaticSecretConfig(
@@ -713,6 +806,32 @@ opik_keycloak_secret = OLVaultK8SSecret(
 )
 
 env_vars = dict(learn_ai_config.require_object("env_vars") or {})
+
+# Azure OpenAI, additive alongside the existing OPENAI_API_KEY wiring, which is not
+# touched. Nothing here is secret: the managed identity is reached by exchanging the
+# projected ServiceAccount token mounted below, so the client id is an identifier
+# rather than a credential and there is nothing to rotate.
+#
+# A StackReference to a stack that does not exist fails the whole preview, so this is
+# a config switch that gets flipped per environment once infrastructure/azure/openai
+# has been deployed there.
+if learn_ai_config.get_bool("enable_azure_openai"):
+    azure_openai_stack = make_stack_reference(projects.AZURE_OPENAI, stack_info.name)
+    env_vars.update(azure_identity_env(azure_openai_stack, "learn-ai"))
+    env_vars.update(
+        azure_openai_env(
+            azure_openai_stack,
+            "learn-ai",
+            api_version=learn_ai_config.get("azure_openai_api_version") or "v1",
+            default_deployment=learn_ai_config.get("azure_openai_default_deployment")
+            or "gpt-4o",
+        )
+    )
+    azure_identity_volumes = [azure_identity_token_volume()]
+    azure_identity_volume_mounts = [azure_identity_token_mount()]
+else:
+    azure_identity_volumes = []
+    azure_identity_volume_mounts = []
 
 # Opik instrumentation (non-secret settings). OPIK_URL_OVERRIDE is derived from
 # the opik application stack's exported URL so it tracks the deployed instance
@@ -784,6 +903,8 @@ learn_ai_app_k8s = OLApplicationK8s(
         # Use the fixed name used in the SecurityGroupPolicy spec
         application_security_group_name=Output.from_input("learn-ai-app"),
         application_service_account_name=learn_ai_service_account.metadata.name,
+        extra_volumes=azure_identity_volumes,
+        extra_volume_mounts=azure_identity_volume_mounts,
         application_image_repository="mitodl/learn-ai-app",
         **docker_image_config_kwargs("LEARN_AI"),
         application_min_replicas=learn_ai_config.get("min_replicas") or 2,
@@ -799,6 +920,22 @@ learn_ai_app_k8s = OLApplicationK8s(
         granian_config=GranianConfig(
             interface="asgi",
             workers=1,
+            # Above the measured cold start: RSS respawns in production took 14.7-19.5s
+            # from "Spawning worker-1" to "Started worker-1" (2026-10-14). On the 2.7.x
+            # the image ships today the main process holds the listener, so this only
+            # lets the old worker keep serving through the import instead of
+            # connections queueing for it. On 2.8.x the old worker is stopped after
+            # this interval whether or not the new one is listening, so Granian's 3.5s
+            # default would refuse connections for ~15s per respawn. Set ahead of the
+            # bump, since pyproject allows granian<3 and a lockfile refresh alone moves
+            # it (mit-learn#4024).
+            respawn_interval=60,
+            # Fresh pods sit at 523-595MiB container RSS (7d to 2026-10-15). On an
+            # RSS respawn the old worker keeps draining long-lived streamed responses
+            # beside the new one (up to ~22 minutes observed), so the cap has to leave
+            # room for both. All 3 OOMKills in the 14 days to 2026-10-15 came 65-90s
+            # into a respawn, two of them at the 1536Mi floor limit.
+            worker_startup_rss=600,
             runtime_mode=None,
             # Holding pin: the component default dropped to 1. asgi forces
             # blocking_threads=1 regardless, so this is the only axis on which the
@@ -830,32 +967,53 @@ learn_ai_app_k8s = OLApplicationK8s(
         import_nginx_config=not learn_ai_config.get_bool("use_granian"),
         # Nginx resources (defaults from component are fine)
         # App container resources
+        # Steady-state working set runs 600-630Mi; MainConfig.ready() eagerly
+        # imports litellm, so exec'ing a shell or running a management command
+        # in a live pod has no headroom against a 1000Mi limit. Keep the
+        # request where actual usage sits and raise the limit for burst room.
+        # The limit is also the lowest one the memory VPA admits a pod with (it
+        # keeps the request:limit ratio and floors the request), so it sets the
+        # Granian RSS cap: (0.9 * 2048 - worker_startup_rss 600) = 1243MiB. That is
+        # close to the 1382MiB cap 1536Mi gave without the reservation, so respawns
+        # stay about as frequent (34 in 14 days). The p90 pod peaked at 1312MiB
+        # container RSS over the 7 days to 2026-10-15.
         resource_requests={"cpu": "100m", "memory": "1000Mi"},
-        resource_limits={"memory": "1000Mi"},
+        resource_limits={"memory": "2048Mi"},
         init_migrations=True,
         init_collectstatic=True,  # Assuming createcachetable is not needed or handled elsewhere
+        # Both queues run --concurrency=2 prefork (component default), so each
+        # forked child re-pays the litellm import cost -- steady-state working
+        # set already sits at 815-930Mi against the old 1000Mi limit (one
+        # queue has already been OOMKilled in production). Raise the limit to
+        # give the prefork children room without changing the pool model.
+        celery_redis_config=OLApplicationK8sCeleryRedisConfig(
+            host=redis_cache.address,
+            password=redis_config.require("password"),
+        ),
         celery_worker_configs=[
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="default",
-                redis_host=redis_cache.address,
-                redis_database_index="1",
-                redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "100m", "memory": "1000Mi"},
-                resource_limits={"memory": "1000Mi"},
+                resource_limits={"memory": "1536Mi"},
             ),
             OLApplicationK8sCeleryWorkerConfig(
                 queue_name="edx_content",
-                redis_host=redis_cache.address,
-                redis_database_index="1",
-                redis_password=redis_config.require("password"),
                 resource_requests={"cpu": "100m", "memory": "1000Mi"},
-                resource_limits={"memory": "1000Mi"},
+                resource_limits={"memory": "1536Mi"},
             ),
         ],
         celery_beat_config=OLApplicationK8sCeleryBeatConfig(
             scheduler="celery.beat.PersistentScheduler",
-            resource_requests={"cpu": "10m", "memory": "384Mi"},
-            resource_limits={"memory": "384Mi"},
+            # learn-ai's main.apps.MainConfig.ready() unconditionally imports
+            # litellm (added in 0.36.2 to fix a separate memory leak), which
+            # beat now pays for at boot despite never executing LLM code --
+            # 384Mi no longer covers that baseline import cost and beat
+            # OOMKilled on every startup. Matching the other three containers
+            # at 1000Mi/1000Mi (zero memory headroom) still wasn't
+            # enough -- prod shows ~25 beat restarts/week -- so give it the
+            # same limit bump as the rest of the app.
+            resource_requests={"cpu": "10m", "memory": "1000Mi"},
+            resource_limits={"memory": "1536Mi"},
         ),
         # hpa_scaling_metrics is left at the component default. It is unused here:
         # the component builds a KEDA ScaledObject instead of a native HPA when
@@ -981,10 +1139,12 @@ learn_ai_oidc_resources = OLApisixOIDCResources(
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",  # Use mitlearn SSO config
-        vaultauth=vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",  # Use mitlearn SSO config
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     ),
     opts=ResourceOptions(delete_before_replace=True, parent=vault_k8s_resources),
 )
@@ -1027,8 +1187,40 @@ learn_ai_mit_learn_oidc_resources = OLApisixOIDCResources(
         # adds organization:*, which mit-learn maps to users.User.organizations
         # via APISIX_USERDATA_MAP and reads to decide whether to skip onboarding.
         oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
-        oidc_logout_path="/logout",
-        oidc_post_logout_redirect_uri="/",
+        # Prefixed, because logout_path is compared against the un-rewritten
+        # request URI and every request on this host arrives under /ai/.  Both
+        # the plugin (openid-connect.lua reads ctx.var.request_uri) and
+        # lua-resty-openidc (ngx.var.request_uri) read the original URI, which
+        # proxy-rewrite never touches -- it sets upstream_uri -- so this holds
+        # regardless of the order the two plugins run in.  The comparison is
+        # exact string equality, which is what the "logout-redirect" route
+        # below exists to satisfy.
+        #
+        # An unprefixed "/logout" therefore never matched anything here, so
+        # learn-ai's plugin never performed a logout of its own.  What logged
+        # people out instead was a three-hop detour: "logout-redirect" 302'd to
+        # mit-learn's /logout, whose CustomLogoutView cleared the mit-learn
+        # Django session and -- seeing the gateway header still present --
+        # bounced to OIDC_LOGOUT_URL, which is mit-learn's own /logout/oidc.
+        # That did end the shared session, but by way of another application's
+        # views, and it left learn-ai's own post_logout_redirect_uri dead.
+        oidc_logout_path="/ai/logout/oidc",
+        # mit-learn's own post-logout landing, not a learn-ai path: the session
+        # being destroyed is the shared MIT Learn one, and learn-ai has no
+        # logout view of its own (main/urls.py).  Its CustomLogoutView clears
+        # the mit-learn Django session -- which otherwise outlives the gateway
+        # session -- and sends the browser on to the Learn frontend.  Keycloak
+        # accepts it: this is byte-identical to the URI mit-learn's own
+        # resource passes, and ol-mitlearn-client's end_session endpoint takes
+        # it in CI, RC and Production (an unregistered URI gets a 400 there).
+        oidc_post_logout_redirect_uri=f"https://{learn_api_domain}/logout/",
+        # 14 days, matching mit_learn/__main__.py.  Unset, lua-resty-session
+        # applies its compiled-in 86400 (resty/session.lua's
+        # DEFAULT_ABSOLUTE_TIMEOUT) -- and because the "reqauth" route below
+        # performs a real login that writes the *shared* cookie, a user who
+        # logged in through /ai/http/login/ got a one-day MIT Learn session
+        # while one who logged in through mit-learn got fourteen.
+        oidc_session_absolute_timeout=60 * 20160,
         oidc_session_idling_timeout=0,
         oidc_session_rolling_timeout=0,
         oidc_session_cookie_domain=learn_api_domain.removeprefix("api"),
@@ -1037,10 +1229,12 @@ learn_ai_mit_learn_oidc_resources = OLApisixOIDCResources(
             stack_info.env_suffix,
         ),
         oidc_use_session_secret=True,
-        vault_mount="secret-operations",
-        vault_mount_type="kv-v1",
-        vault_path="sso/mitlearn",  # Use mitlearn SSO config
-        vaultauth=vault_k8s_resources.auth_name,
+        credentials=OLApisixOIDCVaultCredentials(
+            mount="secret-operations",
+            mount_type="kv-v1",
+            path="sso/mitlearn",  # Use mitlearn SSO config
+            vaultauth=vault_k8s_resources.auth_name,
+        ),
     ),
     opts=ResourceOptions(delete_before_replace=True, parent=vault_k8s_resources),
 )
@@ -1127,21 +1321,41 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
         # mitxonline's and mit-learn's logout-redirect routes already run on --
         # while restoring the prometheus/opentelemetry/gzip this route was
         # missing.
+        #
+        # Now feeds the plugin's own logout path instead of mit-learn's
+        # /logout.  Three patterns, all landing on /ai/logout/oidc: the two
+        # exact spellings a caller would use as the human-facing entry point,
+        # plus the trailing-slash variant of the plugin path itself.
+        #
+        # A "/foo/*" pattern is a prefix match on "/foo/" and cannot match the
+        # shorter exact "/foo", which cuts both ways here.  The old
+        # "/ai/logout/*" covered /ai/logout/ but not /ai/logout, so the
+        # slashless spelling 404s today and is new rather than retained.  And
+        # /ai/logout/oidc matches none of the three patterns below, so it falls
+        # through to "passauth", whose plugin holds the logout_path and performs
+        # the real logout -- listing it here would 302 it to itself forever.
+        #
+        # Deeper paths under /ai/logout/ no longer trigger a logout, where
+        # "/ai/logout/*" swept them all in.  Deliberate: they are not endpoints,
+        # and nothing references them.
+        #
+        # No proxy-rewrite, since a matching request is answered with a 302 and
+        # never reaches the upstream -- mitxonline's and mit-learn's equivalents
+        # omit it for the same reason.
         OLApisixRouteConfig(
             route_name="logout-redirect",
             priority=10,
             shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
             plugins=[
-                proxy_rewrite_plugin,
                 OLApisixPluginConfig(
                     name="redirect",
                     config={
-                        "uri": "/logout",  # Redirect within the rewritten path
+                        "uri": "/ai/logout/oidc",
                     },
                 ),
             ],
             hosts=[learn_api_domain],
-            paths=["/ai/logout/*"],
+            paths=["/ai/logout", "/ai/logout/", "/ai/logout/oidc/*"],
             backend_service_name=learn_ai_app_k8s.application_lb_service_name,
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",

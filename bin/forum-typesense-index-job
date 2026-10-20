@@ -1,0 +1,155 @@
+#!/usr/bin/env python
+"""Build a one-off Job that fills the forum Typesense collection.
+
+Moving an edxapp deployment's forum search from Elasticsearch to Typesense
+(`typesense:forum_search_enabled` in the stack config) needs the collection to
+exist before the setting applies. In openedx-forum 0.4.7 the post_save receiver
+for threads and comments indexes inline with no exception handling, and the
+Typesense backend only upserts into the collection, so with ATOMIC_REQUESTS on
+a missing collection fails the request and rolls the post back.
+
+The Job is derived from the running LMS Deployment so that it has the same
+image, config, service account and security group. It prints the collection's
+document count next to the MySQL thread and comment counts.
+
+The stack needs `typesense:enabled`, which is what puts the TYPESENSE_*
+settings the forum client reads into the LMS config. Without it the Job fails
+with an AttributeError.
+
+Usage:
+
+    kubectl -n <namespace> get deployment lms-edxapp-app -o json > lms.json
+    bin/forum-typesense-index-job lms.json <job-name> <mode> > job.json
+    kubectl create -f job.json
+
+mode is one of:
+
+  rebuild  Drop, recreate and fill the collection. Run it BEFORE the setting
+           applies, while nothing reads or writes the collection. It calls
+           TypesenseIndexBackend directly, so it works whatever
+           FORUM_SEARCH_BACKEND is set to (`manage.py lms
+           rebuild_forum_indices` picks the backend from settings and would
+           rebuild Elasticsearch).
+
+  catchup  Upsert every thread and comment without dropping the collection.
+           Run it AFTER the setting has rolled out, to pick up posts written
+           between the rebuild and the rollout. Don't rerun rebuild at that
+           point: posts made between the collection's delete and create fail.
+           It does not remove anything, so a thread or comment deleted between
+           the rebuild and the rollout stays in the collection.
+"""
+
+import json
+import sys
+from pathlib import Path
+from typing import Any
+
+LMS_CONTAINER = "lms-edxapp-app"
+
+IMPORTS = """
+from django.core.paginator import Paginator
+from forum.models import Comment, CommentThread
+from forum.search.typesense import (
+    TypesenseIndexBackend,
+    collection_name,
+    document_from_comment,
+    document_from_thread,
+    get_typesense_client,
+)
+"""
+
+REPORT = """
+collection = get_typesense_client().collections[collection_name()].retrieve()
+print("typesense collection", collection_name(), "num_documents", collection["num_documents"])
+print("mysql threads", CommentThread.objects.count(), "comments", Comment.objects.count())
+"""
+
+SCRIPTS = {
+    "rebuild": IMPORTS
+    + """
+backend = TypesenseIndexBackend()
+backend.rebuild_indices()
+backend.validate_indices()
+"""
+    + REPORT,
+    # Same loop as TypesenseIndexBackend.rebuild_indices in forum 0.4.7, minus
+    # initialize_indices(force_new_index=True).
+    "catchup": IMPORTS
+    + """
+TypesenseIndexBackend().validate_indices()
+client = get_typesense_client()
+for model, build in [(CommentThread, document_from_thread), (Comment, document_from_comment)]:
+    paginator = Paginator(model.objects.order_by("pk").all(), per_page=500)
+    for page_number in paginator.page_range:
+        documents = [build(obj.pk, obj.doc_to_hash()) for obj in paginator.get_page(page_number).object_list]
+        if documents:
+            response = client.collections[collection_name()].documents.import_(documents, {"action": "upsert"})
+            if not all(result["success"] for result in response):
+                raise ValueError(f"Errors while importing documents: {response}")
+"""
+    + REPORT,
+}
+
+
+def build_job(deployment: dict[str, Any], job_name: str, mode: str) -> dict[str, Any]:
+    """Turn an LMS Deployment into a Job that runs one of the index scripts.
+
+    :param deployment: the lms-edxapp-app Deployment as returned by kubectl
+    :param job_name: name for the Job
+    :param mode: key into SCRIPTS
+    :returns: the Job manifest
+    :rtype: dict[str, Any]
+    """
+    template = deployment["spec"]["template"]
+    pod_spec = template["spec"]
+
+    app = next(c for c in pod_spec["containers"] if c["name"] == LMS_CONTAINER)
+    for key in (
+        "livenessProbe",
+        "readinessProbe",
+        "startupProbe",
+        "lifecycle",
+        "ports",
+    ):
+        app.pop(key, None)
+    app["command"] = ["python", "manage.py", "lms", "shell", "-c", SCRIPTS[mode]]
+    app["args"] = []
+    app["resources"] = {
+        "requests": {"cpu": "250m", "memory": "2Gi"},
+        "limits": {"memory": "4Gi"},
+    }
+    # The log-shipping sidecar never exits, so the Job would never complete
+    # with it.
+    pod_spec["containers"] = [app]
+    pod_spec["restartPolicy"] = "Never"
+
+    labels = dict(template["metadata"]["labels"])
+    # Off the webapp Service selector; the pod-security-group label stays so
+    # the pod keeps the LMS security group and can reach MySQL and Typesense.
+    labels["ol.mit.edu/component"] = "job"
+    labels["ol.mit.edu/process"] = "forum-typesense-index"
+    labels.pop("ol.mit.edu/alert_tier", None)
+
+    return {
+        "apiVersion": "batch/v1",
+        "kind": "Job",
+        "metadata": {
+            "name": job_name,
+            "namespace": deployment["metadata"]["namespace"],
+            "labels": labels,
+        },
+        "spec": {
+            "backoffLimit": 0,
+            "ttlSecondsAfterFinished": 86400,
+            "template": {"metadata": {"labels": labels}, "spec": pod_spec},
+        },
+    }
+
+
+if __name__ == "__main__":
+    deployment_path, name, job_mode = sys.argv[1:]
+    json.dump(
+        build_job(json.loads(Path(deployment_path).read_text()), name, job_mode),
+        sys.stdout,
+        indent=2,
+    )

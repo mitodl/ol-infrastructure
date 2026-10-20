@@ -13,6 +13,8 @@ from ol_concourse.lib.models.pipeline import (
 )
 from ol_concourse.lib.resources import s3_object, ssh_git_repo
 
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
+
 
 @dataclasses.dataclass
 class CourseImageInfo:
@@ -283,14 +285,37 @@ def pipeline_for_s3():
 
 
 if __name__ == "__main__":
+    _course_image_user_data = {
+        "description": (
+            "Template for `jupyter_notebook_docker_image_build`, an "
+            "instance-group pipeline (one instance per `image_name`) that "
+            "builds a per-course Jupyter authoring image and publishes it to "
+            "ECR as `ol-course-notebooks:{image_name}`. This script emits two "
+            "interchangeable pipeline bodies -- `github_definition.json` "
+            "(source pulled from an `ol-notebooks` GitHub repo via "
+            "`((course_repo))`) and `s3_definition.json` (source unpacked "
+            "from an S3 archive via `((s3_bucket))`/`((s3_object_path))`) -- "
+            "the same body is reused for every course of that source type, "
+            "with the course-specific values supplied at `fly set-pipeline` "
+            "time via `--var`/`--instance-var`, not baked into this JSON."
+        ),
+        "team": "infrastructure",
+        "category": "data-platform",
+    }
     github_pipeline = pipeline_for_github()
+    github_output = pipeline_json_with_user_data(
+        github_pipeline, user_data=_course_image_user_data
+    )
     with open("github_definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(github_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(github_pipeline.model_dump_json(indent=2))
+        definition.write(github_output)
+    sys.stdout.write(github_output)
     s3_pipeline = pipeline_for_s3()
+    s3_output = pipeline_json_with_user_data(
+        s3_pipeline, user_data=_course_image_user_data
+    )
     with open("s3_definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(s3_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(s3_pipeline.model_dump_json(indent=2))
+        definition.write(s3_output)
+    sys.stdout.write(s3_output)
     for course in courses:
         if course.repo_uri:
             sys.stdout.write(

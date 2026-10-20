@@ -4,6 +4,7 @@ import asyncio
 import os
 import time
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import aiohttp
 
@@ -56,11 +57,17 @@ async def _get_token() -> str:
         return _token
 
 
-async def trigger_job(pipeline: str, job: str) -> str:
-    """Trigger a Concourse job and return the build URL."""
+async def trigger_job(pipeline: str, job: str, team: str | None = None) -> str:
+    """Trigger a Concourse job and return the build URL.
+
+    :param team: Concourse team owning *pipeline*. Defaults to the bot's
+        ``CONCOURSE_TEAM`` (``infrastructure``, where the per-app release
+        pipelines live). Library publish pipelines are in team ``main``, so
+        they pass their own -- see ``bridge.settings.libraries``.
+    """
     token = await _get_token()
     url = (
-        f"{CONCOURSE_URL}/api/v1/teams/{CONCOURSE_TEAM}"
+        f"{CONCOURSE_URL}/api/v1/teams/{team or CONCOURSE_TEAM}"
         f"/pipelines/{pipeline}/jobs/{job}/builds"
     )
     async with (
@@ -71,6 +78,108 @@ async def trigger_job(pipeline: str, job: str) -> str:
         build = await resp.json()
 
     return f"{CONCOURSE_URL}/builds/{build['id']}"
+
+
+def job_url(pipeline: str, job: str, team: str | None = None) -> str:
+    """Return the web UI URL of *job*, whose newest build is listed first."""
+    return (
+        f"{CONCOURSE_URL}/teams/{team or CONCOURSE_TEAM}"
+        f"/pipelines/{pipeline}/jobs/{job}"
+    )
+
+
+async def list_jobs(pipeline: str, team: str | None = None) -> list[str]:
+    """Return the names of the jobs defined in *pipeline*, in pipeline order.
+
+    Lets the bot resolve a monorepo's publishable packages from the pipeline
+    itself instead of from a hand-maintained list. The publish pipelines
+    discover their packages at generation time by walking the source checkout
+    (``discover_python_packages``), so any list written down elsewhere is stale
+    the moment a package is added.
+    """
+    token = await _get_token()
+    url = (
+        f"{CONCOURSE_URL}/api/v1/teams/{team or CONCOURSE_TEAM}"
+        f"/pipelines/{pipeline}/jobs"
+    )
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(url, headers={"Authorization": f"Bearer {token}"}) as resp,
+    ):
+        resp.raise_for_status()
+        jobs = await resp.json()
+    return [job["name"] for job in jobs or []]
+
+
+async def pipeline_is_paused(pipeline: str, team: str | None = None) -> bool:
+    """Return whether *pipeline* is paused.
+
+    A build triggered into a paused pipeline is created and then never
+    scheduled, so the bot reports a build URL that sits at "pending" forever.
+    `publish-ol-django-pypi` is paused as of 2026-09-04, which makes this the
+    first thing a publish of it would hit.
+    """
+    token = await _get_token()
+    url = f"{CONCOURSE_URL}/api/v1/teams/{team or CONCOURSE_TEAM}/pipelines/{pipeline}"
+    async with (
+        aiohttp.ClientSession() as session,
+        session.get(url, headers={"Authorization": f"Bearer {token}"}) as resp,
+    ):
+        resp.raise_for_status()
+        body = await resp.json()
+    return bool(body.get("paused"))
+
+
+_BUILDS_PAGE_LIMIT = 100
+_ACTIVE_BUILD_STATUSES = frozenset({"pending", "started"})
+
+
+def _older_page_cursor(link: object) -> str | None:
+    """Return the `to` build id of a `Link: rel="next"` URL, or None."""
+    return parse_qs(urlsplit(str(link)).query).get("to", [None])[0]
+
+
+async def active_build_url(
+    pipeline: str, job: str, team: str | None = None
+) -> str | None:
+    """Return the URL of a pending or running build of *job*, or None if idle.
+
+    Not the job's `next_build`. Concourse 8.3.1 leaves out reruns of any build
+    older than the latest non-rerun one (`updateNextBuildForJob` in
+    atc/db/build.go), so an old rerun can be running while it is empty. The
+    job's build list includes them, but sorts each rerun beside the build it
+    reruns rather than by when it started, so every page is read.
+
+    Pages are followed by the `to` cursor in the `Link: rel="next"` header,
+    sent back to `CONCOURSE_URL` rather than to the URL in the header, so the
+    token only goes where every other call sends it.
+
+    :raises RuntimeError: If the cursor does not move to older builds.
+    """
+    token = await _get_token()
+    url = (
+        f"{CONCOURSE_URL}/api/v1/teams/{team or CONCOURSE_TEAM}"
+        f"/pipelines/{pipeline}/jobs/{job}/builds"
+    )
+    params: dict[str, str] = {"limit": str(_BUILDS_PAGE_LIMIT)}
+    async with aiohttp.ClientSession() as session:
+        while True:
+            async with session.get(
+                url, headers={"Authorization": f"Bearer {token}"}, params=params
+            ) as resp:
+                resp.raise_for_status()
+                builds = await resp.json()
+                older = resp.links.get("next")
+            for build in builds or []:
+                if build.get("status") in _ACTIVE_BUILD_STATUSES:
+                    return f"{CONCOURSE_URL}/builds/{build['id']}"
+            cursor = _older_page_cursor(older["url"]) if older else None
+            if cursor is None:
+                return None
+            if cursor == params.get("to"):
+                msg = f"Build list of {pipeline}/{job} repeated page to={cursor}."
+                raise RuntimeError(msg)
+            params = {"limit": str(_BUILDS_PAGE_LIMIT), "to": cursor}
 
 
 _CHECK_POLL_SECONDS = 2

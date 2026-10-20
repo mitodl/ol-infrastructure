@@ -17,6 +17,7 @@ from ol_infrastructure.substructure.keycloak.ol_platform_engineering import (
     create_ol_platform_engineering_realm,
 )
 from ol_infrastructure.substructure.keycloak.olapps import create_olapps_realm
+from ol_infrastructure.substructure.keycloak.scim import create_scim_resources
 
 stack_info = parse_stack()
 env_name = f"keycloak-{stack_info.env_suffix}"
@@ -119,3 +120,4 @@ create_ol_mit_realm(
     session_secret,
     fetch_realm_public_key_partial,
 )
+create_scim_resources(keycloak_provider, keycloak_url)

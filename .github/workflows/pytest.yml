@@ -6,7 +6,11 @@ on:
     branches: [main]
   pull_request:
 
-permissions: {}
+# Every job here only reads the checkout: nothing publishes, comments, or writes
+# back. Set at the workflow level rather than per job so a job added later
+# inherits the restriction instead of silently getting the default token.
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -19,7 +23,7 @@ jobs:
         persist-credentials: false
 
     - name: Install uv
-      uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       with:
         enable-cache: true
 
@@ -33,6 +37,62 @@ jobs:
 
     - name: Run tests
       run: uv run pytest
+
+  # The unit suite stubs ngx and apisix.core, so it proves the Lua does what we
+  # meant but not that APISIX accepts the plugin config or that OpenResty
+  # behaves as assumed. These two jobs cover that, and are separate so a
+  # gateway-level failure is distinguishable from an ordinary test failure.
+  apisix-integration:
+    name: APISIX integration (real gateway, ${{ matrix.apisix }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every APISIX release a cluster runs. Production is split while the
+        # chart upgrade rolls out: 3.18.0 on the applications and residential
+        # clusters, 3.19.0 on data and operations (2026-10-07). Drop a version
+        # once no cluster runs it.
+        apisix: ["3.18.0", "3.19.0"]
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        persist-credentials: false
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      with:
+        enable-cache: true
+
+    - name: Set up Python
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      with:
+        python-version-file: pyproject.toml
+
+    - name: Install dependencies
+      run: uv sync --frozen
+
+    # Excluded from the default run by `-m 'not integration'` in pyproject.
+    - name: Run APISIX integration tests
+      env:
+        APISIX_IT_IMAGE: apache/apisix:${{ matrix.apisix }}-debian
+      run: uv run pytest tests/apisix_integration -m integration
+
+  apisix-testnginx:
+    name: APISIX test-nginx
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      with:
+        persist-credentials: false
+
+    # Builds an image from the pinned APISIX version, adds Test::Nginx and
+    # etcd, and runs APISIX's own harness against src/.../files/*.lua.
+    - name: Run test-nginx suite
+      run: tests/apisix_testnginx/run.sh
 
   # ONE required status check standing for this whole workflow.
   #
@@ -50,7 +110,7 @@ jobs:
   # required directly -- a workflow that does not trigger reports nothing at all and
   # would leave every unrelated PR pending forever.
   ci-gate:
-    needs: [test]
+    needs: [test, apisix-integration, apisix-testnginx]
     # Without this the gate is skipped when a dependency fails, and GitHub treats a
     # skipped required job as successful, allowing the PR to merge despite the failure.
     if: always()

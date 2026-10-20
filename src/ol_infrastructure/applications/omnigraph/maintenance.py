@@ -1,5 +1,16 @@
 """Scheduled out-of-band maintenance for the omnigraph graph store.
 
+TWO MODELS, CHOSEN BY THE SERVED STORAGE FORMAT
+
+Up to format 9 (omnigraph 0.11) the two sweeps below run beside the serving
+data tier, and most of this docstring is about that. From format 14 (0.12 and
+later) every writer of a cluster root keeps an exclusive lock, so `optimize`
+and `cleanup` are refused with `state_lock_held` while the server is up. There
+one CronJob owns a nightly stop window instead: see
+``create_maintenance_window`` at the end of this module. Everything between
+here and there describes the pre-14 sweeps and goes away with the last
+environment on format 9.
+
 ``optimize`` (Lance fragment compaction) and ``cleanup`` (old-version GC) are
 DIRECT-STORAGE commands: they reject ``--server`` outright and operate on the
 S3 store behind the running server's back. That is by design — the server's
@@ -99,6 +110,7 @@ from typing import NamedTuple
 import pulumi_kubernetes as kubernetes
 from pulumi import Output, Resource, ResourceOptions
 
+from ol_infrastructure.applications.omnigraph.lock_handoff import UNLOCK_LEASE_NAME
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # Nightly compaction, and weekly version GC an hour later on Sunday. Both are
@@ -323,10 +335,13 @@ def _cron_job(  # noqa: PLR0913
 
 
 class OmnigraphMaintenance(NamedTuple):
-    """Handles to the provisioned maintenance CronJobs."""
+    """Handles to the provisioned maintenance CronJobs.
 
-    optimize: kubernetes.batch.v1.CronJob
-    cleanup: kubernetes.batch.v1.CronJob
+    Every one is a direct writer of the storage root, which is what the
+    storage-format migration Job waits on before it takes a baseline.
+    """
+
+    cron_jobs: list[kubernetes.batch.v1.CronJob]
 
 
 def create_maintenance(  # noqa: PLR0913
@@ -396,7 +411,280 @@ def create_maintenance(  # noqa: PLR0913
         suspend=suspend,
     )
 
-    return OmnigraphMaintenance(
-        optimize=optimize_cron_job,
-        cleanup=cleanup_cron_job,
+    return OmnigraphMaintenance(cron_jobs=[optimize_cron_job, cleanup_cron_job])
+
+
+# ── Format 14 and later: one stop window ─────────────────────────────────────
+#
+# The command is agent-kit `docker/omnigraph_maintenance.py`, baked into the
+# omnigraph-server image. It scales the server Deployment to 0, waits for its
+# pods to exit, takes over the `serve` lock, runs `optimize` (and `cleanup` on
+# its weekday) per graph, and restores the replica count, also on SIGTERM.
+# Design: agent-kit docs/internals/design/omnigraph-0-13-upgrade-spec.md (D5).
+# This module supplies the schedule, the identity and the time budget.
+
+MAINTENANCE_SERVICE_ACCOUNT_NAME = "omnigraph-maintenance"
+MAINTENANCE_WINDOW_NAME = "omnigraph-maintenance"
+
+# Every witan user loses the data tier for the length of the window, nightly.
+# 03:20 UTC is the old optimize slot. The window has to be over before the CI
+# indexer's 04:00 run, which is the first writer to arrive afterwards.
+DEFAULT_MAINTENANCE_SCHEDULE = DEFAULT_OPTIMIZE_SCHEDULE
+
+# The old weekly cleanup ran on Sunday (DEFAULT_CLEANUP_SCHEDULE).
+DEFAULT_CLEANUP_ISO_WEEKDAY = 7
+
+# THE TIME BUDGET, from the 03:20 start:
+#
+#   03:45  no new command starts            MAINTENANCE_WINDOW_SECONDS
+#   03:55  a command still running is stopped   + COMMAND_TIMEOUT_SECONDS
+#   03:56  the Job's deadline, as a backstop    WINDOW_ACTIVE_DEADLINE_SECONDS
+#   03:58  SIGKILL, if the close hangs          + TERMINATION_GRACE_SECONDS
+#
+# The Job deadline is above the sum of the two the command enforces itself, so
+# in a run that is merely slow the command closes its own window (unlock,
+# scale back up) and the deadline never fires. When it does fire the pod gets
+# SIGTERM and the grace period to do the same.
+#
+# Sized against Production's sweeps beside a live 0.11 server over the 30 days
+# to 2026-10-13 (kube_job_status_completion_time - start_time): optimize took
+# 55s to 163s for all graphs. cleanup took 329s to 1552s and the last three
+# runs were the longest, so a Sunday window can run out before every graph has
+# been cleaned. Graphs it did not reach are logged and fail the Job, and
+# nothing is left locked. The command optimizes every graph first and starts
+# the cleanup pass at a different graph each week, so a short window delays a
+# graph's cleanup and does not starve it. Both numbers need re-measuring on
+# 0.13 with the server stopped (CI, then QA) before Production's cutover. If
+# cleanup does not fit, these constants and the start time have to move
+# together: an earlier `omnigraph:maintenance_schedule` alone adds no time.
+MAINTENANCE_WINDOW_SECONDS = 1500
+COMMAND_TIMEOUT_SECONDS = 600
+WINDOW_ACTIVE_DEADLINE_SECONDS = 2160
+WINDOW_STARTING_DEADLINE_SECONDS = 60
+# Stop one command (the image allows 30s), unlock, restore the replica count.
+# The image documents 120 as what its close needs.
+TERMINATION_GRACE_SECONDS = 120
+
+if WINDOW_ACTIVE_DEADLINE_SECONDS <= (
+    MAINTENANCE_WINDOW_SECONDS + COMMAND_TIMEOUT_SECONDS
+):
+    msg = "the Job deadline would fire before the command closes its own window"
+    raise AssertionError(msg)
+
+
+class OmnigraphMaintenanceWindow(NamedTuple):
+    """Handles to the stop-window CronJob and its access."""
+
+    cron_job: kubernetes.batch.v1.CronJob
+    role_binding: kubernetes.rbac.v1.RoleBinding
+
+
+def create_maintenance_window(  # noqa: PLR0913
+    stack_info: StackInfo,
+    namespace: str,
+    k8s_global_labels: dict[str, str],
+    image: str | Output[str],
+    aws_region: str,
+    cluster_configmap_name: str,
+    cluster_config_dir: str,
+    server_deployment_name: str,
+    schedule: str,
+    cleanup_older_than: str,
+    cleanup_iso_weekday: int,
+    depends_on: list[Resource],
+    *,
+    suspend: bool = False,
+) -> OmnigraphMaintenanceWindow:
+    """Provision the nightly stop-window CronJob and its ServiceAccount's Role.
+
+    The ServiceAccount itself (``MAINTENANCE_SERVICE_ACCOUNT_NAME``) is an IRSA
+    one, created with the server's by the stack's auth binding: the job needs
+    the same S3 access. It is a separate identity because of what is bound
+    here. Granting the scale verbs to the server's ServiceAccount would let the
+    server scale its own Deployment.
+
+    :param cluster_configmap_name: the ConfigMap holding ``cluster.yaml``. The
+        command reads the storage root and the graph list from it, so a graph
+        cannot exist without being maintained.
+    :param server_deployment_name: the Deployment the window stops. The
+        command reads its pod selector from it, so there is no second copy of
+        the selector here to drift.
+    :param cleanup_iso_weekday: UTC day ``cleanup`` also runs on (1 is Monday).
+    :param suspend: hold the window off while a storage-format migration is
+        armed. The command also skips on the Deployment's migration-armed
+        annotation, which covers a run that started before the suspend landed.
+    """
+    role = kubernetes.rbac.v1.Role(
+        f"omnigraph-maintenance-window-role-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=MAINTENANCE_WINDOW_NAME,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        rules=[
+            kubernetes.rbac.v1.PolicyRuleArgs(
+                api_groups=["coordination.k8s.io"],
+                resources=["leases"],
+                resource_names=[UNLOCK_LEASE_NAME],
+                verbs=["get", "update"],
+            ),
+            # RBAC cannot scope `list` to a label selector.
+            kubernetes.rbac.v1.PolicyRuleArgs(
+                api_groups=[""], resources=["pods"], verbs=["list"]
+            ),
+            # `get` on the Deployment for its replica count, resourceVersion
+            # and the migration-armed annotation. The write goes through the
+            # scale subresource only, so this identity cannot change the image,
+            # the command or anything else about the server.
+            kubernetes.rbac.v1.PolicyRuleArgs(
+                api_groups=["apps"],
+                resources=["deployments"],
+                resource_names=[server_deployment_name],
+                verbs=["get"],
+            ),
+            kubernetes.rbac.v1.PolicyRuleArgs(
+                api_groups=["apps"],
+                resources=["deployments/scale"],
+                resource_names=[server_deployment_name],
+                verbs=["get", "update"],
+            ),
+        ],
     )
+    role_binding = kubernetes.rbac.v1.RoleBinding(
+        f"omnigraph-maintenance-window-binding-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=MAINTENANCE_WINDOW_NAME,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        role_ref=kubernetes.rbac.v1.RoleRefArgs(
+            api_group="rbac.authorization.k8s.io",
+            kind="Role",
+            name=role.metadata.name,
+        ),
+        subjects=[
+            kubernetes.rbac.v1.SubjectArgs(
+                kind="ServiceAccount",
+                name=MAINTENANCE_SERVICE_ACCOUNT_NAME,
+                namespace=namespace,
+            )
+        ],
+    )
+    pod_labels = {
+        **k8s_global_labels,
+        "app.kubernetes.io/name": MAINTENANCE_WINDOW_NAME,
+    }
+    cron_job = kubernetes.batch.v1.CronJob(
+        f"omnigraph-maintenance-window-{stack_info.env_suffix}",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name=MAINTENANCE_WINDOW_NAME,
+            namespace=namespace,
+            labels=k8s_global_labels,
+        ),
+        spec=kubernetes.batch.v1.CronJobSpecArgs(
+            schedule=schedule,
+            suspend=suspend,
+            # A second window opening on a server the first has stopped would
+            # find it at 0 replicas and skip, but there is no reason to start
+            # one.
+            concurrency_policy="Forbid",
+            # A late start pushes the whole budget above towards the 04:00
+            # indexer, so the slack is only what the budget has left over.
+            starting_deadline_seconds=WINDOW_STARTING_DEADLINE_SECONDS,
+            successful_jobs_history_limit=1,
+            failed_jobs_history_limit=3,
+            job_template=kubernetes.batch.v1.JobTemplateSpecArgs(
+                metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=k8s_global_labels),
+                spec=kubernetes.batch.v1.JobSpecArgs(
+                    # No retry: a second attempt would stop the server again.
+                    backoff_limit=BACKOFF_LIMIT,
+                    active_deadline_seconds=WINDOW_ACTIVE_DEADLINE_SECONDS,
+                    template=kubernetes.core.v1.PodTemplateSpecArgs(
+                        metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=pod_labels),
+                        spec=kubernetes.core.v1.PodSpecArgs(
+                            restart_policy="Never",
+                            service_account_name=MAINTENANCE_SERVICE_ACCOUNT_NAME,
+                            termination_grace_period_seconds=TERMINATION_GRACE_SECONDS,
+                            containers=[
+                                kubernetes.core.v1.ContainerArgs(
+                                    name="maintenance",
+                                    # The server's own image, by digest, so the
+                                    # CLI is the storage-format version of the
+                                    # server whose lock it takes over.
+                                    image=image,
+                                    command=["/usr/local/bin/omnigraph_maintenance.py"],
+                                    env=[
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="AWS_REGION", value=aws_region
+                                        ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="OMNIGRAPH_CLUSTER_DIR",
+                                            value=cluster_config_dir,
+                                        ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="OMNIGRAPH_SERVER_DEPLOYMENT",
+                                            value=server_deployment_name,
+                                        ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="OMNIGRAPH_UNLOCK_LEASE",
+                                            value=UNLOCK_LEASE_NAME,
+                                        ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="POD_NAME",
+                                            value_from=kubernetes.core.v1.EnvVarSourceArgs(
+                                                field_ref=kubernetes.core.v1.ObjectFieldSelectorArgs(
+                                                    field_path="metadata.name"
+                                                )
+                                            ),
+                                        ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="OMNIGRAPH_CLEANUP_OLDER_THAN",
+                                            value=cleanup_older_than,
+                                        ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="OMNIGRAPH_CLEANUP_ISO_WEEKDAY",
+                                            value=str(cleanup_iso_weekday),
+                                        ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="OMNIGRAPH_WINDOW_SECONDS",
+                                            value=str(MAINTENANCE_WINDOW_SECONDS),
+                                        ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="OMNIGRAPH_COMMAND_TIMEOUT_SECONDS",
+                                            value=str(COMMAND_TIMEOUT_SECONDS),
+                                        ),
+                                    ],
+                                    # As the sweeps before it: compaction
+                                    # rewrites fragments through memory.
+                                    resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                        requests={"cpu": "100m", "memory": "256Mi"},
+                                        limits={"cpu": "1", "memory": "1Gi"},
+                                    ),
+                                    volume_mounts=[
+                                        # sub_path, as on the server: overlay
+                                        # only cluster.yaml.
+                                        kubernetes.core.v1.VolumeMountArgs(
+                                            name="cluster-config",
+                                            mount_path=f"{cluster_config_dir}/cluster.yaml",
+                                            sub_path="cluster.yaml",
+                                            read_only=True,
+                                        ),
+                                    ],
+                                )
+                            ],
+                            volumes=[
+                                kubernetes.core.v1.VolumeArgs(
+                                    name="cluster-config",
+                                    config_map=kubernetes.core.v1.ConfigMapVolumeSourceArgs(
+                                        name=cluster_configmap_name,
+                                    ),
+                                ),
+                            ],
+                        ),
+                    ),
+                ),
+            ),
+        ),
+        opts=ResourceOptions(depends_on=[*depends_on, role_binding]),
+    )
+    return OmnigraphMaintenanceWindow(cron_job=cron_job, role_binding=role_binding)

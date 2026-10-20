@@ -111,17 +111,15 @@ nextjs_max_old_space_size_mib = (
 # Kept at request + 512Mi as the request grew, preserving that absorption margin.
 nextjs_memory_limit = "2Gi"
 
-stay_updated_hubspot_form_ids = {
-    "ci": "f201f3af-c2c0-4b7d-b297-ddbb75912cc1",
-    "qa": "f201f3af-c2c0-4b7d-b297-ddbb75912cc1",
-    "production": "a5d18493-dcdb-4482-ad10-16ab66a35526",
+# HubSpot tracking portal: xprodev for dev/RC, xPRO prod for production
+# (mitodl/hq#10735). Public value (in the js.hs-scripts.com URL), not a secret.
+hubspot_portal_ids = {
+    "ci": "23128026",
+    "qa": "23128026",
+    "production": "4994459",
 }
 
-try:
-    stay_updated_hubspot_form_id = stay_updated_hubspot_form_ids[stack_info.env_suffix]
-except KeyError as exc:
-    msg = f"Unsupported MIT Learn Next.js environment: {stack_info.env_suffix}"
-    raise ValueError(msg) from exc
+hubspot_portal_id = hubspot_portal_ids.get(stack_info.env_suffix, "")
 
 raw_env_vars = {
     # Env vars available only on server
@@ -148,6 +146,7 @@ raw_env_vars = {
     or "",
     "NEXT_PUBLIC_CSRF_COOKIE_NAME": nextjs_config.require("csrf_cookie_name"),
     "NEXT_PUBLIC_EMBEDLY_KEY": nextjs_config.require("embedly_key"),
+    "NEXT_PUBLIC_HUBSPOT_PORTAL_ID": hubspot_portal_id,
     "NEXT_PUBLIC_LEARN_AI_CSRF_COOKIE_NAME": f"learn_ai_{stack_info.env_suffix}_csrftoken".replace(  # noqa: E501
         "production_", ""
     ),
@@ -157,6 +156,9 @@ raw_env_vars = {
     "NEXT_PUBLIC_LEARN_AI_SYLLABUS_ENDPOINT": nextjs_config.require(
         "syllabus_endpoint"
     ),
+    "NEXT_PUBLIC_LEARN_AI_SEARCH_SUMMARY_ENDPOINT": nextjs_config.require(
+        "search_summary_endpoint"
+    ),
     "NEXT_PUBLIC_MITOL_API_BASE_URL": nextjs_config.require("mitlearn_api_base_url"),
     "NEXT_PUBLIC_MITX_ONLINE_CSRF_COOKIE_NAME": "csrf_mitxonline",
     "NEXT_PUBLIC_MITX_ONLINE_BASE_URL": nextjs_config.require("mitxonline_base_url"),
@@ -165,6 +167,12 @@ raw_env_vars = {
     ),
     "NEXT_PUBLIC_MITOL_AXIOS_WITH_CREDENTIALS": "true",
     "NEXT_PUBLIC_MITOL_SUPPORT_EMAIL": "mitlearn-support@mit.edu",
+    # Optional: the app's yup schema treats it as optional and the lead form
+    # reports itself unavailable rather than erroring when unset.
+    "NEXT_PUBLIC_ORG_LEARNING_HUBSPOT_FORM_ID": nextjs_config.get(
+        "org_learning_hubspot_form_id"
+    )
+    or "",
     "NEXT_PUBLIC_ORIGIN": nextjs_config.require("origin"),
     "NEXT_PUBLIC_POSTHOG_API_HOST": nextjs_config.require("posthog_api_host"),
     "NEXT_PUBLIC_PODCASTS_FEATURED_LIST_LEARNINGPATH_ID": (
@@ -178,7 +186,6 @@ raw_env_vars = {
     "NEXT_PUBLIC_SENTRY_PROFILES_SAMPLE_RATE": "0.25",
     "NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE": "0.001",
     "NEXT_PUBLIC_SITE_NAME": "MIT Learn",
-    "NEXT_PUBLIC_STAY_UPDATED_HUBSPOT_FORM_ID": stay_updated_hubspot_form_id,
     "NEXT_PUBLIC_VERSION": MIT_LEARN_NEXTJS_DOCKER_TAG,
     "NEXT_PUBLIC_FEATURE_product_page_courses": "false",
     "NEXT_PUBLIC_FEATURE_article_viewer": "true",

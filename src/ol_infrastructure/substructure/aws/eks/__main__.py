@@ -342,6 +342,7 @@ setup_grafana(
     cluster_name=cluster_name,
     stack_info=stack_info,
     k8s_provider=k8s_provider,
+    k8s_global_labels=k8s_global_labels,
     grafana_k8s_monitoring_version=VERSIONS["GRAFANA_K8S_MONITORING_VERSION"],
 )
 

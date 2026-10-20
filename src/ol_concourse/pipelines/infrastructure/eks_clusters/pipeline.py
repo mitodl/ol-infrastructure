@@ -4,6 +4,7 @@ from ol_concourse.lib.resources import git_repo
 
 from ol_concourse.pipelines.constants import PULUMI_CODE_PATH, PULUMI_WATCHED_PATHS
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -74,9 +75,24 @@ eks_cluster_update_pipeline = PipelineFragment.combine_fragments(
 if __name__ == "__main__":
     import sys
 
+    output = pipeline_json_with_user_data(
+        eks_cluster_update_pipeline,
+        user_data={
+            "description": (
+                "Runs Pulumi chains for `infrastructure/aws/eks` and "
+                "`substructure/aws/eks` across the `data`, `operations`, "
+                "`applications`, and `residential` EKS clusters' CI/QA/Production "
+                "stacks. Each stage is gated on a preview of itself, not the "
+                "prior stage, because cluster stacks drift independently -- "
+                "they get hand-touched during incidents."
+            ),
+            "team": "infrastructure",
+            "category": "core-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(eks_cluster_update_pipeline.model_dump_json(indent=2))
-    sys.stdout.write(eks_cluster_update_pipeline.model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.writelines(
         [
             "\n",

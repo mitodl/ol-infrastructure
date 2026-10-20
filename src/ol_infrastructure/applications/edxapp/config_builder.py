@@ -350,7 +350,6 @@ def build_base_general_config() -> ConfigDict:
         "ENABLE_DISCUSSION_SERVICE": True,
         "ENABLE_EDXNOTES": True,
         "ENABLE_HELP_LINK": True,
-        "ENABLE_MKTG_SITE": False,
         "ENABLE_MOBILE_REST_API": True,
         "ENABLE_OAUTH2_PROVIDER": True,
         "ENABLE_PUBLISHER": False,
@@ -473,15 +472,13 @@ def get_deployment_overrides(env_prefix: str) -> ConfigDict:
         ],
         # Module-level settings overrides for residential
         "DISABLE_START_DATES": False,
-        "ENABLE_MKTG_SITE": False,  # Extracted to module-level
-        "MKTG_URL_LINK_MAP": {
-            "TOS": "tos",
-            "ABOUT": "about",
-            "ACCESSIBILITY": "accessibility",
-        },
         # FEATURES overrides for residential (only non-module-level flags)
         "FEATURES": {
             "ALLOW_PUBLIC_ACCOUNT_CREATION": True,
+            # Upstream dropped ENABLE_MKTG_SITE (openedx-platform#38720), which
+            # made this the only gate for redirecting course about pages to
+            # course home. Overrides the base True to keep the about page.
+            "ENABLE_COURSE_HOME_REDIRECT": False,
             "DISABLE_HONOR_CERTIFICATES": True,
             "ENABLE_CANVAS_INTEGRATION": True,
             "ENABLE_CONTENT_LIBRARIES": True,

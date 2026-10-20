@@ -8,6 +8,10 @@ path "secret-global/*" {
 path "secret-operations/sso/dagster" {
   capabilities = ["read"]
 }
+# Keycloak client-credentials for Opik, read by the ml code location
+path "secret-operations/sso/opik" {
+  capabilities = ["read"]
+}
 path "mariadb-xpro/creds/readonly/*" {
   capabilities = ["read"]
 }
@@ -87,6 +91,14 @@ path "postgres-mitxonline/creds/readonly/*" {
   capabilities = ["read"]
 }
 path "postgres-mitxonline/creds/readonly" {
+  capabilities = ["read"]
+}
+# xPro application database, ingested by the data_loading dlt pipeline
+# (RFC 12711).
+path "postgres-xpro/creds/readonly/*" {
+  capabilities = ["read"]
+}
+path "postgres-xpro/creds/readonly" {
   capabilities = ["read"]
 }
 path "secret-data/" {

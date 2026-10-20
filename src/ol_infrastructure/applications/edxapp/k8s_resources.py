@@ -4,8 +4,9 @@
 import hashlib
 import json
 import os
+from collections.abc import Awaitable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pulumi
 import pulumi_aws as aws
@@ -14,7 +15,7 @@ import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import iam
 
-from bridge.settings.openedx.types import OpenEdxSupportedRelease
+from bridge.settings.openedx.types import EnvStage, OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.applications.edxapp.k8s_autoscaling import (
     build_cms_webapp_keda_config,
@@ -49,6 +50,7 @@ from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCertConfig,
 )
 from ol_infrastructure.components.services.k8s import (
+    ALERT_TIER_LABEL,
     GranianConfig,
     OLApplicationK8s,
     OLApplicationK8sConfig,
@@ -65,8 +67,14 @@ from ol_infrastructure.lib.aws.eks_helper import (
     default_psg_egress_args,
     get_default_psg_ingress_args,
 )
+from ol_infrastructure.lib.azure_workload_identity import (
+    azure_identity_env,
+    azure_identity_token_mount,
+    azure_identity_token_volume,
+)
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
@@ -119,6 +127,21 @@ _OTEL_SDK_ENV: dict[str, str] = {
     # edxapp is upstream of everything it calls, so a head sample here would
     # discard whole traces. The Alloy tail sampler owns that (see lib/otel.py).
     "OTEL_TRACES_SAMPLER": "parentbased_always_on",
+    # The old HTTP semconv makes opentelemetry-instrumentation-wsgi fall back to
+    # wsgiref.util.request_uri() when RAW_URI/REQUEST_URI is absent, which
+    # granian never sets. That latin-1 encodes PATH_INFO after Django has
+    # replaced it in the shared environ with the UTF-8-decoded path, so any path
+    # with a codepoint above U+00FF (learner usernames) 500s in the OTel
+    # middleware. The stable semconv skips that fallback. "http/dup" still
+    # emits the old attributes and still crashes.
+    #
+    # Costs: with no RAW_URI/REQUEST_URI, server spans carry http.route but no
+    # url.path, so a trace can't be found by concrete path. The token also moves
+    # the mysqlclient spans from net.peer.* to server.address/server.port.
+    # Safe here only because edxapp exports no metrics: the RED dashboards and
+    # alerts read the old-semconv http_server_duration_milliseconds.
+    # https://github.com/open-telemetry/opentelemetry-python-contrib/issues/3237
+    "OTEL_SEMCONV_STABILITY_OPT_IN": "http",
 }
 
 
@@ -149,14 +172,28 @@ def _pod_config_hash(
     of that template, which leaves a config-only change inert until something
     else happens to restart the pod. Annotating the pod template with this hash
     makes the template change whenever the config does.
+
+    The returned Output deliberately carries no resource dependencies. These
+    ConfigMaps have fixed names, so a data change replaces them delete-first,
+    and Pulumi then replaces every resource with a recorded property dependency
+    on them -- also delete-first. Left in place, that edge turns any config
+    change into deleting every edxapp Deployment at once (2026-09-16, mitxonline
+    LMS dropped from 27 pods to 3). Without it, the Deployment sees only a
+    changed annotation and does a rolling update.
     """
     names = sorted(config_maps)
-    return Output.all(
+    config_hash = Output.all(
         *(_config_map_contents(config_maps[name]) for name in names)
     ).apply(
         lambda contents: hashlib.sha256(
             json.dumps(dict(zip(names, contents, strict=True)), sort_keys=True).encode()
         ).hexdigest()
+    )
+    return Output(
+        set(),
+        cast(Awaitable[str], config_hash.future()),
+        config_hash.is_known(),
+        config_hash.is_secret(),
     )
 
 
@@ -173,6 +210,7 @@ def create_k8s_resources(  # noqa: C901
     stack_info: StackInfo,
     vault_config: Config,
     vault_policy: vault.Policy,
+    azure_openai_stack: StackReference | None = None,
 ) -> dict[str, Any]:
     """Create all Kubernetes resources for the edxapp LMS and CMS deployments."""
     env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
@@ -222,6 +260,21 @@ def create_k8s_resources(  # noqa: C901
     # 2026-08-26 saturation was the connection ceiling, not the thread pool: idle
     # APISIX keepalives consume backpressure while doing no work, so CMS takes
     # DEFAULT_WSGI_BACKPRESSURE and only its threads stay pinned.
+    #
+    # Installs at workers=1 also set respawn_interval and, in production,
+    # worker_startup_rss. edxapp runs Granian 2.8.x, where a worker listens only after
+    # importing the app and a planned respawn stops the old worker after
+    # respawn_interval (default 3.5s) regardless, so at one worker a short interval
+    # refuses connections until the import finishes. On 2026-09-17, mitxonline LMS
+    # pods on warm nodes went Ready 18s after container start (the first probe). On a
+    # node that had just pulled the image, a first start exceeded the 60s startup probe
+    # and its restart still refused connections 24s in. 60s covers the restart case;
+    # a respawn never runs on a node without the image. worker_startup_rss is the p95 container RSS
+    # of pods 1-5 minutes old at one worker (mitxonline LMS 1075MiB over the first 80
+    # minutes at workers=1; mitx and mitx-staging LMS and CMS 609-642MiB over 7 days),
+    # rounded up. It reserves room for the replacement worker in the derived
+    # --workers-max-rss. Not set in CI/QA, whose 2Gi limit cannot fit mitxonline
+    # LMS's value and whose low traffic keeps the cap from tripping.
     #
     # See docs/plans/granian-configuration-overhaul.md stage 3.
     LMS_GRANIAN_HOLDING_PINS = {
@@ -276,6 +329,21 @@ def create_k8s_resources(  # noqa: C901
 
     # Look up what what release to deploy for this stack
     release_info = OpenLearningOpenEdxDeployment.get_item(stack_info.env_prefix)
+    openedx_release = release_info.release_by_env(cast("EnvStage", stack_info.name))
+
+    # Celery added --disable-prefetch in 5.6. release/ulmo pins Celery 5.5.3, whose
+    # worker exits on the unknown option.
+    celery_prefetch_args = (
+        []
+        if openedx_release == OpenEdxSupportedRelease.ulmo
+        else ["--disable-prefetch"]
+    )
+
+    # The "--" stops opentelemetry-instrument's argparse from reading the wrapped
+    # command's flags as its own. Without it, Python 3.11 (release/ulmo) treats
+    # granian's --metrics as an ambiguous abbreviation of --metrics_exporter and
+    # exits before granian starts. Python 3.12 does not, so master/verawood hid it.
+    otel_wrapper = ["opentelemetry-instrument", "--"]
 
     # Environments that have retired their OpenSearch domain set
     # edxapp:elasticsearch_enabled to false. The stack reference has to be
@@ -430,6 +498,7 @@ def create_k8s_resources(  # noqa: C901
         edxapp_cache=edxapp_cache,
         notes_stack=notes_stack,
         opensearch_hostname=opensearch_hostname,
+        azure_openai_stack=azure_openai_stack,
     )
 
     openedx_data_pvc = kubernetes.core.v1.PersistentVolumeClaim(
@@ -471,9 +540,34 @@ def create_k8s_resources(  # noqa: C901
         command=["/bin/sh", "-c", "mkdir -p /openedx/data/export_course_repos"],
     )
 
+    # Azure OpenAI workload identity federation, mitxonline only. Every LMS and CMS
+    # workload including the CronJobs runs under vault_k8s_resources.service_account_name
+    # (see edxapp_service_account_name above), which is the single subject the federated
+    # credential in infrastructure/azure/openai trusts.
+    #
+    # AZURE_CLIENT_ID and AZURE_TENANT_ID also appear as Django settings in the
+    # 18-azure-openai config source; the copies here are what DefaultAzureCredential
+    # itself reads out of the process environment, with no application code involved.
+    azure_identity_volumes = (
+        [azure_identity_token_volume()] if azure_openai_stack else []
+    )
+    azure_identity_volume_mounts = (
+        [azure_identity_token_mount()] if azure_openai_stack else []
+    )
+    azure_identity_config: dict[str, Any] = (
+        azure_identity_env(azure_openai_stack, "mitxonline")
+        if azure_openai_stack
+        else {}
+    )
+    azure_identity_env_vars = [
+        kubernetes.core.v1.EnvVarArgs(name=name, value=value)
+        for name, value in azure_identity_config.items()
+    ]
+
     # Common volume mounts for main application containers (both webapp and celery).
     # These are injected by the component into all containers via extra_volume_mounts.
     common_extra_volume_mounts = [
+        *azure_identity_volume_mounts,
         kubernetes.core.v1.VolumeMountArgs(
             name="edxapp-config",
             mount_path="/openedx/config",
@@ -687,15 +781,20 @@ def create_k8s_resources(  # noqa: C901
                     "--active",
                     "--warning",
                 ],
-                # Tracks the CMS celery worker: the sweep walks the modulestore in
-                # process rather than fanning out to celery, so it wants comparable
-                # headroom.
+                # Tracks the CMS celery worker by default: the sweep walks the
+                # modulestore in process rather than fanning out to celery, so it
+                # wants comparable headroom. Memory grows with every course the
+                # sweep visits and is never released, so a large catalog needs its
+                # own override (mitxonline Production: ~5.2Gi at start plus ~1Mi
+                # per course across ~4,300 courses).
                 resource_requests={
                     "cpu": resources_dict["celery"]["cms"]["cpu_request"],
-                    "memory": resources_dict["celery"]["cms"]["memory_request"],
+                    "memory": edxapp_config.get("courseware_reindex_memory_request")
+                    or resources_dict["celery"]["cms"]["memory_request"],
                 },
                 resource_limits={
-                    "memory": resources_dict["celery"]["cms"]["memory_limit"],
+                    "memory": edxapp_config.get("courseware_reindex_memory_limit")
+                    or resources_dict["celery"]["cms"]["memory_limit"],
                 },
                 # No active_deadline_seconds: runtime scales with the size of the
                 # course catalog, and a wrong guess converts a slow sweep into a
@@ -753,6 +852,10 @@ def create_k8s_resources(  # noqa: C901
         lms_edxapp_secret_names.append(secrets.webhook_tokens_secret_name)
     if secrets.typesense:
         lms_edxapp_secret_names.append(secrets.typesense_secret_name)
+    if configmaps.azure_openai:
+        lms_edxapp_config_sources[configmaps.azure_openai_config_name] = (
+            configmaps.azure_openai
+        )
     lms_edxapp_config_maps: dict[str, kubernetes.core.v1.ConfigMap | Output[Any]] = {
         configmaps.general_config_name: configmaps.general,
         configmaps.interpolated_config_name: configmaps.interpolated,
@@ -762,6 +865,10 @@ def create_k8s_resources(  # noqa: C901
         # init container cats into lms.env.yml. This is a Python module, not config.
         configmaps.settings_override_config_name: configmaps.settings_override,
     }
+    if configmaps.azure_openai:
+        lms_edxapp_config_maps[configmaps.azure_openai_config_name] = (
+            configmaps.azure_openai
+        )
     lms_edxapp_configmap_names = list(lms_edxapp_config_maps)
     lms_config_hash = _pod_config_hash(
         {
@@ -835,6 +942,7 @@ def create_k8s_resources(  # noqa: C901
             ),
         ]
     )
+    lms_edxapp_volumes.extend(azure_identity_volumes)
 
     # Mounts injected into init containers only: the config source paths that
     # the config-aggregator uses to concatenate config YAMLs.
@@ -868,6 +976,7 @@ def create_k8s_resources(  # noqa: C901
                 "DJANGO_SETTINGS_MODULE": "lms.envs.mitol.production",
                 "OTEL_SERVICE_NAME": f"{env_name}-edxapp-lms",
                 **_OTEL_SDK_ENV,
+                **azure_identity_config,
             },
             application_lb_service_name=lms_webapp_deployment_name,
             application_lb_service_port_name="http",
@@ -891,7 +1000,7 @@ def create_k8s_resources(  # noqa: C901
             # installed in the image -- see mitodl/lehrer#177. Do not deploy this
             # ahead of that PR's image, or granian fails to start (missing
             # executable).
-            command_prefix=["opentelemetry-instrument"],
+            command_prefix=otel_wrapper,
             granian_config=GranianConfig(
                 application_module="lms.wsgi:application",
                 port=8000,
@@ -964,10 +1073,16 @@ def create_k8s_resources(  # noqa: C901
             resource_limits={
                 "memory": resources_dict["webapp"]["lms"]["memory_limit"],
             },
-            # Preserves the bounds of the hand-rolled lms-webapp-vpa this replaces.
-            # The floor is deliberately below resource_limits so the VPA can size
-            # these pods down as well as up.
-            webapp_vpa_min_allowed_memory="256Mi",
+            # 256Mi preserves the bounds of the hand-rolled lms-webapp-vpa this
+            # replaces, so the VPA can size pods down as well as up. An install that
+            # sets worker_startup_rss raises it with
+            # k8s_resources.webapp.lms.vpa_min_allowed_memory: --workers-max-rss is
+            # derived from the declared limit, and the VPA scales the limit with the
+            # request (RequestsAndLimits). A pod admitted below the declared limit has
+            # no room for the respawn overlap the startup reservation is for.
+            webapp_vpa_min_allowed_memory=resources_dict["webapp"]["lms"].get(
+                "vpa_min_allowed_memory", "256Mi"
+            ),
             webapp_vpa_max_allowed_memory="4Gi",
             pod_security_context=pod_security_context,
             extra_volumes=lms_edxapp_volumes,
@@ -1105,6 +1220,10 @@ def create_k8s_resources(  # noqa: C901
         cms_edxapp_secret_names.append(secrets.meilisearch_secret_name)
     if secrets.typesense:
         cms_edxapp_secret_names.append(secrets.typesense_secret_name)
+    if configmaps.azure_openai:
+        cms_edxapp_config_sources[configmaps.azure_openai_config_name] = (
+            configmaps.azure_openai
+        )
     cms_edxapp_config_maps: dict[str, kubernetes.core.v1.ConfigMap | Output[Any]] = {
         configmaps.general_config_name: configmaps.general,
         configmaps.interpolated_config_name: configmaps.interpolated,
@@ -1113,6 +1232,10 @@ def create_k8s_resources(  # noqa: C901
         # Volume only -- see the note on lms_edxapp_config_maps.
         configmaps.settings_override_config_name: configmaps.settings_override,
     }
+    if configmaps.azure_openai:
+        cms_edxapp_config_maps[configmaps.azure_openai_config_name] = (
+            configmaps.azure_openai
+        )
     cms_edxapp_configmap_names = list(cms_edxapp_config_maps)
     cms_config_hash = _pod_config_hash(
         {
@@ -1186,6 +1309,7 @@ def create_k8s_resources(  # noqa: C901
             ),
         ]
     )
+    cms_edxapp_volumes.extend(azure_identity_volumes)
 
     cms_edxapp_init_volume_mounts = [
         kubernetes.core.v1.VolumeMountArgs(
@@ -1215,6 +1339,7 @@ def create_k8s_resources(  # noqa: C901
                 "DJANGO_SETTINGS_MODULE": "cms.envs.mitol.production",
                 "OTEL_SERVICE_NAME": f"{env_name}-edxapp-cms",
                 **_OTEL_SDK_ENV,
+                **azure_identity_config,
             },
             application_lb_service_name=cms_webapp_deployment_name,
             application_lb_service_port_name="http",
@@ -1238,7 +1363,7 @@ def create_k8s_resources(  # noqa: C901
             # installed in the image -- see mitodl/lehrer#177. Do not deploy this
             # ahead of that PR's image, or granian fails to start (missing
             # executable).
-            command_prefix=["opentelemetry-instrument"],
+            command_prefix=otel_wrapper,
             granian_config=GranianConfig(
                 application_module="cms.wsgi:application",
                 port=8000,
@@ -1318,9 +1443,10 @@ def create_k8s_resources(  # noqa: C901
             resource_limits={
                 "memory": resources_dict["webapp"]["cms"]["memory_limit"],
             },
-            # Preserves the bounds of the hand-rolled cms-webapp-vpa this replaces.
-            # See the LMS config above.
-            webapp_vpa_min_allowed_memory="256Mi",
+            # Same default and per-install override as the LMS config above.
+            webapp_vpa_min_allowed_memory=resources_dict["webapp"]["cms"].get(
+                "vpa_min_allowed_memory", "256Mi"
+            ),
             webapp_vpa_max_allowed_memory="4Gi",
             pod_security_context=pod_security_context,
             extra_volumes=cms_edxapp_volumes,
@@ -1378,6 +1504,12 @@ def create_k8s_resources(  # noqa: C901
 
     celery_volume_mounts = common_extra_volume_mounts
 
+    # A stuck or restarting worker delays tasks and does not take the site down, so
+    # none of these pods page. The tier goes on each Deployment's metadata and pod
+    # template only: the selectors are immutable, and nothing reads a tier from the
+    # ScaledObjects that share the *_labels dicts.
+    celery_alert_tier_label = {ALERT_TIER_LABEL: str(AlertTier.notify)}
+
     # Selector labels must match the existing Deployment's spec.selector (immutable).
     # The old SGP label (pod-security-group) is kept in the selector; the new
     # edxapp-celery-sg label is added only to the pod template so the
@@ -1394,7 +1526,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=f"{lms_celery_deployment_name}",
             namespace=namespace,
-            labels=lms_celery_labels,
+            labels=lms_celery_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             selector=kubernetes.meta.v1.LabelSelectorArgs(
@@ -1402,7 +1534,7 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_celery_labels,
+                    labels=lms_celery_labels | celery_alert_tier_label,
                     annotations=lms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
@@ -1468,6 +1600,18 @@ def create_k8s_resources(  # noqa: C901
                                 "--app=lms.celery",
                                 "worker",
                                 "-E",
+                                # Every worker that starts declares a
+                                # celeryev.<uuid> queue for gossip and relies on the
+                                # broker to reclaim it. kombu's Redis transport never
+                                # does: Channel.close() only deletes queues in
+                                # _fanout_queues, which _queue_bind populates only for
+                                # FANOUT exchanges, and celery declares celeryev as a
+                                # TOPIC exchange. The queue and its binding survive
+                                # even a clean shutdown, and the exchange copies every
+                                # event into the orphan forever. Monitoring is
+                                # unaffected: -E above still emits events, and leek's
+                                # revoke goes over pidbox, not gossip.
+                                "--without-gossip",
                                 "--loglevel=info",
                                 "--hostname=edx.lms.core.default.%h",
                                 "--max-tasks-per-child",
@@ -1480,7 +1624,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--exclude-queues=edx.cms.core.default",
                                 "--concurrency=2",
                                 "--prefetch-multiplier=1",
-                                "--disable-prefetch",
+                                *celery_prefetch_args,
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -1498,6 +1642,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
@@ -1564,7 +1709,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=lms_high_mem_celery_deployment_name,
             namespace=namespace,
-            labels=lms_high_mem_celery_labels,
+            labels=lms_high_mem_celery_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             selector=kubernetes.meta.v1.LabelSelectorArgs(
@@ -1585,7 +1730,7 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_high_mem_celery_labels,
+                    labels=lms_high_mem_celery_labels | celery_alert_tier_label,
                     annotations={
                         # Keep Karpenter and the cluster autoscaler from reclaiming the
                         # node underneath a running report.
@@ -1657,6 +1802,10 @@ def create_k8s_resources(  # noqa: C901
                                 "--app=lms.celery",
                                 "worker",
                                 "-E",
+                                # See the note on the default LMS celery worker
+                                # above: on a Redis broker, gossip's per-worker
+                                # celeryev.<uuid> queue is never reclaimed.
+                                "--without-gossip",
                                 "--loglevel=info",
                                 "--hostname=edx.lms.core.high_mem.%h",
                                 # One report per process, then recycle, so a report's
@@ -1667,7 +1816,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--exclude-queues=edx.cms.core.default",
                                 "--concurrency=1",
                                 "--prefetch-multiplier=1",
-                                "--disable-prefetch",
+                                *celery_prefetch_args,
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -1685,6 +1834,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
@@ -1748,7 +1898,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=lms_beat_deployment_name,
             namespace=namespace,
-            labels=lms_beat_labels,
+            labels=lms_beat_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             replicas=1,
@@ -1757,7 +1907,7 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_beat_labels,
+                    labels=lms_beat_labels | celery_alert_tier_label,
                     annotations=lms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
@@ -1825,6 +1975,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={"cpu": "100m", "memory": "512Mi"},
@@ -1857,7 +2008,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=f"{env_name}-edxapp-lms-process-scheduled-emails",
             namespace=namespace,
-            labels=lms_process_scheduled_emails_labels,
+            labels=lms_process_scheduled_emails_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             replicas=1,
@@ -1866,7 +2017,8 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=lms_process_scheduled_emails_labels,
+                    labels=lms_process_scheduled_emails_labels
+                    | celery_alert_tier_label,
                     annotations=lms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
@@ -1944,6 +2096,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             volume_mounts=celery_volume_mounts,
                         ),
@@ -1971,7 +2124,7 @@ def create_k8s_resources(  # noqa: C901
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
             name=f"{cms_celery_deployment_name}",
             namespace=namespace,
-            labels=cms_celery_labels,
+            labels=cms_celery_labels | celery_alert_tier_label,
         ),
         spec=kubernetes.apps.v1.DeploymentSpecArgs(
             selector=kubernetes.meta.v1.LabelSelectorArgs(
@@ -1979,7 +2132,7 @@ def create_k8s_resources(  # noqa: C901
             ),
             template=kubernetes.core.v1.PodTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    labels=cms_celery_labels,
+                    labels=cms_celery_labels | celery_alert_tier_label,
                     annotations=cms_config_hash_annotations,
                 ),
                 spec=kubernetes.core.v1.PodSpecArgs(
@@ -2045,6 +2198,12 @@ def create_k8s_resources(  # noqa: C901
                                 "--app=cms.celery",
                                 "worker",
                                 "-E",
+                                # See the note on the default LMS celery worker
+                                # above: on a Redis broker, gossip's per-worker
+                                # celeryev.<uuid> queue is never reclaimed. This
+                                # deployment churns hardest under KEDA, so it
+                                # starts the most of them.
+                                "--without-gossip",
                                 "--loglevel=info",
                                 "--hostname=edx.cms.core.default.%h",
                                 "--max-tasks-per-child",
@@ -2053,7 +2212,7 @@ def create_k8s_resources(  # noqa: C901
                                 "--exclude-queues=edx.lms.core.default,edx.lms.core.high,edx.lms.core.high_mem",
                                 "--prefetch-multiplier=1",
                                 "--concurrency=2",
-                                "--disable-prefetch",
+                                *celery_prefetch_args,
                             ],
                             env=[
                                 kubernetes.core.v1.EnvVarArgs(
@@ -2071,6 +2230,7 @@ def create_k8s_resources(  # noqa: C901
                                     kubernetes.core.v1.EnvVarArgs(name=k, value=v)
                                     for k, v in _OTEL_SDK_ENV.items()
                                 ],
+                                *azure_identity_env_vars,
                             ],
                             resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                 requests={
@@ -2133,9 +2293,7 @@ def create_k8s_resources(  # noqa: C901
 
     # APISIX ingress configuration and setup
     apisix_ingress_class = edxapp_config.get("apisix_ingress_class") or "apisix"
-    tls_secret_name = (
-        "shared-backend-tls-pair"  # pragma: allowlist secret  # noqa: S105
-    )
+    tls_secret_name = "shared-backend-tls-pair"  # pragma: allowlist secret  # noqa: S105
     cert_manager_certificate = OLCertManagerCert(
         f"ol-{stack_info.env_prefix}-edxapp-tls-cert-{stack_info.env_suffix}",
         cert_config=OLCertManagerCertConfig(

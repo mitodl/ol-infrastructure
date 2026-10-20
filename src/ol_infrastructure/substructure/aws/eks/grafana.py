@@ -6,7 +6,21 @@ from pulumi import ResourceOptions
 
 from bridge.lib.versions import GRAFANA_K8S_MONITORING_CHART_VERSION
 from bridge.secrets.sops import read_yaml_secrets
+from ol_infrastructure.lib.ol_types import (
+    AlertTier,
+    Component,
+    Services,
+    cluster_addon_labels,
+)
 from ol_infrastructure.lib.pulumi_helper import StackInfo
+
+# The K8sGlobalLabels keys that alert rules join on to tier and route a
+# workload's alerts. kube-state-metrics surfaces each as a label_ol_mit_edu_*
+# column on kube_<kind>_labels.
+_OL_ROUTING_LABEL_KEYS = ",".join(
+    f"ol.mit.edu/{field}"
+    for field in ("service", "component", "alert_tier", "environment")
+)
 
 
 def _apisix_cookie_metrics_alloy_config() -> str:
@@ -176,6 +190,7 @@ def setup_grafana(
     cluster_name: str,
     stack_info: StackInfo,
     k8s_provider: kubernetes.Provider,
+    k8s_global_labels: dict[str, str],
     grafana_k8s_monitoring_version: str = GRAFANA_K8S_MONITORING_CHART_VERSION,
 ):
     """
@@ -187,6 +202,8 @@ def setup_grafana(
         cluster_name: The name of the EKS cluster.
         stack_info: The StackInfo object containing environment information.
         k8s_provider: The Pulumi Kubernetes provider instance.
+        k8s_global_labels: The program's shared label dict, merged into each
+            workload's routing labels.
         grafana_k8s_monitoring_version: The version of the Grafana k8s-monitoring chart.
     """
     if stack_info.env_suffix.lower() == "ci":
@@ -195,6 +212,24 @@ def setup_grafana(
     grafana_vault_secrets = read_yaml_secrets(
         Path(f"alloy/grafana.{stack_info.env_suffix}.yaml")
     )
+
+    def _labels(component: Component, alert_tier: AlertTier) -> dict[str, str]:
+        return cluster_addon_labels(
+            base_labels=k8s_global_labels,
+            stack_info=stack_info,
+            service=Services.grafana_k8s_monitoring,
+            component=component,
+            alert_tier=alert_tier,
+        )
+
+    # The collectors and kube-state-metrics are what every alert rule reads
+    # from. Losing one blinds alerting for the cluster without taking anything
+    # user-facing down.
+    collector_labels = _labels(Component.agent, AlertTier.notify)
+    kube_state_metrics_labels = _labels(Component.exporter, AlertTier.notify)
+    alloy_operator_labels = _labels(Component.controller, AlertTier.notify)
+    # Cost and energy telemetry. A gap in it is a reporting problem.
+    cost_exporter_labels = _labels(Component.exporter, AlertTier.ticket)
 
     alloy_extra_env_vars = [
         {
@@ -341,6 +376,46 @@ def setup_grafana(
                                         "threshold_ms": 5000,
                                     },
                                     {
+                                        # Keep every trace that touches one of
+                                        # these low-volume first-party services.
+                                        # At 15% they sample into invisibility:
+                                        # ol-analytics-api sees ~10 requests a
+                                        # day, so "broken" and "quiet" look the
+                                        # same in Tempo.
+                                        #
+                                        # Non-inverted on purpose.  The
+                                        # processor ORs a non-inverted match
+                                        # across every resource in the trace
+                                        # (hasResourceOrSpanWithCondition), so a
+                                        # trace through APISIX into one of these
+                                        # is kept.  invert_match ANDs instead,
+                                        # and since APISIX fronts nearly every
+                                        # request an inverted exclusion list
+                                        # almost never fires.
+                                        #
+                                        # The cost is that a new low-volume
+                                        # service is sampled at 15% until it is
+                                        # added here.  Keeping these whole adds
+                                        # ~1% to exported spans (spanmetrics, 7d
+                                        # to 2026-09-28: ~1.7M kept at 15% vs
+                                        # ~1.5B exported in total).
+                                        #
+                                        # Regexes are unanchored in the
+                                        # processor, hence ^...$.
+                                        "name": "keep-low-volume-services",
+                                        "type": "string_attribute",
+                                        "key": "service.name",
+                                        "enabled_regex_matching": True,
+                                        "values": [
+                                            "^ol-analytics-api$",
+                                            "^learn-ai-webapp$",
+                                            "^ocw-studio-webapp$",
+                                            "^ovs-webapp$",
+                                            f"^{stack_info.env_suffix}-witan$",
+                                            f"^{stack_info.env_suffix}-toolhive-.+$",
+                                        ],
+                                    },
+                                    {
                                         "name": "sample-15pct-traces",
                                         "type": "probabilistic",
                                         "sampling_percentage": 15,
@@ -361,16 +436,47 @@ def setup_grafana(
                                     # That is untenable now that numTraces buffers
                                     # ~50k traces (order 1GiB) instead of 100.  No
                                     # CPU limit: throttling the sampler stalls the
-                                    # trace pipeline for the whole cluster.
+                                    # trace pipeline for the whole cluster.  CPU
+                                    # peaks at ~175m on applications-production
+                                    # and under 35m everywhere else (30d, 1m).
                                     "alloy": {
                                         "resources": {
                                             "requests": {
-                                                "cpu": "500m",
+                                                "cpu": "200m",
                                                 "memory": "1Gi",
                                             },
                                             "limits": {"memory": "2Gi"},
                                         },
                                     },
+                                },
+                            },
+                            # APISIX 3.18's access phase (verify_https_client
+                            # in apisix/init.lua) re-runs the SNI router with
+                            # the Host header, and radixtree_sni.lua marks the
+                            # sni_radixtree_match span ERROR on a miss even
+                            # though its own comment calls that miss expected.
+                            # Behind Fastly the lookup misses: the ApisixTls
+                            # certs cover the backend_* origin names Fastly
+                            # sends as SNI, not the public Host. That put an
+                            # ERROR span in nearly every APISIX trace, so
+                            # keep-errors sampled 86-87% of residential-production
+                            # traces and 20-24% of applications-production's
+                            # (count_traces_sampled, 2026-09-28).
+                            #
+                            # The miss is harmless there: verify_https_client
+                            # returns true and the request proceeds. It is also
+                            # the only source of this span in Tempo, because the
+                            # TLS handshake's own lookup (ssl_client_hello_phase)
+                            # calls tracer.release() and is never exported, and
+                            # nothing here uses the stream proxy. So resetting
+                            # it hides no failure. This runs on the receiver,
+                            # ahead of the loadbalancing hop to the sampler.
+                            "transform": {
+                                "traces": {
+                                    "span": [
+                                        'set(span.status.code, STATUS_CODE_UNSET) where resource.attributes["service.name"] == "apisix" and span.name == "sni_radixtree_match" and span.status.message == "failed match SNI"',
+                                        'set(span.status.message, "") where resource.attributes["service.name"] == "apisix" and span.name == "sni_radixtree_match" and span.status.code == STATUS_CODE_UNSET',
+                                    ],
                                 },
                             },
                             # Traefik's tracing.otlp exporter (see traefik.py)
@@ -409,6 +515,21 @@ def setup_grafana(
                 "clusterMetrics": {
                     "enabled": True,
                     "collector": "alloy-metrics",
+                    # The chart's default kube-state-metrics allowlist keeps
+                    # kube_job.*, kube_statefulset.* and kube_daemonset.* whole
+                    # but names deployment and pod metrics one by one, and
+                    # neither kube_deployment_labels nor kube_pod_labels is
+                    # among them. Without this, the deployments and pods
+                    # entries in metricLabelsAllowlist below are emitted by KSM
+                    # and then dropped by Alloy before remote write.
+                    "kube-state-metrics": {
+                        "metricsTuning": {
+                            "includeMetrics": [
+                                "kube_deployment_labels",
+                                "kube_pod_labels",
+                            ],
+                        },
+                    },
                 },
                 # v4: opencost moved from clusterMetrics to costMetrics feature
                 "costMetrics": {
@@ -431,6 +552,20 @@ def setup_grafana(
                 "podLogsViaLoki": {
                     "enabled": True,
                     "collector": "alloy-logs",
+                    # The chart default (True) renders `tail_from_end = true`
+                    # on loki.source.file, which seeks to EOF for any file with
+                    # no stored position -- including every newly created
+                    # container log. Whatever a container writes before
+                    # local.file_match notices its log file (sync_period
+                    # defaults to 10s) is then dropped, so startup output
+                    # survives or vanishes depending on where the container
+                    # lands in that window. The superset web pods lost their
+                    # first 4.2s on 2026-09-21, gunicorn's arbiter block
+                    # included, and kept it on 2026-09-18.
+                    # Safe to disable only alongside the host-storage preset
+                    # below, which is what makes positions survive a collector
+                    # restart.
+                    "onlyGatherNewLogLines": False,
                     "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config()
                     + _keycloak_olapps_idp_login_redact_alloy_config(),
                 },
@@ -451,6 +586,38 @@ def setup_grafana(
                         "zipkin": {
                             "enabled": True,
                             "port": 9411,
+                        },
+                    },
+                    # Dagster is the only stack with OTEL_METRICS_EXPORTER on
+                    # (dagster/__main__.py's dagster_otel_env). Turning it on
+                    # enables every installed instrumentation's metrics, not
+                    # just db.client.connections.usage -- requests/urllib3
+                    # also emit http.client.* duration histograms, one series
+                    # per distinct host an instrumented client hits. QA's
+                    # fixed set of internal calls (Vault, Airbyte,
+                    # telemetry.dagster.io) bounded that at ~540 series;
+                    # Production's canvas run workers make per-partition
+                    # S3/GCS calls against many more hosts, an untested and
+                    # likely far larger cardinality regime. There is no stock
+                    # OTEL_* env var to disable one instrumentation's metrics
+                    # without also silencing its traces (OTEL_PYTHON_DISABLED_
+                    # INSTRUMENTATIONS takes both), so the metric is dropped
+                    # here instead via otelcol.processor.filter, scoped to
+                    # dagster so nothing else that later turns on OTel metrics
+                    # loses this series by surprise.
+                    "metrics": {
+                        "filters": {
+                            # Bracket classes, not backslash escapes: this
+                            # string crosses Helm's Sprig `quote` and Alloy's
+                            # River string-unescaping before OTTL parses it,
+                            # and each hop consumes one level of backslash.
+                            # `\.` doesn't survive that round trip as a valid
+                            # OTTL escape; `[.]` needs no escaping at all.
+                            "metric": [
+                                'IsMatch(name, "^http[.]client[.]") and '
+                                'resource.attributes["service.namespace"] '
+                                '== "dagster"',
+                            ],
                         },
                     },
                 },
@@ -565,11 +732,18 @@ def setup_grafana(
                         ],
                     },
                 },
+                # The operator's chart has no value that labels its Deployment
+                # object, only the pod.
+                "alloy-operator": {"podLabels": alloy_operator_labels},
                 # v4: kepler and kube-state-metrics moved to telemetryServices;
                 #     opencost moved here from clusterMetrics
                 "telemetryServices": {
                     "kube-state-metrics": {
                         "deploy": True,
+                        # Lands on every object the subchart renders (the
+                        # Deployment, its pod template, the Service and the
+                        # RBAC objects) and in no selector.
+                        "customLabels": kube_state_metrics_labels,
                         # kube-state-metrics only emits kube_<resource>_labels for
                         # resources named here, so without this every kube_job_*
                         # series is anonymous -- on data-production that is ~2000
@@ -589,6 +763,33 @@ def setup_grafana(
                         # labels that the Grafana Cloud Kubernetes app relies on.
                         # Harmless on clusters with no Dagster: they just get a
                         # kube_job_labels series per Job with no dagster_* labels.
+                        #
+                        # deployments: OLApplicationK8s puts
+                        # ol.mit.edu/otel-service-name on each webapp Deployment
+                        # it knows the OTel service.name for, and the
+                        # TempoServiceNeverSeen rule joins it against Tempo's span
+                        # metrics. Allowlisting a resource makes KSM emit one
+                        # kube_deployment_labels series per Deployment whether or
+                        # not it carries the label, so the cost is one series per
+                        # Deployment (245 across the production stack on
+                        # 2026-09-30, going by kube_deployment_spec_replicas).
+                        #
+                        # pods, deployments, statefulsets, daemonsets and jobs
+                        # carry the routing labels so alert rules can join a
+                        # workload's tier and component onto its alerts
+                        # (docs/plans/rootly-label-routing-implementation-spec.md
+                        # section 4.1). A workload without the labels still gets
+                        # a series, with no label_ol_mit_edu_* columns, so a
+                        # join against it leaves the alert untiered and does
+                        # not drop it.
+                        #
+                        # kube_pod_labels is one series per pod, the same
+                        # cardinality and churn as kube_pod_info. Dagster run
+                        # pods are deliberately not dropped from it: they were
+                        # 1,077 of the 13,862 distinct production pods seen in
+                        # 24h on 2026-10-06, and a pod with no kube_pod_labels
+                        # series is the one case where a join silences its
+                        # alert.
                         "metricLabelsAllowlist": [
                             "nodes=[agentpool,alpha.eksctl.io/cluster-name,"
                             "alpha.eksctl.io/nodegroup-name,"
@@ -604,12 +805,20 @@ def setup_grafana(
                             "node.kubernetes.io/instance-type,"
                             "topology.kubernetes.io/region,"
                             "topology.kubernetes.io/zone]",
-                            "jobs=[dagster/code-location,dagster/job]",
+                            f"jobs=[dagster/code-location,dagster/job,{_OL_ROUTING_LABEL_KEYS}]",
+                            f"deployments=[ol.mit.edu/otel-service-name,{_OL_ROUTING_LABEL_KEYS}]",
+                            f"pods=[{_OL_ROUTING_LABEL_KEYS}]",
+                            f"statefulsets=[{_OL_ROUTING_LABEL_KEYS}]",
+                            f"daemonsets=[{_OL_ROUTING_LABEL_KEYS}]",
                         ],
                     },
-                    "kepler": {"deploy": True},
+                    # Pod only: the chart has no value for the DaemonSet's own
+                    # labels.
+                    "kepler": {"deploy": True, "podLabels": cost_exporter_labels},
                     "opencost": {
                         "deploy": True,
+                        "commonLabels": cost_exporter_labels,
+                        "podLabels": cost_exporter_labels,
                         "metricsSource": "grafana-cloud-metrics",
                         "opencost": {
                             "exporter": {
@@ -628,6 +837,14 @@ def setup_grafana(
                 #     named alloy instances replaced by collectors map with presets
                 "collectorCommon": {
                     "alloy": {
+                        # Reaches all five Alloy instances, the tail-sampling
+                        # collector included. extraLabels is the workload
+                        # object and podLabels the pod template; neither is in
+                        # the selector.
+                        "controller": {
+                            "extraLabels": collector_labels,
+                            "podLabels": collector_labels,
+                        },
                         "extraEnv": alloy_extra_env_vars,
                         "remoteConfig": {
                             "enabled": True,
@@ -652,7 +869,18 @@ def setup_grafana(
                         "presets": ["singleton"],
                     },
                     "alloy-logs": {
-                        "presets": ["filesystem-log-reader", "daemonset"],
+                        # host-storage moves Alloy's storage path off the
+                        # container filesystem (/tmp/alloy, discarded on every
+                        # pod restart) onto a /var/lib/alloy hostPath, so the
+                        # read positions outlive a collector restart. Without
+                        # it, onlyGatherNewLogLines=False above would re-read
+                        # every retained pod log on the node from byte 0 on each
+                        # restart (~60MB/node measured).
+                        "presets": [
+                            "filesystem-log-reader",
+                            "daemonset",
+                            "host-storage",
+                        ],
                     },
                     "alloy-receiver": {
                         "presets": ["deployment"],

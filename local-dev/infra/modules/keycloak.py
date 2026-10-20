@@ -13,16 +13,21 @@ seeded by local-dev/scripts/kc-seed-users.sh, which the root Tiltfile runs
 automatically (the "kc-seed-users" resource) after this realm is applied.
 """
 
-import json
-
 import pulumi_keycloak as keycloak
 import pulumi_kubernetes as k8s
 from pulumi import InvokeOptions, Output, ResourceOptions
 
+from bridge.lib.constants import oidc_secret_data
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_browser_flows,
     create_organization_first_broker_login_flows,
 )
+
+# The session.secret every gateway OIDC Secret carries. It has to be one value
+# across Secrets: mit-learn's routes and mitxonline's /mitxonline/* routes on
+# api.learn.<domain> read different Secrets but decrypt one shared session
+# cookie.
+LOCAL_OIDC_SESSION_SECRET = "local-dev-oidc-session-secret-32chars!"  # noqa: S105  # pragma: allowlist secret
 
 
 def create_olapps_dev_realm(  # noqa: PLR0913
@@ -33,9 +38,12 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     learn_ai_client_secret: Output,
     mitxonline_client_secret: Output,
     unified_ecommerce_client_secret: Output,
+    ovs_client_secret: Output,
+    ocw_studio_client_secret: Output,
     *,
     root_domain: str,
     verify_email: bool = True,
+    enabled_apps: tuple[str, ...] = (),
 ) -> None:
     """
     Create the olapps Keycloak realm for local development.
@@ -144,7 +152,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     for alias, default in [
         ("CONFIGURE_TOTP", False),
         ("VERIFY_EMAIL", verify_email),
-        # UPDATE_EMAIL was removed in Keycloak 26 — omit to avoid validation error.
+        ("UPDATE_EMAIL", False),
         ("UPDATE_PASSWORD", False),
     ]:
         keycloak.RequiredAction(
@@ -351,12 +359,16 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         client: keycloak.openid.Client,
         client_secret_value: Output,
     ) -> k8s.core.v1.Secret:
-        """Create a k8s Secret with OIDC credentials for APISIX secretRef.
+        """Create the Secret an APISIX openid-connect plugin reads via secretRef.
 
-        Only client_id and client_secret are stored here; session.secret is
-        set inline in each ApisixRoute config so that APISIX does not treat it
-        as a plugin config key during secretRef merging (which would override
-        the JWT verification key and break RS256 token validation).
+        It carries the keys oidc_secret_data returns, the same ones deployed
+        stacks' VSO templates write from Vault (see OLApisixOIDCResources):
+        client_id, client_secret, realm, discovery and session.secret. The
+        ingress controller merges these over the route's inline plugin config,
+        so the routes do not repeat them. session.secret is lua-resty-session's
+        cookie encryption key; every Secret carries LOCAL_OIDC_SESSION_SECRET so
+        the two ol-mitlearn-oidc copies agree (mit-learn's routes write the
+        Learn cookie, mitxonline's /mitxonline/* proxy route reads it).
         """
         return k8s.core.v1.Secret(
             resource_name,
@@ -364,27 +376,18 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             string_data=Output.all(
                 client_id=client.client_id,
                 client_secret=client_secret_value,
-                realm_id=client.realm_id,
-                realm_name="olapps",
-                url=client.realm_id.apply(lambda rid: f"{keycloak_url}/realms/{rid}"),
+                realm=client.realm_id,
             ).apply(
-                lambda args: {
-                    "client_id": args["client_id"],
-                    "client_secret": args["client_secret"],
-                    "realm_id": args["realm_id"],
-                    "realm_name": args["realm_name"],
-                    "url": args["url"],
-                    # Convenience composite JSON for apps that read it as one value.
-                    "oidc_credentials": json.dumps(
-                        {
-                            "client_id": args["client_id"],
-                            "client_secret": args["client_secret"],
-                            "realm_id": args["realm_id"],
-                            "realm_name": args["realm_name"],
-                            "url": args["url"],
-                        }
-                    ),
-                }
+                lambda args: oidc_secret_data(
+                    {
+                        "client_id": args["client_id"],
+                        "client_secret": args["client_secret"],
+                        "realm_name": args["realm"],
+                        "url": f"{keycloak_url}/realms/{args['realm']}",
+                        "secret": LOCAL_OIDC_SESSION_SECRET,
+                    },
+                    include_session_secret=True,
+                )
             ),
             opts=k8s_opts,
         )
@@ -467,6 +470,10 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         valid_redirect_uris=[
             f"https://learn.{root_domain}/*",
             f"https://api.learn.{root_domain}/*",
+            # mitxonline's deployed gateway routes authenticate through this
+            # client (sso/mitlearn), so rendering them locally needs its hosts.
+            f"https://mitxonline.{root_domain}/*",
+            f"https://api.mitxonline.{root_domain}/*",
         ],
         web_origins=["+"],
         opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
@@ -485,14 +492,17 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         mitlearn_client,
         mitlearn_client_secret,
     )
-    # Same mitlearn creds, for mitxonline-learn-proxy-route's secretRef.
-    _make_oidc_secret(
-        "oidc-secret-mitlearn-in-mitxonline",
-        "mitxonline",
-        "ol-mitlearn-oidc",
-        mitlearn_client,
-        mitlearn_client_secret,
-    )
+    # Same mitlearn creds for the other apps' routes on api.learn that read
+    # mit-learn's session via secretRef: mitxonline-learn-proxy-route and
+    # learn-ai's /ai/* routes. Resource names unchanged for mitxonline.
+    for namespace in ("mitxonline", "learn-ai"):
+        _make_oidc_secret(
+            f"oidc-secret-mitlearn-in-{namespace}",
+            namespace,
+            "ol-mitlearn-oidc",
+            mitlearn_client,
+            mitlearn_client_secret,
+        )
 
     # --- MITx Online ---
     mitxonline_client = keycloak.openid.Client(
@@ -525,6 +535,122 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         "ol-mitxonline-oidc",
         mitxonline_client,
         mitxonline_client_secret,
+    )
+
+    # --- ODL Video Service ---
+    # OVS does OIDC inside Django (social-auth) rather than at APISIX, so its
+    # Secret carries the SOCIAL_AUTH_KEYCLOAK_* env names directly and includes
+    # the realm's RS256 public key that social-core verifies ID tokens with
+    # (prod gets the same key from Vault as realm_public_key).
+    ovs_client = keycloak.openid.Client(
+        "olapps-ovs-client",
+        name="ol-ovs-client",
+        realm_id=realm.realm,
+        client_id="ol-ovs-client",
+        client_secret=ovs_client_secret,
+        enabled=True,
+        access_type="CONFIDENTIAL",
+        standard_flow_enabled=True,
+        implicit_flow_enabled=False,
+        # OVS validates "moira list" names against Keycloak groups through the
+        # Admin API with a client_credentials grant on this client.
+        service_accounts_enabled=True,
+        valid_redirect_uris=[f"https://video.odl.{root_domain}/*"],
+        opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
+    )
+    ovs_realm_management = keycloak.openid.get_client_output(
+        realm_id=realm.realm,
+        client_id="realm-management",
+        opts=InvokeOptions(provider=keycloak_provider),
+    )
+    # Same grants as the prod ol-mit OVS client (substructure/keycloak/ol_mit.py).
+    for resource_name, role in [
+        ("olapps-ovs-sa-manage-users", "manage-users"),
+        ("olapps-ovs-sa-view-users", "view-users"),
+        ("olapps-ovs-sa-query-users", "query-users"),
+        ("olapps-ovs-sa-query-groups", "query-groups"),
+    ]:
+        keycloak.openid.ClientServiceAccountRole(
+            resource_name,
+            realm_id=realm.realm,
+            service_account_user_id=ovs_client.service_account_user_id,
+            client_id=ovs_realm_management.id,
+            role=role,
+            opts=kc_opts,
+        )
+    keycloak.openid.ClientDefaultScopes(
+        "olapps-ovs-default-scopes",
+        realm_id=realm.realm,
+        client_id=ovs_client.id,
+        default_scopes=DEFAULT_SCOPES,
+        opts=kc_opts,
+    )
+    # OVS maps the token's `user_groups` claim to Django flags: /Admin ->
+    # superuser, /Staff -> staff (odl_video/pipeline.py). kc-seed-users.sh
+    # puts admin@odl.local in Admin.
+    for group_name in ("Admin", "Staff"):
+        keycloak.Group(
+            f"olapps-ovs-group-{group_name.lower()}",
+            realm_id=realm.realm,
+            name=group_name,
+            opts=kc_opts,
+        )
+    keycloak.openid.GroupMembershipProtocolMapper(
+        "olapps-ovs-user-groups-mapper",
+        realm_id=realm.realm,
+        client_id=ovs_client.id,
+        name="user_groups",
+        claim_name="user_groups",
+        full_path=True,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
+        opts=kc_opts,
+    )
+    # social-core decodes the access token with audience == client_id, and
+    # Keycloak omits the client from `aud` unless a mapper adds it (same as
+    # the prod ol-mit OVS client; see KEYCLOAK-6638).
+    keycloak.openid.AudienceProtocolMapper(
+        "olapps-ovs-audience-mapper",
+        realm_id=realm.realm,
+        client_id=ovs_client.id,
+        name="audience",
+        included_client_audience=ovs_client.client_id,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        opts=kc_opts,
+    )
+    realm_keys = keycloak.get_realm_keys_output(
+        realm_id=realm.realm,
+        algorithms=["RS256"],
+        statuses=["ACTIVE"],
+        opts=InvokeOptions(provider=keycloak_provider),
+    )
+    k8s.core.v1.Secret(
+        "oidc-secret-ovs",
+        metadata={"name": "ol-ovs-oidc", "namespace": "odl-video-service"},
+        string_data=Output.all(
+            client_id=ovs_client.client_id,
+            client_secret=ovs_client_secret,
+            public_key=realm_keys.keys.apply(lambda keys: keys[0].public_key),
+        ).apply(
+            lambda a: {
+                "SOCIAL_AUTH_KEYCLOAK_KEY": a["client_id"],
+                "SOCIAL_AUTH_KEYCLOAK_SECRET": a["client_secret"],
+                "SOCIAL_AUTH_KEYCLOAK_PUBLIC_KEY": a["public_key"],
+                "SOCIAL_AUTH_KEYCLOAK_AUTHORIZATION_URL": (
+                    f"{keycloak_url}/realms/olapps/protocol/openid-connect/auth"
+                ),
+                "SOCIAL_AUTH_KEYCLOAK_ACCESS_TOKEN_URL": (
+                    f"{keycloak_url}/realms/olapps/protocol/openid-connect/token"
+                ),
+                # Admin API credentials for group lookups (ui/keycloak_utils.py);
+                # settings.py derives KEYCLOAK_SERVER_URL/REALM from the token URL.
+                "KEYCLOAK_SVC_ADMIN": a["client_id"],
+                "KEYCLOAK_SVC_ADMIN_PASSWORD": a["client_secret"],
+            }
+        ),
+        opts=k8s_opts,
     )
 
     # --- MITx Online B2B (service account client for Keycloak Admin API) ---
@@ -663,3 +789,80 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         ],
         opts=kc_opts,
     )
+
+    # -------------------------------------------------------------------------
+    # ocw-studio
+    #
+    # Gated on enabled_apps: its k8s Secret lands in the ocw-studio namespace,
+    # which the core stack only creates when the app is switched on.
+    #
+    # Unlike the other apps here, ocw-studio authenticates in Django with
+    # python-social-auth's KeycloakOAuth2 backend rather than through the
+    # APISIX openid-connect plugin, so its Secret carries SOCIAL_AUTH_KEYCLOAK_*
+    # names that the app reads directly as env vars. That backend verifies the
+    # ID token signature itself and needs the realm's RS256 public key, which
+    # only exists once the realm does -- hence the get_realm_keys_output lookup
+    # rather than a literal.
+    # -------------------------------------------------------------------------
+    if "ocw-studio" in set(enabled_apps):
+        ocw_studio_client = keycloak.openid.Client(
+            "olapps-ocw-studio-client",
+            name="ol-ocw-studio-client",
+            realm_id=realm.realm,
+            client_id="ol-ocw-studio-client",
+            client_secret=ocw_studio_client_secret,
+            enabled=True,
+            access_type="CONFIDENTIAL",
+            standard_flow_enabled=True,
+            implicit_flow_enabled=False,
+            service_accounts_enabled=False,
+            valid_redirect_uris=[
+                f"https://studio.ocw.{root_domain}/*",
+            ],
+            opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
+        )
+        keycloak.openid.ClientDefaultScopes(
+            "olapps-ocw-studio-default-scopes",
+            realm_id=realm.realm,
+            client_id=ocw_studio_client.id,
+            default_scopes=DEFAULT_SCOPES,
+            opts=kc_opts,
+        )
+        # social-core's KeycloakOAuth2 decodes the access token with
+        # audience == client_id (its audience() is hardcoded to the client key,
+        # with no setting to override), and Keycloak puts the client in `azp`
+        # rather than `aud` unless a mapper adds it -- so the callback died with
+        # InvalidAudienceError. Same mapper the prod ol-mit ocw-studio client
+        # and the local-dev OVS client above carry, for the same reason.
+        keycloak.openid.AudienceProtocolMapper(
+            "olapps-ocw-studio-audience-mapper",
+            realm_id=realm.realm,
+            client_id=ocw_studio_client.id,
+            name="audience",
+            included_client_audience=ocw_studio_client.client_id,
+            add_to_id_token=True,
+            add_to_access_token=True,
+            opts=kc_opts,
+        )
+
+        k8s.core.v1.Secret(
+            "oidc-secret-ocw-studio",
+            metadata={
+                "name": "ol-ocw-studio-oidc",
+                "namespace": "ocw-studio",
+            },
+            string_data=Output.all(
+                client_id=ocw_studio_client.client_id,
+                client_secret=ocw_studio_client_secret,
+                # get_realm_keys returns the full certificate list; the backend
+                # wants the bare base64 body of the active RS256 signing key.
+                public_key=realm_keys.keys.apply(lambda keys: keys[0].public_key),
+            ).apply(
+                lambda args: {
+                    "SOCIAL_AUTH_KEYCLOAK_KEY": args["client_id"],
+                    "SOCIAL_AUTH_KEYCLOAK_SECRET": args["client_secret"],
+                    "SOCIAL_AUTH_KEYCLOAK_PUBLIC_KEY": args["public_key"],
+                }
+            ),
+            opts=ResourceOptions(provider=k8s_provider, parent=ocw_studio_client),
+        )

@@ -6,12 +6,14 @@ config:
   learn_ai:backend_domain: "api-learn-ai-ci.ol.mit.edu"
   learn_ai:db_password:
     secure: v1:LPQWUf68siLqkk30:JHBZ8gREGp0fRcAWH4ER7ExID5d3LVbn8BoFZ8o7tOBj43Jf+Jqh2c9acA/im/p9+W4c15appQNpC1hMHo4+hrIks3UIhC8a8+SV6GzO908=
+  learn_ai:enable_azure_openai: true
   learn_ai:env_vars:
     AI_DEFAULT_RECOMMENDATION_MODEL: "openai/gpt-4o-mini"
     AI_DEFAULT_SYLLABUS_MODEL: "openai/gpt-4o-mini"
     AI_DEFAULT_TUTOR_MODEL: "openai/gpt-4o"
     AI_DEFAULT_VIDEO_GPT_MODEL: "openai/gpt-4o-mini"
     AI_MIT_CONTENTFILE_URL: "https://api.rc.learn.mit.edu/api/v1/contentfiles/"
+    AI_MIT_LEARNING_RESOURCES_URL: "https://api.rc.learn.mit.edu/api/v1/learning_resources/"
     AI_MIT_SEARCH_URL: "https://api.rc.learn.mit.edu/api/v0/vector_learning_resources_search/"
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"

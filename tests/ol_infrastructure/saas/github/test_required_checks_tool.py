@@ -174,6 +174,56 @@ class TestJobNameMatching:
         assert not tool._defines({"test", "javascript-tests"}, "ci-gate")
 
 
+class TestBlockedDefaultBranch:
+    """Only PRs to the default branch are in scope for these repository rulesets."""
+
+    def test_prs_to_release_branches_are_ignored(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        monkeypatch.setattr(tool, "_declared", lambda: {"repo": ["prek"]})
+
+        def gh(*args: str) -> Any:
+            if args[:1] == ("api",):
+                return {"default_branch": "main"}
+            return [
+                {
+                    "number": 89,
+                    "headRefOid": "release-sha",
+                    "title": "Release",
+                    "isDraft": False,
+                    "baseRefName": "release",
+                },
+                {
+                    "number": 90,
+                    "headRefOid": "main-sha",
+                    "title": "Main PR",
+                    "isDraft": False,
+                    "baseRefName": "main",
+                },
+            ]
+
+        monkeypatch.setattr(tool, "_gh", gh)
+        monkeypatch.setattr(tool, "_checks_on", lambda *_: ({"prek": None}, set()))
+
+        tool.blocked(repos=["repo"])
+
+        assert capsys.readouterr().out == (
+            "repo: all 1 open PRs produce every required context\n"
+        )
+
+    def test_unknown_default_branch_fails_closed(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        monkeypatch.setattr(tool, "_declared", lambda: {"repo": ["prek"]})
+        monkeypatch.setattr(tool, "_gh", lambda *_: None)
+
+        with pytest.raises(SystemExit) as exit_called:
+            tool.blocked(repos=["repo"])
+
+        assert exit_called.value.code == 1
+        assert "cannot determine default branch" in capsys.readouterr().out
+
+
 class TestDriftExitStatus:
     """`drift` is only useful to CI if a reported failure also fails the process.
 

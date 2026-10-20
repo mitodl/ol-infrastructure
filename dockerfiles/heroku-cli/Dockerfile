@@ -3,18 +3,15 @@
 ARG TAG=24-alpine
 FROM node:$TAG
 
+# Fail the build if the Heroku installer download fails, not just the shell.
+SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
+
 WORKDIR /app
 
 # Install dependencies
+# hadolint ignore=DL3018
 RUN set -eux; \
-    # Packages to install
-    apk add --no-cache \
-    && \
-    apk add git \
-    && \
-    apk add curl \
-    && \
-    apk add bash \
+    apk add --no-cache git curl bash \
     && \
     curl https://cli-assets.heroku.com/install.sh | sh \
     && \

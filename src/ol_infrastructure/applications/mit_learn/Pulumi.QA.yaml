@@ -9,7 +9,7 @@ config:
     memory: "4800Mi"
   mitlearn:celery_default_resource_limits:
     memory: "4800Mi"
-  mitlearn:db_instance_size: db.m7g.xlarge
+  mitlearn:db_instance_size: db.t4g.large
   mitlearn:db_password:
     secure: v1:Xk9oxNvxSQAJUAHE:8CdeLN2SlyhyU0iZpqEX5rnHSJ3PClleDJi2UpzoCsVZ4UjNkr7vCOAKY7CvCuB/7CBKJKM=
   mitlearn:fastly_anycast_ips: []
@@ -102,7 +102,10 @@ config:
     OTEL_SPAN_ATTRIBUTE_COUNT_LIMIT: "128"
     OPENSEARCH_INDEX: "mitlearn-rc"
     OPENSEARCH_SHARD_COUNT: 2
+    OPENSEARCH_REPLICA_COUNT: 0
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-qa-254ozvoip3e2ywfx5lsch5w2uu.us-east-1.es.amazonaws.com"
+    # = OVS QA CloudFront (E1KA122GOS192Z); a mismatch drops all OVS media
+    OVS_ALLOWED_MEDIA_HOSTS: '["du3yhovcx8dht.cloudfront.net"]'
     OVS_API_BASE_URL: "https://video-rc.odl.mit.edu"
     POSTHOG_API_HOST: "https://ph.ol.mit.edu"
     POSTHOG_ENABLED: "true"
@@ -120,13 +123,12 @@ config:
     # STARROCKS_HOST/STARROCKS_PORT are deliberately unset here, even though
     # QA has both a StarRocks cluster and the Vault mount behind it.
     # SyncProgramCertificatesTask pins its view_name to the
-    # ol_data_lake_production catalog with no setting to override it, and QA's
-    # StarRocks registers that catalog too -- so setting the host here would
-    # not rehearse the sync against QA data, it would replicate production
-    # learner PII (gender, year of birth, country, city, street address,
-    # postal code) into the RC database. mit-learn declines to register the
-    # beat entry while these are unset, which is the behaviour we want.
-    # Set them once the view name is environment-aware.
+    # ol_data_lake_production catalog with no setting to override it. QA's
+    # StarRocks does not register that catalog (RFC 12711 step 7), so the
+    # sync would fail rather than rehearse against QA data. It must never be
+    # pointed at production learner PII from the RC database either. mit-learn
+    # declines to register the beat entry while these are unset. Set them
+    # once the view name is environment-aware.
     TIKA_SERVER_ENDPOINT: "https://tika-qa.ol.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3
@@ -136,6 +138,5 @@ config:
   mitlearn:zendesk_help_url: "mitlearn.zendesk.com"
   redis:password:
     secure: v1:eRydfkAj/y5E7anM:QZ33gRMPZ7DDG3TrvAbuZk+6zliItTLKf4zuBgwEzpliRDnnxA/FoKMjRf4IB1uFLDH4Bb/n5sUxUj+s4fXlRuZt/jxA66eNBg==
-  redis:instance_type: "cache.m6g.large"
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa

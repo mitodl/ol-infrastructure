@@ -54,9 +54,13 @@ class AppRegistration:
 
 
 APPS: dict[str, AppRegistration] = {
-    "learn-ai": AppRegistration(slack_channel="product-learn-ai"),
+    "learn-ai": AppRegistration(
+        slack_channel="product-learn-ai", release_resource_workflow=True
+    ),
     "micromasters": AppRegistration(
-        repo_main_branch="master", slack_channel="product-micromasters"
+        repo_main_branch="master",
+        slack_channel="product-micromasters",
+        release_resource_workflow=True,
     ),
     "mit-learn": AppRegistration(slack_channel="product-mit-learn"),
     # mit-learn-nextjs shares mit-learn's repo *and* Slack channel -- they are
@@ -124,6 +128,16 @@ def release_resource_workflow(app_name: str) -> bool:
 #: is the registry for.
 RELEASE_BOT_APP_ID = 4437866
 
+#: GitHub App id for `ol-data-platform`, the identity Dagster authenticates as when
+#: it writes to GitHub: committing the instructor user list to access-forge and
+#: opening program unpublish-review issues on mit-learn. Its credentials live in
+#: `src/bridge/secrets/ol_data/global.yaml` and reach Vault through the dagster
+#: stack. Re-derive with:
+#:
+#:     gh api /orgs/mitodl/installations \
+#:       --jq '.installations[] | select(.app_slug=="ol-data-platform") | .app_id'
+DATA_PLATFORM_APP_ID = 5126620
+
 
 def release_workflow_repos() -> frozenset[str]:
     """Return the "owner/repo" slugs slated for the ol-release-bot release workflow.
@@ -131,9 +145,9 @@ def release_workflow_repos() -> frozenset[str]:
     EVERY REGISTERED APP, NOT ONLY THE ONES ALREADY RUNNING THE NEW WORKFLOW. That
     is deliberate and it over-grants on purpose (decision: Tobias, 2026-09-01). The
     actual opt-in is ``AppRegistration.release_resource_workflow`` above, which
-    defaults to ``False`` and today is set on ``ol-analytics-api`` alone -- so the
-    consumer below grants a bypass on ``mit-learn`` and ``mitxonline`` for an App
-    that does not yet finish their releases.
+    defaults to ``False`` and today is set on ``ol-analytics-api``, ``learn-ai`` and
+    ``micromasters`` -- so the consumer below grants a bypass on ``mit-learn`` and
+    ``mitxonline`` for an App that does not yet finish their releases.
 
     The trade is pre-provisioning against a rollout that would otherwise need a
     GitHub ruleset edit interleaved with every pipeline flip -- and that edit is the

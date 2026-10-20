@@ -54,7 +54,7 @@ src/bridge/                   # Shared utilities
 ### Configuration Files (Root)
 
 - `pyproject.toml` — Python dependencies (uv format), ruff/mypy config
-- `.pre-commit-config.yaml` — Pre-commit hook definitions
+- `.pre-commit-config.yaml` — Hook definitions, run by prek
 - `.sops.yaml` — SOPS encryption rules (KMS key mappings)
 - `uv.lock` — Locked dependency versions
 
@@ -75,7 +75,7 @@ src/bridge/                   # Shared utilities
 ## Key Files Reference
 
 - `pyproject.toml` — Dependencies, tool config (ruff/mypy settings)
-- `.pre-commit-config.yaml` — Pre-commit hooks (ruff, mypy, yamllint, shellcheck, packer fmt, hadolint)
+- `.pre-commit-config.yaml` — Hooks run by prek (ruff, mypy, yamllint, shellcheck, packer fmt, hadolint)
 - `README.md` — High-level overview (mentions outdated Poetry workflow)
 - `src/ol_infrastructure/lib/pulumi_helper.py` — Stack parsing utilities
 - `src/ol_infrastructure/lib/ol_types.py` — Core Pydantic types, enums
@@ -89,7 +89,7 @@ src/bridge/                   # Shared utilities
 2. **Python Version:** Python 3.12.x required (specified in `pyproject.toml`)
 3. **Linting:** Code MUST pass `ruff format` and minimize new `ruff check` errors
 4. **Type Checking:** Run `mypy` but expect many existing errors (1316+)—only fix new ones
-5. **Pre-commit:** Tests may fail on unrelated Docker linting—ignore if not your changes
+5. **Hooks:** `uv run prek run --all-files` must pass; CI runs it as the `prek` check
 
 **Note:** Expect ~1316 type errors and ~809 ruff errors in the codebase. Your changes should not introduce NEW errors.
 

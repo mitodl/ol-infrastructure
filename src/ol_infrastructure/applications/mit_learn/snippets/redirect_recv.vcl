@@ -19,8 +19,8 @@ if (table.lookup(prefix_redirects, var.path_prefix)) {
   error 601 "## path redirect";
 }
 
-if (table.lookup(path_redirects, req.url)) {
-  set var.redirect = table.lookup(path_redirects, req.url);
+if (table.lookup(path_redirects, req.url.path)) {
+  set var.redirect = table.lookup(path_redirects, req.url.path);
   if (std.strlen(req.url.qs) > 0) {
     set var.location = var.redirect "?" + req.url.qs;
   } else {

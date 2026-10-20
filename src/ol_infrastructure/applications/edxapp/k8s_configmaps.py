@@ -197,6 +197,9 @@ def _build_interpolated_config_dict(
         "PAYMENT_SUPPORT_EMAIL": edxapp_config.require("sender_email_address"),
         "PREVIEW_LMS_BASE": domains["preview"],
         "SENTRY_ENVIRONMENT": env_name,
+        # Stated here rather than left to the ol_openedx_sentry default: with it on,
+        # the SDK sends cookies, client IP and user identity with every event.
+        "SENTRY_SEND_DEFAULT_PII": False,
         "SESSION_COOKIE_DOMAIN": f".{domains['lms'].split('.', 1)[-1]}",
         "UNIVERSITY_EMAIL": edxapp_config.require("sender_email_address"),
         "OPENEDX_TELEMETRY": ["edx_django_utils.monitoring.OpenTelemetryBackend"],
@@ -226,6 +229,15 @@ def _build_interpolated_config_dict(
             "languagePreferenceCookieName": f"{env_name}-openedx-language-preference",
             "userInfoCookieName": f"{env_name}-edx-user-info",
             "csrfTokenApiPath": "/csrf/api/v1/token",
+            # Where frontend-base resolves the course authoring role, e.g.
+            # admin-console's error page "back" link. Mirrors
+            # COURSE_AUTHORING_MICROFRONTEND_URL, which the legacy MFE read.
+            "externalRoutes": [
+                {
+                    "role": "org.openedx.frontend.role.courseAuthoring",
+                    "url": f"https://{domains['studio']}/authoring",
+                }
+            ],
             "commonAppConfig": {
                 "mitolFooter": {
                     "accessibilityUrl": "https://accessibility.mit.edu/",
@@ -309,10 +321,15 @@ def _build_interpolated_config_dict(
         config.update(
             {
                 "CANVAS_BASE_URL": edxapp_config.require("canvas_base_url"),
+                # No MKTG_URLS ROOT: since openedx-platform#38720 the LMS index
+                # redirects to ROOT whenever it differs from LMS_ROOT_URL, and
+                # residential has no separate marketing site to send users to.
+                # For the same reason any COURSES value makes /courses redirect
+                # to it, so point it at this LMS's dashboard.
                 "MKTG_URL_OVERRIDES": {
-                    "COURSES": f"https://{marketing_domain}/",
+                    "COURSES": f"https://{domains['lms']}/dashboard",
                     "PRIVACY": f"https://{marketing_domain}/privacy",
-                    "TOS": f"https://{marketing_domain}/terms",
+                    "TOS": f"https://{marketing_domain}/tos",
                     "ABOUT": f"https://{marketing_domain}/about",
                     "HONOR": f"https://{marketing_domain}/honor-code/",
                     "ACCESSIBILITY": "https://accessibility.mit.edu/",
@@ -324,19 +341,26 @@ def _build_interpolated_config_dict(
                     f"https://{domains['studio']}/logout",
                     f"https://{edxapp_config.require('mit_learn_api_domain')}/logout",
                 ],
-                "MKTG_URLS": {
-                    "ROOT": f"https://{marketing_domain}/",
-                },
             }
         )
+        # Match the legacy MITx (residential) footer: only Terms of Service +
+        # Accessibility (accessibilityUrl is set in the base config above), the
+        # trademark logo ("MIT Open Learning" = mit-ol-logo.svg, which the legacy
+        # footer uses \u2014 NOT the header's logo.svg), and the legacy copyright text.
+        # Other links are omitted so the MFE footer matches the legacy footer.
         config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
             {
-                "privacyPolicyUrl": f"https://{marketing_domain}/privacy",
-                "termsOfServiceUrl": f"https://{marketing_domain}/terms",
-                "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
-                "aboutUrl": f"https://{marketing_domain}/about",
-                "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
-                "copyrightText": "\u00a9 MIT Open Learning. All rights reserved except where noted.",
+                "termsOfServiceUrl": f"https://{marketing_domain}/tos",
+                "footerLogoUrl": (
+                    f"https://{domains['lms']}/static/"
+                    f"{stack_info.env_prefix}/images/mit-ol-logo.svg"
+                ),
+                "copyrightText": "\u00a9 {year} MITx Residential. All rights reserved.",
+                # The legacy MITx footer links its trademark logo to MIT Open
+                # Learning (LOGO_TRADEMARK_URL + MIT_OPEN_LEARNING_SITE_LINK in
+                # mitx/common-mfe-config.env.jsx). Without this the Site Project
+                # footer renders the logo as a bare image.
+                "footerLogoDestination": "https://openlearning.mit.edu",
             }
         )
 
@@ -376,9 +400,21 @@ def _build_interpolated_config_dict(
                 "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
                 "aboutUrl": f"https://{marketing_domain}/about-us",
                 "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
-                "copyrightText": "\u00a9 MIT xPRO. All rights reserved except where noted.",
+                "copyrightText": "\u00a9 {year} MIT xPRO. All rights reserved.",
+                # The xPRO logo linked to the marketing site, as the legacy
+                # footer had it (LOGO_URL + MARKETING_SITE_BASE_URL in
+                # xpro/common-mfe-config.env.jsx). Note xPRO uses LOGO_URL, not
+                # the trademark mark mitx and mitxonline use.
+                "footerLogoUrl": config["LOGO_URL"],
+                "footerLogoDestination": f"https://{marketing_domain}",
             }
         )
+        # The xPRO user menu builds `${marketingSiteBaseUrl}/dashboard` etc, so
+        # without this those resolved to relative paths on the LMS host. No
+        # trailing slash: the components append their own segment.
+        config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolHeader"] = {
+            "marketingSiteBaseUrl": f"https://{marketing_domain}",
+        }
 
     # MITx Online-specific configuration
     elif stack_info.env_prefix == "mitxonline":
@@ -445,13 +481,37 @@ def _build_interpolated_config_dict(
         config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolFooter"].update(
             {
                 "privacyPolicyUrl": f"https://{marketing_domain}/privacy-policy/",
-                "termsOfServiceUrl": f"https://{marketing_domain}/terms-of-service/",
+                "termsOfServiceUrl": (
+                    f"https://{edxapp_config.require('mit_learn_domain')}/terms"
+                ),
                 "honorCodeUrl": f"https://{marketing_domain}/honor-code/",
-                "aboutUrl": f"https://{marketing_domain}/about-us/",
-                "supportUrl": f"https://{stack_info.env_prefix}.zendesk.com/hc/en-us/requests/new/",
-                "copyrightText": "\u00a9 MIT Open Learning. All rights reserved except where noted.",
+                "aboutUrl": (
+                    f"https://{edxapp_config.require('mit_learn_domain')}/about"
+                ),
+                "supportUrl": "https://support.learn.mit.edu/",
+                "copyrightText": "\u00a9 {year} Massachusetts Institute of Technology",
+                # Footer uses the plain "MIT" mark (mit-logo.svg), not the header
+                # logo.svg, to match the legacy MITxOnline footer.
+                "footerLogoUrl": (
+                    f"https://{domains['lms']}/static/"
+                    f"{stack_info.env_prefix}/images/mit-logo.svg"
+                ),
+                # The legacy learning MFE footer links that mark to web.mit.edu
+                # (LOGO_TRADEMARK_URL + MIT_BASE_URL in
+                # mitxonline/common-mfe-config.env.jsx).
+                "footerLogoDestination": "https://web.mit.edu",
             }
         )
+        # Header destinations for the Site Project MFEs. The components fall back
+        # to the production learn.mit.edu and to lmsBaseUrl when these are
+        # absent, so on RC the instructor dashboard's Dashboard button points at
+        # production MIT Learn and Profile / Settings at the LMS rather than the
+        # marketing site. No trailing slash: the components append their own
+        # path segment.
+        config["FRONTEND_SITE_CONFIG"]["commonAppConfig"]["mitolHeader"] = {
+            "mitLearnBaseUrl": f"https://{edxapp_config.require('mit_learn_domain')}",
+            "marketingSiteBaseUrl": f"https://{marketing_domain}",
+        }
 
     return config
 
@@ -469,6 +529,7 @@ class EdxappConfigMaps:
     waffle_flags_yaml: kubernetes.core.v1.ConfigMap
     ssh_known_hosts: kubernetes.core.v1.ConfigMap
     settings_override: kubernetes.core.v1.ConfigMap
+    azure_openai: kubernetes.core.v1.ConfigMap | None
 
     general_config_name: str
     interpolated_config_name: str
@@ -479,6 +540,7 @@ class EdxappConfigMaps:
     waffle_flags_yaml_config_name: str
     ssh_known_hosts_config_name: str
     settings_override_config_name: str
+    azure_openai_config_name: str | None
 
 
 def create_k8s_configmaps(  # noqa: PLR0915
@@ -489,6 +551,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
     edxapp_cache: OLAmazonCache,
     notes_stack: StackReference,
     opensearch_hostname: Output[str] | None,
+    azure_openai_stack: StackReference | None = None,
 ) -> EdxappConfigMaps:
     """Create all Kubernetes configmaps for EDXApp using dictionary-based configuration.
 
@@ -501,6 +564,8 @@ def create_k8s_configmaps(  # noqa: PLR0915
         notes_stack: StackReference for notes service
         opensearch_hostname: OpenSearch hostname, or None where the
             environment's OpenSearch domain has been retired
+        azure_openai_stack: StackReference on infrastructure/azure/openai, or None
+            where Azure OpenAI is not wired up for this deployment
 
     Returns:
         EdxappConfigMaps dataclass containing all ConfigMap resources
@@ -929,6 +994,59 @@ def create_k8s_configmaps(  # noqa: PLR0915
         data={"production.py": settings_override_module},
     )
 
+    # Azure OpenAI identity configuration. Nothing here is secret: the managed identity
+    # is reached by exchanging the pod's projected ServiceAccount token, so the client
+    # id is an identifier rather than a credential.
+    #
+    # Delivered as flat top-level settings in its own config source rather than as a
+    # second `TRANSLATIONS_PROVIDERS:` block. The init container concatenates the
+    # config sources with `cat` instead of deep-merging them, so a second file emitting
+    # that key would silently clobber the deepl / openai / gemini / mistral providers --
+    # last one wins, no error anywhere. ol-openedx-course-translations (0.11.0 and
+    # later, from mitodl/open-edx-plugins) folds these into TRANSLATIONS_PROVIDERS in
+    # Python, from its production plugin settings hook. The `v1` API version needs
+    # 0.12.1 or later: earlier releases pin litellm 1.83.0, whose v1 client path
+    # drops the Entra token provider.
+    azure_openai_config_name: str | None = None
+    azure_openai_config_map = None
+    if azure_openai_stack is not None:
+        azure_openai_config_name = "18-azure-openai-config-yaml"
+        azure_openai_config_map = kubernetes.core.v1.ConfigMap(
+            f"ol-{stack_info.env_prefix}-edxapp-azure-openai-config-{stack_info.env_suffix}",
+            metadata={
+                "name": azure_openai_config_name,
+                "namespace": namespace,
+                "labels": k8s_global_labels,
+            },
+            data=Output.all(
+                identities=azure_openai_stack.require_output("workload_identities"),
+                accounts=azure_openai_stack.require_output("cognitive_accounts"),
+                tenant_id=azure_openai_stack.require_output("tenant_id"),
+            ).apply(
+                lambda args: {
+                    "18-azure-openai-config.yaml": render_yaml(
+                        {
+                            "AZURE_OPENAI_CLIENT_ID": args["identities"]["mitxonline"][
+                                "client_id"
+                            ],
+                            "AZURE_OPENAI_TENANT_ID": args["tenant_id"],
+                            "AZURE_OPENAI_ENDPOINT": args["accounts"]["mitxonline"][
+                                "endpoint"
+                            ],
+                            "AZURE_OPENAI_API_VERSION": edxapp_config.get(
+                                "azure_openai_api_version"
+                            )
+                            or "v1",
+                            "AZURE_OPENAI_DEFAULT_DEPLOYMENT": edxapp_config.get(
+                                "azure_openai_default_deployment"
+                            )
+                            or "gpt-5.2",
+                        }
+                    )
+                }
+            ),
+        )
+
     return EdxappConfigMaps(
         general=general_config_map,
         interpolated=interpolated_config_map,
@@ -939,6 +1057,7 @@ def create_k8s_configmaps(  # noqa: PLR0915
         waffle_flags_yaml=waffle_flags_yaml_config_map,
         ssh_known_hosts=ssh_known_hosts_config_map,
         settings_override=settings_override_config_map,
+        azure_openai=azure_openai_config_map,
         general_config_name=general_config_name,
         interpolated_config_name=interpolated_config_name,
         cms_general_config_name=cms_general_config_name,
@@ -948,4 +1067,5 @@ def create_k8s_configmaps(  # noqa: PLR0915
         waffle_flags_yaml_config_name=waffle_flags_yaml_config_name,
         ssh_known_hosts_config_name=ssh_known_hosts_config_name,
         settings_override_config_name=settings_override_config_name,
+        azure_openai_config_name=azure_openai_config_name,
     )

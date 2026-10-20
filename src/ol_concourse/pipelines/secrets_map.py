@@ -75,7 +75,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "applications/clickhouse/": [],
     "applications/codejail/": [],
     "applications/concourse/": ["concourse/", "vector/"],
-    "applications/dagster/": [],
+    "applications/dagster/": ["mitlearn/secrets.*.yaml", "ol_data/"],
     "applications/digital_credentials/": ["digital_credentials/"],
     "applications/ecs_test/": [],
     "applications/edx_notes/": ["edx_notes/"],
@@ -90,6 +90,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     ],
     "applications/fastly_redirector/": ["fastly.yaml"],
     "applications/google_ads_optimization/": [],
+    "applications/gravitino/": [],
     "applications/gwarek/": [],
     "applications/jupyterhub/": [],
     "applications/jupyterhub_data/": ["jupyterhub_data/"],
@@ -113,11 +114,11 @@ PROJECT_SECRETS: dict[str, list[str]] = {
         "vector/",
     ],
     "applications/mit_learn_nextjs/": [],
-    "applications/mitxonline/": ["fastly.yaml", "mitxonline/"],
+    "applications/mitxonline/": ["fastly.yaml", "mitxonline/", "vector/"],
     "applications/ocw_site/": ["fastly.yaml", "vector/"],
     "applications/ocw_studio/": ["ocw_studio/"],
     "applications/odl_video_service/": ["odl_video_service/"],
-    "applications/ol_analytics_api/": [],
+    "applications/ol_analytics_api/": ["ol_analytics_api/"],
     "applications/omnigraph/": ["omnigraph/"],
     "applications/open_discussions/": ["heroku/"],
     "applications/open_metadata/": ["open_metadata/"],
@@ -134,7 +135,6 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "applications/vuln_scanner/": [],
     "applications/witan/": ["witan/"],
     "applications/xpro/": ["fastly.yaml", "vector/", "xpro/"],
-    "applications/xqueue/": [],
     "applications/xqwatcher/": [],
     # ---- infrastructure/ --------------------------------------------------
     "infrastructure/aws/data_warehouse/": [],
@@ -151,6 +151,10 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "infrastructure/aws/private_ca/": [],
     "infrastructure/aws/s3_sites/": [],
     "infrastructure/aws/sftp_servers/": [],
+    # azure.<env>.yaml is provider auth, but its subscription_id and tenant_id are
+    # also exported as stack outputs and consumed by the application stacks, so it is
+    # content-bearing rather than credential-only.
+    "infrastructure/azure/openai/": ["pulumi/azure.*.yaml"],
     # consul.<env>.yaml's basic_auth_password is baked into the server cloud-init
     # userdata, so it is content-bearing here (unlike the provider-auth reads in
     # substructure/consul and applications/concourse via lib.consul).

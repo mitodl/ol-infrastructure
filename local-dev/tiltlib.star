@@ -4,7 +4,7 @@
 #   load("../../tiltlib.star", "k8s_yaml_local")  # from apps/<app>/
 #   load("./local-dev/tiltlib.star", "k8s_yaml_local")  # from repo root
 #
-# k8s_yaml_local applies manifests with two local-dev conveniences:
+# k8s_yaml_local applies manifests with three local-dev conveniences:
 #
 # 1. Root-domain substitution. The LOCAL_DEV_ROOT_DOMAIN environment variable
 #    (default: mit.dev) replaces every 'mit.dev' occurrence so hostnames,
@@ -19,9 +19,24 @@
 #    local_overrides ConfigMap passed for per-developer overrides — see
 #    "Local Configuration Overrides" in local-dev/README.md) rolls the pods
 #    so new values actually take effect.
+#
+# 3. Published image tags. The root Tiltfile sets LOCAL_DEV_PREBUILT_IMAGE_TAGS
+#    to a JSON object of image name -> tag for the apps that have a
+#    prebuilt_tags entry and no checkout. Deployment containers running one
+#    of those images get that tag in place of the one in the manifest.
 
 _ROOT_DOMAIN_DEFAULT = "mit.dev"
 _CONFIG_HASH_ANNOTATION = "ol.mit.edu/config-hash"
+_PREBUILT_IMAGE_TAGS_ENV = "LOCAL_DEV_PREBUILT_IMAGE_TAGS"
+
+
+def current_root_domain():
+    """Return the value k8s_yaml_local substitutes 'mit.dev' for, so a caller
+    that needs the same value for something other than YAML (e.g. folding it
+    into a downstream checksum input) doesn't duplicate the env var name or
+    default."""
+    return os.environ.get("LOCAL_DEV_ROOT_DOMAIN", _ROOT_DOMAIN_DEFAULT)
+
 
 def _config_fingerprint(paths_and_texts):
     """Return a stable fingerprint of the combined data/binaryData/stringData
@@ -57,22 +72,34 @@ def _config_fingerprint(paths_and_texts):
                 pairs.append("%s/%s=%s" % (name, k, v))
     return str(hash("\n".join(sorted(pairs))))
 
-def _stamp_deployments(content, fingerprint):
+def _image_name(image):
+    """Return an image reference without its tag or digest."""
+    name = image.split("@")[0]
+    if ":" in name.split("/")[-1]:
+        name = name.rsplit(":", 1)[0]
+    return name
+
+def _pin_images(pod_spec, image_tags):
+    """Point every container whose image is in image_tags at that tag."""
+    containers = (pod_spec.get("initContainers") or []) + (pod_spec.get("containers") or [])
+    for c in containers:
+        name = _image_name(c.get("image", ""))
+        if name in image_tags:
+            c["image"] = "%s:%s" % (name, image_tags[name])
+
+def _stamp_deployments(content, fingerprint, image_tags):
     """Add the config-fingerprint annotation to every Deployment pod
     template in a (possibly multi-doc) manifest text, so changing any
-    applied ConfigMap/Secret rolls the pods. Returns a Blob, or None if
-    there are no Deployments."""
+    applied ConfigMap/Secret rolls the pods, and apply image_tags to its
+    containers. Returns a Blob, or None if there are no Deployments."""
     docs = [d for d in decode_yaml_stream(content) if d != None]
     stamped = False
     for d in docs:
         if d.get("kind") == "Deployment":
-            annotations = (
-                d.setdefault("spec", {})
-                .setdefault("template", {})
-                .setdefault("metadata", {})
-                .setdefault("annotations", {})
-            )
+            template = d.setdefault("spec", {}).setdefault("template", {})
+            annotations = template.setdefault("metadata", {}).setdefault("annotations", {})
             annotations[_CONFIG_HASH_ANNOTATION] = fingerprint
+            _pin_images(template.get("spec") or {}, image_tags)
             stamped = True
     if not stamped:
         return None
@@ -83,7 +110,7 @@ def k8s_yaml_local(paths, local_overrides=None):
     fingerprint annotation covering every applied ConfigMap/Secret, including
     an optional gitignored ConfigMap of per-developer overrides (see module
     docstring)."""
-    rd = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", _ROOT_DOMAIN_DEFAULT)
+    rd = current_root_domain()
 
     # read_file(default=...) also registers a watch on the override path —
     # including its creation — so adding or editing it mid-session re-runs
@@ -110,7 +137,8 @@ def k8s_yaml_local(paths, local_overrides=None):
         contents.append((p, content))
 
     fingerprint = _config_fingerprint(contents)
+    image_tags = decode_json(os.environ.get(_PREBUILT_IMAGE_TAGS_ENV, "{}"))
 
     for p, content in contents:
-        stamped = _stamp_deployments(content, fingerprint)
+        stamped = _stamp_deployments(content, fingerprint, image_tags)
         k8s_yaml(stamped if stamped != None else blob(content))

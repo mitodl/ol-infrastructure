@@ -1,17 +1,30 @@
 """Rebuild every cluster graph at a new storage root, in-cluster, in one pod.
 
-omnigraph storage is strict-single-version: a binary reads exactly one
-internal-schema, there is no in-place migration, and the gate is enforced in
-both directions including read-only opens. So a release that bumps the format
-cannot be rolled out — every graph has to be exported by the OLD binary and
-reloaded by the NEW one, at a DIFFERENT root, with the old root left
-byte-for-byte intact as the rollback.
+omnigraph storage is strict-single-version: a binary serves exactly one
+internal-schema, and the gate is enforced in both directions including
+read-only opens. `omnigraph upgrade` converts a standalone store in place but
+refuses a cluster-managed root, which is what every deployed graph is. So a
+release that bumps the format cannot be rolled out — every graph has to be
+exported by the OLD binary and reloaded by the NEW one, at a DIFFERENT root,
+with the old root left byte-for-byte intact as the rollback.
 
 ``docs/omnigraph-storage-format-upgrade-runbook.md`` is the procedure this
 automates, and it stays the reference for everything around it — pausing the
 Concourse pipeline, scaling the Deployment down, the cutover, retiring the old
 root. This script is steps 2, 3, 4 and 6 of that runbook: baseline, export,
-rebuild, verify.
+rebuild, verify. Before any of them it waits for every direct writer of the
+graphs to be suspended and idle and for the server to be gone
+(``wait_for_writers``), because nothing else in the Job can stop one writing
+through the export.
+
+THE NEW ROOT IS LEFT UNLOCKED. From omnigraph 0.12 every direct write on a
+cluster root (``cluster apply``, ``load``, ``optimize``) takes the root's
+exclusive lock and keeps it after the command exits, and the next writer is
+refused until that exact lock id is force-unlocked. This Job is the only
+process that knows the new root exists, so it releases each lock it created as
+soon as the command that created it has exited (``run_and_unlock``), and fails
+if the root is still locked at the end: a lock left behind would refuse the
+server's first boot on the new root.
 
 WHY IN ONE POD. The runbook runs two ``kubectl run`` pods and moves every
 export through the operator's workstation with ``kubectl exec ... > file``,
@@ -34,15 +47,26 @@ verification can be inspected before anything is repointed. Nothing here writes
 to the old root.
 """
 
+import hashlib
+import hmac
 import json
 import logging
 import os
 import re
 import shutil
+import ssl
 import subprocess
 import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
 from collections import Counter
+from collections.abc import Callable, Iterable, Iterator
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+from xml.etree import ElementTree as ET
 
 # `s3://<bucket>/fmt<N>`, where N is the NEW internal-schema number. Anchored
 # and digit-only on purpose: `<` and `>` are legal in S3 object keys, so an
@@ -51,14 +75,29 @@ from pathlib import Path
 # `load` reporting success on top of it.
 NEW_ROOT_RE = re.compile(r"^s3://[a-z0-9.-]+/fmt[0-9]+$")
 
-# `rows=` counts out of `omnigraph snapshot`, e.g.
-# `node:Memory v2 branch=main rows=41`. Compared PER TABLE between old and new:
-# a total-row check would pass a rebuild that put every row in the wrong table,
-# and a whole-store check would pass one that silently dropped an empty one.
-SNAPSHOT_ROW_RE = re.compile(r"^(?P<table>\S+)\s+.*\brows=(?P<rows>\d+)", re.MULTILINE)
+# `entities=` counts out of `omnigraph snapshot`, e.g.
+# `node type 'Memory' published_dataset_version=2 native_dataset_branch=main
+# entities=41` (one line), as printed by 0.10, 0.11 and 0.13. 0.8 printed
+# `node:Memory v2 branch=main rows=41`, and matching only that shape made the
+# Job stop at its first graph against a 0.10 root. Compared PER TABLE between
+# old and new: a total-row check would pass a rebuild that put every row in
+# the wrong table, and a whole-store check would pass one that silently
+# dropped an empty one.
+SNAPSHOT_ROW_RE = re.compile(
+    r"^(?:node|edge) type '(?P<table>[^']+)'.*\bentities=(?P<rows>\d+)", re.MULTILINE
+)
 SNAPSHOT_SCHEMA_RE = re.compile(r"^internal_schema_version:\s*(\d+)", re.MULTILINE)
 
 VERDICT_PATH = Path("/tmp/migration-verdict.json")  # noqa: S108
+
+# The verdict's two durable copies. Loki splits a multi-line record into one
+# entry per line, and kept only the header of the Production fmt9 verdict
+# (2026-09-16), so the log copy is one compact line behind a marker that can
+# be grepped for. The S3 copy is what `bin/omnigraph-cutover-pr` reads; the
+# pod, its emptyDir and eventually its logs are all gone by the time anyone
+# cuts over from an older run.
+VERDICT_LOG_MARKER = "MIGRATION_VERDICT_JSON"
+VERDICT_KEY_TEMPLATE = "migrations/{prefix}/verdict.json"
 
 # omnigraph >= 0.9 refuses a keyed write staging more than this many rows in
 # one table, engine-side, on local stores as well as served ones. `--mode
@@ -67,6 +106,37 @@ KEYED_ROW_CAP = 8192
 # Rows per batch, under the cap with headroom — the cap belongs to a binary
 # this script does not control, and the cost of headroom is one extra commit.
 LOAD_ROW_BATCH = 8000
+# omnigraph 0.13 also refuses a keyed write whose parsed rows for one table
+# exceed this many bytes ("resource limit exceeded for keyed parsed entity
+# bytes ... limit 33554432", measured on 0.13.0 with 32 rows of 1 MiB).
+KEYED_BYTE_CAP = 32 * 1024 * 1024
+# JSONL bytes per batch. The cap counts parsed values, not JSONL text: the
+# measurement above came to exactly the string bytes loaded, and how other
+# types are counted is not measured. So this is half the cap, and counts every
+# table's rows together.
+LOAD_BYTE_BATCH = KEYED_BYTE_CAP // 2
+
+# The id of the lock a direct write on a cluster root leaves behind, as the
+# command reports it: `cluster apply` prints `Admission lock: <id>`, and
+# `load` and `optimize` print `cluster admission retained: ... lock_id=<id>`.
+LOCK_ID_RE = re.compile(r"(?:Admission lock: |\block_id=)(?P<id>[0-9A-Z]{26})\b")
+
+# The in-cluster API, read with the pod's own ServiceAccount token. Only for
+# the writer pre-flight, and only read verbs: the Roles this runs under grant
+# get/list on cronjobs and jobs, get on deployments and list on pods, and
+# nothing else (storage_migration.py).
+K8sObject = dict[str, Any]
+K8S_API = "https://kubernetes.default.svc"
+SA_DIR = Path("/var/run/secrets/kubernetes.io/serviceaccount")
+
+# How long the pre-flight waits for the graph writers to go quiet before it
+# gives up. The longest of them is the CI indexer, whose own deadline is three
+# hours, but a run that long means a cold index, and holding an outage open for
+# it is the wrong trade: fail, and let the operator re-create the Job. Thirty
+# minutes also covers the gap between arming the omnigraph stack and the witan
+# deploy that suspends its two CronJobs.
+WRITER_WAIT_SECONDS = 30 * 60
+WRITER_POLL_SECONDS = 15
 
 LOG = logging.getLogger("migrate-storage-format")
 
@@ -121,6 +191,195 @@ def run(
             f"--- stdout ---\n{stdout}\n--- stderr ---\n{stderr}"
         )
     return subprocess.CompletedProcess(argv, returncode, stdout, stderr)
+
+
+def parse_writer_cronjobs(spec: str) -> list[tuple[str, str]]:
+    """Parse ``OMNIGRAPH_WRITER_CRONJOBS``: whitespace-separated ``<ns>/<name>``."""
+    writers = []
+    for item in spec.split():
+        namespace, sep, name = item.partition("/")
+        if not sep or not namespace or not name or "/" in name:
+            sys.exit(f"!!! writer {item!r} is not <namespace>/<cronjob>")
+        writers.append((namespace, name))
+    return writers
+
+
+def parse_server_deployment(spec: str) -> tuple[str, str]:
+    """Parse ``OMNIGRAPH_SERVER_DEPLOYMENT``: one ``<namespace>/<name>``."""
+    namespace, sep, name = spec.strip().partition("/")
+    if not sep or not namespace or not name or "/" in name:
+        sys.exit(f"!!! server {spec!r} is not <namespace>/<deployment>")
+    return namespace, name
+
+
+def server_blockers(
+    namespace: str, name: str, get: Callable[[str], K8sObject | None]
+) -> list[str]:
+    """Say why the server Deployment ``namespace/name`` could still write, if it can.
+
+    Arming the migration sets ``replicas: 0``, but the pod it had keeps
+    committing for up to its termination grace, and Pulumi does not reconcile
+    ``replicas`` after writing it, so something else can scale it back up. So
+    both are read: the declared count, and the pods behind the Deployment's
+    own selector. A pod counts as live unless its phase is ``Failed`` or
+    ``Succeeded``, which is when its containers have exited; a Terminating pod
+    is still ``Running``, and ``Unknown`` (a lost node) is not proof of exit.
+
+    An absent Deployment IS a blocker, unlike an absent writer CronJob: the
+    server exists in every environment, so not finding it means this was
+    pointed at the wrong name and has checked nothing.
+    """
+    path = f"/apis/apps/v1/namespaces/{namespace}/deployments/{name}"
+    deployment = get(path)
+    if deployment is None:
+        return [f"deployment {namespace}/{name} not found"]
+    blockers = []
+    replicas = deployment["spec"].get("replicas", 1)
+    if replicas:
+        blockers.append(f"deployment {namespace}/{name} declares {replicas} replica(s)")
+    labels = deployment["spec"]["selector"]["matchLabels"]
+    selector = urllib.parse.quote(
+        ",".join(f"{key}={value}" for key, value in sorted(labels.items()))
+    )
+    pods = get(f"/api/v1/namespaces/{namespace}/pods?labelSelector={selector}") or {}
+    blockers.extend(
+        f"pod {namespace}/{pod['metadata']['name']} is {pod['status'].get('phase')}"
+        for pod in pods.get("items", [])
+        if pod["status"].get("phase") not in {"Failed", "Succeeded"}
+    )
+    return blockers
+
+
+def writer_blockers(
+    namespace: str, name: str, cronjob: K8sObject | None, jobs: list[K8sObject]
+) -> list[str]:
+    """Say why the writer CronJob ``namespace/name`` could still write, if it can.
+
+    Two conditions, and both are needed. ``spec.suspend`` stops the NEXT
+    schedule, not a Job already running, so a writer created a minute before
+    the freeze keeps writing through the export. And a CronJob with no running
+    Job can still start one at its next tick unless it is suspended.
+
+    A Job blocks until it carries a terminal ``Complete`` or ``Failed``
+    condition. ``.status.active`` alone is not enough: a Job the CronJob
+    created just before suspension has ``status: {}`` until the Job controller
+    reconciles it, and would start writing after the pre-flight cleared. Both
+    terminal conditions count as finished because waiting for ``Complete``
+    alone blocks on long-dead FAILED Jobs (CI carries indexer failures over a
+    month old).
+
+    An absent CronJob is not a blocker: the CI indexer is not declared at all in
+    an environment with no managed repos.
+    """
+    if cronjob is None:
+        return []
+    blockers = []
+    if not cronjob.get("spec", {}).get("suspend", False):
+        blockers.append(f"cronjob {namespace}/{name} is not suspended")
+    for job in jobs:
+        owners = job["metadata"].get("ownerReferences", [])
+        if not any(o["kind"] == "CronJob" and o["name"] == name for o in owners):
+            continue
+        status = job.get("status", {})
+        if job_finished(status):
+            continue
+        job_name = f"{namespace}/{job['metadata']['name']}"
+        active = status.get("active", 0)
+        if active:
+            blockers.append(f"job {job_name} has {active} active pod(s)")
+        else:
+            blockers.append(f"job {job_name} has not finished")
+    return blockers
+
+
+def job_finished(status: K8sObject) -> bool:
+    """Whether a Job's status carries a terminal ``Complete``/``Failed`` condition."""
+    return any(
+        c.get("type") in {"Complete", "Failed"} and c.get("status") == "True"
+        for c in status.get("conditions", [])
+    )
+
+
+def k8s_get(path: str) -> K8sObject | None:
+    """GET ``path`` from the in-cluster API; ``None`` on a 404."""
+    token = (SA_DIR / "token").read_text().strip()
+    context = ssl.create_default_context(cafile=str(SA_DIR / "ca.crt"))
+    request = urllib.request.Request(  # noqa: S310
+        f"{K8S_API}{path}", headers={"Authorization": f"Bearer {token}"}
+    )
+    try:
+        with urllib.request.urlopen(request, context=context, timeout=30) as resp:  # noqa: S310
+            return json.load(resp)
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:  # noqa: PLR2004
+            return None
+        raise
+
+
+def current_writer_blockers(
+    writers: list[tuple[str, str]],
+    server: tuple[str, str],
+    get: Callable[[str], K8sObject | None],
+) -> list[str]:
+    """Collect every writer's blockers, listing each namespace's Jobs once."""
+    jobs_by_namespace: dict[str, list[K8sObject]] = {}
+    blockers = server_blockers(*server, get)
+    for namespace, name in writers:
+        if namespace not in jobs_by_namespace:
+            listed = get(f"/apis/batch/v1/namespaces/{namespace}/jobs")
+            jobs_by_namespace[namespace] = (listed or {}).get("items", [])
+        cronjob = get(f"/apis/batch/v1/namespaces/{namespace}/cronjobs/{name}")
+        blockers.extend(
+            writer_blockers(namespace, name, cronjob, jobs_by_namespace[namespace])
+        )
+    return blockers
+
+
+def wait_for_writers(  # noqa: PLR0913
+    writers: list[tuple[str, str]],
+    server: tuple[str, str],
+    *,
+    get: Callable[[str], K8sObject | None] = k8s_get,
+    wait_seconds: float = WRITER_WAIT_SECONDS,
+    poll_seconds: float = WRITER_POLL_SECONDS,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.monotonic,
+) -> None:
+    """Block until no graph writer can write, or exit naming the ones that can.
+
+    Runs before the baseline, so waiting costs nothing but outage time and
+    giving up leaves both roots exactly as they were.
+    """
+    deadline = clock() + wait_seconds
+    while True:
+        # An API error is one more reason to wait, not a reason to fail: the
+        # Job has no retries, and a blip mid-poll would otherwise end the
+        # migration before it started. It still ends it at the deadline.
+        try:
+            blockers = current_writer_blockers(writers, server, get)
+        except (OSError, urllib.error.URLError) as exc:
+            blockers = [f"kubernetes API read failed: {exc}"]
+        if not blockers:
+            LOG.info(
+                "writer pre-flight clear: %s",
+                ", ".join(f"{ns}/{name}" for ns, name in [server, *writers]),
+            )
+            return
+        if clock() >= deadline:
+            sys.exit(
+                "!!! graph writers still able to write after "
+                f"{wait_seconds:.0f}s, not exporting:\n  "
+                + "\n  ".join(blockers)
+                + "\nA CronJob that is not suspended usually means the witan "
+                "stack has not been deployed since the migration was armed. An "
+                "active Job can be waited out or deleted. A server that is "
+                "still declared or still has a pod means the omnigraph stack's "
+                "scale-down has not finished or was undone. Once the writers are "
+                "quiet, re-create this Job with `pulumi up --replace` on its URN "
+                "(docs/omnigraph-storage-format-upgrade-runbook.md)."
+            )
+        LOG.info("waiting on graph writers: %s", "; ".join(blockers))
+        sleep(poll_seconds)
 
 
 def snapshot_tables(binary: str, store: str) -> dict[str, int]:
@@ -196,6 +455,163 @@ def bucket_of(root: str) -> str:
     return root.removeprefix("s3://").split("/", 1)[0]
 
 
+def verdict_object(new_root: str) -> tuple[str, str]:
+    """Return the bucket and key the verdict for a rebuild into ``new_root`` goes to.
+
+    Keyed by the target prefix, so a re-run of the same migration overwrites
+    the earlier verdict (the bucket's versioning keeps it) and a later
+    migration to a different format never does.
+    """
+    return bucket_of(new_root), VERDICT_KEY_TEMPLATE.format(
+        prefix=new_root.rsplit("/", 1)[-1]
+    )
+
+
+def claim_verdict_key(old_root: str, new_root: str, region: str) -> tuple[str, str]:
+    """Overwrite this rebuild's verdict key with an in-progress marker.
+
+    The pod's ``invalidate-verdict`` initContainer has already done this with
+    the AWS CLI, before any other step can fail (``storage_migration.py``).
+    Doing it again here proves this container's own stdlib write path works
+    before the export starts rather than after the rebuild, and stamps the
+    marker with when the migration itself began.
+    """
+    bucket, key = verdict_object(new_root)
+    marker = {
+        "ok": False,
+        "status": "in_progress",
+        "old_root": old_root,
+        "new_root": new_root,
+        "started_at": datetime.now(UTC).isoformat(timespec="seconds"),
+    }
+    put_object(bucket, key, json.dumps(marker, indent=2).encode(), region)
+    LOG.info("in-progress verdict written to s3://%s/%s", bucket, key)
+    return bucket, key
+
+
+def _sha256_hex(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def sigv4_authorization(  # noqa: PLR0913
+    *,
+    method: str,
+    path: str,
+    headers: dict[str, str],
+    payload_hash: str,
+    region: str,
+    service: str,
+    access_key: str,
+    secret_key: str,
+) -> str:
+    """Return the SigV4 ``Authorization`` header for a request with no query string.
+
+    Every header passed is signed, and ``headers`` must already carry
+    ``host`` and ``x-amz-date``. Written against the stdlib because the server
+    image this runs in has neither boto3 nor the AWS CLI (see the
+    ``snapshot-cluster-state`` initContainer in ``storage_migration.py``).
+    """
+    amz_date = headers["x-amz-date"]
+    scope = f"{amz_date[:8]}/{region}/{service}/aws4_request"
+    canonical_headers = {k.lower(): " ".join(v.split()) for k, v in headers.items()}
+    signed = ";".join(sorted(canonical_headers))
+    canonical_request = "\n".join(
+        [
+            method,
+            urllib.parse.quote(path, safe="/-_.~"),
+            "",
+            *(f"{k}:{canonical_headers[k]}" for k in sorted(canonical_headers)),
+            "",
+            signed,
+            payload_hash,
+        ]
+    )
+    string_to_sign = "\n".join(
+        [
+            "AWS4-HMAC-SHA256",
+            amz_date,
+            scope,
+            _sha256_hex(canonical_request.encode()),
+        ]
+    )
+    key = f"AWS4{secret_key}".encode()
+    for part in scope.split("/"):
+        key = hmac.new(key, part.encode(), hashlib.sha256).digest()
+    signature = hmac.new(key, string_to_sign.encode(), hashlib.sha256).hexdigest()
+    return (
+        f"AWS4-HMAC-SHA256 Credential={access_key}/{scope}, "
+        f"SignedHeaders={signed}, Signature={signature}"
+    )
+
+
+def web_identity_credentials(region: str) -> tuple[str, str, str]:
+    """Exchange the pod's IRSA token for temporary credentials.
+
+    The EKS pod-identity webhook injects ``AWS_ROLE_ARN`` and
+    ``AWS_WEB_IDENTITY_TOKEN_FILE`` into every container of a pod whose
+    ServiceAccount carries the role annotation. ``AssumeRoleWithWebIdentity``
+    is authenticated by the token itself, so the request is unsigned.
+    """
+    form = urllib.parse.urlencode(
+        {
+            "Action": "AssumeRoleWithWebIdentity",
+            "Version": "2011-06-15",
+            "RoleArn": env("AWS_ROLE_ARN"),
+            "RoleSessionName": "omnigraph-storage-migration",
+            "WebIdentityToken": Path(env("AWS_WEB_IDENTITY_TOKEN_FILE"))
+            .read_text()
+            .strip(),
+        }
+    ).encode()
+    request = urllib.request.Request(
+        f"https://sts.{region}.amazonaws.com/", data=form, method="POST"
+    )
+    with urllib.request.urlopen(request, timeout=30) as resp:  # noqa: S310
+        tree = ET.parse(resp)  # noqa: S314  (AWS STS over TLS)
+    ns = {"sts": "https://sts.amazonaws.com/doc/2011-06-15/"}
+    creds = tree.find(".//sts:Credentials", ns)
+    if creds is None:
+        sys.exit("!!! AssumeRoleWithWebIdentity returned no Credentials")
+    return (
+        creds.findtext("sts:AccessKeyId", "", ns),
+        creds.findtext("sts:SecretAccessKey", "", ns),
+        creds.findtext("sts:SessionToken", "", ns),
+    )
+
+
+def put_object(bucket: str, key: str, body: bytes, region: str) -> None:
+    """PUT ``body`` to ``s3://bucket/key`` under the pod's IRSA identity."""
+    access_key, secret_key, session_token = web_identity_credentials(region)
+    host = f"{bucket}.s3.{region}.amazonaws.com"
+    path = f"/{key}"
+    payload_hash = _sha256_hex(body)
+    headers = {
+        "host": host,
+        "content-type": "application/json",
+        "x-amz-content-sha256": payload_hash,
+        "x-amz-date": datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"),
+        "x-amz-security-token": session_token,
+    }
+    headers["Authorization"] = sigv4_authorization(
+        method="PUT",
+        path=path,
+        headers=headers,
+        payload_hash=payload_hash,
+        region=region,
+        service="s3",
+        access_key=access_key,
+        secret_key=secret_key,
+    )
+    request = urllib.request.Request(
+        f"https://{host}{urllib.parse.quote(path, safe='/-_.~')}",
+        data=body,
+        headers=headers,
+        method="PUT",
+    )
+    with urllib.request.urlopen(request, timeout=30):  # noqa: S310
+        pass
+
+
 def check_format_moved(
     old_formats: dict[str, int], new_formats: dict[str, int]
 ) -> list[str]:
@@ -221,15 +637,15 @@ def check_format_moved(
 
 
 def chunk_export(export: Path) -> list[Path]:
-    """Split one graph's export into loads omnigraph 0.9 will accept.
+    """Split one graph's export into loads omnigraph will accept.
 
-    0.9 caps a keyed write at ``KEYED_ROW_CAP`` rows PER TABLE, enforced by the
-    engine on local and remote stores alike. One `load` of a populated graph
-    therefore fails outright — the same cap that forced row-bounded chunking
-    into agent-kit's ``witan_core.chunking``
-    (https://github.com/mitodl/agent-kit/pull/217).
+    A keyed write is capped PER TABLE, by the engine, on local and remote
+    stores alike: ``KEYED_ROW_CAP`` rows since 0.9 and ``KEYED_BYTE_CAP`` parsed
+    bytes since 0.13. One `load` of a populated graph therefore fails outright
+    — the same caps that forced bounded chunking into agent-kit's
+    ``witan_core.chunking`` (https://github.com/mitodl/agent-kit/pull/217).
 
-    EVERY NODE BEFORE ANY EDGE, and that ordering outranks the row bound. An
+    EVERY NODE BEFORE ANY EDGE, and that ordering outranks both bounds. An
     edge resolves against nodes already persisted or present in the same batch;
     an endpoint in neither fails the whole load with ``dst '...' not found``.
     Exports are not sorted, and a graph's edges routinely point at nodes
@@ -238,34 +654,94 @@ def chunk_export(export: Path) -> list[Path]:
 
     Returns the original path unchanged when nothing needs splitting, so the
     common case stays a single load with no temporary files.
+
+    STREAMED: holding the rows while deciding how to group them puts a whole
+    graph's export in memory inside a 4 GiB container, which is the failure
+    this chunking exists to prevent rather than one it should introduce. The
+    first pass counts rows per table and keeps no bodies; the two that follow
+    re-read the file and write each row straight into the batch it belongs to.
+    Peak memory is one line and the per-table counters, whatever the export
+    weighs.
     """
-    nodes: list[str] = []
-    edges: list[str] = []
     per_table: Counter[str] = Counter()
     with export.open() as fh:
         for line in fh:
             if not line.strip():
                 continue
             record = json.loads(line)
-            table = record.get("type") or record.get("edge") or ""
-            per_table[table] += 1
-            (nodes if "type" in record else edges).append(line)
+            per_table[record.get("type") or record.get("edge") or ""] += 1
 
-    if not per_table or max(per_table.values()) <= LOAD_ROW_BATCH:
+    size = export.stat().st_size
+    if not per_table or (
+        max(per_table.values()) <= LOAD_ROW_BATCH and size <= LOAD_BYTE_BATCH
+    ):
         return [export]
 
     LOG.info(
-        "     splitting: largest table has %d rows (cap %d per keyed write)",
+        "     splitting: largest table has %d rows (cap %d per keyed write), "
+        "export is %d bytes (cap %d parsed bytes per table)",
         max(per_table.values()),
         KEYED_ROW_CAP,
+        size,
+        KEYED_BYTE_CAP,
     )
     batches: list[Path] = []
-    for group in (nodes, edges):
-        for start in range(0, len(group), LOAD_ROW_BATCH):
-            part = export.with_name(f"{export.stem}.{len(batches):03d}.jsonl")
-            part.write_text("".join(group[start : start + LOAD_ROW_BATCH]))
-            batches.append(part)
+    # Nodes first, then edges — two separate passes so the ordering above
+    # holds without either group being buffered to achieve it.
+    for nodes_wanted in (True, False):
+        _write_batches(_rows_of_kind(export, nodes=nodes_wanted), export, batches)
     return batches
+
+
+def _rows_of_kind(export: Path, *, nodes: bool) -> Iterator[str]:
+    """Yield the export's node rows (``nodes=True``) or its edge rows.
+
+    A node row is the one that carries a top-level ``type``; an edge row names
+    its type under ``edge``. Re-reading the file per group costs one extra
+    parse per line and saves holding either group.
+    """
+    with export.open() as fh:
+        for line in fh:
+            if not line.strip():
+                continue
+            if ("type" in json.loads(line)) is nodes:
+                yield line
+
+
+def _write_batches(rows: Iterable[str], export: Path, batches: list[Path]) -> None:
+    """Append ``rows`` to numbered batch files, each inside both load bounds.
+
+    A batch closes at ``LOAD_ROW_BATCH`` rows or before the row that would
+    take it past ``LOAD_BYTE_BATCH``. A single row over the byte bound still
+    gets a batch of its own: it cannot be split, and whether it loads is the
+    engine's to say.
+
+    ``batches`` is appended to rather than returned so the numbering continues
+    across both groups: the loader runs them in list order, and a restarted
+    count would have edge batches overwriting node ones.
+    """
+    handle = None
+    written = size = 0
+    try:
+        for line in rows:
+            line_size = len(line.encode())
+            if (
+                handle is None
+                or written == LOAD_ROW_BATCH
+                or size + line_size > LOAD_BYTE_BATCH
+            ):
+                if handle is not None:
+                    handle.close()
+                part = export.with_name(f"{export.stem}.{len(batches):03d}.jsonl")
+                handle = part.open("w")
+                batches.append(part)
+                written = size = 0
+            handle.write(line)
+            written += 1
+            size += line_size
+    finally:
+        if handle is not None:
+            handle.close()
 
 
 def graph_ids_from_cluster_config(cluster_yaml: Path) -> list[str]:
@@ -390,6 +866,54 @@ def baseline_and_export(
     return baseline
 
 
+def run_and_unlock(
+    binary: str, args: list[str], rebuild_dir: Path
+) -> subprocess.CompletedProcess[str]:
+    """Run a direct write on the new root, then release the lock it left.
+
+    The lock is released by the exact id the command itself reported, never
+    by whatever ``cluster status`` shows: the id is the evidence that the lock
+    is this step's, and ``force-unlock`` refuses an id that is not the one
+    held. By the time ``run`` returns the command has exited, so its I/O is
+    terminal, which is upstream's condition for unlocking.
+
+    A FAILED COMMAND KEEPS ITS LOCK. ``run`` exits on a non-zero status before
+    the unlock, and 0.13 reports a failed load's effects as unknown. The root
+    then stays locked against a server booting onto a half-built rebuild; the
+    runbook covers clearing the prefix before a re-run.
+    """
+    result = run([binary, *args])
+    lock_ids = {
+        match["id"] for match in LOCK_ID_RE.finditer(result.stdout + result.stderr)
+    }
+    if len(lock_ids) != 1:
+        sys.exit(
+            f"!!! expected `{' '.join(args[:2])}` to report the one lock it "
+            f"left on the new root, found {sorted(lock_ids) or 'none'}. Not "
+            "unlocking a lock this step cannot name.\n"
+            f"--- stdout ---\n{result.stdout}\n--- stderr ---\n{result.stderr}"
+        )
+    run(
+        [
+            binary,
+            "cluster",
+            "force-unlock",
+            "--config",
+            str(rebuild_dir),
+            lock_ids.pop(),
+        ]
+    )
+    return result
+
+
+def cluster_lock(binary: str, rebuild_dir: Path) -> dict[str, Any]:
+    """Return the lock ``cluster status`` reports on the root ``rebuild_dir`` names."""
+    out = run(
+        [binary, "cluster", "status", "--config", str(rebuild_dir), "--json"]
+    ).stdout
+    return json.loads(out)["state_observations"]
+
+
 def rebuild(  # noqa: PLR0913
     new_binary: str,
     new_root: str,
@@ -400,43 +924,47 @@ def rebuild(  # noqa: PLR0913
     schema_dir: Path,
     actor: str,
 ) -> None:
-    """Create the graphs at ``new_root`` and load every export into them."""
+    """Create the graphs at ``new_root``, load every export, and index them.
+
+    THE EXPORTS ARE LOADED AS WRITTEN. A 0.11.0 export (top-level ``id``, a
+    keyed edge's id derived from its endpoints, millisecond DateTime) loads
+    into 0.13.0 unchanged and re-exports identically, so there is no rewrite
+    step between the two binaries. The 0.10 to 0.11 rebuild needed one and it
+    lived here; ``git log`` has it if a future format does too.
+    """
     LOG.info("=== 2/3 rebuild (new binary)")
     config = build_rebuild_config(cluster_yaml, rebuild_dir, schema_dir, new_root)
     LOG.info("  staged %s -> storage: %s", config, new_root)
     run([new_binary, "cluster", "validate", "--config", str(rebuild_dir)])
 
-    # `import` BEFORE `apply`, and both are required. A fresh root has no
-    # `__cluster/state.json`, and `apply` refuses to create one
-    # (`state_missing ... run cluster import to bootstrap state`). This bites
-    # only on the first apply against a new root — which is exactly what this
-    # is, at the point of no return.
-    # `import` TAKES NO `--as`; `apply` DOES. omnigraph 0.9 validates scope
-    # flags per verb — "a flag a command never reads is rejected instead of
-    # silently ignored" — and `cluster import` is one that never read it. 0.8.1
-    # accepted the flag and ignored it, so the runbook's manual procedure
-    # carries `--as` on both lines and worked; on 0.9 the import fails with
-    # "`cluster` is a cluster control command; --as ... does not apply".
-    #
-    # `apply` keeps it: the deploy-time cluster-apply Job runs
-    # `cluster apply --config ... --as svc-witan-admin` against this same 0.9
-    # image successfully, and the actor is what attributes its writes.
-    run([new_binary, "cluster", "import", "--config", str(rebuild_dir)])
-    run([new_binary, "cluster", "apply", "--config", str(rebuild_dir), "--as", actor])
+    # `apply` ALONE CREATES THE LEDGER. Through 0.11 a fresh root needed
+    # `cluster import` first; 0.12 removed that command, and a direct apply on
+    # an empty root now writes `__cluster` itself. `--as` attributes the
+    # writes; a direct apply authorizes as the storage owner whatever the
+    # bundles' group membership says, which is why the image's fixture groups
+    # are good enough here. The server's entrypoint renders the real
+    # membership and re-applies on its first boot at the new root.
+    run_and_unlock(
+        new_binary,
+        ["cluster", "apply", "--config", str(rebuild_dir), "--as", actor],
+        rebuild_dir,
+    )
 
     for graph in graphs:
         LOG.info("  -- %s", graph)
+        export = export_dir / f"{graph}.jsonl"
         store = f"{new_root}/graphs/{graph}.omni"
+        batches = chunk_export(export)
         # `merge` into a freshly-created empty graph is a full load and is the
         # safe choice: `overwrite` is destructive and buys nothing against an
         # empty table. `--yes` because a non-local destructive write refuses
         # without a TTY, and there is none here.
-        for batch, path in enumerate(chunk_export(export_dir / f"{graph}.jsonl")):
+        for batch, path in enumerate(batches):
             if batch:
                 LOG.info("     batch %d", batch + 1)
-            run(
+            run_and_unlock(
+                new_binary,
                 [
-                    new_binary,
                     "load",
                     "--store",
                     store,
@@ -445,8 +973,59 @@ def rebuild(  # noqa: PLR0913
                     "--mode",
                     "merge",
                     "--yes",
-                ]
+                ],
+                rebuild_dir,
             )
+        if pending := build_indexes(new_binary, store, rebuild_dir):
+            LOG.warning("     indexes deferred by optimize: %s", pending)
+        # RECLAIM THIS GRAPH'S COPIES, AND ONLY AFTER ITS LOADS SUCCEEDED. The
+        # raw export and any batch files are two copies of one graph's rows;
+        # carrying both for every graph to the end of the loop roughly doubles
+        # peak disk against a volume sized for one copy of each export, and
+        # can evict the Job even when the exports themselves fit. Ordering
+        # matters as much as the deletion: `run` raises on a failed load, so a
+        # failure leaves every file in place for the operator, which the
+        # no-retry contract depends on.
+        for spent in {export, *batches}:
+            spent.unlink(missing_ok=True)
+
+    # Every step above released its own lock, so anything still held was not
+    # taken by this Job, and the server's first boot would be refused by it.
+    lock = cluster_lock(new_binary, rebuild_dir)
+    if lock["locked"]:
+        sys.exit(
+            f"!!! {new_root} is still locked after the rebuild (lock id "
+            f"{lock['lock_id']}, operation {lock['lock_operation']}). This Job "
+            "released every lock it took, so another process has written to "
+            "the new root. Not verifying a root something else is writing."
+        )
+
+
+def build_indexes(binary: str, store: str, rebuild_dir: Path) -> list[dict[str, str]]:
+    """Build ``store``'s declared indexes, returning any it had to defer.
+
+    ``load`` builds none. omnigraph 0.11 moved index builds off every write
+    path (upstream iss-848) and left ``optimize`` as the only thing that
+    creates them, so a freshly loaded root has no BTREE on any edge's
+    ``__id``/``__src``/``__dst``. Nothing fails: traversals fall back to a full
+    edge scan per hop, which is what Production's council did after the
+    2026-09-16 fmt9 cutover (``no BTREE index on '__src'`` on every WorksOn
+    traversal). The maintenance CronJob would get there eventually, but it is
+    suspended for the whole migration, so the rebuild does it instead of
+    serving unindexed until the next 03:20 tick.
+
+    Deferred indexes (a vector property with no vectors yet, full-text coverage
+    that needs an explicit rebuild) are reported, not fatal: neither is an edge
+    BTREE, and neither stops the graph serving correctly.
+    """
+    out = run_and_unlock(
+        binary, ["optimize", "--store", store, "--json"], rebuild_dir
+    ).stdout
+    return [
+        pending
+        for dataset in json.loads(out)["datasets"]
+        for pending in dataset["pending_indexes"]
+    ]
 
 
 def verify(
@@ -455,21 +1034,32 @@ def verify(
     graphs: list[str],
     baseline: dict[str, dict[str, int]],
 ) -> tuple[dict[str, GraphReport], list[str]]:
-    """Compare per-table row counts at the new root against the baseline."""
+    """Compare per-table row counts at the new root against the old baseline.
+
+    A table the rebuild schema declares but the old graph never had is
+    expected EMPTY rather than absent: the export cannot contain rows for it,
+    and a schema that grew a type since the graph was created (a local store
+    that predates `TaskComment`, found by the 2026-09-15 dry run on a real
+    store) would otherwise fail a rebuild whose every row matched.
+    """
     LOG.info("=== 3/3 verify (per-table row counts)")
     report: dict[str, GraphReport] = {}
     mismatched: list[str] = []
     for graph in graphs:
         after = snapshot_tables(new_binary, f"{new_root}/graphs/{graph}.omni")
         before = baseline[graph]
-        ok = after == before
+        new_tables = sorted(set(after) - set(before))
+        expected = before | dict.fromkeys(new_tables, 0)
+        ok = after == expected
         report[graph] = {
             "ok": ok,
             "before": before,
+            "expected": expected,
             "after": after,
-            "missing_tables": sorted(set(before) - set(after)),
+            "new_tables": new_tables,
+            "missing_tables": sorted(set(expected) - set(after)),
             "changed_tables": sorted(
-                t for t in set(before) & set(after) if before[t] != after[t]
+                t for t in set(expected) & set(after) if expected[t] != after[t]
             ),
         }
         if not ok:
@@ -520,9 +1110,17 @@ def main() -> int:
             "writing to."
         )
 
+    bucket, key = claim_verdict_key(old_root, new_root, env("AWS_REGION"))
+
+    wait_for_writers(
+        parse_writer_cronjobs(env("OMNIGRAPH_WRITER_CRONJOBS")),
+        parse_server_deployment(env("OMNIGRAPH_SERVER_DEPLOYMENT")),
+    )
+
+    binaries: dict[str, str] = {}
     for label, binary in (("old", old_binary), ("new", new_binary)):
-        reported = run([binary, "version"]).stdout.strip().replace("\n", " | ")
-        LOG.info("%s: %s", label, reported)
+        binaries[label] = run([binary, "version"]).stdout.strip().replace("\n", " | ")
+        LOG.info("%s: %s", label, binaries[label])
 
     graphs = graph_ids_from_cluster_config(cluster_yaml)
     if not graphs:
@@ -561,21 +1159,48 @@ def main() -> int:
 
     verdict = {
         "ok": not mismatched and not format_problems,
+        "status": "finished",
         "old_root": old_root,
         "new_root": new_root,
         "graphs": report,
         "old_internal_schema": old_formats,
         "new_internal_schema": new_formats,
         "format_problems": format_problems,
+        "binaries": binaries,
+        "finished_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
     rendered = json.dumps(verdict, indent=2, sort_keys=True)
     VERDICT_PATH.write_text(rendered)
     # ALSO to stdout. The pod's filesystem is an emptyDir that goes away with
     # the container, and `kubectl exec`/`cp` cannot reach a completed pod — so
-    # the file alone is unreadable by the time anyone wants it. The logs are
-    # what survive, so the verdict has to be in them for anything (a human or a
-    # pipeline step) to gate the cutover on it.
+    # the file alone is unreadable by the time anyone wants it. The indented
+    # copy is for a human reading `kubectl logs`; the marker line is the one
+    # Loki keeps whole.
     LOG.info("migration verdict:\n%s", rendered)
+    LOG.info(
+        "%s %s",
+        VERDICT_LOG_MARKER,
+        json.dumps(verdict, sort_keys=True, separators=(",", ":")),
+    )
+
+    # Written whatever the outcome, with `ok` exactly as computed: a failed
+    # run's verdict is the evidence for why, and the cutover script refuses
+    # anything that is not ok. A write failure fails the Job even after a clean
+    # verification, because the cutover script has nothing to read otherwise;
+    # the marker line above still carries the verdict.
+    try:
+        put_object(bucket, key, rendered.encode(), env("AWS_REGION"))
+    except (OSError, urllib.error.URLError):
+        LOG.exception(
+            "could not write the verdict to s3://%s/%s. The rebuild itself "
+            "is %s; the verdict is on the %s line above.",
+            bucket,
+            key,
+            "verified" if verdict["ok"] else "NOT verified",
+            VERDICT_LOG_MARKER,
+        )
+        return 1
+    LOG.info("verdict written to s3://%s/%s", bucket, key)
 
     if format_problems:
         for problem in format_problems:

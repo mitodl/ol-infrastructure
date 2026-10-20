@@ -1,18 +1,60 @@
 # ruff: noqa: E501
 """APISIX ingress controller components for Kubernetes."""
 
-from typing import Any, Literal
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Annotated, Any, Literal, assert_never
 
 import pulumi_kubernetes as kubernetes
-from pulumi import ComponentResource, Output, ResourceOptions
-from pydantic import BaseModel, Field, NonNegativeInt, field_validator, model_validator
+from pulumi import ComponentResource, ResourceOptions
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    NonNegativeInt,
+    PositiveInt,
+    field_validator,
+    model_validator,
+)
 
-from bridge.lib.constants import DEFAULT_OIDC_SESSION_COOKIE_NAME
+from bridge.lib.constants import (
+    DEFAULT_OIDC_SESSION_COOKIE_NAME,
+    GATEWAY_IDENTITY_HEADERS,
+    OIDC_VAULT_FIELDS,
+    oidc_secret_data,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+
+# Read once at import: the files are shipped verbatim as serverless function
+# bodies, with configuration passed separately on the plugin config.
+OIDC_ERROR_RECOVERY_LUA = (
+    Path(__file__)
+    .parent.joinpath("files", "oidc_error_callback_recovery.lua")
+    .read_text()
+)
+CANONICAL_HTTPS_REDIRECT_LUA = (
+    Path(__file__).parent.joinpath("files", "canonical_https_redirect.lua").read_text()
+)
+STRIP_CLIENT_IDENTITY_HEADERS_LUA = (
+    Path(__file__)
+    .parent.joinpath("files", "strip_client_identity_headers.lua")
+    .read_text()
+)
+
+# The only statuses ngx.redirect accepts; anything else is a Lua error at
+# request time (ngx_http_lua_control.c:209-219).
+NGX_REDIRECT_STATUSES = (301, 302, 303, 307, 308)
+
+# lua_shared_dict that oidc_error_callback_recovery.lua counts restarts in.  The
+# gateway has to define it (apisix.nginx.customLuaSharedDicts in
+# infrastructure/aws/eks/apisix_official.py); where it is absent the function
+# falls back to the guard cookie alone.
+OIDC_RECOVERY_SHARED_DICT = "ol-oidc-recovery"
+OIDC_RECOVERY_SHARED_DICT_SIZE = "1m"
 
 
 class OLApisixPluginConfig(BaseModel):
@@ -26,7 +68,7 @@ class OLApisixPluginConfig(BaseModel):
     name: str
     enable: bool = True
     secret_ref: str | None = Field(
-        None,
+        default=None,
         alias="secretRef",
     )
     config: dict[str, Any] = {}
@@ -103,13 +145,336 @@ end"""
     )
 
 
+def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
+    recoverable_errors: list[str] | None = None,
+    session_cookie_names: Sequence[str] = (),
+    guard_cookie_name: str = "apisix_oidc_recovery",
+    guard_max_age: int = 60,
+    *,
+    max_restarts_per_session_state: int = 1,
+    canonical_https_redirect: bool = True,
+    canonical_redirect_status: Literal[301, 302, 303, 307, 308] = 308,
+) -> OLApisixPluginConfig:
+    """Everything that has to happen before openid-connect sees the request.
+
+    APISIX keys a plugin config by plugin name, so a route can carry exactly ONE
+    ``serverless-pre-function``.  Both of the fixes below have to run ahead of
+    openid-connect (priority 2599), and ``serverless-pre-function`` (priority
+    10000) is the only hook that gets there, so they are necessarily one plugin
+    rather than two.  ``serverless/init.lua`` runs ``functions`` in array order
+    and stops at the first one returning a code or body, which is exactly the
+    sequencing wanted here: normalise the origin first, and only then look at
+    whether this is a failed callback.
+
+    **Canonical origin** (``canonical_https_redirect.lua``).  The shared-plugin
+    defaults already include APISIX's ``redirect`` plugin with ``http_to_https``,
+    but its priority is below openid-connect's, so on an OIDC route it is dead
+    code -- openid-connect has already answered.  The consequences are measured,
+    not hypothetical.  APISIX derives only a relative redirect_uri and
+    lua-resty-openidc 1.8.0 (the version APISIX 3.17 pins) makes it absolute from
+    ``ngx.var.scheme`` and ``ngx.var.http_host``, so a plain-HTTP request sends
+    Keycloak ``http://...`` and a request carrying ``Host: <host>:443`` sends
+    ``https://<host>:443/...``.  Keycloak registers bare-host https URIs only and
+    rejects both with ``error="invalid_redirect_uri"``; the login dies at the
+    authorization endpoint, before any callback exists for the recovery function
+    below to rescue.  Worse than the failed logins: because the upgrade never
+    runs, APISIX answers plain-HTTP requests with an OIDC session cookie over
+    cleartext and without the ``Secure`` attribute.
+
+    Redirecting is what fixes this, not header-setting.  lua-resty-openidc does
+    prefer ``Forwarded`` / ``X-Forwarded-Proto`` / ``X-Forwarded-Host`` over those
+    ngx vars, but on this deployment none of the three reaches it -- sending each
+    against production leaves the redirect_uri unchanged -- so pinning them would
+    be a no-op dressed up as a fix.
+
+    Note this leaves port 80 answering with a redirect rather than closing it.
+    That is only safe because every ACME ClusterIssuer on the cluster solves via
+    dns01/Route53; an issuer switched to http-01 would need its challenge path
+    carved out of the redirect.
+
+    **Error-callback recovery** (``oidc_error_callback_recovery.lua``).  An
+    authorization request whose Keycloak authentication session has expired --
+    the user left the login tab open, or followed a stale bookmark -- comes back
+    to the callback with ``error=temporarily_unavailable`` and no ``code``.
+    Keycloak's intent there is that the client start over; it even marks the
+    event ``restart_after_timeout="true"``.  ``lua-resty-openidc`` instead treats
+    any ``error`` parameter as fatal and hands the openid-connect plugin a
+    failure, which APISIX serves as a 21KB HTTP 500.  The user sees a stack-trace
+    page where they expected a login form, and nothing retries.
+
+    This is measured, not hypothetical: 614 such callbacks a day across
+    api.learn.mit.edu, mitxonline.mit.edu and nb.learn.mit.edu, from 530
+    distinct client addresses, 181 of which never reached a successful callback
+    in the same 24 hours.  It is the only one of the three causes of callback
+    500s that actually blocks anybody -- see ``log_rules/apisix_oidc.py``.
+
+    Running before openid-connect, this turns that dead end back into a login
+    page.  The redirect target is derived from the callback URI rather than
+    configured: APISIX's callback always sits at ``<login prefix>/.apisix/
+    redirect``, and the route serving it is by construction the one with
+    ``unauth_action="auth"``, so redirecting to the parent path re-enters the
+    authorization flow that just failed and lands the user wherever that route
+    normally sends them.  That keeps this attachable to a host's shared plugin
+    config with no per-application wiring.
+
+    Only errors the IdP considers transient are recovered.  ``access_denied``
+    (the user pressed "Cancel") or ``invalid_request`` (a real
+    misconfiguration) must keep failing loudly -- bouncing those back into
+    ``/login`` would spin the browser between the gateway and Keycloak.
+
+    Recovery is attempted at most once per ``guard_max_age`` seconds per
+    browser, tracked by a short-lived guard cookie.  If the retry hits the same
+    error, the second callback falls through to the plugin's 500 instead of
+    looping: a persistently broken IdP should surface as an error, not as an
+    infinite redirect.
+
+    **Missing-session recovery** (same function, enabled by
+    ``session_cookie_names``).  A callback that carries a ``code`` but none of
+    the host's OIDC session cookies cannot succeed: lua-resty-openidc checks the
+    ``state`` parameter against the one it stored in that session when it sent
+    the browser to Keycloak, and with no session there is nothing to check
+    against.  The browser finishing the login is not the one that started it --
+    an email verification or password-reset link opened in a different browser
+    or an in-app webview, most likely -- or it has lost the cookie since.
+
+    This is the larger share of what remained after the error-callback fix.  In
+    the 24h to 2026-09-28, 142 of mitxonline.mit.edu's 160 ``code`` callback
+    500s and 57 of api.learn.mit.edu's 64 carried no session cookie, and none of
+    the sampled ``state`` values ever got a 302, so these are not replays of a
+    login that already worked.  Conversely, all 6,741 successful ``code``
+    callbacks over the same day carried the session cookie, so the check cannot
+    divert a login that would have succeeded.  Sending the browser back through
+    the login prefix starts a flow it holds the cookie for, and the Keycloak SSO
+    session it just established completes that flow without a second prompt.
+
+    Pass every session cookie name that any route referencing the shared config
+    uses.  Recovery happens only when *none* of them is present, so listing a
+    name too many is harmless, but omitting one would divert every successful
+    login on the routes that use it.  An empty sequence (the default) turns the
+    branch off.  The same guard cookie bounds it to one attempt per window.
+
+    **Restart bound for browsers that store no cookies.**  A browser that drops
+    this host's cookies while keeping Keycloak's drops the guard too, so every
+    callback is restarted and it loops through Keycloak until the browser's own
+    redirect limit.  Production saw two such loops in the 20h to 2026-10-01
+    13:17Z: 35 restarts in 23s for one api.learn.mit.edu client and 7 in under
+    5s for one nb.learn.mit.edu client.  Every hop of a loop carries the same
+    Keycloak ``session_state``, so the function also counts restarts per
+    ``session_state`` in the ``OIDC_RECOVERY_SHARED_DICT`` lua_shared_dict and
+    lets the callback fall through to the 500 past
+    ``max_restarts_per_session_state``.  A browser that does keep cookies never
+    reaches the counter a second time: its second callback carries either the
+    session cookie or the guard.  The dict is per APISIX pod, so the effective
+    bound is that many restarts per replica per host.
+
+    This covers the ``code`` branch only in practice.  Keycloak sends no
+    ``session_state`` with ``error=temporarily_unavailable`` (none of the 2,027
+    such callbacks in the 24h to 2026-10-07 16:59Z carried one), so a
+    cookie-less browser on the error branch is still bounded only by its own
+    redirect limit.
+
+    Both functions live in ``files/`` and are shipped verbatim -- nothing is
+    interpolated into them.  Tunables travel as ``oidc_error_recovery`` and
+    ``canonical_https_redirect`` blocks on the plugin config, which the functions
+    read off ``conf``: ``serverless/init.lua`` invokes each as
+    ``func(conf, ctx)``, and its schema does not set ``additionalProperties``,
+    so extra keys validate.  Keeping them real ``.lua`` files means they are
+    syntax-highlighted, reviewable, and testable under APISIX's own test-nginx
+    harness (``t/oidc_error_callback_recovery.t``,
+    ``t/canonical_https_redirect.t``).
+
+    :param recoverable_errors: OAuth 2.0 ``error`` codes to restart the flow
+        for.  Defaults to ``temporarily_unavailable``, which is 100% of what
+        production emits today.  An explicit empty list makes the plugin a
+        no-op, for turning it off without detaching it from every route that
+        references a shared plugin config.
+    :param session_cookie_names: OIDC session cookie names used by the routes
+        this plugin config is attached to.  A ``code`` callback carrying none of
+        them is restarted rather than left to fail.  Empty disables this.
+    :param guard_cookie_name: Name of the loop-breaker cookie.
+    :param guard_max_age: Seconds the guard cookie lives, bounding how often one
+        browser can be sent back through login.  Also the lifetime of the
+        per-``session_state`` restart counter.
+    :param max_restarts_per_session_state: Restarts allowed for one Keycloak
+        ``session_state`` per ``guard_max_age`` window, per APISIX pod.
+    :param canonical_https_redirect: Whether to send non-canonical origins to
+        ``https://<bare host>`` before openid-connect runs.  ``False`` drops the
+        function entirely, for a host that must keep answering on plain HTTP.
+    :param canonical_redirect_status: Status for that redirect, uniform across
+        methods.  APISIX's own ``redirect`` plugin instead picks per method --
+        301 for GET/HEAD, 308 for everything else (``redirect.lua`` 208-215) --
+        so 308 here is a simplification rather than a behavioural fix: both
+        preserve a POST.  Restricted to the codes ``ngx.redirect`` accepts.
+
+    :returns: A ``serverless-pre-function`` plugin config to attach to routes.
+    :rtype: OLApisixPluginConfig
+    """
+    # Checked rather than left to the annotation: the `Literal` above documents
+    # the contract but nothing enforces it at the call sites, since this repo's
+    # mypy hook runs without the project installed and resolves a cross-module
+    # import to Any.  APISIX will not catch it either -- the block this travels
+    # in is not part of serverless-pre-function's schema -- so an unchecked bad
+    # value would first surface as a 500 on live traffic.  Raising here moves
+    # that to `pulumi preview`.
+    if canonical_redirect_status not in NGX_REDIRECT_STATUSES:
+        msg = (
+            f"canonical_redirect_status must be one of {NGX_REDIRECT_STATUSES}, "
+            f"got {canonical_redirect_status}: ngx.redirect rejects anything else."
+        )
+        raise ValueError(msg)
+
+    # guard_max_age is the counter's init_ttl, and ngx.shared.DICT treats 0 as
+    # "never expires": a session_state would stay refused until the pod restarts.
+    if guard_max_age < 1:
+        msg = f"guard_max_age must be at least 1 second, got {guard_max_age}."
+        raise ValueError(msg)
+    if max_restarts_per_session_state < 1:
+        msg = (
+            "max_restarts_per_session_state must be at least 1, got "
+            f"{max_restarts_per_session_state}: 0 would refuse every recovery."
+        )
+        raise ValueError(msg)
+
+    # Order matters and is load-bearing: serverless/init.lua stops at the first
+    # function returning a code, so the origin has to be canonical before the
+    # recovery function decides whether to redirect back into the login flow.
+    functions = [OIDC_ERROR_RECOVERY_LUA]
+    if canonical_https_redirect:
+        functions.insert(0, CANONICAL_HTTPS_REDIRECT_LUA)
+    return OLApisixPluginConfig(
+        name="serverless-pre-function",
+        secretRef=None,
+        # rewrite rather than the plugin's default access phase: openid-connect
+        # also runs in rewrite, and serverless-pre-function's priority (10000)
+        # outranks it (2599), so this gets to normalise the origin and inspect
+        # the callback before the plugin reads either.  In the access phase it
+        # would run after openid-connect had already built its redirect_uri and
+        # failed.
+        config={
+            "phase": "rewrite",
+            "functions": functions,
+            "canonical_https_redirect": {"status": canonical_redirect_status},
+            "oidc_error_recovery": {
+                # `is None`, not `or`: an explicit empty list means "recover
+                # nothing", and `or` would quietly turn that back into the
+                # default.
+                "recoverable_errors": (
+                    ["temporarily_unavailable"]
+                    if recoverable_errors is None
+                    else recoverable_errors
+                ),
+                "session_cookie_names": list(session_cookie_names),
+                "guard_cookie_name": guard_cookie_name,
+                "guard_max_age": guard_max_age,
+                "restart_dict_name": OIDC_RECOVERY_SHARED_DICT,
+                "max_restarts": max_restarts_per_session_state,
+            },
+        },
+    )
+
+
+def gateway_global_pre_function_plugin(
+    header_names: Sequence[str] = GATEWAY_IDENTITY_HEADERS,
+) -> OLApisixPluginConfig:
+    """Build the cluster's one global ``serverless-pre-function``.
+
+    The ingress controller flattens every ApisixGlobalRule into a single
+    plugin-name-keyed map, so anything that has to run on every route ahead of
+    openid-connect goes into this function list rather than a second rule.
+
+    **Canonical origin on OIDC routes** (``canonical_https_redirect.lua`` with
+    ``require_openid_connect``).  ``oidc_gateway_pre_function_plugin`` runs the
+    same function, but only for applications that attach it.  As of 2026-10-01
+    the production OIDC routes of airbyte, dagster, ol-analytics, opik, gwarek,
+    celery-monitoring and learn-ai did not, and the hosts probed answered plain
+    HTTP with an OIDC session cookie over cleartext and without ``Secure``, and
+    sent Keycloak an ``http://`` redirect_uri.  Running it here covers every
+    OIDC route in the cluster, including routes created outside Pulumi.  It is
+    scoped to routes carrying openid-connect because those are the ones that
+    mint a session and a redirect_uri from the request origin; leaving every
+    other route alone means this changes nothing that was not broken.  The
+    status is the 308 the per-application function also defaults to.
+
+    **Identity-header strip** (``strip_client_identity_headers.lua``).  Clears
+    the gateway's own identity headers when a client supplies them.
+
+    The openid-connect plugin sets X-Userinfo, X-ID-Token, X-Raw-ID-Token and
+    X-Refresh-Token from a verified session, and clears any inbound copy before
+    it does -- but only on the routes it is attached to.  Every other route on
+    an OIDC host
+    forwards the client's version untouched, and mitol-apigateway's middleware
+    authenticates off X-Userinfo without asking whether the gateway or the
+    caller wrote it.  Two such routes exist today: mitxonline's
+    ``/static/hash.txt`` and learn-ai's ``canvas_*`` endpoints.  Neither is
+    reachable as a forgery right now -- Granian's static mount answers
+    ``/static/*`` before Django's middleware runs, and the canvas routes sit
+    behind ``key-auth``, which rejects an unkeyed request at the gateway -- but
+    both depend on something other than the trust boundary to hold, and the
+    canvas exception only holds against callers without the Canvas API key.
+
+    **This belongs on an ``ApisixGlobalRule``, not on a shared plugin config.**
+    The routes it needs to cover are precisely the ones nobody remembered to
+    attach a plugin to, and APISIX keys plugins by name when merging a plugin
+    config into a route: a route carrying ``oidc_gateway_pre_function_plugin``
+    -- which is every OIDC route -- overrides the shared config's
+    ``serverless-pre-function`` wholesale rather than running both.  Attaching
+    this there would leave it running only where it is least needed.  A global
+    rule has neither problem: it runs after route matching but before the
+    matched route's rewrite and access phases
+    (``apisix/init.lua http_access_phase``), so it lands ahead of
+    openid-connect (rewrite, priority 2599) on every route in the cluster.
+
+    ``proxy-rewrite``'s ``headers.remove`` would express the same thing
+    declaratively and is the wrong tool here: its rewrite handler
+    unconditionally runs ``ngx.req.set_uri`` on a ``uri_safe_encode``'d path
+    whether or not a rewrite was asked for, so putting it in a global rule
+    would re-encode the URI of every request in the cluster before each
+    route's own ``proxy-rewrite`` got to it.
+
+    Each name is cleared in both its dash and its underscore spelling.  APISIX
+    runs nginx with ``underscores_in_headers on``, so ``X_Userinfo`` is a
+    header in its own right that reaches the upstream, and Django folds it onto
+    the same ``HTTP_X_USERINFO`` the middleware reads.  Clearing only the dash
+    spelling would leave the hole open under a different name -- as upstream's
+    own clear in ``openid-connect.lua`` does.
+
+    :param header_names: Headers to clear.  Defaults to
+        ``GATEWAY_IDENTITY_HEADERS``, which deliberately omits X-Access-Token
+        and Authorization -- see the constant for why.
+
+    :returns: A ``serverless-pre-function`` plugin config for a global rule.
+    :rtype: OLApisixPluginConfig
+    """
+    return OLApisixPluginConfig(
+        name="serverless-pre-function",
+        secretRef=None,
+        config={
+            # rewrite, matching oidc_gateway_pre_function_plugin: the access
+            # phase would run after openid-connect had already read the
+            # request.
+            "phase": "rewrite",
+            # Redirect first: serverless/init.lua stops at the first function
+            # returning a code, and a redirected request needs no header strip.
+            "functions": [
+                CANONICAL_HTTPS_REDIRECT_LUA,
+                STRIP_CLIENT_IDENTITY_HEADERS_LUA,
+            ],
+            "canonical_https_redirect": {
+                "status": 308,
+                "require_openid_connect": True,
+            },
+            "identity_header_strip": {"headers": list(header_names)},
+        },
+    )
+
+
 class OLApisixRouteConfig(BaseModel):
     """Configuration for a single ApisixRoute rule (legacy CRD path)."""
 
     route_name: str
     priority: int = 0
     shared_plugin_config_name: str | None = None
-    plugins: list[OLApisixPluginConfig] = []
+    plugins: list[OLApisixPluginConfig | dict[str, Any]] = []
     hosts: list[str] = []
     paths: list[str] = []
     # Optional ApisixRoute ``match.exprs`` entries for matching on headers,
@@ -141,12 +506,16 @@ class OLApisixRouteConfig(BaseModel):
     @field_validator("plugins")
     @classmethod
     def ensure_request_id_plugin(
-        cls, v: list[OLApisixPluginConfig]
-    ) -> list[OLApisixPluginConfig]:
+        cls, v: list[OLApisixPluginConfig | dict[str, Any]]
+    ) -> list[OLApisixPluginConfig | dict[str, Any]]:
         """
         Ensure that the request-id plugin is always added to the plugins list
         """
-        if not any(plugin.name == "request-id" for plugin in v):
+        if not any(
+            (plugin.get("name") if isinstance(plugin, dict) else plugin.name)
+            == "request-id"
+            for plugin in v
+        ):
             v.append(
                 OLApisixPluginConfig(
                     name="request-id",
@@ -221,7 +590,9 @@ class OLApisixRoute(ComponentResource):
                 "name": route_config.route_name,
                 "priority": route_config.priority,
                 "plugins": [
-                    p.model_dump(by_alias=True, exclude_none=True)
+                    p
+                    if isinstance(p, dict)
+                    else p.model_dump(by_alias=True, exclude_none=True)
                     for p in route_config.plugins
                 ],
                 "match": {
@@ -252,21 +623,57 @@ class OLApisixRoute(ComponentResource):
         return routes
 
 
+class OLApisixOIDCVaultCredentials(BaseModel):
+    """The openid-connect plugin's client credentials come from Vault.
+
+    OLApisixOIDCResources writes them into a per-application Secret through
+    VSO (OLVaultK8SSecret), rendering the plugin keys from the Keycloak
+    client's fields at ``path``.
+    """
+
+    # forbid: a misspelled field, or a field of the other variant, is an error
+    # rather than a silently dropped value.
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["vault"] = "vault"
+    vaultauth: str = Field(min_length=1)
+    mount: str = "secret-operations"
+    mount_type: Literal["kv-v1", "kv-v2"] = "kv-v1"
+    path: str
+
+
+class OLApisixOIDCSecretCredentials(BaseModel):
+    """The openid-connect plugin's client credentials are in a Secret that
+    already exists in the application's namespace, for clusters without Vault.
+
+    Nothing checks its contents: whoever creates it has to write the plugin
+    keys ``bridge.lib.constants.oidc_secret_data`` returns, ``session.secret``
+    included when ``oidc_use_session_secret``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: Literal["existing_secret"] = "existing_secret"
+    secret_name: str = Field(min_length=1)
+
+
 class OLApisixOIDCConfig(BaseModel):
     """Configuration for APISIX OIDC authentication resources.
 
-    Holds Vault path details and OIDC plugin settings used to create the
-    per-application Kubernetes Secret (via OLVaultK8SSecret) and generate
-    the openid-connect plugin configuration block.
+    Holds the OIDC plugin settings and where the plugin's client credentials
+    come from. Either way the Secret the plugin reads has to carry the keys
+    ``bridge.lib.constants.oidc_secret_data`` returns (``client_id``,
+    ``client_secret``, ``realm``, ``discovery``, and ``session.secret`` when
+    ``oidc_use_session_secret``).
     """
 
     application_name: str
     k8s_labels: dict[str, str] = {}
     k8s_namespace: str
-    vault_mount: str = "secret-operations"
-    vault_mount_type: Literal["kv-v1", "kv-v2"] = "kv-v1"
-    vault_path: str
-    vaultauth: str
+    credentials: Annotated[
+        OLApisixOIDCVaultCredentials | OLApisixOIDCSecretCredentials,
+        Field(discriminator="source"),
+    ]
 
     oidc_bearer_only: bool = False
     oidc_introspection_endpoint_auth_method: str = "client_secret_basic"
@@ -294,14 +701,25 @@ class OLApisixOIDCConfig(BaseModel):
     oidc_session_idling_timeout: NonNegativeInt | None = None
     oidc_session_rolling_timeout: NonNegativeInt | None = None
     oidc_ssl_verify: bool = True
+    # Sends code_challenge (S256) on the authorization request and
+    # code_verifier on the token request. Keycloak accepts both from a client
+    # that does not require PKCE, so this has to be on, and deployed in every
+    # stack sharing a client, before that client gets
+    # pkce_code_challenge_method="S256".
+    oidc_use_pkce: bool = True
     oidc_use_session_secret: bool = True
 
 
 class OLApisixOIDCResources(ComponentResource):
     """
-    OIDC configuration for apisix
-    Defines and creates an "OLVaultK8SSecret" resource in the k8s cluster
-    Also provides helper functions for creating config blocks for the oidc plugin
+    The client-credential Secret behind one application's APISIX
+    openid-connect routes, and the plugin block those routes attach.
+
+    Creates an OLVaultK8SSecret for OLApisixOIDCVaultCredentials; for
+    OLApisixOIDCSecretCredentials it creates nothing and points the plugin at
+    the named Secret. get_full_oidc_plugin_config() returns the openid-connect
+    entry for an OLApisixRoute's plugins; this component does not create the
+    routes.
     """
 
     def __init__(
@@ -317,37 +735,48 @@ class OLApisixOIDCResources(ComponentResource):
 
         resource_options = ResourceOptions(parent=self).merge(opts)
 
-        self.secret_name = f"ol-apisix-{oidc_config.application_name}-oidc-secrets"
-
-        __templates: dict[str, str | Output[str]] = {
-            "client_id": '{{ get .Secrets "client_id" }}',
-            "client_secret": '{{ get .Secrets "client_secret" }}',
-            "realm": '{{ get .Secrets "realm_name" }}',
-            "discovery": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
-        }
-
-        if oidc_config.oidc_use_session_secret:
-            __templates["session.secret"] = '{{ get .Secrets "secret" }}'
-
-        self.oidc_secrets = OLVaultK8SSecret(
-            f"{oidc_config.application_name}-oidc-secrets",
-            resource_config=OLVaultK8SStaticSecretConfig(
-                dest_secret_labels=oidc_config.k8s_labels,
-                dest_secret_name=self.secret_name,
-                exclude_raw=True,
-                excludes=[".*"],
-                labels=oidc_config.k8s_labels,
-                mount=oidc_config.vault_mount,
-                mount_type=oidc_config.vault_mount_type,
-                name=self.secret_name,
-                namespace=oidc_config.k8s_namespace,
-                path=oidc_config.vault_path,
-                refresh_after="1m",
-                templates=__templates,
-                vaultauth=oidc_config.vaultauth,
-            ),
-            opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
-        )
+        self.oidc_secrets: OLVaultK8SSecret | None = None
+        match oidc_config.credentials:
+            case OLApisixOIDCSecretCredentials(secret_name=secret_name):
+                self.secret_name = secret_name
+            case OLApisixOIDCVaultCredentials() as vault:
+                self.secret_name = (
+                    f"ol-apisix-{oidc_config.application_name}-oidc-secrets"
+                )
+                self.oidc_secrets = OLVaultK8SSecret(
+                    f"{oidc_config.application_name}-oidc-secrets",
+                    resource_config=OLVaultK8SStaticSecretConfig(
+                        dest_secret_labels=oidc_config.k8s_labels,
+                        dest_secret_name=self.secret_name,
+                        exclude_raw=True,
+                        excludes=[".*"],
+                        labels=oidc_config.k8s_labels,
+                        mount=vault.mount,
+                        mount_type=vault.mount_type,
+                        name=self.secret_name,
+                        namespace=oidc_config.k8s_namespace,
+                        path=vault.path,
+                        refresh_after="1m",
+                        # A fresh dict typed like the parameter (dict is
+                        # invariant, so the dict[str, str] oidc_secret_data
+                        # returns can't be passed as is).
+                        templates={
+                            **oidc_secret_data(
+                                {
+                                    field: f'{{{{ get .Secrets "{field}" }}}}'
+                                    for field in OIDC_VAULT_FIELDS
+                                },
+                                include_session_secret=oidc_config.oidc_use_session_secret,
+                            )
+                        },
+                        vaultauth=vault.vaultauth,
+                    ),
+                    opts=resource_options.merge(
+                        ResourceOptions(delete_before_replace=True)
+                    ),
+                )
+            case _ as unhandled:
+                assert_never(unhandled)
 
         session_config: dict[str, Any] = {}
         # Flat session.cookie_domain, per the openid-connect plugin's
@@ -395,6 +824,7 @@ class OLApisixOIDCResources(ComponentResource):
             "renew_access_token_on_expiry": oidc_config.oidc_renew_access_token_on_expiry,
             "logout_path": oidc_config.oidc_logout_path,
             "post_logout_redirect_uri": oidc_config.oidc_post_logout_redirect_uri,
+            "use_pkce": oidc_config.oidc_use_pkce,
             **session_config,
         }
 
@@ -465,6 +895,38 @@ class OLApisixSharedPluginsConfig(BaseModel):
     # Either raw CRD dicts or OLApisixPluginConfig objects; the component
     # normalises the latter to dicts before rendering.
     plugins: list[dict[str, Any] | OLApisixPluginConfig] = []
+    # Per-client-IP rate limiting as a DDoS backstop.  Opt-in (default off) so
+    # that enabling it on one application does not change the behaviour of the
+    # other services that share this component.  Both plugins default to their
+    # local (node-local shared memory) policy here, so the effective ceiling
+    # scales with the gateway replica count -- at 11 replicas a single IP
+    # spread across pods gets roughly 11x the per-pod rate before it is
+    # throttled.  This is intended to blunt single-source floods, not to
+    # replace edge/volumetric protection; a cluster-wide cap is available via
+    # each plugin's ``policy: redis``/``redis-cluster`` option (or
+    # limit-count), just not configured by this component today.
+    enable_rate_limiting: bool = False
+    # Key used to bucket requests.  ``remote_addr`` resolves to the real client
+    # IP because the gateway trusts Fastly's X-Forwarded-For (see trustedAddresses).
+    rate_limit_key: str = "remote_addr"
+    rate_limit_rejected_code: int = Field(default=429, ge=200, le=599)
+    # Thresholds are ~10x the observed worst-case single browser IP.  Measured
+    # from 30d of APISIX access logs for api.learn.mit.edu: the busiest
+    # legitimate browser client sustained ~5 req/s (304 requests in its peak
+    # minute) and accumulated 16.9 request-seconds in that minute, i.e. a mean
+    # concurrency of ~0.3.  The headroom is deliberate rather than measured:
+    # the browser population is identified by header heuristics, so quieter
+    # clients are undercounted, and a large shared-NAT egress point could
+    # plausibly exceed a single user by an order of magnitude.  These values
+    # target single-source flood abuse, not normal aggregated load.
+    # limit-req: leaky-bucket request rate (requests/second) plus burst slack.
+    rate_limit_requests_per_second: PositiveInt = 50
+    rate_limit_burst: NonNegativeInt = 25
+    # limit-conn: maximum concurrent in-flight requests plus burst slack.  Sized
+    # for an SPA page load multiplexed over HTTP/2 behind shared NAT, which can
+    # briefly hold far more requests open than the mean concurrency suggests.
+    rate_limit_max_concurrent: PositiveInt = 100
+    rate_limit_concurrent_burst: NonNegativeInt = 50
 
 
 class OLApisixSharedPlugins(ComponentResource):
@@ -607,6 +1069,40 @@ class OLApisixSharedPlugins(ComponentResource):
             "config": {"sampler": {"name": "always_on"}},
         }
 
+        # limit-conn caps concurrent in-flight requests per client; limit-req
+        # applies a leaky-bucket request-rate ceiling.  Both set
+        # ``allow_degradation`` so that if the plugin's shared-memory store is
+        # unavailable the request is allowed through rather than failing closed
+        # — a rate-limiting backstop must never become its own outage.
+        __rate_limit_plugins: list[dict[str, Any]] = [
+            {
+                "name": "limit-conn",
+                "enable": True,
+                "config": {
+                    "conn": plugin_config.rate_limit_max_concurrent,
+                    "burst": plugin_config.rate_limit_concurrent_burst,
+                    "default_conn_delay": 0.1,
+                    "key_type": "var",
+                    "key": plugin_config.rate_limit_key,
+                    "rejected_code": plugin_config.rate_limit_rejected_code,
+                    "allow_degradation": True,
+                },
+            },
+            {
+                "name": "limit-req",
+                "enable": True,
+                "config": {
+                    "rate": plugin_config.rate_limit_requests_per_second,
+                    "burst": plugin_config.rate_limit_burst,
+                    "nodelay": True,
+                    "key_type": "var",
+                    "key": plugin_config.rate_limit_key,
+                    "rejected_code": plugin_config.rate_limit_rejected_code,
+                    "allow_degradation": True,
+                },
+            },
+        ]
+
         resource_options = ResourceOptions(parent=self).merge(opts)
 
         # Defaults first, then the caller's own plugins.  APISIX dispatches by
@@ -629,6 +1125,8 @@ class OLApisixSharedPlugins(ComponentResource):
             else plugin
             for plugin in plugin_config.plugins
         )
+        if plugin_config.enable_rate_limiting:
+            plugins.extend(__rate_limit_plugins)
 
         # Gate on CI to match the cluster-level plugin enablement: APISIX does not
         # load the opentelemetry plugin on CI, so attaching it to a route there
@@ -705,6 +1203,172 @@ class OLApisixSharedPlugins(ComponentResource):
                 opts=resource_options,
             )
         )
+
+
+# User-Agent of the first-party server-side callers that must not be treated
+# as browsers.  ``mit-learn-ssr`` is what the mit-learn Next.js SSR layer sets
+# on purpose (frontends/main/src/bootstrap/api.ts), with or without a
+# ``/<version>`` suffix.  ``axios/`` is the HTTP client default it sent before
+# that, kept until every environment runs a release that sends the explicit
+# one -- see browser_traffic_match_exprs.
+FIRST_PARTY_SERVICE_CLIENT_UA_REGEX = r"^(?:axios/|mit-learn-ssr(?:/|$))"
+
+
+def browser_traffic_match_exprs(
+    origin_regex: str,
+    service_client_ua_regex: str,
+) -> list[dict[str, Any]]:
+    """Build ``ApisixRoute`` match exprs that select real browser traffic.
+
+    For route groups that carry per-client-IP rate limiting.  That limit is
+    sized for one browser, so a first-party server-side caller is the wrong
+    shape for it: it aggregates every end user behind one address and a
+    browser-sized bucket throttles the whole population at once.
+
+    Matching on ``Origin`` alone excludes such a caller only by accident,
+    because the HTTP clients they use happen not to send that header.  The
+    negative User-Agent clause makes it the intent, so the exclusion survives a
+    server-side caller that does send an ``Origin``.
+
+    Deliberately narrow: it names first-party clients rather than excusing
+    every non-browser.  Crawlers do send a site's ``Origin`` and are single
+    actors that a per-IP limit should catch, so they stay in.
+
+    This adds a knob any client can turn, not just a description of existing
+    behaviour: anything that sends a matching User-Agent now opts itself out.
+    That is not a regression for a non-browser caller, which could already opt
+    out by omitting ``Origin`` -- dropping a header is easier than setting one
+    -- but it does mean the exclusion is only as trustworthy as the rate limit
+    it guards, which is a blast-radius control rather than an anti-abuse one.
+
+    ``service_client_ua_regex`` is required rather than defaulted so that each
+    host states its own first-party client next to the evidence for it.  A
+    shared default would silently exempt every stock-``axios`` integrator on
+    any host that adopted this helper.
+
+    :param origin_regex: anchored regex for the site's own ``Origin`` values.
+    :param service_client_ua_regex: anchored regex matching the User-Agent of
+        first-party server-side callers, which are excluded.  Anchor it:
+        APISIX matches with ``ngx.re.find``, a substring search, so an
+        unanchored value would exempt any User-Agent merely containing it.
+
+    :returns: exprs for ``OLApisixRouteConfig.exprs``.
+    :rtype: list[dict[str, Any]]
+    """
+    return [
+        {
+            "subject": {"scope": "Header", "name": "Origin"},
+            "op": "RegexMatch",
+            "value": origin_regex,
+        },
+        {
+            "subject": {"scope": "Header", "name": "User-Agent"},
+            "op": "RegexNotMatch",
+            "value": service_client_ua_regex,
+        },
+    ]
+
+
+class OLApisixSharedPluginsVariant(BaseModel):
+    """One route-group variation on a host's single shared plugin list.
+
+    A host sometimes needs more than one shared plugin config: api.learn.mit.edu
+    splits its ``browser-*`` routes onto a second config so they can carry rate
+    limiting that the Fastly-fronted routes must not.  Expressing that as two
+    hand-written ``OLApisixSharedPluginsConfig`` objects means every
+    non-rate-limiting plugin has to be repeated in both, and a one-sided edit
+    changes behaviour by request Origin with nothing in review or CI to catch
+    it.  That drift has already shipped twice on api.learn: once by a plugin
+    being copied into only one list, and once by a rebase silently moving an
+    attachment from one list to the other because the two lists ended with the
+    same three lines of context.
+
+    This model therefore carries only the fields a variant may legitimately
+    differ on.  ``plugins`` is not among them, and ``extra="forbid"`` makes
+    passing it an error rather than a silent no-op, so the plugin list is
+    shared by construction.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Pulumi resource name for this variant's component.  Supplied per variant
+    # rather than derived, because changing the name of an existing component
+    # replaces it and every child CRD under it.
+    name: str
+    # Appended to application_name to form the CRD metadata.name that routes
+    # reference, so it also has to stay stable for an existing variant.
+    resource_suffix: str
+    enable_rate_limiting: bool = False
+
+
+def ol_apisix_shared_plugins_variants(
+    plugin_config: OLApisixSharedPluginsConfig,
+    variants: list[OLApisixSharedPluginsVariant],
+    opts: ResourceOptions | None = None,
+) -> dict[str, OLApisixSharedPlugins]:
+    """Render one plugin list as several shared plugin configs on a host.
+
+    The rate-limit thresholds stay on ``plugin_config`` where they are
+    documented; they are inert on a variant that leaves
+    ``enable_rate_limiting`` off.
+
+    :param plugin_config: the shared configuration.  ``resource_suffix`` and
+        ``enable_rate_limiting`` belong to a variant, so setting either here
+        is an error rather than a value that is quietly discarded.
+    :param variants: the per-route-group variations to render.
+    :param opts: passed through to each component.
+
+    :raises ValueError: if the shared config sets a per-variant field, or if
+        two variants would render the same CRD name.
+
+    :returns: the rendered components, keyed by ``resource_suffix``. A route's
+        ``shared_plugin_config_name`` takes the component's ``resource_name``
+        (``<application_name>-<resource_suffix>``), not the bare key.
+    :rtype: dict[str, OLApisixSharedPlugins]
+    """
+    # Refuse rather than ignore. Converting a single-config application to this
+    # factory means moving enable_rate_limiting off the config and onto a
+    # variant; leaving it behind would otherwise drop rate limiting from every
+    # route on the host with nothing to show for it, which is the same class of
+    # silent divergence this factory exists to prevent.
+    misplaced = sorted(
+        {"resource_suffix", "enable_rate_limiting"} & plugin_config.model_fields_set
+    )
+    if misplaced:
+        msg = (
+            f"{misplaced} belong to a variant, not to the shared config passed "
+            "to ol_apisix_shared_plugins_variants; set them on each "
+            "OLApisixSharedPluginsVariant instead."
+        )
+        raise ValueError(msg)
+    suffixes = [variant.resource_suffix for variant in variants]
+    if len(set(suffixes)) != len(suffixes):
+        msg = (
+            "Shared plugin variants on one host need distinct resource_suffix "
+            f"values; got {suffixes}. Both CRDs would otherwise be created "
+            "under the same metadata.name and the second would win."
+        )
+        raise ValueError(msg)
+    return {
+        variant.resource_suffix: OLApisixSharedPlugins(
+            variant.name,
+            # Shallow by design: every variant shares one ``plugins`` list
+            # object, which is the point. Safe because OLApisixSharedPlugins
+            # only reads that list -- it builds its own output list and
+            # model_dumps each entry. A caller that mutates plugin_config.plugins
+            # after this call would change every variant at once.
+            # ``update`` bypasses validation, so only values that have already
+            # been validated on OLApisixSharedPluginsVariant may go in it.
+            plugin_config=plugin_config.model_copy(
+                update={
+                    "resource_suffix": variant.resource_suffix,
+                    "enable_rate_limiting": variant.enable_rate_limiting,
+                }
+            ),
+            opts=opts,
+        )
+        for variant in variants
+    }
 
 
 class OLApisixExternalUpstreamConfig(BaseModel):

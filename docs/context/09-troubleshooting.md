@@ -44,13 +44,12 @@ mypy src/ | diff - baseline.txt
 uv run ruff check --fix src/
 ```
 
-### Issue: pre-commit hook `hadolint-docker` fails with existing Docker warnings
-**Solution:** Ignore hadolint failures if your changes don't affect Dockerfiles. These are pre-existing issues.
+### Issue: hook `hadolint-docker` fails on a Dockerfile you changed
+**Solution:** Fix the finding, or add a `# hadolint ignore=<rule>` comment above the instruction when the rule does not apply. The hook passes on `main`, and CI runs it as the `prek` check.
 
-To skip hadolint during development:
+To skip one hook locally while you work on something else:
 ```bash
-# Skip pre-commit hooks
-git commit --no-verify
+SKIP=hadolint-docker git commit
 ```
 
 ### Issue: Code format changed unexpectedly
@@ -268,8 +267,8 @@ pulumi stack output --json
 # mypy takes 75+ seconds
 uv run mypy src/  # Budget 120s
 
-# Pre-commit may take 2+ minutes
-uv run pre-commit run --all-files  # Budget 180s
+# prek runs every hook; budget more on a cold cache
+uv run prek run --all-files  # Budget 180s
 
 # Integration tests can take 5+ minutes
 uv run pytest tests/integration/ -v  # Budget 300s

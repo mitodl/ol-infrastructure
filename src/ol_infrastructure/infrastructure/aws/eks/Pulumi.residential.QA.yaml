@@ -39,10 +39,14 @@ config:
         ol.mit.edu/core_node: true
         ol.mit.edu/gpu_node: false
       node_group_options: {}
+      # 4 (as in CI and Production), not 3: the ASG spans 4 AZs, so at
+      # desired=3 one AZ has no core node, and the Meilisearch and Typesense
+      # pods whose EBS volumes live there cannot schedule (us-east-1a after the
+      # 2026-10-09 instance refresh).
       scaling:
-        desired: 3
+        desired: 4
         max: 6
-        min: 3
+        min: 4
       tags:
         cluster: residential-qa
       taints: {}

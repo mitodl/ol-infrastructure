@@ -34,11 +34,11 @@ PR #5400 has since removed — see §0.4.
 
 | Analysis finding | Status on 2026-08-17 |
 |---|---|
-| §5.6 six routes UI-managed, ~51 rules unmanaged | **Closed.** PR #5218 adopted the Service Routes; all **12** routes are now `rootly.AlertRoute` resources in `saas/rootly/__main__.py`, `sh-test` included |
+| §5.6 six routes UI-managed, ~51 rules unmanaged | **Closed.** PR #5218 adopted the Service Routes; all **12** routes became `rootly.AlertRoute` resources in `saas/rootly/__main__.py`, `sh-test` included. 10 remain after the Grafana Service Route (#5819) and `sh-test` were deleted |
 | §5.2 QA/CI Slack diversion inert | **Open.** Both fallback rules still `enabled: false`; `pulumi_rootly`'s `AlertRouteRuleArgs` has no `enabled` field, so this is unmanageable from Pulumi (remediation spec W0) |
 | §5.2 Low urgency pages like High | **Closed.** PR #5354 added `escalation_path_defer_low_urgency_off_hours` (`__main__.py:729`); PR #5377 added `escalation_path_medium_urgency_slack_only` (`:758`) routing Medium and Low to `#devops-warnings` |
 | §5.7 `Cloudwatch - Critical` `setup_incomplete` | **Open.** Still `setup_incomplete` live |
-| §5.7 `exampleDeleteMe-EscalationPolicy` | **Open.** Still declared at `__main__.py:538` |
+| §5.7 `exampleDeleteMe-EscalationPolicy` | **Closed 2026-10-06.** Unprotected by #6223, then removed from the stack along with the `sh-test` route |
 | §4.4 11-entry alertname demotion allowlist | **Unchanged.** All 12 urgency rules present on source `90cda8ea`, created 2026-07-20, none since |
 | §1 kube-state-metrics exports no labels | **Unchanged.** `clusterMetrics` and `telemetryServices["kube-state-metrics"]` in `substructure/aws/eks/grafana.py:379,501` carry no label configuration |
 | §3.2 schema defects | **Unchanged.** `Component` still four members; `product`/`application`/`component` still only on `K8sAppLabels`; `Services.learn_ai` still a tuple; `BusinessUnit.residential_staging` still present |
@@ -360,9 +360,9 @@ explicit.
 |---|---|---|---|
 | 1 | Enable the two disabled CI/QA route fallback rules (route `691913ad` rule `1e552e8f`; route `588edbfc` rule `53e8784f`) | remediation W0 | **open** — UI-only; `AlertRouteRuleArgs` has no `enabled` field |
 | 1a | CI source default urgency High → Low (`__main__.py:3013`) | remediation W2a | **open** |
-| 1b | `QA Non-Paging Escalation Policy` (`d63b7456`) has one service and zero levels — those CloudWatch alarms notify nobody | this project | **open** — delete the policy and move `MITx Online QA - Open edX - Redis` onto `CI/QA Slack Notifications` |
+| 1b | `QA Non-Paging Escalation Policy` (`d63b7456`) had one service and zero levels, so those CloudWatch alarms notified nobody | this project | **closed** 2026-10-07 — the policy and its service `MITx Online QA - Open edX - Redis` (`cc36d725`) are deleted; `mitx_qa_elasticache_route_rule` sends the mitx-qa ElastiCache alarms to `CI/QA Slack Notifications` |
 | 1c | Account-wide "default alerts channel" toggle posts every alert to `#devops-alerts` regardless of routing (`__main__.py:513-521`) | this project | **open** — until this is off, the CI/QA separation has no observable effect |
-| 2 | Delete `exampleDeleteMe-EscalationPolicy` (`__main__.py:538`); finish `Cloudwatch - Critical` source setup | this project | **open** |
+| 2 | Delete `exampleDeleteMe-EscalationPolicy` (done 2026-10-06, with `sh-test`); finish `Cloudwatch - Critical` source setup | this project | **open** (`Cloudwatch - Critical` only) |
 | 3 | Three dead `component` rules in the Grafana Service Route | this project | **re-specified and promoted** — *move* to the Grafana Production Service Route, don't repair in place; two of the three match live payloads **today** (§0.4), so this is step **P1.5**, not a Phase 3 item. Delete the now-inert Grafana Service Route with them |
 | 4 | Import the six unmanaged alert routes | — | **closed** by PR #5218 |
 | 5 | Low urgency pages like High | — | **closed** by PRs #5354, #5377 |
@@ -594,6 +594,162 @@ carrying `service` alone before. The remaining 48 are APISIX (2), the Grafana
 Keycloak (2) and the 7 already-`service`-labeled application workloads, which need
 `component` and `alert_tier` added at their own call sites.
 
+#### 3.3.2 [2026-10-06] `OLApplicationK8s` selects on its whole label set
+
+The same selector trap as §3.3.1, in our own component. Every Deployment
+`OLApplicationK8s` creates for the webapp, each celery worker and beat uses one dict
+for `spec.selector.matchLabels` and the pod template, and that dict starts from the
+caller's `k8s_global_labels`. Setting `alert_tier` on the
+`K8sAppLabels` an application stack builds would therefore change an immutable selector
+and delete-and-recreate the webapp of each of the ten stacks that use the component.
+
+The tier is set by the component instead, on the pod template and the Deployment
+metadata only: `webapp_alert_tier` (default `page`) and `celery_alert_tier` (default
+`notify`, workers and beat, per analysis §7.5). The config rejects an
+`ol.mit.edu/alert_tier` key in `k8s_global_labels`. `pulumi preview` on
+`mit_learn` `Production`: five Deployments updated in place, none replaced.
+
+Not covered by this: beat keeps `component=celery` (it is in beat's selector, so
+moving it to `Component.beat` is a replacement), and scheduled-job, pre/post-deploy
+Job and dev-shell pods carry no tier. edxapp uses the component for the LMS and CMS
+webapps only. Its celery and beat Deployments are built by hand in
+`edxapp/k8s_resources.py` and still need a tier there.
+
+#### 3.3.3 [2026-10-06] `k8s-monitoring` labels nine workloads per cluster from one release
+
+The Grafana `k8s-monitoring` chart (4.5.2) installs nine workloads in the `grafana`
+namespace of every QA and Production cluster, and each subchart takes its labels under
+a different key. Verified the same way as §3.3.1: render with a sentinel under each
+candidate key, then check every object with a `spec.selector`.
+
+| Workload | Key that reaches the pod | Also on the workload object |
+|---|---|---|
+| five Alloy collectors (`alloy-metrics`, `-logs`, `-receiver`, `-singleton`, the tail sampler) | `collectorCommon.alloy.controller.podLabels` | `collectorCommon.alloy.controller.extraLabels` |
+| `kube-state-metrics` | `telemetryServices.kube-state-metrics.customLabels` | same key, and its Service, ServiceAccount and RBAC objects |
+| `opencost` | `telemetryServices.opencost.podLabels` | `telemetryServices.opencost.commonLabels`, which also reaches its Service, ServiceAccount and RBAC objects |
+| `kepler` | `telemetryServices.kepler.podLabels` | none |
+| `alloy-operator` | `alloy-operator.podLabels` | none |
+
+The collectors are not rendered by this chart. It emits `Alloy` custom resources and
+the operator renders the `alloy` chart (1.12.1) from each one's spec, so the second
+hop was checked against that chart for all three controller types: `extraLabels` lands
+on the workload metadata and `podLabels` on the pod template, and neither is in the
+selector or a `volumeClaimTemplate`.
+
+All nine share `service=grafana-k8s-monitoring`. The collectors, kube-state-metrics and
+the operator are tier `notify`: losing one blinds alerting for that cluster without
+taking anything user-facing down. `opencost` and `kepler` are `ticket`, the same call
+as the Vantage agent. `kepler` and `alloy-operator` carry the labels on the pod only,
+so they join through `kube_pod_labels` and not through the workload-level series.
+
+#### 3.3.4 [2026-10-07] Dagster: a code location and its run workers share one label set
+
+The `dagster` namespace was the largest untiered block in production: 117 pods on
+`data-production`, 97 of them Job-owned run workers carrying no `ol.mit.edu` label at
+all. Keys verified by rendering charts `dagster` and `dagster-user-deployments` 1.13.25
+with a sentinel:
+
+| Workload | Key that reaches the pod | Also on the workload object |
+|---|---|---|
+| webserver | `dagsterWebserver.labels` | `dagsterWebserver.deploymentLabels` |
+| daemon | `dagsterDaemon.labels` | `dagsterDaemon.deploymentLabels` |
+| each code location | `deployments[].labels` | same key |
+| run workers | the launching code location's `deployments[].labels` | same, on the Job |
+
+None of them reaches a selector. The last row is the constraint: the user-deployments
+chart copies a code location's `labels` into `DAGSTER_CLI_API_GRPC_CONTAINER_CONTEXT`,
+and `dagster_k8s` applies them to the Job and pod of every run that location launches,
+with the code location's value winning over the run launcher's. The chart has no
+run-only labels key, so a code server and its run workers share one `component` and
+`alert_tier`, and both are `component=worker`. A single job can still override its own
+run pods through a `dagster-k8s/config` tag, which is merged after the code location's
+context.
+
+Everything in the stack is tier `notify`, including pgbouncer and the SQL exporter,
+which the stack builds by hand.
+
+#### 3.3.5 [2026-10-07] JupyterHub: six keys, pod-only, and the tier differs per hub
+
+Two stacks install chart `jupyterhub` 4.4.2: `applications/jupyterhub` (course
+notebooks, namespaces `jupyter` and `jupyter-authoring`) and
+`applications/jupyterhub_data` (analyst notebooks, `jupyter-data`). No pod in the
+three namespaces carried a tier on 2026-10-07; the count moves with user servers and
+per-node image pullers (45 to 53 on `applications-production` that day). Keys
+verified by rendering the chart with a sentinel:
+
+| Workload | Key | Component | Tier |
+|---|---|---|---|
+| hub | `hub.labels` | `webapp` | per stack |
+| proxy | `proxy.labels` | `gateway` | per stack |
+| user-scheduler | `scheduling.userScheduler.labels` | `controller` | `notify` |
+| user servers | `singleuser.extraLabels` | `worker` | `notify` |
+| user-placeholder | `scheduling.userPlaceholder.labels` | `worker` | `ticket` |
+| image pullers | `prePuller.labels` | `agent` | `ticket` |
+
+All six land on the pod only. The chart builds every selector, PodDisruptionBudget
+and NetworkPolicy from its own `component`/`app`/`release` labels and exposes no key
+for the workload object's metadata, so `kube_deployment_labels`,
+`kube_statefulset_labels` and `kube_daemonset_labels` will keep reporting these
+workloads untiered (the same gap as VPA and kepler). `singleuser.extraLabels` is
+not rendered into a manifest: it becomes `KubeSpawner.extra_labels`, so it reaches a
+user server when the hub next spawns it, not on apply. Helm merges it with the
+chart's default `hub.jupyter.org/network-access-hub` entry. The course hubs cull
+every server at `maxAge` 14400 s, so they converge within four hours. The analyst
+hub sets `maxAge: 0` and culls only after four idle hours, so a server in steady use
+keeps its unlabeled pod indefinitely: check that namespace for empty-tier pods before
+the `group_left` rewrite, and restart the stragglers.
+
+Each key carries the stack's whole label set, with `component` and `alert_tier`
+added. The image puller is enabled only on the learner hub, and the analyst hub's
+placeholder StatefulSet runs zero replicas.
+
+Applying a label change restarts the hub and the proxy. Both are single-replica
+`Recreate` Deployments, and replacing the proxy pod drops every open notebook
+connection on that hub.
+
+The hub and proxy are the two workloads whose loss takes the service down for every
+user, and their tier is the stack's: `page` for the course hubs, `notify` for the
+analyst hub. `lib/jupyterhub_config.jupyterhub_workload_labels` holds the mapping for
+both stacks.
+
+#### 3.3.6 [2026-10-13] Five data-platform charts, and a subchart that puts pod labels in a volume claim
+
+Airbyte, Superset, Gravitino, OpenMetadata and Opik had 25 to 27 untiered pods on
+`data-production` on 2026-10-13 (the count moves with Job pods). The first four already passed the stack's labels to
+the chart, so their pods carried `service` and no `component` or `alert_tier`. Opik
+passed nothing. Keys verified by rendering each chart at its pinned version with a
+sentinel and checking every `spec.selector` and `volumeClaimTemplates`:
+
+| Chart (pinned version) | Key that reaches the pod | Also on the workload object |
+|---|---|---|
+| `airbyte` 2.4.0 | `<component>.podLabels`, one per Deployment | none |
+| `superset` 0.22.8 | `supersetNode` / `supersetWorker` / `supersetCeleryBeat` / `supersetMcp` `.podLabels` | `.deploymentLabels`, rendered for node and worker only |
+| `gravitino-helm` 1.3.11 | `podLabels` | none |
+| `openmetadata` 2.0.5 | `commonLabels` | same key |
+| `opik` 2.2.96 | `commonLabels` for backend, python-backend and frontend, `mysql.primary.podLabels`, `minio.podLabels` | `commonLabels` only |
+
+Everything is tier `notify`: these are internal tools and pipelines, and an outage is
+late data or a BI tool being down in working hours.
+
+Three things the render showed.
+
+1. **A shared key gets the tier and no component.** OpenMetadata's `commonLabels` is
+   its only label key and reaches the server pods, both CronJobs' pods and the OMJob
+   operator Deployment's metadata. Opik's reaches three Deployments with three roles.
+   Neither carries `component`, the rule `cluster_addon_labels` already states.
+   `K8sGlobalLabels.workload_labels` takes the component as optional for this.
+2. **Opik's bundled Redis cannot be labeled.** The subchart copies `redis.podLabels`
+   into the StatefulSet's `volumeClaimTemplates`, which is as immutable as a
+   selector. `opik-redis-master` stays untiered until it is patched or the subchart
+   changes. A selector check alone would have passed this.
+3. **Pods the chart does not render stay unlabeled.** The OMJob operator's pod
+   template takes no labels, and the ingestion pods it launches (owner kind `OMJob`)
+   and the sync pods Airbyte's workload launcher creates are built at runtime.
+   Airbyte's bootloader is a bare Pod and keeps the stack labels without a tier.
+
+The Gravitino posture and reconcile CronJobs and the schema Job are not tiered here:
+§3.5 counts Deployments, StatefulSets and DaemonSets.
+
 Also backfill CI/QA clusters, which the analysis explicitly did not measure. Coverage
 there does not affect paging (CI/QA alerts go Slack-only per §8.1) but an unlabeled QA
 workload routes as untier-ed, so the QA stack stops being a rehearsal for the
@@ -734,21 +890,35 @@ and pay for the ~2,000 series. Cost is the lesser risk here.
 
 where `_OL_LABEL_KEYS = "ol.mit.edu/service,ol.mit.edu/component,ol.mit.edu/alert_tier,ol.mit.edu/environment"`.
 
+**[2026-10-06] As implemented, two differences from the sketch above.**
+
+1. **No Dagster drop rule.** §0.6 sized `data-production` at 2,004 of 2,606 live
+   production pods. Re-measured from `kube_pod_info`: 160 of 985 live, and over 24h
+   `dagster-(run|step)-*` pods were 1,077 of 13,862 distinct production pods (8%).
+   `applications-production` is where the churn is (11,275 distinct pods in 24h, mostly
+   DaemonSet pods following node turnover). The rule would save 8% of the new series and
+   leave run pods with no right-hand series, which silences `PodOOMKilled*` for them
+   once §4.2 lands. `kube_pod_labels` churns one for one with `kube_pod_info`, which is
+   already paid for.
+2. **`includeMetrics` needs two entries, not five.** In chart 4.5.2 the default
+   allow-list keeps `kube_job.*`, `kube_statefulset.*` and `kube_daemonset.*` whole.
+   Only `kube_deployment_labels` (added by #6103) and `kube_pod_labels` are missing
+   from it.
+
+The verification queries below are edited to match: `count(kube_pod_labels)` should
+equal `count(kube_pod_info)`, and the Dagster scoping check is gone with the rule.
+
 **Verification, before touching any alert rule:**
 
 ```
-count(kube_pod_labels)                                    → ~600  (2,606 minus dagster run pods)
+count(kube_pod_labels)                                    → equals count(kube_pod_info)
 count(kube_deployment_labels)                             → >0
+count(kube_statefulset_labels), count(kube_daemonset_labels)  → >0
 count(kube_pod_labels{label_ol_mit_edu_alert_tier!=""})    → matches §3.5 coverage
 count(kube_node_labels{label_topology_kubernetes_io_zone!=""})  → unchanged from today
-count(kube_pod_labels{namespace="dagster"})               → >0, and covers the daemon,
-                                                             webserver and code-location
-                                                             pods but no dagster-run-* pod
 ```
 
-The fourth is the regression check for the `nodes=[...]` trap in §0.3; the fifth is the
-regression check for the drop rule's scoping — a zero there means the rule is matching
-the whole namespace and would silence Dagster's long-lived services.
+The last is the regression check for the `nodes=[...]` trap in §0.3.
 
 ### 4.2 Rewrite the 16 joinable rules
 
@@ -865,7 +1035,7 @@ rules against both. Renaming is cleaner and is a one-line change in
 as the rule move, not later.
 
 Ordering caution, unchanged from analysis §4.3: conditions are `contains`, so the
-narrow rules must precede the broad ones. Now that all 12 routes are in Pulumi
+narrow rules must precede the broad ones. Now that every route is in Pulumi
 (#5218), rule position is reviewable in a diff — which is the first time this
 hand-maintained invariant has been visible at all.
 
@@ -894,7 +1064,7 @@ hand-maintained invariant has been visible at all.
 | P1.1 Enable the two CI/QA route rules (UI) | — | minutes |
 | P1.2 CI source urgency High → Low | — | small |
 | P1.3 Turn off the account-wide default alerts channel | P1.1 | small |
-| P1.4 Delete `exampleDeleteMe`, fix `QA Non-Paging`, finish `Cloudwatch - Critical` | — | small |
+| P1.4 Delete `exampleDeleteMe` (done 2026-10-06), fix `QA Non-Paging` (deleted 2026-10-07), finish `Cloudwatch - Critical` | — | small |
 | **P1.5 Move the 2 live `component` rules to the Production Service Route; delete the inert Grafana Service Route** | — | **small — reaches 2 orphaned services today (§0.4)** |
 | P2.A Extend `Component` + tighten the type; retype `_Check.component`; enum hygiene | — | small |
 | P2.B Add `AlertTier`; move roll-up fields to base; explicit `environment` | P2.A | small |

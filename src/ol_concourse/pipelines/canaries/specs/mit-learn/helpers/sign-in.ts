@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test"
+import { expect, type Locator, type Page } from "@playwright/test"
 import { existsSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -45,6 +45,17 @@ async function rejectionMessage(page: Page): Promise<string | null> {
   return (await message.innerText()).trim()
 }
 
+/** A Keycloak screen, filled in and about to be submitted. */
+export type SignInScreen = "email" | "password"
+
+/**
+ * Called on each Keycloak screen after it is filled and before it is submitted,
+ * with the locators that show the credential. Only the documentation capture in
+ * ../../../docs/capture/ passes one, to screenshot the screens with those
+ * locators masked; the canaries never do.
+ */
+export type OnSignInScreen = (screen: SignInScreen, sensitive: Locator[]) => Promise<void>
+
 /**
  * Drive the real MIT Learn login, from the homepage through Keycloak.
  *
@@ -52,7 +63,7 @@ async function rejectionMessage(page: Page): Promise<string | null> {
  * is identity-first, so an account it does not recognise is never answered with
  * a login error — the browser is simply sent somewhere else. See ../README.md.
  */
-export async function signIn(page: Page): Promise<void> {
+export async function signIn(page: Page, onScreen?: OnSignInScreen): Promise<void> {
   if (existsSync(REJECTED_CREDENTIAL_MARKER)) {
     throw new Error(
       "Refusing to re-submit a credential Keycloak already rejected in this run. " +
@@ -76,7 +87,9 @@ export async function signIn(page: Page): Promise<void> {
 
   const identityProvider = new URL(page.url()).origin
   const emailScreen = page.url()
-  await page.getByLabel("Email", { exact: true }).fill(email)
+  const emailField = page.getByLabel("Email", { exact: true })
+  await emailField.fill(email)
+  await onScreen?.("email", [emailField])
   await page.getByRole("button", { name: "Next", exact: true }).click()
   await page.waitForURL((url) => url.href !== emailScreen, { timeout: REDIRECT_TIMEOUT })
 
@@ -100,7 +113,9 @@ export async function signIn(page: Page): Promise<void> {
     )
   }
 
-  await page.getByLabel("Password", { exact: true }).fill(password)
+  const passwordField = page.getByLabel("Password", { exact: true })
+  await passwordField.fill(password)
+  await onScreen?.("password", [passwordField, page.getByText(email)])
   await page.getByRole("button", { name: "Next", exact: true }).click()
   try {
     await page.waitForURL((url) => url.origin === applicationOrigin, {

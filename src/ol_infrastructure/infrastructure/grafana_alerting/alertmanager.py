@@ -162,6 +162,13 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             # per rule -- and, once promoted past `channel=devops-warnings`,
             # one Rootly incident per rule instead of one per service.
             "service_name",
+            # And for metric_rules/clickhouse.py, whose server rules aggregate
+            # `by (cluster, namespace, hostname)` off the operator exporter.
+            # Every replica shares one namespace, and those series are scraped
+            # from the single exporter pod, so `hostname` is the only label
+            # that tells replicas apart. Without it, two replicas going
+            # read-only at once would arrive as a single notification.
+            "hostname",
             # Same reasoning once more for metric_rules/eks_general.py's
             # WorkloadJobFailed*, which aggregate `sum by (cluster, namespace,
             # workload)` -- `workload` is the owning CronJob for a scheduled Job
@@ -178,6 +185,21 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             # erroring at once in the same namespace would collapse into one
             # notification group.
             "component_id",
+            # metric_rules/apisix_edge.py's APISIXEdgeRateLimited aggregates
+            # `by (matched_host, route)`. A host can carry several rate-limited
+            # route groups (api.learn's browser and API rules), so without this
+            # label rejections on two routes of one host would arrive as one
+            # notification group.
+            "route",
+            # metric_rules/dagster_control_plane.py aggregates its daemon
+            # heartbeat rules by `daemon_type`, its tick-failure rules by
+            # `tick_type` and its ID-window rule by `relation`. Without these, a
+            # SENSOR daemon going stale while SCHEDULER already is lands in the
+            # same group, and Rootly's groupKey dedup folds it into the open
+            # alert instead of raising it.
+            "daemon_type",
+            "tick_type",
+            "relation",
         ],
         # "1m", not "60s" — Grafana normalizes durations to the largest unit and
         # a mismatched spelling shows as a perpetual diff on every preview.

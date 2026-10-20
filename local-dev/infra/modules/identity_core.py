@@ -14,7 +14,9 @@ from dataclasses import dataclass
 import pulumi_kubernetes as k8s
 import requests
 import yaml as pyyaml
-from pulumi import ResourceOptions
+from pulumi import Alias, ResourceOptions
+
+from ol_infrastructure.lib.k8s_crds import keycloak_operator_crd_urls
 
 
 @dataclass
@@ -34,12 +36,20 @@ def create_identity_core(  # noqa: PLR0913
     apisix_release: k8s.helm.v3.Release,
     tls_secret: k8s.core.v1.Secret,
     keycloak_operator_version: str,
+    keycloak_image: str,
     keycloak_hostname: str,
     keycloak_url: str,  # noqa: ARG001
     root_domain: str,  # noqa: ARG001
     db_cluster: k8s.apiextensions.CustomResource,
 ) -> IdentityCoreResources:
-    """Deploy Keycloak operator, instance, and routes (no realm)."""
+    """Deploy Keycloak operator, instance, and routes (no realm).
+
+    ``keycloak_image`` must be a pre-built (``kc.sh build`` already run) image
+    with the OL theme and SPI jars in ``/opt/keycloak/providers``; the instance
+    starts it with ``--optimized``. Any image built from
+    ``local-dev/keycloak/Dockerfile`` qualifies, as does the published
+    ``mitodl/keycloak`` the core stack defaults to.
+    """
     kc_base = (
         "https://raw.githubusercontent.com/keycloak/"
         f"keycloak-k8s-resources/{keycloak_operator_version}/kubernetes"
@@ -48,10 +58,7 @@ def create_identity_core(  # noqa: PLR0913
     # CRDs first — cluster-scoped, no namespace patching needed.
     operator_crds = k8s.yaml.v2.ConfigGroup(
         "keycloak-operator-crds",
-        files=[
-            f"{kc_base}/keycloaks.k8s.keycloak.org-v1.yml",
-            f"{kc_base}/keycloakrealmimports.k8s.keycloak.org-v1.yml",
-        ],
+        files=keycloak_operator_crd_urls(kc_base),
         opts=_k8s(parent=local_infra_ns, delete_before_replace=False),
     )
 
@@ -97,7 +104,7 @@ def create_identity_core(  # noqa: PLR0913
     # the Keycloak instance.
     instance = k8s.apiextensions.CustomResource(
         "keycloak-instance",
-        api_version="k8s.keycloak.org/v2alpha1",
+        api_version="k8s.keycloak.org/v2beta1",
         kind="Keycloak",
         metadata={
             "name": "keycloak",
@@ -105,10 +112,7 @@ def create_identity_core(  # noqa: PLR0913
         },
         spec={
             "instances": 1,
-            "image": (
-                "mitodl/keycloak"
-                "@sha256:4475afe3c385da6bd240a4a2811fa1231dd3365497ca78c017327c7c4e0ea1e2"
-            ),
+            "image": keycloak_image,
             # The image is pre-built (kc.sh build was run during Docker build).
             # startOptimized=True uses that build; False would re-run kc.sh build
             # on every pod start (slow). The image already has organization baked
@@ -190,33 +194,22 @@ def create_identity_core(  # noqa: PLR0913
             "resources": {
                 "limits": {"memory": "2Gi"},
             },
-            "unsupported": {
-                "podTemplate": {
-                    "spec": {
-                        "containers": [
-                            {
-                                "env": [
-                                    # Image has OTel compiled in at build time.
-                                    # Without a receiver, SDK init timeouts
-                                    # destabilise the pod.
-                                    {
-                                        "name": "OTEL_SDK_DISABLED",
-                                        "value": "true",
-                                    },
-                                    {
-                                        "name": "KC_HOSTNAME_STRICT",
-                                        "value": "false",
-                                    },
-                                ],
-                            }
-                        ]
-                    }
-                }
-            },
+            "env": [
+                # Image has OTel compiled in at build time. Without a
+                # receiver, SDK init timeouts destabilise the pod.
+                {"name": "OTEL_SDK_DISABLED", "value": "true"},
+                {"name": "KC_HOSTNAME_STRICT", "value": "false"},
+            ],
         },
         opts=_k8s(
             parent=local_infra_ns,
             depends_on=[operator, admin_secret, db_cluster],
+        ).merge(
+            # Same CRD storage, so the apiVersion change is a state identity
+            # change only; without the alias Pulumi would replace the instance.
+            ResourceOptions(
+                aliases=[Alias(type_="kubernetes:k8s.keycloak.org/v2alpha1:Keycloak")]
+            )
         ),
     )
 

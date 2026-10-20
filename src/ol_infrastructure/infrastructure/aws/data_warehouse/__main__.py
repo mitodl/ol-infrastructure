@@ -13,7 +13,10 @@ from pulumi_aws import athena, glue, iam, s3
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.iam_helper import (
+    DATA_LAKE_STAGES,
+    UNREBUILDABLE_DATA_LAKE_STAGES,
     cross_environment_glue_denial,
+    data_lake_bucket_arns,
     data_lake_glue_resources,
     lint_iam_policy,
 )
@@ -37,17 +40,6 @@ aws_config = AWSBase(
     },
 )
 s3_kms_key = kms_stack.require_output("kms_s3_data_analytics_key")
-
-data_stages = (
-    "raw",
-    "staging",
-    "intermediate",
-    "mart",
-    "integrations",
-    "external",
-    "dimensional",
-    "reporting",
-)
 
 results_bucket_config = S3BucketConfig(
     bucket_name=f"ol-warehouse-results-{stack_info.env_suffix}",
@@ -142,7 +134,7 @@ data_landing_zone_bucket = OLBucket(
 )
 warehouse_buckets.append(data_landing_zone_bucket)
 warehouse_dbs = []
-for data_stage in data_stages:
+for data_stage in DATA_LAKE_STAGES:
     lake_storage_bucket = OLBucket(
         f"ol_data_lake_s3_bucket_{data_stage}",
         config=S3BucketConfig(
@@ -161,12 +153,15 @@ for data_stage in data_stages:
             # and is the current version. A noncurrent version exists only
             # because the key was already deleted or overwritten.
             #
-            # 90 days is the undelete window, not a reclaim horizon. The
-            # historical backlog is well past it (100% of sampled noncurrent
-            # bytes in staging, 90.6% in mart), but the dimensional layer
-            # rebuilds often enough that ~76% of its churn is younger than 90
-            # days and stays resident at steady state.
-            noncurrent_version_expiration_days=90,
+            # The window is the undelete window, not a reclaim horizon. Raw
+            # and history keep 90 days because nothing can rebuild them. Every
+            # other stage is dbt output that a rebuild from raw reproduces, and
+            # its full-rebuild churn keeps refilling the window: at 90 days
+            # mart and dimensional production held 33.6 and 30.3 TB of Standard
+            # storage against ~0.4 TB current each (2026-09-20).
+            noncurrent_version_expiration_days=(
+                90 if data_stage in UNREBUILDABLE_DATA_LAKE_STAGES else 30
+            ),
             server_side_encryption_enabled=True,
             kms_key_id=s3_kms_key["arn"],
             bucket_key_enabled=True,
@@ -292,20 +287,13 @@ query_engine_permissions: list[dict[str, str | list[str]]] = [
             "s3:ListBucketVersions",
             "s3:PutObject",
         ],
-        "Resource": [
-            f"arn:aws:s3:::ol-data-lake-{stage}-{stack_info.env_suffix}"
-            for stage in data_stages
-        ]
-        + [
-            f"arn:aws:s3:::ol-data-lake-{stage}-{stack_info.env_suffix}/*"
-            for stage in data_stages
-        ],
+        "Resource": data_lake_bucket_arns(stack_info.env_suffix),
     },
 ]
 
 # The cross-environment Deny deliberately does not belong in this document.
-# applications/starrocks attaches every environment's copy of this policy to
-# every StarRocks IRSA role so each instance can query both data lake catalogs.
+# applications/starrocks attaches more than one environment's copy of this
+# policy to a StarRocks IRSA role (production holds QA's, for the QA mirror).
 # A Deny embedded here travels onto those foreign principals: the QA copy landed
 # its "deny production" statement on the production role, where an explicit Deny
 # beat the Allow from the production copy attached alongside it, and production

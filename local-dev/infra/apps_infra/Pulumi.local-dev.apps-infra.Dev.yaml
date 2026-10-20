@@ -1,6 +1,7 @@
 ---
 config:
-  # Path to the kubeconfig for the k3d cluster.
+  # Path to a kubeconfig holding the k3d cluster as context `local-dev`; the
+  # provider always targets that context name.
   # Defaults to ${HOME}/.kube/config if not set.
   ol-local-dev-apps-infra:kubeconfig: ""
   # Domain configuration: unset on purpose. Pinning these here would override
@@ -11,4 +12,6 @@ config:
   ol-local-dev-apps-infra:learn_ai_client_secret: "local-dev-learn-ai-secret" # pragma: allowlist secret
   ol-local-dev-apps-infra:mitxonline_client_secret: "local-dev-mitxonline-secret" # pragma: allowlist secret
   ol-local-dev-apps-infra:unified_ecommerce_client_secret: "local-dev-unified-ecommerce-secret" # pragma: allowlist secret
+  ol-local-dev-apps-infra:ovs_client_secret: "local-dev-ovs-secret" # pragma: allowlist secret
+  ol-local-dev-apps-infra:ocw_studio_client_secret: "local-dev-ocw-studio-secret" # pragma: allowlist secret
 encryptionsalt: v1:PidwC1BukA0=:v1:fQSvxydFUaIrKsEE:C/DV/mn+diHPVUfZrl/5F5QXOYhEuw==

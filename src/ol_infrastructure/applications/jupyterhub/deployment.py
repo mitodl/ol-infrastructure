@@ -19,10 +19,12 @@ from ol_infrastructure.components.aws.eks import OLEKSTrustRole
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCVaultCredentials,
     OLApisixRoute,
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    oidc_gateway_pre_function_plugin,
     stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
@@ -53,6 +55,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
     service_trust_role: OLEKSTrustRole,
     application_labels: dict[str, str],
     k8s_global_labels: dict[str, str],
+    workload_labels: dict[str, dict[str, str]],
     extra_images: dict[str, dict[str, str]] | None = None,
     service_account_name: str | None = None,
 ) -> kubernetes.helm.v3.Release:
@@ -186,6 +189,28 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                 # host belongs to mit-learn, which clears it from its own
                 # routes.  Safe to delete once the old cookies have aged out.
                 stale_session_cookie_cleanup_plugin(),
+                # Two pre-openid-connect fixes, necessarily one plugin (APISIX
+                # allows a single serverless-pre-function per config).  The
+                # expired-authentication-session callbacks are the same ones
+                # api.learn and mitxonline see, at this host's much smaller
+                # volume (2/day).  The canonical-origin redirect matters more
+                # here than anywhere else: nb.learn and authoring.nb.learn are
+                # the two hosts Keycloak actually rejects today, 61 hits over
+                # 7 days between them, because they take direct plain-HTTP
+                # traffic that the `redirect` default plugin never gets to
+                # upgrade.
+                #
+                # Only this deployment's own cookie: MIT Learn's .learn.mit.edu
+                # session also reaches this host, but no route here reads it,
+                # so its presence says nothing about whether this login can
+                # succeed.
+                oidc_gateway_pre_function_plugin(
+                    session_cookie_names=[
+                        apisix_oidc_session_cookie_name(
+                            base_name, stack_info.env_suffix
+                        )
+                    ],
+                ),
             ],
         ),
     )
@@ -230,9 +255,11 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
             oidc_session_rolling_timeout=0,
             oidc_use_session_secret=True,
             oidc_scope="openid email",
-            vault_mount="secret-operations",
-            vault_path="sso/mitlearn",
-            vaultauth=vault_k8s_resources.auth_name,
+            credentials=OLApisixOIDCVaultCredentials(
+                mount="secret-operations",
+                path="sso/mitlearn",
+                vaultauth=vault_k8s_resources.auth_name,
+            ),
         ),
     )
 
@@ -301,6 +328,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     "users": True,
                 },
                 "proxy": {
+                    "labels": workload_labels["proxy"],
                     "service": {
                         "type": "NodePort",
                         "nodePorts": {
@@ -329,6 +357,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     "podPriority": {"enabled": True},
                     "userPlaceholder": {
                         "enabled": True,
+                        "labels": workload_labels["user_placeholder"],
                         "replicas": jupyterhub_deployment_config.get(
                             "user_placeholder_replicas"
                         )
@@ -336,6 +365,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     },
                     "userScheduler": {
                         "enabled": True,
+                        "labels": workload_labels["user_scheduler"],
                         # The chart leaves this unbounded by default; our
                         # 128Mi cap was too tight for a scheduler whose
                         # informer caches scale with total cluster object
@@ -353,6 +383,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     },
                 },
                 "hub": {
+                    "labels": workload_labels["hub"],
                     "db": {"type": "postgres"},
                     "extraEnv": [
                         {
@@ -415,8 +446,10 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
                     },
                     "pdb": {"enabled": True},
                 },
-                "prePuller": get_prepuller_config_for_images(extra_images_list),
+                "prePuller": get_prepuller_config_for_images(extra_images_list)
+                | {"labels": workload_labels["pre_puller"]},
                 "singleuser": {
+                    "extraLabels": workload_labels["singleuser"],
                     "serviceAccountName": service_account_name,
                     "extraFiles": {
                         "menu_override": {

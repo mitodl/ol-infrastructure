@@ -29,52 +29,17 @@ aws_config = AWSBase(tags={"OU": "operations", "Environment": "operations-produc
 
 ### SNS resources for severity-based alert notifications
 #
-# Phase 6 of https://github.com/mitodl/ol-infrastructure/issues/4828: these
-# topics are named `OpsGenie_*` because the org actually used OpsGenie when
-# they were created; the name was never updated after migrating to Rootly,
-# so it's stale history rather than a typo. Renaming an sns.Topic forces
-# replacement (new ARN), and every consumer across 16+ downstream app stacks
-# resolves the ARN dynamically via get_monitoring_sns_arn()'s StackReference
-# lookup rather than a hardcoded name/ARN, so deleting the old topics
-# immediately would silently break CloudWatch alarm notifications for any
-# stack not yet redeployed.
-#
-# So this adds new topics alongside the old ones (not a rename in place) and
-# repoints the shared export at them. Downstream stacks pick up the new ARN
-# the next time they redeploy on their own schedule -- no code changes
-# needed on their end, since none of them reference the topic by literal
-# name. The old OpsGenie_* topics are intentionally left defined here and
-# NOT deleted yet; do that as a separate follow-up once a live AWS check
-# (CloudWatch alarms' AlarmActions across all accounts/regions) confirms
-# nothing still references them.
+# Phase 6 of https://github.com/mitodl/ol-infrastructure/issues/4828: the
+# legacy OpsGenie_* topics (and the opsgenie_sns_topics export that pointed
+# at them) have been removed. See the merged history of this file for the
+# transition period -- new topics were added alongside the old ones, all
+# 16+ downstream app stacks were confirmed (via a live AWS CloudWatch check
+# on AlarmActions, not just a code grep) to have redeployed onto the new
+# notification_sns_topics export before this cleanup went in, so removing
+# the legacy topics here does not break anything.
 #
 # Named after the severity tier, not the destination service, so the next
 # notification-service change doesn't leave another stale vendor name behind.
-critical_sns_topic = sns.Topic(
-    "monitoring-critical-alerts-sns-topic",
-    name="OpsGenie_Critical_Notifications",
-    tags=aws_config.merged_tags({"Name": "Rootly Critical Notifications"}),
-)
-warning_sns_topic = sns.Topic(
-    "monitoring-warning-alerts-sns-topic",
-    name="OpsGenie_Warning_Notifications",
-    tags=aws_config.merged_tags({"Name": "Rootly Warning Notifications"}),
-)
-
-critical_top_webhook_subscription = sns.TopicSubscription(
-    "monitoring-critical-alerts-sns-topic-webhook-subscription",
-    endpoint=monitoring_config.require_secret("rootly_critical_webhook_url"),
-    protocol="https",
-    topic=critical_sns_topic.arn,
-)
-
-warning_topic_subscription = sns.TopicSubscription(
-    "monitoring-warning-alerts-sns-topic-subscription",
-    endpoint=monitoring_config.require_secret("rootly_warning_webhook_url"),
-    protocol="https",
-    topic=warning_sns_topic.arn,
-)
-
 critical_notifications_sns_topic = sns.Topic(
     "monitoring-critical-notifications-sns-topic",
     name="Critical_Notifications",
@@ -100,26 +65,6 @@ warning_notifications_webhook_subscription = sns.TopicSubscription(
     topic=warning_notifications_sns_topic.arn,
 )
 
-# Old export retained so any not-yet-redeployed downstream stack's
-# StackReference read still resolves during the transition; get_monitoring_sns_arn()
-# (lib/aws/monitoring_helper.py) falls back to this if notification_sns_topics
-# is absent. A repo-wide grep for "opsgenie_sns_topics" is NOT a sufficient
-# removal criterion by itself -- it only reflects checked-out code, not
-# deployed state. A stack can have zero code references to the old export
-# while its last-deployed CloudWatch alarms still have the old topic ARN
-# baked in, simply because it hasn't been redeployed since this change
-# merged. Before removing this export (and, later, the old topics
-# themselves), confirm via a live AWS check -- e.g. `aws cloudwatch
-# describe-alarms` across all accounts/regions, filtered for AlarmActions
-# matching the old OpsGenie_* topic ARNs -- that nothing still points at
-# them, not just that the source code has moved on.
-export(
-    "opsgenie_sns_topics",
-    {
-        "critical_sns_topic_arn": critical_sns_topic.arn,
-        "warning_sns_topic_arn": warning_sns_topic.arn,
-    },
-)
 export(
     "notification_sns_topics",
     {

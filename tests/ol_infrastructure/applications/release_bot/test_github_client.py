@@ -166,11 +166,17 @@ class _FakeGitCommit:
         self.author = _FakeAuthor(author_name, commit_date)
 
 
+class _FakeParent:
+    def __init__(self, sha):
+        self.sha = sha
+
+
 class _FakeCommit:
-    def __init__(self, sha, message, author_name, url):
+    def __init__(self, sha, message, author_name, url, parents=()):
         self.sha = sha
         self.commit = _FakeGitCommit(message, author_name)
         self.html_url = url
+        self.parents = [_FakeParent(parent) for parent in parents]
 
 
 class _FakeTag:
@@ -186,9 +192,12 @@ class _FakeBranch:
 
 
 class _FakeComparison:
-    def __init__(self, status, commits):
+    def __init__(self, status, commits, total_commits=None):
         self.status = status
         self.commits = commits
+        self.total_commits = (
+            len(commits or []) if total_commits is None else total_commits
+        )
 
 
 class _FakeIssue:
@@ -225,6 +234,7 @@ class _FakeDeployment:
         self.ref = ref
         self.sha = sha
         self.environment = environment
+        self.created_at = datetime(2026, 9, 2, 11, 0, tzinfo=UTC)
         self._statuses = statuses
 
     def get_statuses(self):
@@ -322,7 +332,7 @@ def test_commits_since_last_tag_uses_compare_when_a_tag_exists(fake_repo):
             ),
         )
     )
-    commits = github._commits_since_last_tag_sync("mitodl/thing")
+    commits = github._commits_since_last_tag_sync("mitodl/thing")["commits"]
     assert commits == [
         {
             "sha": "abc123",
@@ -333,16 +343,39 @@ def test_commits_since_last_tag_uses_compare_when_a_tag_exists(fake_repo):
     ]
 
 
-def test_commits_since_last_tag_diverged_comparison_returns_empty(fake_repo):
-    """A "diverged" comparison status returns no commits rather than erroring."""
+def test_commits_since_last_tag_lists_a_diverged_comparison(fake_repo):
+    """An in-flight hotfix's tag is off main, so the comparison diverges.
+
+    GitHub still lists main's commits since the merge base (live, 2026-10-09:
+    a diverged compare with ahead_by=71 listed all 71), and they are exactly
+    what the next release would carry -- so they must not read as nothing.
+    """
     fake_repo(
         _FakeRepo(
             tags=[_FakeTag("2026.07.01.1")],
-            comparison=_FakeComparison("diverged", None),
+            comparison=_FakeComparison(
+                "diverged",
+                [_FakeCommit("abc123", "fix: bug", "me", "https://x/abc123")],
+            ),
         )
     )
-    commits = github._commits_since_last_tag_sync("mitodl/thing")
-    assert commits == []
+    unreleased = github._commits_since_last_tag_sync("mitodl/thing")
+    assert [c["sha"] for c in unreleased["commits"]] == ["abc123"]
+    assert unreleased["omitted"] == 0
+
+
+def test_commits_since_last_tag_survives_an_empty_commit_message(fake_repo):
+    """Git allows an empty message; it must not take the whole reply down."""
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("2026.07.01.1")],
+            comparison=_FakeComparison(
+                "ahead", [_FakeCommit("abc123", "", "me", "https://x/abc123")]
+            ),
+        )
+    )
+    unreleased = github._commits_since_last_tag_sync("mitodl/thing")
+    assert [c["sha"] for c in unreleased["commits"]] == ["abc123"]
 
 
 def test_commits_since_last_tag_falls_back_to_commit_history_without_a_tag(fake_repo):
@@ -353,7 +386,7 @@ def test_commits_since_last_tag_falls_back_to_commit_history_without_a_tag(fake_
             commits=[_FakeCommit("def456", "chore: bump", "me", "https://x/def456")],
         )
     )
-    commits = github._commits_since_last_tag_sync("mitodl/thing")
+    commits = github._commits_since_last_tag_sync("mitodl/thing")["commits"]
     assert commits == [
         {
             "sha": "def456",
@@ -427,7 +460,7 @@ def test_release_tag_re_rejects_non_release_tags(tag):
     assert not github._RELEASE_TAG_RE.match(tag)
 
 
-def test_latest_release_tag_finds_unpadded_calver(fake_repo):
+def test_release_baseline_finds_unpadded_calver(fake_repo):
     """The regression that silently broke release notes.
 
     The pattern required zero-padded month and day, but the release resource
@@ -437,10 +470,10 @@ def test_latest_release_tag_finds_unpadded_calver(fake_repo):
     """
     repo = _FakeRepo(tags=[_FakeTag("2026.8.3.1"), _FakeTag("not-a-release-tag")])
     fake_repo(repo)
-    assert github._latest_release_tag(repo) == "2026.8.3.1"
+    assert github._release_baseline(repo) == "2026.8.3.1"
 
 
-def test_latest_release_tag_picks_highest_not_first(fake_repo):
+def test_release_baseline_picks_highest_not_first(fake_repo):
     """Tag order from the GitHub API is not documented to be chronological."""
     repo = _FakeRepo(
         tags=[
@@ -450,20 +483,58 @@ def test_latest_release_tag_picks_highest_not_first(fake_repo):
         ]
     )
     fake_repo(repo)
-    assert github._latest_release_tag(repo) == "2026.8.3.1"
+    assert github._release_baseline(repo) == "2026.8.3.1"
 
 
-def test_latest_release_tag_compares_numerically_not_lexically(fake_repo):
+def test_release_baseline_compares_numerically_not_lexically(fake_repo):
     """2026.8.3.1 is newer than 2026.12.1.1 lexically but older numerically."""
     repo = _FakeRepo(tags=[_FakeTag("2026.8.3.1"), _FakeTag("2026.12.1.1")])
     fake_repo(repo)
-    assert github._latest_release_tag(repo) == "2026.12.1.1"
+    assert github._release_baseline(repo) == "2026.12.1.1"
 
 
-def test_latest_release_tag_returns_none_without_release_tags(fake_repo):
-    repo = _FakeRepo(tags=[_FakeTag("v1.0.0")])
+def test_release_baseline_returns_none_without_release_tags(fake_repo):
+    repo = _FakeRepo(tags=[_FakeTag("not-a-release-tag"), _FakeTag("v1.0")])
     fake_repo(repo)
-    assert github._latest_release_tag(repo) is None
+    assert github._release_baseline(repo) is None
+
+
+def test_release_baseline_falls_back_to_the_highest_semver_tag(fake_repo):
+    """Before its first calver release, an app's baseline is its last semver tag.
+
+    The release resource does the same (semver_tag_fallback). Without it a
+    repo moving off the legacy pipeline reads as never released and the
+    preview lists its whole history.
+    """
+    repo = _FakeRepo(
+        tags=[_FakeTag("v0.9.2"), _FakeTag("v0.37.3"), _FakeTag("v0.37.1")]
+    )
+    fake_repo(repo)
+    assert github._release_baseline(repo) == "v0.37.3"
+
+
+def test_release_baseline_prefers_calver_over_a_higher_semver_tag(fake_repo):
+    """The fallback applies only until the first calver release exists."""
+    repo = _FakeRepo(tags=[_FakeTag("v99.0.0"), _FakeTag("2026.10.15.1")])
+    fake_repo(repo)
+    assert github._release_baseline(repo) == "2026.10.15.1"
+
+
+def test_release_preview_counts_from_the_semver_baseline(fake_repo, monkeypatch):
+    """The first calver release lists only the commits since the last semver tag."""
+    monkeypatch.setattr(github, "_in_flight_release_sync", lambda _slug: None)
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("v0.37.3"), _FakeTag("v0.37.2")],
+            comparison=_FakeComparison(
+                "ahead", [_FakeCommit("abc123", "fix: bug", "me", "https://x/abc123")]
+            ),
+        )
+    )
+    preview = github._release_preview_sync("mitodl/thing")
+    assert preview["since"] == "v0.37.3"
+    assert [c["sha"] for c in preview["commits"]] == ["abc123"]
+    assert preview["omitted"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -496,6 +567,255 @@ def test_next_release_version_ignores_other_days():
     )
 
 
+def test_commits_since_last_tag_counts_what_the_cap_left_out(fake_repo, monkeypatch):
+    """A release longer than the cap must say so, not under-report silently."""
+    monkeypatch.setattr(github, "_COMMIT_LIST_LIMIT", 2)
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("2026.8.3.1")],
+            comparison=_FakeComparison(
+                "ahead",
+                [
+                    _FakeCommit(sha, f"fix: {sha}", "dev", f"https://x/{sha}")
+                    for sha in ("aaa", "bbb", "ccc", "ddd", "eee")
+                ],
+            ),
+        )
+    )
+    unreleased = github._commits_since_last_tag_sync("mitodl/thing")
+    assert [c["sha"] for c in unreleased["commits"]] == ["aaa", "bbb"]
+    assert unreleased["omitted"] == 3
+
+
+def _merge_history():
+    """Micromasters since v0.254.0, as the compare API listed it on 2026-10-15."""
+    return [
+        _FakeCommit(
+            "0b10fcbe",
+            "fix(sentry): cap request bodies at 1KB (#5561)",
+            "dev",
+            "https://x/0b10fcbe",
+            parents=["f053061e"],
+        ),
+        _FakeCommit(
+            "321043c2",
+            "chore(release): track only the VERSION file in bumpversion",
+            "dev",
+            "https://x/321043c2",
+            parents=["0b10fcbe"],
+        ),
+        _FakeCommit(
+            "d88388e6",
+            "Merge pull request #5565 from mitodl/cpatti/bump\n\n"
+            "chore(release): track only the VERSION file in bumpversion",
+            "dev",
+            "https://x/d88388e6",
+            parents=["0b10fcbe", "321043c2"],
+        ),
+    ]
+
+
+def test_a_merged_pr_is_listed_once_not_with_the_commits_it_merged(fake_repo):
+    """The merge commit names the PR; the commit it merged would repeat it."""
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("v0.254.0")],
+            comparison=_FakeComparison("ahead", _merge_history()),
+        )
+    )
+    unreleased = github._commits_since_last_tag_sync("mitodl/thing")
+
+    assert [c["sha"] for c in unreleased["commits"]] == ["0b10fcbe", "d88388e6"]
+    assert [github.pull_request(c["message"])[0] for c in unreleased["commits"]] == [
+        5561,
+        5565,
+    ]
+    # Hiding a merged commit is not truncation.
+    assert unreleased["omitted"] == 0
+
+
+def test_a_merged_pr_hides_all_its_commits_but_not_what_main_had(fake_repo):
+    """A PR branch that merged main in carries main's commits; they stay."""
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("2026.10.1.1")],
+            comparison=_FakeComparison(
+                "ahead",
+                [
+                    _FakeCommit("m1", "fix: on main (#1)", "a", "u", ["base"]),
+                    _FakeCommit("b1", "feat: part one", "b", "u", ["base"]),
+                    _FakeCommit(
+                        "b2", "Merge branch 'main' into feat", "b", "u", ["b1", "m1"]
+                    ),
+                    _FakeCommit("b3", "feat: part two", "b", "u", ["b2"]),
+                    _FakeCommit(
+                        "pr",
+                        "Merge pull request #2 from mitodl/feat\n\nfeat: the thing",
+                        "b",
+                        "u",
+                        ["m1", "b3"],
+                    ),
+                ],
+            ),
+        )
+    )
+    unreleased = github._commits_since_last_tag_sync("mitodl/thing")
+
+    assert [c["sha"] for c in unreleased["commits"]] == ["m1", "pr"]
+
+
+def test_a_pr_syncing_main_into_a_branch_does_not_hide_main(fake_repo):
+    """A PR merge inside another PR's branch cannot hide what main already had."""
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("2026.10.1.1")],
+            comparison=_FakeComparison(
+                "ahead",
+                [
+                    _FakeCommit("m1", "fix: on main (#1)", "a", "u", ["base"]),
+                    _FakeCommit("b1", "feat: part one", "b", "u", ["base"]),
+                    _FakeCommit(
+                        "b2",
+                        "Merge pull request #3 from mitodl/main",
+                        "b",
+                        "u",
+                        ["b1", "m1"],
+                    ),
+                    _FakeCommit("b3", "feat: part two", "b", "u", ["b2"]),
+                    _FakeCommit(
+                        "pr",
+                        "Merge pull request #2 from mitodl/feat\n\nfeat: the thing",
+                        "b",
+                        "u",
+                        ["m1", "b3"],
+                    ),
+                ],
+            ),
+        )
+    )
+    unreleased = github._commits_since_last_tag_sync("mitodl/thing")
+
+    assert [c["sha"] for c in unreleased["commits"]] == ["m1", "pr"]
+
+
+def test_a_merge_without_a_pr_keeps_the_commits_it_merged(fake_repo):
+    """Its subject names a branch, not a change, so it cannot stand for them."""
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("2026.10.1.1")],
+            comparison=_FakeComparison(
+                "ahead",
+                [
+                    _FakeCommit("b1", "feat: thing", "b", "u", ["base"]),
+                    _FakeCommit("mg", "Merge branch 'feat'", "b", "u", ["base", "b1"]),
+                ],
+            ),
+        )
+    )
+    unreleased = github._commits_since_last_tag_sync("mitodl/thing")
+
+    assert [c["sha"] for c in unreleased["commits"]] == ["b1", "mg"]
+
+
+def test_commits_since_last_tag_omits_nothing_under_the_cap(fake_repo):
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("2026.8.3.1")],
+            comparison=_FakeComparison(
+                "ahead", [_FakeCommit("aaa", "fix: a", "dev", "https://x/aaa")]
+            ),
+        )
+    )
+    assert github._commits_since_last_tag_sync("mitodl/thing")["omitted"] == 0
+
+
+def test_commits_since_last_tag_without_a_tag_cannot_count_the_rest(
+    fake_repo, monkeypatch
+):
+    """With no release tag the range is all of history, so the rest is unknown."""
+    monkeypatch.setattr(github, "_COMMIT_LIST_LIMIT", 2)
+    fake_repo(
+        _FakeRepo(
+            tags=[],
+            commits=[
+                _FakeCommit(sha, f"fix: {sha}", "dev", f"https://x/{sha}")
+                for sha in ("aaa", "bbb", "ccc")
+            ],
+        )
+    )
+    unreleased = github._commits_since_last_tag_sync("mitodl/thing")
+    assert len(unreleased["commits"]) == 2
+    assert unreleased["omitted"] is None
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        ("feat(b2b): apply consent (#91)", (91, "feat(b2b): apply consent")),
+        ('Revert "fix: thing (#12)" (#15)', (15, 'Revert "fix: thing (#12)"')),
+        (
+            "Merge pull request #5565 from mitodl/cpatti/bump\n\nTrack VERSION",
+            (5565, "Track VERSION"),
+        ),
+        (
+            "Merge pull request #5565 from mitodl/cpatti/bump",
+            (5565, "Merge pull request #5565 from mitodl/cpatti/bump"),
+        ),
+        ("chore: bump things\n\nsee #12", (None, "chore: bump things")),
+        ("fix #12 in the middle", (None, "fix #12 in the middle")),
+        ("", (None, "")),
+    ],
+)
+def test_pull_request_reads_squash_and_merge_commits(message, expected):
+    assert github.pull_request(message) == expected
+
+
+def test_deployment_report_names_a_newer_failed_attempt(fake_repo):
+    fake_repo(
+        _FakeRepo(
+            deployments=[
+                _FakeDeployment(
+                    3, "2026.9.3.1", "RC", [_FakeDeploymentStatus("failure")], "ccc"
+                ),
+                _FakeDeployment(
+                    2, "2026.9.2.1", "RC", [_FakeDeploymentStatus("success")], "bbb"
+                ),
+            ]
+        )
+    )
+    report = github._deployment_report_sync("mitodl/thing", "RC")
+    assert report["success"]["version"] == "2026.9.2.1"
+    assert report["newer"]["version"] == "2026.9.3.1"
+    assert report["newer"]["state"] == "failure"
+
+
+def test_deployment_report_has_no_newer_when_the_newest_succeeded(fake_repo):
+    fake_repo(
+        _FakeRepo(
+            deployments=[
+                _FakeDeployment(
+                    2, "2026.9.2.1", "RC", [_FakeDeploymentStatus("success")]
+                ),
+                _FakeDeployment(1, "2026.9.1.1", "RC", []),
+            ]
+        )
+    )
+    report = github._deployment_report_sync("mitodl/thing", "RC")
+    assert report["success"]["version"] == "2026.9.2.1"
+    assert report["newer"] is None
+
+
+def test_deployment_report_with_no_success_still_reports_the_attempt(fake_repo):
+    fake_repo(
+        _FakeRepo(
+            deployments=[_FakeDeployment(1, "2026.9.1.1", "Production", [])],
+        )
+    )
+    report = github._deployment_report_sync("mitodl/thing", "Production")
+    assert report["success"] is None
+    assert report["newer"]["state"] == "no status"
+
+
 # ---------------------------------------------------------------------------
 # Release-machinery filtering
 # ---------------------------------------------------------------------------
@@ -523,7 +843,7 @@ def test_commits_since_last_tag_drops_release_machinery(fake_repo):
             ),
         )
     )
-    commits = github._commits_since_last_tag_sync("mitodl/thing")
+    commits = github._commits_since_last_tag_sync("mitodl/thing")["commits"]
     assert [c["message"] for c in commits] == ["fix: real work"]
 
 
@@ -543,8 +863,69 @@ def test_commits_since_last_tag_keeps_lookalike_subjects(fake_repo):
             ),
         )
     )
-    commits = github._commits_since_last_tag_sync("mitodl/thing")
+    commits = github._commits_since_last_tag_sync("mitodl/thing")["commits"]
     assert len(commits) == 2
+
+
+# ---------------------------------------------------------------------------
+# Hotfix requests
+# ---------------------------------------------------------------------------
+
+
+class _FakeRef:
+    def __init__(self, repo, ref):
+        self._repo = repo
+        self.ref = ref
+
+    def delete(self):
+        self._repo.refs.remove(self)
+
+
+class _RefsRepo:
+    """Just the git-refs slice of the API that hotfix requests use."""
+
+    def __init__(self, *names):
+        self.refs = [_FakeRef(self, name) for name in names]
+
+    def get_git_matching_refs(self, ref):
+        return [r for r in self.refs if r.ref.startswith(f"refs/{ref}")]
+
+    def create_git_ref(self, ref, sha):
+        assert ref == f"refs/tags/hotfix/{sha}"
+        self.refs.append(_FakeRef(self, ref))
+
+
+_HOTFIX_SHA = "a" * 40
+
+
+def test_pending_hotfix_requests_lists_the_requested_shas(fake_repo):
+    fake_repo(_RefsRepo(f"refs/tags/hotfix/{_HOTFIX_SHA}", "refs/tags/2026.9.1.1"))
+    assert github._pending_hotfix_requests_sync("mitodl/thing") == [_HOTFIX_SHA]
+
+
+def test_request_hotfix_names_the_tag_after_the_full_sha(fake_repo):
+    """The release resource deletes a request by exactly this name."""
+    repo = fake_repo(_RefsRepo())
+    github._request_hotfix_sync("mitodl/thing", _HOTFIX_SHA)
+    assert [r.ref for r in repo.refs] == [f"refs/tags/hotfix/{_HOTFIX_SHA}"]
+
+
+def test_cancel_hotfix_requests_deletes_only_requests(fake_repo):
+    repo = fake_repo(
+        _RefsRepo(f"refs/tags/hotfix/{_HOTFIX_SHA}", "refs/tags/2026.9.1.1")
+    )
+    assert github._cancel_hotfix_requests_sync("mitodl/thing") == [_HOTFIX_SHA]
+    assert [r.ref for r in repo.refs] == ["refs/tags/2026.9.1.1"]
+
+
+def test_hotfix_tags_not_named_for_a_full_sha_are_not_requests(fake_repo):
+    """The release resource ignores these, so they must not block releases here."""
+    repo = fake_repo(
+        _RefsRepo("refs/tags/hotfix/test", f"refs/tags/hotfix/{_HOTFIX_SHA[:7]}")
+    )
+    assert github._pending_hotfix_requests_sync("mitodl/thing") == []
+    assert github._cancel_hotfix_requests_sync("mitodl/thing") == []
+    assert len(repo.refs) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -636,7 +1017,7 @@ def test_release_tags_scans_the_whole_listing(fake_repo):
     tags.append(_FakeTag("2026.12.31.9"))
     repo = _FakeRepo(tags=tags)
     fake_repo(repo)
-    assert github._latest_release_tag(repo) == "2026.12.31.9"
+    assert github._release_baseline(repo) == "2026.12.31.9"
 
 
 def test_release_tags_warns_when_the_scan_cap_is_reached(
@@ -759,6 +1140,8 @@ def test_release_issue_for_version_matches_the_checklist_header(fake_repo):
     )
     issue = github._release_issue_for_version_sync("mitodl/thing", "2026.7.22.1")
     assert issue["number"] == 8
+    # The RC announcement reads the checklist from this to name who is outstanding.
+    assert issue["body"] == CHECKLIST_BODY
 
 
 def test_release_issue_for_version_finds_a_closed_issue(fake_repo):

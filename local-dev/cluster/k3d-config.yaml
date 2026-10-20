@@ -95,6 +95,14 @@ options:
       nodeFilters:
       - server:*
       - agent:*
+    # Once evicting, k3s holds the disk-pressure taint until a further 10%
+    # beyond the 5% threshold is free, so nothing schedules until 15% is.
+    # Let the taint clear just above the threshold instead. Same arg as
+    # lehrer's local-dev/k3d-config.yaml. Applies on cluster (re)create.
+    - arg: --kubelet-arg=eviction-minimum-reclaim=imagefs.available=1%,nodefs.available=1%
+      nodeFilters:
+      - server:*
+      - agent:*
 
 kubeAPI:
   hostIP: "0.0.0.0"

@@ -135,25 +135,34 @@ def open_drift_pr(
     """Commit, push, and open or update a pull request.
 
     Requires $GITHUB_APP_ID, $GITHUB_APP_INSTALLATION_ID, and
-    $GITHUB_APP_PRIVATE_KEY.
+    $GITHUB_APP_PRIVATE_KEY, or failing those a $GITHUB_TOKEN. The token is
+    for a local run (e.g. `bin/omnigraph-cutover-pr` passing `gh auth token`),
+    which acts as the person running it rather than the App.
     """
     app_id = os.environ.get("GITHUB_APP_ID")
     installation_id = os.environ.get("GITHUB_APP_INSTALLATION_ID")
     private_key = os.environ.get("GITHUB_APP_PRIVATE_KEY")
-    if not app_id or not installation_id or not private_key:
+    if app_id and installation_id and private_key:
+        token = _mint_installation_token(app_id, installation_id, private_key)
+    elif os.environ.get("GITHUB_TOKEN"):
+        token = os.environ["GITHUB_TOKEN"]
+    else:
         msg = (
             "GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, and "
-            "GITHUB_APP_PRIVATE_KEY must all be set to push and open a pull "
-            "request"
+            "GITHUB_APP_PRIVATE_KEY must all be set, or GITHUB_TOKEN, to push "
+            "and open a pull request"
         )
         raise SystemExit(msg)
-    token = _mint_installation_token(app_id, installation_id, private_key)
     # The credential helper below reads this from the environment.
     os.environ["GITHUB_TOKEN"] = token
 
     # Concourse checks the repo out as a different uid than the task runs as
-    # often enough that git's ownership check is worth pre-empting.
-    _git(repo_dir, "config", "--global", "--add", "safe.directory", str(repo_dir))
+    # often enough that git's ownership check is worth pre-empting. Only then:
+    # git's check passes for a checkout we own, and on a workstation the global
+    # config is the person's own ~/.gitconfig, which would otherwise collect a
+    # dead temp path per run.
+    if repo_dir.stat().st_uid != os.getuid():
+        _git(repo_dir, "config", "--global", "--add", "safe.directory", str(repo_dir))
 
     if not _git(repo_dir, "status", "--porcelain"):
         print("No drift: working tree is clean, nothing to propose.")
@@ -165,20 +174,22 @@ def open_drift_pr(
     _git(repo_dir, "add", "--all")
     _git(repo_dir, "commit", "--message", title)
 
-    if _remote_tree(repo_dir, branch) == _git(repo_dir, "rev-parse", "HEAD^{tree}"):
-        print(f"Drift unchanged since the last run on {branch}; not pushing.")
-        return
-
-    _git(
-        repo_dir,
-        "-c",
-        f"credential.helper={CREDENTIAL_HELPER}",
-        "push",
-        "--force",
-        f"https://github.com/{repo}",
-        f"HEAD:refs/heads/{branch}",
+    unchanged = _remote_tree(repo_dir, branch) == _git(
+        repo_dir, "rev-parse", "HEAD^{tree}"
     )
-    print(f"Pushed {branch}")
+    if unchanged:
+        print(f"Drift unchanged since the last run on {branch}; not pushing.")
+    else:
+        _git(
+            repo_dir,
+            "-c",
+            f"credential.helper={CREDENTIAL_HELPER}",
+            "push",
+            "--force",
+            f"https://github.com/{repo}",
+            f"HEAD:refs/heads/{branch}",
+        )
+        print(f"Pushed {branch}")
 
     session = requests.Session()
     session.headers.update(
@@ -190,6 +201,13 @@ def open_drift_pr(
     )
     body = body_file.read_text()
     number = _open_pull_request_number(session, repo, branch)
+    # An unchanged tree still refreshes an open PR's body: the body can carry
+    # evidence newer than the diff (omnigraph-cutover-pr re-run against a
+    # fresh verdict for the same edit). With no open PR it stays closed, so a
+    # PR a human closed is not reopened over the same drift.
+    if number is None and unchanged:
+        print(f"No open pull request for {branch}; not reopening.")
+        return
     if number is None:
         response = session.post(
             f"{GITHUB_API}/repos/{repo}/pulls",

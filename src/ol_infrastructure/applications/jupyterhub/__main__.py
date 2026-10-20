@@ -20,7 +20,9 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION, lint_iam_policy
+from ol_infrastructure.lib.jupyterhub_config import jupyterhub_workload_labels
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
@@ -60,14 +62,18 @@ aws_config = AWSBase(
 )
 
 # Kubernetes labels
-k8s_global_labels = K8sAppLabels(
+k8s_label_model = K8sAppLabels(
     application=Application.jupyterhub,
     product=Product.mitlearn,
     service=Services.jupyterhub,
     source_repository="https://github.com/jupyterhub",
     ou=BusinessUnit.mit_learn,
     stack=stack_info,
-).model_dump()
+)
+k8s_global_labels = k8s_label_model.model_dump()
+# Course notebooks are learner-facing: without the hub nobody can start a
+# server, and without the proxy every running one is unreachable.
+workload_labels = jupyterhub_workload_labels(k8s_label_model, AlertTier.page)
 
 application_labels = k8s_global_labels | {
     "ol.mit.edu/application": "jupyterhub",
@@ -333,6 +339,7 @@ for deployment_config in deployment_configs:
         cluster_stack=cluster_stack,
         application_labels=application_labels,
         k8s_global_labels=k8s_global_labels,
+        workload_labels=workload_labels,
         extra_images=jupyterhub_info.extra_images,
         service_account_name=jupyterhub_info.service_account_name,
         service_trust_role=jupyterhub_trust_role,

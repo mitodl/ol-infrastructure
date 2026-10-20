@@ -1,9 +1,14 @@
-"""Authenticated synthetic probe: prove `council` answers a real query.
+"""Authenticated synthetic probe: prove `council` answers real queries.
+
+It sends TWO queries, and the second one exists because the first cannot see
+what broke CI on 2026-09-08: an ordinary read and a full-text (`search()`)
+read fail independently, so a probe that only does the former reports healthy
+while every BM25 caller is being refused. See `SEARCH_PROBE_QUERY` below.
 
 Carved out of tk-observability-for-shared-witan-service-ad3dba item 1
 (tk-an-authenticated-synthetic-probe-for-council-to--e89d8f). Two alert rules
 already cover a lost `council` graph from opposite directions —
-`WitanToolCallErrorRate` (needs live traffic) and `WitanGraphQuarantined`
+`WitanToolCallErrorRate` (needs live traffic) and `WitanGraphBlockedAtStartup`
 (needs a pod restart) — and a real window sits between them: `council` lost
 during a quiet period with no restart goes unreported until someone tries to
 use the service, which for a shared agent memory graph can be hours.
@@ -70,15 +75,105 @@ query council_probe() {
 }
 """
 
+# A second bounded read that goes through the FULL-TEXT path specifically.
+#
+# The plain query above cannot see a dead BM25 index, and on 2026-09-08 that
+# was not hypothetical: CI was skipped in the 2026-09-01 Lance 11 analyzer
+# rebuild, every `search()`/`bm25()` query there was refused with HTTP 409
+# `full_text_index_rebuild_required`, and this probe went on passing every 15
+# minutes because `match { $m: Memory }` is an ordinary read. The
+# rebuild-required guard is deliberately narrow — "ordinary reads remain
+# available; do not return a partial indexed result" — and that narrowness is
+# exactly what made the existing probe blind to it. `check_omnigraph_format.py`
+# stays green through an analyzer bump too, and correctly so: the on-disk
+# format does not move. Nothing else watches this.
+#
+# ★ IT DELIBERATELY DOES NOT ASSERT ON THE HIT COUNT. A search matching zero
+# rows is a legitimate answer — an empty or freshly-cut-over graph would fail
+# such an assertion forever, for no defect. What this probe asserts is that the
+# full-text path ANSWERS AT ALL, which is precisely the thing that breaks: the
+# failure mode is a refusal (HTTP 409), not a wrong result, so `run_probe`'s
+# existing non-2xx handling turns it into a non-zero exit with no new
+# machinery. Keep the literal inline rather than parameterising it, for the
+# same reason the query above takes no parameters.
+SEARCH_PROBE_QUERY = """
+query council_search_probe() {
+    match {
+        $m: Memory
+        search($m.content, "witan")
+    }
+    return { $m.slug }
+    limit 1
+}
+"""
+
+#: Every query one run makes, in order — the ordinary read first, then the
+#: full-text read.
+#:
+#: This tuple, not a hand-kept number, is what says how many HTTP calls a run
+#: costs: ``council_probe.py`` derives the CronJob's
+#: ``activeDeadlineSeconds`` from ``len(PROBE_QUERIES) * HTTP_TIMEOUT_SECONDS``
+#: plus a startup budget. Adding a third probe here therefore widens that
+#: deadline automatically instead of quietly eating into the headroom the pod
+#: needs to be scheduled and start an interpreter — which is exactly what
+#: adding the second one did, when the deadline was a literal 60.
+PROBE_QUERIES: tuple[tuple[str, str], ...] = (
+    ("ordinary", PROBE_QUERY),
+    ("search", SEARCH_PROBE_QUERY),
+)
+
 HTTP_TIMEOUT_SECONDS = 15
+
+#: The HTTP contract omnigraph-server 0.13 requires on every protected route:
+#: without exactly this header and value it answers 400
+#: ``api_contract_mismatch`` before it looks at the graph or the query. A 0.11
+#: server ignores it, so sending it is safe on both sides of the cutover. Same
+#: value as ``witan_core.omnigraph_http.HTTP_API_CONTRACT``; this script cannot
+#: import it (see WHY A RAW HTTP CALL above), so the two move together by hand.
+HTTP_API_CONTRACT_HEADER = "Omnigraph-Http-Api"
+HTTP_API_CONTRACT = "0.13"
+API_CONTRACT_MISMATCH = "api_contract_mismatch"
+
+#: Budget for everything in a run that is not an HTTP call: pod scheduling,
+#: image pull, interpreter start. Generous on purpose — the deadline below is
+#: a backstop for a wedged run, not a policy on slow nodes.
+PROBE_STARTUP_BUDGET_SECONDS = 30
+
+#: What `council_probe.py` sets as the CronJob's `activeDeadlineSeconds`.
+#:
+#: DERIVED, and that is the point. It lives here, beside the two inputs it is
+#: a function of, because here is where drift starts: when this script grew
+#: its second query, a literal 60 in the deployment would have silently
+#: halved the startup headroom instead of widening the deadline. Adding a
+#: third probe to PROBE_QUERIES now moves this on its own.
+#:
+#: Currently 2 * 15 + 30 = 60, the value it has always had.
+PROBE_ACTIVE_DEADLINE_SECONDS = (
+    len(PROBE_QUERIES) * HTTP_TIMEOUT_SECONDS + PROBE_STARTUP_BUDGET_SECONDS
+)
 
 
 class ProbeError(Exception):
     """A condition that must exit the run non-zero."""
 
 
-def run_probe(server_addr: str, graph_id: str, token: str) -> dict[str, Any]:
-    """POST the probe query and return the decoded JSON body on success.
+def _error_code(body: str) -> str | None:
+    """Return the ``code`` of an omnigraph error body, or None if it has none.
+
+    A proxy's HTML error page is not JSON, and that is an ordinary failure to
+    report verbatim, not something to raise on.
+    """
+    try:
+        parsed = json.loads(body)
+    except json.JSONDecodeError:
+        return None
+    return parsed.get("code") if isinstance(parsed, dict) else None
+
+
+def run_probe(
+    server_addr: str, graph_id: str, token: str, query: str = PROBE_QUERY
+) -> dict[str, Any]:
+    """POST a probe query and return the decoded JSON body on success.
 
     Raises :class:`ProbeError` for anything that means `council` did not
     answer: an unreachable server, a non-2xx response, or a 2xx body that
@@ -87,7 +182,7 @@ def run_probe(server_addr: str, graph_id: str, token: str) -> dict[str, Any]:
     proxy in front of the real server would otherwise read as success.
     """
     url = f"{server_addr.rstrip('/')}/graphs/{graph_id}/query"
-    payload = json.dumps({"query": PROBE_QUERY, "params": {}}).encode()
+    payload = json.dumps({"query": query, "params": {}}).encode()
     request = urllib.request.Request(  # noqa: S310 - server_addr is our own config
         url,
         method="POST",
@@ -95,6 +190,7 @@ def run_probe(server_addr: str, graph_id: str, token: str) -> dict[str, Any]:
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
+            HTTP_API_CONTRACT_HEADER: HTTP_API_CONTRACT,
         },
     )
     try:
@@ -102,9 +198,22 @@ def run_probe(server_addr: str, graph_id: str, token: str) -> dict[str, Any]:
             request, timeout=HTTP_TIMEOUT_SECONDS
         ) as response:
             status = response.status
+            stamped = response.headers.get_all(HTTP_API_CONTRACT_HEADER) or []
             body = response.read()
     except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", "replace")[:500]
+        error_body = exc.read().decode("utf-8", "replace")
+        detail = error_body[:500]
+        if _error_code(error_body) == API_CONTRACT_MISMATCH:
+            # Named apart from every other refusal because the remedy is
+            # different: the graph and this probe's credentials may be fine,
+            # and the server is on another omnigraph version than this script.
+            msg = (
+                f"POST {url} failed: the server does not speak "
+                f"{HTTP_API_CONTRACT_HEADER}: {HTTP_API_CONTRACT} "
+                f"(HTTP {exc.code} {detail}). Update HTTP_API_CONTRACT in "
+                "check_council_health.py to the deployed omnigraph's contract."
+            )
+            raise ProbeError(msg) from exc
         msg = f"POST {url} failed: HTTP {exc.code} {detail}"
         raise ProbeError(msg) from exc
     except urllib.error.URLError as exc:
@@ -113,6 +222,18 @@ def run_probe(server_addr: str, graph_id: str, token: str) -> dict[str, Any]:
     except TimeoutError as exc:
         msg = f"POST {url} timed out after {HTTP_TIMEOUT_SECONDS}s"
         raise ProbeError(msg) from exc
+
+    # A 0.13 server stamps its contract on every response. One that names
+    # another contract is a different server than this probe was written for,
+    # whatever the body looks like. An absent stamp is not refused here: a
+    # 0.11 server sends none, and this script runs on both sides of the cutover.
+    if stamped and stamped != [HTTP_API_CONTRACT]:
+        msg = (
+            f"POST {url} returned HTTP {status} stamped "
+            f"{HTTP_API_CONTRACT_HEADER}: {', '.join(stamped)}, not "
+            f"{HTTP_API_CONTRACT}"
+        )
+        raise ProbeError(msg)
 
     try:
         parsed = json.loads(body)
@@ -129,6 +250,11 @@ def run_probe(server_addr: str, graph_id: str, token: str) -> dict[str, Any]:
         )
         raise ProbeError(msg)
     return parsed
+
+
+def _row_count(result: dict[str, Any]) -> int:
+    """Rows a query returned, preferring the server's own count."""
+    return int(result.get("row_count", len(result.get("rows", []))))
 
 
 def main() -> int:
@@ -155,7 +281,14 @@ def main() -> int:
         # cast rather than assert since this is not a runtime invariant worth
         # enforcing twice, just a fact the type checker cannot see through
         # the comprehension above.
-        result = run_probe(cast(str, server_addr), graph_id, cast(str, token))
+        counts = {
+            label: _row_count(
+                run_probe(
+                    cast(str, server_addr), graph_id, cast(str, token), query=query
+                )
+            )
+            for label, query in PROBE_QUERIES
+        }
     except ProbeError as exc:
         # Not `.exception()`: `exc` is already a fully-formatted, known
         # failure message (a classified HTTP/JSON condition), not an
@@ -164,9 +297,9 @@ def main() -> int:
         return 1
 
     LOG.info(
-        "council-health probe OK: graph=%s row_count=%s",
+        "council-health probe OK: graph=%s %s",
         graph_id,
-        result.get("row_count", len(result.get("rows", []))),
+        " ".join(f"{label}_row_count={count}" for label, count in counts.items()),
     )
     return 0
 

@@ -1,4 +1,4 @@
-ARG SUPERSET_TAG=6.1.0@sha256:59cd4af66006fe4cc98906eda42a771dbefdacb432f9ab083e02cdc6ff01f29d
+ARG SUPERSET_TAG=6.1.0@sha256:16b50bbef6648912a79e3293d418fefa743ce555d36c5af6b85d859119ed7f88
 ARG NL_EXPLORER_SHA=fb4e6bba3706564f77fee695e661702dcd78bd6b
 
 # Stage 1: build the NL Explorer frontend
@@ -16,9 +16,11 @@ COPY --link requirements.txt /tmp/requirements.txt
 # Copy extension manifest + compiled frontend assets into the image
 # COPY --from=nl-explorer-frontend /build/nl-explorer/extension.json /app/extensions/nl-explorer/extension.json
 # COPY --from=nl-explorer-frontend /build/nl-explorer/dist/ /app/extensions/nl-explorer/dist/
+# hadolint ignore=DL3066
 USER root
 WORKDIR /app
 # hadolint ignore=DL3008
 RUN chmod 1777 /tmp && apt-get update && apt-get install -y --no-install-recommends git libmariadb-dev build-essential pkg-config && rm -rf /var/lib/apt/lists/*
 RUN uv pip install --no-cache-dir -r /tmp/requirements.txt
+# hadolint ignore=DL3066
 USER superset

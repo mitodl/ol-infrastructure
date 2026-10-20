@@ -21,6 +21,8 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         context=APP_DIR,
         target='local-dev',
         dockerfile=APP_DIR + '/Dockerfile',
+        # .claude/ holds agent worktrees; syncing one into the pod restarted it in a loop.
+        ignore=['.claude/'],
         # Sync the whole repo: Django apps are top-level dirs (courses,
         # ecommerce, cms, ...). granian's --reload-ignore-dirs filters the
         # non-Python churn.
@@ -53,3 +55,17 @@ k8s_resource(
 
 k8s_resource('mitxonline-celery', labels=['mitxonline'], resource_deps=['local-infra-apps'])
 k8s_resource('mitxonline-celery-beat', labels=['mitxonline'], resource_deps=['local-infra-apps'])
+
+# The routes read discovery and session.secret from Secrets local-infra-apps
+# writes; see the mitlearn-routes resource in local-dev/apps/mit-learn/Tiltfile.
+k8s_resource(
+    new_name='mitxonline-routes',
+    objects=[
+        'mitxonline-shared-plugins:apisixpluginconfig',
+        'mitxonline-tls:apisixtls',
+        'mitxonline-route:apisixroute',
+        'mitxonline-learn-proxy-route:apisixroute',
+    ],
+    labels=['mitxonline'],
+    resource_deps=['local-infra-apps'],
+)

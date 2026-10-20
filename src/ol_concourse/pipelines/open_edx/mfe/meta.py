@@ -194,6 +194,31 @@ def meta_pipeline() -> Pipeline:
 if __name__ == "__main__":
     import sys
 
+    from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
+
+    release_names = sorted(
+        {
+            release
+            for deployment in deployments
+            for release in OpenLearningOpenEdxDeployment.get_item(deployment).releases
+        }
+    )
+    output = pipeline_json_with_user_data(
+        meta_pipeline(),
+        user_data={
+            "description": (
+                "Self-updating registry for the Open edX MFE pipeline family: "
+                f"one `{{deployment}}-{{release}}-mfe-pipeline` per (deployment, "
+                f"release) pair across {', '.join(deployments)} "
+                f"({', '.join(release_names)}), plus one "
+                "`{deployment}-site-pipeline` per OEP-65 Site Project, all "
+                "re-generated from `pipeline.py` and `site_pipeline.py` "
+                "whenever this repo changes."
+            ),
+            "team": "main",
+            "category": "meta",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(meta_pipeline().model_dump_json(indent=2))
-    sys.stdout.write(meta_pipeline().model_dump_json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)

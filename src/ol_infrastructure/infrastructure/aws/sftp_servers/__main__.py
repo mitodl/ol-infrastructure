@@ -34,6 +34,8 @@ sftp_server_config = SFTPServerConfig(
     server_name=f"sftp-{stack_info.env_suffix}",
     bucket_name=f"ol-data-lake-sftp-{stack_info.env_suffix}",
     users=[mit_press_sftp_user_config],
+    # Partner uploads can't be regenerated, so this is a long undelete window.
+    noncurrent_version_expiration_days=90,
     tags=aws_config.tags,
 )
 

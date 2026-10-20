@@ -25,6 +25,7 @@ from ol_concourse.pipelines.constants import (
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.jobs import pulumi_jobs_chain
+from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
 from ol_concourse.pipelines.versions_map import project_version_paths
 
@@ -36,10 +37,9 @@ def build_dagster_docker_pipeline() -> Pipeline:
     code_locations = [
         {"name": "canvas", "module": "canvas.definitions"},
         {"name": "data_loading", "module": "data_loading.definitions"},
-        {"name": "data_platform", "module": "data_platform.definitions"},
         {"name": "edxorg", "module": "edxorg.definitions"},
         {"name": "lakehouse", "module": "lakehouse.definitions"},
-        {"name": "learning_resources", "module": "learning_resources.definitions"},
+        {"name": "delivery", "module": "delivery.definitions"},
         {"name": "legacy_openedx", "module": "legacy_openedx.definitions"},
         {"name": "openedx", "module": "openedx.definitions"},
         {"name": "b2b_organization", "module": "b2b_organization.definitions"},
@@ -59,7 +59,10 @@ def build_dagster_docker_pipeline() -> Pipeline:
     extra_watched_paths = {
         "data_loading": ["src/ol_dlt/"],
         "lakehouse": ["src/ol_dbt/"],
-        "k8s": ["dg_deployments/reconcile_edxorg_partitions.py"],
+        "k8s": [
+            "dg_deployments/reconcile_edxorg_partitions.py",
+            "dg_deployments/dagster-k8s/",
+        ],
     }
 
     # Create git resources for each code location with specific path filters
@@ -271,9 +274,24 @@ def build_dagster_docker_pipeline() -> Pipeline:
 
 
 if __name__ == "__main__":
+    output = pipeline_json_with_user_data(
+        build_dagster_docker_pipeline(),
+        user_data={
+            "description": (
+                "Builds a Docker image per Dagster code location from "
+                "ol-data-platform's `dg_projects/` (canvas, data_loading, "
+                "edxorg, lakehouse, delivery, legacy_openedx, "
+                "openedx, b2b_organization, ml, plus the dagster-k8s base image), "
+                "pushes each to ECR, then deploys the Dagster server via Pulumi to "
+                "QA and Production once every image build has passed."
+            ),
+            "team": "infrastructure",
+            "category": "data-platform",
+        },
+    )
     with open("definition.json", "w") as definition:  # noqa: PTH123
-        definition.write(build_dagster_docker_pipeline().json(indent=2))
-    sys.stdout.write(build_dagster_docker_pipeline().json(indent=2))
+        definition.write(output)
+    sys.stdout.write(output)
     sys.stdout.writelines(
         ("\n", "fly -t pr-inf sp -p docker-pulumi-dagster -c definition.json")
     )

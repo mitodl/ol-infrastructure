@@ -12,3 +12,10 @@ import back through base.py (which imports every sub-module).
 
 MIMIR_DATASOURCE_REF = {"type": "prometheus", "uid": "grafanacloud-prom"}
 LOKI_DATASOURCE_REF = {"type": "loki", "uid": "grafanacloud-logs"}
+
+# Traces live in a per-stack Tempo instance registered the same way. Checked
+# 2026-09-17 against all three stacks: the datasource *names* differ
+# (grafanacloud-mitolci-traces, grafanacloud-mitolqa-traces,
+# grafanacloud-mitolproduction-traces) but the UID is `grafanacloud-traces` on
+# each, so a dashboard referencing it renders on whichever stack it lands in.
+TEMPO_DATASOURCE_REF = {"type": "tempo", "uid": "grafanacloud-traces"}

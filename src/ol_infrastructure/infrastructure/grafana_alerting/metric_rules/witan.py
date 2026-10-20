@@ -27,7 +27,7 @@ That is the right blast radius now that the cluster serves ``council``,
 would let a rebuildable per-repo code graph take down the memory graph every
 agent depends on. The residual risk is narrow and severe: if ``council``
 specifically fails to open, the pod stays Ready, /healthz returns 200, and
-every real request 404s.
+every real request against it fails.
 
 Neither health endpoint can close that. omnigraph's ``/healthz`` is flat by
 design, and witan's answers from process state alone on purpose -- a probe that
@@ -51,7 +51,7 @@ well clear of that and far below the ~1.0 a lost graph produces.
 calls in the window the ratio is 0/0 = NaN, which never satisfies the
 comparison, so a graph lost during a quiet period is not reported until someone
 tries to use it. The boot-time half of the signal is in
-log_rules/witan.py::WitanGraphQuarantined, which is not traffic-dependent but
+log_rules/witan.py::WitanGraphBlockedAtStartup, which is not traffic-dependent but
 only has something to say when a pod starts. Closing the remaining window needs
 an authenticated synthetic probe that asserts ``council`` is queryable; that is
 tracked separately and is not something an alert rule can do.
@@ -102,6 +102,26 @@ keep it out. The 10-day age gate clears the longest cadence in these namespaces
 (weekly), so a newly created CronJob is not reported before it has had a real
 chance to run.
 
+WitanDataTierScaledToZero: the state DeploymentUnavailable* excludes
+----------------------------------------------------------------------
+eks_general.py's ``DeploymentUnavailable*`` requires ``spec_replicas > 0``, so
+a Deployment at 0 desired replicas is by its definition not an outage. For
+omnigraph-server it is one. Two things scale it to 0: an armed storage-format
+migration, and (at storage format 14) the nightly ``omnigraph-maintenance``
+window, which leaves it at 0 ON PURPOSE when it cannot remove its own lock.
+Either one left that way takes every witan tool call down with a Deployment
+that reports nothing wrong.
+
+The pending period is what excludes the window, not a time-of-day match. The
+window's Job deadline is 36 minutes and its pod gets 120s more to scale the
+server back up, so 45 minutes at 0 replicas is longer than any window that
+ended normally, wherever ``omnigraph:maintenance_schedule`` puts it. If that
+deadline grows, this has to grow with it.
+
+A migration cutover that keeps the server down for longer than 45 minutes fires
+this too. That is correct (the data tier is down) and expected: silence it for
+the cutover.
+
 Verification
 --------------
 ★ CHECK THE VALUE, NOT THE ROW SET. base.py's pipeline ends in a threshold on
@@ -137,6 +157,14 @@ VALUE is greater than zero -- rather than only to be quiet:
                                    past the 0.5 threshold is positive by
                                    construction. See the baseline figures
                                    above.
+
+``WitanDataTierScaledToZero`` was evaluated against the production Mimir tenant
+on 2026-10-13. As committed it returns a real 0 for omnigraph-server. Over the
+30 days before, at 5-minute steps, it returns 1 at 10 of 8,641 steps, all on
+2026-09-16: two at 15:46Z-15:51Z and eight from 18:36Z to 19:11Z. That longest
+run is under the 45-minute pending period, so the rule would not have fired on
+it. The window itself exists nowhere yet, so "longer than any window" rests on
+the Job's configured deadline and not on an observed run.
 """
 
 from collections.abc import Callable
@@ -161,13 +189,25 @@ _DAILY_STALE_SECONDS = 129600
 # namespaces. Validate a new entry against its `schedule` label on
 # kube_cronjob_info before adding it, the same discipline eks_general.py's
 # bucket membership asks for.
-_DAILY_MAINTENANCE_CRONJOBS = "omnigraph-optimize|witan-view-reaper"
+#
+# `omnigraph-maintenance` replaces `omnigraph-optimize` (and the weekly
+# `omnigraph-cleanup`) once an environment serves storage format 14, on the
+# same `20 3 * * *` schedule. It does not exist anywhere yet, so its series
+# is unvalidated and matches nothing until the first cutover.
+_DAILY_MAINTENANCE_CRONJOBS = (
+    "omnigraph-optimize|omnigraph-maintenance|witan-view-reaper"
+)
 
 # Longer than the longest cadence in these namespaces (weekly), so a newly
 # created CronJob is not reported before it could plausibly have succeeded.
 _NEVER_SUCCEEDED_MIN_AGE_SECONDS = 864000
 
 _WITAN_NAMESPACES = "witan|omnigraph"
+
+# Longer than the maintenance window can hold the server at 0 replicas: a
+# 36-minute Job deadline plus the 120s its pod gets to scale back up
+# (applications/omnigraph/maintenance.py).
+_SCALED_TO_ZERO_FOR = "45m"
 
 _ERROR_RATE_SUMMARY = (
     "Over half of witan's MCP tool calls in {{ $labels.cluster }} are failing"
@@ -176,16 +216,23 @@ _ERROR_RATE_SUMMARY = (
 _ERROR_RATE_DESCRIPTION = (
     "witan in cluster {{ $labels.cluster }} is failing more than half of its MCP"
     " tool calls. A ratio near 1.0 with the pod still Ready is the signature of a"
-    " quarantined `council` graph: omnigraph skips a graph it cannot open rather"
+    " blocked `council` graph: omnigraph skips a graph it cannot open rather"
     " than refusing to start, so the process serves, /healthz returns 200, and"
-    " every request against the missing graph 404s. Check the omnigraph-server"
-    " boot line for the graph count it actually opened (`kubectl -n omnigraph"
-    " logs deploy/omnigraph-server | grep 'serving omnigraph'`) against what"
-    " cluster.yaml declares -- WitanGraphQuarantined in log_rules/witan.py"
-    " watches that same number. Then read witan's own mcp.tool_call lines"
+    " every request against the missing graph fails. Check the omnigraph-server"
+    " boot lines for a graph it could not open (`kubectl -n omnigraph logs"
+    " deploy/omnigraph-server | grep 'graph blocked during startup'`) --"
+    " WitanGraphBlockedAtStartup in log_rules/witan.py watches that same line."
+    " Then read witan's own mcp.tool_call lines"
     " (`kubectl -n witan logs deploy/witan-server`), which carry tool, outcome,"
     " duration_ms and actor_id, to see whether the failures are one tool or all"
-    " of them. All of them means the graph; one of them means that tool."
+    " of them. All of them means the graph; one of them means that tool. A"
+    " failed line also says why: error_type, error (the message, replaced by"
+    " error_withheld=true where it is not safe to log) and refused."
+    " refused=true means witan declined the call on purpose, and this alert"
+    " counts those as errors too. A missing `council` graph is NOT a refusal:"
+    " it logs error_type=ToolError, refused=false and an `omnigraph ... failed`"
+    " message in error. A missing code graph logs ClusterGraphMissing with"
+    " refused=true."
 )
 
 _DAILY_STALE_SUMMARY = (
@@ -196,9 +243,20 @@ _DAILY_STALE_SUMMARY = (
 _DAILY_STALE_DESCRIPTION = (
     "The daily maintenance CronJob {{ $labels.cronjob }} in namespace"
     " {{ $labels.namespace }}, cluster {{ $labels.cluster }}, has not completed"
-    " successfully for over 36 hours. Neither of these jobs fails loudly when it"
+    " successfully for over 36 hours. None of these jobs fails loudly when it"
     " stops -- that is why they need a window sized to their cadence rather than"
     " eks_general.py's 15-day slow bucket."
+    " omnigraph-maintenance exists only where the data tier serves storage"
+    " format 14, in place of omnigraph-optimize. It STOPS omnigraph-server every"
+    " night at 03:20 UTC to compact and clean the store, and scales it back up."
+    " If this alert names it, first check that the server is running"
+    " (`kubectl -n omnigraph get deploy omnigraph-server`): a window that could"
+    " not remove its own lock leaves the Deployment at 0 replicas on purpose."
+    " The last Job's log says which case it is, and"
+    " docs/omnigraph-store-maintenance-runbook.md (When the window leaves the"
+    " server down) is the recovery. A Job that failed with the server back up"
+    " names the graphs it did not reach; a suspended CronJob means a"
+    " storage-format migration is armed."
     " omnigraph-optimize is Lance compaction: every commit adds fragments, reads"
     " degrade by roughly 21x on an uncompacted store, and the store keeps serving"
     " while it gets slower. Its sweep is per-graph and continues past a failure,"
@@ -223,6 +281,31 @@ _NEVER_SUCCEEDED_DESCRIPTION = (
     " fires at all also leaves no Job history to read, so check the schedule and"
     " startingDeadlineSeconds on `kubectl -n {{ $labels.namespace }} describe"
     " cronjob {{ $labels.cronjob }}` before looking for a failing run."
+)
+
+_SCALED_TO_ZERO_SUMMARY = (
+    "omnigraph-server in {{ $labels.cluster }} has been scaled to 0 replicas"
+    " for over 45 minutes"
+)
+
+_SCALED_TO_ZERO_DESCRIPTION = (
+    "The omnigraph-server Deployment in cluster {{ $labels.cluster }} has"
+    " declared 0 replicas for over 45 minutes, so every witan tool call is"
+    " failing. DeploymentUnavailable does not report this: it ignores a"
+    " Deployment that asks for 0 replicas."
+    " Two things scale it to 0. The nightly omnigraph-maintenance window"
+    " (storage format 14 only) does, and leaves it there on purpose when it"
+    " cannot remove its own lock: read the last Job's log (`kubectl -n omnigraph"
+    " logs job/<newest omnigraph-maintenance job>`) and follow"
+    " docs/omnigraph-store-maintenance-runbook.md (When the window leaves the"
+    " server down). Do not scale it up before clearing the lock, because the"
+    " server refuses to start under it."
+    " An armed storage-format migration does too: `kubectl -n omnigraph get"
+    " deploy omnigraph-server -o jsonpath='{.metadata.annotations}'` shows"
+    " ol.mit.edu/migration-armed, and"
+    " docs/omnigraph-storage-format-upgrade-runbook.md is the procedure. If a"
+    " cutover is in progress this is expected, and can be silenced until it"
+    " ends."
 )
 
 
@@ -265,6 +348,22 @@ def _daily_stale_expr(cluster_filter: str) -> str:
         f'{{cluster=~"{cluster_filter}", '
         f'cronjob=~"{_DAILY_MAINTENANCE_CRONJOBS}"}} > 0)) '
         f"> {_DAILY_STALE_SECONDS}"
+    )
+
+
+def _scaled_to_zero_expr(cluster_filter: str) -> str:
+    """1 while omnigraph-server declares 0 replicas, else a real 0.
+
+    ``== bool 0`` and not ``== 0``: the filtering form returns the series with
+    its original value, which is 0, and base.py's ``last(A) > 0`` never fires
+    on it. See the module docstring's verification note.
+    """
+    return (
+        "max by (cluster, namespace, deployment) (\n"
+        "  kube_deployment_spec_replicas"
+        f'{{cluster=~"{cluster_filter}", namespace="omnigraph", '
+        'deployment="omnigraph-server"}\n'
+        ") == bool 0"
     )
 
 
@@ -409,6 +508,34 @@ def create(
                     "description": _NEVER_SUCCEEDED_DESCRIPTION,
                 },
                 datas=rd(_never_succeeded_expr(_PROD_CLUSTERS)),
+            ),
+            # --- Data tier left scaled to zero ---
+            # Last in the list so the rules above keep their positions.
+            alerting.RuleGroupRuleArgs(
+                name="WitanDataTierScaledToZeroWarning",
+                condition="C",
+                for_=_SCALED_TO_ZERO_FOR,
+                no_data_state="OK",
+                exec_err_state="OK",
+                labels={"severity": "warning", "environment": "non-production"},
+                annotations={
+                    "summary": _SCALED_TO_ZERO_SUMMARY,
+                    "description": _SCALED_TO_ZERO_DESCRIPTION,
+                },
+                datas=rd(_scaled_to_zero_expr(_NON_PROD_CLUSTERS)),
+            ),
+            alerting.RuleGroupRuleArgs(
+                name="WitanDataTierScaledToZeroCritical",
+                condition="C",
+                for_=_SCALED_TO_ZERO_FOR,
+                no_data_state="OK",
+                exec_err_state="KeepLast",
+                labels={"severity": "critical", "environment": "production"},
+                annotations={
+                    "summary": _SCALED_TO_ZERO_SUMMARY,
+                    "description": _SCALED_TO_ZERO_DESCRIPTION,
+                },
+                datas=rd(_scaled_to_zero_expr(_PROD_CLUSTERS)),
             ),
         ],
         opts=resource_opts,

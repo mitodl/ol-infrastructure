@@ -17,7 +17,7 @@ class CloudfrontPriceClass(StrEnum):
     # https://docs.aws.amazon.com/cloudfront/latest/APIReference/API_DistributionConfig.html
     # NB: POP == Points Of Presence which is where CDN edge servers are located
     us_eu = "PriceClass_100"  # POPs in US, Canada, Europe, and Israel
-    exclude_au_sa = (  # POPs in all supported geos except South America and Australia  # noqa: E501
+    exclude_au_sa = (  # POPs in all supported geos except South America and Australia
         "PriceClass_200"
     )
     all_geos = "PriceClass_All"  # POPs in all supoprted geos
@@ -58,7 +58,6 @@ class S3ServerlessSite(ComponentResource):
 
         generic_resource_opts = ResourceOptions(parent=self).merge(opts)
         site_bucket_name = f"{site_config.site_name}-bucket"
-        site_bucket_arn = f"arn:aws:s3:::{site_bucket_name}"
 
         self.site_bucket = s3.Bucket(
             f"{site_config.site_name}-bucket",
@@ -85,24 +84,29 @@ class S3ServerlessSite(ComponentResource):
             ignore_public_acls=False,
         )
 
-        s3.BucketPolicy(
+        self.site_bucket_policy = s3.BucketPolicy(
             f"{site_bucket_name}-policy",
             bucket=self.site_bucket.id,
-            policy=json.dumps(
-                {
-                    "Version": "2012-10-17",
-                    "Statement": [
-                        {
-                            "Sid": "PublicRead",
-                            "Effect": "Allow",
-                            "Principal": "*",
-                            "Action": "s3:GetObject",
-                            "Resource": [
-                                f"{site_bucket_arn}/*",
-                            ],
-                        }
-                    ],
-                }
+            # Use the bucket's real ARN: site_bucket_name is only the Pulumi
+            # resource name, and S3 rejects a policy naming another bucket with
+            # MalformedPolicy.
+            policy=self.site_bucket.arn.apply(
+                lambda bucket_arn: json.dumps(
+                    {
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Sid": "PublicRead",
+                                "Effect": "Allow",
+                                "Principal": "*",
+                                "Action": "s3:GetObject",
+                                "Resource": [
+                                    f"{bucket_arn}/*",
+                                ],
+                            }
+                        ],
+                    }
+                )
             ),
             opts=generic_resource_opts.merge(
                 ResourceOptions(

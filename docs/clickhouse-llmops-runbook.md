@@ -22,8 +22,9 @@ deployed on the data EKS cluster for LLMOps tooling (TensorZero, Opik).
 5. [Scaling the Cluster](#scaling-the-cluster)
 6. [Monitoring and Alerting](#monitoring-and-alerting)
 7. [Backup and Restore](#backup-and-restore)
-8. [Troubleshooting](#troubleshooting)
-9. [Useful Commands](#useful-commands)
+8. [Upgrade Canary (QA)](#upgrade-canary-qa)
+9. [Troubleshooting](#troubleshooting)
+10. [Useful Commands](#useful-commands)
 
 ---
 
@@ -250,29 +251,129 @@ histogram_quantile(0.99, rate(clickhouse_query_duration_milliseconds_bucket[5m])
 
 ## Backup and Restore
 
-### Cold S3 data (automatic)
+There are two recovery layers. Neither covers the other's case.
 
-Data moved to `cold_s3` disk is stored in S3 (`ol-data-clickhouse-cold-<env>`).
-S3 Intelligent-Tiering provides durability (11 nines). No separate backup needed
-for cold data.
+| Layer | What | Schedule / retention | Use it for |
+|---|---|---|---|
+| AWS Backup | EBS snapshot of every CH and Keeper PVC (`<cluster>-eks-backup-plan`, `infrastructure/aws/eks/aws_backup.py`) | Daily 05:00 UTC, 14 days | A lost or corrupted PVC. Crash-consistent and per volume, not coordinated across replicas. |
+| SQL `BACKUP` | `clickhouse-backup` CronJob: every database except `system` / `INFORMATION_SCHEMA`, to `s3://ol-data-clickhouse-backup-<env>/backups/<UTC timestamp>/` | Daily 03:30 UTC, 14 days (`clickhouse:backup_retention_days`); overwritten or deleted objects kept 7 more days as noncurrent versions | Restoring tables or whole databases, into this cluster or another one at the same or a newer server version. |
 
-### Hot data snapshot
+The SQL backup runs on replica 0 (`chi-clickhouse-default-0-0`) because Opik's
+Liquibase ledger (`default.DATABASECHANGELOG*`) exists only there. The target is
+the `backups` disk (`s3_plain`), the only disk `backups.allowed_disk` permits.
+The cold-tier bucket is not a backup: once tiering is active it holds live
+parts.
 
-ClickHouse's built-in `BACKUP` command can snapshot hot data to the cold S3 bucket:
+### Check the latest backup
 
-```sql
-BACKUP DATABASE tensorzero_db
-TO S3('https://ol-data-clickhouse-cold-production.s3.amazonaws.com/backups/tensorzero_db/', '<irsa-credentials-auto-provided>')
-SETTINGS compression_method='lz4';
+```bash
+kubectl -n clickhouse get jobs -l app.kubernetes.io/name=clickhouse-backup
+kubectl -n clickhouse logs job/<job-name>
+aws s3 ls s3://ol-data-clickhouse-backup-<env>/backups/
 ```
 
-### Restore from backup
+`system.backups` only lists runs since that server last restarted, and only on
+the server that ran them.
+
+### Restore
+
+**Never restore into the cluster the backup came from while its tables still
+exist, not even under a new table name.** Opik's replicated tables hardcode
+their Keeper path in the engine definition, e.g.
+`ReplicatedReplacingMergeTree('/clickhouse/tables/{shard}/opik_db/spans',
+'{replica}', ...)`. `RESTORE ... AS opik_db.spans_restored` keeps that
+definition, so the restored table registers under the live table's Keeper path
+and replica name instead of becoming an independent copy.
+
+Restore into a cluster with its own Keeper ensemble instead: a scratch
+ClickHouseInstallation and ClickHouseKeeperInstallation, or a rebuilt cluster
+after a total loss. Its IRSA role needs read access to the source environment's
+backup bucket, and its `backups` disk must point at that bucket. Run the
+restore on replica 0 of the target:
 
 ```sql
-RESTORE DATABASE tensorzero_db
-FROM S3('https://ol-data-clickhouse-cold-production.s3.amazonaws.com/backups/tensorzero_db/')
-SETTINGS allow_non_empty_tables=true;
+RESTORE DATABASE opik_db FROM Disk('backups', '<UTC timestamp>');
+RESTORE TABLE default.DATABASECHANGELOG, TABLE default.DATABASECHANGELOGLOCK
+FROM Disk('backups', '<UTC timestamp>');
 ```
+
+To recover individual rows into the live cluster, restore into the scratch
+cluster first, then copy across with `INSERT INTO opik_db.<table> SELECT ...
+FROM remote('<scratch host>', opik_db.<table>, ...)`.
+
+### Scratch restore server
+
+A single pod is enough for a drill or a version check. It needs no CHI or CHK,
+just `clickhouse-server` running its own embedded Keeper. This is how the
+2026-09-24 drill restored the production backup (168 s for 20 GiB, all 32
+tables, row counts in
+https://github.com/mitodl/ol-infrastructure/pull/5817#issuecomment-5823823703).
+
+- Namespace `clickhouse` in the backup's own environment, `serviceAccountName:
+  clickhouse`. The IRSA role on that service account can already read the
+  backup bucket.
+- Image: the server version under test.
+- A gp3 PVC on `/var/lib/clickhouse`, sized at 2.5x the backup (50Gi for 20 GiB).
+- One file in `config.d/` holding the `backups` s3_plain disk (copy the
+  endpoint from the live `config.d/storage.xml`), `backups/allowed_disk`, a
+  single-node `keeper_server` on localhost, `zookeeper` pointing at
+  `localhost:9181`, and `macros` `shard=0`, `replica=restore-drill`.
+  Never point it at `keeper-clickhouse`: see the warning above.
+
+```sql
+RESTORE ALL FROM Disk('backups', '<UTC timestamp>') ASYNC;
+SELECT status, error, dateDiff('second', start_time, end_time) FROM system.backups;
+```
+
+Compare `system.tables.total_rows` against replica 0. For the ReplacingMergeTree
+tables (`traces`, `spans`, `trace_threads`), compare counts with
+`last_updated_at` before the backup's start time instead, since prod keeps
+writing and merging after the backup. Delete the pod, PVC and ConfigMap when
+done.
+
+---
+
+## Upgrade Canary (QA)
+
+QA runs 2 ClickHouse replicas and 3 Keeper nodes, so it exercises replication
+and Keeper quorum the way production does. Every server, Keeper and operator
+upgrade goes to QA first.
+
+1. Confirm QA's latest `clickhouse-backup` job succeeded.
+2. Change the version for QA only, and apply the stack that owns it:
+   - Server: `clickhouse:version` in `Pulumi.QA.yaml`, applied with the
+     `applications/clickhouse` QA stack.
+   - Operator: `CLICKHOUSE_OPERATOR_VERSION` in `bridge/lib/versions.py`,
+     applied with the `data.QA` stack of `substructure/aws/eks`, which installs the
+     operator.
+   - Keeper: `CLICKHOUSE_KEEPER_VERSION` in `bridge/lib/versions.py`, applied
+     with the `applications/clickhouse` QA stack. It is a floating tag
+     (`26.8-alpine`) shared by every environment and bumped by Renovate, so a
+     patch release reaches any Keeper pod that pulls the image without passing
+     through QA. Pin it to a full version or digest before relying on the
+     canary for Keeper.
+   Shared constants go on a branch applied to QA first.
+3. Watch the rollout. The operator restarts one host at a time.
+   - Both replicas hold every replicated table. Run this on replica 0; it must
+     return nothing:
+     `SELECT database, table, total_replicas, active_replicas, absolute_delay,
+     queue_size FROM system.replicas WHERE active_replicas < 2 OR
+     total_replicas < 2 OR absolute_delay > 0 OR queue_size > 0`.
+     Also compare `SELECT count() FROM system.replicas` across both replicas: a
+     replica that failed to create its tables has an empty `system.replicas`,
+     so a delay check alone passes on it.
+   - Keeper quorum: `echo mntr | nc localhost 2181` on each Keeper pod. One
+     reports `zk_server_state leader` with `zk_synced_followers 2`, the others
+     `follower`.
+4. Opik smoke check on QA. Opik runs its Liquibase migrations (against
+   replica 0) only in the `backend-migrations` init container, and a
+   ClickHouse upgrade does not restart Opik, so restart it first:
+   `kubectl -n opik rollout restart deployment/opik-backend`, then
+   `kubectl -n opik logs deployment/opik-backend -c backend-migrations`.
+   The UI lists recent traces, and a trace logged from the SDK shows up.
+5. For a server upgrade, restore the latest production backup into a scratch
+   server at the new version (above) to confirm production data loads.
+6. Promote the same change to production.
 
 ---
 
