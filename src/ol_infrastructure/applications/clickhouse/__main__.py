@@ -598,6 +598,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     tls_secret_name: str,
     tls_certificate: Any,
     keeper_tls_enabled: bool,
+    reconcile_task_id: str | None,
 ) -> "Output[kubernetes.apiextensions.CustomResource]":
     """Build the ClickHouseInstallation CRD and return it wrapped in an Output.
 
@@ -842,6 +843,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                 labels=labels,
             ),
             spec={
+                **({"taskID": reconcile_task_id} if reconcile_task_id else {}),
                 # wait: after restarting a replica, wait for it to rejoin the
                 # cluster before moving to the next. The operator default
                 # (0.26.0 reconcile.host.wait) waits for exclusion and
@@ -1137,12 +1139,25 @@ interserver_credentials_enabled = clickhouse_config.require_bool(
 # rule is never consulted), so this rolls every replica in turn. A replica that
 # cannot complete the TLS handshake comes back with no Keeper session, its
 # replicated tables read-only, and the operator, which only waits for /ping,
-# moves on to the next one. Check system.zookeeper_connection and
-# system.replicas.is_readonly on the first restarted replica. The operator does
-# not abort an in-flight reconcile when the CHI changes, so to stop the roll,
-# scale kube-system/clickhouse-operator to 0, set this back to false, apply,
-# and scale the operator back up; it then writes 2181 back to that replica.
+# moves on to the next one. Check system.zookeeper_connection (no row, or a
+# port other than 9281, both mean stop) and system.replicas.is_readonly on the
+# first restarted replica.
+#
+# The operator does not abort an in-flight reconcile when the CHI changes. To
+# stop the roll: scale kube-system/clickhouse-operator to 0, set this back to
+# false and clickhouse:reconcile_task_id to a value not used before, apply, and
+# scale the operator back up. The task ID is what makes it reconcile: the
+# interrupted reconcile never completed, so the reverted spec equals the last
+# completed one and the operator would otherwise find nothing to do. The
+# server hot-reloads its zookeeper section, so any replica whose host
+# ConfigMap was already rewritten is on 9281 even if the operator stopped
+# before restarting it; check every chi-clickhouse-deploy-confd-default-0-N
+# ConfigMap shows 2181 again afterwards.
 keeper_tls_enabled = clickhouse_config.require_bool("keeper_tls_enabled")
+# A non-auto spec.taskID is part of the operator's change detection (auto-
+# prefixed IDs are excluded), so a new value forces a reconcile of an
+# otherwise unchanged CHI. Unset in normal operation.
+reconcile_task_id = clickhouse_config.get("reconcile_task_id")
 
 ############################################################
 # S3 Cold Storage Bucket
@@ -1568,6 +1583,7 @@ clickhouse_installation = _create_clickhouse_installation(
     tls_secret_name=clickhouse_tls_secret_name,
     tls_certificate=clickhouse_server_certificate,
     keeper_tls_enabled=keeper_tls_enabled,
+    reconcile_task_id=reconcile_task_id,
 )
 
 ############################################################

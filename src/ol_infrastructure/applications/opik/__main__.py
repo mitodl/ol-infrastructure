@@ -366,12 +366,16 @@ opik_helm_release = kubernetes.helm.v3.Release(
                         # ``opik`` ClickHouse user is granted access to ``default``
                         # for exactly this (see ol-application-clickhouse).
                         #
-                        # All three ClickHouse clients (Liquibase's JDBC
-                        # driver, R2DBC and client-v2) verify the server
-                        # against the JVM default trust store when given no
-                        # trust material, which is where the CA lands (see
-                        # caCerts above).
-                        "ANALYTICS_DB_MIGRATIONS_URL": f"jdbc:clickhouse:https://{CLICKHOUSE_MIGRATIONS_HOST}:{CLICKHOUSE_HTTPS_PORT}",
+                        # Migrations run on the legacy ru.yandex.clickhouse
+                        # driver (clickhouse-jdbc 0.3.1, via
+                        # liquibase-clickhouse), whose URL parser needs
+                        # host:port right after // and rejects the newer
+                        # jdbc:clickhouse:https:// form. TLS is ssl=true;
+                        # sslmode defaults to strict, and with no sslrootcert
+                        # it verifies against the JVM default trust store, as
+                        # R2DBC and client-v2 do for the runtime connections.
+                        # That store is where the CA lands (see caCerts above).
+                        "ANALYTICS_DB_MIGRATIONS_URL": f"jdbc:clickhouse://{CLICKHOUSE_MIGRATIONS_HOST}:{CLICKHOUSE_HTTPS_PORT}?ssl=true",
                         "ANALYTICS_DB_PROTOCOL": "HTTPS",
                         "ANALYTICS_DB_HOST": CLICKHOUSE_HOST,
                         "ANALYTICS_DB_PORT": str(CLICKHOUSE_HTTPS_PORT),
