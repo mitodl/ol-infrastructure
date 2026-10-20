@@ -133,7 +133,11 @@ in each app, which is slower than models change.
    and the run's trace is tagged `model_status:deprecated`; a retired id, or one not in
    `provider:model` form, raises at build time. App-side lists (learn-ai's `LLMModel` rows,
    mit-learn's configuration rows) are checked against the catalog in CI, which fails on a
-   retired or malformed id and warns on a deprecated or unlisted one.
+   retired or malformed id and warns on a deprecated or unlisted one. The warning and the tag
+   come from `build_model`, so learn-ai's LangGraph bots, which build their own client
+   (library spec §6.6), get neither: `resolve_policy` returns no model to
+   check. For them the CI check on `LLMModel` rows is the only catalog check until LangGraph
+   is replaced.
 3. Adding or changing an entry is a pull request to `ol-llm`, approved by the catalog owner
    (§6). It needs: the provider covered by the data-handling policy (§3) once that exists, a price in
    `genai-prices` and in Opik or added to both, and for a use case switching to it, an
@@ -143,9 +147,13 @@ in each app, which is slower than models change.
    spend rules (§1.2). The spend dashboard and alerts
    (`tk-decide-the-cost-source-of-truth-and-build-the-ll-b9fbda`, not built yet) must show
    unpriced tokens by app and model and alert on them, so a model that stays in use gets an
-   entry. When the data-handling
-   policy or a blocking evaluation gate is adopted, it needs its own check on uncataloged
-   models (e.g. an Opik rule on the tag), because the catalog no longer stops the call.
+   entry. Because the catalog no longer stops the call, the data-handling policy, when
+   adopted, needs a check that runs before it (e.g. `build_model` refusing a provider the
+   policy does not approve, which works for an uncataloged id because the provider is part
+   of the id). An Opik rule on the `model_status` tag only reports a call after the data has
+   reached the provider. A blocking evaluation gate needs no extra check for a model set in
+   a use case's declaration, because the evaluation runs on the pull request that changes it
+   (lifecycle spec §5.1 items 1 and 2) whether or not the model is cataloged.
 4. Floating aliases (`mistral-large-latest`) and preview models (`gemini-3-pro-preview`) are
    allowed for any use case. The catalog records that an id floats, because such a model can
    change behavior with no catalog change and no evaluation. Restricting them to
