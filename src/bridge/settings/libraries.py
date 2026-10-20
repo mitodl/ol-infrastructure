@@ -116,6 +116,10 @@ LIBRARIES: dict[str, LibraryRegistration] = {
 #: Only two of Doof's eight are a real gap: edx-sga and edx-api-client. Three
 #: repos are archived, one moved to GitHub Actions, one has been dormant since
 #: 2018, and one was never publishable through Doof in the first place.
+#:
+#: `ol-django` is a ninth entry and not one of Doof's eight: it is here so that
+#: `/doof publish ol-django` explains where it publishes instead of saying
+#: "unknown". It publishes itself through GitHub Actions (since 2026-08-28).
 UNPUBLISHABLE_LIBRARIES: dict[str, str] = {
     "ol-django": (
         "not published from Concourse by design — the repo publishes each "
