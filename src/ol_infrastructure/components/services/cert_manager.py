@@ -23,14 +23,14 @@ class OLCertManagerCertConfig(BaseModel):
     # Certificate lifetime as a Go duration, e.g. "87600h". cert-manager defaults
     # to 90 days.
     duration: str | None = None
-    # When set, cert-manager will add a PKCS12 keystore (keystore.p12) and truststore
-    # (truststore.p12) to the TLS secret. The keystore password is read from the named
-    # K8s Secret. Required for StarRocks SSL (which uses Java's JSSE / PKCS12 format).
-    pkcs12_keystore_password_secret_name: str | None = None
     # Hold the Pulumi operation until cert-manager reports the Certificate
     # Ready, so dependents see the Secret populated. Without it the resource
     # completes as soon as the API server accepts the object.
     wait_for_ready: bool = False
+    # When set, cert-manager will add a PKCS12 keystore (keystore.p12) and truststore
+    # (truststore.p12) to the TLS secret. The keystore password is read from the named
+    # K8s Secret. Required for StarRocks SSL (which uses Java's JSSE / PKCS12 format).
+    pkcs12_keystore_password_secret_name: str | None = None
     pkcs12_keystore_password_secret_key: str = "password"  # noqa: S105
     usages: list[
         Literal[
