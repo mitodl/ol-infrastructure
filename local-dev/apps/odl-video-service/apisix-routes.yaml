@@ -30,3 +30,8 @@ spec:
     backends:
     - serviceName: odlvideo-webapp
       servicePort: 8088
+    plugins:
+    - name: redirect
+      enable: true
+      config:
+        http_to_https: true

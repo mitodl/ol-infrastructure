@@ -38,6 +38,10 @@ spec:
     # next dev HMR runs over a websocket; harmless for the production image.
     websocket: true
     plugins:
+    - name: redirect
+      enable: true
+      config:
+        http_to_https: true
     - name: response-rewrite
       enable: true
       config:

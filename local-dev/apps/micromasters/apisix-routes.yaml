@@ -31,3 +31,8 @@ spec:
     backends:
     - serviceName: micromasters-webapp
       servicePort: 8079
+    plugins:
+    - name: redirect
+      enable: true
+      config:
+        http_to_https: true
