@@ -31,6 +31,12 @@ team that already exists is never sent a ``users`` list.
 
 Domains are declared in ``DOMAIN_CONFIG``.  Which assets belong to each is set
 from ol-data-platform's dbt manifest, not here.
+
+The business glossary is declared in ``GLOSSARY_CONFIG`` and ``GLOSSARY_TERMS``.
+The glossary and each term are created when missing and never patched, so a
+steward's edits in the OpenMetadata UI are kept: once a term exists, change its
+definition there, not here.  Which columns carry each term is set from
+ol-data-platform's dbt column meta (``meta.openmetadata.glossary``).
 """
 
 import os
@@ -186,6 +192,372 @@ _DOMAIN_TYPE = "Aggregate"
 
 # displayName is create-only for the same reason as teams.
 _DOMAIN_PATCHABLE_FIELDS: list[str] = ["description", "domainType"]
+
+# The business glossary.  Terms are referred to by FQN from ol-data-platform's
+# dbt column meta (e.g. "open-learning.course-run"), so renaming one breaks its
+# column links; the om-ingest-dbt job skips an FQN that does not exist.
+#
+# Definitions follow what the dimensional models in ol-data-platform
+# (src/ol_dbt/models/dimensional) implement.  The glossary's reviewers are its
+# owning team, so OpenMetadata creates each term as a draft and opens an
+# approval task for that team.
+GLOSSARY_NAME = "open-learning"
+_GLOSSARY_TEAM = "data-platform"
+
+GLOSSARY_CONFIG: dict[str, Any] = {
+    "displayName": "Open Learning",
+    "description": (
+        "What the terms used about MIT Open Learning's learners, courses and "
+        "enrollments mean in the warehouse, and the privacy categories its "
+        "columns fall into. Each term names the dimensional model that decides "
+        "it."
+    ),
+    # A column can carry several terms, e.g. Direct identifier and Directory
+    # information.  Exclusivity is set per parent term below instead.
+    "mutuallyExclusive": False,
+}
+
+_NIST_800_122 = {
+    "name": "NIST SP 800-122",
+    "endpoint": "https://nvlpubs.nist.gov/nistpubs/legacy/sp/nistspecialpublication800-122.pdf",
+}
+_FERPA_99_3 = {
+    "name": "34 CFR 99.3 (FERPA definitions)",
+    "endpoint": "https://www.ecfr.gov/current/title-34/subtitle-A/part-99/subpart-A/section-99.3",
+}
+
+# Created in order, so a parent term comes before its children.  ``parent`` is
+# the name of a term declared earlier.
+GLOSSARY_TERMS: list[dict[str, Any]] = [
+    {
+        "name": "platform",
+        "displayName": "Platform",
+        "synonyms": ["platform_code", "source platform"],
+        "description": (
+            "The system a record came from, by its code in `dim_platform`: "
+            "`mitxonline` (MITx Online), `mitxpro` (MIT xPRO), `edxorg` (edX.org), "
+            "`residential` (MITx Residential), `bootcamps`, `emeritus` and "
+            "`global_alumni` (xPRO courses run on partner platforms), "
+            "`micromasters`, `ocw` and `mitlearn`. Facts and `dim_course_run` "
+            "carry it as `platform`, `dim_course` as `primary_platform` and "
+            "`dim_program` as `platform_code`.\n\n"
+            "A course or course run readable id is unique only within a platform: "
+            "courses that moved from edX.org to MITx Online kept their ids. A join "
+            "on `courserun_readable_id` or `course_readable_id` must also match "
+            "the platform, or it fans out.\n\n"
+            "MicroMasters is not an Open edX instance of its own. Its course runs "
+            "are stored under the platform that ran them, and `micromasters` "
+            "appears only on programs and certificates."
+        ),
+    },
+    {
+        "name": "user",
+        "displayName": "User",
+        "synonyms": ["account holder", "person"],
+        "description": (
+            "A person, as `dim_user` resolves them from their accounts on every "
+            "platform. Accounts are the same person when they share a lowercased "
+            "email address or were already linked upstream (MITx Online with "
+            "edX.org, MIT Learn accounts sharing a global id). For xPRO, Bootcamps, "
+            "Residential, Emeritus and Global Alumni the email is the only signal, "
+            "so the same person under two emails is two users.\n\n"
+            "`user_pk` is derived from the person's most durable account id, so it "
+            "survives an email change; `user_pk_source` says which id it came "
+            "from. Facts refer to it as `user_fk`.\n\n"
+            "A user need not have enrolled in anything, e.g. an MIT Learn sign-up. "
+            "See Learner."
+        ),
+    },
+    {
+        "name": "learner",
+        "displayName": "Learner",
+        "synonyms": ["student", "enrollee"],
+        "description": (
+            "A user who has enrolled in a course run or a program: a `user_fk` "
+            "that appears in `tfact_enrollment`. `dim_user` has no learner flag "
+            "and holds every account, enrolled or not, so counting its rows counts "
+            "users, not learners.\n\n"
+            "`afact_learner_courserun_progress` has one row per learner and course "
+            "run, for course enrollments whose `user_fk` and `courserun_fk` both "
+            "resolved. `afact_learner_courserun_daily_activity` has one row per "
+            "learner, course run and day with tracked activity.\n\n"
+            "See Active learner for learners who did something."
+        ),
+    },
+    {
+        "name": "course",
+        "displayName": "Course",
+        "synonyms": ["course concept"],
+        "description": (
+            "A course as a catalog entry, independent of when it is taught, e.g. "
+            "6.00.1x. One current row per (`primary_platform`, "
+            "`course_readable_id`) in `dim_course`, which keeps history as SCD "
+            "Type 2 (filter on `is_current`). A course has one or more course "
+            "runs; enrollments, grades and certificates belong to the runs.\n\n"
+            "edX.org, Emeritus and Global Alumni have no course table, so their "
+            "courses are built from course runs. OCW courses are in `dim_course` "
+            "but have no runs or enrollments in the dimensional models."
+        ),
+    },
+    {
+        "name": "course-run",
+        "displayName": "Course run",
+        "synonyms": ["run", "course offering", "section"],
+        "description": (
+            "One offering of a course, with its own dates, enrollment window, "
+            "enrollments, grades and certificates. One current row per "
+            "(`platform`, `courserun_readable_id`) in `dim_course_run` (SCD Type "
+            "2, filter on `is_current`); `course_fk` points at its course.\n\n"
+            "`courserun_readable_id` is not unique across platforms (e.g. "
+            "`MITx/14.73x/2013_Spring` is on both `edxorg` and `mitxonline`), so "
+            "always pair it with `platform`."
+        ),
+    },
+    {
+        "name": "program",
+        "displayName": "Program",
+        "synonyms": ["MicroMasters", "professional certificate program"],
+        "description": (
+            "A set of courses that leads to a program certificate, e.g. a "
+            "MicroMasters program or an xPRO professional certificate. One row per "
+            "(`source_id`, `platform_code`) in `dim_program`; "
+            "`bridge_program_course` lists its courses and whether each is "
+            "required. Programs have no runs.\n\n"
+            "A program enrollment is a `tfact_enrollment` row with "
+            "`enrollment_type = 'program'`. MicroMasters has no program enrollment "
+            "records, so on a MicroMasters course enrollment `program_fk` is looked "
+            "up from the run's program membership. On an xPRO course enrollment "
+            "it is the program the course was bought under."
+        ),
+    },
+    {
+        "name": "enrollment",
+        "displayName": "Enrollment",
+        "synonyms": ["registration"],
+        "description": (
+            "A learner's registration in a course run or a program: one "
+            "`tfact_enrollment` row per (`enrollment_id`, `platform`, "
+            "`enrollment_type`), where `enrollment_type` is `course` or "
+            "`program`. The row stays after the learner unenrolls, so counting rows "
+            "counts everyone who ever enrolled. Filter on `enrollment_is_active` "
+            "for current enrollments (see Active enrollment).\n\n"
+            "A learner can hold several enrollments in one run after refunds, "
+            "deferrals or transfers; `afact_learner_courserun_progress` reports "
+            "the active one, else the newest. An xPRO program purchase creates a "
+            "program enrollment and a course enrollment for each of its courses."
+        ),
+    },
+    {
+        "name": "active-enrollment",
+        "displayName": "Active enrollment",
+        "synonyms": ["currently enrolled"],
+        "description": (
+            "An enrollment the learner has not left: "
+            "`tfact_enrollment.enrollment_is_active = true`, the platform's own "
+            'flag. This is the canonical "currently enrolled" test. Do not derive '
+            "it from `enrollment_status`, which records why an enrollment changed, "
+            "is null on edX.org and Residential, and differs by platform: "
+            "`deferred` marks active audit enrollments on MITx Online but inactive "
+            "ones on xPRO and Bootcamps.\n\n"
+            "It says nothing about whether the learner did anything in the course. "
+            "See Active learner."
+        ),
+    },
+    {
+        "name": "active-learner",
+        "displayName": "Active learner",
+        "synonyms": ["engaged learner"],
+        "description": (
+            "A learner with tracked course activity in a period: a row in "
+            "`afact_learner_courserun_daily_activity` for that day, month or "
+            "course run. Activity is a video play, problem check, course "
+            "navigation, discussion event or Open edX chatbot submit; enrolling "
+            "and earning a certificate are not activity. "
+            "`afact_learner_courserun_progress.last_active_on` is the latest such "
+            "day.\n\n"
+            "Only MITx Online, xPRO, Residential and edX.org have tracked "
+            "activity. The day is the event's date in the source's timezone, not "
+            "UTC.\n\n"
+            '"Active" has three meanings in the warehouse and this is the '
+            "behavioural one. An Active enrollment is a current enrollment, and an "
+            "Active account is an account that has not been deactivated."
+        ),
+    },
+    {
+        "name": "active-account",
+        "displayName": "Active account",
+        "synonyms": ["is_active"],
+        "description": (
+            "A platform account that has not been deactivated: the "
+            "`dim_user.user_is_active_on_<platform>` flags, copied from each "
+            "platform's account `is_active` flag, which the applications use to "
+            "soft-delete accounts. Null when the user has no account on that "
+            "platform.\n\n"
+            "It is not a measure of use: an account can be active without ever "
+            "being used. See Active learner."
+        ),
+    },
+    {
+        "name": "enrollment-mode",
+        "displayName": "Enrollment mode",
+        "synonyms": ["track", "course mode"],
+        "description": (
+            "The track a learner enrolled in, as the platform recorded it in "
+            "`tfact_enrollment.enrollment_mode`. The common values are `audit` and "
+            "`verified` (see Verified); edX.org also has `honor` and `credit`. "
+            "Null for Bootcamps, Emeritus and Global Alumni, which have no modes."
+        ),
+    },
+    {
+        "name": "verified",
+        "displayName": "Verified",
+        "synonyms": ["verified track", "verified certificate", "upgraded"],
+        "description": (
+            "Two related uses.\n\n"
+            "As an enrollment mode, `enrollment_mode = 'verified'` is the "
+            "certificate track a learner pays for, as opposed to `audit`. The "
+            "warehouse also sets it on DEDP course enrollments on MITx Online and "
+            "edX.org that a fulfilled MITx Online or MicroMasters order paid for, "
+            "whatever mode the platform recorded.\n\n"
+            "As a certificate type, `dim_certificate_type.certificate_type_code = "
+            "'verified'`. `tfact_certificate` gives it to every MITx Online course "
+            "and program certificate, MicroMasters course certificate, edX.org "
+            "program certificate and Bootcamps certificate. edX.org course "
+            "certificates take the mode recorded on the certificate, and xPRO "
+            "certificates are `professional`. "
+            "`certificate_requires_id_verification` is a fixed attribute of the "
+            "type, not a record that the learner's identity was checked."
+        ),
+    },
+    {
+        "name": "certificate",
+        "displayName": "Certificate",
+        "synonyms": ["credential", "certified"],
+        "description": (
+            "A certificate a platform issued to a learner for a course run "
+            "(`certificate_scope = 'course'`) or a program (`'program'`): one "
+            "`tfact_certificate` row per (`certificate_id`, `platform`, "
+            "`certificate_scope`), typed by `certificate_type_fk` (see Verified).\n\n"
+            "A revoked certificate keeps its row (`certificate_is_revoked`). When "
+            "a learner has more than one for a run, `is_current` marks the one "
+            "that stands: unrevoked first, then the latest issued. A MicroMasters "
+            "course certificate that arrives from both edX.org and MicroMasters "
+            "is collapsed to the edX.org row.\n\n"
+            "A learner is certified in a run "
+            "(`afact_learner_courserun_progress.is_certified`) when they hold an "
+            "unrevoked course certificate for it, which does not require a "
+            "passing grade. edX.org certificates are never marked revoked, and "
+            "Residential, Emeritus and Global Alumni have no certificates in the "
+            "warehouse."
+        ),
+    },
+    {
+        "name": "pii",
+        "displayName": "Personally identifiable information (PII)",
+        "synonyms": ["PII", "personal data"],
+        "references": [_NIST_800_122],
+        "description": (
+            "Per NIST SP 800-122, any information about an individual that can be "
+            "used to distinguish or trace their identity (e.g. name, email "
+            "address, date and place of birth), and any other information that is "
+            "linked or linkable to them (e.g. educational, financial and "
+            "employment information). In the warehouse that covers `dim_user` and "
+            "every fact row that carries a `user_fk`.\n\n"
+            "OpenMetadata's auto-classification sets the `PII.Sensitive` and "
+            "`PII.NonSensitive` tags from column names and content. The terms "
+            "under Identifiability say how directly a column identifies a person, "
+            "and the terms under FERPA classification say how FERPA treats it."
+        ),
+    },
+    {
+        "name": "identifiability",
+        "displayName": "Identifiability",
+        "references": [_NIST_800_122],
+        "mutuallyExclusive": True,
+        "description": (
+            "How directly a column identifies a person, after NIST SP 800-122. A "
+            "column carries at most one of these terms."
+        ),
+    },
+    {
+        "name": "direct-identifier",
+        "parent": "identifiability",
+        "displayName": "Direct identifier",
+        "synonyms": ["direct PII"],
+        "references": [_NIST_800_122],
+        "description": (
+            "A value that identifies one person on its own: a name, an email "
+            "address, or a platform user id or username. In `dim_user`: "
+            "`full_name`, `email`, `user_global_id`, and every `*_user_id`, "
+            "`*_username` and `*_identity_key` column."
+        ),
+    },
+    {
+        "name": "indirect-identifier",
+        "parent": "identifiability",
+        "displayName": "Indirect identifier",
+        "synonyms": ["quasi-identifier"],
+        "references": [_NIST_800_122, _FERPA_99_3],
+        "description": (
+            "A value that does not identify a person alone but can in combination "
+            "with others, e.g. date of birth, gender, location, employer or job "
+            "title. In `dim_user`: `birth_year`, `gender`, `address_country`, "
+            "`address_state`, `company`, `job_title`, `industry` and "
+            "`highest_education`. A small group broken down by these columns can "
+            "single a person out."
+        ),
+    },
+    {
+        "name": "ferpa-classification",
+        "displayName": "FERPA classification",
+        "references": [_FERPA_99_3],
+        "mutuallyExclusive": True,
+        "description": (
+            "How FERPA treats a column of student data. Under 34 CFR 99.3 "
+            "directory information is a part of a student's education record, so "
+            "a column carries the narrower term: Directory information when the "
+            "value is a directory item, Education record otherwise. A column "
+            "carries at most one of these terms."
+        ),
+    },
+    {
+        "name": "directory-information",
+        "parent": "ferpa-classification",
+        "displayName": "Directory information",
+        "references": [_FERPA_99_3],
+        "description": (
+            "Information from a student's education record that would not "
+            "generally be considered harmful or an invasion of privacy if "
+            "disclosed, and that an institution may disclose without consent "
+            "after giving notice, unless the student has opted out. 34 CFR 99.3 "
+            "lists e.g. name, address, telephone listing, email address, "
+            "photograph, date and place of birth, enrollment status, dates of "
+            "attendance, and degrees, honors and awards received; each institution "
+            "designates its own list. It excludes social security numbers and, "
+            "with narrow exceptions, student ID numbers.\n\n"
+            "Directory information is still PII. In `dim_user`: `full_name` and "
+            "`email`."
+        ),
+    },
+    {
+        "name": "education-record",
+        "parent": "ferpa-classification",
+        "displayName": "Education record",
+        "synonyms": ["educational record"],
+        "references": [_FERPA_99_3],
+        "description": (
+            "A record directly related to a student and maintained by the "
+            "institution or a party acting for it (34 CFR 99.3), e.g. grades, "
+            "assignments and submissions, and financial aid records. Disclosing "
+            "the parts that are not directory information needs the student's "
+            "written consent unless a FERPA exception applies.\n\n"
+            "In the dimensional models: grades (`tfact_grade` and the grade columns of "
+            "`afact_learner_courserun_progress`), the financial aid income in "
+            "`dim_user`, and the profile's `gender`, `company`, `job_title` and "
+            "`industry`."
+        ),
+    },
+]
 
 # displayName is set when a team is created and never patched afterwards:
 # IngestionBotPolicy, which this job's token carries, denies EditDisplayName
@@ -644,8 +1016,78 @@ def _access_control_steps() -> list[tuple[str, Callable[[], None]]]:
     ]
 
 
+def _create(collection: str, label: str, body: dict[str, Any]) -> None:
+    """POST a new entity.
+
+    :param collection: The API collection, e.g. ``"glossaries"``.
+    :param label: What is being created, for the log line.
+    :param body: The create request.
+    :raises requests.HTTPError: On any non-2xx response from the OM API.
+    """
+    post_resp = requests.post(
+        f"{OM_SERVER_URL}/v1/{collection}",
+        headers=_AUTH_HEADER,
+        json=body,
+        timeout=30,
+    )
+    post_resp.raise_for_status()
+    print(f"[done] {label}: created")  # noqa: T201
+
+
+def _reconcile_glossary() -> None:
+    """Create the glossary, owned and reviewed by its team, if it is missing.
+
+    :raises requests.HTTPError: On any non-2xx response from the OM API.
+    :raises ValueError: If the owning team does not exist.
+    """
+    label = f"glossary {GLOSSARY_NAME}"
+    if _get_by_name("glossaries", GLOSSARY_NAME) is not None:
+        print(f"[ok]   {label}: exists — skipping")  # noqa: T201
+        return
+
+    team = _get_by_name("teams", _GLOSSARY_TEAM)
+    if team is None:
+        msg = f"owning team {_GLOSSARY_TEAM!r} does not exist"
+        raise ValueError(msg)
+    team_ref = {"id": team["id"], "type": "team"}
+    _create(
+        "glossaries",
+        label,
+        {
+            "name": GLOSSARY_NAME,
+            **GLOSSARY_CONFIG,
+            "owners": [team_ref],
+            "reviewers": [team_ref],
+        },
+    )
+
+
+def _reconcile_glossary_term(term: dict[str, Any]) -> None:
+    """Create the glossary term if it is missing.
+
+    :param term: An entry of ``GLOSSARY_TERMS``.
+    :raises requests.HTTPError: On any non-2xx response from the OM API.
+    """
+    parent_fqn = GLOSSARY_NAME
+    if parent := term.get("parent"):
+        parent_fqn = f"{GLOSSARY_NAME}.{parent}"
+    fqn = f"{parent_fqn}.{term['name']}"
+    label = f"glossary term {fqn}"
+    if _get_by_name("glossaryTerms", fqn) is not None:
+        print(f"[ok]   {label}: exists — skipping")  # noqa: T201
+        return
+
+    body = {k: v for k, v in term.items() if k != "parent"}
+    if parent:
+        body["parent"] = parent_fqn
+    _create("glossaryTerms", label, {"glossary": GLOSSARY_NAME, **body})
+
+
 def main() -> None:
-    """Reconcile every tag, team and domain; exit non-zero if any step fails."""
+    """Reconcile every tag, team, domain and glossary term.
+
+    Exits non-zero if any step fails.
+    """
     errors: list[str] = []
 
     steps: list[tuple[str, Callable[[], None]]] = [
@@ -658,6 +1100,11 @@ def main() -> None:
         *(
             (f"domain {name}", partial(_reconcile_domain, name, domain))
             for name, domain in DOMAIN_CONFIG.items()
+        ),
+        (f"glossary {GLOSSARY_NAME}", _reconcile_glossary),
+        *(
+            (f"glossary term {term['name']}", partial(_reconcile_glossary_term, term))
+            for term in GLOSSARY_TERMS
         ),
     ]
     for label, step in steps:
