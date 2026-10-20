@@ -29,6 +29,8 @@ config:
     DEV_ENV: "false"
     LANGSMITH_PROJECT: "learn-ai-ci"
     LANGSMITH_TRACING: "true"
+    LOGIN_REDIRECT_ALLOWED_HOSTS: '["learn-ai-ci.ol.mit.edu", "ci.learn.mit.edu",
+      "courses.ci.learn.mit.edu"]'
     MITOL_APP_BASE_URL: "https://learn-ai-ci.ol.mit.edu"
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_COOKIE_NAME: "mitol"
