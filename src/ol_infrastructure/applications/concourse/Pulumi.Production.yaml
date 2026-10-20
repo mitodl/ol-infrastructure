@@ -35,8 +35,7 @@ config:
       OU: open-courseware
     concourse_team: ocw
     disk_size_gb: 1000
-    disk_throughput: 600
-    disk_iops: 3000
+    disk_throughput: 250
     iam_policies:
     - base
     - ocw
@@ -61,8 +60,7 @@ config:
       OU: operations
     concourse_team: infrastructure
     disk_size_gb: 1000
-    disk_throughput: 600
-    disk_iops: 4000
+    disk_throughput: 300
     iam_policies:
     - base
     - infra
