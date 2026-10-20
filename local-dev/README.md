@@ -1266,7 +1266,9 @@ read udp 10.87.0.1:47380->10.87.0.1:53: i/o timeout
 
 **Why:** Docker writes a container's `/etc/resolv.conf` when the container *starts*, from the host's resolver config at that moment, and never revisits it. Move the host between networks — home wifi to the office, VPN up or down — and every long-running container keeps forwarding DNS to resolvers that are no longer reachable. Nothing in the repo is broken, which is what makes this one confusing: the containers stay up, the nodes report `Ready`, and only name resolution is dead.
 
-A detail worth knowing, because it misleads: Docker appends public fallbacks (`8.8.8.8`, `8.8.4.4`) that *do* answer from any network. The failure is not that every resolver is dead — it's that the dead ones come first and burn the client's whole timeout budget before the fallback is reached. dagger's own logs show it abandoning the resolve at ~20s; containerd surfaces the same thing as a bare `Try again` (`EAI_AGAIN`).
+A detail worth knowing, because it misleads: the resolver list usually ends in public resolvers (`8.8.8.8`, `8.8.4.4`) that *do* answer from any network, so the failure is not that every resolver is dead — it's that the dead ones come first and burn the client's whole timeout budget before a working one is reached. dagger's own logs show it abandoning the resolve at ~20s; containerd surfaces the same thing as a bare `Try again` (`EAI_AGAIN`).
+
+Those public entries come from your *host's* config, not from Docker: for k3d nodes, moby copies the host file's nameservers into the node's `ExtServers` verbatim and adds nothing of its own. (It does substitute its own defaults, but only on the legacy bridge and only when no nameserver survives filtering — a path these nodes never take.) So a `host(8.8.8.8)` in a node's `resolv.conf` is a host resolver, and `cat /etc/resolv.conf` on the host will show it.
 
 To confirm, compare a container against the host — a stale one shows the old network's search domain and upstreams:
 
@@ -1282,6 +1284,11 @@ cat /etc/resolv.conf                                      # e.g. search mit.edu
 ```
 
 `start.sh` runs this automatically, before the exec heal.
+
+Two things the script has to work around, worth knowing if you are reading its output:
+
+- **systemd-resolved hosts** (the Ubuntu and Fedora default) publish a stub `/etc/resolv.conf` listing only `127.0.0.53`. The real upstreams live in `/run/systemd/resolve/resolv.conf`, and that is the file Docker reads when it sees the stub — so the script follows the same rule. Comparing against the stub instead would make it skip every container on exactly the hosts that need checking.
+- **A reading a restart cannot change is remembered.** Detection compares against the host's resolver list and probes suspect resolvers from the host, which on macOS is the Mac while the container's resolvers belong to the Docker VM. A VM-internal forwarder is then in neither the Mac's list nor reachable from it, and would read as drift forever. When a restart brings a container back byte-identical, the script records that verdict under `${XDG_STATE_HOME:-~/.local/state}/ol-local-dev/` and stops flagging it. The record is scoped to the host resolver config it was formed under, so changing networks discards it and everything is judged fresh again. Delete the file to reset.
 
 Pods already in `ImagePullBackOff` retry on kubelet's backoff timer (up to ~5m) rather than immediately, so a still-red Tilt right after a heal doesn't mean the heal failed. To retry at once, delete the pod:
 

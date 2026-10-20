@@ -221,27 +221,22 @@ resolver_answers() {
 	dig "@$1" +time="$PROBE_TIMEOUT" +tries=1 +short "$PROBE_NAME" >/dev/null 2>&1
 }
 
-# Docker substitutes its own public defaults when the host offers it no usable
-# (non-loopback) nameserver, so these can appear in a container's upstream list
-# without ever having been a host resolver. They are never the stale
-# previous-network upstream this script hunts: they answer from any network with
-# egress, so a container still pointing at them is not the breakage we are here
-# to fix. Counting them as drift would restart healthy containers — and since a
-# restart re-bakes the very same defaults, the confirmation below would then
-# fail every run. Exclude them from the candidate set.
-DOCKER_FALLBACK_NS=$'8.8.8.8\n8.8.4.4\n2001:4860:4860::8888\n2001:4860:4860::8844'
-
 # A container is stale when it is still pointing at a resolver that the host has
 # since dropped AND that no longer answers.
 #
 # Note the shape of this test. The obvious rule — "stale if none of its
-# resolvers answer" — is wrong here, because Docker appends public fallbacks
-# (8.8.8.8, 8.8.4.4) that answer from any network. The failure is not that
+# resolvers answer" — is wrong here. A host list routinely ends in public
+# resolvers (8.8.8.8, 8.8.4.4) that answer from any network, and a k3d node
+# inherits them verbatim: moby's TransformForIntNS copies exactly the host
+# file's nameservers into the node's ExtServers and adds nothing of its own.
+# (Only TransformForLegacyNw substitutes moby's own defaults, and only when no
+# nameserver survives filtering — a path these nodes never take, so a public
+# resolver seen here came from the host.) The failure is therefore not that
 # every resolver is dead; it is that the *dead ones come first* and burn the
-# client's entire timeout budget before the working fallback is ever reached.
-# dagger logs the resolve being abandoned at ~20s; containerd reports the same
-# failure as a bare `Try again` (EAI_AGAIN). So one unreachable stale entry is
-# enough to break image pulls, even with a working resolver behind it.
+# client's entire timeout budget before a working one is ever reached. dagger
+# logs the resolve being abandoned at ~20s; containerd reports the same failure
+# as a bare `Try again` (EAI_AGAIN). So one unreachable stale entry is enough to
+# break image pulls, even with a working resolver behind it.
 upstreams_stale() {
 	local conf="$1" ns found_stale=false
 	local -a upstreams
@@ -250,7 +245,6 @@ upstreams_stale() {
 
 	for ns in "${upstreams[@]}"; do
 		grep -qxF "$ns" <<<"$HOST_NS" && continue
-		grep -qxF "$ns" <<<"$DOCKER_FALLBACK_NS" && continue
 		memo_has "ns $ns" && continue
 		# Present in the container, absent from the host: a drift candidate.
 		if ! $HAVE_DIG || ! resolver_answers "$ns"; then
