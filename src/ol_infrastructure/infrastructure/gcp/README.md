@@ -55,6 +55,11 @@ is already enabled (four projects today); the command never enables an API, and
 reports the rest as not checked. A service account has no creation time in the
 IAM API, so a new one shows up only as missing from the baseline.
 
+`--all-projects` is for manual runs. It checks every project the account can
+list, so a project it cannot read (e.g. `mitx-pipeline-main-dc29`, below) or one
+that was never meant to be in the baseline fails every run. A scheduled run
+should check the baseline's projects, which is the default.
+
 Once a finding is understood (moved, deleted, or accepted as a known exception),
 regenerate the baseline and commit it:
 
