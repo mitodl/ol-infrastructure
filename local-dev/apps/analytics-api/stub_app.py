@@ -704,6 +704,28 @@ def _needs_attention(status, last_active_on, shared):
     return datetime.date.fromisoformat(last_active_on) <= _NEEDS_ATTENTION_CUTOFF
 
 
+# A course with no completable blocks, so the real view has nothing to count
+# and nulls content_progress for every learner in it, not for scattered rows.
+_NO_CONTENT_COURSERUN = "course-v1:MITx+15.S08x+2026_Summer"
+
+
+def _content_progress(n, status, shared, courserun_readable_id):
+    """Share of course content completed, 0 to 1 (ol-analytics-api#116).
+
+    None when consent is withheld, like every outcome field, and for every row
+    in _NO_CONTENT_COURSERUN. Most passed and certified rows read 1.0, with
+    one in five between 0.7 and 0.95: this is not the grade, so a learner can
+    pass without finishing every unit.
+    """
+    if not shared or courserun_readable_id == _NO_CONTENT_COURSERUN:
+        return None
+    if status == "not_started":
+        return 0.0
+    if status == "in_progress":
+        return round(0.05 + (n * 7 % 18) / 20, 2)
+    return round(0.7 + (n % 6) / 20, 2) if n % 5 == 0 else 1.0
+
+
 # One run in this many is skipped for each learner (see `_build_learner_progress`).
 _SKIP_EVERY = 4
 
@@ -768,6 +790,9 @@ def _build_learner_progress():
                     else None,
                     "grade": round((n % 10) / 10, 2) if shared else None,
                     "letter_grade": None,
+                    "content_progress": _content_progress(
+                        n, status, shared, run["courserun_readable_id"]
+                    ),
                     "certificate_issued_on": "2026-06-01T00:00:00Z"
                     if shared and certified
                     else None,
@@ -893,7 +918,130 @@ def _rows_for(resource, contract_scoped):
     ]
 
 
-def _needs_attention_row():
+# The real `/learners` rejects more `courserun_readable_id` values than this.
+MAX_COURSERUN_FILTERS = 50
+
+# Contracts answered with one course instead of contract "1"'s fifteen, to see
+# the learner directory with a single module. The MITx Online contract id
+# differs per local database, so override it with SINGLE_COURSE_CONTRACT_IDS
+# (comma-separated) if yours isn't 166.
+SINGLE_COURSE_CONTRACT_IDS = set(
+    filter(None, os.environ.get("SINGLE_COURSE_CONTRACT_IDS", "166").split(","))
+)
+
+# Relabels one existing run's learners as a course of the stub's own. Its id
+# and title match nothing in MITx Online, whose run for this contract shares
+# its course with contract "1"; the analytics pages never link to MITx Online
+# runs, so nothing depends on the two agreeing.
+_SINGLE_COURSE_SOURCE_RUN = "course-v1:MITx+6.86x+2026_Spring"
+_SINGLE_COURSE_RUN = {
+    "courserun_readable_id": "course-v1:MITx+AIMDx+2026_Spring",
+    "courserun_title": "Applied AI for Materials Discovery",
+}
+_SINGLE_COURSE_CONTRACT_NAME = "Test University Single Course Contract"
+_SINGLE_COURSE_SEAT_LIMIT = 50
+SINGLE_COURSE_LEARNER_PROGRESS = [
+    dict(row, **_SINGLE_COURSE_RUN)
+    for row in LEARNER_PROGRESS
+    if row["courserun_readable_id"] == _SINGLE_COURSE_SOURCE_RUN
+]
+SINGLE_COURSE_RUNS = [
+    {
+        "courserun_id": _SINGLE_COURSE_RUN["courserun_readable_id"],
+        "courserun_title": _SINGLE_COURSE_RUN["courserun_title"],
+        "courserun_start_on": SINGLE_COURSE_LEARNER_PROGRESS[0]["courserun_start_on"],
+        "courserun_end_on": SINGLE_COURSE_LEARNER_PROGRESS[0]["courserun_end_on"],
+    }
+]
+
+
+def _scaled(row, factor, keep=()):
+    """`row` with every int count scaled by `factor`, except the keys in `keep`."""
+    return {
+        k: round(v * factor) if type(v) is int and k not in keep else v
+        for k, v in row.items()
+    }
+
+
+def _single_course_resources(contract_id):
+    """Return the aggregate sections for a single-course contract, derived from
+    `SINGLE_COURSE_LEARNER_PROGRESS` so they agree with its learner directory.
+
+    The funnel and content rows are the source run's, which
+    `_reconcile_course_counts` already fitted to these same learner rows. The
+    content row's engagement cohorts predate that and exceed its enrollment,
+    so they're scaled down to fit inside it. The monthly trend is the org's,
+    scaled so its busiest month has as many active learners as the course has
+    learners, with certificates taken from the learner rows instead. A lone
+    course is in no program, so `program-funnel` is empty.
+    """
+    identity = {
+        "contract_pk": contract_id,
+        "contract_id": contract_id,
+        "b2b_contract_name": _SINGLE_COURSE_CONTRACT_NAME,
+    }
+    rows = SINGLE_COURSE_LEARNER_PROGRESS
+    learners = {r["learner_id"] for r in rows}
+    active = {r["learner_id"] for r in rows if r["enrollment_is_active"]}
+    passed = {
+        r["learner_id"]
+        for r in rows
+        if r["outcomes_shared"] and r["completion_status"] in ("passed", "certified")
+    }
+    certified = {
+        r["learner_id"]
+        for r in rows
+        if r["outcomes_shared"] and r["completion_status"] == "certified"
+    }
+    utilization = dict(
+        CONTRACT_UTILIZATION[0],
+        **identity,
+        b2b_contract_membership_type="code",
+        seat_limit=_SINGLE_COURSE_SEAT_LIMIT,
+        seats_consumed=len(learners),
+        active_learners=len(active),
+        learners_certified=len(certified),
+        seat_utilization_pct=round(len(learners) / _SINGLE_COURSE_SEAT_LIMIT * 100, 1),
+        completion_rate_pct=round(len(passed) / len(learners) * 100, 1),
+    )
+    funnel = [
+        dict(row, **identity, **_SINGLE_COURSE_RUN)
+        for row in ENROLLMENT_FUNNEL
+        if row["courserun_readable_id"] == _SINGLE_COURSE_SOURCE_RUN
+    ]
+    content = []
+    for row in CONTENT_ENGAGEMENT:
+        if row["courserun_readable_id"] != _SINGLE_COURSE_SOURCE_RUN:
+            continue
+        enrolled = row["total_enrolled_learners"]
+        fit = _scaled(
+            row,
+            min(1, enrolled * 0.8 / row["engaged_learners"]),
+            keep=("total_enrolled_learners", "certificates_earned"),
+        )
+        fit["engagement_rate_pct"] = round(fit["engaged_learners"] / enrolled * 100, 1)
+        content.append(dict(fit, **identity, **_SINGLE_COURSE_RUN))
+    busiest = max(row["monthly_active_learners"] for row in ENGAGEMENT_TREND)
+    trend = [
+        dict(
+            _scaled(row, len(learners) / busiest),
+            **identity,
+            certificates_earned=len(certified) or None,
+        )
+        for row in ENGAGEMENT_TREND
+    ]
+    return {
+        "contract-utilization": [utilization],
+        "enrollment-funnel": funnel,
+        "engagement-trend": trend,
+        "program-funnel": [],
+        "content-engagement": content,
+    }
+
+
+def _needs_attention_row(
+    learner_rows=LEARNER_PROGRESS, contract_id=_VIEWED_CONTRACT["contract_id"]
+):
     """`ContractNeedsAttention` for `_VIEWED_CONTRACT`, derived from
     `LEARNER_PROGRESS` so it always agrees with the learner directory's
     `needs_attention` filter, as the real query-time aggregate does.
@@ -904,9 +1052,9 @@ def _needs_attention_row():
     `include_inactive=false` default.
     Not floored: the fixture's counts sit well above the real API's floor.
     """
-    active = [r for r in LEARNER_PROGRESS if r["enrollment_is_active"]]
+    active = [r for r in learner_rows if r["enrollment_is_active"]]
     return {
-        "contract_id": int(_VIEWED_CONTRACT["contract_id"]),
+        "contract_id": int(contract_id),
         "learners_considered": len({r["learner_id"] for r in active}),
         "learners_needing_attention": len(
             {r["learner_id"] for r in active if r["needs_attention"]}
@@ -936,6 +1084,20 @@ COMPUTED = {
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+    single_course = False
+    contract_id = None
+
+    @property
+    def learner_rows(self):
+        """Learner rows for the contract this request is scoped to."""
+        if self.single_course:
+            return SINGLE_COURSE_LEARNER_PROGRESS
+        return LEARNER_PROGRESS
+
+    @property
+    def course_runs(self):
+        """`course-runs` rows for the contract this request is scoped to."""
+        return SINGLE_COURSE_RUNS if self.single_course else COURSE_RUNS
 
     def _send_json(self, status, payload):
         body = json.dumps(payload).encode("utf-8")
@@ -958,7 +1120,7 @@ class Handler(BaseHTTPRequestHandler):
         Paged but never filtered: the real endpoint takes only limit/offset.
         """
         offset, limit = self._parse_offset_limit(qs)
-        page = COURSE_RUNS[offset:]
+        page = self.course_runs[offset:]
         if limit is not None:
             page = page[:limit]
         self._send_json(
@@ -966,7 +1128,7 @@ class Handler(BaseHTTPRequestHandler):
             {
                 "organization_id": org,
                 "as_of": AS_OF,
-                "total_count": len(COURSE_RUNS),
+                "total_count": len(self.course_runs),
                 "data": page,
             },
         )
@@ -975,7 +1137,11 @@ class Handler(BaseHTTPRequestHandler):
         """needs-attention: distinct learners needing attention, paged like
         every org envelope even though there is only ever one row here.
         """
-        rows = [_needs_attention_row()]
+        rows = [
+            _needs_attention_row(self.learner_rows, self.contract_id)
+            if self.single_course
+            else _needs_attention_row()
+        ]
         offset, limit = self._parse_offset_limit(qs)
         page = rows[offset:]
         if limit is not None:
@@ -1003,7 +1169,7 @@ class Handler(BaseHTTPRequestHandler):
         sort_key = qs.get("sort", ["full_name"])[0]
         descending = qs.get("descending", ["false"])[0].lower() == "true"
 
-        rows = LEARNER_PROGRESS
+        rows = self.learner_rows
         if not include_inactive:
             rows = [r for r in rows if r["enrollment_is_active"]]
         if courserun:
@@ -1084,8 +1250,17 @@ class Handler(BaseHTTPRequestHandler):
         search = (qs.get("search", [""])[0] or "").strip().lower()
         statuses = qs.get("completion_status", [])
         needs_attention = qs.get("needs_attention", [None])[0]
+        # Repeatable here, unlike on learner-progress: values OR together.
+        courseruns = qs.get("courserun_readable_id", [])
+        if len(courseruns) > MAX_COURSERUN_FILTERS:
+            self._send_json(
+                422, {"detail": "courserun_readable_id takes at most 50 values"}
+            )
+            return
 
         def matches(r):
+            if courseruns and r["courserun_readable_id"] not in courseruns:
+                return False
             if search and not (
                 search in (r["full_name"] or "").lower()
                 or search in r["email"].lower()
@@ -1100,7 +1275,7 @@ class Handler(BaseHTTPRequestHandler):
                 return r["needs_attention"] is (needs_attention.lower() == "true")
             return True
 
-        active = [r for r in LEARNER_PROGRESS if r["enrollment_is_active"]]
+        active = [r for r in self.learner_rows if r["enrollment_is_active"]]
         matched = {r["learner_id"] for r in active if matches(r)}
         learners = {}
         for r in active:
@@ -1169,6 +1344,8 @@ class Handler(BaseHTTPRequestHandler):
 
         org = match.group("org")
         resource = match.group("resource")
+        self.contract_id = match.group("contract") if contract_scoped else None
+        self.single_course = self.contract_id in SINGLE_COURSE_CONTRACT_IDS
         qs = parse_qs(parsed.query)
 
         handler = COMPUTED.get(resource) or CONTRACT_ONLY.get(resource)
@@ -1182,7 +1359,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json(422, {"detail": "limit/offset must be integers"})
             return
 
-        rows = _rows_for(resource, contract_scoped)
+        rows = (
+            _single_course_resources(match.group("contract")).get(resource)
+            if self.single_course
+            else _rows_for(resource, contract_scoped)
+        )
         if rows is None:
             self._send_json(
                 404,
