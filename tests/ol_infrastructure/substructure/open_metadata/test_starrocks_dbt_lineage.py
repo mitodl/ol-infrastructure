@@ -280,18 +280,25 @@ def test_prune_refused(
     assert job.prune_refusal(model_count, stale, current, 0.5) is not None
 
 
-class _NotFoundError(Exception):
-    status_code = 404
+class _FakeAPIError(Exception):
+    def __init__(self, path: str, status_code: int) -> None:
+        super().__init__(path)
+        self.status_code = status_code
 
 
 class _FakeClient:
-    def __init__(self, gone: set[str]) -> None:
+    """Deletes edges; a path in ``gone`` is a 404 and one in ``rejected`` a 500."""
+
+    def __init__(self, gone: set[str], rejected: frozenset[str] = frozenset()) -> None:
         self.gone = gone
+        self.rejected = rejected
         self.deleted: list[str] = []
 
     def delete(self, path: str) -> None:
         if path in self.gone:
-            raise _NotFoundError(path)
+            raise _FakeAPIError(path, 404)
+        if path in self.rejected:
+            raise _FakeAPIError(path, 500)
         self.deleted.append(path)
 
 
@@ -339,7 +346,13 @@ def fake_sdk(job: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         job, "fqn", SimpleNamespace(build=_fake_build, quote_name=_quote)
     )
-    monkeypatch.setattr(job, "APIError", _NotFoundError)
+    monkeypatch.setattr(job, "APIError", _FakeAPIError)
+
+
+def _prune(
+    job: ModuleType, om: _FakeOM, manifest: dict[str, Any], settings: Any
+) -> tuple[int, int]:
+    return job._apply_prune(om, job._plan_prune(om, manifest, settings), settings)
 
 
 def _settings(job: ModuleType, *, dry_run: bool) -> Any:
@@ -389,7 +402,7 @@ def test_prune_deletes_only_stale_lake_edges(
     om = _FakeOM(_graph(), gone=set())
 
     with caplog.at_level("INFO"):
-        assert job._prune(om, MANIFEST, _settings(job, dry_run=False)) == (2, 0)
+        assert _prune(job, om, MANIFEST, _settings(job, dry_run=False)) == (2, 0)
 
     assert om.client.deleted == [
         "/lineage/table/lake-ol_warehouse.marts.dropped/table/sr-orders",
@@ -409,7 +422,7 @@ def test_dry_run_logs_without_deleting(
     om = _FakeOM(_graph(), gone=set())
 
     with caplog.at_level("INFO"):
-        assert job._prune(om, MANIFEST, _settings(job, dry_run=True)) == (2, 0)
+        assert _prune(job, om, MANIFEST, _settings(job, dry_run=True)) == (2, 0)
 
     assert om.client.deleted == []
     assert sum(message.startswith("Would delete") for message in caplog.messages) == 2
@@ -423,7 +436,7 @@ def test_an_edge_already_gone_is_not_a_failure(job: ModuleType) -> None:
         gone={"/lineage/table/lake-ol_warehouse.marts.users/table/sr-retired"},
     )
 
-    assert job._prune(om, MANIFEST, _settings(job, dry_run=False)) == (1, 0)
+    assert _prune(job, om, MANIFEST, _settings(job, dry_run=False)) == (1, 0)
 
 
 @pytest.mark.usefixtures("fake_sdk")
@@ -432,7 +445,7 @@ def test_a_manifest_without_starrocks_models_prunes_nothing(job: ModuleType) -> 
     om = _FakeOM(_graph(), gone=set())
     elsewhere = _manifest({"orders": ["ol_warehouse.marts.orders"]}, schema="other")
 
-    assert job._prune(om, elsewhere, _settings(job, dry_run=False)) == (0, 1)
+    assert _prune(job, om, elsewhere, _settings(job, dry_run=False)) == (0, 1)
     assert om.client.deleted == []
 
 
@@ -450,5 +463,62 @@ def test_a_prune_past_the_limit_deletes_nothing(job: ModuleType) -> None:
     # Only one model left reads the lake: nine of ten edges look stale.
     manifest = _manifest({"model_0": ["ol_warehouse.marts.t0"]})
 
-    assert job._prune(om, manifest, _settings(job, dry_run=False)) == (0, 1)
+    assert _prune(job, om, manifest, _settings(job, dry_run=False)) == (0, 1)
+    assert om.client.deleted == []
+
+
+@pytest.mark.usefixtures("fake_sdk")
+def test_a_rejected_delete_is_a_failure(job: ModuleType) -> None:
+    """Any API error other than a 404 fails the job."""
+    om = _FakeOM(_graph(), gone=set())
+    om.client.rejected = frozenset(
+        {"/lineage/table/lake-ol_warehouse.marts.users/table/sr-retired"}
+    )
+
+    assert _prune(job, om, MANIFEST, _settings(job, dry_run=False)) == (1, 1)
+    assert om.client.deleted == [
+        "/lineage/table/lake-ol_warehouse.marts.dropped/table/sr-orders"
+    ]
+
+
+@pytest.mark.usefixtures("fake_sdk")
+def test_edges_a_bad_manifest_links_do_not_dilute_the_guard(
+    job: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A manifest naming the wrong lake tables must not delete the right edges.
+
+    Its link step adds one edge per model.  Counted in the total, those edges
+    would make the correct ones only half of it, under the limit.
+    """
+    lineages = [
+        _lineage(
+            _starrocks(f"model_{i}"),
+            [(_lake(f"ol_warehouse.marts.t{i}"), "DbtLineage")],
+        )
+        for i in range(10)
+    ]
+    om = _FakeOM(lineages, gone=set())
+    wrong = _manifest({f"model_{i}": [f"ol_warehouse.wrong.t{i}"] for i in range(10)})
+
+    def link(
+        metadata: _FakeOM, manifest: dict[str, Any], settings: Any
+    ) -> tuple[int, int, set[str]]:
+        for source, _, model in job.source_edges(manifest, settings.schemas):
+            node = _lake(f"{source['database']}.{source['schema']}.{source['name']}")
+            lineage = metadata.lineages[f"sr-{model}"]
+            lineage["nodes"].append(node)
+            lineage["upstreamEdges"].append(
+                {
+                    "fromEntity": node["id"],
+                    "toEntity": lineage["entity"]["id"],
+                    "lineageDetails": {"source": "DbtLineage"},
+                }
+            )
+        return 10, 0, set()
+
+    monkeypatch.setattr(job, "_link", link)
+
+    counts = job._sync(om, wrong, _settings(job, dry_run=False))
+
+    assert (counts.linked, counts.pruned, counts.prune_failed) == (10, 0, 1)
     assert om.client.deleted == []

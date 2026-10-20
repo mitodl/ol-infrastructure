@@ -312,16 +312,25 @@ def _link(
     return linked, failed, missing
 
 
-def _prune(
+@dataclass(frozen=True)
+class PrunePlan:
+    """The stale edges a run found, and why it may not delete them."""
+
+    stale: list[LakeEdge]
+    refusal: str | None
+    failed: int
+
+
+def _plan_prune(
     metadata: OpenMetadata, manifest: dict[str, Any], settings: Settings
-) -> tuple[int, int]:
-    """Delete the lake edges into StarRocks that the manifest no longer declares.
+) -> PrunePlan:
+    """Find the lake edges into StarRocks that the manifest no longer declares.
 
     Every table in the configured StarRocks databases is checked, not only the
     manifest's models, so a removed model whose table OM still lists loses its
-    edges too.
-
-    :returns: Edges deleted (or that would be, in a dry run) and failures.
+    edges too.  This runs before linking: the guard has to weigh the stale
+    edges against the graph as it stood, because a bad manifest's own edges
+    would otherwise inflate the total and let it delete every correct one.
     """
     expected = lake_sources_by_model(
         manifest,
@@ -368,12 +377,49 @@ def _prune(
         log.info("%s stale lake edge %s -> %s", verb, edge.from_fqn, edge.to_fqn)
     if refusal:
         log.error("Not pruning stale lake edges: %s", refusal)
-        return 0, failed + 1
-    if settings.dry_run:
-        return len(stale), failed
+    return PrunePlan(stale=stale, refusal=refusal, failed=failed)
 
-    deleted, delete_failed = _delete_edges(metadata, stale)
-    return deleted, failed + delete_failed
+
+def _apply_prune(
+    metadata: OpenMetadata, plan: PrunePlan, settings: Settings
+) -> tuple[int, int]:
+    """Delete the planned edges unless the plan was refused or this is a dry run.
+
+    :returns: Edges deleted (or that would be, in a dry run) and failures.
+    """
+    if plan.refusal:
+        return 0, plan.failed + 1
+    if settings.dry_run:
+        return len(plan.stale), plan.failed
+    deleted, delete_failed = _delete_edges(metadata, plan.stale)
+    return deleted, plan.failed + delete_failed
+
+
+@dataclass(frozen=True)
+class RunCounts:
+    """What one run linked and pruned."""
+
+    linked: int
+    link_failed: int
+    missing: set[str]
+    pruned: int
+    prune_failed: int
+
+
+def _sync(
+    metadata: OpenMetadata, manifest: dict[str, Any], settings: Settings
+) -> RunCounts:
+    """Plan the prune against the graph as it stands, link, then prune."""
+    plan = _plan_prune(metadata, manifest, settings)
+    linked, link_failed, missing = _link(metadata, manifest, settings)
+    pruned, prune_failed = _apply_prune(metadata, plan, settings)
+    return RunCounts(
+        linked=linked,
+        link_failed=link_failed,
+        missing=missing,
+        pruned=pruned,
+        prune_failed=prune_failed,
+    )
 
 
 def _delete_edges(metadata: OpenMetadata, edges: list[LakeEdge]) -> tuple[int, int]:
@@ -438,24 +484,23 @@ def main() -> None:
         .read()
     )
 
-    linked, link_failed, missing = _link(metadata, manifest, settings)
+    counts = _sync(metadata, manifest, settings)
     # A table OM has not ingested is not this job's failure: the model may not
     # have been built yet, or the metadata job that creates the table may not
     # have run.
-    for name in sorted(missing):
+    for name in sorted(counts.missing):
         log.warning("No OpenMetadata table for %s; its edges were skipped", name)
-    pruned, prune_failed = _prune(metadata, manifest, settings)
     log.info(
         "Done. Linked=%d failed=%d tables-missing=%d pruned=%d%s prune-failed=%d",
-        linked,
-        link_failed,
-        len(missing),
-        pruned,
+        counts.linked,
+        counts.link_failed,
+        len(counts.missing),
+        counts.pruned,
         " (dry run)" if settings.dry_run else "",
-        prune_failed,
+        counts.prune_failed,
     )
 
-    if link_failed or prune_failed:
+    if counts.link_failed or counts.prune_failed:
         sys.exit(1)
 
 
