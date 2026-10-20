@@ -6,6 +6,11 @@
 # the heal on every wake so `kubectl exec` is reliable without you thinking
 # about it. It is a no-op when the cluster is healthy or stopped.
 #
+# It also runs heal-dns.sh, because waking is exactly when the network tends to
+# have changed underneath you — close the lid at home, open it at the office,
+# and every container is still forwarding DNS to the old network's resolvers
+# (see heal-dns.sh). Also a no-op when nothing has drifted.
+#
 # Setup (Homebrew sleepwatcher runs ~/.wakeup on wake):
 #
 #   brew install sleepwatcher
@@ -35,4 +40,5 @@ LOG="$HOME/Library/Logs/local-dev-heal.log"
 
 mkdir -p "$(dirname "$LOG")"
 echo "=== wake $(date '+%Y-%m-%dT%H:%M:%S') ===" >>"$LOG"
+"$REPO/local-dev/scripts/heal-dns.sh" >>"$LOG" 2>&1 || true
 "$REPO/local-dev/scripts/heal-exec.sh" >>"$LOG" 2>&1 || true

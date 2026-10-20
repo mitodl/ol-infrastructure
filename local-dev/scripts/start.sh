@@ -136,6 +136,21 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Heal stale container DNS (post-network-change recovery)
+# ---------------------------------------------------------------------------
+# Docker bakes a container's resolv.conf at start and never revisits it, so
+# moving the host between networks leaves long-running containers pointing at
+# resolvers they can no longer reach — image pulls and dagger builds then time
+# out on the registry. This runs before the exec heal on purpose: re-baking DNS
+# restarts the container anyway, and heal-exec.sh only bounces nodes that fail
+# its own probe, so a node healed here is not restarted twice.
+# This is a no-op when everything is current. Best-effort: never block startup.
+log "Checking container DNS freshness..."
+if ! "${SCRIPT_DIR}/heal-dns.sh"; then
+	warn "DNS heal reported problems; continuing to start Tilt anyway."
+fi
+
+# ---------------------------------------------------------------------------
 # Heal wedged kubelet exec/streaming (post-sleep recovery)
 # ---------------------------------------------------------------------------
 # After a Docker VM pause on Mac sleep (OrbStack or Docker Desktop), a node's kubelet exec/streaming server

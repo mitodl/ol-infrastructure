@@ -121,9 +121,10 @@ For per-developer app env vars and secrets (API keys, feature flags), don't edit
 This will:
 1. Validate that `setup.sh` has been run (cluster exists, kubeconfig configured, certs present)
 2. Restart the k3d cluster if it was paused by `stop.sh`, and the image registry if it was stopped
-3. Heal any wedged kubelet exec/streaming (see [Troubleshooting](#kubectl-exec-fails-with-a-502-wedged-kubelet-streaming)) — a no-op when healthy
-4. Sync Python dependencies via `uv`
-5. Start Tilt
+3. Re-bake stale container DNS if the host changed networks (see [Troubleshooting](#image-pulls-and-builds-fail-with-dns-io-timeout-after-changing-networks)) — a no-op when current
+4. Heal any wedged kubelet exec/streaming (see [Troubleshooting](#kubectl-exec-fails-with-a-502-wedged-kubelet-streaming)) — a no-op when healthy
+5. Sync Python dependencies via `uv`
+6. Start Tilt
 
 ### 4. Monitor the environment
 
@@ -168,7 +169,8 @@ ol-infrastructure/
 │
 └── local-dev/
     ├── scripts/                 # setup.sh, start.sh, stop.sh, teardown.sh, seed.sh,
-    │                            # heal-exec.sh, prune-docker.sh, kc-theme-image.sh
+    │                            # heal-exec.sh, heal-dns.sh, prune-docker.sh,
+    │                            # kc-theme-image.sh
     │                            # (each described in its header)
     ├── keycloak/                # Dockerfile for testing an unreleased ol-keycloakify theme
     ├── cluster/                 # k3d cluster definition + registry retention config
@@ -1252,6 +1254,43 @@ docker run --rm --volumes-from k3d-registry.localhost alpine rm -rf /var/lib/zot
 
 The push that follows re-uploads those layers. Note the error names the repo whose push broke — fixing the push (usually the timeout above) stops it recurring.
 
+### Image pulls and builds fail with DNS i/o timeout after changing networks
+
+Pods sit in `ImagePullBackOff` and dagger-backed Tilt builds (`codejail`, `mfe-*`) fail at `Container.from`, all with a DNS timeout on the registry:
+
+```
+failed to resolve reference "docker.io/library/python:3.12-slim-trixie":
+dial tcp: lookup registry-1.docker.io on 10.87.0.1:53:
+read udp 10.87.0.1:47380->10.87.0.1:53: i/o timeout
+```
+
+**Why:** Docker writes a container's `/etc/resolv.conf` when the container *starts*, from the host's resolver config at that moment, and never revisits it. Move the host between networks — home wifi to the office, VPN up or down — and every long-running container keeps forwarding DNS to resolvers that are no longer reachable. Nothing in the repo is broken, which is what makes this one confusing: the containers stay up, the nodes report `Ready`, and only name resolution is dead.
+
+A detail worth knowing, because it misleads: Docker appends public fallbacks (`8.8.8.8`, `8.8.4.4`) that *do* answer from any network. The failure is not that every resolver is dead — it's that the dead ones come first and burn the client's whole timeout budget before the fallback is reached. containerd and dagger both give up at ~20s.
+
+To confirm, compare a container against the host — a stale one shows the old network's search domain and upstreams:
+
+```bash
+docker exec k3d-local-dev-server-0 cat /etc/resolv.conf   # e.g. search hsd1.ma.comcast.net
+cat /etc/resolv.conf                                      # e.g. search mit.edu
+```
+
+**Fix:** run the heal script. It compares each container's baked resolvers against the host's current ones and `docker restart`s only the containers that actually drifted — a restart re-bakes `resolv.conf`, which is the whole fix. Like `heal-exec.sh` it avoids `k3d cluster stop/start`, so node IPs are preserved. It's a no-op when nothing has drifted:
+
+```bash
+./local-dev/scripts/heal-dns.sh
+```
+
+`start.sh` runs this automatically, before the exec heal.
+
+Pods already in `ImagePullBackOff` retry on kubelet's backoff timer (up to ~5m) rather than immediately, so a still-red Tilt right after a heal doesn't mean the heal failed. To retry at once, delete the pod:
+
+```bash
+kubectl --context local-dev delete pod -n <namespace> <pod>
+```
+
+**Automatic on wake:** `wakeup.example.sh` calls this alongside `heal-exec.sh` — see the sleepwatcher setup in the next section. Waking is exactly when the network tends to have changed underneath you.
+
 ### `kubectl exec` fails with a 502 (wedged kubelet streaming)
 
 `kubectl exec` / `attach` / `logs -f` into a pod may fail like this, even though `kubectl get` / `describe` / `logs` still work and the node shows `Ready`:
@@ -1281,7 +1320,7 @@ ln -sf "$PWD/local-dev/scripts/wakeup.example.sh" ~/.wakeup
 brew services start sleepwatcher
 ```
 
-sleepwatcher runs `~/.wakeup` on every wake; the example hook calls `heal-exec.sh` and logs to `~/Library/Logs/local-dev-heal.log`.
+sleepwatcher runs `~/.wakeup` on every wake; the example hook calls `heal-dns.sh` and `heal-exec.sh`, logging to `~/Library/Logs/local-dev-heal.log`.
 
 **Automatic on wake (Linux):** we don't ship a hook, but if your dev box suspends and you hit this, wrap `heal-exec.sh` in a systemd resume hook — a script in `/usr/lib/systemd/system-sleep/` (invoked with `post`/`resume`) or a unit ordered `After=suspend.target`.
 
