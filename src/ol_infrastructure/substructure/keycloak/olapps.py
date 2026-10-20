@@ -14,6 +14,9 @@ from ol_infrastructure.substructure.keycloak.learner_records import (
     create_learner_records_clients,
     parse_learner_records_clients,
 )
+from ol_infrastructure.substructure.keycloak.ol_memory import (
+    create_ol_memory_resources,
+)
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_browser_flows,
     create_organization_first_broker_login_flows,
@@ -47,6 +50,12 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     keycloak_realm_config = Config("keycloak_realm")
     captcha_domain = "www.recaptcha.net"
     mitlearn_domain = keycloak_realm_config.require("learn_domain")
+    # The shared memory service (applications/hindsight) runs in QA only for now.
+    # Off, the token exchange setting is left unmanaged rather than written as
+    # false, so environments without the service see no change.
+    ol_memory_enabled = (
+        keycloak_realm_config.get_bool("olapps-ol-memory-enabled") or False
+    )
     ol_apps_realm = keycloak.Realm(
         "olapps",
         # Labeled "Client Login Timeout" in the admin console's Tokens tab
@@ -400,6 +409,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
         service_accounts_enabled=False,
+        standard_token_exchange_enabled=ol_memory_enabled or None,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "olapps-learn-ai-redirect-uris"
         ),
@@ -451,6 +461,16 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         ).apply(json.dumps),
     )
     # Learn AI [END]
+
+    ol_memory_scopes = (
+        create_ol_memory_resources(
+            realm_id=ol_apps_realm.id,
+            learn_ai_client=olapps_learn_ai_client,
+            resource_options=resource_options,
+        )
+        if ol_memory_enabled
+        else None
+    )
 
     # OL ANALYTICS API [START]
     # ol-analytics-api is the B2B multi-tenant analytics gateway serving MIT
@@ -572,6 +592,17 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 "web-origins",
                 "ol-profile",
                 "organization",
+                # This client's secret is shared by several apps, so it never
+                # gets memory tokens itself. Its tokens name the clients that
+                # exchange them for memory tokens instead.
+                *(
+                    [
+                        ol_memory_scopes.learn_ai_audience.name,
+                        ol_memory_scopes.mitlearn_memory_audience.name,
+                    ]
+                    if ol_memory_scopes
+                    else []
+                ),
             ],
         )
         olapps_mitlearn_client_roles = keycloak_realm_config.get_object(
