@@ -1,16 +1,16 @@
 """cert-manager issuer and certificate state alert rules.
 
 Replaces the CertManagerACMEIssuerUnavailable* log rules, which counted the
-controller's "ACME client for issuer not initialised/available" line. Every
-controller start logs a burst of that line in the ~50ms before the issuer cache
-populates, so two pod reschedules 15m apart (2026-10-20, applications-production)
+controller's "ACME client for issuer not initialised/available" line. The
+controller logs a burst of that line on start, in the ~50ms before the issuer
+cache populates, so two pod reschedules 15m apart (2026-10-20, applications-production)
 kept the 15m count above threshold past the 20m for_ and paged with both
 ClusterIssuers Ready and every certificate valid. These rules read the state
 cert-manager reports about its own resources instead, so a restart cannot trip them.
 
 Depends on the controller ServiceMonitor enabled in
 infrastructure/aws/eks/cert_manager.py. Metric names and labels are from
-cert-manager v1.21.2 (pkg/metrics/*_test.go).
+cert-manager v1.21.2 (pkg/metrics/).
 
 CertManagerCertificateRenewalOverdue keys off renewal_timestamp rather than a
 fixed days-to-expiry threshold because renewBefore varies by issuer: the
