@@ -210,6 +210,8 @@ Open edX runs **in this cluster**, composed from the [lehrer](https://github.com
 tilt up --context local-dev -- --enabled_apps mit-learn,openedx
 ```
 
+List the apps comma-separated or repeat `--enabled_apps` once per app. A running Tilt takes the same flags from `tilt args -- --enabled_apps mit-learn,openedx`, which replaces its whole list.
+
 It needs lehrer checked out next to this repo (or `MITOL_WORKSPACE_ROOT` pointing at the directory that holds it). Nothing else: the `openedx-secrets` Secret is created for you from lehrer's `local-dev/secret-defaults.yaml`, the same file `lehrer dev setup` reads.
 
 How the split works, and why it is not a fork of lehrer's manifests:
