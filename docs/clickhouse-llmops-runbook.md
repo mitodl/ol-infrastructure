@@ -18,7 +18,7 @@ deployed on the data EKS cluster for LLMOps tooling (TensorZero, Opik).
 1. [Initial Cluster Setup](#initial-cluster-setup)
 2. [Adding a New LLMOps Tenant](#adding-a-new-llmops-tenant)
 3. [Rotating Credentials](#rotating-credentials)
-4. [Adjusting Hot/Cold Storage Tier Cutoff](#adjusting-hotcold-storage-tier-cutoff)
+4. [Tiered Storage and the Opik v2 Cutover](#tiered-storage-and-the-opik-v2-cutover)
 5. [Scaling the Cluster](#scaling-the-cluster)
 6. [Monitoring and Alerting](#monitoring-and-alerting)
 7. [Backup and Restore](#backup-and-restore)
@@ -150,38 +150,122 @@ of VSO syncing the new secret).
 
 ---
 
-## Adjusting Hot/Cold Storage Tier Cutoff
+## Tiered Storage and the Opik v2 Cutover
 
-The `hot_data_days` config is **informational only** — it is stored as a Pulumi stack
-config value for operator reference but is **not read by the Pulumi program** and does
-not automatically configure ClickHouse TTL MOVE intervals. The actual data movement
-cutoff is determined by the `TTL … TO VOLUME 'cold'` expressions defined in each
-table's DDL.
+> _Draft. Nothing below has been run in any environment yet._
 
-Each LLMOps tool must define `TTL` expressions in their table DDL pointing to the
-`tiered` storage policy. Example table DDL:
-```sql
-CREATE TABLE IF NOT EXISTS tensorzero_db.spans
-(
-    span_id UUID,
-    timestamp DateTime,
-    -- ... other columns
-)
-ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/tensorzero_db.spans', '{replica}')
-PARTITION BY toYYYYMM(timestamp)
-ORDER BY (timestamp, span_id)
-TTL timestamp + INTERVAL 7 DAY TO VOLUME 'cold'
-SETTINGS storage_policy = 'tiered';
-```
+Every table in every environment is on ClickHouse's built-in `default` policy and
+all parts sit on the hot `default` disk (checked 2026-10-20). Two policies are
+defined in `config.d/storage.xml` and neither is in use:
 
-To update the cutoff for a table, alter the TTL expression directly in ClickHouse:
-```sql
-ALTER TABLE tensorzero_db.spans MODIFY TTL timestamp + INTERVAL 14 DAY TO VOLUME 'cold';
-```
+- `tiered_replicated` is the Opik chart's `clickhouse.tieredStorage` layout
+  (chart 2.2.103): volume `default` on the `default` disk, volume `cold` on the
+  `cold` disk, which is a read-through cache over `cold_s3`. Tables move onto
+  it one at a time. A table can only switch to a policy that keeps every volume
+  and disk of its current one, which is why the hot volume is named `default`.
+- `tiered` (volumes `hot`, `cold`) predates the chart layout. No table can
+  switch to `tiered_replicated` from it, and nothing uses it; remove it once
+  the cutover is done.
 
-Updating `clickhouse:hot_data_days` via `pulumi config set` and running `pulumi up`
-will **not** change the TTL of existing tables; it only records the intended policy for
-operator awareness.
+`hot_data_days` is not read by the program. The move-to-cold interval lives in
+each table's TTL.
+
+Opik's `traces` and `spans` can't usefully tier as they are: they are
+unpartitioned, so each holds one or two huge parts spanning their whole history,
+and a TTL move takes whole parts. Upstream Opik replaces them with
+`traces_local_v2` / `spans_local_v2` (migrations 000101/000115, already applied
+and empty here), partitioned by `toMonday(id_at)`, through an operator-run
+cutover. After it, a move TTL moves whole weeks.
+
+The upstream policy attachment is the chart's `clickhouse-tiered-storage-ttl`
+Job (`clickhouse.tieredStorage.ttl.enabled`), not a Liquibase migration. It and
+the chart's cold-tier migration Job render only when `clickhouse.enabled` is
+true, i.e. when the chart runs ClickHouse itself. Our opik stack sets it false,
+so we run the equivalent statements ourselves (step 6).
+
+### Before the window
+
+1. The 26.3 server upgrade is done. The upstream cutover scripts and runbook
+   were verified against ClickHouse 26.3, and we run 24.8.
+2. `tiered_replicated` is present on every replica:
+   ```sql
+   SELECT hostName(), policy_name, volume_name, disks
+   FROM clusterAllReplicas('default', system.storage_policies)
+   WHERE policy_name = 'tiered_replicated';
+   ```
+3. Check out `apps/opik-backend/data-migrations/{traces,spans}-local-v2-cutover`
+   from comet-ml/opik at the tag matching `OPIK_CHART_VERSION` in
+   `src/bridge/lib/versions.py`. Read its `README.md` in full; this section only
+   maps it onto our deployment. Install a `clickhouse-client` matching the
+   server major and port-forward `svc/clickhouse` 9000 in namespace
+   `clickhouse`.
+4. Set these in `component.backend.env` in `applications/opik/__main__.py`,
+   apply the opik stack, then `kubectl -n opik rollout restart
+   deployment/opik-backend` (the chart does not roll pods on a ConfigMap
+   change) and confirm with `kubectl -n opik rollout status`:
+   - `ANALYTICS_DB_DATA_MODEL_TRACE_DELETION_EVENTS_CAPTURE_ENABLED=true`
+   - `ANALYTICS_DB_DATA_MODEL_SPAN_DELETION_EVENTS_CAPTURE_ENABLED=true`
+5. Provision the least-privilege cutover user described under "Required
+   privileges" upstream (column-scoped `ALTER UPDATE(_row_exists)`, the
+   four-privilege `RENAME`/`EXCHANGE` rule). Then run `delta_replay.sh` once
+   anchored at the current instant as the privilege smoke test.
+6. Freeze Opik chart upgrades (Renovate) from the backfill until `finalize.sh`.
+   A Liquibase change to `traces` or `spans` mid-window races the swap.
+7. Take an on-demand SQL backup:
+   `kubectl -n clickhouse create job --from=cronjob/clickhouse-backup clickhouse-backup-precutover`.
+   Data retention stays off (`RETENTION_ENABLED` unset), which the drivers
+   require.
+
+### The cutover, QA first
+
+Run traces first, then spans, each per its upstream README. Stop after the
+`EXCHANGE` (no `--with-wrap`): we run one shard, so the `Distributed` wrap buys
+nothing and adds a maintenance window.
+
+1. `estimate.sh`, then `backfill.sh --dry-run`, then `backfill.sh`. Record the
+   `backfill_start` it prints.
+2. `delta_replay.sh --backfill-start '<backfill_start> UTC'`, then a full
+   `verify.sh` (no sampling).
+3. Set `ANALYTICS_DB_DATA_MODEL_TRACE_COLUMNS_NON_NULLABLE=true` (or the
+   `SPAN_` one), roll the backend as in step 4 above, and check it positively:
+   an in-progress trace written through the API stores the epoch/NaN sentinel.
+4. Final `delta_replay.sh` (record `delta_start`), then immediately
+   `exchange_and_wrap.sh --backfill-start '<backfill_start> UTC'
+   --confirm-retention-paused`. Check that every per-host `ON CLUSTER` row
+   reports status 0, and record `exchange_done`.
+5. Immediately run `reconcile.sh --gap-start '<delta_start> UTC' --swap-done
+   '<exchange_done> UTC' --confirm-retention-paused` until it prints
+   `RECONCILED`, then `verify.sh --old-table traces_pre_cutover_backup
+   --new-table traces --window-from '<delta_start>' --window-to '<now>'`. Work
+   the upstream "When the cutover is done" checklist. Keep
+   `traces_pre_cutover_backup` through the soak; `finalize.sh` drops it.
+6. Tier the new table (it keeps the name `traces`, since there is no wrap).
+   These are the chart TTL Job's statements; `<weeks>` is the hot window
+   (chart default 13):
+   ```sql
+   ALTER TABLE opik_db.traces ON CLUSTER '{cluster}'
+     MODIFY SETTING storage_policy = 'tiered_replicated';
+   ALTER TABLE opik_db.traces ON CLUSTER '{cluster}'
+     MODIFY TTL id_at + INTERVAL <weeks> WEEK TO DISK 'cold'
+     SETTINGS materialize_ttl_after_modify = 0;
+   -- Backfill the TTL onto parts written before it existed, at a quiet time:
+   ALTER TABLE opik_db.traces ON CLUSTER '{cluster}' MATERIALIZE TTL;
+   ```
+   A later Opik migration that rebuilds the table drops this TTL, so check
+   `SHOW CREATE TABLE` after every Opik upgrade.
+7. Confirm parts reach `cold` past the hot window, and that queries spanning
+   both return the pre-cutover counts:
+   ```sql
+   SELECT disk_name, count(), formatReadableSize(sum(bytes_on_disk))
+   FROM system.parts WHERE database = 'opik_db' AND table IN ('traces', 'spans') AND active
+   GROUP BY disk_name;
+   ```
+   Then set `ANALYTICS_DB_COLD_STORAGE_DISK_HEALTH_CHECK_ENABLED=true` on the
+   backend, so a pod that can't reach `cold_s3` leaves readiness.
+
+Run the same sequence in Production after QA has soaked. Once both
+environments are on the v2 tables, drop `prefer_not_to_merge` and the `tiered`
+policy from the stack.
 
 ---
 
