@@ -54,12 +54,19 @@ from bridge.settings.apps import (
     release_resource_workflow as app_release_resource_workflow,
 )
 from bridge.settings.apps import repo_main_branch as app_repo_main_branch
+from ol_concourse.pipelines.applications.learn_ai_frontend.values import (
+    ENVIRONMENTS as LEARN_AI_FRONTEND_ENVIRONMENTS,
+)
 from ol_concourse.pipelines.constants import (
     ECR_REGION,
     PULUMI_WATCHED_PATHS,
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
+from ol_concourse.pipelines.infrastructure.k8s_apps.static_frontend import (
+    StaticFrontendConfig,
+    static_frontend_fragment,
+)
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
 from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
@@ -149,6 +156,7 @@ class AppPipelineParams(BaseModel):
     github_repo: str | None = None
     sentry_sourcemaps: SentrySourcemapsConfig | None = None
     refresh_stack: bool = True
+    static_frontend: StaticFrontendConfig | None = None
     description: str = ""
     category: str = "applications"
 
@@ -239,7 +247,10 @@ pipeline_params = {
     "learn-ai": AppPipelineParams(
         app_name="learn-ai",
         refresh_stack=False,
-        description="Builds the Learn AI service image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
+        static_frontend=StaticFrontendConfig(
+            path="frontend-demo/", environments=LEARN_AI_FRONTEND_ENVIRONMENTS
+        ),
+        description="Builds the Learn AI service image and deploys it to Kubernetes via Pulumi, and ships its static frontend with each release, following the modernized GitHub Release/Deployment workflow.",
     ),
     "mit-learn": AppPipelineParams(
         app_name="mit-learn",
@@ -1985,13 +1996,26 @@ def _build_release_resource_app_pipeline(
         jobs=ci_fragment.jobs,
     )
 
-    combined_fragment = PipelineFragment.combine_fragments(
+    fragments = [
         ci_deployment_fragment,
         qa_and_production_fragment,
         main_branch_container_fragement,
         release_container_fragment,
-    )
-    return combined_fragment.to_pipeline()
+    ]
+    if pipeline_parameters.static_frontend is not None:
+        fragments.append(
+            static_frontend_fragment(
+                app_name=app_name,
+                repo_uri=f"https://github.com/{github_repo}",
+                repo_main_branch=pipeline_parameters.repo_main_branch,
+                config=pipeline_parameters.static_frontend,
+                deployment_rc=deployment_rc,
+                deployment_prod=deployment_prod,
+                qa_job_name=qa_job_name,
+                production_job_name=f"deploy-{project_name}-production",
+            )
+        )
+    return PipelineFragment.combine_fragments(*fragments).to_pipeline()
 
 
 def build_app_pipeline(app_name: str) -> Pipeline:
@@ -2010,6 +2034,14 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     )
     if app_release_resource_workflow(app_name):
         return _build_release_resource_app_pipeline(app_name, pipeline_parameters)
+    if pipeline_parameters.static_frontend is not None:
+        # The frontend jobs chain off the release workflow's GitHub Deployments;
+        # the legacy shape has none, and would silently drop the frontend.
+        msg = (
+            f"{app_name}: static_frontend requires release_resource_workflow=True "
+            "in bridge.settings.apps."
+        )
+        raise ValueError(msg)
     return _build_legacy_app_pipeline(app_name, pipeline_parameters)
 
 

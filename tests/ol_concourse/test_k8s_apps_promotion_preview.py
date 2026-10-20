@@ -39,7 +39,10 @@ MARKER = f"<!-- ol-infrastructure-revision: {SHA} -->"
 
 def _job(app_name: str, job_suffix: str) -> dict[str, Any]:
     pipeline = json.loads(build_app_pipeline(app_name).model_dump_json())
-    (job,) = [j for j in pipeline["jobs"] if j["name"].endswith(job_suffix)]
+    # The full name, not a suffix: an app's static frontend jobs also end in
+    # "-qa" and "-production".
+    name = f"deploy-ol-application-{app_name}{job_suffix}"
+    (job,) = [j for j in pipeline["jobs"] if j["name"] == name]
     return job
 
 
