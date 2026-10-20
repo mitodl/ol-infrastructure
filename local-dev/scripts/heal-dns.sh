@@ -322,8 +322,15 @@ for node in "${ordered_nodes[@]:-}"; do
 			warn "Node '$node' not Ready within $READY_TIMEOUT after restart; continuing."
 		fi
 	fi
-	# Confirm the restart actually achieved what it was for.
-	if upstreams_stale "$(container_resolv "$node")"; then
+	# Confirm the restart actually achieved what it was for. An unreadable
+	# resolv.conf must not read as success: every staleness test returns false
+	# on empty input, so skipping this check would report "Healed" for a
+	# container we never managed to inspect.
+	conf="$(container_resolv "$node")"
+	if [[ -z "$conf" ]]; then
+		warn "Could not re-read /etc/resolv.conf in '$node' after restart; cannot confirm."
+		failed+=("$node")
+	elif upstreams_stale "$conf"; then
 		warn "Still stale after restart: $node"
 		failed+=("$node")
 	else
@@ -339,7 +346,10 @@ for eng in "${stale_dagger[@]:-}"; do
 		continue
 	fi
 	conf="$(container_resolv "$eng")"
-	if upstreams_stale "$conf" || search_stale "$conf"; then
+	if [[ -z "$conf" ]]; then
+		warn "Could not re-read /etc/resolv.conf in '$eng' after restart; cannot confirm."
+		failed+=("$eng")
+	elif upstreams_stale "$conf" || search_stale "$conf"; then
 		warn "Still stale after restart: $eng"
 		failed+=("$eng")
 	else
