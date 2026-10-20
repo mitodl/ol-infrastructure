@@ -102,6 +102,10 @@ Sub-modules
                  shared-data (S3) failures, replay lag and CN memory. Off the
                  FE/CN ServiceMonitors' allowlisted families; pairs with
                  dashboards/starrocks_overview.py.
+  cert_manager — New in 2026-10. ClusterIssuer and Certificate readiness,
+                 overdue renewals, and missing cert-manager metrics. Replaces
+                 the ACME log rules in log_rules/cert_manager.py, which paged
+                 on controller restarts.
   vector_edxapp_tracking
                — New in 2026-09. Source: grafana-alerts#9, recreated here rather
                  than merged there. edxapp tracking-log delivery off the Vector
@@ -117,6 +121,7 @@ from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
     apisix_edge,
+    cert_manager,
     clickhouse,
     dagster_control_plane,
     dagster_pgbouncer,
@@ -232,6 +237,7 @@ def create(resource_opts: ResourceOptions) -> None:
     dagster_control_plane.create(alerts_folder.uid, rd, resource_opts)
     witan.create(alerts_folder.uid, rd, resource_opts)
     clickhouse.create(alerts_folder.uid, rd, resource_opts)
+    cert_manager.create(alerts_folder.uid, rd, resource_opts)
     starrocks.create(alerts_folder.uid, rd, resource_opts)
     otel_service_red.create(alerts_folder.uid, rd, resource_opts)
     otel_trace_pipeline.create(alerts_folder.uid, rd, resource_opts)

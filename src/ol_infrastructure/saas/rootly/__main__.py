@@ -3472,7 +3472,9 @@ alerts_source_grafana_prometheus_production = rootly.AlertsSource(
                 # hours or weeks, so there is nothing a 3am page buys.
                 "ScheduledJobStaleFastCritical",
                 "ScheduledJobStaleSlowCritical",
-                "CertManagerACMEIssuerUnavailableProduction",
+                "CertManagerClusterIssuerNotReadyProduction",
+                "CertManagerCertificateNotReadyProduction",
+                "CertManagerCertificateRenewalOverdueProduction",
                 "CertManagerChallengePresentationFailureProduction",
                 "OCWStudioContentSyncInvalidPasswordProd",
                 "HPAAtMaxReplicasCritical",

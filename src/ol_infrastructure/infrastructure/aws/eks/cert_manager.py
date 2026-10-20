@@ -161,8 +161,13 @@ def setup_cert_manager(
                 "tolerations": operations_tolerations,
                 "replicaCount": 1,
                 "enableCertificateOwnerRef": True,
+                # Scraped by the k8s-monitoring collector's prometheusOperatorObjects
+                # integration; metric_rules/cert_manager.py alerts on these.
                 "prometheus": {
-                    "enabled": False,
+                    "enabled": True,
+                    "servicemonitor": {
+                        "enabled": True,
+                    },
                 },
                 "config": {
                     "apiVersion": "controller.config.cert-manager.io/v1alpha1",
