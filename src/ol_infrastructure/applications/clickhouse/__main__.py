@@ -192,10 +192,11 @@ ch_image = f"altinity/clickhouse-server:{ch_version}"
 # The server takes its MergeTree defaults from the default profile's
 # `compatibility` setting, once, at startup (Context::getMergeTreeSettings,
 # 25.8+). During a rolling upgrade, set it to the version being upgraded from so
-# an upgraded replica keeps writing parts the others can still read: 25.8 writes
-# compact parts that servers before 25.5 cannot read
-# (write_marks_for_substreams_in_compact_parts), and 25.11 and 26.3 change String
-# and nested-type serialization the same way. Remove it once every replica runs
+# an upgraded replica keeps writing parts the others can still read: 25.11, 26.1
+# and 26.3 change String, nested-type and index file serialization in ways older
+# servers cannot read. Altinity 25.8 changes no part format we use, so the 24.8
+# value is a precaution there; on a 25.8 replica it shows as
+# allow_part_offset_column_in_projections = 0. Remove it once every replica runs
 # the new version; it then takes effect at each replica's next restart.
 ch_compatibility = clickhouse_config.get("compatibility")
 keeper_image = f"clickhouse/clickhouse-keeper:{CLICKHOUSE_KEEPER_VERSION}"
