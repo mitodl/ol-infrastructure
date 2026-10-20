@@ -24,6 +24,7 @@ from typing import Any
 
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
+import pulumi_tls as tls
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 
@@ -37,6 +38,10 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBindingConfig,
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
@@ -175,6 +180,17 @@ INTERSERVER_CREDENTIALS_XML = dedent(f"""\
     </clickhouse>
 """)
 CLICKHOUSE_LOOPBACK_NETWORKS = ("127.0.0.1", "::1")
+# Names the operator derives its per-host Services from: chi-<chi>-<cluster>-
+# <shard>-<replica> and chk-<chk>-<cluster>-<shard>-<replica>.
+CHI_CLUSTER_NAME = "default"
+CHK_CLUSTER_NAME = "cluster1"
+# TLS listeners, next to the plaintext ones rather than replacing them.
+CLICKHOUSE_HTTPS_PORT = 8443
+CLICKHOUSE_NATIVE_TLS_PORT = 9440
+KEEPER_TLS_PORT = 9281
+CLICKHOUSE_TLS_DIR = "/etc/clickhouse-server/tls"
+KEEPER_TLS_DIR = "/etc/clickhouse-keeper/tls"
+TLS_DISABLED_PROTOCOLS = "sslv2,sslv3,tlsv1,tlsv1_1"
 
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(CLICKHOUSE_NAMESPACE, ns)
@@ -358,6 +374,8 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
     ebs_storageclass_output: "Output[Any]",
     fallback_storage_class: str,
     resources: dict[str, Any],
+    tls_secret_name: str,
+    tls_certificate: Any,
 ) -> "Output[kubernetes.apiextensions.CustomResource]":
     """Create a ClickHouseKeeperInstallation CRD resource managed by the Altinity operator.
 
@@ -438,6 +456,16 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                     ],
                     "settings": {
                         "keeper_server/tcp_port": "2181",
+                        # TLS client port beside 2181. The operator's
+                        # keeper-clickhouse Service is headless, so 9281 is
+                        # reachable through it without being declared. Raft
+                        # (9444) stays plaintext: turning on raft TLS is all
+                        # or nothing across the ensemble, and a rolling
+                        # restart would split it.
+                        "keeper_server/tcp_port_secure": str(KEEPER_TLS_PORT),
+                        "openSSL/server/certificateFile": f"{KEEPER_TLS_DIR}/tls.crt",
+                        "openSSL/server/privateKeyFile": f"{KEEPER_TLS_DIR}/tls.key",
+                        "openSSL/server/disableProtocols": TLS_DISABLED_PROTOCOLS,
                         "keeper_server/coordination_settings/raft_logs_level": "warning",
                         "keeper_server/coordination_settings/operation_timeout_ms": "10000",
                         "keeper_server/coordination_settings/session_timeout_ms": "30000",
@@ -491,6 +519,27 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                                         "name": "clickhouse-keeper",
                                         "image": image,
                                         "resources": resources,
+                                        "volumeMounts": [
+                                            {
+                                                "name": "keeper-tls",
+                                                "mountPath": KEEPER_TLS_DIR,
+                                                "readOnly": True,
+                                            }
+                                        ],
+                                    }
+                                ],
+                                # Mounted as a directory, not by subPath, so a
+                                # renewed certificate reaches the pod. Keeper
+                                # watches the certificate files and reloads
+                                # them. Group-readable through fsGroup 101,
+                                # the Keeper process's group.
+                                "volumes": [
+                                    {
+                                        "name": "keeper-tls",
+                                        "secret": {
+                                            "secretName": tls_secret_name,
+                                            "defaultMode": 0o440,
+                                        },
                                     }
                                 ],
                             },
@@ -518,6 +567,7 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                     ],
                 },
             },
+            opts=ResourceOptions(depends_on=[tls_certificate]),
         )
     )
 
@@ -545,6 +595,8 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     interserver_secret: Any,
     vault_k8s_resources: Any,
     resources: dict[str, Any],
+    tls_secret_name: str,
+    tls_certificate: Any,
 ) -> "Output[kubernetes.apiextensions.CustomResource]":
     """Build the ClickHouseInstallation CRD and return it wrapped in an Output.
 
@@ -868,6 +920,23 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                         "shutdown_wait_unfinished": str(
                             CLICKHOUSE_SHUTDOWN_WAIT_QUERIES_SECONDS
                         ),
+                        # TLS listeners beside 8123 and 9000, which stay open
+                        # for the operator, the backup job and Opik until each
+                        # moves over. The operator reaches the server on 8123
+                        # while that port exists (access.scheme auto).
+                        "https_port": str(CLICKHOUSE_HTTPS_PORT),
+                        "tcp_port_secure": str(CLICKHOUSE_NATIVE_TLS_PORT),
+                        # The server watches these two files and reloads them
+                        # when cert-manager renews the certificate.
+                        "openSSL/server/certificateFile": f"{CLICKHOUSE_TLS_DIR}/tls.crt",
+                        "openSSL/server/privateKeyFile": f"{CLICKHOUSE_TLS_DIR}/tls.key",
+                        "openSSL/server/disableProtocols": TLS_DISABLED_PROTOCOLS,
+                        # Adds the stack's CA to what the server trusts as a
+                        # client (Keeper over TLS, a TLS peer replica).
+                        # loadDefaultCAFile stays true in the base config, and
+                        # Poco loads both, so S3 (cold tier, backups) still
+                        # verifies against the system CAs.
+                        "openSSL/client/caConfig": f"{CLICKHOUSE_TLS_DIR}/ca.crt",
                     },
                     # Users, profiles, and quotas are managed by the operator
                     # (merged into its generated usersd configmap) rather than
@@ -946,6 +1015,30 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                                                 },
                                             },
                                         ],
+                                        "volumeMounts": [
+                                            {
+                                                "name": "clickhouse-tls",
+                                                "mountPath": CLICKHOUSE_TLS_DIR,
+                                                "readOnly": True,
+                                            }
+                                        ],
+                                    }
+                                ],
+                                # Mounted as a directory, not by subPath, so a
+                                # renewed certificate reaches the pod.
+                                # World-readable because the server runs as
+                                # uid/gid 101 and the pod has no fsGroup.
+                                # Adding fsGroup would have the kubelet re-own
+                                # every file on the data volume at the next
+                                # mount (its root is 0755, not group-writable,
+                                # so OnRootMismatch does not skip it).
+                                "volumes": [
+                                    {
+                                        "name": "clickhouse-tls",
+                                        "secret": {
+                                            "secretName": tls_secret_name,
+                                            "defaultMode": 0o444,
+                                        },
                                     }
                                 ],
                             },
@@ -992,6 +1085,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     users_secret,
                     interserver_secret,
                     vault_k8s_resources,
+                    tls_certificate,
                 ],
             ),
         )
@@ -1269,6 +1363,130 @@ interserver_secret = OLVaultK8SSecret(
 )
 
 ############################################################
+# TLS: a CA owned by this stack
+#
+# Unlike gravitino's namespace-local CA, which cert-manager generates, this one
+# is generated here so its certificate can be a stack output: Opik runs in
+# another namespace and has to trust it, and there is no trust-manager on the
+# data clusters to copy it there. The key lives in this stack's state,
+# encrypted with the stack's KMS key. cert-manager issues and renews the leaf
+# certificates from it.
+############################################################
+CA_VALIDITY_HOURS = 10 * 365 * 24
+clickhouse_ca_key = tls.PrivateKey(
+    f"clickhouse-ca-key-{stack_info.env_suffix}",
+    algorithm="ECDSA",
+    ecdsa_curve="P256",
+)
+# Clients embed this certificate in their trust stores, so renewing it is a
+# planned event for every client at once. Ten years keeps it one.
+clickhouse_ca_cert = tls.SelfSignedCert(
+    f"clickhouse-ca-cert-{stack_info.env_suffix}",
+    private_key_pem=clickhouse_ca_key.private_key_pem,
+    is_ca_certificate=True,
+    validity_period_hours=CA_VALIDITY_HOURS,
+    allowed_uses=["cert_signing", "crl_signing", "digital_signature"],
+    subject=tls.SelfSignedCertSubjectArgs(
+        common_name=f"clickhouse-ca-{stack_info.env_suffix}",
+        organization="Massachusetts Institute of Technology",
+        organizational_unit="Open Learning",
+    ),
+)
+clickhouse_ca_secret_name = "clickhouse-ca"  # noqa: S105  # pragma: allowlist secret
+clickhouse_ca_secret = kubernetes.core.v1.Secret(
+    f"clickhouse-ca-secret-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=clickhouse_ca_secret_name,
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels=k8s_global_labels,
+    ),
+    type="kubernetes.io/tls",
+    string_data={
+        "tls.crt": clickhouse_ca_cert.cert_pem,
+        "tls.key": clickhouse_ca_key.private_key_pem,
+    },
+)
+clickhouse_ca_issuer = kubernetes.apiextensions.CustomResource(
+    f"clickhouse-ca-issuer-{stack_info.env_suffix}",
+    api_version="cert-manager.io/v1",
+    kind="Issuer",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="clickhouse-ca",
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels=k8s_global_labels,
+    ),
+    spec={"ca": {"secretName": clickhouse_ca_secret_name}},
+    opts=ResourceOptions(depends_on=[clickhouse_ca_secret]),
+)
+
+
+def _service_dns_names(service: str) -> list[str]:
+    """Every name a client in the cluster can reach ``service`` by.
+
+    The operator's own config uses the bare Service name (remote_servers,
+    interserver_http_host), so the short forms are included as well as the FQDN.
+    """
+    return [
+        service,
+        f"{service}.{CLICKHOUSE_NAMESPACE}",
+        f"{service}.{CLICKHOUSE_NAMESPACE}.svc",
+        f"{service}.{CLICKHOUSE_NAMESPACE}.svc.cluster.local",
+    ]
+
+
+clickhouse_tls_secret_name = "clickhouse-server-tls"  # noqa: S105  # pragma: allowlist secret
+clickhouse_server_certificate = OLCertManagerCert(
+    f"clickhouse-server-cert-{stack_info.env_suffix}",
+    cert_config=OLCertManagerCertConfig(
+        application_name="clickhouse",
+        resource_suffix="server",
+        k8s_namespace=CLICKHOUSE_NAMESPACE,
+        k8s_labels=k8s_global_labels,
+        issuer_name="clickhouse-ca",
+        dest_secret_name=clickhouse_tls_secret_name,
+        dns_names=[
+            "localhost",
+            # The load-balanced client Service and the operator's own.
+            *_service_dns_names("clickhouse"),
+            *_service_dns_names("clickhouse-clickhouse"),
+            *(
+                name
+                for replica in range(ch_replicas)
+                for name in _service_dns_names(
+                    f"chi-clickhouse-{CHI_CLUSTER_NAME}-0-{replica}"
+                )
+            ),
+        ],
+    ),
+    opts=ResourceOptions(depends_on=[clickhouse_ca_issuer]),
+)
+
+keeper_tls_secret_name = "clickhouse-keeper-tls"  # noqa: S105  # pragma: allowlist secret
+keeper_server_certificate = OLCertManagerCert(
+    f"clickhouse-keeper-cert-{stack_info.env_suffix}",
+    cert_config=OLCertManagerCertConfig(
+        application_name="clickhouse",
+        resource_suffix="keeper",
+        k8s_namespace=CLICKHOUSE_NAMESPACE,
+        k8s_labels=k8s_global_labels,
+        issuer_name="clickhouse-ca",
+        dest_secret_name=keeper_tls_secret_name,
+        dns_names=[
+            "localhost",
+            *_service_dns_names("keeper-clickhouse"),
+            *(
+                name
+                for replica in range(keeper_replicas)
+                for name in _service_dns_names(
+                    f"chk-clickhouse-{CHK_CLUSTER_NAME}-0-{replica}"
+                )
+            ),
+        ],
+    ),
+    opts=ResourceOptions(depends_on=[clickhouse_ca_issuer]),
+)
+
+############################################################
 # ClickHouse Keeper — ClickHouseKeeperInstallation CRD
 #
 # Keeper provides distributed coordination (ZooKeeper-compatible protocol)
@@ -1286,6 +1504,8 @@ keeper_installation = _create_clickhouse_keeper_installation(
     ebs_storageclass_output=cluster_stack.get_output("ebs_storageclass"),
     fallback_storage_class=storage_class,
     resources=keeper_resources,
+    tls_secret_name=keeper_tls_secret_name,
+    tls_certificate=keeper_server_certificate,
 )
 
 ############################################################
@@ -1324,6 +1544,8 @@ clickhouse_installation = _create_clickhouse_installation(
     users_secret=users_secret,
     interserver_secret=interserver_secret,
     vault_k8s_resources=clickhouse_app.vault_k8s_resources,
+    tls_secret_name=clickhouse_tls_secret_name,
+    tls_certificate=clickhouse_server_certificate,
 )
 
 ############################################################
@@ -1540,6 +1762,16 @@ clickhouse_client_service = kubernetes.core.v1.Service(
                 port=9000,
                 target_port=9000,
             ),
+            kubernetes.core.v1.ServicePortArgs(
+                name="https",
+                port=CLICKHOUSE_HTTPS_PORT,
+                target_port=CLICKHOUSE_HTTPS_PORT,
+            ),
+            kubernetes.core.v1.ServicePortArgs(
+                name="native-tls",
+                port=CLICKHOUSE_NATIVE_TLS_PORT,
+                target_port=CLICKHOUSE_NATIVE_TLS_PORT,
+            ),
         ],
     ),
 )
@@ -1640,6 +1872,12 @@ clickhouse_network_policy = kubernetes.networking.v1.NetworkPolicy(
                 ports=[
                     kubernetes.networking.v1.NetworkPolicyPortArgs(port=8123),
                     kubernetes.networking.v1.NetworkPolicyPortArgs(port=9000),
+                    kubernetes.networking.v1.NetworkPolicyPortArgs(
+                        port=CLICKHOUSE_HTTPS_PORT
+                    ),
+                    kubernetes.networking.v1.NetworkPolicyPortArgs(
+                        port=CLICKHOUSE_NATIVE_TLS_PORT
+                    ),
                 ],
             ),
             # Allow Prometheus scraping from Alloy, which runs in the `grafana`
@@ -1776,6 +2014,12 @@ export(
 )
 export("clickhouse_native_port", 9000)
 export("clickhouse_http_port", 8123)
+export("clickhouse_native_tls_port", CLICKHOUSE_NATIVE_TLS_PORT)
+export("clickhouse_https_port", CLICKHOUSE_HTTPS_PORT)
+export("keeper_tls_port", KEEPER_TLS_PORT)
+# Public half only. Clients outside the clickhouse namespace add it to their
+# trust stores (applications/opik).
+export("ca_certificate_pem", clickhouse_ca_cert.cert_pem)
 export(
     "keeper_service",
     f"keeper-clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local",
@@ -1785,8 +2029,11 @@ export(
     "connection_guide",
     dedent(f"""\
         ClickHouse HTTP: http://clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:8123
+        ClickHouse HTTPS: https://clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:{CLICKHOUSE_HTTPS_PORT}
         ClickHouse Native: clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:9000
+        ClickHouse Native TLS: clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:{CLICKHOUSE_NATIVE_TLS_PORT}
         Keeper: keeper-clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:2181
+        Keeper TLS: keeper-clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:{KEEPER_TLS_PORT}
 
         Tenants: opik_db
         Hot/cold cutoff: {hot_data_days} days (table TTL MOVE expressions)
