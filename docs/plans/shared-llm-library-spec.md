@@ -328,6 +328,7 @@ missing (inventory, 2026-09-10).
 3. Validation failures retry on the same model, not a fallback. Output validators raise
    `ModelRetry`; `Agent(retries=…)` bounds them (PydanticAI's default is 1 for tools and 1 for
    output). A model that cannot produce the schema is not fixed by a different model mid-run.
+   A streamed run does not retry (§6.5).
 4. Fallback is a declared per-use-case policy. Composed as `FallbackModel` with
    `fallback_on` set to the "fall back" rows above, not PydanticAI's default of every
    `ModelAPIError`, which would mask 401s and 400s. Streams fall back only before the first
@@ -894,6 +895,10 @@ primary made one attempt and raised `LLMRejected` without trying the fallback.
 - Validation failures retry on the same model (§3.2 rule 3). `UseCase.output_retries` sets
   `Agent(retries={"output": n})`, default 1, which is PydanticAI's default. When they are
   spent the caller gets `LLMInvalidOutput`.
+- A streamed run is the exception. PydanticAI's `run_stream` keeps the first output that
+  matches the output type, so invalid output raises `LLMInvalidOutput` with no retry, and the
+  caller may already have read part of it. A retry would stream a second answer after chunks
+  of the discarded one the caller may have shown. Decided 2026-10-20 (mitodl/ol-llm#11).
 
 ### 6.6 Entry points
 
@@ -909,7 +914,8 @@ Both paths share the model factory, policy, attribution, tracing, and errors.
 - The `_sync` variants exist for Celery tasks and Dagster assets.
 - Streaming is for the request profile. `run_stream` is an async context manager yielding an
   object with `stream_text()`, `stream_output()`, and `result()`; `result()` is available
-  once the stream is consumed and carries the same markers as a non-streamed call.
+  once the stream is consumed and carries the same markers as a non-streamed call. Invalid
+  output is not retried (§6.5).
 - Call sites that are not built on PydanticAI (learn-ai's LangGraph bots) take the numbers
   from `resolve_policy(use_case)` and apply them to their own client. The retry wrapper and
   typed errors apply only to models the library builds.
