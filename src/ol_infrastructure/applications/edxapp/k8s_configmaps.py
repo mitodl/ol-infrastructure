@@ -1004,7 +1004,9 @@ def create_k8s_configmaps(  # noqa: PLR0915
     # that key would silently clobber the deepl / openai / gemini / mistral providers --
     # last one wins, no error anywhere. ol-openedx-course-translations (0.11.0 and
     # later, from mitodl/open-edx-plugins) folds these into TRANSLATIONS_PROVIDERS in
-    # Python, from its production plugin settings hook.
+    # Python, from its production plugin settings hook. The `v1` API version needs
+    # 0.12.1 or later: earlier releases pin litellm 1.83.0, whose v1 client path
+    # drops the Entra token provider.
     azure_openai_config_name: str | None = None
     azure_openai_config_map = None
     if azure_openai_stack is not None:
