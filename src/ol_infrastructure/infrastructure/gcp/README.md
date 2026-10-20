@@ -313,11 +313,22 @@ enabled no APIs.
    _Internal_ if it is an `mit.edu` account (no verification needed),
    otherwise _External_, published to production. An External app left in
    _Testing_ issues refresh tokens that expire after 7 days, which breaks a
-   scheduled sync.
+   scheduled sync. _Publish app_ refuses until Branding has `mit.edu` under
+   authorized domains and the three App domain links filled in; the OCW home
+   page and its privacy and terms page satisfy them. Leave the logo empty,
+   because a logo puts the app through brand verification.
 4. Console > Clients > Web application, with Data Collaborative's redirect URI.
    The secret is shown once; capture it into
-   `src/bridge/secrets/gcp/` immediately, then hand the client id, secret and
-   project id to Data Collaborative over a secure channel.
+   `src/bridge/secrets/gcp/ocw_highsystems_oauth.production.yaml` immediately,
+   then hand the client id, secret and project id to Data Collaborative over a
+   secure channel.
+
+The channel is owned by `mitopencourseware@gmail.com`, so the app is
+_External_ and published, as "OCW HighSystems". It is unverified, so the owner
+clicks through an unverified-app warning once when connecting HighSystems. The
+registered redirect URI carries an `accessToken` query parameter that Google
+matches exactly, so if Data Collaborative changes that token the client and the
+`redirect_uri` in the SOPS file have to be updated to match.
 
 The channel owner then completes the OAuth flow in HighSystems with
 `yt-analytics.readonly` and `youtube.readonly`. The second is not optional:
@@ -326,12 +337,11 @@ with only the analytics scope is rejected. An OAuth client with no token
 requests for six months is deleted by Google, so a stalled integration loses
 its client.
 
-The consent screen's scope list does not limit what a client can request. With
-an _Internal_ app there is also no Google review and no unverified-app warning,
-so whoever holds the client secret and controls a registered redirect URI can
-ask any `mit.edu` user for any scope under an MIT-branded screen. Keep the
+The consent screen's scope list does not limit what a client can request, so
+whoever holds the client secret and controls a registered redirect URI can ask
+any Google user for any scope under the OCW HighSystems name. Keep the
 redirect URIs to Data Collaborative's single callback. Name the OL owner of the
-client in its description. To cut access, rotate or delete the client secret
+client in its name. To cut access, rotate or delete the client secret
 in the console, and have the channel owner revoke HighSystems at
 <https://myaccount.google.com/permissions>.
 
