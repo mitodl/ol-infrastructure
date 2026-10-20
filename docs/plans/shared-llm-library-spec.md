@@ -315,7 +315,7 @@ missing (inventory, 2026-09-10).
    | `ModelHTTPError` 429 | rate limited | yes, honoring `retry_after` | yes |
    | `ModelHTTPError` 408, 500, 502, 503, 504, 529 | provider unavailable | yes | yes |
    | `ModelAPIError` that is not `ModelHTTPError` (connection errors; OpenAI, Anthropic, and Bedrock timeouts arrive this way) | provider unavailable | yes | yes |
-   | `ModelHTTPError` 400, 401, 403, 404, 422 | rejected (our bug or config) | no | no |
+   | `ModelHTTPError` 400, 401, 403, 404, 413, 422 | rejected (our bug or config; a 400, 413, or 422 can be one batch row's input, rule 7) | no | no |
    | `ContentFilterError` | content filtered | no | no |
    | `UnexpectedModelBehavior` after output retries are spent | invalid output | no | no |
    | `UsageLimitExceeded` | budget exceeded | no | no |
