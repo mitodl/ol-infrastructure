@@ -318,9 +318,14 @@ extend_exclude = [
   # Runs in marimo single-user pods from a postStart hook; tomlkit comes with
   # marimo there.
   "src/ol_infrastructure/applications/jupyterhub_data/marimo_ai_defaults\\.py",
+  # Hindsight extensions, mounted into the Hindsight image and imported there.
+  "src/ol_infrastructure/applications/hindsight/ol_memory_ext/",
   "dockerfiles/",
   "scripts/helpers/",
   "scripts/openedx/",
+  # The Hindsight extension harness declares its dependencies inline
+  # (uv run --script) and runs against containers, not this environment.
+  "scripts/hindsight/",
   # Standalone services: the files below are the service runtime, built into
   # their own image against their own requirements.txt, so they import things
   # this project does not declare (flask, slack_bolt, aiohttp, github).

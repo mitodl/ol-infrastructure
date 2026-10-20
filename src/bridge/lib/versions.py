@@ -191,3 +191,11 @@ LOKI_VERSION = "3.7.8"
 ALLOY_VERSION = "v1.20.1"
 # renovate: datasource=docker depName=grafana packageName=grafana/grafana
 GRAFANA_VERSION = "13.2.3"
+# The -slim variant: no bundled local models. Embeddings come from the
+# text-embeddings-inference server below.
+# renovate: datasource=docker depName=hindsight-api packageName=ghcr.io/vectorize-io/hindsight-api
+HINDSIGHT_VERSION = "1.0.0-slim"
+# The plain tag is the GPU build; the stack runs f"cpu-{TEXT_EMBEDDINGS_INFERENCE_VERSION}",
+# published for amd64 only. Renovate tracks the plain tags, which move together.
+# renovate: datasource=docker depName=text-embeddings-inference packageName=ghcr.io/huggingface/text-embeddings-inference
+TEXT_EMBEDDINGS_INFERENCE_VERSION = "1.9.4"
