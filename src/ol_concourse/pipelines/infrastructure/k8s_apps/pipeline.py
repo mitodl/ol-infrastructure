@@ -248,7 +248,7 @@ pipeline_params = {
         app_name="learn-ai",
         refresh_stack=False,
         static_frontend=StaticFrontendConfig(
-            path="frontend-demo/", environments=LEARN_AI_FRONTEND_ENVIRONMENTS
+            path="frontend-demo", environments=LEARN_AI_FRONTEND_ENVIRONMENTS
         ),
         description="Builds the Learn AI service image and deploys it to Kubernetes via Pulumi, and ships its static frontend with each release, following the modernized GitHub Release/Deployment workflow.",
     ),

@@ -69,7 +69,7 @@ class StaticFrontendEnv(BaseModel):
 class StaticFrontendConfig(BaseModel):
     """A static frontend built from a directory of the app's repository."""
 
-    path: str = "frontend-demo/"
+    path: str = "frontend-demo"
     environments: list[StaticFrontendEnv]
 
 
@@ -256,7 +256,18 @@ def static_frontend_fragment(  # noqa: PLR0913
                 GetStep(get=source.name, trigger=True),
                 *_deploy_steps(app_name, env, source.name, config.path, bucket, fastly),
             ]
-        jobs.append(Job(name=job_name, build_log_retention={"builds": 10}, plan=plan))
+        # serial: every build ends in a destructive `rclone sync` to the same
+        # bucket prefix. Concourse runs a job's builds in parallel by default,
+        # so two overlapping builds (QA re-runs record a new Deployment each
+        # time) could let an older tag finish last and overwrite a newer one.
+        jobs.append(
+            Job(
+                name=job_name,
+                serial=True,
+                build_log_retention={"builds": 10},
+                plan=plan,
+            )
+        )
 
     return PipelineFragment(
         resource_types=resource_types, resources=resources, jobs=jobs

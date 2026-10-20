@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 
+from ol_concourse.pipelines.infrastructure.k8s_apps.meta import meta_pipeline
 from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
     AppPipelineParams,
     build_app_pipeline,
@@ -20,6 +21,7 @@ from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
 
 APP = "learn-ai"
 BRANCH_NAMES = ("release", "release-candidate")
+FRONTEND_PATH = pipeline_params[APP].static_frontend.path
 
 
 def _pipeline(app_name: str = APP) -> dict[str, Any]:
@@ -91,7 +93,7 @@ def test_ci_frontend_tracks_the_frontend_path_on_main():
 
     assert get["trigger"] is True
     assert resource["source"]["branch"] == "main"
-    assert resource["source"]["paths"] == ["frontend-demo"]
+    assert resource["source"]["paths"] == [FRONTEND_PATH]
 
 
 def test_each_environment_syncs_its_own_bucket_and_purges_its_own_fastly():
@@ -135,22 +137,33 @@ def test_apps_without_a_frontend_are_unchanged():
         assert not [n for n in names if "-frontend-" in n]
 
 
-def test_a_legacy_app_cannot_carry_a_frontend():
+def test_a_legacy_app_cannot_carry_a_frontend(monkeypatch):
     """The legacy shape has no Deployments, so it would silently drop the jobs."""
-    params = AppPipelineParams(
-        app_name="mitxonline",
-        static_frontend=pipeline_params[APP].static_frontend,
+    monkeypatch.setitem(
+        pipeline_params,
+        "mitxonline",
+        AppPipelineParams(
+            app_name="mitxonline",
+            static_frontend=pipeline_params[APP].static_frontend,
+        ),
     )
     with pytest.raises(ValueError, match="static_frontend requires"):
-        _build_pipeline_for(params)
+        build_app_pipeline("mitxonline")
 
 
-def _build_pipeline_for(params: AppPipelineParams):
-    pipeline_params[params.app_name], original = (
-        params,
-        pipeline_params[params.app_name],
-    )
-    try:
-        return build_app_pipeline(params.app_name)
-    finally:
-        pipeline_params[params.app_name] = original
+@pytest.mark.parametrize("stage", ["ci", "qa", "production"])
+def test_frontend_builds_do_not_overlap(stage):
+    """Each build ends in a destructive sync, so an older one must not finish last."""
+    assert _job(f"deploy-{APP}-frontend-{stage}")["serial"] is True
+
+
+def test_editing_the_frontend_values_regenerates_the_pipeline():
+    """learn-ai-pipeline reads values.py, so the meta pipeline has to watch it."""
+    meta = meta_pipeline([APP]).model_dump()
+    (definitions,) = [
+        r for r in meta["resources"] if r["name"] == "k8s-app-pipeline-definitions"
+    ]
+
+    assert {str(path) for path in definitions["source"]["paths"]} >= {
+        "src/ol_concourse/pipelines/applications/learn_ai_frontend/values.py"
+    }
