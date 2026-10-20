@@ -9,7 +9,7 @@ data:
   ODL_VIDEO_BASE_URL: "https://video.odl.mit.test"
   ODL_VIDEO_DB_DISABLE_SSL: "True"
   ODL_VIDEO_ENVIRONMENT: "local"
-  ODL_VIDEO_ADMIN_EMAIL: "admin@odl.local"
+  ODL_VIDEO_ADMIN_EMAIL: "admin@ol.test"
   ODL_VIDEO_FROM_EMAIL: "MIT ODL Video <ol-engineering-support@mit.edu>"
   ODL_VIDEO_SUPPORT_EMAIL: "MIT ODL Video <ol-engineering-support@mit.edu>"
   ODL_VIDEO_SECURE_SSL_REDIRECT: "False"

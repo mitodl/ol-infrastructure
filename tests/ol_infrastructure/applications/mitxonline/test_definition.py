@@ -58,7 +58,7 @@ def _local_bindings(**overrides) -> definition.MitxonlineBindings:
         ),
         "environment_variables": {
             "OPENEDX_API_BASE_URL": OPENEDX_BASE_URL,
-            "MITX_ONLINE_ADMIN_EMAIL": "admin@odl.local",
+            "MITX_ONLINE_ADMIN_EMAIL": "admin@ol.test",
         },
         "k8s_labels": {"ol.mit.edu/application": "mitxonline"},
         "secret_names": ["mitxonline-secrets"],

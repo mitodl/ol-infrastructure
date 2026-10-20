@@ -6,9 +6,9 @@
 #
 # Users created (the realm has registrationEmailAsUsername=true, so log in with
 # the email address as the username):
-#   admin@odl.local   / localdev123  — realm admin role
-#   student@odl.local / localdev123
-#   prof@odl.local    / localdev123
+#   admin@ol.test   / localdev123  — realm admin role
+#   student@ol.test / localdev123
+#   prof@ol.test    / localdev123
 #
 # Usage:
 #   ./local-dev/scripts/kc-seed-users.sh
@@ -100,9 +100,9 @@ ensure_admin_role
 # ---------------------------------------------------------------------------
 user_email() {
     case "$1" in
-        admin) echo "admin@odl.local" ;;
-        student) echo "student@odl.local" ;;
-        prof) echo "prof@odl.local" ;;
+        admin) echo "admin@ol.test" ;;
+        student) echo "student@ol.test" ;;
+        prof) echo "prof@ol.test" ;;
     esac
 }
 user_first() {
@@ -120,7 +120,7 @@ for USERNAME in admin student prof; do
 
     # Check if user already exists. Look up by email, not username: the realm
     # has registrationEmailAsUsername=true, so Keycloak stores the username as
-    # the email address (e.g. "admin@odl.local", not "admin"). A username=
+    # the email address (e.g. "admin@ol.test", not "admin"). A username=
     # lookup would always miss and the script would try to re-create existing
     # users on every run, breaking idempotency.
     EXISTING_ID=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
@@ -144,6 +144,7 @@ for USERNAME in admin student prof; do
             \"email\": \"${EMAIL}\",
             \"firstName\": \"${FIRST}\",
             \"lastName\": \"${LAST}\",
+            \"attributes\": {\"fullName\": [\"${FIRST} ${LAST}\"]},
             \"enabled\": true,
             \"emailVerified\": true,
             \"credentials\": [{
@@ -181,7 +182,7 @@ done
 # The Admin group is provisioned by local-dev/infra/modules/keycloak.py. This
 # runs for existing users too, so it fixes up realms seeded before the group.
 ensure_admin_group_membership() {
-    local email="admin@odl.local"
+    local email="admin@ol.test"
     local user_id group_id
     user_id=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
         -H "Authorization: Bearer ${TOKEN}" \

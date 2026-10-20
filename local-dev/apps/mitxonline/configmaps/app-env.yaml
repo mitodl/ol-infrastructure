@@ -39,7 +39,7 @@ data:
   # Site config
   SITE_NAME: "MITx Online"
   MITX_ONLINE_ENVIRONMENT: "local"
-  MITX_ONLINE_ADMIN_EMAIL: "admin@odl.local"
+  MITX_ONLINE_ADMIN_EMAIL: "admin@ol.test"
   MITX_ONLINE_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"
   MITX_ONLINE_REPLY_TO_ADDRESS: "MIT Learn <mitlearn-support@mit.edu>"
   MITX_ONLINE_SUPPORT_EMAIL: "mitlearn-support@mit.edu"

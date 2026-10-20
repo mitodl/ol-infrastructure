@@ -11,7 +11,7 @@ data:
   MICROMASTERS_SECURE_SSL_REDIRECT: "False"
   MICROMASTERS_DB_DISABLE_SSL: "True"
   MICROMASTERS_LOG_LEVEL: "INFO"
-  MICROMASTERS_ADMIN_EMAIL: "admin@odl.local"
+  MICROMASTERS_ADMIN_EMAIL: "admin@ol.test"
   MICROMASTERS_SUPPORT_EMAIL: "ol-engineering-support@mit.edu"
   MICROMASTERS_FROM_EMAIL: "MITx MicroMasters <ol-engineering-support@mit.edu>"
   NODE_ENV: "production"

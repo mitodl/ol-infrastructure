@@ -288,14 +288,14 @@ APPS = [
                 # email, and createsuperuser then fails on the unique email
                 # with no way out short of exec'ing in. No password is set;
                 # login goes through Keycloak.
-                "description": "Create or promote the admin@odl.local superuser",
+                "description": "Create or promote the admin@ol.test superuser",
                 "cmd": (
                     "python manage.py shell -c " +
                     "'from django.contrib.auth import get_user_model; " +
                     "U = get_user_model(); " +
                     "u, created = U.objects.get_or_create(" +
-                    "email=\"admin@odl.local\", " +
-                    "defaults={\"username\": \"admin\", \"name\": \"Admin\"}); " +
+                    "email=\"admin@ol.test\", " +
+                    "defaults={\"username\": \"admin@ol.test\", \"name\": \"Admin\"}); " +
                     "u.is_staff = True; u.is_superuser = True; u.save(); " +
                     "print((\"created\" if created else \"promoted\"), u.email)'"
                 ),
@@ -349,7 +349,7 @@ APPS = [
                     "U = get_user_model(); " +
                     "u, created = U.objects.get_or_create(" +
                     "username=\"admin\", " +
-                    "defaults={\"email\": \"admin@odl.local\"}); " +
+                    "defaults={\"email\": \"admin@ol.test\"}); " +
                     "u.is_staff = True; u.is_superuser = True; " +
                     "u.set_password(\"admin\"); u.save(); " +
                     "print((\"created\" if created else \"reset\"), u.username)'"

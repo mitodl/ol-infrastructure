@@ -15,7 +15,7 @@ data:
   ALLOWED_HOSTS: '["*"]'
   DJANGO_SETTINGS_MODULE: "main.settings"
   MITOL_ENVIRONMENT: "local"
-  MITOL_ADMIN_EMAIL: "admin@odl.local"
+  MITOL_ADMIN_EMAIL: "admin@ol.test"
   MITOL_SECURE_SSL_REDIRECT: "False"
   MITOL_DB_DISABLE_SSL: "True"
   MITOL_DB_CONN_MAX_AGE: "0"

@@ -228,9 +228,9 @@ To run Open edX on its own instead — no MIT Learn, no shared infra — use `le
 
 ### Test accounts
 
-Log in at any app (or `https://sso.ol.mit.test` directly) with the seeded Keycloak users: `admin@odl.local`, `student@odl.local`, `prof@odl.local` — password `localdev123` for all three.  <!-- pragma: allowlist secret -->
+Log in at any app (or `https://sso.ol.mit.test` directly) with the seeded Keycloak users: `admin@ol.test`, `student@ol.test`, `prof@ol.test` — password `localdev123` for all three.  <!-- pragma: allowlist secret -->
 
-odl-video-service derives Django permissions from Keycloak group membership: `admin@odl.local` is in the realm's `Admin` group, so it becomes a Django superuser on first login; the other two are plain users.
+odl-video-service derives Django permissions from Keycloak group membership: `admin@ol.test` is in the realm's `Admin` group, so it becomes a Django superuser on first login; the other two are plain users.
 
 ### Editing code
 
