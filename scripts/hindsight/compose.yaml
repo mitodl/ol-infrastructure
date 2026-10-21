@@ -32,7 +32,9 @@ services:
     - 127.0.0.1:8098:8080
 
   embeddings:
-    image: ghcr.io/huggingface/text-embeddings-inference:cpu-${TEXT_EMBEDDINGS_INFERENCE_VERSION:?}
+    # The deployed stack embeds with Bedrock. The harness tests access control,
+    # which doesn't depend on the model, so it embeds locally and runs offline.
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9.4
     platform: linux/amd64
     command: [--json-output, --model-id, BAAI/bge-base-en-v1.5, --revision, a5beb1e3e68b9ab74eb54cfd186867f64f240e1a]  # pragma: allowlist secret
     ports:

@@ -4,8 +4,8 @@ One memory per learner, shared by every app, plus general (non-learner) memory.
 Hindsight is used for storage and retrieval only: callers produce their notes
 through ol-llm, and the server runs with no LLM provider, chunks-mode retain,
 and observations and consolidation off, so it makes no LLM calls of its own.
-Embeddings come from a text-embeddings-inference server in the same namespace,
-so no learner text leaves the cluster.
+Embeddings come from Cohere Embed v4 on Bedrock, called with the pod's IRSA
+role.
 
 Every request carries a Keycloak token for the memory service's audience. The
 OL extensions in ol_memory_ext/ enforce who may touch which bank:
@@ -25,11 +25,11 @@ from string import Template
 
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, Output, ResourceOptions, export
-from pulumi_aws import ec2
+from pulumi_aws import ec2, get_caller_identity
 from pydantic import SecretStr
 
 from bridge.lib.magic_numbers import DEFAULT_POSTGRES_PORT
-from bridge.lib.versions import HINDSIGHT_VERSION, TEXT_EMBEDDINGS_INFERENCE_VERSION
+from bridge.lib.versions import HINDSIGHT_VERSION
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
     OLEKSAuthBindingConfig,
@@ -46,6 +46,11 @@ from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
     check_cluster_namespace,
     setup_k8s_provider,
+)
+from ol_infrastructure.lib.aws.iam_helper import (
+    BEDROCK_PARLIAMENT_CONFIG,
+    IAM_POLICY_VERSION,
+    bedrock_invoke_statements,
 )
 from ol_infrastructure.lib.ol_types import (
     AlertTier,
@@ -80,15 +85,16 @@ vault_infra_stack = make_stack_reference(
 NAMESPACE = "hindsight"
 API_NAME = "hindsight"
 API_PORT = 8888
-EMBEDDINGS_NAME = "hindsight-embeddings"
-EMBEDDINGS_PORT = 8080
 SERVICE_ACCOUNT_NAME = "hindsight"
 DB_NAME = "hindsight"
 DB_CREDS_SECRET_NAME = "hindsight-db-creds"  # pragma: allowlist secret  # noqa: S105
 EXTENSION_PACKAGE = "ol_memory_ext"
 EXTENSION_ROOT = "/opt/ol_ext"
 EXTENSION_SOURCE = Path(__file__).parent / EXTENSION_PACKAGE / "__init__.py"
-MODEL_CACHE_PATH = "/data"
+# Multilingual, with a 128K-token input. Hindsight fixes the vector column to
+# the model's dimension (1536) once a bank holds data, so changing the model
+# means re-embedding every bank.
+EMBEDDINGS_MODEL = "bedrock/cohere.embed-v4:0"
 
 aws_config = AWSBase(
     tags={"OU": "operations", "Environment": f"applications-{stack_info.env_suffix}"}
@@ -210,6 +216,13 @@ hindsight_auth_binding = OLEKSAuthBinding(
         cluster_name=cluster_stack.require_output("cluster_name"),
         cluster_identities=cluster_stack.require_output("cluster_identities"),
         vault_auth_endpoint=cluster_stack.require_output("vault_auth_endpoint"),
+        iam_policy_document={
+            "Version": IAM_POLICY_VERSION,
+            "Statement": bedrock_invoke_statements(
+                get_caller_identity().account_id, vendor="cohere"
+            ),
+        },
+        parliament_config=BEDROCK_PARLIAMENT_CONFIG,
         irsa_service_account_name=SERVICE_ACCOUNT_NAME,
         create_irsa_service_account=True,
         vault_sync_service_account_names=["hindsight-vault"],
@@ -240,125 +253,6 @@ hindsight_db_creds = OLVaultK8SSecret(
     opts=ResourceOptions(
         delete_before_replace=True,
         depends_on=[hindsight_auth_binding.vault_k8s_resources],
-    ),
-)
-
-################################
-# Embeddings server (Hugging Face text embeddings inference)
-################################
-embeddings_model = hindsight_config.require("embeddings_model")
-embeddings_model_revision = hindsight_config.require("embeddings_model_revision")
-embeddings_cpu = hindsight_config.require("embeddings_cpu")
-embeddings_selector = {"app.kubernetes.io/name": EMBEDDINGS_NAME}
-embeddings_labels = {
-    **k8s_app_labels.workload_labels(alert_tier=alert_tier),
-    **embeddings_selector,
-}
-
-embeddings_deployment = kubernetes.apps.v1.Deployment(
-    f"hindsight-embeddings-deployment-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=EMBEDDINGS_NAME, namespace=NAMESPACE, labels=k8s_labels
-    ),
-    spec=kubernetes.apps.v1.DeploymentSpecArgs(
-        replicas=hindsight_config.require_int("embeddings_replicas"),
-        selector=kubernetes.meta.v1.LabelSelectorArgs(match_labels=embeddings_selector),
-        template=kubernetes.core.v1.PodTemplateSpecArgs(
-            metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=embeddings_labels),
-            spec=kubernetes.core.v1.PodSpecArgs(
-                # The CPU image is published for amd64 only.
-                node_selector={"kubernetes.io/arch": "amd64"},
-                containers=[
-                    kubernetes.core.v1.ContainerArgs(
-                        name="text-embeddings-inference",
-                        image=(
-                            "ghcr.io/huggingface/text-embeddings-inference:"
-                            f"cpu-{TEXT_EMBEDDINGS_INFERENCE_VERSION}"
-                        ),
-                        args=[
-                            "--json-output",
-                            "--model-id",
-                            embeddings_model,
-                            "--revision",
-                            embeddings_model_revision,
-                        ],
-                        env=[
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="PORT", value=str(EMBEDDINGS_PORT)
-                            ),
-                            # The image defaults to 8 threads whatever the
-                            # container is given.
-                            kubernetes.core.v1.EnvVarArgs(
-                                name="RAYON_NUM_THREADS", value=embeddings_cpu
-                            ),
-                        ],
-                        ports=[
-                            kubernetes.core.v1.ContainerPortArgs(
-                                name="http", container_port=EMBEDDINGS_PORT
-                            )
-                        ],
-                        resources=kubernetes.core.v1.ResourceRequirementsArgs(
-                            requests={
-                                "cpu": embeddings_cpu,
-                                "memory": hindsight_config.require("embeddings_memory"),
-                            },
-                            limits={
-                                "memory": hindsight_config.require("embeddings_memory")
-                            },
-                        ),
-                        # The model is downloaded from Hugging Face on start.
-                        startup_probe=kubernetes.core.v1.ProbeArgs(
-                            http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                                path="/health", port="http"
-                            ),
-                            period_seconds=5,
-                            failure_threshold=60,
-                        ),
-                        readiness_probe=kubernetes.core.v1.ProbeArgs(
-                            http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                                path="/health", port="http"
-                            ),
-                            period_seconds=10,
-                        ),
-                        liveness_probe=kubernetes.core.v1.ProbeArgs(
-                            http_get=kubernetes.core.v1.HTTPGetActionArgs(
-                                path="/health", port="http"
-                            ),
-                            period_seconds=20,
-                            failure_threshold=3,
-                        ),
-                        volume_mounts=[
-                            kubernetes.core.v1.VolumeMountArgs(
-                                name="model-cache", mount_path=MODEL_CACHE_PATH
-                            )
-                        ],
-                    )
-                ],
-                volumes=[
-                    kubernetes.core.v1.VolumeArgs(
-                        name="model-cache",
-                        empty_dir=kubernetes.core.v1.EmptyDirVolumeSourceArgs(
-                            size_limit="2Gi"
-                        ),
-                    )
-                ],
-            ),
-        ),
-    ),
-)
-
-embeddings_service = kubernetes.core.v1.Service(
-    f"hindsight-embeddings-service-{stack_info.env_suffix}",
-    metadata=kubernetes.meta.v1.ObjectMetaArgs(
-        name=EMBEDDINGS_NAME, namespace=NAMESPACE, labels=k8s_labels
-    ),
-    spec=kubernetes.core.v1.ServiceSpecArgs(
-        selector=embeddings_selector,
-        ports=[
-            kubernetes.core.v1.ServicePortArgs(
-                name="http", port=EMBEDDINGS_PORT, target_port="http"
-            )
-        ],
     ),
 )
 
@@ -414,10 +308,8 @@ hindsight_settings = {
     # A retain with attachments stores the file bytes in a table with no bank_id,
     # out of the fence trigger's reach. Notes are text.
     "ENABLE_FILE_UPLOAD_API": "false",
-    "EMBEDDINGS_PROVIDER": "tei",
-    "EMBEDDINGS_TEI_URL": (
-        f"http://{EMBEDDINGS_NAME}.{NAMESPACE}.svc.cluster.local:{EMBEDDINGS_PORT}"
-    ),
+    "EMBEDDINGS_PROVIDER": "litellm-sdk",
+    "EMBEDDINGS_LITELLM_SDK_MODEL": EMBEDDINGS_MODEL,
     "RERANKER_PROVIDER": "rrf",
     "EXTENSION_PASSTHROUGH_HEADERS": "x-ol-learner",
     "TENANT_EXTENSION": f"{EXTENSION_PACKAGE}:KeycloakTenantExtension",
@@ -485,6 +377,10 @@ api_deployment = kubernetes.apps.v1.Deployment(
                             kubernetes.core.v1.EnvVarArgs(
                                 name="PYTHONPATH", value=EXTENSION_ROOT
                             ),
+                            # LiteLLM's Bedrock client reads its region from here.
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="AWS_REGION_NAME", value=aws_config.region
+                            ),
                             # $(VAR) substitution only sees variables defined
                             # before it, and envFrom counts as before.
                             kubernetes.core.v1.EnvVarArgs(
@@ -513,8 +409,8 @@ api_deployment = kubernetes.apps.v1.Deployment(
                             },
                             limits={"memory": hindsight_config.require("api_memory")},
                         ),
-                        # Startup runs the migrations and probes the embeddings
-                        # server before the API answers.
+                        # Startup runs the migrations and a test embedding
+                        # before the API answers.
                         startup_probe=kubernetes.core.v1.ProbeArgs(
                             http_get=kubernetes.core.v1.HTTPGetActionArgs(
                                 path="/health", port="http"
@@ -557,7 +453,7 @@ api_deployment = kubernetes.apps.v1.Deployment(
             ),
         ),
     ),
-    opts=ResourceOptions(depends_on=[hindsight_db_creds, embeddings_service]),
+    opts=ResourceOptions(depends_on=[hindsight_db_creds]),
 )
 
 api_service = kubernetes.core.v1.Service(

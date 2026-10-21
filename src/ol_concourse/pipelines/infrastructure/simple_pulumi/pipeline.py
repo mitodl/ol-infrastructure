@@ -496,9 +496,7 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "with its embeddings server, via Pulumi."
         ),
         category="core-platform",
-        # QA only while the memory service is an experiment; only
-        # Pulumi.QA.yaml exists.
-        stages=["QA"],
+        stages=["QA", "Production"],
         topology="preview-gated",
     ),
     "jupyterhub-data": SimplePulumiParams(
