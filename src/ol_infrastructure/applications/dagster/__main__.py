@@ -2770,6 +2770,9 @@ def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, st
 # It also takes in data_loading's own dlt runs. Over the 7 days to 2026-10-21
 # those peaked at 8 concurrent Jobs (kube_job_labels, data-production) against
 # the canvas export's 133, which arrives as a burst at each six-hourly tick.
+# dagster_instance.yaml's sampling comments still name canvas: editing that file
+# rolls the daemon and webserver (dagster_instance_checksum_annotation), so they
+# wait for its next real change.
 #
 # ml is listed for a different reason: ol-llm sends its model spans (with token
 # usage and cost) to Opik through its own SDK TracerProvider, and that provider
