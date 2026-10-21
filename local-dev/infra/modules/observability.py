@@ -528,7 +528,9 @@ def _create_alloy(
                                 {"containerPort": 4317, "name": "otlp-grpc"},
                                 {"containerPort": 4318, "name": "otlp-http"},
                             ],
-                            "resources": {"limits": {"memory": "192Mi"}},
+                            # At 192Mi each pod sat at its limit, mostly file
+                            # pages, thrashing on page faults and burning cores.
+                            "resources": {"limits": {"memory": "512Mi"}},
                             "volumeMounts": [
                                 {"name": "config", "mountPath": "/etc/alloy"},
                                 {
