@@ -50,6 +50,7 @@ from ol_concourse.lib.tasks import TASK_IMAGE, bump_version_task
 from pydantic import BaseModel, model_validator
 
 from bridge.settings.apps import github_repo as app_github_repo
+from bridge.settings.apps import release_changelog as app_release_changelog
 from bridge.settings.apps import (
     release_resource_workflow as app_release_resource_workflow,
 )
@@ -943,8 +944,15 @@ def _define_release_resources(
     app_name: str,
     github_repo: str,
     repo_main_branch: str,
+    *,
+    generated_changelog: bool = True,
 ) -> tuple[Resource, Resource, Resource, Resource, Resource]:
-    """Define the release-flow resources: release resource, gates, issues, and GitHub Deployments."""
+    """Define the release-flow resources: release resource, gates, issues, and GitHub Deployments.
+
+    ``generated_changelog`` has the release resource fold a Keep a Changelog
+    entry into the ``Release <version>`` commit; see
+    ``AppRegistration.release_changelog`` for when to turn it off.
+    """
     # Shared GitHub App installation ol-concourse-lib no longer defaults --
     # every consumer of this library supplies its own credential reference.
     # Backed by the "shared/github_app" entry in
@@ -969,6 +977,7 @@ def _define_release_resources(
         private_ssh_key=github_app_private_key,
         repository=github_repo,
         semver_tag_fallback=True,
+        changelog_style="cumulative" if generated_changelog else None,
     ).model_copy(
         # Not the library's `never`. Rebuilding the release resource image
         # gives this resource a fresh, empty version history on its next
@@ -1650,6 +1659,7 @@ def _build_release_resource_app_pipeline(
         app_name=app_name,
         github_repo=github_repo,
         repo_main_branch=pipeline_parameters.repo_main_branch,
+        generated_changelog=app_release_changelog(app_name),
     )
 
     main_image_build_job = _build_image_job(
