@@ -241,7 +241,7 @@ run_launcher:
         # parentbased_traceidratio at DEFAULT_TRACE_SAMPLING_RATE -- and that is
         # "1.0" (lib/otel.py), not a fraction. Run workers are launched by the
         # daemon, so most of their traces are parentless roots and the ratio is
-        # the one that applies: every data_loading run worker trace is head-sampled in.
+        # the one that applies: every canvas run worker trace is head-sampled in.
         # Deliberate rather than overlooked. Alloy's tailSampling is what decides
         # what to keep -- errors, slow traces, everything from services that are
         # not high-volume -- and head sampling upstream of it only discards
@@ -250,11 +250,10 @@ run_launcher:
         # that.
         #
         # So the volume control for a busier location is the tail sampler, not
-        # this. Measure what data_loading (which took over the canvas export,
-        # and with it the pilot, when canvas was retired) actually lands in
-        # Tempo before opting in openedx, which peaks at 13823 concurrent run
-        # workers against the canvas export's 106 -- two orders of magnitude,
-        # against a policy nobody has re-sized for run-worker traffic.
+        # this. Measure what canvas actually lands in Tempo before opting in
+        # openedx, which peaks at 13823 concurrent run workers against canvas's
+        # 106 -- two orders of magnitude, against a policy nobody has re-sized
+        # for run-worker traffic.
         #
         # Tracked in tk-extend-otel-auto-instrumentation-to-dagster-run--378bda.
         env:
