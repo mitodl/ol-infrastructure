@@ -674,10 +674,10 @@ _make_cronjob(
 # through its external catalogs are the lake tables the Trino and Glue
 # services already hold, and are not ingested a second time.
 #
-# open_metadata:starrocks_host_port is the single switch: unset (CI, where
-# there is no StarRocks cluster) creates none of the three jobs.  Credentials
-# come from the om-connector-starrocks secret, a Vault-issued read-only user
-# created by the application stack.
+# open_metadata:starrocks_host_port unset (a stack with no StarRocks cluster)
+# creates none of the three jobs.  Credentials come from the
+# om-connector-starrocks secret, a Vault-issued read-only user created by the
+# application stack.
 #
 # The three run in order after b2b_analytics_starrocks_nightly, the Dagster
 # schedule that builds the models at 06:00 UTC and uploads their manifest and
@@ -685,6 +685,14 @@ _make_cronjob(
 #   08:00  metadata          creates the tables in OM
 #   08:30  dbt enrichment    descriptions, tags, owners and test results
 #   09:00  lake lineage      edges from the lake tables each model reads
+#
+# The last two read the uploaded manifest, so open_metadata:enable_starrocks_dbt
+# creates them only where that schedule runs.  ol-data-platform registers it in
+# production alone (SCHEDULE_ENVIRONMENTS in lakehouse), and a hand
+# materialization in QA can't stand in for it: ol_warehouse_qa_dimensional held
+# none of the models' base tables on 2026-10-20, so the asset fails its
+# base-table check before dbt runs and uploads nothing.  Turn this on in QA
+# together with that schedule.
 starrocks_host_port = om_config.get("starrocks_host_port")
 
 # Name of the single service-level database OM files the StarRocks databases
@@ -699,8 +707,6 @@ STARROCKS_OM_DATABASE_NAME = "default_catalog"
 STARROCKS_DBT_SCHEMAS = ["b2b_analytics", "b2b_learner_records"]
 
 if starrocks_host_port:
-    starrocks_dbt_artifacts_prefix = "openmetadata/dbt-artifacts/starrocks"
-
     _make_cronjob(
         name="starrocks",
         schedule="0 8 * * *",
@@ -716,6 +722,9 @@ if starrocks_host_port:
             _secret_env("om-connector-starrocks", "OM_STARROCKS_PASSWORD"),
         ],
     )
+
+if starrocks_host_port and om_config.require_bool("enable_starrocks_dbt"):
+    starrocks_dbt_artifacts_prefix = "openmetadata/dbt-artifacts/starrocks"
 
     # Same script as the Trino dbt job, pointed at the StarRocks artifacts.
     # The lake schemas are left out of the filter on purpose: the models'
