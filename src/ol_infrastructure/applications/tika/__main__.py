@@ -15,6 +15,8 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    OLApisixUpstream,
+    OLApisixUpstreamConfig,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -139,12 +141,39 @@ tika_helm_release = kubernetes.helm.v3.Release(
         ),
         values={
             "commonLabels": k8s_global_labels,
-            # Raised 2->3 (2026-08-15): the daily edX catalog OLX ingestion job
-            # (mit-learn's import_all_mit_edx_files) hammers every replica
-            # concurrently, so 2 replicas meant a large fraction of requests
-            # landed on a pod that was mid-OOM-restart, returning 502s that the
-            # calling celery task doesn't retry gracefully.
-            "replicaCount": 3,
+            # Batch callers (Dagster's openedx document extraction, mit-learn's
+            # import_all_mit_edx_files, OCW) aren't coordinated. On 2026-10-20
+            # an ~11h Dagster batch ran three fixed replicas at 2-3 cores each,
+            # then at their 4-core limit for the last ~3h; that day had 179
+            # parser TIMEOUTs and two OOMKills. Enabling the chart's HPA also drops
+            # `replicas` from the Deployment, which Helm's three-way merge
+            # would otherwise reset on every upgrade. Utilization is relative
+            # to the 1-core request, so 200% is 2 cores per pod. Memory is left
+            # out: in that batch it rose and fell with CPU, so it adds no
+            # earlier signal. The default scale-down behavior (300s
+            # stabilization) is kept; the chart can't set `behavior`.
+            "autoscaling": {
+                "enabled": True,
+                "minReplicas": 3,
+                "maxReplicas": 6,
+                "targetCPUUtilizationPercentage": 200,
+                "targetMemoryUtilizationPercentage": 0,
+            },
+            # The HTTP server runs in the forked TikaServerProcess, so while the
+            # watchdog restarts it (1-24s, measured 2026-10-02) the port refuses
+            # connections. The chart default needs 5s x 20 failures (100s) to
+            # mark a pod unready, longer than any of those restarts; a refused
+            # connection fails instantly, so this takes ~6s. The timeout keeps
+            # the chart's 30s because loaded pods have answered `/` slower than
+            # that (18 "deadline exceeded" probe events in the 14 days to
+            # 2026-10-21); a shorter one could pull every busy pod at once.
+            # Liveness keeps the chart's lenient default so a restart isn't a
+            # kill.
+            "readinessProbe": {
+                "periodSeconds": 2,
+                "timeoutSeconds": 30,
+                "failureThreshold": 3,
+            },
             "service": {
                 "type": "ClusterIP",
                 "port": 9998,
@@ -196,6 +225,55 @@ tika_helm_release = kubernetes.helm.v3.Release(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
+    ),
+)
+
+# The chart exposes neither lifecycle hooks nor the grace period. On SIGTERM the
+# Tika watchdog's shutdown hook force-kills the forked server, so a scale-down
+# would drop every in-flight parse. The preStop sleep runs before SIGTERM and
+# keeps the pod serving those parses (up to the 300s APISIX read timeout) after
+# it has left the Service endpoints.
+tika_prestop_sleep_seconds = 300
+kubernetes.apps.v1.DeploymentPatch(
+    f"tika-{stack_info.env_suffix}-graceful-shutdown-patch",
+    metadata=kubernetes.meta.v1.ObjectMetaPatchArgs(
+        name="tika",
+        namespace=tika_namespace,
+        annotations={"pulumi.com/patchForce": "true"},
+    ),
+    spec=kubernetes.apps.v1.DeploymentSpecPatchArgs(
+        template=kubernetes.core.v1.PodTemplateSpecPatchArgs(
+            spec=kubernetes.core.v1.PodSpecPatchArgs(
+                termination_grace_period_seconds=tika_prestop_sleep_seconds + 30,
+                containers=[
+                    kubernetes.core.v1.ContainerPatchArgs(
+                        name="tika",
+                        lifecycle=kubernetes.core.v1.LifecyclePatchArgs(
+                            pre_stop=kubernetes.core.v1.LifecycleHandlerPatchArgs(
+                                sleep=kubernetes.core.v1.SleepActionPatchArgs(
+                                    seconds=tika_prestop_sleep_seconds
+                                )
+                            )
+                        ),
+                    )
+                ],
+            )
+        )
+    ),
+    opts=ResourceOptions(depends_on=[tika_helm_release]),
+)
+
+# Endpoint granularity on the route gives APISIX one node per pod, so its
+# default retries now apply. Nginx treats PUT as idempotent, so a parse that hit
+# the 300s read timeout would be re-sent and start a second heavy parse on
+# another pod while Tika is already overloaded. Callers own retrying.
+OLApisixUpstream(
+    name=f"tika-apisix-upstream-{stack_info.env_suffix}",
+    upstream_config=OLApisixUpstreamConfig(
+        service_name="tika",
+        k8s_namespace=tika_namespace,
+        k8s_labels=application_labels,
+        retries=0,
     ),
 )
 
@@ -254,6 +332,11 @@ end
             paths=["/*"],
             backend_service_name="tika",
             backend_service_port=9998,
+            # With "service" granularity APISIX reuses keepalive connections
+            # to the ClusterIP that conntrack has pinned to one pod, so a pod
+            # that is unready or in its preStop sleep keeps getting new parses.
+            # Resolving to pod IPs lets APISIX drop it from the upstream.
+            backend_resolve_granularity="endpoint",
         ),
     ],
     opts=ResourceOptions(
