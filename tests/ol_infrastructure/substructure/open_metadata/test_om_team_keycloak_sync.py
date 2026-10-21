@@ -7,11 +7,17 @@ reported, not fatal, and a failed read stops the run before any write.
 """
 
 import itertools
+import json
 
 import pytest
+import requests
 
+from ol_infrastructure.substructure.open_metadata.scripts import (
+    om_team_keycloak_sync,
+)
 from ol_infrastructure.substructure.open_metadata.scripts.om_team_keycloak_sync import (
     GroupPlan,
+    Keycloak,
     SyncError,
     plan_sync,
     sync,
@@ -188,3 +194,48 @@ def test_a_failed_read_stops_the_run_before_any_write():
         sync(["data-platform", "analytics"], om, keycloak)
 
     assert keycloak.writes == []
+
+
+def _response(status: int, body: object, headers: dict[str, str] | None = None):
+    response = requests.Response()
+    response.status_code = status
+    response._content = json.dumps(body).encode()
+    response.headers.update(headers or {})
+    return response
+
+
+def test_create_child_group_reads_the_id_keycloak_returns(monkeypatch):
+    # Keycloak 26.7.4 GroupResource.addChild answers a new child with 201, a
+    # Location header, and the new GroupRepresentation as the JSON body.
+    monkeypatch.setattr(
+        om_team_keycloak_sync.requests,
+        "post",
+        lambda *_args, **_kwargs: _response(200, {"access_token": "token"}),
+    )
+    keycloak = Keycloak(
+        realm_url="https://sso/realms/r",
+        admin_url="https://sso/admin/realms/r",
+        client_id="client",
+        client_secret="secret",  # pragma: allowlist secret
+        parent_group_id="parent",
+    )
+    calls = []
+
+    def request(method, url, **kwargs):
+        calls.append((method, url, kwargs["json"]))
+        return _response(
+            201,
+            {"id": "new-id", "name": "analytics", "path": "/parent/analytics"},
+            {"Location": "https://sso/admin/realms/r/groups/new-id"},
+        )
+
+    monkeypatch.setattr(keycloak.session, "request", request)
+
+    assert keycloak.create_child_group("analytics") == "new-id"
+    assert calls == [
+        (
+            "POST",
+            "https://sso/admin/realms/r/groups/parent/children",
+            {"name": "analytics"},
+        )
+    ]
