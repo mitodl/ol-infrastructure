@@ -13,7 +13,7 @@ spec:
   - name: cors
     enable: true
     config:
-      allow_origins: "https://mitxonline.mit.dev,https://learn.mit.dev"
+      allow_origins: "https://mitxonline.mit.test,https://learn.mit.test"
       allow_methods: "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS"
       allow_headers: "Authorization,Content-Type,X-CSRFToken,X-Requested-With"
       expose_headers: "X-CSRFToken"
@@ -36,13 +36,13 @@ metadata:
 spec:
   ingressClassName: apache-apisix
   hosts:
-  - "mitxonline.mit.dev"
-  - "api.mitxonline.mit.dev"
+  - "mitxonline.mit.test"
+  - "api.mitxonline.mit.test"
   secret:
     name: local-dev-tls
     namespace: mitxonline
 ---
-# ApisixRoute for mitxonline.mit.dev and api.mitxonline.mit.dev.
+# ApisixRoute for mitxonline.mit.test and api.mitxonline.mit.test.
 #
 # Sub-routes match QA pattern:
 #   passauth        : /*              (pass — injects X-Userinfo if session present)
@@ -51,8 +51,8 @@ spec:
 #   cart            : /cart, /cart/, /cart/* (require authentication, priority 20)
 #
 # No explicit redirect_uri — lua-resty-openidc auto-derives it.
-# session.cookie.domain set to .mitxonline.mit.dev so the cookie is shared
-# between the frontend (mitxonline.mit.dev) and API (api.mitxonline.mit.dev).
+# session.cookie.domain set to .mitxonline.mit.test so the cookie is shared
+# between the frontend (mitxonline.mit.test) and API (api.mitxonline.mit.test).
 apiVersion: apisix.apache.org/v2
 kind: ApisixRoute
 metadata:
@@ -65,8 +65,8 @@ spec:
     priority: 0
     match:
       hosts:
-      - "mitxonline.mit.dev"
-      - "api.mitxonline.mit.dev"
+      - "mitxonline.mit.test"
+      - "api.mitxonline.mit.test"
       paths:
       - "/*"
     backends:
@@ -89,12 +89,12 @@ spec:
         ssl_verify: false
         renew_access_token_on_expiry: true
         logout_path: "/logout/oidc"
-        post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
+        post_logout_redirect_uri: "https://mitxonline.mit.test/logout/"
         session:
           # Flat keys: APISIX 3.17+ ignores the nested session.cookie.* form.
           # 0 disables lua-resty-session's 900s idling / 3600s rolling
           # defaults, leaving absolute_timeout in charge, as deployed.
-          cookie_domain: ".mitxonline.mit.dev"
+          cookie_domain: ".mitxonline.mit.test"
           absolute_timeout: 1209600
           idling_timeout: 0
           rolling_timeout: 0
@@ -109,8 +109,8 @@ spec:
     priority: 10
     match:
       hosts:
-      - "mitxonline.mit.dev"
-      - "api.mitxonline.mit.dev"
+      - "mitxonline.mit.test"
+      - "api.mitxonline.mit.test"
       paths:
       - "/logout/oidc/*"
     backends:
@@ -127,8 +127,8 @@ spec:
     priority: 10
     match:
       hosts:
-      - "mitxonline.mit.dev"
-      - "api.mitxonline.mit.dev"
+      - "mitxonline.mit.test"
+      - "api.mitxonline.mit.test"
       paths:
       - "/login/*"
       - "/admin/login/*"
@@ -150,12 +150,12 @@ spec:
         ssl_verify: false
         renew_access_token_on_expiry: true
         logout_path: "/logout/oidc"
-        post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
+        post_logout_redirect_uri: "https://mitxonline.mit.test/logout/"
         session:
           # Flat keys: APISIX 3.17+ ignores the nested session.cookie.* form.
           # 0 disables lua-resty-session's 900s idling / 3600s rolling
           # defaults, leaving absolute_timeout in charge, as deployed.
-          cookie_domain: ".mitxonline.mit.dev"
+          cookie_domain: ".mitxonline.mit.test"
           absolute_timeout: 1209600
           idling_timeout: 0
           rolling_timeout: 0
@@ -170,8 +170,8 @@ spec:
     priority: 20
     match:
       hosts:
-      - "mitxonline.mit.dev"
-      - "api.mitxonline.mit.dev"
+      - "mitxonline.mit.test"
+      - "api.mitxonline.mit.test"
       paths:
       - "/cart"
       - "/cart/"
@@ -192,12 +192,12 @@ spec:
         ssl_verify: false
         renew_access_token_on_expiry: true
         logout_path: "/logout/oidc"
-        post_logout_redirect_uri: "https://mitxonline.mit.dev/logout/"
+        post_logout_redirect_uri: "https://mitxonline.mit.test/logout/"
         session:
           # Flat keys: APISIX 3.17+ ignores the nested session.cookie.* form.
           # 0 disables lua-resty-session's 900s idling / 3600s rolling
           # defaults, leaving absolute_timeout in charge, as deployed.
-          cookie_domain: ".mitxonline.mit.dev"
+          cookie_domain: ".mitxonline.mit.test"
           absolute_timeout: 1209600
           idling_timeout: 0
           rolling_timeout: 0
@@ -226,7 +226,7 @@ spec:
     priority: 0
     match:
       hosts:
-      - api.learn.mit.dev
+      - api.learn.mit.test
       paths:
       - "/mitxonline/*"
     backends:
@@ -259,7 +259,7 @@ spec:
         # a shorter value here would drop Learn sessions Learn still accepts.
         session:
           cookie_name: mitlearn_apisix_session_dev
-          cookie_domain: ".learn.mit.dev"
+          cookie_domain: ".learn.mit.test"
           absolute_timeout: 1209600
           # 0 disables lua-resty-session's 900s idling / 3600s rolling
           # defaults, leaving absolute_timeout in charge, as deployed.

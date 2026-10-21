@@ -7,7 +7,7 @@ metadata:
 spec:
   ingressClassName: apache-apisix
   hosts:
-  - "micromasters.mit.dev"
+  - "micromasters.mit.test"
   secret:
     name: local-dev-tls
     namespace: micromasters
@@ -25,9 +25,14 @@ spec:
   - name: public
     match:
       hosts:
-      - "micromasters.mit.dev"
+      - "micromasters.mit.test"
       paths:
       - "/*"
     backends:
     - serviceName: micromasters-webapp
       servicePort: 8079
+    plugins:
+    - name: redirect
+      enable: true
+      config:
+        http_to_https: true

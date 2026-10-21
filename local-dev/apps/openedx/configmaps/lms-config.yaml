@@ -22,22 +22,22 @@ data:
   ELASTIC_SEARCH_HOST: "opensearch-cluster-master.local-infra.svc.cluster.local"
 
   # Served through APISIX on the shared wildcard cert rather than the
-  # port-forwards lehrer's standalone cluster uses. 'mit.dev' is substituted for
-  # LOCAL_DEV_ROOT_DOMAIN at apply time — see local-dev/tiltlib.star.
-  LMS_BASE_URL: "https://lms.mit.dev"
-  CMS_BASE_URL: "https://studio.mit.dev"
+  # port-forwards lehrer's standalone cluster uses. LOCAL_DEV_ROOT_DOMAIN
+  # replaces 'mit.test' at apply time — see local-dev/tiltlib.star.
+  LMS_BASE_URL: "https://lms.mit.test"
+  CMS_BASE_URL: "https://studio.mit.test"
   # Host forms of the two above. lehrer sets them to its standalone
   # localhost:8000/8010, which is where the LMS's Studio links would point.
-  LMS_BASE: "lms.mit.dev"
-  CMS_BASE: "studio.mit.dev"
+  LMS_BASE: "lms.mit.test"
+  CMS_BASE: "studio.mit.test"
   # Points the LMS's own courseware links at the learning MFE instead of the
   # legacy /courses/<id>/course/ pages. Unset, the setting is None and the LMS
   # silently keeps using the legacy courseware -- which works, but then the LMS
   # and mitxonline disagree about where a course is, since
   # CourseRun.courseware_url is hardcoded to the /learn/... shape. Same value
   # production derives in edxapp's k8s_configmaps.py.
-  LEARNING_MICROFRONTEND_URL: "https://lms.mit.dev/learn"
-  EDXNOTES_PUBLIC_API: "https://notes.mit.dev/api/v1"
+  LEARNING_MICROFRONTEND_URL: "https://lms.mit.test/learn"
+  EDXNOTES_PUBLIC_API: "https://notes.mit.test/api/v1"
   HTTPS: "on"
 
   # --------------------------------------------------------------------------
@@ -74,7 +74,7 @@ data:
   #
   # AUTHORIZATION_URL is browser-facing and so must be the public host. The
   # other two are called server-side from the LMS pod, which resolves
-  # mitxonline.mit.dev but cannot verify its mkcert-signed certificate -- no CA
+  # mitxonline.mit.test but cannot verify its mkcert-signed certificate -- no CA
   # bundle is merged into this image and no SSL_CERT_FILE is set, unlike the
   # mitxonline and mit-learn pods. Pointing them at the in-cluster Service over
   # plain HTTP avoids that entirely; revisit if the LMS pod ever grows the
@@ -85,7 +85,7 @@ data:
   # whose serializer returns edx_username as `username` -- which is what the
   # backend's ID_KEY resolves accounts on.
   OL_OAUTH2_OTHER_SETTINGS: >-
-    {"AUTHORIZATION_URL": "https://mitxonline.mit.dev/oauth2/authorize/",
+    {"AUTHORIZATION_URL": "https://mitxonline.mit.test/oauth2/authorize/",
      "ACCESS_TOKEN_URL": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8010/oauth2/token/",
      "API_ROOT": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8010/"}
 

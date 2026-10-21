@@ -7,7 +7,7 @@ metadata:
 spec:
   ingressClassName: apache-apisix
   hosts:
-  - "video.odl.mit.dev"
+  - "video.odl.mit.test"
   secret:
     name: local-dev-tls
     namespace: odl-video-service
@@ -24,9 +24,14 @@ spec:
   - name: public
     match:
       hosts:
-      - "video.odl.mit.dev"
+      - "video.odl.mit.test"
       paths:
       - "/*"
     backends:
     - serviceName: odlvideo-webapp
       servicePort: 8088
+    plugins:
+    - name: redirect
+      enable: true
+      config:
+        http_to_https: true

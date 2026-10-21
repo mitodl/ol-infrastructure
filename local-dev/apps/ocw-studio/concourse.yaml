@@ -116,7 +116,7 @@ spec:
         # Must match what Studio puts in pipeline definitions and what the
         # browser uses, or build links in the UI point nowhere.
         - name: CONCOURSE_EXTERNAL_URL
-          value: https://concourse.ocw.mit.dev
+          value: https://concourse.ocw.mit.test
         - name: CONCOURSE_ADD_LOCAL_USER
           value: test:test  # pragma: allowlist secret
         - name: CONCOURSE_MAIN_TEAM_LOCAL_USER

@@ -84,7 +84,7 @@ fi
 command -v curl > /dev/null || err "curl not found"
 command -v jq > /dev/null || err "jq not found"
 
-_ROOT_DOMAIN="${LOCAL_DEV_ROOT_DOMAIN:-mit.dev}"
+_ROOT_DOMAIN="${LOCAL_DEV_ROOT_DOMAIN:-mit.test}"
 KC_URL="${KC_URL:-https://sso.ol.${_ROOT_DOMAIN}}"
 # The ingress serves an mkcert-issued cert whose root CA is not in the system
 # trust store, so curl needs it explicitly or the handshake fails (exit 60)

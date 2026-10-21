@@ -33,18 +33,18 @@ This environment runs the MIT Learn application stack as Kubernetes workloads in
 
 | App | Local URL | Description |
 |-----|-----------|-------------|
-| mit-learn (frontend) | `https://learn.mit.dev` | Next.js frontend |
-| mit-learn (backend) | `https://api.learn.mit.dev` | Django/granian API |
-| learn-ai | `https://ai.learn.mit.dev`, `https://api.learn.mit.dev/ai/` | Django AI proxy service. The frontend uses the `/ai/` path, which shares mit-learn's login session. |
-| mitxonline | `https://mitxonline.mit.dev` | MITx Online LMS (Django/uwsgi) |
-| odl-video-service | `https://video.odl.mit.dev` | ODL Video Service (Django/uwsgi) |
-| micromasters | `https://micromasters.mit.dev` | MicroMasters (Django/granian), opt-in, see [MicroMasters](#micromasters) |
-| Keycloak SSO | `https://sso.ol.mit.dev` | Identity provider (olapps realm) |
-| Mailpit | `https://mail.mit.dev` | Captured outbound email (web UI) |
-| Grafana | `https://grafana.mit.dev` | Logs from every service in the cluster (1-week retention) |
-| OCW theme dev server | `https://ocw-dev.learn.mit.dev` | The ocw-hugo-themes dev server, run on your machine (see below) |
+| mit-learn (frontend) | `https://learn.mit.test` | Next.js frontend |
+| mit-learn (backend) | `https://api.learn.mit.test` | Django/granian API |
+| learn-ai | `https://ai.learn.mit.test`, `https://api.learn.mit.test/ai/` | Django AI proxy service. The frontend uses the `/ai/` path, which shares mit-learn's login session. |
+| mitxonline | `https://mitxonline.mit.test` | MITx Online LMS (Django/uwsgi) |
+| odl-video-service | `https://video.odl.mit.test` | ODL Video Service (Django/uwsgi) |
+| micromasters | `https://micromasters.mit.test` | MicroMasters (Django/granian), opt-in, see [MicroMasters](#micromasters) |
+| Keycloak SSO | `https://sso.ol.mit.test` | Identity provider (olapps realm) |
+| Mailpit | `https://mail.mit.test` | Captured outbound email (web UI) |
+| Grafana | `https://grafana.mit.test` | Logs from every service in the cluster (1-week retention) |
+| OCW theme dev server | `https://ocw-dev.learn.mit.test` | The ocw-hugo-themes dev server, run on your machine (see below) |
 
-All hostnames use a `.dev` TLD that mirrors production (`.edu` → `.dev`), so URLs, CSRF cookies, and OIDC redirect URIs behave identically to deployed environments.
+The main app hostnames mirror production with `mit.edu` swapped for `mit.test` (`learn.mit.edu` → `learn.mit.test`, `sso.ol.mit.edu` → `sso.ol.mit.test`), so URLs, CSRF cookies, and OIDC redirect URIs have the same shape as in deployed environments; Open edX, ocw-studio, and the local-only services use local names. `.test` is reserved (RFC 2606) and never resolves on the public internet, so a hostname missing from `/etc/hosts` fails to resolve rather than reaching someone else's server.
 
 **Design goals:**
 - `setup.sh` does the minimum necessary outside the cluster (k3d, certs, /etc/hosts). Everything else is in-cluster.
@@ -97,7 +97,7 @@ This will:
 1. Check all prerequisites
 2. Create the `local-dev` k3d cluster with a local image registry on port 5001
 3. Generate a wildcard TLS certificate with `mkcert` (trusted by your OS)
-4. Add all `.dev` hostnames to `/etc/hosts` (requires `sudo`)
+4. Add all local hostnames to `/etc/hosts` (requires `sudo`)
 
 > **WSL2 users:** If `setup.sh` reports that `/etc/wsl.conf` was updated, run `wsl --shutdown` in Windows PowerShell and reopen your WSL terminal before continuing. The script also prints any Windows hosts entries or a `certutil` command that need to be applied in an elevated Windows PowerShell.
 
@@ -149,7 +149,7 @@ Day-to-day:
 | You want to… | Do this | What happens |
 |---|---|---|
 | Start working | `./local-dev/scripts/start.sh` | Restarts the cluster if paused, heals, syncs deps, runs Tilt |
-| Stop coding but keep apps running | `Ctrl+C` in the Tilt terminal | Apps stay reachable at their `.dev` URLs; edits no longer sync until Tilt runs again |
+| Stop coding but keep apps running | `Ctrl+C` in the Tilt terminal | Apps stay reachable at their `mit.test` URLs; edits no longer sync until Tilt runs again |
 | Shut down for the day | `Ctrl+C` Tilt, then `./local-dev/scripts/stop.sh` | Removes Tilt-managed workloads, pauses the cluster; DB data survives |
 | Destroy everything | `./local-dev/scripts/teardown.sh` | Deletes the cluster, Pulumi resources, certs, /etc/hosts entries |
 
@@ -228,16 +228,16 @@ To run Open edX on its own instead — no MIT Learn, no shared infra — use `le
 
 ### Test accounts
 
-Log in at any app (or `https://sso.ol.mit.dev` directly) with the seeded Keycloak users: `admin@odl.local`, `student@odl.local`, `prof@odl.local` — password `localdev123` for all three.  <!-- pragma: allowlist secret -->
+Log in at any app (or `https://sso.ol.mit.test` directly) with the seeded Keycloak users: `admin@ol.test`, `student@ol.test`, `prof@ol.test` — password `localdev123` for all three.  <!-- pragma: allowlist secret -->
 
-odl-video-service derives Django permissions from Keycloak group membership: `admin@odl.local` is in the realm's `Admin` group, so it becomes a Django superuser on first login; the other two are plain users.
+odl-video-service derives Django permissions from Keycloak group membership: `admin@ol.test` is in the realm's `Admin` group, so it becomes a Django superuser on first login; the other two are plain users.
 
 ### Editing code
 
 With an app repo checked out next to `ol-infrastructure`, Tilt live-syncs your edits into the running containers — no rebuild. (Curious how? See [Two transports](ARCHITECTURE.md#two-transports-how-your-code-reaches-a-pod) in ARCHITECTURE.md.) What to expect:
 
 - **Django apps:** granian runs with `--reload` and restarts its workers on each change — the new code serves once Django finishes re-importing (roughly 10–30 s depending on the app). Watch for `Changes detected, reloading workers..` in the app logs. Celery workers and beat don't auto-reload — restart those resources from the Tilt UI after changing task code. When `pyproject.toml` or `uv.lock` changes, Tilt runs `uv sync` inside the container first.
-- **Next.js frontend:** Tilt builds the `local-dev` stage of `Dockerfile.web`, which runs `next dev` (Turbopack). Changes under `frontends/` hot-reload in roughly a second (the first request to each page after a pod start pays a one-time on-demand compile). HMR websockets are proxied through apisix, so the browser hot-updates on `https://learn.mit.dev` too. `NEXT_PUBLIC_*` values are runtime env vars (see its `configmaps/app-env.yaml`), not build args, so changing them needs no rebuild. When `yarn.lock` changes, Tilt runs `yarn install` inside the container.
+- **Next.js frontend:** Tilt builds the `local-dev` stage of `Dockerfile.web`, which runs `next dev` (Turbopack). Changes under `frontends/` hot-reload in roughly a second (the first request to each page after a pod start pays a one-time on-demand compile). HMR websockets are proxied through apisix, so the browser hot-updates on `https://learn.mit.test` too. `NEXT_PUBLIC_*` values are runtime env vars (see its `configmaps/app-env.yaml`), not build args, so changing them needs no rebuild. When `yarn.lock` changes, Tilt runs `yarn install` inside the container.
 - **No checkout:** Tilt deploys the pre-built Docker Hub image (`mitodl/<app>-app:latest`). To run a specific release instead, add `"<app>=<tag>"` to `prebuilt_tags` in `tilt_config.json` (the Next.js frontend's key is `mit-learn-nextjs`). It works, but does not hot-reload — you can work on mit-learn without having learn-ai checked out.
 
 ### Access logs
@@ -255,7 +255,7 @@ kubectl --context local-dev logs -n mit-learn deploy/mitlearn-worker-default -f
 kubectl --context local-dev logs -n operations deploy/apisix -f
 ```
 
-To search across services — or to follow a request from the ingress into the app and on into the worker that picked up the task — use **Grafana at [https://grafana.mit.dev](https://grafana.mit.dev)**. It opens straight into the UI with no login. Every pod in the cluster is collected, including the ones Tilt does not manage (Postgres, Valkey, OpenSearch, Keycloak, APISIX, Mailpit).
+To search across services — or to follow a request from the ingress into the app and on into the worker that picked up the task — use **Grafana at [https://grafana.mit.test](https://grafana.mit.test)**. It opens straight into the UI with no login. Every pod in the cluster is collected, including the ones Tilt does not manage (Postgres, Valkey, OpenSearch, Keycloak, APISIX, Mailpit).
 
 The quickest way in is **Drilldown → Logs**, which needs no LogQL at all: pick a service, then narrow by detected label, field, or log level from the sidebar. Its **Patterns** tab groups repetitive lines into templates, which is how you spot one error buried in a wall of health checks.
 
@@ -305,7 +305,7 @@ kubectl --context local-dev exec -it -n local-infra local-pg-1 -- psql -U app -d
 
 ### Inspect emails (Mailpit)
 
-All outbound email is captured by Mailpit. Access the web UI at `https://mail.mit.dev`.
+All outbound email is captured by Mailpit. Access the web UI at `https://mail.mit.test`.
 
 ---
 
@@ -396,11 +396,11 @@ The rule of thumb for which config surface a knob belongs to: settings that chan
 
 ### Root domain
 
-Every service hostname derives from the `LOCAL_DEV_ROOT_DOMAIN` environment variable, which defaults to `mit.dev`: `learn.<root_domain>`, `api.learn.<root_domain>`, `sso.ol.<root_domain>`, and so on. Set it in your shell environment so that it is exported to `tilt up` and `setup.sh`.
+Every service hostname derives from the `LOCAL_DEV_ROOT_DOMAIN` environment variable, which defaults to `mit.test`: `learn.<root_domain>`, `api.learn.<root_domain>`, `sso.ol.<root_domain>`, and so on. Set it in your shell environment so that it is exported to `tilt up` and `setup.sh`.
 
 `tilt up` fails immediately if `sso.ol.<root_domain>` does not resolve, whether through DNS or `/etc/hosts`.
 
-After changing the value, re-run `./local-dev/scripts/setup.sh` to reissue the TLS certificate and rewrite the `/etc/hosts` block; pass `--skip-hosts` to reissue the certificate only, which is what you want when the hostnames already resolve through DNS. The certificate's SANs cover one root domain, so requests to hostnames outside it fail at the TLS layer.
+After changing the value, or pulling a change to its default, re-run `./local-dev/scripts/setup.sh` to reissue the TLS certificate and rewrite the `/etc/hosts` block; pass `--skip-hosts` to reissue the certificate only, which is what you want when the hostnames already resolve through DNS. The certificate's SANs cover one root domain, so requests to hostnames outside it fail at the TLS layer. Tilt rewrites only the current default (`mit.test`) in app manifests, so a hostname under any other domain in a gitignored `app-env.local.yaml` passes through unchanged; check those files for the old domain after a change. Hostnames that apps stored in their databases keep the old domain until rewritten: re-run `seed-mit-learn-mitxonline` for Learn's resource URLs and `seed-ocw-studio-theme-pipeline` for ocw-studio's theme-assets pipeline, and edit the redirect URIs of any OAuth application you registered by hand.
 
 ### Log retention
 
@@ -437,7 +437,7 @@ The infrastructure is split across two Pulumi stacks:
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `keycloak_hostname` | `sso.ol.mit.dev` | Keycloak ingress hostname |
+| `keycloak_hostname` | `sso.ol.mit.test` | Keycloak ingress hostname |
 | `tls_cert_path` | `local-dev/certs/local-dev.pem` | mkcert cert (relative to repo root) |
 | `keycloak_image` | published `mitodl/keycloak` digest | Keycloak server image. Leave unset here and use `tilt_config.json` instead — see [Testing a local ol-keycloakify build](#testing-a-local-ol-keycloakify-build). |
 | `observability_enabled` | `true` | Deploy Grafana + Loki + Alloy (~1.9GB). Set to `false` on a constrained Docker VM. |
@@ -584,7 +584,7 @@ Confirm the pod is on your tag, then log in again or trigger a password reset to
 kubectl --context local-dev -n local-infra get pod keycloak-0 -o jsonpath='{.spec.containers[0].image}'
 ```
 
-Emails land in [Mailpit](#inspect-emails-mailpit); the olapps realm enables the `UPDATE_EMAIL` required action, so changing an email from the [account console](https://sso.ol.mit.dev/realms/olapps/account/) exercises the email-update confirmation template as well.
+Emails land in [Mailpit](#inspect-emails-mailpit); the olapps realm enables the `UPDATE_EMAIL` required action, so changing an email from the [account console](https://sso.ol.mit.test/realms/olapps/account/) exercises the email-update confirmation template as well.
 
 Edit, re-run the script, and Keycloak rolls again. The tag is the checkout's short commit plus a hash of its uncommitted changes (tracked edits and untracked files; gitignored files don't count) and of the Dockerfile, so each distinct input gets its own tag and the operator, which only rolls when the image string changes, rolls once per change. The registry keeps the ten most recent tags per repository, so if `keycloak-0` ever fails to pull an old tag after many builds, re-run the script. To return to the published image:
 
@@ -612,7 +612,7 @@ Two addresses, and apps generally need both:
 | From | Address |
 |------|---------|
 | Inside the cluster (boto3, the site-host nginx) | `http://rustfs.local-infra.svc.cluster.local:9000` |
-| A browser (media URLs, presigned links) | `https://s3.mit.dev` |
+| A browser (media URLs, presigned links) | `https://s3.mit.test` |
 
 Credentials are the fixed local-dev pair `localdevaccess` / `localdevsecret123`,
 defined in `objectstore.py` and repeated in each app's `secrets.yaml`.
@@ -793,7 +793,7 @@ print(SyncXproProgramsTask.run(full_refresh=True))
 PY
 kubectl --context local-dev -n mit-learn exec deploy/mitlearn-webapp -c app -- python manage.py clear_cache
 
-curl -sk "https://api.learn.mit.dev/api/v1/courses/?platform=xpro"
+curl -sk "https://api.learn.mit.test/api/v1/courses/?platform=xpro"
 ```
 
 - The xPRO tasks are in [mit-learn #4054](https://github.com/mitodl/mit-learn/pull/4054),
@@ -918,11 +918,11 @@ PY
 cd dg_projects/delivery   # in ol-data-platform
 unset DBT_MODEL_FIXTURE_DIR
 export VAULT_OIDC_NONINTERACTIVE=1 DBT_MODEL_LOCAL_LAKE=1
-export MIT_LEARN_BASE_URL=https://api.learn.mit.dev
+export MIT_LEARN_BASE_URL=https://api.learn.mit.test
 export MIT_LEARN_WEBHOOK_SECRET=local-dev-mitlearn-insecure-webhook-secret  # pragma: allowlist secret
 uv run dagster asset materialize -m delivery.definitions --select "mit_learn_delivery/oll_webhook"
 
-curl -sk "https://api.learn.mit.dev/api/v1/courses/?platform=oll&limit=1" | jq .count
+curl -sk "https://api.learn.mit.test/api/v1/courses/?platform=oll&limit=1" | jq .count
 ```
 
 To roll back, give the pair back to the legacy pipeline, run it and clear the cache:
@@ -973,11 +973,11 @@ serves published sites out of the buckets.
 
 | Hostname | What it serves |
 |----------|----------------|
-| `studio.ocw.mit.dev` | Studio itself |
-| `draft.ocw.mit.dev` | the preview bucket — what "Publish draft" writes |
-| `live.ocw.mit.dev` | the publish bucket — what "Publish live" writes |
-| `test.ocw.mit.dev` | the test bucket the pipeline's smoke-test step reads |
-| `concourse.ocw.mit.dev` | the Concourse UI (log in as `test` / `test`) |
+| `studio.ocw.mit.test` | Studio itself |
+| `draft.ocw.mit.test` | the preview bucket — what "Publish draft" writes |
+| `live.ocw.mit.test` | the publish bucket — what "Publish live" writes |
+| `test.ocw.mit.test` | the test bucket the pipeline's smoke-test step reads |
+| `concourse.ocw.mit.test` | the Concourse UI (log in as `test` / `test`) |
 
 Re-run `./local-dev/scripts/setup.sh` after enabling it: those hostnames need
 `/etc/hosts` entries and the TLS cert needs a `*.ocw.<domain>` wildcard, neither of
@@ -1015,7 +1015,7 @@ a local Postgres database to read, and most developers do not need it running:
 ```
 
 Enabling it creates the `micromasters` database on the shared Postgres cluster and
-deploys the web app at `https://micromasters.mit.dev` plus one celery worker. Re-run
+deploys the web app at `https://micromasters.mit.test` plus one celery worker. Re-run
 `./local-dev/scripts/setup.sh` first if your `/etc/hosts` predates the app; the
 existing `*.<domain>` certificate already covers the hostname.
 
@@ -1124,7 +1124,7 @@ keycloak:openid/clientServiceAccountRole:ClientServiceAccountRole resource 'olap
 has a problem: Missing required argument. The argument "client_id" is required, but no definition was found.
 ```
 
-The b2b client the error names is not the problem. Keycloak is empty — `curl -sk https://sso.ol.mit.dev/admin/realms` with an admin token returns only `master` — while the apps-infra Pulumi state still describes the `olapps` realm, so Pulumi skips creating it and dies on the first resource that has to look something up inside it.
+The b2b client the error names is not the problem. Keycloak is empty — `curl -sk https://sso.ol.mit.test/admin/realms` with an admin token returns only `master` — while the apps-infra Pulumi state still describes the `olapps` realm, so Pulumi skips creating it and dies on the first resource that has to look something up inside it.
 
 That happens when the cluster is replaced without `teardown.sh`: deleted by hand, lost to a `docker system prune` (see [Disk Management](#disk-management)), or to a WSL reset. The state lives in this checkout and survives all of them.
 
@@ -1352,7 +1352,7 @@ wsl --shutdown
 
 Then reopen your WSL terminal. If `setup.sh` has already run, the entries will persist from that point on.
 
-### Windows browser can't resolve `.dev` hostnames
+### Windows browser can't resolve `mit.test` hostnames
 
 Your Windows browser reads `C:\Windows\System32\drivers\etc\hosts`, not WSL's `/etc/hosts`. `setup.sh` attempts to write the same block to the Windows hosts file directly. If it couldn't (requires Windows admin elevation), re-run `setup.sh` and paste the printed `Add-Content` command into an **elevated** Windows PowerShell.
 

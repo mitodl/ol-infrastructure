@@ -13,7 +13,7 @@ spec:
   - name: cors
     enable: true
     config:
-      allow_origins: "https://ai.learn.mit.dev,https://learn.mit.dev"
+      allow_origins: "https://ai.learn.mit.test,https://learn.mit.test"
       allow_methods: "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS"
       allow_headers: "Authorization,Content-Type,X-CSRFToken,X-Requested-With"
       expose_headers: "X-CSRFToken"
@@ -36,12 +36,12 @@ metadata:
 spec:
   ingressClassName: apache-apisix
   hosts:
-  - "ai.learn.mit.dev"
+  - "ai.learn.mit.test"
   secret:
     name: local-dev-tls
     namespace: learn-ai
 ---
-# ApisixRoute for ai.learn.mit.dev.
+# ApisixRoute for ai.learn.mit.test.
 #
 # Sub-routes match QA pattern:
 #   websocket  : /ws/*          (pass, websocket enabled)
@@ -63,7 +63,7 @@ spec:
     priority: 1
     match:
       hosts:
-      - "ai.learn.mit.dev"
+      - "ai.learn.mit.test"
       paths:
       - "/ws/*"
     backends:
@@ -104,7 +104,7 @@ spec:
     priority: 2
     match:
       hosts:
-      - "ai.learn.mit.dev"
+      - "ai.learn.mit.test"
       paths:
       - "/*"
     backends:
@@ -140,7 +140,7 @@ spec:
     priority: 10
     match:
       hosts:
-      - "ai.learn.mit.dev"
+      - "ai.learn.mit.test"
       paths:
       - "/logout/*"
     backends:
@@ -156,7 +156,7 @@ spec:
     priority: 10
     match:
       hosts:
-      - "ai.learn.mit.dev"
+      - "ai.learn.mit.test"
       paths:
       - "/admin/login/*"
       - "/http/login/*"
@@ -192,7 +192,7 @@ spec:
 # learn-ai under /ai/* on mit-learn's API host, as RC and production serve it
 # (src/ol_infrastructure/applications/learn_ai/__main__.py). Here the browser
 # sends mit-learn's gateway session cookie, so learn-ai sees the logged-in user;
-# on ai.learn.mit.dev it never gets that cookie and everyone is anonymous.
+# on ai.learn.mit.test it never gets that cookie and everyone is anonymous.
 #
 # The openid-connect config matches mit-learn's passauth (client, scope,
 # session settings), so this reads and writes the same
@@ -211,7 +211,7 @@ spec:
     priority: 0
     match:
       hosts:
-      - api.learn.mit.dev
+      - api.learn.mit.test
       paths:
       - "/ai/*"
     backends:
@@ -238,7 +238,7 @@ spec:
           # Same as mit-learn's routes (local-dev/apps/mit-learn/apisix-routes.yaml),
           # so this reads mit-learn's login session.
           cookie_name: mitlearn_apisix_session_dev
-          cookie_domain: ".learn.mit.dev"
+          cookie_domain: ".learn.mit.test"
           absolute_timeout: 1209600
           idling_timeout: 0
           rolling_timeout: 0
@@ -248,7 +248,7 @@ spec:
     priority: 10
     match:
       hosts:
-      - api.learn.mit.dev
+      - api.learn.mit.test
       paths:
       - "/ai/admin/login/*"
       - "/ai/http/login/*"
@@ -276,7 +276,7 @@ spec:
           # Same as mit-learn's routes (local-dev/apps/mit-learn/apisix-routes.yaml),
           # so this reads mit-learn's login session.
           cookie_name: mitlearn_apisix_session_dev
-          cookie_domain: ".learn.mit.dev"
+          cookie_domain: ".learn.mit.test"
           absolute_timeout: 1209600
           idling_timeout: 0
           rolling_timeout: 0

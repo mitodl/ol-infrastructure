@@ -7,9 +7,9 @@
 # k8s_yaml_local applies manifests with three local-dev conveniences:
 #
 # 1. Root-domain substitution. The LOCAL_DEV_ROOT_DOMAIN environment variable
-#    (default: mit.dev) replaces every 'mit.dev' occurrence so hostnames,
+#    (default: mit.test) replaces every 'mit.test' occurrence so hostnames,
 #    URLs, and cookie-domain references update consistently:
-#      export LOCAL_DEV_ROOT_DOMAIN=mycompany.dev && tilt up
+#      export LOCAL_DEV_ROOT_DOMAIN=mycompany.test && tilt up
 #
 # 2. Config-change rollouts. Kubernetes does not restart pods when a
 #    ConfigMap/Secret they reference changes, so every Deployment applied in
@@ -25,13 +25,13 @@
 #    prebuilt_tags entry and no checkout. Deployment containers running one
 #    of those images get that tag in place of the one in the manifest.
 
-_ROOT_DOMAIN_DEFAULT = "mit.dev"
+_ROOT_DOMAIN_DEFAULT = "mit.test"
 _CONFIG_HASH_ANNOTATION = "ol.mit.edu/config-hash"
 _PREBUILT_IMAGE_TAGS_ENV = "LOCAL_DEV_PREBUILT_IMAGE_TAGS"
 
 
 def current_root_domain():
-    """Return the value k8s_yaml_local substitutes 'mit.dev' for, so a caller
+    """Return the value k8s_yaml_local substitutes 'mit.test' for, so a caller
     that needs the same value for something other than YAML (e.g. folding it
     into a downstream checksum input) doesn't duplicate the env var name or
     default."""

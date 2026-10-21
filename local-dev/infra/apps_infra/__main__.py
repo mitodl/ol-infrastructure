@@ -32,7 +32,7 @@ kubeconfig_path = config.get("kubeconfig") or ""
 
 # Root domain configuration
 root_domain = config.get("root_domain") or os.environ.get(
-    "LOCAL_DEV_ROOT_DOMAIN", "mit.dev"
+    "LOCAL_DEV_ROOT_DOMAIN", "mit.test"
 )
 
 keycloak_hostname = config.get("keycloak_hostname") or f"sso.ol.{root_domain}"

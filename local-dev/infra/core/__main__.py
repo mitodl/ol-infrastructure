@@ -73,7 +73,7 @@ mkcert_ca_cert_path = config.get("mkcert_ca_cert_path") or "local-dev/certs/root
 
 # Root domain for all local-dev hostnames.
 root_domain = config.get("root_domain") or os.environ.get(
-    "LOCAL_DEV_ROOT_DOMAIN", "mit.dev"
+    "LOCAL_DEV_ROOT_DOMAIN", "mit.test"
 )
 
 keycloak_hostname = config.get("keycloak_hostname") or f"sso.ol.{root_domain}"
