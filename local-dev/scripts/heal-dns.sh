@@ -198,8 +198,14 @@ save_memo() {
 # Record what we misjudged about a container that came back unchanged. Only
 # resolvers the host does not list are worth remembering — those are the ones
 # that reached the drift-candidate branch in the first place.
+#
+# `check_search` must mirror the caller's: the search domain is only part of
+# the verdict for the dagger engine. Recording a node's search reading here
+# would be recording something we never judged it on, and because the memo is
+# shared it would then suppress the dagger engine's search comparison — which
+# is the only drift signal dagger exposes at all.
 remember_false_positives() {
-	local conf="$1" ns their_search
+	local conf="$1" check_search="$2" ns their_search
 	local -a upstreams
 	mapfile -t upstreams < <(baked_upstreams "$conf")
 	for ns in "${upstreams[@]:-}"; do
@@ -207,8 +213,10 @@ remember_false_positives() {
 		grep -qxF "$ns" <<<"$HOST_NS" && continue
 		memo_add "ns $ns"
 	done
-	their_search="$(baked_search "$conf")"
-	[[ "$their_search" != "$HOST_SEARCH" ]] && memo_add "search $their_search"
+	if [[ "$check_search" == true ]]; then
+		their_search="$(baked_search "$conf")"
+		[[ "$their_search" != "$HOST_SEARCH" ]] && memo_add "search $their_search"
+	fi
 	return 0
 }
 
@@ -325,7 +333,7 @@ confirm_restart() {
 		return 0
 	fi
 	if [[ -n "$before" && "$after" == "$before" ]]; then
-		remember_false_positives "$after"
+		remember_false_positives "$after" "$check_search"
 		warn "'$name' came back with an unchanged resolv.conf, so it already matches what this host produces now; treating the earlier stale reading as a false positive and skipping it until the host's DNS changes."
 		return 0
 	fi
