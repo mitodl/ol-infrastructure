@@ -334,6 +334,316 @@ def _reconcile_domain(name: str, desired: dict[str, str]) -> None:
     _apply_patch(f"domain {name}", f"{OM_SERVER_URL}/v1/domains/{domain['id']}", ops)
 
 
+# ── Access control ────────────────────────────────────────────────────────
+# A user's own roles come from the `roles` claim that Keycloak sends at login
+# (authorizer useRolesFromProvider in applications/open_metadata, mapping in
+# substructure/keycloak ol_data_platform.py OPEN_METADATA_ROLE_BY_REALM_ROLE):
+# ol-platform-admin and ol-data-engineer -> DataEngineer, ol-researcher ->
+# DataContributor, the two analyst roles and every other user -> DataConsumer.
+# No realm role maps to Admin; admins come from initialAdmins.  The claim
+# replaces the roles a user holds, so roles assigned to a person in the UI do
+# not survive their next login.  On top of their own roles every user inherits
+# DataConsumer and OrganizationPolicy from the Organization team, and a team's
+# members inherit its defaultRoles.
+#
+# DataEngineer and DataContributor are the custom roles the claim names.  They
+# grant only what DataConsumer does not: DataConsumer already lets everyone
+# view everything and edit descriptions, tags, glossary terms, tier and
+# certification.
+
+# Entity types that hold warehouse and BI metadata, as opposed to governance
+# entities (glossaries, teams, policies).
+_DATA_ASSET_RESOURCES: list[str] = [
+    "apiEndpoint",
+    "chart",
+    "container",
+    "dashboard",
+    "dashboardDataModel",
+    "database",
+    "databaseSchema",
+    "metric",
+    "mlmodel",
+    "pipeline",
+    "searchIndex",
+    "storedProcedure",
+    "table",
+    "topic",
+]
+
+# Desired state for each custom policy, keyed by policy name.  The server
+# stores rules, resources and operations sorted, so they are compared as sets.
+POLICY_CONFIG: dict[str, dict[str, Any]] = {
+    "DataEngineerPolicy": {
+        "displayName": "Data Engineer Policy",
+        "description": (
+            "Technical metadata, lineage and data quality tests on data assets."
+        ),
+        "rules": [
+            {
+                "name": "DataEngineerPolicy-TechnicalMetadata",
+                "description": "Edit technical metadata and lineage of data assets.",
+                "effect": "allow",
+                "resources": _DATA_ASSET_RESOURCES,
+                "operations": [
+                    "EditCustomFields",
+                    "EditDescription",
+                    "EditDisplayName",
+                    "EditLineage",
+                    "EditTags",
+                ],
+            },
+            {
+                "name": "DataEngineerPolicy-DataQuality",
+                "description": (
+                    "Add and edit the tests on a table, and triage their failures."
+                ),
+                "effect": "allow",
+                "resources": ["table", "testCase", "testSuite"],
+                "operations": ["CreateTests", "EditTests"],
+            },
+            {
+                "name": "DataEngineerPolicy-TestCases",
+                "description": "Create and edit test cases and test suites.",
+                "effect": "allow",
+                "resources": ["testCase", "testSuite"],
+                "operations": ["Create", "EditAll"],
+            },
+        ],
+    },
+    "DataContributorPolicy": {
+        "displayName": "Data Contributor Policy",
+        "description": "Save queries against data assets.",
+        "rules": [
+            {
+                # A saved query is owned by its author, so OrganizationPolicy's
+                # owner rule covers editing and deleting it afterwards.
+                "name": "DataContributorPolicy-Queries",
+                "description": "Save SQL queries to data assets.",
+                "effect": "allow",
+                "resources": ["query"],
+                "operations": ["Create"],
+            },
+        ],
+    },
+}
+
+# Desired state for each custom role, keyed by role name.  These names are the
+# values Keycloak sends in the `roles` claim, so renaming one here without
+# renaming its Keycloak client role leaves its holders with no role.
+ROLE_CONFIG: dict[str, dict[str, Any]] = {
+    "DataEngineer": {
+        "displayName": "Data Engineer",
+        "description": (
+            "Maintains technical metadata, lineage and data quality tests. "
+            "Granted by the ol-data-engineer and ol-platform-admin Keycloak "
+            "roles."
+        ),
+        "policies": ["DataEngineerPolicy"],
+    },
+    "DataContributor": {
+        "displayName": "Data Contributor",
+        "description": (
+            "Documents data assets and saves queries against them. Granted by "
+            "the ol-researcher Keycloak role."
+        ),
+        "policies": ["DataContributorPolicy"],
+    },
+}
+
+# The exact defaultRoles of each listed team.  data-platform members are the
+# stewards: DataSteward adds owners, display names, lineage and running
+# ingestion to what DataConsumer allows.  The team is also who reviews data
+# contracts, but in ol-data-platform pull requests: contracts are synced to
+# OpenMetadata already Approved, so OpenMetadata's own approval step (an
+# In Review contract that only its `reviewers` can approve) is not used.
+TEAM_DEFAULT_ROLES: dict[str, list[str]] = {
+    "data-platform": ["DataSteward"],
+}
+
+
+def _get_by_name_with_fields(
+    collection: str, name: str, fields: str
+) -> dict[str, Any] | None:
+    """Fetch an entity by name with extra fields, or None if it does not exist.
+
+    :param collection: The API collection, e.g. ``"roles"``.
+    :param name: The entity's name.
+    :param fields: Comma-separated fields to include, e.g. ``"policies"``.
+    :raises requests.HTTPError: On any non-2xx response other than 404.
+    """
+    get_resp = requests.get(
+        f"{OM_SERVER_URL}/v1/{collection}/name/{name}",
+        headers=_AUTH_HEADER,
+        params={"fields": fields},
+        timeout=30,
+    )
+    if get_resp.status_code == requests.codes.not_found:
+        return None
+    get_resp.raise_for_status()
+    return get_resp.json()
+
+
+def _entity_refs(
+    collection: str, entity_type: str, names: list[str]
+) -> list[dict[str, str]]:
+    """Resolve entity names to the references a PATCH expects.
+
+    :param collection: The API collection, e.g. ``"roles"``.
+    :param entity_type: The reference type, e.g. ``"role"``.
+    :param names: Entity names, every one of which must exist.
+    :raises ValueError: If a named entity does not exist.
+    """
+    refs = []
+    for name in names:
+        entity = _get_by_name(collection, name)
+        if entity is None:
+            msg = f"{entity_type} {name!r} does not exist"
+            raise ValueError(msg)
+        refs.append({"id": entity["id"], "type": entity_type})
+    return refs
+
+
+def _normalized_rules(rules: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
+    """Reduce policy rules to a form that ignores the server's reordering.
+
+    :param rules: Rules as sent to or returned by the policies API.
+    """
+    return sorted(
+        (
+            rule["name"],
+            rule["effect"],
+            frozenset(resource.lower() for resource in rule["resources"]),
+            frozenset(rule["operations"]),
+            rule.get("condition"),
+            rule.get("description"),
+        )
+        for rule in rules
+    )
+
+
+def _reconcile_policy(name: str, desired: dict[str, Any]) -> None:
+    """Create the policy if it is missing, else PATCH its description and rules.
+
+    displayName is create-only, as for teams.
+
+    :param name: Policy name, e.g. ``"DataEngineerPolicy"``.
+    :param desired: The policy's displayName, description and rules.
+    :raises requests.HTTPError: On any non-2xx response from the OM API.
+    """
+    policy = _get_by_name("policies", name)
+    if policy is None:
+        post_resp = requests.post(
+            f"{OM_SERVER_URL}/v1/policies",
+            headers=_AUTH_HEADER,
+            json={"name": name, **desired},
+            timeout=30,
+        )
+        post_resp.raise_for_status()
+        print(f"[done] policy {name}: created")  # noqa: T201
+        return
+
+    ops = []
+    if policy.get("description") != desired["description"]:
+        ops.append(
+            {"op": "add", "path": "/description", "value": desired["description"]}
+        )
+    if _normalized_rules(policy["rules"]) != _normalized_rules(desired["rules"]):
+        ops.append({"op": "add", "path": "/rules", "value": desired["rules"]})
+
+    _apply_patch(f"policy {name}", f"{OM_SERVER_URL}/v1/policies/{policy['id']}", ops)
+
+
+def _reconcile_role(name: str, desired: dict[str, Any]) -> None:
+    """Create the role if it is missing, else PATCH its description and policies.
+
+    :param name: Role name, e.g. ``"DataEngineer"``.
+    :param desired: The role's displayName, description and policy names.
+    :raises requests.HTTPError: On any non-2xx response from the OM API.
+    :raises ValueError: If a policy the role names does not exist.
+    """
+    role = _get_by_name_with_fields("roles", name, "policies")
+    if role is None:
+        post_resp = requests.post(
+            f"{OM_SERVER_URL}/v1/roles",
+            headers=_AUTH_HEADER,
+            json={"name": name, **desired},
+            timeout=30,
+        )
+        post_resp.raise_for_status()
+        print(f"[done] role {name}: created")  # noqa: T201
+        return
+
+    ops = []
+    if role.get("description") != desired["description"]:
+        ops.append(
+            {"op": "add", "path": "/description", "value": desired["description"]}
+        )
+    if {policy["name"] for policy in role["policies"]} != set(desired["policies"]):
+        ops.append(
+            {
+                "op": "add",
+                "path": "/policies",
+                "value": _entity_refs("policies", "policy", desired["policies"]),
+            }
+        )
+
+    _apply_patch(f"role {name}", f"{OM_SERVER_URL}/v1/roles/{role['id']}", ops)
+
+
+def _reconcile_team_default_roles(team_name: str, role_names: list[str]) -> None:
+    """Set a team's defaultRoles to exactly ``role_names``.
+
+    :param team_name: Team name, e.g. ``"data-platform"``.
+    :param role_names: Names of the roles every member of the team inherits.
+    :raises requests.HTTPError: On any non-2xx response from the OM API.
+    :raises ValueError: If the team or a named role does not exist.
+    """
+    team = _get_by_name_with_fields("teams", team_name, "defaultRoles")
+    if team is None:
+        msg = f"team {team_name!r} does not exist"
+        raise ValueError(msg)
+
+    ops = []
+    if {role["name"] for role in team["defaultRoles"]} != set(role_names):
+        ops.append(
+            {
+                "op": "add",
+                "path": "/defaultRoles",
+                "value": _entity_refs("roles", "role", role_names),
+            }
+        )
+
+    _apply_patch(
+        f"team {team_name} defaultRoles",
+        f"{OM_SERVER_URL}/v1/teams/{team['id']}",
+        ops,
+    )
+
+
+def _access_control_steps() -> list[tuple[str, Callable[[], None]]]:
+    """Return the access-control steps, policies before the roles that use them.
+
+    Runs after the team steps, because team defaultRoles need the team.
+    """
+    return [
+        *(
+            (f"policy {name}", partial(_reconcile_policy, name, policy))
+            for name, policy in POLICY_CONFIG.items()
+        ),
+        *(
+            (f"role {name}", partial(_reconcile_role, name, role))
+            for name, role in ROLE_CONFIG.items()
+        ),
+        *(
+            (
+                f"team {name} defaultRoles",
+                partial(_reconcile_team_default_roles, name, roles),
+            )
+            for name, roles in TEAM_DEFAULT_ROLES.items()
+        ),
+    ]
+
+
 def main() -> None:
     """Reconcile every tag, team and domain; exit non-zero if any step fails."""
     errors: list[str] = []
@@ -344,6 +654,7 @@ def main() -> None:
             (f"team {name}", partial(_reconcile_team, name, team))
             for name, team in TEAM_CONFIG.items()
         ),
+        *_access_control_steps(),
         *(
             (f"domain {name}", partial(_reconcile_domain, name, domain))
             for name, domain in DOMAIN_CONFIG.items()

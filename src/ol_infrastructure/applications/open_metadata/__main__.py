@@ -114,6 +114,23 @@ aws_account = get_caller_identity()
 
 open_metadata_namespace = "open-metadata"
 open_metadata_service_account_name = "openmetadata"
+# Users' roles come from the `roles` claim that the ol-open_metadata-client
+# Keycloak client sends (substructure/keycloak ol_data_platform.py
+# OPEN_METADATA_ROLE_BY_REALM_ROLE). The claim never carries `Admin`, because
+# OpenMetadata only ever promotes from it and never clears isAdmin when it is
+# absent. Admins come only from initialAdmins below.
+#
+# Tokens OpenMetadata issues itself (session JWTs, personal access tokens) carry
+# a snapshot of the user's roles, `Admin` included, and GET
+# /users/loggedInUser resyncs the user from that snapshot. An old personal
+# access token can therefore give a demoted user back a role or admin, or drop
+# a role they were given after it was issued, until they next log in. Demoting
+# anyone fully means revoking their personal access tokens.
+#
+# To demote an admin: remove them from initialAdmins below and from
+# adminPrincipals in the authorizerConfiguration row, unset isAdmin on their
+# OpenMetadata user, and revoke their personal access tokens.
+open_metadata_use_roles_from_provider = True
 # Used both for the chart's own ingestion pods and for the om-auth-config Job,
 # which borrows it for psycopg2 rather than carrying a second image.
 om_ingestion_image = (
@@ -756,19 +773,22 @@ open_metadata_assets_policy_attachment = iam.RolePolicyAttachment(
     opts=ResourceOptions(parent=open_metadata_irsa_role),
 )
 
-# Reconcile the two 2.0 session settings into the database row the server
-# actually reads.  The AUTHENTICATION_* entries in extraEnvs below only bind on
-# an install whose `authenticationConfiguration` row does not exist yet, because
-# `SettingsCache.createDefaultConfiguration` seeds that row from the YAML only
-# when it is absent and `SecurityConfigurationManager` reads it back from the
-# database on every boot.  Our row was written by 1.13.x and has neither key.
+# Reconcile the two 2.0 session settings and useRolesFromProvider into the
+# database rows the server actually reads.  The AUTHENTICATION_* entries in
+# extraEnvs below and the authorizer Helm values only bind on an install whose
+# `authenticationConfiguration` / `authorizerConfiguration` row does not exist
+# yet, because `SettingsCache.createDefaultConfiguration` seeds each row from the
+# YAML only when it is absent and `SecurityConfigurationManager` reads them back
+# from the database on every boot.  Our rows were written by 1.13.x.
 #
 # This is a dependency of the Helm release rather than a follower of it: the
 # server snapshots its auth configuration during startup, so the write has to
 # land before the release rolls the pods for the release's own rollout to pick
 # it up.  The Job name embeds a hash of the script and of the desired values so
 # that changing either recreates the Job and re-runs it; the script itself is
-# idempotent and does nothing when the row already agrees.
+# idempotent and does nothing when the rows already agree.  The same hash is a
+# pod annotation on the server, because a change that only touches the chart's
+# config Secret would not otherwise roll the pods.
 _auth_config_script = (
     Path(__file__).parent / "scripts" / "om_auth_config.py"
 ).read_text()
@@ -778,6 +798,7 @@ _auth_config_hash = hashlib.sha256(
             _auth_config_script,
             str(OPEN_METADATA_SESSION_EXPIRY_SECONDS),
             str(OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER),
+            json.dumps(open_metadata_use_roles_from_provider),
         ]
     ).encode()
 ).hexdigest()[:8]
@@ -827,6 +848,10 @@ open_metadata_auth_config_job = kubernetes.batch.v1.Job(
                                 name="OM_MAX_ACTIVE_SESSIONS_PER_USER",
                                 value=str(OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER),
                             ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="OM_USE_ROLES_FROM_PROVIDER",
+                                value=json.dumps(open_metadata_use_roles_from_provider),
+                            ),
                         ],
                         env_from=[
                             kubernetes.core.v1.EnvFromSourceArgs(
@@ -872,6 +897,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # metadata, which do not share a role, so it carries the tier and no
             # component. The operator's pod template takes no labels at all.
             "commonLabels": k8s_labels.workload_labels(alert_tier=AlertTier.notify),
+            "podAnnotations": {"ol.mit.edu/om-auth-config": _auth_config_hash},
             "openmetadata": {
                 "config": {
                     # Ref: https://docs.open-metadata.org/latest/deployment/security/keycloak/kubernetes
@@ -879,6 +905,14 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "enabled": True,
                         "className": "org.openmetadata.service.security.DefaultAuthorizer",  # noqa: E501
                         "containerRequestFilter": "org.openmetadata.service.security.JwtFilter",  # noqa: E501
+                        # Not bootstrap-only. The chart renders this into
+                        # adminPrincipals, which the authorizerConfiguration row
+                        # keeps (om_auth_config.py merges around it), and every
+                        # OIDC login makes anyone in adminPrincipals an admin
+                        # again (AuthenticationCodeFlowHandler.getOrCreateOidcUser).
+                        # These are the only admins: no Keycloak role maps to
+                        # `Admin`. See the demotion steps at
+                        # open_metadata_use_roles_from_provider.
                         "initialAdmins": [
                             "tmacey",
                             "shaidar",
@@ -887,6 +921,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
                             "qhoque",
                         ],
                         "principalDomain": "mit.edu",
+                        "useRolesFromProvider": open_metadata_use_roles_from_provider,
                     },
                     "authentication": {
                         "provider": "custom-oidc",
