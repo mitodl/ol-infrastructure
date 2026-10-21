@@ -148,7 +148,7 @@ Packages
 
 | Package | Import | Depends on | Holds |
 | --- | --- | --- | --- |
-| `ol-llm` | `ol_llm` | `opik` (pinned), `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http`, `httpx` | What every call site needs whatever it is built on: tracing wiring (SDK root trace, OTel spans linked by `OpikSpanProcessor`, Keycloak-refreshing auth), §4 attribution, the §3 policy values (`resolve_policy`), prompt fetch through the SDK with embedded fallback, batch helpers |
+| `ol-llm` | `ol_llm` | `opik` (pinned), `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http`, `httpx` | What every call site needs whatever it is built on: tracing wiring (SDK root trace, OTel spans linked by `OpikSpanProcessor`, Keycloak-refreshing auth, `traced_embedding` for embedding calls made by the application's own client), §4 attribution, the §3 policy values (`resolve_policy`), prompt fetch through the SDK with embedded fallback, batch helpers |
 | `ol-llm[pydantic-ai]` | | `pydantic-ai-slim` | Model factory, the §6 call contract's retry wrapper, both entry points (agent and traced completion) |
 | `ol-llm[openai]`, `[anthropic]`, `[bedrock]`, `[google]`, `[mistral]` | | the matching `pydantic-ai-slim` extra, so each also installs PydanticAI | Provider SDKs, chosen per consumer |
 | `ol-llm[harness]` | | `pydantic-ai-harness` (0.x, pinned to a minor series) | In-session memory and compaction (§5 categories A and B). Each harness release pins `pydantic-ai-slim` exactly, so this extra fixes the PydanticAI version |
@@ -240,9 +240,9 @@ Consequences:
   unreachable.
 
 litellm is not a dependency. mit-learn's non-chat uses of litellm (token counting,
-`litellm.embedding`) stay in mit-learn until the library's embedding entry point exists.
-Embeddings come under the library after the chat core (decided 2026-10-01,
-`llm-usage-policies-spec.md` §4.1).
+`litellm.embedding`) stay in mit-learn. Embeddings come under the library after the chat core
+(decided 2026-10-01, `llm-usage-policies-spec.md` §4.1), and mit-learn's encoder keeps calling
+`litellm.embedding` inside `traced_embedding` (§6.6, decided 2026-10-21).
 
 Python floor `>=3.11`, the oldest Python among edx-platform releases in use (ulmo).
 pydantic-ai-slim and the OTel packages require `>=3.10`, so the floor costs nothing and keeps
@@ -913,6 +913,22 @@ Both paths share the model factory, policy, attribution, tracing, and errors.
 - Call sites that are not built on PydanticAI (learn-ai's LangGraph bots) take the numbers
   from `resolve_policy(use_case)` and apply them to their own client. The retry wrapper and
   typed errors apply only to models the library builds.
+- Embeddings: `embed` and `embed_sync` take a use case and texts and return the vectors with
+  the model id, dimension, and usage. They need the `pydantic-ai` extra plus the provider's
+  extra. A call site built on LangChain or LangGraph keeps its own embedding client instead and
+  wraps each provider request in `traced_embedding(use_case, texts, attribution=...)`, a
+  context manager in the base package.
+  - It opens the root trace with the §4 fields, or a span under the caller's trace when one is
+    active, and records a span for the request under the use case's catalog id. The client
+    must call that same model.
+  - It runs the catalog checks `embed` runs for an embedding model: a retired id raises, an
+    unlisted or deprecated id logs the warning and takes the `model_status` tag.
+  - It yields a handle on which the caller reports the input token count from the response. On
+    a cache hit the caller reports zero, since litellm fills in usage for cached items. Each
+    request gets its own wrap, so a hedged call records every request it sent.
+  - It lets the caller's exceptions through unchanged. The texts are recorded only when
+    `include_content` is on, and the vectors never are, as with `embed`.
+  - Whether Opik prices an embedding span from its model and usage is not verified.
 
 ### 6.7 Errors and degraded results
 
