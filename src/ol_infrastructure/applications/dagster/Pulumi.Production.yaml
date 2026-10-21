@@ -95,8 +95,10 @@ config:
   #    runs, which peaked at 8 concurrent Jobs over the 7 days to 2026-10-21
   #    (kube_job_labels, data-production) against the canvas export's 133.
   #    Some of those jobs run more than one op (the course_xml_blocks load
-  #    has one per table), so each can add more than two processes. Not
-  #    measured: the series count after the move.
+  #    has one per table), so each can add more than two processes. Those
+  #    runs also call instrumented clients (botocore, requests, sqlalchemy)
+  #    where the canvas export's httpx2 calls were not. Not measured: the
+  #    series count after the move.
   dagster:otel_metrics_enabled: "true"
   # 6 -> 4. The first replica count set from the exporter rather than from a
   # guess. Six days of 1-minute samples (8640 points) taken entirely after the
