@@ -227,7 +227,7 @@ and the code graphs carry a branch per writer, so the window passes
 `--older-than` alone.
 
 The default, 2d, run every night, was chosen to fit the stop window in CI and
-QA, where commits are few, and it no longer does. On format 14
+QA, where commits are few. It no longer fits there. On format 14
 cleanup runs with the server down, and before it deletes anything it opens
 every version present, retained or about to be removed, at 0.16 to 0.22s each.
 Retention bounds only the table versions. The commit manifests
