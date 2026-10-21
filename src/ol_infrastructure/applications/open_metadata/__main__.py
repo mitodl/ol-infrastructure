@@ -489,6 +489,36 @@ superset_connector_secret = OLVaultK8SSecret(
 )
 connector_secrets.append(superset_connector_secret)
 
+# Keycloak client and parent group for the team-keycloak-sync CronOMJob, which
+# mirrors OpenMetadata team membership into Keycloak groups. Written to Vault by
+# the keycloak substructure stack. Only that job reads it, so like the Superset
+# secret it has no restart target.
+OLVaultK8SSecret(
+    f"open-metadata-{stack_info.name}-team-keycloak-sync-secret",
+    OLVaultK8SStaticSecretConfig(
+        name="openmetadata-team-keycloak-sync",
+        namespace=open_metadata_namespace,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name="om-team-keycloak-sync",  # noqa: S106  # pragma: allowlist secret
+        labels=k8s_global_labels,
+        mount="secret-openmetadata",
+        mount_type="kv-v2",
+        path="keycloak-team-sync",
+        templates={
+            "KEYCLOAK_REALM_URL": '{{ get .Secrets "url" }}',
+            "KEYCLOAK_ADMIN_URL": '{{ get .Secrets "admin_url" }}',
+            "KEYCLOAK_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+            "KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+            "KEYCLOAK_PARENT_GROUP_ID": '{{ get .Secrets "parent_group_id" }}',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
+    ),
+)
+
 # Read-only StarRocks credentials for the StarRocks ingestion job, issued by
 # Vault's `database-starrocks` mount. The mount name is not environment
 # qualified: QA and Production each run their own Vault server. The jobs that

@@ -33,6 +33,7 @@ from ol_infrastructure.lib.aws.iam_helper import (
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.substructure.open_metadata.teams import declared_team_names
 
 stack_info = parse_stack()
 om_config = Config("open_metadata")
@@ -944,6 +945,50 @@ kubernetes.batch.v1.Job(
         depends_on=[ingestion_irsa_role],
         delete_before_replace=True,
     ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Team membership -> Keycloak groups
+# ---------------------------------------------------------------------------
+# Team membership is assigned in the OpenMetadata UI. This job mirrors each team
+# declared in om_server_config.py's TEAM_CONFIG into a Keycloak group under
+# /openmetadata-teams in the ol-data-platform realm, adding and removing members
+# to match. The Keycloak client and parent group come from the keycloak
+# substructure stack through the om-team-keycloak-sync secret.
+#
+# A schedule rather than OpenMetadata change events: each run reconciles the
+# whole state, so a missed run or a hand edit in Keycloak is corrected by the
+# next one, and there is no webhook receiver to deploy and secure.
+#
+# OpenMetadata's jwtTeamClaimMapping stays unset. With it set, every login would
+# add the Keycloak memberships back into OpenMetadata and undo removals made
+# there.
+
+_make_cronjob(
+    name="team-keycloak-sync",
+    schedule="17 * * * *",
+    python_script=(
+        Path(__file__).parent / "scripts" / "om_team_keycloak_sync.py"
+    ).read_text(),
+    extra_env=[
+        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+        _plain_env("OM_TEAMS", json.dumps(declared_team_names(_server_config_script))),
+        *(
+            _secret_env("om-team-keycloak-sync", key)
+            for key in (
+                "KEYCLOAK_REALM_URL",
+                "KEYCLOAK_ADMIN_URL",
+                "KEYCLOAK_CLIENT_ID",
+                "KEYCLOAK_CLIENT_SECRET",
+                "KEYCLOAK_PARENT_GROUP_ID",
+            )
+        ),
+    ],
+    resources={
+        "requests": {"cpu": "100m", "memory": "128Mi"},
+        "limits": {"cpu": "500m", "memory": "256Mi"},
+    },
 )
 
 export(
