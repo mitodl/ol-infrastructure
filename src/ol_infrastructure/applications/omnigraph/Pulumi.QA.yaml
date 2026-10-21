@@ -137,10 +137,11 @@ config:
   # The nightly window only optimizes here, as in Production (see the comment
   # on this key there). 0.13's cleanup plans every object under _versions/,
   # including the commit manifests it never removes. QA's code-bridge cleanup
-  # took 413s for 2,559 versions on 2026-10-21 (0.16s each), and the indexer
-  # adds about 255 manifests a day (42 every 4h), so its cleanup would pass
-  # the 600s command timeout around 2026-10-25 and fail the window every night
-  # after. Clean up in a planned long run instead
+  # took 413s for 2,559 versions on 2026-10-21 (0.16s each), the first night
+  # after a backlog run. 2d retention holds about 1,200 table versions, so the
+  # 2026-10-22 plan is about 3,150 versions (510s), and the indexer adds about
+  # 255 manifests a day (42 every 4h), so its cleanup would pass the 600s
+  # command timeout around 2026-10-25 and fail the window every night after. Clean up in a planned long run instead
   # (docs/omnigraph-store-maintenance-runbook.md, "Clearing a cleanup
   # backlog"). Revisit when ModernRelay/omnigraph#1095 ships.
   omnigraph:cleanup_iso_weekdays: []

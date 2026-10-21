@@ -239,10 +239,13 @@ They grow by one per commit. In Production on 2026-10-21 they were 11,800 of
 about 1,500 a day, so no retention fits Production's window and its
 `omnigraph:cleanup_iso_weekdays` is `[]`. QA's is `[]` for the same reason on
 one graph: its code-bridge cleanup took 413s for 2,559 versions on 2026-10-21
-(0.16s each), and the indexer adds about 255 manifests a day, about 40s a
-night, so it would pass the 600s timeout around 2026-10-25. CI keeps the
-nightly default, but its code-bridge had 4,744 versions on 2026-10-21, which
-is over the timeout already. Upstream: ModernRelay/omnigraph#1095.
+(0.16s each), the first night after a backlog run. With about 1,200 table
+versions retained at 2d its 2026-10-22 plan is about 3,150 versions (510s),
+and the indexer adds about 255 manifests a day, about 40s a night, so it would
+pass the 600s timeout around 2026-10-25. CI still has the nightly default,
+and its code-bridge had 4,744 versions on 2026-10-21, over the timeout
+already, so CI's window fails every night (and `WorkloadJobFailed*` fires)
+until CI gets a backlog run or `[]` too. Upstream: ModernRelay/omnigraph#1095.
 
 witan's own code needs no older versions. Every live branch head is kept
 regardless of age, which covers witan-code's per-writer WIP views, and witan
