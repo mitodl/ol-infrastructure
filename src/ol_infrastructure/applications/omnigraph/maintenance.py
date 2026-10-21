@@ -137,14 +137,23 @@ DEFAULT_CLEANUP_SCHEDULE = "20 4 * * 0"
 # format 14 cleanup runs with the server stopped, and before it deletes
 # anything it opens every table version present, retained or not
 # (omnigraph v0.13.0 collector.rs discover_published and plan_sweep, run in
-# full by optimize.rs cleanup_detached_only before any sweep). One run costs
-# about 0.14s per present version on S3: QA's code-bridge took 488s to remove
-# 12 of its 3,522 versions on 2026-10-18. A run stopped during that plan
-# deletes nothing. Run nightly (DEFAULT_CLEANUP_ISO_WEEKDAYS) at 2d, each run
-# sees about three days of writes. Production's code-bridge writes about 800
-# table versions a day (S3 listing of _versions/, 2026-10-17 to 10-19), so
-# that is about 2,400 versions, about 6 minutes. A Sunday-only run sees nine
-# days at 2d and 37 at 30d.
+# full by optimize.rs cleanup_detached_only before any sweep). A run stopped
+# during that plan deletes nothing. On S3 a run costs 0.17 to 0.22s per object
+# under the graph's _versions/ directories, 0.19s on average (Production's
+# 2026-10-20 backlog run: 4,026s over 21,021 versions on six graphs; QA's
+# nightly on 2026-10-21: 0.16 to 0.19s on its larger graphs).
+#
+# That count includes __manifest/_versions/ (one per graph commit) and
+# __manifest/tree/*/_versions/ (one per commit on each writer branch), and
+# 0.13's cleanup never removes those: every delete marker in the bucket under
+# council and ol-data-platform is a table version. So retention bounds only the
+# table versions, and the plan grows by every commit, every night. In
+# Production on 2026-10-21 the manifests were 11,800 of 25,372 versions, about
+# 2,240s of plan before any table version, and grew by about 1,500 a day. No
+# retention fits that in the window (MAINTENANCE_WINDOW_SECONDS), so
+# Production sets omnigraph:cleanup_iso_weekdays to [] and cleans up only in a
+# planned long run (the store-maintenance runbook's "Clearing a cleanup
+# backlog").
 #
 # witan's own code needs no older versions. The current head of every live
 # branch is always retained whatever its age, as is a named branch's oldest
@@ -444,7 +453,9 @@ DEFAULT_MAINTENANCE_SCHEDULE = DEFAULT_OPTIMIZE_SCHEDULE
 
 # Every night. A cleanup's time grows with the versions written since the last
 # one, so a weekly run plans a week of writes on top of the retained ones (see
-# DEFAULT_CLEANUP_OLDER_THAN).
+# DEFAULT_CLEANUP_OLDER_THAN). That holds while the commit manifests cleanup
+# never removes are small. Production's are not, and it sets [] to only
+# optimize.
 DEFAULT_CLEANUP_ISO_WEEKDAYS = (1, 2, 3, 4, 5, 6, 7)
 
 # THE TIME BUDGET, from the 03:20 start:
@@ -535,7 +546,8 @@ def create_maintenance_window(  # noqa: PLR0913
         ``SERVER_STOP_MARGIN_SECONDS``, so a server still draining writes is
         not taken for a stuck one.
     :param cleanup_iso_weekdays: UTC days ``cleanup`` also runs on (1 is
-        Monday), rendered as the comma list the image parses.
+        Monday), rendered as the comma list the image parses. Empty means the
+        window only optimizes.
     :param suspend: hold the window off while a storage-format migration is
         armed. The command also skips on the Deployment's migration-armed
         annotation, which covers a run that started before the suspend landed.
