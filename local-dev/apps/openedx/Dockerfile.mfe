@@ -1,0 +1,29 @@
+# nginx image for a legacy Open edX MFE (frontend-app-learning,
+# frontend-app-authoring).
+#
+# The build context is a temporary directory the Tiltfile's legacy_mfe()
+# populates: `dagger call mfe build-legacy-configured ... export --path
+# <tmp>/dist` writes the bundle, then the Tiltfile copies this Dockerfile's
+# sibling nginx template in next to it.
+#
+# The same nginx 1.31-alpine line lehrer uses for its site-project MFE images
+# (lehrer local-dev/Dockerfile.mfe).
+FROM nginx:1.31-alpine@sha256:a3554c0d0b48177b1413c26e01f695334428020d9df01243fbae3e11cfd17417
+
+# The URL prefix the bundle is built for, without slashes: "learn" for a
+# bundle built with PUBLIC_PATH=/learn/.
+ARG MFE_PATH
+
+# Into <MFE_PATH>/, not the server root. The bundle references its own assets
+# absolutely under PUBLIC_PATH, so the files have to sit at the path the HTML
+# names. See nginx-mfe.conf.template.
+COPY dist/ /usr/share/nginx/html/${MFE_PATH}/
+
+# The image's entrypoint renders /etc/nginx/templates/*.template through
+# envsubst into conf.d at container start, so the one prefix drives both the
+# file layout above and the server config. The filter limits envsubst to
+# MFE_* names; without it nginx's own $uri and $scheme in the template would
+# be substituted away as undefined environment variables.
+ENV MFE_PATH=${MFE_PATH} NGINX_ENVSUBST_FILTER=^MFE_
+COPY nginx-mfe.conf.template /etc/nginx/templates/default.conf.template
+EXPOSE 80

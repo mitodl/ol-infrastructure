@@ -38,6 +38,8 @@ This environment runs the MIT Learn application stack as Kubernetes workloads in
 | learn-ai | `https://ai.learn.mit.test`, `https://api.learn.mit.test/ai/` | Django AI proxy service. The frontend uses the `/ai/` path, which shares mit-learn's login session. |
 | learn-ai sandbox | `https://ai-sandbox.learn.mit.test` | Static build of `learn-ai/frontend-demo`, learn-ai checkout only, see [learn-ai sandbox](#learn-ai-sandbox-frontend-demo) |
 | mitxonline | `https://mitxonline.mit.test` | MITx Online LMS (Django/granian) |
+| Open edX LMS | `https://lms.mit.test` | Courseware, opt-in, see [Open edX](#open-edx); logs in through mitxonline; the learning MFE is at `/learn` |
+| Open edX Studio | `https://studio.mit.test` | Course authoring, logs in through the LMS; its home is the authoring MFE at `/authoring` |
 | odl-video-service | `https://video.odl.mit.test` | ODL Video Service (Django/uwsgi) |
 | micromasters | `https://micromasters.mit.test` | MicroMasters (Django/granian), opt-in, see [MicroMasters](#micromasters) |
 | Keycloak SSO | `https://sso.ol.mit.test` | Identity provider (olapps realm) |
@@ -228,7 +230,7 @@ tilt up --context local-dev -- --enabled_apps mit-learn,openedx
 
 List the apps comma-separated or repeat `--enabled_apps` once per app. A running Tilt takes the same flags from `tilt args -- --enabled_apps mit-learn,openedx`, which replaces its whole list.
 
-It needs lehrer checked out next to this repo (or `MITOL_WORKSPACE_ROOT` pointing at the directory that holds it). Nothing else: the `openedx-secrets` Secret is created for you from lehrer's `local-dev/secret-defaults.yaml`, the same file `lehrer dev setup` reads.
+It needs lehrer checked out next to this repo (or `MITOL_WORKSPACE_ROOT` pointing at the directory that holds it), plus the tools lehrer's builds use: run `uv sync && uv run lehrer dev check` in the lehrer checkout, which checks each of them against the version lehrer requires. Nothing else: the `openedx-secrets` Secret is created for you from lehrer's `local-dev/secret-defaults.yaml`, the same file `lehrer dev setup` reads.
 
 How the split works, and why it is not a fork of lehrer's manifests:
 
@@ -238,7 +240,9 @@ How the split works, and why it is not a fork of lehrer's manifests:
 
 `local-dev/apps/openedx/Tiltfile` calls lehrer's `setup()` with this cluster's topology. Valkey and OpenSearch come from the shared `local-infra` namespace rather than a second copy in `openedx` (`manage_infra: False`); MariaDB and MongoDB stay lehrer's, since this cluster has neither. Ingress is APISIX on the shared wildcard cert.
 
-Config differences live in `local-dev/apps/openedx/configmaps/` as `*-config-overrides` ConfigMaps, which lehrer's manifests layer **last** in `envFrom`. Only the keys that actually differ belong there — hosts and public URLs. Everything else is inherited, so a key added on lehrer's side arrives without an edit here. Overriding one more key means adding one line, not copying a ConfigMap.
+Config differences live in `local-dev/apps/openedx/configmaps/` as `*-config-overrides` ConfigMaps, which lehrer's manifests layer **last** in `envFrom`. Only the keys that actually differ belong there — hosts and public URLs. Everything else is inherited, so a key added on lehrer's side arrives without an edit here. Overriding one more key means adding one line, not copying a ConfigMap, with one constraint: an override reaches Django only if lehrer's settings model declares that key. Check with `kubectl -n openedx exec deploy/lms -- python -c 'import django; django.setup(); from django.conf import settings; print(settings.KEY)'` before trusting a new override.
+
+Two MFEs that lehrer's local-dev does not build are built here through lehrer's dagger module and served under the platform hosts, as in production: the learning MFE at `https://lms.mit.test/learn` and the course-authoring MFE at `https://studio.mit.test/authoring`. Studio depends on the second one: on the master release its home page is a redirect into the authoring MFE and every Studio page links to it, so without it Studio has no working page. Each build is a `dagger call mfe build-legacy-configured` run of a minute or two. The MFE source is cloned inside dagger, so Tilt has nothing local to watch for it; trigger `mfe-learning` or `mfe-authoring` by hand in the Tilt UI to pick up a new upstream commit.
 
 To run Open edX on its own instead — no MIT Learn, no shared infra — use `lehrer dev setup` && `lehrer dev start` in the lehrer repo, which brings up a self-contained cluster.
 
