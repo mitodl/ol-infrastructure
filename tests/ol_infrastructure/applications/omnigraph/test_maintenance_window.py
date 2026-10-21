@@ -17,6 +17,8 @@ from ol_infrastructure.applications.omnigraph.lock_handoff import (
 )
 from ol_infrastructure.applications.omnigraph.maintenance import (
     COMMAND_TIMEOUT_SECONDS,
+    LANCE_MEM_POOL_BYTES,
+    MAINTENANCE_MEMORY_LIMIT,
     MAINTENANCE_WINDOW_SECONDS,
     TERMINATION_GRACE_SECONDS,
     WINDOW_ACTIVE_DEADLINE_SECONDS,
@@ -98,6 +100,26 @@ def test_the_grace_period_is_what_the_image_says_its_close_needs() -> None:
     assert TERMINATION_GRACE_SECONDS >= 120
 
 
+def test_the_lance_pool_fits_every_concurrent_fold_and_the_container() -> None:
+    """Optimize folds up to 8 tables at once, and each fold's sort holds a 40 MiB
+    merge reservation that cannot spill, in one pool for the whole process. The
+    pool has to leave the sorts room for their rows (the 2026-10-20 failure held
+    33.4 MiB), and the container room for the pool on top of the 336 MB the
+    window used at most before it.
+    """
+    mib = 1024 * 1024
+    concurrent_folds = 8
+    merge_reservation = 40 * mib
+    rows_per_sort = 34 * mib
+    peak_working_set = 336 * 1000 * 1000
+    assert (
+        LANCE_MEM_POOL_BYTES - concurrent_folds * merge_reservation
+        >= concurrent_folds * rows_per_sort
+    )
+    limit = int(MAINTENANCE_MEMORY_LIMIT.removesuffix("Mi")) * mib
+    assert limit - LANCE_MEM_POOL_BYTES >= peak_working_set
+
+
 @pulumi.runtime.test
 def test_the_window_can_scale_the_server_and_nothing_else_about_it():
     mocks = _Mocks()
@@ -177,7 +199,9 @@ def test_the_cron_job_runs_the_images_window_command_with_its_env():
             "OMNIGRAPH_COMMAND_TIMEOUT_SECONDS": str(COMMAND_TIMEOUT_SECONDS),
             # A server draining writes for its whole grace is not stuck.
             "OMNIGRAPH_SERVER_STOP_SECONDS": "180",
+            "LANCE_MEM_POOL_SIZE": str(LANCE_MEM_POOL_BYTES),
         }
+        assert container["resources"]["limits"]["memory"] == MAINTENANCE_MEMORY_LIMIT
         # The command reads the storage root and the graph list from it.
         (mount,) = container["volumeMounts"]
         assert mount["mountPath"] == "/etc/omnigraph/cluster/cluster.yaml"

@@ -497,6 +497,24 @@ TERMINATION_GRACE_SECONDS = 120
 # pods to exit: the time the kubelet and the Deployment controller take to act
 # on the scale-down. The image's own default of 90 is a 35s grace plus this.
 SERVER_STOP_MARGIN_SECONDS = 55
+# optimize folds a lagging BTree index by rebuilding it, and Lance sorts the
+# column through one DataFusion memory pool shared by the whole process: 150 MiB
+# unless LANCE_MEM_POOL_SIZE is set (lance-datafusion 11.0.0, exec.rs). Each
+# sort also holds a 40 MiB merge reservation that cannot spill, and optimize
+# works up to 8 tables at once (omnigraph's OMNIGRAPH_MAINTENANCE_CONCURRENCY
+# default). Three folds at once then leave 30 MiB shared by all three sorts'
+# rows. On 2026-10-20 that failed optimize on one code graph per environment
+# with "Not enough memory to continue external sort": two folds held their
+# reservations and the third's sort or reservation was refused. 640 MiB holds 8
+# reservations plus 40 MiB of rows each. That assumes each sort's rows stay
+# under 40 MiB (the largest seen was 33.4 MiB, already capped by the pool), so
+# a recurrence after the graphs grow means raising the pool again. Lowering the
+# concurrency instead would also slow cleanup, which shares it.
+LANCE_MEM_POOL_BYTES = 640 * 1024 * 1024
+# The pool on top of the window's peak working set, 336 MB at most in either
+# environment over the 14 days to 2026-10-21. The server is at 0 replicas while
+# this runs.
+MAINTENANCE_MEMORY_LIMIT = "1536Mi"
 
 if WINDOW_ACTIVE_DEADLINE_SECONDS <= (
     MAINTENANCE_WINDOW_SECONDS + COMMAND_TIMEOUT_SECONDS
@@ -702,12 +720,19 @@ def create_maintenance_window(  # noqa: PLR0913
                                                 + SERVER_STOP_MARGIN_SECONDS
                                             ),
                                         ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="LANCE_MEM_POOL_SIZE",
+                                            value=str(LANCE_MEM_POOL_BYTES),
+                                        ),
                                     ],
                                     # As the sweeps before it: compaction
                                     # rewrites fragments through memory.
                                     resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                         requests={"cpu": "100m", "memory": "256Mi"},
-                                        limits={"cpu": "1", "memory": "1Gi"},
+                                        limits={
+                                            "cpu": "1",
+                                            "memory": MAINTENANCE_MEMORY_LIMIT,
+                                        },
                                     ),
                                     volume_mounts=[
                                         # sub_path, as on the server: overlay
