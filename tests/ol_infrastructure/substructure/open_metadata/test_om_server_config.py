@@ -106,7 +106,14 @@ def _glossary(
 
 
 def _run_glossary_steps(monkeypatch: pytest.MonkeyPatch, config: ModuleType) -> None:
-    for name in ("TAG_CONFIG", "TEAM_CONFIG", "DOMAIN_CONFIG"):
+    for name in (
+        "TAG_CONFIG",
+        "TEAM_CONFIG",
+        "POLICY_CONFIG",
+        "ROLE_CONFIG",
+        "TEAM_DEFAULT_ROLES",
+        "DOMAIN_CONFIG",
+    ):
         monkeypatch.setattr(config, name, {})
     config.main()
 
