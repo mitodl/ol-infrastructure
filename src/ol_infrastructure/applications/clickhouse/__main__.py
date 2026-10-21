@@ -189,6 +189,16 @@ def _zone_spread(label_selector: dict[str, str]) -> list[dict[str, Any]]:
 
 ch_version = clickhouse_config.get("version") or CLICKHOUSE_SERVER_VERSION
 ch_image = f"altinity/clickhouse-server:{ch_version}"
+# The server takes its MergeTree defaults from the default profile's
+# `compatibility` setting, once, at startup (Context::getMergeTreeSettings,
+# 25.8+). During a rolling upgrade, set it to the version being upgraded from so
+# an upgraded replica keeps writing parts the others can still read: 25.11, 26.1
+# and 26.3 change String, nested-type and index file serialization in ways older
+# servers cannot read. Altinity 25.8 changes no part format we use, so the 24.8
+# value is a precaution there; on a 25.8 replica it shows as
+# allow_part_offset_column_in_projections = 0. Remove it once every replica runs
+# the new version; it then takes effect at each replica's next restart.
+ch_compatibility = clickhouse_config.get("compatibility")
 keeper_image = f"clickhouse/clickhouse-keeper:{CLICKHOUSE_KEEPER_VERSION}"
 
 IO_OPTIMIZED_NODE_SELECTOR = {"ol.mit.edu/io_optimized": "true"}
@@ -762,7 +772,14 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     # clickhouse_operator management user and base profiles).
                     # Password hashes are pulled from the Vault-synced secret
                     # via secretKeyRef so plaintext never enters the CHI spec.
-                    "profiles": _LLMOPS_PROFILES,
+                    "profiles": {
+                        **_LLMOPS_PROFILES,
+                        **(
+                            {"default/compatibility": ch_compatibility}
+                            if ch_compatibility
+                            else {}
+                        ),
+                    },
                     "quotas": _LLMOPS_QUOTAS,
                     "users": ch_users,
                 },

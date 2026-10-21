@@ -341,8 +341,14 @@ upgrade goes to QA first.
 
 1. Confirm QA's latest `clickhouse-backup` job succeeded.
 2. Change the version for QA only, and apply the stack that owns it:
-   - Server: `clickhouse:version` in `Pulumi.QA.yaml`, applied with the
-     `applications/clickhouse` QA stack.
+   - Server: `CLICKHOUSE_SERVER_VERSION` in `bridge/lib/versions.py`, applied
+     with the `applications/clickhouse` QA stack. Production stays on the old
+     version by setting `clickhouse:version` in `Pulumi.Production.yaml` until
+     the canary passes. In every stack that rolls, set `clickhouse:compatibility`
+     to the version being upgraded from (e.g. `'24.8'`), so an upgraded replica
+     writes parts the others can still read, and remove it in a later change
+     once every replica runs the new version. A target more than a year or two
+     LTS lines newer needs an intermediate version first.
    - Operator: `CLICKHOUSE_OPERATOR_VERSION` in `bridge/lib/versions.py`,
      applied with the `data.QA` stack of `substructure/aws/eks`, which installs the
      operator.

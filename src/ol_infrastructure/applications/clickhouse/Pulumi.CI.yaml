@@ -5,7 +5,9 @@ config:
   clickhouse:hot_storage_size: 100Gi
   clickhouse:replicas: '1'
   clickhouse:keeper_replicas: '1'
-  clickhouse:version: 24.8.14.10546.altinitystable
+  # Mid-upgrade to 25.8 (CLICKHOUSE_SERVER_VERSION): keep writing parts 24.8
+  # replicas can read until every replica runs 25.8.
+  clickhouse:compatibility: '24.8'
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
   clickhouse:admin_password:

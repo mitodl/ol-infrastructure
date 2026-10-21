@@ -93,8 +93,11 @@ VAULT_PLUGIN_STARROCKS_SHA256 = "3a737897b3c37eb61cab0b6b2804bd711dde7d31b308cf3
 # Altinity ClickHouse Operator — released as tag "release-X.Y.Z" on GitHub
 # renovate: datasource=github-releases depName=clickhouse-operator packageName=Altinity/clickhouse-operator
 CLICKHOUSE_OPERATOR_VERSION = "release-0.26.0"
+# 24.8 -> 26.3 goes through 25.8: upstream supports a rolling upgrade only
+# between versions less than a year or two LTS lines apart. Stacks still on the
+# previous line pin clickhouse:version and set clickhouse:compatibility.
 # renovate: datasource=docker depName=altinity/clickhouse-server packageName=altinity/clickhouse-server
-CLICKHOUSE_SERVER_VERSION = "25.8.1.2953.altinitystable"
+CLICKHOUSE_SERVER_VERSION = "25.8.28.10001.altinitystable"
 # renovate: datasource=docker depName=clickhouse/clickhouse-keeper packageName=clickhouse/clickhouse-keeper
 CLICKHOUSE_KEEPER_VERSION = "26.8-alpine"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts

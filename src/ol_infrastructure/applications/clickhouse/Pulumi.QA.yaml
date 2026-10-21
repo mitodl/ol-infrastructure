@@ -17,7 +17,9 @@ config:
   # operator's rolling restart, 3 Keeper nodes exercise quorum.
   clickhouse:replicas: '2'
   clickhouse:keeper_replicas: '3'
-  clickhouse:version: 24.8.14.10546.altinitystable
+  # Mid-upgrade to 25.8 (CLICKHOUSE_SERVER_VERSION): keep writing parts 24.8
+  # replicas can read until every replica runs 25.8.
+  clickhouse:compatibility: '24.8'
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
   clickhouse:admin_password:
