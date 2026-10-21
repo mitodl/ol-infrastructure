@@ -315,7 +315,7 @@ missing (inventory, 2026-09-10).
    | `ModelHTTPError` 429 | rate limited | yes, honoring `retry_after` | yes |
    | `ModelHTTPError` 408, 500, 502, 503, 504, 529 | provider unavailable | yes | yes |
    | `ModelAPIError` that is not `ModelHTTPError` (connection errors; OpenAI, Anthropic, and Bedrock timeouts arrive this way) | provider unavailable | yes | yes |
-   | `ModelHTTPError` 400, 401, 403, 404, 422 | rejected (our bug or config) | no | no |
+   | `ModelHTTPError` 400, 401, 403, 404, 413, 422 | rejected (our bug or config; a 400, 413, or 422 can be one batch row's input, rule 7) | no | no |
    | `ContentFilterError` | content filtered | no | no |
    | `UnexpectedModelBehavior` after output retries are spent | invalid output | no | no |
    | `UsageLimitExceeded` | budget exceeded | no | no |
@@ -343,9 +343,11 @@ missing (inventory, 2026-09-10).
    value and `opik.metadata.degraded` plus a reason on the trace. The translation plugins'
    silent keep-source behavior becomes a marked partial result.
 7. Batch isolates rows. A row failure records its class and does not fail the chunk;
-   rejected-class failures open the circuit immediately, since retrying a config bug burns
-   budget; unavailable-class failures open it after a threshold. ol-data-platform's
-   summarize module is the reference.
+   rejected-class failures of the account or model open the circuit immediately, since
+   retrying a config bug burns budget; a rejection of one row's input fails that row, and
+   opens the circuit only after a threshold of them with no accepted request between them;
+   unavailable-class failures open it after a threshold of their own (§6.7).
+   ol-data-platform's summarize module is the reference.
 
 ### 3.3 Decision
 
@@ -966,9 +968,28 @@ trace are marked together. `LLMResult` is frozen and the trace is closed once th
 returns, so a check done after the call cannot mark either. `postprocess` keeps the output
 type, and an exception it raises reaches the caller unchanged.
 
-For the batch helpers (§3.2 rule 7): `LLMRejected` opens the circuit at once,
-`LLMRateLimited` and `LLMUnavailable` count toward its threshold, and `LLMInvalidOutput`,
-`LLMContentFiltered`, and `LLMBudgetExceeded` are failures of that row only.
+For the batch helpers (§3.2 rule 7): `LLMRejected` with a 400, 413, or 422 rejects one row's
+input (too long, malformed, or refused by a provider's input moderation that answers with a
+400) and is a failure of that row only, not retried under the same key (a hash of the row's
+input, the prompt name and template, and the use case's primary model); ten of them with no
+accepted request between them open the circuit, because then the request itself is wrong (e.g.
+a parameter the model no longer takes). Any other `LLMRejected` (401, 403, 404, other
+statuses, or a transport error with no status) opens the circuit at once. `LLMRateLimited` and
+`LLMUnavailable` count toward a separate threshold of three in a row, and `LLMInvalidOutput`,
+`LLMContentFiltered`, and `LLMBudgetExceeded` are failures of that row only; an input filter
+that PydanticAI raises as `ContentFilterError` (Azure's) is `LLMContentFiltered`, a row
+failure that resets both counts below rather than adding to one. The counts belong to one
+batch call (or to a breaker the caller passes to several) and take rows in the order they
+finish, across workers. A success or a row's own failure shows the provider accepted the
+request and resets both counts. A rate limit or an outage says nothing about the request, so
+it leaves the rejection count alone (400s alternating with 503s still reach ten); a row
+rejection resets the transient count. Once the circuit is open, rows still in flight do not
+clear the rejection run, and those rejected for their input join it. When a run of row
+rejections opens the circuit, or every row a batch attempted was rejected for its input (a
+batch shorter than the threshold), the batch report lists those rows: each was persisted as
+not to retry, and a fixed request parameter does not change the key, so the caller clears
+their skip marks once the request is fixed. Decided 2026-10-20: one oversized or filtered row
+stopped the whole batch when every rejection opened the circuit.
 
 ### 6.8 Usage limits
 
