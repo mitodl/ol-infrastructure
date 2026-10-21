@@ -19,7 +19,7 @@ except RuntimeError:
 from ol_infrastructure.substructure.keycloak.passkey_flow import (
     create_passkey_browser_flow,
 )
-from tests.ol_infrastructure.substructure.keycloak.recording_mocks import RecordingMocks
+from tests.ol_infrastructure.recording_mocks import RecordingMocks
 
 PREFIX = "ol-browser-data-platform"
 

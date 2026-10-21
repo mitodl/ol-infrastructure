@@ -7,8 +7,6 @@ not read, a verb its ServiceAccount lacks, or a time budget in which the Job's
 deadline kills the window before it has scaled the server back up.
 """
 
-from typing import Any
-
 import pulumi
 
 from ol_infrastructure.applications.omnigraph.lock_handoff import (
@@ -26,6 +24,7 @@ from ol_infrastructure.applications.omnigraph.maintenance import (
     create_maintenance_window,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
+from tests.ol_infrastructure.recording_mocks import RecordingMocks
 
 STACK_INFO = StackInfo(
     name="CI",
@@ -38,22 +37,6 @@ STACK_INFO = StackInfo(
 
 # 03:20 UTC start, and the CI indexer's first run after it at 04:00.
 SECONDS_TO_NEXT_WRITER = 40 * 60
-
-
-class _Mocks(pulumi.runtime.Mocks):
-    def __init__(self) -> None:
-        self.resources: list[pulumi.runtime.MockResourceArgs] = []
-
-    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-        self.resources.append(args)
-        return [f"{args.name}_id", args.inputs]
-
-    def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
-        return {}
-
-
-def _of_type(mocks: _Mocks, typ: str) -> list[dict[str, Any]]:
-    return [r.inputs for r in mocks.resources if r.typ == typ]
 
 
 def _window(
@@ -122,12 +105,12 @@ def test_the_lance_pool_fits_every_concurrent_fold_and_the_container() -> None:
 
 @pulumi.runtime.test
 def test_the_window_can_scale_the_server_and_nothing_else_about_it():
-    mocks = _Mocks()
+    mocks = RecordingMocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
     window = _window()
 
     def check(_: object) -> None:
-        (role,) = _of_type(mocks, "kubernetes:rbac.authorization.k8s.io/v1:Role")
+        (role,) = mocks.of_type("kubernetes:rbac.authorization.k8s.io/v1:Role")
         assert role["rules"] == [
             {
                 "apiGroups": ["coordination.k8s.io"],
@@ -149,8 +132,8 @@ def test_the_window_can_scale_the_server_and_nothing_else_about_it():
                 "verbs": ["get", "update"],
             },
         ]
-        (binding,) = _of_type(
-            mocks, "kubernetes:rbac.authorization.k8s.io/v1:RoleBinding"
+        (binding,) = mocks.of_type(
+            "kubernetes:rbac.authorization.k8s.io/v1:RoleBinding"
         )
         # Its own identity: bound to the server's, the server could scale
         # its own Deployment.
@@ -167,12 +150,12 @@ def test_the_window_can_scale_the_server_and_nothing_else_about_it():
 
 @pulumi.runtime.test
 def test_the_cron_job_runs_the_images_window_command_with_its_env():
-    mocks = _Mocks()
+    mocks = RecordingMocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
     window = _window()
 
     def check(_: object) -> None:
-        (cron_job,) = _of_type(mocks, "kubernetes:batch/v1:CronJob")
+        (cron_job,) = mocks.of_type("kubernetes:batch/v1:CronJob")
         spec = cron_job["spec"]
         assert spec["schedule"] == "20 3 * * *"
         assert spec["concurrencyPolicy"] == "Forbid"
@@ -222,12 +205,12 @@ def test_no_cleanup_days_render_as_an_empty_list():
     and QA set ``omnigraph:cleanup_iso_weekdays: []`` so their windows only
     optimize.
     """
-    mocks = _Mocks()
+    mocks = RecordingMocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
     window = _window(cleanup_iso_weekdays=())
 
     def check(_: object) -> None:
-        (cron_job,) = _of_type(mocks, "kubernetes:batch/v1:CronJob")
+        (cron_job,) = mocks.of_type("kubernetes:batch/v1:CronJob")
         (container,) = cron_job["spec"]["jobTemplate"]["spec"]["template"]["spec"][
             "containers"
         ]
@@ -241,12 +224,12 @@ def test_no_cleanup_days_render_as_an_empty_list():
 
 @pulumi.runtime.test
 def test_an_armed_migration_suspends_the_window():
-    mocks = _Mocks()
+    mocks = RecordingMocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
     window = _window(suspend=True)
 
     def check(_: object) -> None:
-        (cron_job,) = _of_type(mocks, "kubernetes:batch/v1:CronJob")
+        (cron_job,) = mocks.of_type("kubernetes:batch/v1:CronJob")
         assert cron_job["spec"]["suspend"] is True
 
     return window.cron_job.urn.apply(check)
@@ -259,7 +242,7 @@ def test_the_armed_marker_is_the_one_the_image_looks_for() -> None:
 
 @pulumi.runtime.test
 def test_the_plan_gate_runs_the_images_plan_check_with_the_boots_inputs():
-    mocks = _Mocks()
+    mocks = RecordingMocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
     gate = create_plan_gate(
         stack_info=STACK_INFO,
@@ -279,7 +262,7 @@ def test_the_plan_gate_runs_the_images_plan_check_with_the_boots_inputs():
     )
 
     def check(_: object) -> None:
-        (job,) = _of_type(mocks, "kubernetes:batch/v1:Job")
+        (job,) = mocks.of_type("kubernetes:batch/v1:Job")
         assert "name" not in job["metadata"]
         template = job["spec"]["template"]
         # A new cluster.yaml or image has to run the gate again.

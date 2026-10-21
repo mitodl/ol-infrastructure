@@ -21,7 +21,7 @@ from ol_infrastructure.substructure.keycloak.client_policies import (
     PKCE_REQUIRED_CLIENT_ARGS,
     create_pkce_client_policy,
 )
-from tests.ol_infrastructure.substructure.keycloak.recording_mocks import RecordingMocks
+from tests.ol_infrastructure.recording_mocks import RecordingMocks
 
 PREFIX = "ol-data-platform"
 

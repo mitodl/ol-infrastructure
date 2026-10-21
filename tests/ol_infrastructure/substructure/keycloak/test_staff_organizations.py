@@ -17,7 +17,7 @@ except RuntimeError:
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_staff_organizations,
 )
-from tests.ol_infrastructure.substructure.keycloak.recording_mocks import RecordingMocks
+from tests.ol_infrastructure.recording_mocks import RecordingMocks
 
 REALM = "ol-platform-engineering"
 
