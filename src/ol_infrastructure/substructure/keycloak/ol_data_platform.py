@@ -54,6 +54,13 @@ OPEN_METADATA_ROLE_BY_REALM_ROLE = {
     "ol-data-analyst": "DataConsumer",
     "ol-business-analyst": "DataConsumer",
 }
+# The composites of default-roles-<realm> in a realm Keycloak creates.
+KEYCLOAK_STOCK_DEFAULT_ROLES = (
+    "offline_access",
+    "uma_authorization",
+    "account/view-profile",
+    "account/manage-account",
+)
 
 
 def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
@@ -495,8 +502,9 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     # OpenMetadata reads a top-level `roles` claim from the ID token it gets at
     # the login callback (AuthenticationCodeFlowHandler.syncRolesFromProvider),
     # and from the access token when a provider token is presented directly
-    # (JwtFilter). A user with none of these client roles gets no claim, and
-    # OpenMetadata then leaves their roles alone. Team membership is not part
+    # (JwtFilter). Keycloak omits the claim for a user with none of these
+    # client roles, and OpenMetadata then leaves their roles alone, which is
+    # why every user holds DataConsumer (below). Team membership is not part
     # of this claim.
     keycloak.openid.UserClientRoleProtocolMapper(
         "ol-data-platform-openmetadata-roles-mapper",
@@ -510,6 +518,26 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         add_to_id_token=True,
         add_to_access_token=True,
         add_to_userinfo=True,
+        opts=resource_options,
+    )
+    # Every user holds DataConsumer through the realm's default roles, so the
+    # claim is never omitted and losing a realm role takes its OpenMetadata
+    # role away at the next login. It changes no one's access, because every
+    # user already inherits DataConsumer from the Organization team. It does
+    # not demote admins: OpenMetadata only ever sets isAdmin from the claim.
+    # This resource owns the realm's whole default-role list, so it repeats
+    # Keycloak's stock defaults.
+    keycloak.DefaultRoles(
+        "ol-data-platform-default-roles",
+        realm_id=ol_data_platform_realm.id,
+        default_roles=[
+            *KEYCLOAK_STOCK_DEFAULT_ROLES,
+            Output.concat(
+                ol_data_platform_openmetadata_client.client_id,
+                "/",
+                ol_data_platform_openmetadata_client_role_refs["DataConsumer"].name,
+            ),
+        ],
         opts=resource_options,
     )
     vault.generic.Secret(
