@@ -233,14 +233,21 @@ shard, so the `Distributed` wrap buys nothing and adds a maintenance window.
    an in-progress trace written through the API stores the epoch/NaN sentinel.
 4. Final `delta_replay.sh` (record `delta_start`), then immediately
    `exchange_and_wrap.sh --backfill-start '<backfill_start> UTC'
-   --confirm-retention-paused`. Check that every per-host `ON CLUSTER` row
-   reports status 0, and record `exchange_done`.
+   --confirm-retention-paused`, adding `--confirm-columns-non-nullable` for
+   spans only once step 3's check has passed on every backend pod (the spans
+   driver requires it; the traces driver rejects it as an unknown argument).
+   Check that every per-host `ON CLUSTER` row reports status 0, and record
+   `exchange_done`.
 5. Immediately run `reconcile.sh --gap-start '<delta_start> UTC' --swap-done
    '<exchange_done> UTC' --confirm-retention-paused` until it prints
    `RECONCILED`, then `verify.sh --old-table traces_pre_cutover_backup
-   --new-table traces --window-from '<delta_start>' --window-to '<now>'`. Work
-   the upstream "When the cutover is done" checklist. Keep
-   `traces_pre_cutover_backup` parked through the soak.
+   --new-table traces --window-from '<delta_start>' --window-to
+   '<exchange_done>'`. The upper bound is the swap, not now: the parked
+   backup froze at the `EXCHANGE` while the live table keeps taking writes, so
+   any row created after it fails the row-count match. The upstream spans
+   README states this; the traces README still says `<now>`, but the same
+   reasoning applies. Work the upstream "When the cutover is done" checklist.
+   Keep `traces_pre_cutover_backup` parked through the soak.
 6. After the soak, `finalize.sh` drops the parked backup. That is the point of
    no return.
 7. Tier both tables, only after `finalize.sh`. Upstream freezes DDL on these
