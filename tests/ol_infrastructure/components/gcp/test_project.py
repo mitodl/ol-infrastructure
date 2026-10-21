@@ -455,7 +455,7 @@ class TestRecaptchaKeys:
 
     @pulumi.runtime.test
     def test_key_depends_on_the_recaptcha_admin_grant(self, monkeypatch):
-        # Creating the key in parallel with the grant fails with a 403.
+        # Creating the key in parallel with the grant can fail with a 403.
         key_opts: list[pulumi.ResourceOptions] = []
         real_key: Any = gcp.recaptcha.EnterpriseKey
 

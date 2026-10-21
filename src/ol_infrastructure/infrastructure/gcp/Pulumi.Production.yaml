@@ -49,8 +49,11 @@ config:
       display_name: Pulumi GCP provider
       import_id: projects/mitol01/serviceAccounts/pulumi-gcp@mitol01.iam.gserviceaccount.com
       # Its other project roles were granted by hand to bootstrap the stack.
-      # This one is not bootstrap: roles/resourcemanager.projectIamAdmin lets
-      # the stack grant it to itself, and the recaptcha_keys below wait on it.
+      # Do not list them here: removing one from this list would revoke it,
+      # and without roles/resourcemanager.projectIamAdmin the stack cannot
+      # grant itself anything. This one is not bootstrap, since that role lets
+      # the stack grant it to itself. Keep it while the stack manages
+      # recaptcha_keys; every refresh of a key needs it.
       project_roles:
       - roles/recaptchaenterprise.admin
       iam_members:
