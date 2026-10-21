@@ -32,6 +32,14 @@ team that already exists is never sent a ``users`` list.
 Domains are declared in ``DOMAIN_CONFIG``.  Which assets belong to each is set
 from ol-data-platform's dbt manifest, not here.
 
+Access policies and roles are declared in ``POLICY_CONFIG`` and ``ROLE_CONFIG``,
+and code owns them: rules or policies changed in the UI are put back.  Bots are
+declared in ``BOT_CONFIG`` but only checked, not created.  Creating a bot user
+or assigning it a role needs an admin, and this job runs as the ingestion bot,
+which is not one.  A bot that is missing, or lacks its role, is reported for an
+admin to set up.  A bot that is an admin, or holds any role it is not declared
+with, fails the job.
+
 The business glossary is declared in ``GLOSSARY_CONFIG`` and ``GLOSSARY_TERMS``.
 The glossary and each term are created when missing and never patched, so a
 steward's edits in the OpenMetadata UI are kept: once a term exists, change its
@@ -819,6 +827,42 @@ POLICY_CONFIG: dict[str, dict[str, Any]] = {
             },
         ],
     },
+    # Exactly what ol-data-platform's asset_check_openmetadata_sensor (lakehouse
+    # code location) needs: GET and, when missing, PUT the
+    # dagsterAssetCheck test definition (ViewBasic, Create); GET and POST a test
+    # case (ViewTests, CreateTests on its table); POST its results (EditTests on
+    # the table).  Bots inherit no team policies.  OpenMetadata also gives every
+    # bot DefaultBotRole, which cannot be removed, so the token can still view
+    # everything and edit descriptions, tags, glossary terms, tier and
+    # certification on any entity, and file tasks, through its
+    # DataConsumerPolicy.
+    "DagsterBotPolicy": {
+        "displayName": "Dagster Bot Policy",
+        "description": (
+            "Lets Dagster write its asset check results as test cases on tables."
+        ),
+        "rules": [
+            {
+                "name": "DagsterBotRule-TestDefinition",
+                "description": (
+                    "Read test definitions and create the one Dagster's checks "
+                    "use when it is missing."
+                ),
+                "effect": "allow",
+                "resources": ["testDefinition"],
+                "operations": ["Create", "ViewBasic"],
+            },
+            {
+                "name": "DagsterBotRule-TableTests",
+                "description": (
+                    "Read and create test cases on tables and add their results."
+                ),
+                "effect": "allow",
+                "resources": ["table"],
+                "operations": ["CreateTests", "EditTests", "ViewTests"],
+            },
+        ],
+    },
 }
 
 # Desired state for each custom role, keyed by role name.  These names are the
@@ -842,6 +886,11 @@ ROLE_CONFIG: dict[str, dict[str, Any]] = {
         ),
         "policies": ["DataContributorPolicy"],
     },
+    "DagsterBotRole": {
+        "displayName": "Dagster Bot Role",
+        "description": "Role of dagster-bot.",
+        "policies": ["DagsterBotPolicy"],
+    },
 }
 
 # The exact defaultRoles of each listed team.  data-platform members are the
@@ -853,6 +902,19 @@ ROLE_CONFIG: dict[str, dict[str, Any]] = {
 TEAM_DEFAULT_ROLES: dict[str, list[str]] = {
     "data-platform": ["DataSteward"],
 }
+
+# The roles each bot should hold, keyed by bot name.  dagster-bot writes the
+# Dagster asset check results, so that an OpenMetadata alert on test case
+# failures can leave them out with matchUpdatedBy (Dagster notifies for its own
+# checks).  OpenMetadata 2.0.5's alert filters cannot match on a test case's
+# platform or definition.
+BOT_CONFIG: dict[str, set[str]] = {
+    "dagster-bot": {"DagsterBotRole"},
+}
+
+# OpenMetadata gives every bot this role when it is created
+# (UserResource.addRolesToBot): DefaultBotPolicy and DataConsumerPolicy.
+_DEFAULT_BOT_ROLE = "DefaultBotRole"
 
 
 def _get_by_name_with_fields(
@@ -1014,10 +1076,52 @@ def _reconcile_team_default_roles(team_name: str, role_names: list[str]) -> None
     )
 
 
+def _check_bot(name: str, roles: set[str]) -> None:
+    """Report a bot that is missing or lacks *roles*; fail on one that holds more.
+
+    :param name: Bot name, which is also the name of the bot's user.
+    :param roles: The roles the bot should hold besides DefaultBotRole.
+    :raises requests.HTTPError: On any unexpected non-2xx response from the OM API.
+    :raises ValueError: If the user is not a bot, is an admin, or holds a role not
+        in *roles*.
+    """
+    user = _get_by_name_with_fields("users", name, "roles")
+    if user is None:
+        print(  # noqa: T201
+            f"[todo] bot {name}: does not exist. An admin creates it under "
+            f"Settings > Bots and gives it {sorted(roles)}."
+        )
+        return
+
+    if user.get("isBot") is not True:
+        msg = "is a user, not a bot"
+        raise ValueError(msg)
+
+    # OM's authorizer returns before evaluating any policy for an admin, so the
+    # role check below would pass a token that can do anything.
+    if user.get("isAdmin") is True:
+        msg = "is an admin, so its roles do not limit it; an admin unsets isAdmin"
+        raise ValueError(msg)
+
+    held = {role["name"] for role in user["roles"]}
+    if extra := held - roles - {_DEFAULT_BOT_ROLE}:
+        msg = f"holds {sorted(extra)}, beyond {sorted(roles)}; an admin removes them"
+        raise ValueError(msg)
+    if missing := roles - held:
+        print(  # noqa: T201
+            f"[todo] bot {name}: lacks {sorted(missing)}. An admin assigns them "
+            "under Settings > Bots."
+        )
+        return
+
+    print(f"[ok]   bot {name}: holds {sorted(roles)}")  # noqa: T201
+
+
 def _access_control_steps() -> list[tuple[str, Callable[[], None]]]:
     """Return the access-control steps, policies before the roles that use them.
 
-    Runs after the team steps, because team defaultRoles need the team.
+    Runs after the team steps, because team defaultRoles need the team.  Bots
+    are checked last, after the roles they should hold.
     """
     return [
         *(
@@ -1034,6 +1138,10 @@ def _access_control_steps() -> list[tuple[str, Callable[[], None]]]:
                 partial(_reconcile_team_default_roles, name, roles),
             )
             for name, roles in TEAM_DEFAULT_ROLES.items()
+        ),
+        *(
+            (f"bot {name}", partial(_check_bot, name, roles))
+            for name, roles in BOT_CONFIG.items()
         ),
     ]
 
@@ -1153,7 +1261,9 @@ def _reconcile_glossary_term(term: dict[str, Any]) -> None:
 
 
 def main() -> None:
-    """Reconcile every tag, team, domain and glossary term.
+    """Reconcile every tag, team, policy, role, domain and glossary term.
+
+    Each bot is checked, not reconciled.
 
     Exits non-zero if any step fails.
     """
