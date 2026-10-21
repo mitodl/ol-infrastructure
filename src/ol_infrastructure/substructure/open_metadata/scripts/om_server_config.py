@@ -32,6 +32,11 @@ team that already exists is never sent a ``users`` list.
 Domains are declared in ``DOMAIN_CONFIG``.  Which assets belong to each is set
 from ol-data-platform's dbt manifest, not here.
 
+Custom properties are declared in ``CUSTOM_PROPERTY_CONFIG``, per entity type.
+A missing property is added and one whose description or displayName differs
+is put back.  A property removed from the config is left on the type, because
+deleting it drops its value from every entity that has one.
+
 Access policies and roles are declared in ``POLICY_CONFIG`` and ``ROLE_CONFIG``,
 and code owns them: rules or policies changed in the UI are put back.  Bots are
 declared in ``BOT_CONFIG`` but only checked, not created.  Creating a bot user
@@ -210,6 +215,31 @@ _DOMAIN_TYPE = "Aggregate"
 
 # displayName is create-only for the same reason as teams.
 _DOMAIN_PATCHABLE_FIELDS: list[str] = ["description", "domainType"]
+
+# Custom properties, keyed by entity type and then property name.  propertyType
+# names one of OpenMetadata's property types (e.g. "string"), and cannot be
+# changed once the property exists.
+#
+# ol-data-platform's `ol-dbt metrics sync` writes metricFileSha256 on every
+# Metric it syncs, so the sync authors a version of the metric that it takes as
+# its drift baseline.  The server rejects the sync's PATCH without it.
+CUSTOM_PROPERTY_CONFIG: dict[str, dict[str, dict[str, str]]] = {
+    "metric": {
+        "metricFileSha256": {
+            "propertyType": "string",
+            "displayName": "Metric file SHA-256",
+            "description": (
+                "SHA-256 of the metrics/ file this metric was last synced from. "
+                "Written by ol-dbt metrics sync; do not edit."
+            ),
+        },
+    },
+}
+
+# A PUT of an existing property replaces it, and the server records a change to
+# either field.  The PUT is authorized as Create on the type, so the bot's
+# EditDisplayName deny does not apply.
+_CUSTOM_PROPERTY_UPDATABLE_FIELDS: list[str] = ["description", "displayName"]
 
 # The business glossary.  Terms are referred to by FQN from ol-data-platform's
 # dbt column meta (e.g. "open-learning.course-run"), so renaming one breaks its
@@ -742,6 +772,73 @@ def _reconcile_domain(name: str, desired: dict[str, str]) -> None:
     _apply_patch(f"domain {name}", f"{OM_SERVER_URL}/v1/domains/{domain['id']}", ops)
 
 
+def _reconcile_custom_property(
+    entity_type: str, name: str, desired: dict[str, str]
+) -> None:
+    """Add the custom property if it is missing, else put back a changed one.
+
+    :param entity_type: The entity type the property extends, e.g. ``"metric"``.
+    :param name: Property name, e.g. ``"metricFileSha256"``.
+    :param desired: The property's propertyType name, displayName and description.
+    :raises requests.HTTPError: On any non-2xx response from the OM API.
+    :raises ValueError: If the entity type or property type does not exist, or
+        the property exists with another property type.
+    """
+    label = f"{entity_type} custom property {name}"
+    entity_def = _get_by_name_with_fields(
+        "metadata/types", entity_type, "customProperties"
+    )
+    if entity_def is None:
+        msg = f"entity type {entity_type!r} does not exist"
+        raise ValueError(msg)
+
+    current = next(
+        (prop for prop in entity_def["customProperties"] if prop["name"] == name),
+        None,
+    )
+    changed: list[str] = []
+    if current is not None:
+        # The server's updater matches properties on name and type but stores
+        # them by name, so a PUT with another type does not replace the
+        # property cleanly.  Changing it needs a person.
+        if current["propertyType"]["name"] != desired["propertyType"]:
+            msg = (
+                f"exists with propertyType {current['propertyType']['name']!r}, "
+                f"expected {desired['propertyType']!r}"
+            )
+            raise ValueError(msg)
+        changed = [
+            field
+            for field in _CUSTOM_PROPERTY_UPDATABLE_FIELDS
+            if current.get(field) != desired[field]
+        ]
+        if not changed:
+            print(f"[ok]   {label}: already at desired state — skipping")  # noqa: T201
+            return
+
+    property_type = _get_by_name("metadata/types", desired["propertyType"])
+    if property_type is None:
+        msg = f"property type {desired['propertyType']!r} does not exist"
+        raise ValueError(msg)
+
+    put_resp = requests.put(
+        f"{OM_SERVER_URL}/v1/metadata/types/{entity_def['id']}",
+        headers=_AUTH_HEADER,
+        json={
+            "name": name,
+            "displayName": desired["displayName"],
+            "description": desired["description"],
+            "propertyType": {"id": property_type["id"], "type": "type"},
+        },
+        timeout=30,
+    )
+    put_resp.raise_for_status()
+    if current is None:
+        print(f"[done] {label}: created")  # noqa: T201
+    else:
+        print(f"[done] {label}: updated {', '.join(changed)}")  # noqa: T201
+
+
 # ── Access control ────────────────────────────────────────────────────────
 # A user's own roles come from the `roles` claim that Keycloak sends at login
 # (authorizer useRolesFromProvider in applications/open_metadata, mapping in
@@ -1267,7 +1364,7 @@ def _reconcile_glossary_term(term: dict[str, Any]) -> None:
 
 
 def main() -> None:
-    """Reconcile every tag, team, policy, role, domain and glossary term.
+    """Reconcile every tag, team, policy, role, domain, custom property and term.
 
     Each bot is checked, not reconciled.
 
@@ -1285,6 +1382,14 @@ def main() -> None:
         *(
             (f"domain {name}", partial(_reconcile_domain, name, domain))
             for name, domain in DOMAIN_CONFIG.items()
+        ),
+        *(
+            (
+                f"{entity_type} custom property {name}",
+                partial(_reconcile_custom_property, entity_type, name, prop),
+            )
+            for entity_type, props in CUSTOM_PROPERTY_CONFIG.items()
+            for name, prop in props.items()
         ),
         (f"glossary {GLOSSARY_NAME}", _reconcile_glossary),
         *(
