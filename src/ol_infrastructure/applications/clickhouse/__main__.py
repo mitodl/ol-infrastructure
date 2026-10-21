@@ -582,10 +582,14 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                        (/var/lib/clickhouse/, the NVMe or EBS PVC). A custom
                        local disk at that same path is rejected with
                        UNKNOWN_ELEMENT_IN_CONFIG ("cannot be equal to <path>"),
-                       so only its free-space headroom is tuned here, to the
-                       Opik chart's tieredStorage.hot.keepFreeSpaceBytes. -->
+                       so only its free-space headroom is tuned here: the
+                       Opik chart's tieredStorage.hot.keepFreeSpaceBytes plus
+                       the cold cache's max_size. The cache sits on this same
+                       filesystem, so without the extra reservation hot parts
+                       could take the room the cache later grows into and the
+                       volume could fill. -->
                   <default>
-                    <keep_free_space_bytes>{COLD_TIER_HOT_KEEP_FREE_SPACE_BYTES}</keep_free_space_bytes>
+                    <keep_free_space_bytes>{COLD_TIER_HOT_KEEP_FREE_SPACE_BYTES + cold_cache_max_size_bytes}</keep_free_space_bytes>
                   </default>
                   <!-- Opik's backend readiness check
                        (ANALYTICS_DB_COLD_STORAGE_DISK_HEALTH_CHECK_ENABLED)
@@ -605,7 +609,8 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                        stay off S3. The chart puts it on a separate PVC; it
                        sits on the data PVC here because adding a volume claim
                        template means recreating every StatefulSet. Sized at a
-                       tenth of the data volume. -->
+                       tenth of the data volume, which the default disk's
+                       keep_free_space_bytes reserves. -->
                   <cold>
                     <type>cache</type>
                     <disk>cold_s3</disk>
