@@ -202,10 +202,14 @@ developers who have no use for them. The
 Tiltfile forwards `enabled_apps` to both Pulumi stacks and to the app Tiltfiles as
 `LOCAL_DEV_ENABLED_APPS` so they can make that call.
 
-Disabling an app only takes effect while Tilt is running: Tilt is what removes
-the workloads, so editing `enabled_apps` with Tilt stopped leaves them up until
-the next `tilt up`. Worth knowing for GitLab in particular, which holds ~2.6
-GiB, though the behaviour is not specific to it.
+Remove an app from `enabled_apps` while Tilt is running and Tilt deletes its
+workloads when it reloads. A later `tilt up` cleans up only what it applied
+itself, so an app removed while Tilt was stopped keeps running: start Tilt
+before editing, or delete the workloads yourself, which for GitLab is
+`kubectl --context local-dev -n gitlab delete statefulset gitlab`. Going
+through `stop.sh` is fine too, since its `tilt down` removes every app still
+listed at that point. Worth knowing for GitLab in particular, which holds
+~2.6 GiB, though none of this is specific to it.
 
 ### Open edX
 

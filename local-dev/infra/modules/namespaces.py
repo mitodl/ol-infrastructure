@@ -13,9 +13,9 @@ from pulumi import ResourceOptions
 # off, and deleting a namespace takes its PersistentVolumeClaims with it --
 # StatefulSet volume retention cannot survive that.
 #
-# What that would cost is GitLab's own git history and a ~13 minute first
-# boot on every re-enable. It is not the only copy of the content: Studio's
-# is in the shared Postgres, and it can rebuild a repo from there with
+# What that would cost is GitLab's own git history, plus a first boot (~2
+# minutes) on every re-enable. It is not the only copy of the content:
+# Studio's is in the shared Postgres, and it can rebuild a repo from there with
 # reset_sync_states --create_backends and sync_website_to_backend
 # --force-create. Avoiding that rebuild, and the boot, is the reason this
 # namespace is unconditional; the volumes are reclaimed explicitly, as
