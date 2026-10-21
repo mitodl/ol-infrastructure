@@ -28,10 +28,11 @@ config:
   # concurrent writes go indeterminate: treat a QA write-concurrency symptom as
   # expected, not as a new bug.
   #
-  # ★ NEVER COPY THIS TO CI OR PRODUCTION. Neither sets this key, so both stay
-  # on witan's code default of 4 — which deployment.py describes as the
-  # measured value — and there the gate is load-bearing, with real users on the
-  # other side of it.
+  # ★ NEVER COPY 50 TO CI OR PRODUCTION. CI does not set this key, so it stays
+  # on witan's code default of 4. Production raises it to 16 (2026-10-21),
+  # sized so a full queue finishes inside the 120s budget; see the omnigraph
+  # Production stack. Either way the gate is load-bearing there, with real
+  # users on the other side of it.
   #
   # The original rationale for trying 50 follows, kept because the reasoning
   # about WHY the first cap had to move is still correct; only its hoped-for
@@ -76,8 +77,7 @@ config:
   # the one this project spent three days eliminating. On QA, provoking it is
   # the experiment and the probe counts it (its INDETERMINATE bucket). On
   # Production it would be a regression, which is why Production raises this
-  # only to 24 (2026-10-21), sized so a full queue finishes inside the budget
-  # at its slowest observed write cost; see the omnigraph Production stack.
+  # only to 16.
   witan:remote_write_max_inflight: "50"
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgFurjegA1WE1b8N4qiEM2KVAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMPKzZtLLEs+e1lDyxAgEQgDvcpTPZFDqJ0PRIVpj9brgaTIzNqWSoJAIjfZmtHhx574TzRhGmQ8O2iFsh1Em3Gev5En32LbkcHW4z9w==

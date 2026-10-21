@@ -480,6 +480,10 @@ WINDOW_STARTING_DEADLINE_SECONDS = 60
 # Stop one command (the image allows 30s), unlock, restore the replica count.
 # The image documents 120 as what its close needs.
 TERMINATION_GRACE_SECONDS = 120
+# How much longer than the server's termination grace the window waits for its
+# pods to exit: the time the kubelet and the Deployment controller take to act
+# on the scale-down. The image's own default of 90 is a 35s grace plus this.
+SERVER_STOP_MARGIN_SECONDS = 55
 
 if WINDOW_ACTIVE_DEADLINE_SECONDS <= (
     MAINTENANCE_WINDOW_SECONDS + COMMAND_TIMEOUT_SECONDS
@@ -504,6 +508,7 @@ def create_maintenance_window(  # noqa: PLR0913
     cluster_configmap_name: str,
     cluster_config_dir: str,
     server_deployment_name: str,
+    server_termination_grace_seconds: int,
     schedule: str,
     cleanup_older_than: str,
     cleanup_iso_weekdays: tuple[int, ...],
@@ -525,6 +530,10 @@ def create_maintenance_window(  # noqa: PLR0913
     :param server_deployment_name: the Deployment the window stops. The
         command reads its pod selector from it, so there is no second copy of
         the selector here to drift.
+    :param server_termination_grace_seconds: that Deployment's pod grace. The
+        command gives up on a server that has not stopped within it plus
+        ``SERVER_STOP_MARGIN_SECONDS``, so a server still draining writes is
+        not taken for a stuck one.
     :param cleanup_iso_weekdays: UTC days ``cleanup`` also runs on (1 is
         Monday), rendered as the comma list the image parses.
     :param suspend: hold the window off while a storage-format migration is
@@ -671,6 +680,13 @@ def create_maintenance_window(  # noqa: PLR0913
                                         kubernetes.core.v1.EnvVarArgs(
                                             name="OMNIGRAPH_COMMAND_TIMEOUT_SECONDS",
                                             value=str(COMMAND_TIMEOUT_SECONDS),
+                                        ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="OMNIGRAPH_SERVER_STOP_SECONDS",
+                                            value=str(
+                                                server_termination_grace_seconds
+                                                + SERVER_STOP_MARGIN_SECONDS
+                                            ),
                                         ),
                                     ],
                                     # As the sweeps before it: compaction

@@ -77,7 +77,7 @@ config:
   # unblocked for future sizing work without another two deploy cycles. This is
   # deliberate, not an un-reverted experiment.
   #
-  # SUPERSEDED 2026-10-21: Production now raises this too, to 24, sized from
+  # SUPERSEDED 2026-10-21: Production now raises this too, to 16, sized from
   # its own per-write cost (see its stack config). CI does not set this key,
   # so it stays on data_tier.py's DEFAULT_PER_ACTOR_INFLIGHT_MAX of 4.
   #

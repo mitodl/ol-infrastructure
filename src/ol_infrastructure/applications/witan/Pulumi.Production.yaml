@@ -5,11 +5,11 @@ config:
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   # witan:oidc_audience: witan
-  # Lifts the MCP pod's per-graph write gate from 4 to 24, paired with
+  # Lifts the MCP pod's per-graph write gate from 4 to 16, paired with
   # omnigraph:per_actor_inflight_max in the omnigraph stack, which has the
   # sizing: a burst of writes waits instead of being refused, and a full queue
-  # still finishes inside the 120s budget at Production's slowest observed
-  # write cost. WITAN_REMOTE_WRITE_QUEUE_SECONDS stays at its 10s default.
-  witan:remote_write_max_inflight: "24"
+  # still finishes inside the 120s budget at Production's estimated write cost
+  # under load. WITAN_REMOTE_WRITE_QUEUE_SECONDS stays at its 10s default.
+  witan:remote_write_max_inflight: "16"
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwEm+wja3knm1eEmHZI7JWkfAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMlJ+T612UiySXgzekAgEQgDuOrSfm9GTTDgmNn6BIsIZocvor5Laz3HVw5xhFSYxEMzwzmTw3US3R92hFxOoMXPMyjyaAoqgPtbucxw==

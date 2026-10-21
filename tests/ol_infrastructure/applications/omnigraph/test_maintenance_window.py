@@ -64,6 +64,7 @@ def _window(*, suspend: bool = False):
         cluster_configmap_name="omnigraph-cluster-config",
         cluster_config_dir="/etc/omnigraph/cluster",
         server_deployment_name="omnigraph-server",
+        server_termination_grace_seconds=125,
         schedule="20 3 * * *",
         cleanup_older_than="30d",
         cleanup_iso_weekdays=(1, 3, 7),
@@ -172,6 +173,8 @@ def test_the_cron_job_runs_the_images_window_command_with_its_env():
             "OMNIGRAPH_CLEANUP_ISO_WEEKDAY": "1,3,7",
             "OMNIGRAPH_WINDOW_SECONDS": str(MAINTENANCE_WINDOW_SECONDS),
             "OMNIGRAPH_COMMAND_TIMEOUT_SECONDS": str(COMMAND_TIMEOUT_SECONDS),
+            # A server draining writes for its whole grace is not stuck.
+            "OMNIGRAPH_SERVER_STOP_SECONDS": "180",
         }
         # The command reads the storage root and the graph list from it.
         (mount,) = container["volumeMounts"]
