@@ -42,7 +42,7 @@ OM_LINEAGE_PRUNE_DRY_RUN     JSON boolean.  ``true`` logs the stale edges
                              without deleting them.
 OM_LINEAGE_PRUNE_MAX_FRACTION
                              Largest share of the current lake edges one run
-                             may delete before it refuses to prune.
+                             may delete before it refuses to link or prune.
 """
 
 import json
@@ -376,19 +376,17 @@ def _plan_prune(
     for edge in stale:
         log.info("%s stale lake edge %s -> %s", verb, edge.from_fqn, edge.to_fqn)
     if refusal:
-        log.error("Not pruning stale lake edges: %s", refusal)
+        log.error("Not linking or pruning lake edges: %s", refusal)
     return PrunePlan(stale=stale, refusal=refusal, failed=failed)
 
 
 def _apply_prune(
     metadata: OpenMetadata, plan: PrunePlan, settings: Settings
 ) -> tuple[int, int]:
-    """Delete the planned edges unless the plan was refused or this is a dry run.
+    """Delete the planned edges unless this is a dry run.
 
     :returns: Edges deleted (or that would be, in a dry run) and failures.
     """
-    if plan.refusal:
-        return 0, plan.failed + 1
     if settings.dry_run:
         return len(plan.stale), plan.failed
     deleted, delete_failed = _delete_edges(metadata, plan.stale)
@@ -409,8 +407,21 @@ class RunCounts:
 def _sync(
     metadata: OpenMetadata, manifest: dict[str, Any], settings: Settings
 ) -> RunCounts:
-    """Plan the prune against the graph as it stands, link, then prune."""
+    """Plan the prune against the graph as it stands, link, then prune.
+
+    A refused plan skips linking too.  The edges a bad manifest links would
+    count toward the next run's total, so a second run against the same
+    manifest would pass the limit and delete the correct edges.
+    """
     plan = _plan_prune(metadata, manifest, settings)
+    if plan.refusal:
+        return RunCounts(
+            linked=0,
+            link_failed=0,
+            missing=set(),
+            pruned=0,
+            prune_failed=plan.failed + 1,
+        )
     linked, link_failed, missing = _link(metadata, manifest, settings)
     pruned, prune_failed = _apply_prune(metadata, plan, settings)
     return RunCounts(

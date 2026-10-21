@@ -349,10 +349,41 @@ def fake_sdk(job: ModuleType, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(job, "APIError", _FakeAPIError)
 
 
+@pytest.fixture
+def fake_link(job: ModuleType, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Make ``_link`` add the manifest's lake edges to the fake graph.
+
+    :returns: The models linked, in order.
+    """
+    linked: list[str] = []
+
+    def link(
+        metadata: _FakeOM, manifest: dict[str, Any], settings: Any
+    ) -> tuple[int, int, set[str]]:
+        for source, _, model in job.source_edges(manifest, settings.schemas):
+            node = _lake(f"{source['database']}.{source['schema']}.{source['name']}")
+            lineage = metadata.lineages[f"sr-{model}"]
+            lineage["nodes"].append(node)
+            lineage["upstreamEdges"].append(
+                {
+                    "fromEntity": node["id"],
+                    "toEntity": lineage["entity"]["id"],
+                    "lineageDetails": {"source": "DbtLineage"},
+                }
+            )
+            linked.append(model)
+        return len(linked), 0, set()
+
+    monkeypatch.setattr(job, "_link", link)
+    return linked
+
+
 def _prune(
     job: ModuleType, om: _FakeOM, manifest: dict[str, Any], settings: Any
 ) -> tuple[int, int]:
-    return job._apply_prune(om, job._plan_prune(om, manifest, settings), settings)
+    plan = job._plan_prune(om, manifest, settings)
+    assert plan.refusal is None
+    return job._apply_prune(om, plan, settings)
 
 
 def _settings(job: ModuleType, *, dry_run: bool) -> Any:
@@ -440,17 +471,24 @@ def test_an_edge_already_gone_is_not_a_failure(job: ModuleType) -> None:
 
 
 @pytest.mark.usefixtures("fake_sdk")
-def test_a_manifest_without_starrocks_models_prunes_nothing(job: ModuleType) -> None:
+def test_a_manifest_without_starrocks_models_prunes_nothing(
+    job: ModuleType, fake_link: list[str]
+) -> None:
     """A manifest from the wrong target must not look like every model left."""
     om = _FakeOM(_graph(), gone=set())
     elsewhere = _manifest({"orders": ["ol_warehouse.marts.orders"]}, schema="other")
 
-    assert _prune(job, om, elsewhere, _settings(job, dry_run=False)) == (0, 1)
+    counts = job._sync(om, elsewhere, _settings(job, dry_run=False))
+
+    assert (counts.linked, counts.pruned, counts.prune_failed) == (0, 0, 1)
+    assert fake_link == []
     assert om.client.deleted == []
 
 
 @pytest.mark.usefixtures("fake_sdk")
-def test_a_prune_past_the_limit_deletes_nothing(job: ModuleType) -> None:
+def test_a_prune_past_the_limit_deletes_nothing(
+    job: ModuleType, fake_link: list[str]
+) -> None:
     """Losing most of the lake edges in one run is refused and fails the job."""
     lineages = [
         _lineage(
@@ -463,7 +501,10 @@ def test_a_prune_past_the_limit_deletes_nothing(job: ModuleType) -> None:
     # Only one model left reads the lake: nine of ten edges look stale.
     manifest = _manifest({"model_0": ["ol_warehouse.marts.t0"]})
 
-    assert _prune(job, om, manifest, _settings(job, dry_run=False)) == (0, 1)
+    counts = job._sync(om, manifest, _settings(job, dry_run=False))
+
+    assert (counts.linked, counts.pruned, counts.prune_failed) == (0, 0, 1)
+    assert fake_link == []
     assert om.client.deleted == []
 
 
@@ -482,13 +523,14 @@ def test_a_rejected_delete_is_a_failure(job: ModuleType) -> None:
 
 
 @pytest.mark.usefixtures("fake_sdk")
-def test_edges_a_bad_manifest_links_do_not_dilute_the_guard(
-    job: ModuleType, monkeypatch: pytest.MonkeyPatch
+def test_a_bad_manifest_never_deletes_the_right_edges(
+    job: ModuleType, fake_link: list[str]
 ) -> None:
     """A manifest naming the wrong lake tables must not delete the right edges.
 
-    Its link step adds one edge per model.  Counted in the total, those edges
-    would make the correct ones only half of it, under the limit.
+    Linking adds one wrong edge per model.  If a refused run still linked, the
+    next run would count those edges in the total, find the correct edges only
+    half of it, pass the limit and delete them.
     """
     lineages = [
         _lineage(
@@ -500,25 +542,9 @@ def test_edges_a_bad_manifest_links_do_not_dilute_the_guard(
     om = _FakeOM(lineages, gone=set())
     wrong = _manifest({f"model_{i}": [f"ol_warehouse.wrong.t{i}"] for i in range(10)})
 
-    def link(
-        metadata: _FakeOM, manifest: dict[str, Any], settings: Any
-    ) -> tuple[int, int, set[str]]:
-        for source, _, model in job.source_edges(manifest, settings.schemas):
-            node = _lake(f"{source['database']}.{source['schema']}.{source['name']}")
-            lineage = metadata.lineages[f"sr-{model}"]
-            lineage["nodes"].append(node)
-            lineage["upstreamEdges"].append(
-                {
-                    "fromEntity": node["id"],
-                    "toEntity": lineage["entity"]["id"],
-                    "lineageDetails": {"source": "DbtLineage"},
-                }
-            )
-        return 10, 0, set()
+    for _ in range(2):
+        counts = job._sync(om, wrong, _settings(job, dry_run=False))
+        assert (counts.linked, counts.pruned, counts.prune_failed) == (0, 0, 1)
 
-    monkeypatch.setattr(job, "_link", link)
-
-    counts = job._sync(om, wrong, _settings(job, dry_run=False))
-
-    assert (counts.linked, counts.pruned, counts.prune_failed) == (10, 0, 1)
+    assert fake_link == []
     assert om.client.deleted == []

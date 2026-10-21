@@ -766,10 +766,11 @@ if starrocks_host_port and om_config.require_bool("enable_starrocks_dbt"):
             _plain_env("OM_DBT_PREFIX", starrocks_dbt_artifacts_prefix),
             _plain_env("OM_DBT_SCHEMAS", json.dumps(STARROCKS_DBT_SCHEMAS)),
             # The job deletes the lake edges the manifest no longer declares.
-            # It refuses when a run would delete more than this share of
-            # them, since a manifest from the wrong target or a broken upload
-            # looks like every model stopped reading the lake.  Raise it for
-            # one run after a refactor that legitimately drops that many.
+            # It neither links nor prunes when a run would delete more than
+            # this share of them, since a manifest from the wrong target or a
+            # broken upload looks like every model stopped reading the lake.
+            # Raise it for one run after a refactor that legitimately drops
+            # that many.
             _plain_env(
                 "OM_LINEAGE_PRUNE_MAX_FRACTION",
                 str(
