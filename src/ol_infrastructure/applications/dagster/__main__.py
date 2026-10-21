@@ -2665,13 +2665,13 @@ OTEL_AGENT_PYTHONPATH = "/opt/otel/auto_instrumentation"
 # this one. requests and urllib3 each emit http.client.* duration and size
 # histograms. The canvas API client uses httpx2, which is not instrumented, but
 # S3 IO goes through botocore over urllib3 and Vault through hvac over
-# requests. The run workers that inherit this env (canvas, see
+# requests. The run workers that inherit this env (data_loading, see
 # OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS) are short-lived processes, each with
 # its own random service.instance.id, and so is every step subprocess the
 # multiprocess executor spawns inside one. Production started ~440-475 canvas
 # run-worker Jobs a day in the week to 2026-09-18, each minting at least one
-# fresh set of series. Measure the series count on QA before setting this in
-# Production.
+# fresh set of series; those are data_loading's now. Measure the series count
+# on QA before setting this in Production.
 dagster_otel_metrics_enabled = dagster_config.get_bool("otel_metrics_enabled") or False
 
 
@@ -2757,22 +2757,28 @@ def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, st
 # last and kubelet therefore honours. Read the flush-policy comment in that file
 # before adding to this set.
 #
-# canvas is the pilot: 7 days of kube_job_labels on data-production put it at a
+# The pilot was canvas: 7 days of kube_job_labels on data-production put it at a
 # mean of 87 concurrent run-worker Jobs against a peak of 106 -- steady rather
 # than bursty, so its trace volume is predictable -- while openedx runs a mean
 # of 221 against a peak of 13823. Enough traffic to produce a real per-worker
 # connection footprint, two orders of magnitude less blast radius than the
 # location that would otherwise dominate the signal.
 #
+# canvas was retired into data_loading (mitodl/ol-data-platform#2260), and its
+# course export, which is that traffic, runs there now, so the pilot follows it.
+# It also takes in data_loading's own dlt runs. Over the 7 days to 2026-10-21
+# those peaked at 8 concurrent Jobs (kube_job_labels, data-production) against
+# the canvas export's 133, which arrives as a burst at each six-hourly tick.
+#
 # Run workers inherit the code location's OTEL_SERVICE_NAME, so their spans
-# arrive as `production-dagster-code-canvas` alongside the code server's and
+# arrive as `production-dagster-code-data-loading` alongside the code server's and
 # cannot be told apart by service.name -- the launcher cannot override it,
 # because the code location sets that key and the code location's value is the
 # one kubelet keeps. Separate them on `k8s.pod.name` (a run worker's is
 # `dagster-run-<run-id>`, the server's is the deployment's) or on
 # `service.instance.id`, which the SDK makes unique per process. Both are
 # already present on the spans #5733 is producing.
-OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS = {"canvas"}
+OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS = {"data_loading"}
 
 
 def dagster_run_worker_otel_env(location_name: str) -> list[dict[str, str]]:
@@ -2781,7 +2787,8 @@ def dagster_run_worker_otel_env(location_name: str) -> list[dict[str, str]]:
     The value rides on the code location's own env, which the chart copies into
     the container context every one of its run workers inherits.
 
-    :param location_name: the code location's unhyphenated name, e.g. ``canvas``.
+    :param location_name: the code location's unhyphenated name, e.g.
+        ``data_loading``.
     """
     if not ships_telemetry(stack_info):
         return []
@@ -2814,7 +2821,6 @@ def grpc_health_check_command(port: int) -> list[str]:
 # Define the user code deployments before the main helm chart so they can be referenced
 # Define all code locations based on ol-data-platform structure
 code_locations: list[dict[str, str | int]] = [
-    {"name": "canvas", "module": "canvas.definitions", "port": 4000},
     {"name": "data_loading", "module": "data_loading.definitions", "port": 4000},
     {"name": "edxorg", "module": "edxorg.definitions", "port": 4002},
     {"name": "lakehouse", "module": "lakehouse.definitions", "port": 4003},
