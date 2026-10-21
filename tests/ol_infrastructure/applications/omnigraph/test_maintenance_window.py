@@ -54,7 +54,9 @@ def _of_type(mocks: _Mocks, typ: str) -> list[dict[str, Any]]:
     return [r.inputs for r in mocks.resources if r.typ == typ]
 
 
-def _window(*, suspend: bool = False):
+def _window(
+    *, suspend: bool = False, cleanup_iso_weekdays: tuple[int, ...] = (1, 3, 7)
+):
     return create_maintenance_window(
         stack_info=STACK_INFO,
         namespace="omnigraph",
@@ -67,7 +69,7 @@ def _window(*, suspend: bool = False):
         server_termination_grace_seconds=125,
         schedule="20 3 * * *",
         cleanup_older_than="30d",
-        cleanup_iso_weekdays=(1, 3, 7),
+        cleanup_iso_weekdays=cleanup_iso_weekdays,
         depends_on=[],
         suspend=suspend,
     )
@@ -184,6 +186,30 @@ def test_the_cron_job_runs_the_images_window_command_with_its_env():
         # for the server to stop would wait on itself.
         labels = job["template"]["metadata"]["labels"]
         assert labels["app.kubernetes.io/name"] == "omnigraph-maintenance"
+
+    return window.cron_job.urn.apply(check)
+
+
+@pulumi.runtime.test
+def test_no_cleanup_days_render_as_an_empty_list():
+    """The image reads an empty OMNIGRAPH_CLEANUP_ISO_WEEKDAY as no cleanup days.
+
+    agent-kit docker/omnigraph_maintenance.py parse_iso_weekdays. Production
+    sets ``omnigraph:cleanup_iso_weekdays: []`` so its window only optimizes.
+    """
+    mocks = _Mocks()
+    pulumi.runtime.set_mocks(mocks, preview=False)
+    window = _window(cleanup_iso_weekdays=())
+
+    def check(_: object) -> None:
+        (cron_job,) = _of_type(mocks, "kubernetes:batch/v1:CronJob")
+        (container,) = cron_job["spec"]["jobTemplate"]["spec"]["template"]["spec"][
+            "containers"
+        ]
+        env = {e["name"]: e.get("value") for e in container["env"]}
+        # The real provider drops the empty value and keeps the entry, as
+        # `pulumi preview` shows. The image reads both as no cleanup days.
+        assert env["OMNIGRAPH_CLEANUP_ISO_WEEKDAY"] in ("", None)
 
     return window.cron_job.urn.apply(check)
 

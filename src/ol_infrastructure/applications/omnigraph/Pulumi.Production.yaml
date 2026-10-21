@@ -78,5 +78,17 @@ config:
   # (e.g. once the hot write paths are batched). In-flight memory stays bounded
   # by per_actor_bytes_max. Unquoted because __main__.py reads it with get_int.
   omnigraph:per_actor_inflight_max: 16
+  # The nightly window only optimizes here. 0.13's cleanup plans every object
+  # under _versions/, 0.17 to 0.22s each (the 2026-10-20 backlog run's Job
+  # logs), including the commit manifests it never removes. On 2026-10-21 the
+  # manifests alone were 11,800 versions, about 2,240s of plan against the
+  # 1,500s window, growing by about 1,500 a day, so cleanup in the window would
+  # time out on code-bridge and council and leave the server down for the
+  # whole window every night. Clean up in a planned long run instead
+  # (docs/omnigraph-store-maintenance-runbook.md, "Clearing a cleanup
+  # backlog"), sized from the _versions count on the day: nothing schedules
+  # it, and it grows by about 5 minutes a day. Revisit when
+  # ModernRelay/omnigraph#1095 ships.
+  omnigraph:cleanup_iso_weekdays: []
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwF51lHyFZBMipn03XTrTTsKAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMIK7o7DGmOomYnJtDAgEQgDuWNWhBp4MmY5g1IS5INjiOfMa0yZcKOzoHa0L7AjLfrw9rMSs/jELIM0qfIJguIuQsCYjLMpJoX7CgSQ==

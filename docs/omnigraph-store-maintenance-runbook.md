@@ -32,7 +32,8 @@ finishes, for every witan user. The command is in the server image (agent-kit
    waits for its pods to exit;
 3. force-unlocks the `serve` lock the server left;
 4. runs `optimize` on every graph in `cluster.yaml`, then on the days in
-   `omnigraph:cleanup_iso_weekdays` (default every day) also
+   `omnigraph:cleanup_iso_weekdays` (default every day; Production sets `[]`,
+   so its window only optimizes) also
    `cleanup --older-than <cleanup_older_than>`, force-unlocking after each;
 5. scales the Deployment back to the replica count it found and releases the
    Lease.
@@ -46,9 +47,9 @@ window that runs out delays a graph's cleanup to a later night. That does not
 help a graph whose cleanup alone takes more than 10 minutes. Cleanup plans
 every version present before it deletes any, so a run stopped by the timeout
 deletes nothing, and that graph is stopped every night, never cleaned, and its
-backlog grows. Clear it once with [a longer
-run](#clearing-a-cleanup-backlog), and see "Why retention is an age, not a
-version count" for why nightly at 2d keeps it from coming back.
+backlog grows. Clear it with [a longer run](#clearing-a-cleanup-backlog), and
+see "Why retention is an age, not a version count" for why retention alone
+does not keep it from coming back.
 
 The council probe does not run between 03:00 and 03:59 on this format. Its
 04:00 run is the check that the window ended, so a failed
@@ -110,9 +111,11 @@ heal on its own.
 
 A graph whose cleanup log says `` `omnigraph cleanup ... --graph <id> ...` did
 not finish in 600s `` night after night has more versions than one command can
-plan. Size it before you schedule the run. A cleanup costs about 0.14s per
-table version present (measured on S3, 2026-10-18), and the count is the
-number of manifests under `_versions/`:
+plan. Size it before you schedule the run. A cleanup costs 0.16 to 0.22s per
+object under the graph's `_versions/` directories, 0.19s on average
+(Production, 2026-10-20: 4,026s over 21,021 versions on six graphs). The
+count includes the commit manifests under `__manifest/`, which cleanup reads
+but never removes:
 
 ```bash
 aws s3 ls --recursive s3://ol-data-witan-<env>/<storage_prefix>/graphs/<id>.omni/ \
@@ -140,9 +143,14 @@ kubectl -n omnigraph create job omnigraph-backlog-cleanup \
 kubectl -n omnigraph logs -f job/omnigraph-backlog-cleanup
 ```
 
-A 1800s command timeout covers about 12,000 versions on one graph. For a
-larger count raise it and `activeDeadlineSeconds` together: a deadline that
-fires mid-plan stops the run with nothing deleted. An image that predates
+Size the command timeout at 0.22s per version plus headroom: 1800s covers
+about 8,000 versions on one graph, and the window has to hold the sum over
+every graph (all of Production was about 25,000 on 2026-10-21, about 90
+minutes at 0.22s). The example's 5400s window is too short for all of
+Production, so compute the window from the count summed over every graph, plus
+about a minute for the optimize pass, and raise the timeout, the window and
+`activeDeadlineSeconds` together: a deadline that fires mid-plan stops the run
+with nothing deleted. An image that predates
 comma lists in `OMNIGRAPH_CLEANUP_ISO_WEEKDAY` refuses `1,2,3,4,5,6,7` before
 it stops anything; give it today's ISO weekday (`date -u +%u`) instead. The
 Job ends with `maintenance window complete: all graphs maintained` and the
@@ -218,14 +226,24 @@ commit either one retains survives. `--keep` counts commits per live branch,
 and the code graphs carry a branch per writer, so the window passes
 `--older-than` alone.
 
-The default, 2d, run every night, is sized by the stop window. On format 14
+The default, 2d, run every night, was chosen to fit the stop window in CI and
+QA, where commits are few. On format 14
 cleanup runs with the server down, and before it deletes anything it opens
-every table version present, retained or about to be removed. QA's code-bridge
-took 488s to remove 12 of 3,522 versions on 2026-10-18. A nightly run at 2d
-sees about three days of writes: Production's code-bridge writes about 800
-versions a day, so about 2,400 versions and 6 minutes. A Sunday-only run at 2d
-would see nine days, over the 10-minute command limit, and at 30d it would see
-37. witan's own code needs no older versions. Every live branch head is kept
+every version present, retained or about to be removed, at 0.16 to 0.22s each.
+Retention bounds only the table versions. The commit manifests
+(`__manifest/_versions/`, and `__manifest/tree/*/_versions/` for each writer
+branch) are planned too, and 0.13's cleanup never removes them: every delete
+marker under Production's council and ol-data-platform is a table version.
+They grow by one per commit. In Production on 2026-10-21 they were 11,800 of
+25,372 versions, about 2,240s of plan against a 1,500s window, and grew by
+about 1,500 a day, so no retention fits Production's window and its
+`omnigraph:cleanup_iso_weekdays` is `[]`. CI and QA commit far less and keep
+the nightly default, but the same growth applies: QA's code-bridge took 413s
+on 2026-10-21 and adds about 270 manifests a day, about 55s a night, so it
+reaches the 600s timeout around 2026-10-24 and then needs `[]` too. Upstream:
+ModernRelay/omnigraph#1095.
+
+witan's own code needs no older versions. Every live branch head is kept
 regardless of age, which covers witan-code's per-writer WIP views, and witan
 makes no time-travel reads. What 2d gives up is the operator's undelete: a
 hard-deleted witan row is readable through `omnigraph query --snapshot` only
