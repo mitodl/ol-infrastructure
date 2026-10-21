@@ -35,7 +35,7 @@ set -euo pipefail
 CONTEXT="local-dev"
 CLUSTER_NAME="local-dev"
 READY_TIMEOUT="120s"  # kubectl wait for a node to report Ready after restart
-DOCKER_READY_WAIT=90  # seconds to wait for the Docker engine to resume on wake
+DOCKER_READY_WAIT="${DOCKER_READY_WAIT:-90}" # seconds to wait for the Docker engine to resume on wake
 CLUSTER_READY_WAIT=90 # seconds to wait for the cluster API to resume on wake
 RESTART_ATTEMPTS=3
 REQUEST_TIMEOUT="10s" # per-call kubectl timeout so an unreachable node fails fast

@@ -1297,7 +1297,25 @@ Pods already in `ImagePullBackOff` retry on kubelet's backoff timer (up to ~5m) 
 kubectl --context local-dev delete pod -n <namespace> <pod>
 ```
 
-**Automatic on wake:** `wakeup.example.sh` calls this alongside `heal-exec.sh` — see the sleepwatcher setup in the next section. Waking is exactly when the network tends to have changed underneath you.
+**Automatic (Linux):** install the two example user units — no root, nothing outside `$HOME`:
+
+```bash
+mkdir -p ~/.config/systemd/user
+for u in local-dev-heal.service local-dev-heal.timer; do
+  sed "s|<checkout>|$PWD|g" "local-dev/scripts/systemd/$u.example" \
+    > ~/.config/systemd/user/"$u"
+done
+systemctl --user daemon-reload
+systemctl --user enable --now local-dev-heal.timer
+```
+
+`journalctl --user -u local-dev-heal` for output.
+
+This polls every five minutes rather than hooking an event, which is deliberate. The trigger for stale container DNS is a *network* change, and bringing a VPN up or switching wifi involves no suspend at all — so a wake hook would miss exactly the cases above. `Persistent=true` makes it catch up a run missed while the machine was suspended, which covers the close-the-lid case too. The heal is a no-op when nothing has drifted, so a five-minute tick is cheap. A switch mid-interval is healed on the next tick, or immediately by running the script by hand.
+
+Two notes on why it is a *user* timer and not a sleep hook: `sleep.target` exists only in the system manager, so a user unit can never be pulled in by it (it would fail silently); and logind's `PrepareForSleep` D-Bus signal, the proper user-space wake hook, needs a client library that is not reliably installed. Distros that manage units declaratively express the same two units through their own configuration.
+
+On macOS this heal self-skips (see above), so there is nothing to schedule.
 
 ### `kubectl exec` fails with a 502 (wedged kubelet streaming)
 
@@ -1323,12 +1341,13 @@ while dialing 192.168.97.3:10250, code 502: 502 Bad Gateway
 
 ```bash
 brew install sleepwatcher
-# edit the REPO path inside the example hook first, then symlink it as ~/.wakeup:
-ln -sf "$PWD/local-dev/scripts/wakeup.example.sh" ~/.wakeup
+ln -sf "$PWD/local-dev/scripts/wakeup-macos.example.sh" ~/.wakeup
 brew services start sleepwatcher
 ```
 
-sleepwatcher runs `~/.wakeup` on every wake; the example hook calls `heal-dns.sh` and `heal-exec.sh`, logging to `~/Library/Logs/local-dev-heal.log`.
+sleepwatcher runs `~/.wakeup` on every wake; the example hook calls `heal-exec.sh`, logging to `~/Library/Logs/local-dev-heal.log`. No editing needed — it derives the checkout path from its own location, resolved through the symlink. It deliberately does not call `heal-dns.sh`, which self-skips whenever Docker runs in a VM.
+
+If you symlinked `~/.wakeup` before this script was renamed from `wakeup.example.sh`, re-point it: the old path now dangles and sleepwatcher fails silently.
 
 **Automatic on wake (Linux):** we don't ship a hook, but if your dev box suspends and you hit this, wrap `heal-exec.sh` in a systemd resume hook — a script in `/usr/lib/systemd/system-sleep/` (invoked with `post`/`resume`) or a unit ordered `After=suspend.target`.
 
