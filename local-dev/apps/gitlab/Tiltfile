@@ -4,7 +4,7 @@
 # mitodl image to build here, so this Tiltfile only applies YAML and wires up
 # the one-time token bootstrap.
 
-load("../../tiltlib.star", "k8s_yaml_local")
+load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
 
 NAMESPACE = 'gitlab'
 DEPLOY_NAME = 'gitlab'
@@ -14,7 +14,7 @@ DEPLOY_NAME = 'gitlab'
 # something else you run -- an externally hosted GitLab on the same domain,
 # say. It has to stay inside the root domain either way, because the mkcert
 # certificate only covers that one zone.
-_rd = os.environ.get('LOCAL_DEV_ROOT_DOMAIN', 'mit.dev')
+_rd = current_root_domain()
 GITLAB_HOSTNAME = os.environ.get('LOCAL_DEV_GITLAB_HOSTNAME', 'gitlab.' + _rd)
 
 k8s_yaml_local([

@@ -41,8 +41,8 @@ data:
   # needs no clicking around in the UI beyond making the group). See the
   # GitLab section of local-dev/README.md.
   # CONTENT_SYNC_BACKEND: "content_sync.backends.gitlab.GitlabBackend"
-  # GIT_DOMAIN: "gitlab.mit.dev"
-  # GIT_API_URL: "https://gitlab.mit.dev"
+  # GIT_DOMAIN: "gitlab.mit.test"
+  # GIT_API_URL: "https://gitlab.mit.test"
   # GIT_ORGANIZATION: "ocw"
   # GIT_TOKEN: "glpat-localdevlocaldev1234"  # pragma: allowlist secret
   # GIT_BRANCH_MAIN: "main"
