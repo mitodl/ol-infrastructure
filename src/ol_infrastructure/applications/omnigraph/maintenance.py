@@ -153,7 +153,9 @@ DEFAULT_CLEANUP_SCHEDULE = "20 4 * * 0"
 # retention fits that in the window (MAINTENANCE_WINDOW_SECONDS), so
 # Production sets omnigraph:cleanup_iso_weekdays to [] and cleans up only in a
 # planned long run (the store-maintenance runbook's "Clearing a cleanup
-# backlog").
+# backlog"). QA sets [] too: its code-bridge took 413s for 2,559 versions on
+# 2026-10-21 and gains about 255 manifests a day, so it would pass
+# COMMAND_TIMEOUT_SECONDS around 2026-10-25.
 #
 # witan's own code needs no older versions. The current head of every live
 # branch is always retained whatever its age, as is a named branch's oldest
@@ -454,8 +456,8 @@ DEFAULT_MAINTENANCE_SCHEDULE = DEFAULT_OPTIMIZE_SCHEDULE
 # Every night. A cleanup's time grows with the versions written since the last
 # one, so a weekly run plans a week of writes on top of the retained ones (see
 # DEFAULT_CLEANUP_OLDER_THAN). That holds while the commit manifests cleanup
-# never removes are small. Production's are not, and it sets [] to only
-# optimize.
+# never removes are small. Production's and QA's are not, and they set [] to
+# only optimize.
 DEFAULT_CLEANUP_ISO_WEEKDAYS = (1, 2, 3, 4, 5, 6, 7)
 
 # THE TIME BUDGET, from the 03:20 start:

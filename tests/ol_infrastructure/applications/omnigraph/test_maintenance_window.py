@@ -195,7 +195,8 @@ def test_no_cleanup_days_render_as_an_empty_list():
     """The image reads an empty OMNIGRAPH_CLEANUP_ISO_WEEKDAY as no cleanup days.
 
     agent-kit docker/omnigraph_maintenance.py parse_iso_weekdays. Production
-    sets ``omnigraph:cleanup_iso_weekdays: []`` so its window only optimizes.
+    and QA set ``omnigraph:cleanup_iso_weekdays: []`` so their windows only
+    optimize.
     """
     mocks = _Mocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
