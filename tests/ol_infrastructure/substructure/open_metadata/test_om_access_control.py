@@ -13,28 +13,16 @@ a role does not.
 """
 
 import copy
-import importlib
 import uuid
 from types import ModuleType
 from typing import Any
 
 import pytest
-import requests
 
-SERVER = "http://openmetadata:8585/api"
-
-
-class FakeResponse:
-    def __init__(self, status_code: int, body: dict[str, Any] | None = None) -> None:
-        self.status_code = status_code
-        self._body = body or {}
-
-    def json(self) -> dict[str, Any]:
-        return copy.deepcopy(self._body)
-
-    def raise_for_status(self) -> None:
-        if self.status_code >= 400:
-            raise requests.HTTPError(str(self.status_code))
+from tests.ol_infrastructure.substructure.open_metadata.conftest import (
+    SERVER,
+    FakeResponse,
+)
 
 
 class FakeOpenMetadata:
@@ -145,17 +133,15 @@ def server() -> FakeOpenMetadata:
 
 
 @pytest.fixture
-def config(monkeypatch: pytest.MonkeyPatch, server: FakeOpenMetadata) -> ModuleType:
-    monkeypatch.setenv("OM_SERVER_URL", SERVER)
-    monkeypatch.setenv("OM_BOT_JWT_TOKEN", "token")  # pragma: allowlist secret
-    module = importlib.import_module(
-        "ol_infrastructure.substructure.open_metadata.scripts.om_server_config"
-    )
-    module = importlib.reload(module)
-    monkeypatch.setattr(module.requests, "get", server.get)
-    monkeypatch.setattr(module.requests, "post", server.post)
-    monkeypatch.setattr(module.requests, "patch", server.patch)
-    return module
+def config(
+    monkeypatch: pytest.MonkeyPatch,
+    om_server_config: ModuleType,
+    server: FakeOpenMetadata,
+) -> ModuleType:
+    monkeypatch.setattr(om_server_config.requests, "get", server.get)
+    monkeypatch.setattr(om_server_config.requests, "post", server.post)
+    monkeypatch.setattr(om_server_config.requests, "patch", server.patch)
+    return om_server_config
 
 
 def _reconcile_access(config: ModuleType) -> None:
