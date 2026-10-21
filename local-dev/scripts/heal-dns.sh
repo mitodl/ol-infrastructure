@@ -148,20 +148,19 @@ baked_search() {
 # ---------------------------------------------------------------------------
 # Memo of readings a restart proved us wrong about
 # ---------------------------------------------------------------------------
-# Detection compares a container's config against the *host's* and probes
-# suspect resolvers *from the host*. On macOS both of those run on the Mac,
-# while the container's resolvers belong to the Docker VM — so a VM-internal
-# forwarder (OrbStack's 0.250.250.200, Docker Desktop's 192.168.65.7) is
-# neither in the Mac's list nor reachable from it, and reads as drift on every
-# single run. Docker Desktop no longer copies the host's search domain either,
-# which flags the dagger engine the same way. The restart then re-bakes a
-# byte-identical file, confirm_restart recognises the false positive — and the
-# next run repeats the whole thing, so every start and every wake bounces the
-# cluster for nothing.
+# A restart normally re-bakes resolv.conf from the host's current config, so a
+# resolver we flagged should be gone afterwards. When the container comes back
+# byte-identical instead, the reading was never drift: something pins those
+# resolvers independently of the host file. A daemon-level override does
+# exactly that — `"dns": [...]` in daemon.json, or `--dns` on dockerd — and
+# those addresses will never match the host's list no matter how many times we
+# restart. (local-dev sets no daemon DNS itself; this is a user's own daemon
+# config.)
 #
-# So record the verdict rather than rediscovering it. A reading that survived a
-# restart unchanged is a permanent feature of this setup, not a leftover from
-# the previous network, and is skipped on later runs.
+# Without a record, every run re-flags them, restarts for nothing, and
+# rediscovers the same false positive. So record the verdict: a reading that
+# survived a restart unchanged is a fixed feature of this setup, not a leftover
+# from the previous network, and is skipped on later runs.
 #
 # What keeps this from masking real drift is the fingerprint: the memo is
 # scoped to the host resolver config it was formed under. Change networks and
@@ -369,6 +368,30 @@ wait_ready() {
 # (not resuming), these time out and we skip — that is not ours to fix.
 if ! wait_ready "$DOCKER_READY_WAIT" docker info; then
 	warn "Docker engine not ready after ${DOCKER_READY_WAIT}s; skipping DNS heal."
+	exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Only a daemon on this kernel has DNS worth comparing
+# ---------------------------------------------------------------------------
+# Detection compares a container's resolvers against this host's and probes them
+# from this host. Both only mean anything when the daemon shares our network
+# namespace. On macOS — and Docker Desktop for Linux — it does not: nodes carry
+# the VM's own forwarder (0.250.250.200 on OrbStack, 192.168.65.7 on Docker
+# Desktop), which is in neither our resolver list nor reachable from here, so
+# every container reads as stale on every run.
+#
+# Restarting cannot fix that: the forwarder address is stable across host
+# network changes, so a restart re-bakes the identical file. Nor does it need
+# fixing — the forwarder follows the host's DNS, so lookups keep working across
+# a network switch (reported on OrbStack, Docker Engine 29.8.2).
+#
+# Comparing kernels is what separates the two cases; uname alone would wrongly
+# clear Docker Desktop for Linux. This runs after the readiness wait above
+# because it needs `docker info` — asking earlier would let an unreachable
+# daemon's empty output read as "VM" and skip a host that needs healing.
+if [[ "$(docker info --format '{{.KernelVersion}}')" != "$(uname -r)" ]]; then
+	ok "Docker runs in a VM here, so its DNS is not this host's to compare against; skipping."
 	exit 0
 fi
 
