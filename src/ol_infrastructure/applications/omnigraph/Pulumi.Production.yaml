@@ -55,5 +55,28 @@ config:
   # Cross-checked against storage_prefix at preview time — see the CI
   # config's comment on this same key for why.
   omnigraph:internal_schema_version: 14
+  # Raised from the default of 4, with witan:remote_write_max_inflight in the
+  # witan stack, so a burst of writes waits instead of being refused with HTTP
+  # 429. Measured on QA under omnigraph 0.13 on 2026-10-21: the caps do not
+  # change throughput (writes to one graph commit one at a time), only where a
+  # burst queues.
+  #
+  # 16, not QA's 50, because every admitted write has to finish inside witan's
+  # 120s budget or it times out with an indeterminate outcome, which is worse
+  # than a 429. Per-write cost rises under load: QA's gap between commits went
+  # from 1.0-1.1s at 4-8 writers to 1.3-2.3s at 16. Production's memory_store
+  # took about 2.7s typical against QA's 1.48s at one writer (Loki
+  # mcp.tool_call duration_ms, 7 days to 2026-10-21, only 15 calls), so scaling
+  # QA's worst gap by that ratio estimates 4.2s per write under load in
+  # Production. 16 queued is about 67s. witan's deadline check does not cover
+  # this within a burst: it predicts from the graph's average write time, which
+  # only moves as writes finish, so a burst is admitted on a quiet graph's
+  # average. During a witan rollout the old pod's queue can still be draining
+  # while the new pod admits its own, and witan writes as each user's actor, so
+  # this cap does not bound the sum. 32 queued is about 134s, the reason this
+  # is not 24 (48, about 200s). Re-derive from the per-write cost if it changes
+  # (e.g. once the hot write paths are batched). In-flight memory stays bounded
+  # by per_actor_bytes_max. Unquoted because __main__.py reads it with get_int.
+  omnigraph:per_actor_inflight_max: 16
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwF51lHyFZBMipn03XTrTTsKAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMIK7o7DGmOomYnJtDAgEQgDuWNWhBp4MmY5g1IS5INjiOfMa0yZcKOzoHa0L7AjLfrw9rMSs/jELIM0qfIJguIuQsCYjLMpJoX7CgSQ==
