@@ -292,10 +292,19 @@ backup bucket, and its `backups` disk must point at that bucket. Run the
 restore on replica 0 of the target:
 
 ```sql
-RESTORE DATABASE opik_db FROM Disk('backups', '<UTC timestamp>');
+RESTORE DATABASE opik_db FROM Disk('backups', '<UTC timestamp>')
+SETTINGS allow_different_table_def = 1;
 RESTORE TABLE default.DATABASECHANGELOG, TABLE default.DATABASECHANGELOGLOCK
-FROM Disk('backups', '<UTC timestamp>');
+FROM Disk('backups', '<UTC timestamp>')
+SETTINGS allow_different_table_def = 1;
 ```
+
+`allow_different_table_def` is needed whenever the backup was taken on an older
+server version than the target. RESTORE compares the table it creates against
+the definition stored in the backup, and a newer server renders some DDL
+differently: 25.8 writes `CODEC(Gorilla(8), ...)` where a 24.8 backup holds
+`CODEC(Gorilla, ...)`, so a restore without it fails with `CANNOT_RESTORE_TABLE`
+on `opik_db.experiment_aggregates`.
 
 To recover individual rows into the live cluster, restore into the scratch
 cluster first, then copy across with `INSERT INTO opik_db.<table> SELECT ...
@@ -321,9 +330,12 @@ https://github.com/mitodl/ol-infrastructure/pull/5817#issuecomment-5823823703).
   Never point it at `keeper-clickhouse`: see the warning above.
 
 ```sql
-RESTORE ALL FROM Disk('backups', '<UTC timestamp>') ASYNC;
+RESTORE ALL FROM Disk('backups', '<UTC timestamp>')
+SETTINGS allow_different_table_def = 1 ASYNC;
 SELECT status, error, dateDiff('second', start_time, end_time) FROM system.backups;
 ```
+
+On 2026-10-21 the 33.43 GiB production backup restored into 25.8.28 in 287 s.
 
 Compare `system.tables.total_rows` against replica 0. For the ReplacingMergeTree
 tables (`traces`, `spans`, `trace_threads`), compare counts with
@@ -367,7 +379,11 @@ upgrade goes to QA first.
      total_replicas < 2 OR absolute_delay > 0 OR queue_size > 0`.
      Also compare `SELECT count() FROM system.replicas` across both replicas: a
      replica that failed to create its tables has an empty `system.replicas`,
-     so a delay check alone passes on it.
+     so a delay check alone passes on it. In Production use `< 3` and add
+     `AND database != 'default'`: the Liquibase ledger tables
+     (`default.DATABASECHANGELOG*`) are replicated only on replica 0 there, and
+     replicas 1 and 2 hold plain `MergeTree` copies, so they always report
+     `total_replicas = 1`.
    - Keeper quorum: `echo mntr | nc localhost 2181` on each Keeper pod. One
      reports `zk_server_state leader` with `zk_synced_followers 2`, the others
      `follower`.

@@ -164,8 +164,8 @@ keeper_resources = clickhouse_config.get_object("keeper_resources") or {
 }
 # Server waits on SIGTERM for running queries (shutdown_wait_unfinished_queries)
 # and, by default, for a running BACKUP (shutdown_wait_backups_and_restores).
-# The daily backup takes ~165s on production replica 0, so the kubelet's
-# default 30s would SIGKILL a replica restarted during it.
+# The daily backup took 274s on production replica 0 on 2026-10-21, so the
+# kubelet's default 30s would SIGKILL a replica restarted during it.
 CLICKHOUSE_TERMINATION_GRACE_SECONDS = 300
 CLICKHOUSE_SHUTDOWN_WAIT_QUERIES_SECONDS = 60
 
