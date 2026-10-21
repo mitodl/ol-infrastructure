@@ -27,7 +27,9 @@ config:
     limits:
       cpu: 500m
       memory: 512Mi
-  clickhouse:version: 24.8.14.10546.altinitystable
+  # Mid-upgrade to 25.8 (CLICKHOUSE_SERVER_VERSION): keep writing parts 24.8
+  # replicas can read until every replica runs 25.8.
+  clickhouse:compatibility: '24.8'
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   clickhouse:admin_password:
