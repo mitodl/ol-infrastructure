@@ -454,6 +454,44 @@ class TestRecaptchaKeys:
         )
 
     @pulumi.runtime.test
+    def test_key_depends_on_the_recaptcha_admin_grant(self, monkeypatch):
+        # Creating the key in parallel with the grant can fail with a 403.
+        key_opts: list[pulumi.ResourceOptions] = []
+        real_key: Any = gcp.recaptcha.EnterpriseKey
+
+        def recording_key(*args, opts, **kwargs):
+            key_opts.append(opts)
+            return real_key(*args, opts=opts, **kwargs)
+
+        monkeypatch.setattr(gcp.recaptcha, "EnterpriseKey", recording_key)
+        component = OLGCPProject(
+            "test-recaptcha-grant",
+            OLGCPProjectConfig(
+                project_id="mitol01",
+                labels=valid_labels(),
+                enabled_services=["recaptchaenterprise.googleapis.com"],
+                service_accounts=[
+                    OLGCPServiceAccountConfig(
+                        account_id="pulumi-gcp",
+                        display_name="Pulumi GCP provider",
+                        project_roles=[
+                            "roles/recaptchaenterprise.admin",
+                            "roles/aiplatform.user",
+                        ],
+                    )
+                ],
+                recaptcha_keys=[TestRecaptchaKeys.key_config()],
+            ),
+        )
+        (opts,) = key_opts
+        assert isinstance(opts.depends_on, list)
+        grants = component.project_role_grants
+        assert grants["pulumi-gcp", "roles/recaptchaenterprise.admin"] in (
+            opts.depends_on
+        )
+        assert grants["pulumi-gcp", "roles/aiplatform.user"] not in opts.depends_on
+
+    @pulumi.runtime.test
     def test_created_key_unprotected_until_asked(self):
         assert self.build_component().recaptcha_keys["learn-rc"]._protect is not True
         protected = self.build_component(protect=True)
