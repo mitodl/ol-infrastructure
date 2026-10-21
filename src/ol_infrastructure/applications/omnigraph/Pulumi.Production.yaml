@@ -86,7 +86,9 @@ config:
   # time out on code-bridge and council and leave the server down for the
   # whole window every night. Clean up in a planned long run instead
   # (docs/omnigraph-store-maintenance-runbook.md, "Clearing a cleanup
-  # backlog"). Revisit when ModernRelay/omnigraph#1095 ships.
+  # backlog"), sized from the _versions count on the day: nothing schedules
+  # it, and it grows by about 5 minutes a day. Revisit when
+  # ModernRelay/omnigraph#1095 ships.
   omnigraph:cleanup_iso_weekdays: []
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHjksIVfl1VtAHpBda/1YYjj6tSeS2o4TXgvEEyBIXLjjwF51lHyFZBMipn03XTrTTsKAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMIK7o7DGmOomYnJtDAgEQgDuWNWhBp4MmY5g1IS5INjiOfMa0yZcKOzoHa0L7AjLfrw9rMSs/jELIM0qfIJguIuQsCYjLMpJoX7CgSQ==

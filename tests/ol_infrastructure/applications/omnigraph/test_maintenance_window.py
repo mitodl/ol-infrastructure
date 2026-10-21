@@ -207,7 +207,9 @@ def test_no_cleanup_days_render_as_an_empty_list():
             "containers"
         ]
         env = {e["name"]: e.get("value") for e in container["env"]}
-        assert env["OMNIGRAPH_CLEANUP_ISO_WEEKDAY"] == ""
+        # The real provider drops the empty value and keeps the entry, as
+        # `pulumi preview` shows. The image reads both as no cleanup days.
+        assert env["OMNIGRAPH_CLEANUP_ISO_WEEKDAY"] in ("", None)
 
     return window.cron_job.urn.apply(check)
 

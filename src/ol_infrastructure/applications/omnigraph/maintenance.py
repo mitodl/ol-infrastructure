@@ -133,12 +133,12 @@ DEFAULT_CLEANUP_SCHEDULE = "20 4 * * 0"
 # nothing useful here. (The two combine as a union: a commit either one retains
 # survives. omnigraph v0.13.0 docs/user/operations/maintenance.md#cleanup.)
 #
-# The age is sized by how long the stop window takes, not by storage. From
+# The age was chosen to fit the stop window in CI and QA, not by storage. From
 # format 14 cleanup runs with the server stopped, and before it deletes
 # anything it opens every table version present, retained or not
 # (omnigraph v0.13.0 collector.rs discover_published and plan_sweep, run in
 # full by optimize.rs cleanup_detached_only before any sweep). A run stopped
-# during that plan deletes nothing. On S3 a run costs 0.17 to 0.22s per object
+# during that plan deletes nothing. On S3 a run costs 0.16 to 0.22s per object
 # under the graph's _versions/ directories, 0.19s on average (Production's
 # 2026-10-20 backlog run: 4,026s over 21,021 versions on six graphs; QA's
 # nightly on 2026-10-21: 0.16 to 0.19s on its larger graphs).
