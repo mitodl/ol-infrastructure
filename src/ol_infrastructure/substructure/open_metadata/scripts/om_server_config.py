@@ -36,7 +36,8 @@ The business glossary is declared in ``GLOSSARY_CONFIG`` and ``GLOSSARY_TERMS``.
 The glossary and each term are created when missing and never patched, so a
 steward's edits in the OpenMetadata UI are kept: once a term exists, change its
 definition there, not here.  A term a steward soft-deletes or moves under
-another parent is left alone too.  Renaming a term or hard-deleting it frees
+another parent is left alone too, and so is a missing term declared under it
+or under a soft-deleted glossary.  Renaming a term or hard-deleting it frees
 its name, so the next run creates it again: rename or remove it in
 ``GLOSSARY_TERMS`` as well.  Which columns carry each term is set from
 ol-data-platform's dbt column meta (``meta.openmetadata.glossary``).
@@ -1104,7 +1105,7 @@ def _exists_in_om(label: str, collection: str, fqn: str) -> bool:
 
 
 def _reconcile_glossary_term(term: dict[str, Any]) -> None:
-    """Create the glossary term if it is missing.
+    """Create the glossary term if it is missing and its parent and glossary exist.
 
     :param term: An entry of ``GLOSSARY_TERMS``.
     :raises requests.HTTPError: On any non-2xx response from the OM API other
@@ -1117,6 +1118,21 @@ def _reconcile_glossary_term(term: dict[str, Any]) -> None:
     label = f"glossary term {fqn}"
     if _exists_in_om(label, "glossaryTerms", fqn):
         return
+
+    # The server answers 404 for a parent or glossary that is missing or
+    # soft-deleted before its duplicate-name check, e.g. for the children of a
+    # term a steward moved, which are still declared under the old parent.
+    ancestors = [("glossaries", GLOSSARY_NAME)]
+    if parent:
+        ancestors.append(("glossaryTerms", parent_fqn))
+    for collection, ancestor_fqn in ancestors:
+        ancestor = _get_by_name(collection, ancestor_fqn, include="all")
+        if ancestor is None or ancestor.get("deleted"):
+            print(  # noqa: T201
+                f"[skip] {label}: {ancestor_fqn} is missing or deleted in "
+                "OpenMetadata, left alone"
+            )
+            return
 
     body = {k: v for k, v in term.items() if k != "parent"}
     if parent:
