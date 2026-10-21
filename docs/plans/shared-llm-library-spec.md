@@ -371,9 +371,10 @@ gateway logs, and Prometheus. The library applies them; call sites supply values
 | `thread_id` | conversations | chat thread id | `thread_id` on the root trace; `gen_ai.conversation.id` via `run(conversation_id=…)` on spans | none | never |
 | `run_id` | batch | Dagster run id, Celery task id | `opik.metadata.run_id` | none | never |
 | `degraded` | when true | `true` plus a reason | `opik.metadata.degraded`, `opik.metadata.degraded_reason` | none | `degraded` counter (library) |
+| `model_status` | a model in the use case's chain is deprecated or not in the catalog | `deprecated`, `uncataloged` | tag `model_status:…` on the root trace (`llm-usage-policies-spec.md` §2.2) | none | none |
 
 Conventions: snake_case keys. Tags carry only low-cardinality `key:value` pairs (app,
-use_case, environment) for filtering; everything goes in `opik.metadata.*`. Prometheus labels
+use_case, environment, model_status) for filtering; everything goes in `opik.metadata.*`. Prometheus labels
 never carry user, thread, or run identifiers.
 
 Where the library writes them. The root of every run is an `@opik.track` trace, so the
@@ -876,7 +877,8 @@ primary made one attempt and raised `LLMRejected` without trying the fallback.
   after the first chunk reaches the caller as `LLMUnavailable`.
 - A model whose gateway route already falls back takes no `fallback_models`. The model catalog
   (`tk-policy-model-catalog-and-lifecycle-ba2fc7`) records which routes do, and
-  `build_model` raises `ValueError` for a use case that sets both.
+  `build_model` raises `ValueError` for a use case that sets both. A primary the catalog does
+  not list is not checked.
 
 ### 6.5 Structured output
 
@@ -975,7 +977,8 @@ requests per run unless the use case sets it. `cost_limit` is a per-run dollar c
 unset in phase one: the budgets decision (2026-10-01, `llm-usage-policies-spec.md` §1) is
 alerts only until the spend baseline exists. PydanticAI prices a run from `genai-prices` and only warns
 (`CostNotFoundWarning`) when it has no price for the model, so a `cost_limit` on an unpriced
-model enforces nothing. The library's test suite checks that every catalog model has a price.
+model enforces nothing. The library's test suite checks that every catalog model has a price;
+a model the catalog does not list (`llm-usage-policies-spec.md` §2.2) may have none.
 
 ### 6.9 Type stubs
 
