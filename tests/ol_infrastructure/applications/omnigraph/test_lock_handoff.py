@@ -127,7 +127,9 @@ def test_the_server_gets_the_lease_its_peers_and_nothing_else():
             }
         ]
 
-    return handoff.role_binding.urn.apply(check)
+    # Nothing orders the Lease against the binding, so the binding's URN alone
+    # can resolve before the mocks have seen the Lease.
+    return pulumi.Output.all(handoff.lease.urn, handoff.role_binding.urn).apply(check)
 
 
 @pulumi.runtime.test
