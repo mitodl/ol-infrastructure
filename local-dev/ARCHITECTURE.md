@@ -197,7 +197,7 @@ Grafana's **Logs Drilldown** app (`Drilldown → Logs`) is the intended entry po
 
 Alloy also exposes an OTLP receiver on 4317/4318 forwarding to Loki's native OTLP endpoint (`http://alloy.operations.svc.cluster.local:4318`). **Nothing emits to it yet** — it exists so an app can opt into production-style OTLP export by setting the `OTEL_*` env vars used in the deployed environments, and so Keycloak's `OTEL_SDK_DISABLED=true` workaround in `identity_core.py` (added precisely because no receiver existed) can be lifted.
 
-The whole stack is roughly 1.9GB and can be switched off with `observability_enabled: "false"`; nothing else depends on it.
+The whole stack is roughly 2.9GB and can be switched off with `observability_enabled: "false"`; nothing else depends on it.
 
 ## Design decisions
 

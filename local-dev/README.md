@@ -440,7 +440,7 @@ The infrastructure is split across two Pulumi stacks:
 | `keycloak_hostname` | `sso.ol.mit.test` | Keycloak ingress hostname |
 | `tls_cert_path` | `local-dev/certs/local-dev.pem` | mkcert cert (relative to repo root) |
 | `keycloak_image` | published `mitodl/keycloak` digest | Keycloak server image. Leave unset here and use `tilt_config.json` instead — see [Testing a local ol-keycloakify build](#testing-a-local-ol-keycloakify-build). |
-| `observability_enabled` | `true` | Deploy Grafana + Loki + Alloy (~1.9GB). Set to `false` on a constrained Docker VM. |
+| `observability_enabled` | `true` | Deploy Grafana + Loki + Alloy (~2.9GB). Set to `false` on a constrained Docker VM. |
 
 **`local-dev/infra/apps_infra/Pulumi.local-dev.apps-infra.Dev.yaml`** — Keycloak realm and OIDC clients:
 

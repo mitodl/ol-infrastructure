@@ -82,7 +82,7 @@ keycloak_url = config.get("keycloak_url") or f"https://{keycloak_hostname}"
 apisix_admin_key = config.require_secret("apisix_admin_key")
 apisix_viewer_key = config.require_secret("apisix_viewer_key")
 
-# Observability (Grafana + Loki + Alloy). Roughly 1.9GB of workloads, so it is
+# Observability (Grafana + Loki + Alloy). Roughly 2.9GB of workloads, so it is
 # opt-out for developers on a constrained Docker VM.
 observability_enabled = config.get_bool("observability_enabled") is not False
 
