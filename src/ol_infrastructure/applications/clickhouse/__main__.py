@@ -828,6 +828,10 @@ def _create_clickhouse_installation(  # noqa: PLR0913
             ],
         }
 
+    task_id_spec: dict[str, Any] = (
+        {"taskID": reconcile_task_id} if reconcile_task_id else {}
+    )
+
     return Output.all(
         storage_config=storage_config_xml,
         irsa_role_arn=irsa_role_arn,
@@ -843,7 +847,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                 labels=labels,
             ),
             spec={
-                **({"taskID": reconcile_task_id} if reconcile_task_id else {}),
+                **task_id_spec,
                 # wait: after restarting a replica, wait for it to rejoin the
                 # cluster before moving to the next. The operator default
                 # (0.26.0 reconcile.host.wait) waits for exclusion and
