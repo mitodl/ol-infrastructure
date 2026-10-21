@@ -75,7 +75,9 @@ config:
   # outcome is INDETERMINATE — the exact failure the gate was built to stop, and
   # the one this project spent three days eliminating. On QA, provoking it is
   # the experiment and the probe counts it (its INDETERMINATE bucket). On
-  # Production it would be a regression.
+  # Production it would be a regression, which is why Production raises this
+  # only to 24 (2026-10-21), sized so a full queue finishes inside the budget
+  # at its slowest observed write cost; see the omnigraph Production stack.
   witan:remote_write_max_inflight: "50"
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgFurjegA1WE1b8N4qiEM2KVAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMPKzZtLLEs+e1lDyxAgEQgDvcpTPZFDqJ0PRIVpj9brgaTIzNqWSoJAIjfZmtHhx574TzRhGmQ8O2iFsh1Em3Gev5En32LbkcHW4z9w==

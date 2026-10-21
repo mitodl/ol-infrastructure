@@ -77,9 +77,9 @@ config:
   # unblocked for future sizing work without another two deploy cycles. This is
   # deliberate, not an un-reverted experiment.
   #
-  # ★ NEVER COPY THIS TO CI OR PRODUCTION. Neither sets this key, so both stay
-  # on data_tier.py's DEFAULT_PER_ACTOR_INFLIGHT_MAX of 4, and the collapse
-  # above is what raising it there would buy.
+  # SUPERSEDED 2026-10-21: Production now raises this too, to 24, sized from
+  # its own per-write cost (see its stack config). CI does not set this key,
+  # so it stays on data_tier.py's DEFAULT_PER_ACTOR_INFLIGHT_MAX of 4.
   #
   # DO NOT chase more throughput by raising caps further — that lever is spent.
   # The next honest one is reducing per-write cost: a single-row insert costs a
