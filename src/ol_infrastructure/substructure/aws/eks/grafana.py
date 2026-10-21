@@ -186,6 +186,22 @@ stage.match {
 """
 
 
+def _edxapp_waffle_no_request_drop_alloy_config() -> str:
+    """
+    Alloy River stage that drops edx_toggles' "Flag '...' accessed without a
+    request" warning, which edxapp celery workers emit on every waffle flag
+    check. On 2026-10-21 it was ~74 GB/day, roughly 40% of all logs Grafana
+    Cloud received, and carries no signal.
+    """
+    return r"""
+stage.match {
+  selector = "{container=~\"lms-edxapp|cms-edxapp\"} |= \"accessed without a request, which is likely in the context of a celery task\""
+  action = "drop"
+  drop_counter_reason = "edx_waffle_flag_no_request"
+}
+"""
+
+
 def setup_grafana(
     cluster_name: str,
     stack_info: StackInfo,
@@ -567,7 +583,8 @@ def setup_grafana(
                     # restart.
                     "onlyGatherNewLogLines": False,
                     "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config()
-                    + _keycloak_olapps_idp_login_redact_alloy_config(),
+                    + _keycloak_olapps_idp_login_redact_alloy_config()
+                    + _edxapp_waffle_no_request_drop_alloy_config(),
                 },
                 "applicationObservability": {
                     "enabled": True,
