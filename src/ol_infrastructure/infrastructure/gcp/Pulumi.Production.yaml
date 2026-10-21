@@ -26,6 +26,7 @@ config:
       # stay that way.
     - iam.googleapis.com
     - apikeys.googleapis.com
+    - recaptchaenterprise.googleapis.com
       # Every Service resource above lists the project's enabled services
       # through this API, billed to mitol01.
     - serviceusage.googleapis.com
@@ -162,6 +163,56 @@ config:
         api_targets:
         - service: youtube.googleapis.com
       protect: true
+      # Replacements for the legacy reCAPTCHA keys in
+      # recaptcha-migrated-075600d5919, ol-data-platform and mit-open, one per
+      # legacy key and covering the same hosts, so each old key can be deleted
+      # once its replacement is live. Non-production only; production follows
+      # once the runbook in README.md has been proven on these. Every consumer
+      # renders the v2 checkbox through www.google.com/recaptcha/api.js (or
+      # www.recaptcha.net for Keycloak) and verifies through classic
+      # siteverify, which needs the key's legacy secret (README.md).
+    recaptcha_keys:
+      # mitxonline QA and CI: SOPS mitxonline/secrets.{qa,ci}.yaml.
+    - key_name: mitxonline-rc
+      display_name: MITx Online RC and CI
+      integration_type: CHECKBOX
+      allowed_domains:
+      - rc.mitxonline.mit.edu
+      - ci.mitxonline.mit.edu
+      # xpro QA and CI: SOPS xpro/secrets.{qa,ci}.yaml. CI's canonical host is
+      # xpro-ci.odl.mit.edu (MITXPRO_SECURE_SSL_HOST); QA's odl.mit.edu host
+      # redirects to rc.xpro.mit.edu.
+    - key_name: xpro-rc
+      display_name: MITxPro RC and CI
+      integration_type: CHECKBOX
+      allowed_domains:
+      - rc.xpro.mit.edu
+      - ci.xpro.mit.edu
+      - xpro-ci.odl.mit.edu
+      # Open Discussions QA and CI share one Vault path,
+      # secret-operations/rc-apps/mit-open/recaptcha-keys, written by hand.
+    - key_name: open-discussions-rc
+      display_name: MIT Open Discussions RC and CI
+      integration_type: CHECKBOX
+      allowed_domains:
+      - discussions-rc.odl.mit.edu
+      - discussions-ci.odl.mit.edu
+      # mit-learn QA: SOPS mitlearn/secrets.qa.yaml, read by mit_learn and
+      # mit_learn_nextjs. CI holds no key today; its domain is listed so CI
+      # can take this key rather than a third one.
+    - key_name: learn-rc
+      display_name: Learn RC and CI
+      integration_type: CHECKBOX
+      allowed_domains:
+      - rc.learn.mit.edu
+      - ci.learn.mit.edu
+      # Keycloak olapps registration form, QA and CI.
+    - key_name: sso-rc
+      display_name: SSO RC and CI
+      integration_type: CHECKBOX
+      allowed_domains:
+      - sso-qa.ol.mit.edu
+      - sso-ci.ol.mit.edu
     # OCW's YouTube Analytics feed into the HighSystems course-records database
     # built by Data Collaborative (mitodl/hq#13305). Its own project rather than
     # mitol01 because the OAuth consent screen is one per project: a vendor
