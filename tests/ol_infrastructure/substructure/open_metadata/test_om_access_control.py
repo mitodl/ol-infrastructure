@@ -8,7 +8,8 @@ is a user with ``isBot`` that always holds DefaultBotRole.
 
 What matters is that a second run changes nothing, that rules or policies
 changed by hand are put back, and that a bot holding more than its declared
-roles fails the job while one that is missing or short of a role does not.
+roles, or that is an admin, fails the job while one that is missing or short of
+a role does not.
 """
 
 import copy
@@ -81,11 +82,19 @@ class FakeOpenMetadata:
         self.entities["roles"][name] = role
         return role
 
-    def add_user(self, name: str, roles: list[str], *, is_bot: bool = True) -> None:
+    def add_user(
+        self,
+        name: str,
+        roles: list[str],
+        *,
+        is_bot: bool = True,
+        is_admin: bool = False,
+    ) -> None:
         self.entities["users"][name] = {
             "id": str(uuid.uuid4()),
             "name": name,
             "isBot": is_bot,
+            "isAdmin": is_admin,
             "roles": [{"type": "role", "name": role} for role in roles],
         }
 
@@ -248,6 +257,14 @@ def test_bot_with_an_extra_role_fails(
         "dagster-bot", ["DefaultBotRole", "DagsterBotRole", "IngestionBotRole"]
     )
     with pytest.raises(ValueError, match="IngestionBotRole"):
+        config._check_bot("dagster-bot", {"DagsterBotRole"})
+
+
+def test_an_admin_bot_with_its_role_fails(
+    config: ModuleType, server: FakeOpenMetadata
+) -> None:
+    server.add_user("dagster-bot", ["DefaultBotRole", "DagsterBotRole"], is_admin=True)
+    with pytest.raises(ValueError, match="is an admin"):
         config._check_bot("dagster-bot", {"DagsterBotRole"})
 
 

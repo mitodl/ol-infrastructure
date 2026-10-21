@@ -37,7 +37,8 @@ and code owns them: rules or policies changed in the UI are put back.  Bots are
 declared in ``BOT_CONFIG`` but only checked, not created.  Creating a bot user
 or assigning it a role needs an admin, and this job runs as the ingestion bot,
 which is not one.  A bot that is missing, or lacks its role, is reported for an
-admin to set up; a bot holding any role it is not declared with fails the job.
+admin to set up.  A bot that is an admin, or holds any role it is not declared
+with, fails the job.
 
 The business glossary is declared in ``GLOSSARY_CONFIG`` and ``GLOSSARY_TERMS``.
 The glossary and each term are created when missing and never patched, so a
@@ -1081,7 +1082,8 @@ def _check_bot(name: str, roles: set[str]) -> None:
     :param name: Bot name, which is also the name of the bot's user.
     :param roles: The roles the bot should hold besides DefaultBotRole.
     :raises requests.HTTPError: On any unexpected non-2xx response from the OM API.
-    :raises ValueError: If the user is not a bot, or holds a role not in *roles*.
+    :raises ValueError: If the user is not a bot, is an admin, or holds a role not
+        in *roles*.
     """
     user = _get_by_name_with_fields("users", name, "roles")
     if user is None:
@@ -1093,6 +1095,12 @@ def _check_bot(name: str, roles: set[str]) -> None:
 
     if user.get("isBot") is not True:
         msg = "is a user, not a bot"
+        raise ValueError(msg)
+
+    # OM's authorizer returns before evaluating any policy for an admin, so the
+    # role check below would pass a token that can do anything.
+    if user.get("isAdmin") is True:
+        msg = "is an admin, so its roles do not limit it; an admin unsets isAdmin"
         raise ValueError(msg)
 
     held = {role["name"] for role in user["roles"]}
