@@ -8,7 +8,7 @@ answers one decision task. Decisions were made by the project owner on 2026-10-0
 | §1 Budgets and rate limits | `tk-policy-budgets-and-rate-limits-for-llm-usage-3284fe` | Decided: alerts only in phase one |
 | §2 Model catalog and lifecycle | `tk-policy-model-catalog-and-lifecycle-ba2fc7` | Decided: one catalog in `ol-llm`, floating aliases allowed |
 | §3 Data handling and retention | `tk-policy-data-handling-and-retention-for-prompts-c-76830f` | On hold; no proposal in this document |
-| §4 Embeddings and MCP scope | `tk-policy-scope-of-embeddings-and-mcp-tool-access-i-3d8034` | Decided as proposed |
+| §4 Embeddings and MCP scope | `tk-policy-scope-of-embeddings-and-mcp-tool-access-i-3d8034` | Decided as proposed; §4.1 amended 2026-10-21 |
 | §5 Adoption order | `tk-decide-the-first-adopter-and-whether-existing-in-54a13c` | Decided as proposed |
 | §6 Ownership and success criteria | `tk-decide-ownership-and-success-criteria-for-the-pl-8445bd` | Decided, no target date |
 
@@ -188,6 +188,17 @@ Decided 2026-10-01:
 - The library's embedding entry point comes after the chat core. Until then mit-learn and
   ol-data-platform keep their current embedding code.
 
+Decided 2026-10-21: a call site built on LangChain or LangGraph keeps its own embedding client,
+as learn-ai's LangGraph bots keep their chat client (`shared-llm-library-spec.md` §6.6). The
+entry point, `embed`, runs on PydanticAI, so adopting it means a second framework in those
+applications, and its OpenAI path needs `openai>=3.19` while litellm 1.106.2 and
+llama-index-llms-openai 0.8.3 (the latest releases on 2026-10-21) require `openai<3`.
+mit-learn's encoder therefore keeps calling `litellm.embedding` and wraps each call in the
+library's `traced_embedding`, which opens the root trace with the §4 fields and records a span
+with the model and token usage. The timeout and retry numbers come from
+`resolve_policy(use_case)`; the retry wrapper and typed errors apply only to models the library
+builds. Call sites on a plain SDK (ol-data-platform) move onto `embed`.
+
 ### 4.2 MCP and tool traffic
 
 No production application has a model call MCP tools. agent-kit serves MCP tools to coding
@@ -239,8 +250,9 @@ Criteria for done:
 1. No model call outside `ol-llm` in the five integrations, checked by an import rule in each
    repository's CI. Two scoped exceptions follow from decisions already made: learn-ai's
    LangGraph bots, which keep their client and take their policy values, prompts, and Opik
-   wiring from the library until LangGraph is replaced, and embedding calls until the
-   library's embedding entry point exists (§4.1).
+   wiring from the library until LangGraph is replaced, and embedding calls from LangChain or
+   LangGraph call sites, which keep their client and wrap each call in `traced_embedding`
+   (§4.1).
 2. Every model call in the last 7 days has a trace in the shared Opik with `app`, `use_case`,
    `environment`, and `model` set.
 3. Spend is reported per application and use case, and the monthly total is within 10 percent
