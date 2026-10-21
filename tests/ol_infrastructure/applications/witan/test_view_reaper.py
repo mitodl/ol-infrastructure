@@ -38,7 +38,7 @@ def _of_type(mocks: _Mocks, typ: str) -> list[dict[str, Any]]:
 
 
 @pulumi.runtime.test
-def test_a_failed_run_outlives_the_next_run_and_then_goes():
+def test_a_failed_run_outlives_the_next_run():
     """The next daily run has finished, one way or the other, before the TTL
     removes the failure, so consecutive failures never leave a gap that
     resolves the alert and re-fires it.
@@ -73,8 +73,15 @@ def test_a_failed_run_outlives_the_next_run_and_then_goes():
     def check(_: object) -> None:
         (cron_job,) = _of_type(mocks, "kubernetes:batch/v1:CronJob")
         assert cron_job["metadata"]["name"] == CRONJOB_NAME
-        job_spec = cron_job["spec"]["jobTemplate"]["spec"]
-        ttl = job_spec["ttlSecondsAfterFinished"]
-        assert ttl > ONE_DAY_SECONDS + job_spec["activeDeadlineSeconds"]
+        spec = cron_job["spec"]
+        job_spec = spec["jobTemplate"]["spec"]
+        # The latest the next run can finish: it may start up to the starting
+        # deadline late, then run up to its active deadline.
+        next_run_done = (
+            ONE_DAY_SECONDS
+            + spec["startingDeadlineSeconds"]
+            + job_spec["activeDeadlineSeconds"]
+        )
+        assert job_spec["ttlSecondsAfterFinished"] > next_run_done
 
     return reaper.urn.apply(check)
