@@ -41,14 +41,18 @@ STARROCKS_SHARED_REALM_ROLES = frozenset(
 )
 # The OpenMetadata role each realm role grants. Each value is a client role on
 # ol-open_metadata-client, sent in the `roles` claim that OpenMetadata reads at
-# login (authorizer useRolesFromProvider): "Admin" sets the user's isAdmin flag,
-# and every other name must be an OpenMetadata Role, which replaces the roles
-# the user had. The custom roles are defined in substructure/open_metadata's
-# om_server_config.py. ol-instructor is left out, so instructors get no
-# OpenMetadata role of their own. That is not no access: they can still log in,
-# and they inherit DataConsumer from the Organization team like every user.
+# login (authorizer useRolesFromProvider). Each name must be an OpenMetadata
+# Role, and the claim replaces the roles the user had. The custom roles are
+# defined in substructure/open_metadata's om_server_config.py. No realm role
+# maps to "Admin": it would set isAdmin, and OpenMetadata never clears isAdmin
+# when it leaves the claim, so Keycloak could grant admin but not take it back.
+# Admins come from initialAdmins in applications/open_metadata, and
+# ol-platform-admin gets DataEngineer (stewardship comes from the data-platform
+# team). ol-instructor is left out. That is not no access: instructors can
+# still log in, and like every user they hold DataConsumer through the realm's
+# default roles and inherit it from the Organization team.
 OPEN_METADATA_ROLE_BY_REALM_ROLE = {
-    "ol-platform-admin": "Admin",
+    "ol-platform-admin": "DataEngineer",
     "ol-data-engineer": "DataEngineer",
     "ol-researcher": "DataContributor",
     "ol-data-analyst": "DataConsumer",
@@ -523,8 +527,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
     # Every user holds DataConsumer through the realm's default roles, so the
     # claim is never omitted and losing a realm role takes its OpenMetadata
     # role away at the next login. It changes no one's access, because every
-    # user already inherits DataConsumer from the Organization team. It does
-    # not demote admins: OpenMetadata only ever sets isAdmin from the claim.
+    # user already inherits DataConsumer from the Organization team.
     # This resource owns the realm's whole default-role list, so it repeats
     # Keycloak's stock defaults.
     keycloak.DefaultRoles(

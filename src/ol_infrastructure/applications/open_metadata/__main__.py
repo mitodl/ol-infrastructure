@@ -116,19 +116,20 @@ open_metadata_namespace = "open-metadata"
 open_metadata_service_account_name = "openmetadata"
 # Users' roles come from the `roles` claim that the ol-open_metadata-client
 # Keycloak client sends (substructure/keycloak ol_data_platform.py
-# OPEN_METADATA_ROLE_BY_REALM_ROLE). `Admin` in the claim only ever promotes:
-# OpenMetadata never clears isAdmin when it is absent.
+# OPEN_METADATA_ROLE_BY_REALM_ROLE). The claim never carries `Admin`, because
+# OpenMetadata only ever promotes from it and never clears isAdmin when it is
+# absent. Admins come only from initialAdmins below.
 #
 # Tokens OpenMetadata issues itself (session JWTs, personal access tokens) carry
 # a snapshot of the user's roles, `Admin` included, and GET
 # /users/loggedInUser resyncs the user from that snapshot. An old personal
-# access token can therefore make a demoted user an admin again, or drop a role
-# they were given after it was issued, until they next log in.
+# access token can therefore give a demoted user back a role or admin, or drop
+# a role they were given after it was issued, until they next log in. Demoting
+# anyone fully means revoking their personal access tokens.
 #
-# To demote an admin: take ol-platform-admin away in Keycloak, remove them from
-# initialAdmins below and from adminPrincipals in the authorizerConfiguration
-# row, unset isAdmin on their OpenMetadata user, and revoke their personal
-# access tokens.
+# To demote an admin: remove them from initialAdmins below and from
+# adminPrincipals in the authorizerConfiguration row, unset isAdmin on their
+# OpenMetadata user, and revoke their personal access tokens.
 open_metadata_use_roles_from_provider = True
 # Used both for the chart's own ingestion pods and for the om-auth-config Job,
 # which borrows it for psycopg2 rather than carrying a second image.
@@ -909,8 +910,8 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         # keeps (om_auth_config.py merges around it), and every
                         # OIDC login makes anyone in adminPrincipals an admin
                         # again (AuthenticationCodeFlowHandler.getOrCreateOidcUser).
-                        # Everyone else is an admin through ol-platform-admin, which
-                        # puts `Admin` in the roles claim. See the demotion steps at
+                        # These are the only admins: no Keycloak role maps to
+                        # `Admin`. See the demotion steps at
                         # open_metadata_use_roles_from_provider.
                         "initialAdmins": [
                             "tmacey",

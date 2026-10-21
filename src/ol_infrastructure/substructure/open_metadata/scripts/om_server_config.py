@@ -338,8 +338,9 @@ def _reconcile_domain(name: str, desired: dict[str, str]) -> None:
 # A user's own roles come from the `roles` claim that Keycloak sends at login
 # (authorizer useRolesFromProvider in applications/open_metadata, mapping in
 # substructure/keycloak ol_data_platform.py OPEN_METADATA_ROLE_BY_REALM_ROLE):
-# ol-platform-admin -> Admin, ol-data-engineer -> DataEngineer, ol-researcher
-# -> DataContributor, the two analyst roles -> DataConsumer.  The claim
+# ol-platform-admin and ol-data-engineer -> DataEngineer, ol-researcher ->
+# DataContributor, the two analyst roles and every other user -> DataConsumer.
+# No realm role maps to Admin; admins come from initialAdmins.  The claim
 # replaces the roles a user holds, so roles assigned to a person in the UI do
 # not survive their next login.  On top of their own roles every user inherits
 # DataConsumer and OrganizationPolicy from the Organization team, and a team's
@@ -434,7 +435,8 @@ ROLE_CONFIG: dict[str, dict[str, Any]] = {
         "displayName": "Data Engineer",
         "description": (
             "Maintains technical metadata, lineage and data quality tests. "
-            "Granted by the ol-data-engineer Keycloak role."
+            "Granted by the ol-data-engineer and ol-platform-admin Keycloak "
+            "roles."
         ),
         "policies": ["DataEngineerPolicy"],
     },
