@@ -131,6 +131,10 @@ EBS_GP3_IOPS_3000_VAC = "ebs-gp3-iops-3000"
 EBS_GP3_IOPS_3000_STORAGE_CLASS = "ebs-gp3-iops-3000-sc"
 # ClickHouse's conventional Prometheus port, used for both server and Keeper.
 CLICKHOUSE_METRICS_PORT = 9363
+# Free space the server keeps on the hot disk before TTL moves stop placing
+# parts there; the Opik chart's tieredStorage.hot.keepFreeSpaceBytes default.
+COLD_TIER_HOT_KEEP_FREE_SPACE_BYTES = 10 * 1024**3
+
 
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(CLICKHOUSE_NAMESPACE, ns)
@@ -575,6 +579,9 @@ def _create_clickhouse_installation(  # noqa: PLR0913
         )
     )
 
+    # hot_storage_size is a Kubernetes quantity in Gi, e.g. "1500Gi"; anything
+    # else fails the int() conversion.
+    cold_cache_max_size_bytes = int(hot_storage_size.removesuffix("Gi")) * 1024**3 // 10
     storage_config_xml = Output.all(cold_bucket_name, backup_bucket_name).apply(
         lambda buckets: dedent(f"""\
             <clickhouse>
@@ -584,13 +591,43 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                        which points at the server's main path
                        (/var/lib/clickhouse/, the NVMe or EBS PVC). A custom
                        local disk at that same path is rejected with
-                       UNKNOWN_ELEMENT_IN_CONFIG ("cannot be equal to <path>"). -->
+                       UNKNOWN_ELEMENT_IN_CONFIG ("cannot be equal to <path>"),
+                       so only its free-space headroom is tuned here: the
+                       Opik chart's tieredStorage.hot.keepFreeSpaceBytes plus
+                       the cold cache's max_size. The cache sits on this same
+                       filesystem, so without the extra reservation hot parts
+                       could take the room the cache later grows into and the
+                       volume could fill. -->
+                  <default>
+                    <keep_free_space_bytes>{COLD_TIER_HOT_KEEP_FREE_SPACE_BYTES + cold_cache_max_size_bytes}</keep_free_space_bytes>
+                  </default>
+                  <!-- Opik's backend readiness check
+                       (ANALYTICS_DB_COLD_STORAGE_DISK_HEALTH_CHECK_ENABLED)
+                       looks for a disk named exactly cold_s3. Its object
+                       metadata lives on the data PVC, so a pod restart does
+                       not orphan the S3 objects under live parts. -->
                   <cold_s3>
                     <type>s3</type>
                     <endpoint>https://{buckets[0]}.s3.amazonaws.com/data/</endpoint>
                     <use_environment_credentials>true</use_environment_credentials>
                     <metadata_path>/var/lib/clickhouse/disks/cold_s3/</metadata_path>
+                    <s3_max_get_rps>1000</s3_max_get_rps>
+                    <s3_max_put_rps>500</s3_max_put_rps>
                   </cold_s3>
+                  <!-- Read-through cache over cold_s3, as the Opik chart's
+                       tieredStorage renders it, so repeat reads of cold parts
+                       stay off S3. The chart puts it on a separate PVC; it
+                       sits on the data PVC here because adding a volume claim
+                       template means recreating every StatefulSet. Sized at a
+                       tenth of the data volume, which the default disk's
+                       keep_free_space_bytes reserves. -->
+                  <cold>
+                    <type>cache</type>
+                    <disk>cold_s3</disk>
+                    <path>/var/lib/clickhouse/caches/cold/</path>
+                    <max_size>{cold_cache_max_size_bytes}</max_size>
+                    <cache_on_write_operations>0</cache_on_write_operations>
+                  </cold>
                   <!-- Destination for BACKUP ... TO Disk('backups', ...).
                        s3_plain rather than s3: an s3 disk keeps its object
                        metadata on the local PVC, so a backup written through
@@ -606,17 +643,25 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                   </backups>
                 </disks>
                 <policies>
-                  <tiered>
+                  <!-- The Opik chart's tieredStorage policy, under the name
+                       its TTL job attaches (ALTER TABLE ... MODIFY SETTING
+                       storage_policy = 'tiered_replicated', then MODIFY TTL
+                       id_at + INTERVAL n WEEK TO DISK 'cold'). The hot volume
+                       must be named "default": a table can only switch to a
+                       policy that keeps every volume, and every disk in it, of
+                       its current policy, and every table starts on the
+                       built-in policy whose one volume is "default". Inert
+                       until a table is moved onto it. -->
+                  <tiered_replicated>
                     <volumes>
-                      <hot>
+                      <default>
                         <disk>default</disk>
-                      </hot>
+                      </default>
                       <cold>
-                        <disk>cold_s3</disk>
-                        <prefer_not_to_merge>true</prefer_not_to_merge>
+                        <disk>cold</disk>
                       </cold>
                     </volumes>
-                  </tiered>
+                  </tiered_replicated>
                 </policies>
               </storage_configuration>
               <!-- Without this, Disk() is refused outright as a BACKUP target
@@ -736,7 +781,10 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                         "config.d/system_log_tables.xml": SYSTEM_LOG_TABLES_XML,
                     },
                     "settings": {
-                        "default_storage_policy": "tiered",
+                        # No default_storage_policy here: it is not a server
+                        # setting and was ignored. New tables land on the
+                        # built-in "default" policy and move to
+                        # tiered_replicated per table.
                         # Server default is 0.9 of the cgroup memory limit;
                         # 0.85 matches the Opik chart and leaves more of the
                         # limit for memory the server does not track before
@@ -899,6 +947,11 @@ opik_password = _require_password(
 ############################################################
 cold_bucket_name = f"ol-data-clickhouse-cold-{stack_info.env_suffix}"
 
+# Never add an expiration rule here, and leave versioning off. Once a table
+# tiers, each S3 object is part of a live data part whose metadata sits on a
+# replica's PVC, so an object expired under it corrupts that part and the table
+# reading it. Retention belongs in table TTLs, which delete the part and its
+# objects together.
 cold_bucket_config = S3BucketConfig(
     bucket_name=cold_bucket_name,
     tags=aws_config.tags,
