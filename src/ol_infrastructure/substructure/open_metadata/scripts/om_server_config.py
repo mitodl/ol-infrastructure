@@ -138,6 +138,12 @@ TEAM_CONFIG: dict[str, dict[str, str]] = {
         "displayName": "Analytics",
         "description": "Analysts who work with the warehouse.",
     },
+    "b2b": {
+        "displayName": "B2B",
+        "description": (
+            "Reviews the B2B business metrics and partner dashboard definitions."
+        ),
+    },
 }
 
 _TEAM_TYPE = "Group"
