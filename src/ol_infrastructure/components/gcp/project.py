@@ -56,6 +56,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from ol_infrastructure.lib.ol_types import GCPBase
 
 RECAPTCHA_SERVICE = "recaptchaenterprise.googleapis.com"
+RECAPTCHA_ADMIN_ROLE = "roles/recaptchaenterprise.admin"
 
 
 class APIKeyRestrictionType(StrEnum):
@@ -316,6 +317,8 @@ class OLGCPProject(ComponentResource):
         self.service_account_emails: dict[str, Output[str]] = {}
         self.api_keys: dict[str, gcp.projects.ApiKey] = {}
         self.recaptcha_keys: dict[str, gcp.recaptcha.EnterpriseKey] = {}
+        # Keyed (account_id, role).
+        self.project_role_grants: dict[tuple[str, str], gcp.projects.IAMMember] = {}
         # Keyed "<pool_id>/<provider_id>"; provider ids are only unique per pool.
         self.workload_identity_providers: dict[
             str, gcp.iam.WorkloadIdentityPoolProvider
@@ -388,14 +391,16 @@ class OLGCPProject(ComponentResource):
             self.service_account_emails[account.account_id] = service_account.email
             for role in account.project_roles:
                 role_slug = role.replace("/", "-").replace(".", "-")
-                gcp.projects.IAMMember(
-                    f"{name}-{account.account_id}-{role_slug}",
-                    project=config.project_id,
-                    role=role,
-                    member=service_account.email.apply(
-                        lambda email: f"serviceAccount:{email}"
-                    ),
-                    opts=child_opts,
+                self.project_role_grants[account.account_id, role] = (
+                    gcp.projects.IAMMember(
+                        f"{name}-{account.account_id}-{role_slug}",
+                        project=config.project_id,
+                        role=role,
+                        member=service_account.email.apply(
+                            lambda email: f"serviceAccount:{email}"
+                        ),
+                        opts=child_opts,
+                    )
                 )
             for index, grant in enumerate(account.iam_members):
                 grant_slug = grant.role.rsplit("/", 1)[-1].replace(".", "-")
@@ -440,6 +445,15 @@ class OLGCPProject(ComponentResource):
             if RECAPTCHA_SERVICE in self.services
             else []
         )
+        # The stack's own identity needs this role to create a key. Waiting on
+        # the grant orders the creates, but IAM can take minutes to propagate,
+        # so the apply that adds the grant can still fail on the keys and pass
+        # on a re-run.
+        recaptcha_admin_grants = [
+            grant
+            for (_, role), grant in self.project_role_grants.items()
+            if role == RECAPTCHA_ADMIN_ROLE
+        ]
         for recaptcha_key in config.recaptcha_keys:
             self.recaptcha_keys[recaptcha_key.key_name] = gcp.recaptcha.EnterpriseKey(
                 f"{name}-recaptcha-key-{recaptcha_key.key_name}",
@@ -456,7 +470,7 @@ class OLGCPProject(ComponentResource):
                     child_opts,
                     import_id=recaptcha_key.import_id,
                     protect=recaptcha_key.protect,
-                    depends_on=recaptcha_services,
+                    depends_on=[*recaptcha_services, *recaptcha_admin_grants],
                 ),
             )
 

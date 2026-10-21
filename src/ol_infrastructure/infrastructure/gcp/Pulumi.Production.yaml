@@ -48,6 +48,11 @@ config:
     - account_id: pulumi-gcp
       display_name: Pulumi GCP provider
       import_id: projects/mitol01/serviceAccounts/pulumi-gcp@mitol01.iam.gserviceaccount.com
+      # Its other project roles were granted by hand to bootstrap the stack.
+      # This one is not bootstrap: roles/resourcemanager.projectIamAdmin lets
+      # the stack grant it to itself, and the recaptcha_keys below wait on it.
+      project_roles:
+      - roles/recaptchaenterprise.admin
       iam_members:
         # Which workload may exchange its identity for this account's token.
         # The provider's attribute condition already restricts this to the
