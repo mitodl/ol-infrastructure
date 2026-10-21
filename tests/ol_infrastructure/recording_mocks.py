@@ -1,4 +1,6 @@
-"""Pulumi mocks that record every registered resource for the Keycloak tests."""
+"""Pulumi mocks that record every registered resource."""
+
+from typing import Any
 
 import pulumi
 
@@ -15,3 +17,7 @@ class RecordingMocks(pulumi.runtime.Mocks):
 
     def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
         return {}
+
+    def of_type(self, typ: str) -> list[dict[str, Any]]:
+        """Return the inputs of every recorded resource of Pulumi type ``typ``."""
+        return [r.inputs for r in self.resources if r.typ == typ]

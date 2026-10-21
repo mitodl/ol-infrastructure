@@ -27,7 +27,7 @@ from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
     onboard_oidc_org,
     onboard_saml_org,
 )
-from tests.ol_infrastructure.substructure.keycloak.recording_mocks import RecordingMocks
+from tests.ol_infrastructure.recording_mocks import RecordingMocks
 
 REALM = "olapps"
 IDP_TYPES = {

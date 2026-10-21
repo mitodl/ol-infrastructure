@@ -21,7 +21,7 @@ except RuntimeError:
 from ol_infrastructure.substructure.keycloak.registration_flow import (
     create_recaptcha_registration_flow,
 )
-from tests.ol_infrastructure.substructure.keycloak.recording_mocks import RecordingMocks
+from tests.ol_infrastructure.recording_mocks import RecordingMocks
 
 PREFIX = "ol-registration"
 
