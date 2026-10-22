@@ -490,6 +490,58 @@ which carries the bucket's IRSA grant. Cedar is not what authorizes it, so the
 witan break-glass pod (agent-kit ADR-0005 path b) is the wrong path despite
 `svc-witan-admin` appearing in the command line.
 
+## Rebuilding a graph whose schema change cannot be migrated
+
+Some schema changes are refused by `schema plan` (`supported: false`, e.g.
+removing a column), and then the plan gate fails every deploy of the image that
+carries them. omnigraph 0.13's `cluster apply` has no replace operation, and its
+plan is keyed by graph id, so a single `cluster.yaml` cannot both delete and
+create a graph. The rebuild is two deploys, both stack config:
+
+1. Add the graph id to both `omnigraph:withheld_graphs` and
+   `omnigraph:graph_removal_allowlist` in `Pulumi.<env>.yaml` (preview refuses
+   a withheld graph that is not allow-listed). The deploy drops
+   the graph and its Cedar bundle from `cluster.yaml` (a bundle naming an
+   undeclared graph fails the plan with `dangling_graph_reference`), and the
+   server's boot apply deletes every object under
+   `<storage_root>/graphs/<id>.omni/`, `_versions/` and `__manifest/` included.
+   The bucket keeps the deleted objects as noncurrent versions for 30 days.
+2. After that deploy has passed, remove both keys. The next boot apply creates
+   the graph empty from the image's schema. Do not merge this before step 1's
+   deploy has run: Concourse can skip an intermediate commit, and a deploy of
+   step 2 alone plans the refused migration again.
+3. Refill it. `council` is refused by `withheld_graphs`, since nothing
+   re-derives it. A rebuilt `code-<repo>` graph refills on the CI indexer's
+   next scheduled run: it skips a file only when the graph holds that file's
+   content hash, and the new graph holds none. `code-bridge` needs a forced
+   reindex of every managed repo, because the per-repo graphs still hold their
+   hashes, so an incremental run skips unchanged files and writes no bridge
+   bindings for them:
+
+```bash
+script="sed 's/witan code index [.]/witan code reindex ./' /usr/local/bin/witan-ci-index > /scratch/witan-ci-reindex.sh && grep -q 'witan code reindex [.]' /scratch/witan-ci-reindex.sh && exec sh /scratch/witan-ci-reindex.sh"
+kubectl -n witan create job witan-ci-reindex-$(date -u +%Y%m%d%H%M) \
+  --from=cronjob/witan-ci-indexer --dry-run=client -o json \
+  | jq --arg script "$script" '.spec.template.spec.containers[0].command = ["sh", "-c", $script]' \
+  | kubectl -n witan create -f -
+```
+
+Start it right after a scheduled `witan-ci-indexer` run (every 4 hours, on the
+hour) has finished. The CronJob's `Forbid` does not see a Job created by hand,
+and two sweeps writing the same default views at once is the multi-writer case
+the indexer avoids. The Job inherits the 3-hour deadline, so one started within
+an hour of the scheduled run ends before the next. It exits non-zero if any
+repo failed and names them on its last line
+(`witan-ci-index: indexed N, failed M`). Delete it when it is done, since a
+failed Job keeps `WorkloadJobFailed*` firing for as long as it exists.
+
+Keep both deploys clear of the 03:20 window (and its end by about 04:00). A
+`pulumi up` during it scales the server back to 1, and the new pod waits on the
+held Lease until the window closes, so the Deployment update can time out.
+Between the two deploys every bridge write fails with `ClusterGraphMissing`
+(`witan.code.index.bridge_failed`, logged at error, not fatal to the index), and
+the reaper's `code-bridge` sweep fails if it runs then (04:50).
+
 ## What this does not cover
 
 - **A storage-format bump.** That cannot be done by restart or by any command
