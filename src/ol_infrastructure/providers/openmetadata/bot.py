@@ -14,6 +14,11 @@ generates a new one, which revokes the old.
 
 A bot that already exists is adopted rather than failing, as the bots created
 by hand under Settings > Bots before this provider were.
+
+``read`` and ``delete`` connect with the credentials saved at the last create or
+update, as every dynamic provider does. After the provisioner's client secret
+changes, the refresh before an update fails with a 401 until one
+``pulumi up --skip-refresh`` saves the new secret.
 """
 
 from typing import Any, Literal
@@ -29,7 +34,7 @@ DEFAULT_BOT_ROLE = "DefaultBotRole"
 JWTTokenExpiry = Literal["OneHour", "1", "7", "30", "60", "90", "Unlimited"]
 
 _CONNECTION_PROPS = ("server_url", "token_url", "client_id", "client_secret")
-_UPDATABLE_PROPS = ("display_name", "description", "email", "roles")
+_UPDATABLE_PROPS = ("display_name", "description", "roles")
 _TOKEN_PROPS = ("token_expiry", "rotation")
 
 
@@ -39,11 +44,13 @@ class OpenMetadataBotSpec(BaseModel):
     :param name: The bot's name, which is also its user's name.
     :param display_name: Shown in the OpenMetadata UI.
     :param description: Shown on the bot's page.
-    :param email: The bot user's email. OpenMetadata requires one and rejects
-        a duplicate, so it must not be a person's.
+    :param email: The bot user's email. OpenMetadata requires one, rejects a
+        duplicate, and keeps the original on every update, so it is set only
+        when the bot is created.
     :param roles: The roles the bot holds besides ``DefaultBotRole``.
     :param token_expiry: How long a generated token lasts, in days.
-    :param rotation: Any value; changing it generates a new token.
+    :param rotation: Any value; changing it generates a new token. Empty
+        rather than None, because Pulumi drops inputs that are None.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -54,7 +61,7 @@ class OpenMetadataBotSpec(BaseModel):
     email: str
     roles: list[str]
     token_expiry: JWTTokenExpiry = "Unlimited"  # noqa: S105
-    rotation: str | None = None
+    rotation: str = ""
 
     @field_validator("roles")
     @classmethod
@@ -191,7 +198,6 @@ class OpenMetadataBotProvider(dynamic.ResourceProvider):
                     **props,
                     "display_name": user.get("displayName"),
                     "description": user.get("description"),
-                    "email": user["email"],
                     "roles": _held_roles(user),
                 },
                 user,

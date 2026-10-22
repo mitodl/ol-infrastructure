@@ -19,7 +19,14 @@ from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+from pulumi import (
+    Config,
+    InvokeOptions,
+    Output,
+    ResourceOptions,
+    StackReference,
+    export,
+)
 from pulumi_aws import get_caller_identity, iam
 
 from bridge.lib.versions import OPEN_METADATA_VERSION
@@ -60,7 +67,7 @@ superset_stack = StackReference(stack_ref(projects.SUPERSET, stack_info.name))
 open_metadata_stack = StackReference(stack_ref(projects.OPEN_METADATA, stack_info.name))
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
-setup_vault_provider()
+vault_provider = setup_vault_provider()
 
 open_metadata_namespace = "open-metadata"
 ingestion_sa_name = "openmetadata-ingestion"
@@ -993,6 +1000,9 @@ server_config_job = kubernetes.batch.v1.Job(
 _provisioner_credentials = vault.kv.get_secret_v2_output(
     mount=OPENMETADATA_PROVISIONER_VAULT_MOUNT,
     name=OPENMETADATA_PROVISIONER_VAULT_NAME,
+    # The stack transformation sets the provider on resources only; an invoke
+    # without one would use the default provider, which has no Vault token.
+    opts=InvokeOptions(provider=vault_provider),
 ).data
 om_api_url = open_metadata_stack.require_output("open_metadata")["api_url"]
 om_connection = OpenMetadataConnection(

@@ -208,6 +208,7 @@ def server(monkeypatch: pytest.MonkeyPatch) -> FakeOpenMetadata:
 
 
 def _props(**overrides: Any) -> dict[str, Any]:
+    """Build inputs as the engine delivers them, without the None-valued ones."""
     spec = OpenMetadataBotSpec(
         name="dagster-bot",
         display_name="Dagster",
@@ -215,14 +216,18 @@ def _props(**overrides: Any) -> dict[str, Any]:
         email="dagster-bot@mit.edu",
         roles=["DagsterBotRole"],
     )
-    return {
+    props = {
         "server_url": SERVER,
         "token_url": TOKEN_URL,
         "client_id": "ol-openmetadata-provisioner",
         "client_secret": "secret",  # pragma: allowlist secret
         **spec.model_dump(),
+        "user_id": None,
+        "is_admin": None,
+        "token": None,
         **overrides,
     }
+    return {key: value for key, value in props.items() if value is not None}
 
 
 def _role_names(user: dict[str, Any]) -> list[str]:
@@ -327,6 +332,8 @@ def test_diff() -> None:
     assert not provider.diff(created.id, outs, _props()).changes
     assert provider.diff(created.id, outs, _props(description="new")).changes
     assert provider.diff(created.id, outs, _props(rotation="2026-10")).changes
+    # OpenMetadata keeps a user's original email, so it is not diffed.
+    assert not provider.diff(created.id, outs, _props(email="x@mit.edu")).changes
     renamed = provider.diff(created.id, outs, _props(name="other-bot"))
     assert renamed.replaces == ["name"]
     assert provider.diff(created.id, {**outs, "is_admin": True}, _props()).changes
