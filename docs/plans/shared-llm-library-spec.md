@@ -830,11 +830,13 @@ by type and status:
 | Raised underneath | Class | Library error | Retry | Fall back |
 | --- | --- | --- | --- | --- |
 | `ModelHTTPError` 429 | rate limited | `LLMRateLimited` (carries `retry_after`) | yes | yes |
-| `ModelHTTPError` 408, 500, 502, 503, 504, 529 | provider unavailable | `LLMUnavailable` | yes | yes |
+| `ModelHTTPError` 408, 424, 500, 502, 503, 504, 529 | provider unavailable | `LLMUnavailable` | yes | yes |
 | `ModelAPIError` that is not `ModelHTTPError`; `TimeoutException`, `NetworkError`, and `RemoteProtocolError` from `httpx` or `httpx2` | provider unavailable | `LLMUnavailable` | yes | yes |
 | `ModelHTTPError`, any other status; any other `httpx` or `httpx2` `TransportError` | rejected | `LLMRejected` (carries `status_code`, `None` for a transport error) | no | no |
 
-The retry rows are the §3.2 statuses and the transport errors that mean no answer came back.
+The retry rows are the §3.2 statuses, 424, and the transport errors that mean no answer came
+back. PydanticAI 2.59 gives Bedrock's in-stream `modelStreamErrorException` status 424, and
+Bedrock says to retry it; before 2.59 it arrived as a `ModelAPIError` with no status.
 Everything else is rejected, which closes the table so nothing is unclassified. A permanent
 failure (a 501 or 505, `UnsupportedProtocol` from a bad base URL, `LocalProtocolError`,
 `ProxyError`) then costs one attempt, not the full retry budget on every model in the
@@ -877,7 +879,8 @@ primary made one attempt and raised `LLMRejected` without trying the fallback.
 - When a fallback model answers, the result is marked degraded with reason `fallback_model`
   (§6.7), and `LLMResult.model` names the model that answered.
 - Streams fall back only while opening (`models/fallback.py:325-337` in 2.52.0). A failure
-  after the first chunk reaches the caller as `LLMUnavailable`.
+  after the first chunk reaches the caller as the class its error maps to: a throttle as
+  `LLMRateLimited`, a stream error or a dropped connection as `LLMUnavailable`.
 - A model whose gateway route already falls back takes no `fallback_models`. The model catalog
   (`tk-policy-model-catalog-and-lifecycle-ba2fc7`) records which routes do, and
   `build_model` raises `ValueError` for a use case that sets both. A primary the catalog does
