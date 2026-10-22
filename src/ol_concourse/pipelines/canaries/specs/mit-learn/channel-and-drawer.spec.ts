@@ -70,7 +70,14 @@ test.describe("MIT Learn channel browse", () => {
 
     const drawer = page.getByRole("dialog")
     await expect(drawer).toBeVisible()
-    await expect(drawer.getByRole("heading", { name: literal(resourceName) })).toBeVisible()
+    // `level: 2` is the drawer's own title. Without it the name also matches
+    // the level-4 card headings in the drawer's "Similar Learning Resources"
+    // and per-topic carousels, which load after the title and routinely carry
+    // another edition of the same course under the same name. Measured on RC:
+    // "Mathematics for Computer Science" matched six headings once they had
+    // loaded, so the unscoped locator failed strict mode whenever the
+    // carousels won the race.
+    await expect(drawer.getByRole("heading", { level: 2, name: literal(resourceName) })).toBeVisible()
 
     // Re-enter the identical URL as a cold navigation. This is not a repeat of
     // what just happened: the click was client-side routing with the app
@@ -88,6 +95,8 @@ test.describe("MIT Learn channel browse", () => {
     // below on purpose: together they say whether a failure was the server
     // fetch or the client render, which is the first question triage asks.
     await expect(page).toHaveTitle(literal(resourceName))
-    await expect(page.getByRole("dialog").getByRole("heading", { name: literal(resourceName) })).toBeVisible()
+    await expect(
+      page.getByRole("dialog").getByRole("heading", { level: 2, name: literal(resourceName) }),
+    ).toBeVisible()
   })
 })
