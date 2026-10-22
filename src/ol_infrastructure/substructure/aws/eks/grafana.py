@@ -42,11 +42,12 @@ def _apisix_cookie_metrics_alloy_config() -> str:
     its own metrics endpoint (:12345/metrics), from where they are scraped and
     forwarded to Grafana Cloud Prometheus. Alloy prefixes each name with
     `loki_process_custom_`, e.g. loki_process_custom_apisix_cookie_header_bytes.
-    Each histogram carries the APISix stream's labels (cluster, namespace,
-    container, ...; pod is already structured metadata here), so there is one
-    series set per cluster. host is extracted but deliberately not promoted to
-    a label, since that would also add it to the Loki stream. Use LogQL
-    (`| logfmt | unwrap cookie_bytes`) for per-host breakdowns.
+    Each alloy-logs DaemonSet pod exposes its own histograms, so there is one
+    series set per node running an APISix pod, labelled with that Alloy pod's
+    instance/pod; aggregate with `sum without (instance, pod)`. host is
+    extracted but deliberately not promoted to a label, since that would also
+    add it to the Loki stream. Use LogQL (`| logfmt | unwrap cookie_bytes`)
+    for per-host breakdowns.
 
     Privacy: only numeric cookie metrics are extracted; cookie values are never
     logged or extracted.
