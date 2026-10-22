@@ -9,11 +9,15 @@ It accepts tokens from 'security-admin-console' (browser admin UI), 'admin-cli'
 when KC_SPI_REALM_RESTAPI_EXTENSION_SCIM_ACCEPT_ADMIN_CLI_LOGIN=true is set on
 the Keycloak instance, or (plugin 4.x+) any service account client holding the
 master-realm 'scim-admin' client role. The Keycloak substructure stack
-provisions such a client and writes its credentials to Vault:
+provisions such a client and writes its credentials to Vault.
+
+Query the backend under the master realm (the --realm default). The plugin looks
+up the token's client in the realm from the URL, and scim-config-manager only
+exists in master, so /realms/olapps/... returns 401. The master listing still
+includes the olapps providers.
 
     python export_scim_config.py \
         --url https://sso.ol.mit.edu \
-        --realm olapps \
         --client-id scim-config-manager \
         --client-secret "$(vault kv get -field=client_secret \
             secret-operations/keycloak/scim-config-manager)"
@@ -24,7 +28,6 @@ means the incoming Host header must match KC_HOSTNAME (sso.ol.mit.edu).
 Usage against the public URL (simplest — no port-forward needed):
     python export_scim_config.py \
         --url https://sso.ol.mit.edu \
-        --realm olapps \
         --username admin \
         --password "$(vault kv get -field=password secret-operations/keycloak/admin)"
 
@@ -35,7 +38,6 @@ If connecting via port-forward to work around TLS SNI issues:
         --url https://localhost:18443 \
         --insecure \
         --host-header sso.ol.mit.edu \
-        --realm olapps \
         --username admin \
         --password "$(vault kv get -field=password secret-operations/keycloak/admin)"
 
@@ -177,7 +179,7 @@ def main() -> None:
         "instead of using the public URL, also pass --host-header so the admin "
         "backend hostname check passes.",
     )
-    parser.add_argument("--realm", default="olapps")
+    parser.add_argument("--realm", default="master")
     parser.add_argument("--username")
     parser.add_argument("--password")
     parser.add_argument("--client-id", default="admin-cli")
