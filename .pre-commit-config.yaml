@@ -20,6 +20,16 @@ repos:
     language: python
     files: ^src/bridge/lib/(versions\.py|version_pins/)
     pass_filenames: false
+    # The mechanical half of the canaries' "update docs/journeys.md in the same
+    # PR" rule: every spec named, the test count right, no missing or orphaned
+    # screenshot. Checks the whole tree rather than the changed files, because
+    # CI runs prek with --all-files.
+  - id: check-canary-journeys-doc
+    name: Check canaries docs/journeys.md against the specs
+    entry: python src/ol_concourse/pipelines/canaries/check_journeys_doc.py
+    language: python
+    files: ^src/ol_concourse/pipelines/canaries/(specs/|docs/|check_journeys_doc\.py)
+    pass_filenames: false
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v6.0.0
   hooks:

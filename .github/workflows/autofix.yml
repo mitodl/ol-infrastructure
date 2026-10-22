@@ -45,7 +45,8 @@ jobs:
         key: prek-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.pre-commit-config.yaml')
           }}
     # packer_fmt checks src/bilder/**/*.pkr.hcl. hadolint-docker needs only the
-    # runner's Docker. sync-version-pins imports nothing but the standard library.
+    # runner's Docker. sync-version-pins and check-canary-journeys-doc import
+    # nothing but the standard library.
     - uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789   # v3.4.0
       with:
         version: "1.16.1"

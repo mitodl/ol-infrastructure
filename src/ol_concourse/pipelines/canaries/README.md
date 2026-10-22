@@ -55,6 +55,8 @@ specs/<property>/      One directory per web property.
   mit-learn/
 docs/journeys.md       Every journey, step by step, with screenshots.
 docs/capture/          Regenerates those screenshots. Not a canary; never scheduled.
+check_journeys_doc.py  The check-canary-journeys-doc hook: fails when journeys.md
+                       and the specs or images disagree.
 ```
 
 To see what the canaries actually do to each property without reading the specs, start

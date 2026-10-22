@@ -257,7 +257,11 @@ When you add or change a journey:
    Frames after login have no masks, because today those pages show no address. A
    future page that starts showing one is caught only by looking. Never commit a frame
    whose visible URL carries a token.
-4. Update the section here.
+4. Update the section here, including the "N tests in M spec files" sentence. The
+   `check-canary-journeys-doc` hook ([`../check_journeys_doc.py`](../check_journeys_doc.py))
+   fails the PR if the section misses a spec file or states the wrong count, if the
+   page shows an image that does not exist, or if an image is committed or captured
+   but never shown. Run it with `prek run check-canary-journeys-doc --all-files`.
 
 A new property gets a new `## <property>` section and its own
 `capture/<property>.capture.ts`, written to `images/<property>/<journey>/`, and is

@@ -108,7 +108,11 @@ downloads none.
    first time a journey lands without it. Mirror the steps in
    `docs/capture/<property>.capture.ts`, regenerate the images, and check every
    signed-in frame by eye before committing — the page's "Keeping this page current"
-   section has the command and the scrubbing rules.
+   section has the command and the scrubbing rules. The `check-canary-journeys-doc`
+   hook fails the PR when the page misses a spec file, states the wrong test count,
+   links an image that does not exist, or leaves a committed or captured image
+   unlinked. It cannot tell whether the steps still describe what the spec asserts.
+   That part is still on you.
 
 ## Adding a new property
 
