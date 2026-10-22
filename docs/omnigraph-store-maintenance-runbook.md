@@ -538,14 +538,17 @@ failed Job keeps `WorkloadJobFailed*` firing for as long as it exists.
 ### The delete outlasts the startup probe
 
 Step 1's delete runs inside the boot apply, before the server listens, so it
-has the startup probe's budget: 20s plus 24 failures 5s apart, 140s. In-cluster
-it deletes about 1,000 objects a minute. CI's `code-bridge` held about 15,500
-on 2026-10-22, so kubelet killed the container with 11,356 left. Every later
+runs under the startup probe. The first probe is at 20s and the 24th failure
+at 135s (20 + 23 × 5), when kubelet sends SIGTERM. SIGTERM does not stop
+the apply, which keeps deleting through the 125s termination grace until
+SIGKILL, so a delete gets about 4 minutes. In-cluster it deletes about 1,000
+objects a minute. On 2026-10-22 CI's polled object count fell from 15,438 at
+16:17:25Z to 11,848 at 16:21:05Z, then stopped at 11,356 left. Every later
 boot then refuses with `an earlier cluster apply was interrupted and its
 deployment is still outstanding`, and the server stays down until the
 deployment is reconciled by hand. Count the objects first
 (`aws s3 ls --recursive <storage_root>/graphs/<id>.omni/ | wc -l`). Anything
-over about 2,000 will be killed, so plan on the recovery below as part of
+over about 3,500 will be killed, so plan on the recovery below as part of
 the window:
 
 ```bash
