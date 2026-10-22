@@ -70,11 +70,6 @@ class LibraryRegistration:
 
 LIBRARIES: dict[str, LibraryRegistration] = {
     # Monorepos: `/doof publish <library> <package>` -> job build-<package>.
-    "ol-django": LibraryRegistration(
-        pipeline="publish-ol-django-pypi",
-        package_job_prefix="build-",
-        github_repo="mitodl/ol-django",
-    ),
     "open-edx-plugins": LibraryRegistration(
         pipeline="publish-open-edx-plugins-pypi",
         package_job_prefix="build-",
@@ -121,7 +116,17 @@ LIBRARIES: dict[str, LibraryRegistration] = {
 #: Only two of Doof's eight are a real gap: edx-sga and edx-api-client. Three
 #: repos are archived, one moved to GitHub Actions, one has been dormant since
 #: 2018, and one was never publishable through Doof in the first place.
+#:
+#: `ol-django` is a ninth entry and not one of Doof's eight: it is here so that
+#: `/doof publish ol-django` explains where it publishes instead of saying
+#: "unknown". It publishes itself through GitHub Actions (since 2026-08-28).
 UNPUBLISHABLE_LIBRARIES: dict[str, str] = {
+    "ol-django": (
+        "not published from Concourse by design — the repo publishes each "
+        "package itself: a version bump merged to main is built and uploaded to "
+        "PyPI by the `publish` job in its `ci.yml` workflow, using PyPI trusted "
+        "publishing. Prepare a release with `scripts/release.py prepare`."
+    ),
     "edx-sga": (
         "no publish pipeline yet — the repo is active (last push 2026-07-29) "
         "and its only workflow is CI, so PyPI releases still go through Doof."

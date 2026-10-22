@@ -27,24 +27,13 @@ from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
     onboard_oidc_org,
     onboard_saml_org,
 )
+from tests.ol_infrastructure.recording_mocks import RecordingMocks
 
 REALM = "olapps"
 IDP_TYPES = {
     "oidc": "keycloak:oidc/identityProvider:IdentityProvider",
     "saml": "keycloak:saml/identityProvider:IdentityProvider",
 }
-
-
-class _RecordingMocks(pulumi.runtime.Mocks):
-    def __init__(self) -> None:
-        self.resources: list[pulumi.runtime.MockResourceArgs] = []
-
-    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-        self.resources.append(args)
-        return [f"{args.name}_id", dict(args.inputs)]
-
-    def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
-        return {}
 
 
 def _onboard_oidc(org: OrgConfig, org_domain: str) -> None:
@@ -114,7 +103,7 @@ ONBOARD = {"oidc": _onboard_oidc, "saml": _onboard_saml}
 def _idp_inputs(
     protocol: str, org_domains: list[str], org_domain: str = "ANY"
 ) -> dict[str, Any]:
-    recording = _RecordingMocks()
+    recording = RecordingMocks()
     pulumi.runtime.set_mocks(recording, preview=False)
 
     @pulumi.runtime.test

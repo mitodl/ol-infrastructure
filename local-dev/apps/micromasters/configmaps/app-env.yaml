@@ -6,12 +6,12 @@ metadata:
   namespace: micromasters
 data:
   DJANGO_SETTINGS_MODULE: "micromasters.settings"
-  MICROMASTERS_BASE_URL: "https://micromasters.mit.dev"
+  MICROMASTERS_BASE_URL: "https://micromasters.mit.test"
   MICROMASTERS_ENVIRONMENT: "local"
   MICROMASTERS_SECURE_SSL_REDIRECT: "False"
   MICROMASTERS_DB_DISABLE_SSL: "True"
   MICROMASTERS_LOG_LEVEL: "INFO"
-  MICROMASTERS_ADMIN_EMAIL: "admin@odl.local"
+  MICROMASTERS_ADMIN_EMAIL: "admin@ol.test"
   MICROMASTERS_SUPPORT_EMAIL: "ol-engineering-support@mit.edu"
   MICROMASTERS_FROM_EMAIL: "MITx MicroMasters <ol-engineering-support@mit.edu>"
   NODE_ENV: "production"
@@ -20,7 +20,7 @@ data:
   DEBUG: "False"
   # settings.py parses both of these as Python list literals.
   ALLOWED_HOSTS: '["*"]'
-  CSRF_TRUSTED_ORIGINS: '["https://micromasters.mit.dev"]'
+  CSRF_TRUSTED_ORIGINS: '["https://micromasters.mit.test"]'
   USE_X_FORWARDED_HOST: "True"
 
   # mkcert root CA — trusts the local wildcard TLS cert for inter-pod HTTPS

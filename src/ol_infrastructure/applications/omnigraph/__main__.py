@@ -192,6 +192,12 @@ GRAPH_REMOVAL_ALLOWLIST: list[str] = omnigraph_config.get_object(
     "graph_removal_allowlist", []
 )
 
+# Graphs left out of cluster.yaml that it would otherwise declare, to rebuild
+# one whose schema change omnigraph cannot migrate in place. Listed together
+# with GRAPH_REMOVAL_ALLOWLIST, the deploy deletes the graph; clearing both
+# re-adds it, empty, from the image's schema. See build_cluster_graphs.
+WITHHELD_GRAPHS: list[str] = omnigraph_config.get_object("withheld_graphs", [])
+
 # The image to migrate FROM — the one currently deployed, whose binary can
 # still read the old root. Set only while a storage-format migration is being
 # run; unset (the steady state) means no migration Job exists at all. See the
@@ -328,16 +334,17 @@ CLEANUP_SCHEDULE = omnigraph_config.get("cleanup_schedule") or DEFAULT_CLEANUP_S
 MAINTENANCE_SCHEDULE = (
     omnigraph_config.get("maintenance_schedule") or DEFAULT_MAINTENANCE_SCHEDULE
 )
-# `is None`, not `or`: a configured empty list has to reach the check below
-# rather than read as "unset" and become the default. A bare `7` (the old
-# cleanup_iso_weekday shape) and a boolean (an int subclass the image would
-# refuse at start) are both rejected here, at preview.
+# `is None`, not `or`: a configured empty list means "optimize only, never
+# clean up" and must not read as "unset" and become the default. The image
+# renders it as an empty OMNIGRAPH_CLEANUP_ISO_WEEKDAY, which it parses as no
+# cleanup days (agent-kit docker/omnigraph_maintenance.py parse_iso_weekdays).
+# A bare `7` (the old cleanup_iso_weekday shape) and a boolean (an int subclass
+# the image would refuse at start) are both rejected here, at preview.
 _configured_cleanup_weekdays = omnigraph_config.get_object("cleanup_iso_weekdays")
 if _configured_cleanup_weekdays is None:
     CLEANUP_ISO_WEEKDAYS = DEFAULT_CLEANUP_ISO_WEEKDAYS
 elif (
     isinstance(_configured_cleanup_weekdays, list)
-    and _configured_cleanup_weekdays
     and all(
         type(day) is int and 1 <= day <= 7  # noqa: PLR2004
         for day in _configured_cleanup_weekdays
@@ -347,8 +354,9 @@ elif (
     CLEANUP_ISO_WEEKDAYS = tuple(_configured_cleanup_weekdays)
 else:
     msg = (
-        "omnigraph:cleanup_iso_weekdays must be a non-empty list of distinct "
-        f"days from 1 (Monday) to 7 (Sunday), got {_configured_cleanup_weekdays!r}"
+        "omnigraph:cleanup_iso_weekdays must be a list of distinct days from "
+        "1 (Monday) to 7 (Sunday), or [] to never clean up, got "
+        f"{_configured_cleanup_weekdays!r}"
     )
     raise ValueError(msg)
 if (
@@ -1097,6 +1105,7 @@ data_tier = create_data_tier(
     per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist=GRAPH_REMOVAL_ALLOWLIST,
+    withheld_graphs=WITHHELD_GRAPHS,
     maintenance_schedule=MAINTENANCE_SCHEDULE,
     cleanup_iso_weekdays=CLEANUP_ISO_WEEKDAYS,
     # Arming a migration suspends the maintenance CronJobs for its duration.

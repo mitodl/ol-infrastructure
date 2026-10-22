@@ -4,27 +4,36 @@ config:
   starrocks:domain: lakehouse.ci.starrocks.ol.mit.edu
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
-  # OIDC and Iceberg data-lake integration are intentionally disabled for CI:
-  # this cluster only needs to exist so ol-analytics-api's CI deploy can reach
-  # a real StarRocks FE over Vault dynamic credentials, not serve real queries.
+  # OIDC stays off: CI has no ol-starrocks Keycloak client or sso/starrocks
+  # secret, and its consumers (ol-analytics-api CI, data CI builds) use Vault
+  # dynamic credentials.
   starrocks:oidc_enabled: "false"
-  starrocks:enable_data_lake_integration: "false"
+  # Registers ol_data_lake_ci read/write and ol_data_lake_qa read-only, so a CI
+  # dbt build writes to the CI lake and defers unchanged models to QA.
+  starrocks:enable_data_lake_integration: "true"
   starrocks:fe_config:
     replicas: 1
     cpu_request: 2000m
-    memory_request: 4Gi
-    memory_limit: 4Gi
-    jvm_heap_mb: 3072
+    # Without any catalog the FE already ran at 3.8Gi of its old 4Gi limit
+    # (2026-10-22); the Glue catalogs add metadata caching on top. Pods on the
+    # FE's core node (m8i-flex.xlarge, 16GiB) requested 8.6Gi including the old
+    # 4Gi, so the extra 4Gi still fits on the node its zonal PVCs pin it to.
+    memory_request: 8Gi
+    memory_limit: 8Gi
+    jvm_heap_mb: 6144
     storage: 20Gi
     log_storage: 20Gi
   starrocks:use_be: "false"
   starrocks:use_cn: "true"
+  # QA's per-pod shape, with fewer replicas: CI builds changed subgraphs, not the
+  # whole warehouse. CN runs on Karpenter nodes, not the core nodegroup.
   starrocks:cn_config:
     min_replicas: 1
-    max_replicas: 1
+    max_replicas: 4
     cpu_request: 1000m
-    memory_request: 2Gi
-    memory_limit: 2Gi
+    cpu_limit: 4000m
+    memory_request: 6Gi
+    memory_limit: 6Gi
   starrocks:ssl_enabled: "false"
   starrocks:ssl_force_secure_transport: "false"
   starrocks:root_password:

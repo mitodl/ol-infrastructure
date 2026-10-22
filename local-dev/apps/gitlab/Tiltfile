@@ -1,0 +1,65 @@
+# GitLab CE for local development.
+#
+# Opt-in via enabled_apps. Everything is a plain manifest -- there is no
+# mitodl image to build here, so this Tiltfile only applies YAML and wires up
+# the one-time token bootstrap.
+
+load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
+
+NAMESPACE = 'gitlab'
+DEPLOY_NAME = 'gitlab'
+
+# Defaults to gitlab.<root domain>, like every other hostname here. Override
+# it with LOCAL_DEV_GITLAB_HOSTNAME when that name is already taken by
+# something else you run -- an externally hosted GitLab on the same domain,
+# say. It has to stay inside the root domain either way, because the mkcert
+# certificate only covers that one zone.
+_rd = current_root_domain()
+GITLAB_HOSTNAME = os.environ.get('LOCAL_DEV_GITLAB_HOSTNAME', 'gitlab.' + _rd)
+
+k8s_yaml_local([
+    'configmaps/omnibus.yaml',
+    'secrets.yaml',
+    'deployment.yaml',
+    'apisix-routes.yaml',
+], substitutions={'__GITLAB_HOSTNAME__': GITLAB_HOSTNAME})
+
+k8s_resource(
+    DEPLOY_NAME,
+    # objects= is explicit on purpose. Left to itself Tilt assigns
+    # non-workload objects to whichever resource it likes, and the first
+    # attempt here applied only the Service and StatefulSet -- so the pod
+    # came up and died on `configmap "gitlab-omnibus-config" not found`.
+    objects=[
+        'gitlab-omnibus-config:configmap',
+        'gitlab-secrets:secret',
+        'gitlab-tls:apisixtls',
+        'gitlab-route:apisixroute',
+    ],
+    labels=['gitlab'],
+    # local-infra-apps runs after local-infra-core, which provisions the
+    # gitlab namespace and its TLS secret, and it installs APISIX, which the
+    # route needs. Applying any earlier fails with "namespaces gitlab not
+    # found".
+    resource_deps=['local-infra-apps'],
+    links=[link('https://' + GITLAB_HOSTNAME, 'GitLab')],
+)
+
+# Seed the personal access token named in secrets.yaml.
+#
+# A Tilt local_resource rather than a Kubernetes Job: the work is a single
+# `gitlab-rails runner` call inside the running container, and a Job would
+# need its own image, ServiceAccount and RBAC to exec into another pod for no
+# benefit. It is idempotent, so re-running it is safe.
+#
+# Without this, nothing can talk to the API until a human logs in and makes a
+# token by hand, which defeats the point of having it configured already.
+local_resource(
+    'gitlab-token',
+    cmd='bash ' + os.path.join(config.main_dir, 'local-dev/apps/gitlab/seed-token.sh'),
+    deps=[os.path.join(config.main_dir, 'local-dev/apps/gitlab/seed-token.sh')],
+    labels=['gitlab'],
+    resource_deps=[DEPLOY_NAME],
+    auto_init=True,
+    trigger_mode=TRIGGER_MODE_AUTO,
+)

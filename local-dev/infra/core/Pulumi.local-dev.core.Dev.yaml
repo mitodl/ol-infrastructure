@@ -13,7 +13,7 @@ config:
   # APISIX secrets for core infrastructure
   ol-local-dev-core:apisix_admin_key: "local-dev-apisix-admin-key"
   ol-local-dev-core:apisix_viewer_key: "local-dev-apisix-viewer-key"
-  # Observability (Grafana + Loki + Alloy, ~1.9GB of workloads).
+  # Observability (Grafana + Loki + Alloy, ~2.9GB of workloads).
   # Set to false to skip it on a constrained Docker VM.
   ol-local-dev-core:observability_enabled: "true"
   # log_retention_period: unset on purpose. Pinning it here would override

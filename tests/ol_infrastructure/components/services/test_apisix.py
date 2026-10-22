@@ -189,6 +189,26 @@ def test_chash_spec_has_hash_on_and_key():
 
 
 @pulumi.runtime.test
+def test_retries_zero_is_rendered():
+    """retries=0 must reach the spec; a falsy check would drop it and leave
+    APISIX retrying on every remaining node.
+    """
+    upstream = OLApisixUpstream(
+        "test-no-retry-upstream",
+        OLApisixUpstreamConfig(
+            service_name="tika",
+            k8s_namespace="tika",
+            retries=0,
+        ),
+    )
+
+    def check(spec):
+        assert spec == {"loadbalancer": {"type": "roundrobin"}, "retries": 0}
+
+    return upstream.apisix_upstream_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
 def test_resource_name_matches_service_name():
     """apisix-ingress-controller matches ApisixUpstream to a Service by exact
     same-name, same-namespace lookup -- metadata.name must equal service_name,

@@ -1,6 +1,6 @@
 ---
-# TLS for learn.mit.dev (frontend domain).
-# The wildcard *.learn.mit.dev SAN covers this.
+# TLS for learn.mit.test (frontend domain).
+# The wildcard *.learn.mit.test SAN covers this.
 # Secret is already copied to mit-learn namespace by Pulumi.
 apiVersion: apisix.apache.org/v2
 kind: ApisixTls
@@ -10,13 +10,13 @@ metadata:
 spec:
   ingressClassName: apache-apisix
   hosts:
-  - "learn.mit.dev"
+  - "learn.mit.test"
   secret:
     name: local-dev-tls
     namespace: mit-learn
 ---
-# ApisixRoute — learn.mit.dev → Next.js frontend
-# No OIDC at this layer: auth happens via the Django API (api.learn.mit.dev).
+# ApisixRoute — learn.mit.test → Next.js frontend
+# No OIDC at this layer: auth happens via the Django API (api.learn.mit.test).
 # The frontend itself calls the API with credentials; CSRF is cookie-based.
 apiVersion: apisix.apache.org/v2
 kind: ApisixRoute
@@ -29,7 +29,7 @@ spec:
   - name: frontend
     match:
       hosts:
-      - "learn.mit.dev"
+      - "learn.mit.test"
       paths:
       - "/*"
     backends:
@@ -38,6 +38,10 @@ spec:
     # next dev HMR runs over a websocket; harmless for the production image.
     websocket: true
     plugins:
+    - name: redirect
+      enable: true
+      config:
+        http_to_https: true
     - name: response-rewrite
       enable: true
       config:

@@ -116,8 +116,7 @@ async def pipeline_is_paused(pipeline: str, team: str | None = None) -> bool:
 
     A build triggered into a paused pipeline is created and then never
     scheduled, so the bot reports a build URL that sits at "pending" forever.
-    `publish-ol-django-pypi` is paused as of 2026-09-04, which makes this the
-    first thing a publish of it would hit.
+    Checking first lets a publish into a paused pipeline say so instead.
     """
     token = await _get_token()
     url = f"{CONCOURSE_URL}/api/v1/teams/{team or CONCOURSE_TEAM}/pipelines/{pipeline}"

@@ -587,7 +587,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     )
     # OVS maps the token's `user_groups` claim to Django flags: /Admin ->
     # superuser, /Staff -> staff (odl_video/pipeline.py). kc-seed-users.sh
-    # puts admin@odl.local in Admin.
+    # puts admin@ol.test in Admin.
     for group_name in ("Admin", "Staff"):
         keycloak.Group(
             f"olapps-ovs-group-{group_name.lower()}",
@@ -770,11 +770,11 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     # had none, which is why login landed on registration.
     #
     # Seed one placeholder organization so identity-first login renders
-    # correctly. It owns a fake, non-routable domain (org.local): all outbound
+    # correctly. It owns a reserved, never-resolving domain (org.test): all outbound
     # mail is captured by Mailpit regardless, but a fake domain keeps real
     # addresses out of the picture. The org is intentionally NOT wired to the
     # fake-touchstone IdP (that IdP is a local stub), so members fall through to
-    # the username/password screen like the seeded @odl.local test users.
+    # the username/password screen like the seeded @ol.test test users.
     # -------------------------------------------------------------------------
     keycloak.organization.Organization(
         "olapps-local-dev-org",
@@ -784,7 +784,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         enabled=True,
         domains=[
             keycloak.organization.OrganizationDomainArgs(
-                name="org.local", verified=True
+                name="org.test", verified=True
             ),
         ],
         opts=kc_opts,

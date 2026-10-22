@@ -2822,11 +2822,6 @@ code_locations: list[dict[str, str | int]] = [
     {"name": "legacy_openedx", "module": "legacy_openedx.definitions", "port": 4005},
     {"name": "openedx", "module": "openedx.definitions", "port": 4006},
     {
-        "name": "b2b_organization",
-        "module": "b2b_organization.definitions",
-        "port": 4007,
-    },
-    {
         "name": "ml",
         "module": "ml.definitions",
         "port": 4008,

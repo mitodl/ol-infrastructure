@@ -7,13 +7,14 @@
 # k8s_yaml_local applies manifests with three local-dev conveniences:
 #
 # 1. Root-domain substitution. The LOCAL_DEV_ROOT_DOMAIN environment variable
-#    (default: mit.dev) replaces every 'mit.dev' occurrence so hostnames,
+#    (default: mit.test) replaces every 'mit.test' occurrence so hostnames,
 #    URLs, and cookie-domain references update consistently:
-#      export LOCAL_DEV_ROOT_DOMAIN=mycompany.dev && tilt up
+#      export LOCAL_DEV_ROOT_DOMAIN=mycompany.test && tilt up
 #
 # 2. Config-change rollouts. Kubernetes does not restart pods when a
-#    ConfigMap/Secret they reference changes, so every Deployment applied in
-#    the same call gets a pod-template annotation fingerprinting the combined
+#    ConfigMap/Secret they reference changes, so every Deployment and
+#    StatefulSet applied in the same call gets a pod-template annotation
+#    fingerprinting the combined
 #    data/stringData of every ConfigMap and Secret passed in — editing any of
 #    them (the tracked app-env.yaml/secrets.yaml, or an optional gitignored
 #    local_overrides ConfigMap passed for per-developer overrides — see
@@ -25,13 +26,13 @@
 #    prebuilt_tags entry and no checkout. Deployment containers running one
 #    of those images get that tag in place of the one in the manifest.
 
-_ROOT_DOMAIN_DEFAULT = "mit.dev"
+_ROOT_DOMAIN_DEFAULT = "mit.test"
 _CONFIG_HASH_ANNOTATION = "ol.mit.edu/config-hash"
 _PREBUILT_IMAGE_TAGS_ENV = "LOCAL_DEV_PREBUILT_IMAGE_TAGS"
 
 
 def current_root_domain():
-    """Return the value k8s_yaml_local substitutes 'mit.dev' for, so a caller
+    """Return the value k8s_yaml_local substitutes 'mit.test' for, so a caller
     that needs the same value for something other than YAML (e.g. folding it
     into a downstream checksum input) doesn't duplicate the env var name or
     default."""
@@ -87,7 +88,7 @@ def _pin_images(pod_spec, image_tags):
         if name in image_tags:
             c["image"] = "%s:%s" % (name, image_tags[name])
 
-def _stamp_deployments(content, fingerprint, image_tags):
+def _stamp_workloads(content, fingerprint, image_tags):
     """Add the config-fingerprint annotation to every Deployment pod
     template in a (possibly multi-doc) manifest text, so changing any
     applied ConfigMap/Secret rolls the pods, and apply image_tags to its
@@ -95,7 +96,7 @@ def _stamp_deployments(content, fingerprint, image_tags):
     docs = [d for d in decode_yaml_stream(content) if d != None]
     stamped = False
     for d in docs:
-        if d.get("kind") == "Deployment":
+        if d.get("kind") in ("Deployment", "StatefulSet"):
             template = d.setdefault("spec", {}).setdefault("template", {})
             annotations = template.setdefault("metadata", {}).setdefault("annotations", {})
             annotations[_CONFIG_HASH_ANNOTATION] = fingerprint
@@ -105,11 +106,16 @@ def _stamp_deployments(content, fingerprint, image_tags):
         return None
     return encode_yaml_stream(docs)
 
-def k8s_yaml_local(paths, local_overrides=None):
+def k8s_yaml_local(paths, local_overrides=None, substitutions=None):
     """Apply k8s YAML with root-domain substitution and a pod-template
     fingerprint annotation covering every applied ConfigMap/Secret, including
     an optional gitignored ConfigMap of per-developer overrides (see module
-    docstring)."""
+    docstring).
+
+    substitutions is an optional dict of literal token -> value replacements,
+    applied after the root-domain pass so a token cannot be mangled by it. Use
+    it for a value that varies per developer for some reason other than the
+    root domain."""
     rd = current_root_domain()
 
     # read_file(default=...) also registers a watch on the override path —
@@ -134,11 +140,17 @@ def k8s_yaml_local(paths, local_overrides=None):
         content = str(read_file(p))
         if rd != _ROOT_DOMAIN_DEFAULT:
             content = content.replace(_ROOT_DOMAIN_DEFAULT, rd)
+        # Caller-supplied literal replacements, applied after the root-domain
+        # pass so a token cannot be mangled by it. Use these for values that
+        # vary per developer and are not simply the root domain -- a hostname
+        # that collides with something the developer already runs, say.
+        for token in (substitutions or {}):
+            content = content.replace(token, substitutions[token])
         contents.append((p, content))
 
     fingerprint = _config_fingerprint(contents)
     image_tags = decode_json(os.environ.get(_PREBUILT_IMAGE_TAGS_ENV, "{}"))
 
     for p, content in contents:
-        stamped = _stamp_deployments(content, fingerprint, image_tags)
+        stamped = _stamp_workloads(content, fingerprint, image_tags)
         k8s_yaml(stamped if stamped != None else blob(content))

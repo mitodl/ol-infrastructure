@@ -4,7 +4,7 @@
 # What this script does:
 #   1. Validates prerequisites (Docker, kubectl, k3d, tilt, helm, mkcert, pulumi)
 #   2. Creates the k3d cluster (local-dev) with local image registry
-#   3. Generates mkcert TLS certificates for all local .dev hostnames
+#   3. Generates mkcert TLS certificates for all local hostnames
 #   4. Adds /etc/hosts entries for all local hostnames
 #      (--skip-hosts prints the entries instead of writing them)
 #
@@ -25,8 +25,8 @@ CLUSTER_NAME="local-dev"
 # Root domain configuration
 # ---------------------------------------------------------------------------
 # Override by setting LOCAL_DEV_ROOT_DOMAIN before running this script:
-#   LOCAL_DEV_ROOT_DOMAIN=mycompany.dev ./local-dev/scripts/setup.sh
-ROOT_DOMAIN="${LOCAL_DEV_ROOT_DOMAIN:-mit.dev}"
+#   LOCAL_DEV_ROOT_DOMAIN=mycompany.test ./local-dev/scripts/setup.sh
+ROOT_DOMAIN="${LOCAL_DEV_ROOT_DOMAIN:-mit.test}"
 
 # ---------------------------------------------------------------------------
 # All local hostnames — must be listed explicitly; /etc/hosts has no wildcards.
@@ -36,8 +36,9 @@ HOSTS=(
     "api.learn.${ROOT_DOMAIN}"
     # mit-learn frontend (Next.js)
     "learn.${ROOT_DOMAIN}"
-    # learn-ai
+    # learn-ai, and its sandbox (frontend-demo; apps/learn-ai/sandbox.yaml)
     "ai.learn.${ROOT_DOMAIN}"
+    "ai-sandbox.learn.${ROOT_DOMAIN}"
     # ocw-hugo-themes dev server, run on the host and fronted by APISIX so it
     # has an origin inside .learn.${ROOT_DOMAIN} (see apps/mit-learn/ocw-hugo-dev.yaml)
     "ocw-dev.learn.${ROOT_DOMAIN}"
@@ -60,6 +61,11 @@ HOSTS=(
     "micromasters.${ROOT_DOMAIN}"
     # Shared S3-compatible object store (RustFS), deployed with ocw-studio
     "s3.${ROOT_DOMAIN}"
+    # GitLab (optional; only deployed when enabled_apps includes gitlab, but
+    # a hosts entry for an app you have not enabled costs nothing).
+    # Follows LOCAL_DEV_GITLAB_HOSTNAME so this never shadows an external
+    # GitLab a developer already runs on gitlab.<root domain>.
+    "${LOCAL_DEV_GITLAB_HOSTNAME:-gitlab.${ROOT_DOMAIN}}"
     # Keycloak SSO
     "sso.ol.${ROOT_DOMAIN}"
     # Mailpit (captured outbound email)
@@ -470,7 +476,7 @@ with open('/etc/hosts', 'w') as f:
 
     # WSL: prevent /etc/hosts from being regenerated on WSL restart, and mirror
     # the same entries into the Windows hosts file so that Windows browsers can
-    # resolve the .dev hostnames (Docker Desktop forwards 127.0.0.1 from WSL).
+    # resolve the local hostnames (Docker Desktop forwards 127.0.0.1 from WSL).
     if is_wsl; then
         log "WSL detected: updating wsl.conf and Windows hosts file..."
         wsl_result=$(_wsl_conf_disable_generate_hosts)

@@ -20,7 +20,6 @@ workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "mit-learn")
 IMAGE = 'mitodl/mit-learn-nextjs-app'
 _DIR = config.main_dir + "/local-dev/apps/mit-learn-nextjs"
-_rd = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
 
 if os.path.exists(os.path.join(APP_DIR, '.git')):
     docker_build(

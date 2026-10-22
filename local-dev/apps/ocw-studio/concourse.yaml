@@ -42,6 +42,23 @@ spec:
         component: concourse
     spec:
       initContainers:
+        # Pipeline resource and task containers get their own rootfs, so they
+        # do not inherit anything this pod trusts. Anything they clone or
+        # fetch over TLS from a local-dev hostname -- the in-cluster GitLab,
+        # say -- fails certificate verification. CONCOURSE_CERTS_DIR below
+        # bind-mounts this directory into every one of them as
+        # /etc/ssl/certs, so it has to carry the public roots as well; mkcert
+        # alone would break pulls from Docker Hub and clones from github.com.
+      - name: ca-bundle-merge
+        image: alpine:3
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /concourse-certs/ca-certificates.crt
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+        - name: concourse-certs
+          mountPath: /concourse-certs
         # Same keys.sh the compose stack ran, inlined. Regenerated on every
         # pod start: they authenticate the worker to the web in this pod only,
         # and nothing outside it ever sees them.
@@ -116,7 +133,7 @@ spec:
         # Must match what Studio puts in pipeline definitions and what the
         # browser uses, or build links in the UI point nowhere.
         - name: CONCOURSE_EXTERNAL_URL
-          value: https://concourse.ocw.mit.dev
+          value: https://concourse.ocw.mit.test
         - name: CONCOURSE_ADD_LOCAL_USER
           value: test:test  # pragma: allowlist secret
         - name: CONCOURSE_MAIN_TEAM_LOCAL_USER
@@ -198,11 +215,16 @@ spec:
           value: "true"
         - name: CONCOURSE_CONTAINERD_DNS_PROXY_ENABLE
           value: "true"
+        # Mounted into every resource and task container as /etc/ssl/certs.
+        - name: CONCOURSE_CERTS_DIR
+          value: /concourse-certs
         volumeMounts:
         - name: concourse-keys
           mountPath: /concourse-keys
         - name: worker-state
           mountPath: /worker-state
+        - name: concourse-certs
+          mountPath: /concourse-certs
         # Sized for the configured build concurrency, not for an idle
         # worker. Every pipeline task runs in this one pod's containerd, so
         # OCW_MASS_BUILD_MAX_IN_FLIGHT parallel Hugo builds all draw on this
@@ -223,7 +245,11 @@ spec:
         emptyDir: {}
       - name: worker-state
         emptyDir: {}
-
+      - name: concourse-certs
+        emptyDir: {}
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
 ---
 apiVersion: v1
 kind: Service

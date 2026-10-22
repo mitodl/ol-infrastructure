@@ -1453,6 +1453,8 @@ class OLApisixUpstreamConfig(BaseModel):
     # same upstream pod.
     hash_on: Literal["vars", "header", "cookie", "consumer"] | None = None
     hash_key: str | None = None
+    # Unset keeps APISIX's default: retry on the other available nodes.
+    retries: NonNegativeInt | None = None
 
     @model_validator(mode="after")
     def validate_chash_fields(self) -> "OLApisixUpstreamConfig":
@@ -1488,6 +1490,9 @@ class OLApisixUpstream(ComponentResource):
         if upstream_config.loadbalancer_type == "chash":
             loadbalancer_spec["hashOn"] = upstream_config.hash_on
             loadbalancer_spec["key"] = upstream_config.hash_key
+        upstream_spec: dict[str, Any] = {"loadbalancer": loadbalancer_spec}
+        if upstream_config.retries is not None:
+            upstream_spec["retries"] = upstream_config.retries
 
         self.apisix_upstream_resource = kubernetes.apiextensions.CustomResource(
             f"OLApisixUpstream-{name}",
@@ -1499,6 +1504,6 @@ class OLApisixUpstream(ComponentResource):
                 labels=upstream_config.k8s_labels,
                 namespace=upstream_config.k8s_namespace,
             ),
-            spec={"loadbalancer": loadbalancer_spec},
+            spec=upstream_spec,
             opts=resource_options,
         )

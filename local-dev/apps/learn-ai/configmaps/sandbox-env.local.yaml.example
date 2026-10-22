@@ -1,0 +1,19 @@
+# Per-developer overrides for the learn-ai sandbox (gitignored when copied).
+#
+# Copy to sandbox-env.local.yaml. Only needed for the sandbox's Open edX
+# features (video and Canvas content): nginx forwards /openedx_proxy/ to
+# courses.rc.learn.mit.edu with this cookie.
+#
+# To get the value, log in at https://courses.rc.learn.mit.edu/ and copy the
+# mitxonline-qa-edx-lms-sessionid cookie from the browser's dev tools.
+#
+# learnai-sandbox is a manual Tilt resource: after editing this file, click its
+# update button. The image is cached, so that only rolls the pod.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: learnai-sandbox-env-local
+  namespace: learn-ai
+data:
+  # OPENEDX_SESSION_COOKIE_VALUE: "..."  # pragma: allowlist secret

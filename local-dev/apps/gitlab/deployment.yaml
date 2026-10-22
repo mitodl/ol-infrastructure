@@ -1,0 +1,116 @@
+---
+# GitLab CE for local development.
+#
+# Opt-in: add `gitlab` to enabled_apps. It is off by default because it is by
+# far the heaviest single workload here -- see the resource notes below and
+# the GitLab section of local-dev/README.md.
+#
+# Why a StatefulSet rather than a Deployment like Concourse: GitLab owns
+# repositories and a database, so losing the volume loses the content Studio
+# has pushed. The volumeClaimTemplates keep that across restarts and rollouts.
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitlab
+  namespace: gitlab
+spec:
+  selector:
+    app: gitlab
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: gitlab
+  namespace: gitlab
+spec:
+  serviceName: gitlab
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitlab
+  template:
+    metadata:
+      labels:
+        app: gitlab
+    spec:
+      # GitLab's own boot sequence is long and it reconfigures on every start;
+      # killing it mid-reconfigure leaves /etc/gitlab inconsistent.
+      terminationGracePeriodSeconds: 120
+      containers:
+      - name: gitlab
+        image: gitlab/gitlab-ce:19.4.2-ce.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 80
+        env:
+        - name: GITLAB_OMNIBUS_CONFIG
+          valueFrom:
+            configMapKeyRef:
+              name: gitlab-omnibus-config
+              key: gitlab.rb
+        - name: GITLAB_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: gitlab-secrets
+              key: root_password
+        # GitLab boots slowly -- several minutes on first run while it
+        # migrates the bundled database. A startupProbe with a long budget
+        # keeps the readiness probe from flapping, and keeps kubelet from
+        # restart-looping a container that is merely still starting.
+        startupProbe:
+          httpGet:
+            path: /-/readiness
+            port: 80
+          periodSeconds: 10
+          # 30 minutes, against a measured ~2 minute first boot on this
+          # machine. The headroom is for slower ones: a container restarted
+          # mid-migration leaves /etc/gitlab inconsistent, and a generous
+          # ceiling on a probe that passes in two minutes costs nothing.
+          failureThreshold: 180
+        readinessProbe:
+          httpGet:
+            path: /-/readiness
+            port: 80
+          periodSeconds: 15
+          failureThreshold: 4
+        resources:
+          # Measured, not guessed: ~2.6 GiB and under 0.1 core at rest,
+          # ~1.6 cores while booting. See local-dev/README.md. The limit
+          # leaves room for a reconfigure and for Gitaly during a large push.
+          requests:
+            cpu: 500m
+            memory: 3Gi
+          limits:
+            memory: 8Gi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/gitlab
+        - name: data
+          mountPath: /var/opt/gitlab
+        - name: logs
+          mountPath: /var/log/gitlab
+      volumes:
+      # Logs are deliberately not persisted: they are large, and kubectl logs
+      # does not read them anyway.
+      - name: logs
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: config
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 20Gi

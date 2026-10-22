@@ -39,13 +39,6 @@ OPEN_EDX_PLUGINS_REPO = git_repo(
     paths=["src/", "pyproject.toml", "uv.lock"],
 )
 
-OL_DJANGO_REPO = git_repo(
-    name=Identifier("ol-django-source"),
-    uri="https://github.com/mitodl/ol-django",
-    branch="main",
-    paths=["src/", "pyproject.toml", "uv.lock"],
-)
-
 PIPELINE_IMAGE = AnonymousResource(
     type="registry-image",
     source={
@@ -148,7 +141,6 @@ def meta_pipeline() -> Pipeline:
         resources=[
             OL_INFRASTRUCTURE_REPO,
             OPEN_EDX_PLUGINS_REPO,
-            OL_DJANGO_REPO,
         ],
         jobs=[
             self_update_job(),
@@ -160,12 +152,6 @@ def meta_pipeline() -> Pipeline:
                     "build_publish_plugins.py"
                 ),
                 source_resource_name=str(OPEN_EDX_PLUGINS_REPO.name),
-            ),
-            set_child_pipeline_job(
-                job_name="set-ol-django-pipeline",
-                pipeline_name="publish-ol-django-pypi",
-                generator_script=("src/ol_concourse/pipelines/libraries/ol_django.py"),
-                source_resource_name=str(OL_DJANGO_REPO.name),
             ),
         ],
     )
@@ -180,9 +166,8 @@ if __name__ == "__main__":
                 "Self-managing meta pipeline for the Python-package publish "
                 "pipelines: regenerates and sets "
                 "`publish-open-edx-plugins-pypi` from `mitodl/open-edx-plugins` "
-                "and `publish-ol-django-pypi` from `mitodl/ol-django` (via "
-                "`ol_django.py`), each on any push to its source repo, and "
-                "re-sets itself on changes to its own generator code."
+                "on any push to that repo, and re-sets itself on changes to its "
+                "own generator code."
             ),
             "team": "main",
             "category": "meta",

@@ -133,18 +133,29 @@ DEFAULT_CLEANUP_SCHEDULE = "20 4 * * 0"
 # nothing useful here. (The two combine as a union: a commit either one retains
 # survives. omnigraph v0.13.0 docs/user/operations/maintenance.md#cleanup.)
 #
-# The age is sized by how long the stop window takes, not by storage. From
+# The age was chosen to fit the stop window in CI and QA, not by storage. From
 # format 14 cleanup runs with the server stopped, and before it deletes
 # anything it opens every table version present, retained or not
 # (omnigraph v0.13.0 collector.rs discover_published and plan_sweep, run in
-# full by optimize.rs cleanup_detached_only before any sweep). One run costs
-# about 0.14s per present version on S3: QA's code-bridge took 488s to remove
-# 12 of its 3,522 versions on 2026-10-18. A run stopped during that plan
-# deletes nothing. Run nightly (DEFAULT_CLEANUP_ISO_WEEKDAYS) at 2d, each run
-# sees about three days of writes. Production's code-bridge writes about 800
-# table versions a day (S3 listing of _versions/, 2026-10-17 to 10-19), so
-# that is about 2,400 versions, about 6 minutes. A Sunday-only run sees nine
-# days at 2d and 37 at 30d.
+# full by optimize.rs cleanup_detached_only before any sweep). A run stopped
+# during that plan deletes nothing. On S3 a run costs 0.16 to 0.22s per object
+# under the graph's _versions/ directories, 0.19s on average (Production's
+# 2026-10-20 backlog run: 4,026s over 21,021 versions on six graphs; QA's
+# nightly on 2026-10-21: 0.16 to 0.19s on its larger graphs).
+#
+# That count includes __manifest/_versions/ (one per graph commit) and
+# __manifest/tree/*/_versions/ (one per commit on each writer branch), and
+# 0.13's cleanup never removes those: every delete marker in the bucket under
+# council and ol-data-platform is a table version. So retention bounds only the
+# table versions, and the plan grows by every commit, every night. In
+# Production on 2026-10-21 the manifests were 11,800 of 25,372 versions, about
+# 2,240s of plan before any table version, and grew by about 1,500 a day. No
+# retention fits that in the window (MAINTENANCE_WINDOW_SECONDS), so
+# Production sets omnigraph:cleanup_iso_weekdays to [] and cleans up only in a
+# planned long run (the store-maintenance runbook's "Clearing a cleanup
+# backlog"). QA sets [] too: its code-bridge took 413s for 2,559 versions on
+# 2026-10-21 and gains about 255 manifests a day, so it would pass
+# COMMAND_TIMEOUT_SECONDS around 2026-10-25.
 #
 # witan's own code needs no older versions. The current head of every live
 # branch is always retained whatever its age, as is a named branch's oldest
@@ -444,7 +455,9 @@ DEFAULT_MAINTENANCE_SCHEDULE = DEFAULT_OPTIMIZE_SCHEDULE
 
 # Every night. A cleanup's time grows with the versions written since the last
 # one, so a weekly run plans a week of writes on top of the retained ones (see
-# DEFAULT_CLEANUP_OLDER_THAN).
+# DEFAULT_CLEANUP_OLDER_THAN). That holds while the commit manifests cleanup
+# never removes are small. Production's and QA's are not, and they set [] to
+# only optimize.
 DEFAULT_CLEANUP_ISO_WEEKDAYS = (1, 2, 3, 4, 5, 6, 7)
 
 # THE TIME BUDGET, from the 03:20 start:
@@ -480,6 +493,28 @@ WINDOW_STARTING_DEADLINE_SECONDS = 60
 # Stop one command (the image allows 30s), unlock, restore the replica count.
 # The image documents 120 as what its close needs.
 TERMINATION_GRACE_SECONDS = 120
+# How much longer than the server's termination grace the window waits for its
+# pods to exit: the time the kubelet and the Deployment controller take to act
+# on the scale-down. The image's own default of 90 is a 35s grace plus this.
+SERVER_STOP_MARGIN_SECONDS = 55
+# optimize folds a lagging BTree index by rebuilding it, and Lance sorts the
+# column through one DataFusion memory pool shared by the whole process: 150 MiB
+# unless LANCE_MEM_POOL_SIZE is set (lance-datafusion 11.0.0, exec.rs). Each
+# sort also holds a 40 MiB merge reservation that cannot spill, and optimize
+# works up to 8 tables at once (omnigraph's OMNIGRAPH_MAINTENANCE_CONCURRENCY
+# default). Three folds at once then leave 30 MiB shared by all three sorts'
+# rows. On 2026-10-20 that failed optimize on one code graph per environment
+# with "Not enough memory to continue external sort": two folds held their
+# reservations and the third's sort or reservation was refused. 640 MiB holds 8
+# reservations plus 40 MiB of rows each. That assumes each sort's rows stay
+# under 40 MiB (the largest seen was 33.4 MiB, already capped by the pool), so
+# a recurrence after the graphs grow means raising the pool again. Lowering the
+# concurrency instead would also slow cleanup, which shares it.
+LANCE_MEM_POOL_BYTES = 640 * 1024 * 1024
+# The pool on top of the window's peak working set, 336 MB at most in either
+# environment over the 14 days to 2026-10-21. The server is at 0 replicas while
+# this runs.
+MAINTENANCE_MEMORY_LIMIT = "1536Mi"
 
 if WINDOW_ACTIVE_DEADLINE_SECONDS <= (
     MAINTENANCE_WINDOW_SECONDS + COMMAND_TIMEOUT_SECONDS
@@ -504,6 +539,7 @@ def create_maintenance_window(  # noqa: PLR0913
     cluster_configmap_name: str,
     cluster_config_dir: str,
     server_deployment_name: str,
+    server_termination_grace_seconds: int,
     schedule: str,
     cleanup_older_than: str,
     cleanup_iso_weekdays: tuple[int, ...],
@@ -525,8 +561,13 @@ def create_maintenance_window(  # noqa: PLR0913
     :param server_deployment_name: the Deployment the window stops. The
         command reads its pod selector from it, so there is no second copy of
         the selector here to drift.
+    :param server_termination_grace_seconds: that Deployment's pod grace. The
+        command gives up on a server that has not stopped within it plus
+        ``SERVER_STOP_MARGIN_SECONDS``, so a server still draining writes is
+        not taken for a stuck one.
     :param cleanup_iso_weekdays: UTC days ``cleanup`` also runs on (1 is
-        Monday), rendered as the comma list the image parses.
+        Monday), rendered as the comma list the image parses. Empty means the
+        window only optimizes.
     :param suspend: hold the window off while a storage-format migration is
         armed. The command also skips on the Deployment's migration-armed
         annotation, which covers a run that started before the suspend landed.
@@ -672,12 +713,26 @@ def create_maintenance_window(  # noqa: PLR0913
                                             name="OMNIGRAPH_COMMAND_TIMEOUT_SECONDS",
                                             value=str(COMMAND_TIMEOUT_SECONDS),
                                         ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="OMNIGRAPH_SERVER_STOP_SECONDS",
+                                            value=str(
+                                                server_termination_grace_seconds
+                                                + SERVER_STOP_MARGIN_SECONDS
+                                            ),
+                                        ),
+                                        kubernetes.core.v1.EnvVarArgs(
+                                            name="LANCE_MEM_POOL_SIZE",
+                                            value=str(LANCE_MEM_POOL_BYTES),
+                                        ),
                                     ],
                                     # As the sweeps before it: compaction
                                     # rewrites fragments through memory.
                                     resources=kubernetes.core.v1.ResourceRequirementsArgs(
                                         requests={"cpu": "100m", "memory": "256Mi"},
-                                        limits={"cpu": "1", "memory": "1Gi"},
+                                        limits={
+                                            "cpu": "1",
+                                            "memory": MAINTENANCE_MEMORY_LIMIT,
+                                        },
                                     ),
                                     volume_mounts=[
                                         # sub_path, as on the server: overlay

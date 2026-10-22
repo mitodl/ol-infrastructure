@@ -20,7 +20,7 @@ if k8s_context() != "local-dev":
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
-config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
+config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters gitlab. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
 config.define_string_list("prebuilt_tags", usage="Published image tag to run for an app with no checkout, instead of latest, e.g. mit-learn=0.82.0 learn-ai=0.37.0")
 config.define_string_list("lake_host_ports", usage="Host ports for the data-platform lake forwards, e.g. rustfs=9100 gravitino=9101 (defaults: starrocks=9030 gravitino=9001 rustfs=9000). Move one that another process on your machine already holds.")
@@ -50,9 +50,10 @@ per_app_databases = cfg.get("per_app_databases", False)
 os.putenv("LOCAL_DEV_ENABLED_APPS", ",".join(enabled_apps))
 
 # Every service hostname, CORS origin, APISIX route, and Keycloak redirect URI
-# derives from this value. local-dev/tiltlib.star reads the same environment
-# variable when applying app manifests.
-root_domain = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
+# derives from this value, the same one local-dev/tiltlib.star substitutes into
+# app manifests.
+load("./local-dev/tiltlib.star", "current_root_domain")
+root_domain = current_root_domain()
 
 # The TLS certificate covers only this domain, so an unresolvable hostname means
 # nothing the stack serves is reachable. DNS and /etc/hosts both satisfy this.
@@ -67,7 +68,7 @@ if str(local(
          "  Fix by either:\n" +
          "    - running ./local-dev/scripts/setup.sh (adds 127.0.0.1 entries to /etc/hosts), or\n" +
          "    - pointing DNS for *.%s at this host, or\n" +
-         "    - unsetting LOCAL_DEV_ROOT_DOMAIN to use the mit.dev default.")
+         "    - unsetting LOCAL_DEV_ROOT_DOMAIN to use the mit.test default.")
         % (_probe_host, root_domain, root_domain)
     )
 
@@ -287,14 +288,14 @@ APPS = [
                 # email, and createsuperuser then fails on the unique email
                 # with no way out short of exec'ing in. No password is set;
                 # login goes through Keycloak.
-                "description": "Create or promote the admin@odl.local superuser",
+                "description": "Create or promote the admin@ol.test superuser",
                 "cmd": (
                     "python manage.py shell -c " +
                     "'from django.contrib.auth import get_user_model; " +
                     "U = get_user_model(); " +
                     "u, created = U.objects.get_or_create(" +
-                    "email=\"admin@odl.local\", " +
-                    "defaults={\"username\": \"admin\", \"name\": \"Admin\"}); " +
+                    "email=\"admin@ol.test\", " +
+                    "defaults={\"username\": \"admin@ol.test\", \"name\": \"Admin\"}); " +
                     "u.is_staff = True; u.is_superuser = True; u.save(); " +
                     "print((\"created\" if created else \"promoted\"), u.email)'"
                 ),
@@ -326,6 +327,17 @@ APPS = [
         ],
     },
     {
+        # Off by default, and the heaviest thing here by some margin. It
+        # exists so ocw-studio's GitLab content-sync backend has somewhere to
+        # push to without an external server. See the GitLab section of
+        # local-dev/README.md for what it costs to run.
+        "name": "gitlab",
+        "dir": "gitlab",
+        "namespace": "gitlab",
+        "deploy_name": "gitlab",
+        "tiltfile": "./local-dev/apps/gitlab/Tiltfile",
+    },
+    {
         # Off by default: it exists so the data platform's micromasters dlt
         # source has a local database to read, which most developers do not
         # need running.
@@ -348,7 +360,7 @@ APPS = [
                     "U = get_user_model(); " +
                     "u, created = U.objects.get_or_create(" +
                     "username=\"admin\", " +
-                    "defaults={\"email\": \"admin@odl.local\"}); " +
+                    "defaults={\"email\": \"admin@ol.test\"}); " +
                     "u.is_staff = True; u.is_superuser = True; " +
                     "u.set_password(\"admin\"); u.save(); " +
                     "print((\"created\" if created else \"reset\"), u.username)'"
@@ -474,10 +486,15 @@ local_resource(
 # path (even while Keycloak itself is idle) and a batch of them trip
 # "context deadline exceeded" together. Serialising keeps one admin request in
 # flight at a time, which the path handles comfortably.
+#
+# `--run-program` makes the refresh use the Keycloak provider settings the
+# program computes now. Without it, refresh uses the ones recorded in state,
+# so after a root-domain change every resource fails to refresh against the
+# old hostname before the new URL can be applied.
 local_resource(
     "local-infra-apps",
     # FORCE_COLOR is unset for the same reason as local-infra-core above.
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --refresh --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --refresh --run-program --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
     # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
     # the core stack only creates on demand.
     env={"LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps)},

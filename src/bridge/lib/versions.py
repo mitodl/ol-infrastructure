@@ -93,8 +93,11 @@ VAULT_PLUGIN_STARROCKS_SHA256 = "3a737897b3c37eb61cab0b6b2804bd711dde7d31b308cf3
 # Altinity ClickHouse Operator — released as tag "release-X.Y.Z" on GitHub
 # renovate: datasource=github-releases depName=clickhouse-operator packageName=Altinity/clickhouse-operator
 CLICKHOUSE_OPERATOR_VERSION = "release-0.26.0"
+# 24.8 -> 26.3 goes through 25.8: upstream supports a rolling upgrade only
+# between versions less than a year or two LTS lines apart. Stacks still on the
+# previous line pin clickhouse:version and set clickhouse:compatibility.
 # renovate: datasource=docker depName=altinity/clickhouse-server packageName=altinity/clickhouse-server
-CLICKHOUSE_SERVER_VERSION = "25.8.1.2953.altinitystable"
+CLICKHOUSE_SERVER_VERSION = "25.8.28.10001.altinitystable"
 # renovate: datasource=docker depName=clickhouse/clickhouse-keeper packageName=clickhouse/clickhouse-keeper
 CLICKHOUSE_KEEPER_VERSION = "26.8-alpine"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
@@ -191,11 +194,6 @@ LOKI_VERSION = "3.7.8"
 ALLOY_VERSION = "v1.20.1"
 # renovate: datasource=docker depName=grafana packageName=grafana/grafana
 GRAFANA_VERSION = "13.2.3"
-# The -slim variant: no bundled local models. Embeddings come from the
-# text-embeddings-inference server below.
+# The -slim variant: no bundled local models. Embeddings come from Bedrock.
 # renovate: datasource=docker depName=hindsight-api packageName=ghcr.io/vectorize-io/hindsight-api
 HINDSIGHT_VERSION = "1.0.0-slim"
-# The plain tag is the GPU build; the stack runs f"cpu-{TEXT_EMBEDDINGS_INFERENCE_VERSION}",
-# published for amd64 only. Renovate tracks the plain tags, which move together.
-# renovate: datasource=docker depName=text-embeddings-inference packageName=ghcr.io/huggingface/text-embeddings-inference
-TEXT_EMBEDDINGS_INFERENCE_VERSION = "1.9.4"

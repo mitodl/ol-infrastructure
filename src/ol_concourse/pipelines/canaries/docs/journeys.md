@@ -9,13 +9,14 @@ each rule are in [`../AGENTS.md`](../AGENTS.md) and the property's own
 page is stale. **A new or changed journey updates this page in the same PR** (see
 [Keeping this page current](#keeping-this-page-current)).
 
-Every screenshot was taken against RC, in Chromium at 1280×800, by
+Every screenshot was taken against RC on 2026-10-22, in Chromium at 1280×800, by
 [`capture/mit-learn.capture.ts`](capture/mit-learn.capture.ts). Content on RC changes, so
 the course names and counts in the pictures will not match a run today. The journeys do
 not assert on them either.
 
 - [mit-learn](#mit-learn): `canary-mit-learn`, against <https://rc.learn.mit.edu>
   - [Homepage](#homepage)
+  - [HubSpot tracking](#hubspot-tracking)
   - [Channel browse and resource drawer](#channel-browse-and-resource-drawer)
   - [Search by URL](#search-by-url)
   - [Signed in: login, dashboard, header search](#signed-in-login-dashboard-header-search)
@@ -27,7 +28,7 @@ not assert on them either.
 ## mit-learn
 
 Pipeline `canary-mit-learn`, job `run-mit-learn-canary`, every 10 minutes, Chromium
-only. Six tests in four spec files, running serially with one retry. The journeys are
+only. Seven tests in five spec files, running serially with one retry. The journeys are
 ranked by the production traffic they stand in for; see the property
 [README](../specs/mit-learn/README.md#journeys) for that ranking.
 
@@ -42,6 +43,17 @@ nothing about the hero copy, the featured courses or the search box, because all
 is CMS content. An assertion on it would turn red when an editor changes a word.
 This journey catches a blank page, a crashed bundle or a 5xx. The other journeys cover
 everything past that.
+
+### HubSpot tracking
+
+`specs/mit-learn/hubspot-tracking.spec.ts`: anonymous. It loads the same `/` as the
+homepage journey, so there is no separate picture. The thing it asserts has nothing on
+screen.
+
+**1. Exactly one `<script>` from `https://js.hs-scripts.com/` is on the page.** The
+tag is injected after hydration (`afterInteractive`), not in the server-rendered HTML,
+so the count is auto-retried until it appears. A missing tag breaks nothing a visitor
+or any other journey would notice, which is why it has a journey of its own.
 
 ### Channel browse and resource drawer
 
@@ -71,10 +83,18 @@ is asserted, not just the tab.
 ![Resource drawer opened by clicking a card](images/mit-learn/channel-and-drawer/03-drawer-client-side.jpg)
 
 **3. Clicking the first card opens the drawer.** The URL gains `?resource=<id>`, and a
-dialog opens whose heading is the card's own title. The journey reads that title off the
-card rather than pinning a resource, so it has no content of its own to go stale. The
-click is retried as a unit with `toPass`: a click that lands before React hydrates is
-silently swallowed.
+dialog opens whose level-2 title is the card's own title. The journey reads that title
+off the card rather than pinning a resource, so it has no content of its own to go
+stale. The click is retried as a unit with `toPass`: a click that lands before React
+hydrates is silently swallowed.
+
+The heading level matters. Below the fold the drawer loads "Similar Learning
+Resources" and per-topic carousels, and their cards are level-4 headings that often
+carry another edition of the same course under the same name. From 2026-10-13 the
+first card on `/c/unit/ocw` was "Mathematics for Computer Science", whose drawer
+shows that title six times once the carousels load. An unscoped heading locator then
+failed strict mode whenever the carousels won the race. Between 2026-10-13 and
+2026-10-22 that was 564 of 1,323 scheduled runs, plus 43 that only passed on the retry.
 
 ![The same drawer URL loaded cold](images/mit-learn/channel-and-drawer/04-drawer-cold-load.jpg)
 
@@ -84,7 +104,7 @@ resource while rendering, which is the path a shared or indexed drawer link take
 assertions, split on purpose:
 
 - the **document title** names the resource (server-rendered), and
-- the **dialog heading** names it (client-rendered).
+- the dialog's **level-2 heading** names it (client-rendered).
 
 When the server-side fetch fails, Next answers **HTTP 200** with a `Not Found` title and
 the channel still on screen. Nothing on the page looks broken. Which of the two
@@ -158,10 +178,21 @@ fill-and-Enter is retried as a unit. The box is in the server-rendered markup be
 React is listening, so an early keystroke is dropped. WebKit exposed this race; Chromium
 only wins it by being fast.
 
+None of that is checked until this query's results have arrived. The listing keeps
+showing the previous results, dimmed, while a query fetches. One signed-in capture on
+RC caught the unfiltered catalogue ("All (45067)") still on screen after the URL had
+changed, and every assertion here would have passed against it. So the journey first
+waits for the visually hidden live region to announce "N results". That region is
+empty until the fetch settles. The "AI Overview" panel above the results loads on its
+own and is not asserted on.
+
 ![The Courses tab selected](images/mit-learn/login-and-search/06-courses-tab.jpg)
 
 **6. On the Courses tab, a card named `Course: …mathematics…` is visible.** This checks
 relevance, not a count, because any specific number goes stale at the next content sync.
+The tab click refetches, so the journey waits for the URL to carry
+`resource_type_group=course` and for the live region to announce the Courses tab's own
+count. A leftover announcement from the All tab cannot satisfy that.
 
 ---
 

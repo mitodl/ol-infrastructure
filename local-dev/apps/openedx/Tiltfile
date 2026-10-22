@@ -34,7 +34,7 @@ else:
 
     local_dev = os.path.join(lehrer_dir, "local-dev")
 
-    # Applied through k8s_yaml_local, not k8s_yaml, for the 'mit.dev' ->
+    # Applied through k8s_yaml_local, not k8s_yaml, for the 'mit.test' ->
     # LOCAL_DEV_ROOT_DOMAIN substitution. Layered last in envFrom by lehrer's
     # manifests.
     #
@@ -84,7 +84,7 @@ else:
         ],
         # config_override_paths alone hashes those two files' raw, pre-render
         # content, but k8s_yaml_local substitutes current_root_domain() for
-        # 'mit.dev' in them before applying — so a domain override changes the
+        # 'mit.test' in them before applying — so a domain override changes the
         # ConfigMaps without changing the checksum lehrer stamps on the pod
         # template, and LMS/CMS/workers never roll onto the new URLs. Folding
         # the same value in here (lehrer#238) fixes that.

@@ -73,7 +73,7 @@ mkcert_ca_cert_path = config.get("mkcert_ca_cert_path") or "local-dev/certs/root
 
 # Root domain for all local-dev hostnames.
 root_domain = config.get("root_domain") or os.environ.get(
-    "LOCAL_DEV_ROOT_DOMAIN", "mit.dev"
+    "LOCAL_DEV_ROOT_DOMAIN", "mit.test"
 )
 
 keycloak_hostname = config.get("keycloak_hostname") or f"sso.ol.{root_domain}"
@@ -82,7 +82,7 @@ keycloak_url = config.get("keycloak_url") or f"https://{keycloak_hostname}"
 apisix_admin_key = config.require_secret("apisix_admin_key")
 apisix_viewer_key = config.require_secret("apisix_viewer_key")
 
-# Observability (Grafana + Loki + Alloy). Roughly 1.9GB of workloads, so it is
+# Observability (Grafana + Loki + Alloy). Roughly 2.9GB of workloads, so it is
 # opt-out for developers on a constrained Docker VM.
 observability_enabled = config.get_bool("observability_enabled") is not False
 

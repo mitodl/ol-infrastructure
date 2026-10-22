@@ -7,8 +7,6 @@ that only shows up on the first boot after a cutover. The names and grants are
 pinned here against the contract that file documents.
 """
 
-from typing import Any
-
 import pulumi
 import pytest
 
@@ -18,22 +16,7 @@ from ol_infrastructure.applications.omnigraph.lock_handoff import (
     validate_graph_removal_allowlist,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
-
-
-class _Mocks(pulumi.runtime.Mocks):
-    def __init__(self) -> None:
-        self.resources: list[pulumi.runtime.MockResourceArgs] = []
-
-    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-        self.resources.append(args)
-        return [f"{args.name}_id", args.inputs]
-
-    def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
-        return {}
-
-
-def _of_type(mocks: _Mocks, typ: str) -> list[dict[str, Any]]:
-    return [r.inputs for r in mocks.resources if r.typ == typ]
+from tests.ol_infrastructure.recording_mocks import RecordingMocks
 
 
 @pytest.mark.parametrize(
@@ -80,7 +63,7 @@ def test_an_allowlisted_graph_that_is_no_longer_declared_passes() -> None:
 @pulumi.runtime.test
 def test_the_server_gets_the_lease_its_peers_and_nothing_else():
     """One named Lease to take, the pod list to check, and no way to scale."""
-    mocks = _Mocks()
+    mocks = RecordingMocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
 
     handoff = create_lock_handoff(
@@ -101,12 +84,12 @@ def test_the_server_gets_the_lease_its_peers_and_nothing_else():
     )
 
     def check(_: object) -> None:
-        (lease,) = _of_type(mocks, "kubernetes:coordination.k8s.io/v1:Lease")
+        (lease,) = mocks.of_type("kubernetes:coordination.k8s.io/v1:Lease")
         assert lease["metadata"]["name"] == "omnigraph-unlock"
         # No holder: the first boot takes it with an update.
         assert "spec" not in lease
 
-        (role,) = _of_type(mocks, "kubernetes:rbac.authorization.k8s.io/v1:Role")
+        (role,) = mocks.of_type("kubernetes:rbac.authorization.k8s.io/v1:Role")
         assert role["rules"] == [
             {
                 "apiGroups": ["coordination.k8s.io"],
@@ -116,8 +99,8 @@ def test_the_server_gets_the_lease_its_peers_and_nothing_else():
             },
             {"apiGroups": [""], "resources": ["pods"], "verbs": ["list"]},
         ]
-        (binding,) = _of_type(
-            mocks, "kubernetes:rbac.authorization.k8s.io/v1:RoleBinding"
+        (binding,) = mocks.of_type(
+            "kubernetes:rbac.authorization.k8s.io/v1:RoleBinding"
         )
         assert binding["subjects"] == [
             {
@@ -127,13 +110,15 @@ def test_the_server_gets_the_lease_its_peers_and_nothing_else():
             }
         ]
 
-    return handoff.role_binding.urn.apply(check)
+    # Nothing orders the Lease against the binding, so the binding's URN alone
+    # can resolve before the mocks have seen the Lease.
+    return pulumi.Output.all(handoff.lease.urn, handoff.role_binding.urn).apply(check)
 
 
 @pulumi.runtime.test
 def test_the_env_is_what_the_entrypoint_reads() -> None:
     """The names are the entrypoint's contract; a typo is a refused boot."""
-    pulumi.runtime.set_mocks(_Mocks(), preview=False)
+    pulumi.runtime.set_mocks(RecordingMocks(), preview=False)
     handoff = create_lock_handoff(
         stack_info=StackInfo(
             name="CI",

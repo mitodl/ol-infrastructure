@@ -148,7 +148,7 @@ Packages
 
 | Package | Import | Depends on | Holds |
 | --- | --- | --- | --- |
-| `ol-llm` | `ol_llm` | `opik` (pinned), `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http`, `httpx` | What every call site needs whatever it is built on: tracing wiring (SDK root trace, OTel spans linked by `OpikSpanProcessor`, Keycloak-refreshing auth), §4 attribution, the §3 policy values (`resolve_policy`), prompt fetch through the SDK with embedded fallback, batch helpers |
+| `ol-llm` | `ol_llm` | `opik` (pinned), `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http`, `httpx` | What every call site needs whatever it is built on: tracing wiring (SDK root trace, OTel spans linked by `OpikSpanProcessor`, Keycloak-refreshing auth, `traced_embedding` for embedding calls made by the application's own client), §4 attribution, the §3 policy values (`resolve_policy`), prompt fetch through the SDK with embedded fallback, batch helpers |
 | `ol-llm[pydantic-ai]` | | `pydantic-ai-slim` | Model factory, the §6 call contract's retry wrapper, both entry points (agent and traced completion) |
 | `ol-llm[openai]`, `[anthropic]`, `[bedrock]`, `[google]`, `[mistral]` | | the matching `pydantic-ai-slim` extra, so each also installs PydanticAI | Provider SDKs, chosen per consumer |
 | `ol-llm[harness]` | | `pydantic-ai-harness` (0.x, pinned to a minor series) | In-session memory and compaction (§5 categories A and B). Each harness release pins `pydantic-ai-slim` exactly, so this extra fixes the PydanticAI version |
@@ -240,9 +240,9 @@ Consequences:
   unreachable.
 
 litellm is not a dependency. mit-learn's non-chat uses of litellm (token counting,
-`litellm.embedding`) stay in mit-learn until the library's embedding entry point exists.
-Embeddings come under the library after the chat core (decided 2026-10-01,
-`llm-usage-policies-spec.md` §4.1).
+`litellm.embedding`) stay in mit-learn. Embeddings come under the library after the chat core
+(decided 2026-10-01, `llm-usage-policies-spec.md` §4.1), and mit-learn's encoder keeps calling
+`litellm.embedding` inside `traced_embedding` (§6.6, decided 2026-10-21).
 
 Python floor `>=3.11`, the oldest Python among edx-platform releases in use (ulmo).
 pydantic-ai-slim and the OTel packages require `>=3.10`, so the floor costs nothing and keeps
@@ -315,9 +315,9 @@ missing (inventory, 2026-09-10).
    | `ModelHTTPError` 429 | rate limited | yes, honoring `retry_after` | yes |
    | `ModelHTTPError` 408, 500, 502, 503, 504, 529 | provider unavailable | yes | yes |
    | `ModelAPIError` that is not `ModelHTTPError` (connection errors; OpenAI, Anthropic, and Bedrock timeouts arrive this way) | provider unavailable | yes | yes |
-   | `ModelHTTPError` 400, 401, 403, 404, 422 | rejected (our bug or config) | no | no |
+   | `ModelHTTPError` 400, 401, 403, 404, 413, 422 | rejected (our bug or config; a 400, 413, or 422 can be one batch row's input, rule 7) | no | no |
    | `ContentFilterError` | content filtered | no | no |
-   | `UnexpectedModelBehavior` after output retries are spent | invalid output | no | no |
+   | `UnexpectedModelBehavior` after output retries are spent (at once for a stream) | invalid output | no | no |
    | `UsageLimitExceeded` | budget exceeded | no | no |
 
    There is exactly one retry layer per provider. The OpenAI and Anthropic SDKs retry twice by
@@ -328,6 +328,7 @@ missing (inventory, 2026-09-10).
 3. Validation failures retry on the same model, not a fallback. Output validators raise
    `ModelRetry`; `Agent(retries=…)` bounds them (PydanticAI's default is 1 for tools and 1 for
    output). A model that cannot produce the schema is not fixed by a different model mid-run.
+   A streamed run does not retry invalid output (§6.5).
 4. Fallback is a declared per-use-case policy. Composed as `FallbackModel` with
    `fallback_on` set to the "fall back" rows above, not PydanticAI's default of every
    `ModelAPIError`, which would mask 401s and 400s. Streams fall back only before the first
@@ -343,9 +344,11 @@ missing (inventory, 2026-09-10).
    value and `opik.metadata.degraded` plus a reason on the trace. The translation plugins'
    silent keep-source behavior becomes a marked partial result.
 7. Batch isolates rows. A row failure records its class and does not fail the chunk;
-   rejected-class failures open the circuit immediately, since retrying a config bug burns
-   budget; unavailable-class failures open it after a threshold. ol-data-platform's
-   summarize module is the reference.
+   rejected-class failures of the account or model open the circuit immediately, since
+   retrying a config bug burns budget; a rejection of one row's input fails that row, and
+   opens the circuit only after a threshold of them with no accepted request between them;
+   unavailable-class failures open it after a threshold of their own (§6.7).
+   ol-data-platform's summarize module is the reference.
 
 ### 3.3 Decision
 
@@ -371,9 +374,10 @@ gateway logs, and Prometheus. The library applies them; call sites supply values
 | `thread_id` | conversations | chat thread id | `thread_id` on the root trace; `gen_ai.conversation.id` via `run(conversation_id=…)` on spans | none | never |
 | `run_id` | batch | Dagster run id, Celery task id | `opik.metadata.run_id` | none | never |
 | `degraded` | when true | `true` plus a reason | `opik.metadata.degraded`, `opik.metadata.degraded_reason` | none | `degraded` counter (library) |
+| `model_status` | a model in the use case's chain is deprecated or not in the catalog | `deprecated`, `uncataloged` | tag `model_status:…` on the root trace (`llm-usage-policies-spec.md` §2.2) | none | none |
 
 Conventions: snake_case keys. Tags carry only low-cardinality `key:value` pairs (app,
-use_case, environment) for filtering; everything goes in `opik.metadata.*`. Prometheus labels
+use_case, environment, model_status) for filtering; everything goes in `opik.metadata.*`. Prometheus labels
 never carry user, thread, or run identifiers.
 
 Where the library writes them. The root of every run is an `@opik.track` trace, so the
@@ -876,7 +880,8 @@ primary made one attempt and raised `LLMRejected` without trying the fallback.
   after the first chunk reaches the caller as `LLMUnavailable`.
 - A model whose gateway route already falls back takes no `fallback_models`. The model catalog
   (`tk-policy-model-catalog-and-lifecycle-ba2fc7`) records which routes do, and
-  `build_model` raises `ValueError` for a use case that sets both.
+  `build_model` raises `ValueError` for a use case that sets both. A primary the catalog does
+  not list is not checked.
 
 ### 6.5 Structured output
 
@@ -894,6 +899,10 @@ primary made one attempt and raised `LLMRejected` without trying the fallback.
 - Validation failures retry on the same model (§3.2 rule 3). `UseCase.output_retries` sets
   `Agent(retries={"output": n})`, default 1, which is PydanticAI's default. When they are
   spent the caller gets `LLMInvalidOutput`.
+- A streamed run is the exception. PydanticAI's `run_stream` keeps the first output that
+  matches the output type, so invalid output raises `LLMInvalidOutput` with no retry. A retry
+  would stream a second answer after chunks of the discarded one, which the caller may
+  already have shown. Decided 2026-10-20 (mitodl/ol-llm#11).
 
 ### 6.6 Entry points
 
@@ -909,10 +918,27 @@ Both paths share the model factory, policy, attribution, tracing, and errors.
 - The `_sync` variants exist for Celery tasks and Dagster assets.
 - Streaming is for the request profile. `run_stream` is an async context manager yielding an
   object with `stream_text()`, `stream_output()`, and `result()`; `result()` is available
-  once the stream is consumed and carries the same markers as a non-streamed call.
+  once the stream is consumed and carries the same markers as a non-streamed call. Invalid
+  output is not retried (§6.5).
 - Call sites that are not built on PydanticAI (learn-ai's LangGraph bots) take the numbers
   from `resolve_policy(use_case)` and apply them to their own client. The retry wrapper and
   typed errors apply only to models the library builds.
+- Embeddings: `embed` and `embed_sync` take a use case and texts and return the vectors with
+  the model id, dimension, and usage. They need the `pydantic-ai` extra plus the provider's
+  extra. A call site built on LangChain or LangGraph keeps its own embedding client instead and
+  wraps each provider request in `traced_embedding(use_case, texts, attribution=...)`, a
+  context manager in the base package.
+  - It opens the root trace with the §4 fields, or a span under the caller's trace when one is
+    active, and records a span for the request under the use case's catalog id. The client
+    must call that same model.
+  - It runs the catalog checks `embed` runs for an embedding model: a retired id raises, an
+    unlisted or deprecated id logs the warning and takes the `model_status` tag.
+  - It yields a handle on which the caller reports the input token count from the response. On
+    a cache hit the caller reports zero, since litellm fills in usage for cached items. Each
+    request gets its own wrap, so a hedged call records every request it sent.
+  - It lets the caller's exceptions through unchanged. The texts are recorded only when
+    `include_content` is on, and the vectors never are, as with `embed`.
+  - Whether Opik prices an embedding span from its model and usage is not verified.
 
 ### 6.7 Errors and degraded results
 
@@ -923,7 +949,7 @@ exception as `__cause__` and with `use_case`, `model`, and `retryable` set.
 | --- | --- |
 | `LLMRateLimited`, `LLMUnavailable`, `LLMRejected` | the retry wrapper (§6.3) |
 | `LLMContentFiltered` | `ContentFilterError` |
-| `LLMInvalidOutput` | `UnexpectedModelBehavior` once output retries are spent, including a response cut off at the token limit |
+| `LLMInvalidOutput` | `UnexpectedModelBehavior` once output retries are spent (at once for a stream), including a response cut off at the token limit |
 | `LLMBudgetExceeded` | `UsageLimitExceeded` |
 
 `ContentFilterError` subclasses `UnexpectedModelBehavior`, so it is matched first. By default
@@ -948,9 +974,28 @@ trace are marked together. `LLMResult` is frozen and the trace is closed once th
 returns, so a check done after the call cannot mark either. `postprocess` keeps the output
 type, and an exception it raises reaches the caller unchanged.
 
-For the batch helpers (§3.2 rule 7): `LLMRejected` opens the circuit at once,
-`LLMRateLimited` and `LLMUnavailable` count toward its threshold, and `LLMInvalidOutput`,
-`LLMContentFiltered`, and `LLMBudgetExceeded` are failures of that row only.
+For the batch helpers (§3.2 rule 7): `LLMRejected` with a 400, 413, or 422 rejects one row's
+input (too long, malformed, or refused by a provider's input moderation that answers with a
+400) and is a failure of that row only, not retried under the same key (a hash of the row's
+input, the prompt name and template, and the use case's primary model); ten of them with no
+accepted request between them open the circuit, because then the request itself is wrong (e.g.
+a parameter the model no longer takes). Any other `LLMRejected` (401, 403, 404, other
+statuses, or a transport error with no status) opens the circuit at once. `LLMRateLimited` and
+`LLMUnavailable` count toward a separate threshold of three in a row, and `LLMInvalidOutput`,
+`LLMContentFiltered`, and `LLMBudgetExceeded` are failures of that row only; an input filter
+that PydanticAI raises as `ContentFilterError` (Azure's) is `LLMContentFiltered`, a row
+failure that resets both counts below rather than adding to one. The counts belong to one
+batch call (or to a breaker the caller passes to several) and take rows in the order they
+finish, across workers. A success or a row's own failure shows the provider accepted the
+request and resets both counts. A rate limit or an outage says nothing about the request, so
+it leaves the rejection count alone (400s alternating with 503s still reach ten); a row
+rejection resets the transient count. Once the circuit is open, rows still in flight do not
+clear the rejection run, and those rejected for their input join it. When a run of row
+rejections opens the circuit, or every row a batch attempted was rejected for its input (a
+batch shorter than the threshold), the batch report lists those rows: each was persisted as
+not to retry, and a fixed request parameter does not change the key, so the caller clears
+their skip marks once the request is fixed. Decided 2026-10-20: one oversized or filtered row
+stopped the whole batch when every rejection opened the circuit.
 
 ### 6.8 Usage limits
 
@@ -959,7 +1004,8 @@ requests per run unless the use case sets it. `cost_limit` is a per-run dollar c
 unset in phase one: the budgets decision (2026-10-01, `llm-usage-policies-spec.md` §1) is
 alerts only until the spend baseline exists. PydanticAI prices a run from `genai-prices` and only warns
 (`CostNotFoundWarning`) when it has no price for the model, so a `cost_limit` on an unpriced
-model enforces nothing. The library's test suite checks that every catalog model has a price.
+model enforces nothing. The library's test suite checks that every catalog model has a price;
+a model the catalog does not list (`llm-usage-policies-spec.md` §2.2) may have none.
 
 ### 6.9 Type stubs
 

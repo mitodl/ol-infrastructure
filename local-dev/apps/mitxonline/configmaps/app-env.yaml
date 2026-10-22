@@ -6,25 +6,25 @@ metadata:
   namespace: mitxonline
 data:
   DJANGO_SETTINGS_MODULE: "main.settings"
-  MITX_ONLINE_BASE_URL: "https://mitxonline.mit.dev"
-  MITXONLINE_DOCKER_BASE_URL: "https://mitxonline.mit.dev"
+  MITX_ONLINE_BASE_URL: "https://mitxonline.mit.test"
+  MITXONLINE_DOCKER_BASE_URL: "https://mitxonline.mit.test"
 
   # Redirect target for a first-time login (GatewayLoginView sends users whose
   # profile has completed_onboarding=False here); defaults to a legacy
   # mitxonline.odl.local:8013 host, which doesn't resolve in this stack.
-  MITXONLINE_NEW_USER_LOGIN_URL: "https://mitxonline.mit.dev/create-profile"
+  MITXONLINE_NEW_USER_LOGIN_URL: "https://mitxonline.mit.test/create-profile"
 
   # Base of most Learn links and redirects mitxonline builds, such as the
   # post-purchase dashboard redirect. The default maps MITX_ONLINE_ENVIRONMENT
   # to a Learn host and falls back to https://learn.mit.edu, so "local" would
   # send them to production Learn.
-  MIT_LEARN_BASE_URL: "https://learn.mit.dev"
+  MIT_LEARN_BASE_URL: "https://learn.mit.test"
 
   # The trailing "&" is deliberate: the view appends "?redirect_url=..." to this
   # value, and it keeps no_redirect parsing as exactly "1".
   # If the openedx app is ever enabled here, change this to
-  # https://lms.mit.dev/logout to match how the deployed envs do it.
-  LOGOUT_REDIRECT_URL: "https://mitxonline.mit.dev/logout?no_redirect=1&"
+  # https://lms.mit.test/logout to match how the deployed envs do it.
+  LOGOUT_REDIRECT_URL: "https://mitxonline.mit.test/logout?no_redirect=1&"
   MITX_ONLINE_DB_DISABLE_SSL: "True"
   MITX_ONLINE_USE_S3: "False"
   DEBUG: "False"
@@ -39,7 +39,7 @@ data:
   # Site config
   SITE_NAME: "MITx Online"
   MITX_ONLINE_ENVIRONMENT: "local"
-  MITX_ONLINE_ADMIN_EMAIL: "admin@odl.local"
+  MITX_ONLINE_ADMIN_EMAIL: "admin@ol.test"
   MITX_ONLINE_FROM_EMAIL: "MIT Learn <mitlearn-support@mit.edu>"
   MITX_ONLINE_REPLY_TO_ADDRESS: "MIT Learn <mitlearn-support@mit.edu>"
   MITX_ONLINE_SUPPORT_EMAIL: "mitlearn-support@mit.edu"
@@ -47,9 +47,9 @@ data:
   EXPOSE_OIDC_LOGIN: "True"
 
   # Keycloak
-  KEYCLOAK_BASE_URL: "https://sso.ol.mit.dev"
+  KEYCLOAK_BASE_URL: "https://sso.ol.mit.test"
   KEYCLOAK_REALM_NAME: "olapps"
-  KEYCLOAK_DISCOVERY_URL: "https://sso.ol.mit.dev/realms/olapps/.well-known/openid-configuration"
+  KEYCLOAK_DISCOVERY_URL: "https://sso.ol.mit.test/realms/olapps/.well-known/openid-configuration"
 
   # Enable the APISIX user middleware: it reads the X-Userinfo header APISIX
   # injects and authenticates (and auto-creates) the Django user. Defaults to
@@ -57,7 +57,7 @@ data:
   MITOL_APIGATEWAY_DISABLE_MIDDLEWARE: "false"
   # Required for Django's CSRF origin check on POSTs behind HTTPS (e.g. the
   # admin login form); defaults to empty, which rejects them with DEBUG=False.
-  CSRF_TRUSTED_ORIGINS: "https://mitxonline.mit.dev,https://learn.mit.dev"
+  CSRF_TRUSTED_ORIGINS: "https://mitxonline.mit.test,https://learn.mit.test"
 
   # Valkey
   # Each app needs its own Valkey DBs, or Celery and RedBeat pick up another
@@ -103,10 +103,10 @@ data:
   # /learn/... shape is hardcoded in mitxonline and cannot be pointed at the
   # LMS's legacy /courses/<id>/course/ courseware.
   #
-  # 'mit.dev' is rewritten to LOCAL_DEV_ROOT_DOMAIN by k8s_yaml_local.
-  OPENEDX_API_BASE_URL: "https://lms.mit.dev"
-  OPENEDX_COURSE_BASE_URL: "https://lms.mit.dev"
-  OPENEDX_STUDIO_API_BASE_URL: "https://studio.mit.dev"
+  # 'mit.test' is rewritten to LOCAL_DEV_ROOT_DOMAIN by k8s_yaml_local.
+  OPENEDX_API_BASE_URL: "https://lms.mit.test"
+  OPENEDX_COURSE_BASE_URL: "https://lms.mit.test"
+  OPENEDX_STUDIO_API_BASE_URL: "https://studio.mit.test"
   # OPENEDX_BASE_REDIRECT_URL is deliberately absent: its default is
   # OPENEDX_API_BASE_URL, so it follows the value above.
 

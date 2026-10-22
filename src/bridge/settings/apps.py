@@ -45,12 +45,25 @@ class AppRegistration:
         and the release bot starts accepting commands for the app -- until
         then it refuses them, since every command it offers targets a job or
         an artifact only the modernized pipeline produces.
+    :param release_changelog: Whether the release resource writes a generated
+        ``CHANGELOG.md`` entry (version, date, one line per change) into each
+        ``Release <version>`` commit. Only meaningful with
+        ``release_resource_workflow``. Set it False for an app that already
+        maintains its own ``CHANGELOG.md``: the resource inserts its entry
+        ahead of the first ``## `` line, which in a file managed by another
+        tool lands between that tool's anchor and its heading and duplicates
+        the release. ``ol-analytics-api`` does this -- scriv collects
+        hand-written fragments during the version bump. An app that shares a
+        repo with another registered app (``mit-learn-nextjs``) must also set
+        it False until the two have separate changelogs, or both flows would
+        write the one file.
     """
 
     github_repo: str | None = None
     repo_main_branch: str = "main"
     slack_channel: str | None = None
     release_resource_workflow: bool = False
+    release_changelog: bool = True
 
 
 APPS: dict[str, AppRegistration] = {
@@ -80,7 +93,11 @@ APPS: dict[str, AppRegistration] = {
         repo_main_branch="master", slack_channel="product-ovs"
     ),
     # No app-specific channel given -- falls back to RELEASE_ANNOUNCE_CHANNEL.
-    "ol-analytics-api": AppRegistration(release_resource_workflow=True),
+    # Keeps its own scriv-managed CHANGELOG.md (see bin/collect-changelog in
+    # that repo), so the resource must not write one too.
+    "ol-analytics-api": AppRegistration(
+        release_resource_workflow=True, release_changelog=False
+    ),
     "xpro": AppRegistration(
         github_repo="mitodl/mitxpro",
         repo_main_branch="master",
@@ -113,6 +130,12 @@ def release_resource_workflow(app_name: str) -> bool:
     """Return whether the given app runs the modernized release-resource pipeline."""
     entry = APPS.get(app_name)
     return bool(entry and entry.release_resource_workflow)
+
+
+def release_changelog(app_name: str) -> bool:
+    """Return whether the release resource writes a generated CHANGELOG.md entry."""
+    entry = APPS.get(app_name)
+    return entry.release_changelog if entry else True
 
 
 #: GitHub App id for `ol-release-bot`, the identity the Concourse `release`,

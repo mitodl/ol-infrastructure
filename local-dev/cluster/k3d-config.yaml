@@ -39,7 +39,7 @@ registries:
         endpoint:
           - "http://k3d-registry.localhost:5001"
 
-# Expose HTTPS and HTTP on host ports 443/80 so that *.mit.dev ingress routes
+# Expose HTTPS and HTTP on host ports 443/80 so that *.mit.test ingress routes
 # are reachable without a port suffix.
 ports:
 - port: 80:30080

@@ -63,7 +63,8 @@ def slack():
 
 
 def _command(text: str) -> dict[str, str]:
-    return {"text": text}
+    # `command` is the slash command Slack dispatched, as it sends it.
+    return {"command": "/doof", "text": text}
 
 
 def _record_trigger(calls: list[tuple[str, str, str]]):
@@ -2679,6 +2680,174 @@ async def test_a_refused_command_replies_only_to_whoever_ran_it(
     await bot._cmd_doof(mixed_repos, slack.ack, slack.respond, _command(text), {})
 
     assert slack.respond.call_args.kwargs["response_type"] == "ephemeral"
+
+
+# ---------------------------------------------------------------------------
+# who ran a command
+# ---------------------------------------------------------------------------
+
+
+async def test_a_command_announces_who_ran_it_before_doing_the_work(
+    repos, slack, monkeypatch
+):
+    """Release state goes to the channel; whose release it is has to go too."""
+    monkeypatch.setattr(
+        bot.github,
+        "release_preview",
+        AsyncMock(
+            return_value={
+                "version": "2026.8.12.1",
+                "since": "2026.8.3.1",
+                "commits": [],
+                "omitted": 0,
+                "in_flight": None,
+            }
+        ),
+    )
+
+    await bot._cmd_doof(
+        repos,
+        slack.ack,
+        slack.respond,
+        _command("preview my-app"),
+        {"user_id": "UDANA"},
+    )
+
+    announcement, *rest = slack.respond.call_args_list
+    assert announcement.args[0] == "<@UDANA> requested `/doof preview my-app`"
+    assert announcement.kwargs["response_type"] == "in_channel"
+    # The announcement is an extra message, not a replacement for the answer.
+    assert any("2026.8.12.1" in str(call.args[0]) for call in rest if call.args)
+
+
+@pytest.mark.parametrize("text", ["help", "uptime", "nonsense"])
+async def test_a_privately_answered_command_announces_nobody(text, repos, slack):
+    """Only the person who ran these sees the reply, so naming them is noise."""
+    await bot._cmd_doof(
+        repos, slack.ack, slack.respond, _command(text), {"user_id": "UDANA"}
+    )
+
+    assert "requested" not in slack.said
+
+
+async def test_a_refused_command_still_says_who_ran_it(mixed_repos, slack):
+    """The announcement is posted before a handler can decide to refuse."""
+    await bot._cmd_doof(
+        mixed_repos,
+        slack.ack,
+        slack.respond,
+        _command("release legacy-app"),
+        {"user_id": "UDANA"},
+    )
+
+    first = slack.respond.call_args_list[0]
+    assert first.args[0] == "<@UDANA> requested `/doof release legacy-app`"
+    # ...and the refusal itself still goes back only to them.
+    assert slack.respond.call_args.kwargs["response_type"] == "ephemeral"
+
+
+async def test_whoever_ran_a_command_can_come_from_the_slash_payload(
+    mixed_repos, slack
+):
+    """Bolt fills `context`, but the raw payload names the user too."""
+    await bot._cmd_doof(
+        mixed_repos,
+        slack.ack,
+        slack.respond,
+        dict(_command("release nope"), user_id="UPAYLOAD"),
+        {},
+    )
+
+    assert slack.respond.call_args_list[0].args[0].startswith("<@UPAYLOAD> requested")
+
+
+async def test_nothing_is_announced_when_nothing_names_the_runner(mixed_repos, slack):
+    """Half an announcement -- `<@> requested` -- is worse than none."""
+    await bot._cmd_doof(
+        mixed_repos, slack.ack, slack.respond, _command("release nope"), {}
+    )
+
+    assert "requested" not in slack.said
+
+
+async def test_the_echoed_command_cannot_break_out_of_its_code_span(mixed_repos, slack):
+    await bot._cmd_doof(
+        mixed_repos,
+        slack.ack,
+        slack.respond,
+        _command("release `<!here>`"),
+        {"user_id": "UDANA"},
+    )
+
+    announced = slack.respond.call_args_list[0].args[0]
+    assert announced == "<@UDANA> requested `/doof release '&lt;!here&gt;'`"
+    assert "<!here>" not in announced
+
+
+async def test_the_announcement_names_the_command_slack_dispatched(mixed_repos, slack):
+    """The echo follows the payload, so a renamed command stays accurate."""
+    await bot._cmd_doof(
+        mixed_repos,
+        slack.ack,
+        slack.respond,
+        {"command": "/doofenshmirtz", "text": "release nope"},
+        {"user_id": "UDANA"},
+    )
+
+    assert (
+        slack.respond.call_args_list[0].args[0]
+        == "<@UDANA> requested `/doofenshmirtz release nope`"
+    )
+
+
+async def test_a_failed_announcement_does_not_take_the_command_down(slack):
+    """Saying who ran a command is not worth losing the command over."""
+    slack.respond.side_effect = RuntimeError("response_url unreachable")
+    ack = bot._announcing(slack.ack, slack.respond, "<@UDANA> requested `/doof uptime`")
+
+    await ack()
+
+    slack.ack.assert_awaited_once()
+
+
+async def test_a_very_long_command_is_cut_down_to_one_line(mixed_repos, slack):
+    """It is announced before anything validates it, so anyone can type anything."""
+    await bot._cmd_doof(
+        mixed_repos,
+        slack.ack,
+        slack.respond,
+        _command("release " + "x" * 500),
+        {"user_id": "UDANA"},
+    )
+
+    announced = slack.respond.call_args_list[0].args[0]
+    assert announced.endswith("…`")
+    assert len(announced) < 2 * bot._ECHO_LIMIT
+
+
+async def test_cutting_the_echo_short_cannot_split_an_escape(mixed_repos, slack):
+    await bot._cmd_doof(
+        mixed_repos,
+        slack.ack,
+        slack.respond,
+        _command("release " + "&" * 300),
+        {"user_id": "UDANA"},
+    )
+
+    announced = slack.respond.call_args_list[0].args[0]
+    assert "&amp;" in announced
+    assert "&" not in announced.replace("&amp;", "")
+
+
+async def test_acknowledging_twice_announces_once(slack):
+    """A handler that acks again must not post the line a second time."""
+    ack = bot._announcing(slack.ack, slack.respond, "<@UDANA> requested `/doof uptime`")
+
+    await ack()
+    await ack()
+
+    assert slack.ack.await_count == 2
+    assert slack.respond.await_count == 1
 
 
 async def test_the_promote_button_reports_an_unknown_app_without_usage():

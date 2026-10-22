@@ -35,6 +35,7 @@ from ol_infrastructure.components.gcp.project import (
     OLGCPOIDCProviderConfig,
     OLGCPProject,
     OLGCPProjectConfig,
+    OLGCPRecaptchaKeyConfig,
     OLGCPServiceAccountConfig,
     OLGCPWorkloadIdentityPoolConfig,
 )
@@ -109,6 +110,10 @@ for project in managed_projects:
         api_keys=[
             OLGCPAPIKeyConfig(**api_key) for api_key in project.get("api_keys") or []
         ],
+        recaptcha_keys=[
+            OLGCPRecaptchaKeyConfig(**recaptcha_key)
+            for recaptcha_key in project.get("recaptcha_keys") or []
+        ],
         workload_identity_pools=[
             OLGCPWorkloadIdentityPoolConfig(
                 **{
@@ -150,5 +155,20 @@ export(
         }
         for project_id, gcp_project in gcp_projects.items()
         if gcp_project.workload_identity_providers
+    },
+)
+# The site key is the key's resource id. It is public (every page that renders
+# the widget carries it), so it is exported in the clear. The legacy secret that
+# classic siteverify needs is not exposed by the provider; README.md covers how
+# to read it.
+export(
+    "recaptcha_site_keys",
+    {
+        project_id: {
+            key_name: recaptcha_key.name
+            for key_name, recaptcha_key in gcp_project.recaptcha_keys.items()
+        }
+        for project_id, gcp_project in gcp_projects.items()
+        if gcp_project.recaptcha_keys
     },
 )

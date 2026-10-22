@@ -106,6 +106,11 @@ def create_ingress(  # noqa: PLR0913
                             "existingCASecret": args["trusted_ca"],
                             "certCAFilename": APISIX_TRUSTED_CA_FILENAME,
                         },
+                        # Without it, http_to_https redirects go to listenPort
+                        # 9443, which k3d does not publish. Copied from
+                        # setup_apisix in infrastructure/aws/eks/apisix_official.py
+                        # (hq#10999).
+                        "pluginAttrs": {"redirect": {"https_port": 443}},
                         "admin": {
                             "enabled": True,
                             "ip": "0.0.0.0",  # noqa: S104

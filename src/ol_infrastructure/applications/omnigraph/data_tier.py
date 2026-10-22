@@ -55,6 +55,7 @@ from pulumi import Output, ResourceOptions
 from ol_infrastructure.applications.omnigraph.cluster_config import (
     build_cluster_graphs,
     build_cluster_policies,
+    require_withheld_graphs_removable,
 )
 from ol_infrastructure.applications.omnigraph.image_schema import (
     ImageSchemaUnavailableError,
@@ -120,6 +121,11 @@ CLUSTER_APPLY_ACTOR = "svc-witan-admin"
 # derived from the memory limit, and a limit raised without revisiting the caps
 # would silently leave them mis-sized.
 SERVER_MEMORY_LIMIT = "2Gi"
+
+# How long the server drains in-flight requests after SIGTERM, and the pod's
+# grace around that. See termination_grace_period_seconds on the Deployment.
+SERVER_SHUTDOWN_GRACE_SECONDS = 120
+SERVER_TERMINATION_GRACE_SECONDS = SERVER_SHUTDOWN_GRACE_SECONDS + 5
 
 # ── Per-actor admission caps ─────────────────────────────────────────────────
 #
@@ -313,6 +319,7 @@ def create_data_tier(  # noqa: PLR0913
     per_actor_inflight_max: int = DEFAULT_PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max: int = DEFAULT_PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist: list[str] | None = None,
+    withheld_graphs: list[str] | None = None,
     maintenance_schedule: str = DEFAULT_MAINTENANCE_SCHEDULE,
     cleanup_iso_weekdays: tuple[int, ...] = DEFAULT_CLEANUP_ISO_WEEKDAYS,
     *,
@@ -345,6 +352,11 @@ def create_data_tier(  # noqa: PLR0913
     ``graph_removal_allowlist`` names the graphs the server entrypoint may
     delete when ``cluster.yaml`` stops declaring them. Only read once the
     served format is one whose binaries delete on apply (0.13, format 14).
+
+    ``withheld_graphs`` leaves graphs out of ``cluster.yaml``, its policy
+    bundles and the maintenance window's graph list, to rebuild a graph
+    whose schema change cannot be migrated in place. See
+    ``build_cluster_graphs``.
 
     ``maintenance_schedule`` and ``cleanup_iso_weekdays`` set the nightly stop
     window that replaces the optimize and cleanup sweeps on that format, and
@@ -459,10 +471,13 @@ def create_data_tier(  # noqa: PLR0913
     # below is mounted with ``sub_path`` so it overlays only the single
     # ``cluster.yaml`` file and leaves those baked-in schemas visible alongside
     # it, rather than replacing the whole directory.
-    cluster_graphs = build_cluster_graphs(managed_repos)
+    cluster_graphs = build_cluster_graphs(managed_repos, withheld_graphs)
     removable_graphs = validate_graph_removal_allowlist(
         [] if graph_removal_allowlist is None else graph_removal_allowlist,
         list(cluster_graphs),
+    )
+    require_withheld_graphs_removable(
+        [] if withheld_graphs is None else withheld_graphs, removable_graphs
     )
     # Whether the served format is 0.12+'s, where every writer keeps the
     # root's exclusive lock after it exits. Keyed on the served format rather
@@ -816,43 +831,38 @@ def create_data_tier(  # noqa: PLR0913
                     # of dead time this task describes no longer reproduces
                     # in the typical case.
                     #
-                    # NOT lowered below 30 despite that, on review: this pod
-                    # already admits writes it expects to take up to the
-                    # tool-call deadline below, not just an instant — see the
-                    # per-actor admission-cap sizing above, MEASURED
-                    # 2026-08-12: n=4 concurrent single-row writes wall
-                    # 15.54s, comfortably admitted as "lands inside the
-                    # deadline". A cap below that would let a routine
-                    # restart SIGKILL a write the server had already decided
-                    # was safe to admit — trading a bounded, expected outage
-                    # for the exact indeterminate-outcome risk
+                    # The server drains for SERVER_SHUTDOWN_GRACE_SECONDS,
+                    # witan's 120s request budget
+                    # (WITAN_REMOTE_CALL_BUDGET_SECONDS). Every write the
+                    # per-actor cap admits is one its caller waits up to that
+                    # long for, and writes to one graph commit one at a time,
+                    # so a restart during a burst has to let the queue finish.
+                    # Cutting it off sooner turns writes the server already
+                    # admitted into the indeterminate outcome
                     # tk-a-502-from-the-deployed-witan-does-not-mean-the--f76dcb
-                    # describes, on every restart rather than only under
-                    # genuine overload. 30 is the tool call's own hard
-                    # deadline (three hardcoded ToolHive constants, same
-                    # comment block) — the client has already given up and
-                    # treated the call as failed by the time the server
-                    # would still be waiting, so there is nothing to gain by
-                    # going higher, and real risk in going lower.
+                    # describes. Waiting longer gains nothing, because the
+                    # caller has given up by then. This was 30 while ToolHive
+                    # cut tool calls at 30s and the cap was 4 (4 concurrent
+                    # writes took 15.54s on 2026-08-12). QA measured 1.3-2.3s
+                    # between commits at 16 writers on 2026-10-21, so a queue
+                    # at Production's cap of 16 can outlast 30s.
                     #
-                    # 35, NOT 30, since omnigraph 0.11 bounds its own shutdown.
-                    # 0.11 holds in-flight requests after SIGTERM for
-                    # OMNIGRAPH_SHUTDOWN_GRACE_SECONDS (upstream default 25)
-                    # and exits 2 at that deadline; upstream says the
-                    # orchestrator's grace must be longer. The server's grace
-                    # is set to 30 below, the tool-call deadline above, which
-                    # covers the measured 15.54s write with the same margin
-                    # this value had. The pod gets 5s more so the process
-                    # exits on its own deadline rather than being SIGKILLed
-                    # at it. An idle server still exits within milliseconds
-                    # (measured locally on 0.11.0), so the extra 5s costs
-                    # nothing on a routine restart.
+                    # omnigraph holds in-flight requests after SIGTERM for
+                    # OMNIGRAPH_SHUTDOWN_GRACE_SECONDS and exits 2 at that
+                    # deadline; upstream says the orchestrator's grace must be
+                    # longer. The pod gets 5s more so the process exits on its
+                    # own deadline rather than being SIGKILLed at it. An idle
+                    # server still exits within milliseconds (measured locally
+                    # on 0.11.0), so this costs nothing on a routine restart.
+                    # A restart during a burst holds the Recreate outage open
+                    # until the queue drains. The maintenance window's wait
+                    # for the server to stop is derived from this value.
                     #
                     # No preStop sleep: one replica under `Recreate` has no
                     # other endpoint to drain traffic to, so a sleep would
                     # only lengthen the outage and spend from this same
                     # budget.
-                    termination_grace_period_seconds=35,
+                    termination_grace_period_seconds=SERVER_TERMINATION_GRACE_SECONDS,
                     containers=[
                         kubernetes.core.v1.ContainerArgs(
                             name="omnigraph-server",
@@ -897,7 +907,7 @@ def create_data_tier(  # noqa: PLR0913
                                 # this can land before the 0.11 image.
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="OMNIGRAPH_SHUTDOWN_GRACE_SECONDS",
-                                    value="30",
+                                    value=str(SERVER_SHUTDOWN_GRACE_SECONDS),
                                 ),
                                 # What the 0.13 entrypoint reads to take over
                                 # the previous pod's lock. See lock_handoff.py.
@@ -1143,6 +1153,7 @@ def create_data_tier(  # noqa: PLR0913
                     cluster_configmap_name=CLUSTER_CONFIGMAP_NAME,
                     cluster_config_dir=CLUSTER_CONFIG_DIR,
                     server_deployment_name=OMNIGRAPH_SERVER_SERVICE_NAME,
+                    server_termination_grace_seconds=SERVER_TERMINATION_GRACE_SECONDS,
                     schedule=maintenance_schedule,
                     cleanup_older_than=cleanup_older_than,
                     cleanup_iso_weekdays=cleanup_iso_weekdays,
