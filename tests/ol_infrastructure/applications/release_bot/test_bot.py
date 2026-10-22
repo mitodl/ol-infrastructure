@@ -63,7 +63,8 @@ def slack():
 
 
 def _command(text: str) -> dict[str, str]:
-    return {"text": text}
+    # `command` is the slash command Slack dispatched, as it sends it.
+    return {"command": "/doof", "text": text}
 
 
 def _record_trigger(calls: list[tuple[str, str, str]]):
@@ -2781,6 +2782,32 @@ async def test_the_echoed_command_cannot_break_out_of_its_code_span(mixed_repos,
     announced = slack.respond.call_args_list[0].args[0]
     assert announced == "<@UDANA> requested `/doof release '&lt;!here&gt;'`"
     assert "<!here>" not in announced
+
+
+async def test_the_announcement_names_the_command_slack_dispatched(mixed_repos, slack):
+    """The echo follows the payload, so a renamed command stays accurate."""
+    await bot._cmd_doof(
+        mixed_repos,
+        slack.ack,
+        slack.respond,
+        {"command": "/doofenshmirtz", "text": "release nope"},
+        {"user_id": "UDANA"},
+    )
+
+    assert (
+        slack.respond.call_args_list[0].args[0]
+        == "<@UDANA> requested `/doofenshmirtz release nope`"
+    )
+
+
+async def test_a_failed_announcement_does_not_take_the_command_down(slack):
+    """Saying who ran a command is not worth losing the command over."""
+    slack.respond.side_effect = RuntimeError("response_url unreachable")
+    ack = bot._announcing(slack.ack, slack.respond, "<@UDANA> requested `/doof uptime`")
+
+    await ack()
+
+    slack.ack.assert_awaited_once()
 
 
 async def test_acknowledging_twice_announces_once(slack):

@@ -1418,7 +1418,13 @@ def _announcing(
         await ack(*args, **kwargs)
         if not announced:
             announced = True
-            await respond(attribution, response_type="in_channel")
+            try:
+                await respond(attribution, response_type="in_channel")
+            except Exception:
+                # Hooking `ack` puts this ahead of everything the handler
+                # does, so a failure to say who ran a command must not take
+                # the command itself down with it.
+                log.exception("Failed to announce who ran a command")
 
     return wrapped
 
