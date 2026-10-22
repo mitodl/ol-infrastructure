@@ -1250,7 +1250,8 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 # The endpoint went unreachable on 2026-10-21 and every run that
                 # fetched it failed. This copy is the Wayback Machine's capture
                 # of 2025-07-29, whose SSO/SLO URLs and signing cert match what
-                # Production had deployed.
+                # Production had deployed. Remove it once metadata.php answers
+                # again, or a moved endpoint or rotated cert won't be picked up.
                 org_saml_metadata_xml=Path(__file__)
                 .parent.joinpath("files/olapps/ukm_metadata.xml")
                 .read_text(),

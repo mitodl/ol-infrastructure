@@ -59,9 +59,9 @@ class SamlIdpConfig(BaseModel):
     first_login_flow: keycloak.authentication.Flow
     realm_id: str | pulumi.Output[str]
     resource_options: pulumi.ResourceOptions
-    # Keycloak refreshes the IdP's signing keys from the URL. Pulumi reads the
-    # XML when it is given and fetches the URL only when it is not, so a saved
-    # copy keeps the stack deployable while the partner's endpoint is down.
+    # The URL is set as the IdP's metadataDescriptorUrl in Keycloak. Pulumi reads
+    # the XML when it is given and fetches the URL only when it is not, so a
+    # saved copy keeps the stack deployable while the partner's endpoint is down.
     org_saml_metadata_url: str | None = None
     org_saml_metadata_xml: str | None = None
     name_id_format: NameIdFormat = NameIdFormat.unspecified

@@ -5,12 +5,19 @@ identity-provider resource from the Pulumi program. Pulumi reads that as a delet
 and removes the partner's working SSO integration.
 """
 
+import asyncio
 from urllib.error import URLError
 
 import httpx
 import pulumi
 import pulumi_keycloak as keycloak
 import pytest
+
+# Python 3.14+ compatibility: ensure event loop exists for set_mocks()
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
 
 from ol_infrastructure.substructure.keycloak import oidc_helpers, saml_helpers
 from ol_infrastructure.substructure.keycloak.oidc_helpers import (
@@ -173,8 +180,7 @@ def test_oidc_error_response_with_json_body_raises(monkeypatch, status):
 def test_saved_saml_metadata_deploys_while_the_endpoint_is_down():
     """A saved copy builds the IdP without a fetch and keeps the descriptor URL.
 
-    Keycloak still refreshes keys from the URL, so the live IdP doesn't change
-    when a copy is added.
+    Keeping the URL in extraConfig means adding a copy doesn't change the live IdP.
     """
     recording = RecordingMocks()
     pulumi.runtime.set_mocks(recording, preview=False)
