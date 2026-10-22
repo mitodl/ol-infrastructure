@@ -186,6 +186,46 @@ stage.match {
 """
 
 
+def _apisix_low_value_log_drop_alloy_config() -> str:
+    """
+    Alloy River stages that drop APISIX log lines nobody reads, measured on
+    applications-production over 24h to 2026-10-22 (7.57 GB total):
+
+    - POST /event tracking beacons, ~740 MB/day, almost all
+      courses.learn.mit.edu and courses.xpro.mit.edu.
+    - CORS OPTIONS preflights, ~420 MB/day, answered by APISIX itself
+      (upstream_addr=-).
+    - nginx's "Using opentelemetry collector.address with no TLS is a
+      security risk" warn, ~40 MB/day of one repeated line.
+
+    Only status < 400 is dropped so failing requests stay visible. Request
+    counts per host and status are still in Prometheus via apisix_http_status.
+
+    The selector is namespace/container rather than service: the pipeline has
+    no service label, which is also why the apisix_cookie_metrics stage above
+    never matches.
+    """
+    return r"""
+stage.match {
+  selector = "{namespace=\"operations\", container=\"apisix\"} |= \"request_method=POST \" |= \"request_uri=\\\"/event\\\" \" |~ \" status=[1-3][0-9][0-9] \""
+  action = "drop"
+  drop_counter_reason = "apisix_event_beacon"
+}
+
+stage.match {
+  selector = "{namespace=\"operations\", container=\"apisix\"} |= \"request_method=OPTIONS \" |~ \" status=[1-3][0-9][0-9] \""
+  action = "drop"
+  drop_counter_reason = "apisix_cors_preflight"
+}
+
+stage.match {
+  selector = "{namespace=\"operations\", container=\"apisix\"} |= \"with no TLS is a security risk\""
+  action = "drop"
+  drop_counter_reason = "apisix_otel_no_tls_warn"
+}
+"""
+
+
 def setup_grafana(
     cluster_name: str,
     stack_info: StackInfo,
@@ -567,7 +607,8 @@ def setup_grafana(
                     # restart.
                     "onlyGatherNewLogLines": False,
                     "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config()
-                    + _keycloak_olapps_idp_login_redact_alloy_config(),
+                    + _keycloak_olapps_idp_login_redact_alloy_config()
+                    + _apisix_low_value_log_drop_alloy_config(),
                 },
                 "applicationObservability": {
                     "enabled": True,
