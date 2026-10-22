@@ -1038,9 +1038,8 @@ dagster_bot = OpenMetadataBot(
 
 # ol-data-platform's lakehouse code location reads secret-data/pipelines/*. A
 # path of its own rather than pipelines/openmetadata, which the application
-# stack still fills with the ingestion bot's token: two stacks writing one path
-# would each delete it when they stop. Dagster moves to this path, then the
-# application stack's copy goes.
+# stack filled with the ingestion bot's token until Dagster moved here: two
+# stacks writing one path would each delete it when they stop.
 vault.generic.Secret(
     f"om-dagster-bot-vault-secret-{stack_info.env_suffix}",
     path="secret-data/pipelines/openmetadata-dagster-bot",

@@ -614,36 +614,24 @@ for _bot_key, _bot_name in _OM_BOTS.items():
     )
     connector_secret_names.append(_k8s_secret_name)
 
-# Copies of the ingestion bot token for consumers that read only their own Vault
-# mounts. Each copy reads the same SOPS key, which keeps a rotation to one place.
-# Concourse shares this Vault.
-# - The contracts sync pipeline (ol_concourse/pipelines/applications/
-#   ol_data_contracts_sync.py) publishes ol-data-platform's contracts/ to
-#   production OpenMetadata. Concourse reads only secret-concourse/<team>/*.
-# - ol-data-platform's lakehouse code location pushes Dagster asset check
-#   results to production OpenMetadata as test cases. Dagster's Vault policy
-#   reads secret-data/pipelines/*. Its sensor is registered only in production,
-#   since the tables it names come from the production dbt manifest.
+# A copy of the ingestion bot token for the contracts sync pipeline in
+# ol_concourse/pipelines/applications/ol_data_contracts_sync.py, which
+# publishes ol-data-platform's contracts/ to production OpenMetadata. Concourse
+# shares this Vault but reads only secret-concourse/<team>/*. Dagster's token
+# is dagster-bot's, written by substructure/open_metadata.
 if stack_info.env_suffix == "production":
-    _ingestion_bot_api_secret = Output.secret(
-        json.dumps(
-            {
-                "token": open_metadata_connector_secrets["ingestion_bot"]["token"],
-                "server_url": f"https://{open_metadata_config.require('domain')}/api",
-            }
-        )
-    )
-    for _consumer, _vault_path in {
-        "concourse-contracts": (
-            "secret-concourse/infrastructure/openmetadata_contracts_bot"
+    vault.generic.Secret(
+        f"open-metadata-concourse-contracts-bot-secret-{stack_info.env_suffix}",
+        path="secret-concourse/infrastructure/openmetadata_contracts_bot",
+        data_json=Output.secret(
+            json.dumps(
+                {
+                    "token": open_metadata_connector_secrets["ingestion_bot"]["token"],
+                    "server_url": f"https://{open_metadata_config.require('domain')}/api",
+                }
+            )
         ),
-        "dagster": "secret-data/pipelines/openmetadata",
-    }.items():
-        vault.generic.Secret(
-            f"open-metadata-{_consumer}-bot-secret-{stack_info.env_suffix}",
-            path=_vault_path,
-            data_json=_ingestion_bot_api_secret,
-        )
+    )
 
 # IRSA trust role granting the OpenMetadata server pod read access to AWS Glue and S3.
 # Uses OLEKSTrustRole directly (rather than OLEKSAuthBinding) because Vault K8s
