@@ -3,12 +3,19 @@
 The scim-for-keycloak enterprise plugin stores its outbound provisioning targets
 in its own JPA tables, not in Keycloak's component model, so pulumi_keycloak
 cannot manage them. They are only reachable through the plugin's SCIM admin
-backend at ``/realms/{realm}/scim/admin/backend/scim/v2/RemoteScimProviderConfig``.
+backend at ``/realms/master/scim/admin/backend/scim/v2/RemoteScimProviderConfig``.
 
 Since plugin 4.x the backend accepts client_credentials tokens from a master
 realm service account that holds the ``master-realm`` client role
 ``scim-admin``. Earlier releases only accepted ``admin-cli`` and
 ``security-admin-console`` tokens.
+
+Requests go to the backend under the master realm, whatever realm the provider
+belongs to. The plugin verifies the token in its issuer realm but then looks up
+the token's client in the realm from the URL, and the service account client
+only exists in master, so ``/realms/olapps/...`` returns 401. The list endpoint
+under master returns providers from every realm the caller holds
+``<realm>-realm`` ``scim-admin`` on.
 
 Writes are read-modify-write: the live resource is fetched and only the
 declared attributes are overlaid before the PUT. A SCIM PUT replaces the whole
@@ -29,6 +36,7 @@ SCIM_REMOTE_PROVIDER_SCHEMA = (
 )
 SCIM_CONTENT_TYPE = "application/scim+json"
 REQUEST_TIMEOUT_SECONDS = 30
+ADMIN_REALM = "master"
 LIST_PAGE_SIZE = 100
 
 
@@ -114,7 +122,7 @@ class ScimRemoteProviderSpec(BaseModel):
 
 def _session(props: dict[str, Any]) -> requests.Session:
     token_response = requests.post(
-        f"{props['keycloak_url']}/realms/master/protocol/openid-connect/token",
+        f"{props['keycloak_url']}/realms/{ADMIN_REALM}/protocol/openid-connect/token",
         data={
             "grant_type": "client_credentials",
             "client_id": props["client_id"],
@@ -136,7 +144,7 @@ def _session(props: dict[str, Any]) -> requests.Session:
 
 def _endpoint(props: dict[str, Any]) -> str:
     return (
-        f"{props['keycloak_url']}/realms/{props['realm']}"
+        f"{props['keycloak_url']}/realms/{ADMIN_REALM}"
         "/scim/admin/backend/scim/v2/RemoteScimProviderConfig"
     )
 
