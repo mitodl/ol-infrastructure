@@ -72,6 +72,14 @@ if ! kubectl config get-contexts "local-dev" &>/dev/null; then
 fi
 ok "kubectl context 'local-dev' configured."
 
+# scripts/eks/eks.py setup can leave QA/Production contexts in ~/.kube/config
+# (older versions wrote there by default). They authenticate through eks.py, so a
+# bare kubectl can land on them. Best-effort: only eks.py's entries are detected.
+if kubectl config view --kubeconfig "${HOME}/.kube/config" -o jsonpath='{.users[*].user.exec.args}' 2>/dev/null |
+	grep -qF 'scripts/eks/eks.py","exec-credential"'; then
+	err "${HOME}/.kube/config holds EKS contexts from scripts/eks/eks.py. Remove them with: uv run python scripts/eks/eks.py prune-default-kubeconfig"
+fi
+
 # Set active context
 kubectl config use-context "local-dev" &>/dev/null
 
