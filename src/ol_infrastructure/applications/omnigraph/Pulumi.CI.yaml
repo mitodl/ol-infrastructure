@@ -72,5 +72,15 @@ config:
   # other is caught here instead of reaching the cluster as a crash-looping
   # server, same incident this comment already describes above.
   omnigraph:internal_schema_version: 14
+  # Rebuilding code-bridge, step 1 of 2 (mitodl/agent-kit#523). The image drops
+  # InterfaceBinding.repo_file, which omnigraph 0.13 cannot migrate in place,
+  # so the plan gate refuses it against the existing graph. Withheld and
+  # allow-listed together, this deploy's apply deletes code-bridge. Step 2
+  # removes both keys, and that deploy's apply creates it empty from the new
+  # schema. Then reindex every managed repo with a forced run.
+  omnigraph:withheld_graphs:
+  - code-bridge
+  omnigraph:graph_removal_allowlist:
+  - code-bridge
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagHdMkilOMMReBzl5ZFVAxo4AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMp4JVj0Zbv48c45+qAgEQgDt/KPJs42c+WEXeS2IPS6gVYHOCM2L51SVYdqGNpSII1XjPkxQgj6ypYwhz6wdA7GrvJjK9P89/US3Nww==
