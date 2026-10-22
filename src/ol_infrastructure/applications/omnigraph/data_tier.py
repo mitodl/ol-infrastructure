@@ -55,6 +55,7 @@ from pulumi import Output, ResourceOptions
 from ol_infrastructure.applications.omnigraph.cluster_config import (
     build_cluster_graphs,
     build_cluster_policies,
+    require_withheld_graphs_removable,
 )
 from ol_infrastructure.applications.omnigraph.image_schema import (
     ImageSchemaUnavailableError,
@@ -474,6 +475,9 @@ def create_data_tier(  # noqa: PLR0913
     removable_graphs = validate_graph_removal_allowlist(
         [] if graph_removal_allowlist is None else graph_removal_allowlist,
         list(cluster_graphs),
+    )
+    require_withheld_graphs_removable(
+        [] if withheld_graphs is None else withheld_graphs, removable_graphs
     )
     # Whether the served format is 0.12+'s, where every writer keeps the
     # root's exclusive lock after it exits. Keyed on the served format rather

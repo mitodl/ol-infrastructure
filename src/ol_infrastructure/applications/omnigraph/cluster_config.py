@@ -145,16 +145,7 @@ def _validate_withheld_graphs(
     :raises ValueError: when the value is not a list of graph ids, an entry
         names no declarable graph, or an entry is ``council``.
     """
-    if not isinstance(withheld_graphs, list) or not all(
-        isinstance(graph, str) for graph in withheld_graphs
-    ):
-        # `pulumi config set` without `--path` stores one string, which would
-        # otherwise be read as a list of its characters.
-        msg = (
-            "omnigraph:withheld_graphs must be a list of graph ids, "
-            f"got {withheld_graphs!r}"
-        )
-        raise ValueError(msg)
+    require_graph_id_list(withheld_graphs, "withheld_graphs")
     unknown = sorted(set(withheld_graphs) - set(declarable_graph_ids))
     if unknown:
         # A typo would otherwise withhold nothing, and the deploy that was
@@ -175,6 +166,47 @@ def _validate_withheld_graphs(
         )
         raise ValueError(msg)
     return withheld_graphs
+
+
+def require_graph_id_list(value: object, key: str) -> list[str]:
+    """Return ``value``, refusing anything but a list of graph ids.
+
+    ``Config.get_object`` JSON-decodes the stack value, so a JSON string such
+    as ``"code-bridge"`` arrives as a ``str``, which would otherwise be read as
+    a list of its characters.
+
+    :param value: the decoded ``omnigraph:<key>`` value.
+    :param key: the config key, for the error.
+    :raises ValueError: when ``value`` is not a list of strings.
+    """
+    if not isinstance(value, list) or not all(
+        isinstance(graph, str) for graph in value
+    ):
+        msg = f"omnigraph:{key} must be a list of graph ids, got {value!r}"
+        raise ValueError(msg)
+    return value
+
+
+def require_withheld_graphs_removable(
+    withheld_graphs: list[str], removable_graphs: list[str]
+) -> None:
+    """Refuse a withheld graph whose deletion is not allow-listed.
+
+    Withholding always means deleting. Without the allow-list entry the
+    ConfigMap is updated and the plan gate then fails the deploy, but a
+    failed deploy does not roll the ConfigMap back, so the server's next boot
+    (e.g. the nightly window scaling it back up) refuses to start.
+
+    :raises ValueError: naming the withheld graphs that are not allow-listed.
+    """
+    missing = sorted(set(withheld_graphs) - set(removable_graphs))
+    if missing:
+        msg = (
+            f"omnigraph:withheld_graphs names {missing}, which "
+            "omnigraph:graph_removal_allowlist does not. Withholding a graph "
+            "deletes it, so list it in both."
+        )
+        raise ValueError(msg)
 
 
 def build_cluster_policies(

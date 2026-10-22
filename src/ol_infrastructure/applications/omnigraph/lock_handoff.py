@@ -27,6 +27,9 @@ from typing import NamedTuple
 import pulumi_kubernetes as kubernetes
 from pulumi import Output, Resource, ResourceOptions
 
+from ol_infrastructure.applications.omnigraph.cluster_config import (
+    require_graph_id_list,
+)
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 # The first storage format whose binaries persist the cluster lock. 0.12 and
@@ -74,16 +77,7 @@ def validate_graph_removal_allowlist(
     :raises ValueError: when an entry is a declared graph, or the value is
         not a list of graph ids.
     """
-    if not isinstance(allowlist, list) or not all(
-        isinstance(graph, str) for graph in allowlist
-    ):
-        # `pulumi config set` without `--path` stores one string, which would
-        # otherwise be read as a list of its characters.
-        msg = (
-            "omnigraph:graph_removal_allowlist must be a list of graph ids, "
-            f"got {allowlist!r}"
-        )
-        raise ValueError(msg)
+    require_graph_id_list(allowlist, "graph_removal_allowlist")
     still_declared = sorted(set(allowlist) & set(declared_graph_ids))
     if still_declared:
         msg = (

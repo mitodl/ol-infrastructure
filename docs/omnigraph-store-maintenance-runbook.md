@@ -499,7 +499,8 @@ plan is keyed by graph id, so a single `cluster.yaml` cannot both delete and
 create a graph. The rebuild is two deploys, both stack config:
 
 1. Add the graph id to both `omnigraph:withheld_graphs` and
-   `omnigraph:graph_removal_allowlist` in `Pulumi.<env>.yaml`. The deploy drops
+   `omnigraph:graph_removal_allowlist` in `Pulumi.<env>.yaml` (preview refuses
+   a withheld graph that is not allow-listed). The deploy drops
    the graph and its Cedar bundle from `cluster.yaml` (a bundle naming an
    undeclared graph fails the plan with `dangling_graph_reference`), and the
    server's boot apply deletes every object under
@@ -510,8 +511,11 @@ create a graph. The rebuild is two deploys, both stack config:
    deploy has run: Concourse can skip an intermediate commit, and a deploy of
    step 2 alone plans the refused migration again.
 3. Refill it. `council` is refused by `withheld_graphs`, since nothing
-   re-derives it. A code graph or `code-bridge` needs a forced reindex, because
-   the CI indexer's incremental run skips unchanged files and writes no bridge
+   re-derives it. A rebuilt `code-<repo>` graph refills on the CI indexer's
+   next scheduled run: it skips a file only when the graph holds that file's
+   content hash, and the new graph holds none. `code-bridge` needs a forced
+   reindex of every managed repo, because the per-repo graphs still hold their
+   hashes, so an incremental run skips unchanged files and writes no bridge
    bindings for them:
 
 ```bash

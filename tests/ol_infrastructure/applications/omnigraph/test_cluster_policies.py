@@ -17,6 +17,7 @@ from ol_infrastructure.applications.omnigraph.cluster_config import (
     COUNCIL_GRAPH_ID,
     build_cluster_graphs,
     build_cluster_policies,
+    require_withheld_graphs_removable,
 )
 
 REPOS = [
@@ -165,3 +166,13 @@ class TestWithheldGraphs:
         """`pulumi config set` without `--path` stores a bare string."""
         with pytest.raises(ValueError, match="must be a list"):
             build_cluster_graphs(REPOS, malformed)
+
+    def test_a_withheld_graph_must_be_allowlisted(self):
+        """Withheld alone updates the ConfigMap, the plan gate fails the deploy,
+        and the next boot refuses to start on the ConfigMap left behind.
+        """
+        with pytest.raises(ValueError, match="code-bridge"):
+            require_withheld_graphs_removable([BRIDGE_GRAPH_ID], [])
+
+    def test_a_withheld_and_allowlisted_graph_passes(self):
+        require_withheld_graphs_removable([BRIDGE_GRAPH_ID], [BRIDGE_GRAPH_ID])
