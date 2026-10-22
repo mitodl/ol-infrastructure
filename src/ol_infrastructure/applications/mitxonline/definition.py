@@ -798,6 +798,9 @@ def openedx_login_gate_upstream_config(
         external_hostname=gate.lms_service_host,
         scheme="http",
         port=gate.lms_service_port,
+        # Explicit rather than the controller default: the LMS answers any
+        # other Host (e.g. the Service's DNS name) with DisallowedHost.
+        pass_host="pass",  # noqa: S106 -- APISIX passHost mode, not a password
     )
 
 

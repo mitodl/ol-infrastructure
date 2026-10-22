@@ -511,3 +511,15 @@ def test_openedx_login_gate_sends_learners_without_a_session_to_keycloak():
     ]
     config = plugin["config"] if isinstance(plugin, dict) else plugin.config
     assert config["unauth_action"] == "auth"
+
+
+def test_openedx_login_gate_upstream_passes_the_public_host_to_the_lms():
+    """The LMS rejects any Host but its public one (Django DisallowedHost), so
+    the upstream must not fall back to the Service's DNS name.
+    """
+    gate = _gate_bindings().openedx_login_gate
+    config = definition.openedx_login_gate_upstream_config(gate, {})
+
+    assert config.external_hostname == "lms.mitxonline-openedx.svc.cluster.local"
+    assert config.port == 8000
+    assert config.pass_host == "pass"  # noqa: S105

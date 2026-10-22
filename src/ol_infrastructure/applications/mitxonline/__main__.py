@@ -707,7 +707,9 @@ if bindings.openedx_login_gate is not None:
         ),
     )
     mitxonline_apisix_route_openedx_login_gate = OLApisixRoute(
-        name=f"mitxonline-apisix-route-openedx-login-gate-{stack_info.env_suffix}",
+        # Outside the "mitxonline-apisix-route-*" names the webapp KEDA matcher
+        # aggregates: this route's traffic and latency are the LMS's, not ours.
+        name=f"mitxonline-openedx-login-gate-route-{stack_info.env_suffix}",
         k8s_namespace=mitxonline_namespace,
         k8s_labels=k8s_app_labels,
         route_configs=definition.openedx_login_gate_route_configs(

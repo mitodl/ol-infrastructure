@@ -60,6 +60,8 @@ from ol_infrastructure.components.services import apisix as apisix_module  # noq
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
     FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
     FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
+    OLApisixExternalUpstream,
+    OLApisixExternalUpstreamConfig,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixOIDCRouteGroup,
@@ -2001,3 +2003,54 @@ def test_learn_session_rejects_another_clients_vault_path():
                 path="sso/ol-analytics-api", vaultauth="vaultauth"
             ),
         )
+
+
+@pulumi.runtime.test
+def test_external_upstream_spec_omits_unset_port_and_pass_host():
+    """Existing external upstreams keep the controller defaults."""
+    upstream = OLApisixExternalUpstream(
+        "test-external-default",
+        OLApisixExternalUpstreamConfig(
+            application_name="ext",
+            k8s_namespace="ns",
+            external_hostname="example.org",
+        ),
+    )
+
+    def check(spec):
+        assert spec == {
+            "scheme": "https",
+            "externalNodes": [{"type": "Domain", "name": "example.org"}],
+        }
+
+    return upstream.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_external_upstream_spec_carries_port_and_pass_host():
+    upstream = OLApisixExternalUpstream(
+        "test-external-service",
+        OLApisixExternalUpstreamConfig(
+            application_name="ext-svc",
+            k8s_namespace="ns",
+            external_hostname="lms.other-ns.svc.cluster.local",
+            scheme="http",
+            port=8000,
+            pass_host="pass",
+        ),
+    )
+
+    def check(spec):
+        assert spec == {
+            "scheme": "http",
+            "passHost": "pass",
+            "externalNodes": [
+                {
+                    "type": "Domain",
+                    "name": "lms.other-ns.svc.cluster.local",
+                    "port": 8000,
+                }
+            ],
+        }
+
+    return upstream.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
