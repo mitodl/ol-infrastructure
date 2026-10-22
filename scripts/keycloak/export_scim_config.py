@@ -11,10 +11,11 @@ the Keycloak instance, or (plugin 4.x+) any service account client holding the
 master-realm 'scim-admin' client role. The Keycloak substructure stack
 provisions such a client and writes its credentials to Vault.
 
-Query the backend under the master realm (the --realm default). The plugin looks
-up the token's client in the realm from the URL, and scim-config-manager only
-exists in master, so /realms/olapps/... returns 401. The master listing still
-includes the olapps providers.
+Query the backend under the realm that issued the token (--realm defaults to
+--auth-realm). The plugin looks up the token's client in the realm from the URL,
+and scim-config-manager only exists in master, so /realms/olapps/... returns
+401. The master listing still includes the olapps providers. With a --token from
+another realm, pass that realm as --realm.
 
     python export_scim_config.py \
         --url https://sso.ol.mit.edu \
@@ -179,7 +180,12 @@ def main() -> None:
         "instead of using the public URL, also pass --host-header so the admin "
         "backend hostname check passes.",
     )
-    parser.add_argument("--realm", default="master")
+    parser.add_argument(
+        "--realm",
+        default=None,
+        help="Realm in the admin backend URL. Defaults to --auth-realm, the realm "
+        "that issued the token.",
+    )
     parser.add_argument("--username")
     parser.add_argument("--password")
     parser.add_argument("--client-id", default="admin-cli")
@@ -235,7 +241,7 @@ def main() -> None:
     else:
         parser.error("Provide --token, --client-secret, or --username+--password")
 
-    realm = args.realm
+    realm = args.realm or args.auth_realm
     result: dict[str, Any] = {"realm": realm, "keycloak_url": url, "resources": {}}
 
     # ── Core plugin resources ────────────────────────────────────────────────
