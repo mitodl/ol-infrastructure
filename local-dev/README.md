@@ -36,6 +36,7 @@ This environment runs the MIT Learn application stack as Kubernetes workloads in
 | mit-learn (frontend) | `https://learn.mit.test` | Next.js frontend |
 | mit-learn (backend) | `https://api.learn.mit.test` | Django/granian API |
 | learn-ai | `https://ai.learn.mit.test`, `https://api.learn.mit.test/ai/` | Django AI proxy service. The frontend uses the `/ai/` path, which shares mit-learn's login session. |
+| learn-ai sandbox | `https://ai-sandbox.learn.mit.test` | Static build of `learn-ai/frontend-demo`, learn-ai checkout only, see [learn-ai sandbox](#learn-ai-sandbox-frontend-demo) |
 | mitxonline | `https://mitxonline.mit.test` | MITx Online LMS (Django/uwsgi) |
 | odl-video-service | `https://video.odl.mit.test` | ODL Video Service (Django/uwsgi) |
 | micromasters | `https://micromasters.mit.test` | MicroMasters (Django/granian), opt-in, see [MicroMasters](#micromasters) |
@@ -1165,6 +1166,36 @@ problem.
 Re-run `./local-dev/scripts/setup.sh` if your `/etc/hosts` predates this: the
 hostname needs an entry. The TLS certificate already covers it through the
 `*.learn.<root_domain>` wildcard.
+
+### learn-ai sandbox (frontend-demo)
+
+With a learn-ai checkout, Tilt builds `learn-ai/frontend-demo` as a static
+export and serves it with nginx at `https://ai-sandbox.learn.<root_domain>`,
+the way CI, QA and Production serve it. There is no published image, so
+without a checkout the sandbox is not deployed. The `learnai-webapp` row in the
+Tilt UI links to it and to the learn-ai Django admin.
+
+`learnai-sandbox` is a manual resource. Saving a file never starts a `next
+build` (about a minute, several GiB of memory); click the resource's update
+button in the Tilt UI when you want your changes, and after editing
+`configmaps/sandbox-env.local.yaml`. It still builds once on `tilt up`, after
+`learnai-webapp`.
+
+The sandbox calls learn-ai at `https://api.learn.<root_domain>/ai`, so it shares
+mit-learn's login, and mit-learn at `/learn/`. Search goes to production, as
+every deployed sandbox does. The `NEXT_PUBLIC_*` values are build args in
+`apps/learn-ai/Tiltfile`. It is served on a `.learn` host, not localhost, for
+the cookie reasons under
+[OCW theme development](#ocw-theme-development-ocw-hugo-themes).
+
+Open edX content (video and Canvas panels) goes through nginx's
+`/openedx_proxy/` to `courses.rc.learn.mit.edu`. To be logged in there, copy
+`apps/learn-ai/configmaps/sandbox-env.local.yaml.example` to
+`sandbox-env.local.yaml` and set your RC LMS session cookie. The proxy passes
+only the two `GET`s the sandbox makes.
+
+Re-run `./local-dev/scripts/setup.sh` if your `/etc/hosts` predates this; the
+TLS certificate already covers the hostname.
 
 ---
 

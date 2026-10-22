@@ -61,7 +61,11 @@ data:
   SESSION_COOKIE_NAME: "session_learn_ai"
   CSRF_COOKIE_NAME: "learn_ai_csrftoken"
   CSRF_COOKIE_DOMAIN: ".learn.mit.test"
-  CSRF_TRUSTED_ORIGINS: '["https://ai.learn.mit.test","https://learn.mit.test","https://api.learn.mit.test"]'
+  CSRF_TRUSTED_ORIGINS: '["https://ai.learn.mit.test","https://learn.mit.test","https://api.learn.mit.test","https://ai-sandbox.learn.mit.test"]'
+  # Hosts /http/login/?next= may return to; the setting's default is the
+  # production hosts. The local counterparts of QA's list (sandbox, Learn, Open
+  # edX, MITx Online), plus ai.learn itself.
+  LOGIN_REDIRECT_ALLOWED_HOSTS: '["ai.learn.mit.test","ai-sandbox.learn.mit.test","learn.mit.test","lms.mit.test","mitxonline.mit.test"]'
 
   # Feature flags
   FEATURE_LEARN_AI_ENABLED: "True"
