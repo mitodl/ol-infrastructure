@@ -679,6 +679,9 @@ vector_deployment = kubernetes.apps.v1.Deployment(
         # it back to the static replicas=2 on every pulumi up. Same pattern
         # as applications/xqwatcher/__main__.py.
         ignore_changes=["spec.replicas"],
+        # The volume references the ConfigMap by literal name, so without this
+        # the rollout can start before the ConfigMap is replaced.
+        depends_on=[vector_config_map],
     ),
 )
 
