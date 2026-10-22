@@ -31,6 +31,8 @@ from pulumi import dynamic
 from pydantic import BaseModel, ConfigDict, field_validator
 from pydantic.alias_generators import to_camel
 
+from ol_infrastructure.providers.http import raise_for_status_with_body
+
 SCIM_REMOTE_PROVIDER_SCHEMA = (
     "urn:goldfish:params:scim:schemas:core:2.0:ScimRemoteProvider"
 )
@@ -149,17 +151,6 @@ def _endpoint(props: dict[str, Any]) -> str:
     )
 
 
-def _raise_for_status(response: requests.Response) -> None:
-    # The SCIM error body carries the plugin's validation message, which
-    # raise_for_status() alone would drop.
-    if not response.ok:
-        msg = (
-            f"{response.request.method} {response.url} returned "
-            f"{response.status_code}: {response.text}"
-        )
-        raise RuntimeError(msg)
-
-
 def _declared(props: dict[str, Any]) -> dict[str, Any]:
     declared = dict(props["spec"])
     if props["authentication"] is not None:
@@ -180,7 +171,7 @@ def _find_by_name(
             params={"count": LIST_PAGE_SIZE, "startIndex": len(resources) + 1},
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
-        _raise_for_status(response)
+        raise_for_status_with_body(response)
         page = response.json()
         page_resources = page.get("Resources", [])
         if not page_resources:
@@ -262,7 +253,7 @@ def _put(
         json=body,
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
-    _raise_for_status(response)
+    raise_for_status_with_body(response)
     return response.json()
 
 
@@ -285,7 +276,7 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
                 json={"schemas": [SCIM_REMOTE_PROVIDER_SCHEMA], **_declared(props)},
                 timeout=REQUEST_TIMEOUT_SECONDS,
             )
-            _raise_for_status(response)
+            raise_for_status_with_body(response)
             created = response.json()
         return dynamic.CreateResult(id_=created["id"], outs=props)
 
@@ -296,7 +287,7 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
             # An empty id tells the engine the resource is gone, so a provider
             # deleted in the admin UI drops out of state on refresh.
             return dynamic.ReadResult(id_="", outs={})
-        _raise_for_status(response)
+        raise_for_status_with_body(response)
         live = response.json()
         return dynamic.ReadResult(
             id_=id_,
@@ -332,7 +323,7 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
     ) -> dynamic.UpdateResult:
         session = _session(_news)
         response = _get(session, _news, _id)
-        _raise_for_status(response)
+        raise_for_status_with_body(response)
         _put(session, _news, response.json())
         return dynamic.UpdateResult(outs=_news)
 
@@ -343,7 +334,7 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
         )
         if response.status_code == requests.codes.not_found:
             return
-        _raise_for_status(response)
+        raise_for_status_with_body(response)
 
 
 class ScimRemoteProvider(dynamic.Resource):
