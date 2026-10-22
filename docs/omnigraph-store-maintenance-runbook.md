@@ -535,6 +535,44 @@ repo failed and names them on its last line
 (`witan-ci-index: indexed N, failed M`). Delete it when it is done, since a
 failed Job keeps `WorkloadJobFailed*` firing for as long as it exists.
 
+### The delete outlasts the startup probe
+
+Step 1's delete runs inside the boot apply, before the server listens, so it
+runs under the startup probe. The first probe is at 20s and the 24th failure
+at 135s (20 + 23 × 5), when kubelet sends SIGTERM. SIGTERM does not stop
+the apply, which keeps deleting through the 125s termination grace until
+SIGKILL, so a delete gets about 4 minutes. In-cluster it deletes about 1,000
+objects a minute. On 2026-10-22 CI's polled object count fell from 15,438 at
+16:17:25Z to 11,848 at 16:21:05Z, then stopped at 11,356 left. Every later
+boot then refuses with `an earlier cluster apply was interrupted and its
+deployment is still outstanding`, and the server stays down until the
+deployment is reconciled by hand. Count the objects first
+(`aws s3 ls --recursive <storage_root>/graphs/<id>.omni/ | wc -l`). Anything
+over about 3,500 will be killed, so plan on the recovery below as part of
+the window:
+
+```bash
+kubectl -n omnigraph scale deploy/omnigraph-server --replicas=0
+eval "$(aws configure export-credentials --format env)" && export AWS_REGION=us-east-1
+root=s3://<bucket>/<storage_prefix>
+omnigraph cluster status --cluster "$root" --json   # outstanding_id, lock_id
+aws s3 cp "$root/__cluster/lock.json" -              # confirm it is the killed pod's `deployment` lock
+omnigraph cluster force-unlock --cluster "$root" <lock_id>
+omnigraph cluster apply --cluster "$root" --deployment-id <outstanding_id> \
+  --writers-stopped --as svc-witan-admin --json      # finishes the delete; ends "converged": true
+omnigraph cluster force-unlock --cluster "$root" <new lock_id from lock.json>
+kubectl -n omnigraph scale deploy/omnigraph-server --replicas=1
+```
+
+Scale to 0 first: `--writers-stopped` attests that nothing else writes the
+root, and the crash-looping pod would. Only force-unlock a lock once its
+owner has exited and the graph's object count has stopped moving. The
+root-addressed apply leaves its own lock with operation `deployment_reconcile`
+after it succeeds. The entrypoint takes over only `serve` and `deployment`
+locks, so release that one by hand, or the next boot refuses it. From a
+laptop the reconcile deleted CI's remaining 11,356 objects in about 35
+minutes. Step 2's create is quick and stays inside the probe.
+
 Keep both deploys clear of the 03:20 window (and its end by about 04:00). A
 `pulumi up` during it scales the server back to 1, and the new pod waits on the
 held Lease until the window closes, so the Deployment update can time out.
