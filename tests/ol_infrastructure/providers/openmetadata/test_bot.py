@@ -105,6 +105,7 @@ class FakeOpenMetadata:
         # Checked in order, so a longer prefix comes before a shorter one.
         routes: dict[tuple[str, str], Any] = {
             ("GET", "roles/name/"): self.roles.get,
+            ("GET", "bots/name/"): self.bots.get,
             ("GET", "users/auth-mechanism/"): self._auth_mechanism,
             ("GET", "users/name/"): lambda key: self._view(self.users.get(key), params),
             ("GET", "users/"): lambda key: self._view(self._user_by_id(key), params),
@@ -287,6 +288,17 @@ def test_create_adopts_a_hand_made_bot_and_keeps_its_token(
     assert server.tokens_issued == 0
 
 
+def test_create_demotes_an_admin_bot_before_a_role_fails(
+    server: FakeOpenMetadata,
+) -> None:
+    server.add_user("dagster-bot", ["DefaultBotRole"], is_admin=True)
+
+    with pytest.raises(ValueError, match="role 'NoSuchRole' does not exist"):
+        OpenMetadataBotProvider().create(_props(roles=["NoSuchRole"]))
+
+    assert server.users["dagster-bot"]["isAdmin"] is False
+
+
 def test_create_refuses_a_person_with_the_bot_name(server: FakeOpenMetadata) -> None:
     server.add_user("dagster-bot", [], is_bot=False)
     with pytest.raises(ValueError, match="is a user, not a bot"):
@@ -315,6 +327,31 @@ def test_read_reports_roles_and_token_changed_in_the_ui(
     assert provider.diff(created.id, read.outs, _props()).changes
 
 
+def test_bot_metadata_changed_apart_from_its_user_is_put_back(
+    server: FakeOpenMetadata,
+) -> None:
+    provider = OpenMetadataBotProvider()
+    created = provider.create(_props())
+    server.bots["dagster-bot"]["description"] = "edited in the UI"
+
+    read = provider.read(created.id, created.outs)
+    assert read.outs["bot_in_sync"] is False
+    assert provider.diff(created.id, read.outs, _props()).changes
+
+    updated = provider.update(created.id, read.outs, _props())
+    assert server.bots["dagster-bot"]["description"] == _props()["description"]
+    assert updated.outs["bot_in_sync"] is True
+
+
+def test_update_refuses_a_bot_not_at_the_server(server: FakeOpenMetadata) -> None:
+    provider = OpenMetadataBotProvider()
+    created = provider.create(_props())
+
+    with pytest.raises(ValueError, match="cannot move between OpenMetadata"):
+        provider.update(str(uuid.uuid4()), created.outs, _props(description="new"))
+    assert server.users["dagster-bot"]["description"] != "new"
+
+
 def test_read_of_a_deleted_bot_drops_it(server: FakeOpenMetadata) -> None:
     provider = OpenMetadataBotProvider()
     created = provider.create(_props())
@@ -336,6 +373,7 @@ def test_diff() -> None:
     assert not provider.diff(created.id, outs, _props(email="x@mit.edu")).changes
     renamed = provider.diff(created.id, outs, _props(name="other-bot"))
     assert renamed.replaces == ["name"]
+    assert renamed.delete_before_replace
     assert provider.diff(created.id, {**outs, "is_admin": True}, _props()).changes
 
 

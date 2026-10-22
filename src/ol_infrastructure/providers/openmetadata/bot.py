@@ -146,22 +146,37 @@ def _apply(client: OpenMetadataClient, props: dict[str, Any]) -> dict[str, Any]:
         msg = f"bot user {name!r} is missing after it was created"
         raise RuntimeError(msg)
 
-    operations: list[dict[str, Any]] = []
-    if _held_roles(user) != props["roles"]:
-        operations.append(
-            {
-                "op": "add",
-                "path": "/roles",
-                "value": _role_refs(client, [DEFAULT_BOT_ROLE, *props["roles"]]),
-            }
-        )
     # OpenMetadata's authorizer returns before evaluating any policy for an
-    # admin, so an admin bot's roles would not limit its token.
+    # admin, so an admin bot's roles would not limit its token. Demoted on its
+    # own first, so a role that fails to resolve below cannot leave it an admin.
     if user.get("isAdmin") is True:
-        operations.append({"op": "replace", "path": "/isAdmin", "value": False})
-    if operations:
-        user = client.patch(f"users/{user['id']}", operations)
+        user = client.patch(
+            f"users/{user['id']}",
+            [{"op": "replace", "path": "/isAdmin", "value": False}],
+        )
+    if _held_roles(user) != props["roles"]:
+        user = client.patch(
+            f"users/{user['id']}",
+            [
+                {
+                    "op": "add",
+                    "path": "/roles",
+                    "value": _role_refs(client, [DEFAULT_BOT_ROLE, *props["roles"]]),
+                }
+            ],
+        )
     return user
+
+
+def _bot_in_sync(client: OpenMetadataClient, name: str, user: dict[str, Any]) -> bool:
+    # The bot entity carries its own displayName and description, which can
+    # change apart from its user's.
+    bot = client.get(f"bots/name/{name}")
+    return (
+        bot is not None
+        and bot.get("displayName") == user.get("displayName")
+        and bot.get("description") == user.get("description")
+    )
 
 
 def _outs(
@@ -171,6 +186,7 @@ def _outs(
         **props,
         "user_id": user["id"],
         "is_admin": user.get("isAdmin") is True,
+        "bot_in_sync": _bot_in_sync(client, props["name"], user),
         "token": _token(client, user["id"]),
     }
 
@@ -214,13 +230,30 @@ class OpenMetadataBotProvider(dynamic.ResourceProvider):
         ]
         if olds.get("is_admin"):
             changed.append("is_admin")
+        if olds.get("bot_in_sync") is False:
+            changed.append("bot_in_sync")
         replaces = ["name"] if olds["name"] != news["name"] else []
-        return dynamic.DiffResult(changes=bool(changed or replaces), replaces=replaces)
+        # The old bot goes first: the replacement may reuse its email, which
+        # OpenMetadata keeps unique, and a renamed bot gets a new token anyway.
+        return dynamic.DiffResult(
+            changes=bool(changed or replaces),
+            replaces=replaces,
+            delete_before_replace=bool(replaces),
+        )
 
     def update(
         self, id_: str, olds: dict[str, Any], news: dict[str, Any]
     ) -> dynamic.UpdateResult:
         client = OpenMetadataClient(news)
+        # An update cannot change the resource's id, so a server_url that points
+        # at a different OpenMetadata would manage a different user than the one
+        # in state. A URL alias for the same server still finds it.
+        if client.get(f"users/{id_}") is None:
+            msg = (
+                f"bot user {id_} is not at {news['server_url']}. A bot cannot move "
+                "between OpenMetadata servers in place; if it was deleted, refresh."
+            )
+            raise ValueError(msg)
         user = _apply(client, news)
         if any(olds.get(key) != news[key] for key in _TOKEN_PROPS):
             client.put(
@@ -264,9 +297,13 @@ class OpenMetadataBot(dynamic.Resource):
                 **spec.model_dump(),
                 "user_id": None,
                 "is_admin": None,
+                "bot_in_sync": None,
                 "token": None,
             },
             opts=pulumi.ResourceOptions.merge(
-                opts, pulumi.ResourceOptions(additional_secret_outputs=["token"])
+                opts,
+                pulumi.ResourceOptions(
+                    additional_secret_outputs=["token", "client_secret"]
+                ),
             ),
         )
