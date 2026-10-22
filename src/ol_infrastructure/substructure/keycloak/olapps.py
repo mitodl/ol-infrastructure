@@ -1247,6 +1247,13 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="UKM",
                 idp_display_name="Universiti Kebangsaan Malaysia",
                 org_saml_metadata_url="https://sso.ukm.my/saml2/idp/metadata.php",
+                # The endpoint went unreachable on 2026-10-21 and every run that
+                # fetched it failed. This copy is the Wayback Machine's capture
+                # of 2025-07-29, whose SSO/SLO URLs and signing cert match what
+                # Production had deployed.
+                org_saml_metadata_xml=Path(__file__)
+                .parent.joinpath("files/olapps/ukm_metadata.xml")
+                .read_text(),
                 # UKM gave one value per field for "attribute name and friendly
                 # name", so the plain name (SimpleSAMLphp's basic format) is
                 # the identifier; matching on the Name attribute works whether
