@@ -1384,6 +1384,45 @@ def _in_channel(respond):
     return wrapped
 
 
+def _attribution(command: dict[str, Any], context: dict[str, Any] | None) -> str | None:
+    """Name whoever ran a command, echoing what they typed, or None if unknown.
+
+    The channel sees release state but not who asked for it, which is why
+    `/doof promote` already records its requester by hand. Rendering it here,
+    off the dispatcher, covers every subcommand including ones added later.
+    """
+    user = (context or {}).get("user_id") or command.get("user_id")
+    if not user:
+        return None
+    invocation = f"{command.get('command', '/doof')} {command['text']}".strip()
+    # The echo is whatever someone typed and it goes inside a code span, so a
+    # backtick in it would close the span and let the rest render as mrkdwn.
+    invocation = _slack_escape(invocation).replace("`", "'")
+    return f"<@{user}> requested `{invocation}`"
+
+
+def _announcing(
+    ack: _SlackCallable, respond: _SlackCallable, attribution: str
+) -> _SlackCallable:
+    """Wrap `ack` so acknowledging a command announces who ran it, once.
+
+    Hooking `ack` rather than announcing from the dispatcher keeps the extra
+    round-trip off the path to Slack's 3s acknowledgement deadline, while
+    still putting the announcement ahead of the GitHub and Concourse work a
+    handler does before it says anything itself.
+    """
+    announced = False
+
+    async def wrapped(*args, **kwargs):
+        nonlocal announced
+        await ack(*args, **kwargs)
+        if not announced:
+            announced = True
+            await respond(attribution, response_type="in_channel")
+
+    return wrapped
+
+
 async def _cmd_doof(repos, ack, respond, command, context):
     parts = command["text"].split(None, 1)
     if not parts or parts[0] not in _SUBCOMMANDS:
@@ -1396,6 +1435,10 @@ async def _cmd_doof(repos, ack, respond, command, context):
     # whether it is alive, is not.
     if subcommand not in _PRIVATE_SUBCOMMANDS:
         respond = _in_channel(respond)
+        # Built from `command`, not `sub_command`: the echo is what was typed.
+        attribution = _attribution(command, context)
+        if attribution:
+            ack = _announcing(ack, respond, attribution)
     await _SUBCOMMANDS[subcommand](repos, ack, respond, sub_command, context)
 
 
