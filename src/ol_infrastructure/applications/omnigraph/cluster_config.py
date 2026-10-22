@@ -81,7 +81,9 @@ def code_graph_id(repo: str) -> str:
     return f"{CODE_GRAPH_PREFIX}{body[:keep].strip('-')}-{digest}"
 
 
-def build_cluster_graphs(managed_repos: list[str]) -> dict[str, dict[str, str]]:
+def build_cluster_graphs(
+    managed_repos: list[str], withheld_graphs: list[str] | None = None
+) -> dict[str, dict[str, str]]:
     """Build the ``graphs:`` block of cluster.yaml for ``managed_repos``.
 
     One graph per repo rather than one shared code graph (ADR-0009 follow-up,
@@ -99,8 +101,19 @@ def build_cluster_graphs(managed_repos: list[str]) -> dict[str, dict[str, str]]:
     editing this list creates the graph and restarts the server into it in the
     same deploy.
 
+    ``withheld_graphs`` (``omnigraph:withheld_graphs``) leaves graphs out of
+    the block that would otherwise be declared. It exists to rebuild a graph
+    whose schema change omnigraph cannot migrate in place (e.g. dropping a
+    column): there is no replace operation in ``cluster apply``, and its plan
+    is keyed by graph id, so one ``cluster.yaml`` cannot both delete and
+    create the same graph. The rebuild is one deploy with the graph withheld
+    (and in ``omnigraph:graph_removal_allowlist``), whose apply deletes it,
+    then one without, whose apply creates it empty from the image's schema.
+
     Raises ``ValueError`` on a duplicate derived id — two repo URIs that
-    normalize to the same graph id would otherwise silently share one store.
+    normalize to the same graph id would otherwise silently share one store —
+    and on a withheld entry that is not a list of graph ids, names no graph
+    this would declare, or names ``council``.
     """
     graphs: dict[str, dict[str, str]] = {
         COUNCIL_GRAPH_ID: {"schema": COUNCIL_SCHEMA_FILE},
@@ -116,7 +129,52 @@ def build_cluster_graphs(managed_repos: list[str]) -> dict[str, dict[str, str]]:
             )
             raise ValueError(msg)
         graphs[graph] = {"schema": CODE_SCHEMA_FILE}
-    return graphs
+    withheld = _validate_withheld_graphs(
+        [] if withheld_graphs is None else withheld_graphs, list(graphs)
+    )
+    return {graph: spec for graph, spec in graphs.items() if graph not in withheld}
+
+
+def _validate_withheld_graphs(
+    withheld_graphs: list[str], declarable_graph_ids: list[str]
+) -> list[str]:
+    """Return ``withheld_graphs``, refusing an entry that cannot be rebuilt.
+
+    :param withheld_graphs: graph ids from ``omnigraph:withheld_graphs``.
+    :param declarable_graph_ids: the ids cluster.yaml would declare without it.
+    :raises ValueError: when the value is not a list of graph ids, an entry
+        names no declarable graph, or an entry is ``council``.
+    """
+    if not isinstance(withheld_graphs, list) or not all(
+        isinstance(graph, str) for graph in withheld_graphs
+    ):
+        # `pulumi config set` without `--path` stores one string, which would
+        # otherwise be read as a list of its characters.
+        msg = (
+            "omnigraph:withheld_graphs must be a list of graph ids, "
+            f"got {withheld_graphs!r}"
+        )
+        raise ValueError(msg)
+    unknown = sorted(set(withheld_graphs) - set(declarable_graph_ids))
+    if unknown:
+        # A typo would otherwise withhold nothing, and the deploy that was
+        # meant to delete a graph would succeed without touching it.
+        msg = (
+            f"omnigraph:withheld_graphs names {unknown}, which cluster.yaml "
+            "would not declare anyway."
+        )
+        raise ValueError(msg)
+    if COUNCIL_GRAPH_ID in withheld_graphs:
+        # The code graphs and the bridge are derived from checkouts, so a
+        # reindex puts their contents back. council holds what people and
+        # agents wrote, and nothing re-derives it.
+        msg = (
+            f"omnigraph:withheld_graphs names {COUNCIL_GRAPH_ID!r}. Withholding "
+            "a graph deletes its storage and history, and council's contents "
+            "are not derived from anything a reindex can replay."
+        )
+        raise ValueError(msg)
+    return withheld_graphs
 
 
 def build_cluster_policies(
@@ -152,19 +210,24 @@ def build_cluster_policies(
         for graph, spec in cluster_graphs.items()
         if spec["schema"] == CODE_SCHEMA_FILE
     )
-    policies: dict[str, dict[str, object]] = {
-        "memory_rules": {
+    # A bundle is omitted with its graph (withheld_graphs). omnigraph refuses
+    # an `applies_to` naming an undeclared graph (`dangling_graph_reference`,
+    # v0.13.0 omnigraph-cluster config.rs), so keeping it would fail the plan
+    # of the deploy that removes the graph.
+    policies: dict[str, dict[str, object]] = {}
+    if COUNCIL_GRAPH_ID in cluster_graphs:
+        policies["memory_rules"] = {
             "file": f"./{MEMORY_POLICY_FILE}",
             "applies_to": [COUNCIL_GRAPH_ID],
-        },
-        "bridge_rules": {
+        }
+    if BRIDGE_GRAPH_ID in cluster_graphs:
+        policies["bridge_rules"] = {
             "file": f"./{BRIDGE_POLICY_FILE}",
             "applies_to": [BRIDGE_GRAPH_ID],
-        },
-        "server_rules": {
-            "file": f"./{SERVER_POLICY_FILE}",
-            "applies_to": ["cluster"],
-        },
+        }
+    policies["server_rules"] = {
+        "file": f"./{SERVER_POLICY_FILE}",
+        "applies_to": ["cluster"],
     }
     # Omitted entirely when no repo is managed: a bundle with an empty
     # `applies_to` governs nothing, and declaring one reads as though the code

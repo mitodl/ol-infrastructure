@@ -192,6 +192,12 @@ GRAPH_REMOVAL_ALLOWLIST: list[str] = omnigraph_config.get_object(
     "graph_removal_allowlist", []
 )
 
+# Graphs left out of cluster.yaml that it would otherwise declare, to rebuild
+# one whose schema change omnigraph cannot migrate in place. Listed together
+# with GRAPH_REMOVAL_ALLOWLIST, the deploy deletes the graph; clearing both
+# re-adds it, empty, from the image's schema. See build_cluster_graphs.
+WITHHELD_GRAPHS: list[str] = omnigraph_config.get_object("withheld_graphs", [])
+
 # The image to migrate FROM — the one currently deployed, whose binary can
 # still read the old root. Set only while a storage-format migration is being
 # run; unset (the steady state) means no migration Job exists at all. See the
@@ -1099,6 +1105,7 @@ data_tier = create_data_tier(
     per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist=GRAPH_REMOVAL_ALLOWLIST,
+    withheld_graphs=WITHHELD_GRAPHS,
     maintenance_schedule=MAINTENANCE_SCHEDULE,
     cleanup_iso_weekdays=CLEANUP_ISO_WEEKDAYS,
     # Arming a migration suspends the maintenance CronJobs for its duration.

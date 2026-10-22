@@ -318,6 +318,7 @@ def create_data_tier(  # noqa: PLR0913
     per_actor_inflight_max: int = DEFAULT_PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max: int = DEFAULT_PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist: list[str] | None = None,
+    withheld_graphs: list[str] | None = None,
     maintenance_schedule: str = DEFAULT_MAINTENANCE_SCHEDULE,
     cleanup_iso_weekdays: tuple[int, ...] = DEFAULT_CLEANUP_ISO_WEEKDAYS,
     *,
@@ -350,6 +351,11 @@ def create_data_tier(  # noqa: PLR0913
     ``graph_removal_allowlist`` names the graphs the server entrypoint may
     delete when ``cluster.yaml`` stops declaring them. Only read once the
     served format is one whose binaries delete on apply (0.13, format 14).
+
+    ``withheld_graphs`` leaves graphs out of ``cluster.yaml``, its policy
+    bundles and the maintenance window's graph list, to rebuild a graph
+    whose schema change cannot be migrated in place. See
+    ``build_cluster_graphs``.
 
     ``maintenance_schedule`` and ``cleanup_iso_weekdays`` set the nightly stop
     window that replaces the optimize and cleanup sweeps on that format, and
@@ -464,7 +470,7 @@ def create_data_tier(  # noqa: PLR0913
     # below is mounted with ``sub_path`` so it overlays only the single
     # ``cluster.yaml`` file and leaves those baked-in schemas visible alongside
     # it, rather than replacing the whole directory.
-    cluster_graphs = build_cluster_graphs(managed_repos)
+    cluster_graphs = build_cluster_graphs(managed_repos, withheld_graphs)
     removable_graphs = validate_graph_removal_allowlist(
         [] if graph_removal_allowlist is None else graph_removal_allowlist,
         list(cluster_graphs),

@@ -103,3 +103,65 @@ class TestEdgeCases:
         failure in the data tier, so it is pinned on both sides.
         """
         assert policies_for(REPOS)[name]["file"] == expected
+
+
+class TestWithheldGraphs:
+    """``omnigraph:withheld_graphs`` rebuilds a graph over two deploys.
+
+    The deploy that withholds a graph deletes it, so what it renders has to
+    pass omnigraph's own config validation, and what an unset key renders has
+    to be byte-for-byte what it was before, or every stack restarts its server.
+    """
+
+    def test_withholding_the_bridge_drops_its_graph_and_its_bundle(self):
+        """Omnigraph refuses a bundle naming an undeclared graph
+        (`dangling_graph_reference`), which would fail the plan of the very
+        deploy that removes the graph.
+        """
+        graphs = build_cluster_graphs(REPOS, [BRIDGE_GRAPH_ID])
+        policies = build_cluster_policies(graphs)
+
+        assert BRIDGE_GRAPH_ID not in graphs
+        assert "bridge_rules" not in policies
+        governed = [
+            graph
+            for spec in policies.values()
+            for graph in spec["applies_to"]
+            if graph != "cluster"
+        ]
+        assert sorted(governed) == sorted(graphs)
+
+    def test_withholding_a_code_graph_drops_it_from_the_code_bundle(self):
+        withheld = "code-github-com-mitodl-agent-kit"
+        policies = build_cluster_policies(build_cluster_graphs(REPOS, [withheld]))
+        assert policies["code_rules"]["applies_to"] == [
+            "code-github-com-mitodl-ol-infrastructure"
+        ]
+
+    @pytest.mark.parametrize("unset", [None, []])
+    def test_nothing_withheld_renders_what_it_did_before(self, unset):
+        """Key order included: it feeds the config hash that restarts the server."""
+        graphs = build_cluster_graphs(REPOS, unset)
+        assert list(graphs) == list(build_cluster_graphs(REPOS))
+        assert list(build_cluster_policies(graphs)) == [
+            "memory_rules",
+            "bridge_rules",
+            "server_rules",
+            "code_rules",
+        ]
+
+    def test_council_cannot_be_withheld(self):
+        """Its contents are authored, so nothing re-derives them after a delete."""
+        with pytest.raises(ValueError, match="council"):
+            build_cluster_graphs(REPOS, [COUNCIL_GRAPH_ID])
+
+    def test_an_unknown_graph_is_refused(self):
+        """A typo would withhold nothing, and the delete would silently not happen."""
+        with pytest.raises(ValueError, match="code-brigde"):
+            build_cluster_graphs(REPOS, ["code-brigde"])
+
+    @pytest.mark.parametrize("malformed", ["code-bridge", {}, 0, [1]])
+    def test_a_value_that_is_not_a_list_of_ids_is_refused(self, malformed):
+        """`pulumi config set` without `--path` stores a bare string."""
+        with pytest.raises(ValueError, match="must be a list"):
+            build_cluster_graphs(REPOS, malformed)
