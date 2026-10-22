@@ -66,6 +66,10 @@ data:
   # production hosts. The local counterparts of QA's list (sandbox, Learn, Open
   # edX, MITx Online), plus ai.learn itself.
   LOGIN_REDIRECT_ALLOWED_HOSTS: '["ai.learn.mit.test","ai-sandbox.learn.mit.test","learn.mit.test","lms.mit.test","mitxonline.mit.test"]'
+  # Courses the sandbox's demo Canvas bots may use; the setting's default [] 400s
+  # every request. Same lists as CI/QA/Production (Pulumi.*.yaml).
+  CANVAS_SYLLABUS_DEMO_READABLE_IDS: '["14566-kaleba:20211202", "34642-15.095_FA25"]'
+  CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: '["14566-kaleba:20211202+canvas", "34642-15.095_FA25+canvas"]'
 
   # Feature flags
   FEATURE_LEARN_AI_ENABLED: "True"
