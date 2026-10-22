@@ -139,3 +139,22 @@ config:
     secure: v1:bm9R4ZzTLXsioNmr:BAS1km5mgbC94evdYsX1CqgKyXYxzBmfvMztk9p4ItE+CV0Ri8qt1w==
   keycloak_realm:olapps-ol-analytics-api-client-secret:
     secure: v1:5VJGC7Pzu5vL300V:WqLYDxehAOTa3HNcQTl6R8nsOiYf1ZmjkOWpwe82M/HU+EzGFgtw4X6Zn7B2GM0ebFOCJUH9Xqh6xA==
+  keycloak_scim:remote_providers:
+  - realm: olapps
+    name: ol-learn-scim
+    base_url: https://api.rc.learn.mit.edu/scim/v2
+    enabled: true
+    replay_on_failure: false
+    authentication_list:
+    - authentication_type: BEARER
+      authentication_token:
+        secure: v1:75u15Erc/e8tQDu4:unN2+DVmliIHv4XT7VyFMtRlG6dhVY/MRtOw6WFoekeicsXrOxCMrkMyZX/EAg==
+  - realm: olapps
+    name: ol-mitxonline-scim
+    base_url: https://rc.mitxonline.mit.edu/scim/v2
+    enabled: true
+    replay_on_failure: false
+    authentication_list:
+    - authentication_type: BEARER
+      authentication_token:
+        secure: v1:TN2gY8gq8KzftmNh:XmIPuJBoyqCNnevfCzZaEKlRZHVeDy2z5+GXa1Wov2uAPK4TD1W2BmFIhre+70VdRMfWghzp2Ts=
