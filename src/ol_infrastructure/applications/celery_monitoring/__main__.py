@@ -32,6 +32,7 @@ from ol_infrastructure.components.services.cert_manager import (
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
+    OLVaultRestartTarget,
 )
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -310,6 +311,10 @@ leek_broker_subscriptions_secret = OLVaultK8SSecret(
         # redis_brokers is written by this stack, so it only changes on a
         # pulumi up; polling every minute just fills the Vault audit log.
         refresh_after="1h",
+        # Leek reads the subscriptions from env_from only at startup.
+        restart_targets=[
+            OLVaultRestartTarget(kind="Deployment", name="celery-monitoring")
+        ],
         templates={
             "LEEK_AGENT_SUBSCRIPTIONS": '{{ get .Secrets "broker_subscriptions" | toJson }}',  # noqa: E501
         },
