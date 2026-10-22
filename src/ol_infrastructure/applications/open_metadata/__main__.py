@@ -135,6 +135,17 @@ open_metadata_service_account_name = "openmetadata"
 # adminPrincipals in the authorizerConfiguration row, unset isAdmin on their
 # OpenMetadata user, and revoke their personal access tokens.
 open_metadata_use_roles_from_provider = True
+# The chart renders this into AUTHORIZER_ADMIN_PRINCIPALS in a Secret the server
+# reads through envFrom, with no checksum on the pods, so its hash is a pod
+# annotation below: the server only creates the admins at startup.
+open_metadata_initial_admins = [
+    "tmacey",
+    "shaidar",
+    "mas48",
+    "cpatti",
+    "qhoque",
+    OPENMETADATA_PROVISIONER_USERNAME,
+]
 # Used both for the chart's own ingestion pods and for the om-auth-config Job,
 # which borrows it for psycopg2 rather than carrying a second image.
 om_ingestion_image = (
@@ -931,7 +942,12 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # metadata, which do not share a role, so it carries the tier and no
             # component. The operator's pod template takes no labels at all.
             "commonLabels": k8s_labels.workload_labels(alert_tier=AlertTier.notify),
-            "podAnnotations": {"ol.mit.edu/om-auth-config": _auth_config_hash},
+            "podAnnotations": {
+                "ol.mit.edu/om-auth-config": _auth_config_hash,
+                "ol.mit.edu/om-initial-admins": hashlib.sha256(
+                    json.dumps(open_metadata_initial_admins).encode()
+                ).hexdigest()[:8],
+            },
             "openmetadata": {
                 "config": {
                     # Ref: https://docs.open-metadata.org/latest/deployment/security/keycloak/kubernetes
@@ -953,14 +969,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         # what makes the provisioner's service account an admin
                         # without an OIDC login. substructure/open_metadata uses
                         # it to create bots, which only an admin can do.
-                        "initialAdmins": [
-                            "tmacey",
-                            "shaidar",
-                            "mas48",
-                            "cpatti",
-                            "qhoque",
-                            OPENMETADATA_PROVISIONER_USERNAME,
-                        ],
+                        "initialAdmins": open_metadata_initial_admins,
                         "principalDomain": "mit.edu",
                         "useRolesFromProvider": open_metadata_use_roles_from_provider,
                     },
