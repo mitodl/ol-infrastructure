@@ -733,6 +733,18 @@ def setup_grafana(
                                             "otelcol_processor_tail_sampling_sampling_policy_evaluation_error_total",
                                             # Gauge -- no suffix. Already arriving.
                                             "otelcol_processor_tail_sampling_sampling_traces_on_memory",
+                                            # alloy-logs' APISix cookie histograms, from
+                                            # the stage.metrics above. The default list
+                                            # keeps only loki_process_dropped_lines_total.
+                                            "loki_process_custom_apisix_cookie_header_bytes_bucket",
+                                            "loki_process_custom_apisix_cookie_header_bytes_sum",
+                                            "loki_process_custom_apisix_cookie_header_bytes_count",
+                                            "loki_process_custom_apisix_cookie_count_bucket",
+                                            "loki_process_custom_apisix_cookie_count_sum",
+                                            "loki_process_custom_apisix_cookie_count_count",
+                                            "loki_process_custom_apisix_oidc_session_cookie_bytes_bucket",
+                                            "loki_process_custom_apisix_oidc_session_cookie_bytes_sum",
+                                            "loki_process_custom_apisix_oidc_session_cookie_bytes_count",
                                         ],
                                     },
                                 },
