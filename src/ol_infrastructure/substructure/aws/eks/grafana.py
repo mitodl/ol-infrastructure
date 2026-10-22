@@ -31,7 +31,8 @@ def _apisix_cookie_metrics_alloy_config() -> str:
     This string is injected into the loki.process "pod_logs" component by the
     k8s-monitoring chart via podLogsViaLoki.extraLogProcessingStages. It runs
     after the standard relabeling stages so retained stream labels (e.g.
-    service, namespace, and container) are already available.
+    namespace, container, and stream) are already available. There is no
+    `service` stream label in this pipeline, only service_name.
 
     The APISix access log format appends cookie telemetry at the end of each
     line. This pipeline extracts the three numeric fields:
@@ -39,14 +40,18 @@ def _apisix_cookie_metrics_alloy_config() -> str:
 
     The stage.metrics blocks emit Prometheus histograms that Alloy exposes on
     its own metrics endpoint (:12345/metrics), from where they are scraped and
-    forwarded to Grafana Cloud Prometheus.
+    forwarded to Grafana Cloud Prometheus. Alloy prefixes each name with
+    `loki_process_custom_`, e.g. loki_process_custom_apisix_cookie_header_bytes.
+    The histograms are cluster-wide: host is extracted but deliberately not
+    promoted to a label, since that would also add it to the Loki stream. Use
+    LogQL (`| logfmt | unwrap cookie_bytes`) for per-host breakdowns.
 
     Privacy: only numeric cookie metrics are extracted; cookie values are never
     logged or extracted.
     """
     return r"""
 stage.match {
-  selector = "{service=\"apisix\"} |= \"cookie_bytes=\""
+  selector = "{namespace=\"operations\", container=\"apisix\", stream=\"stdout\"} |= \"cookie_bytes=\""
   pipeline_name = "apisix_cookie_metrics"
 
   // Extract host, status, and the three numeric cookie fields appended at the
@@ -59,7 +64,7 @@ stage.match {
   stage.metrics {
     metric.histogram {
       name        = "apisix_cookie_header_bytes"
-      description = "Size in bytes of the Cookie request header at the APISix ingress, per virtual host"
+      description = "Size in bytes of the Cookie request header at the APISix ingress"
       source      = "cookie_bytes"
       buckets     = [256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536]
     }
