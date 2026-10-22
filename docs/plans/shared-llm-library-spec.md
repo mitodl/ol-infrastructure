@@ -332,9 +332,9 @@ missing (inventory, 2026-09-10).
 4. Fallback is a declared per-use-case policy. Composed as `FallbackModel` with
    `fallback_on` set to the "fall back" rows above, not PydanticAI's default of every
    `ModelAPIError`, which would mask 401s and 400s. Streams fall back only before the first
-   chunk (`models/fallback.py:334`); a failure mid-stream reaches the caller. If a gateway
-   route does its own fallback, the library policy for that route has none, so retries do not
-   multiply.
+   chunk (`models/fallback.py:363-365` in 2.59.0); a failure mid-stream reaches the caller.
+   If a gateway route does its own fallback, the library policy for that route has none, so
+   retries do not multiply.
 5. Callers see typed errors. The library raises its own small set (`LLMRateLimited`,
    `LLMUnavailable`, `LLMRejected`, `LLMContentFiltered`, `LLMInvalidOutput`,
    `LLMBudgetExceeded`), each carrying the original as `__cause__`. Request-time surfaces map
@@ -830,13 +830,16 @@ by type and status:
 | Raised underneath | Class | Library error | Retry | Fall back |
 | --- | --- | --- | --- | --- |
 | `ModelHTTPError` 429 | rate limited | `LLMRateLimited` (carries `retry_after`) | yes | yes |
-| `ModelHTTPError` 408, 424, 500, 502, 503, 504, 529 | provider unavailable | `LLMUnavailable` | yes | yes |
+| `ModelHTTPError` 408, 500, 502, 503, 504, 529 | provider unavailable | `LLMUnavailable` | yes | yes |
+| `ModelHTTPError` 424 with `in_stream` set | provider unavailable | `LLMUnavailable` | yes | yes |
 | `ModelAPIError` that is not `ModelHTTPError`; `TimeoutException`, `NetworkError`, and `RemoteProtocolError` from `httpx` or `httpx2` | provider unavailable | `LLMUnavailable` | yes | yes |
 | `ModelHTTPError`, any other status; any other `httpx` or `httpx2` `TransportError` | rejected | `LLMRejected` (carries `status_code`, `None` for a transport error) | no | no |
 
-The retry rows are the §3.2 statuses, 424, and the transport errors that mean no answer came
-back. PydanticAI 2.59 gives Bedrock's in-stream `modelStreamErrorException` status 424, and
-Bedrock says to retry it; before 2.59 it arrived as a `ModelAPIError` with no status.
+The retry rows are the §3.2 statuses, an in-stream 424, and the transport errors that mean no
+answer came back. PydanticAI 2.59 gives Bedrock's in-stream `modelStreamErrorException` status
+424 and sets `in_stream`, and Bedrock says to retry it; before 2.59 it arrived as a
+`ModelAPIError` with no status. Bedrock's 424 before a stream opens is a `ModelErrorException`,
+which it gives no retry advice for, so it is rejected like any other status.
 Everything else is rejected, which closes the table so nothing is unclassified. A permanent
 failure (a 501 or 505, `UnsupportedProtocol` from a bad base URL, `LocalProtocolError`,
 `ProxyError`) then costs one attempt, not the full retry budget on every model in the
@@ -878,9 +881,10 @@ primary made one attempt and raised `LLMRejected` without trying the fallback.
   `FallbackExceptionGroup` as `__cause__`.
 - When a fallback model answers, the result is marked degraded with reason `fallback_model`
   (§6.7), and `LLMResult.model` names the model that answered.
-- Streams fall back only while opening (`models/fallback.py:325-337` in 2.52.0). A failure
-  after the first chunk reaches the caller as the class its error maps to: a throttle as
-  `LLMRateLimited`, a stream error or a dropped connection as `LLMUnavailable`.
+- Streams fall back until their first event (`FallbackModel.request_stream`,
+  `models/fallback.py:349-365` in 2.59.0). A failure after the first chunk reaches the
+  caller as the class its error maps to: a throttle as `LLMRateLimited`, a stream error or a
+  dropped connection as `LLMUnavailable`.
 - A model whose gateway route already falls back takes no `fallback_models`. The model catalog
   (`tk-policy-model-catalog-and-lifecycle-ba2fc7`) records which routes do, and
   `build_model` raises `ValueError` for a use case that sets both. A primary the catalog does
