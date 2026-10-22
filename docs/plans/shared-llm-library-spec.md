@@ -29,7 +29,8 @@ was read from installed source of pydantic-ai-slim 2.42.0, opik 2.2.59, and
 opentelemetry-exporter-otlp-proto-http 1.44.0, the latest releases on 2026-09-11, plus
 comet-ml/opik at `59df1fb9`. §6 was written on 2026-10-01 against pydantic-ai-slim 2.52.0 (openai
 3.22.1, anthropic 1.11.0, google-genai 2.26.0, mistralai 3.0.0, boto3 1.43.107), and the §3
-facts it depends on were re-checked at that version.
+facts it depends on were re-checked at that version. The in-stream 424 row of §6.3 and the
+stream fallback boundary in §6.4 were re-read against pydantic-ai-slim 2.59.0 on 2026-10-22.
 
 ## 1. Consumers
 
@@ -332,7 +333,7 @@ missing (inventory, 2026-09-10).
 4. Fallback is a declared per-use-case policy. Composed as `FallbackModel` with
    `fallback_on` set to the "fall back" rows above, not PydanticAI's default of every
    `ModelAPIError`, which would mask 401s and 400s. Streams fall back only before the first
-   chunk (`models/fallback.py:363-365` in 2.59.0); a failure mid-stream reaches the caller.
+   event (`models/fallback.py:363-365` in 2.59.0); a failure mid-stream reaches the caller.
    If a gateway route does its own fallback, the library policy for that route has none, so
    retries do not multiply.
 5. Callers see typed errors. The library raises its own small set (`LLMRateLimited`,
@@ -839,7 +840,10 @@ The retry rows are the §3.2 statuses, an in-stream 424, and the transport error
 answer came back. PydanticAI 2.59 gives Bedrock's in-stream `modelStreamErrorException` status
 424 and sets `in_stream`, and Bedrock says to retry it; before 2.59 it arrived as a
 `ModelAPIError` with no status. Bedrock's 424 before a stream opens is a `ModelErrorException`,
-which it gives no retry advice for, so it is rejected like any other status.
+which it gives no retry advice for, so it is rejected like any other status. Like every retry
+row, an in-stream 424 is retried only when it is the stream's first event (the library reads
+Bedrock's first event while the stream can still be retried); after the first event it reaches
+the caller unretried (§6.4).
 Everything else is rejected, which closes the table so nothing is unclassified. A permanent
 failure (a 501 or 505, `UnsupportedProtocol` from a bad base URL, `LocalProtocolError`,
 `ProxyError`) then costs one attempt, not the full retry budget on every model in the
@@ -882,7 +886,7 @@ primary made one attempt and raised `LLMRejected` without trying the fallback.
 - When a fallback model answers, the result is marked degraded with reason `fallback_model`
   (§6.7), and `LLMResult.model` names the model that answered.
 - Streams fall back until their first event (`FallbackModel.request_stream`,
-  `models/fallback.py:349-365` in 2.59.0). A failure after the first chunk reaches the
+  `models/fallback.py:349-365` in 2.59.0). A failure after the first event reaches the
   caller as the class its error maps to: a throttle as `LLMRateLimited`, a stream error or a
   dropped connection as `LLMUnavailable`.
 - A model whose gateway route already falls back takes no `fallback_models`. The model catalog
