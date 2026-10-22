@@ -13,7 +13,8 @@ spec:
   - name: cors
     enable: true
     config:
-      allow_origins: "https://ai.learn.mit.test,https://learn.mit.test"
+      # ai-sandbox is the learn-ai sandbox (sandbox.yaml), which calls this API cross-origin.
+      allow_origins: "https://ai.learn.mit.test,https://learn.mit.test,https://ai-sandbox.learn.mit.test"
       allow_methods: "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS"
       allow_headers: "Authorization,Content-Type,X-CSRFToken,X-Requested-With"
       expose_headers: "X-CSRFToken"

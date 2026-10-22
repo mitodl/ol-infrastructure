@@ -17,8 +17,9 @@ spec:
     config:
       # ocw-dev is the OCW hugo dev server (see ocw-hugo-dev.yaml), which
       # calls this API cross-origin. It has to sit inside .learn.mit.test for
-      # the csrftoken cookie to be readable from it at all.
-      allow_origins: "https://learn.mit.test,https://ocw-dev.learn.mit.test"
+      # the csrftoken cookie to be readable from it at all. ai-sandbox is the
+      # learn-ai sandbox (apps/learn-ai/sandbox.yaml), which calls /learn/*.
+      allow_origins: "https://learn.mit.test,https://ocw-dev.learn.mit.test,https://ai-sandbox.learn.mit.test"
       allow_methods: "GET,POST,PUT,PATCH,DELETE,HEAD,OPTIONS"
       allow_headers: "Authorization,Content-Type,X-CSRFToken,X-Requested-With"
       expose_headers: "X-CSRFToken"

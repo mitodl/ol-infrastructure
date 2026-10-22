@@ -1,0 +1,172 @@
+---
+# The learn-ai sandbox (learn-ai/frontend-demo) at ai-sandbox.learn.mit.test.
+#
+# A static export (`next build`) served by nginx, as CI/QA/Production serve it
+# from S3 (src/ol_concourse/pipelines/applications/learn_ai_frontend/values.py),
+# rather than `next dev`: it idles at a few MiB instead of gigabytes. Built only
+# from a learn-ai checkout, on a manual trigger (see the learn-ai Tiltfile).
+#
+# The host sits inside .learn.mit.test for the same reason ocw-dev does
+# (apps/mit-learn/ocw-hugo-dev.yaml): the page has to read learn_ai_csrftoken
+# from document.cookie, and get mit-learn's session cookie sent to
+# api.learn.mit.test/ai, where it logs in. The *.learn wildcard cert covers it.
+#
+# /openedx_proxy/ replaces frontend-demo's dev-proxy-server.js, which only runs
+# under `next dev`: it forwards the two GETs the sandbox makes to RC Open edX
+# with the session cookie you set in configmaps/sandbox-env.local.yaml (see the
+# .example next to it).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: learnai-sandbox-env
+  namespace: learn-ai
+data:
+  OPENEDX_SESSION_COOKIE_NAME: "mitxonline-qa-edx-lms-sessionid"
+  # Must be defined, even empty: the nginx image only substitutes variables that
+  # are set, and a leftover ${...} is an unknown nginx variable that stops it.
+  OPENEDX_SESSION_COOKIE_VALUE: ""
+  # Substitute only these, so nginx's own $uri etc. survive the template pass.
+  NGINX_ENVSUBST_FILTER: "^OPENEDX_"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: learnai-sandbox-nginx
+  namespace: learn-ai
+data:
+  # Rendered to /etc/nginx/conf.d/default.conf by the image's entrypoint.
+  default.conf.template: |
+    server {
+        listen 80 default_server;
+        server_name _;
+        root /usr/share/nginx/html;
+
+        location / {
+            try_files $uri $uri.html $uri/ =404;
+        }
+        error_page 404 /404.html;
+
+        # Only the two reads frontend-demo makes (src/services/openedx/client.ts),
+        # so the RC session can't be used for anything else. The rest is 403.
+        location /openedx_proxy/ {
+            limit_except GET { deny all; }
+            rewrite ^/openedx_proxy/(api/user/v1/me|api/courses/v2/blocks/.+)$ /$1 break;
+            return 403;
+            proxy_pass https://courses.rc.learn.mit.edu;
+            proxy_ssl_server_name on;
+            # The session cookie goes upstream, so authenticate the upstream.
+            proxy_ssl_verify on;
+            proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+            proxy_ssl_verify_depth 3;
+            proxy_set_header Host courses.rc.learn.mit.edu;
+            proxy_set_header Cookie "${OPENEDX_SESSION_COOKIE_NAME}=${OPENEDX_SESSION_COOKIE_VALUE}";
+            # nginx passes client headers through; drop APISIX's forwarding
+            # headers as dev-proxy-server.js does (an empty value omits them).
+            proxy_set_header X-Forwarded-For "";
+            proxy_set_header X-Forwarded-Host "";
+            proxy_set_header X-Forwarded-Proto "";
+            proxy_set_header X-Forwarded-Port "";
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: learnai-sandbox
+  namespace: learn-ai
+  labels:
+    app: learnai-sandbox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: learnai-sandbox
+  template:
+    metadata:
+      labels:
+        app: learnai-sandbox
+    spec:
+      containers:
+      - name: nginx
+        image: learnai-sandbox
+        ports:
+        - containerPort: 80
+          name: http
+        envFrom:
+        - configMapRef:
+            name: learnai-sandbox-env
+        # Gitignored per-developer overrides; LAST so its keys win.
+        - configMapRef:
+            name: learnai-sandbox-env-local
+            optional: true
+        volumeMounts:
+        - name: nginx-templates
+          mountPath: /etc/nginx/templates
+          readOnly: true
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 5m
+            memory: 16Mi
+          limits:
+            memory: 64Mi
+      volumes:
+      - name: nginx-templates
+        configMap:
+          name: learnai-sandbox-nginx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: learnai-sandbox
+  namespace: learn-ai
+  labels:
+    app: learnai-sandbox
+spec:
+  selector:
+    app: learnai-sandbox
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: learnai-sandbox-tls
+  namespace: learn-ai
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - ai-sandbox.learn.mit.test
+  secret:
+    name: local-dev-tls
+    namespace: learn-ai
+---
+# No OIDC here: the sandbox logs in through api.learn.mit.test/ai/http/login/.
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: learnai-sandbox-route
+  namespace: learn-ai
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: sandbox
+    match:
+      hosts:
+      - ai-sandbox.learn.mit.test
+      paths:
+      - "/*"
+    backends:
+    - serviceName: learnai-sandbox
+      servicePort: 80
+    plugins:
+    - name: redirect
+      enable: true
+      config:
+        http_to_https: true
