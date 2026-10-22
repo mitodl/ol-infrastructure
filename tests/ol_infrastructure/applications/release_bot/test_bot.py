@@ -2810,6 +2810,35 @@ async def test_a_failed_announcement_does_not_take_the_command_down(slack):
     slack.ack.assert_awaited_once()
 
 
+async def test_a_very_long_command_is_cut_down_to_one_line(mixed_repos, slack):
+    """It is announced before anything validates it, so anyone can type anything."""
+    await bot._cmd_doof(
+        mixed_repos,
+        slack.ack,
+        slack.respond,
+        _command("release " + "x" * 500),
+        {"user_id": "UDANA"},
+    )
+
+    announced = slack.respond.call_args_list[0].args[0]
+    assert announced.endswith("…`")
+    assert len(announced) < 2 * bot._ECHO_LIMIT
+
+
+async def test_cutting_the_echo_short_cannot_split_an_escape(mixed_repos, slack):
+    await bot._cmd_doof(
+        mixed_repos,
+        slack.ack,
+        slack.respond,
+        _command("release " + "&" * 300),
+        {"user_id": "UDANA"},
+    )
+
+    announced = slack.respond.call_args_list[0].args[0]
+    assert "&amp;" in announced
+    assert "&" not in announced.replace("&amp;", "")
+
+
 async def test_acknowledging_twice_announces_once(slack):
     """A handler that acks again must not post the line a second time."""
     ack = bot._announcing(slack.ack, slack.respond, "<@UDANA> requested `/doof uptime`")

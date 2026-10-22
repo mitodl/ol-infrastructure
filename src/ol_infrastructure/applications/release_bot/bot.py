@@ -1384,6 +1384,12 @@ def _in_channel(respond):
     return wrapped
 
 
+# How much of a command the announcement echoes. It is posted before a
+# handler can decide to refuse, so anything anyone types reaches the channel;
+# an attribution is one line, not a transcript.
+_ECHO_LIMIT = 120
+
+
 def _attribution(command: dict[str, Any], context: dict[str, Any] | None) -> str | None:
     """Name whoever ran a command, echoing what they typed, or None if unknown.
 
@@ -1395,8 +1401,11 @@ def _attribution(command: dict[str, Any], context: dict[str, Any] | None) -> str
     if not user:
         return None
     invocation = f"{command.get('command', '/doof')} {command['text']}".strip()
-    # The echo is whatever someone typed and it goes inside a code span, so a
-    # backtick in it would close the span and let the rest render as mrkdwn.
+    if len(invocation) > _ECHO_LIMIT:
+        invocation = invocation[:_ECHO_LIMIT].rstrip() + "…"
+    # Escape after cutting, or the cut lands mid-entity. The echo is whatever
+    # someone typed and it goes inside a code span, so a backtick in it would
+    # close the span and let the rest render as mrkdwn.
     invocation = _slack_escape(invocation).replace("`", "'")
     return f"<@{user}> requested `{invocation}`"
 
