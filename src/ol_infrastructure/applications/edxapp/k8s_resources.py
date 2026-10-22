@@ -214,6 +214,8 @@ def create_k8s_resources(  # noqa: C901
 ) -> dict[str, Any]:
     """Create all Kubernetes resources for the edxapp LMS and CMS deployments."""
     env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
+    # Also the LMS Service name. mitxonline's Pulumi.<env>.yaml names it in
+    # openedx_login_gate.lms_service_host; rename both together.
     lms_webapp_deployment_name = f"{env_name}-edxapp-lms-webapp"
     cms_webapp_deployment_name = f"{env_name}-edxapp-cms-webapp"
 
