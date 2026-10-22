@@ -16,6 +16,8 @@ from typing import Any
 import pulumi
 import requests
 
+from ol_infrastructure.providers.http import raise_for_status_with_body
+
 REQUEST_TIMEOUT_SECONDS = 30
 JSON_PATCH_CONTENT_TYPE = "application/json-patch+json"
 
@@ -61,7 +63,7 @@ class OpenMetadataClient:
             },
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
-        _raise_for_status(token_response)
+        raise_for_status_with_body(token_response)
         self._base_url = f"{props['server_url'].rstrip('/')}/v1"
         self._session = requests.Session()
         self._session.headers["Authorization"] = (
@@ -75,7 +77,7 @@ class OpenMetadataClient:
         )
         if response.status_code == requests.codes.not_found:
             return None
-        _raise_for_status(response)
+        raise_for_status_with_body(response)
         return response.json()
 
     def put(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
@@ -83,7 +85,7 @@ class OpenMetadataClient:
         response = self._session.put(
             f"{self._base_url}/{path}", json=body, timeout=REQUEST_TIMEOUT_SECONDS
         )
-        _raise_for_status(response)
+        raise_for_status_with_body(response)
         return response.json()
 
     def patch(self, path: str, operations: list[dict[str, Any]]) -> dict[str, Any]:
@@ -94,7 +96,7 @@ class OpenMetadataClient:
             headers={"Content-Type": JSON_PATCH_CONTENT_TYPE},
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
-        _raise_for_status(response)
+        raise_for_status_with_body(response)
         return response.json()
 
     def delete(self, path: str, **params: str) -> None:
@@ -104,15 +106,4 @@ class OpenMetadataClient:
         )
         if response.status_code == requests.codes.not_found:
             return
-        _raise_for_status(response)
-
-
-def _raise_for_status(response: requests.Response) -> None:
-    # OpenMetadata explains a 400 or 403 in the body, which raise_for_status()
-    # alone would drop.
-    if not response.ok:
-        msg = (
-            f"{response.request.method} {response.url} returned "
-            f"{response.status_code}: {response.text}"
-        )
-        raise RuntimeError(msg)
+        raise_for_status_with_body(response)
