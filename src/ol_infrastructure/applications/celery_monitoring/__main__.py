@@ -307,7 +307,9 @@ leek_broker_subscriptions_secret = OLVaultK8SSecret(
         name="leek-broker-subscriptions",
         namespace=celery_monitoring_namespace,
         path="redis_brokers",
-        refresh_after="1m",
+        # redis_brokers is written by this stack, so it only changes on a
+        # pulumi up; polling every minute just fills the Vault audit log.
+        refresh_after="1h",
         templates={
             "LEEK_AGENT_SUBSCRIPTIONS": '{{ get .Secrets "broker_subscriptions" | toJson }}',  # noqa: E501
         },
