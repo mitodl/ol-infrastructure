@@ -196,7 +196,8 @@ def _apisix_low_value_log_drop_alloy_config() -> str:
     - CORS OPTIONS preflights, ~420 MB/day, answered by APISIX itself
       (upstream_addr=-).
     - nginx's "Using opentelemetry collector.address with no TLS is a
-      security risk" warn, ~40 MB/day of one repeated line.
+      security risk" warn, ~30 MB/day, logged on every timer tick and
+      admin-API config push.
 
     Only status < 400 is dropped so failing requests stay visible. Request
     counts per host and status are still in Prometheus via apisix_http_status.
@@ -204,26 +205,44 @@ def _apisix_low_value_log_drop_alloy_config() -> str:
     The selector is namespace/container rather than service: the pipeline has
     no service label, which is also why the apisix_cookie_metrics stage above
     never matches.
+
+    Each regex is anchored at the start of the line and only spans fields the
+    server writes. A plain substring match would also hit the client-supplied
+    http_user_agent/http_referer later in the line, letting anyone hide a
+    request (5xx included) by putting "request_method=OPTIONS status=200" in
+    their User-Agent. Field order follows the access log format in
+    infrastructure/aws/eks/apisix_official.py.
     """
-    return r"""
+    access_prefix = (
+        r"^time_local=\"[^\"]*\" body_bytes_sent=[0-9]+ bytes_sent=[0-9]+"
+        r" client=[^ ]+ host=[^ ]+ remote_addr=[^ ]+ request_id=[^ ]+"
+        r" request_length=[0-9]+ "
+    )
+    return (
+        r"""
 stage.match {
-  selector = "{namespace=\"operations\", container=\"apisix\"} |= \"request_method=POST \" |= \"request_uri=\\\"/event\\\" \" |~ \" status=[1-3][0-9][0-9] \""
+  selector = "{namespace=\"operations\", container=\"apisix\", stream=\"stdout\"} |~ `"""
+        + access_prefix
+        + r"""request_method=POST request_time=[^ ]+ request_uri=\"/event\" status=[1-3][0-9][0-9] `"
   action = "drop"
   drop_counter_reason = "apisix_event_beacon"
 }
 
 stage.match {
-  selector = "{namespace=\"operations\", container=\"apisix\"} |= \"request_method=OPTIONS \" |~ \" status=[1-3][0-9][0-9] \""
+  selector = "{namespace=\"operations\", container=\"apisix\", stream=\"stdout\"} |~ `"""
+        + access_prefix
+        + r"""request_method=OPTIONS request_time=[^ ]+ request_uri=\"[^\"]*\" status=[1-3][0-9][0-9] `"
   action = "drop"
   drop_counter_reason = "apisix_cors_preflight"
 }
 
 stage.match {
-  selector = "{namespace=\"operations\", container=\"apisix\"} |= \"with no TLS is a security risk\""
+  selector = "{namespace=\"operations\", container=\"apisix\", stream=\"stderr\"} |~ `^[0-9/]+ [0-9:]+ .warn. [0-9#]+: [*][0-9]+ .lua. utils.lua:[0-9]+: find_and_log..: Using opentelemetry collector.address with no TLS is a security risk, (context: ngx.timer|client: [0-9.]+, server: , request: \"PUT /apisix/admin/configs HTTP/1.1\", host: \"[0-9.:]+\", request_id: \"[0-9a-f]+\")$`"
   action = "drop"
   drop_counter_reason = "apisix_otel_no_tls_warn"
 }
 """
+    )
 
 
 def setup_grafana(
