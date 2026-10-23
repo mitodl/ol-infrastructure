@@ -44,6 +44,14 @@ def default_kubeconfig_path(eks_module, monkeypatch, tmp_path):
     return path
 
 
+@pytest.fixture(autouse=True)
+def isolated_cache_dir(eks_module, monkeypatch, tmp_path):
+    """Keep tests away from the developer's real ~/.cache files."""
+    monkeypatch.setattr(eks_module, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(eks_module, "EXEC_DEBUG_LOG_PATH", tmp_path / "exec-debug.log")
+    return tmp_path
+
+
 @pytest.fixture
 def two_clusters(eks_module):
     """Two ClusterConfig fixtures covering common test cases."""
@@ -188,6 +196,35 @@ def test_load_valid_vault_token_refuses_noninteractive_login_when_blocked(
         eks_module.load_valid_vault_token(
             eks_module.AccessMode.DEVELOPER, block_noninteractive_login=True
         )
+
+
+@pytest.mark.unit
+def test_load_valid_vault_token_discards_expired_cached_token(eks_module, monkeypatch):
+    """An expired cached token is checked against Vault on one call, then dropped.
+
+    Long-running kubectl clients keep retrying the exec plugin; keeping the dead
+    token made every retry call auth/token/lookup-self indefinitely.
+    """
+    token_path = eks_module.cache_file("vault-token-developer")
+    eks_module.dump_json(token_path, {"token": "expired-token"})
+    vault_checks = []
+
+    class ExpiredClient:
+        def is_authenticated(self) -> bool:
+            vault_checks.append(1)
+            return False
+
+    monkeypatch.setattr(eks_module, "vault_client", lambda _token=None: ExpiredClient())
+    monkeypatch.setattr(eks_module, "exec_invocation_is_interactive", lambda: False)
+
+    for _ in range(3):
+        with pytest.raises(RuntimeError, match="non-interactive"):
+            eks_module.load_valid_vault_token(
+                eks_module.AccessMode.DEVELOPER, block_noninteractive_login=True
+            )
+
+    assert not token_path.exists()
+    assert len(vault_checks) == 2  # the pre- and post-lock checks of the first call
 
 
 @pytest.mark.unit

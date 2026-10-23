@@ -166,9 +166,11 @@ def cache_file(name: str) -> Path:
 
 def load_json(path: Path) -> dict[str, Any] | None:
     """Load a JSON file if it exists."""
-    if not path.exists():
+    # No exists() pre-check: another process may unlink the file between the two.
+    try:
+        return json.loads(path.read_text())
+    except FileNotFoundError:
         return None
-    return json.loads(path.read_text())
 
 
 def dump_json(path: Path, payload: dict[str, Any]) -> None:
@@ -614,6 +616,11 @@ def load_valid_vault_token(
                 oidc_role=oidc_role,
             )
             return token
+
+        # Drop the dead token so later calls fail locally. Otherwise long-running
+        # kubectl clients that keep retrying the exec plugin re-check it against
+        # Vault forever.
+        token_cache_path.unlink(missing_ok=True)
 
         if block_noninteractive_login and not exec_invocation_is_interactive():
             append_exec_debug_event(
