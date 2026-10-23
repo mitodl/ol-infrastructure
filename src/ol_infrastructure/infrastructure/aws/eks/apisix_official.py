@@ -976,6 +976,9 @@ def setup_apisix(
                         "enabled": True,
                         "namespace": "operations",
                         "labels": k8s_global_labels,
+                        # Grafana Cloud bills per DPM; the chart's 15s default
+                        # is 4x the included rate. Consumers use >=5m windows.
+                        "interval": "60s",
                     },
                 },
                 # --- Custom error pages ---
