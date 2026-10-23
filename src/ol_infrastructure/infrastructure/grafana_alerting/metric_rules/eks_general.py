@@ -251,18 +251,20 @@ def create(
             # CrashLoopBackOff state.
             #
             # Init containers report through their own KSM family,
-            # kube_pod_init_container_status_waiting_reason, which the
-            # container-only expression this rule used to have could not see.
-            # A pod looping in Init:CrashLoopBackOff never starts its main
-            # container, so it was invisible here: data-qa's opik-backend had
-            # its backend-migrations init container in CrashLoopBackOff in ten
-            # pods between 2026-10-05 and 2026-10-21, one of them
-            # (679bf76c96-pjg54) for 2026-10-15 to 2026-10-20 with no alert.
-            # Over the 14 days to 2026-10-23, init-container CrashLoopBackOff
-            # lasting 5m showed up only in that namespace on CI/QA and nowhere
-            # in production.
+            # kube_pod_init_container_status_waiting_reason, so a pod stuck in
+            # Init:CrashLoopBackOff never matched the container-only expression
+            # (data-qa's opik-backend migrations, 2026-10-15 to 2026-10-20).
             # Init and main container names differ within a pod, so the `or`
             # keeps both sides as separate series.
+            #
+            # A looping init container that runs for minutes between restarts
+            # (a migration waiting on a lock) drops out of CrashLoopBackOff
+            # while it runs, so its series flaps and rarely holds for 5m
+            # straight. It still reaches Alerting because a series that goes
+            # missing keeps its Pending state until
+            # missing_series_evals_to_resolve evaluations pass (Grafana's
+            # ngalert state manager). The opik gaps ran up to 7 minutes, so
+            # lowering that below 8 would stop this case from firing.
             #
             # keep_firing_for + missing_series_evals_to_resolve attack the
             # storm mechanism directly: a churning pod's series vanishes the
