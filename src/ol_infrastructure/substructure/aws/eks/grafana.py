@@ -637,6 +637,21 @@ def setup_grafana(
                                 "kube_deployment_labels",
                                 "kube_pod_labels",
                             ],
+                            # The default allowlist keeps kube_replicaset.*,
+                            # and every Deployment's revision history leaves
+                            # old 0-replica ReplicaSets behind (~2.1k per
+                            # environment), so each metric costs ~2.1k series.
+                            # The Asserts and Kubernetes Monitoring recording
+                            # rules only join on kube_replicaset_owner; the
+                            # replica counts stay for ad hoc rollout checks.
+                            "excludeMetrics": [
+                                "kube_replicaset_created",
+                                "kube_replicaset_metadata_generation",
+                                "kube_replicaset_status_observed_generation",
+                                "kube_replicaset_status_fully_labeled_replicas",
+                                "kube_replicaset_status_ready_replicas",
+                                "kube_replicaset_status_terminating_replicas",
+                            ],
                         },
                     },
                 },
