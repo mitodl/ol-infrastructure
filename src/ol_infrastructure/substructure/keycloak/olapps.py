@@ -8,6 +8,7 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
+    PKCE_REQUIRED_CLIENT_ARGS,
     create_pkce_client_policy,
 )
 from ol_infrastructure.substructure.keycloak.learner_records import (
@@ -514,6 +515,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             standard_flow_enabled=True,
             implicit_flow_enabled=False,
             service_accounts_enabled=False,
+            **PKCE_REQUIRED_CLIENT_ARGS,
             valid_redirect_uris=keycloak_realm_config.get_object(
                 "olapps-ol-analytics-api-redirect-uris"
             ),
@@ -578,6 +580,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             standard_flow_enabled=True,
             implicit_flow_enabled=False,
             service_accounts_enabled=False,
+            **PKCE_REQUIRED_CLIENT_ARGS,
             valid_redirect_uris=keycloak_realm_config.get_object(
                 "olapps-mitlearn-client-redirect-uris"
             ),
