@@ -100,6 +100,9 @@ class OpenEdxVars(BaseModel):
     enable_ai_drawer_slot: Literal["true", "false"] | None = None
     feedback_csrf_cookie_name: str | None = None
     appzi_url: str | None = None
+    # Set per environment rather than derived from mit_learn_api_url the way
+    # FEEDBACK_SUBMIT_URL is: that URL is also set on mitxonline CI, so deriving
+    # would switch CI on too.  Enablement is a deliberate per-environment call.
     contact_us_support_api_url: str | None = None
     enable_auto_language_selection: Literal["true", "false"] | None = None
     enable_tagging_taxonomy_pages: Literal["true", "false"] | None = None
