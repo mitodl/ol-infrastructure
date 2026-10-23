@@ -56,7 +56,6 @@ ol-openedx-sentry = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-openedx-uai-content-customization = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 ol-social-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 openedx-companion-auth = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
-pulumi-keycloak = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 rapid-response-xblock = { timestamp = "0001-01-01T00:00:00Z", span = "PT0S" }
 
 [manifest]

@@ -379,9 +379,6 @@ exclude-newer = "7d"
 required-version = ">=0.9.17"
 
 [tool.uv.exclude-newer-package]
-# 6.14.0 (2026-10-06) is the first release that works against Keycloak 26.8.
-# Taken inside the 7-day window on purpose; remove this line after 2026-10-13.
-pulumi-keycloak = "0d"
 # certifi 2026.10.19 drops the compromised eMudhra CAs; security fix, taken inside the
 # 7-day window on purpose. Remove this line after 2026-10-26.
 certifi = "0d"
