@@ -27,4 +27,5 @@ config:
   nextjs:sentry_env: "ci"
   nextjs:syllabus_endpoint: "https://api.ci.learn.mit.edu/ai/http/syllabus_agent/"
   nextjs:search_summary_endpoint: "https://api.ci.learn.mit.edu/ai/http/search_summary_agent/"
+  nextjs:support_endpoint: "https://api.ci.learn.mit.edu/ai/http/support_agent/"
   nextjs:optimize_images: "true"
