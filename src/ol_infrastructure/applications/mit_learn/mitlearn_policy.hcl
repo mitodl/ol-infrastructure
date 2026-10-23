@@ -23,6 +23,10 @@ path "secret-operations/sso/mitlearn" {
 path "secret-operations/sso/mitlearn-admin" {
   capabilities = ["read"]
 }
+# Keycloak client ol-llm authenticates to Opik with.
+path "secret-operations/sso/opik" {
+  capabilities = ["read"]
+}
 
 path "secret-operations/global/embedly" {
   capabilities = ["read"]
