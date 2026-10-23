@@ -259,12 +259,12 @@ def create(
             #
             # A looping init container that runs for minutes between restarts
             # (a migration waiting on a lock) drops out of CrashLoopBackOff
-            # while it runs, so its series flaps and rarely holds for 5m
-            # straight. It still reaches Alerting because a series that goes
-            # missing keeps its Pending state until
-            # missing_series_evals_to_resolve evaluations pass (Grafana's
-            # ngalert state manager). The opik gaps ran up to 7 minutes, so
-            # lowering that below 8 would stop this case from firing.
+            # while it runs, so its raw series flaps and rarely holds for 5m
+            # straight. When it is the only crash loop, the whole query goes
+            # empty during those runs, no_data_state="OK" resets Pending, and
+            # the alert never fires. max_over_time over 10m keeps the series
+            # present across the gaps (the opik ones ran up to 7 minutes), so
+            # the init side does not depend on missing-series handling.
             #
             # keep_firing_for + missing_series_evals_to_resolve attack the
             # storm mechanism directly: a churning pod's series vanishes the
@@ -290,7 +290,7 @@ def create(
                 datas=rd(
                     'sum by (cluster, namespace, pod, container) (kube_pod_container_status_waiting_reason{cluster=~".*-(ci|qa)", reason="CrashLoopBackOff"}) > 0'
                     " or "
-                    'sum by (cluster, namespace, pod, container) (kube_pod_init_container_status_waiting_reason{cluster=~".*-(ci|qa)", reason="CrashLoopBackOff"}) > 0'
+                    'sum by (cluster, namespace, pod, container) (max_over_time(kube_pod_init_container_status_waiting_reason{cluster=~".*-(ci|qa)", reason="CrashLoopBackOff"}[10m])) > 0'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -308,7 +308,7 @@ def create(
                 datas=rd(
                     'sum by (cluster, namespace, pod, container) (kube_pod_container_status_waiting_reason{cluster=~".*-(production)", reason="CrashLoopBackOff"}) > 0'
                     " or "
-                    'sum by (cluster, namespace, pod, container) (kube_pod_init_container_status_waiting_reason{cluster=~".*-(production)", reason="CrashLoopBackOff"}) > 0'
+                    'sum by (cluster, namespace, pod, container) (max_over_time(kube_pod_init_container_status_waiting_reason{cluster=~".*-(production)", reason="CrashLoopBackOff"}[10m])) > 0'
                 ),
             ),
             # --- Celery Beat restarts ---
