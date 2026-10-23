@@ -1,30 +1,94 @@
 """Helpers for configuring Keycloak OIDC identity providers."""
 
+import json
 from typing import Any
 
 import httpx
+import pulumi
+
+# Discovery document keys and the keycloak.oidc.IdentityProvider arguments
+# they populate.
+_DISCOVERY_IDP_ARGS = {
+    "authorization_endpoint": "authorization_url",
+    "token_endpoint": "token_url",
+    "userinfo_endpoint": "user_info_url",
+    "end_session_endpoint": "logout_url",
+    "jwks_uri": "jwks_url",
+    "issuer": "issuer",
+}
 
 
 class OidcDiscoveryError(Exception):
     """An OIDC provider's discovery document could not be fetched or used.
 
-    Raised instead of returning None so that an unreachable or unusable partner
-    endpoint fails the deploy. Returning None dropped the IdP resource from the
-    Pulumi program, which Pulumi then deleted along with the working integration.
+    Raised instead of returning None so that an unusable partner endpoint, or an
+    unreachable one with no saved copy, fails the deploy. Returning None dropped
+    the IdP resource from the Pulumi program, which Pulumi then deleted along
+    with the working integration.
     """
 
 
-def oidc_identity_provider_args_from_discovery_url(
+def _fetch_oidc_discovery(discovery_url: str) -> dict[str, Any]:
+    try:
+        response = httpx.get(discovery_url, timeout=10)
+        # An error response with a JSON body parses fine, so without this an
+        # IdP-not-found page would be read as discovery metadata. HTTPError is
+        # the base of both RequestError and the HTTPStatusError this raises.
+        response.raise_for_status()
+        return response.json()
+    except (httpx.HTTPError, ValueError) as e:
+        msg = f"Unable to fetch OIDC discovery document from {discovery_url}: {e}"
+        raise OidcDiscoveryError(msg) from e
+
+
+def load_oidc_discovery(discovery_url: str, saved_json: str | None) -> dict[str, Any]:
+    """Return a provider's discovery document, from its URL when it answers.
+
+    A saved copy keeps the stack deployable while the partner's endpoint is
+    down: the fetch failure becomes a warning and the IdP is built from the
+    copy. When both are available the live document wins, and a difference in
+    the endpoints we deploy is logged so the copy can be refreshed.
+
+    :param discovery_url: The full URL to the OIDC discovery endpoint.
+    :param saved_json: A saved copy of the discovery document.
+    :returns: The parsed discovery document.
+    :rtype: dict[str, Any]
+    :raises OidcDiscoveryError: The fetch failed with no saved copy to fall
+        back to.
+    """
+    try:
+        live = _fetch_oidc_discovery(discovery_url)
+    except OidcDiscoveryError as e:
+        if saved_json is None:
+            raise
+        pulumi.log.warn(f"{e}. Building the IdP from the saved copy instead.")
+        return json.loads(saved_json)
+    if saved_json is not None:
+        saved = json.loads(saved_json)
+        changed = sorted(
+            key for key in _DISCOVERY_IDP_ARGS if live.get(key) != saved.get(key)
+        )
+        if changed:
+            pulumi.log.warn(
+                f"OIDC discovery document at {discovery_url} differs from the saved "
+                f"copy in {', '.join(changed)}. Deploying the live values; refresh "
+                "the saved copy so a later outage doesn't roll them back."
+            )
+    return live
+
+
+def oidc_identity_provider_args_from_discovery(
+    oidc_provider_metadata: dict[str, Any],
     discovery_url: str,
     client_secret: str | None = None,
 ) -> dict[str, Any]:
     """Build a dictionary of arguments for a Keycloak OIDC Identity Provider.
 
-    This helper function is used to simplify the process of registering an OIDC identity
-    provider in Keycloak by fetching the provider's metadata from its discovery URL.
-
-    :param discovery_url: The full URL to the OIDC discovery endpoint
-        (e.g. https://accounts.google.com/.well-known/openid-configuration)
+    :param oidc_provider_metadata: The provider's discovery document, from
+        load_oidc_discovery.
+    :type oidc_provider_metadata: dict[str, Any]
+    :param discovery_url: The URL the document was published at, for error
+        messages.
     :type discovery_url: str
     :param client_secret: Optional client secret for client_secret_basic authentication.
         If provided, uses client_secret_basic instead of private_key_jwt.
@@ -34,34 +98,14 @@ def oidc_identity_provider_args_from_discovery_url(
         keycloak.oidc.IdentityProvider Pulumi resource.
     :rtype: Dict[str, Any]
 
-    :raises OidcDiscoveryError: The discovery document could not be fetched or
-        parsed, or the provider does not support the scopes and client
-        authentication method we require.
+    :raises OidcDiscoveryError: The provider does not support the scopes and
+        client authentication method we require.
     """
-    try:
-        response = httpx.get(discovery_url, timeout=10)
-        # An error response with a JSON body parses fine, so without this an
-        # IdP-not-found page would be read as discovery metadata. HTTPError is
-        # the base of both RequestError and the HTTPStatusError this raises.
-        response.raise_for_status()
-        oidc_provider_metadata = response.json()
-    except (httpx.HTTPError, ValueError) as e:
-        msg = f"Unable to fetch OIDC discovery document from {discovery_url}: {e}"
-        raise OidcDiscoveryError(msg) from e
-    keycloak_arg_map = {
-        "authorization_endpoint": "authorization_url",
-        "token_endpoint": "token_url",
-        "userinfo_endpoint": "user_info_url",
-        "end_session_endpoint": "logout_url",
-        "jwks_uri": "jwks_url",
-    }
     oidc_idp_args = {
-        keycloak_arg_map[key]: oidc_provider_metadata[key]
-        for key in keycloak_arg_map
+        idp_arg: oidc_provider_metadata[key]
+        for key, idp_arg in _DISCOVERY_IDP_ARGS.items()
         if key in oidc_provider_metadata
     }
-    if "issuer" in oidc_provider_metadata:
-        oidc_idp_args["issuer"] = oidc_provider_metadata["issuer"]
 
     required_scopes = ("openid", "email", "profile")
     if "scopes_supported" in oidc_provider_metadata:

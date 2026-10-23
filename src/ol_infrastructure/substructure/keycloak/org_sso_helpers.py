@@ -6,14 +6,15 @@ import pulumi_keycloak as keycloak
 from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
 
 from ol_infrastructure.substructure.keycloak.oidc_helpers import (
-    oidc_identity_provider_args_from_discovery_url,
+    load_oidc_discovery,
+    oidc_identity_provider_args_from_discovery,
 )
 from ol_infrastructure.substructure.keycloak.saml_helpers import (
     SAML_FRIENDLY_NAMES,
-    SamlMetadataError,
     extract_saml_metadata,
     generate_pulumi_args_dict,
     get_saml_attribute_mappers,
+    load_saml_metadata,
 )
 
 # idp_alias accepts any case ([A-Za-z0-9_-]) but must not contain spaces or
@@ -59,9 +60,9 @@ class SamlIdpConfig(BaseModel):
     first_login_flow: keycloak.authentication.Flow
     realm_id: str | pulumi.Output[str]
     resource_options: pulumi.ResourceOptions
-    # The URL is set as the IdP's metadataDescriptorUrl in Keycloak. Pulumi reads
-    # the XML when it is given and fetches the URL only when it is not, so a
-    # saved copy keeps the stack deployable while the partner's endpoint is down.
+    # The URL is set as the IdP's metadataDescriptorUrl in Keycloak and fetched
+    # on every run. Give the XML too (a saved copy of what the URL serves) so
+    # the stack stays deployable while the partner's endpoint is down.
     org_saml_metadata_url: str | None = None
     org_saml_metadata_xml: str | None = None
     name_id_format: NameIdFormat = NameIdFormat.unspecified
@@ -174,13 +175,10 @@ def onboard_saml_org(  # noqa: C901
         saml_config.idp_alias.lower()
     )  # Lowercase; used for Keycloak API alias field
 
-    metadata_source = (
-        saml_config.org_saml_metadata_xml or saml_config.org_saml_metadata_url
+    metadata = load_saml_metadata(
+        saml_config.org_saml_metadata_url, saml_config.org_saml_metadata_xml
     )
-    if metadata_source is None:  # Type guard, should not happen due to validation
-        msg = f"No metadata source configured for {saml_config.idp_alias}"
-        raise SamlMetadataError(msg)
-    saml_metadata = extract_saml_metadata(metadata_source)
+    saml_metadata = extract_saml_metadata(metadata)
     saml_args = generate_pulumi_args_dict(saml_metadata)
 
     # Apply overrides if provided
@@ -192,7 +190,7 @@ def onboard_saml_org(  # noqa: C901
         saml_args["signing_certificate"] = saml_config.signing_certificate
 
     mappers = get_saml_attribute_mappers(
-        metadata_source,
+        metadata,
         keycloak_alias,
         saml_config.attribute_map,
         saml_config.attribute_name_map,
@@ -281,13 +279,10 @@ def onboard_saml_idp(saml_config: SamlIdpConfig) -> None:  # noqa: C901
     resource_alias = saml_config.idp_alias
     keycloak_alias = saml_config.idp_alias.lower()
 
-    metadata_source = (
-        saml_config.org_saml_metadata_xml or saml_config.org_saml_metadata_url
+    metadata = load_saml_metadata(
+        saml_config.org_saml_metadata_url, saml_config.org_saml_metadata_xml
     )
-    if metadata_source is None:  # Type guard, should not happen due to validation
-        msg = f"No metadata source configured for {saml_config.idp_alias}"
-        raise SamlMetadataError(msg)
-    saml_metadata = extract_saml_metadata(metadata_source)
+    saml_metadata = extract_saml_metadata(metadata)
     saml_args = generate_pulumi_args_dict(saml_metadata)
 
     if saml_config.single_sign_on_service_url is not None:
@@ -298,7 +293,7 @@ def onboard_saml_idp(saml_config: SamlIdpConfig) -> None:  # noqa: C901
         saml_args["signing_certificate"] = saml_config.signing_certificate
 
     mappers = get_saml_attribute_mappers(
-        metadata_source,
+        metadata,
         keycloak_alias,
         saml_config.attribute_map,
         saml_config.attribute_name_map,
@@ -378,6 +373,8 @@ class OIDCIdpConfig(BaseModel):
     )
     idp_display_name: str  # Human-readable display name shown on the login page
     org_oidc_metadata_url: str
+    # A saved copy of the discovery document, used when the URL doesn't answer.
+    org_oidc_discovery_json: str | None = None
     first_login_flow: keycloak.authentication.Flow
     realm_id: str | pulumi.Output[str]
     resource_options: pulumi.ResourceOptions
@@ -403,11 +400,10 @@ def onboard_oidc_org(
     AttributeImporterIdentityProviderMapper, with a real Pulumi dependency
     edge instead of a bare alias string.
 
-    :raises OidcDiscoveryError: propagated from
-        oidc_identity_provider_args_from_discovery_url if the discovery
-        document is inaccessible/unparseable, the provider is missing
-        required scopes (openid, email, profile), or it doesn't support the
-        selected client-auth method (client_secret_basic when
+    :raises OidcDiscoveryError: the discovery document is
+        inaccessible/unparseable and there is no saved copy, the provider is
+        missing required scopes (openid, email, profile), or it doesn't
+        support the selected client-auth method (client_secret_basic when
         oidc_config.client_secret is set, private_key_jwt otherwise) -- this
         fails the deploy rather than silently dropping the IdP resource.
     """
@@ -421,14 +417,17 @@ def onboard_oidc_org(
         oidc_config.idp_alias.lower()
     )  # Lowercase; used for Keycloak API alias field
 
-    oidc_idp_arg_map = oidc_identity_provider_args_from_discovery_url(
+    oidc_idp_arg_map = oidc_identity_provider_args_from_discovery(
+        load_oidc_discovery(
+            oidc_config.org_oidc_metadata_url, oidc_config.org_oidc_discovery_json
+        ),
         oidc_config.org_oidc_metadata_url,
         client_secret=oidc_config.client_secret,
     )
     # Caller-supplied extra_config is merged first (lowest precedence) so it
     # can add new keys (e.g. Board Infinity's PKCE settings) but can never
     # override the helper-owned/validated ones that follow -- in particular
-    # clientAuthMethod, which oidc_identity_provider_args_from_discovery_url
+    # clientAuthMethod, which oidc_identity_provider_args_from_discovery
     # already validated against the discovery doc. Letting a caller clobber
     # that would silently produce an IdP that can't exchange codes.
     oidc_idp_arg_map["extra_config"] = (
