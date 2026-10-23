@@ -328,9 +328,10 @@ clearance.
 - A denied `listNamespaces` or `loadTable` is a 403 that names the object and echoes the policy
   expression. Gravitino does not hide the existence of what you cannot read.
 - Inside a schema you can reach, listings are filtered to what you may read.
-- The first request after `jcasbin.cacheExpirationSecs` elapses can 403 for an authorized user,
-  and the retry succeeds (spike defect, to be filed upstream). Through StarRocks this is a failed
-  query.
+- On 1.3.0 the first request after `jcasbin.cacheExpirationSecs` elapsed could 403 for an
+  authorized user (apache/gravitino#12169). 1.3.1, which we run, fixes it. Two related denials
+  under concurrent requests (#13605, #13363) are fixed only on main, so an occasional spurious 403
+  that succeeds on retry is still possible. Through StarRocks this is a failed query.
 - Denials audit as `UNKNOWN` with a null object. Alert on status and URI, not on operation.
 - Revoking a role does not invalidate an already-vended S3 credential before it expires
   (deployment spec, default 3600s).

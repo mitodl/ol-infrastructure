@@ -82,11 +82,12 @@ Two controls, both required:
    with the pod's token rather than chaining from the pod role. If (1) ever regresses, the most a
    basic-mode credential can reach is lake object storage.
 
-Neither control changes the upstream behaviour, and upstream treats it as intended. The
-access-control API table says of credentials: "If you can load the metadata object, you can get its
-credential" (`docs/security/access-control.md`), and the catalog-level endpoint is how the Spark and
-Flink connectors get storage access. File it as a feature request (a switch to disable basic mode, or
-to refuse catalog-level vending when authorization is on), not as a bug.
+Neither control changes the upstream behaviour. Upstream has since fixed it: apache/gravitino#13977
+reported this hole, and #13987 (merged to main 2026-10-22) makes `generate()` return `null` for
+catalog-level requests and caps the STS session-name length, which also removes the 41-character
+limit below. 1.3.1 does not have it. The cherry-pick to branch-1.3 is
+https://github.com/apache/gravitino/pull/14129, open as of 2026-10-23. Keep both controls until we
+run a release that carries it, then re-test the catalog-level endpoint.
 
 What the spike measured was `s3-token`. `aws-irsa` shares the session-policy code path for table
 requests, but its downscoping is not measured. It is the first thing to check in QA (see
@@ -487,9 +488,13 @@ chart renders both keys when both are non-empty (`templates/poddisruptionbudget.
 server rejects a PDB that sets both. Clear `minAvailable` to `""` if you switch to `maxUnavailable`.
 Replica count as `gravitino:replicas` in stack config, StarRocks-style.
 
-The spike's cache-expiry defect (one spurious 403 after `jcasbin.cacheExpirationSecs` lapses) is
-per-replica. Two replicas hit it twice as often, not less. It should be filed upstream before
-Production, as the evaluation already says.
+The spike's cache-expiry defect (one spurious 403 after `jcasbin.cacheExpirationSecs` lapses) was
+apache/gravitino#12169, fixed in 1.3.1, the version we run: eviction now clears only the role's
+policies, not the user-to-role binding (`JcasbinAuthorizer.java:1405-1424`). The spike harness
+re-run on stock images (5s TTL, 12s idle gap, role granted directly to the user) gave 403 then 200
+in 10/10 trials on 1.3.0 and 200 in 10/10 on 1.3.1. Not re-run: roles granted through a group,
+StarRocks traffic, the default 3600s TTL. Two related denials under concurrent requests (#13605,
+#13363) are fixed on main only, with no branch-1.3 backport as of 2026-10-23.
 
 ## P10: jobs
 
