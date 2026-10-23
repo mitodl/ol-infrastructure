@@ -198,6 +198,12 @@ GRAPH_REMOVAL_ALLOWLIST: list[str] = omnigraph_config.get_object(
 # re-adds it, empty, from the image's schema. See build_cluster_graphs.
 WITHHELD_GRAPHS: list[str] = omnigraph_config.get_object("withheld_graphs", [])
 
+# Seconds the server's boot may take before the startupProbe kills it, when
+# the default 135s is too short. Set it with a withheld graph whose delete runs
+# in the boot apply at about 1,000 objects a minute, and clear it with the
+# withheld graph. Unset leaves the Deployment spec as it is.
+BOOT_BUDGET_SECONDS: int | None = omnigraph_config.get_int("boot_budget_seconds")
+
 # The image to migrate FROM — the one currently deployed, whose binary can
 # still read the old root. Set only while a storage-format migration is being
 # run; unset (the steady state) means no migration Job exists at all. See the
@@ -1106,6 +1112,7 @@ data_tier = create_data_tier(
     per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist=GRAPH_REMOVAL_ALLOWLIST,
     withheld_graphs=WITHHELD_GRAPHS,
+    boot_budget_seconds=BOOT_BUDGET_SECONDS,
     maintenance_schedule=MAINTENANCE_SCHEDULE,
     cleanup_iso_weekdays=CLEANUP_ISO_WEEKDAYS,
     # Arming a migration suspends the maintenance CronJobs for its duration.
