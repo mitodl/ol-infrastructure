@@ -135,6 +135,10 @@ open_metadata_service_account_name = "openmetadata"
 # adminPrincipals in the authorizerConfiguration row, unset isAdmin on their
 # OpenMetadata user, and revoke their personal access tokens.
 open_metadata_use_roles_from_provider = True
+# CI's authenticationConfiguration row was seeded while this was still "public",
+# and public means the implicit flow, which ol-open_metadata-client no longer
+# allows. The auth-config Job reconciles the row to this value.
+open_metadata_client_type = "confidential"
 # The chart renders this into AUTHORIZER_ADMIN_PRINCIPALS in a Secret the server
 # reads through envFrom, with no checksum on the pods, so its hash is a pod
 # annotation below: the server only creates the admins at startup.
@@ -806,7 +810,7 @@ open_metadata_assets_policy_attachment = iam.RolePolicyAttachment(
     opts=ResourceOptions(parent=open_metadata_irsa_role),
 )
 
-# Reconcile the two 2.0 session settings and useRolesFromProvider into the
+# Reconcile the two 2.0 session settings, clientType and useRolesFromProvider into the
 # database rows the server actually reads.  The AUTHENTICATION_* entries in
 # extraEnvs below and the authorizer Helm values only bind on an install whose
 # `authenticationConfiguration` / `authorizerConfiguration` row does not exist
@@ -831,6 +835,7 @@ _auth_config_hash = hashlib.sha256(
             _auth_config_script,
             str(OPEN_METADATA_SESSION_EXPIRY_SECONDS),
             str(OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER),
+            open_metadata_client_type,
             json.dumps(open_metadata_use_roles_from_provider),
         ]
     ).encode()
@@ -880,6 +885,10 @@ open_metadata_auth_config_job = kubernetes.batch.v1.Job(
                             kubernetes.core.v1.EnvVarArgs(
                                 name="OM_MAX_ACTIVE_SESSIONS_PER_USER",
                                 value=str(OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER),
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="OM_CLIENT_TYPE",
+                                value=open_metadata_client_type,
                             ),
                             kubernetes.core.v1.EnvVarArgs(
                                 name="OM_USE_ROLES_FROM_PROVIDER",
@@ -964,7 +973,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
                     "authentication": {
                         "provider": "custom-oidc",
                         # Ref: https://docs.open-metadata.org/v1.12.x/deployment/security/keycloak/kubernetes
-                        "clientType": "confidential",
+                        "clientType": open_metadata_client_type,
                         "callbackUrl": f"https://{open_metadata_config.require('domain')}/callback",
                         # publicKeys, authority, clientId loaded from vault via env vars
                         "oidcConfiguration": {
