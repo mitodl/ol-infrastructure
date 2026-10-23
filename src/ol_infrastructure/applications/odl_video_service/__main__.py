@@ -739,7 +739,6 @@ app_env_vars: dict[str, str | bool] = {
     ),
     "FEATURE_RETRANSCODE_ENABLED": "True",
     "FEATURE_VIDEOJS_ANNOTATIONS": "True" if enabled_annotations else "False",
-    "GA_DIMENSION_CAMERA": "dimension1",
     "LECTURE_CAPTURE_USER": "emello@mit.edu",
     "NODE_ENV": "production",
     "ODL_VIDEO_ADMIN_EMAIL": "cuddle_bunnies@mit.edu",
