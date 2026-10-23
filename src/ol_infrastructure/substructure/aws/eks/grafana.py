@@ -763,6 +763,14 @@ def setup_grafana(
                         # route. http.status_code is untouched, so the 4xx
                         # rate still shows. The destination transform on
                         # gc-otlp-endpoint merges the collapsed datapoints.
+                        #
+                        # The leading-slash test only holds for Django. A
+                        # Starlette/FastAPI app's route templates (/items/{id})
+                        # also start with "/" and would all collapse. As of
+                        # 2026-10-23 the only emitters of http.server.* are the
+                        # Django webapps (learn, learn-ai, mitxonline,
+                        # ocw-studio, ovs); scope this by service before
+                        # turning metrics on for anything else.
                         "transforms": {
                             "datapoint": [
                                 'set(attributes["http.target"], "unmatched") '
