@@ -965,6 +965,37 @@ POLICY_CONFIG: dict[str, dict[str, Any]] = {
             },
         ],
     },
+    # What ol-data-platform's `ol-dbt metrics sync` needs on top of
+    # DefaultBotRole's ViewAll: PUT a metric (Create when it is new; a PUT to an
+    # existing one is authorized as EditAll, EntityUtil.createOrUpdateOperation),
+    # PATCH its description, owners, reviewers, tags, status and
+    # extension.metricFileSha256 (covered by EditAll), and PUT a table->metric
+    # lineage edge, which checks EditLineage on both ends
+    # (LineageResource.addLineage).  DefaultBotPolicy's EditDisplayName deny
+    # matches only that operation, so it does not block the EditAll PUT.
+    "MetricsSyncBotPolicy": {
+        "displayName": "Metrics Sync Bot Policy",
+        "description": (
+            "Lets ol-dbt metrics sync create and update Metric entities and add "
+            "lineage from tables to them."
+        ),
+        "rules": [
+            {
+                "name": "MetricsSyncBotRule-Metrics",
+                "description": "Create metrics and edit any field of them.",
+                "effect": "allow",
+                "resources": ["metric"],
+                "operations": ["Create", "EditAll"],
+            },
+            {
+                "name": "MetricsSyncBotRule-Lineage",
+                "description": "Add lineage edges from tables to metrics.",
+                "effect": "allow",
+                "resources": ["table", "metric"],
+                "operations": ["EditLineage"],
+            },
+        ],
+    },
 }
 
 # Desired state for each custom role, keyed by role name.  These names are the
@@ -992,6 +1023,11 @@ ROLE_CONFIG: dict[str, dict[str, Any]] = {
         "displayName": "Dagster Bot Role",
         "description": "Role of dagster-bot.",
         "policies": ["DagsterBotPolicy"],
+    },
+    "MetricsSyncBotRole": {
+        "displayName": "Metrics Sync Bot Role",
+        "description": "Role of metrics-sync-bot.",
+        "policies": ["MetricsSyncBotPolicy"],
     },
 }
 
