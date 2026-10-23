@@ -35,6 +35,9 @@ config:
   # environment; flipping it restarts every replica (see keeper_tls_enabled
   # in __main__.py).
   clickhouse:keeper_tls_enabled: "false"
+  # Set to "true" only after every chi-* pod mounts /etc/clickhouse-server/tls
+  # (see tls_listeners_enabled in __main__.py). Opik's move to 8443 waits on it.
+  clickhouse:tls_listeners_enabled: "false"
   clickhouse:interserver_password:
     secure: v1:LD+fef8012oLTL3k:3h67AkUS7Nfi3uVH3q43ZmlLDck1a2Z6Ew7wuTMW7VXNTerZ9enwdc12ilM+1aD27MJ6tD2cs2B+YsUN
 secretsprovider: awskms://alias/infrastructure-secrets-qa

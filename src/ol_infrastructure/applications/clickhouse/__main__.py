@@ -597,6 +597,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     resources: dict[str, Any],
     tls_secret_name: str,
     tls_certificate: Any,
+    tls_listeners_enabled: bool,
     keeper_tls_enabled: bool,
     reconcile_task_id: str | None,
 ) -> "Output[kubernetes.apiextensions.CustomResource]":
@@ -931,23 +932,32 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                         "shutdown_wait_unfinished": str(
                             CLICKHOUSE_SHUTDOWN_WAIT_QUERIES_SECONDS
                         ),
-                        # TLS listeners beside 8123 and 9000, which stay open
-                        # for the operator, the backup job and Opik until each
-                        # moves over. The operator reaches the server on 8123
-                        # while that port exists (access.scheme auto).
-                        "https_port": str(CLICKHOUSE_HTTPS_PORT),
-                        "tcp_port_secure": str(CLICKHOUSE_NATIVE_TLS_PORT),
-                        # The server watches these two files and reloads them
-                        # when cert-manager renews the certificate.
-                        "openSSL/server/certificateFile": f"{CLICKHOUSE_TLS_DIR}/tls.crt",
-                        "openSSL/server/privateKeyFile": f"{CLICKHOUSE_TLS_DIR}/tls.key",
-                        "openSSL/server/disableProtocols": TLS_DISABLED_PROTOCOLS,
-                        # Adds the stack's CA to what the server trusts as a
-                        # client (Keeper over TLS, a TLS peer replica).
-                        # loadDefaultCAFile stays true in the base config, and
-                        # Poco loads both, so S3 (cold tier, backups) still
-                        # verifies against the system CAs.
-                        "openSSL/client/caConfig": f"{CLICKHOUSE_TLS_DIR}/ca.crt",
+                        **(
+                            {
+                                # TLS listeners beside 8123 and 9000, which
+                                # stay open for the operator, the backup job
+                                # and Opik until each moves over. The operator
+                                # reaches the server on 8123 while that port
+                                # exists (access.scheme auto).
+                                "https_port": str(CLICKHOUSE_HTTPS_PORT),
+                                "tcp_port_secure": str(CLICKHOUSE_NATIVE_TLS_PORT),
+                                # The server watches these two files and
+                                # reloads them when cert-manager renews the
+                                # certificate.
+                                "openSSL/server/certificateFile": f"{CLICKHOUSE_TLS_DIR}/tls.crt",
+                                "openSSL/server/privateKeyFile": f"{CLICKHOUSE_TLS_DIR}/tls.key",
+                                "openSSL/server/disableProtocols": TLS_DISABLED_PROTOCOLS,
+                                # Adds the stack's CA to what the server
+                                # trusts as a client (Keeper over TLS, a TLS
+                                # peer replica). loadDefaultCAFile stays true
+                                # in the base config, and Poco loads both, so
+                                # S3 (cold tier, backups) still verifies
+                                # against the system CAs.
+                                "openSSL/client/caConfig": f"{CLICKHOUSE_TLS_DIR}/ca.crt",
+                            }
+                            if tls_listeners_enabled
+                            else {}
+                        ),
                     },
                     # Users, profiles, and quotas are managed by the operator
                     # (merged into its generated usersd configmap) rather than
@@ -1137,6 +1147,23 @@ interserver_password = clickhouse_config.require_secret("interserver_password").
 interserver_credentials_enabled = clickhouse_config.require_bool(
     "interserver_credentials_enabled"
 )
+# Turns on the server's 8443 and 9440 listeners. Rolled out in two applies,
+# like the interserver credentials, because the settings and the certificate
+# volume reach a replica at different times. The operator writes settings into
+# the shared configd ConfigMap and restarts a host for them (SYSTEM SHUTDOWN)
+# before it updates that host's StatefulSet, so the server comes back reading
+# certificate paths that are not mounted yet. 25.8 then never finishes startup:
+# on 2026-10-23 production and QA replica 0 stopped after the interserver
+# listener, failed liveness, and the operator recreated the StatefulSet and
+# gave up with it deleted. So:
+#   1. With this false, the pod template change (certificate volume,
+#      interserver password env var) rolls every replica as a plain
+#      StatefulSet update, with no config restart in front of it.
+#   2. Set it true once every chi-* pod has /etc/clickhouse-server/tls. The
+#      operator then restarts each replica into the new settings with the
+#      files already there.
+# Opik's move to 8443 (applications/opik) has to wait for step 2.
+tls_listeners_enabled = clickhouse_config.require_bool("tls_listeners_enabled")
 # Points the servers at Keeper's TLS port. Flip it per stack only after Keeper
 # is serving 9281 there. Operator 0.26 restarts a host for any zookeeper change
 # (isZookeeperChangeRequiresReboot is !a.Equals(b); the zookeeper/* "no" restart
@@ -1586,6 +1613,7 @@ clickhouse_installation = _create_clickhouse_installation(
     vault_k8s_resources=clickhouse_app.vault_k8s_resources,
     tls_secret_name=clickhouse_tls_secret_name,
     tls_certificate=clickhouse_server_certificate,
+    tls_listeners_enabled=tls_listeners_enabled,
     keeper_tls_enabled=keeper_tls_enabled,
     reconcile_task_id=reconcile_task_id,
 )
