@@ -149,6 +149,7 @@ ocw_site_buckets = ocw_site_stack.require_output("ocw_site_buckets")
 qdrant_cloud_stack = make_stack_reference(
     projects.QDRANT_CLOUD, f"mitlearn.{stack_info.name}"
 )
+opik_stack = make_stack_reference(projects.OPIK, stack_info.name)
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
 
 qdrant_secrets = read_yaml_secrets(Path("qdrant_cloud/account.yaml"))
@@ -1632,6 +1633,22 @@ else:
     azure_identity_volumes = []
     azure_identity_volume_mounts = []
 
+# Opik tracing of the embedding encoder through ol-llm. mit-learn leaves tracing off
+# unless OPIK_URL_OVERRIDE is set. OL_LLM_ENVIRONMENT is explicit because the app
+# otherwise falls back to MITOL_ENVIRONMENT, which is "rc" in QA. The Keycloak client
+# arrives through the sso/opik secret in k8s_secrets.py. OPIK_API_KEY stays unset:
+# ol-llm refuses to start with it alongside the OPIK_KEYCLOAK_* variables.
+env_vars.update(
+    {
+        "OL_LLM_ENVIRONMENT": stack_info.env_suffix,
+        "OPIK_URL_OVERRIDE": opik_stack.require_output("opik_url").apply(
+            lambda url: f"{url}/api/"
+        ),
+        "OPIK_WORKSPACE": "default",
+        "OPIK_PROJECT_NAME": "mit-learn",
+    }
+)
+
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
 # carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_app_labels)
@@ -1975,16 +1992,16 @@ starrocks_vault_mount_path = (
     "database-starrocks" if env_vars.get("STARROCKS_HOST") else None
 )
 
-# The StarRocks credential reaches the app through env_from_secret_names, i.e.
-# envFrom, so its values become pod environment variables fixed at pod start.
-# Re-rendering the Kubernetes Secret does not touch a running pod. Vault
-# rotates this lease on its own (the StarRocks role's max TTL is six months),
-# so without these restart targets the rotation lands in the Secret, Vault
-# revokes the old StarRocks user with DROP USER, and beat keeps authenticating
-# as a user that no longer exists -- the sync stops until something unrelated
-# rolls the pods. That failure is silent in exactly the way the missing
-# configuration this PR fixes was.
-starrocks_secret_restart_targets = [
+# The StarRocks and Opik credentials reach the app through env_from_secret_names,
+# i.e. envFrom, so their values become pod environment variables fixed at pod
+# start. Re-rendering the Kubernetes Secret does not touch a running pod. Vault
+# rotates the StarRocks lease on its own (the StarRocks role's max TTL is six
+# months), so without these restart targets the rotation lands in the Secret,
+# Vault revokes the old StarRocks user with DROP USER, and beat keeps
+# authenticating as a user that no longer exists -- the sync stops until
+# something unrelated rolls the pods. That failure is silent in exactly the way
+# the missing configuration this PR fixes was.
+env_secret_restart_targets = [
     OLVaultRestartTarget(kind="Deployment", name=deployment_name)
     for deployment_name in application_deployment_names(
         application_name="mitlearn",
@@ -2004,7 +2021,7 @@ secret_names, secret_resources = create_mitlearn_k8s_secrets(
     redis_password=redis_config.require("password"),
     redis_cache=redis_cache,
     starrocks_vault_mount_path=starrocks_vault_mount_path,
-    starrocks_restart_targets=starrocks_secret_restart_targets,
+    restart_targets=env_secret_restart_targets,
 )
 
 # Configure and deploy the mitlearn application using OLApplicationK8s
