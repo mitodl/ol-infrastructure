@@ -47,5 +47,8 @@ config:
   # environment; flipping it restarts every replica (see keeper_tls_enabled
   # in __main__.py).
   clickhouse:keeper_tls_enabled: "false"
+  # Set to "true" only after every chi-* pod mounts /etc/clickhouse-server/tls
+  # (see tls_listeners_enabled in __main__.py). Apply opik after this stack.
+  clickhouse:tls_listeners_enabled: "false"
 secretsprovider: awskms://alias/infrastructure-secrets-production
 encryptedkey: AQICAHi3FG4qowC3UzOLWOAA4Y9/RTwqKjovG3wyVVYDxkR+zAHLtEgrQCjsmuo8KCBdgudpAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMxIEgSqVA8a3Tn4V6AgEQgDsUrzePlDlRE3LsXGQFZyYL8ydnDXuwV+uBRwua0UHc7xdUZxcCGUISGouz5NLtQeQ5AhlfyjsTrQAtWQ==
