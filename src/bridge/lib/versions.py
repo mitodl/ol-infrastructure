@@ -196,4 +196,4 @@ ALLOY_VERSION = "v1.20.1"
 GRAFANA_VERSION = "13.2.3"
 # The -slim variant: no bundled local models. Embeddings come from Bedrock.
 # renovate: datasource=docker depName=hindsight-api packageName=ghcr.io/vectorize-io/hindsight-api
-HINDSIGHT_VERSION = "1.0.0-slim"
+HINDSIGHT_VERSION = "1.1.0-slim"
