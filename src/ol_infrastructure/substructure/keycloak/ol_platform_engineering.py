@@ -695,6 +695,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
         service_accounts_enabled=False,
+        **PKCE_REQUIRED_CLIENT_ARGS,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-platform-engineering-dagster-redirect-uris"
         ),
