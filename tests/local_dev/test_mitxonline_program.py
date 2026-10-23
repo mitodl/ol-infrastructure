@@ -331,6 +331,17 @@ def test_shared_plugins_omit_opentelemetry(tmp_path, monkeypatch):
     assert {"redirect", "cors", "prometheus", "serverless-pre-function"} <= names
 
 
+def test_the_gateway_and_django_allow_the_same_cors_origins(tmp_path, monkeypatch):
+    """The gateway answers preflights itself, so its list must match Django's."""
+    mocks = _render(tmp_path, monkeypatch, root_domain="mit.localhost")
+    config = _one(mocks, PLUGIN_CONFIG, "mitxonline-ol-shared-plugins")
+    cors = {p["name"]: p for p in config["spec"]["plugins"]}["cors"]
+    origins = "https://mitxonline.mit.localhost,https://learn.mit.localhost"
+    assert cors["config"]["allow_origins"] == origins
+    env = _env(_one(mocks, DEPLOYMENT, "mitxonline-app"))
+    assert env["CORS_ALLOWED_ORIGINS"] == origins
+
+
 # Keys from outside the three local layers: PORT from the component,
 # OTEL_RESOURCE_ATTRIBUTES from the definition's label merge. Grow this only with
 # a name you found in src/ (grep it); anything else here is a deployed value

@@ -114,6 +114,12 @@ LOCAL_ENV_DEFAULTS = {
     "CSRF_TRUSTED_ORIGINS": (
         f"https://mitxonline.{root_domain},https://learn.{root_domain}"
     ),
+    # Origins allowed to call mitxonline cross-origin, as the deployed stacks set
+    # it (Pulumi.Production.yaml). definition.cors_allow_origins reads it for the
+    # gateway's cors plugin, so it must be set.
+    "CORS_ALLOWED_ORIGINS": (
+        f"https://mitxonline.{root_domain},https://learn.{root_domain}"
+    ),
     # Valkey: this app's logical DBs are 6 and 7. Each app needs its own, or
     # Celery and RedBeat pick up another app's tasks; the allocation is listed
     # under Shared Valkey in local-dev/ARCHITECTURE.md.
@@ -360,6 +366,9 @@ shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=definition.NAMESPACE,
         k8s_labels=LABELS,
         enable_defaults=True,
+        # The same origins Django is given as CORS_ALLOWED_ORIGINS; see
+        # definition.cors_allow_origins for why the gateway needs them too.
+        cors_allow_origins=definition.cors_allow_origins(bindings),
         # Local Alloy has no trace backend.
         enable_opentelemetry=False,
         plugins=list(definition.shared_plugins(bindings)),
