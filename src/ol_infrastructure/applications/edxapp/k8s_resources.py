@@ -21,10 +21,13 @@ from ol_infrastructure.applications.edxapp.k8s_autoscaling import (
     build_cms_webapp_keda_config,
     build_lms_webapp_keda_config,
     create_celery_autoscaling_resources,
+    create_cms_export_celery_autoscaling,
     create_webapp_trigger_auth,
 )
 from ol_infrastructure.applications.edxapp.k8s_configmaps import (
+    CMS_EXPORT_CELERY_QUEUE,
     create_k8s_configmaps,
+    uses_cms_export_queue,
 )
 from ol_infrastructure.applications.edxapp.k8s_secrets import create_k8s_secrets
 from ol_infrastructure.applications.edxapp.meilisearch import (
@@ -220,6 +223,7 @@ def create_k8s_resources(  # noqa: C901
     lms_celery_deployment_name = f"{env_name}-edxapp-lms-celery"
     lms_high_mem_celery_deployment_name = f"{env_name}-edxapp-lms-high-mem-celery"
     cms_celery_deployment_name = f"{env_name}-edxapp-cms-celery"
+    cms_export_celery_deployment_name = f"{env_name}-edxapp-cms-export-celery"
     lms_beat_deployment_name = f"{env_name}-edxapp-lms-beat"
 
     # All deployments that consume MariaDB credentials and need to restart on rotation.
@@ -233,6 +237,8 @@ def create_k8s_resources(  # noqa: C901
         lms_beat_deployment_name,
         f"{env_name}-edxapp-lms-process-scheduled-emails",
     ]
+    if uses_cms_export_queue(stack_info):
+        edxapp_db_restart_deployment_names.append(cms_export_celery_deployment_name)
 
     aws_account = aws.get_caller_identity()
 
@@ -2257,6 +2263,180 @@ def create_k8s_resources(  # noqa: C901
             depends_on=[v for v in cms_edxapp_config_sources.values() if v is not None]
         ),
     )
+
+    if uses_cms_export_queue(stack_info):
+        ############################################
+        # Dedicated CMS export celery deployment
+        #
+        # Serves only CMS_EXPORT_CELERY_QUEUE; see its definition in
+        # k8s_configmaps.py for why exports get their own worker. No VPA: like the
+        # high_mem worker it idles between bursts, so a recommender would learn the
+        # idle floor and shrink it below what a burst needs.
+        ############################################
+        # Fall back to the CMS celery sizing when a stack has not been given explicit
+        # cms_export values.
+        cms_export_resources = resources_dict["celery"].get(
+            "cms_export", resources_dict["celery"]["cms"]
+        )
+        cms_export_celery_selector_labels = k8s_global_labels | {
+            "ol.mit.edu/component": "edxapp-cms-export-celery",
+            "ol.mit.edu/pod-security-group": edxapp_k8s_app_security_group.id,
+        }
+        cms_export_celery_labels = cms_export_celery_selector_labels | {
+            "ol.mit.edu/edxapp-celery-sg": "true",
+        }
+        cms_export_celery_deployment = kubernetes.apps.v1.Deployment(
+            f"ol-{stack_info.env_prefix}-edxapp-cms-export-celery-deployment-{stack_info.env_suffix}",
+            metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                name=cms_export_celery_deployment_name,
+                namespace=namespace,
+                labels=cms_export_celery_labels | celery_alert_tier_label,
+            ),
+            spec=kubernetes.apps.v1.DeploymentSpecArgs(
+                selector=kubernetes.meta.v1.LabelSelectorArgs(
+                    match_labels=cms_export_celery_selector_labels
+                ),
+                # Surge rather than drain-first: this deployment idles at one replica, so
+                # deleting the old pod before its replacement is ready would leave the
+                # export queue with no consumer for the rollout.
+                strategy=kubernetes.apps.v1.DeploymentStrategyArgs(
+                    type="RollingUpdate",
+                    rolling_update=kubernetes.apps.v1.RollingUpdateDeploymentArgs(
+                        max_surge=1,
+                        max_unavailable=0,
+                    ),
+                ),
+                template=kubernetes.core.v1.PodTemplateSpecArgs(
+                    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+                        labels=cms_export_celery_labels | celery_alert_tier_label,
+                        annotations=cms_config_hash_annotations,
+                    ),
+                    spec=kubernetes.core.v1.PodSpecArgs(
+                        termination_grace_period_seconds=DEFAULT_CELERY_TERMINATION_GRACE_PERIOD_SECONDS,
+                        affinity=kubernetes.core.v1.AffinityArgs(
+                            pod_anti_affinity=kubernetes.core.v1.PodAntiAffinityArgs(
+                                preferred_during_scheduling_ignored_during_execution=[
+                                    kubernetes.core.v1.WeightedPodAffinityTermArgs(
+                                        weight=100,
+                                        pod_affinity_term=kubernetes.core.v1.PodAffinityTermArgs(
+                                            label_selector=kubernetes.meta.v1.LabelSelectorArgs(
+                                                match_labels=cms_export_celery_selector_labels,
+                                            ),
+                                            topology_key="kubernetes.io/hostname",
+                                        ),
+                                    ),
+                                ]
+                            )
+                        ),
+                        service_account_name=vault_k8s_resources.service_account_name,
+                        security_context=pod_security_context,
+                        volumes=cms_edxapp_volumes,
+                        init_containers=[
+                            kubernetes.core.v1.ContainerArgs(
+                                name="export-course-repos-mkdir",
+                                image=cached_image_uri("busybox:1.35"),
+                                command=[
+                                    "/bin/sh",
+                                    "-c",
+                                    "mkdir -p /openedx/data/export_course_repos",
+                                ],
+                                volume_mounts=[
+                                    kubernetes.core.v1.VolumeMountArgs(
+                                        name="openedx-data",
+                                        mount_path="/openedx/data",
+                                    ),
+                                ],
+                            ),
+                            kubernetes.core.v1.ContainerArgs(
+                                name="config-aggregator",
+                                image=cached_image_uri("busybox:1.35"),
+                                command=["/bin/sh", "-c"],
+                                args=[
+                                    "cat /openedx/config-sources/*/*.yaml > /openedx/config/cms.env.yml"
+                                ],
+                                volume_mounts=[
+                                    *cms_edxapp_init_volume_mounts,
+                                    kubernetes.core.v1.VolumeMountArgs(
+                                        name="edxapp-config",
+                                        mount_path="/openedx/config",
+                                    ),
+                                ],
+                            ),
+                        ],
+                        containers=[
+                            kubernetes.core.v1.ContainerArgs(
+                                name="cms-edxapp",
+                                image=cached_image_uri(
+                                    f"mitodl/edxapp@{EDXAPP_DOCKER_IMAGE_DIGEST}"
+                                ),
+                                command=["opentelemetry-instrument", "celery"],
+                                args=[
+                                    "--app=cms.celery",
+                                    "worker",
+                                    "-E",
+                                    # See the note on the default LMS celery worker
+                                    # above: on a Redis broker, gossip's per-worker
+                                    # celeryev.<uuid> queue is never reclaimed.
+                                    "--without-gossip",
+                                    "--loglevel=info",
+                                    f"--hostname={CMS_EXPORT_CELERY_QUEUE}.%h",
+                                    "--max-tasks-per-child",
+                                    "100",
+                                    f"--queues={CMS_EXPORT_CELERY_QUEUE}",
+                                    "--prefetch-multiplier=1",
+                                    "--concurrency=2",
+                                    *celery_prefetch_args,
+                                ],
+                                env=[
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name="SERVICE_VARIANT", value="cms"
+                                    ),
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name="DJANGO_SETTINGS_MODULE",
+                                        value="cms.envs.mitol.production",
+                                    ),
+                                    kubernetes.core.v1.EnvVarArgs(
+                                        name="OTEL_SERVICE_NAME",
+                                        value=f"{env_name}-edxapp-cms-export-celery",
+                                    ),
+                                    *[
+                                        kubernetes.core.v1.EnvVarArgs(name=k, value=v)
+                                        for k, v in _OTEL_SDK_ENV.items()
+                                    ],
+                                    *azure_identity_env_vars,
+                                ],
+                                resources=kubernetes.core.v1.ResourceRequirementsArgs(
+                                    requests={
+                                        "cpu": cms_export_resources["cpu_request"],
+                                        "memory": cms_export_resources[
+                                            "memory_request"
+                                        ],
+                                    },
+                                    limits={
+                                        "memory": cms_export_resources["memory_limit"],
+                                    },
+                                ),
+                                volume_mounts=celery_volume_mounts,
+                            )
+                        ],
+                    ),
+                ),
+            ),
+            opts=pulumi.ResourceOptions(
+                depends_on=[
+                    v for v in cms_edxapp_config_sources.values() if v is not None
+                ]
+            ),
+        )
+        create_cms_export_celery_autoscaling(
+            edxapp_cache=edxapp_cache,
+            replicas_dict=replicas_dict,
+            namespace=namespace,
+            cms_export_celery_labels=cms_export_celery_labels,
+            cms_export_celery_deployment_name=cms_export_celery_deployment_name,
+            stack_info=stack_info,
+            cms_export_celery_deployment=cms_export_celery_deployment,
+        )
 
     # Create celery autoscaling resources (ScaledObjects for Redis-based scaling).
     # Webapp ScaledObjects are managed by the OLApplicationK8s component instances above.

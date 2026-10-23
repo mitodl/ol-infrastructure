@@ -21,6 +21,21 @@ from ol_infrastructure.applications.edxapp.config_builder import (
 from ol_infrastructure.components.aws.cache import OLAmazonCache
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
+# Served only by the dedicated CMS export celery worker (k8s_resources.py). Git
+# auto-exports and S3 course exports take tens of seconds to minutes, so on
+# edx.cms.core.default they held up Studio's short publish tasks.
+CMS_EXPORT_CELERY_QUEUE = "edx.cms.core.export"
+
+
+def uses_cms_export_queue(stack_info: StackInfo) -> bool:
+    """Whether this stack routes exports to CMS_EXPORT_CELERY_QUEUE.
+
+    The queue settings and the worker that consumes the queue are both gated on
+    this, so a stack never routes exports to a queue nothing serves. CI and QA
+    keep exports on edx.cms.core.default.
+    """
+    return stack_info.env_suffix == "production"
+
 
 def _build_interpolated_config_dict(
     stack_info: StackInfo,
@@ -668,6 +683,17 @@ def create_k8s_configmaps(  # noqa: PLR0915
             }
         )
         cms_general_config_content["SEGMENT_IO"] = False
+
+    # The plugins pass these as queue= on apply_async. YAML cannot route them
+    # through EXPLICIT_QUEUES: cms/envs/production.py assigns it as a literal
+    # after plugin settings load. Unset, the plugins keep upstream routing.
+    if uses_cms_export_queue(stack_info):
+        cms_general_config_content["GIT_AUTO_EXPORT_CELERY_QUEUE"] = (
+            CMS_EXPORT_CELERY_QUEUE
+        )
+        cms_general_config_content["COURSE_EXPORT_CELERY_QUEUE"] = (
+            CMS_EXPORT_CELERY_QUEUE
+        )
 
     cms_general_config_content["FEATURES"] = cms_features
 
