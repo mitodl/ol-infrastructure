@@ -3025,6 +3025,12 @@ for location in code_locations:
     # LLM_AZURE_ENDPOINT is the name ml's definitions.py reads. Its azure_openai client
     # authenticates with an Entra token from DefaultAzureCredential, and only when
     # SUMMARY_PROVIDER=azure_openai selects it, so this wiring alone changes no calls.
+    #
+    # AZURE_OPENAI_ENDPOINT and OPENAI_API_VERSION are for the Learn embeddings, which
+    # ol-llm sends through the openai SDK's AsyncAzureOpenAI. That client reads the API
+    # version from OPENAI_API_VERSION only (not AZURE_OPENAI_API_VERSION, which
+    # azure_openai_env emits) and has no "v1" special case, so it gets a dated GA
+    # version rather than mit_learn's "v1".
     if name == "ml" and azure_openai_stack is not None:
         deployment.setdefault("volumes", []).append(azure_identity_token_volume())
         deployment.setdefault("volumeMounts", []).append(azure_identity_token_mount())
@@ -3036,12 +3042,27 @@ for location in code_locations:
                 ).items()
             ]
         )
+        ml_azure_openai_endpoint = azure_openai_stack.require_output(
+            "cognitive_accounts"
+        ).apply(lambda accounts: accounts["dagster-ml"]["endpoint"])
+        deployment["env"].extend(
+            [
+                {"name": "LLM_AZURE_ENDPOINT", "value": ml_azure_openai_endpoint},
+                {"name": "AZURE_OPENAI_ENDPOINT", "value": ml_azure_openai_endpoint},
+                {"name": "OPENAI_API_VERSION", "value": "2024-10-21"},
+            ]
+        )
+
+    # Prefix of MIT Learn's Qdrant collections ({base}.content_files, {base}.topics),
+    # which ml's Learn embeddings smokecheck reads with the read-only key the mit_learn
+    # stack writes to secret-data/pipelines/qdrant. Same expression as mit_learn's
+    # QDRANT_COLLECTION_NAME: Learn's QA collections are mitlearn-qa, not the -rc
+    # suffix of mitlearn_env_suffix above, which only Learn's bucket names use.
+    if name == "ml":
         deployment["env"].append(
             {
-                "name": "LLM_AZURE_ENDPOINT",
-                "value": azure_openai_stack.require_output("cognitive_accounts").apply(
-                    lambda accounts: accounts["dagster-ml"]["endpoint"]
-                ),
+                "name": "LEARN_QDRANT_COLLECTION_BASE",
+                "value": f"mitlearn-{stack_info.env_suffix}",
             }
         )
 
