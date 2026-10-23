@@ -15,12 +15,13 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         IMAGE,
         context=APP_DIR,
         dockerfile=APP_DIR + '/Dockerfile',
-        # The production target, not development: it is the only one that runs
-        # the node_builder stage, and without those bundles Studio renders an
-        # unstyled page with no JS. The cost is that JS/SCSS edits rebuild the
-        # image instead of hot-reloading — see the ocw-studio section of
-        # local-dev/README.md.
-        target='production',
+        # local-dev = production plus dev deps (granian[reload]), with granian
+        # reload switched on so synced Python edits are picked up. Not
+        # development: only production runs the node_builder stage, and
+        # without those bundles Studio renders an unstyled page with no JS.
+        # The cost is that JS/SCSS edits rebuild the image instead of
+        # hot-reloading — see the ocw-studio section of local-dev/README.md.
+        target='local-dev',
         live_update=[
             sync(APP_DIR + '/main', '/src/main'),
             sync(APP_DIR + '/content_sync', '/src/content_sync'),

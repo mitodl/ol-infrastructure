@@ -20,7 +20,8 @@ data:
   ALLOWED_HOSTS: '["*"]'
   # False, matching mitxonline's local-dev config. Not just convention: DEBUG
   # switches on the nplusone profiler, which is a dev-group dependency and is
-  # therefore absent from the production image target this app deploys. Static
+  # therefore absent from the prebuilt production image used without a
+  # checkout. Static
   # files are served by the nginx sidecar from collectstatic output, so nothing
   # here depends on Django's debug static handling.
   DEBUG: "False"
