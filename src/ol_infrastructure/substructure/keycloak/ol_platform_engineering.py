@@ -274,10 +274,10 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     )
     # Every client in this realm signs with the same key, so the bearer route's
     # signature and issuer checks alone admit a client-credentials token from
-    # any of them. Keycloak puts only "account" in a service account's aud, so
-    # the opik stack's audience check (match_with_client_id) needs this mapper
-    # in place first or learn-ai, Dagster and gwarek tracing gets 403s. A
-    # per-application client for Opik traffic needs the same audience.
+    # any of them. This client's service-account tokens carry only "account"
+    # in aud, so the opik stack's audience check (match_with_client_id) needs
+    # this mapper in place first or learn-ai, Dagster and gwarek tracing gets
+    # 403s. A per-application client for Opik traffic needs the same audience.
     keycloak.openid.AudienceProtocolMapper(
         "ol-platform-engineering-opik-audience-mapper",
         realm_id=ol_platform_engineering_realm.id,
