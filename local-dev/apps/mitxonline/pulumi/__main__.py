@@ -83,6 +83,10 @@ LOCAL_ENV_DEFAULTS = {
     # to a Learn host and falls back to https://learn.mit.edu, so "local" would
     # send them to production Learn.
     "MIT_LEARN_BASE_URL": f"https://learn.{root_domain}",
+    # The pair each deployed stack sets. The gateway's cors plugin reads it too
+    # (definition.cors_allow_origins), so Learn's pages can't call mitxonline
+    # cross-origin without it.
+    "CORS_ALLOWED_ORIGINS": f"https://mitxonline.{root_domain},https://learn.{root_domain}",
     # The trailing "&" is deliberate: the view appends "?redirect_url=..." to this
     # value, and it keeps no_redirect parsing as exactly "1".
     # With the openedx app enabled, the deployed envs' https://lms.<root domain>/logout
@@ -362,6 +366,7 @@ shared_plugins = OLApisixSharedPlugins(
         enable_defaults=True,
         # Local Alloy has no trace backend.
         enable_opentelemetry=False,
+        cors_allow_origins=definition.cors_allow_origins(bindings),
         plugins=list(definition.shared_plugins(bindings)),
     ),
     opts=opts,
