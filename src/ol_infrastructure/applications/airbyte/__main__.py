@@ -791,7 +791,12 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     "requests": {"memory": "500Mi", "cpu": "100m"},
                     "limits": {"memory": "1Gi", "cpu": "200m"},
                 },
-                "syncJobMaxTimeoutDays": 45,
+                # Below the 7-day floor of ol-data-platform's Iceberg
+                # orphan-file deletes, which would remove the files of a sync
+                # still running past it. Dagster's run_monitoring cap doesn't
+                # reach these: the lakehouse code location doesn't cancel a
+                # sync when its run ends.
+                "syncJobMaxTimeoutDays": 2,
             },
             "workloadLauncher": {
                 "enabled": True,
