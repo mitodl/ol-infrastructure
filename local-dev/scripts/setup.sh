@@ -36,8 +36,9 @@ HOSTS=(
     "api.learn.${ROOT_DOMAIN}"
     # mit-learn frontend (Next.js)
     "learn.${ROOT_DOMAIN}"
-    # learn-ai
+    # learn-ai, and its sandbox (frontend-demo; apps/learn-ai/sandbox.yaml)
     "ai.learn.${ROOT_DOMAIN}"
+    "ai-sandbox.learn.${ROOT_DOMAIN}"
     # ocw-hugo-themes dev server, run on the host and fronted by APISIX so it
     # has an origin inside .learn.${ROOT_DOMAIN} (see apps/mit-learn/ocw-hugo-dev.yaml)
     "ocw-dev.learn.${ROOT_DOMAIN}"

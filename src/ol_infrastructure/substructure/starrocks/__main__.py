@@ -40,7 +40,8 @@ from pulumi_vault.generic.get_secret import get_secret_output as vault_get_secre
 from bridge.lib.magic_numbers import ONE_MONTH_SECONDS
 from bridge.lib.versions import VAULT_PLUGIN_STARROCKS_SHA256
 from ol_infrastructure.lib import pulumi_projects
-from ol_infrastructure.lib.aws.iam_helper import readable_data_lake_environments
+from ol_infrastructure.lib.aws.iam_helper import query_engine_lake_access
+from ol_infrastructure.lib.data_lake_access import GOVERNANCE_ROLES
 from ol_infrastructure.lib.pulumi_helper import (
     make_stack_reference,
     parse_stack,
@@ -283,9 +284,14 @@ oidc_enabled = starrocks_config.get_bool("oidc_enabled") or False
 # --- Iceberg catalogs -------------------------------------------------------
 # Each instance registers its own lake's catalog, and production also registers
 # QA's so the QA mirror (ol-data-platform lakehouse/assets/qa_mirror.py) can write
-# into it. QA does not get production's: its IRSA role is explicitly denied every
-# production Glue resource (cross_environment_glue_denial), so the catalog and the
-# grants below would only advertise reads that fail (RFC 12711 step 7).
+# into it. CI registers QA's read-only, for slim data CI to defer to QA
+# relations. The grants below give every role only SELECT there, but they are
+# not what stops CI writing QA's lake: admin, ol_platform_admin and
+# ol_data_engineer also hold db_admin. The control is IAM, since CI's IRSA role
+# holds only QA's read-only policy. QA does not get production's: its IRSA role is
+# explicitly denied every production Glue resource
+# (cross_environment_glue_denial), so the catalog and the grants below would only
+# advertise reads that fail (RFC 12711 step 7).
 #
 # Removing an environment from this list deletes its Command, which runs the
 # DROP CATALOG below.
@@ -311,8 +317,9 @@ oidc_enabled = starrocks_config.get_bool("oidc_enabled") or False
 # CREATE DATABASE ... PROPERTIES("location" = ...) fails with a 403 on
 # getFileStatus.  aws.s3.use_aws_sdk_default_behavior names the default chain
 # explicitly so both paths use the IRSA role.
-_DATA_LAKE_ENVS = readable_data_lake_environments(stack_info.env_suffix)
+_DATA_LAKE_ACCESS = query_engine_lake_access(stack_info.env_suffix)
 catalog_setups: list[command.local.Command] = []
+_ICEBERG_CATALOG_ROLES = ("readonly", "app", "admin", *GOVERNANCE_ROLES)
 _catalog_mutable_props = {"aws.s3.use_aws_sdk_default_behavior": "true"}
 _iceberg_roles_sql = ""
 if enable_data_lake:
@@ -324,7 +331,7 @@ if enable_data_lake:
         f'    "aws.s3.region" = "{aws_region}"'
     )
 
-    for _catalog_env in _DATA_LAKE_ENVS:
+    for _catalog_env, _catalog_access in _DATA_LAKE_ACCESS.items():
         _catalog_name = f"ol_data_lake_{_catalog_env}"
         _catalog_sql = (
             f"CREATE EXTERNAL CATALOG IF NOT EXISTS {_catalog_name}\n"
@@ -374,6 +381,15 @@ if enable_data_lake:
             ],
             opts=ResourceOptions(depends_on=[catalog_setups[-1]]),
         )
+        if _catalog_access == "read":
+            _iceberg_roles_sql += "".join(
+                f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE {_role};"
+                f"\nSET CATALOG {_catalog_name};"
+                f"\nGRANT SELECT ON ALL TABLES IN ALL DATABASES TO ROLE {_role};"
+                f"\nSET CATALOG default_catalog;"
+                for _role in _ICEBERG_CATALOG_ROLES
+            )
+            continue
         _iceberg_roles_sql += (
             f"\nGRANT USAGE ON CATALOG {_catalog_name} TO ROLE readonly;"
             f"\nSET CATALOG {_catalog_name};"

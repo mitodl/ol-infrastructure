@@ -1,0 +1,22 @@
+# local-dev-heal.service — re-bake container DNS when the host's resolvers change.
+#
+# Installed as a *user* unit (~/.config/systemd/user/), so it needs no root and
+# runs with your own docker access and kubeconfig. See the local-dev README for
+# the install steps, which substitute <checkout> below.
+#
+# Paired with local-dev-heal.timer. This is deliberately a timer rather than a
+# wake hook: the trigger for stale container DNS is a *network* change, and
+# bringing a VPN up or switching wifi involves no suspend at all, so a wake
+# hook would miss exactly the cases this is for. sleep.target also cannot be
+# hooked from a user unit — it exists only in the system manager.
+
+[Unit]
+Description=local-dev: re-bake container DNS if the host's resolvers changed
+Documentation=https://github.com/mitodl/ol-infrastructure/blob/main/local-dev/README.md
+
+[Service]
+Type=oneshot
+# Short, because a stopped cluster is the common case on a periodic run and the
+# default 90s would otherwise be spent waiting on every tick.
+Environment=DOCKER_READY_WAIT=5
+ExecStart=<checkout>/local-dev/scripts/heal-dns.sh

@@ -59,6 +59,9 @@ class SamlIdpConfig(BaseModel):
     first_login_flow: keycloak.authentication.Flow
     realm_id: str | pulumi.Output[str]
     resource_options: pulumi.ResourceOptions
+    # The URL is set as the IdP's metadataDescriptorUrl in Keycloak. Pulumi reads
+    # the XML when it is given and fetches the URL only when it is not, so a
+    # saved copy keeps the stack deployable while the partner's endpoint is down.
     org_saml_metadata_url: str | None = None
     org_saml_metadata_xml: str | None = None
     name_id_format: NameIdFormat = NameIdFormat.unspecified
@@ -101,12 +104,6 @@ class SamlIdpConfig(BaseModel):
         if not self.org_saml_metadata_url and not self.org_saml_metadata_xml:
             msg = (
                 "Either org_saml_metadata_url or org_saml_metadata_xml must be provided"
-            )
-            raise ValueError(msg)
-        if self.org_saml_metadata_url and self.org_saml_metadata_xml:
-            msg = (
-                "Only one of org_saml_metadata_url or org_saml_metadata_xml "
-                "should be provided"
             )
             raise ValueError(msg)
         return self

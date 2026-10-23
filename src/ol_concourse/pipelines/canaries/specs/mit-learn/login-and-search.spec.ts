@@ -37,6 +37,19 @@ test.describe("MIT Learn signed-in journey", () => {
       })
     }).toPass({ timeout: 30_000 })
 
+    // Wait for this query's results, not the last one's. The listing uses
+    // keepPreviousData, so while a query fetches the page goes on rendering
+    // whatever it showed before, dimmed and inert, and every assertion below
+    // would pass against it. Seen signed in on RC, intermittently: a frame
+    // taken once the URL had changed still held the unfiltered catalogue,
+    // "All (45067)", whose listing happens to include a mathematics course,
+    // so the relevance check below passed on results that were not this
+    // query's. The visually hidden
+    // live region is empty until the fetch settles and then announces the
+    // count, so it is the one signal that the results on screen are this
+    // query's.
+    await expect(page.getByText(/^\d+ results$/)).toBeAttached()
+
     await expect(page.getByRole("heading", { name: "Search Results" })).toBeVisible()
     await expect(page.getByRole("article").first()).toBeVisible()
 
@@ -46,8 +59,13 @@ test.describe("MIT Learn signed-in journey", () => {
     const coursesTab = page.getByRole("tab", { name: /^Courses/ })
     await expect(coursesTab).toBeVisible()
     await expect(page.getByRole("tab", { name: /^Courses \([1-9]\d*\)/ })).toBeVisible()
+    const coursesCount = (await coursesTab.innerText()).match(/\((\d+)\)/)?.[1]
 
     await coursesTab.click()
+    // The same wait again, keyed to the tab's own count so the announcement
+    // left over from the All tab cannot satisfy it.
+    await expect(page).toHaveURL(/[?&]resource_type_group=course/)
+    await expect(page.getByText(new RegExp(`^${coursesCount} results$`))).toBeAttached()
     // Relevance, not an exact count: any specific number is a false page waiting
     // for the next content sync.
     await expect(

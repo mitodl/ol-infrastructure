@@ -36,6 +36,7 @@ This environment runs the MIT Learn application stack as Kubernetes workloads in
 | mit-learn (frontend) | `https://learn.mit.test` | Next.js frontend |
 | mit-learn (backend) | `https://api.learn.mit.test` | Django/granian API |
 | learn-ai | `https://ai.learn.mit.test`, `https://api.learn.mit.test/ai/` | Django AI proxy service. The frontend uses the `/ai/` path, which shares mit-learn's login session. |
+| learn-ai sandbox | `https://ai-sandbox.learn.mit.test` | Static build of `learn-ai/frontend-demo`, learn-ai checkout only, see [learn-ai sandbox](#learn-ai-sandbox-frontend-demo) |
 | mitxonline | `https://mitxonline.mit.test` | MITx Online LMS (Django/uwsgi) |
 | odl-video-service | `https://video.odl.mit.test` | ODL Video Service (Django/uwsgi) |
 | micromasters | `https://micromasters.mit.test` | MicroMasters (Django/granian), opt-in, see [MicroMasters](#micromasters) |
@@ -121,9 +122,10 @@ For per-developer app env vars and secrets (API keys, feature flags), don't edit
 This will:
 1. Validate that `setup.sh` has been run (cluster exists, kubeconfig configured, certs present)
 2. Restart the k3d cluster if it was paused by `stop.sh`, and the image registry if it was stopped
-3. Heal any wedged kubelet exec/streaming (see [Troubleshooting](#kubectl-exec-fails-with-a-502-wedged-kubelet-streaming)) — a no-op when healthy
-4. Sync Python dependencies via `uv`
-5. Start Tilt
+3. Re-bake stale container DNS if the host changed networks (see [Troubleshooting](#image-pulls-and-builds-fail-with-dns-io-timeout-after-changing-networks)) — a no-op when current
+4. Heal any wedged kubelet exec/streaming (see [Troubleshooting](#kubectl-exec-fails-with-a-502-wedged-kubelet-streaming)) — a no-op when healthy
+5. Sync Python dependencies via `uv`
+6. Start Tilt
 
 ### 4. Monitor the environment
 
@@ -168,7 +170,8 @@ ol-infrastructure/
 │
 └── local-dev/
     ├── scripts/                 # setup.sh, start.sh, stop.sh, teardown.sh, seed.sh,
-    │                            # heal-exec.sh, prune-docker.sh, kc-theme-image.sh
+    │                            # heal-exec.sh, heal-dns.sh, prune-docker.sh,
+    │                            # kc-theme-image.sh
     │                            # (each described in its header)
     ├── keycloak/                # Dockerfile for testing an unreleased ol-keycloakify theme
     ├── cluster/                 # k3d cluster definition + registry retention config
@@ -1166,6 +1169,36 @@ Re-run `./local-dev/scripts/setup.sh` if your `/etc/hosts` predates this: the
 hostname needs an entry. The TLS certificate already covers it through the
 `*.learn.<root_domain>` wildcard.
 
+### learn-ai sandbox (frontend-demo)
+
+With a learn-ai checkout, Tilt builds `learn-ai/frontend-demo` as a static
+export and serves it with nginx at `https://ai-sandbox.learn.<root_domain>`,
+the way CI, QA and Production serve it. There is no published image, so
+without a checkout the sandbox is not deployed. The `learnai-webapp` row in the
+Tilt UI links to it and to the learn-ai Django admin.
+
+`learnai-sandbox` is a manual resource. Saving a file never starts a `next
+build` (about a minute, several GiB of memory); click the resource's update
+button in the Tilt UI when you want your changes, and after editing
+`configmaps/sandbox-env.local.yaml`. It still builds once on `tilt up`, after
+`learnai-webapp`.
+
+The sandbox calls learn-ai at `https://api.learn.<root_domain>/ai`, so it shares
+mit-learn's login, and mit-learn at `/learn/`. Search goes to production, as
+every deployed sandbox does. The `NEXT_PUBLIC_*` values are build args in
+`apps/learn-ai/Tiltfile`. It is served on a `.learn` host, not localhost, for
+the cookie reasons under
+[OCW theme development](#ocw-theme-development-ocw-hugo-themes).
+
+Open edX content (video and Canvas panels) goes through nginx's
+`/openedx_proxy/` to `courses.rc.learn.mit.edu`. To be logged in there, copy
+`apps/learn-ai/configmaps/sandbox-env.local.yaml.example` to
+`sandbox-env.local.yaml` and set your RC LMS session cookie. The proxy passes
+only the two `GET`s the sandbox makes.
+
+Re-run `./local-dev/scripts/setup.sh` if your `/etc/hosts` predates this; the
+TLS certificate already covers the hostname.
+
 ---
 
 ## Troubleshooting
@@ -1354,6 +1387,68 @@ docker run --rm --volumes-from k3d-registry.localhost alpine rm -rf /var/lib/zot
 
 The push that follows re-uploads those layers. Note the error names the repo whose push broke — fixing the push (usually the timeout above) stops it recurring.
 
+### Image pulls and builds fail with DNS i/o timeout after changing networks
+
+Pods sit in `ImagePullBackOff` and dagger-backed Tilt builds (`codejail`, `mfe-*`) fail at `Container.from`, all with a DNS timeout on the registry:
+
+```
+failed to resolve reference "docker.io/library/python:3.12-slim-trixie":
+dial tcp: lookup registry-1.docker.io on 10.87.0.1:53:
+read udp 10.87.0.1:47380->10.87.0.1:53: i/o timeout
+```
+
+**Why:** Docker writes a container's `/etc/resolv.conf` when the container *starts*, from the host's resolver config at that moment, and never revisits it. Move the host between networks — home wifi to the office, VPN up or down — and every long-running container keeps forwarding DNS to resolvers that are no longer reachable. Nothing in the repo is broken, which is what makes this one confusing: the containers stay up, the nodes report `Ready`, and only name resolution is dead.
+
+A detail worth knowing, because it misleads: the resolver list usually ends in public resolvers (`8.8.8.8`, `8.8.4.4`) that *do* answer from any network, so the failure is not that every resolver is dead — it's that the dead ones come first and burn the client's whole timeout budget before a working one is reached. dagger's own logs show it abandoning the resolve at ~20s; containerd surfaces the same thing as a bare `Try again` (`EAI_AGAIN`).
+
+Those public entries come from your *host's* config, not from Docker: for k3d nodes, moby copies the host file's nameservers into the node's `ExtServers` verbatim and adds nothing of its own. (It does substitute its own defaults, but only on the legacy bridge and only when no nameserver survives filtering — a path these nodes never take.) So a `host(8.8.8.8)` in a node's `resolv.conf` is a host resolver, and `cat /etc/resolv.conf` on the host will show it.
+
+To confirm, compare a container against the host — a stale one shows the old network's search domain and upstreams:
+
+```bash
+docker exec k3d-local-dev-server-0 cat /etc/resolv.conf   # e.g. search hsd1.ma.comcast.net
+cat /etc/resolv.conf                                      # e.g. search mit.edu
+```
+
+**Fix:** run the heal script. It compares each container's baked resolvers against the host's current ones and `docker restart`s only the containers that actually drifted — a restart re-bakes `resolv.conf`, which is the whole fix. Like `heal-exec.sh` it avoids `k3d cluster stop/start`, so node IPs are preserved. It's a no-op when nothing has drifted:
+
+```bash
+./local-dev/scripts/heal-dns.sh
+```
+
+`start.sh` runs this automatically, before the exec heal.
+
+Two things the script has to work around, worth knowing if you are reading its output:
+
+- **systemd-resolved hosts** (the Ubuntu and Fedora default) publish a stub `/etc/resolv.conf` listing only `127.0.0.53`. The real upstreams live in `/run/systemd/resolve/resolv.conf`, and that is the file Docker reads when it sees the stub — so the script follows the same rule. Comparing against the stub instead would make it skip every container on exactly the hosts that need checking.
+- **It only runs where the Docker daemon is on this machine.** Detection compares each container's resolvers against the host's and probes them from the host, which only means anything when the daemon shares our network namespace. When Docker runs in a VM — macOS, Docker Desktop, WSL2 — nodes carry the VM's own forwarder instead, which is in neither the host's list nor reachable from it. Restarting cannot change that (the forwarder address is stable), and does not need to: the forwarder follows the host's DNS, so lookups keep working across a network switch. The script compares `docker info --format '{{.Name}}'`, the daemon's own hostname, against `uname -n`, and skips when they differ. Hostnames rather than kernel versions on purpose: every WSL2 distro shares one kernel, Docker Desktop's included, so a kernel comparison reads WSL2 as native while its containers still resolve through the VM.
+
+Pods already in `ImagePullBackOff` retry on kubelet's backoff timer (up to ~5m) rather than immediately, so a still-red Tilt right after a heal doesn't mean the heal failed. To retry at once, delete the pod:
+
+```bash
+kubectl --context local-dev delete pod -n <namespace> <pod>
+```
+
+**Automatic (Linux):** install the two example user units — no root, nothing outside `$HOME`:
+
+```bash
+mkdir -p ~/.config/systemd/user
+for u in local-dev-heal.service local-dev-heal.timer; do
+  sed "s|<checkout>|$PWD|g" "local-dev/scripts/systemd/$u.example" \
+    > ~/.config/systemd/user/"$u"
+done
+systemctl --user daemon-reload
+systemctl --user enable --now local-dev-heal.timer
+```
+
+`journalctl --user -u local-dev-heal` for output.
+
+This polls every five minutes rather than hooking an event, which is deliberate. The trigger for stale container DNS is a *network* change, and bringing a VPN up or switching wifi involves no suspend at all — so a wake hook would miss exactly the cases above. `Persistent=true` makes it catch up a run missed while the machine was suspended, which covers the close-the-lid case too. The heal is a no-op when nothing has drifted, so a five-minute tick is cheap. A switch mid-interval is healed on the next tick, or immediately by running the script by hand.
+
+Two notes on why it is a *user* timer and not a sleep hook: `sleep.target` exists only in the system manager, so a user unit can never be pulled in by it (it would fail silently); and logind's `PrepareForSleep` D-Bus signal, the proper user-space wake hook, needs a client library that is not reliably installed. Distros that manage units declaratively express the same two units through their own configuration.
+
+On macOS this heal self-skips (see above), so there is nothing to schedule.
+
 ### `kubectl exec` fails with a 502 (wedged kubelet streaming)
 
 `kubectl exec` / `attach` / `logs -f` into a pod may fail like this, even though `kubectl get` / `describe` / `logs` still work and the node shows `Ready`:
@@ -1378,12 +1473,13 @@ while dialing 192.168.97.3:10250, code 502: 502 Bad Gateway
 
 ```bash
 brew install sleepwatcher
-# edit the REPO path inside the example hook first, then symlink it as ~/.wakeup:
-ln -sf "$PWD/local-dev/scripts/wakeup.example.sh" ~/.wakeup
+ln -sf "$PWD/local-dev/scripts/wakeup-macos.example.sh" ~/.wakeup
 brew services start sleepwatcher
 ```
 
-sleepwatcher runs `~/.wakeup` on every wake; the example hook calls `heal-exec.sh` and logs to `~/Library/Logs/local-dev-heal.log`.
+sleepwatcher runs `~/.wakeup` on every wake; the example hook calls `heal-exec.sh`, logging to `~/Library/Logs/local-dev-heal.log`. No editing needed — it derives the checkout path from its own location, resolved through the symlink. It deliberately does not call `heal-dns.sh`, which self-skips whenever Docker runs in a VM.
+
+If you symlinked `~/.wakeup` before this script was renamed from `wakeup.example.sh`, re-point it: the old path now dangles and sleepwatcher fails silently.
 
 **Automatic on wake (Linux):** we don't ship a hook, but if your dev box suspends and you hit this, wrap `heal-exec.sh` in a systemd resume hook — a script in `/usr/lib/systemd/system-sleep/` (invoked with `post`/`resume`) or a unit ordered `After=suspend.target`.
 

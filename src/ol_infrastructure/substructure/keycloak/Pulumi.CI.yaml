@@ -124,3 +124,13 @@ config:
   keycloak_realm:olapps-ol-analytics-api-redirect-uris:
   - https://analytics-ci.ol.mit.edu/*
   - https://analytics.ci.learn.mit.edu/*
+  keycloak_scim:remote_providers:
+  - realm: olapps
+    name: ol-learn-scim
+    base_url: https://api.ci.learn.mit.edu/scim/v2
+    enabled: true
+    replay_on_failure: false
+    authentication_list:
+    - authentication_type: BEARER
+      authentication_token:
+        secure: v1:zEPwElyqDdTvSldu:ZWMfTO9j5FJaK8qY3UFUEkXVe6Cnh9NH6Gge74pVEVEUdwnApIHA2FMO270tp+4hBX89OpglgOyGYAQ=

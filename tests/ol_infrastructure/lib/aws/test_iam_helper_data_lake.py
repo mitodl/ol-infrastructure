@@ -7,30 +7,30 @@ from ol_infrastructure.lib.aws.iam_helper import (
     cross_environment_glue_denial,
     data_lake_bucket_arns,
     data_lake_glue_namespaces,
-    readable_data_lake_environments,
+    query_engine_lake_access,
 )
 
 
 @pytest.mark.parametrize(
     ("env_suffix", "expected"),
     [
-        ("production", ["qa", "production"]),
-        ("qa", ["qa"]),
-        ("ci", ["qa"]),
+        ("production", {"qa": "write", "production": "write"}),
+        ("qa", {"qa": "write"}),
+        ("ci", {"ci": "write", "qa": "read"}),
     ],
 )
-def test_readable_environments(env_suffix, expected):
-    assert readable_data_lake_environments(env_suffix) == expected
+def test_query_engine_lake_access(env_suffix, expected):
+    assert query_engine_lake_access(env_suffix) == expected
 
 
 @pytest.mark.parametrize("env_suffix", ["production", "qa", "ci"])
-def test_no_readable_lake_is_denied(env_suffix):
+def test_no_registered_lake_is_denied(env_suffix):
     denied = {
         resource
         for statement in cross_environment_glue_denial(env_suffix)
         for resource in statement["Resource"]
     }
-    for environment in readable_data_lake_environments(env_suffix):
+    for environment in query_engine_lake_access(env_suffix):
         for namespace in data_lake_glue_namespaces(environment):
             assert f"arn:aws:glue:*:*:database/{namespace}" not in denied
 
