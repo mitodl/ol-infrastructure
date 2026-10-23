@@ -146,18 +146,5 @@ config:
   # (docs/omnigraph-store-maintenance-runbook.md, "Clearing a cleanup
   # backlog"). Revisit when ModernRelay/omnigraph#1095 ships.
   omnigraph:cleanup_iso_weekdays: []
-  # Rebuilding code-bridge, step 1 of 2 (mitodl/agent-kit#523). The image drops
-  # InterfaceBinding.repo_file, which omnigraph 0.13 cannot migrate in place,
-  # so the plan gate refuses it against the existing graph. Withheld and
-  # allow-listed together, this deploy's boot apply deletes code-bridge
-  # (9,026 objects on 2026-10-23, at about 1,000 a minute), and the boot
-  # budget lets it finish under the startup probe. Step 2 removes all three
-  # keys, and that deploy's apply creates code-bridge empty from the new
-  # schema. Then reindex every managed repo with a forced run.
-  omnigraph:withheld_graphs:
-  - code-bridge
-  omnigraph:graph_removal_allowlist:
-  - code-bridge
-  omnigraph:boot_budget_seconds: 1800
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgHdah3681q3jIoMB6EquY0xAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMQkBOIyzkj00xRzZ9AgEQgDvOaikBeNnKV3FG4ZgMGvt3MOO4WsufLhs1b/FFH28hvQEuaZnfrQ1oLOS4NHXINUEJweVvuqaQUVj9gg==
