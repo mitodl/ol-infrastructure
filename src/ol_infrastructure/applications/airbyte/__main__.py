@@ -647,6 +647,19 @@ default_resources_definition = {
     },
 }
 
+# Below the 7-day floor of ol-data-platform's Iceberg orphan-file deletes, which
+# would remove the files of a sync still running past it. Dagster's
+# run_monitoring cap doesn't reach these: the lakehouse code location doesn't
+# cancel a sync when its run ends.
+SYNC_JOB_MAX_TIMEOUT_DAYS = 2
+# The chart renders syncJobMaxTimeoutDays only into the airbyte-env ConfigMap,
+# which its pod templates read through configMapKeyRef with no checksum, so a
+# changed value would never restart the pods that read it. Carrying the value
+# as an annotation on each of those deployments rolls them when it changes.
+sync_timeout_annotation = {
+    "ol.mit.edu/sync-job-max-timeout-days": str(SYNC_JOB_MAX_TIMEOUT_DAYS)
+}
+
 airbyte_helm_release = kubernetes.helm.v3.Release(
     "airbyte-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
@@ -779,6 +792,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     "limits": {"memory": "2Gi", "cpu": "500m"},
                 },
                 "httpIdleTimeout": "20m",
+                "podAnnotations": sync_timeout_annotation,
                 "extraEnv": [  # How long to attempt new source schema discovery
                     {"name": "READ_TIMEOUT", "value": "30m"},
                 ],
@@ -791,17 +805,14 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                     "requests": {"memory": "500Mi", "cpu": "100m"},
                     "limits": {"memory": "1Gi", "cpu": "200m"},
                 },
-                # Below the 7-day floor of ol-data-platform's Iceberg
-                # orphan-file deletes, which would remove the files of a sync
-                # still running past it. Dagster's run_monitoring cap doesn't
-                # reach these: the lakehouse code location doesn't cancel a
-                # sync when its run ends.
-                "syncJobMaxTimeoutDays": 2,
+                "podAnnotations": sync_timeout_annotation,
+                "syncJobMaxTimeoutDays": SYNC_JOB_MAX_TIMEOUT_DAYS,
             },
             "workloadLauncher": {
                 "enabled": True,
                 "hpa": {"enabled": True},
                 "podLabels": workload_labels(Component.controller),
+                "podAnnotations": sync_timeout_annotation,
                 "resources": {
                     "requests": {"memory": "500Mi", "cpu": "100m"},
                     "limits": {"memory": "1Gi", "cpu": "200m"},
@@ -828,6 +839,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "enabled": True,
                 "replicaCount": 1,
                 "podLabels": workload_labels(Component.worker),
+                "podAnnotations": sync_timeout_annotation,
                 "resources": default_resources_definition,
             },
             # manifestServer replaces connectorBuilderServer in chart 2.1+
