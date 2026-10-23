@@ -194,6 +194,32 @@ stage.match {
 """
 
 
+def _log_proxy_access_log_drop_alloy_config() -> str:
+    """
+    Alloy River stage that drops Traefik's 2xx access-log lines for
+    log-proxy.odl.mit.edu.
+
+    Fastly and Heroku deliver their logs to vector-log-proxy through the
+    operations cluster's Traefik, and every delivery produced a ~1.5 KB JSON
+    access-log line -- ~1.9 GB/day on 2026-10-22, most of that Traefik
+    stream's volume -- so we were paying to log the delivery of logs we
+    already pay to ingest. Only the POST deliveries are matched, so the GET
+    Fastly domain-verification challenge on the same host stays logged, and
+    non-2xx lines are kept: the 401s are how a Fastly service with a bad or
+    rotated token shows up.
+
+    Done here rather than with Traefik's accessLog.filters, which are global
+    to the gateway and would drop 2xx lines for every route.
+    """
+    return r"""
+stage.match {
+  selector = "{container=\"traefik-gateway-controller\"} |= \"\\\"RequestHost\\\":\\\"log-proxy.odl.mit.edu\\\"\" |= \"\\\"RequestMethod\\\":\\\"POST\\\"\" |~ \"\\\"DownstreamStatus\\\":2[0-9]{2},\""
+  action = "drop"
+  drop_counter_reason = "log_proxy_2xx_access_log"
+}
+"""
+
+
 def _edxapp_waffle_no_request_drop_alloy_config() -> str:
     """
     Alloy River stage that drops edx_toggles' "Flag '...' accessed without a
@@ -592,6 +618,7 @@ def setup_grafana(
                     "onlyGatherNewLogLines": False,
                     "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config()
                     + _keycloak_olapps_idp_login_redact_alloy_config()
+                    + _log_proxy_access_log_drop_alloy_config()
                     + _edxapp_waffle_no_request_drop_alloy_config(),
                 },
                 "applicationObservability": {
