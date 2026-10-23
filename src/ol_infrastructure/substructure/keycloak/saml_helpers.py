@@ -2,6 +2,7 @@
 
 import ssl
 import xml.etree.ElementTree as ET
+from http.client import HTTPException
 from typing import Any
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -28,6 +29,8 @@ class SamlMetadataError(Exception):
 # of certifi replacing the system/enterprise trust store.
 _SSL_CONTEXT = ssl.create_default_context()
 _SSL_CONTEXT.load_verify_locations(cafile=certifi.where())
+
+_ENTITY_DESCRIPTOR = "{urn:oasis:names:tc:SAML:2.0:metadata}EntityDescriptor"
 
 SAML_FRIENDLY_NAMES = {
     "firstName": [
@@ -86,7 +89,7 @@ def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element:
 
     Raises:
         SamlMetadataError: The fetch failed, the body exceeded the size limit,
-            or the payload was not parseable XML.
+            or the payload was not a SAML EntityDescriptor.
     """
     try:
         # Set timeout and limit response size
@@ -107,10 +110,19 @@ def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element:
                     f"{MAX_METADATA_SIZE} byte maximum"
                 )
                 raise SamlMetadataError(msg)
-            return ET.fromstring(metadata_bytes)  # noqa: S314
-    except (OSError, ET.ParseError) as e:
+            root = ET.fromstring(metadata_bytes)  # noqa: S314
+    # urllib wraps connection errors in URLError (an OSError) but lets a
+    # malformed response surface as http.client.HTTPException.
+    except (OSError, HTTPException, ET.ParseError) as e:
         msg = f"Unable to fetch or parse SAML metadata from {metadata_url}: {e}"
         raise SamlMetadataError(msg) from e
+    if root.tag != _ENTITY_DESCRIPTOR:
+        msg = (
+            f"Unable to fetch or parse SAML metadata from {metadata_url}: the "
+            f"document's root element is {root.tag}, not an EntityDescriptor"
+        )
+        raise SamlMetadataError(msg)
+    return root
 
 
 def _parse_saml_metadata_string(metadata_xml: str) -> ET.Element:
@@ -163,8 +175,8 @@ def load_saml_metadata(metadata_url: str | None, saved_xml: str | None) -> ET.El
         pulumi.log.warn(f"{e}. Building the IdP from the saved copy instead.")
         return _parse_saml_metadata_string(saved_xml)
     if saved_xml is not None:
-        live_fields = extract_saml_metadata(live)
-        saved_fields = extract_saml_metadata(_parse_saml_metadata_string(saved_xml))
+        live_fields = _drift_fields(live)
+        saved_fields = _drift_fields(_parse_saml_metadata_string(saved_xml))
         changed = sorted(
             field for field in live_fields if live_fields[field] != saved_fields[field]
         )
@@ -175,6 +187,19 @@ def load_saml_metadata(metadata_url: str | None, saved_xml: str | None) -> ET.El
                 "copy so a later outage doesn't roll them back."
             )
     return live
+
+
+def _drift_fields(root: ET.Element) -> dict[str, object]:
+    # An IdP without an attribute map gets its mappers from the metadata's
+    # FriendlyNames, so those are deployed values too.
+    return {
+        **extract_saml_metadata(root),
+        "attributes": sorted(
+            (element.get("Name") or "", element.get("FriendlyName") or "")
+            for element in root.iter()
+            if element.get("FriendlyName")
+        ),
+    }
 
 
 def extract_saml_metadata(root: ET.Element) -> dict[str, str | None]:

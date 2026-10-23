@@ -10,6 +10,8 @@ import asyncio
 import io
 import json
 import xml.etree.ElementTree as ET
+from http.client import BadStatusLine
+from pathlib import Path
 from urllib.error import URLError
 
 import httpx
@@ -23,7 +25,7 @@ try:
 except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
-from ol_infrastructure.substructure.keycloak import oidc_helpers, saml_helpers
+from ol_infrastructure.substructure.keycloak import oidc_helpers, olapps, saml_helpers
 from ol_infrastructure.substructure.keycloak.oidc_helpers import (
     OidcDiscoveryError,
     load_oidc_discovery,
@@ -38,6 +40,7 @@ from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
 )
 from ol_infrastructure.substructure.keycloak.saml_helpers import (
     SamlMetadataError,
+    extract_saml_metadata,
     load_saml_metadata,
 )
 from tests.ol_infrastructure.recording_mocks import RecordingMocks
@@ -148,6 +151,42 @@ def test_saml_metadata_prefers_live_and_warns_on_drift(monkeypatch, warnings):
     assert "x509_certificate" in warnings[0]
 
 
+def test_malformed_saml_response_falls_back_to_saved_copy(monkeypatch, warnings):
+    """A bad status line reaches us as HTTPException, not URLError."""
+
+    def _raise(*args, **kwargs):  # noqa: ARG001
+        status_line = "garbage"
+        raise BadStatusLine(status_line)
+
+    monkeypatch.setattr(saml_helpers, "urlopen", _raise)
+    assert load_saml_metadata(METADATA_URL, SAVED_METADATA).get("entityID")
+    assert len(warnings) == 1
+
+
+def test_non_metadata_xml_falls_back_to_saved_copy(monkeypatch, warnings):
+    _serve_saml_metadata(monkeypatch, "<html><body>Maintenance</body></html>")
+    assert load_saml_metadata(METADATA_URL, SAVED_METADATA).get("entityID")
+    assert len(warnings) == 1
+    assert "not an EntityDescriptor" in warnings[0]
+
+
+def test_saml_metadata_warns_when_attributes_drift(monkeypatch, warnings):
+    """Without an attribute map, the advertised attributes decide the mappers."""
+    attribute = (
+        '<saml:Attribute xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" '
+        'Name="mail" FriendlyName="Email"/>'
+    )
+    _serve_saml_metadata(
+        monkeypatch,
+        SAVED_METADATA.replace(
+            "</md:IDPSSODescriptor>", f"{attribute}</md:IDPSSODescriptor>"
+        ),
+    )
+    load_saml_metadata(METADATA_URL, SAVED_METADATA)
+    assert len(warnings) == 1
+    assert "attributes" in warnings[0]
+
+
 def test_saml_metadata_matching_saved_copy_does_not_warn(monkeypatch, warnings):
     _serve_saml_metadata(monkeypatch, SAVED_METADATA)
     load_saml_metadata(METADATA_URL, SAVED_METADATA)
@@ -187,6 +226,16 @@ def test_oidc_discovery_prefers_live_and_warns_on_drift(monkeypatch, warnings):
     assert load_oidc_discovery(DISCOVERY_URL, json.dumps(SAVED_DISCOVERY)) == live
     assert len(warnings) == 1
     assert "token_endpoint" in warnings[0]
+
+
+@pytest.mark.parametrize("body", [["not", "a", "document"], {"status": "maintenance"}])
+def test_non_discovery_json_falls_back_to_saved_copy(monkeypatch, warnings, body):
+    _patch_discovery_response(monkeypatch, 200, body)
+    assert (
+        load_oidc_discovery(DISCOVERY_URL, json.dumps(SAVED_DISCOVERY))
+        == SAVED_DISCOVERY
+    )
+    assert len(warnings) == 1
 
 
 def test_oidc_discovery_matching_saved_copy_does_not_warn(monkeypatch, warnings):
@@ -330,3 +379,39 @@ def test_saved_oidc_discovery_deploys_while_the_endpoint_is_down():
     assert idp["authorizationUrl"] == "https://idp.example.com/auth"
     assert idp["tokenUrl"] == "https://idp.example.com/token"
     assert idp["issuer"] == "https://idp.example.com"
+
+
+# The OIDC IdPs in olapps.py configured with a client secret rather than
+# private_key_jwt.
+CLIENT_SECRET_DISCOVERY_COPIES = {"google", "ubsu"}
+
+
+@pytest.mark.parametrize(
+    "path",
+    sorted(olapps.SAVED_IDP_METADATA_DIR.glob("*_metadata.xml")),
+    ids=lambda path: path.name,
+)
+def test_saved_saml_copy_builds_an_idp(path: Path):
+    """A copy is only used during an outage, so check it can be used now."""
+    fields = extract_saml_metadata(load_saml_metadata(None, path.read_text()))
+    assert fields["entity_id"]
+    assert fields["single_sign_on_service_url"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    sorted(olapps.SAVED_IDP_METADATA_DIR.glob("*_oidc_discovery.json")),
+    ids=lambda path: path.name,
+)
+def test_saved_oidc_copy_builds_an_idp(path: Path):
+    """A copy is only used during an outage, so check it can be used now."""
+    name = path.name.removesuffix("_oidc_discovery.json")
+    args = oidc_identity_provider_args_from_discovery(
+        json.loads(path.read_text()),
+        str(path),
+        client_secret="a-secret"  # pragma: allowlist secret
+        if name in CLIENT_SECRET_DISCOVERY_COPIES
+        else None,
+    )
+    assert args["authorization_url"]
+    assert args["token_url"]

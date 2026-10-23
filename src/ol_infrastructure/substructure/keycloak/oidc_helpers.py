@@ -35,10 +35,26 @@ def _fetch_oidc_discovery(discovery_url: str) -> dict[str, Any]:
         # IdP-not-found page would be read as discovery metadata. HTTPError is
         # the base of both RequestError and the HTTPStatusError this raises.
         response.raise_for_status()
-        return response.json()
+        discovery = response.json()
     except (httpx.HTTPError, ValueError) as e:
         msg = f"Unable to fetch OIDC discovery document from {discovery_url}: {e}"
         raise OidcDiscoveryError(msg) from e
+    # A maintenance page served as JSON with a 200 is an outage too, and has to
+    # reach the saved copy rather than be deployed or crash the drift check.
+    if (
+        not isinstance(discovery, dict)
+        or not {
+            "authorization_endpoint",
+            "token_endpoint",
+        }
+        <= discovery.keys()
+    ):
+        msg = (
+            f"Unable to fetch OIDC discovery document from {discovery_url}: the "
+            "response has no authorization_endpoint and token_endpoint"
+        )
+        raise OidcDiscoveryError(msg)
+    return discovery
 
 
 def load_oidc_discovery(discovery_url: str, saved_json: str | None) -> dict[str, Any]:
