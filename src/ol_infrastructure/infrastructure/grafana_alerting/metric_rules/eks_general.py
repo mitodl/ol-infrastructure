@@ -247,7 +247,22 @@ def create(
                 ),
             ),
             # --- Pod crash looping ---
-            # Fires when a container is in CrashLoopBackOff state.
+            # Fires when a container or an init container is in
+            # CrashLoopBackOff state.
+            #
+            # Init containers report through their own KSM family,
+            # kube_pod_init_container_status_waiting_reason, which the
+            # container-only expression this rule used to have could not see.
+            # A pod looping in Init:CrashLoopBackOff never starts its main
+            # container, so it was invisible here: data-qa's opik-backend had
+            # its backend-migrations init container in CrashLoopBackOff in ten
+            # pods between 2026-10-05 and 2026-10-21, one of them
+            # (679bf76c96-pjg54) for 2026-10-15 to 2026-10-20 with no alert.
+            # Over the 14 days to 2026-10-23, init-container CrashLoopBackOff
+            # lasting 5m showed up only in that namespace on CI/QA and nowhere
+            # in production.
+            # Init and main container names differ within a pod, so the `or`
+            # keeps both sides as separate series.
             #
             # keep_firing_for + missing_series_evals_to_resolve attack the
             # storm mechanism directly: a churning pod's series vanishes the
@@ -272,6 +287,8 @@ def create(
                 },
                 datas=rd(
                     'sum by (cluster, namespace, pod, container) (kube_pod_container_status_waiting_reason{cluster=~".*-(ci|qa)", reason="CrashLoopBackOff"}) > 0'
+                    " or "
+                    'sum by (cluster, namespace, pod, container) (kube_pod_init_container_status_waiting_reason{cluster=~".*-(ci|qa)", reason="CrashLoopBackOff"}) > 0'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -288,6 +305,8 @@ def create(
                 },
                 datas=rd(
                     'sum by (cluster, namespace, pod, container) (kube_pod_container_status_waiting_reason{cluster=~".*-(production)", reason="CrashLoopBackOff"}) > 0'
+                    " or "
+                    'sum by (cluster, namespace, pod, container) (kube_pod_init_container_status_waiting_reason{cluster=~".*-(production)", reason="CrashLoopBackOff"}) > 0'
                 ),
             ),
             # --- Celery Beat restarts ---
