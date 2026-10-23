@@ -231,6 +231,42 @@ clickhouse_ca_configmap = kubernetes.core.v1.ConfigMap(
     data={"clickhouse-ca.pem": clickhouse_stack.require_output("ca_certificate_pem")},
 )
 
+############################################################
+# Backend version, per ReplicaSet
+#
+# The backend image starts with `java -jar opik-backend-$OPIK_VERSION.jar`, in
+# both entrypoint.sh and the backend-migrations init container's
+# run_db_migrations.sh. The image bakes in the right OPIK_VERSION, but the
+# chart also writes OPIK_VERSION into the opik-backend ConfigMap, and that one
+# ConfigMap is shared by every ReplicaSet. A chart bump rewrites it in place
+# while the old ReplicaSet's pods are still running, and envFrom is resolved
+# at each container start, so any old pod that restarts or is recreated (a
+# liveness kill, a node drain) launches the old image looking for the new
+# jar. That is how data-qa's 2.2.96 pods crash-looped on "Unable to access
+# jarfile opik-backend-2.2.103.jar" for days while the 2.2.103 rollout was
+# blocked on its migrations.
+#
+# A ConfigMap named for the version, listed after the chart's in envFrom,
+# gives each pod template its own OPIK_VERSION that a later bump cannot
+# change. pulumi-kubernetes only deletes before replacing when the name stays
+# the same, so a bump creates the new ConfigMap first and deletes the old one
+# as a delete-replaced step after the Helm release, which depends on it, has
+# updated and the old ReplicaSet has scaled down. The image tag is pinned to the
+# same value: the opik chart publishes appVersion equal to its version, so
+# this renders the image the chart would pick anyway, but now from the
+# constant the ConfigMap uses.
+############################################################
+OPIK_BACKEND_VERSION = OPIK_CHART_VERSION
+opik_backend_version_configmap = kubernetes.core.v1.ConfigMap(
+    f"opik-backend-version-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=f"opik-backend-version-{OPIK_BACKEND_VERSION}",
+        namespace=OPIK_NAMESPACE,
+        labels=k8s_global_labels,
+    ),
+    data={"OPIK_VERSION": OPIK_BACKEND_VERSION},
+)
+
 ###################################
 #   Opik Helm Release (K8S)       #
 ###################################
@@ -291,6 +327,7 @@ opik_helm_release = kubernetes.helm.v3.Release(
                     # the same rate, so that failure is correlated, not
                     # independent.
                     "replicaCount": 2,
+                    "image": {"tag": OPIK_BACKEND_VERSION},
                     "podDisruptionBudget": {"enabled": True, "minAvailable": 1},
                     # The chart ships only an ephemeral-storage request, which
                     # leaves the pod BestEffort with no cgroup memory limit. That
@@ -419,9 +456,15 @@ opik_helm_release = kubernetes.helm.v3.Release(
                     # ConfigMap. Listing the Secret last lets it override the
                     # placeholder password values, and because the migration
                     # init container also consumes ``envFrom`` it gets the real
-                    # password too.
+                    # password too. The version ConfigMap comes after the
+                    # chart's so its OPIK_VERSION wins (see above).
                     "envFrom": [
                         {"configMapRef": {"name": "opik-backend"}},
+                        {
+                            "configMapRef": {
+                                "name": opik_backend_version_configmap.metadata.name
+                            }
+                        },
                         {"secretRef": {"name": clickhouse_credentials_secret_name}},
                     ],
                 },
