@@ -708,8 +708,9 @@ class OLApisixOIDCConfig(BaseModel):
     # lua-resty-session leaves Secure off unless asked, so without this the
     # session cookie the gateway issues after login would be sent by the
     # browser on any plain-HTTP request to the cookie's domain (hq#14077).
-    # Every OIDC host is HTTPS-only, local dev included, so there is no
-    # caller that needs it off; the field exists to make that a choice.
+    # Every deployed OIDC host is HTTPS-only, and so is the local-dev stack
+    # that uses this component, so no caller needs it off; the field exists to
+    # make that a choice.
     oidc_session_cookie_secure: bool = True
     oidc_session_absolute_timeout: NonNegativeInt = 0
     # None leaves lua-resty-session's compiled-in defaults (900s idling /
