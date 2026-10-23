@@ -37,13 +37,16 @@ IDP_TYPES = {
 
 
 def _onboard_oidc(org: OrgConfig, org_domain: str) -> None:
-    with mock.patch.object(
-        org_sso_helpers,
-        "oidc_identity_provider_args_from_discovery_url",
-        return_value={
-            "authorization_url": "https://idp.example.com/auth",
-            "token_url": "https://idp.example.com/token",
-        },
+    with (
+        mock.patch.object(org_sso_helpers, "load_oidc_discovery", return_value={}),
+        mock.patch.object(
+            org_sso_helpers,
+            "oidc_identity_provider_args_from_discovery",
+            return_value={
+                "authorization_url": "https://idp.example.com/auth",
+                "token_url": "https://idp.example.com/token",
+            },
+        ),
     ):
         onboard_oidc_org(
             OIDCIdpConfig(
@@ -67,6 +70,7 @@ def _onboard_oidc(org: OrgConfig, org_domain: str) -> None:
 
 def _onboard_saml(org: OrgConfig, org_domain: str) -> None:
     with (
+        mock.patch.object(org_sso_helpers, "load_saml_metadata"),
         mock.patch.object(org_sso_helpers, "extract_saml_metadata", return_value={}),
         mock.patch.object(
             org_sso_helpers,
