@@ -44,7 +44,6 @@ pulumi-provisioner's ``env_vars_from_files``).
 
 import hashlib
 import json
-import math
 from typing import NamedTuple
 
 import pulumi
@@ -164,13 +163,11 @@ def startup_probe_failure_threshold(boot_budget_seconds: int | None) -> int:
             "lengthen a boot, e.g. one whose cluster apply deletes a graph."
         )
         raise ValueError(msg)
+    after_first_probe = boot_budget_seconds - STARTUP_PROBE_INITIAL_DELAY_SECONDS
+    # Integer ceiling division: exact for any budget, unlike float division.
     return (
-        math.ceil(
-            (boot_budget_seconds - STARTUP_PROBE_INITIAL_DELAY_SECONDS)
-            / STARTUP_PROBE_PERIOD_SECONDS
-        )
-        + 1
-    )
+        after_first_probe + STARTUP_PROBE_PERIOD_SECONDS - 1
+    ) // STARTUP_PROBE_PERIOD_SECONDS + 1
 
 
 # ── Per-actor admission caps ─────────────────────────────────────────────────
