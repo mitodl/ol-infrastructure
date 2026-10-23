@@ -176,29 +176,32 @@ qdrant_api_key = qdrant_cloud.AccountsDatabaseApiKeyV2(
 # the key belongs to that cluster. Dagster's policy can read secret-mitlearn, but that
 # holds the manage key above, so this goes to secret-data/pipelines/*, the kv-v1 path
 # its pipeline resources read: QdrantResource takes the cluster URL as `host`.
-qdrant_dagster_read_only_api_key = qdrant_cloud.AccountsDatabaseApiKeyV2(
-    f"mitlearn-qdrant-dagster-read-only-api-key-{stack_info.env_suffix}",
-    cluster_id=qdrant_cluster_id,
-    name=f"dagster-read-only-{stack_info.env_suffix}",
-    global_access_rule=qdrant_cloud.AccountsDatabaseApiKeyV2GlobalAccessRuleArgs(
-        access_type="GLOBAL_ACCESS_RULE_ACCESS_TYPE_READ_ONLY",
-    ),
-    opts=ResourceOptions(
-        provider=qdrant_provider,
-        additional_secret_outputs=["key"],
-    ),
-)
-vault.generic.Secret(
-    f"mitlearn-qdrant-dagster-read-only-vault-secret-{stack_info.env_suffix}",
-    path="secret-data/pipelines/qdrant",
-    data_json=Output.json_dumps(
-        {
-            "host": qdrant_cloud_stack.require_output("cluster_url"),
-            "api_key": qdrant_dagster_read_only_api_key.key,
-        }
-    ),
-    opts=ResourceOptions(delete_before_replace=True),
-)
+# Dagster runs Azure embeddings, and so the smokecheck, in qa and production only,
+# as with its YouTube key in secret-data/pipelines.
+if stack_info.env_suffix in ("qa", "production"):
+    qdrant_dagster_read_only_api_key = qdrant_cloud.AccountsDatabaseApiKeyV2(
+        f"mitlearn-qdrant-dagster-read-only-api-key-{stack_info.env_suffix}",
+        cluster_id=qdrant_cluster_id,
+        name=f"dagster-read-only-{stack_info.env_suffix}",
+        global_access_rule=qdrant_cloud.AccountsDatabaseApiKeyV2GlobalAccessRuleArgs(
+            access_type="GLOBAL_ACCESS_RULE_ACCESS_TYPE_READ_ONLY",
+        ),
+        opts=ResourceOptions(
+            provider=qdrant_provider,
+            additional_secret_outputs=["key"],
+        ),
+    )
+    vault.generic.Secret(
+        f"mitlearn-qdrant-dagster-read-only-vault-secret-{stack_info.env_suffix}",
+        path="secret-data/pipelines/qdrant",
+        data_json=Output.json_dumps(
+            {
+                "host": qdrant_cloud_stack.require_output("cluster_url"),
+                "api_key": qdrant_dagster_read_only_api_key.key,
+            }
+        ),
+        opts=ResourceOptions(delete_before_replace=True),
+    )
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 learn_zone_id = dns_stack.require_output("learn")["id"]
 
