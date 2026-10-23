@@ -248,17 +248,19 @@ clickhouse_ca_configmap = kubernetes.core.v1.ConfigMap(
 #
 # A ConfigMap named for the version, listed after the chart's in envFrom,
 # gives each pod template its own OPIK_VERSION that a later bump cannot
-# change. pulumi-kubernetes only deletes before replacing when the name stays
-# the same, so a bump creates the new ConfigMap first and deletes the old one
-# as a delete-replaced step after the Helm release, which depends on it, has
-# updated and the old ReplicaSet has scaled down. The image tag is pinned to the
+# change. The Pulumi resource name carries the version too, so a bump adds a
+# new resource and drops the old one from the program. Pulumi deletes a
+# dropped resource only at the end of an update that succeeded, so while a
+# Helm upgrade is failing on stuck migrations the old ConfigMap stays, and
+# reverting to that version re-registers it unchanged rather than trying to
+# create a ConfigMap that still exists. The image tag is pinned to the
 # same value: the opik chart publishes appVersion equal to its version, so
 # this renders the image the chart would pick anyway, but now from the
 # constant the ConfigMap uses.
 ############################################################
 OPIK_BACKEND_VERSION = OPIK_CHART_VERSION
 opik_backend_version_configmap = kubernetes.core.v1.ConfigMap(
-    f"opik-backend-version-{stack_info.env_suffix}",
+    f"opik-backend-version-{OPIK_BACKEND_VERSION}-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=f"opik-backend-version-{OPIK_BACKEND_VERSION}",
         namespace=OPIK_NAMESPACE,
