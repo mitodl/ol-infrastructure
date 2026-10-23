@@ -556,6 +556,10 @@ for 25,000 objects), and remove it in step 2's. It raises the startup probe's
 failure threshold, and the Deployment's progress deadline and Pulumi's wait
 for the rollout with it, so the deploy waits out the delete instead of failing
 at Pulumi's 10-minute default. The server is down for the whole delete.
+Start step 1 at least the budget ahead of 03:20: the booting pod holds the
+unlock Lease, so a window that starts mid-delete gives up after 90s and skips
+that night's optimize and cleanup. While the setting is in place every restart
+gets the long probe, so a wedged boot goes unnoticed for the whole budget.
 
 If a delete is killed anyway, reconcile it by hand:
 
