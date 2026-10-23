@@ -85,6 +85,12 @@ clickhouse_stack = make_stack_reference(projects.CLICKHOUSE, stack_info.name)
 setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
 
 OPIK_NAMESPACE = "opik"
+OPIK_USERS_GROUP = "opik-users"
+if stack_info.env_suffix == "production":
+    KEYCLOAK_DOMAIN = "sso.ol.mit.edu"
+else:
+    KEYCLOAK_DOMAIN = f"sso-{stack_info.env_suffix}.ol.mit.edu"
+KEYCLOAK_ISSUER = f"https://{KEYCLOAK_DOMAIN}/realms/ol-platform-engineering"
 
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(OPIK_NAMESPACE, ns)
@@ -521,6 +527,24 @@ opik_oidc = OLApisixOIDCResources(
 # the user once at ``/`` and then calls ``/api/*`` from the browser carrying
 # only the APISIX session cookie (no bearer token).
 opik_session_oidc_plugin = opik_oidc.get_full_oidc_plugin_config(unauth_action="auth")
+# OSS Opik makes everyone it sees the admin of workspace "default", so a session
+# is admitted only when its ID token names the opik-users Keycloak group (the
+# groups mapper on ol-opik-client in substructure/keycloak). The plugin checks
+# the ID token it holds after any refresh, so membership changes land within
+# one access-token lifetime. A non-member gets a 401; /logout/oidc still works.
+opik_session_oidc_plugin["config"]["claim_schema"] = {
+    "type": "object",
+    "required": ["id_token"],
+    "properties": {
+        "id_token": {
+            "type": "object",
+            "required": ["groups"],
+            "properties": {
+                "groups": {"type": "array", "contains": {"const": OPIK_USERS_GROUP}}
+            },
+        }
+    },
+}
 # Bearer auth: validate a Keycloak access token from the Authorization header
 # and reject (rather than redirect) unauthenticated requests, so SDK / machine
 # clients get a clean 401 instead of an HTML login page.
@@ -531,6 +555,14 @@ opik_bearer_oidc_plugin["config"]["bearer_only"] = True
 # for client-credentials service-account tokens (transient sessions), so every
 # SDK request would 401 even with a freshly-issued valid token.
 opik_bearer_oidc_plugin["config"]["use_jwks"] = True
+# Every client in the realm signs with the same key, so without an audience
+# check a client-credentials token from any of them is admitted. The audience
+# mapper on ol-opik-client puts its own client id in aud. The issuer is pinned
+# here rather than taken from the discovery document at request time.
+opik_bearer_oidc_plugin["config"]["claim_validator"] = {
+    "issuer": {"valid_issuers": [KEYCLOAK_ISSUER]},
+    "audience": {"required": True, "match_with_client_id": True},
+}
 
 # Match ``/api/*`` requests that carry a Bearer ``Authorization`` header so they
 # are routed to the bearer-only rule; everything else under ``/api`` falls
@@ -600,11 +632,7 @@ opik_apisix_route = OLApisixRoute(
             backend_service_name="opik-frontend",
             backend_service_port=5173,
             shared_plugin_config_name=opik_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    **opik_oidc.get_full_oidc_plugin_config(unauth_action="auth")
-                )
-            ],
+            plugins=[OLApisixPluginConfig(**opik_session_oidc_plugin)],
         ),
     ],
     opts=ResourceOptions(
