@@ -647,6 +647,15 @@ default_resources_definition = {
     },
 }
 
+# Below the 7-day floor of ol-data-platform's Iceberg orphan-file deletes, which
+# would remove the files of a sync still running past it. Dagster's
+# run_monitoring cap doesn't reach these: the lakehouse code location doesn't
+# cancel a sync when its run ends. airbyte-cron's workload monitor fails a sync
+# workload older than this (default 30 days), and the replication pod exits on
+# its next heartbeat. syncJobMaxTimeoutDays is not a deadline: nothing in the
+# platform reads it.
+SYNC_WORKLOAD_TIMEOUT = "P2D"
+
 airbyte_helm_release = kubernetes.helm.v3.Release(
     "airbyte-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
@@ -824,6 +833,9 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "replicaCount": 1,
                 "podLabels": workload_labels(Component.worker),
                 "resources": default_resources_definition,
+                "extraEnv": [
+                    {"name": "SYNC_WORKLOAD_TIMEOUT", "value": SYNC_WORKLOAD_TIMEOUT},
+                ],
             },
             # manifestServer replaces connectorBuilderServer in chart 2.1+
             # (connectorBuilderServer was removed; manifestServer is now enabled)

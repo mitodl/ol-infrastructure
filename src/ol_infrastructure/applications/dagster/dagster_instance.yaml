@@ -344,7 +344,12 @@ run_monitoring:
   cancel_timeout_seconds: 300
   max_resume_run_attempts: 3
   poll_interval_seconds: 120
-  max_runtime_seconds: 0
+  # Two days. ol-data-platform's Iceberg orphan-file pass deletes unreferenced
+  # files older than 7 days, so a writer still running past that would lose
+  # files it has written but not yet committed. The longest production run in
+  # the 30 days to 2026-10-21 lasted 26.7 hours (two runs attached to a stuck
+  # Airbyte sync). A run tagged dagster/max_runtime overrides this.
+  max_runtime_seconds: 172800
   # A run worker killed mid-step leaves its step's pool claim behind. Once
   # max_resume_run_attempts is spent the run is marked failed with the claim
   # still recorded, and on a pool with a limit of 1 every retry and every later
