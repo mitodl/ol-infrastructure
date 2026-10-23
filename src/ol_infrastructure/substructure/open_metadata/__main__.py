@@ -1046,6 +1046,39 @@ vault.generic.Secret(
     data_json=Output.json_dumps({"token": dagster_bot.token, "server_url": om_api_url}),
 )
 
+# metrics-sync-bot runs ol-data-platform's `ol-dbt metrics sync`, which takes
+# its own name from /v1/users/loggedInUser and reads drift against the versions
+# that name wrote, so it cannot share another bot's identity. It is not a metric
+# reviewer and has no team (ol-data-platform metrics/README.md, "Status and
+# approval").
+metrics_sync_bot = OpenMetadataBot(
+    f"om-metrics-sync-bot-{stack_info.env_suffix}",
+    connection=om_connection,
+    spec=OpenMetadataBotSpec(
+        name="metrics-sync-bot",
+        display_name="Metrics sync",
+        description=(
+            "Publishes ol-data-platform's metrics/ files as Metric entities."
+            " Managed by Pulumi in ol-infrastructure substructure/open_metadata."
+        ),
+        email=f"metrics-sync-bot@{_BOT_EMAIL_DOMAIN}",
+        roles=["MetricsSyncBotRole"],
+    ),
+    opts=ResourceOptions(depends_on=[server_config_job]),
+)
+
+# Beside the contracts sync's token, since the metrics sync is meant to run from
+# Concourse the same way, and Concourse reads only secret-concourse/<team>/*.
+# The developer policy reads secret-*, so the QA token also serves a manual
+# `--dry-run`.
+vault.generic.Secret(
+    f"om-metrics-sync-bot-vault-secret-{stack_info.env_suffix}",
+    path="secret-concourse/infrastructure/openmetadata_metrics_bot",
+    data_json=Output.json_dumps(
+        {"token": metrics_sync_bot.token, "server_url": om_api_url}
+    ),
+)
+
 
 # ---------------------------------------------------------------------------
 # Team membership -> Keycloak groups

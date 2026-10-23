@@ -965,6 +965,51 @@ POLICY_CONFIG: dict[str, dict[str, Any]] = {
             },
         ],
     },
+    # What ol-data-platform's `ol-dbt metrics sync` needs on top of
+    # DefaultBotRole's ViewAll: PUT a metric (Create when it is new; a PUT to an
+    # existing one is authorized as EditAll, EntityUtil.createOrUpdateOperation),
+    # PATCH its description, owners, reviewers, tags, status and
+    # extension.metricFileSha256 (covered by EditAll; /entityStatus maps to no
+    # narrower operation), and PUT a lineage edge from each implemented_by
+    # entity, which checks EditLineage on both ends (LineageResource.addLineage).
+    # EditAll on metric covers the metric's end; the lineage rule lists every
+    # entity type an implemented_by entry can name (ol-data-platform
+    # ENTITY_COLLECTIONS).  DefaultBotPolicy's EditDisplayName deny does not
+    # block the EditAll PUT, but EntityUpdater.updateDisplayName then keeps the
+    # stored non-empty displayName for any bot it denies, so the sync can set a
+    # metric's displayName only on create or where the metric has none.
+    "MetricsSyncBotPolicy": {
+        "displayName": "Metrics Sync Bot Policy",
+        "description": (
+            "Lets ol-dbt metrics sync create and update Metric entities and add "
+            "lineage to them from the entities that implement them."
+        ),
+        "rules": [
+            {
+                "name": "MetricsSyncBotRule-Metrics",
+                "description": "Create metrics and edit any field of them.",
+                "effect": "allow",
+                "resources": ["metric"],
+                "operations": ["Create", "EditAll"],
+            },
+            {
+                "name": "MetricsSyncBotRule-Lineage",
+                "description": (
+                    "Add lineage edges to metrics from the entities that "
+                    "implement them."
+                ),
+                "effect": "allow",
+                "resources": [
+                    "table",
+                    "topic",
+                    "apiEndpoint",
+                    "dashboardDataModel",
+                    "container",
+                ],
+                "operations": ["EditLineage"],
+            },
+        ],
+    },
 }
 
 # Desired state for each custom role, keyed by role name.  These names are the
@@ -992,6 +1037,11 @@ ROLE_CONFIG: dict[str, dict[str, Any]] = {
         "displayName": "Dagster Bot Role",
         "description": "Role of dagster-bot.",
         "policies": ["DagsterBotPolicy"],
+    },
+    "MetricsSyncBotRole": {
+        "displayName": "Metrics Sync Bot Role",
+        "description": "Role of metrics-sync-bot.",
+        "policies": ["MetricsSyncBotPolicy"],
     },
 }
 
