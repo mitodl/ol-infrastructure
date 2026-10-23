@@ -1149,20 +1149,26 @@ interserver_credentials_enabled = clickhouse_config.require_bool(
 )
 # Turns on the server's 8443 and 9440 listeners. Rolled out in two applies,
 # like the interserver credentials, because the settings and the certificate
-# volume reach a replica at different times. The operator writes settings into
-# the shared configd ConfigMap and restarts a host for them (SYSTEM SHUTDOWN)
-# before it updates that host's StatefulSet, so the server comes back reading
-# certificate paths that are not mounted yet. 25.8 then never finishes startup:
-# on 2026-10-23 production and QA replica 0 stopped after the interserver
-# listener, failed liveness, and the operator recreated the StatefulSet and
-# gave up with it deleted. So:
+# volume reach a replica at different times. When a config change needs a
+# reboot, operator 0.26 restarts the host (SYSTEM SHUTDOWN, via
+# hostForceRestart in reconcileHostStatefulSet) before it reconciles that
+# host's StatefulSet, so the server comes back reading certificate paths that
+# are not mounted yet. 25.8 then never finishes startup: on 2026-10-23
+# production and QA replica 0 stopped after the interserver listener and was
+# killed, the operator recreated its not-Ready StatefulSet, the delete outlasted
+# reconcile.statefulSet.update.timeout, and the reconcile gave up with the
+# StatefulSet deleted. So:
 #   1. With this false, the pod template change (certificate volume,
 #      interserver password env var) rolls every replica as a plain
-#      StatefulSet update, with no config restart in front of it.
+#      StatefulSet update. The operator diffs against the last completed
+#      reconcile (status.normalizedCompleted), which a failed one never
+#      replaces, so a stack whose TLS apply failed sees no settings change and
+#      no restart in front of the update.
 #   2. Set it true once every chi-* pod has /etc/clickhouse-server/tls. The
 #      operator then restarts each replica into the new settings with the
 #      files already there.
-# Opik's move to 8443 (applications/opik) has to wait for step 2.
+# applications/opik reads this from the stack outputs to choose 8443 or 8123,
+# so apply this stack before it after flipping.
 tls_listeners_enabled = clickhouse_config.require_bool("tls_listeners_enabled")
 # Points the servers at Keeper's TLS port. Flip it per stack only after Keeper
 # is serving 9281 there. Operator 0.26 restarts a host for any zookeeper change
@@ -1185,6 +1191,11 @@ tls_listeners_enabled = clickhouse_config.require_bool("tls_listeners_enabled")
 # before restarting it; check every chi-clickhouse-deploy-confd-default-0-N
 # ConfigMap shows 2181 again afterwards.
 keeper_tls_enabled = clickhouse_config.require_bool("keeper_tls_enabled")
+# The server trusts the stack CA, which signs Keeper's certificate, only through
+# openSSL/client/caConfig, and that ships with the TLS listener settings.
+if keeper_tls_enabled and not tls_listeners_enabled:
+    msg = "clickhouse:keeper_tls_enabled requires clickhouse:tls_listeners_enabled"
+    raise ValueError(msg)
 # A non-auto spec.taskID is part of the operator's change detection (auto-
 # prefixed IDs are excluded), so a new value forces a reconcile of an
 # otherwise unchanged CHI. Unset in normal operation.
@@ -2086,6 +2097,7 @@ export("clickhouse_native_port", 9000)
 export("clickhouse_http_port", 8123)
 export("clickhouse_native_tls_port", CLICKHOUSE_NATIVE_TLS_PORT)
 export("clickhouse_https_port", CLICKHOUSE_HTTPS_PORT)
+export("tls_listeners_enabled", tls_listeners_enabled)
 export("keeper_tls_port", KEEPER_TLS_PORT)
 # Public half only. Clients outside the clickhouse namespace add it to their
 # trust stores (applications/opik).

@@ -116,7 +116,13 @@ k8s_global_labels = {
 
 # External ClickHouse connection details (see the ol-application-clickhouse stack).
 CLICKHOUSE_HOST = "clickhouse.clickhouse.svc.cluster.local"
+CLICKHOUSE_HTTP_PORT = 8123
 CLICKHOUSE_HTTPS_PORT = 8443
+# The clickhouse stack serves 8443 only once its clickhouse:tls_listeners_enabled
+# rollout step is done; until then 8443 refuses connections and Opik stays on
+# plaintext 8123.
+clickhouse_tls = require_stack_output_value(clickhouse_stack, "tls_listeners_enabled")
+clickhouse_port = CLICKHOUSE_HTTPS_PORT if clickhouse_tls else CLICKHOUSE_HTTP_PORT
 CLICKHOUSE_DATABASE = "opik_db"
 CLICKHOUSE_USER = "opik"
 
@@ -346,8 +352,8 @@ opik_helm_release = kubernetes.helm.v3.Release(
                     "waitForClickhouse": {
                         "clickhouse": {
                             "host": CLICKHOUSE_HOST,
-                            "port": CLICKHOUSE_HTTPS_PORT,
-                            "protocol": "https",
+                            "port": clickhouse_port,
+                            "protocol": "https" if clickhouse_tls else "http",
                         },
                     },
                     # Non-secret ClickHouse connection settings (these land in
@@ -375,10 +381,13 @@ opik_helm_release = kubernetes.helm.v3.Release(
                         # it verifies against the JVM default trust store, as
                         # R2DBC and client-v2 do for the runtime connections.
                         # That store is where the CA lands (see caCerts above).
-                        "ANALYTICS_DB_MIGRATIONS_URL": f"jdbc:clickhouse://{CLICKHOUSE_MIGRATIONS_HOST}:{CLICKHOUSE_HTTPS_PORT}?ssl=true",
-                        "ANALYTICS_DB_PROTOCOL": "HTTPS",
+                        "ANALYTICS_DB_MIGRATIONS_URL": (
+                            f"jdbc:clickhouse://{CLICKHOUSE_MIGRATIONS_HOST}:{clickhouse_port}"
+                            + ("?ssl=true" if clickhouse_tls else "")
+                        ),
+                        "ANALYTICS_DB_PROTOCOL": "HTTPS" if clickhouse_tls else "HTTP",
                         "ANALYTICS_DB_HOST": CLICKHOUSE_HOST,
-                        "ANALYTICS_DB_PORT": str(CLICKHOUSE_HTTPS_PORT),
+                        "ANALYTICS_DB_PORT": str(clickhouse_port),
                         # The 1s default is a single SELECT 1. A new pooled
                         # connection now also pays a TLS handshake, and this
                         # check gates readiness and, through the liveness
