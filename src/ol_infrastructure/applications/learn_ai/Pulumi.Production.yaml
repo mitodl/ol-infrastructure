@@ -18,6 +18,15 @@ config:
     AI_MIT_CONTENTFILE_URL: "https://api.learn.mit.edu/api/v1/contentfiles/"
     AI_MIT_SEARCH_URL: "https://api.learn.mit.edu/api/v0/vector_learning_resources_search/"
     AI_PROMPT_CACHE_FUNCTION: "ai_chatbots.utils.get_django_cache"
+    # Contact us support intake (hq#13712, hq#13991). Placeholders: these are
+    # the "unset" defaults, so the stack deploys unchanged until the real
+    # values land. The field ids are minted per Zendesk instance -- take
+    # them from this environment's own instance, never from another's.
+    # An id Zendesk does not recognise makes it reject the whole ticket.
+    AI_ZENDESK_API_URL: ""
+    AI_ZENDESK_NAME_FIELD_ID: "0"
+    AI_ZENDESK_URL_FIELD_ID: "0"
+    AI_ZENDESK_USERNAME_FIELD_ID: "0"
     CANVAS_SYLLABUS_DEMO_READABLE_IDS: ["14566-kaleba:20211202", "34642-15.095_FA25"]
     CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: ["14566-kaleba:20211202+canvas", "34642-15.095_FA25+canvas"]
     CELERY_TASK_ALWAYS_EAGER: "false"
