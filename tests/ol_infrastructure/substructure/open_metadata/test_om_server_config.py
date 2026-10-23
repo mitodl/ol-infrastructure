@@ -112,7 +112,6 @@ def _run_glossary_steps(monkeypatch: pytest.MonkeyPatch, config: ModuleType) -> 
         "POLICY_CONFIG",
         "ROLE_CONFIG",
         "TEAM_DEFAULT_ROLES",
-        "BOT_CONFIG",
         "DOMAIN_CONFIG",
         "CUSTOM_PROPERTY_CONFIG",
     ):

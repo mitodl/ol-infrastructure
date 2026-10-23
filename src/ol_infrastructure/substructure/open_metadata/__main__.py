@@ -18,7 +18,15 @@ import json
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+import pulumi_vault as vault
+from pulumi import (
+    Config,
+    InvokeOptions,
+    Output,
+    ResourceOptions,
+    StackReference,
+    export,
+)
 from pulumi_aws import get_caller_identity, iam
 
 from bridge.lib.versions import OPEN_METADATA_VERSION
@@ -33,6 +41,16 @@ from ol_infrastructure.lib.aws.iam_helper import (
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.providers.openmetadata import (
+    OpenMetadataBot,
+    OpenMetadataBotSpec,
+    OpenMetadataConnection,
+)
+from ol_infrastructure.substructure.keycloak.openmetadata_provisioner import (
+    OPENMETADATA_PROVISIONER_VAULT_MOUNT,
+    OPENMETADATA_PROVISIONER_VAULT_NAME,
+)
 from ol_infrastructure.substructure.open_metadata.teams import declared_team_names
 
 stack_info = parse_stack()
@@ -46,8 +64,10 @@ aws_config = AWSBase(
 
 cluster_stack = StackReference(stack_ref(projects.EKS, f"data.{stack_info.name}"))
 superset_stack = StackReference(stack_ref(projects.SUPERSET, stack_info.name))
+open_metadata_stack = StackReference(stack_ref(projects.OPEN_METADATA, stack_info.name))
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+vault_provider = setup_vault_provider()
 
 open_metadata_namespace = "open-metadata"
 ingestion_sa_name = "openmetadata-ingestion"
@@ -911,7 +931,7 @@ _server_config_script = (
 ).read_text()
 _server_config_hash = hashlib.sha256(_server_config_script.encode()).hexdigest()[:8]
 
-kubernetes.batch.v1.Job(
+server_config_job = kubernetes.batch.v1.Job(
     f"om-server-config-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=f"om-server-config-{_server_config_hash}",
@@ -965,6 +985,65 @@ kubernetes.batch.v1.Job(
         depends_on=[ingestion_irsa_role],
         delete_before_replace=True,
     ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Bots
+# ---------------------------------------------------------------------------
+# Creating a bot, giving it roles and reading its token are admin-only in
+# OpenMetadata, so these run as the Keycloak service account that the
+# application stack lists in initialAdmins (substructure/keycloak
+# openmetadata_provisioner.py), not as the ingestion bot the Jobs above use.
+# The roles come from om_server_config.py's ROLE_CONFIG, so the bots wait for
+# the server-config Job, which Pulumi waits on until it completes.
+_provisioner_credentials = vault.kv.get_secret_v2_output(
+    mount=OPENMETADATA_PROVISIONER_VAULT_MOUNT,
+    name=OPENMETADATA_PROVISIONER_VAULT_NAME,
+    # The stack transformation sets the provider on resources only; an invoke
+    # without one would use the default provider, which has no Vault token.
+    opts=InvokeOptions(provider=vault_provider),
+).data
+om_api_url = open_metadata_stack.require_output("open_metadata")["api_url"]
+om_connection = OpenMetadataConnection(
+    server_url=om_api_url,
+    token_url=_provisioner_credentials["token_url"],
+    client_id=_provisioner_credentials["client_id"],
+    client_secret=_provisioner_credentials["client_secret"],
+)
+
+# The server names its own bots' users <bot>@<principalDomain>
+# (BotResource.initialize); these follow suit.
+_BOT_EMAIL_DOMAIN = "mit.edu"
+
+# dagster-bot writes the Dagster asset check results, so that an OpenMetadata
+# alert on test case failures can leave them out with matchUpdatedBy (Dagster
+# notifies for its own checks). OpenMetadata 2.0.5's alert filters cannot match
+# on a test case's platform or definition.
+dagster_bot = OpenMetadataBot(
+    f"om-dagster-bot-{stack_info.env_suffix}",
+    connection=om_connection,
+    spec=OpenMetadataBotSpec(
+        name="dagster-bot",
+        display_name="Dagster",
+        description=(
+            "Writes Dagster asset check results to OpenMetadata as test cases."
+            " Managed by Pulumi in ol-infrastructure substructure/open_metadata."
+        ),
+        email=f"dagster-bot@{_BOT_EMAIL_DOMAIN}",
+        roles=["DagsterBotRole"],
+    ),
+    opts=ResourceOptions(depends_on=[server_config_job]),
+)
+
+# ol-data-platform's lakehouse code location reads secret-data/pipelines/*. A
+# path of its own rather than pipelines/openmetadata, which the application
+# stack filled with the ingestion bot's token until Dagster moved here: two
+# stacks writing one path would each delete it when they stop.
+vault.generic.Secret(
+    f"om-dagster-bot-vault-secret-{stack_info.env_suffix}",
+    path="secret-data/pipelines/openmetadata-dagster-bot",
+    data_json=Output.json_dumps({"token": dagster_bot.token, "server_url": om_api_url}),
 )
 
 

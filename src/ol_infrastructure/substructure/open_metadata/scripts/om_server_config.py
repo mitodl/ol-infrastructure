@@ -39,11 +39,10 @@ deleting it drops its value from every entity that has one.
 
 Access policies and roles are declared in ``POLICY_CONFIG`` and ``ROLE_CONFIG``,
 and code owns them: rules or policies changed in the UI are put back.  Bots are
-declared in ``BOT_CONFIG`` but only checked, not created.  Creating a bot user
-or assigning it a role needs an admin, and this job runs as the ingestion bot,
-which is not one.  A bot that is missing, or lacks its role, is reported for an
-admin to set up.  A bot that is an admin, or holds any role it is not declared
-with, fails the job.
+not managed here: creating one or assigning it a role needs an admin, and this
+job runs as the ingestion bot, which is not one.  The stack declares them with
+the OpenMetadataBot provider (ol_infrastructure.providers.openmetadata) after
+this job has created the roles they hold.
 
 The business glossary is declared in ``GLOSSARY_CONFIG`` and ``GLOSSARY_TERMS``.
 The glossary and each term are created when missing and never patched, so a
@@ -1006,19 +1005,6 @@ TEAM_DEFAULT_ROLES: dict[str, list[str]] = {
     "data-platform": ["DataSteward"],
 }
 
-# The roles each bot should hold, keyed by bot name.  dagster-bot writes the
-# Dagster asset check results, so that an OpenMetadata alert on test case
-# failures can leave them out with matchUpdatedBy (Dagster notifies for its own
-# checks).  OpenMetadata 2.0.5's alert filters cannot match on a test case's
-# platform or definition.
-BOT_CONFIG: dict[str, set[str]] = {
-    "dagster-bot": {"DagsterBotRole"},
-}
-
-# OpenMetadata gives every bot this role when it is created
-# (UserResource.addRolesToBot): DefaultBotPolicy and DataConsumerPolicy.
-_DEFAULT_BOT_ROLE = "DefaultBotRole"
-
 
 def _get_by_name_with_fields(
     collection: str, name: str, fields: str
@@ -1179,52 +1165,10 @@ def _reconcile_team_default_roles(team_name: str, role_names: list[str]) -> None
     )
 
 
-def _check_bot(name: str, roles: set[str]) -> None:
-    """Report a bot that is missing or lacks *roles*; fail on one that holds more.
-
-    :param name: Bot name, which is also the name of the bot's user.
-    :param roles: The roles the bot should hold besides DefaultBotRole.
-    :raises requests.HTTPError: On any unexpected non-2xx response from the OM API.
-    :raises ValueError: If the user is not a bot, is an admin, or holds a role not
-        in *roles*.
-    """
-    user = _get_by_name_with_fields("users", name, "roles")
-    if user is None:
-        print(  # noqa: T201
-            f"[todo] bot {name}: does not exist. An admin creates it under "
-            f"Settings > Bots and gives it {sorted(roles)}."
-        )
-        return
-
-    if user.get("isBot") is not True:
-        msg = "is a user, not a bot"
-        raise ValueError(msg)
-
-    # OM's authorizer returns before evaluating any policy for an admin, so the
-    # role check below would pass a token that can do anything.
-    if user.get("isAdmin") is True:
-        msg = "is an admin, so its roles do not limit it; an admin unsets isAdmin"
-        raise ValueError(msg)
-
-    held = {role["name"] for role in user["roles"]}
-    if extra := held - roles - {_DEFAULT_BOT_ROLE}:
-        msg = f"holds {sorted(extra)}, beyond {sorted(roles)}; an admin removes them"
-        raise ValueError(msg)
-    if missing := roles - held:
-        print(  # noqa: T201
-            f"[todo] bot {name}: lacks {sorted(missing)}. An admin assigns them "
-            "under Settings > Bots."
-        )
-        return
-
-    print(f"[ok]   bot {name}: holds {sorted(roles)}")  # noqa: T201
-
-
 def _access_control_steps() -> list[tuple[str, Callable[[], None]]]:
     """Return the access-control steps, policies before the roles that use them.
 
-    Runs after the team steps, because team defaultRoles need the team.  Bots
-    are checked last, after the roles they should hold.
+    Runs after the team steps, because team defaultRoles need the team.
     """
     return [
         *(
@@ -1241,10 +1185,6 @@ def _access_control_steps() -> list[tuple[str, Callable[[], None]]]:
                 partial(_reconcile_team_default_roles, name, roles),
             )
             for name, roles in TEAM_DEFAULT_ROLES.items()
-        ),
-        *(
-            (f"bot {name}", partial(_check_bot, name, roles))
-            for name, roles in BOT_CONFIG.items()
         ),
     ]
 

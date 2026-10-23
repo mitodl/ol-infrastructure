@@ -17,6 +17,9 @@ from ol_infrastructure.substructure.keycloak.ol_platform_engineering import (
     create_ol_platform_engineering_realm,
 )
 from ol_infrastructure.substructure.keycloak.olapps import create_olapps_realm
+from ol_infrastructure.substructure.keycloak.openmetadata_provisioner import (
+    create_openmetadata_provisioner_resources,
+)
 from ol_infrastructure.substructure.keycloak.openmetadata_team_sync import (
     create_openmetadata_team_sync_resources,
 )
@@ -97,6 +100,9 @@ ol_data_platform_realm = create_ol_data_platform_realm(
     fetch_realm_public_key_partial,
 )
 create_openmetadata_team_sync_resources(
+    keycloak_provider, keycloak_url, ol_data_platform_realm
+)
+create_openmetadata_provisioner_resources(
     keycloak_provider, keycloak_url, ol_data_platform_realm
 )
 create_olapps_realm(

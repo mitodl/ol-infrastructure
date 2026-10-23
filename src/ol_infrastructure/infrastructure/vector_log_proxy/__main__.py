@@ -1,5 +1,6 @@
 """Create the resources needed to run a vector-log-proxy server in Kubernetes."""
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -290,6 +291,23 @@ transforms:
         .,err = merge(., event)
         del(.message)
       }
+      # The S3 archive keeps the full record, so Loki only carries the
+      # client_data keys the Fastly CDN dashboards filter on plus a few for
+      # debugging browser-specific issues.
+      if is_object(.client_data) {
+        .client_data = filter(object!(.client_data)) -> |key, _value| {
+          includes(["bot_name", "browser_name", "browser_version",
+            "class_bot", "class_browser", "platform_mobile"], key)
+        }
+      }
+      del(.geo_conn_speed)
+      del(.geo_conn_type)
+      del(.geo_continent_code)
+      del(.geo_country_code3)
+      del(.geo_country_name)
+      del(.geo_latitude)
+      del(.geo_longitude)
+      del(.source_type)
 
   heroku_drop_unwanted_logs:
     type: remap
@@ -349,6 +367,7 @@ vector_config_map = kubernetes.core.v1.ConfigMap(
     data={
         "vector.yaml": vector_config_template,
     },
+    opts=ResourceOptions(delete_before_replace=True),
 )
 
 # ConfigMap for Fastly challenge server Python script
@@ -415,6 +434,13 @@ vector_deployment = kubernetes.apps.v1.Deployment(
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 labels=k8s_global_labels,
+                # Vector reads its config only at startup, so roll the pods
+                # when it changes.
+                annotations={
+                    "checksum/vector-config": hashlib.sha256(
+                        vector_config_template.encode()
+                    ).hexdigest(),
+                },
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
                 service_account_name="vector-log-proxy",
@@ -653,6 +679,9 @@ vector_deployment = kubernetes.apps.v1.Deployment(
         # it back to the static replicas=2 on every pulumi up. Same pattern
         # as applications/xqwatcher/__main__.py.
         ignore_changes=["spec.replicas"],
+        # The volume references the ConfigMap by literal name, so without this
+        # the rollout can start before the ConfigMap is replaced.
+        depends_on=[vector_config_map],
     ),
 )
 

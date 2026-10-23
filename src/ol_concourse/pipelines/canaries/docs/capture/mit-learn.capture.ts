@@ -38,6 +38,13 @@ test("homepage", async ({ page }) => {
   await shot(page, "homepage/01-homepage")
 })
 
+// Mirrored for its assertion only. The tag has nothing on screen, so a frame
+// here would be a second copy of the homepage.
+test("hubspot tracking", async ({ page }) => {
+  await page.goto("/")
+  await expect(page.locator('script[src^="https://js.hs-scripts.com/"]')).toHaveCount(1)
+})
+
 test("channel listing", async ({ page }) => {
   await page.goto(CHANNEL_PATH)
   await expect(page.getByRole("heading", { level: 1, name: CHANNEL_TITLE })).toBeVisible()
@@ -62,12 +69,14 @@ test("resource drawer", async ({ page }) => {
   }).toPass({ timeout: 30_000 })
   const drawer = page.getByRole("dialog")
   await expect(drawer).toBeVisible()
-  await expect(drawer.getByRole("heading", { name: literal(resourceName) })).toBeVisible()
+  await expect(drawer.getByRole("heading", { level: 2, name: literal(resourceName) })).toBeVisible()
   await shot(page, "channel-and-drawer/03-drawer-client-side")
 
   await page.goto(page.url())
   await expect(page).toHaveTitle(literal(resourceName))
-  await expect(page.getByRole("dialog").getByRole("heading", { name: literal(resourceName) })).toBeVisible()
+  await expect(
+    page.getByRole("dialog").getByRole("heading", { level: 2, name: literal(resourceName) }),
+  ).toBeVisible()
   await shot(page, "channel-and-drawer/04-drawer-cold-load")
 })
 
@@ -115,14 +124,18 @@ test("signed in: login, dashboard, header search", async ({ page }) => {
     await searchBox.press("Enter")
     await expect(page).toHaveURL(new RegExp(`/search\\?.*q=${SEARCH_QUERY}`), { timeout: 5_000 })
   }).toPass({ timeout: 30_000 })
+  await expect(page.getByText(/^\d+ results$/)).toBeAttached()
   await expect(page.getByRole("heading", { name: "Search Results" })).toBeVisible()
   await expect(page.getByRole("article").first()).toBeVisible()
   const coursesTab = page.getByRole("tab", { name: /^Courses/ })
   await expect(coursesTab).toBeVisible()
   await expect(page.getByRole("tab", { name: /^Courses \([1-9]\d*\)/ })).toBeVisible()
+  const coursesCount = (await coursesTab.innerText()).match(/\((\d+)\)/)?.[1]
   await shot(page, "login-and-search/05-header-search-results")
 
   await coursesTab.click()
+  await expect(page).toHaveURL(/[?&]resource_type_group=course/)
+  await expect(page.getByText(new RegExp(`^${coursesCount} results$`))).toBeAttached()
   await expect(
     page.getByRole("article", { name: new RegExp(`^Course:.*${SEARCH_QUERY}`, "i") }).first(),
   ).toBeVisible()

@@ -31,7 +31,8 @@ def _apisix_cookie_metrics_alloy_config() -> str:
     This string is injected into the loki.process "pod_logs" component by the
     k8s-monitoring chart via podLogsViaLoki.extraLogProcessingStages. It runs
     after the standard relabeling stages so retained stream labels (e.g.
-    service, namespace, and container) are already available.
+    namespace, container, and stream) are already available. There is no
+    `service` stream label in this pipeline, only service_name.
 
     The APISix access log format appends cookie telemetry at the end of each
     line. This pipeline extracts the three numeric fields:
@@ -39,14 +40,21 @@ def _apisix_cookie_metrics_alloy_config() -> str:
 
     The stage.metrics blocks emit Prometheus histograms that Alloy exposes on
     its own metrics endpoint (:12345/metrics), from where they are scraped and
-    forwarded to Grafana Cloud Prometheus.
+    forwarded to Grafana Cloud Prometheus. Alloy prefixes each name with
+    `loki_process_custom_`, e.g. loki_process_custom_apisix_cookie_header_bytes.
+    Each alloy-logs DaemonSet pod exposes its own histograms, so there is one
+    series set per node running an APISix pod, labelled with that Alloy pod's
+    instance/pod; aggregate with `sum without (instance, pod)`. host is
+    extracted but deliberately not promoted to a label, since that would also
+    add it to the Loki stream. Use LogQL (`| logfmt | unwrap cookie_bytes`)
+    for per-host breakdowns.
 
     Privacy: only numeric cookie metrics are extracted; cookie values are never
     logged or extracted.
     """
     return r"""
 stage.match {
-  selector = "{service=\"apisix\"} |= \"cookie_bytes=\""
+  selector = "{namespace=\"operations\", container=\"apisix\", stream=\"stdout\"} |= \"cookie_bytes=\""
   pipeline_name = "apisix_cookie_metrics"
 
   // Extract host, status, and the three numeric cookie fields appended at the
@@ -59,7 +67,7 @@ stage.match {
   stage.metrics {
     metric.histogram {
       name        = "apisix_cookie_header_bytes"
-      description = "Size in bytes of the Cookie request header at the APISix ingress, per virtual host"
+      description = "Size in bytes of the Cookie request header at the APISix ingress"
       source      = "cookie_bytes"
       buckets     = [256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536]
     }
@@ -243,6 +251,48 @@ stage.match {
 }
 """
     )
+
+
+def _log_proxy_access_log_drop_alloy_config() -> str:
+    """
+    Alloy River stage that drops Traefik's 2xx access-log lines for
+    log-proxy.odl.mit.edu.
+
+    Fastly and Heroku deliver their logs to vector-log-proxy through the
+    operations cluster's Traefik, and every delivery produced a ~1.5 KB JSON
+    access-log line -- ~1.9 GB/day on 2026-10-22, most of that Traefik
+    stream's volume -- so we were paying to log the delivery of logs we
+    already pay to ingest. Only the POST deliveries are matched, so the GET
+    Fastly domain-verification challenge on the same host stays logged, and
+    non-2xx lines are kept: the 401s are how a Fastly service with a bad or
+    rotated token shows up.
+
+    Done here rather than with Traefik's accessLog.filters, which are global
+    to the gateway and would drop 2xx lines for every route.
+    """
+    return r"""
+stage.match {
+  selector = "{container=\"traefik-gateway-controller\"} |= \"\\\"RequestHost\\\":\\\"log-proxy.odl.mit.edu\\\"\" |= \"\\\"RequestMethod\\\":\\\"POST\\\"\" |~ \"\\\"DownstreamStatus\\\":2[0-9]{2},\""
+  action = "drop"
+  drop_counter_reason = "log_proxy_2xx_access_log"
+}
+"""
+
+
+def _edxapp_waffle_no_request_drop_alloy_config() -> str:
+    """
+    Alloy River stage that drops edx_toggles' "Flag '...' accessed without a
+    request" warning, which edxapp celery workers emit on every waffle flag
+    check. On 2026-10-21 it was ~74 GB/day, roughly 40% of all logs Grafana
+    Cloud received, and carries no signal.
+    """
+    return r"""
+stage.match {
+  selector = "{container=~\"lms-edxapp|cms-edxapp\"} |= \"accessed without a request, which is likely in the context of a celery task\""
+  action = "drop"
+  drop_counter_reason = "edx_waffle_flag_no_request"
+}
+"""
 
 
 def setup_grafana(
@@ -627,7 +677,9 @@ def setup_grafana(
                     "onlyGatherNewLogLines": False,
                     "extraLogProcessingStages": _apisix_cookie_metrics_alloy_config()
                     + _keycloak_olapps_idp_login_redact_alloy_config()
-                    + _apisix_low_value_log_drop_alloy_config(),
+                    + _apisix_low_value_log_drop_alloy_config()
+                    + _log_proxy_access_log_drop_alloy_config()
+                    + _edxapp_waffle_no_request_drop_alloy_config(),
                 },
                 "applicationObservability": {
                     "enabled": True,
@@ -785,6 +837,18 @@ def setup_grafana(
                                             "otelcol_processor_tail_sampling_sampling_policy_evaluation_error_total",
                                             # Gauge -- no suffix. Already arriving.
                                             "otelcol_processor_tail_sampling_sampling_traces_on_memory",
+                                            # alloy-logs' APISix cookie histograms, from
+                                            # the stage.metrics above. The default list
+                                            # keeps only loki_process_dropped_lines_total.
+                                            "loki_process_custom_apisix_cookie_header_bytes_bucket",
+                                            "loki_process_custom_apisix_cookie_header_bytes_sum",
+                                            "loki_process_custom_apisix_cookie_header_bytes_count",
+                                            "loki_process_custom_apisix_cookie_count_bucket",
+                                            "loki_process_custom_apisix_cookie_count_sum",
+                                            "loki_process_custom_apisix_cookie_count_count",
+                                            "loki_process_custom_apisix_oidc_session_cookie_bytes_bucket",
+                                            "loki_process_custom_apisix_oidc_session_cookie_bytes_sum",
+                                            "loki_process_custom_apisix_oidc_session_cookie_bytes_count",
                                         ],
                                     },
                                 },
