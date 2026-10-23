@@ -844,8 +844,8 @@ names the learner in `x-ol-learner`, and the validator limits it to the forget s
 sequence has two phases because deleting a bank cascades away its operation rows, the only
 record of work in flight. Clearing the bank's memories raises a fence (one hour, in
 `ol_memory_bank_fence`) and keeps the bank row; pending operations are cancelled and processing
-ones drained; then the bank is deleted. While fenced, the validator refuses writes other than an
-app's own deletes, bank creation and worker retries. The validator checks a worker task only
+ones drained; then the bank is deleted. While fenced, the validator refuses bank creation, worker
+retries, and every write except an app deleting its own notes. The validator checks a worker task only
 when it starts, so a `BEFORE INSERT` trigger on every content table with a `bank_id` also
 refuses inserts into a fenced bank, whatever the writer. It was added after a retain whose
 embeddings timed out inserted 24 notes 45 s after its learner's bank was deleted. The harness
