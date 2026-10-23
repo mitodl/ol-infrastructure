@@ -50,6 +50,9 @@ from ol_infrastructure.components.services.apisix_gateway_api import (  # noqa: 
 
 
 def shared_plugins(name: str, **overrides) -> OLApisixSharedPlugins:
+    # cors_allow_origins has no default on the model, and none of these tests
+    # are about CORS.
+    overrides.setdefault("cors_allow_origins", ["https://myapp.mit.edu"])
     return OLApisixSharedPlugins(
         name,
         plugin_config=OLApisixSharedPluginsConfig(
