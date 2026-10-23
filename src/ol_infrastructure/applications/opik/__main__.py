@@ -607,7 +607,7 @@ opik_bearer_oidc_plugin["config"]["use_jwks"] = True
 # here rather than taken from the discovery document at request time.
 opik_bearer_oidc_plugin["config"]["claim_validator"] = {
     "issuer": {"valid_issuers": [KEYCLOAK_ISSUER]},
-    "audience": {"match_with_client_id": True},
+    "audience": {"required": True, "match_with_client_id": True},
 }
 # An ID token for ol-opik-client also has that aud, and a non-member can read
 # their own from the id_token_hint on the /logout/oidc redirect. ID tokens have
