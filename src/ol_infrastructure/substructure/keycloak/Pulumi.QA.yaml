@@ -50,6 +50,7 @@ config:
   - "https://nb.rc.learn.mit.edu/*"
   - "https://authoring.nb.rc.learn.mit.edu/*"
   - "https://binder.rc.learn.mit.edu/*"
+  - "https://courses.rc.learn.mit.edu/auth/login/ol-oauth2/.apisix/redirect"
   keycloak_realm:olapps-mitlearn-client-roles:
   - "https://rc.learn.mit.edu/*"
   - "https://learn-ai.ol.mit.edu/*"

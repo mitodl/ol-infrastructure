@@ -38,6 +38,7 @@ from ol_infrastructure.components.aws.cache import (
 from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix import (
+    OLApisixExternalUpstream,
     OLApisixOIDCResources,
     OLApisixRoute,
     OLApisixSharedPlugins,
@@ -575,6 +576,8 @@ DEPLOYED_ENV_DEFAULTS = {
     "ZENDESK_HELP_WIDGET_ENABLED": "True",
 }
 
+# Unset (the default) renders no Open edX login gate route.
+openedx_login_gate_config = mitxonline_config.get_object("openedx_login_gate")
 bindings = definition.MitxonlineBindings(
     env_suffix=stack_info.env_suffix,
     hostnames=definition.MitxonlineHostnames(
@@ -611,6 +614,11 @@ bindings = definition.MitxonlineBindings(
         password=redis_config.require("password"),
     ),
     webapp_keda=mitxonline_webapp_keda_config,
+    openedx_login_gate=(
+        definition.OpenedxLoginGate(**openedx_login_gate_config)
+        if openedx_login_gate_config
+        else None
+    ),
 )
 
 mitxonline_k8s_app = OLApplicationK8s(
@@ -687,6 +695,31 @@ mitxonline_apisix_route_prefix = OLApisixRoute(
         delete_before_replace=True,
     ),
 )
+
+if bindings.openedx_login_gate is not None:
+    mitxonline_openedx_login_gate_upstream = OLApisixExternalUpstream(
+        f"mitxonline-openedx-login-gate-upstream-{stack_info.env_suffix}",
+        external_upstream_config=definition.openedx_login_gate_upstream_config(
+            bindings.openedx_login_gate, k8s_app_labels
+        ),
+    )
+    mitxonline_apisix_route_openedx_login_gate = OLApisixRoute(
+        # Outside the "mitxonline-apisix-route-*" names the webapp KEDA matcher
+        # aggregates: this route's traffic and latency are the LMS's, not ours.
+        name=f"mitxonline-openedx-login-gate-route-{stack_info.env_suffix}",
+        k8s_namespace=mitxonline_namespace,
+        k8s_labels=k8s_app_labels,
+        route_configs=definition.openedx_login_gate_route_configs(
+            bindings,
+            oidc=mitxonline_prefixed_oidc_resources,
+            shared_plugin_config_name=mitxonline_shared_plugins.resource_name,
+            upstream_name=mitxonline_openedx_login_gate_upstream.resource_name,
+        ),
+        opts=ResourceOptions(
+            delete_before_replace=True,
+            depends_on=[mitxonline_openedx_login_gate_upstream],
+        ),
+    )
 
 ## Fastly Service
 

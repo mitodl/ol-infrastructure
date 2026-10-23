@@ -414,3 +414,76 @@ def test_local_routes_read_oidc_credentials_from_the_bound_secret():
 def test_oidc_credentials_come_from_exactly_one_source(bindings):
     with pytest.raises(ValueError, match="oidc_secret_name"):
         definition.direct_oidc_config(bindings)
+
+
+# ─── Open edX login gate ──────────────────────────────────────────────────────
+
+
+LMS_HOST = "courses.learn.mit.dev"
+
+
+def _gate_bindings(**overrides) -> definition.MitxonlineBindings:
+    return _deployed_bindings(
+        openedx_login_gate=definition.OpenedxLoginGate(
+            lms_host=LMS_HOST,
+            lms_service_host="lms.mitxonline-openedx.svc.cluster.local",
+        ),
+        **overrides,
+    )
+
+
+def _gate_routes(bindings: definition.MitxonlineBindings):
+    oidc = OLApisixOIDCResources(
+        "gate-oidc", oidc_config=definition.prefixed_oidc_config(bindings)
+    )
+    return definition.openedx_login_gate_route_configs(
+        bindings, oidc=oidc, shared_plugin_config_name="shared", upstream_name="lms"
+    )
+
+
+def test_openedx_login_gate_renders_nothing_unless_bound():
+    assert _gate_routes(_deployed_bindings()) == []
+
+
+def test_openedx_login_gate_matches_only_browser_page_loads_of_the_login_start():
+    """MITx Online replays the Open edX login with python-requests to mint edX
+    API tokens; that client sends no Fetch Metadata, so it must not match.
+    """
+    [route] = _gate_routes(_gate_bindings())
+
+    assert route.hosts == [LMS_HOST]
+    assert route.paths == ["/auth/login/ol-oauth2/*"]
+    assert {
+        (expr["subject"]["name"], expr["op"], expr["value"]) for expr in route.exprs
+    } == {
+        ("Sec-Fetch-Mode", "Equal", "navigate"),
+        ("Sec-Fetch-Dest", "Equal", "document"),
+    }
+
+
+def test_openedx_login_gate_sends_learners_without_a_session_to_keycloak():
+    """With unauth_action "pass" the route would forward anonymous learners
+    untouched and never write the MIT Learn session.
+    """
+    [route] = _gate_routes(_gate_bindings())
+
+    [plugin] = [
+        plugin
+        for plugin in route.plugins
+        if (plugin.get("name") if isinstance(plugin, dict) else plugin.name)
+        == "openid-connect"
+    ]
+    config = plugin["config"] if isinstance(plugin, dict) else plugin.config
+    assert config["unauth_action"] == "auth"
+
+
+def test_openedx_login_gate_upstream_passes_the_public_host_to_the_lms():
+    """The LMS rejects any Host but its public one (Django DisallowedHost), so
+    the upstream must not fall back to the Service's DNS name.
+    """
+    gate = _gate_bindings().openedx_login_gate
+    config = definition.openedx_login_gate_upstream_config(gate, {})
+
+    assert config.external_hostname == "lms.mitxonline-openedx.svc.cluster.local"
+    assert config.port == 8000
+    assert config.pass_host == "pass"  # noqa: S105
