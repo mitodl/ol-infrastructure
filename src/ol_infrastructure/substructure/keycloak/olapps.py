@@ -580,7 +580,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             standard_flow_enabled=True,
             implicit_flow_enabled=False,
             service_accounts_enabled=False,
-            **PKCE_REQUIRED_CLIENT_ARGS,
+            # Not PKCE_REQUIRED_CLIENT_ARGS yet. mit-learn's AccountActionStartView
+            # sends its own authorization request with this client (change email
+            # and password) and that request has no code_challenge.
             valid_redirect_uris=keycloak_realm_config.get_object(
                 "olapps-mitlearn-client-redirect-uris"
             ),
