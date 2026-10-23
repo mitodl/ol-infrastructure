@@ -16,10 +16,141 @@
 # Prerequisites:
 #   - lehrer checked out at $MITOL_WORKSPACE_ROOT/lehrer (defaults to a sibling
 #     of this repo)
+#   - dagger on PATH: every lehrer image build, including the two legacy MFE
+#     builds below, shells out to `dagger call`
 #   - the local-infra-core and local-infra-apps Pulumi stacks applied, which is
 #     what creates the openedx namespace and replicates local-dev-tls into it
 
 load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
+
+# The app dir holding Dockerfile.mfe and nginx-mfe.conf.template, which every
+# legacy MFE image below is built from.
+_openedx_app_dir = config.main_dir + "/local-dev/apps/openedx"
+
+
+def legacy_mfe(name, repo, public_path, env, lehrer_dir, slot_config):
+    """Build frontend-app-<name> with lehrer's dagger module and serve it in-cluster.
+
+    public_path is the URL prefix the bundle is built for and served under,
+    without slashes ("learn"); env is the list of KEY=VALUE build variables
+    apart from PUBLIC_PATH and APP_ID. PUBLIC_PATH is derived from
+    public_path here so the bundle's asset prefix, nginx's MFE_PATH and the
+    readiness probe cannot disagree; APP_ID is name, which matches
+    production's application ids ("learning", "authoring"). Produces the
+    openedx-mfe-<name> image and the mfe-<name> Deployment and Service; the
+    APISIX route that reaches it lives in apisix-routes.yaml.
+    """
+    ctx = "/tmp/ol-local-dev-mfe-" + name
+    image = "openedx-mfe-" + name
+    # PUBLIC_PATH drives both the asset tags in index.html and the webpack
+    # runtime's chunk loader (r.p); it has to agree with the APISIX route path
+    # and with MFE_PATH, where Dockerfile.mfe puts the dist.
+    env = env + ["PUBLIC_PATH=/" + public_path + "/"]
+    # lehrer's slot config picks each MFE's header and footer overrides by
+    # APP_ID; without it the authoring MFE gets the LMS footer, not Studio's.
+    env = env + ["APP_ID=" + name]
+
+    # build-legacy-configured, not build-legacy: it resolves this deployment's
+    # extra_slot_files, per-release variants and extra_npm_bundles from
+    # lehrer's mfe_slot_config/legacy/build_config.yaml, so the local build
+    # carries the same slot overrides as production instead of a bare upstream
+    # bundle. build-legacy would need all of that restated here.
+    #
+    # dir=lehrer_dir: `dagger call` resolves its module from the working
+    # directory, and dagger.json lives in lehrer, not here. Without it every
+    # build fails with `unknown command "mfe"`.
+    custom_build(
+        ref=image,
+        command=(
+            "set -e && " +
+            "rm -rf " + ctx + " && " +
+            "mkdir -p " + ctx + " && " +
+            "dagger --progress=plain call mfe build-legacy-configured" +
+            " --slot-config " + slot_config +
+            " --release-name master" +
+            # build-legacy-configured defaults node_version to 20 (lehrer
+            # src/lehrer/core/mfe.py) and does not derive it from
+            # --release-name. The master release is Node 24
+            # (OpenEdxSupportedRelease.master, src/bridge/settings/openedx/
+            # types.py), which is also what these MFEs' .nvmrc files ask for,
+            # so pass it explicitly or the local build runs on a runtime
+            # production never uses.
+            " --node-version 24" +
+            " --mfe-name " + name +
+            " --mfe-repo " + repo +
+            " --mfe-branch master" +
+            " --deployment-name mitxonline" +
+            # Comma-separated because that is how dagger takes a `strings`
+            # argument; no value may contain a comma.
+            " --env-vars '" + ",".join(env) + "'" +
+            " export --path " + ctx + "/dist && " +
+            "cp " + _openedx_app_dir + "/nginx-mfe.conf.template " + ctx + "/ && " +
+            "docker build -t $EXPECTED_REF" +
+            " --build-arg MFE_PATH=" + public_path +
+            " -f " + _openedx_app_dir + "/Dockerfile.mfe " + ctx
+        ),
+        # The slot config and this app dir, not the upstream repo: the MFE
+        # source is cloned inside dagger, so Tilt has nothing local to watch
+        # for it. A new upstream commit needs a manual trigger.
+        deps=[slot_config, _openedx_app_dir + "/Dockerfile.mfe",
+              _openedx_app_dir + "/nginx-mfe.conf.template"],
+        dir=lehrer_dir,
+    )
+
+    deployment = "mfe-" + name
+    k8s_yaml(blob(
+        "apiVersion: apps/v1\n" +
+        "kind: Deployment\n" +
+        "metadata:\n" +
+        "  name: " + deployment + "\n" +
+        "  namespace: openedx\n" +
+        "spec:\n" +
+        "  replicas: 1\n" +
+        "  selector:\n" +
+        "    matchLabels:\n" +
+        "      app: " + deployment + "\n" +
+        "  template:\n" +
+        "    metadata:\n" +
+        "      labels:\n" +
+        "        app: " + deployment + "\n" +
+        "    spec:\n" +
+        "      containers:\n" +
+        "      - name: mfe\n" +
+        "        image: " + image + "\n" +
+        "        ports:\n" +
+        "        - containerPort: 80\n" +
+        "        readinessProbe:\n" +
+        # The prefix, not /: nginx-mfe.conf.template deliberately 404s the
+        # root, so probing / would never pass.
+        "          httpGet:\n" +
+        "            path: /" + public_path + "/\n" +
+        "            port: 80\n" +
+        "          initialDelaySeconds: 5\n" +
+        "          periodSeconds: 10\n" +
+        "        resources:\n" +
+        "          requests:\n" +
+        "            memory: 64Mi\n" +
+        "            cpu: 50m\n" +
+        "          limits:\n" +
+        "            memory: 128Mi\n" +
+        "            cpu: 200m\n" +
+        "---\n" +
+        "apiVersion: v1\n" +
+        "kind: Service\n" +
+        "metadata:\n" +
+        "  name: " + deployment + "\n" +
+        "  namespace: openedx\n" +
+        "spec:\n" +
+        "  selector:\n" +
+        "    app: " + deployment + "\n" +
+        "  ports:\n" +
+        "  - name: http\n" +
+        "    port: 80\n" +
+        "    targetPort: 80\n" +
+        "  type: ClusterIP\n"
+    ))
+    k8s_resource(deployment, labels=["mfe"], resource_deps=["local-infra-apps"])
+
 
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 lehrer_dir = os.path.join(workspace_root, "lehrer")
@@ -109,50 +240,48 @@ else:
     k8s_resource("notes-migrate", resource_deps=["local-infra-apps"])
 
     # -----------------------------------------------------------------------
-    # The learning MFE (frontend-app-learning)
+    # Legacy MFEs: learning (frontend-app-learning) and course authoring
+    # (frontend-app-authoring)
     #
     # lehrer's build_manifest.yaml ships only the frontend-base *site project*
-    # (admin-console / gradebook / instructor-dashboard), so nothing serves
-    # /learn and every "go to course" link 404s. frontend-app-learning has not
-    # landed on frontend-base -- there is no @openedx/frontend-app-learning on
-    # npm -- so it cannot join that site project, and version_matrix.py builds
-    # it the legacy way for every real deployment (no branch_override, unlike
-    # admin-console and gradebook which are pinned to "legacy-mfe").
+    # (admin-console / gradebook / instructor-dashboard). Neither of these has
+    # landed on frontend-base -- there is no @openedx/frontend-app-learning or
+    # @openedx/frontend-app-authoring on npm -- so they cannot join that site
+    # project, and version_matrix.py builds both the legacy way for every real
+    # deployment (no branch_override, unlike admin-console and gradebook which
+    # are pinned to "legacy-mfe"). Without the learning MFE nothing serves
+    # /learn and every "go to course" link 404s. Without the authoring MFE
+    # Studio has no pages at all on the master release: its home view is a
+    # redirect to COURSE_AUTHORING_MICROFRONTEND_URL and the shared header
+    # template resolves the same URL on every page, 500.html included, so each
+    # of them raises ImproperlyConfigured while the setting is unset.
     #
     # Built here rather than in lehrer only because lehrer's local-dev does not
     # expose a legacy-MFE build; lehrer still owns the build *definition* --
-    # this calls its dagger module and its build_config.yaml, and adds no new
-    # build logic of its own. If lehrer ever grows a legacy_mfes option to
-    # setup(), this whole block collapses into passing it a list.
+    # legacy_mfe() calls its dagger module and its build_config.yaml, and adds
+    # no new build logic of its own. If lehrer ever grows a legacy_mfes option
+    # to setup(), these two calls collapse into passing it a list.
     # -----------------------------------------------------------------------
     _rd = current_root_domain()
-    _deploy_config = os.path.join(lehrer_dir, "deployments/mit-ol")
-    _mfe_slot_config = os.path.join(_deploy_config, "mfe_slot_config/legacy")
-    _learning_ctx = "/tmp/ol-local-dev-mfe-learning"
-    _openedx_app_dir = config.main_dir + "/local-dev/apps/openedx"
+    _mfe_slot_config = os.path.join(lehrer_dir, "deployments/mit-ol/mfe_slot_config/legacy")
 
     # Mirrors the production build env in
-    # src/ol_concourse/pipelines/open_edx/mfe/pipeline.py, with local-dev
-    # hostnames. The cookie names are not cosmetic: the MFE reads the LMS's
-    # user-info cookie to decide whether it has a session, and its JWT cookie
-    # to authenticate every API call, so a mismatch with
+    # src/ol_concourse/pipelines/open_edx/mfe/pipeline.py (mfe_params), with
+    # local-dev hostnames; production sends the same set to every MFE. Three
+    # entries differ per MFE: BASE_URL is added at each legacy_mfe() call
+    # below, and PUBLIC_PATH and APP_ID come from legacy_mfe() itself. The
+    # cookie names are not cosmetic: the MFE reads the LMS's user-info cookie
+    # to decide whether it has a session, and its JWT cookie to authenticate
+    # every API call, so a mismatch with
     # EDXMKTG_USER_INFO_COOKIE_NAME / LANGUAGE_COOKIE_NAME / JWT_AUTH's
     # JWT_AUTH_COOKIE_HEADER_PAYLOAD presents as a permanently logged-out MFE
     # or as a hard error page. Values read off the running LMS.
-    #
-    # Comma-separated because that is how dagger takes a `strings` argument;
-    # none of these values may contain a comma.
-    _learning_env = ",".join([
+    _mfe_env = [
         "LMS_BASE_URL=https://lms." + _rd,
         "STUDIO_BASE_URL=https://studio." + _rd,
         "LOGIN_URL=https://lms." + _rd + "/login",
         "LOGOUT_URL=https://lms." + _rd + "/logout",
         "REFRESH_ACCESS_TOKEN_ENDPOINT=https://lms." + _rd + "/login_refresh",
-        # PUBLIC_PATH drives both the asset tags in index.html and the webpack
-        # runtime's chunk loader (r.p). It has to agree with the APISIX route
-        # path and with where Dockerfile.mfe-learning puts the dist.
-        "PUBLIC_PATH=/learn/",
-        "BASE_URL=https://lms." + _rd + "/learn",
         "LEARNING_BASE_URL=https://lms." + _rd + "/learn",
         "DISCUSSIONS_MFE_BASE_URL=https://lms." + _rd + "/discussions",
         "MARKETING_SITE_BASE_URL=https://mitxonline." + _rd,
@@ -211,106 +340,20 @@ else:
         # name. The dagger build already takes --deployment-name; this is the
         # value the *browser* sees, which is a separate input.
         "DEPLOYMENT_NAME=mitxonline",
-    ])
+    ]
 
-    # build-legacy-configured, not build-legacy: it resolves this deployment's
-    # extra_slot_files, per-release variants and extra_npm_bundles from
-    # lehrer's mfe_slot_config/legacy/build_config.yaml, so the local build
-    # carries the same slot overrides as production instead of a bare upstream
-    # bundle. build-legacy would need all of that restated here.
-    #
-    # dir=lehrer_dir: `dagger call` resolves its module from the working
-    # directory, and dagger.json lives in lehrer, not here. Without it every
-    # build fails with `unknown command "mfe"`.
-    custom_build(
-        ref="openedx-mfe-learning",
-        command=(
-            "set -e && " +
-            "rm -rf " + _learning_ctx + " && " +
-            "mkdir -p " + _learning_ctx + " && " +
-            "dagger --progress=plain call mfe build-legacy-configured" +
-            " --slot-config " + _mfe_slot_config +
-            " --release-name master" +
-            # build-legacy-configured defaults node_version to 20
-            # (lehrer src/lehrer/core/mfe.py) and does not derive it from
-            # --release-name. The master release is Node 24
-            # (OpenEdxSupportedRelease.master, src/bridge/settings/openedx/
-            # types.py), which is also what frontend-app-learning's .nvmrc
-            # asks for, so pass it explicitly or the local build runs on a
-            # runtime production never uses.
-            " --node-version 24" +
-            " --mfe-name learning" +
-            " --mfe-repo https://github.com/openedx/frontend-app-learning" +
-            " --mfe-branch master" +
-            " --deployment-name mitxonline" +
-            " --env-vars '" + _learning_env + "'" +
-            " export --path " + _learning_ctx + "/dist && " +
-            "cp " + _openedx_app_dir + "/nginx-mfe-learning.conf " +
-            _learning_ctx + "/ && " +
-            "docker build -t $EXPECTED_REF" +
-            " -f " + _openedx_app_dir + "/Dockerfile.mfe-learning " +
-            _learning_ctx
-        ),
-        # The slot config and this app dir, not the upstream repo: the MFE
-        # source is cloned inside dagger, so Tilt has nothing local to watch
-        # for it. A new upstream commit needs a manual trigger.
-        deps=[_mfe_slot_config, _openedx_app_dir + "/Dockerfile.mfe-learning",
-              _openedx_app_dir + "/nginx-mfe-learning.conf"],
-        dir=lehrer_dir,
+    legacy_mfe(
+        "learning", "https://github.com/openedx/frontend-app-learning", "learn",
+        _mfe_env + ["BASE_URL=https://lms." + _rd + "/learn"],
+        lehrer_dir, _mfe_slot_config,
     )
-
-    k8s_yaml(blob(
-        "apiVersion: apps/v1\n" +
-        "kind: Deployment\n" +
-        "metadata:\n" +
-        "  name: mfe-learning\n" +
-        "  namespace: openedx\n" +
-        "spec:\n" +
-        "  replicas: 1\n" +
-        "  selector:\n" +
-        "    matchLabels:\n" +
-        "      app: mfe-learning\n" +
-        "  template:\n" +
-        "    metadata:\n" +
-        "      labels:\n" +
-        "        app: mfe-learning\n" +
-        "    spec:\n" +
-        "      containers:\n" +
-        "      - name: mfe\n" +
-        "        image: openedx-mfe-learning\n" +
-        "        ports:\n" +
-        "        - containerPort: 80\n" +
-        "        readinessProbe:\n" +
-        # /learn/, not /: nginx-mfe-learning.conf deliberately 404s the root,
-        # so probing / would never pass.
-        "          httpGet:\n" +
-        "            path: /learn/\n" +
-        "            port: 80\n" +
-        "          initialDelaySeconds: 5\n" +
-        "          periodSeconds: 10\n" +
-        "        resources:\n" +
-        "          requests:\n" +
-        "            memory: 64Mi\n" +
-        "            cpu: 50m\n" +
-        "          limits:\n" +
-        "            memory: 128Mi\n" +
-        "            cpu: 200m\n" +
-        "---\n" +
-        "apiVersion: v1\n" +
-        "kind: Service\n" +
-        "metadata:\n" +
-        "  name: mfe-learning\n" +
-        "  namespace: openedx\n" +
-        "spec:\n" +
-        "  selector:\n" +
-        "    app: mfe-learning\n" +
-        "  ports:\n" +
-        "  - name: http\n" +
-        "    port: 80\n" +
-        "    targetPort: 80\n" +
-        "  type: ClusterIP\n"
-    ))
-    k8s_resource("mfe-learning", labels=["mfe"],
-                 resource_deps=["local-infra-apps"])
+    # On the Studio host, as in production (mfe_params builds this one MFE's
+    # BASE_URL from studio_domain). configmaps/cms-config.yaml points the CMS's
+    # COURSE_AUTHORING_MICROFRONTEND_URL at the same place.
+    legacy_mfe(
+        "authoring", "https://github.com/openedx/frontend-app-authoring", "authoring",
+        _mfe_env + ["BASE_URL=https://studio." + _rd + "/authoring"],
+        lehrer_dir, _mfe_slot_config,
+    )
 
     k8s_yaml_local(["apisix-routes.yaml"])
