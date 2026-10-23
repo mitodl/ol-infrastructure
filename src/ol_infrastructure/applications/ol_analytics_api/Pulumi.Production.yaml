@@ -4,6 +4,9 @@ config:
   aws:region: us-east-1
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
+  # Browser origins outside this service's own host that call it with credentials.
+  ol_analytics_api:cors_frontend_origins:
+  - "https://learn.mit.edu"   # MIT Learn frontend, which calls learn_domain
   ol_analytics_api:domain: analytics.ol.mit.edu
   ol_analytics_api:learn_domain: analytics.learn.mit.edu
   ol_analytics_api:env_vars:

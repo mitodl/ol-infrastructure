@@ -657,8 +657,8 @@ if k8s_deploy:
 
     # Shared plugin defaults for every route below: prometheus (per-route
     # series), opentelemetry (OTLP spans), gzip (these routes served every
-    # response uncompressed), cors, the http->https redirect and
-    # Referrer-Policy. Each route also keeps its own plugins --
+    # response uncompressed), the http->https redirect and Referrer-Policy.
+    # Each route also keeps its own plugins --
     # OLApisixHTTPRoute merges the two lists, with the route's entries winning
     # by name.
     xpro_shared_plugins = OLApisixSharedPlugins(
@@ -668,6 +668,10 @@ if k8s_deploy:
             resource_suffix="ol-shared-plugins",
             k8s_namespace=xpro_namespace,
             k8s_labels=k8s_app_labels,
+            # xpro's pages and API share one origin and Django sets no CORS
+            # headers, so no cross-origin page reads these responses. An empty
+            # list attaches no cors plugin, as before the shared config.
+            cors_allow_origins=[],
         ),
     )
 
@@ -717,11 +721,9 @@ if k8s_deploy:
                 ],
             ),
             # Granian serves static without a CORS header; the sidecar added a
-            # blanket one. Kept even though the shared config now supplies
-            # `cors`: that plugin only answers requests carrying an Origin,
-            # while this header went out unconditionally, and static assets are
-            # exactly what a cross-origin font or stylesheet load fetches
-            # without one.
+            # blanket one, and the shared config attaches no `cors` plugin.
+            # Static assets are what a cross-origin font or stylesheet load
+            # fetches.
             OLApisixHTTPRouteConfig(
                 route_name="static",
                 shared_plugins=xpro_shared_plugins,

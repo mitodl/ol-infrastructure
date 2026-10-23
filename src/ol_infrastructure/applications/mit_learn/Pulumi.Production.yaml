@@ -20,6 +20,10 @@ config:
     cors_urls:
     - "https://api.learn.mit.edu"
     - "https://learn.mit.edu"
+    - "https://courses.learn.mit.edu"   # MITxOnline courseware MFE, same as csrf_domains below
+    - "https://lms.mitx.mit.edu"   # MITx LMS: ol-openedx-chat video summary/flashcard fetch
+    - "https://staging.mitx.mit.edu"   # MITx Staging LMS: ol-openedx-chat video summary/flashcard fetch
+    - "https://courses.xpro.mit.edu"   # xPRO LMS: ol-openedx-chat video summary/flashcard fetch
     - "https://api.mitopen.odl.mit.edu"   # legacy
     - "https://mitopen.odl.mit.edu"   # legacy
     - "https://draft.ocw.mit.edu"
