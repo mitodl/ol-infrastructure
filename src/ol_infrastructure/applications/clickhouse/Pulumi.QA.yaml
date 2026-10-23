@@ -31,6 +31,10 @@ config:
   # Set to "true" only after the apply that adds interserver_password has
   # restarted every replica (see INTERSERVER_CREDENTIALS_XML in __main__.py).
   clickhouse:interserver_credentials_enabled: "false"
+  # Set to "true" only after Keeper is verified serving TLS on 9281 in this
+  # environment; flipping it restarts every replica (see keeper_tls_enabled
+  # in __main__.py).
+  clickhouse:keeper_tls_enabled: "false"
   clickhouse:interserver_password:
     secure: v1:LD+fef8012oLTL3k:3h67AkUS7Nfi3uVH3q43ZmlLDck1a2Z6Ew7wuTMW7VXNTerZ9enwdc12ilM+1aD27MJ6tD2cs2B+YsUN
 secretsprovider: awskms://alias/infrastructure-secrets-qa
