@@ -53,8 +53,8 @@ def _create_static_secret(
         mount_type: Type of the Vault mount (e.g., "kv-v1", "kv-v2"). Defaults to "kv-v1".
         opts: Optional Pulumi resource options.
         restart_targets: Deployments to rolling-restart when this secret's
-            contents change. Required for anything consumed via envFrom, whose
-            values are fixed at pod start.
+            contents change. Without them, pods reading it via envFrom keep the
+            old values until something else rolls them.
 
     Returns:
         A tuple containing the generated Kubernetes secret name and the resource object.

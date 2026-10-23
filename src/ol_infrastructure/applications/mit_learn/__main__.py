@@ -2031,8 +2031,7 @@ starrocks_vault_mount_path = (
 # months), so without these restart targets the rotation lands in the Secret,
 # Vault revokes the old StarRocks user with DROP USER, and beat keeps
 # authenticating as a user that no longer exists -- the sync stops until
-# something unrelated rolls the pods. That failure is silent in exactly the way
-# the missing configuration this PR fixes was.
+# something unrelated rolls the pods, and nothing reports it.
 env_secret_restart_targets = [
     OLVaultRestartTarget(kind="Deployment", name=deployment_name)
     for deployment_name in application_deployment_names(
