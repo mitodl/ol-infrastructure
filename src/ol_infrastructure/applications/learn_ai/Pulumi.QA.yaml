@@ -30,15 +30,16 @@ config:
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_PROMPT_CACHE_FUNCTION: "ai_chatbots.utils.get_django_cache"
-    # Contact us support intake (hq#13712, hq#13991). Placeholders: these are
-    # the "unset" defaults, so the stack deploys unchanged until the real
-    # values land. The field ids are minted per Zendesk instance -- take
-    # them from this environment's own instance, never from another's.
-    # An id Zendesk does not recognise makes it reject the whole ticket.
-    AI_ZENDESK_API_URL: ""
-    AI_ZENDESK_NAME_FIELD_ID: "0"
-    AI_ZENDESK_URL_FIELD_ID: "0"
-    AI_ZENDESK_USERNAME_FIELD_ID: "0"
+    # Contact us support intake (hq#13712, hq#13991). These point at the
+    # odl1791467332 Zendesk sandbox, the same instance used for local
+    # development. The field ids are minted per Zendesk instance, so the
+    # OAuth client id and secret in the SOPS secrets file must be issued by
+    # this same instance -- ids and credentials are a matched pair, and an
+    # id Zendesk does not recognise makes it reject the whole ticket.
+    AI_ZENDESK_API_URL: "https://odl1791467332.zendesk.com"
+    AI_ZENDESK_NAME_FIELD_ID: "57089968511131"
+    AI_ZENDESK_URL_FIELD_ID: "57089642026779"
+    AI_ZENDESK_USERNAME_FIELD_ID: "57089989500187"
     CELERY_TASK_ALWAYS_EAGER: "false"
     CANVAS_SYLLABUS_DEMO_READABLE_IDS: ["14566-kaleba:20211202", "34642-15.095_FA25"]
     CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: ["14566-kaleba:20211202+canvas", "34642-15.095_FA25+canvas"]
