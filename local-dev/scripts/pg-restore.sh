@@ -21,7 +21,10 @@
 # migrate a half-loaded schema. DROP ... WITH (FORCE) ends the apps' existing
 # sessions, and their pods reconnect once the limit lifts. A pod that was
 # already serving does not re-run migrate, so if the archive predates the
-# checkout's migrations, restart the app Deployments afterwards.
+# checkout's migrations, restart the app Deployments afterwards. mitxonline
+# migrates in a pre-deploy Job, not on pod start: `tilt trigger mitxonline-app`
+# re-runs it (a trigger is a force update, which destroys and recreates the
+# stack, Job included).
 #
 # Usage:
 #   ./local-dev/scripts/pg-restore.sh DIR [--yes]

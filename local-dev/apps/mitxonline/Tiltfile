@@ -1,21 +1,25 @@
 # mitxonline Tiltfile
 # Builds the mitxonline Django app (granian) and deploys it to the mitxonline namespace.
-# When the sibling mitxonline repo is not checked out, Tilt uses the prebuilt
-# DockerHub image (mitodl/mitxonline-app:latest) without attempting a local build.
+# When the sibling mitxonline repo is not checked out, the published
+# mitodl/mitxonline-app image runs (latest, or the prebuilt_tags pin).
 
-load("../../tiltlib.star", "k8s_yaml_local")
+load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
 
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "mitxonline")
 IMAGE = 'mitodl/mitxonline-app'
-NAMESPACE = 'mitxonline'
-DEPLOY_NAME = 'mitxonline-webapp'
+# Must equal the root Tiltfile's deploy_name for mitxonline: seeds depend on this
+# resource by name and exec into this Deployment.
+DEPLOY_NAME = 'mitxonline-app'
+PROGRAM_DIR = os.path.join(config.main_dir, 'local-dev/apps/mitxonline/pulumi')
+APPLY = os.path.join(config.main_dir, 'local-dev/scripts/pulumi-app-apply.sh')
+HAS_CHECKOUT = os.path.exists(os.path.join(APP_DIR, '.git'))
 
-if os.path.exists(os.path.join(APP_DIR, '.git')):
+if HAS_CHECKOUT:
     # Build the `local-dev` target: `production` (the only target that bakes in
     # the compiled webpack frontend, which checkout needs since that flow still
     # runs through mitxonline.mit.test) plus dev deps (pytest, ipdb, ...) and
-    # watchfiles so granian can --reload (see deployment.yaml).
+    # watchfiles so granian can --reload (the program sets granian_reload).
     docker_build(
         IMAGE,
         context=APP_DIR,
@@ -38,34 +42,48 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         ],
     )
 
-k8s_yaml_local([
-    'configmaps/app-env.yaml',
-    'configmaps/nginx.yaml',
-    'secrets.yaml',
-    'deployment.yaml',
-    'apisix-routes.yaml',
-], local_overrides='configmaps/app-env.local.yaml')
-
+# ApisixTls stays hand-written; it references the local-dev-tls wildcard the
+# core stack copies into this namespace.
+k8s_yaml_local(['apisix-tls.yaml'])
 k8s_resource(
-    DEPLOY_NAME,
-    port_forwards=['8010:8010'],
+    new_name='mitxonline-tls',
+    objects=['mitxonline-tls:apisixtls'],
     labels=['mitxonline'],
-    resource_deps=['local-infra-apps'],
+    resource_deps=['local-infra-core'],
 )
 
-k8s_resource('mitxonline-celery', labels=['mitxonline'], resource_deps=['local-infra-apps'])
-k8s_resource('mitxonline-celery-beat', labels=['mitxonline'], resource_deps=['local-infra-apps'])
-
-# The routes read discovery and session.secret from Secrets local-infra-apps
-# writes; see the mitlearn-routes resource in local-dev/apps/mit-learn/Tiltfile.
-k8s_resource(
-    new_name='mitxonline-routes',
-    objects=[
-        'mitxonline-shared-plugins:apisixpluginconfig',
-        'mitxonline-tls:apisixtls',
-        'mitxonline-route:apisixroute',
-        'mitxonline-learn-proxy-route:apisixroute',
+# The workloads and the gateway routes come from the deployed definition,
+# rendered by local-dev/apps/mitxonline/pulumi (pulumi up as a custom deploy).
+# The apply timeout this resource needs (its apply includes the migrate Job)
+# is session-wide, so the root Tiltfile sets it.
+root_domain = current_root_domain()
+prebuilt_tags = os.environ.get('LOCAL_DEV_PREBUILT_IMAGE_TAGS', '')
+k8s_custom_deploy(
+    DEPLOY_NAME,
+    apply_cmd=[APPLY, 'mitxonline', 'up'],
+    delete_cmd=[APPLY, 'mitxonline', 'down'],
+    # The pin reaches the program through the environment; naming it here makes
+    # a changed pin re-apply, which os.putenv alone would not.
+    apply_env={'LOCAL_DEV_ROOT_DOMAIN': root_domain, 'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags},
+    delete_env={'LOCAL_DEV_ROOT_DOMAIN': root_domain, 'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags},
+    # Everything the render reads; .tiltignore keeps __pycache__ out of these.
+    deps=[
+        PROGRAM_DIR,
+        APPLY,
+        os.path.join(config.main_dir, 'local-dev/scripts/pulumi-clear-stale-lock.sh'),
+        os.path.join(config.main_dir, 'local-dev/scripts/pulumi-pending-objects.py'),
+        os.path.join(config.main_dir, 'src/ol_infrastructure/applications/mitxonline'),
+        os.path.join(config.main_dir, 'src/ol_infrastructure/components/services'),
+        os.path.join(config.main_dir, 'src/ol_infrastructure/lib'),
+        os.path.join(config.main_dir, 'src/bridge/lib'),
+        'secrets.yaml',
     ],
+    # Without a checkout nothing registers the image, and naming it here would
+    # fail the Tiltfile load; the program then runs the published image.
+    image_deps=[IMAGE] if HAS_CHECKOUT else [],
+)
+k8s_resource(
+    DEPLOY_NAME,
     labels=['mitxonline'],
     resource_deps=['local-infra-apps'],
 )

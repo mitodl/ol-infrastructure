@@ -10,6 +10,16 @@ How to add a new app to the stack or change the shared in-cluster infrastructure
 
 ## Adding a New App
 
+### Which surface?
+
+Pick one:
+
+- **The app has a deployed definition** (`src/ol_infrastructure/applications/<app>/definition.py`): a Pulumi program under `local-dev/apps/<app>/pulumi/` renders it with k3d bindings, and Tilt applies it through `local-dev/scripts/pulumi-app-apply.sh` as a `k8s_custom_deploy`. mitxonline is the example: its `pulumi/` and Tiltfile are the template. A developer's env and memory limits for such an app live in its gitignored stack file (`pulumi/Pulumi.Dev.yaml`; `vars` and `web_memory_limit` are the deployed stacks' keys, the other limits local ones in the same style; mitxonline ships a `.example`), not in an `app-env.local.yaml`. Two touchpoints sit outside the app directory: the root `Tiltfile` raises the apply timeout per Pulumi-rendered app, and `teardown.sh` destroys each program's stack by name.
+- **No deployed definition** (local-only services, apps not yet on `OLApplicationK8s`): Kubernetes manifests under `local-dev/apps/<app>/`, as step 1 below describes.
+- **Shared infrastructure several apps use** (a database engine, a cache, an identity provider): a module under `local-dev/infra/modules/`, called from the `core` stack; see [Modifying Shared Infrastructure](#modifying-shared-infrastructure).
+
+Either kind of app also needs its prerequisites from the `apps_infra` stack: the database (step 2), the namespace and TLS Secret (step 3) and the Keycloak client (step 4). Steps 2 to 6 apply to both kinds.
+
 ### 1. Create the app manifests directory
 
 ```

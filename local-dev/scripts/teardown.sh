@@ -197,7 +197,10 @@ if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
     # Now destroy Pulumi resources while cluster is running
     log "Destroying Pulumi-managed resources before cluster teardown..."
 
-    # Destroy apps_infra stack first (it depends on core stack)
+    log "  Destroying mitxonline stack..."
+    destroy_stack "local-dev/apps/mitxonline/pulumi" "Dev" "mitxonline"
+
+    # Destroy apps_infra before core (it depends on core stack)
     log "  Destroying apps_infra stack..."
     destroy_stack "local-dev/infra/apps_infra" "local-dev.apps-infra.Dev" "Apps infrastructure"
 
@@ -214,6 +217,7 @@ else
     warn "Cluster '${CLUSTER_NAME}' not found — nothing to delete."
 
     log "Checking for Pulumi state left behind by the missing cluster..."
+    drop_orphan_stack "local-dev/apps/mitxonline/pulumi" "Dev" "mitxonline"
     drop_orphan_stack "local-dev/infra/apps_infra" "local-dev.apps-infra.Dev" "Apps infrastructure"
     drop_orphan_stack "local-dev/infra/core" "local-dev.core.Dev" "Core infrastructure"
     cd "${REPO_ROOT}"

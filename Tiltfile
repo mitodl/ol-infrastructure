@@ -48,6 +48,11 @@ per_app_databases = cfg.get("per_app_databases", False)
 # An included Tiltfile shares no variables with this one, so an app that
 # configures itself differently when another is enabled reads the list here.
 os.putenv("LOCAL_DEV_ENABLED_APPS", ",".join(enabled_apps))
+# update_settings is session-wide, so this applies to every app's apply:
+# mitxonline's runs its migrate Job inside `pulumi up`, which Tilt's 30 s
+# default cuts off on a first apply.
+if "mitxonline" in enabled_apps:
+    update_settings(k8s_upsert_timeout_secs=300)
 
 # Every service hostname, CORS origin, APISIX route, and Keycloak redirect URI
 # derives from this value, the same one local-dev/tiltlib.star substitutes into
@@ -226,7 +231,7 @@ APPS = [
         "name": "mitxonline",
         "dir": "mitxonline",
         "namespace": "mitxonline",
-        "deploy_name": "mitxonline-webapp",
+        "deploy_name": "mitxonline-app",
         "images": {"mitxonline": "mitodl/mitxonline-app"},
         "tiltfile": "./local-dev/apps/mitxonline/Tiltfile",
         "seed_commands": [

@@ -17,7 +17,7 @@ data:
   CELERY_BROKER_HOSTNAME: "valkey.local-infra.svc.cluster.local"
   # lehrer leaves the vhost empty, which is DB 0 (mit-learn's broker). The LMS
   # and Studio share one broker, so both override files use 12. The allocation
-  # is listed next to the Valkey settings in apps/mitxonline/configmaps/app-env.yaml.
+  # is listed under Shared Valkey in local-dev/ARCHITECTURE.md.
   CELERY_BROKER_VHOST: "12"
   ELASTIC_SEARCH_HOST: "opensearch-cluster-master.local-infra.svc.cluster.local"
 
@@ -86,8 +86,8 @@ data:
   # backend's ID_KEY resolves accounts on.
   OL_OAUTH2_OTHER_SETTINGS: >-
     {"AUTHORIZATION_URL": "https://mitxonline.mit.test/oauth2/authorize/",
-     "ACCESS_TOKEN_URL": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8010/oauth2/token/",
-     "API_ROOT": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8010/"}
+     "ACCESS_TOKEN_URL": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8073/oauth2/token/",
+     "API_ROOT": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8073/"}
 
   # Back on now that there is a provider to redirect to: this is what sends an
   # anonymous visitor into the SSO flow instead of leaving the MFE staring at a
@@ -112,7 +112,7 @@ data:
   # enrolled in mitxonline with edx_enrolled=False and simply has no courseware,
   # even though login succeeded.
   #
-  # The literal is mitxonline's, verbatim. It is named "stub" there from when
-  # there was no local LMS to accept an enrollment; it is a working token now,
-  # and the two sides have to stay in lockstep.
+  # mitxonline's secrets.yaml copies this value verbatim. edxapp-provision
+  # rotates the AccessToken to a changed value on its next run (and deletes the
+  # account's old one), so change both files together and re-run it.
   OPENEDX_SERVICE_WORKER_API_TOKEN: "local-dev-stub-token" # pragma: allowlist secret

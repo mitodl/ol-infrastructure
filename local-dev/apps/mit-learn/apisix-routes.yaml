@@ -97,7 +97,7 @@ spec:
           cookie_name: mitlearn_apisix_session_dev
           cookie_domain: ".learn.mit.test"
           # 14 days, as deployed mit-learn sets; the /mitxonline/* reader in
-          # local-dev/apps/mitxonline/apisix-routes.yaml uses the same value,
+          # mitxonline's rendered /mitxonline/* reader uses the same value,
           # as deployed. 0 disables lua-resty-session's 900s idling / 3600s
           # rolling defaults, leaving absolute_timeout in charge.
           absolute_timeout: 1209600
@@ -155,7 +155,7 @@ spec:
           cookie_name: mitlearn_apisix_session_dev
           cookie_domain: ".learn.mit.test"
           # 14 days, as deployed mit-learn sets; the /mitxonline/* reader in
-          # local-dev/apps/mitxonline/apisix-routes.yaml uses the same value,
+          # mitxonline's rendered /mitxonline/* reader uses the same value,
           # as deployed. 0 disables lua-resty-session's 900s idling / 3600s
           # rolling defaults, leaving absolute_timeout in charge.
           absolute_timeout: 1209600
@@ -214,7 +214,7 @@ spec:
           cookie_name: mitlearn_apisix_session_dev
           cookie_domain: ".learn.mit.test"
           # 14 days, as deployed mit-learn sets; the /mitxonline/* reader in
-          # local-dev/apps/mitxonline/apisix-routes.yaml uses the same value,
+          # mitxonline's rendered /mitxonline/* reader uses the same value,
           # as deployed. 0 disables lua-resty-session's 900s idling / 3600s
           # rolling defaults, leaving absolute_timeout in charge.
           absolute_timeout: 1209600
@@ -278,7 +278,7 @@ spec:
           cookie_name: mitlearn_apisix_session_dev
           cookie_domain: ".learn.mit.test"
           # 14 days, as deployed mit-learn sets; the /mitxonline/* reader in
-          # local-dev/apps/mitxonline/apisix-routes.yaml uses the same value,
+          # mitxonline's rendered /mitxonline/* reader uses the same value,
           # as deployed. 0 disables lua-resty-session's 900s idling / 3600s
           # rolling defaults, leaving absolute_timeout in charge.
           absolute_timeout: 1209600

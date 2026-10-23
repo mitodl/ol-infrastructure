@@ -95,7 +95,7 @@ ok "TLS certificates found."
 # Is this the cluster the Pulumi state was written against?
 # ---------------------------------------------------------------------------
 # State lives in this checkout and outlives the cluster. The stacks recover on
-# their own (both `pulumi refresh` before applying), but the databases in a
+# their own (every stack refreshes before applying), but the databases in a
 # replaced cluster are empty, and unannounced that reads as data disappearing.
 # kube-system's UID is assigned at bootstrap, so it changes with the cluster.
 # The marker sits under .pulumi so wiping the state wipes the claim too.

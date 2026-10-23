@@ -19,11 +19,12 @@
 **/node_modules/
 **/.next/
 
-# Pulumi state and artifacts
+# Pulumi state and artifacts. Stack files (Pulumi.<stack>.yaml) stay watched:
+# the local apps' gitignored stack file is how a developer sets env and memory
+# limits, so Tilt must re-apply on it; nothing rewrites a stack file after
+# `stack select --create` creates it on the first apply.
 .pulumi/
 **/*.auto.tfvars.json
-**/Pulumi.*.yaml
-**/Pulumi.*.yml
 
 # IDEs and editors
 .vscode/
