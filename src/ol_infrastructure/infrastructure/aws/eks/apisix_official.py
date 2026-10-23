@@ -52,7 +52,9 @@ GATEWAY_SSL_CIPHERS = (
 # whatever their own Fastly service sets, because Fastly's response header
 # rules run after the origin's.  No includeSubDomains until the subdomains of
 # every gateway host have been checked for anything still served over HTTP.
-GATEWAY_HSTS_HEADER_VALUE = "max-age=31536000"
+# Starts at one day so a mistake ages out of browsers quickly; raise it to a
+# year (31536000) once it has run without problems.
+GATEWAY_HSTS_HEADER_VALUE = "max-age=86400"
 
 # APISIX's default enabled-plugins list for the version shipped by the pinned
 # chart (chart 2.17.x => APISIX 3.18.x), taken from
