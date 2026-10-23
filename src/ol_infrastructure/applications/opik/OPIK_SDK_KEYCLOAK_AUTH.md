@@ -52,7 +52,7 @@ Usage (call ONCE at process startup, BEFORE the first `opik.Opik()` / decorator)
 Required environment (12-factor; inject from Vault — see notes at bottom):
     OPIK_URL_OVERRIDE          e.g. https://opik-ci.ol.mit.edu/api/
     OPIK_WORKSPACE             "default" for our OSS install
-    OPIK_KEYCLOAK_TOKEN_URL    https://sso.ol.mit.edu/realms/olapps/protocol/openid-connect/token
+    OPIK_KEYCLOAK_TOKEN_URL    https://sso.ol.mit.edu/realms/ol-platform-engineering/protocol/openid-connect/token
     OPIK_KEYCLOAK_CLIENT_ID    ol-opik-client
     OPIK_KEYCLOAK_CLIENT_SECRET  (from Vault)
 
