@@ -969,10 +969,15 @@ POLICY_CONFIG: dict[str, dict[str, Any]] = {
     # DefaultBotRole's ViewAll: PUT a metric (Create when it is new; a PUT to an
     # existing one is authorized as EditAll, EntityUtil.createOrUpdateOperation),
     # PATCH its description, owners, reviewers, tags, status and
-    # extension.metricFileSha256 (covered by EditAll), and PUT a table->metric
-    # lineage edge, which checks EditLineage on both ends
-    # (LineageResource.addLineage).  DefaultBotPolicy's EditDisplayName deny
-    # matches only that operation, so it does not block the EditAll PUT.
+    # extension.metricFileSha256 (covered by EditAll; /entityStatus maps to no
+    # narrower operation), and PUT a lineage edge from each implemented_by
+    # entity, which checks EditLineage on both ends (LineageResource.addLineage).
+    # EditAll on metric covers the metric's end; the lineage rule lists every
+    # entity type an implemented_by entry can name (ol-data-platform
+    # ENTITY_COLLECTIONS).  DefaultBotPolicy's EditDisplayName deny does not
+    # block the EditAll PUT, but EntityUpdater.updateDisplayName then keeps the
+    # stored displayName for any bot it denies, so the sync can set a metric's
+    # displayName only when it creates it.
     "MetricsSyncBotPolicy": {
         "displayName": "Metrics Sync Bot Policy",
         "description": (
@@ -989,9 +994,18 @@ POLICY_CONFIG: dict[str, dict[str, Any]] = {
             },
             {
                 "name": "MetricsSyncBotRule-Lineage",
-                "description": "Add lineage edges from tables to metrics.",
+                "description": (
+                    "Add lineage edges to metrics from the entities that "
+                    "implement them."
+                ),
                 "effect": "allow",
-                "resources": ["table", "metric"],
+                "resources": [
+                    "table",
+                    "topic",
+                    "apiEndpoint",
+                    "dashboardDataModel",
+                    "container",
+                ],
                 "operations": ["EditLineage"],
             },
         ],
