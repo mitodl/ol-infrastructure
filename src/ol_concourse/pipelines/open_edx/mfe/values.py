@@ -121,7 +121,7 @@ mitxonline = [
     OpenEdxVars(
         about_us_url="https://ci.mitxonline.mit.edu/about-us/",
         accessibility_url="https://accessibility.mit.edu/",
-        account_settings_url="https://ci.mitxonline.mit.edu/account-settings",
+        account_settings_url="https://ci.learn.mit.edu/dashboard/settings",
         contact_url="https://support.learn.mit.edu/",
         deployment_name="mitxonline",
         display_feedback_widget="false",
@@ -156,7 +156,7 @@ mitxonline = [
     OpenEdxVars(
         about_us_url="https://rc.mitxonline.mit.edu/about-us/",
         accessibility_url="https://accessibility.mit.edu/",
-        account_settings_url="https://rc.mitxonline.mit.edu/account-settings",
+        account_settings_url="https://rc.learn.mit.edu/dashboard/settings",
         contact_url="https://support.learn.mit.edu/",
         deployment_name="mitxonline",
         display_feedback_widget="false",
@@ -190,7 +190,7 @@ mitxonline = [
     OpenEdxVars(
         about_us_url="https://mitxonline.mit.edu/about-us/",
         accessibility_url="https://accessibility.mit.edu/",
-        account_settings_url="https://mitxonline.mit.edu/account-settings/",
+        account_settings_url="https://learn.mit.edu/dashboard/settings",
         contact_url="https://support.learn.mit.edu/",
         deployment_name="mitxonline",
         display_feedback_widget="false",
