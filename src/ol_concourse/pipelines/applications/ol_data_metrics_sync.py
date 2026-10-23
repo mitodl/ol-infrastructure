@@ -20,6 +20,9 @@ from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 #   pipeline never overwrites such an edit;
 # - a metric that is In Review or Rejected in OpenMetadata, so a review in
 #   progress keeps the build red until a reviewer acts.
+# A displayName that differs between the file and OpenMetadata also fails the
+# build, as `stale`, but the rest of that metric still syncs: OpenMetadata
+# keeps a stored one against any bot's change, so a person has to set it there.
 # An unchanged file writes only its lineage edges, which OpenMetadata upserts.
 #
 # After an OpenMetadata upgrade every build fails before the first file until
@@ -27,9 +30,10 @@ from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 # version (`ol-dbt metrics refresh-schema`). That commit is outside metrics/,
 # so the pipeline recovers at the next daily run or a manual trigger.
 #
-# Setting the pipeline starts a build at once (the metrics resource's first
-# version triggers it), and that build writes to production. It needs the
-# substructure stack to have created the bot's secret first.
+# The job also gets the daily time resource, which has no version until its
+# first 05:00-06:00 UTC window, so the first build runs in the first window
+# after the pipeline is unpaused, not when it is set, and writes to production.
+# It needs the substructure stack to have created the bot's secret first.
 #
 # The bot credentials are written to Vault by the open_metadata substructure
 # Pulumi stack (secret-concourse/infrastructure/openmetadata_metrics_bot), for

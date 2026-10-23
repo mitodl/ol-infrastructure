@@ -976,13 +976,13 @@ POLICY_CONFIG: dict[str, dict[str, Any]] = {
     # entity type an implemented_by entry can name (ol-data-platform
     # ENTITY_COLLECTIONS).  DefaultBotPolicy's EditDisplayName deny does not
     # block the EditAll PUT, but EntityUpdater.updateDisplayName then keeps the
-    # stored displayName for any bot it denies, so the sync can set a metric's
-    # displayName only when it creates it.
+    # stored non-empty displayName for any bot it denies, so the sync can set a
+    # metric's displayName only on create or where the metric has none.
     "MetricsSyncBotPolicy": {
         "displayName": "Metrics Sync Bot Policy",
         "description": (
             "Lets ol-dbt metrics sync create and update Metric entities and add "
-            "lineage from tables to them."
+            "lineage to them from the entities that implement them."
         ),
         "rules": [
             {
