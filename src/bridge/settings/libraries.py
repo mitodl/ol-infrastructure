@@ -111,11 +111,14 @@ LIBRARIES: dict[str, LibraryRegistration] = {
 #: "library" in mitodl/release-script repos_info.json) that have NO Concourse
 #: publish pipeline. Mapped to why, so `/doof publish <name>` can answer
 #: instead of saying "unknown". Each disposition was checked against the live
-#: GitHub repo on 2026-09-04.
+#: GitHub repo on 2026-09-04; the edx-sga and edx-api-client entries were
+#: updated on 2026-10-23.
 #:
-#: Only two of Doof's eight are a real gap: edx-sga and edx-api-client. Three
-#: repos are archived, one moved to GitHub Actions, one has been dormant since
-#: 2018, and one was never publishable through Doof in the first place.
+#: None of Doof's eight is a gap any more. edx-sga and edx-api-client publish
+#: through GitHub Actions with PyPI trusted publishing (edx-sga from its own
+#: repo, edx-api-client from ol-django, which it moved into on 2026-10-23),
+#: three repos are archived, one moved to GitHub Actions, one has been dormant
+#: since 2018, and one was never publishable through Doof in the first place.
 #:
 #: `ol-django` is a ninth entry and not one of Doof's eight: it is here so that
 #: `/doof publish ol-django` explains where it publishes instead of saying
@@ -128,13 +131,18 @@ UNPUBLISHABLE_LIBRARIES: dict[str, str] = {
         "publishing. Prepare a release with `scripts/release.py prepare`."
     ),
     "edx-sga": (
-        "no publish pipeline yet — the repo is active (last push 2026-07-29) "
-        "and its only workflow is CI, so PyPI releases still go through Doof."
+        "not published from Concourse by design — the repo publishes itself: a "
+        "version bump merged to master is built and uploaded to PyPI by the "
+        "`publish` job in its `ci.yml` workflow, using PyPI trusted publishing. "
+        "See the Releasing section of its README."
     ),
     "edx-api-client": (
-        "no publish pipeline yet — the repo is active (last push 2026-08-08) "
-        "and its only workflows are CI and static analysis, so PyPI releases "
-        "still go through Doof."
+        "not published from Concourse by design — it moved into ol-django "
+        "(src/edx_api_client), which publishes it like its other packages: a "
+        "version bump merged to main is built and uploaded to PyPI by the "
+        "`publish` job in ol-django's `ci.yml`, using PyPI trusted publishing. "
+        "Prepare a release with `scripts/release.py prepare --app "
+        "edx_api_client --bump major|minor|patch`."
     ),
     "rapid-response-xblock": (
         "superseded — the repo is archived and the package is now built by "
