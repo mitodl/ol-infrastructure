@@ -199,6 +199,11 @@ def test_saml_metadata_url_must_be_https():
         load_saml_metadata("http://idp.example.com/metadata.xml", SAVED_METADATA)
 
 
+def test_saved_saml_copy_that_is_not_metadata_raises():
+    with pytest.raises(SamlMetadataError, match="not an EntityDescriptor"):
+        load_saml_metadata(None, "<html><body>Maintenance</body></html>")
+
+
 def test_unparseable_saml_metadata_xml_raises():
     with pytest.raises(SamlMetadataError, match="Unable to parse"):
         load_saml_metadata(None, "<EntityDescriptor>truncated")
@@ -236,6 +241,13 @@ def test_non_discovery_json_falls_back_to_saved_copy(monkeypatch, warnings, body
         == SAVED_DISCOVERY
     )
     assert len(warnings) == 1
+
+
+def test_unparseable_saved_oidc_copy_raises(monkeypatch):
+    """Raised even when the live fetch succeeds, since the drift check reads it."""
+    _patch_discovery_response(monkeypatch, 200, SAVED_DISCOVERY)
+    with pytest.raises(OidcDiscoveryError, match="Unable to parse the saved"):
+        load_oidc_discovery(DISCOVERY_URL, '{"issuer": ')
 
 
 def test_oidc_discovery_matching_saved_copy_does_not_warn(monkeypatch, warnings):

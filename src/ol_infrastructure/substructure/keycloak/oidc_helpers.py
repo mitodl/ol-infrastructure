@@ -57,6 +57,17 @@ def _fetch_oidc_discovery(discovery_url: str) -> dict[str, Any]:
     return discovery
 
 
+def _parse_saved_discovery(saved_json: str, discovery_url: str) -> dict[str, Any]:
+    try:
+        return json.loads(saved_json)
+    except ValueError as e:
+        msg = (
+            f"Unable to parse the saved OIDC discovery document for "
+            f"{discovery_url}: {e}"
+        )
+        raise OidcDiscoveryError(msg) from e
+
+
 def load_oidc_discovery(discovery_url: str, saved_json: str | None) -> dict[str, Any]:
     """Return a provider's discovery document, from its URL when it answers.
 
@@ -69,8 +80,8 @@ def load_oidc_discovery(discovery_url: str, saved_json: str | None) -> dict[str,
     :param saved_json: A saved copy of the discovery document.
     :returns: The parsed discovery document.
     :rtype: dict[str, Any]
-    :raises OidcDiscoveryError: The fetch failed with no saved copy to fall
-        back to.
+    :raises OidcDiscoveryError: The saved copy does not parse, or the fetch
+        failed with no saved copy to fall back to.
     """
     try:
         live = _fetch_oidc_discovery(discovery_url)
@@ -78,9 +89,9 @@ def load_oidc_discovery(discovery_url: str, saved_json: str | None) -> dict[str,
         if saved_json is None:
             raise
         pulumi.log.warn(f"{e}. Building the IdP from the saved copy instead.")
-        return json.loads(saved_json)
+        return _parse_saved_discovery(saved_json, discovery_url)
     if saved_json is not None:
-        saved = json.loads(saved_json)
+        saved = _parse_saved_discovery(saved_json, discovery_url)
         changed = sorted(
             key for key in _DISCOVERY_IDP_ARGS if live.get(key) != saved.get(key)
         )

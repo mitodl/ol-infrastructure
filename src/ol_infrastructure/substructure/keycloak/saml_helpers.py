@@ -82,7 +82,8 @@ def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element:
     """Fetch and parse SAML metadata from a URL.
 
     Args:
-        metadata_url: The HTTPS URL of the SAML IdP metadata XML file.
+        metadata_url: The URL of the SAML IdP metadata XML file.
+            load_saml_metadata has already checked that it is HTTPS.
 
     Returns:
         The root ElementTree element of the parsed XML.
@@ -116,10 +117,14 @@ def _fetch_and_parse_saml_metadata(metadata_url: str) -> ET.Element:
     except (OSError, HTTPException, ET.ParseError) as e:
         msg = f"Unable to fetch or parse SAML metadata from {metadata_url}: {e}"
         raise SamlMetadataError(msg) from e
+    return _check_entity_descriptor(root, metadata_url)
+
+
+def _check_entity_descriptor(root: ET.Element, source: str) -> ET.Element:
     if root.tag != _ENTITY_DESCRIPTOR:
         msg = (
-            f"Unable to fetch or parse SAML metadata from {metadata_url}: the "
-            f"document's root element is {root.tag}, not an EntityDescriptor"
+            f"Unable to use SAML metadata from {source}: the document's root "
+            f"element is {root.tag}, not an EntityDescriptor"
         )
         raise SamlMetadataError(msg)
     return root
@@ -135,13 +140,15 @@ def _parse_saml_metadata_string(metadata_xml: str) -> ET.Element:
         The root ElementTree element of the parsed XML.
 
     Raises:
-        SamlMetadataError: The string was not parseable XML.
+        SamlMetadataError: The string was not parseable XML, or not a SAML
+            EntityDescriptor.
     """
     try:
-        return ET.fromstring(metadata_xml)  # noqa: S314
+        root = ET.fromstring(metadata_xml)  # noqa: S314
     except ET.ParseError as e:
         msg = f"Unable to parse the supplied SAML metadata XML: {e}"
         raise SamlMetadataError(msg) from e
+    return _check_entity_descriptor(root, "the supplied XML")
 
 
 def load_saml_metadata(metadata_url: str | None, saved_xml: str | None) -> ET.Element:
