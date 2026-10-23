@@ -561,7 +561,16 @@ opik_bearer_oidc_plugin["config"]["use_jwks"] = True
 # here rather than taken from the discovery document at request time.
 opik_bearer_oidc_plugin["config"]["claim_validator"] = {
     "issuer": {"valid_issuers": [KEYCLOAK_ISSUER]},
-    "audience": {"required": True, "match_with_client_id": True},
+    "audience": {"match_with_client_id": True},
+}
+# An ID token for ol-opik-client also has that aud, and a non-member can read
+# their own from the id_token_hint on the /logout/oidc redirect. ID tokens have
+# typ "ID", and only service-account access tokens carry client_id (from the
+# service_account client scope), so users' ID and access tokens both get a 401.
+opik_bearer_oidc_plugin["config"]["claim_schema"] = {
+    "type": "object",
+    "required": ["typ", "client_id"],
+    "properties": {"typ": {"const": "Bearer"}, "client_id": {"type": "string"}},
 }
 
 # Match ``/api/*`` requests that carry a Bearer ``Authorization`` header so they

@@ -6,7 +6,7 @@ route rules for the same `opik-frontend` backend:
 
 | Route | Match | Behavior |
 |-------|-------|----------|
-| `opik-api-bearer` | `/api/*` **with** `Authorization: Bearer …` | APISIX validates the JWT, returns `401` if invalid (no redirect) and `403` unless `aud` contains `ol-opik-client` |
+| `opik-api-bearer` | `/api/*` **with** `Authorization: Bearer …` | APISIX validates the JWT, returns `401` if invalid or not a service-account access token (no redirect) and `403` unless `aud` contains `ol-opik-client` |
 | `opik-api-session` | `/api/*` **without** a bearer header | cookie/session auth (browser SPA), `401` unless the ID token's `groups` contains `opik-users` |
 | `opik-ui` | everything else | interactive OIDC redirect (humans), same `opik-users` check |
 
