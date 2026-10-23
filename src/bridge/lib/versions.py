@@ -7,7 +7,7 @@ CONSUL_TEMPLATE_VERSION = "0.43.0"
 # renovate: datasource=github-releases depName=consul packageName=hashicorp/consul
 CONSUL_VERSION = "2.0.4"
 # renovate: datasource=github-releases depName=dagger packageName=dagger/dagger
-DAGGER_VERSION = "v0.21.10"
+DAGGER_VERSION = "v0.21.11"
 # renovate: datasource=github-releases depName=keycloak packageName=keycloak/keycloak
 KEYCLOAK_VERSION = "26.7.4"
 # renovate: datasource=docker depName=leek packageName=kodhive/leek
