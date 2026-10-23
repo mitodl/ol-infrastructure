@@ -127,6 +127,49 @@ SERVER_MEMORY_LIMIT = "2Gi"
 SERVER_SHUTDOWN_GRACE_SECONDS = 120
 SERVER_TERMINATION_GRACE_SECONDS = SERVER_SHUTDOWN_GRACE_SECONDS + 5
 
+# The startupProbe's timing. See startup_probe on the Deployment for how the
+# default budget (135s) was sized.
+STARTUP_PROBE_INITIAL_DELAY_SECONDS = 20
+STARTUP_PROBE_PERIOD_SECONDS = 5
+DEFAULT_STARTUP_PROBE_FAILURE_THRESHOLD = 24
+DEFAULT_BOOT_BUDGET_SECONDS = (
+    STARTUP_PROBE_INITIAL_DELAY_SECONDS
+    + (DEFAULT_STARTUP_PROBE_FAILURE_THRESHOLD - 1) * STARTUP_PROBE_PERIOD_SECONDS
+)
+# Room a raised boot budget's rollout gets beyond the old pod's termination
+# grace and the new pod's boot, for scheduling and the image pull.
+BOOT_ROLLOUT_SLACK_SECONDS = 300
+
+
+def startup_probe_failure_threshold(boot_budget_seconds: int | None) -> int:
+    """Return the startupProbe failure threshold that gives a boot this long.
+
+    The Nth failure lands at initial_delay + (N-1) x period, so this is the
+    smallest N whose kill comes at or after ``boot_budget_seconds``.
+
+    :param boot_budget_seconds: ``omnigraph:boot_budget_seconds``, or ``None``
+        for the default budget.
+    :raises ValueError: when the budget is shorter than the default, which
+        would kill a healthy boot.
+    :returns: the probe's ``failure_threshold``.
+    :rtype: int
+    """
+    if boot_budget_seconds is None:
+        return DEFAULT_STARTUP_PROBE_FAILURE_THRESHOLD
+    if boot_budget_seconds < DEFAULT_BOOT_BUDGET_SECONDS:
+        msg = (
+            f"omnigraph:boot_budget_seconds={boot_budget_seconds} is shorter "
+            f"than the default {DEFAULT_BOOT_BUDGET_SECONDS}s. It exists to "
+            "lengthen a boot, e.g. one whose cluster apply deletes a graph."
+        )
+        raise ValueError(msg)
+    after_first_probe = boot_budget_seconds - STARTUP_PROBE_INITIAL_DELAY_SECONDS
+    # Integer ceiling division: exact for any budget, unlike float division.
+    return (
+        after_first_probe + STARTUP_PROBE_PERIOD_SECONDS - 1
+    ) // STARTUP_PROBE_PERIOD_SECONDS + 1
+
+
 # ── Per-actor admission caps ─────────────────────────────────────────────────
 #
 # omnigraph-server admits writes per actor and 429s (with Retry-After) over the
@@ -320,6 +363,7 @@ def create_data_tier(  # noqa: PLR0913
     per_actor_bytes_max: int = DEFAULT_PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist: list[str] | None = None,
     withheld_graphs: list[str] | None = None,
+    boot_budget_seconds: int | None = None,
     maintenance_schedule: str = DEFAULT_MAINTENANCE_SCHEDULE,
     cleanup_iso_weekdays: tuple[int, ...] = DEFAULT_CLEANUP_ISO_WEEKDAYS,
     *,
@@ -357,6 +401,11 @@ def create_data_tier(  # noqa: PLR0913
     bundles and the maintenance window's graph list, to rebuild a graph
     whose schema change cannot be migrated in place. See
     ``build_cluster_graphs``.
+
+    ``boot_budget_seconds`` lengthens the startupProbe's budget, and the
+    Deployment's progress deadline and Pulumi's wait with it, for a deploy
+    whose boot apply runs long (e.g. the delete of a withheld graph). ``None``
+    keeps the default 135s and leaves the Deployment spec unchanged.
 
     ``maintenance_schedule`` and ``cleanup_iso_weekdays`` set the nightly stop
     window that replaces the optimize and cleanup sweeps on that format, and
@@ -731,6 +780,15 @@ def create_data_tier(  # noqa: PLR0913
         if persisted_lock
         else None
     )
+    startup_failure_threshold = startup_probe_failure_threshold(boot_budget_seconds)
+    # The old pod's termination grace (Recreate) plus the new pod's boot.
+    boot_rollout_seconds = (
+        SERVER_TERMINATION_GRACE_SECONDS
+        + boot_budget_seconds
+        + BOOT_ROLLOUT_SLACK_SECONDS
+        if boot_budget_seconds is not None
+        else None
+    )
     omnigraph_deployment = kubernetes.apps.v1.Deployment(
         f"omnigraph-omnigraph-server-deployment-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -756,6 +814,13 @@ def create_data_tier(  # noqa: PLR0913
             annotations={
                 **({MIGRATION_ARMED_ANNOTATION: "true"} if migration_armed else {}),
                 **({"pulumi.com/patchForce": "true"} if persisted_lock else {}),
+                # Pulumi waits 10 minutes for a Deployment by default, which a
+                # raised boot budget can outlast.
+                **(
+                    {"pulumi.com/timeoutSeconds": str(boot_rollout_seconds)}
+                    if boot_rollout_seconds is not None
+                    else {}
+                ),
             }
             or None,
         ),
@@ -779,6 +844,9 @@ def create_data_tier(  # noqa: PLR0913
             # apply scaled the tier back up mid-migration. Clearing
             # migrate_from_image at cutover scales it back to 1.
             replicas=0 if migration_armed else 1,
+            # Unset by default (Kubernetes' 600s). A raised boot budget would
+            # otherwise mark the rollout ProgressDeadlineExceeded mid-boot.
+            progress_deadline_seconds=boot_rollout_seconds,
             # Recreate, NOT the default RollingUpdate: storage is
             # strict-single-version ("a binary reads exactly one storage-format
             # version"; a mixed fleet writing one graph is unsupported), so a
@@ -997,9 +1065,11 @@ def create_data_tier(  # noqa: PLR0913
                                 # the probe that passed. Going later would
                                 # trade that away, delaying Ready on every
                                 # fast boot to buy the one failure back.
-                                initial_delay_seconds=20,
-                                period_seconds=5,
-                                failure_threshold=24,
+                                initial_delay_seconds=(
+                                    STARTUP_PROBE_INITIAL_DELAY_SECONDS
+                                ),
+                                period_seconds=STARTUP_PROBE_PERIOD_SECONDS,
+                                failure_threshold=startup_failure_threshold,
                             ),
                             # Readiness is on /readyz and liveness on /healthz,
                             # the split upstream's deployment guide

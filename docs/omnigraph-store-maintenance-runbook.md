@@ -548,8 +548,20 @@ boot then refuses with `an earlier cluster apply was interrupted and its
 deployment is still outstanding`, and the server stays down until the
 deployment is reconciled by hand. Count the objects first
 (`aws s3 ls --recursive <storage_root>/graphs/<id>.omni/ | wc -l`). Anything
-over about 3,500 will be killed, so plan on the recovery below as part of
-the window:
+over about 3,500 will be killed at the default budget.
+
+For a larger graph, set `omnigraph:boot_budget_seconds` in step 1's change,
+sized from the count at 1,000 objects a minute with room to spare (e.g. 3600
+for 25,000 objects), and remove it in step 2's. It raises the startup probe's
+failure threshold, and the Deployment's progress deadline and Pulumi's wait
+for the rollout with it, so the deploy waits out the delete instead of failing
+at Pulumi's 10-minute default. The server is down for the whole delete.
+Start step 1 at least the budget ahead of 03:20: the booting pod holds the
+unlock Lease, so a window that starts mid-delete gives up after 90s and skips
+that night's optimize and cleanup. While the setting is in place every restart
+gets the long probe, so a wedged boot goes unnoticed for the whole budget.
+
+If a delete is killed anyway, reconcile it by hand:
 
 ```bash
 kubectl -n omnigraph scale deploy/omnigraph-server --replicas=0
