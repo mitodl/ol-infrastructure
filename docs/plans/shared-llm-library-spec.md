@@ -9,7 +9,7 @@ decision task and stays Proposed until the decision is recorded here.
 | §2 Packaging, home, footprint | `tk-decide-the-shared-library-s-packaging-home-repo--451af4` | Decided: home 2026-09-11 (`mitodl/ol-llm`); SDK-based Opik integration and translation-plugin adoption 2026-10-01 (§2.3) |
 | §3 Error contract | `tk-policy-error-contract-for-llm-calls-d27bd1` | Decided 2026-09-11 |
 | §4 Attribution schema | `tk-define-the-attribution-schema-shared-by-gateway--d6f26b` | Decided 2026-10-01, with a platform-wide key for anonymous ids (§4.3) |
-| §5 Memory | `tk-memory-for-the-shared-llm-pattern-supported-stor-063935` | Categories decided 2026-10-01: a shared service, not coupled to any app. Backend decided 2026-10-15: Hindsight, one memory per learner shared across apps, authorised by token exchange (§5.5) |
+| §5 Memory | `tk-memory-for-the-shared-llm-pattern-supported-stor-063935` | Categories decided 2026-10-01: a shared service, not coupled to any app. Backend decided 2026-10-15: Hindsight, one memory per learner shared across apps, authorized by token exchange (§5.5) |
 | §6 Call contract | `tk-specify-the-library-s-call-contract-timeouts-ret-badb39` | Specified 2026-10-01 from the §3 decision |
 | §7 Durable execution | `tk-evaluate-dbos-and-temporal-for-durable-agent-wor-819e78` | Direction set 2026-10-01; nothing decided |
 
@@ -153,7 +153,7 @@ Packages
 | `ol-llm[pydantic-ai]` | | `pydantic-ai-slim` | Model factory, the §6 call contract's retry wrapper, both entry points (agent and traced completion) |
 | `ol-llm[openai]`, `[anthropic]`, `[bedrock]`, `[google]`, `[mistral]` | | the matching `pydantic-ai-slim` extra, so each also installs PydanticAI | Provider SDKs, chosen per consumer |
 | `ol-llm[harness]` | | `pydantic-ai-harness` (0.x, pinned to a minor series) | In-session memory and compaction (§5 categories A and B). Each harness release pins `pydantic-ai-slim` exactly, so this extra fixes the PydanticAI version |
-| `ol-llm[memory]` | | `hindsight-client` | Client for the shared memory service (§5.5), which runs Hindsight 1.0.0 |
+| `ol-llm[memory]` | | `hindsight-client` | Client for the shared memory service (§5.5), which runs Hindsight 1.0.0. The extra still pins `hindsight-client>=0.10,<0.11`, and the PoC shim used raw httpx, so the client is untested against the 1.0.0 server and its token auth. Re-pinning it is a follow-up |
 | `ol_llm.eval` (module) | `ol_llm.eval` | the full opik install, including litellm | Datasets, experiments, `evaluate(prompts=…)`, LLM-judge metrics. Runs in CI eval jobs and on developer machines, never in slimmed runtime images |
 | `ol-llm[django]` | `ol_llm.django` | Django | Settings reader, app-ready tracer setup, Celery helpers. Add only when the Django glue outgrows a settings reader |
 
@@ -674,8 +674,8 @@ are unnamed, and the primary benchmark is built, run and hosted by the vendor wi
 product as the subject.
 
 Hindsight PoC results (2026-10-15, `tk-hindsight-poc-self-hosted-per-learner-memory-on--e57a70`).
-Run locally against Hindsight 1.0.0 (released 2026-10-13, so the v0.10.0 details above are a
-release behind) on the slim image, with pgvector 0.8.1 on Postgres 17 and Ollama for
+Run locally against Hindsight 1.0.0 (released 2026-10-13; the v0.10.0 details above predate
+it) on the slim image, with pgvector 0.8.1 on Postgres 17 and Ollama for
 embeddings. It passed. The shape that works is storage only: ol-llm makes the gate and
 extraction calls (§5.3 item 1) and Hindsight stores the notes it is handed, in chunks mode
 with observations and consolidation off. Server-side extraction would bypass the library:
@@ -698,21 +698,25 @@ Against the five items above:
    is never read.
 4. The §5.3 shim is put, get, search, delete and forget over the HTTP API, now the harness
    client in ol-infrastructure `scripts/hindsight/memory_client.py`. put is a retain with
-   `document_id=<app>.<key>`, so a second put replaces the first. Gateway routing, Opik over
-   OTLP and the per-conversation call count stop applying, because Hindsight makes no model
-   calls.
-5. Deployed against RDS (§5.5), not the bundled database. The migrations stop unless pgvector
-   already exists, so the Vault role statements create it. 111 migrations ran in about 2.5 s on
-   an empty database.
+   `document_id=<app>.<key>`, so a second put replaces the first. Gateway routing of LLM
+   calls, Opik over OTLP and the per-conversation call count stop applying, because Hindsight
+   makes no LLM calls. It still makes embedding calls (§5.5, Server settings).
+   The mental-model recommendation above does not carry over either: the deployed design
+   refuses mental model create and refresh, which need an LLM.
+5. Deployed against RDS (§5.5), not the bundled database. The migrations run
+   `CREATE EXTENSION vector` themselves and stop when the role cannot, as on RDS, so the Vault
+   role statements create it first. Locally, 111 migrations ran in about 2.5 s on an empty
+   database.
 
-Load, at 50,000 banks and 250,000 notes (5,000 written through the API, the rest cloned in
-SQL): serial recall p50 75 ms and p95 121 ms, against 82 ms and 300 ms at 5,000 banks, with
-under 2 ms of database time per recall. At concurrency 16, p50 773 ms at about 19 recalls/s,
-bound by the single Python API process while Postgres sat idle, so throughput scales with API
-replicas. `VECTOR_INDEX_MIN_ROWS=10000` is required. The default 0 builds three partial HNSW
-indexes per bank with a blocking `CREATE INDEX`: 1,144 banks gave 3,452 indexes and seed p50
-rose from 2.3 s to 6.3 s, where 10000 left 20 indexes in total. These are local numbers with
-Ollama embeddings; they have not been re-measured on RDS or with Bedrock embeddings.
+Load, at 50,000 banks and 250,000 notes (5,000 written through the API, the rest cloned in SQL):
+serial recall p50 75 ms and p95 121 ms, against 82 ms and 300 ms at 5,000 banks, with under 2 ms
+of database time per recall. At concurrency 16, p50 773 ms at about 19 recalls/s, bound by the
+single Python API process while Postgres sat idle. That suggests throughput scales with API
+replicas, which was not measured. `VECTOR_INDEX_MIN_ROWS=10000` is required. The default 0
+builds three partial HNSW indexes per bank with a blocking `CREATE INDEX`: 1,144 banks gave
+3,452 indexes and seed p50 rose from 2.3 s to 6.3 s, where 10000 left 20 indexes in total. These
+are local numbers with Ollama embeddings; they have not been re-measured on RDS or with Bedrock
+embeddings.
 
 Proposal. Split the decision by category rather than picking one backend for all of
 memory:
@@ -770,8 +774,8 @@ What item 2 changes in this part:
 Decided by the project owner since:
 
 3. 2026-10-15: Hindsight is the backend for C and D, used for storage and search only (§5.4,
-   PoC results). A learner has one memory, shared by every app, and every call is authorised
-   by a token derived from the learner's own session.
+   PoC results). A learner has one memory, shared by every app, and every app call on a
+   learner's memory is authorized by a token derived from the learner's own session.
 4. 2026-10-16: the service is deployed from ol-infrastructure (`applications/hindsight`), QA
    first. General memory that belongs to no learner (e.g. product and course facts) is allowed
    under a separate grant.
@@ -792,22 +796,27 @@ realm has no lifespan override). `KeycloakTenantExtension` verifies the signatur
 the issuer, audience and expiry, maps `azp` to an app name through the stack's
 `hindsight:app_clients`, and takes the learner from `sub`, so no header can point an app at
 another learner. A token with a `client_id` claim or no `sid` is a service account and never
-reaches a learner bank. Keycloak itself refuses an exchange that does not request the audience
+reaches a learner bank, except through the admin client's forget sequence (Forget, below).
+Keycloak itself refuses an exchange that does not request the audience
 scope ("Requested audience not available"), one from a client without standard token exchange
 enabled, and one of a token whose `azp` and `aud` do not name the requesting client ("Client is
 not within the token audience"). The olapps app clients predate Keycloak's `basic` scope, so
 their tokens carry no `sub`; the audience scope adds a `sub` mapper, which puts it on memory
-tokens only.
+tokens only. Exchange is not the only way to get such a token: an app's own login can request
+the optional audience scope, and the service cannot tell the two apart. Both take the app
+client's secret, and neither reaches past the token's own learner.
 
 Which client each app exchanges as. APISIX 3.19.0 forwards the session access token upstream as
 `X-Access-Token` by default and strips a client-supplied one, and ol-infrastructure does not
-override that. learn-ai's routes log learners in through `ol-mitlearn-client` and share
-mit-learn's session cookie, so every token either app receives has `azp` `ol-mitlearn-client`
-and `azp` cannot tell them apart. That client cannot be a memory identity either: mit-learn,
-learn-ai, mitxonline, ol-analytics-api and jupyterhub all read its secret, so any of them could
-write as mit-learn. Each app exchanges with a client only it holds:
+override that. Both of learn-ai's OIDC resources log learners in through `ol-mitlearn-client`
+(Vault `secret-operations/sso/mitlearn`); the `/ai/*` routes also share mit-learn's session
+cookie, while the legacy host keeps its own. Every token either app receives therefore has `azp`
+`ol-mitlearn-client`, and `azp` cannot tell them apart. That client cannot be a memory identity
+either: mit-learn, learn-ai, mitxonline, ol-analytics-api and jupyterhub all read its secret, so
+any of them could write as mit-learn. Each app exchanges with a client only it holds:
 
-- learn-ai as `ol-learn-ai-client` (Vault `sso/learn-ai`, already in learn-ai's policy).
+- learn-ai as `ol-learn-ai-client` (Vault `secret-operations/sso/learn-ai`, already in
+  learn-ai's policy).
 - mit-learn as `ol-mitlearn-memory-client`, which has no login flow and only exchanges (Vault
   `secret-operations/sso/mitlearn-memory`, not yet in mit-learn's policy).
 
@@ -826,7 +835,7 @@ directives and other whole-bank operations are refused. Another learner's bank a
 not 403, so banks cannot be probed.
 
 General memory. `g-<name>` banks, readable by every app and written only with a
-client-credentials token carrying the `ol-memory-general` scope. The grant is honoured only on a
+client-credentials token carrying the `ol-memory-general` scope. The grant is honored only on a
 service-account token, so a learner token never writes general memory, and the grant never
 reaches a learner bank. No client holds the scope yet.
 
@@ -835,11 +844,11 @@ names the learner in `x-ol-learner`, and the validator limits it to the forget s
 sequence has two phases because deleting a bank cascades away its operation rows, the only
 record of work in flight. Clearing the bank's memories raises a fence (one hour, in
 `ol_memory_bank_fence`) and keeps the bank row; pending operations are cancelled and processing
-ones drained; then the bank is deleted. While fenced, the validator refuses writes, bank
-creation and worker retries. The validator checks a worker task only when it starts, so a
-`BEFORE INSERT` trigger on every content table with a `bank_id` also refuses inserts into a
-fenced bank, whatever the writer. It was added after a retain whose embeddings timed out
-inserted 24 notes 45 s after its learner's bank was deleted. The harness
+ones drained; then the bank is deleted. While fenced, the validator refuses writes other than an
+app's own deletes, bank creation and worker retries. The validator checks a worker task only
+when it starts, so a `BEFORE INSERT` trigger on every content table with a `bank_id` also
+refuses inserts into a fenced bank, whatever the writer. It was added after a retain whose
+embeddings timed out inserted 24 notes 45 s after its learner's bank was deleted. The harness
 (`scripts/hindsight/test_isolation.py`) passed 84 of 84 on a fresh database on 2026-10-17,
 including a forget racing an async retain.
 
@@ -847,18 +856,22 @@ Server settings. `LLM_PROVIDER=none`, `RETAIN_EXTRACTION_MODE=chunks`, observati
 auto-consolidation off, `LLM_TRACE_ENABLED=false`, `STORE_DOCUMENT_TEXT=false`,
 `VECTOR_INDEX_MIN_ROWS=10000`, MCP off, and the file upload API off with attachments refused
 (attachment bytes sit in a table with no `bank_id`, out of the trigger's reach). Hindsight makes
-no model calls of its own, so §5.3 item 1 holds without routing it through the gateway. Every
-caller-written field of a retain is redacted before storage with the built-in secret and card
-screen plus email and phone patterns. Names and assessment content are not pattern-matchable
-and stay the ol-llm gate's job (§5.3 item 2).
+no LLM calls, so extraction stays in ol-llm under §5.3 item 1. It does embed every note and every
+recall query itself, calling Bedrock through LiteLLM in-process with the pod's IRSA role (open
+item 8). Before storage, a retain's content, context, metadata keys and values, and entity text
+are redacted with the built-in secret and card screen plus email and phone patterns. Document
+ids, entity types and timestamps are not, so a document-id key must not carry learner content.
+Names and assessment content are not pattern-matchable and stay the ol-llm gate's job (§5.3
+item 2).
 
 Where it runs. Hindsight `1.0.0-slim` on the applications EKS cluster, cluster-internal at
 `hindsight.hindsight.svc.cluster.local` with no APISIX route, one API replica, and RDS Postgres
 18 with Vault dynamic credentials. Hindsight reads `DATABASE_URL` once, so rotation restarts the
-pod. QA came up on 2026-10-20 and Production on 2026-10-21. The Keycloak change is applied in
-QA; as of 2026-10-21 Production Keycloak was held because its preview fails fetching a partner's
-SAML metadata. Not yet exercised: a QA retain and recall with a learn-ai token exchanged from a
-forwarded session.
+pod. QA came up on 2026-10-20 and Production on 2026-10-21. The Keycloak change was applied in
+QA by 2026-10-20 and in Production on 2026-10-22: the Production deploy gate that carried the
+memory resources was consumed that day, and the next Production preview (2026-10-23) shows none
+of them pending. Not yet exercised: a QA retain and recall with a learn-ai token exchanged from
+a forwarded session.
 
 Still open:
 
@@ -875,9 +888,10 @@ Still open:
    `prune` at the cost of living outside Django migrations.
 4. Writers without a learner session (`tk-grant-for-services-to-write-per-learner-memory-w-f03a14`).
    The owner named four writers on 2026-10-20: learn-ai, mit-learn, the data platform
-   (aggregated per-learner behavioural records) and possibly mitxonline (enrollments). The last
+   (aggregated per-learner behavioral records) and possibly mitxonline (enrollments). The last
    two write from batch or server-side paths that hold no session, so they have no token to
-   exchange, and the admin client is limited to forget. The proposal is a client-credentials
+   exchange, and the admin client is limited to forget. The key-auth Canvas bot routes carry no
+   learner token either. The proposal is a client-credentials
    scope that lets a service name the learner for retain only, under its own app tag and
    document-id prefix, with one client per writer. mitxonline logs learners in through
    `ol-mitlearn-client`, so it needs its own memory client as mit-learn did. Whether the fence
@@ -892,6 +906,11 @@ Still open:
 7. Hindsight fixes the vector column to the model's dimension once a bank holds data, so
    changing the embedding model means re-embedding every bank through export and import, which
    is untested.
+8. Hindsight's embedding calls carry learner content outside ol-llm. Every retained note and
+   every recall query goes to Bedrock from Hindsight's own LiteLLM client, with no §4
+   attribution, no Opik trace and no budget count, which is the gap §5.3 item 1 says the
+   library exists to close. Whether that is accepted or routed through the library is the
+   owner's call.
 
 ## 6. Call contract
 
