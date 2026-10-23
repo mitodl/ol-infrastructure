@@ -2,6 +2,7 @@ import sys
 
 from ol_concourse.pipelines.applications.ol_dbt_openmetadata_sync import (
     ol_dbt_openmetadata_sync_pipeline,
+    watched_checkout,
 )
 from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
@@ -21,11 +22,11 @@ sync_pipeline = ol_dbt_openmetadata_sync_pipeline(
     watched_dir="contracts",
     job_name="sync-data-contracts-to-openmetadata",
     task_name="ol-dbt-contracts-sync",
-    sync_command="""\
+    sync_command=f"""\
 uv run --frozen --package ol-dbt-cli ol-dbt contracts sync \\
     --service "Starburst Galaxy" \\
     --manifest /tmp/manifest.json \\
-    --contracts-dir ../ol-data-platform-contracts/contracts
+    --contracts-dir {watched_checkout("contracts")}
 """,
     bot_credentials="openmetadata_contracts_bot",
 )

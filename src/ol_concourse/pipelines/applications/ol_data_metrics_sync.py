@@ -2,22 +2,34 @@ import sys
 
 from ol_concourse.pipelines.applications.ol_dbt_openmetadata_sync import (
     ol_dbt_openmetadata_sync_pipeline,
+    watched_checkout,
 )
 from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 # Publishes every metric in ol-data-platform's metrics/ to production
-# OpenMetadata as a Metric entity, with lineage from the tables named in its
-# implemented_by. A metric whose dbt_model is not in the manifest yet, or whose
-# description, owners, reviewers or status someone changed in OpenMetadata
-# since the bot last wrote it, is reported and left alone, and the build fails
-# so the change can become a pull request. A metric that is In Review or
-# Rejected in OpenMetadata is also left alone. Other metrics still sync. There
-# is no --force here: overriding an edit made in OpenMetadata is a decision for
-# a person running the command (ol-data-platform metrics/README.md). An
-# unchanged file writes only its lineage edges, which OpenMetadata upserts.
+# OpenMetadata as a Metric entity, with lineage from each implemented_by
+# entity. An implemented_by model tagged starrocks is skipped with a warning
+# until OpenMetadata has a StarRocks service; the build still passes.
+#
+# Each of these is reported, leaves that metric unwritten and fails the build,
+# while the other metrics still sync:
+# - a dbt_model not in the manifest yet (the daily run picks it up once it is);
+# - a description, owners, reviewers or status someone changed in OpenMetadata
+#   since the bot last wrote it, which belongs in a pull request
+#   (ol-data-platform metrics/README.md). There is no --force here, so the
+#   pipeline never overwrites such an edit;
+# - a metric that is In Review or Rejected in OpenMetadata, so a review in
+#   progress keeps the build red until a reviewer acts.
+# An unchanged file writes only its lineage edges, which OpenMetadata upserts.
+#
 # After an OpenMetadata upgrade every build fails before the first file until
-# ol-data-platform commits a refreshed CreateMetric schema snapshot
-# (`ol-dbt metrics refresh-schema`).
+# the CreateMetric schema snapshot in ol-data-platform matches the server's
+# version (`ol-dbt metrics refresh-schema`). That commit is outside metrics/,
+# so the pipeline recovers at the next daily run or a manual trigger.
+#
+# Setting the pipeline starts a build at once (the metrics resource's first
+# version triggers it), and that build writes to production. It needs the
+# substructure stack to have created the bot's secret first.
 #
 # The bot credentials are written to Vault by the open_metadata substructure
 # Pulumi stack (secret-concourse/infrastructure/openmetadata_metrics_bot), for
@@ -26,11 +38,11 @@ sync_pipeline = ol_dbt_openmetadata_sync_pipeline(
     watched_dir="metrics",
     job_name="sync-metrics-to-openmetadata",
     task_name="ol-dbt-metrics-sync",
-    sync_command="""\
+    sync_command=f"""\
 uv run --frozen --package ol-dbt-cli ol-dbt metrics sync \\
     --service "Starburst Galaxy" \\
     --manifest /tmp/manifest.json \\
-    --metrics-dir ../ol-data-platform-metrics/metrics
+    --metrics-dir {watched_checkout("metrics")}
 """,
     bot_credentials="openmetadata_metrics_bot",
 )

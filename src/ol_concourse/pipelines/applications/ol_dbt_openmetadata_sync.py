@@ -31,6 +31,27 @@ boto3.client("s3").download_file(
 """
 
 
+def watched_resource_name(watched_dir: str) -> str:
+    """Name the path-filtered git resource that watches `watched_dir`.
+
+    :param watched_dir: The ol-data-platform directory, e.g. ``contracts``.
+    :returns: The resource name, which is also its input directory in the task.
+    :rtype: str
+    """
+    return f"ol-data-platform-{watched_dir}"
+
+
+def watched_checkout(watched_dir: str) -> str:
+    """Locate `watched_dir` in its own checkout, relative to the repository.
+
+    :param watched_dir: The ol-data-platform directory, e.g. ``contracts``.
+    :returns: The path to pass to the sync command, which runs from the
+        unfiltered repository checkout.
+    :rtype: str
+    """
+    return f"../{watched_resource_name(watched_dir)}/{watched_dir}"
+
+
 def ol_dbt_openmetadata_sync_pipeline(
     *,
     watched_dir: str,
@@ -43,8 +64,8 @@ def ol_dbt_openmetadata_sync_pipeline(
     daily after the manifest upload.
 
     :param watched_dir: The ol-data-platform directory whose commits trigger a
-        sync, e.g. ``contracts``. Its checkout is at
-        ``../ol-data-platform-<watched_dir>/<watched_dir>`` from the repository.
+        sync, e.g. ``contracts``. ``watched_checkout`` gives its path for the
+        sync command.
     :param job_name: The Concourse job name.
     :param task_name: The Concourse task name.
     :param sync_command: The shell command run from the repository checkout
@@ -62,7 +83,7 @@ def ol_dbt_openmetadata_sync_pipeline(
     # (Reading the files from the unfiltered checkout instead could miss the
     # triggering commit, since the two resources are checked independently.)
     watched_changes = git_repo(
-        name=Identifier(f"ol-data-platform-{watched_dir}"),
+        name=Identifier(watched_resource_name(watched_dir)),
         uri="https://github.com/mitodl/ol-data-platform",
         branch="main",
         check_every="60s",
