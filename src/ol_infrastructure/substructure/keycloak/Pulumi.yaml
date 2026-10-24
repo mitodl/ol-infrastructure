@@ -2,5 +2,11 @@
 name: ol-substructure-keycloak
 runtime: python
 description: A project for managing Keycloak configuration
+# keycloak.Realm sends its browser, registration and first-broker-login flow aliases
+# from its own state on every update. That state only changes on a refresh (it holds
+# the built-ins after creation), so a non-refreshing update can rebind stale flows
+# over the ones keycloak.authentication.Bindings set, and preview shows no diff.
+options:
+  refresh: always
 backend:
   url: s3://mitol-pulumi-state/

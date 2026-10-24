@@ -4,12 +4,12 @@
 #
 # keycloak.py binds browserFlow/firstBrokerLoginFlow to our custom "Organization
 # browser"/"Organization first broker login" flows via a keycloak.authentication.Bindings
-# resource. That binding only gets written once: any later update to the
-# keycloak.Realm resource itself (e.g. changing smtp_server, password_policy, etc.)
-# PUTs a full realm representation that doesn't include those two fields, and
-# Keycloak's API resets them to its built-in defaults ("browser" / "first broker
-# login") as a result. Pulumi never notices, because Bindings' own inputs didn't
-# change, so it doesn't reapply. Without the custom "Organization browser" flow,
+# resource. Any later update to the keycloak.Realm resource itself (e.g. changing
+# smtp_server, password_policy, etc.) PUTs a full realm representation whose flow
+# fields come from the Realm's own Pulumi state. That state only changes on a
+# refresh, and after creation it holds the built-in defaults ("browser" / "first
+# broker login"), so without a refresh the PUT rebinds them. Pulumi never notices, because Bindings' own inputs didn't change,
+# so it doesn't reapply. Without the custom "Organization browser" flow,
 # the login page's identity-first screen dead-ends at a password-reset prompt
 # instead of routing unrecognized emails to registration.
 #
