@@ -281,7 +281,8 @@ blip the user can't see.
 I did not observe this at the literal 3600s setting, which would need an hour of idling. The
 extrapolation from the 5s and 30s results is inference, not measurement.
 
-Worth an upstream issue against Gravitino before anyone commits to it.
+Worth an upstream issue against Gravitino before anyone commits to it. (Since filed and fixed:
+apache/gravitino#12169, in 1.3.1.)
 
 ## What this does and does not settle
 

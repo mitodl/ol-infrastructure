@@ -359,7 +359,8 @@ GRAVITINO_CHART_VERSION = "1.3.11"
 That pin goes in `src/bridge/lib/versions.py`, with the explanation above the marker because the
 Renovate regex requires the marker directly above the assignment. Deploy it with `kubernetes.helm.v3.Release(chart="oci://registry-1.docker.io/apache/gravitino-helm", version=...)`
 as `applications/toolhive_operator/__main__.py:77-93` does for its OCI chart. The chart's appVersion
-is `1.3.0`, and Docker Hub has no `1.3.0` chart tag. Image `docker.io/apache/gravitino:1.3.0`.
+is `1.3.0`, and Docker Hub has no `1.3.0` chart tag. Image `docker.io/apache/gravitino`, tag pinned
+by `GRAVITINO_VERSION` in `versions.py` (`1.3.1` as of 2026-10-23, ahead of the chart's appVersion).
 
 Chart behaviour to override, all checked in `dev/charts/gravitino` at the tag:
 
@@ -490,7 +491,7 @@ Replica count as `gravitino:replicas` in stack config, StarRocks-style.
 
 The spike's cache-expiry defect (one spurious 403 after `jcasbin.cacheExpirationSecs` lapses) was
 apache/gravitino#12169, fixed in 1.3.1, the version we run: eviction now clears only the role's
-policies, not the user-to-role binding (`JcasbinAuthorizer.java:1405-1424`). The spike harness
+policies, not the user-to-role binding (`JcasbinAuthorizer.java:1405-1424` at the `v1.3.1` tag). The spike harness
 re-run on stock images (5s TTL, 12s idle gap, role granted directly to the user) gave 403 then 200
 in 10/10 trials on 1.3.0 and 200 in 10/10 on 1.3.1. Not re-run: roles granted through a group,
 StarRocks traffic, the default 3600s TTL. Two related denials under concurrent requests (#13605,
