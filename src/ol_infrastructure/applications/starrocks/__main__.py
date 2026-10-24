@@ -245,7 +245,6 @@ starrocks_auth_binding = OLEKSAuthBinding(
 )
 
 # Create OIDC configuration secret if enabled
-oidc_config_secret: OLVaultK8SSecret | None = None
 if starrocks_config.get_bool("oidc_enabled"):
     oidc_config_secret_name = f"{stack_info.env_prefix}-starrocks-oidc-config"
     oidc_config_secret_config = OLVaultK8SStaticSecretConfig(
@@ -1051,14 +1050,13 @@ starrocks_release = kubernetes.helm.v3.Release(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
-        # The FE reads its keystore password and OAuth2 client secret from these
-        # Secrets through feEnvVars, and sits in CreateContainerConfigError
-        # until they exist.
+        # The FE reads its keystore password from this Secret through feEnvVars
+        # and sits in CreateContainerConfigError until it exists. The OIDC config
+        # Secret is already covered as a descendant of starrocks_auth_binding.
         depends_on=[
             starrocks_root_password_secret,
             starrocks_auth_binding,
             *([ssl_keystore_password_secret] if ssl_keystore_password_secret else []),
-            *([oidc_config_secret] if oidc_config_secret else []),
         ],
     ),
 )
