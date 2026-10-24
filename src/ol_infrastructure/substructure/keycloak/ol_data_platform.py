@@ -289,8 +289,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ),
         enabled=True,
         access_type="CONFIDENTIAL",
-        # Needed to use for Superset API access
-        direct_access_grants_enabled=True,
+        direct_access_grants_enabled=False,
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
         service_accounts_enabled=True,
@@ -486,7 +485,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=True,
+        implicit_flow_enabled=False,
         service_accounts_enabled=True,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-data-platform-openmetadata-redirect-uris"
