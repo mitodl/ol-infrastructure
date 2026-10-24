@@ -94,7 +94,7 @@ RUN command -v which >/dev/null 2>&1 || \
     update-alternatives --install /usr/bin/which which /usr/bin/which.debianutils 0
 
 # Install uv (pinned via the upstream tag; bump deliberately).
-COPY --from=ghcr.io/astral-sh/uv:0.13.1@sha256:4a1f3666816dafadd20ceb71eac9a7d56d7ef30279f7d64048519ab901ada336 /uv /uvx /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff /uv /uvx /usr/local/bin/
 
 # Non-root runtime user and the directories the apps expect to own.
 RUN adduser --disabled-password --gecos "" mitodl && \
