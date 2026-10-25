@@ -91,8 +91,9 @@ currently slated for deletion.
 
 **`mitx-residential` "Server key 1" → edxapp MITx Residential video block.** Chain:
 
-- `secrets_builder.py:117-125` sets `YOUTUBE_API_KEY` for **only** the `mitx` and
-  `mitx-staging` env prefixes. No other deployment gets it.
+- `secrets_builder.py:123-131` sets `YOUTUBE_API_KEY` for **only** the `mitx` and
+  `mitx-staging` env prefixes. No other deployment gets it. (True on 2026-08-10. mitxonline
+  was wired to the same key on 2026-09-04 in 93ea3d324, see `secrets_builder.py:116`.)
 - `Pulumi.mitx.Production.yaml` carries `edxapp:product: residential`. The GCP project
   is named `mitx-residential`. The key dates from 2015-07-21, the era of that deployment.
 - In edx-platform, `settings.YOUTUBE_API_KEY` is used in exactly one place —
@@ -163,8 +164,9 @@ across all 20 visible projects, 42-day window.
 | idle | ocw-studio-qa | OCW Studio RC | 2021-10-13 | NONE |
 | idle | ovs-youtube-qa | API key 1 | 2019-12-19 | NONE |
 
-Six keys carry **no restriction of any kind**, including the only unrestricted key that is
-actually live. Restricting them is worth doing independently of the migration.
+Seven keys carried **no restriction of any kind**, including the only unrestricted key that is
+actually live. The six idle ones were restricted on 2026-10-20 (see below). Server key 1
+moves off when edxapp MITx Residential takes the mitol01 key.
 
 **OAuth clients — 3 genuinely live.** (`32555940559.apps.googleusercontent.com` also appears
 in the data; that is the gcloud CLI's own public client — our own queries, not a consumer.
@@ -316,7 +318,7 @@ Five open questions closed by the project owner. These narrow the scope substant
    Manageability differs per type and must be designed per type:
    - **Service accounts, IAM, enabled APIs** — fully Pulumi-manageable.
    - **API keys** — Pulumi-manageable (`gcp.projects.ApiKey`). Bring them under IaC *with*
-     restrictions; six currently have none.
+     restrictions. Only `mitx-residential` "Server key 1" still has none (2026-10-20).
    - **reCAPTCHA keys** — Pulumi-manageable (`gcp.recaptcha.EnterpriseKey`), but the site
      key is embedded in production frontends, so a change is a coordinated app deploy.
    - **Generic OAuth clients** — not manageable by any API or IaC tool
@@ -326,6 +328,65 @@ Five open questions closed by the project owner. These narrow the scope substant
 7. **New credentials are still being created in the legacy estate** (2026-01, 2026-02,
    2026-04). Redirecting new-credential creation to managed projects should not wait for the
    migration design, or the scope keeps growing under it.
+
+## Projects that can be deleted (re-checked 2026-10-20)
+
+The 2026-07-21 triage listed seven "zero-resource" projects. Two of them are not empty, and
+`open-learning-analytics` belongs on the list instead. These six hold nothing that needs to
+move. `bin/gcp-credential-usage report --days 30` shows zero calls for every one, which
+matches the 42-day zero from 2026-08-10. None of them has a bucket, a BigQuery dataset or an
+App Engine app, and the only service accounts (in `open-learning-analytics`) have never
+authenticated. Deletion is held for now
+(`gcloud projects delete` keeps a 30-day recovery window).
+
+| Project | What is in it | Note |
+|---|---|---|
+| `mit-odl-open-discussions-ci` | `youtube.googleapis.com` and one YouTube-restricted key (2019-11-27) | `open_discussions` still deploys and reads `secret-mit-open/{env}/youtube-developer-key`. Zero traffic says that isn't this key, or the fetch never runs. The Vault value was not hash-compared. |
+| `mit-odl-open-discussions-rc` | same as `-ci`, plus `telemetry` | same as `-ci` |
+| `ol-engineers` | BigQuery, Dataform, Dataplex and storage APIs enabled, created 2025-04-04 | 0 datasets, 0 buckets, 0 SAs, 0 keys, one Owner |
+| `ovs-youtube-prod` | `youtube.googleapis.com`, default quota, no keys | OVS YouTube sync needs no preservation (owner answer 5) |
+| `ovs-youtube-qa` | idle key "API key 1" (restricted 2026-10-20, see below), quota 0 | `ocw_studio/Pulumi.CI.yaml` sets `YT_PROJECT_ID: ovs-youtube-qa`, so OCW Studio CI's YouTube OAuth client probably lives here. With quota 0 it can't call YouTube today. Give CI a mitol01 client if CI publishing is ever wanted. |
+| `open-learning-analytics` | `analytics`, `policyanalyzer`, `telemetry`; two SAs that never authenticated | Universal Analytics only, which is retired (owner answer 4) |
+
+Not deletable, despite the 2026-07-21 list:
+
+- `ocw-studio-qa` carries OCW Studio's production YouTube publishing, the 210,000/day quota,
+  and the three `mit-bounty` reCAPTCHA keys that belong to someone else. `YT_PROJECT_ID` is
+  `ocw-studio-qa` in both `ocw_studio/Pulumi.QA.yaml` and `Pulumi.Production.yaml`.
+- `recaptcha-migrated-075600d5919` holds eight live classic reCAPTCHA keys. Zero API traffic
+  proves nothing for classic keys, as covered in the reCAPTCHA section above. It can go
+  after those keys are migrated.
+
+## Idle unrestricted API keys, restricted 2026-10-20
+
+These six keys had no restriction of any kind and zero calls in the 45 days before the
+change. Each now allows only `apikeys.googleapis.com`, the key-management API. An API key
+carries no principal, so it can't authorize key management, and the keys no longer work
+against any real API. Each carries the annotations `ol-restricted-on` and
+`ol-restricted-reason`. A consumer we missed would get HTTP 403s. It is unverified whether
+`bin/gcp-credential-usage report` attributes a key-restriction rejection to that key, so
+before deleting, look for any 403 in each key's project, whatever credential it is attributed
+to. After about two weeks with none, delete them.
+
+| Project | Key | Created |
+|---|---|---|
+| `mitx-residential` | API key 4 | 2017-11-30 |
+| `mitx-residential` | API key 5 | 2017-11-30 |
+| `mitx-residential` | Geocoding LTI Module | 2016-03-23 |
+| `micromasters-153213` | Development | 2016-12-21 |
+| `ocw-studio-qa` | OCW Studio RC | 2021-10-13 |
+| `ovs-youtube-qa` | API key 1 | 2019-12-19 |
+
+To revert one, point it at the API the consumer needs:
+`gcloud services api-keys update <uid> --project <project> --api-target=service=<api>.googleapis.com`.
+gcloud has no flag that clears restrictions. To drop them entirely, send a `PATCH` to
+`https://apikeys.googleapis.com/v2/projects/<project>/locations/global/keys/<uid>?updateMask=restrictions`
+with an empty JSON body.
+
+`mitx-residential` "Server key 1" is still unrestricted and live (about 700 to 1,500
+`Videos.List` calls/day). mitxonline moved to the mitol01 key on 2026-10-14. MITx Residential
+and mitx-staging move when their Production edxapp stacks next apply. The edxapp pipeline
+deploys Production only on a manual trigger.
 
 ## Operational findings (not migration-blocking)
 
