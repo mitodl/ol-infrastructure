@@ -1809,7 +1809,7 @@ async def _announce_deployments(app, repos, state: ReleaseProgressState) -> bool
     return ok
 
 
-async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta) -> str:
+async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta, client) -> str:
     version = in_flight["version"]
     reached = set()
     for environment in (github.RC_ENVIRONMENT, github.PRODUCTION_ENVIRONMENT):
@@ -1829,9 +1829,26 @@ async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta) -> str:
         state_line = "It is deployed to RC and waiting to be promoted."
     else:
         state_line = "It has not reached RC."
+    issue = None
+    try:
+        issue = await github.release_issue_for_version(cfg.repo, version)
+    except Exception:
+        log.exception("Failed to find the release issue for %s %s", app_name, version)
+    link = (
+        f"<{issue['url']}|Release issue>"
+        if issue
+        else f"<{in_flight['url']}|{in_flight['branch']}>"
+    )
+    # Only RC is waiting on verification: before it there is nothing to
+    # verify, and after production the checklist gates nothing.
+    waiting = ""
+    if reached == {github.RC_ENVIRONMENT} and (
+        mentions := await _outstanding_mentions(client, issue)
+    ):
+        waiting = f"\nStill waiting on: {mentions}"
     return (
         f"⏳ `{app_name}` {version} was cut {_format_age(age)} ago and is not "
-        f"finished. {state_line} <{in_flight['url']}|{in_flight['branch']}>\n"
+        f"finished. {state_line} {link}{waiting}\n"
         f"`/doof release {app_name} {_SUPERSEDE} {version}` replaces it with a "
         f"new release; `/doof abandon {app_name}` drops it."
     )
@@ -1862,7 +1879,7 @@ async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> bool:
         if last_nag is not None and now - last_nag < _STUCK_RENAG_INTERVAL:
             continue
         try:
-            text = await _stuck_release_text(app_name, cfg, in_flight, age)
+            text = await _stuck_release_text(app_name, cfg, in_flight, age, app.client)
         except Exception:
             ok = False
             log.exception(
