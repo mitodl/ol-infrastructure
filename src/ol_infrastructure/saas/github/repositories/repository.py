@@ -237,8 +237,8 @@ def build(repo: dict[str, Any]) -> github.Repository:
     # Nothing is orphaned by the skip -- no such resource has ever existed for an
     # alerts-off repo, since every one of them failed to create.
     #
-    # RETAIN_ON_DELETE FOR THE SAME 422. This resource leaves the program in two ways,
-    # and in both of them alerts are already off by the time Pulumi deletes it. When a
+    # RETAIN_ON_DELETE FOR THE SAME 422. In the two usual ways this resource leaves the
+    # program, alerts are already off by the time Pulumi deletes it. When a
     # repo is archived, GitHub turns its alerts off. When `vulnerability_alerts` flips
     # to false, the alerts update runs first. Pulumi deletes removed resources at the
     # end of a deployment, so the delete reaches GitHub after alerts are off. The
@@ -246,8 +246,11 @@ def build(repo: dict[str, Any]) -> github.Repository:
     # and only a 403 "archived" response is treated as already gone. Confirmed against
     # archived edx-api-client on 2026-10-26. Dropping the resource from state loses
     # nothing, because GitHub will not let security updates be on while alerts are
-    # off. The option has to be in state before a delete can use it, so it ships ahead
-    # of the PR that archives the repos that still carry this resource.
+    # off. A third way out, deleting the repo's file from data/repos/, leaves alerts
+    # on, and retaining then leaves security updates as they are, which matches the
+    # `Repository` retain policy above. The option has to be in state before a delete
+    # can use it, so it ships ahead of the PR that archives the repos that still carry
+    # this resource.
     if repo.get("vulnerability_alerts"):
         github.RepositoryDependabotSecurityUpdates(
             f"mitodl-repo-dependabot-security-updates-{name}",
