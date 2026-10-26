@@ -897,8 +897,10 @@ learn_ai_app_k8s = OLApplicationK8s(
             db_creds_secret_name,
             redis_creds_secret_name,
             static_secrets_name,
-            opik_keycloak_secret_name,
         ],
+        # Optional: the Production keycloak stack writes it to Vault, and pods
+        # should still start if that stack hasn't applied yet.
+        optional_env_from_secret_names=[opik_keycloak_secret_name],
         application_security_group_id=learn_ai_application_security_group.id,
         # Use the fixed name used in the SecurityGroupPolicy spec
         application_security_group_name=Output.from_input("learn-ai-app"),

@@ -152,7 +152,7 @@ def create_mitlearn_k8s_secrets(
     redis_cache: OLAmazonCache,
     restart_targets: list[OLVaultRestartTarget],
     starrocks_vault_mount_path: str | None = None,
-) -> tuple[list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
+) -> tuple[list[str], list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
     """
     Create all Kubernetes secrets required by the mitlearn application.
 
@@ -175,7 +175,9 @@ def create_mitlearn_k8s_secrets(
             STARROCKS_HOST configured -- see the caller.
 
     Returns:
-        A list of the names of the created Kubernetes secrets.
+        The names of the secrets pods require, the names of the secrets pods
+        mount as optional (the Opik client, which another stack writes to Vault),
+        and the secret resources.
     """
     secret_names: list[str] = []
     secret_resources: list[
@@ -299,6 +301,9 @@ def create_mitlearn_k8s_secrets(
 
     # Production Keycloak client (ol-opik-sdk) for ol-llm's embedding traces, which
     # the Production keycloak substructure writes to every environment's Vault.
+    # Optional, so pods still start if that stack hasn't applied yet. VSO doesn't
+    # restart the targets on a secret's first sync, so pods that started without it
+    # trace unauthenticated (and get 401s) until something else rolls them.
     opik_secret_name, opik_secret = _create_static_secret(
         stack_info=stack_info,
         secret_base_name="secret-opik-sdk-client",  # pragma: allowlist secret  # noqa: S106
@@ -310,7 +315,6 @@ def create_mitlearn_k8s_secrets(
         vaultauth=vault_k8s_resources.auth_name,
         restart_targets=restart_targets,
     )
-    secret_names.append(opik_secret_name)
     secret_resources.append(opik_secret)
 
     # 3. Static secrets from the shared 'secret-global' KV-v1 mount
@@ -444,7 +448,7 @@ def create_mitlearn_k8s_secrets(
         redis_creds
     )  # This is different from everything else in the list but allowed per the type hints above
 
-    return secret_names, secret_resources
+    return secret_names, [opik_secret_name], secret_resources
 
 
 # OIDC secret is a little different so we do that one with its own function.

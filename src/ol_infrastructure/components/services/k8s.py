@@ -952,6 +952,15 @@ class OLApplicationK8sConfig(BaseModel):
         ),
     )
     env_from_secret_names: list[str]
+    optional_env_from_secret_names: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Secrets mounted with envFrom like env_from_secret_names, but marked "
+            "optional, so pods start before the secret exists (e.g. one written "
+            "by another stack that may not have applied yet) and read it the "
+            "next time they start."
+        ),
+    )
     application_security_group_id: Output[str] | None = Field(
         default=None,
         description=(
@@ -1949,6 +1958,15 @@ class OLApplicationK8s(ComponentResource):
                 kubernetes.core.v1.EnvFromSourceArgs(
                     secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
                         name=secret_name,
+                    ),
+                )
+            )
+        for secret_name in ol_app_k8s_config.optional_env_from_secret_names:
+            application_deployment_envfrom.append(  # noqa: PERF401
+                kubernetes.core.v1.EnvFromSourceArgs(
+                    secret_ref=kubernetes.core.v1.SecretEnvSourceArgs(
+                        name=secret_name,
+                        optional=True,
                     ),
                 )
             )

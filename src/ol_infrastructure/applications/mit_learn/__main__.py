@@ -2042,7 +2042,7 @@ env_secret_restart_targets = [
 ]
 
 # Create all Kubernetes secrets needed by the application
-secret_names, secret_resources = create_mitlearn_k8s_secrets(
+secret_names, optional_secret_names, secret_resources = create_mitlearn_k8s_secrets(
     stack_info=stack_info,
     mitlearn_namespace=learn_namespace,
     k8s_global_labels=k8s_app_labels,
@@ -2067,6 +2067,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         k8s_global_labels=k8s_app_labels,
         # Reference all Kubernetes secrets containing environment variables
         env_from_secret_names=secret_names,
+        optional_env_from_secret_names=optional_secret_names,
         application_min_replicas=mitlearn_config.get_int("min_replicas") or 2,
         application_max_replicas=mitlearn_config.get_int("max_replicas") or 10,
         application_security_group_id=mitlearn_app_security_group.id,

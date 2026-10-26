@@ -699,7 +699,11 @@ gwarek_common_env_from = [
         secret_ref=core.v1.SecretEnvSourceArgs(name=gwarek_app_secrets_k8s_name)
     ),
     core.v1.EnvFromSourceArgs(
-        secret_ref=core.v1.SecretEnvSourceArgs(name=gwarek_opik_keycloak_k8s_name)
+        # Optional: the Production keycloak stack writes it to Vault, and pods
+        # should still start if that stack hasn't applied yet.
+        secret_ref=core.v1.SecretEnvSourceArgs(
+            name=gwarek_opik_keycloak_k8s_name, optional=True
+        )
     ),
 ]
 
