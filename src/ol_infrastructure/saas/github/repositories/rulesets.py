@@ -430,8 +430,9 @@ def build(repo: dict[str, Any], repository: github.Repository) -> None:
                 # real but much rarer failure than the throughput it costs.
                 #
                 # `ol-analytics-api` opts in because its hand-made "main protection"
-                # ruleset already enforced it, and retiring that ruleset should not
-                # quietly loosen the repo.
+                # ruleset enforced it before being retired. Retiring that ruleset did
+                # bring the repo in line with the fleet's bypass policy (decision
+                # 2026-10-26), but the up-to-date requirement is kept here.
                 strict_required_status_checks_policy=bool(
                     repo.get(archetypes.STRICT_REQUIRED_CHECKS_KEY)
                 ),
