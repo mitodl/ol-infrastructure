@@ -140,7 +140,7 @@ LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.37"
 # renovate: datasource=github-releases depName=qdrant packageName=qdrant/qdrant
 QDRANT_VERSION = "v1.19.2"
 # renovate: datasource=helm depName=typesense-operator packageName=typesense-operator registryUrl=https://akyriako.github.io/typesense-operator
-TYPESENSE_OPERATOR_CHART_VERSION = "0.4.1"
+TYPESENSE_OPERATOR_CHART_VERSION = "0.4.2"
 # renovate: datasource=helm depName=vertical-pod-autoscaler packageName=vertical-pod-autoscaler registryUrl=https://kubernetes.github.io/autoscaler
 VPA_CHART_VERSION = "0.14.0"
 # renovate: datasource=docker depName=toolhive-operator-crds packageName=ghcr.io/stacklok/toolhive/toolhive-operator-crds
