@@ -10,6 +10,7 @@ import os
 import re
 import threading
 import time
+from http.client import HTTPException
 from ssl import CERT_OPTIONAL
 
 from celery.schedules import crontab
@@ -129,7 +130,8 @@ AUTH_USER_REGISTRATION = True
 AUTH_USER_REGISTRATION_ROLE = "Public"
 
 JWKS_FETCH_TIMEOUT_SECONDS = 5
-# A key removed from the realm stops validating within this long.
+# A key removed from the realm stops validating within this long of being
+# removed, as long as Keycloak answers.
 JWKS_MAX_AGE_SECONDS = 300
 # The kid is read before the signature is checked, so an unauthenticated caller
 # can send any kid. This caps how often that can make us call Keycloak.
@@ -149,17 +151,24 @@ class _RealmSigningKeys:
             jwks_uri, cache_jwk_set=False, timeout=JWKS_FETCH_TIMEOUT_SECONDS
         )
         self._keys: dict[str, object] = {}
+        self._attempted_at = float("-inf")
         self._fetched_at = float("-inf")
         self._lock = threading.Lock()
 
-    def _refresh(self) -> None:
-        with self._lock:
-            if time.monotonic() - self._fetched_at < JWKS_REFRESH_COOLDOWN_SECONDS:
+    def _refresh(self, *, wait: bool) -> None:
+        # A request whose kid is already cached doesn't wait on another
+        # thread's fetch; it uses the cached key.
+        if not self._lock.acquire(blocking=wait):
+            return
+        try:
+            if time.monotonic() - self._attempted_at < JWKS_REFRESH_COOLDOWN_SECONDS:
                 return
-            self._fetched_at = time.monotonic()
+            self._attempted_at = time.monotonic()
             try:
                 signing_keys = self._client.get_signing_keys()
-            except (PyJWTError, ValueError):
+            # urllib wraps only connection errors; a dropped or short response
+            # raises OSError or HTTPException directly.
+            except (PyJWTError, ValueError, OSError, HTTPException):
                 logging.warning(
                     "Fetching the realm JWKS from %s failed; keeping %d cached keys",
                     self._client.uri,
@@ -168,13 +177,15 @@ class _RealmSigningKeys:
                 )
                 return
             self._keys = {key.key_id: key.key for key in signing_keys if key.key_id}
+            self._fetched_at = self._attempted_at
+        finally:
+            self._lock.release()
 
     def signing_key(self, kid: str) -> object:
-        if (
-            kid not in self._keys
-            or time.monotonic() - self._fetched_at >= JWKS_MAX_AGE_SECONDS
-        ):
-            self._refresh()
+        if kid not in self._keys:
+            self._refresh(wait=True)
+        elif time.monotonic() - self._fetched_at >= JWKS_MAX_AGE_SECONDS:
+            self._refresh(wait=False)
         try:
             return self._keys[kid]
         except KeyError:
