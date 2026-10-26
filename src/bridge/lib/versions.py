@@ -187,7 +187,7 @@ LITELLM_VERSION = "v1.106.0"
 # prerelease pin (a -rc.N suffix only matches the same suffix), and the same
 # rule keeps it from proposing the -preview.N tags RustFS also publishes.
 # renovate: datasource=docker depName=rustfs packageName=rustfs/rustfs
-RUSTFS_VERSION = "1.0.3"
+RUSTFS_VERSION = "1.0.4"
 # renovate: datasource=docker depName=loki packageName=grafana/loki
 LOKI_VERSION = "3.7.8"
 # renovate: datasource=docker depName=alloy packageName=grafana/alloy
