@@ -23,6 +23,7 @@ from ol_infrastructure.substructure.keycloak.openmetadata_provisioner import (
 from ol_infrastructure.substructure.keycloak.openmetadata_team_sync import (
     create_openmetadata_team_sync_resources,
 )
+from ol_infrastructure.substructure.keycloak.opik_sdk import create_opik_sdk_resources
 from ol_infrastructure.substructure.keycloak.scim import create_scim_resources
 
 stack_info = parse_stack()
@@ -105,6 +106,10 @@ create_openmetadata_team_sync_resources(
 create_openmetadata_provisioner_resources(
     keycloak_provider, keycloak_url, ol_data_platform_realm
 )
+# Only the Production realm signs tokens the Production Opik accepts, and every
+# environment traces there, so this stack writes the client to all their Vaults.
+if stack_info.env_suffix == "production":
+    create_opik_sdk_resources(keycloak_provider, keycloak_url)
 create_olapps_realm(
     keycloak_provider,
     keycloak_url,

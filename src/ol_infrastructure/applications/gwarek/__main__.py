@@ -64,6 +64,12 @@ from ol_infrastructure.lib.ol_types import (
     K8sGlobalLabels,
     Services,
 )
+from ol_infrastructure.lib.opik import (
+    OPIK_KEYCLOAK_SECRET_TEMPLATES,
+    OPIK_SDK_VAULT_MOUNT,
+    OPIK_SDK_VAULT_PATH,
+    opik_api_url,
+)
 from ol_infrastructure.lib.pulumi_helper import (
     format_docker_image_ref,
     make_stack_reference,
@@ -85,7 +91,6 @@ vault_stack = make_stack_reference(
 operations_vpc = network_stack.require_output("operations_vpc")
 
 cluster_stack = make_stack_reference(projects.EKS, f"operations.{stack_info.name}")
-opik_stack = make_stack_reference(projects.OPIK, stack_info.name)
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 
 gwarek_namespace = "gwarek"
@@ -453,10 +458,9 @@ gwarek_app_secrets = OLVaultK8SSecret(
 )
 
 # Keycloak client credentials for Opik, where ol-llm sends the analyzer's
-# traces and fetches its managed prompts. The keycloak substructure publishes
-# the ``ol-opik-client`` client and its realm URL to
-# ``secret-operations/sso/opik``; the token endpoint is derived from the realm
-# URL so it follows the environment's Keycloak. No OPIK_API_KEY: ol-llm's
+# traces and fetches its managed prompts. This is ``ol-opik-sdk``, the Production
+# client every environment's Opik SDKs use (lib/opik.py), which the keycloak
+# substructure writes to ``secret-opik/sdk-client``. No OPIK_API_KEY: ol-llm's
 # Keycloak auth owns the Authorization header (see the opik stack's
 # OPIK_SDK_KEYCLOAK_AUTH.md).
 gwarek_opik_keycloak_k8s_name = "gwarek-opik-keycloak"  # pragma: allowlist secret
@@ -468,18 +472,12 @@ gwarek_opik_keycloak_secret = OLVaultK8SSecret(
         labels=application_labels,
         dest_secret_name=gwarek_opik_keycloak_k8s_name,
         dest_secret_labels=application_labels,
-        mount="secret-operations",
+        mount=OPIK_SDK_VAULT_MOUNT,
         mount_type="kv-v1",
-        path="sso/opik",
+        path=OPIK_SDK_VAULT_PATH,
         excludes=[".*"],
         exclude_raw=True,
-        templates={
-            "OPIK_KEYCLOAK_CLIENT_ID": '{{ get .Secrets "client_id" }}',
-            "OPIK_KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
-            "OPIK_KEYCLOAK_TOKEN_URL": (
-                '{{ get .Secrets "url" }}/protocol/openid-connect/token'
-            ),
-        },
+        templates=OPIK_KEYCLOAK_SECRET_TEMPLATES,
         vaultauth=gwarek_vaultauth,
         restart_targets=[
             OLVaultRestartTarget(kind="Deployment", name="gwarek-api"),
@@ -686,7 +684,7 @@ gwarek_common_env = [
     # APP_ENV label. The OPIK_KEYCLOAK_* variables come in via env_from.
     core.v1.EnvVarArgs(
         name="OPIK_URL_OVERRIDE",
-        value=opik_stack.require_output("opik_url").apply(lambda url: f"{url}/api/"),
+        value=opik_api_url(),
     ),
     core.v1.EnvVarArgs(name="OPIK_WORKSPACE", value="default"),
 ]
@@ -701,7 +699,11 @@ gwarek_common_env_from = [
         secret_ref=core.v1.SecretEnvSourceArgs(name=gwarek_app_secrets_k8s_name)
     ),
     core.v1.EnvFromSourceArgs(
-        secret_ref=core.v1.SecretEnvSourceArgs(name=gwarek_opik_keycloak_k8s_name)
+        # Optional: the Production keycloak stack writes it to Vault, and pods
+        # should still start if that stack hasn't applied yet.
+        secret_ref=core.v1.SecretEnvSourceArgs(
+            name=gwarek_opik_keycloak_k8s_name, optional=True
+        )
     ),
 ]
 

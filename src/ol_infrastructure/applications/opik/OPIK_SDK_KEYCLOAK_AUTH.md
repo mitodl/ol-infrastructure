@@ -1,6 +1,7 @@
 # Authenticating the Opik SDK against our Keycloak-fronted instance
 
-Our Opik install (data-CI cluster, see `__main__.py`) has no native auth. We put
+Our Opik install (data clusters, see `__main__.py`; applications in every environment
+use the Production one) has no native auth. We put
 **Keycloak OIDC in front of it at the APISIX gateway**. The gateway exposes three
 route rules for the same `opik-frontend` backend:
 
@@ -50,10 +51,10 @@ Usage (call ONCE at process startup, BEFORE the first `opik.Opik()` / decorator)
     configure_opik_keycloak_auth()
 
 Required environment (12-factor; inject from Vault — see notes at bottom):
-    OPIK_URL_OVERRIDE          e.g. https://opik-ci.ol.mit.edu/api/
+    OPIK_URL_OVERRIDE          https://opik.ol.mit.edu/api/ (every environment)
     OPIK_WORKSPACE             "default" for our OSS install
-    OPIK_KEYCLOAK_TOKEN_URL    https://sso.ol.mit.edu/realms/olapps/protocol/openid-connect/token
-    OPIK_KEYCLOAK_CLIENT_ID    ol-opik-client
+    OPIK_KEYCLOAK_TOKEN_URL    https://sso.ol.mit.edu/realms/ol-platform-engineering/protocol/openid-connect/token
+    OPIK_KEYCLOAK_CLIENT_ID    ol-opik-sdk
     OPIK_KEYCLOAK_CLIENT_SECRET  (from Vault)
 
 Notes:
@@ -210,11 +211,19 @@ everything thereafter.
 
 ## Sourcing the client secret from Vault
 
-The Keycloak client (`ol-opik-client`) and its secret are published by the keycloak
-substructure. For a Kubernetes-deployed app, sync the secret with the Vault Secrets
-Operator (the same pattern the Opik stack already uses for the OIDC plugin secret at
-`secret-operations/sso/opik`) and surface it to the app as `OPIK_KEYCLOAK_CLIENT_SECRET`
-via `envFrom`/`secretRef`. Never bake the secret into an image or ConfigMap.
+Every environment sends its traces to the Production Opik, which only accepts tokens
+signed by Production Keycloak. SDK clients therefore use `ol-opik-sdk`, a
+client-credentials-only client in the Production `ol-platform-engineering` realm. The
+Production keycloak substructure writes its `url`, `client_id`, and `client_secret` to
+`secret-opik/sdk-client` (KV v1) in the CI, QA, and Production Vaults
+(`substructure/keycloak/opik_sdk.py`, constants in `lib/opik.py`). For a
+Kubernetes-deployed app, grant that path in the app's Vault policy, sync it with the
+Vault Secrets Operator using `OPIK_KEYCLOAK_SECRET_TEMPLATES`, and surface it to the
+app via `envFrom`/`secretRef`. Never bake the secret into an image or ConfigMap.
+
+`ol-opik-client` at `secret-operations/sso/opik` is the gateway's own OIDC client for
+the UI login, and that secret carries the gateway's session secret. Applications
+should not read it.
 
 For a non-K8s / local-dev client, read it from Vault at startup (`hvac`, role + mount
 from env — see the `vault-k8s-auth` skill) rather than committing it.
@@ -227,11 +236,11 @@ hand and set it verbatim — the SDK passes `OPIK_API_KEY` straight into the hea
 ```bash
 TOKEN=$(curl -s -X POST "$OPIK_KEYCLOAK_TOKEN_URL" \
   -d grant_type=client_credentials \
-  -d client_id=ol-opik-client \
+  -d client_id=ol-opik-sdk \
   -d client_secret="$OPIK_KEYCLOAK_CLIENT_SECRET" | jq -r .access_token)
 
 export OPIK_API_KEY="Bearer $TOKEN"          # SDK sends it verbatim -> hits the bearer route  # pragma: allowlist secret
-export OPIK_URL_OVERRIDE="https://opik-ci.ol.mit.edu/api/"
+export OPIK_URL_OVERRIDE="https://opik.ol.mit.edu/api/"
 export OPIK_WORKSPACE="default"
 ```
 

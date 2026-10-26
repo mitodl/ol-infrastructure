@@ -530,6 +530,24 @@ def test_default_container_annotation_set_to_app_container():
 
 
 @pulumi.runtime.test
+def test_optional_env_from_secrets_are_marked_optional():
+    """optional_env_from_secret_names follow the required secrets, as optional"""
+    cfg = _base_config(
+        application_name="myapp", optional_env_from_secret_names=["myapp-opik"]
+    )
+    app = OLApplicationK8s(cfg)
+
+    def check(containers):
+        app_container = next(c for c in containers if c["name"] == "myapp-app")
+        assert [
+            (source["secret_ref"]["name"], source["secret_ref"].get("optional"))
+            for source in app_container["env_from"]
+        ] == [("myapp-secret", None), ("myapp-opik", True)]
+
+    return app.application_deployment.spec.template.spec.containers.apply(check)
+
+
+@pulumi.runtime.test
 def test_config_hash_annotation_absent_without_sources():
     """No config-hash annotation when there's nothing to hash."""
     cfg = _base_config(application_name="myapp")
