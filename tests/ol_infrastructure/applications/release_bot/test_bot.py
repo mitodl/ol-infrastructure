@@ -519,6 +519,12 @@ async def test_preview_fails_closed_when_the_pending_hotfix_check_errors(
 async def test_release_status_surfaces_a_stuck_release(repos, slack, monkeypatch):
     """A releases/ branch outliving production is the failure to surface."""
     monkeypatch.setattr(bot.github, "open_release_issues", AsyncMock(return_value=[]))
+    # Promotion closed the issue, so it is only found by version.
+    monkeypatch.setattr(
+        bot.github,
+        "release_issue_for_version",
+        AsyncMock(return_value={"url": "https://github.com/mitodl/my-app/issues/9"}),
+    )
     monkeypatch.setattr(
         bot.github,
         "in_flight_release",
@@ -537,6 +543,7 @@ async def test_release_status_surfaces_a_stuck_release(repos, slack, monkeypatch
     said = slack.said
     assert "in flight" in said
     assert "2026.8.3.1" in said
+    assert "<https://github.com/mitodl/my-app/issues/9|Release issue>" in said
 
 
 async def test_release_status_reports_checklist_progress(repos, slack, monkeypatch):
