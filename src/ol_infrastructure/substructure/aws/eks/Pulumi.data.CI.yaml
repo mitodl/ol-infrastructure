@@ -6,3 +6,4 @@ config:
   environment:business_unit: data
   environment:target_vpc: data_vpc
   starrocks:enable_operator: true
+  starrocks:operator_fe_ssl_mode: PREFERRED
