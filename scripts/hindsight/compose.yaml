@@ -8,7 +8,7 @@ name: hindsight-harness
 services:
   db:
     # Matches the RDS major the stack deploys.
-    image: pgvector/pgvector:0.8.1-pg18
+    image: pgvector/pgvector:0.8.7-pg18@sha256:2358fcba361ed2233a5ed81b5fe4ca779ccb304120ce531a3bf51c0ed7e2bc11
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: harness-only-password  # pragma: allowlist secret
