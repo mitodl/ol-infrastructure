@@ -581,6 +581,22 @@ def setup_grafana(
                             # it hides no failure. This runs on the receiver,
                             # ahead of the loadbalancing hop to the sampler.
                             "transform": {
+                                # Second half of the unmatched-path collapse in
+                                # applicationObservability.metrics.transforms
+                                # below. That rewrite leaves one datapoint per
+                                # original path, all with the same labels; sent
+                                # as-is, each pod would push several cumulative
+                                # histograms into one Mimir series. Summing
+                                # them here yields a single valid cumulative
+                                # series. It has to live in this processor: the
+                                # chart renders a transform's metric context
+                                # before its datapoint context, so the feature's
+                                # own transform cannot aggregate after it sets.
+                                "metrics": {
+                                    "metric": [
+                                        'aggregate_on_attributes("sum") where IsMatch(name, "^http[.]server[.]")',
+                                    ],
+                                },
                                 "traces": {
                                     "span": [
                                         'set(span.status.code, STATUS_CODE_UNSET) where resource.attributes["service.name"] == "apisix" and span.name == "sni_radixtree_match" and span.status.message == "failed match SNI"',
@@ -744,6 +760,37 @@ def setup_grafana(
                                 'IsMatch(name, "^http[.]client[.]") and '
                                 'resource.attributes["service.namespace"] '
                                 '== "dagster"',
+                            ],
+                        },
+                        # When no Django route matches, the OTel wsgi/asgi
+                        # instrumentation records the raw request path as
+                        # http.target, so every path a vulnerability scanner
+                        # probes (/wp-login.php, /nagiosxi/login.php, ...)
+                        # mints a new histogram series per pod. On learn-ai
+                        # that was ~85k Grafana series across QA and
+                        # Production (2026-10-22), nearly all 404s and 405s.
+                        #
+                        # Route patterns never start with "/" (`^api/...`,
+                        # `api/v0/users/me`, `<drf_format_suffix:format>`);
+                        # raw paths always do. So keying on the leading slash
+                        # catches exactly the unmatched requests, whatever
+                        # their status, without touching a 405 on a real
+                        # route. http.status_code is untouched, so the 4xx
+                        # rate still shows. The destination transform on
+                        # gc-otlp-endpoint merges the collapsed datapoints.
+                        #
+                        # The leading-slash test only holds for Django. A
+                        # Starlette/FastAPI app's route templates (/items/{id})
+                        # also start with "/" and would all collapse. As of
+                        # 2026-10-23 the only emitters of http.server.* are the
+                        # Django webapps (learn, learn-ai, mitxonline,
+                        # ocw-studio, ovs); scope this by service before
+                        # turning metrics on for anything else.
+                        "transforms": {
+                            "datapoint": [
+                                'set(attributes["http.target"], "unmatched") '
+                                'where IsMatch(metric.name, "^http[.]server[.]") '
+                                'and IsMatch(attributes["http.target"], "^/")',
                             ],
                         },
                     },
