@@ -113,7 +113,7 @@ PROMETHEUS_OPERATOR_CRD_VERSION = "v0.94.2"
 # renovate: datasource=github-tags depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
 KEYCLOAK_OPERATOR_CRD_VERSION = "26.7.4"
 # renovate: datasource=helm depName=jupyterhub packageName=jupyterhub registryUrl=https://hub.jupyter.org/helm-chart
-JUPYTERHUB_CHART_VERSION = "4.4.3"
+JUPYTERHUB_CHART_VERSION = "4.4.4"
 # renovate: datasource=github-releases depName=marimo-operator packageName=marimo-team/marimo-operator
 MARIMO_OPERATOR_VERSION = "v0.3.0"
 # TODO(tmacey): pin to a versioned tag once ghcr.io/mitodl/marimo-jupyterlab publishes one.  # noqa: FIX002
