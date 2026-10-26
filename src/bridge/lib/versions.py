@@ -107,7 +107,7 @@ VANTAGE_K8S_AGENT_CHART_VERSION = "1.10.1"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
 VAULT_SECRETS_OPERATOR_CHART_VERSION = "1.6.2"
 # renovate: datasource=docker depName=nginx
-NGINX_VERSION = "1.31.7"
+NGINX_VERSION = "1.31.8"
 # renovate: datasource=github-releases depName=prometheus-operator packageName=prometheus-operator/prometheus-operator
 PROMETHEUS_OPERATOR_CRD_VERSION = "v0.94.2"
 # renovate: datasource=github-tags depName=keycloak-k8s-resources packageName=keycloak/keycloak-k8s-resources
