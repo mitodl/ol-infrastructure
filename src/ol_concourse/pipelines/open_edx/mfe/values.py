@@ -206,7 +206,10 @@ mitxonline = [
         mit_base_url="https://web.mit.edu",
         mit_learn_base_url="https://learn.mit.edu",
         mit_learn_api_url="https://api.learn.mit.edu",
-        contact_us_support_api_url="https://api.learn.mit.edu/ai/http/support_agent/",
+        # contact_us_support_api_url is deliberately unset here. Production
+        # Zendesk is not configured yet (ol-infrastructure#6548), so the bot
+        # would converse and then fail to file. Set it to
+        # https://api.learn.mit.edu/ai/http/support_agent/ after rc verifies.
         feedback_csrf_cookie_name="learn_csrftoken",
         privacy_policy_url="https://mitxonline.mit.edu/privacy-policy/",
         schedule_email_section="true",  # Because the communication MFE treats this boolean as string  # noqa: E501

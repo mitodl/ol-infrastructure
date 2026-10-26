@@ -6,9 +6,10 @@ from bridge.settings.openedx.accessors import fetch_applications_by_type
 from ol_concourse.pipelines.open_edx.mfe.pipeline import OpenEdxVars, mfe_params
 from ol_concourse.pipelines.open_edx.mfe.values import deployments
 
+# Production stays dark until Zendesk is configured there. The bot would hold a
+# full conversation and then fail to file the ticket.
 ENABLED = {
     "mitxonline-qa": "https://api.rc.learn.mit.edu/ai/http/support_agent/",
-    "mitxonline-production": "https://api.learn.mit.edu/ai/http/support_agent/",
 }
 
 ALL_ENV_VARS = [
@@ -31,7 +32,7 @@ def _params_by_mfe(
 def test_support_endpoint_matches_the_enabled_list(
     edx_var: OpenEdxVars, deployment_name: str
 ) -> None:
-    """Only rc and production get an endpoint, each pointing at its own backend."""
+    """Only rc gets an endpoint; every other environment stays None."""
     expected = ENABLED.get(edx_var.environment)
     for params in _params_by_mfe(edx_var, deployment_name).values():
         assert params["CONTACT_US_SUPPORT_API_URL"] == expected
