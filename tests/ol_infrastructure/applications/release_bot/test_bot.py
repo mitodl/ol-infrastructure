@@ -559,6 +559,10 @@ async def test_release_status_reports_checklist_progress(repos, slack, monkeypat
 
     await bot._cmd_release_status(repos, slack.ack, slack.respond, _command(""), {})
     assert "1/2 checked" in slack.said
+    assert (
+        "<https://github.com/mitodl/my-app/issues/1|Release my-app 2026.8.12.1>"
+        in slack.said
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1575,6 +1579,9 @@ async def test_a_stuck_release_off_rc_links_its_issue_without_tagging(
     assert _RC_ISSUE_URL in text
     assert "Still waiting on" not in text
     assert "<@U" not in text
+    # Only a release that reached production still needs its branch dealt with.
+    in_production = bot.github.PRODUCTION_ENVIRONMENT in deployed_to
+    assert ("|releases/2026.9.2.1>" in text) == in_production
 
 
 async def test_a_stuck_release_falls_back_to_its_branch_without_an_issue(

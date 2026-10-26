@@ -534,7 +534,8 @@ async def _cmd_release_status(repos, ack, respond, command, _context):
             continue
         if issues:
             checked, total = github.checklist_status(issues[0]["body"])
-            status = f"🟡 {issues[0]['title']} ({checked}/{total} checked)"
+            title = _slack_escape(issues[0]["title"])
+            status = f"🟡 <{issues[0]['url']}|{title}> ({checked}/{total} checked)"
         else:
             status = "✅ no open release"
         # A release branch outliving its production deploy means the finish
@@ -1834,11 +1835,13 @@ async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta, client) 
         issue = await github.release_issue_for_version(cfg.repo, version)
     except Exception:
         log.exception("Failed to find the release issue for %s %s", app_name, version)
-    link = (
-        f"<{issue['url']}|Release issue>"
-        if issue
-        else f"<{in_flight['url']}|{in_flight['branch']}>"
-    )
+    branch_link = f"<{in_flight['url']}|{in_flight['branch']}>"
+    link = branch_link
+    if issue:
+        link = f"<{issue['url']}|Release issue>"
+        # After production the leftover branch is the problem, so link it too.
+        if github.PRODUCTION_ENVIRONMENT in reached:
+            link += f" · {branch_link}"
     # Only RC is waiting on verification: before it there is nothing to
     # verify, and after production the checklist gates nothing.
     waiting = ""
