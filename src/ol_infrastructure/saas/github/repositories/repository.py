@@ -236,12 +236,27 @@ def build(repo: dict[str, Any]) -> github.Repository:
     # GitHub will not let security updates be on, so there is no second state to assert.
     # Nothing is orphaned by the skip -- no such resource has ever existed for an
     # alerts-off repo, since every one of them failed to create.
+    #
+    # RETAIN_ON_DELETE FOR THE SAME 422. This resource leaves the program in two ways,
+    # and in both of them alerts are already off by the time Pulumi deletes it. When a
+    # repo is archived, GitHub turns its alerts off. When `vulnerability_alerts` flips
+    # to false, the alerts update runs first. Pulumi deletes removed resources at the
+    # end of a deployment, so the delete reaches GitHub after alerts are off. The
+    # provider deletes by calling `DELETE /automated-security-fixes`, which then 422s,
+    # and only a 403 "archived" response is treated as already gone. Confirmed against
+    # archived edx-api-client on 2026-10-26. Dropping the resource from state loses
+    # nothing, because GitHub will not let security updates be on while alerts are
+    # off. The option has to be in state before a delete can use it, so it ships ahead
+    # of the PR that archives the repos that still carry this resource.
     if repo.get("vulnerability_alerts"):
         github.RepositoryDependabotSecurityUpdates(
             f"mitodl-repo-dependabot-security-updates-{name}",
             repository=name,
             enabled=bool(repo.get("dependabot_security_updates")),
-            opts=ResourceOptions(depends_on=[repository, vulnerability_alerts]),
+            opts=ResourceOptions(
+                depends_on=[repository, vulnerability_alerts],
+                retain_on_delete=True,
+            ),
         )
 
     _tier_property(name, repo["tier"], repository)
