@@ -42,6 +42,13 @@ STARROCKS_OPERATOR_CRD_URL = (
     "/deploy/starrocks.com_starrocksclusters.yaml"
 )
 
+# How the operator's own MySQL connection to FE negotiates TLS (--fe-ssl-mode).
+# REQUIRED wherever the lakehouse FE has a keystore, so the operator can never
+# fall back to plaintext; PREFERRED where it has none. The operator rejects
+# VERIFY_CA and VERIFY_IDENTITY at startup because it never verifies the FE
+# certificate.
+FE_SSL_MODES = frozenset({"DISABLED", "PREFERRED", "REQUIRED"})
+
 
 def _fetch_starrocks_crd() -> list[dict[str, Any]]:
     """Fetch the StarRocksCluster CRD manifest for the pinned chart version.
@@ -91,6 +98,13 @@ def setup_starrocks(
     starrocks_config = Config("starrocks")
     if not starrocks_config.get_bool("enable_operator"):
         return
+    fe_ssl_mode = starrocks_config.require("operator_fe_ssl_mode")
+    if fe_ssl_mode not in FE_SSL_MODES:
+        msg = (
+            f"starrocks:operator_fe_ssl_mode must be one of {sorted(FE_SSL_MODES)},"
+            f" got {fe_ssl_mode!r}"
+        )
+        raise ValueError(msg)
 
     starrocks_namespace = "starrocks"
     cluster_stack.require_output("namespaces").apply(
@@ -198,6 +212,7 @@ def setup_starrocks(
                     "enabled": True,
                     "imagePullPolicy": "IfNotPresent",
                     "replicaCount": 1,
+                    "feSslMode": fe_ssl_mode,
                     # The operator's controller-runtime cache is cluster-wide by
                     # default, so its memory tracks total pods in the cluster
                     # rather than anything about StarRocks. data-production
