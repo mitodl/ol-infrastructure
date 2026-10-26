@@ -11,7 +11,9 @@ predates a setting the environment variable for that setting never binds.
 ``sessionExpiry`` and ``maxActiveSessionsPerUser`` are both new in 2.0 and the
 row 1.13.x wrote carries neither, which leaves them at their schema defaults:
 unset (falling through to the deprecated ``oidcConfiguration.sessionExpiry``)
-and 5.  ``useRolesFromProvider`` was false when our authorizer row was seeded.
+and 5.  ``useRolesFromProvider`` was false when our authorizer row was seeded,
+and CI's authentication row still carries ``clientType: public`` from before
+the switch to confidential.
 
 Writing the keys straight into the row is what OM's own 2.0.2 native migration
 does to the authentication row for ``tokenValidity``.  ``jsonb ||`` merges at
@@ -40,6 +42,7 @@ DESIRED: dict[str, dict[str, Any]] = {
     "authenticationConfiguration": {
         "sessionExpiry": int(os.environ["OM_SESSION_EXPIRY_SECONDS"]),
         "maxActiveSessionsPerUser": int(os.environ["OM_MAX_ACTIVE_SESSIONS_PER_USER"]),
+        "clientType": os.environ["OM_CLIENT_TYPE"],
     },
     "authorizerConfiguration": {
         "useRolesFromProvider": json.loads(os.environ["OM_USE_ROLES_FROM_PROVIDER"]),
