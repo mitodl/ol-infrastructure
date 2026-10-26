@@ -193,7 +193,7 @@ LOKI_VERSION = "3.7.8"
 # renovate: datasource=docker depName=alloy packageName=grafana/alloy
 ALLOY_VERSION = "v1.21.2"
 # renovate: datasource=docker depName=grafana packageName=grafana/grafana
-GRAFANA_VERSION = "13.2.3"
+GRAFANA_VERSION = "13.2.4"
 # The -slim variant: no bundled local models. Embeddings come from Bedrock.
 # renovate: datasource=docker depName=hindsight-api packageName=ghcr.io/vectorize-io/hindsight-api
 HINDSIGHT_VERSION = "1.0.0-slim"
