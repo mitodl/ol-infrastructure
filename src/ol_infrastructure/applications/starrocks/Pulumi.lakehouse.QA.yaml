@@ -56,7 +56,8 @@ config:
   # ssl_force_secure_transport stays false until every client uses TLS. The
   # operator does (feSslMode REQUIRED in substructure/aws/eks), as do Vault,
   # Superset, Dagster and dbt. ol-analytics-api's aiomysql pool connects
-  # without ssl and would be refused. OpenMetadata ingestion is unchecked.
+  # without ssl and would be refused. Unchecked: OpenMetadata ingestion and the
+  # mysql CLI the FE entrypoint uses to register followers and observers.
   starrocks:ssl_force_secure_transport: "false"
   starrocks:ssl_keystore_password:
     secure: v1:UCHYHsGETfCN/DnL:ubV+0rJePAFL4JupZ65N/Utf+ZMdzFy0lGS4OEDyqfSZfnZ587k6AvMOITqITKHhmxuApncP0wM=
