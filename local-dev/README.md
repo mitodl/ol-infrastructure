@@ -824,13 +824,12 @@ kubectl --context local-dev -n mit-learn exec deploy/mitlearn-webapp -c app -- p
 curl -sk "https://api.learn.mit.test/api/v1/courses/?platform=xpro"
 ```
 
-- The xPRO tasks are in [mit-learn #4054](https://github.com/mitodl/mit-learn/pull/4054),
-  which is not merged. Check that branch out in the sibling `mit-learn` directory and Tilt
-  builds the image from it. If Tilt was already running, the webapp pod picks the
-  change up and the Celery workers do not until they are restarted, which does not
-  matter for a task run from the shell as here. On MIT Learn's main branch the only warehouse task is
-  `profiles.tasks.SyncProgramCertificatesTask`, and the table it reads,
-  `integrations__learn__program_certificates`, has no raw fixture.
+- The xPRO tasks landed on MIT Learn's main branch in
+  [mit-learn #4054](https://github.com/mitodl/mit-learn/pull/4054). Tilt builds the
+  image from the sibling `mit-learn` directory, so a checkout older than that has no
+  `SyncXproCoursesTask`. After pulling, the webapp pod picks the change up and the
+  Celery workers do not until they are restarted, which does not matter for a task run
+  from the shell as here.
 - A task writes nothing until `ETLSourceOwnership` names the warehouse for what it
   loads. Without the rows it logs `Skipping warehouse write for xpro` and returns 0. See
   `docs/how-to/etl-source-cutover.md` in mit-learn.
@@ -972,11 +971,11 @@ kubectl --context local-dev -n mit-learn exec deploy/mitlearn-webapp -c app -- p
   an empty list and logs `Skipping legacy write for oll`.
 - The webhook clears the API cache itself. The legacy pipeline run from a shell does not,
   which is why the roll back needs `clear_cache`.
-- A delivery is a full sync with no limit on what it unpublishes. The warehouse tasks
-  in mit-learn #4054 refuse to unpublish more than 10% of a source, and the webhook has
-  no such check: a model edit that left 14 of 58 rows unpublished the other 44 in one
-  run. A model that builds with no rows at all gets a `400` from this asset and changes
-  nothing.
+- A delivery is a full sync with no limit on what it unpublishes. MIT Learn's
+  `learning_resources` warehouse tasks refuse to unpublish more than 10% of a source,
+  and the webhook has no such check: a model edit that left 14 of 58 rows unpublished
+  the other 44 in one run. A model that builds with no rows at all gets a `400` from
+  this asset and changes nothing.
 - As of 2026-10-11 the comparison is not empty for this source: the legacy pipeline
   publishes 63 courses and the model has 58. The sheet marks six rows as offered by
   OCW. The staging model drops all six, and the legacy pipeline skips one and loads
