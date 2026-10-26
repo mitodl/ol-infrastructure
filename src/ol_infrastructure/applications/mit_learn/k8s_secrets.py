@@ -301,7 +301,7 @@ def create_mitlearn_k8s_secrets(
     # the Production keycloak substructure writes to every environment's Vault.
     opik_secret_name, opik_secret = _create_static_secret(
         stack_info=stack_info,
-        secret_base_name="secret-ops-sso-opik-sdk",  # pragma: allowlist secret  # noqa: S106
+        secret_base_name="secret-opik-sdk-client",  # pragma: allowlist secret  # noqa: S106
         namespace=mitlearn_namespace,
         labels=k8s_global_labels,
         mount=OPIK_SDK_VAULT_MOUNT,

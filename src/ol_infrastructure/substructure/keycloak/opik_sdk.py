@@ -58,15 +58,24 @@ def create_opik_sdk_resources(
     ).apply(json.dumps)
 
     for env_suffix in OPIK_SDK_ENVIRONMENTS:
+        vault_provider = get_vault_provider(
+            f"https://vault-{env_suffix}.odl.mit.edu",
+            f"operations.{env_suffix}",
+            provider_name=f"vault-provider-{env_suffix}",
+        )
+        opik_mount = vault.Mount(
+            f"opik-sdk-vault-mount-{env_suffix}",
+            description="Production Keycloak client Opik SDKs authenticate with",
+            path=OPIK_SDK_VAULT_MOUNT,
+            type="kv",
+            options={"version": "1"},
+            # Vault refuses a second mount at the same path, so a replacement
+            # has to remove the old one first.
+            opts=ResourceOptions(provider=vault_provider, delete_before_replace=True),
+        )
         vault.generic.Secret(
             f"ol-platform-engineering-opik-sdk-client-vault-credentials-{env_suffix}",
             path=f"{OPIK_SDK_VAULT_MOUNT}/{OPIK_SDK_VAULT_PATH}",
             data_json=credentials_json,
-            opts=ResourceOptions(
-                provider=get_vault_provider(
-                    f"https://vault-{env_suffix}.odl.mit.edu",
-                    f"operations.{env_suffix}",
-                    provider_name=f"vault-provider-{env_suffix}",
-                )
-            ),
+            opts=ResourceOptions(provider=vault_provider, depends_on=[opik_mount]),
         )

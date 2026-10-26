@@ -779,7 +779,7 @@ static_secrets = OLVaultK8SSecret(
 # Opik LLM-observability credentials. Every environment traces to the Production
 # Opik (lib/opik.py), so this is the Production ``ol-opik-sdk`` Keycloak client
 # (client-credentials grant), which the Production keycloak substructure writes to
-# ``secret-operations/sso/opik-sdk`` in every environment's Vault. Sync it into a
+# ``secret-opik/sdk-client`` in every environment's Vault. Sync it into a
 # K8s secret via VSO and expose it to the app as the OPIK_KEYCLOAK_* env vars.
 opik_keycloak_secret_name = "learn-ai-opik-keycloak"  # pragma: allowlist secret  # noqa: S105
 opik_keycloak_secret = OLVaultK8SSecret(

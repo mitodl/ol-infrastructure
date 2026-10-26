@@ -1669,7 +1669,7 @@ else:
 # unless OPIK_URL_OVERRIDE is set. Every environment traces to the Production Opik
 # (lib/opik.py), so OL_LLM_ENVIRONMENT is what tells the environments apart there.
 # It is explicit because the app otherwise falls back to MITOL_ENVIRONMENT, which is
-# "rc" in QA. The Keycloak client arrives through the sso/opik-sdk secret in
+# "rc" in QA. The Keycloak client arrives through the secret-opik/sdk-client secret in
 # k8s_secrets.py. OPIK_API_KEY stays unset: ol-llm refuses to start with it
 # alongside the OPIK_KEYCLOAK_* variables.
 env_vars.update(

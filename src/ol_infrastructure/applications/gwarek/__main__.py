@@ -460,7 +460,7 @@ gwarek_app_secrets = OLVaultK8SSecret(
 # Keycloak client credentials for Opik, where ol-llm sends the analyzer's
 # traces and fetches its managed prompts. This is ``ol-opik-sdk``, the Production
 # client every environment's Opik SDKs use (lib/opik.py), which the keycloak
-# substructure writes to ``secret-operations/sso/opik-sdk``. No OPIK_API_KEY: ol-llm's
+# substructure writes to ``secret-opik/sdk-client``. No OPIK_API_KEY: ol-llm's
 # Keycloak auth owns the Authorization header (see the opik stack's
 # OPIK_SDK_KEYCLOAK_AUTH.md).
 gwarek_opik_keycloak_k8s_name = "gwarek-opik-keycloak"  # pragma: allowlist secret
