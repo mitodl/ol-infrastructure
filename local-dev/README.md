@@ -1264,7 +1264,7 @@ PULUMI_CONFIG_PASSPHRASE='' LOCAL_DEV_ENABLED_APPS="${LOCAL_DEV_ENABLED_APPS:-}"
 
 # Verbose apps_infra stack run
 cd local-dev/infra/apps_infra
-PULUMI_CONFIG_PASSPHRASE='' pulumi up --stack local-dev.apps-infra.Dev --logtostderr -v=3
+PULUMI_CONFIG_PASSPHRASE='' pulumi up --refresh --stack local-dev.apps-infra.Dev --logtostderr -v=3
 ```
 
 Common causes:
