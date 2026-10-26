@@ -833,15 +833,19 @@ else:
 
 # Opik instrumentation (non-secret settings). OPIK_URL_OVERRIDE is the Production
 # Opik's API for every environment; the workspace/project are static for our OSS
-# install. The
-# Keycloak client id/secret and token URL arrive via envFrom (see the VSO secret
-# above). Note: do NOT set OPIK_API_KEY — the app's Keycloak auth flow owns the
-# Authorization header (see the opik stack's OPIK_SDK_KEYCLOAK_AUTH.md).
+# install. The Opik SDK stamps OPIK_ENVIRONMENT on every trace and span as Opik's
+# environment, which is what tells the environments apart in the shared learn-ai
+# project. It is the stack's environment, so QA reports "qa" as mit-learn and
+# dagster do, not MITOL_ENVIRONMENT's "rc". The Keycloak client id/secret and token
+# URL arrive via envFrom (see the VSO secret above). Do NOT set OPIK_API_KEY: the
+# app's Keycloak auth flow owns the Authorization header (see the opik stack's
+# OPIK_SDK_KEYCLOAK_AUTH.md).
 env_vars.update(
     {
         "OPIK_URL_OVERRIDE": opik_api_url(),
         "OPIK_WORKSPACE": "default",
         "OPIK_PROJECT_NAME": "learn-ai",
+        "OPIK_ENVIRONMENT": stack_info.env_suffix,
     }
 )
 
