@@ -167,7 +167,7 @@ class _RealmSigningKeys:
                     exc_info=True,
                 )
                 return
-            self._keys = {key.key_id: key.key for key in signing_keys}
+            self._keys = {key.key_id: key.key for key in signing_keys if key.key_id}
 
     def signing_key(self, kid: str) -> object:
         if (
