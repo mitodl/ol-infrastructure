@@ -91,6 +91,12 @@ repos:
     # cannot contain a credential by construction. See the data/README.md there.
     - --exclude-files
     - src/ol_infrastructure/saas/github/repositories/data/
+    # Written by `bin/gcp-credential-usage snapshot`. Trips the hex-entropy
+    # detector on service-account key ids and reCAPTCHA name digests, which are
+    # identifiers. The command reads only list endpoints, which return no key
+    # material, so the file cannot contain a credential by construction.
+    - --exclude-files
+    - src/ol_infrastructure/infrastructure/gcp/legacy-credential-baseline.json
 - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
   rev: "v0.17.0"
