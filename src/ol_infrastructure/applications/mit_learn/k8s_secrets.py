@@ -22,6 +22,11 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
     OLVaultRestartTarget,
 )
+from ol_infrastructure.lib.opik import (
+    OPIK_KEYCLOAK_SECRET_TEMPLATES,
+    OPIK_SDK_VAULT_MOUNT,
+    OPIK_SDK_VAULT_PATH,
+)
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
@@ -292,21 +297,16 @@ def create_mitlearn_k8s_secrets(
         secret_names.append(secret_name)
         secret_resources.append(secret_resource)
 
-    # Opik Keycloak client (ol-opik-client) for ol-llm's embedding traces, published
-    # by the keycloak substructure. The token endpoint comes from the realm url so
-    # it follows the environment's Keycloak.
+    # Production Keycloak client (ol-opik-sdk) for ol-llm's embedding traces, which
+    # the Production keycloak substructure writes to every environment's Vault.
     opik_secret_name, opik_secret = _create_static_secret(
         stack_info=stack_info,
-        secret_base_name="secret-ops-sso-opik",  # pragma: allowlist secret  # noqa: S106
+        secret_base_name="secret-ops-sso-opik-sdk",  # pragma: allowlist secret  # noqa: S106
         namespace=mitlearn_namespace,
         labels=k8s_global_labels,
-        mount="secret-operations",
-        path="sso/opik",
-        templates={
-            "OPIK_KEYCLOAK_CLIENT_ID": '{{ get .Secrets "client_id" }}',
-            "OPIK_KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
-            "OPIK_KEYCLOAK_TOKEN_URL": '{{ get .Secrets "url" }}/protocol/openid-connect/token',
-        },
+        mount=OPIK_SDK_VAULT_MOUNT,
+        path=OPIK_SDK_VAULT_PATH,
+        templates=OPIK_KEYCLOAK_SECRET_TEMPLATES,
         vaultauth=vault_k8s_resources.auth_name,
         restart_targets=restart_targets,
     )

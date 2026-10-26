@@ -8,8 +8,13 @@ path "secret-global/*" {
 path "secret-operations/sso/dagster" {
   capabilities = ["read"]
 }
-# Keycloak client-credentials for Opik, read by the ml code location
+# Keycloak client-credentials for Opik, read by the ml code location. sso/opik is
+# the per-environment ol-opik-client, which ml reads until it moves to the
+# Production ol-opik-sdk client at sso/opik-sdk; drop it once ml has.
 path "secret-operations/sso/opik" {
+  capabilities = ["read"]
+}
+path "secret-operations/sso/opik-sdk" {
   capabilities = ["read"]
 }
 path "mariadb-xpro/creds/readonly/*" {

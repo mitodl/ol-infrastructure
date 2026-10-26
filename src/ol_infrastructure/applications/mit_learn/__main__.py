@@ -110,6 +110,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
+from ol_infrastructure.lib.opik import opik_api_url
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     make_stack_reference,
@@ -149,7 +150,6 @@ ocw_site_buckets = ocw_site_stack.require_output("ocw_site_buckets")
 qdrant_cloud_stack = make_stack_reference(
     projects.QDRANT_CLOUD, f"mitlearn.{stack_info.name}"
 )
-opik_stack = make_stack_reference(projects.OPIK, stack_info.name)
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
 
 qdrant_secrets = read_yaml_secrets(Path("qdrant_cloud/account.yaml"))
@@ -1666,16 +1666,16 @@ else:
     azure_identity_volume_mounts = []
 
 # Opik tracing of the embedding encoder through ol-llm. mit-learn leaves tracing off
-# unless OPIK_URL_OVERRIDE is set. OL_LLM_ENVIRONMENT is explicit because the app
-# otherwise falls back to MITOL_ENVIRONMENT, which is "rc" in QA. The Keycloak client
-# arrives through the sso/opik secret in k8s_secrets.py. OPIK_API_KEY stays unset:
-# ol-llm refuses to start with it alongside the OPIK_KEYCLOAK_* variables.
+# unless OPIK_URL_OVERRIDE is set. Every environment traces to the Production Opik
+# (lib/opik.py), so OL_LLM_ENVIRONMENT is what tells the environments apart there.
+# It is explicit because the app otherwise falls back to MITOL_ENVIRONMENT, which is
+# "rc" in QA. The Keycloak client arrives through the sso/opik-sdk secret in
+# k8s_secrets.py. OPIK_API_KEY stays unset: ol-llm refuses to start with it
+# alongside the OPIK_KEYCLOAK_* variables.
 env_vars.update(
     {
         "OL_LLM_ENVIRONMENT": stack_info.env_suffix,
-        "OPIK_URL_OVERRIDE": opik_stack.require_output("opik_url").apply(
-            lambda url: f"{url}/api/"
-        ),
+        "OPIK_URL_OVERRIDE": opik_api_url(),
         "OPIK_WORKSPACE": "default",
         "OPIK_PROJECT_NAME": "mit-learn",
     }

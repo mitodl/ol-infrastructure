@@ -97,6 +97,12 @@ from ol_infrastructure.lib.ol_types import (
     KubernetesServiceAppProtocol,
     Services,
 )
+from ol_infrastructure.lib.opik import (
+    OPIK_KEYCLOAK_SECRET_TEMPLATES,
+    OPIK_SDK_VAULT_MOUNT,
+    OPIK_SDK_VAULT_PATH,
+    opik_api_url,
+)
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     format_docker_image_ref,
@@ -117,7 +123,6 @@ cluster_substructure_stack = make_stack_reference(
 )
 dns_stack = make_stack_reference(projects.DNS, "default")
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
-opik_stack = make_stack_reference(projects.OPIK, stack_info.name)
 policy_stack = make_stack_reference(projects.POLICIES, "default")
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
 vault_stack = make_stack_reference(
@@ -771,12 +776,11 @@ static_secrets = OLVaultK8SSecret(
     ),
 )
 
-# Opik LLM-observability credentials. The ``ol-opik-client`` Keycloak client
-# (client-credentials grant) and its realm discovery URL are published by the
-# keycloak substructure to Vault at ``secret-operations/sso/opik``. Sync them
-# into a K8s secret via VSO and expose them to the app as the OPIK_KEYCLOAK_*
-# env vars. The token endpoint is derived from the realm ``url`` key so it stays
-# correct across environments (sso-ci / sso-qa / sso) without hardcoding.
+# Opik LLM-observability credentials. Every environment traces to the Production
+# Opik (lib/opik.py), so this is the Production ``ol-opik-sdk`` Keycloak client
+# (client-credentials grant), which the Production keycloak substructure writes to
+# ``secret-operations/sso/opik-sdk`` in every environment's Vault. Sync it into a
+# K8s secret via VSO and expose it to the app as the OPIK_KEYCLOAK_* env vars.
 opik_keycloak_secret_name = "learn-ai-opik-keycloak"  # pragma: allowlist secret  # noqa: S105
 opik_keycloak_secret = OLVaultK8SSecret(
     name=f"learn-ai-{stack_info.env_suffix}-opik-keycloak-secret",
@@ -786,17 +790,11 @@ opik_keycloak_secret = OLVaultK8SSecret(
         labels=k8s_global_labels,
         dest_secret_name=opik_keycloak_secret_name,
         dest_secret_labels=k8s_global_labels,
-        mount="secret-operations",
+        mount=OPIK_SDK_VAULT_MOUNT,
         mount_type="kv-v1",
-        path="sso/opik",
+        path=OPIK_SDK_VAULT_PATH,
         restart_targets=[{"kind": "Deployment", "name": "learn-ai-app"}],
-        templates={
-            "OPIK_KEYCLOAK_CLIENT_ID": '{{ get .Secrets "client_id" }}',
-            "OPIK_KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
-            "OPIK_KEYCLOAK_TOKEN_URL": (
-                '{{ get .Secrets "url" }}/protocol/openid-connect/token'
-            ),
-        },
+        templates=OPIK_KEYCLOAK_SECRET_TEMPLATES,
         vaultauth=vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
@@ -833,17 +831,15 @@ else:
     azure_identity_volumes = []
     azure_identity_volume_mounts = []
 
-# Opik instrumentation (non-secret settings). OPIK_URL_OVERRIDE is derived from
-# the opik application stack's exported URL so it tracks the deployed instance
-# per environment; the workspace/project are static for our OSS install. The
+# Opik instrumentation (non-secret settings). OPIK_URL_OVERRIDE is the Production
+# Opik's API for every environment; the workspace/project are static for our OSS
+# install. The
 # Keycloak client id/secret and token URL arrive via envFrom (see the VSO secret
 # above). Note: do NOT set OPIK_API_KEY — the app's Keycloak auth flow owns the
 # Authorization header (see the opik stack's OPIK_SDK_KEYCLOAK_AUTH.md).
 env_vars.update(
     {
-        "OPIK_URL_OVERRIDE": opik_stack.require_output("opik_url").apply(
-            lambda url: f"{url}/api/"
-        ),
+        "OPIK_URL_OVERRIDE": opik_api_url(),
         "OPIK_WORKSPACE": "default",
         "OPIK_PROJECT_NAME": "learn-ai",
     }
