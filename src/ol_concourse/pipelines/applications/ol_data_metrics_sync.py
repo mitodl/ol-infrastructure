@@ -27,10 +27,12 @@ from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 # keeps a stored one against any bot's change, so a person has to set it there.
 # An unchanged file writes only its lineage edges, which OpenMetadata upserts.
 #
-# After an OpenMetadata upgrade every build fails before the first file until
-# the CreateMetric schema snapshot in ol-data-platform matches the server's
-# version (`ol-dbt metrics refresh-schema`). That commit is outside metrics/,
-# so the pipeline recovers at the next daily run or a manual trigger.
+# After an OpenMetadata upgrade to a new major or minor version every build
+# fails before the first file until the CreateMetric schema snapshot in
+# ol-data-platform is refreshed to it (`ol-dbt metrics refresh-schema`). That
+# commit is outside metrics/, so the pipeline recovers at the next daily run or
+# a manual trigger. A patch upgrade only prints a `version` warning in a green
+# build's log, so the snapshot can fall a patch release behind unnoticed.
 #
 # The job also gets the daily time resource, which has no version until its
 # first 05:00-06:00 UTC window, so the first build runs in the first window
