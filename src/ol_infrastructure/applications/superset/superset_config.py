@@ -11,9 +11,12 @@ import re
 from ssl import CERT_OPTIONAL
 
 from celery.schedules import crontab
-from flask import g
+from flask import Flask, g
 from flask_appbuilder.security.manager import AUTH_OAUTH
 from flask_caching.backends.rediscache import RedisCache
+from flask_jwt_extended import JWTManager
+from jwt import InvalidTokenError, PyJWKClient
+from jwt.exceptions import PyJWKClientConnectionError, PyJWKClientError
 from sqlalchemy.engine import URL
 from superset.security import SupersetSecurityManager
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
@@ -37,7 +40,8 @@ SQLALCHEMY_DATABASE_URI = f"{_db_uri}?sslmode={DB_SSLMODE}" if DB_SSLMODE else _
 OIDC_URL = os.environ.get("OIDC_URL")
 OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID")
 OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET")
-OIDC_REALM_PUBLIC_KEY = os.environ.get("OIDC_REALM_PUBLIC_KEY")
+# Keycloak publishes the realm's current signing keys here.
+OIDC_JWKS_URI = f"{OIDC_URL}/protocol/openid-connect/certs"
 LOGOUT_REDIRECT_URL = f"{OIDC_URL}/protocol/openid-connect/logout"
 SLACK_API_TOKEN = os.environ.get("SLACK_API_TOKEN")
 
@@ -85,8 +89,10 @@ OAUTH_PROVIDERS = [
 # Required config to get Keycloak token for Superset API use
 # ----------------------------------------------------------
 JWT_ALGORITHM = "RS256"
-JWT_PUBLIC_KEY = OIDC_REALM_PUBLIC_KEY
-# The realm public key signs the access tokens of EVERY client in the shared
+# No static JWT_PUBLIC_KEY: CustomSsoSecurityManager.create_jwt_manager
+# resolves the signing key per token from the realm JWKS, so Keycloak key
+# rotation doesn't break API auth.
+# The realm keys sign the access tokens of EVERY client in the shared
 # ol-data-platform realm, so a signature check alone would accept a token minted
 # for any other client (e.g. the public ol-starrocks-cli PKCE client). Bind
 # acceptance to tokens whose `aud` includes Superset's own OIDC client and whose
@@ -121,8 +127,39 @@ AUTH_USER_REGISTRATION = True
 # The default user self registration role
 AUTH_USER_REGISTRATION_ROLE = "Public"
 
+JWKS_FETCH_TIMEOUT_SECONDS = 5
+# No per-kid key cache: the JWK set is refetched every 5 minutes (PyJWKClient's
+# default lifespan), so a key removed from the realm stops validating within
+# that window. An unknown kid forces an immediate refetch.
+_oidc_jwks_client = PyJWKClient(OIDC_JWKS_URI, timeout=JWKS_FETCH_TIMEOUT_SECONDS)
+
+
+def _oidc_signing_key(jwt_header: dict[str, object], _jwt_data: object) -> object:
+    """Return the realm public key matching the token's ``kid`` header.
+
+    flask-jwt-extended only handles ``InvalidTokenError`` as a client error, so
+    a kid missing from the realm JWKS is re-raised as one instead of surfacing
+    as a 500. A failure to reach Keycloak still propagates.
+    """
+    kid = jwt_header.get("kid")
+    if not isinstance(kid, str):
+        msg = "JWT header has no kid"
+        raise InvalidTokenError(msg)
+    try:
+        return _oidc_jwks_client.get_signing_key(kid).key
+    except PyJWKClientConnectionError:
+        raise
+    except PyJWKClientError as exc:
+        raise InvalidTokenError(str(exc)) from exc
+
 
 class CustomSsoSecurityManager(SupersetSecurityManager):
+    def create_jwt_manager(self, app: Flask) -> JWTManager:
+        """Resolve API JWT signing keys from the realm JWKS by ``kid``."""
+        jwt_manager = super().create_jwt_manager(app)
+        jwt_manager.decode_key_loader(_oidc_signing_key)
+        return jwt_manager
+
     def oauth_user_info(self, provider, response=None):  # noqa: ARG002
         me = self.appbuilder.sm.oauth_remotes[provider].get("openid-connect/userinfo")
         me.raise_for_status()
@@ -717,8 +754,7 @@ MCP_SERVICE_URL = os.environ.get("SUPERSET_MCP_PUBLIC_URL")
 # (e.g. https://keycloak.example.com/realms/master).
 MCP_AUTH_ENABLED = True
 MCP_JWT_ALGORITHM = "RS256"
-# Keycloak publishes its realm signing keys at this well-known path.
-MCP_JWKS_URI = f"{OIDC_URL}/protocol/openid-connect/certs" if OIDC_URL else None
+MCP_JWKS_URI = OIDC_JWKS_URI if OIDC_URL else None
 # Keycloak sets the 'iss' claim to the realm URL.
 MCP_JWT_ISSUER = OIDC_URL
 
