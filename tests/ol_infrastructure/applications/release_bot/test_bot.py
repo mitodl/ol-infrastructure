@@ -519,6 +519,12 @@ async def test_preview_fails_closed_when_the_pending_hotfix_check_errors(
 async def test_release_status_surfaces_a_stuck_release(repos, slack, monkeypatch):
     """A releases/ branch outliving production is the failure to surface."""
     monkeypatch.setattr(bot.github, "open_release_issues", AsyncMock(return_value=[]))
+    # Promotion closed the issue, so it is only found by version.
+    monkeypatch.setattr(
+        bot.github,
+        "release_issue_for_version",
+        AsyncMock(return_value={"url": "https://github.com/mitodl/my-app/issues/9"}),
+    )
     monkeypatch.setattr(
         bot.github,
         "in_flight_release",
@@ -537,6 +543,7 @@ async def test_release_status_surfaces_a_stuck_release(repos, slack, monkeypatch
     said = slack.said
     assert "in flight" in said
     assert "2026.8.3.1" in said
+    assert "<https://github.com/mitodl/my-app/issues/9|Release issue>" in said
 
 
 async def test_release_status_reports_checklist_progress(repos, slack, monkeypatch):
@@ -559,6 +566,10 @@ async def test_release_status_reports_checklist_progress(repos, slack, monkeypat
 
     await bot._cmd_release_status(repos, slack.ack, slack.respond, _command(""), {})
     assert "1/2 checked" in slack.said
+    assert (
+        "<https://github.com/mitodl/my-app/issues/1|Release my-app 2026.8.12.1>"
+        in slack.said
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1416,6 +1427,7 @@ async def test_a_young_release_is_not_reported_as_stuck(repos, slack_app, monkey
     slack_app.client.chat_postMessage.assert_not_called()
 
 
+@pytest.mark.usefixtures("_no_release_issue")
 async def test_a_release_deployed_to_production_but_unfinished_is_called_out(
     repos, slack_app, monkeypatch
 ):
@@ -1457,6 +1469,7 @@ async def test_a_release_deployed_to_production_but_unfinished_is_called_out(
     assert state.nagged_at[("my-app", "2026.8.3.1")] is not None
 
 
+@pytest.mark.usefixtures("_no_release_issue")
 async def test_a_release_that_never_reached_rc_says_so(repos, slack_app, monkeypatch):
     monkeypatch.setattr(
         bot.github,
@@ -1473,6 +1486,7 @@ async def test_a_release_that_never_reached_rc_says_so(repos, slack_app, monkeyp
     assert "has not reached RC" in text
 
 
+@pytest.mark.usefixtures("_no_release_issue")
 async def test_a_stuck_release_is_not_re_reported_every_poll(
     repos, slack_app, monkeypatch
 ):
@@ -1494,6 +1508,7 @@ async def test_a_stuck_release_is_not_re_reported_every_poll(
     slack_app.client.chat_postMessage.assert_called_once()
 
 
+@pytest.mark.usefixtures("_no_release_issue")
 async def test_the_stuck_threshold_is_configurable(repos, slack_app, monkeypatch):
     monkeypatch.setenv("RELEASE_STUCK_AFTER_HOURS", "1")
     monkeypatch.setattr(
@@ -1508,6 +1523,90 @@ async def test_the_stuck_threshold_is_configurable(repos, slack_app, monkeypatch
     await bot._nag_stuck_releases(slack_app, repos, bot.ReleaseProgressState())
 
     slack_app.client.chat_postMessage.assert_called_once()
+
+
+async def _nag_stuck(repos, slack_app, monkeypatch, deployed_to, issue):
+    """Report 2026.9.2.1, cut 3d ago and deployed to *deployed_to*; return the text."""
+    slack_app.client = _slack_client(
+        {"alice@example.com": "UALICE", "bob@example.com": "UBOB"}
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.9.2.1", timedelta(days=3))),
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "latest_successful_deployment",
+        _deployments_by_environment(
+            {env: _deployment(1, "2026.9.2.1", env) for env in deployed_to}
+        ),
+    )
+    lookup = issue if isinstance(issue, AsyncMock) else AsyncMock(return_value=issue)
+    monkeypatch.setattr(bot.github, "release_issue_for_version", lookup)
+    await bot._nag_stuck_releases(slack_app, repos, bot.ReleaseProgressState())
+    return slack_app.client.chat_postMessage.call_args.kwargs["text"]
+
+
+async def test_a_stuck_rc_release_links_its_issue_and_tags_outstanding_authors(
+    repos, slack_app, monkeypatch
+):
+    text = await _nag_stuck(
+        repos,
+        slack_app,
+        monkeypatch,
+        [bot.github.RC_ENVIRONMENT],
+        _issue(_MIXED_CHECKLIST),
+    )
+
+    assert f"<{_RC_ISSUE_URL}|Release issue>" in text
+    assert "tree/releases/" not in text
+    assert "Still waiting on: <@UALICE>, <@UBOB>" in text
+    assert "carol" not in text
+
+
+@pytest.mark.parametrize(
+    "deployed_to",
+    [
+        pytest.param([], id="not-on-rc"),
+        pytest.param(
+            [bot.github.RC_ENVIRONMENT, bot.github.PRODUCTION_ENVIRONMENT],
+            id="in-production",
+        ),
+    ],
+)
+async def test_a_stuck_release_off_rc_links_its_issue_without_tagging(
+    repos, slack_app, monkeypatch, deployed_to
+):
+    """Before RC there is nothing to verify; after production nothing is gated."""
+    text = await _nag_stuck(
+        repos, slack_app, monkeypatch, deployed_to, _issue(_MIXED_CHECKLIST)
+    )
+
+    assert _RC_ISSUE_URL in text
+    assert "Still waiting on" not in text
+    assert "<@U" not in text
+    # Only a release that reached production still needs its branch dealt with.
+    in_production = bot.github.PRODUCTION_ENVIRONMENT in deployed_to
+    assert ("|releases/2026.9.2.1>" in text) == in_production
+
+
+async def test_a_stuck_release_falls_back_to_its_branch_without_an_issue(
+    repos, slack_app, monkeypatch
+):
+    text = await _nag_stuck(
+        repos,
+        slack_app,
+        monkeypatch,
+        [bot.github.RC_ENVIRONMENT],
+        AsyncMock(side_effect=RuntimeError("github down")),
+    )
+
+    assert (
+        "<https://github.com/mitodl/my-app/tree/releases/2026.9.2.1"
+        "|releases/2026.9.2.1>" in text
+    )
+    assert "Still waiting on" not in text
 
 
 # ---------------------------------------------------------------------------

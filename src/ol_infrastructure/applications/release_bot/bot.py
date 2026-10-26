@@ -505,6 +505,28 @@ async def _cmd_release_notes(repos, ack, respond, command, _context):
     await respond(f"*Release notes for `{app_name}`*\n" + "\n".join(lines))
 
 
+async def _in_flight_status(name, cfg, *, has_open_issue: bool) -> str:
+    """Render the in-flight release suffix of a release-status line, or ""."""
+    # A release branch outliving its production deploy means the finish
+    # step never completed. That used to be invisible -- and it froze the
+    # release version until someone noticed -- so report it here.
+    try:
+        in_flight = await github.in_flight_release(cfg.repo)
+    except Exception:
+        log.exception("Failed to fetch in-flight release for %s", name)
+        return ""
+    if not in_flight:
+        return ""
+    status = f" · 🚧 in flight: {_describe_in_flight(in_flight)}"
+    # Promotion closes the issue, so a release stuck after production has no
+    # open one linked earlier in the line.
+    if not has_open_issue and (
+        issue := await _find_release_issue(name, cfg, in_flight["version"])
+    ):
+        status += f" <{issue['url']}|Release issue>"
+    return status
+
+
 async def _cmd_release_status(repos, ack, respond, command, _context):
     await ack()
     app_filter = command["text"].strip() or None
@@ -534,19 +556,11 @@ async def _cmd_release_status(repos, ack, respond, command, _context):
             continue
         if issues:
             checked, total = github.checklist_status(issues[0]["body"])
-            status = f"🟡 {issues[0]['title']} ({checked}/{total} checked)"
+            title = _slack_escape(issues[0]["title"])
+            status = f"🟡 <{issues[0]['url']}|{title}> ({checked}/{total} checked)"
         else:
             status = "✅ no open release"
-        # A release branch outliving its production deploy means the finish
-        # step never completed. That used to be invisible -- and it froze the
-        # release version until someone noticed -- so report it here.
-        try:
-            in_flight = await github.in_flight_release(cfg.repo)
-        except Exception:
-            log.exception("Failed to fetch in-flight release for %s", name)
-            in_flight = None
-        if in_flight:
-            status += f" · 🚧 in flight: {_describe_in_flight(in_flight)}"
+        status += await _in_flight_status(name, cfg, has_open_issue=bool(issues))
         lines.append(f"• *{name}*: {status}")
     if legacy and not app_filter:
         # Naming them keeps a silently short list from reading as "everything
@@ -1809,7 +1823,16 @@ async def _announce_deployments(app, repos, state: ReleaseProgressState) -> bool
     return ok
 
 
-async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta) -> str:
+async def _find_release_issue(app_name, cfg, version) -> dict[str, Any] | None:
+    """Return the release issue for *version*, or None if it is missing or errors."""
+    try:
+        return await github.release_issue_for_version(cfg.repo, version)
+    except Exception:
+        log.exception("Failed to find the release issue for %s %s", app_name, version)
+        return None
+
+
+async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta, client) -> str:
     version = in_flight["version"]
     reached = set()
     for environment in (github.RC_ENVIRONMENT, github.PRODUCTION_ENVIRONMENT):
@@ -1829,9 +1852,24 @@ async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta) -> str:
         state_line = "It is deployed to RC and waiting to be promoted."
     else:
         state_line = "It has not reached RC."
+    issue = await _find_release_issue(app_name, cfg, version)
+    branch_link = f"<{in_flight['url']}|{in_flight['branch']}>"
+    link = branch_link
+    if issue:
+        link = f"<{issue['url']}|Release issue>"
+        # After production the leftover branch is the problem, so link it too.
+        if github.PRODUCTION_ENVIRONMENT in reached:
+            link += f" · {branch_link}"
+    # Only RC is waiting on verification: before it there is nothing to
+    # verify, and after production the checklist gates nothing.
+    waiting = ""
+    if reached == {github.RC_ENVIRONMENT} and (
+        mentions := await _outstanding_mentions(client, issue)
+    ):
+        waiting = f"\nStill waiting on: {mentions}"
     return (
         f"⏳ `{app_name}` {version} was cut {_format_age(age)} ago and is not "
-        f"finished. {state_line} <{in_flight['url']}|{in_flight['branch']}>\n"
+        f"finished. {state_line} {link}{waiting}\n"
         f"`/doof release {app_name} {_SUPERSEDE} {version}` replaces it with a "
         f"new release; `/doof abandon {app_name}` drops it."
     )
@@ -1862,7 +1900,7 @@ async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> bool:
         if last_nag is not None and now - last_nag < _STUCK_RENAG_INTERVAL:
             continue
         try:
-            text = await _stuck_release_text(app_name, cfg, in_flight, age)
+            text = await _stuck_release_text(app_name, cfg, in_flight, age, app.client)
         except Exception:
             ok = False
             log.exception(
