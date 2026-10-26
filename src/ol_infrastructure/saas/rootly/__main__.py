@@ -1,10 +1,10 @@
 """Management of Rootly incident management resources."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pulumi_rootly as rootly
-from pulumi import Output, ResourceOptions
+from pulumi import Input, Output, ResourceOptions
 
 from bridge.secrets.sops import read_yaml_secrets
 
@@ -3581,7 +3581,8 @@ alerts_source_grafana_prometheus_qa = rootly.AlertsSource(
 # a Workflow, which isn't ideal for this since you can't ack/resolve through
 # it, or a per-Service announcement setting). This policy is intentionally
 # minimal -- one level, no schedule, no paging -- since CI/QA alerts should
-# be visible in Slack, not page anyone.
+# be visible in Slack, not page anyone. The one exception, QA total outages,
+# pages through the QA Outages policies below.
 escalation_policy_ci_qa_slack_notifications = rootly.EscalationPolicy(
     "ci-qa-slack-notifications-escalation-policy",
     name="CI/QA Slack Notifications",
@@ -3706,6 +3707,263 @@ alert_route_grafana_prometheus_qa_slack_warnings_route = rootly.AlertRoute(
             "name": "Fallback Rule for Grafana Prometheus QA - Slack Warnings Route",
             "position": 1,
         },
+    ],
+    opts=rootly_opts,
+)
+
+# A QA service that is down entirely pages an on-call during business hours.
+# This is an exception, decided 2026-10-26, to analysis section 8.1's "QA is
+# notify-not-page"; everything else from QA stays Slack-only. QA Opik's backend
+# had 0 available replicas from 2026-10-05 20:20Z to 2026-10-15 ~18:15Z.
+# DeploymentUnavailableWarning fired the whole time and only posted to
+# #devops-warnings, where nobody acted on it. Rootly alert bvGjUS was resolved
+# by hand on 2026-10-06 while Grafana kept firing.
+#
+# Resolving one of these by hand while Grafana still fires does not end it:
+# Grafana re-sends the group on its repeat_interval (4h, alertmanager.py),
+# Rootly opens a new alert for it, and that pages again.
+#
+# Same shape as the Data Platform Escalation Policy: the deferral path holds
+# every alert that arrives outside business hours and replays it at 9am ET, so
+# a QA outage never pages overnight or at the weekend. The Default policy can't
+# do this. High is the only urgency that pages there, and it pages at any hour.
+#
+# The page waits QA_OUTAGE_PAGE_DELAY_MINUTES before it goes out, so an outage
+# that clears within 20 minutes of the Rootly alert never pages. Most of the
+# business-hours candidates since 2026-09-26 cleared that fast: most QA
+# DeploymentUnavailableWarning alerts closed 5, 10 or 15 minutes after they
+# opened. The
+# extra 6 minutes are delivery: Grafana sends the resolve on the group's
+# 5-minute group_interval tick (alertmanager.py), after up to a minute of rule
+# evaluation, so a resolve for an outage that cleared at minute 17 can arrive
+# at minute 23. The hold is the path's initial_delay, not the level's `delay`:
+# a level's delay is the wait before the NEXT level ("Delay before notifying
+# targets in the next Escalation Level", pulumi_rootly EscalationLevel), which
+# is how the Default policy's levels read it ("unacknowledged for 5+10
+# minutes", above). Rootly resolves an alert that recovers inside the initial
+# delay without notifying anyone (https://rootly.com/changelog/delay-escalations;
+# the API docs don't say). The Slack post through the QA Slack route is not
+# delayed.
+QA_OUTAGE_PAGE_DELAY_MINUTES = 26
+
+# Rootly picks a policy's path when the alert arrives, so a deferral window that
+# starts at 17:00 lets an alert arriving at 16:50 page at 17:16. Starting the
+# weeknight block QA_OUTAGE_PAGE_DELAY_MINUTES early (16:34) means nothing pages
+# after 17:00. The page goes out once and does not repeat, for the same reason:
+# a repeat of a 16:30 page would land after 17:00. The blocks still leave no gap
+# (see OFF_HOURS_DEFERRAL_WINDOW).
+_qa_outage_hold_from_minute = 17 * 60 - QA_OUTAGE_PAGE_DELAY_MINUTES
+QA_OUTAGE_HOLD_FROM = (
+    f"{_qa_outage_hold_from_minute // 60:02d}:{_qa_outage_hold_from_minute % 60:02d}"
+)
+_weeknight_block, *_other_blocks = cast(
+    "list[dict[str, Any]]", OFF_HOURS_DEFERRAL_WINDOW["timeBlocks"]
+)
+QA_OUTAGE_OFF_HOURS_WINDOW = {
+    **OFF_HOURS_DEFERRAL_WINDOW,
+    "timeBlocks": [
+        {**_weeknight_block, "startTime": QA_OUTAGE_HOLD_FROM},
+        *_other_blocks,
+    ],
+}
+ALL_ALERT_URGENCY_IDS = [
+    "5d357977-9dbe-42ad-b647-5a442cab3d96",  # High
+    "fce5c971-6660-4ad9-90eb-e75122055f50",  # Medium
+    "d7ed8e91-ffa9-4cc4-b524-729d14a4425b",  # Low
+]
+
+
+def qa_outage_escalation_policy(
+    resource_name: str,
+    name: str,
+    group_id: Input[str],
+    schedule_id: Input[str],
+) -> rootly.EscalationPolicy:
+    """Build a business-hours escalation policy that pages one schedule.
+
+    :param resource_name: Pulumi resource name prefix for the policy and its parts.
+    :param name: The policy's name in Rootly.
+    :param group_id: The team that owns the policy.
+    :param schedule_id: The on-call schedule the page goes to.
+    :returns: The escalation policy.
+    """
+    policy = rootly.EscalationPolicy(
+        resource_name,
+        business_hours={
+            "days": ["F", "M", "R", "T", "W"],
+            "endTime": "17:00",
+            "startTime": "09:00",
+            "timeZone": "America/New_York",
+        },
+        description=(
+            "QA services that are down entirely. Pages on-call during business "
+            f"hours after {QA_OUTAGE_PAGE_DELAY_MINUTES} minutes, once; anything "
+            f"arriving outside Mon-Fri 09:00-{QA_OUTAGE_HOLD_FROM} ET is held until "
+            "the next business morning."
+        ),
+        group_ids=[group_id],
+        name=name,
+        repeat_count=1,
+        opts=rootly_opts,
+    )
+    rootly.EscalationPath(
+        f"{resource_name}-defer-off-hours",
+        name="Defer outside business hours",
+        escalation_policy_id=policy.id,
+        path_type="deferral",
+        match_mode="match-all-rules",
+        after_deferral_behavior="re_evaluate",
+        rules=[QA_OUTAGE_OFF_HOURS_WINDOW],
+        opts=rootly_opts,
+    )
+    # Declared rather than left to the default path Rootly creates with the
+    # policy, because that path's initial_delay can only be set after it
+    # exists. Matching every urgency keeps the page independent of the QA
+    # source's urgency (Medium today; the routing spec's section 6, item 3, proposes
+    # Low). The default path is left with no levels.
+    page_path = rootly.EscalationPath(
+        f"{resource_name}-page-after-delay",
+        name=f"Page after {QA_OUTAGE_PAGE_DELAY_MINUTES} minutes",
+        escalation_policy_id=policy.id,
+        path_type="escalation",
+        match_mode="match-all-rules",
+        notification_type="audible",
+        position=1,
+        initial_delay=QA_OUTAGE_PAGE_DELAY_MINUTES,
+        repeat=False,
+        repeat_count=1,
+        rules=[{"ruleType": "alert_urgency", "urgencyIds": ALL_ALERT_URGENCY_IDS}],
+        opts=rootly_opts,
+    )
+    rootly.EscalationLevel(
+        f"{resource_name}-on-call-escalation-level",
+        # One level and no repeat, so nothing follows this delay.
+        delay=15,
+        escalation_policy_id=policy.id,
+        escalation_policy_path_id=page_path.id,
+        notification_target_params=[
+            {"id": schedule_id, "teamMembers": "all", "type": "schedule"},
+            {
+                "id": "GBDLJJX51",  # #devops-alerts
+                "type": "slack_channel",
+            },
+        ],
+        paging_strategy_configuration_schedule_strategy="on_call_only",
+        paging_strategy_configuration_strategy="default",
+        position=1,
+        opts=rootly_opts,
+    )
+    return policy
+
+
+escalation_policy_qa_outages = qa_outage_escalation_policy(
+    "qa-outages-escalation-policy",
+    name="QA Outages",
+    group_id="9f00e9f1-2f13-470e-a856-50ab5003f260",
+    schedule_id="fad27d50-f0e4-4d21-9b6d-57eb2dec648b",  # Primary On Call Schedule
+)
+
+# data-qa outages go to the data platform on-call, as data-production alerts do
+# through data_platform_route_rules. A separate policy rather than the Data
+# Platform Escalation Policy itself, because that policy sends Medium and Low to
+# #devops-warnings only and every QA alert arrives at Medium.
+escalation_policy_qa_data_platform_outages = qa_outage_escalation_policy(
+    "qa-data-platform-outages-escalation-policy",
+    name="QA Data Platform Outages",
+    group_id=team_data_platform.id,
+    schedule_id=schedule_data_platform_on_call.id,
+)
+
+# The QA rules that mean a service is down rather than degraded, all checked
+# on the QA Grafana stack on 2026-10-26:
+# - DeploymentUnavailableWarning: a Deployment wanting replicas has 0
+#   available (eks_general.py), any QA cluster.
+# - StarRocksFEAllDownWarning, StarRocksFENoLeaderWarning: no FE scraped, or
+#   no leader, so StarRocks takes no DDL or loads (starrocks.py), data-qa.
+# - ClickHouseKeeperLostQuorumWarning: every replicated table is read-only
+#   (clickhouse.py), data-qa.
+# - WitanDataTierScaledToZeroWarning: omnigraph-server declares 0 replicas,
+#   which DeploymentUnavailable ignores (witan.py), operations-qa.
+# DeploymentReplicasMissingWarning and StatefulSetReplicasMissingWarning fire
+# on any missing replica, so they stay Slack-only. QA has no probe rules; the
+# synthetic monitoring rules are production-only.
+QA_OUTAGE_ALERTNAMES = [
+    "DeploymentUnavailableWarning",
+    "StarRocksFEAllDownWarning",
+    "StarRocksFENoLeaderWarning",
+    "ClickHouseKeeperLostQuorumWarning",
+    "WitanDataTierScaledToZeroWarning",
+]
+DATA_PLATFORM_QA_GRAFANA_CLUSTERS = ["data-qa"]
+
+
+def qa_outage_route_rule(
+    name: str,
+    position: int,
+    policy: rootly.EscalationPolicy,
+    clusters: list[str] | None = None,
+) -> dict[str, Any]:
+    """Build a QA route rule matching the outage alertnames exactly.
+
+    `alertname` and `cluster` are grouping labels in grafana_alerting/
+    alertmanager.py, so both are always in commonLabels. `is_one_of` rather
+    than the `contains` used elsewhere in this file, so a sibling rule sharing
+    a prefix (e.g. a future DeploymentUnavailableSomething) does not page.
+
+    :param name: The rule's name in Rootly.
+    :param position: Route position of the rule.
+    :param policy: The escalation policy the rule sends to.
+    :param clusters: Restrict the rule to these clusters.
+    :returns: Alert route rule dict.
+    """
+    conditions = [
+        {
+            "propertyFieldConditionType": "is_one_of",
+            "propertyFieldName": "$.commonLabels.alertname",
+            "propertyFieldType": "payload",
+            "propertyFieldValues": QA_OUTAGE_ALERTNAMES,
+        },
+    ]
+    if clusters:
+        conditions.append(
+            {
+                "propertyFieldConditionType": "is_one_of",
+                "propertyFieldName": "$.commonLabels.cluster",
+                "propertyFieldType": "payload",
+                "propertyFieldValues": clusters,
+            }
+        )
+    return {
+        "conditionGroups": [{"conditions": conditions, "position": 1}],
+        "destinations": [{"targetId": policy.id, "targetType": "EscalationPolicy"}],
+        "fallbackRule": False,
+        "name": name,
+        "position": position,
+    }
+
+
+# A second route rather than rules ahead of the Slack route's fallback. Every
+# route on a source evaluates independently (see data_platform_route_rules), so
+# an outage still posts to #devops-warnings immediately at any hour, which
+# keeps the deploy-timing signal section 8.1 relies on, and this route only
+# adds the page. It has no fallback rule, so nothing else from QA reaches it.
+# The data-qa rule comes first because the first matching rule wins.
+alert_route_grafana_prometheus_qa_outage_route = rootly.AlertRoute(
+    "grafana-prometheus-qa-outage-route",
+    alerts_source_ids=[alerts_source_grafana_prometheus_qa.id],
+    enabled=True,
+    name="Grafana Prometheus QA - Outage Paging Route",
+    owning_team_ids=["9f00e9f1-2f13-470e-a856-50ab5003f260"],
+    rules=[
+        qa_outage_route_rule(
+            "data-qa outages to QA Data Platform Outages",
+            1,
+            escalation_policy_qa_data_platform_outages,
+            DATA_PLATFORM_QA_GRAFANA_CLUSTERS,
+        ),
+        qa_outage_route_rule(
+            "QA outages to QA Outages", 2, escalation_policy_qa_outages
+        ),
     ],
     opts=rootly_opts,
 )

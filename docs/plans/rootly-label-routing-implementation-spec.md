@@ -279,7 +279,8 @@ worth doing in the same commit as the enum extension.
 ## 1. Decisions
 
 Recorded here so they stop being open questions. Q2 was resolved 2026-07-30 (analysis
-§8.1) and is unchanged.
+§8.1) and is unchanged, apart from the QA total-outage page added 2026-10-26 (recorded
+in §8.1).
 
 **1.1 Q1 — CI alerts keep reaching Rootly.** Do not drop them to `oblivion` in the CI
 Grafana stack's notification policy. Rationale: `setup_grafana()` returns early for CI
@@ -751,7 +752,8 @@ The Gravitino posture and reconcile CronJobs and the schema Job are not tiered h
 §3.5 counts Deployments, StatefulSets and DaemonSets.
 
 Also backfill CI/QA clusters, which the analysis explicitly did not measure. Coverage
-there does not affect paging (CI/QA alerts go Slack-only per §8.1) but an unlabeled QA
+there does not affect paging (CI/QA alerts go Slack-only per §8.1, apart from the
+QA total-outage page added 2026-10-26) but an unlabeled QA
 workload routes as untier-ed, so the QA stack stops being a rehearsal for the
 production routing behaviour — which is how a Phase 3 mis-tiering would go unnoticed
 until it reached production.
@@ -1006,7 +1008,8 @@ payload rule) also has no `alert_tier` — it is a `linux_host.py` rule about EC
 instances, not a K8s workload. Keep it, as a fourth rule.
 
 **Do not add an environment-based urgency rule.** Per analysis §8.1, non-production is
-a routing-destination concern (Slack-only escalation policy), not an urgency concern,
+a routing-destination concern (Slack-only escalation policy, or the QA Outages policies
+for a QA total outage), not an urgency concern,
 and the CI/QA sources are separate objects from the Production source anyway.
 
 The existing `escalation_path_defer_medium_urgency_off_hours` (`:691`),
