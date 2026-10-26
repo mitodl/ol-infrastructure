@@ -323,15 +323,23 @@ step that reads those tags and emits table-level `DENY`s for roles without PII c
 that. It is out of scope here and should be filed separately once someone decides who holds PII
 clearance.
 
+Don't emit any `DENY` on 1.3.1. apache/gravitino#13605 lets a request through when a deny role's
+policies are cleared between its checks, and the fix (#13606) is on main only. Wait for a release
+that carries it.
+
 ## Behaviour to expect, and to document for users
 
 - A denied `listNamespaces` or `loadTable` is a 403 that names the object and echoes the policy
   expression. Gravitino does not hide the existence of what you cannot read.
 - Inside a schema you can reach, listings are filtered to what you may read.
 - On 1.3.0 the first request after `jcasbin.cacheExpirationSecs` elapsed could 403 for an
-  authorized user (apache/gravitino#12169). 1.3.1, which we run, fixes it. Two related denials
-  under concurrent requests (#13605, #13363) are fixed only on main, so an occasional spurious 403
-  that succeeds on retry is still possible. Through StarRocks this is a failed query.
+  authorized user (apache/gravitino#12169). 1.3.1, which we run, fixes it. Two related races
+  can still drop a role's policies partway through a request: a reload exposing an empty policy
+  state (#13363), and policies cleared between the checks of one request by TTL eviction or a
+  grant or revoke on that node (#13605). Their fixes (#13364, #13606) are on main only, with no
+  branch-1.3 backport as of 2026-10-26. A dropped allow role is a spurious 403 that succeeds on
+  retry, which through StarRocks is a failed query. A dropped `DENY` role can let the request
+  through (#13605), so `DENY` is not safe to rely on yet (A10).
 - Denials audit as `UNKNOWN` with a null object. Alert on status and URI, not on operation.
 - Revoking a role does not invalidate an already-vended S3 credential before it expires
   (deployment spec, default 3600s).

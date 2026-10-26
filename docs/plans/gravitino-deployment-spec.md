@@ -494,8 +494,10 @@ apache/gravitino#12169, fixed in 1.3.1, the version we run: eviction now clears 
 policies, not the user-to-role binding (`JcasbinAuthorizer.java:1405-1424` at the `v1.3.1` tag). The spike harness
 re-run on stock images (5s TTL, 12s idle gap, role granted directly to the user) gave 403 then 200
 in 10/10 trials on 1.3.0 and 200 in 10/10 on 1.3.1. Not re-run: roles granted through a group,
-StarRocks traffic, the default 3600s TTL. Two related denials under concurrent requests (#13605,
-#13363) are fixed on main only, with no branch-1.3 backport as of 2026-10-23.
+StarRocks traffic, the default 3600s TTL. Two related races that drop a role's policies partway
+through a request (#13363, #13605) are fixed on main only (#13364, #13606), with no branch-1.3
+backport as of 2026-10-26. Besides spurious 403s, #13605 can let a request through a `DENY`, so
+the authorization spec holds off on `DENY` (A10) until a release carries the fix.
 
 ## P10: jobs
 
