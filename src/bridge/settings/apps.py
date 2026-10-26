@@ -102,6 +102,7 @@ APPS: dict[str, AppRegistration] = {
         github_repo="mitodl/mitxpro",
         repo_main_branch="master",
         slack_channel="product-xpro",
+        release_resource_workflow=True,
     ),
 }
 
@@ -168,9 +169,9 @@ def release_workflow_repos() -> frozenset[str]:
     EVERY REGISTERED APP, NOT ONLY THE ONES ALREADY RUNNING THE NEW WORKFLOW. That
     is deliberate and it over-grants on purpose (decision: Tobias, 2026-09-01). The
     actual opt-in is ``AppRegistration.release_resource_workflow`` above, which
-    defaults to ``False`` and today is set on ``ol-analytics-api``, ``learn-ai`` and
-    ``micromasters`` -- so the consumer below grants a bypass on ``mit-learn`` and
-    ``mitxonline`` for an App that does not yet finish their releases.
+    defaults to ``False`` and is set only on the apps already migrated -- so the
+    consumer below also grants a bypass on legacy apps such as ``mit-learn`` and
+    ``mitxonline``, for an App that does not yet finish their releases.
 
     The trade is pre-provisioning against a rollout that would otherwise need a
     GitHub ruleset edit interleaved with every pipeline flip -- and that edit is the

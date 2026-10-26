@@ -243,7 +243,7 @@ pipeline_params = {
         build_target="production",
         settings_dir="mitxpro",
         refresh_stack=False,
-        description="Builds the xPRO Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
+        description="Builds the xPRO Django app image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
     ),
     "learn-ai": AppPipelineParams(
         app_name="learn-ai",
