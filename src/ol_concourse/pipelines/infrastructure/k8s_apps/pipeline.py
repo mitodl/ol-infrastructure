@@ -247,6 +247,7 @@ pipeline_params = {
     ),
     "learn-ai": AppPipelineParams(
         app_name="learn-ai",
+        build_target="production",
         refresh_stack=False,
         static_frontend=StaticFrontendConfig(
             path="frontend-demo", environments=LEARN_AI_FRONTEND_ENVIRONMENTS
