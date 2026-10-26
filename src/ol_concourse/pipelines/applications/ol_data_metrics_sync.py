@@ -8,8 +8,10 @@ from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 
 # Publishes every metric in ol-data-platform's metrics/ to production
 # OpenMetadata as a Metric entity, with lineage from each implemented_by
-# entity. An implemented_by model tagged starrocks is skipped with a warning
-# until OpenMetadata has a StarRocks service; the build still passes.
+# entity. An implemented_by model tagged starrocks links from its view in the
+# StarRocks service (`--starrocks-service`, default "StarRocks", the
+# substructure stack's service_name_starrocks default). A view OpenMetadata
+# has not catalogued yet is skipped with a warning; the build still passes.
 #
 # Each of these is reported, leaves that metric unwritten and fails the build,
 # while the other metrics still sync:
