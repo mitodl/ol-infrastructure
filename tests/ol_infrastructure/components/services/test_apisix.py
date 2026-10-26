@@ -398,16 +398,25 @@ def test_session_cookie_name_and_domain_coexist():
     assert oidc.base_oidc_config["session"] == {
         "cookie_name": "mitlearn_apisix_session",
         "cookie_domain": ".learn.mit.edu",
+        "cookie_secure": True,
     }
 
 
-def test_session_block_omitted_when_nothing_set():
-    """Callers that opt into none of the session settings must not get an empty
-    session block, which would override lua-resty-session's own defaults.
+def test_session_cookie_is_secure_when_nothing_else_is_set():
+    """A caller that sets none of the session options still gets the Secure
+    flag, and nothing else, so lua-resty-session keeps its own defaults.
     """
     oidc = oidc_resources("test-oidc-no-session-config")
 
-    assert "session" not in oidc.base_oidc_config
+    assert oidc.base_oidc_config["session"] == {"cookie_secure": True}
+
+
+def test_session_cookie_secure_can_be_turned_off():
+    oidc = oidc_resources(
+        "test-oidc-cookie-not-secure", oidc_session_cookie_secure=False
+    )
+
+    assert oidc.base_oidc_config["session"]["cookie_secure"] is False
 
 
 def test_session_cookie_name_survives_plugin_rendering():
@@ -423,6 +432,7 @@ def test_session_cookie_name_survives_plugin_rendering():
 
     assert plugin["name"] == "openid-connect"
     assert plugin["config"]["session"]["cookie_name"] == "mitlearn_apisix_session"
+    assert plugin["config"]["session"]["cookie_secure"] is True
     assert plugin["config"]["unauth_action"] == "pass"
 
 

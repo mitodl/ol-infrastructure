@@ -705,6 +705,13 @@ class OLApisixOIDCConfig(BaseModel):
     # or other applications should set an explicit, environment-scoped name so
     # their session cookies stay distinct in the browser's cookie jar.
     oidc_session_cookie_name: str | None = None
+    # lua-resty-session leaves Secure off unless asked, so without this the
+    # session cookie the gateway issues after login would be sent by the
+    # browser on any plain-HTTP request to the cookie's domain (hq#14077).
+    # Every deployed OIDC host is HTTPS-only, and so is the local-dev stack
+    # that uses this component, so no caller needs it off; the field exists to
+    # make that a choice.
+    oidc_session_cookie_secure: bool = True
     oidc_session_absolute_timeout: NonNegativeInt = 0
     # None leaves lua-resty-session's compiled-in defaults (900s idling /
     # 3600s rolling) untouched for callers that haven't opted in. 0
@@ -807,6 +814,13 @@ class OLApisixOIDCResources(ComponentResource):
             session_config.setdefault("session", {})["cookie_name"] = (
                 oidc_config.oidc_session_cookie_name
             )
+
+        # Always emitted, so the session block now exists for every caller.
+        # That block already reaches APISIX for all of them anyway: the
+        # secretRef merges session.secret into it.
+        session_config.setdefault("session", {})["cookie_secure"] = (
+            oidc_config.oidc_session_cookie_secure
+        )
 
         if oidc_config.oidc_session_absolute_timeout:
             session_config.setdefault("session", {})["absolute_timeout"] = (

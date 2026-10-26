@@ -187,3 +187,28 @@ def test_login_sends_s256_challenge_and_matching_verifier(pkce_apisix):
         .decode()
         == challenge
     )
+
+
+def test_session_cookie_is_marked_secure(pkce_apisix):
+    """The component's session.cookie_secure reaches lua-resty-session.
+
+    The cookie set when login starts is the same lua-resty-session cookie the
+    callback upgrades to the authenticated session, so its attributes are the
+    ones a logged-in user ends up holding.  A real APISIX loading the config
+    also shows the openid-connect schema accepts the key.
+    """
+    http = urllib3.PoolManager(retries=False)
+
+    login = http.request("GET", f"{pkce_apisix}/app/page", redirect=False, timeout=10.0)
+
+    assert login.status == 302
+    session_cookies = [
+        cookie
+        for cookie in login.headers.getlist("Set-Cookie")
+        if cookie.startswith("session=")
+    ]
+    assert session_cookies
+    for cookie in session_cookies:
+        attributes = {part.strip().lower() for part in cookie.split(";")[1:]}
+        assert "secure" in attributes
+        assert "httponly" in attributes
