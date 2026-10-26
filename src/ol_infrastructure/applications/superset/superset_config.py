@@ -8,6 +8,8 @@
 import logging
 import os
 import re
+import threading
+import time
 from ssl import CERT_OPTIONAL
 
 from celery.schedules import crontab
@@ -15,8 +17,7 @@ from flask import Flask, g
 from flask_appbuilder.security.manager import AUTH_OAUTH
 from flask_caching.backends.rediscache import RedisCache
 from flask_jwt_extended import JWTManager
-from jwt import InvalidTokenError, PyJWKClient
-from jwt.exceptions import PyJWKClientConnectionError, PyJWKClientError
+from jwt import InvalidTokenError, PyJWKClient, PyJWTError
 from sqlalchemy.engine import URL
 from superset.security import SupersetSecurityManager
 from superset.utils.encrypt import SQLAlchemyUtilsAdapter
@@ -128,29 +129,73 @@ AUTH_USER_REGISTRATION = True
 AUTH_USER_REGISTRATION_ROLE = "Public"
 
 JWKS_FETCH_TIMEOUT_SECONDS = 5
-# No per-kid key cache: the JWK set is refetched every 5 minutes (PyJWKClient's
-# default lifespan), so a key removed from the realm stops validating within
-# that window. An unknown kid forces an immediate refetch.
-_oidc_jwks_client = PyJWKClient(OIDC_JWKS_URI, timeout=JWKS_FETCH_TIMEOUT_SECONDS)
+# A key removed from the realm stops validating within this long.
+JWKS_MAX_AGE_SECONDS = 300
+# The kid is read before the signature is checked, so an unauthenticated caller
+# can send any kid. This caps how often that can make us call Keycloak.
+JWKS_REFRESH_COOLDOWN_SECONDS = 30
+
+
+class _RealmSigningKeys:
+    """The realm's JWKS signing keys by ``kid``.
+
+    PyJWKClient refetches on every unknown kid and drops its cached set when a
+    fetch fails, so it is used here only for fetching. A failed fetch keeps the
+    last good set, and fetches are at most one per cooldown.
+    """
+
+    def __init__(self, jwks_uri: str) -> None:
+        self._client = PyJWKClient(
+            jwks_uri, cache_jwk_set=False, timeout=JWKS_FETCH_TIMEOUT_SECONDS
+        )
+        self._keys: dict[str, object] = {}
+        self._fetched_at = float("-inf")
+        self._lock = threading.Lock()
+
+    def _refresh(self) -> None:
+        with self._lock:
+            if time.monotonic() - self._fetched_at < JWKS_REFRESH_COOLDOWN_SECONDS:
+                return
+            self._fetched_at = time.monotonic()
+            try:
+                signing_keys = self._client.get_signing_keys()
+            except (PyJWTError, ValueError):
+                logging.warning(
+                    "Fetching the realm JWKS from %s failed; keeping %d cached keys",
+                    self._client.uri,
+                    len(self._keys),
+                    exc_info=True,
+                )
+                return
+            self._keys = {key.key_id: key.key for key in signing_keys}
+
+    def signing_key(self, kid: str) -> object:
+        if (
+            kid not in self._keys
+            or time.monotonic() - self._fetched_at >= JWKS_MAX_AGE_SECONDS
+        ):
+            self._refresh()
+        try:
+            return self._keys[kid]
+        except KeyError:
+            msg = f"No realm signing key with kid {kid!r}"
+            raise InvalidTokenError(msg) from None
+
+
+_realm_signing_keys = _RealmSigningKeys(OIDC_JWKS_URI)
 
 
 def _oidc_signing_key(jwt_header: dict[str, object], _jwt_data: object) -> object:
     """Return the realm public key matching the token's ``kid`` header.
 
     flask-jwt-extended only handles ``InvalidTokenError`` as a client error, so
-    a kid missing from the realm JWKS is re-raised as one instead of surfacing
-    as a 500. A failure to reach Keycloak still propagates.
+    an unknown or missing kid is raised as one rather than surfacing as a 500.
     """
     kid = jwt_header.get("kid")
     if not isinstance(kid, str):
         msg = "JWT header has no kid"
         raise InvalidTokenError(msg)
-    try:
-        return _oidc_jwks_client.get_signing_key(kid).key
-    except PyJWKClientConnectionError:
-        raise
-    except PyJWKClientError as exc:
-        raise InvalidTokenError(str(exc)) from exc
+    return _realm_signing_keys.signing_key(kid)
 
 
 class CustomSsoSecurityManager(SupersetSecurityManager):
