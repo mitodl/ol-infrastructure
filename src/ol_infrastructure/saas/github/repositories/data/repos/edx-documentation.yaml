@@ -10,6 +10,8 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: master
+description: Fork of openedx-unsupported/edx-documentation (deprecated upstream; see
+  docs.openedx.org)
 has_discussions: false
 has_projects: true
 has_wiki: true

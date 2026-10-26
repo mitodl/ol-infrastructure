@@ -10,6 +10,7 @@ allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
 archetype: library
+description: Backend API endpoints for MIT Learn's AI chatbots
 has_discussions: false
 has_projects: true
 has_wiki: true

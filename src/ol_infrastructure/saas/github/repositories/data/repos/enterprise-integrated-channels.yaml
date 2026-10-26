@@ -10,6 +10,8 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: main
+description: MIT Open Learning fork of openedx/enterprise-integrated-channels, which
+  sends Open edX data to third-party systems
 has_discussions: false
 has_projects: true
 merge_commit_message: PR_TITLE

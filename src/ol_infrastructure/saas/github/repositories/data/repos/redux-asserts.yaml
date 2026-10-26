@@ -10,6 +10,7 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
 default_branch: master
+description: Functions to assert dispatched actions in Redux integration tests
 has_discussions: false
 has_projects: true
 has_wiki: true
