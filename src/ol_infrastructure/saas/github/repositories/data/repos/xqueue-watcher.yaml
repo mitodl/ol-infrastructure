@@ -11,6 +11,8 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: master
+description: MIT Open Learning fork of openedx/xqueue-watcher, a polling XQueue client
+  and grader
 has_discussions: false
 has_issues: true
 has_projects: true

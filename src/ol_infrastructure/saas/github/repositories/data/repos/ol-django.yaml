@@ -12,6 +12,7 @@ allow_merge_commit: false
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
+description: MIT Open Learning's reusable Django apps
 has_discussions: false
 has_projects: true
 merge_commit_message: PR_TITLE

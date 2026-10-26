@@ -10,6 +10,8 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: master
+description: Fork of the edX Analytics API client for retrieving edX data warehouse
+  data
 has_discussions: false
 has_projects: true
 has_wiki: true

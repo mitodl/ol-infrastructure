@@ -12,6 +12,8 @@ allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
+description: Security posture dashboard that collects and analyzes the security configuration
+  of the third-party services the org depends on
 has_discussions: false
 has_projects: true
 has_wiki: true
