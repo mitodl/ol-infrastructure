@@ -247,7 +247,24 @@ def create(
                 ),
             ),
             # --- Pod crash looping ---
-            # Fires when a container is in CrashLoopBackOff state.
+            # Fires when a container or an init container is in
+            # CrashLoopBackOff state.
+            #
+            # Init containers report through their own KSM family,
+            # kube_pod_init_container_status_waiting_reason, so a pod stuck in
+            # Init:CrashLoopBackOff never matched the container-only expression
+            # (data-qa's opik-backend migrations, 2026-10-15 to 2026-10-20).
+            # Init and main container names differ within a pod, so the `or`
+            # keeps both sides as separate series.
+            #
+            # A looping init container that runs for minutes between restarts
+            # (a migration waiting on a lock) drops out of CrashLoopBackOff
+            # while it runs, so its raw series flaps and rarely holds for 5m
+            # straight. When it is the only crash loop, the whole query goes
+            # empty during those runs, no_data_state="OK" resets Pending, and
+            # the alert never fires. max_over_time over 10m keeps the series
+            # present across the gaps (the opik ones ran up to 7 minutes), so
+            # the init side does not depend on missing-series handling.
             #
             # keep_firing_for + missing_series_evals_to_resolve attack the
             # storm mechanism directly: a churning pod's series vanishes the
@@ -272,6 +289,8 @@ def create(
                 },
                 datas=rd(
                     'sum by (cluster, namespace, pod, container) (kube_pod_container_status_waiting_reason{cluster=~".*-(ci|qa)", reason="CrashLoopBackOff"}) > 0'
+                    " or "
+                    'sum by (cluster, namespace, pod, container) (max_over_time(kube_pod_init_container_status_waiting_reason{cluster=~".*-(ci|qa)", reason="CrashLoopBackOff"}[10m])) > 0'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -288,6 +307,8 @@ def create(
                 },
                 datas=rd(
                     'sum by (cluster, namespace, pod, container) (kube_pod_container_status_waiting_reason{cluster=~".*-(production)", reason="CrashLoopBackOff"}) > 0'
+                    " or "
+                    'sum by (cluster, namespace, pod, container) (max_over_time(kube_pod_init_container_status_waiting_reason{cluster=~".*-(production)", reason="CrashLoopBackOff"}[10m])) > 0'
                 ),
             ),
             # --- Celery Beat restarts ---
