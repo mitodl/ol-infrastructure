@@ -91,7 +91,11 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
-from ol_infrastructure.lib.opik import OPIK_SDK_ENVIRONMENTS, opik_api_url
+from ol_infrastructure.lib.opik import (
+    OPIK_KEYCLOAK_VAULT_ENV,
+    OPIK_SDK_ENVIRONMENTS,
+    opik_api_url,
+)
 from ol_infrastructure.lib.otel import (
     DEFAULT_TRACE_SAMPLING_RATE,
     OTLP_ENDPOINT,
@@ -2986,8 +2990,9 @@ for location in code_locations:
         )
 
     # ml's Opik tracing and Prompt Library. Only the non-secret settings live
-    # here: the code reads the Keycloak client-credentials from Vault itself
-    # (dagster_server_policy.hcl). No OPIK_API_KEY -- the Keycloak auth hook owns the
+    # here: the code reads the Keycloak client-credentials from Vault itself, at
+    # OPIK_KEYCLOAK_VAULT_MOUNT/OPIK_KEYCLOAK_VAULT_PATH (dagster_server_policy.hcl).
+    # No OPIK_API_KEY -- the Keycloak auth hook owns the
     # Authorization header (see the opik stack's OPIK_SDK_KEYCLOAK_AUTH.md).
     # The chart copies a code location's env, volumes and volumeMounts into the
     # run pods it launches (includeConfigInLaunchedRuns), so ml's run workers
@@ -3005,6 +3010,12 @@ for location in code_locations:
                 {"name": "OPIK_URL_OVERRIDE", "value": opik_api_url()},
                 {"name": "OPIK_WORKSPACE", "value": "default"},
                 {"name": "OPIK_PROJECT_NAME", "value": "dagster-ml"},
+                # Set with the URL so ml moves to the Production Opik and its
+                # client in the same pod start, whichever deploys first.
+                *(
+                    {"name": env_name, "value": env_value}
+                    for env_name, env_value in OPIK_KEYCLOAK_VAULT_ENV.items()
+                ),
             ]
         )
 

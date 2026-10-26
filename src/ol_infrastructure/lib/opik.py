@@ -27,6 +27,12 @@ OPIK_SDK_VAULT_MOUNT = "secret-opik"
 OPIK_SDK_VAULT_PATH = "sdk-client"
 # The environments whose Vault receives the ol-opik-sdk credentials.
 OPIK_SDK_ENVIRONMENTS = ("ci", "qa", "production")
+# For code that reads the ol-opik-sdk client from Vault itself (dagster's ml code
+# location), the variables naming where it is.
+OPIK_KEYCLOAK_VAULT_ENV = {
+    "OPIK_KEYCLOAK_VAULT_MOUNT": OPIK_SDK_VAULT_MOUNT,
+    "OPIK_KEYCLOAK_VAULT_PATH": OPIK_SDK_VAULT_PATH,
+}
 # VaultStaticSecret templates for the OPIK_KEYCLOAK_* variables the SDK auth reads.
 # The token endpoint is derived from the realm url stored alongside the client.
 OPIK_KEYCLOAK_SECRET_TEMPLATES = {
