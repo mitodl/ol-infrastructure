@@ -706,12 +706,21 @@ def create_k8s_resources(  # noqa: C901
                     "port": "vector-metrics",
                     "path": "/metrics",
                     "scheme": "http",
-                    "interval": "30s",
+                    "interval": "60s",
                     "relabelings": [
                         {
                             "sourceLabels": ["__meta_kubernetes_pod_container_name"],
                             "action": "keep",
                             "regex": "vector",
+                        }
+                    ],
+                    # The histogram buckets were ~29k prod series with no reader;
+                    # the vector_edxapp_tracking alerts only use counters.
+                    "metricRelabelings": [
+                        {
+                            "sourceLabels": ["__name__"],
+                            "action": "drop",
+                            "regex": "vector_.*_bucket",
                         }
                     ],
                 }
