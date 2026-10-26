@@ -12,7 +12,7 @@ _visibility: public
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
-archetype: library
+archetype: archived
 default_branch: master
 description: A copy of https://github.com/mitocw/content-mit-latex2edx-demo turned
   into a cookiecutter template.
