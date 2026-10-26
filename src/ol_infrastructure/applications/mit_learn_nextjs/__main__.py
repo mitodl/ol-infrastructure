@@ -159,6 +159,7 @@ raw_env_vars = {
     "NEXT_PUBLIC_LEARN_AI_SEARCH_SUMMARY_ENDPOINT": nextjs_config.require(
         "search_summary_endpoint"
     ),
+    "NEXT_PUBLIC_LEARN_AI_SUPPORT_ENDPOINT": nextjs_config.require("support_endpoint"),
     "NEXT_PUBLIC_MITOL_API_BASE_URL": nextjs_config.require("mitlearn_api_base_url"),
     "NEXT_PUBLIC_MITX_ONLINE_CSRF_COOKIE_NAME": "csrf_mitxonline",
     "NEXT_PUBLIC_MITX_ONLINE_BASE_URL": nextjs_config.require("mitxonline_base_url"),

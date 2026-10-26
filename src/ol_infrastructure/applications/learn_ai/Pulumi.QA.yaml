@@ -30,6 +30,13 @@ config:
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_PROMPT_CACHE_FUNCTION: "ai_chatbots.utils.get_django_cache"
+    # Contact us support intake (hq#13712). The odl1791467332 sandbox. Field ids
+    # and the OAuth credentials in SOPS are a matched pair -- both must come
+    # from this instance, since an unrecognised id rejects the whole ticket.
+    AI_ZENDESK_API_URL: "https://odl1791467332.zendesk.com"
+    AI_ZENDESK_NAME_FIELD_ID: "57089968511131"
+    AI_ZENDESK_URL_FIELD_ID: "57089642026779"
+    AI_ZENDESK_USERNAME_FIELD_ID: "57089989500187"
     CELERY_TASK_ALWAYS_EAGER: "false"
     CANVAS_SYLLABUS_DEMO_READABLE_IDS: ["14566-kaleba:20211202", "34642-15.095_FA25"]
     CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: ["14566-kaleba:20211202+canvas", "34642-15.095_FA25+canvas"]
