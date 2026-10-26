@@ -451,6 +451,15 @@ starrocks_tls_secret_name = f"{stack_info.env_prefix}-starrocks-tls-secret"
 ssl_keystore_password_secret: kubernetes.core.v1.Secret | None = None
 ssl_keystore_password: Output[str] | None = None
 ssl_keystore_password_secret_name: str | None = None
+
+
+def _require_nonblank_keystore_password(password: str) -> str:
+    if not password.strip():
+        msg = "starrocks:ssl_keystore_password must not be empty or whitespace-only"
+        raise ValueError(msg)
+    return password
+
+
 if ssl_enabled:
     ssl_keystore_password = starrocks_config.require_secret("ssl_keystore_password")
     ssl_keystore_password_secret_name = (
@@ -463,7 +472,9 @@ if ssl_enabled:
             namespace=namespace,
             labels=k8s_app_labels.model_dump(),
         ),
-        string_data={"password": ssl_keystore_password},
+        string_data={
+            "password": ssl_keystore_password.apply(_require_nonblank_keystore_password)
+        },
     )
 
 # Ref: https://github.com/StarRocks/starrocks-kubernetes-operator/blob/main/helm-charts/charts/kube-starrocks/charts/starrocks/values.yaml
@@ -1039,9 +1050,13 @@ starrocks_release = kubernetes.helm.v3.Release(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
+        # The FE reads its keystore password from this Secret through feEnvVars
+        # and sits in CreateContainerConfigError until it exists. The OIDC config
+        # Secret is already covered as a descendant of starrocks_auth_binding.
         depends_on=[
             starrocks_root_password_secret,
             starrocks_auth_binding,
+            *([ssl_keystore_password_secret] if ssl_keystore_password_secret else []),
         ],
     ),
 )
