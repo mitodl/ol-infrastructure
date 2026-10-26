@@ -693,6 +693,22 @@ So: route CI/QA to the Slack-only escalation policy at delay 0, and do **not** a
 deferral path to it. "Deferred to business hours" is achieved by the destination not
 being a pager, not by holding the message.
 
+Amended 2026-10-26 (tmacey): one exception. A QA service that is down entirely
+also pages during business hours. The rules that count are
+`DeploymentUnavailableWarning` (zero available replicas),
+`StarRocksFEAllDownWarning`, `StarRocksFENoLeaderWarning`,
+`ClickHouseKeeperLostQuorumWarning` and `WitanDataTierScaledToZeroWarning`. A
+separate QA route in `saas/rootly/__main__.py` sends data-qa outages to the
+`QA Data Platform Outages` policy (Data Platform on-call) and the rest to `QA Outages`
+(Platform Engineering primary on-call). Both hold anything arriving outside
+Mon-Fri 09:00-16:34 ET until 9am, and page once, 26 minutes after the Rootly alert
+opens, so an outage that clears within about 20 minutes never pages and nothing pages
+after 17:00. QA Opik's backend sat at zero for ten days
+(2026-10-05 to 2026-10-15) while the alert only reached Slack. The QA Slack route
+is unchanged, so these alerts still post to #devops-warnings immediately and the
+deploy-timing signal above is kept. A Rootly alert resolved by hand while Grafana
+still fires comes back on Grafana's repeat (up to 4h) and pages again.
+
 Open sub-decision, not blocking: should QA alerts also be excluded from the
 `Medium` urgency band entirely (moved to `Low`)? Medium is what the production
 deferral path matches. Leaving QA at Medium is harmless today because QA alerts
