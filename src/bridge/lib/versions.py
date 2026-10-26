@@ -67,7 +67,7 @@ GRAVITINO_VERSION = "1.3.1"
 # Renovate marker. Move it by hand when the image crosses a minor version.
 GRAVITINO_SCHEMA_VERSION = "1.3.0"
 # renovate: datasource=docker depName=karpenter packageName=public.ecr.aws/karpenter/karpenter
-KARPENTER_CHART_VERSION = "1.15.0"
+KARPENTER_CHART_VERSION = "1.15.1"
 # renovate: datasource=helm depName=keda packageName=keda registryUrl=https://kedacore.github.io/charts
 KEDA_CHART_VERSION = "2.21.0"
 # renovate: datasource=helm depName=kubewatch packageName=kubewatch registryUrl=https://robusta-charts.storage.googleapis.com
