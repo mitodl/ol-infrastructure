@@ -127,13 +127,11 @@ spec:
         - "1"
         - --blocking-threads
         - "1"
-        # No --reload, unlike mit-learn: that flag needs the granian[reload]
-        # extra and ocw-studio depends on plain "granian", so granian exits
-        # with 'Using --reload requires the granian[reload] extra'. Tilt still
-        # live-syncs Python changes into the container, but the process has to
-        # be restarted to pick them up — restart the resource from the Tilt UI,
-        # the same as the celery workers. Adding the extra upstream would let
-        # this go back to matching the other apps.
+        # No --reload here: the Tilt-built local-dev image switches reload on
+        # with GRANIAN_RELOAD (see ocw-studio's Dockerfile). The prebuilt
+        # image used without a checkout is the production target, which lacks
+        # the granian[reload] extra, so the flag here would make granian exit
+        # with 'Using --reload requires the granian[reload] extra'.
         - main.wsgi:application
         ports:
         - containerPort: 8041

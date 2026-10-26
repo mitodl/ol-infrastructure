@@ -1019,17 +1019,20 @@ commits site content to a real repo, so set `GIT_ORGANIZATION` and `GIT_TOKEN` i
 Studio without publishing at all, set `CONTENT_SYNC_PIPELINE_BACKEND: ""` there —
 editing then works and Concourse is never contacted.
 
-Two things that differ from the other apps:
+What differs from the other apps:
 
 - **Frontend changes need an image rebuild.** There is no webpack dev server: it needs
   node, and the app image is Python-only, so there is nothing for Tilt to live-sync JS
   into. Django reads the bundles baked in by the Dockerfile's `node_builder` stage,
-  which is why this app builds the `production` target. Tilt rebuilds automatically
-  when JS or SCSS changes; it is just slower than a hot reload.
-- **Python changes need a resource restart.** ocw-studio depends on plain `granian`
-  rather than `granian[reload]`, so the app container cannot run with `--reload`. Tilt
-  syncs the code; restart `ocwstudio-webapp` from the Tilt UI to pick it up, the same
-  as the celery workers.
+  which is why this app builds the `local-dev` target, the `production` target plus
+  dev dependencies. Tilt rebuilds automatically when JS or SCSS changes; it is just
+  slower than a hot reload.
+- **Python changes reload like the other Django apps, but only with a checkout.** The
+  `local-dev` target turns granian's reload on through `GRANIAN_RELOAD`, so Tilt
+  syncs edits under the app's Python directories and granian restarts its worker
+  (`Changes detected, reloading workers..` in the logs). Without an ocw-studio
+  checkout, Tilt runs the prebuilt production image, which does not reload; restart
+  `ocwstudio-webapp` from the Tilt UI instead.
 
 ### MicroMasters
 
