@@ -972,10 +972,10 @@ kubectl --context local-dev -n mit-learn exec deploy/mitlearn-webapp -c app -- p
 - The webhook clears the API cache itself. The legacy pipeline run from a shell does not,
   which is why the roll back needs `clear_cache`.
 - A delivery is a full sync with no limit on what it unpublishes. MIT Learn's
-  `learning_resources` warehouse tasks refuse to unpublish more than 10% of a source, and the webhook has
-  no such check: a model edit that left 14 of 58 rows unpublished the other 44 in one
-  run. A model that builds with no rows at all gets a `400` from this asset and changes
-  nothing.
+  `learning_resources` warehouse tasks refuse to unpublish more than 10% of a source,
+  and the webhook has no such check: a model edit that left 14 of 58 rows unpublished
+  the other 44 in one run. A model that builds with no rows at all gets a `400` from
+  this asset and changes nothing.
 - As of 2026-10-11 the comparison is not empty for this source: the legacy pipeline
   publishes 63 courses and the model has 58. The sheet marks six rows as offered by
   OCW. The staging model drops all six, and the legacy pipeline skips one and loads
