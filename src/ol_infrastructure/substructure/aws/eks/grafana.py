@@ -222,30 +222,30 @@ def _apisix_low_value_log_drop_alloy_config() -> str:
     infrastructure/aws/eks/apisix_official.py.
     """
     access_prefix = (
-        r"^time_local=\"[^\"]*\" body_bytes_sent=[0-9]+ bytes_sent=[0-9]+"
+        r"^time_local=\\\"[^\\\"]*\\\" body_bytes_sent=[0-9]+ bytes_sent=[0-9]+"
         r" client=[^ ]+ host=[^ ]+ remote_addr=[^ ]+ request_id=[^ ]+"
         r" request_length=[0-9]+ "
     )
     return (
         r"""
 stage.match {
-  selector = "{namespace=\"operations\", container=\"apisix\", stream=\"stdout\"} |~ `"""
+  selector = "{namespace=\"operations\", container=\"apisix\", stream=\"stdout\"} |~ \""""
         + access_prefix
-        + r"""request_method=POST request_time=[^ ]+ request_uri=\"/event\" status=[1-3][0-9][0-9] `"
+        + r"""request_method=POST request_time=[^ ]+ request_uri=\\\"/event\\\" status=[1-3][0-9][0-9] \""
   action = "drop"
   drop_counter_reason = "apisix_event_beacon"
 }
 
 stage.match {
-  selector = "{namespace=\"operations\", container=\"apisix\", stream=\"stdout\"} |~ `"""
+  selector = "{namespace=\"operations\", container=\"apisix\", stream=\"stdout\"} |~ \""""
         + access_prefix
-        + r"""request_method=OPTIONS request_time=[^ ]+ request_uri=\"[^\"]*\" status=[1-3][0-9][0-9] `"
+        + r"""request_method=OPTIONS request_time=[^ ]+ request_uri=\\\"[^\\\"]*\\\" status=[1-3][0-9][0-9] \""
   action = "drop"
   drop_counter_reason = "apisix_cors_preflight"
 }
 
 stage.match {
-  selector = "{namespace=\"operations\", container=\"apisix\", stream=\"stderr\"} |~ `^[0-9/]+ [0-9:]+ .warn. [0-9#]+: [*][0-9]+ .lua. utils.lua:[0-9]+: find_and_log..: Using opentelemetry collector.address with no TLS is a security risk, (context: ngx.timer|client: [0-9.]+, server: , request: \"PUT /apisix/admin/configs HTTP/1.1\", host: \"[0-9.:]+\", request_id: \"[0-9a-f]+\")$`"
+  selector = "{namespace=\"operations\", container=\"apisix\", stream=\"stderr\"} |~ \"^[0-9/]+ [0-9:]+ .warn. [0-9#]+: [*][0-9]+ .lua. utils.lua:[0-9]+: find_and_log..: Using opentelemetry collector.address with no TLS is a security risk, (context: ngx.timer|client: [0-9.]+, server: , request: \\\"PUT /apisix/admin/configs HTTP/1.1\\\", host: \\\"[0-9.:]+\\\", request_id: \\\"[0-9a-f]+\\\")$\""
   action = "drop"
   drop_counter_reason = "apisix_otel_no_tls_warn"
 }
