@@ -1152,8 +1152,11 @@ because the evidence is what makes a decision re-examinable when the estate chan
 ## 10. Proposals for review (drafted 2026-10-26)
 
 These are drafts and nothing here has been applied. Each one needs a team decision before
-any YAML or Pulumi changes. Counts assume the 11 dormant repos archived in the same
-batch, which leaves 62 active non-fork repos, all `tier-1`.
+any YAML or Pulumi changes. Counts assume the 11 dormant repos are archived in the same
+batch: default-labels-repo, mit-open-bk (a fork), django-cas-mapper, edxcut, mit-moira,
+mitx_cas_mapper, realistic-mm-users, reddit-config, template-mit-demo,
+world_geographic_regions and xanalytics. That leaves 62 active non-fork repos, all
+`tier-1`.
 
 ### 10.1 Topics vocabulary (CON-05)
 
@@ -1196,8 +1199,10 @@ any that are missing, so nothing is backfilled silently.
 
 - **`owning_team`**: `single_select`. Its allowed values are the GitHub team slugs that are
   accountable for a repo: `devops`, `ol-data`, `odl-engineering`, `owners-mit-learn`,
-  `code-owners-mitx-online`. Using slugs rather than free text keeps the property
-  aligned with `teams.yaml`, and a renamed team fails validation instead of drifting.
+  `code-owners-mitx-online`. Using slugs rather than free text lets the property be
+  checked against `teams.yaml`. A `single_select` allowlist alone would not notice a
+  rename, so the rollout adds a validator in `archetypes.py` that fails when an
+  `owning_team` value is missing from `TEAM_IDS`, next to `_check_team_references`.
   `odl-engineering` is the honest value for most repos. The property is still useful,
   because it marks where `devops` or `ol-data` own a repo outright.
 - **`data_classification`**: `single_select` with `low-risk`, `medium-risk` and `high-risk`,
@@ -1216,7 +1221,11 @@ command that §5.2 calls out, because each property is its own
 ### 10.3 Renaming `master` on the remaining 16 repos (CON-03)
 
 **Mechanism:** set `default_branch: main` in the repo YAML and pass `rename=True` to that
-repo's `BranchDefault`, behind a per-repo opt-in key. The provider then renames the branch
+repo's `BranchDefault`, behind a per-repo opt-in key. That key does not exist yet:
+`repository.py` builds `BranchDefault` with no `rename` argument. So step 0, before any
+wave, is the code change that adds the key and passes it through. Until that lands,
+setting `default_branch: main` on a `master` repo makes the apply fail, because the
+branch it switches to does not exist. The provider then renames the branch
 instead of switching to a branch that doesn't exist. GitHub [retargets open PRs, moves
 branch protection and redirects web
 URLs](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-branches-in-your-repository/renaming-a-branch).
@@ -1238,14 +1247,14 @@ The waves below are ordered by what has to change outside GitHub. Counts are fro
 | 2 | redux-hammock | 21 | 1 | |
 | 2 | release-script | 15 | 1 | |
 | 2 | vault-raft-backup | 9 | 3 | |
-| 3 | mitx-theme | 1 | 0 | `release="master"` in `bridge/settings/openedx/version_matrix.py` |
+| 3 | mitx-theme | 1 | 0 | `branch_override="master"` at `bridge/settings/openedx/version_matrix.py:434` and `:506` (not the `release=` field next to it, which names the Open edX release) |
 | 3 | micromasters | 51 | 3 | `repo_main_branch` in `bridge/settings/apps.py` |
 | 3 | mitxpro | 26 | 2 | `repo_main_branch` in `bridge/settings/apps.py` |
 | 3 | ocw-studio | 30 | 3 | `apps.py`, plus `ocw_course_publisher.py` pipeline |
 | 3 | odl-video-service | 17 | 2 | `repo_main_branch` in `bridge/settings/apps.py` |
 | 3 | open-discussions | 35 | 1 | decide archive-vs-rename first (§10.1) |
 
-Wave 1 needs only the YAML change. In wave 2 the same PR in each repo also fixes its
+After step 0, wave 1 needs only the YAML change. In wave 2 the same PR in each repo also fixes its
 workflow refs. In wave 3 an ol-infrastructure PR updates the deploy config in the same
 deploy window, and each product team is told first. Remember that GitHub closes an open
 PR whose head is the renamed branch.
