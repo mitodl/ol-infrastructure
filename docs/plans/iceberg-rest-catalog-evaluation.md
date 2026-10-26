@@ -465,7 +465,7 @@ complain.
 Gravitino carries a live correctness defect that Lakekeeper does not: the first authorization check
 after a cache entry expires denies an authorized user. It fails closed, so it is a usability and
 correctness problem rather than a security one, but through StarRocks it surfaces as a failed query
-and it should be filed upstream before adoption.
+and it should be filed upstream before adoption. (Since filed and fixed: apache/gravitino#12169, in 1.3.1.)
 
 #### What is equal, and should not be used to argue either way
 
@@ -595,7 +595,7 @@ Three things, in descending order of weight, and none of them is nothing:
 
 Against those, Gravitino carries one live correctness defect Lakekeeper does not: the cache-expiry
 spurious deny. It fails closed, so it is a correctness and usability problem rather than a security
-one, but it should be filed upstream and ideally fixed before production.
+one, but it should be filed upstream and ideally fixed before production. (Since filed and fixed: apache/gravitino#12169, in 1.3.1.)
 
 ### What the resolved contingency leaves behind
 
@@ -618,7 +618,7 @@ table that problem needs a different answer, and it is unrelated to the catalog.
    explicitly what revocation latency is acceptable given that a vended STS credential lives until
    expiry; plan Keycloak service-account clients for the Dagster and Airbyte pods; and decide
    whether existence disclosure on denied namespaces is acceptable.
-3. **File the cache-expiry spurious-deny defect upstream** before production.
+3. **File the cache-expiry spurious-deny defect upstream** before production. (Since filed and fixed: apache/gravitino#12169, in 1.3.1.)
 4. **Re-scope the dependent tasks.** The Cedar policy-set spec is void as written, and the
    Lakekeeper EKS, Keycloak and implementation tasks need rewriting against Gravitino. The
    catalog-independent parts of the Keycloak spec (audience mapper on both tokens, machine
