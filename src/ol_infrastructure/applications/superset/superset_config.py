@@ -155,10 +155,13 @@ class _RealmSigningKeys:
         self._fetched_at = float("-inf")
         self._lock = threading.Lock()
 
-    def _refresh(self, *, wait: bool) -> None:
-        # A request whose kid is already cached doesn't wait on another
-        # thread's fetch; it uses the cached key.
-        if not self._lock.acquire(blocking=wait):
+    def _refresh(self) -> None:
+        # Never wait on another thread's fetch. Otherwise, while Keycloak is
+        # slow, requests with made-up kids queue on the lock and take every
+        # request thread. A request with an unknown kid that arrives during a
+        # fetch is rejected, including on a new pod before its first fetch
+        # finishes.
+        if not self._lock.acquire(blocking=False):
             return
         try:
             if time.monotonic() - self._attempted_at < JWKS_REFRESH_COOLDOWN_SECONDS:
@@ -182,10 +185,11 @@ class _RealmSigningKeys:
             self._lock.release()
 
     def signing_key(self, kid: str) -> object:
-        if kid not in self._keys:
-            self._refresh(wait=True)
-        elif time.monotonic() - self._fetched_at >= JWKS_MAX_AGE_SECONDS:
-            self._refresh(wait=False)
+        if (
+            kid not in self._keys
+            or time.monotonic() - self._fetched_at >= JWKS_MAX_AGE_SECONDS
+        ):
+            self._refresh()
         try:
             return self._keys[kid]
         except KeyError:
