@@ -561,7 +561,6 @@ oidc_secret = OLVaultK8SSecret(
             "OIDC_URL": '{{ get .Secrets "url" }}',
             "OIDC_CLIENT_ID": '{{ get .Secrets "client_id" }}',
             "OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
-            "OIDC_REALM_PUBLIC_KEY": '{{ get .Secrets "realm_public_key" }}',
         },
         refresh_after="1h",
         vaultauth=vault_k8s_resources.auth_name,
