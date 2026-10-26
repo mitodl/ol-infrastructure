@@ -17,6 +17,9 @@ allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
 archetype: application
+copilot_code_review:
+  review_draft_pull_requests: false
+  review_on_push: false
 description: MIT Learn, a central interface for learners to browse MIT courses
 has_discussions: true
 has_projects: true

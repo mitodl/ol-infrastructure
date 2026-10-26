@@ -296,9 +296,12 @@ tier_one_hardening = github.OrganizationRuleset(
 #                     This is why DX-02 and DX-03 remain per-repo audit rules.
 #
 #   copilot_code_review
-#                     Supported on OrganizationRuleset and arguably belongs here --
-#                     six repos carry a hand-made per-repo ruleset for it today. Left
-#                     out pending the decision in the Copilot governance task (§4.6).
+#                     Supported on OrganizationRuleset, but kept per repo (decision
+#                     2026-10-26, §4.6). The six repos that had a hand-made ruleset
+#                     for it declare `copilot_code_review` in their YAML, and
+#                     repositories/rulesets.py builds it. Targeting `tier` here would
+#                     extend Copilot review to every tier-1 repo, which is a team
+#                     decision about the premium-request budget, not a cleanup.
 #
 # THE CLASSIC BRANCH PROTECTION STILL OUT THERE IS NOT INERT. These rulesets are
 # ADDITIVE to it, not a replacement: an action must satisfy classic protection AND

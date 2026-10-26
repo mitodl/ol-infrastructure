@@ -272,6 +272,11 @@ def _check(
 #: The name GitHub shows for the release-branch ruleset this module creates.
 RELEASE_BRANCHES_RULESET_NAME = "protected-release-branches"
 
+#: The name GitHub shows for the Copilot review ruleset this module creates. Shared
+#: with `bin/github-org-inventory` for the same reason as
+#: `REQUIRED_CHECKS_RULESET_NAME`.
+COPILOT_REVIEW_RULESET_NAME = "copilot-code-review"
+
 
 def _release_branch_conditions(
     branches: list[str],
@@ -338,6 +343,54 @@ def build_release_branches(repo: dict[str, Any], repository: github.Repository) 
     )
 
 
+def build_copilot_review(repo: dict[str, Any], repository: github.Repository) -> None:
+    """Request a Copilot code review on every PR to the repo's default branch.
+
+    Per repo rather than an org ruleset targeting `tier` (decision 2026-10-26, closing
+    the Copilot governance task in plan section 4.6). Six repos had a hand-made
+    "Copilot review for default branch" ruleset, and this codifies exactly those six
+    without extending the review to the rest of tier-1. Copilot reviews draw on the
+    org's premium-request budget and add a reviewer to every PR, so widening it is a
+    team decision, not a cleanup.
+
+    THE `deletion` AND `non_fast_forward` RULES AND THE EMPTY BYPASS LIST ARE CARRIED
+    OVER ON PURPOSE. The hand-made rulesets had both rules and no bypass actors, so on
+    these six repos nobody, org owners included, can delete or force-push the default
+    branch. `baseline-default-branch` has the same two rules but lets owners bypass
+    `always`. Dropping them here as duplicates of the baseline would hand owners that
+    bypass on six repos where they do not have it today.
+
+    Pulumi creates this ruleset next to the hand-made one rather than importing it.
+    The hand-made rulesets are deleted by hand once this ruleset exists, the same way
+    as the hand-made required-check rulesets on lehrer and ol-analytics-api.
+    """
+    parameters = repo.get(archetypes.COPILOT_REVIEW_KEY)
+    if not parameters:
+        return
+
+    name = repo["name"]
+    github.RepositoryRuleset(
+        f"mitodl-repo-copilot-code-review-{name}",
+        name=COPILOT_REVIEW_RULESET_NAME,
+        repository=name,
+        target="branch",
+        enforcement="active",
+        bypass_actors=[],
+        conditions=_DEFAULT_BRANCH_ONLY,
+        rules=github.RepositoryRulesetRulesArgs(
+            deletion=True,
+            non_fast_forward=True,
+            copilot_code_review=github.RepositoryRulesetRulesCopilotCodeReviewArgs(
+                review_draft_pull_requests=bool(
+                    parameters.get("review_draft_pull_requests")
+                ),
+                review_on_push=bool(parameters.get("review_on_push")),
+            ),
+        ),
+        opts=ResourceOptions(protect=True, depends_on=[repository]),
+    )
+
+
 def build(repo: dict[str, Any], repository: github.Repository) -> None:
     """Emit the required-status-checks ruleset for one repo, if it declares any.
 
@@ -369,13 +422,19 @@ def build(repo: dict[str, Any], repository: github.Repository) -> None:
         rules=github.RepositoryRulesetRulesArgs(
             required_status_checks=github.RepositoryRulesetRulesRequiredStatusChecksArgs(
                 required_checks=[_check(context) for context in sorted(contexts)],
-                # "Require branches to be up to date before merging". Left OFF
-                # deliberately: on a repo merging several PRs an hour it serialises
+                # "Require branches to be up to date before merging". OFF unless the
+                # repo opts in: on a repo merging several PRs an hour it serialises
                 # every merge behind a re-run of the full suite, and the org's busiest
                 # repos are exactly the ones this rule targets first. It buys protection
                 # against semantic conflicts between concurrently-merged PRs, which is a
                 # real but much rarer failure than the throughput it costs.
-                strict_required_status_checks_policy=False,
+                #
+                # `ol-analytics-api` opts in because its hand-made "main protection"
+                # ruleset already enforced it, and retiring that ruleset should not
+                # quietly loosen the repo.
+                strict_required_status_checks_policy=bool(
+                    repo.get(archetypes.STRICT_REQUIRED_CHECKS_KEY)
+                ),
             ),
         ),
         opts=ResourceOptions(protect=True, depends_on=[repository]),
