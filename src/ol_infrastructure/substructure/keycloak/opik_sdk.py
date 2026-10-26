@@ -27,6 +27,9 @@ from ol_infrastructure.lib.vault import get_vault_provider
 
 REALM_NAME = "ol-platform-engineering"
 OPIK_SDK_CLIENT_ID = "ol-opik-sdk"
+# The client the Opik gateway's OIDC plugin is configured with; its bearer route
+# admits a token only when this is in aud.
+OPIK_GATEWAY_CLIENT_ID = "ol-opik-client"
 
 
 def create_opik_sdk_resources(
@@ -50,6 +53,20 @@ def create_opik_sdk_resources(
         implicit_flow_enabled=False,
         direct_access_grants_enabled=False,
         opts=ResourceOptions(provider=keycloak_provider, delete_before_replace=True),
+    )
+    # Every client in the realm signs with the same key, so the gateway's audience
+    # check (match_with_client_id on ol-opik-client) is what tells an SDK token
+    # from another client's. Without ol-opik-client in aud, that check returns
+    # 403 to every SDK.
+    keycloak.openid.AudienceProtocolMapper(
+        "ol-platform-engineering-opik-sdk-audience-mapper",
+        realm_id=REALM_NAME,
+        client_id=opik_sdk_client.id,
+        name="opik-audience",
+        included_client_audience=OPIK_GATEWAY_CLIENT_ID,
+        add_to_access_token=True,
+        add_to_id_token=False,
+        opts=ResourceOptions(provider=keycloak_provider),
     )
     credentials_json = Output.all(
         url=f"{keycloak_url}/realms/{REALM_NAME}",
