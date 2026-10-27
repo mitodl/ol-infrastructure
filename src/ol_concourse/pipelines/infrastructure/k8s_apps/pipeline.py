@@ -1289,28 +1289,45 @@ def _cache_bust_task() -> TaskStep:
 
 
 def _release_version_steps(
-    release_res: Resource, passed: list[str], *, trigger: bool
+    release_image: Resource,
+    release_res: Resource,
+    passed: list[str],
+    *,
+    trigger: bool,
 ) -> list[GetStep | LoadVarStep]:
-    """Get the release a QA or Production job deploys, and load its version.
+    """Get the release image and version a QA or Production job deploys.
 
     The version becomes ``image_tag``: the Docker tag Pulumi deploys, the ref
     of the GitHub Deployment, and what the Production gate check compares the
     closed issue's title against.
 
-    Production has to take it ``passed:`` the release build as well as QA.
+    Production has to take both ``passed:`` the release build as well as QA.
     Concourse records a job's inputs by resource, not by step name, so QA's
-    second get of this resource (the one ``_classify_promotion_task`` reads,
-    taken at whatever the latest check is) also counts as a version that
-    passed QA. Once the main branch moves past the last release, that latest
-    check is the next, uncut release, and with ``passed:`` QA alone
+    second get of the release resource (the one ``_classify_promotion_task``
+    reads, taken at whatever the latest check is) also counts as a version
+    that passed QA. Once the main branch moves past the last release, that
+    latest check is the next, uncut release, and with ``passed:`` QA alone
     Production resolves to it, deploying a version nothing has built.
-    Only a version the release build cut has passed both.
+
+    Passing the release build keeps out a version nothing cut, but not one
+    cut after a QA build recorded it as that latest check: that version has
+    passed both jobs, through a QA build that deployed the previous release.
+    The image closes that gap. QA gets it only once, and gets that name the
+    same ``passed:`` job resolve to one build of it, so the image and the
+    version come from the same release build and the same QA build, which
+    is then the one that deployed them.
 
     These are custom dependencies, not ``dependencies``, because
     ``pulumi_jobs_chain`` replaces each dependency's ``passed`` with the
     previous stage's job and would drop the release build from Production's.
     """
     return [
+        GetStep(
+            get=release_image.name,
+            trigger=trigger,
+            passed=passed,
+            params={"skip_download": True},
+        ),
         GetStep(get=release_res.name, trigger=trigger, passed=passed),
         LoadVarStep(
             load_var="image_tag", file=f"{release_res.name}/version", reveal=True
@@ -1920,20 +1937,15 @@ def _build_release_resource_app_pipeline(
             1: [stack_serial_group(project_name, "Production")],
         },
         additional_post_steps=additional_post_steps,
-        dependencies=[
-            GetStep(
-                get=app_rc_image.name,
-                trigger=True,
-                passed=[release_image_build_job.name],
-                params={"skip_download": True},
-            ),
-        ],
         # QA: get checklist.md from release resource; start RC GitHub Deployment.
         # Production: wait for release gate (closed release issue); start prod deployment.
         custom_dependencies={
             0: [
                 *_release_version_steps(
-                    release_res, passed=[release_image_build_job.name], trigger=True
+                    app_rc_image,
+                    release_res,
+                    passed=[release_image_build_job.name],
+                    trigger=True,
                 ),
                 # Concourse implicitly re-gets a resource right after a `put`
                 # succeeds, so deployment.json (written by the get/`in` action)
@@ -1952,6 +1964,7 @@ def _build_release_resource_app_pipeline(
                 # Through the release build as well as QA: see
                 # _release_version_steps.
                 *_release_version_steps(
+                    app_rc_image,
                     release_res,
                     passed=[release_image_build_job.name, qa_job_name],
                     trigger=False,
