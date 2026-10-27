@@ -24,7 +24,7 @@ Prompt fetch, label resolution, and trace linkage were also run against a local 
 
 ## 1. Access model
 
-### 1.1 What exists
+### 1.1 What exists (as of 2026-10-01)
 
 - Opik's own authentication cannot be turned on in a self-hosted install.
   `authentication.enabled` switches the backend to `RemoteAuthService`, which calls a
@@ -84,6 +84,16 @@ the cost of splitting each app's traces across three projects. Per-app projects 
 non-production volume is small and the simpler layout is worth more.
 
 Decided 2026-10-01: items 1 to 6, with per-app projects.
+
+Item 3 as built: the Production keycloak stack declares `opik-<app>-<env>` in the Production
+realm for each application and environment in `OPIK_APP_ENVIRONMENTS` (`lib/opik.py`), each
+with the `ol-opik-client` audience mapper item 2 needs, and writes it to
+`secret-opik/sdk-<app>`, a KV v1 mount of its own in that environment's Vault (kept off
+`secret-operations`, which some application policies read wholesale). Each app's policy
+grants only its own path. mitodl/ol-infrastructure#6621 first shipped a single client shared
+by every app and environment; it was replaced before it was deployed, and the owner confirmed
+item 3 on 2026-10-27. The CI prompt-sync and evaluation jobs get clients of their own; so far
+only the ol-data-platform evaluation gate's exists (`ol-data-platform-evaluation-opik`).
 
 ## 2. Prompt authoring and approval
 

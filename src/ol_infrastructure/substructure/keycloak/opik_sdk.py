@@ -1,20 +1,20 @@
-"""Keycloak client that Opik SDKs in every environment authenticate with.
+"""Keycloak clients that Opik SDKs authenticate with, one per app and environment.
 
 Every environment sends its traces to the Production Opik (see lib/opik.py), whose
 gateway verifies bearer tokens against the Production ``ol-platform-engineering``
 realm's JWKS. A CI or QA application therefore needs a Production client, so this
-module only runs on the Production stack and writes the client's credentials to the
-CI, QA, and Production Vaults.
+module only runs on the Production stack. It declares ``opik-<app>-<env>`` for every
+application and environment in OPIK_APP_ENVIRONMENTS and writes each to that
+environment's Vault, so revoking one touches no other app or environment.
 
-The client is separate from ``ol-opik-client``, which also backs the Opik UI login and
-whose Vault secret carries the gateway's session secret. This one has only the
-client-credentials grant, so the CI and QA Vaults never hold the UI client, and it
+The clients are separate from ``ol-opik-client``, which also backs the Opik UI login
+and whose Vault secret carries the gateway's session secret. They have only the
+client-credentials grant, so the CI and QA Vaults never hold the UI client, and they
 can be rotated without signing anyone out of the UI.
 
 ol-data-platform's evaluation gate (ol-llm's evaluation-gate.yml) runs on GitHub
-Actions with a client of its own, so the credentials in GitHub can be revoked
-without rotating every application's. Only the Production Vault holds them; a person
-copies them into that repository's secrets.
+Actions with a client of its own too. Only the Production Vault holds it; a person
+copies it into that repository's secrets.
 """
 
 import json
@@ -24,14 +24,15 @@ import pulumi_vault as vault
 from pulumi import Output, ResourceOptions
 
 from ol_infrastructure.lib.opik import (
+    OPIK_APP_ENVIRONMENTS,
     OPIK_SDK_ENVIRONMENTS,
     OPIK_SDK_VAULT_MOUNT,
-    OPIK_SDK_VAULT_PATH,
+    opik_sdk_client_id,
+    opik_sdk_vault_path,
 )
 from ol_infrastructure.lib.vault import get_vault_provider
 
 REALM_NAME = "ol-platform-engineering"
-OPIK_SDK_CLIENT_ID = "ol-opik-sdk"
 # The client the Opik gateway's OIDC plugin is configured with; its bearer route
 # admits a token only when this is in aud.
 OPIK_GATEWAY_CLIENT_ID = "ol-opik-client"
@@ -97,11 +98,6 @@ def create_opik_sdk_resources(
     :param keycloak_provider: Provider for the Production Keycloak instance.
     :param keycloak_url: Base URL of the Production Keycloak instance.
     """
-    opik_sdk_client = _opik_sdk_client(
-        "ol-platform-engineering-opik-sdk", OPIK_SDK_CLIENT_ID, keycloak_provider
-    )
-    credentials_json = _credentials_json(opik_sdk_client, keycloak_url)
-
     for env_suffix in OPIK_SDK_ENVIRONMENTS:
         vault_provider = get_vault_provider(
             f"https://vault-{env_suffix}.odl.mit.edu",
@@ -110,7 +106,7 @@ def create_opik_sdk_resources(
         )
         opik_mount = vault.Mount(
             f"opik-sdk-vault-mount-{env_suffix}",
-            description="Production Keycloak client Opik SDKs authenticate with",
+            description="Production Keycloak clients Opik SDKs authenticate with",
             path=OPIK_SDK_VAULT_MOUNT,
             type="kv",
             options={"version": "1"},
@@ -118,12 +114,19 @@ def create_opik_sdk_resources(
             # has to remove the old one first.
             opts=ResourceOptions(provider=vault_provider, delete_before_replace=True),
         )
-        vault.generic.Secret(
-            f"ol-platform-engineering-opik-sdk-client-vault-credentials-{env_suffix}",
-            path=f"{OPIK_SDK_VAULT_MOUNT}/{OPIK_SDK_VAULT_PATH}",
-            data_json=credentials_json,
-            opts=ResourceOptions(provider=vault_provider, depends_on=[opik_mount]),
-        )
+        for app, app_environments in OPIK_APP_ENVIRONMENTS.items():
+            if env_suffix not in app_environments:
+                continue
+            client_id = opik_sdk_client_id(app, env_suffix)
+            client = _opik_sdk_client(
+                f"ol-platform-engineering-{client_id}", client_id, keycloak_provider
+            )
+            vault.generic.Secret(
+                f"ol-platform-engineering-{client_id}-vault-credentials",
+                path=f"{OPIK_SDK_VAULT_MOUNT}/{opik_sdk_vault_path(app)}",
+                data_json=_credentials_json(client, keycloak_url),
+                opts=ResourceOptions(provider=vault_provider, depends_on=[opik_mount]),
+            )
         if env_suffix == "production":
             evaluation_client = _opik_sdk_client(
                 "ol-platform-engineering-opik-evaluation-ol-data-platform",

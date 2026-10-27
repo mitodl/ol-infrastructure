@@ -92,9 +92,9 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.opik import (
-    OPIK_KEYCLOAK_VAULT_ENV,
-    OPIK_SDK_ENVIRONMENTS,
+    OPIK_APP_ENVIRONMENTS,
     opik_api_url,
+    opik_keycloak_vault_env,
 )
 from ol_infrastructure.lib.otel import (
     DEFAULT_TRACE_SAMPLING_RATE,
@@ -154,9 +154,9 @@ xpro_stack = (
     else None
 )
 # The ml code location traces its LLM calls to the Production Opik from every
-# environment whose Vault holds the Opik SDK client (lib/opik.py); on the Dev stack
+# environment dagster-ml has an Opik client in (lib/opik.py); on the Dev stack
 # OPIK_URL_OVERRIDE stays unset and the ml code's tracing is a no-op.
-opik_enabled = stack_info.env_suffix in OPIK_SDK_ENVIRONMENTS
+opik_enabled = stack_info.env_suffix in OPIK_APP_ENVIRONMENTS["dagster-ml"]
 # Azure OpenAI for the ml code location, federated to the data cluster's OIDC issuer
 # by infrastructure/azure/openai. Off unless a stack opts in: that project has no Dev
 # stack, and the StackReference only resolves once it has deployed the environment.
@@ -3014,7 +3014,9 @@ for location in code_locations:
                 # client in the same pod start, whichever deploys first.
                 *(
                     {"name": env_name, "value": env_value}
-                    for env_name, env_value in OPIK_KEYCLOAK_VAULT_ENV.items()
+                    for env_name, env_value in opik_keycloak_vault_env(
+                        "dagster-ml"
+                    ).items()
                 ),
             ]
         )

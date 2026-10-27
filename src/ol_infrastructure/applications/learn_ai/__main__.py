@@ -100,8 +100,8 @@ from ol_infrastructure.lib.ol_types import (
 from ol_infrastructure.lib.opik import (
     OPIK_KEYCLOAK_SECRET_TEMPLATES,
     OPIK_SDK_VAULT_MOUNT,
-    OPIK_SDK_VAULT_PATH,
     opik_api_url,
+    opik_sdk_vault_path,
 )
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
@@ -777,9 +777,10 @@ static_secrets = OLVaultK8SSecret(
 )
 
 # Opik LLM-observability credentials. Every environment traces to the Production
-# Opik (lib/opik.py), so this is the Production ``ol-opik-sdk`` Keycloak client
-# (client-credentials grant), which the Production keycloak substructure writes to
-# ``secret-opik/sdk-client`` in every environment's Vault. Sync it into a
+# Opik (lib/opik.py), so this is learn-ai's Production Keycloak client for this
+# environment, ``opik-learn-ai-<env>`` (client-credentials grant), which the
+# Production keycloak substructure writes to ``secret-opik/sdk-learn-ai`` in this
+# environment's Vault. Sync it into a
 # K8s secret via VSO and expose it to the app as the OPIK_KEYCLOAK_* env vars.
 opik_keycloak_secret_name = "learn-ai-opik-keycloak"  # pragma: allowlist secret  # noqa: S105
 opik_keycloak_secret = OLVaultK8SSecret(
@@ -792,7 +793,7 @@ opik_keycloak_secret = OLVaultK8SSecret(
         dest_secret_labels=k8s_global_labels,
         mount=OPIK_SDK_VAULT_MOUNT,
         mount_type="kv-v1",
-        path=OPIK_SDK_VAULT_PATH,
+        path=opik_sdk_vault_path("learn-ai"),
         restart_targets=[{"kind": "Deployment", "name": "learn-ai-app"}],
         templates=OPIK_KEYCLOAK_SECRET_TEMPLATES,
         vaultauth=vault_k8s_resources.auth_name,

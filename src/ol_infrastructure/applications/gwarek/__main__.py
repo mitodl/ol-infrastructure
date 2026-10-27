@@ -67,8 +67,8 @@ from ol_infrastructure.lib.ol_types import (
 from ol_infrastructure.lib.opik import (
     OPIK_KEYCLOAK_SECRET_TEMPLATES,
     OPIK_SDK_VAULT_MOUNT,
-    OPIK_SDK_VAULT_PATH,
     opik_api_url,
+    opik_sdk_vault_path,
 )
 from ol_infrastructure.lib.pulumi_helper import (
     format_docker_image_ref,
@@ -458,9 +458,9 @@ gwarek_app_secrets = OLVaultK8SSecret(
 )
 
 # Keycloak client credentials for Opik, where ol-llm sends the analyzer's
-# traces and fetches its managed prompts. This is ``ol-opik-sdk``, the Production
-# client every environment's Opik SDKs use (lib/opik.py), which the keycloak
-# substructure writes to ``secret-opik/sdk-client``. No OPIK_API_KEY: ol-llm's
+# traces and fetches its managed prompts. This is gwarek's Production client,
+# ``opik-gwarek-production`` (lib/opik.py), which the keycloak substructure writes
+# to ``secret-opik/sdk-gwarek``. No OPIK_API_KEY: ol-llm's
 # Keycloak auth owns the Authorization header (see the opik stack's
 # OPIK_SDK_KEYCLOAK_AUTH.md).
 gwarek_opik_keycloak_k8s_name = "gwarek-opik-keycloak"  # pragma: allowlist secret
@@ -474,7 +474,7 @@ gwarek_opik_keycloak_secret = OLVaultK8SSecret(
         dest_secret_labels=application_labels,
         mount=OPIK_SDK_VAULT_MOUNT,
         mount_type="kv-v1",
-        path=OPIK_SDK_VAULT_PATH,
+        path=opik_sdk_vault_path("gwarek"),
         excludes=[".*"],
         exclude_raw=True,
         templates=OPIK_KEYCLOAK_SECRET_TEMPLATES,
