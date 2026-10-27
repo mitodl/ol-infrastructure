@@ -25,7 +25,9 @@ PersonalData.Personal / PersonalData.SpecialCategory
   flip the flag to True and redeploy to start applying the tag automatically.
 
 Domains are declared in ``DOMAIN_CONFIG``.  Which assets belong to each is set
-from ol-data-platform's dbt manifest, not here.
+from ol-data-platform's dbt manifest and domain rules, not here: by the
+om-ingest-dbt job for dbt's tables, and by the om-ingest-domains job
+(domain_assignment.py) for the other lake tables and Superset.
 
 Custom properties are declared in ``CUSTOM_PROPERTY_CONFIG``, per entity type.
 A missing property is added and one whose description or displayName differs
@@ -127,7 +129,8 @@ _PATCHABLE_FIELDS: list[str] = [
 # warehouse by business area rather than source platform, because dim_user and
 # the combined marts span every platform.  Assets are assigned to them by the
 # rules in ol-data-platform src/ol_dbt/openmetadata_domains.yml, which refer to
-# these names; the om-ingest-dbt job skips a name that does not exist here.
+# these names; the om-ingest-dbt and om-ingest-domains jobs skip a name that
+# does not exist here.
 # Every domain is "Aggregate": each holds raw tables from the source apps as
 # well as the models built for consumers.
 DOMAIN_CONFIG: dict[str, dict[str, str]] = {
