@@ -162,11 +162,10 @@ ol_zone_id = dns_stack.require_output("ol")["id"]
 # Frontend storage bucket
 learn_ai_app_storage_bucket_name = f"ol-mit-learn-ai-{stack_info.env_suffix}"
 
-# CI and QA use SigV4-signed Fastly->S3 requests, so the bucket can be fully
-# private instead of public-read (hq#13287 item 1; mit-learn runs the same
-# pattern in every environment). Production stays on the public-read policy
-# until QA has been validated.
-_learn_ai_bucket_is_sigv4_piloted = stack_info.env_suffix in {"ci", "qa"}
+# Every environment uses SigV4-signed Fastly->S3 requests, so the bucket can be
+# fully private instead of public-read (hq#13287 item 1; mit-learn runs the same
+# pattern). Kept as a flag so production can be rolled back by dropping it here.
+_learn_ai_bucket_is_sigv4_piloted = stack_info.env_suffix in {"ci", "qa", "production"}
 
 learn_ai_app_storage_bucket_config = S3BucketConfig(
     bucket_name=learn_ai_app_storage_bucket_name,
