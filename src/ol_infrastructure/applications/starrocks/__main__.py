@@ -733,6 +733,8 @@ if starrocks_config.get_bool("use_cn"):
 # Reviewed for 1.11.7: the only diff from 1.11.6 is unrelated csiVolumes
 # support (CSI ephemeral inline volumes); the fe.conf config block is
 # byte-identical.
+# Reviewed for 1.11.8: the starrocks subchart changed only its Chart.yaml
+# version; values.yaml and the fe.conf config block are unchanged.
 #
 # fe.conf is rendered into a ConfigMap, which the shared cluster readonly role
 # can read, so no secret value goes into it. The FE's config loader
@@ -746,9 +748,9 @@ if (
     ssl_enabled
     or starrocks_config.get_bool("use_cn")
     or starrocks_config.get_bool("use_be")
-) and (STARROCKS_CHART_VERSION not in ("1.11.6", "1.11.7")):
+) and (STARROCKS_CHART_VERSION not in ("1.11.6", "1.11.7", "1.11.8")):
     msg = (
-        f"_FE_CONFIG_BASE was sourced from chart 1.11.6/1.11.7; review defaults"
+        f"_FE_CONFIG_BASE was sourced from chart 1.11.6-1.11.8; review defaults"
         f" for {STARROCKS_CHART_VERSION} before deploying with SSL, CN, or BE"
         f" enabled"
     )
