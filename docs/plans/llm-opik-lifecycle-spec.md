@@ -5,7 +5,7 @@ answers one decision task. All five were decided by the project owner on 2026-10
 
 | Part | Decision task | Status |
 | --- | --- | --- |
-| §1 Access model | `tk-decide-the-opik-access-model-for-a-shared-instan-fb80c2` | Decided: Keycloak-only with a group gate, per-app clients, per-app projects |
+| §1 Access model | `tk-decide-the-opik-access-model-for-a-shared-instan-fb80c2` | Decided: Keycloak-only with a group gate, one shared SDK client (amended 2026-10-27), per-app projects |
 | §2 Prompt authoring and approval | `tk-decide-the-prompt-authoring-surface-and-approval-e71d7f` | Decided: split by label (option C) |
 | §3 Prompt runtime policy | `tk-decide-prompt-overrides-cache-behavior-fallback--5e7c55` | Decided as written |
 | §4 Mandatory surfaces and deepeval | `tk-decide-which-opik-surfaces-are-mandatory-and-whe-873bd5` | Decided: tiered list; deepeval replaced by Opik metrics |
@@ -24,7 +24,7 @@ Prompt fetch, label resolution, and trace linkage were also run against a local 
 
 ## 1. Access model
 
-### 1.1 What exists
+### 1.1 What exists (as of 2026-10-01)
 
 - Opik's own authentication cannot be turned on in a self-hosted install.
   `authentication.enabled` switches the backend to `RemoteAuthService`, which calls a
@@ -59,14 +59,19 @@ trace, and Opik cannot change that.
    or by a claim check at APISIX. The bearer route additionally checks the token audience.
    APISIX 3.18.0's `claim_validator.audience.match_with_client_id` compares `aud` with the
    route's own `client_id` (`openid-connect.lua:1254-1290`), which is `ol-opik-client`, so
-   every per-app client in item 3 needs a Keycloak audience mapper that adds
-   `ol-opik-client` to its tokens. A token without it gets a 403.
+   the SDK client in item 3 needs a Keycloak audience mapper that adds `ol-opik-client` to
+   its tokens (`ol-opik-sdk` has one). A token without it gets a 403.
    Neither mechanism has been tested; the implementation task picks one.
-3. One service identity per application and environment. Each app-environment gets its own
-   Keycloak client for SDK traffic (for example `opik-learn-ai-production`), replacing the
-   shared secret, so a credential can be revoked without touching other apps and APISIX and
-   Keycloak logs say which app wrote. The CI prompt-sync and evaluation jobs get their own
-   client too.
+3. One shared service identity for SDK traffic (amended 2026-10-27, see below). Every
+   application that traces to Opik, in CI, QA and Production, authenticates as `ol-opik-sdk`,
+   a client-credentials-only client in the Production realm
+   (`substructure/keycloak/opik_sdk.py`); dagster's `ml` code location moves to it with
+   mitodl/ol-data-platform#3144. The Production
+   keycloak stack writes its credentials to `secret-opik/sdk-client`, a KV v1 mount of its
+   own in the CI, QA and Production Vaults, kept off `secret-operations` because some
+   application policies read `secret-operations/*`. It carries the `ol-opik-client` audience
+   mapper item 2 needs. Which client the CI prompt-sync and evaluation jobs use is not
+   decided.
 4. One Opik project per application, named for the app (`learn-ai`, `mit-learn`,
    `dagster-ml`, `gwarek`, `open-edx-translations`). Environment is carried on the trace
    (`environment` field plus the `env:` tag, attribution schema §4.1), not in the project
@@ -84,6 +89,17 @@ the cost of splitting each app's traces across three projects. Per-app projects 
 non-production volume is small and the simpler layout is worth more.
 
 Decided 2026-10-01: items 1 to 6, with per-app projects.
+
+Amended 2026-10-27, item 3: as decided on 2026-10-01 it gave each app-environment its own
+Keycloak client (for example `opik-learn-ai-production`), so one could be revoked without
+touching the others and APISIX and Keycloak logs said which app wrote. mitodl/ol-infrastructure#6621
+shipped the single shared `ol-opik-sdk` instead, and it stays. That gives up three things:
+revoking or rotating it affects every app in every environment; a leak from a CI or QA Vault
+means rotating a Production credential, and whoever holds it can read every Production trace
+and edit or relabel any prompt; and the gateway and Keycloak logs can't tell apps apart.
+Traces still can: each app has its own project (item 4), and the environment is on the trace
+(mit-learn's `OL_LLM_ENVIRONMENT`, learn-ai's `OPIK_ENVIRONMENT`, dagster ml's `DAGSTER_ENV`
+in code; gwarek runs in Production only).
 
 ## 2. Prompt authoring and approval
 
@@ -144,7 +160,8 @@ The workflow:
    for a repository run one at a time, and each reads the pointer file from the default
    branch's HEAD when it starts, not from the commit that triggered it. Otherwise two merges
    close together can finish out of order and the older job moves the label back. Only that
-   job's Keycloak client is meant to move it. Opik cannot enforce that, so the drift report
+   job is meant to move it. Opik cannot enforce that, and with the shared SDK client
+   (§1.2 item 3) the gateway can't tell the job from an app either, so the drift report
    (§1.2 item 5) compares the label with the pointer and reports a mismatch.
 5. Rollback is a revert of the pointer change.
 6. The build exports the text of the pointed version into the image as the embedded default
