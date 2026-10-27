@@ -2571,7 +2571,9 @@ learn_external_service_apisix_route = OLApisixRoute(
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                    name="redirect",
+                    secretRef=None,
+                    config={"uri": "/learn/logout/oidc"},
                 ),
             ],
             hosts=[mitlearn_api_domain],
@@ -2621,7 +2623,9 @@ learn_external_service_apisix_route = OLApisixRoute(
             shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                    name="redirect",
+                    secretRef=None,
+                    config={"uri": "/learn/logout/oidc"},
                 ),
             ],
             hosts=[mitlearn_api_domain],
@@ -2696,7 +2700,9 @@ learn_external_service_apisix_route = OLApisixRoute(
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             plugins=[
                 OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
+                    name="redirect",
+                    secretRef=None,
+                    config={"uri": "/learn/logout/oidc"},
                 ),
             ],
             hosts=[mitlearn_api_domain],
