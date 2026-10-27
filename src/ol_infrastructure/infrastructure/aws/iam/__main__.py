@@ -121,6 +121,9 @@ github_actions_oidc_provider = iam.OpenIdConnectProvider(
     "github-actions-oidc-provider",
     url=f"https://{GITHUB_ACTIONS_OIDC_ISSUER}",
     client_id_lists=[GITHUB_ACTIONS_OIDC_AUDIENCE],
+    # An account has one provider per issuer, and every GitHub Actions role
+    # trusts it, so replacing or deleting it would break all of them at once.
+    opts=ResourceOptions(protect=True),
 )
 export("github_actions_oidc_provider_arn", github_actions_oidc_provider.arn)
 
