@@ -162,7 +162,9 @@ def build_webapp_keda_config(  # noqa: PLR0913
         requests_threshold: Requests/sec per pod before scaling up.
         requests_rate_window: PromQL range for the request-rate ``rate()``. A
             shorter window reacts to a traffic step sooner and is noisier. It has
-            to span at least two APISIX scrapes (15s apart) or the query is empty.
+            to span at least two APISIX scrapes or ``rate()`` is empty; the
+            ServiceMonitor scrapes every 60s, so use 3m or more to survive a
+            missed scrape.
         latency_threshold: p95 latency in ms at which the trigger asks for the
             current replica count (see the ``Value`` note below). Pass None to
             omit the latency trigger -- appropriate where request duration is
