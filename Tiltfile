@@ -553,7 +553,7 @@ if "data-platform" in enabled_apps:
 local_resource(
     "kc-seed-users",
     cmd="LOCAL_DEV_ROOT_DOMAIN={rd} {script}".format(rd=root_domain, script="{}/local-dev/scripts/kc-seed-users.sh".format(config.main_dir)),
-    deps=["./local-dev/scripts/kc-seed-users.sh"],
+    deps=["./local-dev/scripts/kc-seed-users.sh", "./local-dev/scripts/kc-admin.sh"],
     labels=["infra"],
     resource_deps=["local-infra-apps"],
 )
@@ -565,7 +565,7 @@ local_resource(
 local_resource(
     "kc-fix-flow-bindings",
     cmd="LOCAL_DEV_ROOT_DOMAIN={rd} {script}".format(rd=root_domain, script="{}/local-dev/scripts/kc-fix-flow-bindings.sh".format(config.main_dir)),
-    deps=["./local-dev/scripts/kc-fix-flow-bindings.sh"],
+    deps=["./local-dev/scripts/kc-fix-flow-bindings.sh", "./local-dev/scripts/kc-admin.sh"],
     labels=["infra"],
     resource_deps=["local-infra-apps"],
 )
