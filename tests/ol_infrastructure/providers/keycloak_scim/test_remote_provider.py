@@ -6,7 +6,7 @@ from ol_infrastructure.providers.keycloak_scim.remote_provider import (
 )
 
 
-def test_declared_restores_ints_floated_by_the_engine():
+def test_declared_restores_ints_floated_by_the_engine() -> None:
     spec = ScimRemoteProviderSpec(
         realm="olapps",
         name="ol-mitxonline-scim",
