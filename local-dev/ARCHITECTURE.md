@@ -241,7 +241,7 @@ On raw Kubernetes, the naive dev loop is brutal:
 edit code → rebuild image → load into cluster → roll the Deployment → wait for pod
 ```
 
-That is seconds-to-minutes per change. Tilt's **`live_update`** fixes it: it watches your files and syncs the changed ones straight into the running container (conceptually a bind mount, but push-based), then either runs a small command (`uv sync` when the lockfile changes) or lets the process inside hot-reload on its own:
+That is seconds-to-minutes per change. Tilt's **`live_update`** fixes it: it watches your files and syncs the changed ones straight into the running container (conceptually a bind mount, but push-based), then either runs a small command (`yarn install` when the Next.js lockfile changes) or lets the process inside hot-reload on its own:
 
 - Django: `granian --reload`
 - Frontend: `next dev` HMR
@@ -254,7 +254,7 @@ There are two entirely separate paths, and knowing which one is in play explains
 
 **Transport 1 — `live_update` (the everyday one).** When you save a file, Tilt tars just the changed files and streams them into the *running container's* filesystem over the Kubernetes exec API — the same plumbing as `kubectl cp`. No image build, no registry, no pod restart; `granian --reload` / `next dev` notice the file change. This is the compose bind-mount feeling, implemented as push-based sync.
 
-**Transport 2 — image rebuild → push → pull.** Used only when a file-copy can't express the change: Dockerfile edits, dependency changes the `live_update` `run()` steps can't handle, Tiltfile config changes, or a manual rebuild. This path exists because every container runtime has its own private **image store**: your Mac's Docker daemon has one (`docker images`), and each k3d node's containerd has its own. None of them can read each other's. The **registry** (`k3d-registry.localhost`, the zot container) is the network service that bridges them: Tilt pushes the freshly built image there, and each node's kubelet pulls from it like it would from Docker Hub.
+**Transport 2 — image rebuild → push → pull.** Used only when a file-copy can't express the change: Dockerfile edits, Python dependency changes (a `pyproject.toml`/`uv.lock` edit rebuilds instead of running `uv sync` in the pod, because Celery doesn't reload and an in-pod sync would leave running processes on the old packages), mitxonline frontend edits, Tiltfile config changes, or a manual rebuild. This path exists because every container runtime has its own private **image store**: your Mac's Docker daemon has one (`docker images`), and each k3d node's containerd has its own. None of them can read each other's. The **registry** (`k3d-registry.localhost`, the zot container) is the network service that bridges them: Tilt pushes the freshly built image there, and each node's kubelet pulls from it like it would from Docker Hub.
 
 What actually crosses the wire is negotiated, not the whole image. An image is a small JSON manifest plus content-addressed **layers**; push and pull both start by comparing digests and transfer only the layers the other side is missing. A rebuild typically changes only the top (code) layer, so the multi-GB base layers cross once and never again.
 

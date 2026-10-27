@@ -26,19 +26,38 @@ if HAS_CHECKOUT:
         target='local-dev',
         dockerfile=APP_DIR + '/Dockerfile',
         # .claude/ holds agent worktrees; syncing one into the pod restarted it in a loop.
-        ignore=['.claude/'],
+        # Host-side frontend builds and coverage runs write under frontend/, and
+        # every frontend/ change rebuilds the image (below); the image's webpack
+        # stage produces its own bundles, so these never need to reach it.
+        ignore=[
+            '.claude/',
+            'frontend/*/build',
+            'frontend/*/coverage',
+            'frontend/*/.nyc_output',
+        ],
         # Sync the whole repo: Django apps are top-level dirs (courses,
         # ecommerce, cms, ...). granian's --reload-ignore-dirs filters the
         # non-Python churn.
         live_update=[
+            # Dependency changes rebuild the image rather than running uv sync
+            # in the pods: Celery doesn't reload, so running processes would
+            # keep the old packages, and a restarted container loses the sync.
+            # Frontend source changes rebuild it too: the bundles are compiled
+            # in the image's webpack stage, and nothing in the pod watches or
+            # rebuilds them.
+            fall_back_on([
+                APP_DIR + '/pyproject.toml',
+                APP_DIR + '/uv.lock',
+                APP_DIR + '/frontend',
+                APP_DIR + '/package.json',
+                APP_DIR + '/yarn.lock',
+                APP_DIR + '/.yarnrc.yml',
+                # Not all of .yarn/: a host `yarn install` rewrites its cache and
+                # install state without changing what the image builds.
+                APP_DIR + '/.yarn/plugins',
+                APP_DIR + '/.yarn/releases',
+            ]),
             sync(APP_DIR, '/src'),
-            # Reinstall deps on pyproject.toml/uv.lock change (uv, not pip;
-            # dev deps included, matching the local-dev image; --inexact keeps
-            # the image's extra watchfiles install).
-            run(
-                'cd /src && uv sync --frozen --inexact',
-                trigger=[APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock'],
-            ),
         ],
     )
 
