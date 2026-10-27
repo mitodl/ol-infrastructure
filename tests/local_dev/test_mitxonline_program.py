@@ -398,6 +398,29 @@ def test_env_is_exactly_the_three_local_layers(tmp_path, monkeypatch):
     )
 
 
+def test_the_admin_api_takes_the_b2b_clients_pair(tmp_path, monkeypatch):
+    """The admin roles are on mitxonline-b2b-client, whose pair apps-infra
+    writes into mitxonline-keycloak-admin. A KEYCLOAK_ADMIN_* key left in
+    secrets.yaml would compete with it, and ol-mitxonline-client gets a 403.
+    """
+    mocks = _render(tmp_path, monkeypatch)
+    secrets_yaml = mocks.program["secret_data"]
+    workloads = [
+        _one(mocks, DEPLOYMENT, "mitxonline-app"),
+        _one(mocks, JOB, "mitxonline-app-pre-deploy"),
+    ]
+
+    assert not [key for key in secrets_yaml if key.startswith("KEYCLOAK_ADMIN_")]
+    for workload in workloads:
+        for container in workload["spec"]["template"]["spec"]["containers"]:
+            secret_refs = [
+                source["secretRef"]["name"]
+                for source in container.get("envFrom", [])
+                if "secretRef" in source
+            ]
+            assert "mitxonline-keycloak-admin" in secret_refs
+
+
 def test_the_root_domain_flows_into_hosts_and_env(tmp_path, monkeypatch):
     mocks = _render(tmp_path, monkeypatch, root_domain="mit.localhost")
     direct = _one(mocks, ROUTE, "mitxonline-apisix-route-direct-dev")

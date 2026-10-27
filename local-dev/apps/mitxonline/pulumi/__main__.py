@@ -272,7 +272,9 @@ bindings = definition.MitxonlineBindings(
     ),
     environment_variables=env_vars,
     k8s_labels=LABELS,
-    secret_names=[secret_name],
+    # The admin API's client pair, which apps-infra writes into this namespace
+    # (the deployed stacks read it from keycloak-admin-b2b in Vault).
+    secret_names=[secret_name, "mitxonline-keycloak-admin"],
     # The shared mit-learn client, as deployed (sso/mitlearn); apps-infra writes
     # this Secret into the mitxonline namespace.
     oidc_secret_name="ol-mitlearn-oidc",  # noqa: S106  # pragma: allowlist secret
