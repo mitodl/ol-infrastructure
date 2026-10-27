@@ -117,7 +117,7 @@ config:
   keycloak_realm:ol-data-platform-openmetadata-client-secret:
     secure: v1:kUumLXwbKKqZQU3/:IogyWYCtDjFs71I4LJW+DvOhYULDwPJ/Gbucf+0nxqhBY/Tt3vAj1AtGnQf9FHbQ
   keycloak_realm:ol-data-platform-starrocks-client-secret:
-    secure: v1:zHo95RFS+Eoplvmf:NBtJt1ajx88FL6NMWqqmk0czTWG+2ZoUvB/nWhuERLkXffbW5LDIwJ6EhtQCUQ84Cm0CntuUXq6gTACdrjdLdNk0AINAP+0pfvvDk5+0Gus=
+    secure: v1:90Gi8Rntqe/2GVS5:B7N1eNNNtVv+DS3S240LBpZE68RsIu+KWP1TJREZQi6ZLbeGc4VwtkWzgB6pVuFB
   keycloak_realm:session_secret:
     secure: v1:9Y54vvxTRbuuDCro:dXlzvu2/QqxZyEA1iG/elwzgP3xAQSVChqh/c5bXsLmz3j6hDzBlgBzlp9pIbxVk/+1GhYKrIgsULgU=
   keycloak_realm:olapps_email_tmeme: ol-learn
