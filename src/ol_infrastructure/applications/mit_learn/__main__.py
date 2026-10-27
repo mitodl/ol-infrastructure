@@ -6,6 +6,7 @@ import mimetypes
 import textwrap
 from pathlib import Path
 from string import Template
+from typing import Any
 
 import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
@@ -57,6 +58,8 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPluginsConfig,
     OLApisixSharedPluginsVariant,
+    OLApisixUpstream,
+    OLApisixUpstreamConfig,
     browser_traffic_match_exprs,
     oidc_gateway_pre_function_plugin,
     ol_apisix_shared_plugins_variants,
@@ -2296,6 +2299,28 @@ fastly_api_match_exprs = [
     }
 ]
 
+# With "service" granularity APISIX has a single node (the ClusterIP), so when
+# a webapp pod dies (OOMKill, crash, spot interruption) the refused connection
+# has nowhere to be retried and the client gets a 502. Resolving to pod IPs
+# lets APISIX retry it on another pod. retries=1 caps the extra attempts at one
+# instead of APISIX's default of one per remaining pod.
+webapp_endpoint_routing = mitlearn_config.get_bool("webapp_endpoint_routing") or False
+webapp_backend: dict[str, Any] = {
+    "backend_service_name": mitlearn_k8s_app.application_lb_service_name,
+    "backend_service_port": mitlearn_k8s_app.application_lb_service_port_name,
+    "backend_resolve_granularity": "endpoint" if webapp_endpoint_routing else "service",
+}
+if webapp_endpoint_routing:
+    OLApisixUpstream(
+        name=f"ol-mitlearn-k8s-apisix-upstream-{stack_info.env_suffix}",
+        upstream_config=OLApisixUpstreamConfig(
+            service_name=mitlearn_k8s_app.application_lb_service_name,
+            k8s_namespace=learn_namespace,
+            k8s_labels=application_labels,
+            retries=1,
+        ),
+    )
+
 learn_external_service_apisix_route_no_prefix = OLApisixRoute(
     name=f"ol-mitlearn-k8s-apisix-route-no-prefix-{stack_info.env_suffix}",
     k8s_namespace=learn_namespace,
@@ -2320,8 +2345,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/*"],
             exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="fastly-logout-redirect",
@@ -2335,8 +2359,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/logout/oidc/*"],
             exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="fastly-reqauth",
@@ -2355,8 +2378,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
                 "/login/*",
             ],
             exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="browser-passauth",
@@ -2374,8 +2396,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/*"],
             exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="browser-logout-redirect",
@@ -2389,8 +2410,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/logout/oidc/*"],
             exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="browser-reqauth",
@@ -2409,8 +2429,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
                 "/login/*",
             ],
             exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="passauth",
@@ -2424,8 +2443,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/*"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         # Credential metadata generation calls a frontier model once per Open
         # Badges field (gpt-5 and Claude measure 25-46s each, generated
@@ -2453,8 +2471,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/api/v0/credential_metadata/"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="logout-redirect",
@@ -2467,8 +2484,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/logout/oidc/*"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="reqauth",
@@ -2486,8 +2502,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
                 "/login",
                 "/login/*",
             ],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         # The sidecar answered this with a 204 (EFF Do Not Track convention
         # for "no policy published"). "passauth" above would otherwise proxy
@@ -2512,8 +2527,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             hosts=[mitlearn_api_domain],
             paths=["/.well-known/dnt-policy.txt"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
             plugins=[
                 OLApisixPluginConfig(
                     name="mocking",
@@ -2554,8 +2568,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/learn/*"],
             exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="fastly-logout-redirect",
@@ -2569,8 +2582,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/learn/logout/oidc/*"],
             exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="fastly-reqauth",
@@ -2589,8 +2601,7 @@ learn_external_service_apisix_route = OLApisixRoute(
                 "/learn/login/*",
             ],
             exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="browser-passauth",
@@ -2607,8 +2618,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/learn/*"],
             exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="browser-logout-redirect",
@@ -2622,8 +2632,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/learn/logout/oidc/*"],
             exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="browser-reqauth",
@@ -2642,8 +2651,7 @@ learn_external_service_apisix_route = OLApisixRoute(
                 "/learn/login/*",
             ],
             exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="passauth",
@@ -2657,8 +2665,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/learn/*"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         # Credential metadata generation calls a frontier model once per Open
         # Badges field (gpt-5 and Claude measure 25-46s each, generated
@@ -2686,8 +2693,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/learn/api/v0/credential_metadata/"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="logout-redirect",
@@ -2700,8 +2706,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/learn/logout/oidc/*"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="reqauth",
@@ -2719,8 +2724,7 @@ learn_external_service_apisix_route = OLApisixRoute(
                 "/learn/login",
                 "/learn/login/*",
             ],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
     ],
     opts=ResourceOptions(
