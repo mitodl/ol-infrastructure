@@ -1759,9 +1759,22 @@ def _build_release_resource_app_pipeline(
             file=f"{CACHE_BUST_DIR}/value",
             reveal=True,
         ),
+        # `passed:` the release build, like the release get above. Concourse
+        # records a job's inputs by resource, not by step name, and Production
+        # takes the release `passed:` this job, so whatever version this get
+        # resolves to is one Production can deploy. Unconstrained, it took the
+        # resource's latest check, which is the next, uncut release once the
+        # main branch moves past the last one, and Production resolved to it
+        # (micromasters, 2026-10-27). The files read from it, production_version
+        # and production_state, come from the GitHub Deployments API on every
+        # `in` and do not depend on the version, so a cut version serves.
+        # Do not instead add the release build to Production's `passed:`: an
+        # input whose `passed:` names two jobs bound the Production job to an
+        # older QA build than the newest (mitodl/ol-infrastructure#6685).
         GetStep(
             get=release_current,
             resource=release_res.name,
+            passed=[release_image_build_job.name],
             params={"cache_bust": "((.:cache_bust))"},
         ),
         _classify_promotion_task(
