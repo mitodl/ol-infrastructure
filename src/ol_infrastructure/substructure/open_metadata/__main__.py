@@ -1096,8 +1096,10 @@ vault.generic.Secret(
 # asset_check_failure_sensor. A dbt test that only warns is reported by neither.
 #
 # The filter matches every change event of a contract whose latest result is
-# Failed or Aborted, so a contract that stays failing is posted again on each
-# daily validation.
+# Failed, so a contract that stays failing is posted again on each daily
+# validation. Aborted is left out: OpenMetadata sets it when a newer validation
+# supersedes a running one or the quality run cannot be triggered, neither of
+# which says the contract failed.
 #
 # OpenMetadata returns a Slack destination's endpoint unmasked to anyone with
 # ViewAll on eventsubscription, which every user holds through the default
@@ -1117,20 +1119,15 @@ OpenMetadataEventSubscription(
         name="data-contract-failures",
         display_name="Data contract failures",
         description=(
-            "Posts to Slack when a data contract's latest result is Failed or"
-            " Aborted. Managed by Pulumi in ol-infrastructure"
-            " substructure/open_metadata."
+            "Posts to Slack when a data contract's latest result is Failed."
+            " Managed by Pulumi in ol-infrastructure substructure/open_metadata."
         ),
         alert_type="Observability",
         resource="dataContract",
         actions=[
             AlertCondition(
                 name="GetDataContractStatusUpdates",
-                arguments=[
-                    AlertArgument(
-                        name="contractStatusList", input=["Failed", "Aborted"]
-                    )
-                ],
+                arguments=[AlertArgument(name="contractStatusList", input=["Failed"])],
             )
         ],
     ),
