@@ -299,6 +299,18 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             keycloak.RealmUserProfileAttributeArgs(
                 name="emailOptIn",
                 display_name="${emailOptIn}",
+                # ol-learn-scim declares emailOptIn as an integer, and
+                # scim-for-keycloak validates each PATCH locally before sending it.
+                # One user holding "false" fails that validation, which aborts and
+                # rolls back the whole retry run for the provider.
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="options",
+                        config={
+                            "options": json.dumps(["0", "1"], separators=(",", ":"))
+                        },
+                    ),
+                ],
                 required_for_roles=[],
                 permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                     views=["admin", "user"], edits=["admin", "user"]
