@@ -552,6 +552,11 @@ def query_engine_lake_access(env_suffix: str) -> dict[str, DataLakeAccess]:
 # no "actions" location, which _is_parliament_finding_filtered indexes.
 BEDROCK_PARLIAMENT_CONFIG: dict[str, Any] = {"RESOURCE_MISMATCH": {}}
 
+# A system-defined inference profile ID: a Region-group prefix (us, eu, apac, jp,
+# us-gov, global, ...; AWS adds more) and then the model ID, <vendor>.<model>. No
+# * or ?, since IAM would read either as a wildcard in the resource ARN.
+_INFERENCE_PROFILE_ID = re.compile(r"[a-z-]+\.[a-z0-9-]+\.[A-Za-z0-9.:_-]+")
+
 
 def bedrock_invoke_statements(
     account_id: str,
@@ -598,7 +603,8 @@ def bedrock_invoke_statements(
     :type inference_profiles: Sequence[str] | None
 
     :raises ValueError: If both ``vendor`` and ``inference_profiles`` are given,
-        or ``inference_profiles`` is empty.
+        or ``inference_profiles`` is empty or names something other than a
+        system-defined profile ID.
 
     :returns: The invoke statement.
 
@@ -611,6 +617,14 @@ def bedrock_invoke_statements(
         if not inference_profiles:
             # Falling through to the unscoped globs would allow every model.
             msg = "inference_profiles is empty; name at least one profile"
+            raise ValueError(msg)
+        invalid = [
+            profile
+            for profile in inference_profiles
+            if not _INFERENCE_PROFILE_ID.fullmatch(profile)
+        ]
+        if invalid:
+            msg = f"Not system-defined inference profile IDs: {invalid}"
             raise ValueError(msg)
         # A system-defined profile ID is the model ID behind a Region-group
         # prefix: global.anthropic.claude-haiku-4-5-... routes to

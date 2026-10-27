@@ -89,3 +89,20 @@ def test_empty_inference_profiles_are_refused():
     # An empty list must not fall through to the unscoped globs.
     with pytest.raises(ValueError, match="is empty"):
         bedrock_invoke_statements(ACCOUNT_ID, inference_profiles=[])
+
+
+@pytest.mark.parametrize(
+    "profile",
+    [
+        "us.*",
+        "us.anthropic.*",
+        "us.anthropic.claude-?onnet-5",
+        "anthropic.claude-sonnet-5",
+        "claude-sonnet-5",
+    ],
+)
+def test_inference_profiles_must_be_literal_profile_ids(profile):
+    # A glob would widen the grant past the named models, and an ID without a
+    # Region-group prefix has no model ID to derive.
+    with pytest.raises(ValueError, match="Not system-defined"):
+        bedrock_invoke_statements(ACCOUNT_ID, inference_profiles=[profile])
