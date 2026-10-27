@@ -674,6 +674,15 @@ _make_cronjob(
 dbt_artifacts_bucket = (
     om_config.get("dbt_artifacts_bucket") or f"dagster-data-{stack_info.env_suffix}"
 )
+dbt_artifacts_prefix = "openmetadata/dbt-artifacts"
+
+# The production dbt layer schemas.  Restricting the dbt job to them keeps it
+# from resolving dev-namespace model names that don't exist in OM; the domains
+# job assigns tables in the same schemas.
+LAKE_DBT_SCHEMA_INCLUDES = [
+    r"ol_warehouse_[a-z]+_(dimensional|external|intermediate|irx|mart|migration|raw|reporting|staging)$",
+    r"ol_data_lake_[a-z]+",
+]
 
 _make_cronjob(
     name="dbt",
@@ -684,8 +693,53 @@ _make_cronjob(
         _plain_env("OM_SERVICE_NAME", service_name_dbt),
         _plain_env("OM_AWS_REGION", aws_region),
         _plain_env("OM_DBT_BUCKET", dbt_artifacts_bucket),
+        _plain_env("OM_DBT_PREFIX", dbt_artifacts_prefix),
+        _plain_env("OM_DBT_SCHEMA_INCLUDES", json.dumps(LAKE_DBT_SCHEMA_INCLUDES)),
     ],
 )
+
+# ---------------------------------------------------------------------------
+# Domains for what dbt does not describe
+# ---------------------------------------------------------------------------
+# The dbt job above sets the domain of each table dbt builds or declares.  This
+# one applies the same rules (ol-data-platform src/ol_dbt/openmetadata_domains.yml,
+# uploaded beside the manifest) to the lake tables dbt does not declare, and
+# derives each Superset dataset's and dashboard's domain from the tables it
+# reads.  Glue tables, pipelines and charts are left without domains; the
+# script's docstring says why.
+#
+# Runs after the dbt job (03:00), which sets the table domains the datasets
+# take, and the Superset job (04:00), which records the dataset lineage.
+#
+# Gated by the required open_metadata:enable_domain_assignment: it reads the
+# rules the lakehouse uploads beside the manifest on each scheduled build, and
+# QA has no scheduled build (its dbt artifacts come from hand-launched
+# dbt_docs_artifacts_job runs), so in QA the rules file never appears.
+if om_config.require_bool("enable_domain_assignment"):
+    _make_cronjob(
+        name="domains",
+        schedule="30 5 * * *",
+        python_script=(
+            Path(__file__).parent / "scripts" / "domain_assignment.py"
+        ).read_text(),
+        extra_env=[
+            _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+            # The service the dbt job enriches, so the tables it leaves to that
+            # job are the ones that job sets.
+            _plain_env("OM_LAKE_SERVICE_NAME", service_name_dbt),
+            _plain_env("OM_SUPERSET_SERVICE_NAME", service_name_superset),
+            _plain_env("OM_AWS_REGION", aws_region),
+            _plain_env("OM_DBT_BUCKET", dbt_artifacts_bucket),
+            _plain_env("OM_DBT_PREFIX", dbt_artifacts_prefix),
+            _plain_env("OM_DBT_SCHEMA_INCLUDES", json.dumps(LAKE_DBT_SCHEMA_INCLUDES)),
+            # true logs each change without making it, e.g. to review a rules
+            # change's effect before it lands.
+            _plain_env(
+                "OM_DOMAINS_DRY_RUN",
+                json.dumps(om_config.get_bool("domains_dry_run", default=False)),
+            ),
+        ],
+    )
 
 # ---------------------------------------------------------------------------
 # StarRocks: metadata, dbt enrichment, and lineage from the lake
@@ -745,7 +799,7 @@ if starrocks_host_port:
     )
 
 if starrocks_host_port and om_config.require_bool("enable_starrocks_dbt"):
-    starrocks_dbt_artifacts_prefix = "openmetadata/dbt-artifacts/starrocks"
+    starrocks_dbt_artifacts_prefix = f"{dbt_artifacts_prefix}/starrocks"
 
     # Same script as the Trino dbt job, pointed at the StarRocks artifacts.
     # The lake schemas are left out of the filter on purpose: the models'
