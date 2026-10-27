@@ -911,8 +911,12 @@ def setup_apisix(
                                 "cpu": "50m",
                                 "memory": "256Mi",
                             },
+                            # The manager OOMs at 256Mi while decoding its initial
+                            # cache sync, and weekly peaks reach it on several
+                            # clusters. The chart gives it no env hook for
+                            # GOMEMLIMIT, so the ceiling needs real headroom.
                             "limits": {
-                                "memory": "256Mi",
+                                "memory": "512Mi",
                             },
                         },
                         # Surge-first rolling update (maxUnavailable: 0): a new IC pod
