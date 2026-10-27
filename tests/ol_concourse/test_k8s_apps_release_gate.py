@@ -98,7 +98,7 @@ def test_assertion_reads_the_ol_infra_commit_the_job_deploys():
 
 def test_legacy_pipelines_are_untouched():
     """Legacy pipelines have no release gate, so they get no check."""
-    pipeline = json.loads(build_app_pipeline("mitxonline").model_dump_json())
+    pipeline = json.loads(build_app_pipeline("mit-learn").model_dump_json())
     assert ASSERT_GATE_TASK_NAME not in json.dumps(pipeline)
 
 
