@@ -171,10 +171,21 @@ evaluation_gate_bedrock_policy = {
 lint_iam_policy(
     evaluation_gate_bedrock_policy, parliament_config=BEDROCK_PARLIAMENT_CONFIG
 )
-iam.RolePolicy(
+# A managed policy rather than an inline one: the Concourse worker that deploys
+# this stack may create policies and attach them under /ol-infrastructure/, but
+# has no iam:PutRolePolicy.
+evaluation_gate_bedrock_iam_policy = iam.Policy(
     "ol-data-platform-evaluation-gate-bedrock-policy",
-    role=ol_data_platform_evaluation_gate_role.id,
+    name="ol-data-platform-evaluation-gate-bedrock",
+    path="/ol-infrastructure/github-actions/",
+    description="Bedrock invoke for the ol-data-platform evaluation gate workflow.",
     policy=json.dumps(evaluation_gate_bedrock_policy),
+    tags=AWSBase(tags={"OU": BusinessUnit.data, "Environment": Environment.data}).tags,
+)
+iam.RolePolicyAttachment(
+    "ol-data-platform-evaluation-gate-bedrock-policy-attachment",
+    role=ol_data_platform_evaluation_gate_role.name,
+    policy_arn=evaluation_gate_bedrock_iam_policy.arn,
 )
 export(
     "ol_data_platform_evaluation_gate_role_arn",
