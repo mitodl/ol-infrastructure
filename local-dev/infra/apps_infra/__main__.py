@@ -32,7 +32,7 @@ kubeconfig_path = config.get("kubeconfig") or ""
 
 # Root domain configuration
 root_domain = config.get("root_domain") or os.environ.get(
-    "LOCAL_DEV_ROOT_DOMAIN", "mit.dev"
+    "LOCAL_DEV_ROOT_DOMAIN", "mit.test"
 )
 
 keycloak_hostname = config.get("keycloak_hostname") or f"sso.ol.{root_domain}"
@@ -77,10 +77,16 @@ enabled_apps = tuple(
 # ---------------------------------------------------------------------------
 
 k8s_provider_opts: dict[str, Any] = {}
-if kubeconfig_path:
-    k8s_provider_opts["kubeconfig"] = kubeconfig_path
+# Always an explicit path. Tilt hands the commands it runs a KUBECONFIG under
+# ~/Library/Application Support/tilt-dev that exists only while Tilt runs, and
+# the provider records whatever kubeconfig it was given as a provider input, so
+# a later pulumi run outside Tilt (tilt down's delete command, teardown.sh) would
+# try to read a file that is gone and fail to reach the cluster.
+k8s_provider_opts["kubeconfig"] = str(
+    Path(kubeconfig_path or "~/.kube/config").expanduser()
+)
 
-k8s_provider = k8s.Provider("k3d-local", **k8s_provider_opts)
+k8s_provider = k8s.Provider("k3d-local", context="local-dev", **k8s_provider_opts)
 _k8s = make_resource_opts(k8s_provider)
 
 # ---------------------------------------------------------------------------

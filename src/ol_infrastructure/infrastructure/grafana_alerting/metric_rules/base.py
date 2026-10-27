@@ -69,14 +69,14 @@ Sub-modules
                  others it takes no folder_uid: its rules live in the Synthetic
                  Monitoring plugin's folder, not the one created here.
   witan        — New in 2026-08. The shared witan MCP service: the share of tool
-                 calls that fail (the only continuous signal for a quarantined
+                 calls that fail (the only continuous signal for a lost
                  `council` graph, since neither health endpoint can see one),
                  the nightly omnigraph compaction, CronJobs that have never
                  succeeded at all -- the gap eks_general.py's staleness rules
                  document and deliberately leave open -- and omnigraph-server
                  left scaled to 0 replicas, which DeploymentUnavailable*
                  excludes. Pairs with
-                 log_rules/witan.py, which catches the same quarantine at boot
+                 log_rules/witan.py, which catches the same lost graph at boot
                  without needing traffic.
   otel_service_red
                — New in 2026-09. Whole-service p95 latency and 5xx-ratio
@@ -96,11 +96,28 @@ Sub-modules
                  disk, and the daily SQL backup's staleness. Off the Altinity
                  operator's exporter plus Keeper's own endpoint; see the
                  module docstring for which names were verified live.
+  starrocks    — New in 2026-10. The StarRocks lakehouse: FE leader and
+                 scrape loss, safe mode, FE volume, compaction score and
+                 failures, query internal-error share, load rejections,
+                 shared-data (S3) failures, replay lag and CN memory. Off the
+                 FE/CN ServiceMonitors' allowlisted families; pairs with
+                 dashboards/starrocks_overview.py.
+  cert_manager — New in 2026-10. ClusterIssuer and Certificate readiness,
+                 overdue renewals, and missing cert-manager metrics. Replaces
+                 the ACME log rules in log_rules/cert_manager.py, which paged
+                 on controller restarts.
   vector_edxapp_tracking
                — New in 2026-09. Source: grafana-alerts#9, recreated here rather
                  than merged there. edxapp tracking-log delivery off the Vector
                  sidecar's own metrics (PodMonitor added in #4822): source
                  silence, S3 sink errors, and no-bytes-delivered.
+  alloy_pipeline
+               — New in 2026-10. An Alloy instance whose config reload was
+                 rejected and that is running its last good config. New pods
+                 on the rejected config crash-loop and are caught by
+                 PodCrashLoopingCritical; this covers the pods that keep
+                 running, which nothing else alerted on during the
+                 2026-10-23 log gap.
 """
 
 import json
@@ -110,7 +127,9 @@ from pulumiverse_grafana import alerting
 from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
+    alloy_pipeline,
     apisix_edge,
+    cert_manager,
     clickhouse,
     dagster_control_plane,
     dagster_pgbouncer,
@@ -118,6 +137,7 @@ from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
     linux_host,
     otel_service_red,
     otel_trace_pipeline,
+    starrocks,
     synthetic_monitoring,
     vector_edxapp_tracking,
     witan,
@@ -225,9 +245,12 @@ def create(resource_opts: ResourceOptions) -> None:
     dagster_control_plane.create(alerts_folder.uid, rd, resource_opts)
     witan.create(alerts_folder.uid, rd, resource_opts)
     clickhouse.create(alerts_folder.uid, rd, resource_opts)
+    cert_manager.create(alerts_folder.uid, rd, resource_opts)
+    starrocks.create(alerts_folder.uid, rd, resource_opts)
     otel_service_red.create(alerts_folder.uid, rd, resource_opts)
     otel_trace_pipeline.create(alerts_folder.uid, rd, resource_opts)
     vector_edxapp_tracking.create(alerts_folder.uid, rd, resource_opts)
+    alloy_pipeline.create(alerts_folder.uid, rd, resource_opts)
     # No folder_uid: these rules live in the Synthetic Monitoring plugin's own
     # folder rather than the one created above. See the module docstring.
     synthetic_monitoring.create(rd, resource_opts)

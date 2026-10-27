@@ -380,8 +380,7 @@ def create_ol_mit_realm(  # noqa: PLR0913
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
-        # Enabled to allow password-based auth for admin/testing workflows.
-        direct_access_grants_enabled=True,
+        direct_access_grants_enabled=False,
         service_accounts_enabled=True,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-mit-ovs-redirect-uris"

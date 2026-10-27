@@ -12,12 +12,18 @@ data:
   HOSTNAME: "0.0.0.0"
   NODE_EXTRA_CA_CERTS: /etc/ssl/local-dev/rootCA.pem
   # Required by validateEnv at server startup.
-  NEXT_PUBLIC_ORIGIN: "https://learn.mit.dev"
-  NEXT_PUBLIC_MITOL_API_BASE_URL: "https://api.learn.mit.dev"
+  NEXT_PUBLIC_ORIGIN: "https://learn.mit.test"
+  NEXT_PUBLIC_MITOL_API_BASE_URL: "https://api.learn.mit.test"
   NEXT_PUBLIC_SITE_NAME: "MIT Learn"
   NEXT_PUBLIC_MITOL_SUPPORT_EMAIL: "mitlearn-support@mit.edu"
   NEXT_PUBLIC_CSRF_COOKIE_NAME: "csrftoken"
   NEXT_PUBLIC_MITOL_AXIOS_WITH_CREDENTIALS: "true"
-  NEXT_PUBLIC_MITX_ONLINE_BASE_URL: "https://api.learn.mit.dev/mitxonline"
-  NEXT_PUBLIC_MITX_ONLINE_LEGACY_BASE_URL: "https://mitxonline.mit.dev"
+  NEXT_PUBLIC_MITX_ONLINE_BASE_URL: "https://api.learn.mit.test/mitxonline"
+  NEXT_PUBLIC_MITX_ONLINE_LEGACY_BASE_URL: "https://mitxonline.mit.test"
   NEXT_PUBLIC_MITX_ONLINE_CSRF_COOKIE_NAME: "csrf_mitxonline"
+  # learn-ai on mit-learn's API host, where it sees the logged-in user (see
+  # apps/learn-ai/apisix-routes.yaml). On ai.learn.mit.test everyone is anonymous.
+  NEXT_PUBLIC_LEARN_AI_RECOMMENDATION_ENDPOINT: "https://api.learn.mit.test/ai/http/recommendation_agent/"
+  NEXT_PUBLIC_LEARN_AI_SYLLABUS_ENDPOINT: "https://api.learn.mit.test/ai/http/syllabus_agent/"
+  NEXT_PUBLIC_LEARN_AI_SEARCH_SUMMARY_ENDPOINT: "https://api.learn.mit.test/ai/http/search_summary_agent/"
+  NEXT_PUBLIC_LEARN_AI_CSRF_COOKIE_NAME: "learn_ai_csrftoken"

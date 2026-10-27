@@ -17,6 +17,7 @@ allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
 archetype: application
+description: MIT Learn, a central interface for learners to browse MIT courses
 has_discussions: true
 has_projects: true
 merge_commit_message: PR_TITLE

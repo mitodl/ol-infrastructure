@@ -134,7 +134,7 @@ keycloak_image = ${PULL_REF} written to ${TILT_CONFIG}
 If Tilt is running it re-applies local-infra-core now and the operator rolls
 keycloak-0 (a minute or two). Every local session is logged out by the restart.
 Follow along with:
-  kubectl -n local-infra rollout status statefulset/keycloak
+  kubectl --context local-dev -n local-infra rollout status statefulset/keycloak
 Return to the published image with:
   ${BASH_SOURCE[0]} --reset
 EOF

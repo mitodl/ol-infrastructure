@@ -19,9 +19,9 @@
 #   wait-for-keycloak-admin.sh <keycloak-host> [attempts] [sleep-seconds]
 #
 # Examples:
-#   wait-for-keycloak-admin.sh sso.ol.mit.dev          # 60 attempts, 5s apart
+#   wait-for-keycloak-admin.sh sso.ol.mit.test          # 60 attempts, 5s apart
 #   KEYCLOAK_ADMIN_PASSWORD=wrong \
-#     wait-for-keycloak-admin.sh sso.ol.mit.dev 2 1    # negative-path test
+#     wait-for-keycloak-admin.sh sso.ol.mit.test 2 1    # negative-path test
 #
 # Admin credentials default to the local-dev admin/admin used by the
 # pulumi-keycloak provider; override via KEYCLOAK_ADMIN_USER / _PASSWORD.

@@ -21,10 +21,10 @@ by hand and a deploy of the application that holds it. The reCAPTCHA keys for
 learn.mit.edu and rc.learn.mit.edu were created in `mit-open` in April 2026 and
 are now two more keys to re-create.
 
-Service accounts and API keys are declared in `Pulumi.Production.yaml` (see
-[Configuration](#configuration)). OAuth clients and reCAPTCHA keys are created
-by hand in `mitol01` for now (see
-[What this does not manage](#what-this-does-not-manage)). If `mitol01` is
+Service accounts, API keys and reCAPTCHA keys are declared in
+`Pulumi.Production.yaml` (see [Configuration](#configuration) and
+[reCAPTCHA keys](#recaptcha-keys)). OAuth clients are created by hand in
+`mitol01` (see [What this does not manage](#what-this-does-not-manage)). If `mitol01` is
 missing an API you need, add it to `enabled_services`. A gap in `mitol01` is
 something to fix here, not a reason to use a legacy project.
 
@@ -73,7 +73,9 @@ start.
 
 But the provider also needs APIs in order to **read** the resource types this
 stack manages: `iam.googleapis.com` to see service accounts,
-`apikeys.googleapis.com` to see API keys, `serviceusage.googleapis.com` to
+`apikeys.googleapis.com` to see API keys,
+`recaptchaenterprise.googleapis.com` to see reCAPTCHA keys,
+`serviceusage.googleapis.com` to
 see which services are enabled (every `gcp.projects.Service` lists them before
 creating one), and `cloudresourcemanager.googleapis.com` to read and write the
 project IAM policy for `project_roles`. Those have to be enabled *before* the
@@ -89,8 +91,8 @@ So the bootstrap is one out-of-band command per project:
 
 ```bash
 gcloud services enable iam.googleapis.com apikeys.googleapis.com \
-  serviceusage.googleapis.com cloudresourcemanager.googleapis.com \
-  --project=<project>
+  recaptchaenterprise.googleapis.com serviceusage.googleapis.com \
+  cloudresourcemanager.googleapis.com --project=<project>
 ```
 
 and then the same services are declared in `enabled_services` so they stay
@@ -103,12 +105,15 @@ access through a config change. `pulumi-gcp@mitol01` needs
 `iam.serviceAccountAdmin`, `resourcemanager.projectIamAdmin`,
 `serviceusage.apiKeysAdmin` and `serviceusage.serviceUsageAdmin` (granted
 before the stack existed), plus `iam.workloadIdentityPoolAdmin` once a project
-declares `workload_identity_pools`:
+declares `workload_identity_pools` and `recaptchaenterprise.admin` once it
+declares `recaptcha_keys`:
 
 ```bash
-gcloud projects add-iam-policy-binding mitol01 \
-  --member=serviceAccount:pulumi-gcp@mitol01.iam.gserviceaccount.com \
-  --role=roles/iam.workloadIdentityPoolAdmin --condition=None
+for role in roles/iam.workloadIdentityPoolAdmin roles/recaptchaenterprise.admin; do
+  gcloud projects add-iam-policy-binding mitol01 \
+    --member=serviceAccount:pulumi-gcp@mitol01.iam.gserviceaccount.com \
+    --role="$role" --condition=None
+done
 ```
 
 Note this is invisible from `gcloud`: `gcloud services api-keys list` succeeds
@@ -313,11 +318,22 @@ enabled no APIs.
    _Internal_ if it is an `mit.edu` account (no verification needed),
    otherwise _External_, published to production. An External app left in
    _Testing_ issues refresh tokens that expire after 7 days, which breaks a
-   scheduled sync.
+   scheduled sync. _Publish app_ refuses until Branding has `mit.edu` under
+   authorized domains and the three App domain links filled in; the OCW home
+   page and its privacy and terms page satisfy them. Leave the logo empty,
+   because a logo puts the app through brand verification.
 4. Console > Clients > Web application, with Data Collaborative's redirect URI.
    The secret is shown once; capture it into
-   `src/bridge/secrets/gcp/` immediately, then hand the client id, secret and
-   project id to Data Collaborative over a secure channel.
+   `src/bridge/secrets/gcp/ocw_highsystems_oauth.production.yaml` immediately,
+   then hand the client id, secret and project id to Data Collaborative over a
+   secure channel.
+
+The channel is owned by `mitopencourseware@gmail.com`, so the app is
+_External_ and published, as "OCW HighSystems". It is unverified, so the owner
+clicks through an unverified-app warning once when connecting HighSystems. The
+registered redirect URI carries an `accessToken` query parameter that Google
+matches exactly, so if Data Collaborative changes that token the client and the
+`redirect_uri` in the SOPS file have to be updated to match.
 
 The channel owner then completes the OAuth flow in HighSystems with
 `yt-analytics.readonly` and `youtube.readonly`. The second is not optional:
@@ -326,14 +342,125 @@ with only the analytics scope is rejected. An OAuth client with no token
 requests for six months is deleted by Google, so a stalled integration loses
 its client.
 
-The consent screen's scope list does not limit what a client can request. With
-an _Internal_ app there is also no Google review and no unverified-app warning,
-so whoever holds the client secret and controls a registered redirect URI can
-ask any `mit.edu` user for any scope under an MIT-branded screen. Keep the
+The consent screen's scope list does not limit what a client can request, so
+whoever holds the client secret and controls a registered redirect URI can ask
+any Google user for any scope under the OCW HighSystems name. Keep the
 redirect URIs to Data Collaborative's single callback. Name the OL owner of the
-client in its description. To cut access, rotate or delete the client secret
+client in its name. To cut access, rotate or delete the client secret
 in the console, and have the channel owner revoke HighSystems at
 <https://myaccount.google.com/permissions>.
+
+## reCAPTCHA keys
+
+Every OL property that uses reCAPTCHA renders the v2 checkbox through the
+classic `api.js` and verifies the token through classic `siteverify`
+(`https://www.google.com/recaptcha/api/siteverify`): mitxonline, xPro, Open
+Discussions, mit-learn's HubSpot forms and the Keycloak olapps registration
+form. The keys they use today are classic keys Google auto-migrated into
+Enterprise, spread over `recaptcha-migrated-075600d5919`, `ol-data-platform`
+and `mit-open`. A key cannot move between projects, and its site key is
+rendered into the page, so each one is replaced by a key declared here and
+the consumer is redeployed with it.
+
+```yaml
+    recaptcha_keys:
+    - key_name: learn-rc
+      display_name: Learn RC and CI
+      integration_type: CHECKBOX
+      allowed_domains:
+      - rc.learn.mit.edu
+      - ci.learn.mit.edu
+```
+
+- `integration_type: CHECKBOX` matches the v2 checkbox every consumer renders.
+  `INVISIBLE` is v2 invisible and `SCORE` is v3. The provider replaces the key
+  when this changes, which mints a new site key.
+- `allowed_domains` is required. Subdomains are covered, so
+  `rc.mitxonline.mit.edu` also covers `api.rc.mitxonline.mit.edu`.
+- `testing_options` is never set: it makes every challenge pass (or fail).
+  `waf_settings` is for keys a WAF (Fastly, Cloud Armor) issues, and
+  `allow_amp_traffic` applies to `SCORE` only.
+- Set `protect: true` once a deployed page renders the site key.
+
+The site key is the key's resource id, exported as `recaptcha_site_keys`. It
+is public, so it is exported in the clear.
+
+### The legacy secret
+
+Classic `siteverify` authenticates with the key's _legacy secret key_, which
+Google supports for keys created in Enterprise
+(<https://cloud.google.com/recaptcha/docs/verify>). The Pulumi provider has no
+attribute or data source for it, and `gcloud` has no command, so it is read
+from the `projects.keys.retrieveLegacySecretKey` API (or the key's page in the
+console) and written into the consumer's secret store by hand. The caller
+needs `recaptchaenterprise.keys.retrievelegacysecretkey` on `mitol01`, which
+`roles/recaptchaenterprise.admin` carries.
+
+```bash
+set -o pipefail
+site_key=$(pulumi stack output recaptcha_site_keys --json | jq -r '.mitol01["learn-rc"]')
+secret=$(curl -sf \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "x-goog-user-project: mitol01" \
+  "https://recaptchaenterprise.googleapis.com/v1/projects/mitol01/keys/${site_key}:retrieveLegacySecretKey" \
+  | jq -er .legacySecretKey) || echo "legacy secret not retrieved" >&2
+```
+
+Stop if that printed an error rather than writing an empty value. Write
+`$secret` straight into the store below (`sops edit`, or a `vault kv put`
+of both fields for Open Discussions) without echoing it.
+
+### Where each key is consumed
+
+| Legacy key | Replacement | Consumer reads it from |
+|---|---|---|
+| MITx Online RC | `mitxonline-rc` | `src/bridge/secrets/mitxonline/secrets.{qa,ci}.yaml` `recaptcha.site-key`/`secret-key`, via Vault `secret-mitxonline/collected-static-secrets` |
+| MITxPro RC and CI | `xpro-rc` | `src/bridge/secrets/xpro/secrets.{qa,ci}.yaml` `recaptcha.site_key`/`secret_key`, via Vault `secret-xpro/recaptcha` |
+| MIT Open Discussions Pre-Prod | `open-discussions-rc` | Vault `secret-operations/rc-apps/mit-open/recaptcha-keys` (`site_key`, `secret_key`), written by hand and shared by the CI and QA Heroku apps |
+| Learn RC (`mit-open`) | `learn-rc` | `src/bridge/secrets/mitlearn/secrets.qa.yaml` `recaptcha.site_key`/`secret_key`, read by `mit_learn` and, for the site key, `mit_learn_nextjs`. CI's values are empty. |
+| SSO CI and RC (`ol-data-platform`) | `sso-rc` | Keycloak's own database (see below) |
+
+Keycloak does not take its reCAPTCHA settings from this repository today.
+`keycloak_realm:captcha_site_key` and `captcha_secret_key` are still set in
+`substructure/keycloak/Pulumi.{CI,QA,Production}.yaml`, but nothing reads them
+since the realm refactor in #3452 dropped the olapps registration flow and its
+reCAPTCHA execution config. The registration pages on `sso-qa.ol.mit.edu` and
+`sso.ol.mit.edu` still render the widget, so the live settings sit in the
+olapps realm's registration flow in Keycloak. The SSO cutover is an admin
+console change unless that flow is brought back under Pulumi first, which
+should happen before the production SSO key is touched.
+
+Bootcamp's three keys (Production, RC and CI) are deletions, not migrations:
+`mitodl/bootcamp-ecommerce` was archived on 2026-08-17, the
+`bootcamp*.odl.mit.edu` Heroku hostnames no longer resolve, and
+`bootcamps.mit.edu` is a Webflow site with no reCAPTCHA. "MIT Open RC" in
+`ol-data-platform` has no consumer in this repository; confirm its domains
+before deleting it.
+
+### Cutover, per property
+
+Non-production keys go first, one property at a time, to prove these steps.
+Production follows, and Keycloak SSO goes last because it guards the login of
+every property behind SSO.
+
+1. Declare the key under `recaptcha_keys` and let the pipeline apply it. Read
+   the site key from `recaptcha_site_keys` and the legacy secret as above.
+2. Write both values into the consumer's store for that tier and deploy the
+   consumer (its Pulumi stack, then confirm the pods or Heroku dynos
+   restarted).
+3. Verify. The form page renders the new site key (`recaptchaKey` in the page
+   settings for mitxonline, xPro and Open Discussions, `recaptchaSiteKey` in
+   Keycloak's register page context), and one real submission (account
+   creation, or a HubSpot form on mit-learn) goes through.
+4. Set `protect: true` on the new key.
+5. Delete the old key:
+   `gcloud recaptcha keys delete <old-site-key> --project=<legacy-project>`.
+   Classic verification leaves no usage signal on the GCP side, so "the old
+   key went quiet" cannot be observed there. Check instead that no tier's page
+   renders the old site key and no store still holds it.
+
+Until step 5 the rollback is restoring the old values in the store and
+redeploying; the old key keeps working.
 
 ## What this does not manage
 
@@ -347,6 +474,5 @@ in the console, and have the channel owner revoke HighSystems at
 - **Generic OAuth 2.0 clients.** Google exposes no create, update or even
   *list* API for them. Hand-created, stored in Vault/SOPS, and — because they
   cannot be listed — dormant ones cannot be inventoried at all.
-- **reCAPTCHA keys.** Manageable via `gcp.recaptcha.EnterpriseKey`, but the
-  site key ships inside deployed frontends, so rotation is an application
-  release. Deferred until the app-side cutover is designed.
+- **A reCAPTCHA key's legacy secret.** The provider has no attribute or data
+  source for it; see [reCAPTCHA keys](#recaptcha-keys).

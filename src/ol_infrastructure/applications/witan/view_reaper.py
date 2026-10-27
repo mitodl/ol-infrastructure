@@ -55,10 +55,22 @@ CRONJOB_NAME = "witan-view-reaper"
 # `witan:reap_views_schedule`.
 DEFAULT_REAP_VIEWS_SCHEDULE = "50 4 * * *"
 
-# A sweep is one commit-log read per graph plus, rarely, a delete — nothing
-# like the indexer's full-repo clone-and-parse. Ten minutes is generous
-# headroom, not a measured ceiling.
+# A sweep is one `commit list` per view on every graph plus, rarely, a delete,
+# so its run time tracks the view count, mostly the bridge graph's. Ageing
+# views serially, Production runs grew from 130s on 2026-09-21 to 579s on
+# 2026-10-04, and the runs on 10-02, 10-03 and 10-06 hit this deadline.
+# agent-kit #454 (2026-10-06) ages views 8 at a time; Production runs took
+# 12-44s from 2026-10-15 to 2026-10-21.
 REAP_VIEWS_ACTIVE_DEADLINE_SECONDS = 10 * 60
+
+# WorkloadJobFailed* fires for as long as a failed Job object exists, and
+# without a TTL the CronJob keeps up to `failed_jobs_history_limit` of them
+# until newer failures displace them. That held the alert for weeks after
+# 2026-10-06, while every run since 10-07 succeeded. 36h outlives the next
+# daily run, so consecutive failures stay one continuous alert rather than
+# resolving and re-firing between runs. A reaper that stops succeeding
+# altogether is WitanDailyMaintenanceStale's to report, on the same 36h.
+REAP_VIEWS_TTL_SECONDS_AFTER_FINISHED = 36 * 60 * 60
 
 # One retry covers the transient case (an omnigraph-server rollout mid-sweep)
 # without masking a real failure for a full extra interval.
@@ -151,6 +163,7 @@ def create_view_reaper(  # noqa: PLR0913
                 spec=kubernetes.batch.v1.JobSpecArgs(
                     backoff_limit=REAP_VIEWS_BACKOFF_LIMIT,
                     active_deadline_seconds=REAP_VIEWS_ACTIVE_DEADLINE_SECONDS,
+                    ttl_seconds_after_finished=REAP_VIEWS_TTL_SECONDS_AFTER_FINISHED,
                     template=kubernetes.core.v1.PodTemplateSpecArgs(
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
                             labels={

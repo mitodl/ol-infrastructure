@@ -20,7 +20,8 @@ data:
   ALLOWED_HOSTS: '["*"]'
   # False, matching mitxonline's local-dev config. Not just convention: DEBUG
   # switches on the nplusone profiler, which is a dev-group dependency and is
-  # therefore absent from the production image target this app deploys. Static
+  # therefore absent from the prebuilt production image used without a
+  # checkout. Static
   # files are served by the nginx sidecar from collectstatic output, so nothing
   # here depends on Django's debug static handling.
   DEBUG: "False"
@@ -50,31 +51,31 @@ data:
   # draft   — preview bucket, what "Publish draft" writes to
   # live    — publish bucket, what "Publish live" writes to
   # test    — test bucket, used by the pipeline's smoke-test step
-  OCW_STUDIO_BASE_URL: "https://studio.ocw.mit.dev/"
-  OCW_STUDIO_DRAFT_URL: "https://draft.ocw.mit.dev/"
-  OCW_STUDIO_LIVE_URL: "https://live.ocw.mit.dev/"
-  RESOURCE_BASE_URL_DRAFT: "https://draft.ocw.mit.dev/"
-  RESOURCE_BASE_URL_LIVE: "https://live.ocw.mit.dev/"
-  OCW_STUDIO_TEST_URL: "https://test.ocw.mit.dev/"
+  OCW_STUDIO_BASE_URL: "https://studio.ocw.mit.test/"
+  OCW_STUDIO_DRAFT_URL: "https://draft.ocw.mit.test/"
+  OCW_STUDIO_LIVE_URL: "https://live.ocw.mit.test/"
+  RESOURCE_BASE_URL_DRAFT: "https://draft.ocw.mit.test/"
+  RESOURCE_BASE_URL_LIVE: "https://live.ocw.mit.test/"
+  OCW_STUDIO_TEST_URL: "https://test.ocw.mit.test/"
   # http, not https, and the only reason is certificate trust: Hugo fetches
   # these from inside a Concourse task container, which carries public CAs only
   # and cannot verify the local mkcert cert. The hostnames are the same ones a
   # browser uses, so a URL that ends up in built output is still valid; the
   # site routes serve both schemes (see apisix-routes.yaml).
-  STATIC_API_BASE_URL_DRAFT: "http://draft.ocw.mit.dev"
-  STATIC_API_BASE_URL_LIVE: "http://live.ocw.mit.dev"
-  STATIC_API_BASE_URL_TEST: "http://test.ocw.mit.dev/"
+  STATIC_API_BASE_URL_DRAFT: "http://draft.ocw.mit.test"
+  STATIC_API_BASE_URL_LIVE: "http://live.ocw.mit.test"
+  STATIC_API_BASE_URL_TEST: "http://test.ocw.mit.test/"
   STATIC_API_BASE_URL: "https://live-qa.odl.mit.edu/"
-  SITEMAP_DOMAIN: "live.ocw.mit.dev"
+  SITEMAP_DOMAIN: "live.ocw.mit.test"
 
   # ── MIT Learn, as seen from a built site ──────────────────────────────────
   # Deliberately api.learn, not apigateway.learn: the apigateway host is the
   # dead compose-era gateway that several repo env files still point at.
-  MIT_LEARN_BASE_URL: "https://learn.mit.dev"
-  MIT_LEARN_API_BASE_URL: "https://api.learn.mit.dev"
-  SEARCH_API_URL: "https://api.learn.mit.dev/api/v0/search/"
-  COURSE_SEARCH_API_URL: "https://api.learn.mit.dev/api/v1/learning_resources_search/"
-  CONTENT_FILE_SEARCH_API_URL: "https://api.learn.mit.dev/api/v1/content_file_search/"
+  MIT_LEARN_BASE_URL: "https://learn.mit.test"
+  MIT_LEARN_API_BASE_URL: "https://api.learn.mit.test"
+  SEARCH_API_URL: "https://api.learn.mit.test/api/v0/search/"
+  COURSE_SEARCH_API_URL: "https://api.learn.mit.test/api/v1/learning_resources_search/"
+  CONTENT_FILE_SEARCH_API_URL: "https://api.learn.mit.test/api/v1/content_file_search/"
   LEARN_AI_SYLLABUS_ENDPOINT: "https://api.rc.learn.mit.edu/ai/http/syllabus_agent/"
 
   # ── Object storage (RustFS) ───────────────────────────────────────────────
@@ -82,7 +83,7 @@ data:
   # Service, while URLs handed to a browser have to use a name the browser can
   # resolve. Both settings are read by main/s3_utils.py and django-storages.
   AWS_S3_ENDPOINT_URL: "http://rustfs.local-infra.svc.cluster.local:9000"
-  AWS_S3_CUSTOM_DOMAIN: "s3.mit.dev/ol-ocw-studio-app-local"
+  AWS_S3_CUSTOM_DOMAIN: "s3.mit.test/ol-ocw-studio-app-local"
   AWS_QUERYSTRING_AUTH: "False"
   AWS_REGION: "us-east-1"
   AWS_DEFAULT_REGION: "us-east-1"
@@ -148,7 +149,7 @@ data:
   # had the same constraint, defaulting CONCOURSE_EXTERNAL_URL to CONCOURSE_URL.
   # In-cluster this resolves through the CoreDNS override to APISIX, and the
   # pod trusts the mkcert CA (see REQUESTS_CA_BUNDLE above).
-  CONCOURSE_URL: "https://concourse.ocw.mit.dev"
+  CONCOURSE_URL: "https://concourse.ocw.mit.test"
   CONCOURSE_TEAM: "main"
   CONCOURSE_IS_PRIVATE_REPO: "False"
   # How a pipeline task reaches Studio: to report build status, and for the
@@ -176,17 +177,17 @@ data:
 
   # ── Keycloak (python-social-auth KeycloakOAuth2) ──────────────────────────
   # Key, secret and realm public key come from the ol-ocw-studio-oidc Secret.
-  SOCIAL_AUTH_KEYCLOAK_AUTHORIZATION_URL: "https://sso.ol.mit.dev/realms/olapps/protocol/openid-connect/auth"  # pragma: allowlist secret
-  SOCIAL_AUTH_KEYCLOAK_ACCESS_TOKEN_URL: "https://sso.ol.mit.dev/realms/olapps/protocol/openid-connect/token"  # pragma: allowlist secret
+  SOCIAL_AUTH_KEYCLOAK_AUTHORIZATION_URL: "https://sso.ol.mit.test/realms/olapps/protocol/openid-connect/auth"  # pragma: allowlist secret
+  SOCIAL_AUTH_KEYCLOAK_ACCESS_TOKEN_URL: "https://sso.ol.mit.test/realms/olapps/protocol/openid-connect/token"  # pragma: allowlist secret
 
-  # ── Email (captured by Mailpit, browsable at https://mail.mit.dev) ────────
+  # ── Email (captured by Mailpit, browsable at https://mail.mit.test) ────────
   OCW_STUDIO_EMAIL_BACKEND: "django.core.mail.backends.smtp.EmailBackend"
   OCW_STUDIO_EMAIL_HOST: "mailpit.local-infra.svc.cluster.local"
   OCW_STUDIO_EMAIL_PORT: "1025"
   OCW_STUDIO_EMAIL_TLS: "False"
-  OCW_STUDIO_FROM_EMAIL: "OCW Studio <noreply@ocw.mit.dev>"
+  OCW_STUDIO_FROM_EMAIL: "OCW Studio <noreply@ocw.mit.test>"
   # Required settings; nothing is actually delivered through Mailgun locally.
-  MAILGUN_SENDER_DOMAIN: "ocw.mit.dev"
+  MAILGUN_SENDER_DOMAIN: "ocw.mit.test"
   MAILGUN_KEY: "local-dev-unused"
 
   # ── Integrations left off locally ─────────────────────────────────────────

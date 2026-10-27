@@ -45,9 +45,11 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.aws.iam_helper import IAM_POLICY_VERSION
 from ol_infrastructure.lib.k8s_vpa import make_vpa
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
+    Component,
     K8sAppLabels,
     Product,
     Services,
@@ -100,6 +102,18 @@ k8s_labels = K8sAppLabels(
     stack=stack_info,
 )
 k8s_global_labels = k8s_labels.model_dump()
+
+
+def workload_labels(component: Component) -> dict[str, str]:
+    """Label one Superset Deployment with its role and alert tier.
+
+    Superset is an internal BI tool, so every workload is notify.
+
+    :param component: The Deployment's functional role.
+    :returns: The stack's ol.mit.edu labels plus component and alert_tier.
+    """
+    return k8s_labels.workload_labels(alert_tier=AlertTier.notify, component=component)
+
 
 aws_account = get_caller_identity()
 superset_domain = superset_config.require("domain")
@@ -547,7 +561,6 @@ oidc_secret = OLVaultK8SSecret(
             "OIDC_URL": '{{ get .Secrets "url" }}',
             "OIDC_CLIENT_ID": '{{ get .Secrets "client_id" }}',
             "OIDC_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
-            "OIDC_REALM_PUBLIC_KEY": '{{ get .Secrets "realm_public_key" }}',
         },
         refresh_after="1h",
         vaultauth=vault_k8s_resources.auth_name,
@@ -629,6 +642,7 @@ superset_chart = kubernetes.helm.v3.Release(
         version=SUPERSET_CHART_VERSION,
         namespace=superset_namespace,
         cleanup_on_fail=True,
+        max_history=10,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://apache.github.io/superset",
         ),
@@ -704,7 +718,8 @@ superset_chart = kubernetes.helm.v3.Release(
                 "port": str(DEFAULT_REDIS_PORT),
             },
             "supersetNode": {
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.webapp),
+                "deploymentLabels": workload_labels(Component.webapp),
                 "replicas": {"enabled": False},
                 # CPU is the only HPA metric. A gunicorn web pod's memory is a
                 # resident baseline that does not fall when replicas are added,
@@ -741,7 +756,8 @@ superset_chart = kubernetes.helm.v3.Release(
                 "podDisruptionBudget": {"enabled": True, "minAvailable": 1},
             },
             "supersetWorker": {
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.celery),
+                "deploymentLabels": workload_labels(Component.celery),
                 "replicas": {"enabled": True, "replicaCount": 1},
                 # The chart's default command plus --without-gossip: gossip
                 # leaks an orphan celeryev.<uuid> queue on the Redis broker
@@ -756,7 +772,7 @@ superset_chart = kubernetes.helm.v3.Release(
             },
             "supersetCeleryBeat": {
                 "enabled": True,
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.beat),
             },
             # MCP server for AI clients (Claude Desktop, Claude Code, etc.) to
             # interact with dashboards, datasets, and SQL Lab. Shares the same
@@ -766,7 +782,8 @@ superset_chart = kubernetes.helm.v3.Release(
             "supersetMcp": {
                 "enabled": True,
                 "replicaCount": 2,
-                "podLabels": k8s_global_labels | {"ol.mit.edu/process": "mcp"},
+                "podLabels": workload_labels(Component.api)
+                | {"ol.mit.edu/process": "mcp"},
                 "resources": {
                     "limits": {"cpu": "500m", "memory": "512Mi"},
                     "requests": {"cpu": "100m", "memory": "256Mi"},

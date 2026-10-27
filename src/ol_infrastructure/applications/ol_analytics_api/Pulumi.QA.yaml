@@ -4,6 +4,9 @@ config:
   aws:region: us-east-1
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
+  # Browser origins outside this service's own host that call it with credentials.
+  ol_analytics_api:cors_frontend_origins:
+  - "https://rc.learn.mit.edu"   # MIT Learn frontend, which calls learn_domain
   ol_analytics_api:domain: analytics-qa.ol.mit.edu
   ol_analytics_api:learn_domain: analytics.rc.learn.mit.edu
   ol_analytics_api:env_vars:
@@ -25,9 +28,4 @@ config:
     # must set this explicitly. QA points at the RC (release-candidate) stack,
     # matching mitxonline's own Pulumi.QA.yaml backend_domain.
     OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_API_BASE_URL: https://api.rc.mitxonline.mit.edu
-    # No learner data-sharing consent field exists upstream yet. Until one does,
-    # disclose outcomes for learners with no recorded decision. Both tenants
-    # default to failing closed when these are unset.
-    OL_ANALYTICS_API_B2B_DASHBOARD_CONSENT_FAIL_OPEN: "true"
-    OL_ANALYTICS_API_B2B_LEARNER_RECORDS_CONSENT_FAIL_OPEN: "true"
 encryptedkey: AQICAHionUR8LBW1ALuVC0rCH3AE2oQIfGMCx3XmpDH9HjM2LQGpJg9r/l/e4/j3u7c1Q6PpAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMhYZkyfyFaBfe27o+AgEQgDtaxgvH+Z/eGa0K5VgjaN2FArYieVOl8cC1ovbTaqj8PCzatlhfnD9NnrMeTiuB/ktTIrhn3fOyzHMGiw==

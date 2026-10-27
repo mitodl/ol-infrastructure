@@ -110,6 +110,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
+from ol_infrastructure.lib.opik import opik_api_url
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     make_stack_reference,
@@ -170,6 +171,38 @@ qdrant_api_key = qdrant_cloud.AccountsDatabaseApiKeyV2(
         additional_secret_outputs=["key"],
     ),
 )
+# Read-only key for ol-data-platform's ml code location, whose Learn embeddings
+# smokecheck reads these collections. Created here rather than in the dagster stack
+# because this stack already holds the Qdrant Cloud provider and Learn's cluster, and
+# the key belongs to that cluster. Dagster's policy can read secret-mitlearn, but that
+# holds the manage key above, so this goes to secret-data/pipelines/*, the kv-v1 path
+# its pipeline resources read: QdrantResource takes the cluster URL as `host`.
+# Dagster runs Azure embeddings, and so the smokecheck, in qa and production only,
+# as with its YouTube key in secret-data/pipelines.
+if stack_info.env_suffix in ("qa", "production"):
+    qdrant_dagster_read_only_api_key = qdrant_cloud.AccountsDatabaseApiKeyV2(
+        f"mitlearn-qdrant-dagster-read-only-api-key-{stack_info.env_suffix}",
+        cluster_id=qdrant_cluster_id,
+        name=f"dagster-read-only-{stack_info.env_suffix}",
+        global_access_rule=qdrant_cloud.AccountsDatabaseApiKeyV2GlobalAccessRuleArgs(
+            access_type="GLOBAL_ACCESS_RULE_ACCESS_TYPE_READ_ONLY",
+        ),
+        opts=ResourceOptions(
+            provider=qdrant_provider,
+            additional_secret_outputs=["key"],
+        ),
+    )
+    vault.generic.Secret(
+        f"mitlearn-qdrant-dagster-read-only-vault-secret-{stack_info.env_suffix}",
+        path="secret-data/pipelines/qdrant",
+        data_json=Output.json_dumps(
+            {
+                "host": qdrant_cloud_stack.require_output("cluster_url"),
+                "api_key": qdrant_dagster_read_only_api_key.key,
+            }
+        ),
+        opts=ResourceOptions(delete_before_replace=True),
+    )
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 learn_zone_id = dns_stack.require_output("learn")["id"]
 
@@ -1499,7 +1532,6 @@ env_name = stack_info.name.lower() if stack_info.name != "QA" else "rc"
 # Values that are generally unchanging across environments
 env_vars = {
     "ALLOWED_HOSTS": '["*"]',
-    "OVS_ALLOWED_MEDIA_HOSTS": '[".cloudfront.net"]',
     "AWS_STORAGE_BUCKET_NAME": f"ol-mitlearn-app-storage-{env_name}",
     "CANVAS_PDF_TRANSCRIPTION_MODEL": "gpt-4o",
     "CONTENT_FILE_EMBEDDING_CHUNK_OVERLAP": 51,
@@ -1633,6 +1665,22 @@ else:
     azure_identity_volumes = []
     azure_identity_volume_mounts = []
 
+# Opik tracing of the embedding encoder through ol-llm. mit-learn leaves tracing off
+# unless OPIK_URL_OVERRIDE is set. Every environment traces to the Production Opik
+# (lib/opik.py), so OL_LLM_ENVIRONMENT is what tells the environments apart there.
+# It is explicit because the app otherwise falls back to MITOL_ENVIRONMENT, which is
+# "rc" in QA. The Keycloak client arrives through the secret-opik/sdk-client secret in
+# k8s_secrets.py. OPIK_API_KEY stays unset: ol-llm refuses to start with it
+# alongside the OPIK_KEYCLOAK_* variables.
+env_vars.update(
+    {
+        "OL_LLM_ENVIRONMENT": stack_info.env_suffix,
+        "OPIK_URL_OVERRIDE": opik_api_url(),
+        "OPIK_WORKSPACE": "default",
+        "OPIK_PROJECT_NAME": "mit-learn",
+    }
+)
+
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
 # carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_app_labels)
@@ -1692,6 +1740,10 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        # The same list Django gets as CORS_ALLOWED_ORIGINS above.  The gateway
+        # answers CORS preflights itself, so an origin missing here is blocked
+        # on every preflighted request whatever django-cors-headers allows.
+        cors_allow_origins=cors_urls_list,
         plugins=[
             # Everyone currently logged in is holding a session cookie under
             # lua-resty-session's old default name, which the renamed plugins
@@ -1972,16 +2024,15 @@ starrocks_vault_mount_path = (
     "database-starrocks" if env_vars.get("STARROCKS_HOST") else None
 )
 
-# The StarRocks credential reaches the app through env_from_secret_names, i.e.
-# envFrom, so its values become pod environment variables fixed at pod start.
-# Re-rendering the Kubernetes Secret does not touch a running pod. Vault
-# rotates this lease on its own (the StarRocks role's max TTL is six months),
-# so without these restart targets the rotation lands in the Secret, Vault
-# revokes the old StarRocks user with DROP USER, and beat keeps authenticating
-# as a user that no longer exists -- the sync stops until something unrelated
-# rolls the pods. That failure is silent in exactly the way the missing
-# configuration this PR fixes was.
-starrocks_secret_restart_targets = [
+# The StarRocks and Opik credentials reach the app through env_from_secret_names,
+# i.e. envFrom, so their values become pod environment variables fixed at pod
+# start. Re-rendering the Kubernetes Secret does not touch a running pod. Vault
+# rotates the StarRocks lease on its own (the StarRocks role's max TTL is six
+# months), so without these restart targets the rotation lands in the Secret,
+# Vault revokes the old StarRocks user with DROP USER, and beat keeps
+# authenticating as a user that no longer exists -- the sync stops until
+# something unrelated rolls the pods, and nothing reports it.
+env_secret_restart_targets = [
     OLVaultRestartTarget(kind="Deployment", name=deployment_name)
     for deployment_name in application_deployment_names(
         application_name="mitlearn",
@@ -1991,7 +2042,7 @@ starrocks_secret_restart_targets = [
 ]
 
 # Create all Kubernetes secrets needed by the application
-secret_names, secret_resources = create_mitlearn_k8s_secrets(
+secret_names, optional_secret_names, secret_resources = create_mitlearn_k8s_secrets(
     stack_info=stack_info,
     mitlearn_namespace=learn_namespace,
     k8s_global_labels=k8s_app_labels,
@@ -2001,7 +2052,7 @@ secret_names, secret_resources = create_mitlearn_k8s_secrets(
     redis_password=redis_config.require("password"),
     redis_cache=redis_cache,
     starrocks_vault_mount_path=starrocks_vault_mount_path,
-    starrocks_restart_targets=starrocks_secret_restart_targets,
+    restart_targets=env_secret_restart_targets,
 )
 
 # Configure and deploy the mitlearn application using OLApplicationK8s
@@ -2016,6 +2067,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         k8s_global_labels=k8s_app_labels,
         # Reference all Kubernetes secrets containing environment variables
         env_from_secret_names=secret_names,
+        optional_env_from_secret_names=optional_secret_names,
         application_min_replicas=mitlearn_config.get_int("min_replicas") or 2,
         application_max_replicas=mitlearn_config.get_int("max_replicas") or 10,
         application_security_group_id=mitlearn_app_security_group.id,

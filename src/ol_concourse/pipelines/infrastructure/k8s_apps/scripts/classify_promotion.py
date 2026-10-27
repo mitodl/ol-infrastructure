@@ -31,6 +31,12 @@ deletes only the branch: a finished release is new again once Production rolls
 back past it, and must still get its issue. ``release_tag`` is empty for an
 infrastructure-only issue, which needs no check.
 
+The body opens with a hidden marker naming the ol-infrastructure commit that
+was previewed. Closing the issue approves that diff, and the Production job's
+``assert-gate-names-deploy`` refuses to deploy any other commit under it. The
+marker leads the body because the issue put truncates an oversized body from
+the end.
+
 ``pipeline.py`` inlines this file's text into the task (``python3 -c``), so it
 must stay standard-library only and self-contained.
 
@@ -42,15 +48,29 @@ Environment:
     CHECKLIST_FILE: ``<release>/checklist.md`` from the release resource.
     PREVIEW_SUMMARY_FILE: the Production preview's markdown summary.
     NO_CHANGES_MARKER_FILE: written next to the summary when it found no changes.
+    INFRA_REF_FILE: ``<ol-infra>/.git/ref``, the commit that was previewed.
+    INFRA_REPO_URL: the ol-infrastructure repository's web URL, for the link.
     OUTPUT_DIR: directory to write ``title``, ``release_tag``, ``body.md``
         and maybe ``skip`` into.
 """
 
 import os
+import re
 import sys
 from pathlib import Path
 
 NO_INFRA_CHANGES = "No infrastructure changes: Production already matches this code."
+#: Kept in step with ``approved_revision`` in ``assert_gate_names_deploy.py``.
+REVISION_MARKER = "<!-- ol-infrastructure-revision: {sha} -->"
+_SHA = re.compile(r"[0-9a-f]{40}")
+
+
+def infra_revision(ref: str) -> str:
+    """Return the previewed commit SHA, or raise ValueError if *ref* is not one."""
+    if not _SHA.fullmatch(ref):
+        msg = f"the ol-infrastructure ref {ref!r} is not a full commit SHA"
+        raise ValueError(msg)
+    return ref
 
 
 def is_new_release(version: str, production_version: str, state: str) -> bool:
@@ -87,19 +107,29 @@ def classify(
     return "", True
 
 
-def compose_body(
+def compose_body(  # noqa: PLR0913
     checklist: str,
     summary: str,
     *,
     new_release: bool,
     has_diff: bool,
+    revision: str,
+    repo_url: str,
 ) -> str:
-    """Compose the issue body, checklist first so its version header leads."""
-    parts = []
+    """Compose the issue body: the revision marker, then the checklist, then the diff.
+
+    The marker is an HTML comment, so the checklist's version header is still
+    the first thing a reader sees.
+    """
+    parts = [REVISION_MARKER.format(sha=revision)]
     if new_release:
         parts.append(checklist.rstrip())
     parts.append(
         "## Infrastructure changes (Production preview)\n\n"
+        f"Previewed at ol-infrastructure [`{revision[:8]}`]"
+        f"({repo_url.rstrip('/')}/commit/{revision}). Closing this issue "
+        "approves that commit: if a newer one reaches QA first, Production "
+        "refuses to deploy and QA posts a new issue to approve.\n\n"
         + (summary.strip() if has_diff else NO_INFRA_CHANGES)
     )
     return "\n\n".join(parts) + "\n"
@@ -131,6 +161,10 @@ def main() -> None:
             f"summary at {summary_file}."
         )
     has_diff = not Path(os.environ["NO_CHANGES_MARKER_FILE"]).exists()
+    try:
+        revision = infra_revision(_read("INFRA_REF_FILE"))
+    except (ValueError, OSError) as error:
+        sys.exit(f"Refusing to classify {app}: {error}. No issue was posted.")
 
     title, skip = classify(app, version, new_release=new_release, has_diff=has_diff)
     output = Path(os.environ["OUTPUT_DIR"])
@@ -150,6 +184,8 @@ def main() -> None:
         summary_file.read_text(),
         new_release=new_release,
         has_diff=has_diff,
+        revision=revision,
+        repo_url=os.environ["INFRA_REPO_URL"],
     )
     (output / "body.md").write_text(body)
     print(  # noqa: T201

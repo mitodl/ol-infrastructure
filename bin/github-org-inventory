@@ -282,10 +282,15 @@ def _required_checks(
 
     THE SPLIT IS THE WHOLE POINT, not tidiness. `lehrer` and `ol-analytics-api` already
     require checks through rulesets somebody built by hand. Returning those as
-    `required_status_checks` would have rulesets.py declare a SECOND ruleset beside the
-    working one -- two overlapping sets of required contexts on the same branch. They
-    come back in the second list, land under `_required_status_checks_live`, and satisfy
-    SEC-03 without generating a resource.
+    `required_status_checks` would let a crawl copy contexts out of a ruleset Pulumi
+    does not manage into one it does, so nobody decided to declare them. They come back
+    in the second list and land under `_required_status_checks_live`.
+
+    Both repos have since gained a managed `required-status-checks` ruleset (for
+    `prek`), and their hand-made contexts were declared in it deliberately: the overlap
+    with the hand-made rulesets is intended, and is what makes the intent survive in
+    the committed data. Both lists come back populated for them until the hand-made
+    rulesets are retired.
 
     Ours is identified by ruleset NAME (`REQUIRED_CHECKS_RULESET_NAME`), which is the
     only stable handle: the id is assigned by GitHub at creation and differs per repo.

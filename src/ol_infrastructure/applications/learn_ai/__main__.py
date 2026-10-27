@@ -97,6 +97,12 @@ from ol_infrastructure.lib.ol_types import (
     KubernetesServiceAppProtocol,
     Services,
 )
+from ol_infrastructure.lib.opik import (
+    OPIK_KEYCLOAK_SECRET_TEMPLATES,
+    OPIK_SDK_VAULT_MOUNT,
+    OPIK_SDK_VAULT_PATH,
+    opik_api_url,
+)
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     format_docker_image_ref,
@@ -117,7 +123,6 @@ cluster_substructure_stack = make_stack_reference(
 )
 dns_stack = make_stack_reference(projects.DNS, "default")
 network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
-opik_stack = make_stack_reference(projects.OPIK, stack_info.name)
 policy_stack = make_stack_reference(projects.POLICIES, "default")
 sentry_stack = make_stack_reference(projects.SENTRY, "default")
 vault_stack = make_stack_reference(
@@ -771,12 +776,11 @@ static_secrets = OLVaultK8SSecret(
     ),
 )
 
-# Opik LLM-observability credentials. The ``ol-opik-client`` Keycloak client
-# (client-credentials grant) and its realm discovery URL are published by the
-# keycloak substructure to Vault at ``secret-operations/sso/opik``. Sync them
-# into a K8s secret via VSO and expose them to the app as the OPIK_KEYCLOAK_*
-# env vars. The token endpoint is derived from the realm ``url`` key so it stays
-# correct across environments (sso-ci / sso-qa / sso) without hardcoding.
+# Opik LLM-observability credentials. Every environment traces to the Production
+# Opik (lib/opik.py), so this is the Production ``ol-opik-sdk`` Keycloak client
+# (client-credentials grant), which the Production keycloak substructure writes to
+# ``secret-opik/sdk-client`` in every environment's Vault. Sync it into a
+# K8s secret via VSO and expose it to the app as the OPIK_KEYCLOAK_* env vars.
 opik_keycloak_secret_name = "learn-ai-opik-keycloak"  # pragma: allowlist secret  # noqa: S105
 opik_keycloak_secret = OLVaultK8SSecret(
     name=f"learn-ai-{stack_info.env_suffix}-opik-keycloak-secret",
@@ -786,17 +790,11 @@ opik_keycloak_secret = OLVaultK8SSecret(
         labels=k8s_global_labels,
         dest_secret_name=opik_keycloak_secret_name,
         dest_secret_labels=k8s_global_labels,
-        mount="secret-operations",
+        mount=OPIK_SDK_VAULT_MOUNT,
         mount_type="kv-v1",
-        path="sso/opik",
+        path=OPIK_SDK_VAULT_PATH,
         restart_targets=[{"kind": "Deployment", "name": "learn-ai-app"}],
-        templates={
-            "OPIK_KEYCLOAK_CLIENT_ID": '{{ get .Secrets "client_id" }}',
-            "OPIK_KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
-            "OPIK_KEYCLOAK_TOKEN_URL": (
-                '{{ get .Secrets "url" }}/protocol/openid-connect/token'
-            ),
-        },
+        templates=OPIK_KEYCLOAK_SECRET_TEMPLATES,
         vaultauth=vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
@@ -833,19 +831,21 @@ else:
     azure_identity_volumes = []
     azure_identity_volume_mounts = []
 
-# Opik instrumentation (non-secret settings). OPIK_URL_OVERRIDE is derived from
-# the opik application stack's exported URL so it tracks the deployed instance
-# per environment; the workspace/project are static for our OSS install. The
-# Keycloak client id/secret and token URL arrive via envFrom (see the VSO secret
-# above). Note: do NOT set OPIK_API_KEY — the app's Keycloak auth flow owns the
-# Authorization header (see the opik stack's OPIK_SDK_KEYCLOAK_AUTH.md).
+# Opik instrumentation (non-secret settings). OPIK_URL_OVERRIDE is the Production
+# Opik's API for every environment; the workspace/project are static for our OSS
+# install. The Opik SDK stamps OPIK_ENVIRONMENT on every trace and span as Opik's
+# environment, which is what tells the environments apart in the shared learn-ai
+# project. It is the stack's environment, so QA reports "qa" as mit-learn and
+# dagster do, not MITOL_ENVIRONMENT's "rc". The Keycloak client id/secret and token
+# URL arrive via envFrom (see the VSO secret above). Do NOT set OPIK_API_KEY: the
+# app's Keycloak auth flow owns the Authorization header (see the opik stack's
+# OPIK_SDK_KEYCLOAK_AUTH.md).
 env_vars.update(
     {
-        "OPIK_URL_OVERRIDE": opik_stack.require_output("opik_url").apply(
-            lambda url: f"{url}/api/"
-        ),
+        "OPIK_URL_OVERRIDE": opik_api_url(),
         "OPIK_WORKSPACE": "default",
         "OPIK_PROJECT_NAME": "learn-ai",
+        "OPIK_ENVIRONMENT": stack_info.env_suffix,
     }
 )
 
@@ -897,8 +897,10 @@ learn_ai_app_k8s = OLApplicationK8s(
             db_creds_secret_name,
             redis_creds_secret_name,
             static_secrets_name,
-            opik_keycloak_secret_name,
         ],
+        # Optional: the Production keycloak stack writes it to Vault, and pods
+        # should still start if that stack hasn't applied yet.
+        optional_env_from_secret_names=[opik_keycloak_secret_name],
         application_security_group_id=learn_ai_application_security_group.id,
         # Use the fixed name used in the SecurityGroupPolicy spec
         application_security_group_name=Output.from_input("learn-ai-app"),
@@ -1078,6 +1080,27 @@ learn_ai_deployment_envfrom = [
 # Ref: https://apisix.apache.org/docs/ingress-controller/concepts/apisix_plugin_config/
 # Ref: https://apisix.apache.org/docs/ingress-controller/references/apisix_pluginconfig_v2/
 
+# Origins allowed to read learn-ai responses cross-origin, with credentials.
+# This shared config is attached to routes on both of learn-ai's hosts (the
+# legacy api-learn-ai.ol.mit.edu and the /ai/* paths on
+# api.<env>.learn.mit.edu), so it has to cover every frontend that calls either
+# one: learn-ai's own UI and hosts, plus every other frontend that embeds the
+# chat widget, listed per stack in cors_frontend_origins: mit-learn, and each
+# Open edX LMS whose ol-openedx-chat aside calls /ai/* on
+# api.<env>.learn.mit.edu from the learning MFE.
+#
+# Not read out of the stack's CSRF_ALLOWED_ORIGINS -- that list names the same
+# four origins on QA and Production but omits the learn.mit.edu pair on CI, even
+# though learn-ai serves api.ci.learn.mit.edu there. The gateway's headers are
+# what the browser enforces, so a gap here silently breaks the widget rather
+# than Django's CSRF check.
+learn_ai_cors_allow_origins = [
+    f"https://{learn_ai_frontend_domain}",
+    f"https://{learn_ai_config.require('backend_domain')}",
+    f"https://{learn_ai_config.require('learn_backend_domain')}",
+    *learn_ai_config.require_object("cors_frontend_origins"),
+]
+
 # Instantiate shared plugins component
 learn_ai_shared_plugins = OLApisixSharedPlugins(
     f"learn-ai-{stack_info.env_suffix}-ol-shared-plugins",
@@ -1087,6 +1110,7 @@ learn_ai_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=learn_ai_namespace,
         k8s_labels=k8s_global_labels,
         enable_defaults=True,
+        cors_allow_origins=learn_ai_cors_allow_origins,
         plugins=[
             # Both of learn-ai's OIDC resources have now moved off
             # lua-resty-session's default "session" name, so every current user

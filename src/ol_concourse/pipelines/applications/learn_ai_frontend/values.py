@@ -24,23 +24,9 @@ under a ``/frontend/`` key prefix (``files/frontend_path_prefix.vcl``), so the
 build output is synced to ``s3://<bucket>/frontend/`` rather than the root.
 """
 
-from dataclasses import dataclass
-
-
-@dataclass
-class LearnAIFrontendEnv:
-    """One deploy target for the learn-ai frontend."""
-
-    stage: str  # "CI" | "QA" | "Production"
-    branch: str  # branch of mitodl/learn-ai that feeds this environment
-    bucket: str  # S3 bucket created by the learn_ai Pulumi stack
-    fastly_domain: str  # hostname served by the environment's Fastly service
-    build_vars: dict[str, str]  # NEXT_PUBLIC_* values baked into the export
-
-    @property
-    def slug(self) -> str:
-        """Lowercased stage name, safe for use inside Concourse identifiers."""
-        return self.stage.lower()
+from ol_concourse.pipelines.infrastructure.k8s_apps.static_frontend import (
+    StaticFrontendEnv,
+)
 
 
 def _build_vars(
@@ -78,10 +64,9 @@ def _build_vars(
     }
 
 
-ENVIRONMENTS: list[LearnAIFrontendEnv] = [
-    LearnAIFrontendEnv(
+ENVIRONMENTS: list[StaticFrontendEnv] = [
+    StaticFrontendEnv(
         stage="CI",
-        branch="main",
         bucket="ol-mit-learn-ai-ci",
         fastly_domain="learn-ai-ci.ol.mit.edu",
         build_vars=_build_vars(
@@ -90,9 +75,8 @@ ENVIRONMENTS: list[LearnAIFrontendEnv] = [
             openedx_base_url="https://courses.ci.learn.mit.edu/",
         ),
     ),
-    LearnAIFrontendEnv(
+    StaticFrontendEnv(
         stage="QA",
-        branch="release-candidate",
         bucket="ol-mit-learn-ai-qa",
         fastly_domain="learn-ai-qa.ol.mit.edu",
         build_vars=_build_vars(
@@ -101,9 +85,8 @@ ENVIRONMENTS: list[LearnAIFrontendEnv] = [
             openedx_base_url="https://courses.rc.learn.mit.edu/",
         ),
     ),
-    LearnAIFrontendEnv(
+    StaticFrontendEnv(
         stage="Production",
-        branch="release",
         bucket="ol-mit-learn-ai-production",
         fastly_domain="learn-ai.ol.mit.edu",
         build_vars=_build_vars(

@@ -286,6 +286,10 @@ configure_concourse(concourse_config)
 consul_configuration = {Path("00-default.json"): ConsulConfig()}
 
 vector_config = VectorConfig()
+# Both node types: workers carry the spot/lifecycle/preflight helper units.
+vector_config.configuration_templates[
+    TEMPLATES_DIRECTORY.joinpath("vector", "concourse_logs.yaml")
+] = {}
 
 
 if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: SLF001
@@ -351,9 +355,6 @@ if concourse_config._node_type == CONCOURSE_WEB_NODE_TYPE:  # noqa: SLF001
     traefik_config_changed = configure_traefik(traefik_config)
 
     # Add vector configurations specific to concourse web nodes
-    vector_config.configuration_templates[
-        TEMPLATES_DIRECTORY.joinpath("vector", "concourse_logs.yaml")
-    ] = {}
     vector_config.configuration_templates[
         TEMPLATES_DIRECTORY.joinpath("vector", "concourse_metrics.yaml")
     ] = {"concourse_prometheus_port": concourse_config.prometheus_bind_port}

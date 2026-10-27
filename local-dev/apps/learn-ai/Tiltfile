@@ -2,22 +2,54 @@
 # Builds the learn-ai Django/ASGI app and deploys it to the learn-ai namespace.
 # When the sibling learn-ai repo is not checked out, Tilt uses the prebuilt
 # DockerHub image (mitodl/learn-ai-app:latest) without attempting a local build.
+# With a checkout it also serves the sandbox (frontend-demo); see sandbox.yaml.
 
-load("../../tiltlib.star", "k8s_yaml_local")
+load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
 
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "learn-ai")
 IMAGE = 'mitodl/learn-ai-app'
 NAMESPACE = 'learn-ai'
 DEPLOY_NAME = 'learnai-webapp'
+_rd = current_root_domain()
+HAS_CHECKOUT = os.path.exists(os.path.join(APP_DIR, '.git'))
 
-if os.path.exists(os.path.join(APP_DIR, '.git')):
+# Static export of frontend-demo, served by nginx. NEXT_PUBLIC_* values are
+# inlined by `next build`, so they are build args. NODE_OPTIONS caps the main
+# build process's heap (not Next's workers): BuildKit RUN steps have no limit.
+SANDBOX_DOCKERFILE = """
+FROM node:24.15@sha256:f22d6a1f082c02f292e86929b5b0442ac2e5eaf438a5dea9b1566601c3e05940 AS build
+WORKDIR /app
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 NODE_OPTIONS=--max-old-space-size=2048
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY .yarn/releases ./.yarn/releases
+RUN corepack enable && yarn install --immutable
+COPY . .
+ARG NEXT_PUBLIC_MITOL_API_BASE_URL
+ARG NEXT_PUBLIC_AI_CSRF_COOKIE_NAME
+ARG NEXT_PUBLIC_AI_FEEDBACK_URL
+ARG NEXT_PUBLIC_MIT_LEARN_AI_LOGIN_URL
+ARG NEXT_PUBLIC_MIT_LEARN_API_BASE_URL
+ARG NEXT_PUBLIC_MIT_LEARN_APP_BASE_URL
+ARG NEXT_PUBLIC_MIT_SEARCH_ELASTIC_URL
+ARG NEXT_PUBLIC_MIT_SEARCH_VECTOR_URL
+ARG NEXT_PUBLIC_OPENEDX_API_BASE_URL
+ARG NEXT_PUBLIC_OPENEDX_LOGIN_URL
+RUN yarn build
+
+FROM nginx:1.29-alpine@sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de
+COPY --from=build /app/out /usr/share/nginx/html
+"""
+
+if HAS_CHECKOUT:
     docker_build(
         IMAGE,
         context=APP_DIR,
         dockerfile=APP_DIR + '/Dockerfile',
         # .claude/ holds agent worktrees; syncing one into the pod restarted it in a loop.
-        ignore=['.claude/'],
+        # frontend-demo/ is the sandbox, built separately below; without this every
+        # sandbox edit rebuilt this image and rolled the webapp and celery pods.
+        ignore=['.claude/', 'frontend-demo/'],
         live_update=[
             sync(APP_DIR + '/main', '/src/main'),
             run(
@@ -37,11 +69,69 @@ k8s_yaml_local([
 
 k8s_resource(
     DEPLOY_NAME,
-    port_forwards=['8000:8000'],
     labels=['learn-ai'],
     resource_deps=['local-infra-apps'],
+    links=[link('https://ai.learn.' + _rd + '/admin/', 'learn-ai Django admin')] + (
+        [link('https://ai-sandbox.learn.' + _rd, 'learn-ai sandbox')] if HAS_CHECKOUT else []
+    ),
 )
 
 k8s_resource('learnai-celery-default', labels=['learn-ai'], resource_deps=['local-infra-apps'])
 k8s_resource('learnai-celery-edx-content', labels=['learn-ai'], resource_deps=['local-infra-apps'])
 k8s_resource('learnai-celery-beat', labels=['learn-ai'], resource_deps=['local-infra-apps'])
+
+# The route reads discovery and session.secret from a Secret local-infra-apps
+# writes; see the mitlearn-routes resource in local-dev/apps/mit-learn/Tiltfile.
+k8s_resource(
+    new_name='learnai-routes',
+    objects=[
+        'learnai-shared-plugins:apisixpluginconfig',
+        'learnai-tls:apisixtls',
+        'learnai-route:apisixroute',
+    ],
+    labels=['learn-ai'],
+    resource_deps=['local-infra-apps'],
+)
+
+# No image is published for the sandbox, so it exists only with a checkout.
+# Manual trigger: a save never costs a `next build`. Source, build-arg and
+# sandbox-env.local.yaml changes all wait for a click on this resource; it
+# still builds on `tilt up`, after the webapp so the two builds don't overlap.
+if HAS_CHECKOUT:
+    docker_build(
+        'learnai-sandbox',
+        context=os.path.join(APP_DIR, 'frontend-demo'),
+        dockerfile_contents=SANDBOX_DOCKERFILE,
+        build_args={
+            'NEXT_PUBLIC_MITOL_API_BASE_URL': 'https://api.learn.' + _rd + '/ai',
+            'NEXT_PUBLIC_AI_CSRF_COOKIE_NAME': 'learn_ai_csrftoken',
+            'NEXT_PUBLIC_AI_FEEDBACK_URL': 'https://api.learn.' + _rd + '/ai/api/v0/chat_sessions/:threadId/messages/:checkpointPk/rate/',
+            'NEXT_PUBLIC_MIT_LEARN_AI_LOGIN_URL': 'https://api.learn.' + _rd + '/ai/http/login/',
+            'NEXT_PUBLIC_MIT_LEARN_API_BASE_URL': 'https://api.learn.' + _rd + '/learn/',
+            'NEXT_PUBLIC_MIT_LEARN_APP_BASE_URL': 'https://learn.' + _rd + '/',
+            # Production search, as every deployed sandbox uses
+            # (src/ol_concourse/pipelines/applications/learn_ai_frontend/values.py).
+            'NEXT_PUBLIC_MIT_SEARCH_ELASTIC_URL': 'https://api.learn.mit.edu/api/v1/learning_resources_search/',
+            'NEXT_PUBLIC_MIT_SEARCH_VECTOR_URL': 'https://api.learn.mit.edu/api/v0/vector_learning_resources_search/',
+            # nginx proxies this to RC Open edX; see sandbox.yaml.
+            'NEXT_PUBLIC_OPENEDX_API_BASE_URL': '/openedx_proxy/',
+            'NEXT_PUBLIC_OPENEDX_LOGIN_URL': 'https://courses.rc.learn.mit.edu/auth/login/ol-oauth2/?auth_entry=login',
+        },
+        ignore=[
+            'node_modules', '.next', 'out', 'coverage', 'tsconfig.tsbuildinfo',
+            'next-env.d.ts', '.yarn/cache', '.yarn/install-state.gz',
+        ],
+    )
+
+    # Own call: local_overrides takes one ConfigMap, and sharing learn-ai's call
+    # would fold the sandbox ConfigMaps into its fingerprint (rolling webapp and
+    # celery on every nginx template edit).
+    k8s_yaml_local(['sandbox.yaml'], local_overrides='configmaps/sandbox-env.local.yaml')
+
+    k8s_resource(
+        'learnai-sandbox',
+        objects=['learnai-sandbox-tls:apisixtls', 'learnai-sandbox-route:apisixroute'],
+        labels=['learn-ai'],
+        trigger_mode=TRIGGER_MODE_MANUAL,
+        resource_deps=[DEPLOY_NAME],
+    )

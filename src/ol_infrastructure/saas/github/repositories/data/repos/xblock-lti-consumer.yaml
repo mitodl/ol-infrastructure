@@ -10,6 +10,8 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: master
+description: MIT Open Learning fork of openedx/xblock-lti-consumer, the LTI consumer
+  XBlock
 has_discussions: false
 has_projects: true
 merge_commit_message: PR_TITLE

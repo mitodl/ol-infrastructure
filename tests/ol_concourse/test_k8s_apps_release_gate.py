@@ -3,15 +3,18 @@
 The release gate is a trigger: any closed issue matching ``Release <app>``
 fires the Production job, which then deploys whatever last passed QA. These
 tests pin the step that refuses a deploy the closed issue did not approve --
-both where it sits in the generated plan and what the shipped script decides.
+both where it sits in the generated plan and what the shipped script decides,
+for the app version in the title and the ol-infrastructure commit in the body.
 """
 
 import json
 import os
 import subprocess
 import sys
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 
@@ -25,6 +28,10 @@ from ol_concourse.pipelines.infrastructure.k8s_apps.scripts import (
 )
 
 APP = "ol-analytics-api"
+REPO = f"mitodl/{APP}"
+SHA = "a" * 40
+OTHER_SHA = "b" * 40
+GATE_NUMBER = 103
 
 
 def _plan(app_name: str, job_suffix: str) -> list[dict[str, Any]]:
@@ -64,19 +71,128 @@ def test_assertion_reads_the_version_the_job_deploys():
     assert release_get["passed"] == [f"deploy-ol-application-{APP}-qa"]
 
 
+def test_assertion_reads_the_ol_infra_commit_the_job_deploys():
+    """The check reads ol-infra through QA, before anything deploys.
+
+    The job's own Pulumi code get comes after every dependency, so the check
+    needs its own get of the same resource, bound to QA like the others so
+    Concourse resolves both from the same QA build.
+    """
+    plan = _plan(APP, "-production")
+    check = _step_index(plan, "task", ASSERT_GATE_TASK_NAME)
+    revision = _step_index(plan, "get", f"ol-infra-{APP}-revision")
+    code = _step_index(plan, "get", f"ol-infra-{APP}")
+    task = plan[check]
+    params = task["config"]["params"]
+
+    assert revision < check < code
+    assert plan[revision]["resource"] == plan[code]["get"]
+    assert plan[revision]["passed"] == plan[code]["passed"]
+    assert plan[revision]["passed"] == [f"deploy-ol-application-{APP}-qa"]
+    assert not plan[revision]["trigger"]
+    assert params["INFRA_REF_FILE"] == f"ol-infra-{APP}-revision/.git/ref"
+    assert params["GITHUB_REPOSITORY"] == REPO
+    assert params["GITHUB_APP_PRIVATE_KEY"] == "((github_app.release_bot_app_pem))"
+    assert f"ol-infra-{APP}-revision" in {i["name"] for i in task["config"]["inputs"]}
+
+
 def test_legacy_pipelines_are_untouched():
     """Legacy pipelines have no release gate, so they get no check."""
-    pipeline = json.loads(build_app_pipeline("mitxonline").model_dump_json())
+    pipeline = json.loads(build_app_pipeline("mit-learn").model_dump_json())
     assert ASSERT_GATE_TASK_NAME not in json.dumps(pipeline)
 
 
-def _run(
-    tmp_path: Path, gate: dict[str, str], version: str
+CLOSED_AT = "2026-10-15T19:43:38Z"
+
+
+class _FakeGitHub(BaseHTTPRequestHandler):
+    """The two GitHub calls the check makes: an installation token, one issue."""
+
+    body: ClassVar[str | None] = ""
+    closed: ClassVar[bool] = True
+    closed_at: ClassVar[str | None] = CLOSED_AT
+    # Replaces the whole GraphQL response when set.
+    graphql_response: ClassVar[dict[str, Any] | None] = None
+    last_edited_at: ClassVar[str | None] = "2026-10-15T19:33:53Z"
+    calls: ClassVar[list[tuple[str, str]]] = []
+
+    def log_message(self, *_args: Any) -> None:
+        pass
+
+    def _reply(self, body: Any) -> None:
+        payload = json.dumps(body).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def do_POST(self) -> None:
+        self.calls.append(("POST", self.path))
+        if self.path == "/app/installations/456/access_tokens":
+            assert self.headers["Authorization"].startswith("Bearer ")
+            self._reply({"token": "installation-token"})
+            return
+        assert self.path == "/graphql"
+        assert self.headers["Authorization"] == "bearer installation-token"
+        assert self.headers["Content-Type"] == "application/json"
+        length = int(self.headers["Content-Length"])
+        variables = json.loads(self.rfile.read(length))["variables"]
+        assert variables == {"owner": "mitodl", "name": APP, "number": GATE_NUMBER}
+        if self.graphql_response is not None:
+            self._reply(self.graphql_response)
+            return
+        issue = {
+            "body": self.body,
+            "closed": self.closed,
+            "closedAt": self.closed_at,
+            "lastEditedAt": self.last_edited_at,
+        }
+        self._reply({"data": {"repository": {"issue": issue}}})
+
+
+@pytest.fixture
+def fake_github():
+    """Serve the fake GitHub API on a free local port."""
+    _FakeGitHub.body = f"<!-- ol-infrastructure-revision: {SHA} -->\n## Release x\n"
+    _FakeGitHub.closed = True
+    _FakeGitHub.closed_at = CLOSED_AT
+    _FakeGitHub.graphql_response = None
+    _FakeGitHub.last_edited_at = "2026-10-15T19:33:53Z"
+    _FakeGitHub.calls = []
+    server = HTTPServer(("127.0.0.1", 0), _FakeGitHub)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield server
+    server.shutdown()
+
+
+@pytest.fixture(scope="module")
+def private_key(tmp_path_factory) -> str:
+    """Return a throwaway RSA key for the app JWT."""
+    key = tmp_path_factory.mktemp("key") / "key.pem"
+    subprocess.run(  # noqa: S603
+        ["openssl", "genrsa", "-out", str(key), "2048"],  # noqa: S607
+        check=True,
+        capture_output=True,
+    )
+    return key.read_text()
+
+
+def _run(  # noqa: PLR0913
+    tmp_path: Path,
+    server: HTTPServer,
+    private_key: str,
+    gate: dict[str, Any],
+    version: str,
+    revision: str = SHA,
 ) -> subprocess.CompletedProcess[str]:
     gate_file = tmp_path / "gh_issue.json"
     version_file = tmp_path / "version"
-    gate_file.write_text(json.dumps(gate))
+    ref_file = tmp_path / "ref"
+    gate_file.write_text(json.dumps({"issue_number": str(GATE_NUMBER), **gate}))
     version_file.write_text(version)
+    ref_file.write_text(revision + "\n")
     return subprocess.run(  # noqa: S603
         [sys.executable, "-c", _ASSERT_GATE_SCRIPT],
         env={
@@ -84,6 +200,12 @@ def _run(
             "APP_NAME": APP,
             "GATE_FILE": str(gate_file),
             "VERSION_FILE": str(version_file),
+            "INFRA_REF_FILE": str(ref_file),
+            "GITHUB_REPOSITORY": REPO,
+            "GITHUB_APP_ID": "123",
+            "GITHUB_APP_INSTALLATION_ID": "456",
+            "GITHUB_APP_PRIVATE_KEY": private_key,
+            "GITHUB_API_URL": f"http://127.0.0.1:{server.server_address[1]}",
         },
         capture_output=True,
         text=True,
@@ -108,10 +230,127 @@ def _run(
         (f"Release {APP}-v2 2026.9.22.1", "2026.9.22.1", False),
     ],
 )
-def test_script_allows_only_the_approved_version(tmp_path, title, version, allowed):
+def test_script_allows_only_the_approved_version(  # noqa: PLR0913
+    tmp_path, fake_github, private_key, title, version, allowed
+):
     """Only a title naming the deployed version lets the job proceed."""
-    result = _run(tmp_path, {"issue_title": title}, version)
+    result = _run(tmp_path, fake_github, private_key, {"issue_title": title}, version)
     assert (result.returncode == 0) is allowed, result.stderr
+
+
+def test_a_wrong_version_is_refused_without_calling_github(
+    tmp_path, fake_github, private_key
+):
+    """The title check comes first and needs no API call."""
+    gate = {"issue_title": f"Release {APP} 2026.9.17.1"}
+    result = _run(tmp_path, fake_github, private_key, gate, "2026.9.22.1")
+
+    assert result.returncode != 0
+    assert _FakeGitHub.calls == []
+
+
+@pytest.mark.parametrize(
+    ("body", "allowed", "message"),
+    [
+        # The issue previewed the commit being deployed.
+        (f"<!-- ol-infrastructure-revision: {SHA} -->\nbody", True, "approves"),
+        # QA previewed a newer commit after this issue was closed, or failed
+        # after posting it: the commit being deployed is not the one approved.
+        (
+            f"<!-- ol-infrastructure-revision: {OTHER_SHA} -->\nbody",
+            False,
+            f"approved the Production preview of {OTHER_SHA[:8]}",
+        ),
+        # An issue from before the marker existed, or one edited to drop it.
+        ("## Release 2026.9.22.1\n", False, "does not say which"),
+        (None, False, "does not say which"),
+        # Two different revisions: the body no longer says which was approved.
+        (
+            f"<!-- ol-infrastructure-revision: {SHA} -->\n"
+            f"<!-- ol-infrastructure-revision: {OTHER_SHA} -->",
+            False,
+            "does not say which",
+        ),
+    ],
+)
+def test_script_allows_only_the_previewed_ol_infra_commit(  # noqa: PLR0913
+    tmp_path, fake_github, private_key, body, allowed, message
+):
+    """The body's revision marker must name the commit the job deploys."""
+    _FakeGitHub.body = body
+    gate = {"issue_title": f"Release {APP} 2026.9.22.1"}
+    result = _run(tmp_path, fake_github, private_key, gate, "2026.9.22.1")
+
+    assert (result.returncode == 0) is allowed, result.stderr
+    assert message in (result.stdout + result.stderr)
+    assert ("POST", "/graphql") in _FakeGitHub.calls
+
+
+@pytest.mark.parametrize(
+    ("closed", "closed_at", "last_edited_at", "allowed"),
+    [
+        # Edited before the close: the body is the one that was approved.
+        (True, CLOSED_AT, "2026-10-15T19:33:53Z", True),
+        # Never edited after creation.
+        (True, CLOSED_AT, None, True),
+        # A QA put found the just-closed issue through the lagging search
+        # index and rewrote its body, marker included.
+        (True, CLOSED_AT, "2026-10-15T19:43:50Z", False),
+        # Same second as the close: cannot be ordered, so not trusted.
+        (True, CLOSED_AT, CLOSED_AT, False),
+        # Reopened since the gate saw it closed, whatever closedAt still says.
+        (False, CLOSED_AT, "2026-10-15T19:33:53Z", False),
+        (False, None, "2026-10-15T19:33:53Z", False),
+    ],
+)
+def test_script_refuses_a_body_edited_after_the_close(  # noqa: PLR0913
+    tmp_path, fake_github, private_key, closed, closed_at, last_edited_at, allowed
+):
+    """The marker counts only in the body the issue was closed with."""
+    _FakeGitHub.closed = closed
+    _FakeGitHub.closed_at = closed_at
+    _FakeGitHub.last_edited_at = last_edited_at
+    gate = {"issue_title": f"Release {APP} 2026.9.22.1"}
+    result = _run(tmp_path, fake_github, private_key, gate, "2026.9.22.1")
+
+    assert (result.returncode == 0) is allowed, result.stderr
+    if not allowed:
+        assert "edited at or after it was closed" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("response", "message"),
+    [
+        (
+            {"data": {"repository": {"issue": None}}, "errors": [{"type": "x"}]},
+            "GitHub GraphQL errors",
+        ),
+        ({"data": {"repository": {"issue": None}}}, "was not found"),
+        ({"data": {"repository": None}}, "was not found"),
+    ],
+)
+def test_script_fails_closed_when_the_issue_cannot_be_read(
+    tmp_path, fake_github, private_key, response, message
+):
+    """A GraphQL error or a missing issue is a red build, not a deploy."""
+    _FakeGitHub.graphql_response = response
+    gate = {"issue_title": f"Release {APP} 2026.9.22.1"}
+    result = _run(tmp_path, fake_github, private_key, gate, "2026.9.22.1")
+
+    assert result.returncode != 0
+    assert message in result.stderr
+    assert "approves deploying" not in result.stdout
+
+
+def test_script_refuses_a_ref_that_is_not_a_commit(tmp_path, fake_github, private_key):
+    """A tag name or empty ref is not something an approval can name."""
+    gate = {"issue_title": f"Release {APP} 2026.9.22.1"}
+    result = _run(
+        tmp_path, fake_github, private_key, gate, "2026.9.22.1", revision="v1.2.3"
+    )
+
+    assert result.returncode != 0
+    assert "not a full commit SHA" in result.stderr
 
 
 @pytest.mark.parametrize(
@@ -130,8 +369,43 @@ def test_approved_version_parses_only_the_accepted_shapes(title, expected):
     assert assert_gate_names_deploy.approved_version(APP, title) == expected
 
 
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        (f"<!-- ol-infrastructure-revision: {SHA} -->", SHA),
+        # The same revision twice still names one commit.
+        (
+            f"<!-- ol-infrastructure-revision: {SHA} -->\nquoted: "
+            f"<!-- ol-infrastructure-revision: {SHA} -->",
+            SHA,
+        ),
+        (f"<!-- ol-infrastructure-revision: {SHA[:8]} -->", None),
+        (f"<!-- ol-infrastructure-revision: {SHA.upper()} -->", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_approved_revision_parses_only_a_single_full_sha(body, expected):
+    """The body parser returns one full SHA, or None for anything else."""
+    assert assert_gate_names_deploy.approved_revision(body) == expected
+
+
 def test_script_fails_closed_on_an_empty_gate_file(tmp_path):
     """download_version writes `{}` for an empty version; that must not pass."""
-    result = _run(tmp_path, {}, "2026.9.22.1")
+    gate_file = tmp_path / "gh_issue.json"
+    gate_file.write_text("{}")
+    (tmp_path / "version").write_text("2026.9.22.1")
+    result = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", _ASSERT_GATE_SCRIPT],
+        env={
+            **os.environ,
+            "APP_NAME": APP,
+            "GATE_FILE": str(gate_file),
+            "VERSION_FILE": str(tmp_path / "version"),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     assert result.returncode != 0
     assert "Nothing was deployed" in result.stderr

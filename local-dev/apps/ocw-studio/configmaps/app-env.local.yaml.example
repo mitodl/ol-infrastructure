@@ -35,6 +35,19 @@ data:
   # GIT_API_URL: "https://gitlab.com"
   # GIT_ORGANIZATION: "my-group"
   # GIT_TOKEN: "glpat-..."
+  #
+  # GitLab running in this cluster -- add `gitlab` to enabled_apps first, then
+  # create a group to push into (the token below is seeded for you, so this
+  # needs no clicking around in the UI beyond making the group). See the
+  # GitLab section of local-dev/README.md.
+  # CONTENT_SYNC_BACKEND: "content_sync.backends.gitlab.GitlabBackend"
+  # GIT_DOMAIN: "gitlab.mit.test"
+  # GIT_API_URL: "https://gitlab.mit.test"
+  # GIT_ORGANIZATION: "ocw"
+  # GIT_TOKEN: "glpat-localdevlocaldev1234"  # pragma: allowlist secret
+  # GIT_BRANCH_MAIN: "main"
+  # GIT_BRANCH_PREVIEW: "preview"
+  # GIT_BRANCH_RELEASE: "release"
 
   # ── Turn publishing off ───────────────────────────────────────────────────
   # Empty disables the publish pipeline, so Studio edits content but never
@@ -61,7 +74,7 @@ data:
   # PUBLISH_POSTHOG_PROJECT_API_KEY: "phc_..."  # pragma: allowlist secret
 
   # ── Open catalog webhooks (back into MIT Learn) ───────────────────────────
-  # OPEN_CATALOG_URLS: "https://api.learn.mit.dev/api/v1/ocw_next_webhook/"
+  # OPEN_CATALOG_URLS: "https://api.learn.mit.test/api/v1/ocw_next_webhook/"
   # OPEN_CATALOG_WEBHOOK_KEY: "..."
 
   # ── YouTube upload ────────────────────────────────────────────────────────

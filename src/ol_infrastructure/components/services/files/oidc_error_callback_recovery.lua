@@ -26,7 +26,12 @@
 --                                            this host may use; empty disables
 --                                            the missing-session recovery
 --   oidc_error_recovery.guard_cookie_name    loop-breaker cookie name
---   oidc_error_recovery.guard_max_age        guard cookie lifetime, seconds
+--   oidc_error_recovery.guard_max_age        guard cookie lifetime, seconds; also
+--                                            the restart counter's TTL
+--   oidc_error_recovery.restart_dict_name    lua_shared_dict counting restarts
+--                                            per Keycloak session_state
+--   oidc_error_recovery.max_restarts         restarts allowed per session_state
+--                                            per guard window, per pod
 --
 -- See `oidc_gateway_pre_function_plugin` in ../apisix.py for why each branch
 -- is here, and t/oidc_error_callback_recovery.t for the behavioural tests.
@@ -95,6 +100,35 @@ return function(conf, ctx)
     local guard = opts.guard_cookie_name
     if not guard or ctx.var["cookie_" .. guard] then
         return
+    end
+
+    -- A browser that stores none of this host's cookies never sends the guard
+    -- back, so the check above passes on every hop and it loops through
+    -- Keycloak until the browser gives up.  Every hop of such a loop carries
+    -- the same Keycloak `session_state`, so count restarts per value here as
+    -- well.  The dict is per APISIX pod, which makes the bound max_restarts
+    -- times the replica count rather than exact.  A cluster whose nginx config
+    -- does not define the dict yet has ngx.shared[name] == nil and keeps the
+    -- cookie-only behaviour, so this can ship ahead of the gateway change.
+    local session_state = args["session_state"]
+    if type(session_state) == "table" then
+        session_state = session_state[1]
+    end
+    local restarts = opts.restart_dict_name and ngx.shared[opts.restart_dict_name]
+    if session_state and restarts then
+        -- Hashed so a client-chosen value cannot grow the key.  Scoped by host
+        -- because the dict serves every host on the pod and the guard cookie
+        -- it backs up is per host: one SSO session recovering on two hosts
+        -- within the window must not spend the second host's restart.
+        local count = restarts:incr(
+            ngx.md5((ngx.var.host or "") .. "|" .. tostring(session_state)),
+            1, 0, opts.guard_max_age
+        )
+        if count and count > opts.max_restarts then
+            core.log.warn("oidc callback ", reason, " uri=", uri,
+                          " restart limit reached, not restarting auth")
+            return
+        end
     end
 
     core.log.warn("oidc callback ", reason, " uri=", uri, " restarting auth")

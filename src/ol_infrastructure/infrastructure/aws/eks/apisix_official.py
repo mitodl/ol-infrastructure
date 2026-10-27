@@ -18,6 +18,8 @@ from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
 )
 from ol_infrastructure.components.services.apisix import (
+    OIDC_RECOVERY_SHARED_DICT,
+    OIDC_RECOVERY_SHARED_DICT_SIZE,
     gateway_global_pre_function_plugin,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
@@ -26,6 +28,33 @@ from ol_infrastructure.lib.aws.eks_helper import (
 from ol_infrastructure.lib.k8s_crds import adopt_helm_chart_crds
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import StackInfo
+
+# TLS 1.2 cipher suites the gateway offers (TLS 1.3 suites are not affected by
+# ssl_ciphers).  This is Mozilla's "intermediate" profile, and also the first
+# nine entries of the chart's own default -- the chart default goes on to add
+# CBC suites, suites without forward secrecy and DES-CBC3-SHA (hq#14079).
+# The DHE suites are inert without an ssl_dhparam and are kept only so this
+# stays a verbatim copy of the profile.
+# Ref: https://wiki.mozilla.org/Security/Server_Side_TLS
+GATEWAY_SSL_CIPHERS = (
+    "ECDHE-ECDSA-AES128-GCM-SHA256:"
+    "ECDHE-RSA-AES128-GCM-SHA256:"
+    "ECDHE-ECDSA-AES256-GCM-SHA384:"
+    "ECDHE-RSA-AES256-GCM-SHA384:"
+    "ECDHE-ECDSA-CHACHA20-POLY1305:"
+    "ECDHE-RSA-CHACHA20-POLY1305:"
+    "DHE-RSA-AES128-GCM-SHA256:"
+    "DHE-RSA-AES256-GCM-SHA384:"
+    "DHE-RSA-CHACHA20-POLY1305"
+)
+
+# Sent on every gateway response by a global rule.  Hosts behind Fastly keep
+# whatever their own Fastly service sets, because Fastly's response header
+# rules run after the origin's.  No includeSubDomains until the subdomains of
+# every gateway host have been checked for anything still served over HTTP.
+# Starts at one day so a mistake ages out of browsers quickly; raise it to a
+# year (31536000) once it has run without problems.
+GATEWAY_HSTS_HEADER_VALUE = "max-age=86400"
 
 # APISIX's default enabled-plugins list for the version shipped by the pinned
 # chart (chart 2.17.x => APISIX 3.18.x), taken from
@@ -351,6 +380,7 @@ def setup_apisix(
             version=apisix_chart_version,
             namespace="operations",
             cleanup_on_fail=True,
+            max_history=10,
             chart="apisix",
             # The CRDs are applied above as their own Pulumi resource. Helm would
             # only write them on a fresh install anyway, which is the bug.
@@ -509,19 +539,6 @@ def setup_apisix(
                 "service": {
                     "type": "LoadBalancer",
                     "annotations": {
-                        # Both prefixes are set on purpose. external-dns v0.22.0
-                        # moved the default annotation prefix from the "alpha" form
-                        # to the GA one with NO fallback, so each version reads
-                        # exactly one of these and ignores the other: <=v0.21.0 the
-                        # alpha key, >=v0.22.0 the GA key. Carrying both is what
-                        # makes the upgrade (and a rollback) a no-op rather than an
-                        # outage -- under --policy=sync a version that matches no
-                        # annotation sees an empty desired state and plans to delete
-                        # every record it owns. Drop the alpha key only once every
-                        # cluster is past v0.22.0.
-                        "external-dns.alpha.kubernetes.io/hostname": ",".join(
-                            apisix_domains
-                        ),
                         "external-dns.kubernetes.io/hostname": ",".join(apisix_domains),
                         "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-apache-apisix"[
                             :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
@@ -598,6 +615,9 @@ def setup_apisix(
                         ),
                     },
                     "trustedAddresses": fastly_ips,
+                    # Chart default is true, which sends "Server: APISIX/<version>"
+                    # on every response (hq#14079).
+                    "enableServerTokens": False,
                     # Enable comprehensive per-phase request lifecycle tracing
                     # (SSL/SNI, rewrite, access, header_filter, body_filter, log).
                     # Available since chart 2.16.0; without it OpenTelemetry only
@@ -622,6 +642,7 @@ def setup_apisix(
                     "ssl": {
                         "enabled": True,
                         "containerPort": 9443,
+                        "sslCiphers": GATEWAY_SSL_CIPHERS,
                     },
                     "prometheus": {
                         "enabled": True,
@@ -633,6 +654,14 @@ def setup_apisix(
                         "workerProcesses": "auto",
                         "enableCPUAffinity": True,
                         "workerConnections": "10620",
+                        # Counts OIDC login restarts per Keycloak session_state;
+                        # see oidc_gateway_pre_function_plugin.
+                        "customLuaSharedDicts": [
+                            {
+                                "name": OIDC_RECOVERY_SHARED_DICT,
+                                "size": OIDC_RECOVERY_SHARED_DICT_SIZE,
+                            },
+                        ],
                         "logs": {
                             "enableAccessLog": True,
                             "accessLog": "/dev/stdout",
@@ -677,7 +706,13 @@ def setup_apisix(
                             "cookie_count=$cookie_count "
                             "oidc_session_bytes=$oidc_session_bytes "
                             'cookie_names="$cookie_names" '
-                            'cookie_sizes="$cookie_sizes"',
+                            'cookie_sizes="$cookie_sizes" '
+                            # What each client actually negotiated, so a cipher
+                            # change can be checked against real traffic.  Kept
+                            # last: grafana.py's Alloy regex expects the cookie_*
+                            # fields above to stay contiguous.
+                            "ssl_protocol=$ssl_protocol "
+                            "ssl_cipher=$ssl_cipher",
                             "accessLogFormatEscape": "default",
                             "errorLog": "/dev/stderr",
                             "errorLogLevel": "warn",
@@ -877,8 +912,12 @@ def setup_apisix(
                                 "cpu": "50m",
                                 "memory": "256Mi",
                             },
+                            # The manager OOMs at 256Mi while decoding its initial
+                            # cache sync, and weekly peaks reach it on several
+                            # clusters. The chart gives it no env hook for
+                            # GOMEMLIMIT, so the ceiling needs real headroom.
                             "limits": {
-                                "memory": "256Mi",
+                                "memory": "512Mi",
                             },
                         },
                         # Surge-first rolling update (maxUnavailable: 0): a new IC pod
@@ -979,6 +1018,9 @@ def setup_apisix(
                         "enabled": True,
                         "namespace": "operations",
                         "labels": k8s_global_labels,
+                        # Grafana Cloud bills per DPM; the chart's 15s default
+                        # is 4x the included rate. Consumers use >=5m windows.
+                        "interval": "60s",
                     },
                 },
                 # --- Custom error pages ---
@@ -1105,6 +1147,54 @@ def setup_apisix(
         ),
     )
 
+    # HSTS on every gateway response (hq#14079).  A global rule rather than the
+    # shared plugin configs' response-rewrite default, for the same two reasons
+    # as the rule above: routes with no plugin config would never get it, and a
+    # route carrying its own response-rewrite (mitxonline, xpro, micromasters,
+    # ocw-studio, jupyterhub) replaces the shared one by name.  A global
+    # response-rewrite does not displace a route's: response-rewrite has no
+    # run_policy="prefer_route", so APISIX runs the global copy and then the
+    # route's in header_filter, and each caches its header operations under its
+    # own conf_type ("global_rule" vs "route").  The two share only
+    # ctx.response_rewrite_matched, which the route's header_filter recomputes
+    # before its body_filter reads it, and this copy has no body or filters, so
+    # its own body_filter does nothing.
+    #
+    # Its own ApisixGlobalRule so it can be removed without touching the
+    # identity-header strip; no other global rule uses response-rewrite, so the
+    # controller's plugin-name-keyed flattening has nothing to collide with.
+    kubernetes.apiextensions.CustomResource(
+        f"{cluster_name}-apisix-security-response-headers-global-rule",
+        api_version="apisix.apache.org/v2",
+        kind="ApisixGlobalRule",
+        metadata=kubernetes.meta.v1.ObjectMetaArgs(
+            name="security-response-headers",
+            namespace="operations",
+            labels=k8s_global_labels,
+        ),
+        spec={
+            "ingressClassName": "apache-apisix",
+            "plugins": [
+                {
+                    "name": "response-rewrite",
+                    "enable": True,
+                    "config": {
+                        "headers": {
+                            "set": {
+                                "Strict-Transport-Security": GATEWAY_HSTS_HEADER_VALUE,
+                            }
+                        }
+                    },
+                }
+            ],
+        },
+        opts=ResourceOptions(
+            provider=k8s_provider,
+            parent=operations_namespace,
+            depends_on=[apisix_helm_release],
+        ),
+    )
+
     # Create GatewayClass resource for Gateway API
     gateway_class = kubernetes.apiextensions.CustomResource(
         f"{cluster_name}-gateway-class",
@@ -1190,7 +1280,7 @@ def setup_apisix(
     #
     # Upstream issue: https://github.com/apache/apisix-ingress-controller/issues/2643
     #
-    # Solution: Use external-dns.alpha.kubernetes.io/target annotation on Gateway resource.
+    # Solution: Use external-dns.kubernetes.io/target annotation on Gateway resource.
     # ExternalDNS checks this annotation first before looking at status.addresses.
     # See: https://github.com/kubernetes-sigs/external-dns/blob/master/docs/sources/gateway-api.md
     #
@@ -1205,9 +1295,6 @@ def setup_apisix(
                 "namespace": "operations",
                 "annotations": {
                     "pulumi.com/patchForce": "true",
-                    # Both prefixes on purpose -- see the gateway Service
-                    # annotations above for why.
-                    "external-dns.alpha.kubernetes.io/target": hostname,
                     "external-dns.kubernetes.io/target": hostname,
                 },
             }

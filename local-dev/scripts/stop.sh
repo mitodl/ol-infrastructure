@@ -64,7 +64,7 @@ if command -v tilt &>/dev/null; then
         ok "Running tilt session stopped."
     fi
     # Then remove the Tilt-managed workloads from the cluster.
-    if tilt down 2>/dev/null; then
+    if tilt down --context local-dev 2>/dev/null; then
         ok "Tilt-managed resources removed."
     else
         warn "tilt down failed — cluster resources left as-is (pause below still applies)."

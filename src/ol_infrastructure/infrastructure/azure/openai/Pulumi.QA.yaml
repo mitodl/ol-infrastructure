@@ -2,4 +2,18 @@
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 config:
   azure_openai:location: eastus
+  # dagster-ml embeds Learn's content with the model Learn's vectors come from. Setting
+  # this key replaces the code default, so mitlearn's list is repeated.
+  azure_openai:consumer_extra_models:
+    mitlearn:
+    - text-embedding-3-large
+    - text-embedding-3-small
+    dagster-ml:
+    - text-embedding-3-large
+  # 300K TPM. The ml code location sends embedding requests of up to 250K tokens, so its
+  # per-minute limit has to sit above that. mitlearn's QA deployment of the model keeps
+  # the default.
+  azure_openai:consumer_model_capacities:
+    dagster-ml:
+      text-embedding-3-large: 300
 encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgEluXO5SGsWhst5HcBT6UidAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMvxlWDyhg8T0jNsUUAgEQgDtrPf/zeoHEYu7rkChUU4XgLAtrxrZ5SM+E0lLXTm92hyQytrVB5NFYjRdg3zb7vpyzQns9l6g5BItmsQ==

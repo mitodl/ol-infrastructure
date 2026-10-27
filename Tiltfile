@@ -1,11 +1,26 @@
 # MIT Learn Stack — Local Development Entry Point
-# Run: tilt up
+# Run: ./local-dev/scripts/start.sh (or tilt up --context local-dev)
 # Docs: local-dev/README.md
+
+# Tilt applies to, and `tilt down` deletes from, the kubeconfig's current
+# context unless --context overrides it. Its own guard stops only contexts it
+# does not recognize as local: an orbstack or docker-desktop context passes it
+# and would receive the stack, while every kubectl command here targets
+# local-dev.
+if k8s_context() != "local-dev":
+    # k8s_context() is empty when no current context is set or the requested
+    # context is not in the kubeconfig.
+    fail(
+        ("Tilt is pointed at kube context '%s', not 'local-dev'." % k8s_context()
+         if k8s_context() else
+         "Tilt has no usable kube context: none is set, or the one requested is not in your kubeconfig.") +
+        "\n  Run ./local-dev/scripts/start.sh, or pass --context local-dev to tilt up / tilt down."
+    )
 
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
-config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
+config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters gitlab. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
 config.define_string_list("prebuilt_tags", usage="Published image tag to run for an app with no checkout, instead of latest, e.g. mit-learn=0.82.0 learn-ai=0.37.0")
 config.define_string_list("lake_host_ports", usage="Host ports for the data-platform lake forwards, e.g. rustfs=9100 gravitino=9101 (defaults: starrocks=9030 gravitino=9001 rustfs=9000). Move one that another process on your machine already holds.")
@@ -19,17 +34,31 @@ cfg = config.parse()
 # store and a privileged Concourse worker along with it, which is a lot of
 # machine for a developer who is not working on OCW — add it to enabled_apps
 # in tilt_config.json to switch it on.
-enabled_apps = cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
+# Split each entry on commas, because the Pulumi stacks split
+# LOCAL_DEV_ENABLED_APPS on commas. Without this, `--enabled_apps a,b` is one
+# entry here (loading no app Tiltfile) but two apps to Pulumi.
+enabled_apps = [
+    app.strip()
+    for entry in cfg.get("enabled_apps", ["mit-learn", "learn-ai", "mitxonline", "odl-video-service"])
+    for app in entry.split(",")
+    if app.strip()
+]
 per_app_databases = cfg.get("per_app_databases", False)
 
 # An included Tiltfile shares no variables with this one, so an app that
 # configures itself differently when another is enabled reads the list here.
 os.putenv("LOCAL_DEV_ENABLED_APPS", ",".join(enabled_apps))
+# update_settings is session-wide, so this applies to every app's apply:
+# mitxonline's runs its migrate Job inside `pulumi up`, which Tilt's 30 s
+# default cuts off on a first apply.
+if "mitxonline" in enabled_apps:
+    update_settings(k8s_upsert_timeout_secs=300)
 
 # Every service hostname, CORS origin, APISIX route, and Keycloak redirect URI
-# derives from this value. local-dev/tiltlib.star reads the same environment
-# variable when applying app manifests.
-root_domain = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
+# derives from this value, the same one local-dev/tiltlib.star substitutes into
+# app manifests.
+load("./local-dev/tiltlib.star", "current_root_domain")
+root_domain = current_root_domain()
 
 # The TLS certificate covers only this domain, so an unresolvable hostname means
 # nothing the stack serves is reachable. DNS and /etc/hosts both satisfy this.
@@ -44,7 +73,7 @@ if str(local(
          "  Fix by either:\n" +
          "    - running ./local-dev/scripts/setup.sh (adds 127.0.0.1 entries to /etc/hosts), or\n" +
          "    - pointing DNS for *.%s at this host, or\n" +
-         "    - unsetting LOCAL_DEV_ROOT_DOMAIN to use the mit.dev default.")
+         "    - unsetting LOCAL_DEV_ROOT_DOMAIN to use the mit.test default.")
         % (_probe_host, root_domain, root_domain)
     )
 
@@ -202,7 +231,7 @@ APPS = [
         "name": "mitxonline",
         "dir": "mitxonline",
         "namespace": "mitxonline",
-        "deploy_name": "mitxonline-webapp",
+        "deploy_name": "mitxonline-app",
         "images": {"mitxonline": "mitodl/mitxonline-app"},
         "tiltfile": "./local-dev/apps/mitxonline/Tiltfile",
         "seed_commands": [
@@ -264,14 +293,14 @@ APPS = [
                 # email, and createsuperuser then fails on the unique email
                 # with no way out short of exec'ing in. No password is set;
                 # login goes through Keycloak.
-                "description": "Create or promote the admin@odl.local superuser",
+                "description": "Create or promote the admin@ol.test superuser",
                 "cmd": (
                     "python manage.py shell -c " +
                     "'from django.contrib.auth import get_user_model; " +
                     "U = get_user_model(); " +
                     "u, created = U.objects.get_or_create(" +
-                    "email=\"admin@odl.local\", " +
-                    "defaults={\"username\": \"admin\", \"name\": \"Admin\"}); " +
+                    "email=\"admin@ol.test\", " +
+                    "defaults={\"username\": \"admin@ol.test\", \"name\": \"Admin\"}); " +
                     "u.is_staff = True; u.is_superuser = True; u.save(); " +
                     "print((\"created\" if created else \"promoted\"), u.email)'"
                 ),
@@ -303,6 +332,17 @@ APPS = [
         ],
     },
     {
+        # Off by default, and the heaviest thing here by some margin. It
+        # exists so ocw-studio's GitLab content-sync backend has somewhere to
+        # push to without an external server. See the GitLab section of
+        # local-dev/README.md for what it costs to run.
+        "name": "gitlab",
+        "dir": "gitlab",
+        "namespace": "gitlab",
+        "deploy_name": "gitlab",
+        "tiltfile": "./local-dev/apps/gitlab/Tiltfile",
+    },
+    {
         # Off by default: it exists so the data platform's micromasters dlt
         # source has a local database to read, which most developers do not
         # need running.
@@ -325,7 +365,7 @@ APPS = [
                     "U = get_user_model(); " +
                     "u, created = U.objects.get_or_create(" +
                     "username=\"admin\", " +
-                    "defaults={\"email\": \"admin@odl.local\"}); " +
+                    "defaults={\"email\": \"admin@ol.test\"}); " +
                     "u.is_staff = True; u.is_superuser = True; " +
                     "u.set_password(\"admin\"); u.save(); " +
                     "print((\"created\" if created else \"reset\"), u.username)'"
@@ -401,7 +441,11 @@ host_gateway = str(local(
 # Core stack (operators, foundational services, Keycloak instance)
 local_resource(
     "local-infra-core",
-    cmd="bash -c 'pulumi stack init local-dev.core.Dev 2>/dev/null; pulumi refresh --yes --skip-preview --stack local-dev.core.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.core.Dev'",
+    # Tilt sets FORCE_COLOR=1 for local commands. Pulumi's Python host runs
+    # `uv export` and parses its stdout as TOML, and uv honours FORCE_COLOR
+    # even when piped, so the ANSI escapes break the parse ("TOML files cannot
+    # contain control characters: '0x1b'"). Unset it for the Pulumi run.
+    cmd="bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; pulumi stack init local-dev.core.Dev 2>/dev/null; pulumi refresh --yes --skip-preview --stack local-dev.core.Dev && pulumi up --yes --skip-preview --logtostderr --stack local-dev.core.Dev'",
     # Passed as environment rather than interpolated into the command string:
     # log_retention_period is developer-supplied, and a value containing shell
     # metacharacters would otherwise be interpreted here instead of reaching
@@ -447,9 +491,15 @@ local_resource(
 # path (even while Keycloak itself is idle) and a batch of them trip
 # "context deadline exceeded" together. Serialising keeps one admin request in
 # flight at a time, which the path handles comfortably.
+#
+# `--run-program` makes the refresh use the Keycloak provider settings the
+# program computes now. Without it, refresh uses the ones recorded in state,
+# so after a root-domain change every resource fails to refresh against the
+# old hostname before the new URL can be applied.
 local_resource(
     "local-infra-apps",
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c '{wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --refresh --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
+    # FORCE_COLOR is unset for the same reason as local-infra-core above.
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --refresh --run-program --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
     # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
     # the core stack only creates on demand.
     env={"LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps)},
@@ -484,7 +534,7 @@ if "data-platform" in enabled_apps:
     ]:
         local_resource(
             name,
-            serve_cmd="while true; do kubectl -n local-infra port-forward svc/{service} {host_port}:{port}; sleep 2; done".format(service=service, host_port=lake_host_ports.get(service, port), port=port),
+            serve_cmd="while true; do kubectl --context local-dev -n local-infra port-forward svc/{service} {host_port}:{port}; sleep 2; done".format(service=service, host_port=lake_host_ports.get(service, port), port=port),
             labels=["infra"],
             resource_deps=["local-infra-core"],
         )
@@ -533,7 +583,7 @@ for app in [a for a in APPS if a["name"] in enabled_apps]:
     #   ./local-dev/scripts/seed.sh --app <app> --cmd <label>
     for seed in app.get("seed_commands", []):
         exec_cmd = (
-            "kubectl exec -n {ns} deploy/{deploy} -- {cmd}".format(
+            "kubectl --context local-dev exec -n {ns} deploy/{deploy} -- {cmd}".format(
                 ns=app["namespace"],
                 deploy=app["deploy_name"],
                 cmd=seed["cmd"],

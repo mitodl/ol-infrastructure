@@ -11,6 +11,8 @@ allow_merge_commit: false
 allow_rebase_merge: false
 allow_squash_merge: true
 archetype: library
+description: Exports MIT OpenCourseWare course metadata from the MIT Learn API as
+  CSV for OER Commons
 has_discussions: false
 has_projects: true
 has_wiki: true

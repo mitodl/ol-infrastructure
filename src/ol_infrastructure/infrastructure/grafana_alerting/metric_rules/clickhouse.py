@@ -77,6 +77,25 @@ def _server_down(clusters: str) -> str:
     )
 
 
+def _replica_not_ready(clusters: str) -> str:
+    # The operator runs one single-replica StatefulSet per CH host and per
+    # Keeper member, so this is 1 per host or member that is not Ready. A pod
+    # that never starts emits nothing a running server would: Keeper's own
+    # endpoint has no target to scrape, so ClickHouseKeeperDown (on `up`) is
+    # silent for a Pending member, and only ClickHouseServerDown covers a
+    # Pending CH host, through the exporter rather than Kubernetes.
+    selector = (
+        f'cluster=~"{clusters}", namespace="clickhouse", '
+        'statefulset=~"ch[ik]-clickhouse-.*"'
+    )
+    return (
+        "max by (cluster, namespace, statefulset) "
+        f"(kube_statefulset_replicas{{{selector}}})\n"
+        "- max by (cluster, namespace, statefulset) "
+        f"(kube_statefulset_status_replicas_ready{{{selector}}}) > 0"
+    )
+
+
 def _readonly_replica(clusters: str) -> str:
     return (
         f"max by ({_BY_HOST}) (chi_clickhouse_metric_ReadonlyReplica"
@@ -399,6 +418,19 @@ def create(
                 f"max by ({_BY_KEEPER}) (ClickHouseMetrics_KeeperOutstandingRequests) > 10",
                 "10m",
                 "ClickHouse Keeper pod {{ $labels.pod }} in cluster {{ $labels.cluster }} has {{ $value }} requests queued; it is receiving more than it can process.",
+                rd,
+            ),
+            # Appended rather than grouped with the data-at-risk rules: Pulumi
+            # diffs a group's rules by position, so inserting mid-list rewrites
+            # every later rule in place under its neighbour's name.
+            *_paired(
+                # 15m covers a normal one-at-a-time rollout: in data-production
+                # no host or member stayed un-Ready that long in the 30 days to
+                # 2026-10-20, which included a full rolling restart that day.
+                "ClickHouseReplicaNotReady",
+                _replica_not_ready,
+                "15m",
+                "ClickHouse StatefulSet {{ $labels.statefulset }} in cluster {{ $labels.cluster }} has had a pod not Ready for 15 minutes. chi-* is a server replica and chk-* a Keeper member; check the pod for Pending (PVC, scheduling) or a crash loop.",
                 rd,
             ),
         ],

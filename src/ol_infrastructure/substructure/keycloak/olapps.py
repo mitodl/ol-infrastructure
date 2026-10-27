@@ -8,11 +8,15 @@ import pulumi_vault as vault
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
 from ol_infrastructure.substructure.keycloak.client_policies import (
+    PKCE_REQUIRED_CLIENT_ARGS,
     create_pkce_client_policy,
 )
 from ol_infrastructure.substructure.keycloak.learner_records import (
     create_learner_records_clients,
     parse_learner_records_clients,
+)
+from ol_infrastructure.substructure.keycloak.ol_memory import (
+    create_ol_memory_resources,
 )
 from ol_infrastructure.substructure.keycloak.org_flows import (
     create_organization_browser_flows,
@@ -27,6 +31,9 @@ from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
     create_org_for_learn,
     onboard_oidc_org,
     onboard_saml_org,
+)
+from ol_infrastructure.substructure.keycloak.registration_flow import (
+    create_recaptcha_registration_flow,
 )
 
 
@@ -47,6 +54,13 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     keycloak_realm_config = Config("keycloak_realm")
     captcha_domain = "www.recaptcha.net"
     mitlearn_domain = keycloak_realm_config.require("learn_domain")
+    # The shared memory service (applications/hindsight) runs in QA and
+    # Production, not CI.
+    # Off, the token exchange setting is left unmanaged rather than written as
+    # false, so environments without the service see no change.
+    ol_memory_enabled = (
+        keycloak_realm_config.get_bool("olapps-ol-memory-enabled") or False
+    )
     ol_apps_realm = keycloak.Realm(
         "olapps",
         # Labeled "Client Login Timeout" in the admin console's Tokens tab
@@ -285,6 +299,18 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             keycloak.RealmUserProfileAttributeArgs(
                 name="emailOptIn",
                 display_name="${emailOptIn}",
+                # ol-learn-scim declares emailOptIn as an integer, and
+                # scim-for-keycloak validates each PATCH locally before sending it.
+                # One user holding "false" fails that validation, which aborts and
+                # rolls back the whole retry run for the provider.
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="options",
+                        config={
+                            "options": json.dumps(["0", "1"], separators=(",", ":"))
+                        },
+                    ),
+                ],
                 required_for_roles=[],
                 permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                     views=["admin", "user"], edits=["admin", "user"]
@@ -400,6 +426,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
         service_accounts_enabled=False,
+        standard_token_exchange_enabled=ol_memory_enabled or None,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "olapps-learn-ai-redirect-uris"
         ),
@@ -452,6 +479,16 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     )
     # Learn AI [END]
 
+    ol_memory_scopes = (
+        create_ol_memory_resources(
+            realm_id=ol_apps_realm.id,
+            learn_ai_client=olapps_learn_ai_client,
+            resource_options=resource_options,
+        )
+        if ol_memory_enabled
+        else None
+    )
+
     # OL ANALYTICS API [START]
     # ol-analytics-api is the B2B multi-tenant analytics gateway serving MIT
     # Learn's org-manager dashboard. It lives in the olapps realm (not
@@ -490,6 +527,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             standard_flow_enabled=True,
             implicit_flow_enabled=False,
             service_accounts_enabled=False,
+            **PKCE_REQUIRED_CLIENT_ARGS,
             valid_redirect_uris=keycloak_realm_config.get_object(
                 "olapps-ol-analytics-api-redirect-uris"
             ),
@@ -554,6 +592,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             standard_flow_enabled=True,
             implicit_flow_enabled=False,
             service_accounts_enabled=False,
+            # Not PKCE_REQUIRED_CLIENT_ARGS yet. mit-learn's AccountActionStartView
+            # sends its own authorization request with this client (change email
+            # and password) and that request has no code_challenge.
             valid_redirect_uris=keycloak_realm_config.get_object(
                 "olapps-mitlearn-client-redirect-uris"
             ),
@@ -572,6 +613,17 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 "web-origins",
                 "ol-profile",
                 "organization",
+                # This client's secret is shared by several apps, so it never
+                # gets memory tokens itself. Its tokens name the clients that
+                # exchange them for memory tokens instead.
+                *(
+                    [
+                        ol_memory_scopes.learn_ai_audience.name,
+                        ol_memory_scopes.mitlearn_memory_audience.name,
+                    ]
+                    if ol_memory_scopes
+                    else []
+                ),
             ],
         )
         olapps_mitlearn_client_roles = keycloak_realm_config.get_object(
@@ -859,15 +911,30 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     ol_browser_flow = create_organization_browser_flows(
         ol_apps_realm.id, "olapps", opts=resource_options
     )
-    # Bind the flow to the olapps realm for browser login.
+    # OL - browser flow [END]
+    # OL - registration flow [START]
+    ol_registration_flow, ol_registration_recaptcha_config = (
+        create_recaptcha_registration_flow(
+            ol_apps_realm.id,
+            "ol-registration",
+            recaptcha_site_key=keycloak_realm_config.require_secret("captcha_site_key"),
+            recaptcha_secret_key=keycloak_realm_config.require_secret(
+                "captcha_secret_key"
+            ),
+            opts=resource_options,
+        )
+    )
+    # OL - registration flow [END]
     keycloak.authentication.Bindings(
         "ol-apps-flow-bindings",
         realm_id=ol_apps_realm.id,
         browser_flow=ol_browser_flow.alias,
         first_broker_login_flow=ol_first_login_flow.alias,
-        opts=resource_options,
+        registration_flow=ol_registration_flow.alias,
+        opts=resource_options.merge(
+            ResourceOptions(depends_on=[ol_registration_recaptcha_config])
+        ),
     )
-    # OL - browser flow [END]
     # Ensure organization scope is present
     create_organization_scope(ol_apps_realm.id, "olapps", resource_options)
     # Touchstone SAML [START]
@@ -1197,6 +1264,14 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="UKM",
                 idp_display_name="Universiti Kebangsaan Malaysia",
                 org_saml_metadata_url="https://sso.ukm.my/saml2/idp/metadata.php",
+                # The endpoint went unreachable on 2026-10-21 and every run that
+                # fetched it failed. This copy is the Wayback Machine's capture
+                # of 2025-07-29, whose SSO/SLO URLs and signing cert match what
+                # Production had deployed. Remove it once metadata.php answers
+                # again, or a moved endpoint or rotated cert won't be picked up.
+                org_saml_metadata_xml=Path(__file__)
+                .parent.joinpath("files/olapps/ukm_metadata.xml")
+                .read_text(),
                 # UKM gave one value per field for "attribute name and friendly
                 # name", so the plain name (SimpleSAMLphp's basic format) is
                 # the identifier; matching on the Name attribute works whether
@@ -1245,6 +1320,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         onboard_saml_org(
             SamlIdpConfig(
                 idp_alias="istanbul_aydin_staff",
+                org_domain="aydin.edu.tr",
                 idp_display_name="Istanbul Aydin University - Staff",
                 org_saml_metadata_url="https://login.microsoftonline.com/dafbbeb4-3113-49c7-bce6-faeb84139bf6/federationmetadata/2007-06/federationmetadata.xml?appid=3b4d02b1-8482-4837-b8c4-2db32d8a93ee",
                 principal_type="SUBJECT",
@@ -1269,6 +1345,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         onboard_saml_org(
             SamlIdpConfig(
                 idp_alias="istanbul_aydin_students",
+                org_domain="stu.aydin.edu.tr",
                 idp_display_name="Istanbul Aydin University - Students",
                 org_saml_metadata_url="https://login.microsoftonline.com/1220f94e-b228-4761-9501-da9e83e540ac/federationmetadata/2007-06/federationmetadata.xml?appid=d134d48b-ca70-46fd-a008-ab83b9a565fe",
                 principal_type="SUBJECT",
@@ -1306,6 +1383,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         onboard_saml_org(
             SamlIdpConfig(
                 idp_alias="cyprus_aydin_staff",
+                org_domain="cau.edu.tr",
                 idp_display_name="Cyprus Aydin University - Staff",
                 org_saml_metadata_url="https://login.microsoftonline.com/b250b687-5037-48da-a6d7-7471164c4b43/federationmetadata/2007-06/federationmetadata.xml?appid=09b2e0c2-79e9-4498-bf8f-560a6647d53d",
                 principal_type="SUBJECT",
@@ -1330,6 +1408,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         onboard_saml_org(
             SamlIdpConfig(
                 idp_alias="cyprus_aydin_students",
+                org_domain="stu.cau.edu.tr",
                 idp_display_name="Cyprus Aydin University - Students",
                 org_saml_metadata_url="https://login.microsoftonline.com/7b2d4163-41c3-478f-8911-e9117b736dfb/federationmetadata/2007-06/federationmetadata.xml?appid=59324ddf-cc35-40c2-a91b-fa7c0def6e78",
                 principal_type="SUBJECT",

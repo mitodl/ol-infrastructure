@@ -91,6 +91,11 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
+from ol_infrastructure.lib.opik import (
+    OPIK_KEYCLOAK_VAULT_ENV,
+    OPIK_SDK_ENVIRONMENTS,
+    opik_api_url,
+)
 from ol_infrastructure.lib.otel import (
     DEFAULT_TRACE_SAMPLING_RATE,
     OTLP_ENDPOINT,
@@ -148,14 +153,10 @@ xpro_stack = (
     if stack_info.env_suffix in ("ci", "qa", "production")
     else None
 )
-# Opik is also deployed to CI/QA/Production only. The ml code location traces its
-# LLM calls there; on the Dev stack OPIK_URL_OVERRIDE stays unset and the ml
-# code's tracing is a no-op.
-opik_stack = (
-    make_stack_reference(projects.OPIK, stack_info.name)
-    if stack_info.env_suffix in ("ci", "qa", "production")
-    else None
-)
+# The ml code location traces its LLM calls to the Production Opik from every
+# environment whose Vault holds the Opik SDK client (lib/opik.py); on the Dev stack
+# OPIK_URL_OVERRIDE stays unset and the ml code's tracing is a no-op.
+opik_enabled = stack_info.env_suffix in OPIK_SDK_ENVIRONMENTS
 # Azure OpenAI for the ml code location, federated to the data cluster's OIDC issuer
 # by infrastructure/azure/openai. Off unless a stack opts in: that project has no Dev
 # stack, and the StackReference only resolves once it has deployed the environment.
@@ -2822,11 +2823,6 @@ code_locations: list[dict[str, str | int]] = [
     {"name": "legacy_openedx", "module": "legacy_openedx.definitions", "port": 4005},
     {"name": "openedx", "module": "openedx.definitions", "port": 4006},
     {
-        "name": "b2b_organization",
-        "module": "b2b_organization.definitions",
-        "port": 4007,
-    },
-    {
         "name": "ml",
         "module": "ml.definitions",
         "port": 4008,
@@ -2994,9 +2990,9 @@ for location in code_locations:
         )
 
     # ml's Opik tracing and Prompt Library. Only the non-secret settings live
-    # here: the code reads the Keycloak client-credentials from Vault at
-    # secret-operations/sso/opik itself (dagster_server_policy.hcl), the same
-    # secret learn_ai syncs. No OPIK_API_KEY -- the Keycloak auth hook owns the
+    # here: the code reads the Keycloak client-credentials from Vault itself, at
+    # OPIK_KEYCLOAK_VAULT_MOUNT/OPIK_KEYCLOAK_VAULT_PATH (dagster_server_policy.hcl).
+    # No OPIK_API_KEY -- the Keycloak auth hook owns the
     # Authorization header (see the opik stack's OPIK_SDK_KEYCLOAK_AUTH.md).
     # The chart copies a code location's env, volumes and volumeMounts into the
     # run pods it launches (includeConfigInLaunchedRuns), so ml's run workers
@@ -3008,17 +3004,18 @@ for location in code_locations:
         deployment.setdefault("volumes", []).extend(ml_gcp_volumes)
         deployment.setdefault("volumeMounts", []).extend(ml_gcp_volume_mounts)
 
-    if name == "ml" and opik_stack is not None:
+    if name == "ml" and opik_enabled:
         deployment["env"].extend(
             [
-                {
-                    "name": "OPIK_URL_OVERRIDE",
-                    "value": opik_stack.require_output("opik_url").apply(
-                        lambda url: f"{url}/api/"
-                    ),
-                },
+                {"name": "OPIK_URL_OVERRIDE", "value": opik_api_url()},
                 {"name": "OPIK_WORKSPACE", "value": "default"},
                 {"name": "OPIK_PROJECT_NAME", "value": "dagster-ml"},
+                # Set with the URL so ml moves to the Production Opik and its
+                # client in the same pod start, whichever deploys first.
+                *(
+                    {"name": env_name, "value": env_value}
+                    for env_name, env_value in OPIK_KEYCLOAK_VAULT_ENV.items()
+                ),
             ]
         )
 
@@ -3030,6 +3027,12 @@ for location in code_locations:
     # LLM_AZURE_ENDPOINT is the name ml's definitions.py reads. Its azure_openai client
     # authenticates with an Entra token from DefaultAzureCredential, and only when
     # SUMMARY_PROVIDER=azure_openai selects it, so this wiring alone changes no calls.
+    #
+    # AZURE_OPENAI_ENDPOINT and OPENAI_API_VERSION are for the Learn embeddings, which
+    # ol-llm sends through the openai SDK's AsyncAzureOpenAI. That client reads the API
+    # version from OPENAI_API_VERSION only (not AZURE_OPENAI_API_VERSION, which
+    # azure_openai_env emits) and has no "v1" special case, so it gets a dated GA
+    # version rather than mit_learn's "v1".
     if name == "ml" and azure_openai_stack is not None:
         deployment.setdefault("volumes", []).append(azure_identity_token_volume())
         deployment.setdefault("volumeMounts", []).append(azure_identity_token_mount())
@@ -3041,12 +3044,27 @@ for location in code_locations:
                 ).items()
             ]
         )
+        ml_azure_openai_endpoint = azure_openai_stack.require_output(
+            "cognitive_accounts"
+        ).apply(lambda accounts: accounts["dagster-ml"]["endpoint"])
+        deployment["env"].extend(
+            [
+                {"name": "LLM_AZURE_ENDPOINT", "value": ml_azure_openai_endpoint},
+                {"name": "AZURE_OPENAI_ENDPOINT", "value": ml_azure_openai_endpoint},
+                {"name": "OPENAI_API_VERSION", "value": "2024-10-21"},
+            ]
+        )
+
+    # Prefix of MIT Learn's Qdrant collections ({base}.content_files, {base}.topics),
+    # which ml's Learn embeddings smokecheck reads with the read-only key the mit_learn
+    # stack writes to secret-data/pipelines/qdrant. Same expression as mit_learn's
+    # QDRANT_COLLECTION_NAME: Learn's QA collections are mitlearn-qa, not the -rc
+    # suffix of mitlearn_env_suffix above, which only Learn's bucket names use.
+    if name == "ml":
         deployment["env"].append(
             {
-                "name": "LLM_AZURE_ENDPOINT",
-                "value": azure_openai_stack.require_output("cognitive_accounts").apply(
-                    lambda accounts: accounts["dagster-ml"]["endpoint"]
-                ),
+                "name": "LEARN_QDRANT_COLLECTION_BASE",
+                "value": f"mitlearn-{stack_info.env_suffix}",
             }
         )
 
@@ -3577,6 +3595,7 @@ dagster_helm_release = kubernetes.helm.v3.Release(
         chart="dagster",
         version=DAGSTER_CHART_VERSION,
         cleanup_on_fail=True,
+        max_history=10,
         values=dagster_helm_values,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://dagster-io.github.io/helm"
@@ -3648,6 +3667,7 @@ dagster_user_code_release = kubernetes.helm.v3.Release(
         chart="dagster-user-deployments",
         version=DAGSTER_CHART_VERSION,
         cleanup_on_fail=True,
+        max_history=10,
         disable_openapi_validation=True,
         values=dagster_user_code_values,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(

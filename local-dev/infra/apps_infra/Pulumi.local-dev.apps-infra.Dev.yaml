@@ -1,7 +1,9 @@
 ---
 config:
-  # Path to the kubeconfig for the k3d cluster.
-  # Defaults to ${HOME}/.kube/config if not set.
+  # Path to a kubeconfig holding the k3d cluster as context `local-dev`; the
+  # provider always targets that context name. Defaults to ${HOME}/.kube/config
+  # if not set, and is always passed explicitly: the provider must never record
+  # the temporary KUBECONFIG Tilt gives its commands.
   ol-local-dev-apps-infra:kubeconfig: ""
   # Domain configuration: unset on purpose. Pinning these here would override
   # LOCAL_DEV_ROOT_DOMAIN; unset, the code derives sso.ol.<root_domain>.

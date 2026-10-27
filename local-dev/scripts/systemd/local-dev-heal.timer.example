@@ -1,0 +1,22 @@
+# local-dev-heal.timer — periodic trigger for local-dev-heal.service.
+#
+# Installed as a *user* unit (~/.config/systemd/user/); see the local-dev
+# README. Enable with:  systemctl --user enable --now local-dev-heal.timer
+
+[Unit]
+Description=Periodically check local-dev container DNS against the host's
+
+[Timer]
+# A calendar timer rather than OnBootSec=/OnUnitActiveSec=, because
+# Persistent= below only has an effect on OnCalendar= timers
+# (systemd.timer(5)) — and Persistent= is the whole reason this covers resume.
+# A monotonic timer would recur correctly; it just could not catch up a run
+# missed while the machine was suspended, which is the case that matters most.
+OnCalendar=*:0/5
+# Run immediately on activation if a scheduled run was missed while the machine
+# was suspended or shut down. This is what lets a timer cover the wake case
+# without hooking sleep.target, which a user unit cannot do at all.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

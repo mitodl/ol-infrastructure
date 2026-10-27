@@ -180,6 +180,10 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
             resource_suffix="ol-shared-plugins",
             k8s_namespace=namespace,
             k8s_labels=application_labels,
+            # JupyterHub serves its own UI, its API and every single-user server
+            # from this one host, so all of its browser traffic is same-origin.
+            # An empty list attaches no cors plugin at all.
+            cors_allow_origins=[],
             enable_defaults=True,
             plugins=[
                 # Evict the host-only cookie the OIDC resource below used to
@@ -309,6 +313,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         kubernetes.helm.v3.ReleaseArgs(
             chart="jupyterhub",
             cleanup_on_fail=True,
+            max_history=10,
             version=JUPYTERHUB_CHART_VERSION,
             namespace=namespace,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(

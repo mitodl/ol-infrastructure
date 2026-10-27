@@ -24,6 +24,10 @@ config:
     - "ci.learn.mit.edu"
     cors_urls:
     - "https://ci.learn.mit.edu"
+    - "https://courses.ci.learn.mit.edu"   # MITxOnline courseware MFE, same as csrf_domains below
+    - "https://lms-ci.mitx.mit.edu"   # MITx LMS: ol-openedx-chat video summary/flashcard fetch
+    - "https://staging-ci.mitx.mit.edu"   # MITx Staging LMS: ol-openedx-chat video summary/flashcard fetch
+    - "https://courses-ci.xpro.mit.edu"   # xPRO LMS: ol-openedx-chat video summary/flashcard fetch
     - "https://ocw-next.netlify.app"
     - "https://draft-ci.ocw.mit.edu"
     - "https://live-ci.ocw.mit.edu"
@@ -82,6 +86,8 @@ config:
     OCW_ITERATOR_CHUNK_SIZE: 300
     OCW_LIVE_BUCKET: "ocw-content-live-production"
     OIDC_ENDPOINT: "https://sso-ci.ol.mit.edu/realms/olapps"
+    # = OVS QA CloudFront (E1KA122GOS192Z); a mismatch drops all OVS media
+    OVS_ALLOWED_MEDIA_HOSTS: '["du3yhovcx8dht.cloudfront.net"]'
     OVS_API_BASE_URL: "https://video-rc.odl.mit.edu"
     OPENSEARCH_INDEX: "mitlearn-ci"
     OPENSEARCH_SHARD_COUNT: 2

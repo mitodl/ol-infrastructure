@@ -7,8 +7,6 @@ not read, a verb its ServiceAccount lacks, or a time budget in which the Job's
 deadline kills the window before it has scaled the server back up.
 """
 
-from typing import Any
-
 import pulumi
 
 from ol_infrastructure.applications.omnigraph.lock_handoff import (
@@ -17,6 +15,8 @@ from ol_infrastructure.applications.omnigraph.lock_handoff import (
 )
 from ol_infrastructure.applications.omnigraph.maintenance import (
     COMMAND_TIMEOUT_SECONDS,
+    LANCE_MEM_POOL_BYTES,
+    MAINTENANCE_MEMORY_LIMIT,
     MAINTENANCE_WINDOW_SECONDS,
     TERMINATION_GRACE_SECONDS,
     WINDOW_ACTIVE_DEADLINE_SECONDS,
@@ -24,6 +24,7 @@ from ol_infrastructure.applications.omnigraph.maintenance import (
     create_maintenance_window,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
+from tests.ol_infrastructure.recording_mocks import RecordingMocks
 
 STACK_INFO = StackInfo(
     name="CI",
@@ -38,23 +39,9 @@ STACK_INFO = StackInfo(
 SECONDS_TO_NEXT_WRITER = 40 * 60
 
 
-class _Mocks(pulumi.runtime.Mocks):
-    def __init__(self) -> None:
-        self.resources: list[pulumi.runtime.MockResourceArgs] = []
-
-    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-        self.resources.append(args)
-        return [f"{args.name}_id", args.inputs]
-
-    def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
-        return {}
-
-
-def _of_type(mocks: _Mocks, typ: str) -> list[dict[str, Any]]:
-    return [r.inputs for r in mocks.resources if r.typ == typ]
-
-
-def _window(*, suspend: bool = False):
+def _window(
+    *, suspend: bool = False, cleanup_iso_weekdays: tuple[int, ...] = (1, 3, 7)
+):
     return create_maintenance_window(
         stack_info=STACK_INFO,
         namespace="omnigraph",
@@ -64,9 +51,10 @@ def _window(*, suspend: bool = False):
         cluster_configmap_name="omnigraph-cluster-config",
         cluster_config_dir="/etc/omnigraph/cluster",
         server_deployment_name="omnigraph-server",
+        server_termination_grace_seconds=125,
         schedule="20 3 * * *",
         cleanup_older_than="30d",
-        cleanup_iso_weekday=7,
+        cleanup_iso_weekdays=cleanup_iso_weekdays,
         depends_on=[],
         suspend=suspend,
     )
@@ -95,14 +83,34 @@ def test_the_grace_period_is_what_the_image_says_its_close_needs() -> None:
     assert TERMINATION_GRACE_SECONDS >= 120
 
 
+def test_the_lance_pool_fits_every_concurrent_fold_and_the_container() -> None:
+    """Optimize folds up to 8 tables at once, and each fold's sort holds a 40 MiB
+    merge reservation that cannot spill, in one pool for the whole process. The
+    pool has to leave the sorts room for their rows (the 2026-10-20 failure held
+    33.4 MiB), and the container room for the pool on top of the 336 MB the
+    window used at most before it.
+    """
+    mib = 1024 * 1024
+    concurrent_folds = 8
+    merge_reservation = 40 * mib
+    rows_per_sort = 34 * mib
+    peak_working_set = 336 * 1000 * 1000
+    assert (
+        LANCE_MEM_POOL_BYTES - concurrent_folds * merge_reservation
+        >= concurrent_folds * rows_per_sort
+    )
+    limit = int(MAINTENANCE_MEMORY_LIMIT.removesuffix("Mi")) * mib
+    assert limit - LANCE_MEM_POOL_BYTES >= peak_working_set
+
+
 @pulumi.runtime.test
 def test_the_window_can_scale_the_server_and_nothing_else_about_it():
-    mocks = _Mocks()
+    mocks = RecordingMocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
     window = _window()
 
     def check(_: object) -> None:
-        (role,) = _of_type(mocks, "kubernetes:rbac.authorization.k8s.io/v1:Role")
+        (role,) = mocks.of_type("kubernetes:rbac.authorization.k8s.io/v1:Role")
         assert role["rules"] == [
             {
                 "apiGroups": ["coordination.k8s.io"],
@@ -124,8 +132,8 @@ def test_the_window_can_scale_the_server_and_nothing_else_about_it():
                 "verbs": ["get", "update"],
             },
         ]
-        (binding,) = _of_type(
-            mocks, "kubernetes:rbac.authorization.k8s.io/v1:RoleBinding"
+        (binding,) = mocks.of_type(
+            "kubernetes:rbac.authorization.k8s.io/v1:RoleBinding"
         )
         # Its own identity: bound to the server's, the server could scale
         # its own Deployment.
@@ -142,12 +150,12 @@ def test_the_window_can_scale_the_server_and_nothing_else_about_it():
 
 @pulumi.runtime.test
 def test_the_cron_job_runs_the_images_window_command_with_its_env():
-    mocks = _Mocks()
+    mocks = RecordingMocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
     window = _window()
 
     def check(_: object) -> None:
-        (cron_job,) = _of_type(mocks, "kubernetes:batch/v1:CronJob")
+        (cron_job,) = mocks.of_type("kubernetes:batch/v1:CronJob")
         spec = cron_job["spec"]
         assert spec["schedule"] == "20 3 * * *"
         assert spec["concurrencyPolicy"] == "Forbid"
@@ -169,10 +177,14 @@ def test_the_cron_job_runs_the_images_window_command_with_its_env():
             "OMNIGRAPH_UNLOCK_LEASE": "omnigraph-unlock",
             "POD_NAME": None,
             "OMNIGRAPH_CLEANUP_OLDER_THAN": "30d",
-            "OMNIGRAPH_CLEANUP_ISO_WEEKDAY": "7",
+            "OMNIGRAPH_CLEANUP_ISO_WEEKDAY": "1,3,7",
             "OMNIGRAPH_WINDOW_SECONDS": str(MAINTENANCE_WINDOW_SECONDS),
             "OMNIGRAPH_COMMAND_TIMEOUT_SECONDS": str(COMMAND_TIMEOUT_SECONDS),
+            # A server draining writes for its whole grace is not stuck.
+            "OMNIGRAPH_SERVER_STOP_SECONDS": "180",
+            "LANCE_MEM_POOL_SIZE": str(LANCE_MEM_POOL_BYTES),
         }
+        assert container["resources"]["limits"]["memory"] == MAINTENANCE_MEMORY_LIMIT
         # The command reads the storage root and the graph list from it.
         (mount,) = container["volumeMounts"]
         assert mount["mountPath"] == "/etc/omnigraph/cluster/cluster.yaml"
@@ -186,13 +198,38 @@ def test_the_cron_job_runs_the_images_window_command_with_its_env():
 
 
 @pulumi.runtime.test
+def test_no_cleanup_days_render_as_an_empty_list():
+    """The image reads an empty OMNIGRAPH_CLEANUP_ISO_WEEKDAY as no cleanup days.
+
+    agent-kit docker/omnigraph_maintenance.py parse_iso_weekdays. Production
+    and QA set ``omnigraph:cleanup_iso_weekdays: []`` so their windows only
+    optimize.
+    """
+    mocks = RecordingMocks()
+    pulumi.runtime.set_mocks(mocks, preview=False)
+    window = _window(cleanup_iso_weekdays=())
+
+    def check(_: object) -> None:
+        (cron_job,) = mocks.of_type("kubernetes:batch/v1:CronJob")
+        (container,) = cron_job["spec"]["jobTemplate"]["spec"]["template"]["spec"][
+            "containers"
+        ]
+        env = {e["name"]: e.get("value") for e in container["env"]}
+        # The real provider drops the empty value and keeps the entry, as
+        # `pulumi preview` shows. The image reads both as no cleanup days.
+        assert env["OMNIGRAPH_CLEANUP_ISO_WEEKDAY"] in ("", None)
+
+    return window.cron_job.urn.apply(check)
+
+
+@pulumi.runtime.test
 def test_an_armed_migration_suspends_the_window():
-    mocks = _Mocks()
+    mocks = RecordingMocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
     window = _window(suspend=True)
 
     def check(_: object) -> None:
-        (cron_job,) = _of_type(mocks, "kubernetes:batch/v1:CronJob")
+        (cron_job,) = mocks.of_type("kubernetes:batch/v1:CronJob")
         assert cron_job["spec"]["suspend"] is True
 
     return window.cron_job.urn.apply(check)
@@ -205,7 +242,7 @@ def test_the_armed_marker_is_the_one_the_image_looks_for() -> None:
 
 @pulumi.runtime.test
 def test_the_plan_gate_runs_the_images_plan_check_with_the_boots_inputs():
-    mocks = _Mocks()
+    mocks = RecordingMocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
     gate = create_plan_gate(
         stack_info=STACK_INFO,
@@ -225,7 +262,7 @@ def test_the_plan_gate_runs_the_images_plan_check_with_the_boots_inputs():
     )
 
     def check(_: object) -> None:
-        (job,) = _of_type(mocks, "kubernetes:batch/v1:Job")
+        (job,) = mocks.of_type("kubernetes:batch/v1:Job")
         assert "name" not in job["metadata"]
         template = job["spec"]["template"]
         # A new cluster.yaml or image has to run the gate again.

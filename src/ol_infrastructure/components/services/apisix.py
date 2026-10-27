@@ -1,6 +1,7 @@
 # ruff: noqa: E501
 """APISIX ingress controller components for Kubernetes."""
 
+import re
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Annotated, Any, Literal, assert_never
@@ -48,6 +49,24 @@ STRIP_CLIENT_IDENTITY_HEADERS_LUA = (
 # The only statuses ngx.redirect accepts; anything else is a Lua error at
 # request time (ngx_http_lua_control.c:209-219).
 NGX_REDIRECT_STATUSES = (301, 302, 303, 307, 308)
+
+# lua_shared_dict that oidc_error_callback_recovery.lua counts restarts in.  The
+# gateway has to define it (apisix.nginx.customLuaSharedDicts in
+# infrastructure/aws/eks/apisix_official.py); where it is absent the function
+# falls back to the guard cookie alone.
+OIDC_RECOVERY_SHARED_DICT = "ol-oidc-recovery"
+OIDC_RECOVERY_SHARED_DICT_SIZE = "1m"
+
+# A serialized Origin header: scheme, lower-case host and optional port, with no
+# path, query or trailing slash.  APISIX's cors plugin compares the request
+# Origin against each allow_origins entry for exact equality, so anything else
+# passes its schema (`\w+://[^,]+`) but never matches and silently blocks that
+# frontend.  Wildcards ("*", "**") and "null" fail this too, which keeps an
+# explicit list from bringing back reflect-any with credentials.
+CORS_ORIGIN_PATTERN = re.compile(
+    r"^https?://[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
+    r"(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*(?::\d{1,5})?$"
+)
 
 
 class OLApisixPluginConfig(BaseModel):
@@ -144,6 +163,7 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
     guard_cookie_name: str = "apisix_oidc_recovery",
     guard_max_age: int = 60,
     *,
+    max_restarts_per_session_state: int = 1,
     canonical_https_redirect: bool = True,
     canonical_redirect_status: Literal[301, 302, 303, 307, 308] = 308,
 ) -> OLApisixPluginConfig:
@@ -243,10 +263,27 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
     uses.  Recovery happens only when *none* of them is present, so listing a
     name too many is harmless, but omitting one would divert every successful
     login on the routes that use it.  An empty sequence (the default) turns the
-    branch off.  The same guard cookie bounds it to one attempt per window.  A
-    browser that drops this host's cookies while keeping Keycloak's would drop
-    the guard too, and ends at the browser's own redirect limit instead of the
-    500 page -- no worse for someone whose login could not have succeeded.
+    branch off.  The same guard cookie bounds it to one attempt per window.
+
+    **Restart bound for browsers that store no cookies.**  A browser that drops
+    this host's cookies while keeping Keycloak's drops the guard too, so every
+    callback is restarted and it loops through Keycloak until the browser's own
+    redirect limit.  Production saw two such loops in the 20h to 2026-10-01
+    13:17Z: 35 restarts in 23s for one api.learn.mit.edu client and 7 in under
+    5s for one nb.learn.mit.edu client.  Every hop of a loop carries the same
+    Keycloak ``session_state``, so the function also counts restarts per
+    ``session_state`` in the ``OIDC_RECOVERY_SHARED_DICT`` lua_shared_dict and
+    lets the callback fall through to the 500 past
+    ``max_restarts_per_session_state``.  A browser that does keep cookies never
+    reaches the counter a second time: its second callback carries either the
+    session cookie or the guard.  The dict is per APISIX pod, so the effective
+    bound is that many restarts per replica per host.
+
+    This covers the ``code`` branch only in practice.  Keycloak sends no
+    ``session_state`` with ``error=temporarily_unavailable`` (none of the 2,027
+    such callbacks in the 24h to 2026-10-07 16:59Z carried one), so a
+    cookie-less browser on the error branch is still bounded only by its own
+    redirect limit.
 
     Both functions live in ``files/`` and are shipped verbatim -- nothing is
     interpolated into them.  Tunables travel as ``oidc_error_recovery`` and
@@ -268,7 +305,10 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
         them is restarted rather than left to fail.  Empty disables this.
     :param guard_cookie_name: Name of the loop-breaker cookie.
     :param guard_max_age: Seconds the guard cookie lives, bounding how often one
-        browser can be sent back through login.
+        browser can be sent back through login.  Also the lifetime of the
+        per-``session_state`` restart counter.
+    :param max_restarts_per_session_state: Restarts allowed for one Keycloak
+        ``session_state`` per ``guard_max_age`` window, per APISIX pod.
     :param canonical_https_redirect: Whether to send non-canonical origins to
         ``https://<bare host>`` before openid-connect runs.  ``False`` drops the
         function entirely, for a host that must keep answering on plain HTTP.
@@ -292,6 +332,18 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
         msg = (
             f"canonical_redirect_status must be one of {NGX_REDIRECT_STATUSES}, "
             f"got {canonical_redirect_status}: ngx.redirect rejects anything else."
+        )
+        raise ValueError(msg)
+
+    # guard_max_age is the counter's init_ttl, and ngx.shared.DICT treats 0 as
+    # "never expires": a session_state would stay refused until the pod restarts.
+    if guard_max_age < 1:
+        msg = f"guard_max_age must be at least 1 second, got {guard_max_age}."
+        raise ValueError(msg)
+    if max_restarts_per_session_state < 1:
+        msg = (
+            "max_restarts_per_session_state must be at least 1, got "
+            f"{max_restarts_per_session_state}: 0 would refuse every recovery."
         )
         raise ValueError(msg)
 
@@ -326,6 +378,8 @@ def oidc_gateway_pre_function_plugin(  # noqa: PLR0913
                 "session_cookie_names": list(session_cookie_names),
                 "guard_cookie_name": guard_cookie_name,
                 "guard_max_age": guard_max_age,
+                "restart_dict_name": OIDC_RECOVERY_SHARED_DICT,
+                "max_restarts": max_restarts_per_session_state,
             },
         },
     )
@@ -651,6 +705,13 @@ class OLApisixOIDCConfig(BaseModel):
     # or other applications should set an explicit, environment-scoped name so
     # their session cookies stay distinct in the browser's cookie jar.
     oidc_session_cookie_name: str | None = None
+    # lua-resty-session leaves Secure off unless asked, so without this the
+    # session cookie the gateway issues after login would be sent by the
+    # browser on any plain-HTTP request to the cookie's domain (hq#14077).
+    # Every deployed OIDC host is HTTPS-only, and so is the local-dev stack
+    # that uses this component, so no caller needs it off; the field exists to
+    # make that a choice.
+    oidc_session_cookie_secure: bool = True
     oidc_session_absolute_timeout: NonNegativeInt = 0
     # None leaves lua-resty-session's compiled-in defaults (900s idling /
     # 3600s rolling) untouched for callers that haven't opted in. 0
@@ -754,6 +815,13 @@ class OLApisixOIDCResources(ComponentResource):
                 oidc_config.oidc_session_cookie_name
             )
 
+        # Always emitted, so the session block now exists for every caller.
+        # That block already reaches APISIX for all of them anyway: the
+        # secretRef merges session.secret into it.
+        session_config.setdefault("session", {})["cookie_secure"] = (
+            oidc_config.oidc_session_cookie_secure
+        )
+
         if oidc_config.oidc_session_absolute_timeout:
             session_config.setdefault("session", {})["absolute_timeout"] = (
                 oidc_config.oidc_session_absolute_timeout
@@ -822,6 +890,27 @@ class OLApisixSharedPluginsConfig(BaseModel):
     application_name: str
     resource_suffix: str = "shared-plugins"
     enable_defaults: bool = True
+    # Origins the cors default plugin will echo back with
+    # Access-Control-Allow-Credentials: true.  Required whenever
+    # ``enable_defaults`` is set -- there is deliberately no default.  This used
+    # to be the APISIX wildcard "**", which reflects whatever Origin the browser
+    # sent *and* allows credentials, so any origin a user's cookies were sent to
+    # could read authenticated JSON off every OIDC host.  Pass the same list the
+    # application declares to its own framework (Django's
+    # CORS_ALLOWED_ORIGINS / CSRF_ALLOWED_ORIGINS, Open edX's
+    # CORS_ORIGIN_WHITELIST) so the gateway and the app agree; the gateway's
+    # headers are what the browser actually enforces.
+    #
+    # Each entry must be a bare origin (scheme://host[:port]); wildcards, "null"
+    # and anything with a path are rejected -- see CORS_ORIGIN_PATTERN.
+    #
+    # An empty list omits the cors plugin entirely, which is the right answer
+    # for a service whose only callers are same-origin browsers or
+    # server-to-server clients: the gateway then adds no Access-Control-*
+    # headers of its own.  It does not strip the upstream's, so an application
+    # that sets CORS headers itself (django-cors-headers, say) still grants
+    # whatever it allows on simple, non-preflighted requests.
+    cors_allow_origins: list[str] | None = None
     # Attach the opentelemetry plugin (OTLP trace export) to every route that
     # references this shared plugin config.  Automatically disabled on CI, where
     # the plugin is not loaded into APISIX and the Grafana Alloy collector does
@@ -838,15 +927,13 @@ class OLApisixSharedPluginsConfig(BaseModel):
     # application whose responses stream incrementally under a compressible
     # content type -- gzip buffering would delay their first byte.
     enable_gzip: bool = True
-    # Drop the ``cors`` entry from the defaults.  That default is
-    # ``allow_origins: "**"`` with ``allow_credential: True`` -- a browser-facing
-    # grant that only earns its place on an application a browser genuinely
-    # calls cross-origin.  An internal tool reached through one host and
-    # authenticated by an APISIX-managed session cookie (Dagster, Airbyte, Leek,
-    # gwarek) has no cross-origin caller to serve, so referencing this config to
-    # pick up prometheus/opentelemetry/gzip must not also widen its origin
-    # policy.  Applications that do need CORS keep the default and get a real
-    # origin list when the wildcard is replaced per-app.
+    # Drop every ``cors`` entry from the rendered plugins, the default one and
+    # any a caller passes in ``plugins``.  For the default alone this is the same
+    # as ``cors_allow_origins=[]``, and when False no origin list is required.
+    # An internal tool reached through one host and authenticated by an
+    # APISIX-managed session cookie (Dagster, Airbyte, Leek, gwarek) has no
+    # cross-origin caller to serve, so referencing this config to pick up
+    # prometheus/opentelemetry/gzip must not also grant it an origin policy.
     enable_cors: bool = True
     k8s_labels: dict[str, str] = {}
     k8s_namespace: str
@@ -886,6 +973,38 @@ class OLApisixSharedPluginsConfig(BaseModel):
     rate_limit_max_concurrent: PositiveInt = 100
     rate_limit_concurrent_burst: NonNegativeInt = 50
 
+    @field_validator("cors_allow_origins")
+    @classmethod
+    def check_cors_origins(cls, origins: list[str] | None) -> list[str] | None:
+        """Reject any entry that is not a bare origin APISIX can match."""
+        invalid = [o for o in origins or [] if not CORS_ORIGIN_PATTERN.match(o)]
+        if invalid:
+            msg = (
+                f"cors_allow_origins entries must be bare origins "
+                f"(scheme://host[:port], lower-case, no path or trailing slash, "
+                f"no wildcards); got {invalid!r}"
+            )
+            raise ValueError(msg)
+        return origins
+
+    @model_validator(mode="after")
+    def require_explicit_cors_origins(self) -> "OLApisixSharedPluginsConfig":
+        """Refuse to render the cors default plugin without an origin list."""
+        if (
+            self.enable_defaults
+            and self.enable_cors
+            and self.cors_allow_origins is None
+        ):
+            msg = (
+                f"{self.application_name}: cors_allow_origins is required when "
+                "enable_defaults is set. Pass the application's own allowed "
+                "origins (the list it gives Django's CORS_ALLOWED_ORIGINS or "
+                "equivalent), or [] to attach no cors plugin at all for a "
+                "service with no cross-origin browser callers."
+            )
+            raise ValueError(msg)
+        return self
+
 
 class OLApisixSharedPlugins(ComponentResource):
     """
@@ -901,8 +1020,12 @@ class OLApisixSharedPlugins(ComponentResource):
       The v1alpha1 schema only accepts ``name`` and ``config`` per plugin;
       ``enable: false`` plugins are omitted entirely and ``secretRef`` is dropped.
 
-    Callers can use ``self.resource_name`` in both ``OLApisixRouteConfig`` (legacy)
-    and ``OLApisixHTTPRouteConfig`` (Gateway API) without any distinction.
+    Legacy callers pass ``self.resource_name`` to ``OLApisixRouteConfig``;
+    Gateway API callers pass the component itself to
+    ``OLApisixHTTPRouteConfig(shared_plugins=...)``, which reads
+    ``self.plugin_list`` to merge these defaults into each route's own plugins
+    (HTTPRoute allows only one ExtensionRef per rule, so the merge has to happen
+    here rather than in APISIX).
     """
 
     def __init__(
@@ -916,6 +1039,29 @@ class OLApisixSharedPlugins(ComponentResource):
             "ol:infrastructure:services:k8s:OLApisixSharedPlugin", name, None, opts
         )
 
+        # APISIX matches the request Origin against this comma-separated list
+        # and echoes back only a member of it, so allow_credential stays safe.
+        # An empty ``cors_allow_origins`` renders no cors plugin at all -- see
+        # the field's comment on OLApisixSharedPluginsConfig.  allow_methods and
+        # allow_headers stay at "**": once the origin is pinned they only widen
+        # what an already-allowed origin may send.
+        __cors_plugins: list[dict[str, Any]] = (
+            [
+                {
+                    "name": "cors",
+                    "enable": True,
+                    "config": {
+                        "allow_origins": ",".join(plugin_config.cors_allow_origins),
+                        "allow_methods": "**",
+                        "allow_headers": "**",
+                        "allow_credential": True,
+                    },
+                }
+            ]
+            if plugin_config.cors_allow_origins
+            else []
+        )
+
         __default_plugins: list[dict[str, Any]] = [
             {
                 "name": "redirect",
@@ -924,16 +1070,7 @@ class OLApisixSharedPlugins(ComponentResource):
                     "http_to_https": True,
                 },
             },
-            {
-                "name": "cors",
-                "enable": True,
-                "config": {
-                    "allow_origins": "**",
-                    "allow_methods": "**",
-                    "allow_headers": "**",
-                    "allow_credential": True,
-                },
-            },
+            *__cors_plugins,
             {
                 "name": "response-rewrite",
                 "enable": True,
@@ -1100,6 +1237,14 @@ class OLApisixSharedPlugins(ComponentResource):
         self.resource_name = (
             f"{plugin_config.application_name}-{plugin_config.resource_suffix}"
         )
+        # The rendered plugin list, exposed so OLApisixHTTPRoute can merge these
+        # defaults into a route's own plugins.  A single HTTPRoute rule accepts
+        # only one ExtensionRef filter, so a Gateway API route cannot reference
+        # this config *and* its own PluginConfig the way a legacy ApisixRoute
+        # can -- the two lists have to be combined before the CRD is written.
+        self.plugin_list: list[OLApisixPluginConfig] = [
+            OLApisixPluginConfig(**p) for p in plugins
+        ]
         # v2/ApisixPluginConfig — consumed by legacy ApisixRoute/Ingress resources
         # via ``plugin_config_name`` in the route spec.
         self.shared_plugin_apisix_pluginconfig_resource = (
@@ -1399,6 +1544,8 @@ class OLApisixUpstreamConfig(BaseModel):
     # same upstream pod.
     hash_on: Literal["vars", "header", "cookie", "consumer"] | None = None
     hash_key: str | None = None
+    # Unset keeps APISIX's default: retry on the other available nodes.
+    retries: NonNegativeInt | None = None
 
     @model_validator(mode="after")
     def validate_chash_fields(self) -> "OLApisixUpstreamConfig":
@@ -1434,6 +1581,9 @@ class OLApisixUpstream(ComponentResource):
         if upstream_config.loadbalancer_type == "chash":
             loadbalancer_spec["hashOn"] = upstream_config.hash_on
             loadbalancer_spec["key"] = upstream_config.hash_key
+        upstream_spec: dict[str, Any] = {"loadbalancer": loadbalancer_spec}
+        if upstream_config.retries is not None:
+            upstream_spec["retries"] = upstream_config.retries
 
         self.apisix_upstream_resource = kubernetes.apiextensions.CustomResource(
             f"OLApisixUpstream-{name}",
@@ -1445,6 +1595,6 @@ class OLApisixUpstream(ComponentResource):
                 labels=upstream_config.k8s_labels,
                 namespace=upstream_config.k8s_namespace,
             ),
-            spec={"loadbalancer": loadbalancer_spec},
+            spec=upstream_spec,
             opts=resource_options,
         )

@@ -20,7 +20,7 @@ dependencies = [
   "pulumi>=3.39.1,<4",
   "pulumi-aws>=7.1,<8",
   "pulumi-fastly>=12,<13",
-  "pulumi-gcp>=9.34,<10",
+  "pulumi-gcp>=10.1,<11",
   "pulumi-github>=6.0.0,<7",
   "pulumi-mailgun>=3.0.0,<4",
   "pulumi-tls>=5.0.0,<6",
@@ -64,7 +64,7 @@ Repository = "https://github.com/mitodl/ol-infrastructure"
 
 [dependency-groups]
 # CI installs only this group (.github/workflows/autofix.yml); `dev` includes it.
-prek = ["prek==0.5.4"]
+prek = ["prek==0.5.5"]
 dev = [
   { include-group = "prek" },
   "copier",
@@ -228,6 +228,9 @@ inline-quotes = "double"
 
 [tool.ruff.lint.per-file-ignores]
 "src/ol_concourse/**" = ["INP001"]
+# A local-dev app's Pulumi program is a script directory: an __init__.py there
+# would make it a package named `pulumi`, shadowing the SDK for mypy and isort.
+"local-dev/apps/*/pulumi/**" = ["INP001"]
 "scripts/**" = [
   "T201",
   "ERA001",
@@ -318,9 +321,14 @@ extend_exclude = [
   # Runs in marimo single-user pods from a postStart hook; tomlkit comes with
   # marimo there.
   "src/ol_infrastructure/applications/jupyterhub_data/marimo_ai_defaults\\.py",
+  # Hindsight extensions, mounted into the Hindsight image and imported there.
+  "src/ol_infrastructure/applications/hindsight/ol_memory_ext/",
   "dockerfiles/",
   "scripts/helpers/",
   "scripts/openedx/",
+  # The Hindsight extension harness declares its dependencies inline
+  # (uv run --script) and runs against containers, not this environment.
+  "scripts/hindsight/",
   # Standalone services: the files below are the service runtime, built into
   # their own image against their own requirements.txt, so they import things
   # this project does not declare (flask, slack_bolt, aiohttp, github).
@@ -369,13 +377,14 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.uv]
+constraint-dependencies = ["certifi>=2026.10.19"]  # eMudhra CA compromise: never resolve a certifi that trusts the compromised CAs
 exclude-newer = "7d"
 required-version = ">=0.9.17"
 
 [tool.uv.exclude-newer-package]
-# 6.14.0 (2026-10-06) is the first release that works against Keycloak 26.8.
-# Taken inside the 7-day window on purpose; remove this line after 2026-10-13.
-pulumi-keycloak = "0d"
+# certifi 2026.10.19 drops the compromised eMudhra CAs; security fix, taken inside the
+# 7-day window on purpose. Remove this line after 2026-10-26.
+certifi = "0d"
 ol-concourse = "0d"
 django-aqueduct = "0d"
 edx-sysadmin = "0d"

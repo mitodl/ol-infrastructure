@@ -45,12 +45,25 @@ class AppRegistration:
         and the release bot starts accepting commands for the app -- until
         then it refuses them, since every command it offers targets a job or
         an artifact only the modernized pipeline produces.
+    :param release_changelog: Whether the release resource writes a generated
+        ``CHANGELOG.md`` entry (version, date, one line per change) into each
+        ``Release <version>`` commit. Only meaningful with
+        ``release_resource_workflow``. Set it False for an app that already
+        maintains its own ``CHANGELOG.md``: the resource inserts its entry
+        ahead of the first ``## `` line, which in a file managed by another
+        tool lands between that tool's anchor and its heading and duplicates
+        the release. ``ol-analytics-api`` does this -- scriv collects
+        hand-written fragments during the version bump. An app that shares a
+        repo with another registered app (``mit-learn-nextjs``) must also set
+        it False until the two have separate changelogs, or both flows would
+        write the one file.
     """
 
     github_repo: str | None = None
     repo_main_branch: str = "main"
     slack_channel: str | None = None
     release_resource_workflow: bool = False
+    release_changelog: bool = True
 
 
 APPS: dict[str, AppRegistration] = {
@@ -72,21 +85,30 @@ APPS: dict[str, AppRegistration] = {
     "mit-learn-nextjs": AppRegistration(
         github_repo="mitodl/mit-learn", slack_channel="product-mit-learn"
     ),
-    "mitxonline": AppRegistration(slack_channel="product-mitx-online"),
+    "mitxonline": AppRegistration(
+        slack_channel="product-mitx-online", release_resource_workflow=True
+    ),
     "ocw-studio": AppRegistration(
         repo_main_branch="master",
         slack_channel="product-ocw",
         release_resource_workflow=True,
     ),
     "odl-video-service": AppRegistration(
-        repo_main_branch="master", slack_channel="product-ovs"
+        repo_main_branch="master",
+        slack_channel="product-ovs",
+        release_resource_workflow=True,
     ),
     # No app-specific channel given -- falls back to RELEASE_ANNOUNCE_CHANNEL.
-    "ol-analytics-api": AppRegistration(release_resource_workflow=True),
+    # Keeps its own scriv-managed CHANGELOG.md (see bin/collect-changelog in
+    # that repo), so the resource must not write one too.
+    "ol-analytics-api": AppRegistration(
+        release_resource_workflow=True, release_changelog=False
+    ),
     "xpro": AppRegistration(
         github_repo="mitodl/mitxpro",
         repo_main_branch="master",
         slack_channel="product-xpro",
+        release_resource_workflow=True,
     ),
 }
 
@@ -115,6 +137,12 @@ def release_resource_workflow(app_name: str) -> bool:
     """Return whether the given app runs the modernized release-resource pipeline."""
     entry = APPS.get(app_name)
     return bool(entry and entry.release_resource_workflow)
+
+
+def release_changelog(app_name: str) -> bool:
+    """Return whether the release resource writes a generated CHANGELOG.md entry."""
+    entry = APPS.get(app_name)
+    return entry.release_changelog if entry else True
 
 
 #: GitHub App id for `ol-release-bot`, the identity the Concourse `release`,
@@ -147,10 +175,9 @@ def release_workflow_repos() -> frozenset[str]:
     EVERY REGISTERED APP, NOT ONLY THE ONES ALREADY RUNNING THE NEW WORKFLOW. That
     is deliberate and it over-grants on purpose (decision: Tobias, 2026-09-01). The
     actual opt-in is ``AppRegistration.release_resource_workflow`` above, which
-    defaults to ``False`` and today is set on ``ol-analytics-api``, ``learn-ai``,
-    ``micromasters`` and ``ocw-studio`` -- so the consumer below grants a bypass on
-    ``mit-learn`` and ``mitxonline`` for an App that does not yet finish their
-    releases.
+    defaults to ``False`` and is set only on the apps already migrated -- so the
+    consumer below also grants a bypass on legacy apps such as ``mit-learn``, for an
+    App that does not yet finish their releases.
 
     The trade is pre-provisioning against a rollout that would otherwise need a
     GitHub ruleset edit interleaved with every pipeline flip -- and that edit is the

@@ -25,14 +25,22 @@ transforms:
     inputs:
     - 'collect_vault_journald_logs'
     source: |
-      event, err = parse_json(.message)
-      if event != null {
-        ., err = merge(., event)
+      event = parse_json(.message) ?? null
+      if is_object(event) {
+        # The parsed audit fields replace the raw JSON string; shipping both
+        # stored every audit event twice.
+        del(.message)
+        . = merge(., object!(event))
         .environment = "${ENVIRONMENT}"
       }
       # Only want to hear about the raft_backup job from cron
       if ._SYSTEMD_UNIT == "cron.service" && .SYSLOG_IDENTIFIER != "raft_backup" {
         abort
+      }
+      # journald trusted fields (_BOOT_ID, _CMDLINE, __MONOTONIC_TIMESTAMP, ...)
+      # were a large share of every line and are never queried.
+      . = filter(.) -> |key, _value| {
+        !starts_with(key, "_") || key == "_SYSTEMD_UNIT"
       }
 
 
@@ -41,6 +49,9 @@ transforms:
     inputs:
     - 'parse_vault_journald_logs'
     namespace: ec2
+    # hostname is already a Loki label; the instance id is the only useful extra.
+    fields:
+    - instance-id
 
   parse_vault_auth_logs:
     inputs:

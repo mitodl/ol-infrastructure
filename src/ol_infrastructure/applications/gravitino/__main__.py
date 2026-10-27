@@ -63,9 +63,11 @@ from ol_infrastructure.lib.aws.iam_helper import (
     lint_iam_policy,
 )
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
+    Component,
     K8sAppLabels,
     Product,
     Services,
@@ -597,7 +599,11 @@ gravitino_values = {
     },
     "replicas": replicas,
     "serviceAccountName": SERVICE_ACCOUNT_NAME,
-    "podLabels": k8s_labels,
+    # Notify: a catalog outage fails queries and pipeline runs, which is late
+    # data and not a learner-facing outage.
+    "podLabels": k8s_app_labels.workload_labels(
+        alert_tier=AlertTier.notify, component=Component.api
+    ),
     "entity": {
         "jdbcUrl": gravitino_db.db_instance.address.apply(
             lambda address: (
@@ -844,6 +850,7 @@ gravitino_release = kubernetes.helm.v3.Release(
         version=GRAVITINO_CHART_VERSION,
         namespace=NAMESPACE,
         cleanup_on_fail=True,
+        max_history=10,
         skip_await=False,
         values=gravitino_values,
     ),

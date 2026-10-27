@@ -487,6 +487,18 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         stages=["QA", "Production"],
         topology="preview-gated",
     ),
+    "hindsight": SimplePulumiParams(
+        app_name="hindsight",
+        pulumi_project_path="applications/hindsight/",
+        pulumi_project_name="ol-application-hindsight",
+        description=(
+            "Deploys Hindsight, the shared learner and general memory service, "
+            "with its embeddings server, via Pulumi."
+        ),
+        category="core-platform",
+        stages=["QA", "Production"],
+        topology="preview-gated",
+    ),
     "jupyterhub-data": SimplePulumiParams(
         app_name="jupyterhub-data",
         pulumi_project_path="applications/jupyterhub_data/",
@@ -547,6 +559,10 @@ pipeline_params: dict[str, SimplePulumiParams] = {
         pulumi_project_name="ol-application-open-metadata",
         description="Deploys the OpenMetadata data-catalog application via Pulumi.",
         category="data-platform",
+        # initialAdmins names the provisioner's service account.
+        additional_watched_paths=[
+            "src/ol_infrastructure/substructure/keycloak/openmetadata_provisioner.py"
+        ],
         topology="preview-gated",
         auto_deploy_stages=["CI"],
     ),
@@ -559,6 +575,10 @@ pipeline_params: dict[str, SimplePulumiParams] = {
             "OpenMetadata runs on, via Pulumi."
         ),
         category="data-platform",
+        additional_watched_paths=[
+            "src/ol_infrastructure/providers/",
+            "src/ol_infrastructure/substructure/keycloak/openmetadata_provisioner.py",
+        ],
         stages=["QA", "Production"],
         topology="preview-gated",
     ),

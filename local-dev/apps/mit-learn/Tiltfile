@@ -4,13 +4,13 @@
 # When the sibling mit-learn repo is not checked out, Tilt uses the prebuilt
 # DockerHub image (mitodl/mit-learn-app:latest) without attempting a local build.
 
-load("../../tiltlib.star", "k8s_yaml_local")
+load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
 
 NAMESPACE = "mit-learn"
 IMAGE = "mitodl/mit-learn-app"
 MIT_LEARN_DIR = os.path.join(os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/.."), "mit-learn")
 _MIT_LEARN_APP_DIR = os.path.join(config.main_dir, "local-dev/apps/mit-learn")
-_rd = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
+_rd = current_root_domain()
 
 # ─────────────────────────────────────────────────────────────
 # Docker Build
@@ -99,9 +99,25 @@ k8s_resource(
         "18061:8060",  # nginx → host port 18061
     ],
     links=[
-        link("https://api.learn.mit.dev", "MIT Learn API"),
-        link("https://learn.mit.dev", "MIT Learn Frontend"),
+        link("https://api.learn." + _rd, "MIT Learn API"),
+        link("https://learn." + _rd, "MIT Learn Frontend"),
     ],
+)
+
+# The routes' openid-connect blocks take discovery and session.secret from the
+# ol-*-oidc Secrets local-infra-apps writes. Applied against Secrets without
+# them, a route fails APISIX's schema check, APISIX rejects the whole config
+# push, and an APISIX pod that local-infra-core is rolling never becomes ready.
+k8s_resource(
+    new_name="mitlearn-routes",
+    objects=[
+        "mitlearn-shared-plugins:apisixpluginconfig",
+        "mitlearn-tls:apisixtls",
+        "mitlearn-route-no-prefix:apisixroute",
+        "mitlearn-route-prefix:apisixroute",
+    ],
+    labels=["mit-learn"],
+    resource_deps=["local-infra-apps"],
 )
 
 k8s_resource(

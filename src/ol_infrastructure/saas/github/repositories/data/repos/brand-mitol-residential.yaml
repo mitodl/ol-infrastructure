@@ -10,6 +10,8 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: master
+description: Fork of edx/brand-edx.org with branding assets for MIT's residential
+  Open edX
 has_discussions: false
 has_projects: true
 merge_commit_message: PR_TITLE

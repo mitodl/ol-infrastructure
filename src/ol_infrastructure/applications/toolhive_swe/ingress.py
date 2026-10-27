@@ -7,8 +7,13 @@ it to the APISIX gateway, while a Gateway API HTTPRoute routes every path
 (``/mcp``, ``/.well-known/*``) to the vMCP Service. APISIX does NOT participate
 in authentication — it only terminates TLS and proxies through; the vMCP is a
 pure OAuth resource server (no embedded auth server, no token endpoints of its
-own) validating bearer tokens Keycloak issued directly to MCP clients, so no
-plugins are attached.
+own) validating bearer tokens Keycloak issued directly to MCP clients.
+
+The route does carry the shared observability plugins (prometheus,
+opentelemetry, gzip, request-id) so this host is not a blind spot on the
+gateway dashboards. ``text/event-stream`` is deliberately absent from the gzip
+plugin's type list, so MCP's streaming responses are not held behind a
+compression buffer.
 
 The hostname must also be present in the operations EKS stack's
 ``eks:apisix_domains`` so external-dns points it at the APISIX NLB.
@@ -16,6 +21,10 @@ The hostname must also be present in the operations EKS stack's
 
 from pulumi import Resource, ResourceOptions
 
+from ol_infrastructure.components.services.apisix import (
+    OLApisixSharedPlugins,
+    OLApisixSharedPluginsConfig,
+)
 from ol_infrastructure.components.services.apisix_gateway_api import (
     OLApisixHTTPRoute,
     OLApisixHTTPRouteConfig,
@@ -57,21 +66,42 @@ def create_ingress_resources(
         opts=ResourceOptions(depends_on=[swe_virtualmcpserver]),
     )
 
+    # Observability defaults for the route below: prometheus (per-route series),
+    # opentelemetry (OTLP spans), gzip and request-id. Without them this host
+    # produced no metrics and no traces at the gateway at all.
+    #
+    # enable_cors=False: the callers are MCP clients holding a Keycloak bearer
+    # token, not browser pages making cross-origin calls, so picking up the
+    # observability plugins must not also grant the host a wildcard origin.
+    # enable_defaults keeps the http->https redirect and Referrer-Policy, which
+    # cost a token-authenticated API nothing.
+    vmcp_shared_plugins = OLApisixSharedPlugins(
+        f"toolhive-swe-vmcp-{stack_info.env_suffix}-ol-shared-plugins",
+        plugin_config=OLApisixSharedPluginsConfig(
+            application_name="toolhive-swe-vmcp",
+            resource_suffix="ol-shared-plugins",
+            k8s_namespace=namespace,
+            k8s_labels=k8s_global_labels,
+            enable_cors=False,
+        ),
+    )
+
     # Gateway API HTTPRoute attaching the host to the shared operations APISIX
     # gateway and routing all paths (MCP + /.well-known/*) to the vMCP Service.
-    # No plugins: token validation happens inside the vMCP.
+    # APISIX still performs no authentication: token validation happens inside
+    # the vMCP.
     vmcp_httproute = OLApisixHTTPRoute(
         f"toolhive-swe-vmcp-apisix-httproute-{stack_info.env_suffix}",
         route_configs=[
             OLApisixHTTPRouteConfig(
                 route_name="vmcp",
+                shared_plugins=vmcp_shared_plugins,
                 hosts=[vmcp_domain],
                 paths=["/*"],
                 backend_service_name=VMCP_SERVICE_NAME,
                 # Numeric port: the component maps the name "http" to 8071, which
                 # is wrong for this Service — pass the real port explicitly.
                 backend_service_port=VMCP_SERVICE_PORT,
-                plugins=[],
             ),
         ],
         k8s_namespace=namespace,

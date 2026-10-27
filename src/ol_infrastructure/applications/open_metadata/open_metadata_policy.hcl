@@ -14,6 +14,10 @@ path "secret-operations/sso/open_metadata" {
 path "secret-operations/sso/superset" {
   capabilities = ["read"]
 }
+# Keycloak client for the job that mirrors team membership into Keycloak groups
+path "secret-openmetadata/data/keycloak-team-sync" {
+  capabilities = ["read"]
+}
 # Connector credentials for OpenMetadata ingestion pipelines
 path "secret-openmetadata/data/connectors" {
   capabilities = ["read"]

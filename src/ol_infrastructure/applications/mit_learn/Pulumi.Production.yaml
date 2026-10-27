@@ -20,6 +20,10 @@ config:
     cors_urls:
     - "https://api.learn.mit.edu"
     - "https://learn.mit.edu"
+    - "https://courses.learn.mit.edu"   # MITxOnline courseware MFE, same as csrf_domains below
+    - "https://lms.mitx.mit.edu"   # MITx LMS: ol-openedx-chat video summary/flashcard fetch
+    - "https://staging.mitx.mit.edu"   # MITx Staging LMS: ol-openedx-chat video summary/flashcard fetch
+    - "https://courses.xpro.mit.edu"   # xPRO LMS: ol-openedx-chat video summary/flashcard fetch
     - "https://api.mitopen.odl.mit.edu"   # legacy
     - "https://mitopen.odl.mit.edu"   # legacy
     - "https://draft.ocw.mit.edu"
@@ -139,6 +143,8 @@ config:
     OPENSEARCH_INDEX: "mitlearn"
     OPENSEARCH_SHARD_COUNT: 3
     OPENSEARCH_URL: "https://search-opensearch-mitlearn-producti-qjtnw2dcoampmbtscs3wdfci6y.us-east-1.es.amazonaws.com"
+    # = OVS Production CloudFront (E1M3I29KI2GTVW); a mismatch drops all OVS media
+    OVS_ALLOWED_MEDIA_HOSTS: '["d3tsb3m56iwvoq.cloudfront.net"]'
     OVS_API_BASE_URL: "https://video.odl.mit.edu"
     POSTHOG_API_HOST: "https://ph.ol.mit.edu"
     POSTHOG_ENABLED: "true"

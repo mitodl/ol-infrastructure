@@ -50,16 +50,24 @@ from ol_concourse.lib.tasks import TASK_IMAGE, bump_version_task
 from pydantic import BaseModel, model_validator
 
 from bridge.settings.apps import github_repo as app_github_repo
+from bridge.settings.apps import release_changelog as app_release_changelog
 from bridge.settings.apps import (
     release_resource_workflow as app_release_resource_workflow,
 )
 from bridge.settings.apps import repo_main_branch as app_repo_main_branch
+from ol_concourse.pipelines.applications.learn_ai_frontend.values import (
+    ENVIRONMENTS as LEARN_AI_FRONTEND_ENVIRONMENTS,
+)
 from ol_concourse.pipelines.constants import (
     ECR_REGION,
     PULUMI_WATCHED_PATHS,
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
+from ol_concourse.pipelines.infrastructure.k8s_apps.static_frontend import (
+    StaticFrontendConfig,
+    static_frontend_fragment,
+)
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
 from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
@@ -149,6 +157,7 @@ class AppPipelineParams(BaseModel):
     github_repo: str | None = None
     sentry_sourcemaps: SentrySourcemapsConfig | None = None
     refresh_stack: bool = True
+    static_frontend: StaticFrontendConfig | None = None
     description: str = ""
     category: str = "applications"
 
@@ -203,7 +212,7 @@ pipeline_params = {
         app_name="mitxonline",
         build_target="production",
         refresh_stack=False,
-        description="Builds the MITx Online Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
+        description="Builds the MITx Online Django app image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
     ),
     "mit-learn-nextjs": AppPipelineParams(
         app_name="mit-learn-nextjs",
@@ -234,12 +243,15 @@ pipeline_params = {
         build_target="production",
         settings_dir="mitxpro",
         refresh_stack=False,
-        description="Builds the xPRO Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
+        description="Builds the xPRO Django app image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
     ),
     "learn-ai": AppPipelineParams(
         app_name="learn-ai",
         refresh_stack=False,
-        description="Builds the Learn AI service image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
+        static_frontend=StaticFrontendConfig(
+            path="frontend-demo", environments=LEARN_AI_FRONTEND_ENVIRONMENTS
+        ),
+        description="Builds the Learn AI service image and deploys it to Kubernetes via Pulumi, and ships its static frontend with each release, following the modernized GitHub Release/Deployment workflow.",
     ),
     "mit-learn": AppPipelineParams(
         app_name="mit-learn",
@@ -257,7 +269,7 @@ pipeline_params = {
         repo_main_branch=app_repo_main_branch("odl-video-service"),
         build_target="production",
         settings_dir="odl_video",
-        description="Builds the ODL Video Service Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
+        description="Builds the ODL Video Service Django app image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
     ),
     "ol-analytics-api": AppPipelineParams(
         app_name="ol-analytics-api",
@@ -932,8 +944,15 @@ def _define_release_resources(
     app_name: str,
     github_repo: str,
     repo_main_branch: str,
+    *,
+    generated_changelog: bool = True,
 ) -> tuple[Resource, Resource, Resource, Resource, Resource]:
-    """Define the release-flow resources: release resource, gates, issues, and GitHub Deployments."""
+    """Define the release-flow resources: release resource, gates, issues, and GitHub Deployments.
+
+    ``generated_changelog`` has the release resource fold a Keep a Changelog
+    entry into the ``Release <version>`` commit; see
+    ``AppRegistration.release_changelog`` for when to turn it off.
+    """
     # Shared GitHub App installation ol-concourse-lib no longer defaults --
     # every consumer of this library supplies its own credential reference.
     # Backed by the "shared/github_app" entry in
@@ -958,6 +977,7 @@ def _define_release_resources(
         private_ssh_key=github_app_private_key,
         repository=github_repo,
         semver_tag_fallback=True,
+        changelog_style="cumulative" if generated_changelog else None,
     ).model_copy(
         # Not the library's `never`. Rebuilding the release resource image
         # gives this resource a fresh, empty version history on its next
@@ -1193,28 +1213,43 @@ ASSERT_GATE_TASK_NAME = "assert-gate-names-deploy"
 
 
 def _assert_gate_names_deploy_task(
-    app_name: str, release_gate: Resource, version_input: Resource
+    app_name: str,
+    github_repo: str,
+    release_gate: Resource,
+    version_input: Resource,
+    infra_input: Identifier,
 ) -> TaskStep:
-    """Fail the job unless the closed gate issue names the version it deploys.
+    """Fail the job unless the closed gate issue names what it deploys.
 
     Accepts ``Release <app> <version>`` and ``Release <app> infrastructure @
     <version>``, and requires ``<version>`` to equal the contents of
     ``<version_input>/version``, which has to be the same file the job's
-    ``DOCKER_TAG`` comes from. The gate get has already tombstoned the issue,
-    so a refused issue does not fire again. A failure here means nothing
-    deployed, which turns gate/deploy drift into a red build instead of an
-    unapproved release.
+    ``DOCKER_TAG`` comes from. The issue body's revision marker must also name
+    the ol-infrastructure commit in ``<infra_input>``, which has to resolve to
+    the same commit the job's Pulumi code get does. The gate get has already
+    tombstoned the issue, so a refused issue does not fire again. A failure
+    here means nothing deployed, which turns gate/deploy drift into a red build
+    instead of an unapproved release.
     """
     return TaskStep(
         task=Identifier(ASSERT_GATE_TASK_NAME),
         config=TaskConfig(
             platform=Platform.linux,
             image_resource=TASK_IMAGE,
-            inputs=[Input(name=release_gate.name), Input(name=version_input.name)],
+            inputs=[
+                Input(name=release_gate.name),
+                Input(name=version_input.name),
+                Input(name=infra_input),
+            ],
             params={
                 "APP_NAME": app_name,
                 "GATE_FILE": f"{release_gate.name}/gh_issue.json",
                 "VERSION_FILE": f"{version_input.name}/version",
+                "INFRA_REF_FILE": f"{infra_input}/.git/ref",
+                "GITHUB_REPOSITORY": github_repo,
+                "GITHUB_APP_ID": GITHUB_APP_ID,
+                "GITHUB_APP_INSTALLATION_ID": GITHUB_APP_INSTALLATION_ID,
+                "GITHUB_APP_PRIVATE_KEY": GITHUB_APP_PRIVATE_KEY,
             },
             run=Command(path="python3", args=["-c", _ASSERT_GATE_SCRIPT]),
         ),
@@ -1258,8 +1293,13 @@ def _classify_promotion_task(
     release_res: Resource,
     current_release: Identifier,
     pulumi_resource: Resource,
+    pulumi_code: Resource,
 ) -> TaskStep:
-    """Compose the release issue's title and body from the Production preview."""
+    """Compose the release issue's title and body from the Production preview.
+
+    *pulumi_code* is the ol-infrastructure checkout the preview ran from; its
+    commit goes into the body for the Production job to check.
+    """
     return TaskStep(
         task=Identifier(CLASSIFY_TASK_NAME),
         config=TaskConfig(
@@ -1269,6 +1309,7 @@ def _classify_promotion_task(
                 Input(name=release_res.name),
                 Input(name=current_release),
                 Input(name=pulumi_resource.name),
+                Input(name=pulumi_code.name),
             ],
             outputs=[Output(name=Identifier(PROMOTION_DIR))],
             params={
@@ -1283,6 +1324,8 @@ def _classify_promotion_task(
                 "NO_CHANGES_MARKER_FILE": (
                     f"{pulumi_resource.name}/{PREVIEW_NO_CHANGES_MARKER}"
                 ),
+                "INFRA_REF_FILE": f"{pulumi_code.name}/.git/ref",
+                "INFRA_REPO_URL": pulumi_code.source["uri"],
                 "OUTPUT_DIR": PROMOTION_DIR,
             },
             run=Command(path="python3", args=["-c", _CLASSIFY_SCRIPT]),
@@ -1616,6 +1659,7 @@ def _build_release_resource_app_pipeline(
         app_name=app_name,
         github_repo=github_repo,
         repo_main_branch=pipeline_parameters.repo_main_branch,
+        generated_changelog=app_release_changelog(app_name),
     )
 
     main_image_build_job = _build_image_job(
@@ -1686,6 +1730,15 @@ def _build_release_resource_app_pipeline(
     project_name = f"ol-application-{app_name}"
     docker_tag_env = f"{app_name.replace('-', '_').upper()}_DOCKER_TAG"
     release_current = Identifier(f"{app_name}-release-current")
+    # The ol-infra commit Production deploys, fetched again under its own name
+    # so the gate check can read it before anything deploys: pulumi_job puts
+    # its own code get after every dependency. Both gets take ol-infra with
+    # `passed:` QA, as do the release and image gets. Concourse pins inputs
+    # that share a `passed:` job to the outputs of one build of that job and
+    # rejects any build whose version differs, so the two gets name the same
+    # commit.
+    infra_revision = Identifier(f"{ol_infra_repo.name}-revision")
+    qa_job_name = f"deploy-{project_name}-qa"
     qa_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
         # Preview Production at the tag it would deploy, then fold that diff
         # and the app checklist into one release issue, so a single approval
@@ -1712,7 +1765,7 @@ def _build_release_resource_app_pipeline(
             params={"cache_bust": "((.:cache_bust))"},
         ),
         _classify_promotion_task(
-            app_name, release_res, release_current, pulumi_resource
+            app_name, release_res, release_current, pulumi_resource, ol_infra_repo
         ),
         # Open (or update) the GitHub Release Issue. The title names the
         # version it ships, or the live version for an infrastructure-only
@@ -1760,13 +1813,18 @@ def _build_release_resource_app_pipeline(
         ),
     ]
     prod_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
-        # Mark the Production GitHub Deployment as successful.
+        # Mark the Production GitHub Deployment as successful, and say so on the
+        # release issue. Closing that issue authorizes the promotion; it does
+        # not show the release is live, and a closed issue is easy to misread as
+        # "shipped". The comment links the Deployment, which is what records
+        # what is live. The gate's get already put gh_issue.json in the job.
         PutStep(
             put=deployment_prod.name,
             params={
                 "action": "finish",
                 "deployment_file": f"{deployment_prod.name}/deployment.json",
                 "state": "success",
+                "comment_on_issue_file": f"{release_gate.name}/gh_issue.json",
             },
         ),
         # Merge the release branch back into the main branch and delete it so
@@ -1774,10 +1832,10 @@ def _build_release_resource_app_pipeline(
         #
         # Deliberately NOT wrapped in a `try`. It used to be, because this job
         # can be retriggered by an infra-only merge (QA re-runs on any change
-        # under the watched Pulumi paths, and its release_issue put edits the
-        # already-closed release_gate issue, which Concourse's version="every"
-        # get treats as a new trigger here) with no new app release -- and
-        # finish then failed trying to fetch a release branch that a prior
+        # under the watched Pulumi paths and opens a fresh release_gate issue
+        # for the same version once the earlier one is closed; closing that
+        # one is a new trigger for Concourse's version="every" get here) with
+        # no new app release -- and finish then failed trying to fetch a release branch that a prior
         # finish had already deleted. The release resource now no-ops in that
         # case instead of failing, so the `try` buys nothing and costs
         # everything: it equally swallowed *genuine* finish failures. That is
@@ -1870,9 +1928,18 @@ def _build_release_resource_app_pipeline(
             ],
             1: [
                 GetStep(get=release_gate.name, trigger=True, version="every"),
+                GetStep(
+                    get=infra_revision,
+                    resource=ol_infra_repo.name,
+                    trigger=False,
+                    passed=[qa_job_name],
+                ),
                 # Before the deployment record or the deploy itself: the
-                # issue that fired must name the version being deployed.
-                _assert_gate_names_deploy_task(app_name, release_gate, release_res),
+                # issue that fired must name the version and the ol-infra
+                # commit being deployed.
+                _assert_gate_names_deploy_task(
+                    app_name, github_repo, release_gate, release_res, infra_revision
+                ),
                 # main_repo is needed by the action=finish post-step.
                 GetStep(
                     get=main_repo.name,
@@ -1939,13 +2006,26 @@ def _build_release_resource_app_pipeline(
         jobs=ci_fragment.jobs,
     )
 
-    combined_fragment = PipelineFragment.combine_fragments(
+    fragments = [
         ci_deployment_fragment,
         qa_and_production_fragment,
         main_branch_container_fragement,
         release_container_fragment,
-    )
-    return combined_fragment.to_pipeline()
+    ]
+    if pipeline_parameters.static_frontend is not None:
+        fragments.append(
+            static_frontend_fragment(
+                app_name=app_name,
+                repo_uri=f"https://github.com/{github_repo}",
+                repo_main_branch=pipeline_parameters.repo_main_branch,
+                config=pipeline_parameters.static_frontend,
+                deployment_rc=deployment_rc,
+                deployment_prod=deployment_prod,
+                qa_job_name=qa_job_name,
+                production_job_name=f"deploy-{project_name}-production",
+            )
+        )
+    return PipelineFragment.combine_fragments(*fragments).to_pipeline()
 
 
 def build_app_pipeline(app_name: str) -> Pipeline:
@@ -1964,6 +2044,14 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     )
     if app_release_resource_workflow(app_name):
         return _build_release_resource_app_pipeline(app_name, pipeline_parameters)
+    if pipeline_parameters.static_frontend is not None:
+        # The frontend jobs chain off the release workflow's GitHub Deployments;
+        # the legacy shape has none, and would silently drop the frontend.
+        msg = (
+            f"{app_name}: static_frontend requires release_resource_workflow=True "
+            "in bridge.settings.apps."
+        )
+        raise ValueError(msg)
     return _build_legacy_app_pipeline(app_name, pipeline_parameters)
 
 

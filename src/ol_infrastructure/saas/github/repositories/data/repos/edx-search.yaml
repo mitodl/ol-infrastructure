@@ -10,6 +10,7 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: master
+description: MIT Open Learning fork of openedx/edx-search, search services for edx-platform
 has_discussions: false
 has_projects: true
 merge_commit_message: PR_TITLE

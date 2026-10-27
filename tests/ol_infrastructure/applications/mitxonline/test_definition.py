@@ -43,7 +43,7 @@ from ol_infrastructure.components.services.k8s import (  # noqa: E402
 )
 
 LOCAL_IMAGE_TAG = "tilt-abc123"
-OPENEDX_BASE_URL = "https://lms.mit.dev"
+OPENEDX_BASE_URL = "https://lms.mit.test"
 LOCAL_OIDC_SECRET = "ol-mitlearn-oidc"  # noqa: S105  # pragma: allowlist secret
 
 
@@ -52,13 +52,13 @@ def _local_bindings(**overrides) -> definition.MitxonlineBindings:
     settings = {
         "env_suffix": "dev",
         "hostnames": definition.MitxonlineHostnames(
-            api="api.mitxonline.mit.dev",
-            frontend="mitxonline.mit.dev",
-            learn_api="api.learn.mit.dev",
+            api="api.mitxonline.mit.test",
+            frontend="mitxonline.mit.test",
+            learn_api="api.learn.mit.test",
         ),
         "environment_variables": {
             "OPENEDX_API_BASE_URL": OPENEDX_BASE_URL,
-            "MITX_ONLINE_ADMIN_EMAIL": "admin@odl.local",
+            "MITX_ONLINE_ADMIN_EMAIL": "admin@ol.test",
         },
         "k8s_labels": {"ol.mit.edu/application": "mitxonline"},
         "secret_names": ["mitxonline-secrets"],
@@ -67,7 +67,11 @@ def _local_bindings(**overrides) -> definition.MitxonlineBindings:
             registry="direct", autoscalers=False, pod_monitors=False
         ),
         "min_replicas": 1,
-        "web_memory_limit": "1Gi",
+        "sizing": definition.MitxonlineSizing(
+            web=definition.WorkloadResources(
+                requests={"cpu": "100m", "memory": "512Mi"}, limits={"memory": "1Gi"}
+            )
+        ),
         "celery_topology": "merged",
     }
     settings.update(overrides)
@@ -95,20 +99,41 @@ def _deployed_bindings(**overrides) -> definition.MitxonlineBindings:
 # ─── Environment ──────────────────────────────────────────────────────────────
 
 
-def test_bindings_override_the_shared_environment():
-    env = definition.environment_variables(_local_bindings())
+def test_the_environment_is_the_shared_values_under_the_bindings():
+    given = {"OPENEDX_API_BASE_URL": "https://lms.example", "SITE_NAME": "Overridden"}
+    env = definition.environment_variables(_local_bindings(environment_variables=given))
 
-    assert env["MITX_ONLINE_ADMIN_EMAIL"] == "admin@odl.local"
-    assert env["SITE_NAME"] == definition.ENVIRONMENT_VARIABLES["SITE_NAME"]
+    assert env["SITE_NAME"] == "Overridden"
+    assert env["USE_X_FORWARDED_HOST"] == "True"
+    assert set(env) == {
+        *definition.LOCAL_AND_DEPLOYED_ENV,
+        *given,
+        "OTEL_RESOURCE_ATTRIBUTES",
+    }
     assert "ol.mit.edu/application=mitxonline" in env["OTEL_RESOURCE_ATTRIBUTES"]
 
 
-def test_rendering_does_not_mutate_the_shared_environment():
-    before = dict(definition.ENVIRONMENT_VARIABLES)
+def test_rendering_does_not_mutate_the_bindings_environment():
+    given = {"OPENEDX_API_BASE_URL": "https://lms.example"}
+    bindings = _local_bindings(environment_variables=given)
 
-    definition.environment_variables(_local_bindings())
+    definition.environment_variables(bindings)
 
-    assert before == definition.ENVIRONMENT_VARIABLES
+    assert bindings.environment_variables == given
+
+
+def test_gateway_cors_origins_are_djangos_cors_allowed_origins():
+    bindings = _local_bindings(
+        environment_variables={
+            "OPENEDX_API_BASE_URL": OPENEDX_BASE_URL,
+            "CORS_ALLOWED_ORIGINS": "https://mitxonline.mit.dev, https://learn.mit.dev,",
+        }
+    )
+
+    assert definition.cors_allow_origins(bindings) == [
+        "https://mitxonline.mit.dev",
+        "https://learn.mit.dev",
+    ]
 
 
 # ─── Workloads ────────────────────────────────────────────────────────────────
@@ -149,12 +174,6 @@ def test_bindings_reject_a_misspelled_field():
         _local_bindings(dev_shell_enabled=True)
 
 
-def test_merged_worker_is_sized_for_the_largest_queue():
-    (worker,) = definition.celery_worker_configs("merged")
-
-    assert worker.resource_limits == {"memory": "2Gi"}
-
-
 def test_deployed_topology_runs_one_worker_per_queue():
     config = definition.application_config(_deployed_bindings())
 
@@ -172,6 +191,22 @@ def test_merged_topology_runs_one_worker_for_every_queue():
     ]
 
 
+def test_the_pre_deploy_job_migrates_then_creates_the_cache_table():
+    config = definition.application_config(_deployed_bindings())
+
+    assert config.pre_deploy_commands == [
+        (
+            "migrate",
+            [
+                "bash",
+                "-c",
+                "python manage.py migrate --noinput"
+                " && python manage.py createcachetable",
+            ],
+        ),
+    ]
+
+
 def test_reload_is_off_unless_the_bindings_ask_for_it():
     deployed = definition.application_config(_deployed_bindings())
     local = definition.application_config(_local_bindings(granian_reload=True))
@@ -181,6 +216,100 @@ def test_reload_is_off_unless_the_bindings_ask_for_it():
     assert "--reload" in local.granian_config.build_args()
     assert local.granian_config.workers_kill_timeout == 1
     assert local.granian_config.reload_ignore_dirs == definition.RELOAD_IGNORE_DIRS
+
+
+def test_sizing_defaults_are_the_deployed_values():
+    config = definition.application_config(_deployed_bindings())
+
+    assert config.pre_deploy_resource_requests == {"cpu": "250m", "memory": "3Gi"}
+    assert config.pre_deploy_resource_limits == {"memory": "3Gi"}
+    assert config.celery_beat_config.resource_requests == {
+        "cpu": "10m",
+        "memory": "384Mi",
+    }
+    assert config.celery_beat_config.resource_limits == {"memory": "384Mi"}
+    assert {
+        w.worker_name: (w.resource_requests, w.resource_limits)
+        for w in config.celery_worker_configs
+    } == {
+        "celery": ({"cpu": "100m", "memory": "2Gi"}, {"memory": "2Gi"}),
+        "hubspot_sync": ({"cpu": "100m", "memory": "1Gi"}, {"memory": "1Gi"}),
+    }
+
+
+def test_sizing_reaches_every_workload():
+    sizing = definition.MitxonlineSizing(
+        web=definition.WorkloadResources(
+            requests={"cpu": "11m", "memory": "111Mi"}, limits={"memory": "112Mi"}
+        ),
+        pre_deploy=definition.WorkloadResources(
+            requests={"cpu": "22m", "memory": "222Mi"}, limits={"memory": "223Mi"}
+        ),
+        celery_beat=definition.WorkloadResources(
+            requests={"cpu": "33m", "memory": "333Mi"}, limits={"memory": "334Mi"}
+        ),
+        celery_queues={
+            "celery": definition.WorkloadResources(
+                requests={"cpu": "44m", "memory": "256Mi"}, limits={"memory": "256Mi"}
+            ),
+            "hubspot_sync": definition.WorkloadResources(
+                requests={"cpu": "55m", "memory": "768Mi"}, limits={"memory": "768Mi"}
+            ),
+        },
+    )
+
+    config = definition.application_config(_local_bindings(sizing=sizing))
+
+    assert config.resource_requests == sizing.web.requests
+    assert config.resource_limits == sizing.web.limits
+    assert config.pre_deploy_resource_requests == sizing.pre_deploy.requests
+    assert config.pre_deploy_resource_limits == sizing.pre_deploy.limits
+    assert config.celery_beat_config.resource_requests == sizing.celery_beat.requests
+    assert config.celery_beat_config.resource_limits == sizing.celery_beat.limits
+    (worker,) = config.celery_worker_configs
+    assert worker.resource_requests == sizing.celery_queues["hubspot_sync"].requests
+    assert worker.resource_limits == sizing.celery_queues["hubspot_sync"].limits
+
+
+def test_merged_worker_takes_an_uncapped_queue():
+    size = definition.WorkloadResources(requests={"memory": "1Gi"}, limits={})
+    sizing = definition.MitxonlineSizing(
+        web=size,
+        celery_queues={
+            "celery": definition.WorkloadResources(
+                requests={"memory": "2Gi"}, limits={"memory": "2Gi"}
+            ),
+            "hubspot_sync": size,
+        },
+    )
+
+    (worker,) = definition.celery_worker_configs("merged", sizing)
+
+    assert worker.resource_limits == {}
+
+
+@pytest.mark.parametrize(
+    ("queues", "complaint"),
+    [
+        (["celery"], r"missing \['hubspot_sync'\]"),
+        (["celery", "hubspot_sync", "extra"], r"unknown \['extra'\]"),
+    ],
+)
+def test_sizing_must_name_every_queue_exactly_once(queues, complaint):
+    size = definition.WorkloadResources(
+        requests={"memory": "1Gi"}, limits={"memory": "1Gi"}
+    )
+
+    with pytest.raises(ValidationError, match=complaint):
+        definition.MitxonlineSizing(web=size, celery_queues=dict.fromkeys(queues, size))
+
+
+def test_image_repository_binding_names_the_image():
+    config = definition.application_config(
+        _local_bindings(image_repository="localhost:5001/mitxonline-app")
+    )
+
+    assert config.application_image_repository == "localhost:5001/mitxonline-app"
 
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
@@ -208,9 +337,9 @@ def test_routes_follow_the_bound_hostnames():
     direct, prefixed = _route_groups(_deployed_bindings())
 
     assert {tuple(route.hosts) for route in direct} == {
-        ("api.mitxonline.mit.dev", "mitxonline.mit.dev")
+        ("api.mitxonline.mit.test", "mitxonline.mit.test")
     }
-    assert {tuple(route.hosts) for route in prefixed} == {("api.learn.mit.dev",)}
+    assert {tuple(route.hosts) for route in prefixed} == {("api.learn.mit.test",)}
     assert [route.route_name for route in direct] == [
         "passauth",
         "logout-redirect",
@@ -256,8 +385,8 @@ def test_session_cookies_are_named_for_the_environment():
     assert direct.oidc_session_cookie_name != prefixed.oidc_session_cookie_name
     assert bindings.env_suffix in direct.oidc_session_cookie_name
     assert bindings.env_suffix in prefixed.oidc_session_cookie_name
-    assert direct.oidc_session_cookie_domain == ".mitxonline.mit.dev"
-    assert prefixed.oidc_session_cookie_domain == ".learn.mit.dev"
+    assert direct.oidc_session_cookie_domain == ".mitxonline.mit.test"
+    assert prefixed.oidc_session_cookie_domain == ".learn.mit.test"
 
 
 def test_deployed_routes_read_oidc_credentials_from_the_mitlearn_vault_client():

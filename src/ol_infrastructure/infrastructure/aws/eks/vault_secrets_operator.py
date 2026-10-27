@@ -100,6 +100,7 @@ def setup_vault_secrets_operator(
             version=versions["VAULT_SECRETS_OPERATOR_CHART"],
             namespace="operations",
             cleanup_on_fail=True,
+            max_history=10,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://helm.releases.hashicorp.com",
             ),

@@ -31,6 +31,7 @@ config:
   keycloak_realm:okta_sig_cert: MIIDqDCCApCgAwIBAgIGAYaDoqIJMA0GCSqGSIb3DQEBCwUAMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTAeFw0yMzAyMjQxMzM0MTlaFw0zMzAyMjQxMzM1MThaMIGUMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwNU2FuIEZyYW5jaXNjbzENMAsGA1UECgwET2t0YTEUMBIGA1UECwwLU1NPUHJvdmlkZXIxFTATBgNVBAMMDGRldi02Njk0MDg0NDEcMBoGCSqGSIb3DQEJARYNaW5mb0Bva3RhLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKrZ0Vel22z1r18U1KYt/y8am1JL+iwZItqFMTTwdwFfhXhkHxzzF/wZx07LheD01M7Zs39b3rNVBanzEhiwbg1KwF9xRnd+t6FDF40h6jAWwpjzj3T77PKlpmJfQibfeaMuJWKT2xlrHBx343IOYOSIz2E4vMGHPAxdKH9ze/IadTaZqpIhuXWaYBbPA/uPePLeetBBf0/mBJBJSHS9vP6MxZ94WUHMuEQ2gIn8rTIZrevxS6qWahky9AwBOGm2OU0NThqeq0KszVHTdKVuAZIfCtkHaosn48QZ2XqmZvRD6V2AZ5Mb2ClRJbPi12lvH3ds8KqWUUmyjDwS88IkN+sCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAAllfqAsLw+tPLQTNejbkNfZs6j62PmoKctiGz8xSPVzGedS5qFzLmA5yXSxHOVtIODPlNmlR/ZTaaEg3skXVzsmxygYvcUHKsuhThwXMOdnHu4NiyVyHYtrjp2FyN4YXJcPnOEqjzSTuJEZXbNSIDtZ9QzngeaikibdoKplCRhnp0y3RPVXqRmlSWpOmZ1yE23gZ9oNkdgdtsYh6XfqtNsyt/R8hDHONwwcUD7duNc7UvjXop3GXuBYFUvvLwEScaSTut2e8Mmh+VtRNE2jel7mIU57znw3wJiclQKPkZibX/5mcRZnHw0QH6UReoi19EoutPOV6hw1uSaRQ1KQuPQ== # pragma: allowlist secret # noqa: E501
   keycloak_realm:okta_single_sign_on_service_url: https://dev-66940844.okta.com/app/dev-66940844_collintestlogin_1/exk8gfblmeePE5uUQ5d7/sso/saml
   keycloak_realm:olapps_email_theme: ol-learn
+  keycloak_realm:olapps-ol-memory-enabled: "true"
   keycloak_realm:olapps-learn-ai-redirect-uris:
   - "https://learn-ai-qa.ol.mit.edu/*"
   - "https://api-learn-ai-qa.ol.mit.edu/*"
@@ -81,9 +82,6 @@ config:
   - "ol_instructor"
   - "ol_business_analyst"
   keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://open-metadata-qa.ol.mit.edu/*"]
-  keycloak_realm:ol-data-platform-openmetadata-client-roles:
-  - "open_metadata_admin"
-  - "open_metadata_user"
   keycloak_realm:ol-data-platform-starrocks-redirect-uris:
   - "https://lakehouse.qa.starrocks.ol.mit.edu/*"
   - "https://lakehouse.qa.starrocks.ol.mit.edu/api/oauth2"
@@ -141,3 +139,22 @@ config:
     secure: v1:bm9R4ZzTLXsioNmr:BAS1km5mgbC94evdYsX1CqgKyXYxzBmfvMztk9p4ItE+CV0Ri8qt1w==
   keycloak_realm:olapps-ol-analytics-api-client-secret:
     secure: v1:5VJGC7Pzu5vL300V:WqLYDxehAOTa3HNcQTl6R8nsOiYf1ZmjkOWpwe82M/HU+EzGFgtw4X6Zn7B2GM0ebFOCJUH9Xqh6xA==
+  keycloak_scim:remote_providers:
+  - realm: olapps
+    name: ol-learn-scim
+    base_url: https://api.rc.learn.mit.edu/scim/v2
+    enabled: true
+    replay_on_failure: false
+    authentication_list:
+    - authentication_type: BEARER
+      authentication_token:
+        secure: v1:75u15Erc/e8tQDu4:unN2+DVmliIHv4XT7VyFMtRlG6dhVY/MRtOw6WFoekeicsXrOxCMrkMyZX/EAg==
+  - realm: olapps
+    name: ol-mitxonline-scim
+    base_url: https://rc.mitxonline.mit.edu/scim/v2
+    enabled: true
+    replay_on_failure: false
+    authentication_list:
+    - authentication_type: BEARER
+      authentication_token:
+        secure: v1:TN2gY8gq8KzftmNh:XmIPuJBoyqCNnevfCzZaEKlRZHVeDy2z5+GXa1Wov2uAPK4TD1W2BmFIhre+70VdRMfWghzp2Ts=

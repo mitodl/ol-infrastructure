@@ -9,7 +9,7 @@
 # Examples:
 #   ./local-dev/scripts/seed.sh --app mit-learn
 #   ./local-dev/scripts/seed.sh --app mit-learn --cmd "loaddata platforms schools departments offered_by"
-#   ./local-dev/scripts/seed.sh --app mitxonline --cmd "configure_instance"
+#   ./local-dev/scripts/seed.sh --app mitxonline --cmd "populate_course_data"
 #   ./local-dev/scripts/seed.sh --app mit-learn --cmd "backpopulate_ocw_data"
 #
 # The script delegates execution to `kubectl exec` — the target namespace and
@@ -33,7 +33,7 @@ declare -A APP_NAMESPACE=(
 declare -A APP_DEPLOY=(
     [mit-learn]="mitlearn-webapp"
     [learn-ai]="learnai-webapp"
-    [mitxonline]="mitxonline-webapp"
+    [mitxonline]="mitxonline-app"
     [odl-video-service]="odlvideo-webapp"
     [ocw-studio]="ocwstudio-webapp"
     [micromasters]="micromasters-webapp"
@@ -53,9 +53,9 @@ python manage.py prune_subscription_queries"
 RUN_DATA_MIGRATIONS=true python manage.py migrate --noinput
 python manage.py createcachetable"
 
-    [mitxonline]="python manage.py migrate --noinput
-python manage.py configure_wagtail
-python manage.py configure_instance"
+    # No mitxonline default: its pre-deploy Job runs migrate and configure_wagtail
+    # on every apply, and `tilt trigger mitxonline-app` recreates the stack, Job
+    # included, so it re-runs them.
 
     [odl-video-service]="python manage.py migrate --noinput
 python manage.py createpresets"
@@ -66,14 +66,14 @@ python manage.py createpresets"
     # before seeding creates exactly that user, and `createsuperuser` then
     # fails on the unique email with no way forward short of exec'ing in and
     # promoting by hand, so create-or-promote instead of create.
-    [ocw-studio]="python manage.py shell -c 'from django.contrib.auth import get_user_model; U = get_user_model(); u, created = U.objects.get_or_create(email=\"admin@odl.local\", defaults={\"username\": \"admin\", \"name\": \"Admin\"}); u.is_staff = True; u.is_superuser = True; u.save(); print((\"created\" if created else \"promoted\"), u.email)'
+    [ocw-studio]="python manage.py shell -c 'from django.contrib.auth import get_user_model; U = get_user_model(); u, created = U.objects.get_or_create(email=\"admin@ol.test\", defaults={\"username\": \"admin@ol.test\", \"name\": \"Admin\"}); u.is_staff = True; u.is_superuser = True; u.save(); print((\"created\" if created else \"promoted\"), u.email)'
 python manage.py backpopulate_groups
 python manage.py import_website_starters https://github.com/mitodl/ocw-hugo-projects
 python manage.py upsert_theme_assets_pipeline"
 
     # No migrate: the micromasters deployment runs it in an init container.
     # seed_db rebuilds the search index itself and blocks on the celery worker.
-    [micromasters]="python manage.py shell -c 'from django.contrib.auth import get_user_model; U = get_user_model(); u, created = U.objects.get_or_create(username=\"admin\", defaults={\"email\": \"admin@odl.local\"}); u.is_staff = True; u.is_superuser = True; u.set_password(\"admin\"); u.save(); print((\"created\" if created else \"reset\"), u.username)'
+    [micromasters]="python manage.py shell -c 'from django.contrib.auth import get_user_model; U = get_user_model(); u, created = U.objects.get_or_create(username=\"admin\", defaults={\"email\": \"admin@ol.test\"}); u.is_staff = True; u.is_superuser = True; u.set_password(\"admin\"); u.save(); print((\"created\" if created else \"reset\"), u.username)'
 python manage.py seed_db"
 )
 
@@ -88,8 +88,8 @@ exec_in_pod() {
     local deploy="$2"
     local cmd="$3"
 
-    log "kubectl exec -n ${namespace} deploy/${deploy} -- bash -c '${cmd}'"
-    kubectl exec -n "${namespace}" "deploy/${deploy}" -- bash -c "${cmd}"
+    log "kubectl --context local-dev exec -n ${namespace} deploy/${deploy} -- bash -c '${cmd}'"
+    kubectl --context local-dev exec -n "${namespace}" "deploy/${deploy}" -- bash -c "${cmd}"
 }
 
 list_apps() {
@@ -156,7 +156,7 @@ NS="${APP_NAMESPACE[$APP]}"
 DEPLOY="${APP_DEPLOY[$APP]}"
 
 # Verify the deployment is available
-if ! kubectl get deploy "${DEPLOY}" -n "${NS}" &>/dev/null; then
+if ! kubectl --context local-dev get deploy "${DEPLOY}" -n "${NS}" &>/dev/null; then
     err "Deployment '${DEPLOY}' not found in namespace '${NS}'. Is the stack running?"
 fi
 
@@ -165,6 +165,7 @@ if [[ -n "$CUSTOM_CMD" ]]; then
     log "Running custom command in ${APP}..."
     exec_in_pod "${NS}" "${DEPLOY}" "${CUSTOM_CMD}"
 else
+    [[ -z "${APP_DEFAULT_SEED[$APP]+_}" ]] && err "No default seed for '${APP}'. Pass --cmd."
     # Run the full default seed sequence for this app, one command at a time
     log "Running default seed sequence for ${APP}..."
     while IFS= read -r cmd; do

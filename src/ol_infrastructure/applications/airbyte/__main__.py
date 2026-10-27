@@ -62,9 +62,11 @@ from ol_infrastructure.lib.aws.iam_helper import (
     lint_iam_policy,
 )
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     Application,
     AWSBase,
     BusinessUnit,
+    Component,
     K8sAppLabels,
     Product,
     Services,
@@ -108,14 +110,29 @@ aws_config = AWSBase(
     }
 )
 
-k8s_global_labels = K8sAppLabels(
+k8s_labels = K8sAppLabels(
     application=Application.airbyte,
     product=Product.data,
     service=Services.airbyte,
     ou=BusinessUnit.data,
     source_repository="https://github.com/airbytehq/airbyte",
     stack=stack_info,
-).model_dump()
+)
+k8s_global_labels = k8s_labels.model_dump()
+
+
+def workload_labels(component: Component) -> dict[str, str]:
+    """Label one Airbyte Deployment's pods with its role and alert tier.
+
+    Everything here is notify: a sync that stops is late data, picked up in
+    working hours. The chart's podLabels reaches the pod template only.
+
+    :param component: The Deployment's functional role.
+    :returns: The stack's ol.mit.edu labels plus component and alert_tier.
+    """
+    return k8s_labels.workload_labels(alert_tier=AlertTier.notify, component=component)
+
+
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
 airbyte_namespace = "airbyte"
 
@@ -630,6 +647,15 @@ default_resources_definition = {
     },
 }
 
+# Below the 7-day floor of ol-data-platform's Iceberg orphan-file deletes, which
+# would remove the files of a sync still running past it. Dagster's
+# run_monitoring cap doesn't reach these: the lakehouse code location doesn't
+# cancel a sync when its run ends. airbyte-cron's workload monitor fails a sync
+# workload older than this (default 30 days), and the replication pod exits on
+# its next heartbeat. syncJobMaxTimeoutDays is not a deadline: nothing in the
+# platform reads it.
+SYNC_WORKLOAD_TIMEOUT = "P2D"
+
 airbyte_helm_release = kubernetes.helm.v3.Release(
     "airbyte-helm-release",
     kubernetes.helm.v3.ReleaseArgs(
@@ -638,6 +664,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
         version=VERSIONS["AIRBYTE_CHART"],
         namespace=airbyte_namespace,
         cleanup_on_fail=True,
+        max_history=10,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://airbytehq.github.io/charts",
         ),
@@ -756,7 +783,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
                 "enabled": True,
                 "replicaCount": 2,
                 "deploymentStrategyType": "RollingUpdate",
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.api),
                 "resources": {
                     "requests": {"memory": "1Gi", "cpu": "300m"},
                     "limits": {"memory": "2Gi", "cpu": "500m"},
@@ -769,7 +796,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             "worker": {
                 "enabled": True,
                 "hpa": {"enabled": True},
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.worker),
                 "resources": {
                     "requests": {"memory": "500Mi", "cpu": "100m"},
                     "limits": {"memory": "1Gi", "cpu": "200m"},
@@ -779,7 +806,7 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             "workloadLauncher": {
                 "enabled": True,
                 "hpa": {"enabled": True},
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.controller),
                 "resources": {
                     "requests": {"memory": "500Mi", "cpu": "100m"},
                     "limits": {"memory": "1Gi", "cpu": "200m"},
@@ -799,24 +826,27 @@ airbyte_helm_release = kubernetes.helm.v3.Release(
             "temporal": {
                 "enabled": True,
                 "replicaCount": 1,
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.queue),
                 "resources": default_resources_definition,
             },
             "cron": {
                 "enabled": True,
                 "replicaCount": 1,
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.worker),
                 "resources": default_resources_definition,
+                "extraEnv": [
+                    {"name": "SYNC_WORKLOAD_TIMEOUT", "value": SYNC_WORKLOAD_TIMEOUT},
+                ],
             },
             # manifestServer replaces connectorBuilderServer in chart 2.1+
             # (connectorBuilderServer was removed; manifestServer is now enabled)
             "manifestServer": {
                 "enabled": True,
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.api),
                 "resources": default_resources_definition,
             },
             "workloadApiServer": {
-                "podLabels": k8s_global_labels,
+                "podLabels": workload_labels(Component.api),
                 "resources": default_resources_definition,
             },
         },

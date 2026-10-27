@@ -9,7 +9,8 @@ user ``opik``).
 Backing services:
 - ClickHouse  — EXTERNAL. The bundled ClickHouse, the Altinity operator, and
   ZooKeeper that the chart would otherwise deploy are disabled; the chart's
-  backend talks to ``clickhouse.clickhouse.svc.cluster.local`` instead.
+  backend talks to ``clickhouse.clickhouse.svc.cluster.local`` over HTTPS
+  instead, trusting the CA the ClickHouse stack exports.
 - MySQL (state DB), Redis, and MinIO (object storage) — kept as the chart's
   bundled, namespace-local instances. These are internal-only (ClusterIP) and
   use the chart's default credentials, which is acceptable for the CI stack.
@@ -56,8 +57,10 @@ from ol_infrastructure.lib.aws.eks_helper import (
     setup_k8s_provider,
 )
 from ol_infrastructure.lib.ol_types import (
+    AlertTier,
     AWSBase,
     BusinessUnit,
+    Component,
     K8sGlobalLabels,
     Services,
 )
@@ -78,6 +81,7 @@ opik_config = Config("opik")
 stack_info = parse_stack()
 
 cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
+clickhouse_stack = make_stack_reference(projects.CLICKHOUSE, stack_info.name)
 setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
 
 OPIK_NAMESPACE = "opik"
@@ -113,6 +117,12 @@ k8s_global_labels = {
 # External ClickHouse connection details (see the ol-application-clickhouse stack).
 CLICKHOUSE_HOST = "clickhouse.clickhouse.svc.cluster.local"
 CLICKHOUSE_HTTP_PORT = 8123
+CLICKHOUSE_HTTPS_PORT = 8443
+# The clickhouse stack serves 8443 only once its clickhouse:tls_listeners_enabled
+# rollout step is done; until then 8443 refuses connections and Opik stays on
+# plaintext 8123.
+clickhouse_tls = require_stack_output_value(clickhouse_stack, "tls_listeners_enabled")
+clickhouse_port = CLICKHOUSE_HTTPS_PORT if clickhouse_tls else CLICKHOUSE_HTTP_PORT
 CLICKHOUSE_DATABASE = "opik_db"
 CLICKHOUSE_USER = "opik"
 
@@ -200,6 +210,27 @@ clickhouse_credentials_secret = OLVaultK8SSecret(
     ),
 )
 
+############################################################
+# ClickHouse CA
+#
+# The ClickHouse stack signs its server certificate with a CA of its own and
+# exports the CA certificate. The chart's ca-cert-injection init container
+# copies the image's Java trust store and imports every *.pem from this
+# ConfigMap into the copy, which then replaces the trust store in both the
+# backend-migrations init container and the backend. The public CAs stay in
+# it, so LLM provider calls are unaffected.
+############################################################
+CLICKHOUSE_CA_CONFIGMAP_NAME = "clickhouse-ca"
+clickhouse_ca_configmap = kubernetes.core.v1.ConfigMap(
+    f"opik-clickhouse-ca-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=CLICKHOUSE_CA_CONFIGMAP_NAME,
+        namespace=OPIK_NAMESPACE,
+        labels=k8s_global_labels,
+    ),
+    data={"clickhouse-ca.pem": clickhouse_stack.require_output("ca_certificate_pem")},
+)
+
 ###################################
 #   Opik Helm Release (K8S)       #
 ###################################
@@ -211,6 +242,7 @@ opik_helm_release = kubernetes.helm.v3.Release(
         version=OPIK_CHART_VERSION,
         namespace=OPIK_NAMESPACE,
         cleanup_on_fail=True,
+        max_history=10,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://comet-ml.github.io/opik/",
         ),
@@ -222,6 +254,7 @@ opik_helm_release = kubernetes.helm.v3.Release(
             # Fresh install — there is nothing to migrate from the legacy
             # Bitnami-based subcharts.
             "chartMigration": {"enabled": False},
+            "caCerts": {"existingAdditionalCACertsRef": CLICKHOUSE_CA_CONFIGMAP_NAME},
             # Polls system.parts (the opik user is granted SELECT on it in
             # ol-application-clickhouse) every 5m for per-partition part counts
             # and lightweight-delete masks on traces/spans; a distributed lock
@@ -233,6 +266,22 @@ opik_helm_release = kubernetes.helm.v3.Release(
             # single-shard, non-Distributed deployments, and it is `critical`,
             # so enabling it here would pull every backend out of rotation.
             "partitionMetrics": {"enabled": True},
+            # Opik is internal LLM tracing, so everything is notify. commonLabels
+            # reaches the backend, python-backend and frontend Deployments and
+            # their pods, which do not share a role, so it carries no component.
+            "commonLabels": k8s_labels.workload_labels(alert_tier=AlertTier.notify),
+            "mysql": {
+                "primary": {
+                    "podLabels": k8s_labels.workload_labels(
+                        alert_tier=AlertTier.notify, component=Component.database
+                    ),
+                },
+            },
+            "minio": {
+                "podLabels": k8s_labels.workload_labels(alert_tier=AlertTier.notify),
+            },
+            # No redis.podLabels: that subchart copies it into the StatefulSet's
+            # volumeClaimTemplates, which are immutable.
             "component": {
                 "backend": {
                     # Two replicas so a rollout, a node loss, or a single wedged
@@ -299,12 +348,13 @@ opik_helm_release = kubernetes.helm.v3.Release(
                         "failureThreshold": 30,
                     },
                     # Gate backend startup on the external ClickHouse being
-                    # reachable over HTTP.
+                    # reachable. The chart's check is curl -k, so it does not
+                    # need the CA.
                     "waitForClickhouse": {
                         "clickhouse": {
                             "host": CLICKHOUSE_HOST,
-                            "port": CLICKHOUSE_HTTP_PORT,
-                            "protocol": "http",
+                            "port": clickhouse_port,
+                            "protocol": "https" if clickhouse_tls else "http",
                         },
                     },
                     # Non-secret ClickHouse connection settings (these land in
@@ -322,10 +372,28 @@ opik_helm_release = kubernetes.helm.v3.Release(
                         # changelog matches what those changesets manipulate. The
                         # ``opik`` ClickHouse user is granted access to ``default``
                         # for exactly this (see ol-application-clickhouse).
-                        "ANALYTICS_DB_MIGRATIONS_URL": f"jdbc:clickhouse://{CLICKHOUSE_MIGRATIONS_HOST}:{CLICKHOUSE_HTTP_PORT}",
-                        "ANALYTICS_DB_PROTOCOL": "HTTP",
+                        #
+                        # Migrations run on the legacy ru.yandex.clickhouse
+                        # driver (clickhouse-jdbc 0.3.1, via
+                        # liquibase-clickhouse), whose URL parser needs
+                        # host:port right after // and rejects the newer
+                        # jdbc:clickhouse:https:// form. TLS is ssl=true;
+                        # sslmode defaults to strict, and with no sslrootcert
+                        # it verifies against the JVM default trust store, as
+                        # R2DBC and client-v2 do for the runtime connections.
+                        # That store is where the CA lands (see caCerts above).
+                        "ANALYTICS_DB_MIGRATIONS_URL": (
+                            f"jdbc:clickhouse://{CLICKHOUSE_MIGRATIONS_HOST}:{clickhouse_port}"
+                            + ("?ssl=true" if clickhouse_tls else "")
+                        ),
+                        "ANALYTICS_DB_PROTOCOL": "HTTPS" if clickhouse_tls else "HTTP",
                         "ANALYTICS_DB_HOST": CLICKHOUSE_HOST,
-                        "ANALYTICS_DB_PORT": str(CLICKHOUSE_HTTP_PORT),
+                        "ANALYTICS_DB_PORT": str(clickhouse_port),
+                        # The 1s default is a single SELECT 1. A new pooled
+                        # connection now also pays a TLS handshake, and this
+                        # check gates readiness and, through the liveness
+                        # probe above, restarts (comet-ml/opik#5397).
+                        "ANALYTICS_DB_HEALTH_CHECK_TIMEOUT": "5s",
                         "ANALYTICS_DB_DATABASE_NAME": CLICKHOUSE_DATABASE,
                         "ANALYTICS_DB_USERNAME": CLICKHOUSE_USER,
                         "ANALYTICS_DB_MIGRATIONS_USER": CLICKHOUSE_USER,
@@ -369,7 +437,7 @@ opik_helm_release = kubernetes.helm.v3.Release(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
-        depends_on=[clickhouse_credentials_secret],
+        depends_on=[clickhouse_credentials_secret, clickhouse_ca_configmap],
     ),
 )
 
@@ -418,6 +486,11 @@ opik_shared_plugins = OLApisixSharedPlugins(
         resource_suffix="ol-shared-plugins",
         k8s_namespace=OPIK_NAMESPACE,
         k8s_labels=k8s_global_labels,
+        # Opik's UI and API are served from the one host behind OIDC, and the
+        # SDK posts traces server-side where CORS never applies, so no origin
+        # other than Opik's own is meant to read these responses.  An empty list
+        # attaches no cors plugin at all.
+        cors_allow_origins=[],
         enable_defaults=True,
     ),
 )

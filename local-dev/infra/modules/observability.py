@@ -528,7 +528,9 @@ def _create_alloy(
                                 {"containerPort": 4317, "name": "otlp-grpc"},
                                 {"containerPort": 4318, "name": "otlp-http"},
                             ],
-                            "resources": {"limits": {"memory": "192Mi"}},
+                            # At 192Mi each pod sat at its limit, mostly file
+                            # pages, thrashing on page faults and burning cores.
+                            "resources": {"limits": {"memory": "512Mi"}},
                             "volumeMounts": [
                                 {"name": "config", "mountPath": "/etc/alloy"},
                                 {
@@ -732,7 +734,9 @@ def _create_grafana(
                                 "periodSeconds": 10,
                                 "failureThreshold": 30,
                             },
-                            "resources": {"limits": {"memory": "256Mi"}},
+                            # 256Mi was OOMKilled during start-up, while the
+                            # embedded API server registers its resource groups.
+                            "resources": {"limits": {"memory": "768Mi"}},
                             "volumeMounts": [
                                 {
                                     "name": "datasources",

@@ -35,8 +35,7 @@ config:
       OU: open-courseware
     concourse_team: ocw
     disk_size_gb: 1000
-    disk_throughput: 600
-    disk_iops: 3000
+    disk_throughput: 250
     iam_policies:
     - base
     - ocw
@@ -61,8 +60,7 @@ config:
       OU: operations
     concourse_team: infrastructure
     disk_size_gb: 1000
-    disk_throughput: 600
-    disk_iops: 4000
+    disk_throughput: 300
     iam_policies:
     - base
     - infra
@@ -74,6 +72,9 @@ config:
     # deployment's infrastructure team and analyzes this pool's Production
     # role, so CI/QA workers have no reason to hold Access Analyzer access.
     - iam_drift_analysis
+    # Production only, like iam_drift_analysis: ol-data-contracts-sync and
+    # ol-data-metrics-sync are set on this deployment's infrastructure team.
+    - openmetadata_contracts_sync
     instance_type: general_purpose_intel_flex_4xlarge
     name: infra
     spot_options:
@@ -99,6 +100,8 @@ config:
     - ocw_publish
     - operations
     - pulumi_state
+    # An infrastructure-team build can land on this global pool too.
+    - openmetadata_contracts_sync
     instance_type: general_purpose_intel_flex_xlarge
     name: generic
     spot_options:

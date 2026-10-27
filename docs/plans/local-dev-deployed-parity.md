@@ -46,14 +46,8 @@ Every platform version in `local-dev/infra` now comes from
 moves both columns. The nginx sidecar tags in the hand-written app manifests
 are still hardcoded; the sidecar goes away with the app definitions.
 
-Three of these change behaviour an application developer depends on.
+Two of these change behaviour an application developer depends on.
 
-- APISIX 3.15 vs 3.18. `src/ol_infrastructure/components/services/apisix.py:604-612`
-  records that the nested `session.cookie.*` form is a silent no-op from 3.17.
-  Local mitxonline routes use the nested form
-  (`local-dev/apps/mitxonline/apisix-routes.yaml:90-94`) and deployed routes use
-  the flat form. A session cookie change tested locally exercises a code path
-  that does not exist in RC.
 - No `Gateway` locally. `OLApisixHTTPRoute` attaches to the `apisix` Gateway
   (`src/ol_infrastructure/components/services/apisix_gateway_api.py:220-221`),
   so apps already migrated to Gateway API (ocw_studio, xpro) cannot use their
@@ -82,7 +76,7 @@ mit-learn (`/api/v2/courses/` locally, `/api/internal/courses/` in QA and
 Production), `OCW_MASS_BUILD_BATCH_SIZE` in ocw-studio (80 vs 160), and
 `ET_PRESET_IDS` in odl-video-service (one ID vs six).
 
-Workload shape differs in every app:
+Workload shape differs in every YAML-applied app (mitxonline is rendered from its definition now, so the points below no longer describe it):
 
 - Names. The component creates `<app>-app` with container `<app>-app`; local
   uses `<x>-webapp` with container `app`.
@@ -188,8 +182,15 @@ def prefixed_route_configs(bindings, oidc, shared_plugin_config_name): ...
 
 The deployed `__main__.py` builds bindings from the AWS resources it creates.
 A local program builds them from the local platform. Environment-invariant
-settings (the 24 shared variables, celery queue names and sizes, Granian
-settings, route rules and priorities, OIDC session settings) exist once.
+settings (celery queue names, Granian settings, route rules and priorities,
+OIDC session settings) exist once; what each workload is given is a binding
+whose defaults are the deployed sizes. Environment variables split by where
+they hold: the few that hold wherever the app runs, a developer's cluster
+included, are `LOCAL_AND_DEPLOYED_ENV` in the definition; values true of the
+deployed stacks alone are defaults in the deployed program, applied under
+each stack's `vars`, and never reach a local program. A local program has the
+same two layers of its own: `LOCAL_ENV_DEFAULTS` in the program and a
+developer's gitignored override file over it.
 
 The bindings are narrower than first sketched. Database, cache, object
 storage and Keycloak reach the application as environment variables and
@@ -276,9 +277,10 @@ Decided 2026-09-28: local-dev runs one celery worker Deployment consuming
 every queue by default, and a developer can switch an app to the deployed
 topology (one Deployment per queue).
 
-The application definition lists its queues once, with the resources each
-deployed worker gets. The deployed program turns that list into one
-`OLApplicationK8sCeleryWorkerConfig` per queue, as today. The local program
+The application definition lists its queues once; the resources each worker
+gets are a per-queue binding, defaulting to the deployed sizes. The deployed
+program turns that list into one `OLApplicationK8sCeleryWorkerConfig` per
+queue, as today. The local program
 reads a per-app setting:
 
 - `merged` (default): one worker config with `worker_name="all"` and

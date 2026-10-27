@@ -21,7 +21,10 @@
 # migrate a half-loaded schema. DROP ... WITH (FORCE) ends the apps' existing
 # sessions, and their pods reconnect once the limit lifts. A pod that was
 # already serving does not re-run migrate, so if the archive predates the
-# checkout's migrations, restart the app Deployments afterwards.
+# checkout's migrations, restart the app Deployments afterwards. mitxonline
+# migrates in a pre-deploy Job, not on pod start: `tilt trigger mitxonline-app`
+# re-runs it (a trigger is a force update, which destroys and recreates the
+# stack, Job included).
 #
 # Usage:
 #   ./local-dev/scripts/pg-restore.sh DIR [--yes]
@@ -49,12 +52,12 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$DIR" ] && [ -d "$DIR" ] || err "usage: pg-restore.sh DIR [--yes] (DIR must be a pg-backup.sh output directory)"
 
-PG=(kubectl -n local-infra exec local-pg-1 -c postgres --)
-PGI=(kubectl -n local-infra exec -i local-pg-1 -c postgres --)
+PG=(kubectl --context local-dev -n local-infra exec local-pg-1 -c postgres --)
+PGI=(kubectl --context local-dev -n local-infra exec -i local-pg-1 -c postgres --)
 # sql DB "STATEMENT" — quiet, unaligned, tuples-only; every error is fatal.
 sql() { "${PG[@]}" psql -U postgres -qAt -v ON_ERROR_STOP=1 -d "$1" -c "$2"; }
 
-kubectl -n local-infra wait --for=condition=Ready pod/local-pg-1 --timeout=60s > /dev/null \
+kubectl --context local-dev -n local-infra wait --for=condition=Ready pod/local-pg-1 --timeout=60s > /dev/null \
     || err "pod local-pg-1 is not Ready"
 
 # --- Validate every archive before touching the cluster ---------------------
@@ -84,7 +87,7 @@ fi
 command -v curl > /dev/null || err "curl not found"
 command -v jq > /dev/null || err "jq not found"
 
-_ROOT_DOMAIN="${LOCAL_DEV_ROOT_DOMAIN:-mit.dev}"
+_ROOT_DOMAIN="${LOCAL_DEV_ROOT_DOMAIN:-mit.test}"
 KC_URL="${KC_URL:-https://sso.ol.${_ROOT_DOMAIN}}"
 # The ingress serves an mkcert-issued cert whose root CA is not in the system
 # trust store, so curl needs it explicitly or the handshake fails (exit 60)

@@ -559,6 +559,12 @@ policy_definition = {
                 # CreatePolicyVersion when its content drifts from the
                 # imported document.
                 "arn:aws:iam::*:policy/edx-data-extracts-read-only",
+                # substructure/aws/eks/karpenter.py creates one controller
+                # policy per cluster at the default "/" path -- confirmed by a
+                # live AccessDenied on CreatePolicyVersion after #6459 changed
+                # its content. Moving it under a scoped path would force a
+                # replacement, which needs DeletePolicy on "/" anyway.
+                "arn:aws:iam::*:policy/KarpenterControllerPolicy-*",
             ],
         },
         {

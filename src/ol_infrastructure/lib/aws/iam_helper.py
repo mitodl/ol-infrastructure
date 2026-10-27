@@ -342,7 +342,21 @@ PROTECTED_DATA_LAKE_ENVIRONMENTS = ("production",)
 
 # Environments with a data lake of their own, i.e. a Glue catalog a query engine
 # can register.
-DATA_LAKE_ENVIRONMENTS = ("qa", "production")
+DATA_LAKE_ENVIRONMENTS = ("ci", "qa", "production")
+
+DataLakeAccess = Literal["read", "write"]
+
+# Lakes a query engine registers besides its own, and what it may do in them.
+# Production writes QA's because ol-data-platform's QA mirror runs on the
+# production cluster and writes into it. CI reads QA's so slim data CI can defer
+# unchanged upstream models to QA relations, and must not write there. Nothing
+# registers CI's lake but CI. An entry here must also survive
+# cross_environment_glue_denial for the engine's environment, or the catalog only
+# advertises access that fails at query time.
+_FOREIGN_DATA_LAKE_ACCESS: dict[str, dict[str, DataLakeAccess]] = {
+    "production": {"qa": "write"},
+    "ci": {"qa": "read"},
+}
 
 # The layer buckets each environment's lake keeps Iceberg tables in, as
 # ol-data-lake-<stage>-<env>. The Airbyte landing zone,
@@ -506,29 +520,28 @@ def cross_environment_glue_denial(env_suffix: str) -> list[dict[str, Any]]:
     ]
 
 
-def readable_data_lake_environments(env_suffix: str) -> list[str]:
-    """List the data lakes a query engine in ``env_suffix`` registers a catalog for.
+def query_engine_lake_access(env_suffix: str) -> dict[str, DataLakeAccess]:
+    """Map each data lake a query engine in ``env_suffix`` registers to its access.
 
-    Its own lake plus every lake that is not protected from it -- the same rule
-    ``cross_environment_glue_denial`` enforces in IAM. A catalog outside that set
-    would be one the engine's role is explicitly denied, so registering it only
-    advertises access that fails at query time. Production keeps the QA catalog
-    because ol-data-platform's QA mirror runs on the production cluster and
-    writes into it.
+    Its own lake, which it writes, plus the foreign lakes granted in
+    ``_FOREIGN_DATA_LAKE_ACCESS``. Callers attach the matching query-engine policy
+    (read/write or read-only) from each lake's data_warehouse stack and register
+    a catalog for it.
 
     :param env_suffix: The query engine's environment, e.g. ``qa``.
     :type env_suffix: str
 
-    :returns: Environment suffixes, in ``DATA_LAKE_ENVIRONMENTS`` order.
+    :returns: ``"read"`` or ``"write"`` keyed by environment suffix, in
+              ``DATA_LAKE_ENVIRONMENTS`` order.
 
-    :rtype: list[str]
+    :rtype: dict[str, DataLakeAccess]
     """
-    return [
-        environment
+    foreign = _FOREIGN_DATA_LAKE_ACCESS.get(env_suffix, {})
+    return {
+        environment: "write" if environment == env_suffix else foreign[environment]
         for environment in DATA_LAKE_ENVIRONMENTS
-        if environment == env_suffix
-        or environment not in PROTECTED_DATA_LAKE_ENVIRONMENTS
-    ]
+        if environment == env_suffix or environment in foreign
+    }
 
 
 # Parliament's RESOURCE_MISMATCH flags bedrock:InvokeModel* for not also covering
