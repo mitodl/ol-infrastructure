@@ -46,16 +46,19 @@ if HAS_CHECKOUT:
         IMAGE,
         context=APP_DIR,
         dockerfile=APP_DIR + '/Dockerfile',
+        # local-dev = development (dev deps, including granian[reload]) with a
+        # mitodl-owned /src for the sync below and granian reload switched on.
+        target='local-dev',
         # .claude/ holds agent worktrees; syncing one into the pod restarted it in a loop.
         # frontend-demo/ is the sandbox, built separately below; without this every
         # sandbox edit rebuilt this image and rolled the webapp and celery pods.
         ignore=['.claude/', 'frontend-demo/'],
         live_update=[
-            sync(APP_DIR + '/main', '/src/main'),
-            run(
-                'cd /src && pip install -r requirements.txt',
-                trigger=[APP_DIR + '/requirements.txt'],
-            ),
+            # Dependency changes rebuild the image rather than running uv sync
+            # in the pods: Celery doesn't reload, so running processes would
+            # keep the old packages, and a restarted container loses the sync.
+            fall_back_on([APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock']),
+            sync(APP_DIR, '/src'),
         ],
     )
 
