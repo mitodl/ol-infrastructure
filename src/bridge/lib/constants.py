@@ -215,7 +215,7 @@ class LearnSession:
 
 
 def edxapp_lms_webapp_name(env_prefix: str, env_suffix: str) -> str:
-    """Return the name of an Open edX deployment's LMS webapp Deployment and Service.
+    """Return the name of an Open edX deployment's LMS webapp Service.
 
     :param env_prefix: The edxapp deployment, e.g. ``"mitxonline"``.
     :param env_suffix: The stack environment suffix, e.g. ``"qa"``.

@@ -216,7 +216,7 @@ def create_k8s_resources(  # noqa: C901
 ) -> dict[str, Any]:
     """Create all Kubernetes resources for the edxapp LMS and CMS deployments."""
     env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
-    # Also the LMS Service name, which mitxonline's Open edX login gate reaches
+    # The LMS Service name, which mitxonline's Open edX login gate reaches
     # through edxapp_lms_service_host.
     lms_webapp_deployment_name = edxapp_lms_webapp_name(
         stack_info.env_prefix, stack_info.env_suffix
