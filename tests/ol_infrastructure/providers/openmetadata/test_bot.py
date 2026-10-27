@@ -19,23 +19,10 @@ from ol_infrastructure.providers.openmetadata import (
     OpenMetadataBotSpec,
 )
 
+from .fakes import FakeResponse
+
 SERVER = "https://om.example/api"
 TOKEN_URL = "https://keycloak.example/realms/ol/protocol/openid-connect/token"  # noqa: S105
-
-
-class FakeResponse:
-    def __init__(
-        self, method: str, url: str, status_code: int, body: Any = None
-    ) -> None:
-        self.status_code = status_code
-        self.ok = status_code < 400
-        self.url = url
-        self.text = str(body)
-        self.request = type("Request", (), {"method": method})()
-        self._body = body
-
-    def json(self) -> Any:
-        return copy.deepcopy(self._body)
 
 
 class FakeOpenMetadata:

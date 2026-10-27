@@ -72,17 +72,6 @@ class OpenMetadataBotSpec(BaseModel):
         return sorted(set(roles))
 
 
-def _role_refs(client: OpenMetadataClient, names: list[str]) -> list[dict[str, str]]:
-    refs = []
-    for name in names:
-        role = client.get(f"roles/name/{name}")
-        if role is None:
-            msg = f"role {name!r} does not exist"
-            raise ValueError(msg)
-        refs.append({"id": role["id"], "type": "role"})
-    return refs
-
-
 def _bot_user(client: OpenMetadataClient, path: str) -> dict[str, Any] | None:
     return client.get(path, fields="roles")
 
@@ -161,7 +150,9 @@ def _apply(client: OpenMetadataClient, props: dict[str, Any]) -> dict[str, Any]:
                 {
                     "op": "add",
                     "path": "/roles",
-                    "value": _role_refs(client, [DEFAULT_BOT_ROLE, *props["roles"]]),
+                    "value": client.references(
+                        "roles", "role", [DEFAULT_BOT_ROLE, *props["roles"]]
+                    ),
                 }
             ],
         )

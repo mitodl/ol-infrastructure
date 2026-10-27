@@ -43,7 +43,7 @@ STARROCKS_SHARED_REALM_ROLES = frozenset(
 # ol-open_metadata-client, sent in the `roles` claim that OpenMetadata reads at
 # login (authorizer useRolesFromProvider). Each name must be an OpenMetadata
 # Role, and the claim replaces the roles the user had. The custom roles are
-# defined in substructure/open_metadata's om_server_config.py. No realm role
+# defined in substructure/open_metadata's access_control.py. No realm role
 # maps to "Admin": it would set isAdmin, and OpenMetadata never clears isAdmin
 # when it leaves the claim, so Keycloak could grant admin but not take it back.
 # Admins come from initialAdmins in applications/open_metadata, and
