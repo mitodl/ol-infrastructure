@@ -144,7 +144,7 @@ config:
     base_url: https://api.learn.mit.edu/scim/v2
     enabled: true
     replay_on_failure: true
-    retry_interval_in_seconds: 3600
+    retry_interval_in_seconds: 3600.0
     authentication_list:
     - authentication_type: BEARER
       authentication_token:
@@ -154,7 +154,7 @@ config:
     base_url: https://api.mitxonline.mit.edu/scim/v2
     enabled: true
     replay_on_failure: true
-    retry_interval_in_seconds: 300
+    retry_interval_in_seconds: 300.0
     authentication_list:
     - authentication_type: BEARER
       authentication_token:
