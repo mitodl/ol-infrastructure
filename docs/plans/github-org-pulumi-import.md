@@ -1160,9 +1160,10 @@ world_geographic_regions and xanalytics. That leaves 62 active non-fork repos, a
 
 ### 10.1 Topics vocabulary (CON-05)
 
-CON-05 fires on 163 of 172 active repos, but 99 of those are upstream forks. Topics on a
+CON-05 fires on 152 of 161 active repos, but 98 of those are upstream forks. Topics on a
 fork describe somebody else's project, so **exempt `fork` from CON-05** the way CON-03
-already exempts them. That leaves the 62 repos below.
+already exempts them. That leaves the 62 repos below: 54 have no topics, and 8 already
+carry some.
 
 **Proposal:** every active non-fork repo carries exactly one **area** topic from a
 fixed list. Other topics stay free-form, so existing ones like `edx` or `django` are
@@ -1187,8 +1188,11 @@ using the same pattern as `tiers.py`. A free-form vocabulary can't be enforced a
 | `org-docs` | handbook, hq, product, open-collaboration, platform-engineering-site, tech-talk-slides, ol-customizations-nytimes-library |
 
 To review: whether `openedx` should fold into the product areas, and the four `?`
-rows. Once it is agreed, rollout is one PR that adds `topics` to the 62 repo files. CON-05
-then changes from "no topics" to "no area topic".
+rows. Once it is agreed, rollout is one PR that gives each of the 62 repo files its area
+topic. micromasters, ocw-studio and ol-infrastructure already carry theirs. mitx-theme
+already carries `openedx`, which is also an area name, but is assigned `mitx-residential`,
+so the rollout replaces `openedx` there. Keeping both would fail the exactly-one-area
+validator. CON-05 then changes from "no topics" to "no area topic".
 
 ### 10.2 Custom properties beyond `tier`
 
