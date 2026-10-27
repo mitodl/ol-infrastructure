@@ -4,6 +4,8 @@ Source: grafana-alerts/cortex-rules/eks_general.yaml
 
 Warning rules filter cluster=~".*-(ci|qa)"    — fire on CI and QA stacks.
 Critical rules filter cluster=~".*-(production)" — fire on prod stack only.
+DeploymentReplicasMissingProduction is the exception: production-filtered
+but warning tier, so it follows the warning rules below.
 Rules with no matching data on a given stack stay silent (no_data_state=OK).
 
 exec_err_state (query-evaluation failure, distinct from no_data_state) was
@@ -72,33 +74,63 @@ def create(
                 ),
             ),
             # --- Deployment replicas ---
-            # Fires when available replicas / total replicas < 1.0.
+            # Fires when fewer replicas are available than desired. The value is
+            # the number missing. This used to divide available by
+            # kube_deployment_status_replicas, which has no series in the QA or
+            # Production Mimir, so the rule never evaluated to anything. The ratio
+            # form could not have fired on a full outage either: it is 0 there, and
+            # base.py fires on a value > 0 (the bug #6489 fixed for StatefulSets).
+            # QA opik-backend ran 0 of 2 from 2026-10-05 to 2026-10-15 and 1 of 2
+            # from then to 2026-10-21 with no replicas alert.
+            #
+            # for_ is 30m because KEDA scale-ups raise spec_replicas before the new
+            # pods are ready. Replayed over the 30 days to 2026-10-26, 10m would
+            # have fired 108 times on 14 Production Deployments (mostly the
+            # KEDA-scaled edxapp celery workers, lms-edxapp-app and the mitlearn
+            # embeddings worker), and 55 of those started within 25 minutes of a
+            # spec increase. 30m fires 7 times on 5 (QA: 5 on 3), and what is left
+            # is mostly real: xpro-app at 1 of 2 for 14h on 2026-10-22, and
+            # operations celery-monitoring 1 short for four days to 2026-09-28. A
+            # KEDA-scoped exclusion would drop most of the celery workers and edxapp
+            # webapps from the rule rather than only their scale-ups, so there is
+            # none.
+            #
+            # Production is warning tier, not critical: a partly degraded Deployment
+            # is not worth waking anyone for, and a total outage is
+            # DeploymentUnavailable's job. The Production Rootly source maps
+            # severity=warning to Low urgency, which posts to #devops-warnings
+            # (held until 9am ET outside business hours) and pages nobody. On a
+            # total outage the value is spec_replicas, so this rule also fires, 20
+            # minutes after DeploymentUnavailable, as a second notification under
+            # its own alertname. The rule was renamed from DeploymentReplicasMissingCritical
+            # so its name does not claim a tier it no longer has; it had never fired,
+            # so no alert history or silence followed the old name.
             alerting.RuleGroupRuleArgs(
                 name="DeploymentReplicasMissingWarning",
                 condition="C",
-                for_="10m",
+                for_="30m",
                 no_data_state="OK",
                 exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
-                    "description": "There is a mismatch between the requested number of instances for deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
+                    "description": "Deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has had fewer available replicas than desired for 30 minutes."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(ci|qa)"}) / sum by (cluster, namespace, deployment) (kube_deployment_status_replicas) < 1.0'
+                    'sum by (cluster, namespace, deployment) (kube_deployment_spec_replicas{cluster=~".*-(ci|qa)"}) - sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(ci|qa)"}) > 0'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
-                name="DeploymentReplicasMissingCritical",
+                name="DeploymentReplicasMissingProduction",
                 condition="C",
-                for_="10m",
+                for_="30m",
                 no_data_state="OK",
-                exec_err_state="KeepLast",
-                labels={"severity": "critical"},
+                exec_err_state="OK",
+                labels={"severity": "warning"},
                 annotations={
-                    "description": "There is a mismatch between the requested number of instances for deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
+                    "description": "Deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has had fewer available replicas than desired for 30 minutes."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(production)"}) / sum by (cluster, namespace, deployment) (kube_deployment_status_replicas) < 1.0'
+                    'sum by (cluster, namespace, deployment) (kube_deployment_spec_replicas{cluster=~".*-(production)"}) - sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(production)"}) > 0'
                 ),
             ),
             # --- Deployment availability ---
