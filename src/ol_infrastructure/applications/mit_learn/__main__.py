@@ -2083,8 +2083,8 @@ mitlearn_k8s_app = OLApplicationK8s(
             workers=2,
             # Sized against the lowest limit a production pod can run under: the VPA
             # floor (mitlearn:webapp_vpa_min_allowed_memory, 3.5Gi) at the 1:1
-            # request:limit ratio, so 3584Mi. Not the declared 3200Mi, which the VPA
-            # always raises to at least the floor.
+            # request:limit ratio, so 3584Mi as admitted by the VPA. Not the declared
+            # 3200Mi, which a pod only runs under if VPA admission doesn't mutate it.
             #
             # The cap has to leave room for a planned respawn. Granian starts the
             # replacement worker before stopping the old one (one worker at a time),
