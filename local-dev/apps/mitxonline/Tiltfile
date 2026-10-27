@@ -26,14 +26,16 @@ if HAS_CHECKOUT:
         target='local-dev',
         dockerfile=APP_DIR + '/Dockerfile',
         # .claude/ holds agent worktrees; syncing one into the pod restarted it in a loop.
-        # Host-side frontend builds and coverage runs write under frontend/, and
-        # every frontend/ change rebuilds the image (below); the image's webpack
-        # stage produces its own bundles, so these never need to reach it.
+        # Host-side frontend builds and coverage runs write under frontend/ and
+        # webpack-stats/, and every frontend/ change rebuilds the image (below); the
+        # image's webpack stage produces its own bundles and manifests, so these never
+        # need to reach it.
         ignore=[
             '.claude/',
             'frontend/*/build',
             'frontend/*/coverage',
             'frontend/*/.nyc_output',
+            'webpack-stats/',
         ],
         # Sync the whole repo: Django apps are top-level dirs (courses,
         # ecommerce, cms, ...). granian's --reload-ignore-dirs filters the
