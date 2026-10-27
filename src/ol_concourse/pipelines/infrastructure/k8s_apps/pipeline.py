@@ -212,7 +212,7 @@ pipeline_params = {
         app_name="mitxonline",
         build_target="production",
         refresh_stack=False,
-        description="Builds the MITx Online Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
+        description="Builds the MITx Online Django app image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
     ),
     "mit-learn-nextjs": AppPipelineParams(
         app_name="mit-learn-nextjs",

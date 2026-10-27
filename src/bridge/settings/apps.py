@@ -85,7 +85,9 @@ APPS: dict[str, AppRegistration] = {
     "mit-learn-nextjs": AppRegistration(
         github_repo="mitodl/mit-learn", slack_channel="product-mit-learn"
     ),
-    "mitxonline": AppRegistration(slack_channel="product-mitx-online"),
+    "mitxonline": AppRegistration(
+        slack_channel="product-mitx-online", release_resource_workflow=True
+    ),
     "ocw-studio": AppRegistration(
         repo_main_branch="master", slack_channel="product-ocw"
     ),
