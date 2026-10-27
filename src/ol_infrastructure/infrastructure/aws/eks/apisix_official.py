@@ -380,6 +380,7 @@ def setup_apisix(
             version=apisix_chart_version,
             namespace="operations",
             cleanup_on_fail=True,
+            max_history=10,
             chart="apisix",
             # The CRDs are applied above as their own Pulumi resource. Helm would
             # only write them on a fresh install anyway, which is the bug.

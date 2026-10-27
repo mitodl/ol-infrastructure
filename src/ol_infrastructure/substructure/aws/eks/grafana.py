@@ -381,6 +381,7 @@ def setup_grafana(
             namespace="grafana",
             create_namespace=True,
             cleanup_on_fail=True,
+            max_history=10,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://grafana.github.io/helm-charts",
             ),

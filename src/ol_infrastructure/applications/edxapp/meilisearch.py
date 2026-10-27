@@ -197,6 +197,7 @@ def create_meilisearch_resources(
             version=MEILISEARCH_CHART_VERSION,
             namespace=namespace,
             cleanup_on_fail=True,
+            max_history=10,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://meilisearch.github.io/meilisearch-kubernetes",
             ),
