@@ -250,24 +250,6 @@ APPS = [
                 "description": "Load country income thresholds for financial assistance",
                 "cmd": "python manage.py load_country_income_thresholds flexiblepricing/fixtures/country_income_threshold_data.json",
             },
-            {
-                # Deployed, this Application is created by hand in the Django
-                # admin. The credentials match local-dev/apps/ol-analytics-api/secrets.yaml.
-                "label": "seed-mitxonline-analytics-api-client",
-                "description": "Register ol-analytics-api's client-credentials Application for the org-manager check",
-                "cmd": (
-                    "python manage.py shell -c " +
-                    "'from oauth2_provider.models import get_application_model; " +
-                    "App = get_application_model(); " +
-                    "app, created = App.objects.update_or_create(" +
-                    "client_id=\"ol-analytics-api-local\", " +
-                    "defaults={\"name\": \"ol-analytics-api (local-dev)\", " +
-                    "\"client_type\": App.CLIENT_CONFIDENTIAL, " +
-                    "\"authorization_grant_type\": App.GRANT_CLIENT_CREDENTIALS, " +
-                    "\"client_secret\": \"local-dev-ol-analytics-api-mitxonline-secret\"}); " +  # pragma: allowlist secret
-                    "print((\"created\" if created else \"updated\"), app.client_id)'"
-                ),
-            },
         ],
     },
     {

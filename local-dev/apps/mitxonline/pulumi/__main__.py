@@ -293,9 +293,13 @@ secrets_hash = hashlib.sha256(
 deployed_config = definition.application_config(bindings)
 app_config = deployed_config.model_copy(
     update={
-        # Local-dev's fresh-database and Open edX steps; see CONFIGURE_WAGTAIL_STEP
-        # and OPENEDX_OAUTH_APP_STEP.
-        "pre_deploy_commands": with_local_steps(deployed_config.pre_deploy_commands),
+        # Local-dev's fresh-database, Open edX and ol-analytics-api steps; see
+        # CONFIGURE_WAGTAIL_STEP, OPENEDX_OAUTH_APP_STEP and
+        # ANALYTICS_API_OAUTH_APP_STEP.
+        "pre_deploy_commands": with_local_steps(
+            deployed_config.pre_deploy_commands,
+            enabled_apps=os.environ.get("LOCAL_DEV_ENABLED_APPS", "").split(","),
+        ),
         "extra_volumes": [
             k8s.core.v1.VolumeArgs(
                 name=CA_BUNDLE_CONFIGMAP,

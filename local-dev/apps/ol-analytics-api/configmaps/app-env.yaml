@@ -14,8 +14,8 @@ data:
   STARROCKS_USER: "root"
   # The org-manager check, against the local MITx Online through its gateway
   # host, as QA calls api.rc.mitxonline.mit.edu. The client-credentials pair in
-  # secrets.yaml is registered there by the seed-mitxonline-analytics-api-client
-  # seed.
+  # secrets.yaml is registered there by mitxonline's pre-deploy Job while this
+  # app is enabled (ANALYTICS_API_OAUTH_APP_STEP in apps/mitxonline/pulumi/inputs.py).
   OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_API_BASE_URL: "https://api.mitxonline.mit.test"
   # The realm the learner-records tenant verifies partner tokens against.
   OL_ANALYTICS_API_B2B_LEARNER_RECORDS_ISSUER: "https://sso.ol.mit.test/realms/olapps"

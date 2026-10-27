@@ -360,7 +360,6 @@ tilt trigger seed-mit-learn-fixtures
 | mitxonline | `seed-mitxonline-instance` | Full instance setup (superuser, courses, products) |
 | mitxonline | `seed-mitxonline-course-data` | Populate test course data |
 | mitxonline | `seed-mitxonline-income-thresholds` | Load country income thresholds |
-| mitxonline | `seed-mitxonline-analytics-api-client` | Register ol-analytics-api's client-credentials Application |
 | odl-video-service | `seed-ovs-presets` | Create encoding presets (requires real AWS creds) |
 | micromasters | `seed-micromasters-superuser` | Create or reset the `admin` / `admin` superuser |
 | micromasters | `seed-micromasters-data` | Load seed programs, course runs and learners, then rebuild the search index |
@@ -1098,8 +1097,10 @@ It is wired the way the deployed Learn-scoped host is:
 - The app reads the lake's StarRocks as `root`, from the `b2b_analytics` and
   `b2b_learner_records` databases the lake creates empty.
 - The org-manager check calls the local MITx Online at `https://api.mitxonline.mit.test`
-  with a client-credentials token. Run `seed-mitxonline-analytics-api-client` once to
-  register that Application there; until then every dashboard request is a 502.
+  with a client-credentials token. MITx Online's pre-deploy Job registers that
+  Application while `ol-analytics-api` is in `enabled_apps`
+  (`ANALYTICS_API_OAUTH_APP_STEP` in `apps/mitxonline/pulumi/inputs.py`), so enabling
+  the app re-applies mitxonline once.
 - MIT Learn's login requests `organization:*`, and `kc-fix-org-claim` sets the realm's
   organization mapper to add each organization's id, which the deployed realms do. Log
   out and back in after either reaches your cluster: the claim is fixed when the
@@ -1118,10 +1119,9 @@ so the StarRocks rows come from a fixture in ol-data-platform that takes the ids
 is loaded. To go from an empty stack to a populated dashboard, using the realm's
 `local-dev` organization:
 
-1. Run `seed-mitxonline-analytics-api-client`.
-2. In the Keycloak admin console (`https://sso.ol.mit.test/admin/`, `admin` / `admin`),
+1. In the Keycloak admin console (`https://sso.ol.mit.test/admin/`, `admin` / `admin`),
    add your test user to the `Local Dev` organization in the `olapps` realm.
-3. Give MITx Online the organization and a contract, then log in to MIT Learn as that
+2. Give MITx Online the organization and a contract, then log in to MIT Learn as that
    user and make them a manager:
 
    ```bash
@@ -1137,13 +1137,13 @@ is loaded. To go from an empty stack to a populated dashboard, using the realm's
    PY
    ```
 
-4. From an ol-data-platform checkout, load the fixture with the two ids that printed,
+3. From an ol-data-platform checkout, load the fixture with the two ids that printed,
    build the views and refresh them. "B2B views" in
    [docs/LOCAL_LAKE.md](https://github.com/mitodl/ol-data-platform/blob/main/docs/LOCAL_LAKE.md)
    has the commands.
 
 The `UserOrganization` row only exists once MITx Online has seen the organization in the
-user's login, so step 3's update matches nothing if it runs before that login.
+user's login, so step 2's update matches nothing if it runs before that login.
 
 The dashboard page is behind the `b2b-analytics-dashboard` PostHog flag, and it waits for
 PostHog's server to answer before it renders, so a flag bootstrapped from the environment

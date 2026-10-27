@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from pulumi import ResourceOptions, ResourceTransformArgs
 
 REPO = Path(__file__).parents[2]
@@ -134,4 +135,38 @@ def test_with_local_steps_refuses_a_definition_without_pre_deploy_commands():
     to they would be skipped silently, so the program must stop instead.
     """
     with pytest.raises(ValueError, match="pre_deploy_commands"):
-        inputs.with_local_steps(None)
+        inputs.with_local_steps(None, enabled_apps=())
+
+
+@pytest.mark.parametrize("enabled", [True, False])
+def test_with_local_steps_registers_the_analytics_client_only_while_enabled(enabled):
+    apps = ("mitxonline", inputs.ANALYTICS_API_APP) if enabled else ("mitxonline",)
+
+    ((_, command),) = inputs.with_local_steps(
+        [("migrate", ["/bin/sh", "-c", "python manage.py migrate"])],
+        enabled_apps=apps,
+    )
+
+    assert command[-1].startswith("python manage.py migrate")
+    assert command[-1].endswith(inputs.ANALYTICS_API_OAUTH_APP_STEP) is enabled
+
+
+def test_the_analytics_client_step_is_valid_python():
+    script = inputs.ANALYTICS_API_OAUTH_APP_STEP.split("<<'PY'\n", 1)[1]
+    compile(script.removesuffix("PY"), "ANALYTICS_API_OAUTH_APP_STEP", "exec")
+
+
+def test_the_analytics_app_presents_the_credentials_the_job_registers():
+    """secrets.yaml is the analytics app's copy of the pair; a drift between the
+    two fails every org-manager check with a 502.
+    """
+    secret = yaml.safe_load(
+        (REPO / "local-dev/apps/ol-analytics-api/secrets.yaml").read_text()
+    )
+
+    assert secret["stringData"][
+        "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_ID"
+    ] == (inputs.ANALYTICS_API_CLIENT_ID)
+    assert secret["stringData"][
+        "OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_CLIENT_SECRET"
+    ] == (inputs.ANALYTICS_API_CLIENT_SECRET)
