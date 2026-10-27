@@ -21,17 +21,19 @@ from pulumi import Output
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from bridge.lib.constants import (
+    LearnSession,
     apisix_oidc_session_cookie_name,
-    mit_learn_session_cookie_name,
 )
 from bridge.lib.magic_numbers import STATIC_ASSET_MAX_AGE_SECONDS
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCRouteGroup,
     OLApisixOIDCSecretCredentials,
     OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRouteConfig,
+    learn_session_oidc_config,
     oidc_gateway_pre_function_plugin,
     stale_session_cookie_cleanup_plugin,
 )
@@ -396,9 +398,7 @@ def _oidc_credentials(
         return OLApisixOIDCSecretCredentials(secret_name=secret_name)
     if vault_auth_name is not None and secret_name is None:
         return OLApisixOIDCVaultCredentials(
-            mount="secret-operations",
-            mount_type="kv-v1",
-            path="sso/mitlearn",
+            path=LearnSession.vault_path,
             vaultauth=vault_auth_name,
         )
     msg = (
@@ -422,6 +422,47 @@ def _oidc_config(bindings: MitxonlineBindings, **settings: Any) -> OLApisixOIDCC
     )
 
 
+def learn_session(bindings: MitxonlineBindings) -> LearnSession:
+    """Return the MIT Learn session the /mitxonline/* routes share.
+
+    :param bindings: The environment being rendered for.
+    :returns: The shared session for the bound environment.
+    :rtype: LearnSession
+    """
+    return LearnSession.for_host(bindings.env_suffix, bindings.hostnames.learn_api)
+
+
+def direct_route_group(bindings: MitxonlineBindings) -> OLApisixOIDCRouteGroup:
+    """Return where the routes on MITx Online's own hosts are served.
+
+    :param bindings: The environment being rendered for.
+    :returns: The route group for ``direct_oidc_config`` and its routes.
+    :rtype: OLApisixOIDCRouteGroup
+    """
+    return OLApisixOIDCRouteGroup(
+        hosts=[bindings.hostnames.api, bindings.hostnames.frontend],
+        login_paths=["/login/*", "/admin/login/*", "/login*", "/login/oidc*"],
+    )
+
+
+def prefixed_route_group(bindings: MitxonlineBindings) -> OLApisixOIDCRouteGroup:
+    """Return where the /mitxonline/* routes on MIT Learn's host are served.
+
+    The post-logout landing is on the MIT Learn host because the prefixed path
+    only exists there: api.<env>.mitxonline.mit.edu/mitxonline/logout/ is proxied
+    through unrewritten and Django answers it with a 404.
+
+    :param bindings: The environment being rendered for.
+    :returns: The route group for ``prefixed_oidc_config`` and its routes.
+    :rtype: OLApisixOIDCRouteGroup
+    """
+    return OLApisixOIDCRouteGroup(
+        hosts=[bindings.hostnames.learn_api],
+        path_prefix=API_PATH_PREFIX,
+        login_paths=["/login/", "/login/oidc*", "/admin/login/*", "/login"],
+    )
+
+
 def direct_oidc_config(bindings: MitxonlineBindings) -> OLApisixOIDCConfig:
     """Return the OIDC settings for the routes on MITx Online's own hosts.
 
@@ -429,13 +470,13 @@ def direct_oidc_config(bindings: MitxonlineBindings) -> OLApisixOIDCConfig:
     :returns: The config to hand to ``OLApisixOIDCResources``.
     :rtype: OLApisixOIDCConfig
     """
-    api_domain = bindings.hostnames.api
+    route_group = direct_route_group(bindings)
     return _oidc_config(
         bindings,
         application_name="mitxonline-k8s-no-prefix",
-        oidc_logout_path="/logout/oidc",
-        oidc_post_logout_redirect_uri=f"https://{api_domain}/logout/",
-        oidc_session_cookie_domain=api_domain.removeprefix("api"),
+        oidc_logout_path=route_group.logout_path,
+        oidc_post_logout_redirect_uri=route_group.post_logout_uri,
+        oidc_session_cookie_domain=bindings.hostnames.api.removeprefix("api"),
         # This is MITx Online's own login session, on its own parent domain --
         # distinct from the MIT Learn session the prefixed resources below read,
         # so it gets its own name rather than the shared one.  It needs an
@@ -453,39 +494,22 @@ def direct_oidc_config(bindings: MitxonlineBindings) -> OLApisixOIDCConfig:
 def prefixed_oidc_config(bindings: MitxonlineBindings) -> OLApisixOIDCConfig:
     """Return the OIDC settings for the /mitxonline/* routes on MIT Learn's host.
 
+    These routes are what the MIT Learn frontend calls as
+    NEXT_PUBLIC_MITX_ONLINE_BASE_URL.  Their "pass" plugins read the session
+    mit-learn's login set and their "reqauth" route writes it, so everything
+    about the session comes from ``learn_session``.
+
     :param bindings: The environment being rendered for.
     :returns: The config to hand to ``OLApisixOIDCResources``.
     :rtype: OLApisixOIDCConfig
     """
-    learn_api_domain = bindings.hostnames.learn_api
-    return _oidc_config(
-        bindings,
+    return learn_session_oidc_config(
+        learn_session(bindings),
+        prefixed_route_group(bindings),
         application_name="mitxonline-k8s",
-        oidc_logout_path=f"/{API_PATH_PREFIX}/logout/oidc",
-        # The MIT Learn host, not MITx Online's own: the prefixed path only
-        # exists on the host these routes are served from, so naming api_domain
-        # here pointed the tail of the logout at
-        # api.<env>.mitxonline.mit.edu/mitxonline/logout/, which the catch-all
-        # "passauth" route proxies through unrewritten and Django answers with a
-        # 404 (verified on CI) -- so every RP-initiated logout on this group
-        # ended on an error page.
-        oidc_post_logout_redirect_uri=f"https://{learn_api_domain}/{API_PATH_PREFIX}/logout/",
-        # These routes are served from MIT Learn's own host
-        # (api.<env>.learn.mit.edu) and are what the MIT Learn frontend calls as
-        # NEXT_PUBLIC_MITX_ONLINE_BASE_URL.  Their unauth_action="pass" plugins
-        # recognize the session mit-learn's login flow set, which only works
-        # while both name the cookie identically -- so this must track
-        # mit_learn/__main__.py's oidc_session_cookie_name, not the mitxonline
-        # name used above.
-        oidc_session_cookie_name=mit_learn_session_cookie_name(bindings.env_suffix),
-        # Matching mit_learn/__main__.py's cookie domain matters as much as
-        # matching its name.  The "reqauth" route below performs a real login
-        # (unauth_action="auth" on /mitxonline/login/), and without a domain the
-        # plugin would write a *host-only* cookie on api.<env>.learn.mit.edu
-        # under the shared name -- a second, separate entry in the browser's jar
-        # shadowing mit-learn's .learn.mit.edu cookie on that host.  With the
-        # domain set, all of them read and write the one shared cookie.
-        oidc_session_cookie_domain=learn_api_domain.removeprefix("api"),
+        k8s_labels=bindings.k8s_labels,
+        k8s_namespace=NAMESPACE,
+        credentials=_oidc_credentials(bindings),
     )
 
 
@@ -535,7 +559,7 @@ def shared_plugins(bindings: MitxonlineBindings) -> list[OLApisixPluginConfig]:
         oidc_gateway_pre_function_plugin(
             session_cookie_names=[
                 apisix_oidc_session_cookie_name("mitxonline", bindings.env_suffix),
-                mit_learn_session_cookie_name(bindings.env_suffix),
+                learn_session(bindings).cookie_name,
             ],
         ),
     ]
@@ -577,7 +601,8 @@ def direct_route_configs(
     :returns: Route configs for one ``OLApisixRoute``.
     :rtype: list[OLApisixRouteConfig]
     """
-    hosts = [bindings.hostnames.api, bindings.hostnames.frontend]
+    route_group = direct_route_group(bindings)
+    hosts = route_group.hosts
     frame_ancestors = _frame_ancestors_plugin(bindings)
     # Both OIDC resources moved off lua-resty-session's default "session" cookie
     # name, so every current user has a dead one in their browser.  The two route
@@ -592,45 +617,10 @@ def direct_route_configs(
         cookie_domains=[bindings.hostnames.api.removeprefix("api")],
     )
     return [
-        OLApisixRouteConfig(
-            route_name="passauth",
-            priority=0,
-            hosts=hosts,
-            paths=["/*"],
+        *route_group.route_configs(
+            oidc,
             shared_plugin_config_name=shared_plugin_config_name,
-            plugins=[
-                oidc.get_full_oidc_plugin_config(unauth_action="pass"),
-                frame_ancestors,
-                stale_session_cleanup,
-            ],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-        ),
-        OLApisixRouteConfig(
-            route_name="logout-redirect",
-            priority=10,
-            hosts=hosts,
-            paths=["/logout/oidc/*"],
-            plugins=[
-                OLApisixPluginConfig(name="redirect", config={"uri": "/logout/oidc"}),
-                frame_ancestors,
-                stale_session_cleanup,
-            ],
-            shared_plugin_config_name=shared_plugin_config_name,
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-        ),
-        OLApisixRouteConfig(
-            route_name="reqauth",
-            priority=10,
-            hosts=hosts,
-            paths=["/login/*", "/admin/login/*", "/login*", "/login/oidc*"],
-            plugins=[
-                oidc.get_full_oidc_plugin_config(unauth_action="auth"),
-                frame_ancestors,
-                stale_session_cleanup,
-            ],
-            shared_plugin_config_name=shared_plugin_config_name,
+            extra_plugins=[frame_ancestors, stale_session_cleanup],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
         ),
@@ -715,7 +705,8 @@ def prefixed_route_configs(
     :returns: Route configs for one ``OLApisixRoute``.
     :rtype: list[OLApisixRouteConfig]
     """
-    hosts = [bindings.hostnames.learn_api]
+    route_group = prefixed_route_group(bindings)
+    hosts = route_group.hosts
     frame_ancestors = _frame_ancestors_plugin(bindings)
     stale_session_cleanup = stale_session_cookie_cleanup_plugin()
     strip_prefix = OLApisixPluginConfig(
@@ -728,64 +719,16 @@ def prefixed_route_configs(
         },
     )
     return [
-        OLApisixRouteConfig(
-            route_name="passauth",
-            priority=0,
-            hosts=hosts,
-            paths=[f"/{API_PATH_PREFIX}/*"],
-            shared_plugin_config_name=shared_plugin_config_name,
-            plugins=[
-                strip_prefix,
-                oidc.get_full_oidc_plugin_config(unauth_action="pass"),
-                frame_ancestors,
-                stale_session_cleanup,
-            ],
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-        ),
-        # Strips the trailing slash onto this group's own logout path.  It named
-        # the unprefixed "/logout/oidc", which on this host is mit-learn's
-        # plugin: the shared cookie meant the session did get destroyed, but the
-        # post-logout redirect then came from mit-learn's resource, so a user
+        # The logout-redirect route sends the trailing-slash spelling onto this
+        # group's own logout path.  It used to name the unprefixed
+        # "/logout/oidc", which on this host is mit-learn's plugin, so a user
         # logging out of MITx Online landed on a mit-learn page and never
         # reached the Open edX logout fan-out their own logout view performs.
-        # Their MITx Online session cookie also outlived the logout, though
-        # ApisixUserMiddleware inherits force_logout_if_no_header from
-        # RemoteUserMiddleware and drops it on the next request.
-        OLApisixRouteConfig(
-            route_name="logout-redirect",
-            priority=10,
-            hosts=hosts,
-            paths=[f"/{API_PATH_PREFIX}/logout/oidc/*"],
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect",
-                    config={"uri": f"/{API_PATH_PREFIX}/logout/oidc"},
-                ),
-                frame_ancestors,
-                stale_session_cleanup,
-            ],
+        *route_group.route_configs(
+            oidc,
             shared_plugin_config_name=shared_plugin_config_name,
-            backend_service_name=WEBAPP_SERVICE_NAME,
-            backend_service_port=WEBAPP_SERVICE_PORT_NAME,
-        ),
-        OLApisixRouteConfig(
-            route_name="reqauth",
-            priority=10,
-            hosts=hosts,
-            paths=[
-                f"/{API_PATH_PREFIX}/login/",
-                f"/{API_PATH_PREFIX}/login/oidc*",
-                f"/{API_PATH_PREFIX}/admin/login/*",
-                f"/{API_PATH_PREFIX}/login",
-            ],
-            plugins=[
-                strip_prefix,
-                oidc.get_full_oidc_plugin_config(unauth_action="auth"),
-                frame_ancestors,
-                stale_session_cleanup,
-            ],
-            shared_plugin_config_name=shared_plugin_config_name,
+            rewrite_plugins=[strip_prefix],
+            extra_plugins=[frame_ancestors, stale_session_cleanup],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
         ),

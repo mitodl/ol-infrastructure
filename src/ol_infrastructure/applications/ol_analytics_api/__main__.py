@@ -74,7 +74,7 @@ import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 from pulumi_aws import ec2
 
-from bridge.lib.constants import mit_learn_session_cookie_name
+from bridge.lib.constants import LearnSession
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBinding,
@@ -83,12 +83,14 @@ from ol_infrastructure.components.applications.eks import (
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCRouteGroup,
     OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    learn_session_oidc_config,
 )
 from ol_infrastructure.components.services.cert_manager import (
     OLCertManagerCert,
@@ -725,39 +727,28 @@ ol_analytics_api_oidc_resources = OLApisixOIDCResources(
 # recognized here too, mirroring how learn-ai's `/ai/*` route piggybacks on
 # mit-learn's session rather than the JWT-plugin approach that ask implied
 # (this repo has no jwt-auth-plugin route anywhere; the shared-session
-# pass-through IS the established pattern). Sharing the session requires two
-# things beyond the shared client: `unauth_action="pass"` below (never
-# redirects) and a cookie domain broad enough to be sent cross-subdomain --
-# set to the same suffix as mit_learn's own broadened
-# oidc_session_cookie_domain (mitlearn_api_domain.removeprefix("api")) so the
-# exact same browser cookie reaches this host.
+# pass-through IS the established pattern). Sharing the session requires the
+# shared client, `unauth_action="pass"` below (never redirects), and the cookie
+# name and parent domain mit-learn's login writes, all of which come from
+# LearnSession.
 ol_analytics_api_learn_oidc_resources = None
 if ol_analytics_api_learn_domain:
+    ol_analytics_api_learn_session = LearnSession.for_host(
+        stack_info.env_suffix, ol_analytics_api_learn_domain
+    )
     ol_analytics_api_learn_oidc_resources = OLApisixOIDCResources(
         f"ol-analytics-api-{stack_info.env_suffix}-learn-oidc-resources",
-        oidc_config=OLApisixOIDCConfig(
+        oidc_config=learn_session_oidc_config(
+            ol_analytics_api_learn_session,
+            OLApisixOIDCRouteGroup(
+                hosts=[ol_analytics_api_learn_domain],
+                post_logout_redirect_uri=f"https://{ol_analytics_api_learn_domain}/",
+            ),
             application_name=f"{APPLICATION_NAME}-learn",
             k8s_labels=k8s_global_labels,
             k8s_namespace=APPLICATION_NAMESPACE,
-            oidc_logout_path="/logout/oidc",
-            oidc_post_logout_redirect_uri=f"https://{ol_analytics_api_learn_domain}/",
-            oidc_session_absolute_timeout=60 * 20160,
-            oidc_session_idling_timeout=0,
-            oidc_session_rolling_timeout=0,
-            oidc_session_cookie_domain=ol_analytics_api_learn_domain.removeprefix(
-                "analytics"
-            ),
-            # Same reason as the cookie domain above: this host reads the
-            # cookie mit-learn's login flow set, so the name has to match
-            # mit_learn/__main__.py's oidc_session_cookie_name exactly.
-            oidc_session_cookie_name=mit_learn_session_cookie_name(
-                stack_info.env_suffix,
-            ),
-            oidc_use_session_secret=True,
             credentials=OLApisixOIDCVaultCredentials(
-                mount="secret-operations",
-                mount_type="kv-v1",
-                path="sso/mitlearn",
+                path=LearnSession.vault_path,
                 vaultauth=ol_analytics_api_auth_binding.vault_k8s_resources.auth_name,
             ),
         ),

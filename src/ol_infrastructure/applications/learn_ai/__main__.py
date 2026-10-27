@@ -21,8 +21,8 @@ from pulumi_aws import ec2, get_caller_identity, iam, route53, s3
 
 from bridge.lib.constants import (
     FASTLY_A_TLS_1_3,
+    LearnSession,
     apisix_oidc_session_cookie_name,
-    mit_learn_session_cookie_name,
 )
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
@@ -38,12 +38,14 @@ from ol_infrastructure.components.services import appdb
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCRouteGroup,
     OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
     OLApisixRouteConfig,
     OLApisixSharedPlugins,
     OLApisixSharedPluginsConfig,
+    learn_session_oidc_config,
     stale_session_cookie_cleanup_plugin,
 )
 from ol_infrastructure.components.services.cert_manager import (
@@ -1199,64 +1201,37 @@ learn_api_domain = learn_ai_config.require("learn_backend_domain")  # New domain
 # callback can be handed a session envelope with no state for the flow in
 # progress.  With the domain set, all of them read and write the one shared
 # cookie.
+#
+# Everything else about the session (name, timeouts, scope, client) comes from
+# LearnSession, since the "reqauth" route below performs a real login that
+# writes the shared cookie.
+#
+# Every request on this host arrives under /ai/, and logout_path is compared
+# against the un-rewritten request URI (proxy-rewrite sets upstream_uri, which
+# neither openid-connect.lua nor lua-resty-openidc reads), so the logout path
+# carries the prefix.  The post-logout landing is mit-learn's /logout/ rather
+# than a learn-ai path: the session being destroyed is the shared one, and
+# learn-ai has no logout view of its own (main/urls.py).  "/ai/logout" and
+# "/ai/logout/" are the human-facing entry points the logout-redirect route
+# sends on to the plugin's logout path.
+learn_session = LearnSession.for_host(stack_info.env_suffix, learn_api_domain)
+learn_ai_route_group = OLApisixOIDCRouteGroup(
+    hosts=[learn_api_domain],
+    path_prefix="ai",
+    login_paths=["/admin/login/*", "/http/login/*"],
+    logout_entry_paths=["/logout", "/logout/"],
+    post_logout_redirect_uri=learn_session.logout_landing_uri,
+)
 learn_ai_mit_learn_oidc_resources = OLApisixOIDCResources(
     f"learn-ai-mit-learn-{stack_info.env_suffix}-oidc-resources",
-    oidc_config=OLApisixOIDCConfig(
+    oidc_config=learn_session_oidc_config(
+        learn_session,
+        learn_ai_route_group,
         application_name="learn-ai-mit-learn",
         k8s_labels=k8s_global_labels,
         k8s_namespace=learn_ai_namespace,
-        # No oidc_scope override, unlike the legacy-host resource above: the
-        # "reqauth" route below writes the shared session, so it has to request
-        # the same claims mit-learn's own login does.  The component default
-        # adds organization:*, which mit-learn maps to users.User.organizations
-        # via APISIX_USERDATA_MAP and reads to decide whether to skip onboarding.
-        oidc_introspection_endpoint_auth_method="client_secret_basic",  # Default
-        # Prefixed, because logout_path is compared against the un-rewritten
-        # request URI and every request on this host arrives under /ai/.  Both
-        # the plugin (openid-connect.lua reads ctx.var.request_uri) and
-        # lua-resty-openidc (ngx.var.request_uri) read the original URI, which
-        # proxy-rewrite never touches -- it sets upstream_uri -- so this holds
-        # regardless of the order the two plugins run in.  The comparison is
-        # exact string equality, which is what the "logout-redirect" route
-        # below exists to satisfy.
-        #
-        # An unprefixed "/logout" therefore never matched anything here, so
-        # learn-ai's plugin never performed a logout of its own.  What logged
-        # people out instead was a three-hop detour: "logout-redirect" 302'd to
-        # mit-learn's /logout, whose CustomLogoutView cleared the mit-learn
-        # Django session and -- seeing the gateway header still present --
-        # bounced to OIDC_LOGOUT_URL, which is mit-learn's own /logout/oidc.
-        # That did end the shared session, but by way of another application's
-        # views, and it left learn-ai's own post_logout_redirect_uri dead.
-        oidc_logout_path="/ai/logout/oidc",
-        # mit-learn's own post-logout landing, not a learn-ai path: the session
-        # being destroyed is the shared MIT Learn one, and learn-ai has no
-        # logout view of its own (main/urls.py).  Its CustomLogoutView clears
-        # the mit-learn Django session -- which otherwise outlives the gateway
-        # session -- and sends the browser on to the Learn frontend.  Keycloak
-        # accepts it: this is byte-identical to the URI mit-learn's own
-        # resource passes, and ol-mitlearn-client's end_session endpoint takes
-        # it in CI, RC and Production (an unregistered URI gets a 400 there).
-        oidc_post_logout_redirect_uri=f"https://{learn_api_domain}/logout/",
-        # 14 days, matching mit_learn/__main__.py.  Unset, lua-resty-session
-        # applies its compiled-in 86400 (resty/session.lua's
-        # DEFAULT_ABSOLUTE_TIMEOUT) -- and because the "reqauth" route below
-        # performs a real login that writes the *shared* cookie, a user who
-        # logged in through /ai/http/login/ got a one-day MIT Learn session
-        # while one who logged in through mit-learn got fourteen.
-        oidc_session_absolute_timeout=60 * 20160,
-        oidc_session_idling_timeout=0,
-        oidc_session_rolling_timeout=0,
-        oidc_session_cookie_domain=learn_api_domain.removeprefix("api"),
-        # Must track mit_learn/__main__.py's oidc_session_cookie_name exactly.
-        oidc_session_cookie_name=mit_learn_session_cookie_name(
-            stack_info.env_suffix,
-        ),
-        oidc_use_session_secret=True,
         credentials=OLApisixOIDCVaultCredentials(
-            mount="secret-operations",
-            mount_type="kv-v1",
-            path="sso/mitlearn",  # Use mitlearn SSO config
+            path=LearnSession.vault_path,
             vaultauth=vault_k8s_resources.auth_name,
         ),
     ),
@@ -1317,94 +1292,17 @@ mit_learn_learn_ai_https_apisix_route = OLApisixRoute(
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
             backend_resolve_granularity="service",
         ),
-        # Wildcard route that can use auth but doesn't require it
-        OLApisixRouteConfig(
-            route_name="passauth",
-            priority=2,
+        # passauth, logout-redirect and reqauth.  The route-level `redirect`
+        # (uri) on logout-redirect wholly overrides the shared `redirect`
+        # (http_to_https) rather than merging with it, so attaching the shared
+        # config leaves the rewrite intact.
+        *learn_ai_route_group.route_configs(
+            learn_ai_mit_learn_oidc_resources,
+            passauth_priority=2,
             shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin,
-                # Use helper from OIDC component instance
-                OLApisixPluginConfig(
-                    **learn_ai_mit_learn_oidc_resources.get_full_oidc_plugin_config(
-                        "pass"
-                    )
-                ),
-            ],
-            hosts=[learn_api_domain],
-            paths=["/ai/*"],
+            rewrite_plugins=[proxy_rewrite_plugin],
             backend_service_name=learn_ai_app_k8s.application_lb_service_name,
             backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
-        ),
-        # Strip trailing slash from logout redirect.
-        #
-        # The route-level `redirect` (uri) wholly overrides the shared
-        # `redirect` (http_to_https) rather than merging with it, so attaching
-        # the shared config leaves the rewrite intact -- the same arrangement
-        # mitxonline's and mit-learn's logout-redirect routes already run on --
-        # while restoring the prometheus/opentelemetry/gzip this route was
-        # missing.
-        #
-        # Now feeds the plugin's own logout path instead of mit-learn's
-        # /logout.  Three patterns, all landing on /ai/logout/oidc: the two
-        # exact spellings a caller would use as the human-facing entry point,
-        # plus the trailing-slash variant of the plugin path itself.
-        #
-        # A "/foo/*" pattern is a prefix match on "/foo/" and cannot match the
-        # shorter exact "/foo", which cuts both ways here.  The old
-        # "/ai/logout/*" covered /ai/logout/ but not /ai/logout, so the
-        # slashless spelling 404s today and is new rather than retained.  And
-        # /ai/logout/oidc matches none of the three patterns below, so it falls
-        # through to "passauth", whose plugin holds the logout_path and performs
-        # the real logout -- listing it here would 302 it to itself forever.
-        #
-        # Deeper paths under /ai/logout/ no longer trigger a logout, where
-        # "/ai/logout/*" swept them all in.  Deliberate: they are not endpoints,
-        # and nothing references them.
-        #
-        # No proxy-rewrite, since a matching request is answered with a 302 and
-        # never reaches the upstream -- mitxonline's and mit-learn's equivalents
-        # omit it for the same reason.
-        OLApisixRouteConfig(
-            route_name="logout-redirect",
-            priority=10,
-            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect",
-                    config={
-                        "uri": "/ai/logout/oidc",
-                    },
-                ),
-            ],
-            hosts=[learn_api_domain],
-            paths=["/ai/logout", "/ai/logout/", "/ai/logout/oidc/*"],
-            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
-            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
-        ),
-        # Routes that require authentication
-        OLApisixRouteConfig(
-            route_name="reqauth",
-            priority=10,
-            shared_plugin_config_name=learn_ai_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin,
-                OLApisixPluginConfig(
-                    **learn_ai_mit_learn_oidc_resources.get_full_oidc_plugin_config(
-                        "auth"
-                    )
-                ),
-            ],
-            hosts=[learn_api_domain],
-            paths=[
-                "/ai/admin/login/*",
-                "/ai/http/login/*",
-            ],
-            backend_service_name=learn_ai_app_k8s.application_lb_service_name,
-            backend_service_port=learn_ai_app_k8s.application_lb_service_port_name,
-            backend_resolve_granularity="service",
         ),
         # WebSocket route for /ai/ws/* paths (using legacy ApisixRoute CRD).
         # Note: This uses ApisixRoute where 'websocket' field IS used to enable
