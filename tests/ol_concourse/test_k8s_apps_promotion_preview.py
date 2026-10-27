@@ -196,9 +196,7 @@ def test_every_release_workflow_app_gets_the_preview(app_name):
 
 def test_legacy_pipelines_are_untouched():
     """Legacy pipelines have no release issue, so they get none of it."""
-    pipeline = json.dumps(
-        json.loads(build_app_pipeline("mitxonline").model_dump_json())
-    )
+    pipeline = json.dumps(json.loads(build_app_pipeline("mit-learn").model_dump_json()))
     assert CLASSIFY_TASK_NAME not in pipeline
     assert CACHE_BUST_TASK_NAME not in pipeline
     assert "serial_groups" not in pipeline

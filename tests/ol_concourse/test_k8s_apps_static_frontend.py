@@ -141,14 +141,14 @@ def test_a_legacy_app_cannot_carry_a_frontend(monkeypatch):
     """The legacy shape has no Deployments, so it would silently drop the jobs."""
     monkeypatch.setitem(
         pipeline_params,
-        "mitxonline",
+        "mit-learn",
         AppPipelineParams(
-            app_name="mitxonline",
+            app_name="mit-learn",
             static_frontend=pipeline_params[APP].static_frontend,
         ),
     )
     with pytest.raises(ValueError, match="static_frontend requires"):
-        build_app_pipeline("mitxonline")
+        build_app_pipeline("mit-learn")
 
 
 @pytest.mark.parametrize("stage", ["ci", "qa", "production"])

@@ -9,6 +9,8 @@ allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
+description: Hack Snack, a daily MIT OpenCourseWare puzzle game packaged as a React
+  component
 has_discussions: false
 has_projects: true
 has_wiki: true

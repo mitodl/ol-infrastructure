@@ -9,6 +9,7 @@ allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
+description: Configuration data for MIT Open's video ingestion
 has_discussions: false
 has_projects: true
 has_wiki: true

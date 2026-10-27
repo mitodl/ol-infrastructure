@@ -10,6 +10,7 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
 default_branch: master
+description: Maps CAS attributes onto Django user models
 has_discussions: false
 has_projects: true
 has_wiki: true

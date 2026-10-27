@@ -215,8 +215,8 @@ def _required_checks_bypass(
 
     THAT SET IS WIDER THAN THE REPOS ACTUALLY ON THE NEW WORKFLOW, deliberately.
     `AppRegistration.release_resource_workflow` is the real opt-in and only the
-    apps already migrated set it, so legacy apps such as `mit-learn` and
-    `mitxonline` get a bypass here before the App releases them.
+    apps already migrated set it, so legacy apps such as `mit-learn` get a bypass
+    here before the App releases them.
     `release_workflow_repos()` carries the reasoning and the conditions for narrowing
     it later; the short version is that pre-granting keeps a pipeline flip from
     needing a privileged GitHub edit alongside it, which is the step that stranded a

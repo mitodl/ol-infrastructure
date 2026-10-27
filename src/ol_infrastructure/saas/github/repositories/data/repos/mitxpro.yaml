@@ -15,6 +15,7 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: application
 default_branch: master
+description: MIT xPRO web application
 has_discussions: false
 has_projects: true
 merge_commit_message: PR_TITLE

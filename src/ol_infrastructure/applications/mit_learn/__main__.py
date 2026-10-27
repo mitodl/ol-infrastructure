@@ -110,6 +110,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
+from ol_infrastructure.lib.opik import opik_api_url
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     make_stack_reference,
@@ -1664,6 +1665,22 @@ else:
     azure_identity_volumes = []
     azure_identity_volume_mounts = []
 
+# Opik tracing of the embedding encoder through ol-llm. mit-learn leaves tracing off
+# unless OPIK_URL_OVERRIDE is set. Every environment traces to the Production Opik
+# (lib/opik.py), so OL_LLM_ENVIRONMENT is what tells the environments apart there.
+# It is explicit because the app otherwise falls back to MITOL_ENVIRONMENT, which is
+# "rc" in QA. The Keycloak client arrives through the secret-opik/sdk-client secret in
+# k8s_secrets.py. OPIK_API_KEY stays unset: ol-llm refuses to start with it
+# alongside the OPIK_KEYCLOAK_* variables.
+env_vars.update(
+    {
+        "OL_LLM_ENVIRONMENT": stack_info.env_suffix,
+        "OPIK_URL_OVERRIDE": opik_api_url(),
+        "OPIK_WORKSPACE": "default",
+        "OPIK_PROJECT_NAME": "mit-learn",
+    }
+)
+
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
 # carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_app_labels)
@@ -2007,16 +2024,15 @@ starrocks_vault_mount_path = (
     "database-starrocks" if env_vars.get("STARROCKS_HOST") else None
 )
 
-# The StarRocks credential reaches the app through env_from_secret_names, i.e.
-# envFrom, so its values become pod environment variables fixed at pod start.
-# Re-rendering the Kubernetes Secret does not touch a running pod. Vault
-# rotates this lease on its own (the StarRocks role's max TTL is six months),
-# so without these restart targets the rotation lands in the Secret, Vault
-# revokes the old StarRocks user with DROP USER, and beat keeps authenticating
-# as a user that no longer exists -- the sync stops until something unrelated
-# rolls the pods. That failure is silent in exactly the way the missing
-# configuration this PR fixes was.
-starrocks_secret_restart_targets = [
+# The StarRocks and Opik credentials reach the app through env_from_secret_names,
+# i.e. envFrom, so their values become pod environment variables fixed at pod
+# start. Re-rendering the Kubernetes Secret does not touch a running pod. Vault
+# rotates the StarRocks lease on its own (the StarRocks role's max TTL is six
+# months), so without these restart targets the rotation lands in the Secret,
+# Vault revokes the old StarRocks user with DROP USER, and beat keeps
+# authenticating as a user that no longer exists -- the sync stops until
+# something unrelated rolls the pods, and nothing reports it.
+env_secret_restart_targets = [
     OLVaultRestartTarget(kind="Deployment", name=deployment_name)
     for deployment_name in application_deployment_names(
         application_name="mitlearn",
@@ -2026,7 +2042,7 @@ starrocks_secret_restart_targets = [
 ]
 
 # Create all Kubernetes secrets needed by the application
-secret_names, secret_resources = create_mitlearn_k8s_secrets(
+secret_names, optional_secret_names, secret_resources = create_mitlearn_k8s_secrets(
     stack_info=stack_info,
     mitlearn_namespace=learn_namespace,
     k8s_global_labels=k8s_app_labels,
@@ -2036,7 +2052,7 @@ secret_names, secret_resources = create_mitlearn_k8s_secrets(
     redis_password=redis_config.require("password"),
     redis_cache=redis_cache,
     starrocks_vault_mount_path=starrocks_vault_mount_path,
-    starrocks_restart_targets=starrocks_secret_restart_targets,
+    restart_targets=env_secret_restart_targets,
 )
 
 # Configure and deploy the mitlearn application using OLApplicationK8s
@@ -2051,6 +2067,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         k8s_global_labels=k8s_app_labels,
         # Reference all Kubernetes secrets containing environment variables
         env_from_secret_names=secret_names,
+        optional_env_from_secret_names=optional_secret_names,
         application_min_replicas=mitlearn_config.get_int("min_replicas") or 2,
         application_max_replicas=mitlearn_config.get_int("max_replicas") or 10,
         application_security_group_id=mitlearn_app_security_group.id,

@@ -565,8 +565,8 @@ if om_config.get_bool("enable_airbyte_connector"):
 # Superset metadata ingestion
 # ---------------------------------------------------------------------------
 # Authenticates via an OIDC client_credentials grant (Keycloak).  Superset is
-# configured with AUTH_TYPE=AUTH_OAUTH and validates Bearer tokens using the
-# Keycloak realm public key (JWT_PUBLIC_KEY), so no FAB /security/login step
+# configured with AUTH_TYPE=AUTH_OAUTH and validates Bearer tokens against the
+# Keycloak realm JWKS, so no FAB /security/login step
 # is needed.  OIDC credentials are stored in the om-connector-superset K8s
 # secret, provisioned by the open_metadata application stack via Vault.
 

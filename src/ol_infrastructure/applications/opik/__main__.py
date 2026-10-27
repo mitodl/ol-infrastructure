@@ -242,6 +242,7 @@ opik_helm_release = kubernetes.helm.v3.Release(
         version=OPIK_CHART_VERSION,
         namespace=OPIK_NAMESPACE,
         cleanup_on_fail=True,
+        max_history=10,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://comet-ml.github.io/opik/",
         ),

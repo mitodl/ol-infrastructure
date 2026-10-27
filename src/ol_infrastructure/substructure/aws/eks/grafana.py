@@ -381,6 +381,7 @@ def setup_grafana(
             namespace="grafana",
             create_namespace=True,
             cleanup_on_fail=True,
+            max_history=10,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 repo="https://grafana.github.io/helm-charts",
             ),
@@ -911,6 +912,14 @@ def setup_grafana(
                                             "loki_process_custom_apisix_oidc_session_cookie_bytes_bucket",
                                             "loki_process_custom_apisix_oidc_session_cookie_bytes_sum",
                                             "loki_process_custom_apisix_oidc_session_cookie_bytes_count",
+                                        ],
+                                        # Per-component histograms from the default
+                                        # list: ~13.7k prod / ~4k QA series on
+                                        # 2026-10-22, read only by the upstream mixin's
+                                        # Controller dashboards. _count/_sum stay.
+                                        "excludeMetrics": [
+                                            "alloy_component_evaluation_seconds_bucket",
+                                            "alloy_component_dependencies_wait_seconds_bucket",
                                         ],
                                     },
                                 },

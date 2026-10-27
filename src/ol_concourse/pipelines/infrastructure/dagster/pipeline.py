@@ -57,7 +57,12 @@ def build_dagster_docker_pipeline() -> Pipeline:
     # pre-#2492 ol_dlt code in production for days because of exactly this.
     extra_watched_paths = {
         "data_loading": ["src/ol_dlt/"],
-        "lakehouse": ["src/ol_dbt/"],
+        "lakehouse": [
+            "src/ol_dbt/",
+            "src/ol_dbt_cli/",
+            "ingestion/inventory/",
+            "contracts/",
+        ],
         "k8s": [
             "dg_deployments/reconcile_edxorg_partitions.py",
             "dg_deployments/dagster-k8s/",

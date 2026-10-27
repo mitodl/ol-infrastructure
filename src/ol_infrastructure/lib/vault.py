@@ -415,7 +415,11 @@ def set_vault_provider(
     resource_args: pulumi.ResourceTransformationArgs,
     skip_child_token: bool | None = None,  # noqa: FBT001
 ) -> pulumi.ResourceTransformationResult:
-    if resource_args.type_.split(":")[0] == "vault":
+    # A resource given its own Vault provider writes to another environment's
+    # Vault on purpose (e.g. the Opik SDK credentials in substructure/keycloak).
+    if resource_args.type_.split(":")[0] == "vault" and not isinstance(
+        resource_args.opts.provider, pulumi_vault.Provider
+    ):
         resource_args.opts.provider = get_vault_provider(
             vault_address,
             vault_env_namespace,

@@ -435,11 +435,10 @@ if not starrocks_config.get_bool("use_be") and not starrocks_config.get_bool("us
 # Requires StarRocks >= 3.4.1. When enabled:
 #   - cert-manager adds a PKCS12 keystore to the TLS secret.
 #   - FE pods mount the secret and configure fe.conf with the keystore path/password.
-#   - Set ssl_force_secure_transport=true only after updating all clients (e.g. Vault
-#     JDBC URL) to use useSSL=true, as it rejects plain-text connections.
-# Note: once PR #732 in starrocks-kubernetes-operator merges, CN pods will additionally
-#   need cnEnvVars FE_TLS_MODE=skip-verify (or preferred) for the operator's internal
-#   CN→FE MySQL connection to use TLS.
+#   - Set ssl_force_secure_transport=true only after every client uses TLS, as it
+#     rejects plain-text connections (Vault's connection URL uses tls=skip-verify).
+# The operator's own connection to FE is covered by its feSslMode chart value
+# (starrocks:operator_fe_ssl_mode in substructure/aws/eks), not by anything here.
 ssl_enabled = starrocks_config.get_bool("ssl_enabled") or False
 ssl_force_secure_transport = (
     starrocks_config.get_bool("ssl_force_secure_transport") or False
@@ -1042,6 +1041,7 @@ starrocks_release = kubernetes.helm.v3.Release(
         version=STARROCKS_CHART_VERSION,
         namespace=namespace,
         cleanup_on_fail=True,
+        max_history=10,
         skip_await=True,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://starrocks.github.io/starrocks-kubernetes-operator",

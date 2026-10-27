@@ -50,6 +50,7 @@ archived:
 - dls-syseng-web
 - doof
 - dremio-formula
+- edx-api-client
 - edx-dev-intro-slides
 - edx-git-auto-export
 - edx-notes-api
@@ -181,7 +182,6 @@ fork:
 - docs.openedx.org
 - ecommerce
 - edx-analytics-api-client
-- edx-api-client
 - edx-documentation
 - edx-enterprise
 - edx-enterprise-data

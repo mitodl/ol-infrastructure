@@ -85,12 +85,16 @@ APPS: dict[str, AppRegistration] = {
     "mit-learn-nextjs": AppRegistration(
         github_repo="mitodl/mit-learn", slack_channel="product-mit-learn"
     ),
-    "mitxonline": AppRegistration(slack_channel="product-mitx-online"),
+    "mitxonline": AppRegistration(
+        slack_channel="product-mitx-online", release_resource_workflow=True
+    ),
     "ocw-studio": AppRegistration(
         repo_main_branch="master", slack_channel="product-ocw"
     ),
     "odl-video-service": AppRegistration(
-        repo_main_branch="master", slack_channel="product-ovs"
+        repo_main_branch="master",
+        slack_channel="product-ovs",
+        release_resource_workflow=True,
     ),
     # No app-specific channel given -- falls back to RELEASE_ANNOUNCE_CHANNEL.
     # Keeps its own scriv-managed CHANGELOG.md (see bin/collect-changelog in
@@ -170,8 +174,8 @@ def release_workflow_repos() -> frozenset[str]:
     is deliberate and it over-grants on purpose (decision: Tobias, 2026-09-01). The
     actual opt-in is ``AppRegistration.release_resource_workflow`` above, which
     defaults to ``False`` and is set only on the apps already migrated -- so the
-    consumer below also grants a bypass on legacy apps such as ``mit-learn`` and
-    ``mitxonline``, for an App that does not yet finish their releases.
+    consumer below also grants a bypass on legacy apps such as ``mit-learn``, for an
+    App that does not yet finish their releases.
 
     The trade is pre-provisioning against a rollout that would otherwise need a
     GitHub ruleset edit interleaved with every pipeline flip -- and that edit is the

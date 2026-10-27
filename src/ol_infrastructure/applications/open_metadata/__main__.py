@@ -930,6 +930,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
         version=OPEN_METADATA_VERSION,
         namespace=open_metadata_namespace,
         cleanup_on_fail=True,
+        max_history=10,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://helm.open-metadata.org",
         ),

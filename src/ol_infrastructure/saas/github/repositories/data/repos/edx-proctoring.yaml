@@ -10,6 +10,8 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: master
+description: MIT Open Learning fork of openedx/edx-proctoring, the Open edX exam proctoring
+  subsystem
 has_discussions: false
 has_projects: true
 has_wiki: true
