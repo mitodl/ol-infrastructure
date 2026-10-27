@@ -44,3 +44,4 @@ for repo in fleet:
     built_repository = repository.build(repo)
     rulesets.build(repo, built_repository)
     rulesets.build_release_branches(repo, built_repository)
+    rulesets.build_copilot_review(repo, built_repository)

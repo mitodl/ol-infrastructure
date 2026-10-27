@@ -12,6 +12,9 @@ allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
 archetype: library
+copilot_code_review:
+  review_draft_pull_requests: false
+  review_on_push: false
 description: Pipeline definitions for managing data flows to power analytics at MIT
   Open Learning
 has_discussions: true

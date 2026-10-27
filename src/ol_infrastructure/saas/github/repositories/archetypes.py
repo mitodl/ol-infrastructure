@@ -249,6 +249,79 @@ def _check_required_status_checks(fleet: list[dict[str, Any]]) -> None:
         raise ValueError(message)
 
 
+#: Per-repo opt-in for "require branches to be up to date before merging" on the
+#: required-status-checks ruleset. See `build()` in rulesets.py.
+STRICT_REQUIRED_CHECKS_KEY = "required_status_checks_strict"
+
+#: The key a repo declares Copilot code review under, and the only parameters it may
+#: carry. See `build_copilot_review()` in rulesets.py.
+COPILOT_REVIEW_KEY = "copilot_code_review"
+COPILOT_REVIEW_PARAMETERS = frozenset({"review_draft_pull_requests", "review_on_push"})
+
+
+def _strict_problems(repo: dict[str, Any]) -> list[str]:
+    if STRICT_REQUIRED_CHECKS_KEY not in repo:
+        return []
+    name = repo["name"]
+    strict = repo[STRICT_REQUIRED_CHECKS_KEY]
+    if not isinstance(strict, bool):
+        return [f"{name}: {STRICT_REQUIRED_CHECKS_KEY} must be a bool"]
+    if strict and not repo.get("required_status_checks"):
+        return [
+            f"{name}: {STRICT_REQUIRED_CHECKS_KEY} needs required_status_checks "
+            "to apply to"
+        ]
+    return []
+
+
+def _copilot_review_problems(repo: dict[str, Any]) -> list[str]:
+    if COPILOT_REVIEW_KEY not in repo:
+        return []
+    name = repo["name"]
+    parameters = repo[COPILOT_REVIEW_KEY]
+    if repo.get("archived"):
+        return [f"{name}: archived repos cannot carry rulesets"]
+    if not isinstance(parameters, dict) or not parameters:
+        return [
+            f"{name}: {COPILOT_REVIEW_KEY} must be a non-empty mapping of "
+            f"{sorted(COPILOT_REVIEW_PARAMETERS)} to bools"
+        ]
+    problems: list[str] = []
+    unknown = sorted(set(parameters) - COPILOT_REVIEW_PARAMETERS)
+    if unknown:
+        problems.append(f"{name}: {COPILOT_REVIEW_KEY} has unknown keys {unknown}")
+    not_bool = sorted(k for k, v in parameters.items() if not isinstance(v, bool))
+    if not_bool:
+        problems.append(
+            f"{name}: {COPILOT_REVIEW_KEY} values must be bools: {not_bool}"
+        )
+    return problems
+
+
+def _check_ruleset_options(fleet: list[dict[str, Any]]) -> None:
+    """Fail on `required_status_checks_strict` or `copilot_code_review` data that lies.
+
+    Both are read with `bool()` in rulesets.py, so a typo there does not crash. It
+    gives the wrong answer quietly instead. `review_on_pusj: true` would be dropped
+    and `review_on_push` would default to false, and `required_status_checks_strict:
+    "false"` is a non-empty string that `bool()` turns into true. Checking here makes
+    both fail loudly.
+
+    The strict flag also needs `required_status_checks`, because it is a setting on
+    that ruleset. Without the checks there is no ruleset to apply it to, and it would
+    be silently ignored.
+    """
+    problems: list[str] = []
+    for repo in fleet:
+        problems.extend(_strict_problems(repo))
+        problems.extend(_copilot_review_problems(repo))
+    if problems:
+        message = "fleet data carries invalid ruleset options:\n  " + "\n  ".join(
+            problems
+        )
+        raise ValueError(message)
+
+
 def _check_protected_release_branches(fleet: list[dict[str, Any]]) -> None:
     """Fail on `protected_release_branches` data GitHub would reject or that lies.
 
@@ -342,6 +415,7 @@ def load_fleet() -> list[dict[str, Any]]:
     _check_dependabot_requires_alerts(fleet)
     _check_required_status_checks(fleet)
     _check_protected_release_branches(fleet)
+    _check_ruleset_options(fleet)
 
     # The dotfile trap is silent by construction, so assert rather than trust.
     assignments = yaml.safe_load((DATA_DIR / "archetypes-proposed.yaml").read_text())
