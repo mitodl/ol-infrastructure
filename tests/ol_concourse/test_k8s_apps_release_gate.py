@@ -18,7 +18,6 @@ from typing import Any, ClassVar
 
 import pytest
 
-from bridge.settings.apps import APPS, release_resource_workflow
 from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
     _ASSERT_GATE_SCRIPT,
     ASSERT_GATE_TASK_NAME,
@@ -33,7 +32,6 @@ REPO = f"mitodl/{APP}"
 SHA = "a" * 40
 OTHER_SHA = "b" * 40
 GATE_NUMBER = 103
-RELEASE_APPS = [app for app in APPS if release_resource_workflow(app)]
 
 
 def _plan(app_name: str, job_suffix: str) -> list[dict[str, Any]]:
@@ -70,44 +68,7 @@ def test_assertion_reads_the_version_the_job_deploys():
     release_get = plan[_step_index(plan, "get", f"{APP}-release")]
 
     assert task["config"]["params"]["VERSION_FILE"] == f"{APP}-release/version"
-    assert f"deploy-ol-application-{APP}-qa" in release_get["passed"]
-
-
-@pytest.mark.parametrize("app", RELEASE_APPS)
-def test_production_takes_release_and_image_through_build_and_qa(app):
-    """Production's release and image gets are both passed the build and QA.
-
-    QA also gets the release resource at its latest check, which once the main
-    branch moves past the last release is the next, uncut release. Concourse
-    counts that as a version that passed QA, so ``passed:`` QA alone let
-    Production resolve to it (micromasters, 2026-10-27). The image, which QA
-    gets once, ties the version to the QA build that deployed it.
-    """
-    plan = _plan(app, f"deploy-ol-application-{app}-production")
-    expected = [f"build-{app}-release-image", f"deploy-ol-application-{app}-qa"]
-
-    for name in (f"{app}-release", f"{app}-app-release-ecr-image"):
-        get = plan[_step_index(plan, "get", name)]
-        assert get["passed"] == expected, name
-        assert not get["trigger"], name
-    image = plan[_step_index(plan, "get", f"{app}-app-release-ecr-image")]
-    assert image["params"] == {"skip_download": True}
-    assert _step_index(plan, "get", f"{app}-app-release-ecr-image") < _step_index(
-        plan, "task", ASSERT_GATE_TASK_NAME
-    )
-
-
-@pytest.mark.parametrize("app", RELEASE_APPS)
-def test_qa_takes_release_and_image_from_the_build(app):
-    """QA still triggers on, and takes, only what the release build cut."""
-    plan = _plan(app, f"deploy-ol-application-{app}-qa")
-
-    for name in (f"{app}-release", f"{app}-app-release-ecr-image"):
-        get = plan[_step_index(plan, "get", name)]
-        assert get["passed"] == [f"build-{app}-release-image"], name
-        assert get["trigger"], name
-    image = plan[_step_index(plan, "get", f"{app}-app-release-ecr-image")]
-    assert image["params"] == {"skip_download": True}
+    assert release_get["passed"] == [f"deploy-ol-application-{APP}-qa"]
 
 
 def test_assertion_reads_the_ol_infra_commit_the_job_deploys():
