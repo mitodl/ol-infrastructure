@@ -106,6 +106,7 @@ APPS: dict[str, AppRegistration] = {
         github_repo="mitodl/mitxpro",
         repo_main_branch="master",
         slack_channel="product-xpro",
+        release_resource_workflow=True,
     ),
 }
 
