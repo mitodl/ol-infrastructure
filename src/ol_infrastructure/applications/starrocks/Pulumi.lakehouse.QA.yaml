@@ -60,4 +60,4 @@ config:
   # mysql CLI the FE entrypoint uses to register followers and observers.
   starrocks:ssl_force_secure_transport: "false"
   starrocks:ssl_keystore_password:
-    secure: v1:UCHYHsGETfCN/DnL:ubV+0rJePAFL4JupZ65N/Utf+ZMdzFy0lGS4OEDyqfSZfnZ587k6AvMOITqITKHhmxuApncP0wM=
+    secure: v1:ObOchaUnbrDzV49w:xL8OLPChtrzxDJEVtMny+XZIz2gBna7r6tEstsZcD7xyxl7Pd6o1nYV8GK6NG+gGQdePlz2PPO0=
