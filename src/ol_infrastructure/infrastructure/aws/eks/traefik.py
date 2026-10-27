@@ -122,6 +122,7 @@ def setup_traefik(
             # only write them on a fresh install anyway, which is the bug.
             skip_crds=True,
             cleanup_on_fail=True,
+            max_history=10,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
                 # helm.traefik.io was retired and now 404s on index.yaml, which
                 # fails the release at resolve time rather than degrading.

@@ -372,6 +372,7 @@ def setup_aws_integrations(
             version=versions["AWS_LOAD_BALANCER_CONTROLLER_CHART"],
             namespace="kube-system",
             cleanup_on_fail=True,
+            max_history=10,
             timeout=600,
             # The CRDs are applied above as their own Pulumi resource. Helm would
             # only write them on a fresh install anyway, which is the bug.
@@ -455,6 +456,7 @@ def setup_aws_integrations(
             version=versions["AWS_NODE_TERMINATION_HANDLER_CHART"],
             namespace="kube-system",
             cleanup_on_fail=True,
+            max_history=10,
             skip_await=True,
             values={
                 "podLabels": node_termination_labels,

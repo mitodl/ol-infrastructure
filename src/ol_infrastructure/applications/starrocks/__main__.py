@@ -1041,6 +1041,7 @@ starrocks_release = kubernetes.helm.v3.Release(
         version=STARROCKS_CHART_VERSION,
         namespace=namespace,
         cleanup_on_fail=True,
+        max_history=10,
         skip_await=True,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://starrocks.github.io/starrocks-kubernetes-operator",

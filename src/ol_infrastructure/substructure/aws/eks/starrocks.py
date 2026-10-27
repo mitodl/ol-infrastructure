@@ -182,6 +182,7 @@ def setup_starrocks(
             version=STARROCKS_OPERATOR_CHART_VERSION,
             namespace=starrocks_namespace,
             cleanup_on_fail=True,
+            max_history=10,
             skip_await=False,
             # The CRD is applied above as its own Pulumi resource.
             skip_crds=True,

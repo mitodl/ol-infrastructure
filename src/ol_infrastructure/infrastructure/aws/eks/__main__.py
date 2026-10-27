@@ -1344,6 +1344,7 @@ metrics_server_release = kubernetes.helm.v3.Release(
             repo="https://kubernetes-sigs.github.io/metrics-server/",
         ),
         cleanup_on_fail=True,
+        max_history=10,
         skip_await=False,
         values={
             "commonLabels": metrics_server_labels,

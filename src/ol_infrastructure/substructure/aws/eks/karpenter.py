@@ -214,6 +214,7 @@ def setup_karpenter(  # noqa: PLR0913
             disable_crd_hooks=True,
             namespace="operations",
             cleanup_on_fail=True,
+            max_history=10,
             skip_await=False,
             values={},
         ),
@@ -259,6 +260,7 @@ def setup_karpenter(  # noqa: PLR0913
             version=KARPENTER_CHART_VERSION,
             namespace="operations",  # Deploy into the operations namespace
             cleanup_on_fail=True,
+            max_history=10,
             skip_await=False,  # Wait for resources to be ready
             skip_crds=True,  # CRDs are managed by the separate CRD cha
             values={
