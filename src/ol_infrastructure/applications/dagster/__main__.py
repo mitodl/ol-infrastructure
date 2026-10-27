@@ -2666,7 +2666,7 @@ OTEL_AGENT_PYTHONPATH = "/opt/otel/auto_instrumentation"
 # this one. requests and urllib3 each emit http.client.* duration and size
 # histograms. The canvas API client uses httpx2, which is not instrumented, but
 # S3 IO goes through botocore over urllib3 and Vault through hvac over
-# requests. The run workers that inherit this env (canvas, see
+# requests. The run workers that inherit this env (canvas and ml, see
 # OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS) are short-lived processes, each with
 # its own random service.instance.id, and so is every step subprocess the
 # multiprocess executor spawns inside one. Production started ~440-475 canvas
@@ -2765,6 +2765,16 @@ def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, st
 # connection footprint, two orders of magnitude less blast radius than the
 # location that would otherwise dominate the signal.
 #
+# ml is listed for a different reason: ol-llm sends its model spans (with token
+# usage and cost) to Opik through its own SDK TracerProvider, and that provider
+# hands out NoOp tracers under OTEL_SDK_DISABLED=true like any other, so ml's
+# model calls reach Opik only with the flag off. ml is bursty rather than steady:
+# in the 7 days to 2026-10-27 it peaked at 122 concurrent run-worker Jobs (canvas
+# 123) but started 245 Jobs in all against canvas's 3048. Its run workers also
+# export metrics where otel_metrics_enabled is set, including PydanticAI's
+# gen_ai token usage histograms (ol-llm passes no meter provider, so PydanticAI
+# takes the agent's global one).
+#
 # Run workers inherit the code location's OTEL_SERVICE_NAME, so their spans
 # arrive as `production-dagster-code-canvas` alongside the code server's and
 # cannot be told apart by service.name -- the launcher cannot override it,
@@ -2773,7 +2783,7 @@ def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, st
 # `dagster-run-<run-id>`, the server's is the deployment's) or on
 # `service.instance.id`, which the SDK makes unique per process. Both are
 # already present on the spans #5733 is producing.
-OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS = {"canvas"}
+OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS = {"canvas", "ml"}
 
 
 def dagster_run_worker_otel_env(location_name: str) -> list[dict[str, str]]:

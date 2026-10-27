@@ -241,7 +241,7 @@ run_launcher:
         # parentbased_traceidratio at DEFAULT_TRACE_SAMPLING_RATE -- and that is
         # "1.0" (lib/otel.py), not a fraction. Run workers are launched by the
         # daemon, so most of their traces are parentless roots and the ratio is
-        # the one that applies: every canvas run worker trace is head-sampled in.
+        # the one that applies: every canvas and ml run worker trace is head-sampled in.
         # Deliberate rather than overlooked. Alloy's tailSampling is what decides
         # what to keep -- errors, slow traces, everything from services that are
         # not high-volume -- and head sampling upstream of it only discards
