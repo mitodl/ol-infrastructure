@@ -10,12 +10,13 @@ path "secret-operations/sso/dagster" {
 }
 # Keycloak client-credentials for Opik, read by the ml code location. sso/opik is
 # the per-environment ol-opik-client, which ml reads until mitodl/ol-data-platform#3144
-# deploys and it reads the path in OPIK_KEYCLOAK_VAULT_PATH (secret-opik/sdk-client);
-# drop it once that has deployed everywhere.
+# deploys and it reads the path in OPIK_KEYCLOAK_VAULT_PATH (secret-opik/sdk-dagster-ml,
+# dagster-ml's own client for this environment); drop it once that has deployed
+# everywhere.
 path "secret-operations/sso/opik" {
   capabilities = ["read"]
 }
-path "secret-opik/sdk-client" {
+path "secret-opik/sdk-dagster-ml" {
   capabilities = ["read"]
 }
 path "mariadb-xpro/creds/readonly/*" {

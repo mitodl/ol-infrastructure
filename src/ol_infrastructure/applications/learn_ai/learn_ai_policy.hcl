@@ -11,7 +11,7 @@ path "secret-operations/sso/learn-ai" {
 path "secret-operations/sso/mitlearn" {
   capabilities = ["read"]
 }
-path "secret-opik/sdk-client" {
+path "secret-opik/sdk-learn-ai" {
   capabilities = ["read"]
 }
 

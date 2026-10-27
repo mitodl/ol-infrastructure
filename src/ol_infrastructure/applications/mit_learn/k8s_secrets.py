@@ -25,7 +25,7 @@ from ol_infrastructure.components.services.vault import (
 from ol_infrastructure.lib.opik import (
     OPIK_KEYCLOAK_SECRET_TEMPLATES,
     OPIK_SDK_VAULT_MOUNT,
-    OPIK_SDK_VAULT_PATH,
+    opik_sdk_vault_path,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -299,8 +299,9 @@ def create_mitlearn_k8s_secrets(
         secret_names.append(secret_name)
         secret_resources.append(secret_resource)
 
-    # Production Keycloak client (ol-opik-sdk) for ol-llm's embedding traces, which
-    # the Production keycloak substructure writes to every environment's Vault.
+    # mit-learn's Production Keycloak client for this environment
+    # (opik-mit-learn-<env>) for ol-llm's embedding traces, which the Production
+    # keycloak substructure writes to this environment's Vault.
     # Optional, so pods still start if that stack hasn't applied yet. VSO doesn't
     # restart the targets on a secret's first sync, so pods that started without it
     # trace unauthenticated (and get 401s) until something else rolls them.
@@ -310,7 +311,7 @@ def create_mitlearn_k8s_secrets(
         namespace=mitlearn_namespace,
         labels=k8s_global_labels,
         mount=OPIK_SDK_VAULT_MOUNT,
-        path=OPIK_SDK_VAULT_PATH,
+        path=opik_sdk_vault_path("mit-learn"),
         templates=OPIK_KEYCLOAK_SECRET_TEMPLATES,
         vaultauth=vault_k8s_resources.auth_name,
         restart_targets=restart_targets,
