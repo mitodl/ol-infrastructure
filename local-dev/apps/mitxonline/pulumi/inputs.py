@@ -52,8 +52,7 @@ JOB_BACKOFF_LIMIT = 2
 # step is an ensure_* call, so it is safe on every Job run; the deployed stacks'
 # databases never start empty, so the deployed pre-deploy command omits it.
 CONFIGURE_WAGTAIL_STEP = " && python manage.py configure_wagtail"
-OPENEDX_OAUTH_APP_STEP = """ && python manage.py shell <<'PY'
-import os
+OPENEDX_OAUTH_APP_SCRIPT = """import os
 from urllib.parse import urljoin
 
 from django.conf import settings
@@ -77,7 +76,20 @@ _, created = get_application_model().objects.update_or_create(
 )
 verb = "created" if created else "updated"
 print(f"{verb} {settings.OPENEDX_OAUTH_APP_NAME} -> {redirect_uri}")
-PY"""
+"""
+
+
+def manage_py_shell_step(*scripts: str) -> str:
+    """Return a step that runs ``scripts`` in one ``manage.py shell``.
+
+    One heredoc for all of them: bash ends a heredoc only at a line that is
+    exactly its delimiter, so a second ``&& ... <<'PY'`` step after one would
+    land inside the first's input instead of running.
+    """
+    return " && python manage.py shell <<'PY'\n" + "".join(scripts) + "PY"
+
+
+OPENEDX_OAUTH_APP_STEP = manage_py_shell_step(OPENEDX_OAUTH_APP_SCRIPT)
 # ol-analytics-api's org-manager check authenticates to mitxonline with a
 # client-credentials Application (mitodl/mitxonline#3807), created by hand in
 # the Django admin when deployed. Locally the Job re-asserts it while
@@ -86,7 +98,7 @@ PY"""
 ANALYTICS_API_APP = "ol-analytics-api"
 ANALYTICS_API_CLIENT_ID = "ol-analytics-api-local"
 ANALYTICS_API_CLIENT_SECRET = "local-dev-ol-analytics-api-mitxonline-secret"  # noqa: S105  # pragma: allowlist secret
-ANALYTICS_API_OAUTH_APP_STEP = f""" && python manage.py shell <<'PY'
+ANALYTICS_API_OAUTH_APP_SCRIPT = f"""\
 from oauth2_provider.models import get_application_model
 
 Application = get_application_model()
@@ -100,7 +112,7 @@ _, created = Application.objects.update_or_create(
     ),
 )
 print("created" if created else "updated", "ol-analytics-api (local-dev)")
-PY"""
+"""
 
 
 def with_local_steps(
@@ -110,8 +122,9 @@ def with_local_steps(
 ) -> list[tuple[str, list[str]]]:
     """Append CONFIGURE_WAGTAIL_STEP and OPENEDX_OAUTH_APP_STEP to the first deployed
     pre-deploy command, in that order and in the same shell, so they run after
-    migrate and never beside it. ANALYTICS_API_OAUTH_APP_STEP follows them while
-    ol-analytics-api is enabled.
+    migrate and never beside it. While ol-analytics-api is enabled,
+    ANALYTICS_API_OAUTH_APP_SCRIPT runs in the same manage.py shell as the Open
+    edX script.
 
     The component's field is optional; with no command to append to the steps
     would silently never run, so that is an error here.
@@ -120,9 +133,10 @@ def with_local_steps(
         msg = "the deployed definition has no pre_deploy_commands to append to"
         raise ValueError(msg)
     (name, command), *rest = pre_deploy_commands
-    local_steps = CONFIGURE_WAGTAIL_STEP + OPENEDX_OAUTH_APP_STEP
+    scripts = [OPENEDX_OAUTH_APP_SCRIPT]
     if ANALYTICS_API_APP in enabled_apps:
-        local_steps += ANALYTICS_API_OAUTH_APP_STEP
+        scripts.append(ANALYTICS_API_OAUTH_APP_SCRIPT)
+    local_steps = CONFIGURE_WAGTAIL_STEP + manage_py_shell_step(*scripts)
     return [(name, [*command[:-1], command[-1] + local_steps]), *rest]
 
 

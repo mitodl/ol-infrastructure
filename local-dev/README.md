@@ -1099,7 +1099,7 @@ It is wired the way the deployed Learn-scoped host is:
 - The org-manager check calls the local MITx Online at `https://api.mitxonline.mit.test`
   with a client-credentials token. MITx Online's pre-deploy Job registers that
   Application while `ol-analytics-api` is in `enabled_apps`
-  (`ANALYTICS_API_OAUTH_APP_STEP` in `apps/mitxonline/pulumi/inputs.py`), so enabling
+  (`ANALYTICS_API_OAUTH_APP_SCRIPT` in `apps/mitxonline/pulumi/inputs.py`), so enabling
   the app re-applies mitxonline once.
 - MIT Learn's login requests `organization:*`, and `kc-fix-org-claim` sets the realm's
   organization mapper to add each organization's id, which the deployed realms do. Log
