@@ -703,7 +703,7 @@ if bindings.openedx_login_gate is not None:
     mitxonline_openedx_login_gate_upstream = OLApisixExternalUpstream(
         f"mitxonline-openedx-login-gate-upstream-{stack_info.env_suffix}",
         external_upstream_config=definition.openedx_login_gate_upstream_config(
-            bindings.openedx_login_gate, k8s_app_labels
+            bindings.openedx_login_gate, stack_info.env_suffix, k8s_app_labels
         ),
     )
     mitxonline_apisix_route_openedx_login_gate = OLApisixRoute(

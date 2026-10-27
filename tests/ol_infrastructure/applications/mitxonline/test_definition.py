@@ -462,7 +462,6 @@ def _gate_bindings(**overrides) -> definition.MitxonlineBindings:
     return _deployed_bindings(
         openedx_login_gate=definition.OpenedxLoginGate(
             lms_host=LMS_HOST,
-            lms_service_host="lms.mitxonline-openedx.svc.cluster.local",
         ),
         **overrides,
     )
@@ -513,13 +512,32 @@ def test_openedx_login_gate_sends_learners_without_a_session_to_keycloak():
     assert config["unauth_action"] == "auth"
 
 
+def test_openedx_login_gate_sends_the_lms_no_tokens():
+    [route] = _gate_routes(_gate_bindings())
+
+    [plugin] = [
+        plugin
+        for plugin in route.plugins
+        if (plugin.get("name") if isinstance(plugin, dict) else plugin.name)
+        == "openid-connect"
+    ]
+    config = plugin["config"] if isinstance(plugin, dict) else plugin.config
+    assert config["set_access_token_header"] is False
+    assert config["set_id_token_header"] is False
+    assert config["set_userinfo_header"] is False
+
+
 def test_openedx_login_gate_upstream_passes_the_public_host_to_the_lms():
     """The LMS rejects any Host but its public one (Django DisallowedHost), so
     the upstream must not fall back to the Service's DNS name.
     """
     gate = _gate_bindings().openedx_login_gate
-    config = definition.openedx_login_gate_upstream_config(gate, {})
+    config = definition.openedx_login_gate_upstream_config(gate, "qa", {})
 
-    assert config.external_hostname == "lms.mitxonline-openedx.svc.cluster.local"
+    # The name edxapp gives the mitxonline QA LMS Service.
+    assert (
+        config.external_hostname
+        == "mitxonline-qa-edxapp-lms-webapp.mitxonline-openedx.svc.cluster.local"
+    )
     assert config.port == 8000
     assert config.pass_host == "pass"  # noqa: S105

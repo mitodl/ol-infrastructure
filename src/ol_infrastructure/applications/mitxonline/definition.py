@@ -23,6 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from bridge.lib.constants import (
     LearnSession,
     apisix_oidc_session_cookie_name,
+    edxapp_lms_service_host,
 )
 from bridge.lib.magic_numbers import STATIC_ASSET_MAX_AGE_SECONDS
 from ol_infrastructure.components.services.apisix import (
@@ -180,9 +181,6 @@ class OpenedxLoginGate(BaseModel):
 
     lms_host: str
     """The LMS's public host, e.g. ``courses.learn.mit.edu``."""
-    lms_service_host: str
-    """Cluster DNS name of the LMS webapp Service, which lives in the edxapp
-    namespace, e.g. ``mitxonline-production-edxapp-lms-webapp.mitxonline-openedx.svc.cluster.local``."""
     lms_service_port: int = 8000
 
 
@@ -778,7 +776,7 @@ OPENEDX_LOGIN_PATH = "/auth/login/ol-oauth2/"
 
 
 def openedx_login_gate_upstream_config(
-    gate: OpenedxLoginGate, k8s_labels: dict[str, str]
+    gate: OpenedxLoginGate, env_suffix: str, k8s_labels: dict[str, str]
 ) -> OLApisixExternalUpstreamConfig:
     """Return the upstream the gate route forwards to: the LMS in its own namespace.
 
@@ -786,6 +784,8 @@ def openedx_login_gate_upstream_config(
     runs in the edxapp namespace, so the route reaches it by cluster DNS name.
 
     :param gate: Where the LMS is served.
+    :param env_suffix: The stack environment suffix, which the edxapp
+        mitxonline stack of the same environment shares.
     :param k8s_labels: Labels for the ApisixUpstream.
     :returns: The config to hand to ``OLApisixExternalUpstream``.
     :rtype: OLApisixExternalUpstreamConfig
@@ -795,7 +795,7 @@ def openedx_login_gate_upstream_config(
         resource_suffix="lms",
         k8s_labels=k8s_labels,
         k8s_namespace=NAMESPACE,
-        external_hostname=gate.lms_service_host,
+        external_hostname=edxapp_lms_service_host("mitxonline", env_suffix),
         scheme="http",
         port=gate.lms_service_port,
         # Explicit rather than the controller default: the LMS answers any
@@ -850,6 +850,13 @@ def openedx_login_gate_route_configs(
     gate = bindings.openedx_login_gate
     if gate is None:
         return []
+    oidc_plugin = oidc.get_full_oidc_plugin_config(unauth_action="auth")
+    # The LMS needs none of the learner's tokens, so don't send them to it.
+    oidc_plugin["config"].update(
+        set_access_token_header=False,
+        set_id_token_header=False,
+        set_userinfo_header=False,
+    )
     return [
         OLApisixRouteConfig(
             route_name="openedx-login-gate",
@@ -875,7 +882,7 @@ def openedx_login_gate_route_configs(
                 },
             ],
             shared_plugin_config_name=shared_plugin_config_name,
-            plugins=[oidc.get_full_oidc_plugin_config(unauth_action="auth")],
+            plugins=[oidc_plugin],
             upstream=upstream_name,
         ),
     ]
