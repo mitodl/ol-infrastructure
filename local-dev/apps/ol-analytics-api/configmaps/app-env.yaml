@@ -1,0 +1,25 @@
+---
+# Non-secret settings for ol-analytics-api. Deployed values are in
+# src/ol_infrastructure/applications/ol_analytics_api/Pulumi.*.yaml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ol-analytics-api-env
+  namespace: ol-analytics-api
+data:
+  # The data-platform lake's StarRocks. Deployed the pod logs in to Vault for
+  # dynamic credentials; with no OL_ANALYTICS_API_VAULT_ADDR it reads
+  # STARROCKS_USER and STARROCKS_PASSWORD instead (core/db/vault_credentials.py).
+  OL_ANALYTICS_API_STARROCKS_HOST: "starrocks.local-infra.svc.cluster.local"
+  STARROCKS_USER: "root"
+  # The org-manager check, against the local MITx Online through its gateway
+  # host, as QA calls api.rc.mitxonline.mit.edu. The client-credentials pair in
+  # secrets.yaml is registered there by the seed-mitxonline-analytics-api-client
+  # seed.
+  OL_ANALYTICS_API_B2B_DASHBOARD_MITXONLINE_API_BASE_URL: "https://api.mitxonline.mit.test"
+  # The realm the learner-records tenant verifies partner tokens against.
+  OL_ANALYTICS_API_B2B_LEARNER_RECORDS_ISSUER: "https://sso.ol.mit.test/realms/olapps"
+  # httpx trusts this bundle (the system CAs plus mkcert's root) for the MITx
+  # Online and Keycloak calls. The init container in deployment.yaml writes it.
+  SSL_CERT_FILE: "/etc/ssl/local-dev/rootCA.pem"
+  LOG_LEVEL: "INFO"

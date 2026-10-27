@@ -20,7 +20,7 @@ if k8s_context() != "local-dev":
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
-config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters gitlab. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
+config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters gitlab ol-analytics-api. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
 config.define_string_list("prebuilt_tags", usage="Published image tag to run for an app with no checkout, instead of latest, e.g. mit-learn=0.82.0 learn-ai=0.37.0")
 config.define_string_list("lake_host_ports", usage="Host ports for the data-platform lake forwards, e.g. rustfs=9100 gravitino=9101 (defaults: starrocks=9030 gravitino=9001 rustfs=9000). Move one that another process on your machine already holds.")
@@ -250,6 +250,24 @@ APPS = [
                 "description": "Load country income thresholds for financial assistance",
                 "cmd": "python manage.py load_country_income_thresholds flexiblepricing/fixtures/country_income_threshold_data.json",
             },
+            {
+                # Deployed, this Application is created by hand in the Django
+                # admin. The credentials match local-dev/apps/ol-analytics-api/secrets.yaml.
+                "label": "seed-mitxonline-analytics-api-client",
+                "description": "Register ol-analytics-api's client-credentials Application for the org-manager check",
+                "cmd": (
+                    "python manage.py shell -c " +
+                    "'from oauth2_provider.models import get_application_model; " +
+                    "App = get_application_model(); " +
+                    "app, created = App.objects.update_or_create(" +
+                    "client_id=\"ol-analytics-api-local\", " +
+                    "defaults={\"name\": \"ol-analytics-api (local-dev)\", " +
+                    "\"client_type\": App.CLIENT_CONFIDENTIAL, " +
+                    "\"authorization_grant_type\": App.GRANT_CLIENT_CREDENTIALS, " +
+                    "\"client_secret\": \"local-dev-ol-analytics-api-mitxonline-secret\"}); " +  # pragma: allowlist secret
+                    "print((\"created\" if created else \"updated\"), app.client_id)'"
+                ),
+            },
         ],
     },
     {
@@ -385,6 +403,17 @@ APPS = [
                 "cmd": "python manage.py recreate_index",
             },
         ],
+    },
+    {
+        # Off by default. Serves MIT Learn's org analytics dashboard from the
+        # data-platform lake, so it needs data-platform and mitxonline enabled
+        # too. See "ol-analytics-api" in local-dev/README.md.
+        "name": "ol-analytics-api",
+        "dir": "ol-analytics-api",
+        "namespace": "ol-analytics-api",
+        "deploy_name": "ol-analytics-api",
+        "images": {"ol-analytics-api": "mitodl/ol-analytics-api-app"},
+        "tiltfile": "./local-dev/apps/ol-analytics-api/Tiltfile",
     },
 ]
 

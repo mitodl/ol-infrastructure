@@ -1,0 +1,23 @@
+# Per-developer overrides for ol-analytics-api (gitignored when copied).
+#
+# Copy to app-env.local.yaml and add entries under data: — because this
+# ConfigMap is referenced LAST in envFrom in deployment.yaml, its keys override
+# both the tracked app-env ConfigMap AND the tracked Secret. Pods roll
+# automatically when you edit it. See "Local Configuration Overrides" in
+# local-dev/README.md.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ol-analytics-api-env-local
+  namespace: ol-analytics-api
+data:
+  # Colorized console logs instead of JSON.
+  # DEBUG: "true"
+
+  # Show learner outcomes on learner-progress for learners with no recorded
+  # consent decision. Deployed stacks opt in the same way.
+  # OL_ANALYTICS_API_B2B_DASHBOARD_CONSENT_FAIL_OPEN: "true"
+
+  # Read the StarRocks views from a different database.
+  # OL_ANALYTICS_API_B2B_DASHBOARD_STARROCKS_SCHEMA: "b2b_analytics"

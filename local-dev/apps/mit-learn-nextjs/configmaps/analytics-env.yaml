@@ -1,0 +1,12 @@
+---
+# Points the org analytics dashboard at the local ol-analytics-api. Applied by
+# the Tiltfile when ol-analytics-api is in enabled_apps, and
+# analytics-env-off.yaml otherwise. Unset, the dashboard reports analytics as
+# unavailable rather than calling a host nothing serves.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mitlearn-nextjs-env-analytics
+  namespace: mit-learn
+data:
+  NEXT_PUBLIC_ANALYTICS_API_BASE_URL: "https://analytics.learn.mit.test"

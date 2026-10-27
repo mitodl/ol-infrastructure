@@ -1,0 +1,10 @@
+---
+# The same ConfigMap as analytics-env.yaml with no settings, applied when
+# ol-analytics-api is not in enabled_apps. Applying it empty is what clears the
+# URL when the app was switched off while Tilt was stopped: Tilt only deletes
+# objects it applied in the same run.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mitlearn-nextjs-env-analytics
+  namespace: mit-learn

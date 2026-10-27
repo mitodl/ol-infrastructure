@@ -553,8 +553,14 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     # Same mitlearn creds for the other apps' routes on api.learn that read
     # mit-learn's session via secretRef: both of mitxonline's rendered route
     # groups (they authenticate through this client, as deployed) and learn-ai's
-    # /ai/* routes.
-    for namespace in ("mitxonline", "learn-ai"):
+    # /ai/* routes. ol-analytics-api's analytics.learn route reads the same
+    # session, as its deployed Learn-scoped OIDC resource does (sso/mitlearn);
+    # its namespace only exists when the app is enabled.
+    for namespace in (
+        "mitxonline",
+        "learn-ai",
+        *(("ol-analytics-api",) if "ol-analytics-api" in enabled_apps else ()),
+    ):
         _make_oidc_secret(
             f"oidc-secret-mitlearn-in-{namespace}",
             namespace,
