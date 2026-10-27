@@ -84,7 +84,9 @@ spec:
             memory: 256Mi
           limits:
             memory: 512Mi
-        # Readiness checks the StarRocks pool and that MITx Online answers.
+        # Startup and readiness ping the StarRocks pool only. Whether MITx
+        # Online answers is /health/readiness/b2b_dashboard/, which no probe
+        # calls, so a pod whose org-manager checks fail still reports Ready.
         startupProbe:
           httpGet:
             path: /health/startup/
