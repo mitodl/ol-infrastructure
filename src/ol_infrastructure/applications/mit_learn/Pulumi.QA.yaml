@@ -39,7 +39,6 @@ config:
     - "https://draft-qa.ocw.mit.edu"
     - "https://live-qa.ocw.mit.edu"
     mailgun_sender_domain: "mail-rc.learn.mit.edu"
-    session_cookie_domain: ".rc.learn.mit.edu"
     sso_url: "sso-qa.ol.mit.edu"
   mitlearn:k8s_cutover: "true"
   mitlearn:k8s_deploy: "true"

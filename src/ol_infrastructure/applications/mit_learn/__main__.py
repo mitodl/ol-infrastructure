@@ -1615,7 +1615,6 @@ env_vars = {
 interpolation_vars = mitlearn_config.get_object("interpolation_vars")
 
 csrf_origins_list = interpolation_vars["csrf_domains"] or []
-session_cookie_domain = interpolation_vars["session_cookie_domain"] or ""
 cors_urls_list = interpolation_vars["cors_urls"] or []
 cors_urls_json = json.dumps(cors_urls_list)
 auth_allowed_redirect_hosts_list = (
@@ -1634,7 +1633,9 @@ interpolated_vars = {
     "MAILGUN_URL": f"https://api.mailgun.net/v3/{interpolation_vars['mailgun_sender_domain']}",
     "MITOL_CORS_ORIGIN_WHITELIST": cors_urls_json,
     "OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
-    "SESSION_COOKIE_DOMAIN": session_cookie_domain,
+    # Django's own session cookie, scoped like the gateway's so both reach
+    # every host under the Learn parent domain.
+    "SESSION_COOKIE_DOMAIN": learn_session.cookie_domain,
     "ALLOWED_REDIRECT_HOSTS": auth_allowed_redirect_hosts_json,
     "SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
     "USERINFO_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/userinfo",

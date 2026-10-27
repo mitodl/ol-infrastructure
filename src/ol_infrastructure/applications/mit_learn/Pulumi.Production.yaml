@@ -37,7 +37,6 @@ config:
     - "https://draft.ocw.mit.edu"
     - "https://ocw.mit.edu"
     mailgun_sender_domain: "mail.learn.mit.edu" # Need to verify
-    session_cookie_domain: ".learn.mit.edu"
     sso_url: "sso.ol.mit.edu"
   mitlearn:k8s_deploy: "true"
   mitlearn:k8s_cutover: "true"
