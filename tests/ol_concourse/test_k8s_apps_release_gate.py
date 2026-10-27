@@ -18,6 +18,7 @@ from typing import Any, ClassVar
 
 import pytest
 
+from bridge.settings.apps import APPS, release_resource_workflow
 from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
     _ASSERT_GATE_SCRIPT,
     ASSERT_GATE_TASK_NAME,
@@ -32,6 +33,7 @@ REPO = f"mitodl/{APP}"
 SHA = "a" * 40
 OTHER_SHA = "b" * 40
 GATE_NUMBER = 103
+RELEASE_APPS = [app for app in APPS if release_resource_workflow(app)]
 
 
 def _plan(app_name: str, job_suffix: str) -> list[dict[str, Any]]:
@@ -68,7 +70,36 @@ def test_assertion_reads_the_version_the_job_deploys():
     release_get = plan[_step_index(plan, "get", f"{APP}-release")]
 
     assert task["config"]["params"]["VERSION_FILE"] == f"{APP}-release/version"
-    assert release_get["passed"] == [f"deploy-ol-application-{APP}-qa"]
+    assert f"deploy-ol-application-{APP}-qa" in release_get["passed"]
+
+
+@pytest.mark.parametrize("app", RELEASE_APPS)
+def test_production_deploys_only_a_version_the_release_build_cut(app):
+    """Production's release get goes through the release build, not just QA.
+
+    QA also gets the release resource at its latest check, which once the main
+    branch moves past the last release is the next, uncut release. Concourse
+    counts that as a version that passed QA, so ``passed:`` QA alone let
+    Production resolve to it (micromasters, 2026-10-27).
+    """
+    plan = _plan(app, f"deploy-ol-application-{app}-production")
+    release_get = plan[_step_index(plan, "get", f"{app}-release")]
+
+    assert release_get["passed"] == [
+        f"build-{app}-release-image",
+        f"deploy-ol-application-{app}-qa",
+    ]
+    assert not release_get["trigger"]
+
+
+@pytest.mark.parametrize("app", RELEASE_APPS)
+def test_qa_release_get_is_unchanged(app):
+    """QA still triggers on, and takes, only what the release build cut."""
+    plan = _plan(app, f"deploy-ol-application-{app}-qa")
+    release_get = plan[_step_index(plan, "get", f"{app}-release")]
+
+    assert release_get["passed"] == [f"build-{app}-release-image"]
+    assert release_get["trigger"]
 
 
 def test_assertion_reads_the_ol_infra_commit_the_job_deploys():

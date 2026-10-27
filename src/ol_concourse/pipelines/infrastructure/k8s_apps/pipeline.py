@@ -1288,6 +1288,36 @@ def _cache_bust_task() -> TaskStep:
     )
 
 
+def _release_version_steps(
+    release_res: Resource, passed: list[str], *, trigger: bool
+) -> list[GetStep | LoadVarStep]:
+    """Get the release a QA or Production job deploys, and load its version.
+
+    The version becomes ``image_tag``: the Docker tag Pulumi deploys, the ref
+    of the GitHub Deployment, and what the Production gate check compares the
+    closed issue's title against.
+
+    Production has to take it ``passed:`` the release build as well as QA.
+    Concourse records a job's inputs by resource, not by step name, so QA's
+    second get of this resource (the one ``_classify_promotion_task`` reads,
+    taken at whatever the latest check is) also counts as a version that
+    passed QA. Once the main branch moves past the last release, that latest
+    check is the next, uncut release, and with ``passed:`` QA alone
+    Production resolves to it, deploying a version nothing has built.
+    Only a version the release build cut has passed both.
+
+    These are custom dependencies, not ``dependencies``, because
+    ``pulumi_jobs_chain`` replaces each dependency's ``passed`` with the
+    previous stage's job and would drop the release build from Production's.
+    """
+    return [
+        GetStep(get=release_res.name, trigger=trigger, passed=passed),
+        LoadVarStep(
+            load_var="image_tag", file=f"{release_res.name}/version", reveal=True
+        ),
+    ]
+
+
 def _classify_promotion_task(
     app_name: str,
     release_res: Resource,
@@ -1897,22 +1927,14 @@ def _build_release_resource_app_pipeline(
                 passed=[release_image_build_job.name],
                 params={"skip_download": True},
             ),
-            # release_res carries the authoritative calver version; load it here
-            # so image_tag is available to all jobs in the chain, including the
-            # GitHub Deployment start steps and the Pulumi DOCKER_TAG env var.
-            GetStep(
-                get=release_res.name,
-                trigger=False,
-                passed=[release_image_build_job.name],
-            ),
-            LoadVarStep(
-                load_var="image_tag", file=f"{release_res.name}/version", reveal=True
-            ),
         ],
         # QA: get checklist.md from release resource; start RC GitHub Deployment.
         # Production: wait for release gate (closed release issue); start prod deployment.
         custom_dependencies={
             0: [
+                *_release_version_steps(
+                    release_res, passed=[release_image_build_job.name], trigger=True
+                ),
                 # Concourse implicitly re-gets a resource right after a `put`
                 # succeeds, so deployment.json (written by the get/`in` action)
                 # is already available to the later action=finish put without
@@ -1927,6 +1949,13 @@ def _build_release_resource_app_pipeline(
                 ),
             ],
             1: [
+                # Through the release build as well as QA: see
+                # _release_version_steps.
+                *_release_version_steps(
+                    release_res,
+                    passed=[release_image_build_job.name, qa_job_name],
+                    trigger=False,
+                ),
                 GetStep(get=release_gate.name, trigger=True, version="every"),
                 GetStep(
                     get=infra_revision,
