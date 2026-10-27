@@ -10,6 +10,11 @@ The client is separate from ``ol-opik-client``, which also backs the Opik UI log
 whose Vault secret carries the gateway's session secret. This one has only the
 client-credentials grant, so the CI and QA Vaults never hold the UI client, and it
 can be rotated without signing anyone out of the UI.
+
+ol-data-platform's evaluation gate (ol-llm's evaluation-gate.yml) runs on GitHub
+Actions with a client of its own, so the credentials in GitHub can be revoked
+without rotating every application's. Only the Production Vault holds them; a person
+copies them into that repository's secrets.
 """
 
 import json
@@ -30,22 +35,26 @@ OPIK_SDK_CLIENT_ID = "ol-opik-sdk"
 # The client the Opik gateway's OIDC plugin is configured with; its bearer route
 # admits a token only when this is in aud.
 OPIK_GATEWAY_CLIENT_ID = "ol-opik-client"
+OPIK_EVALUATION_CLIENT_ID = "ol-data-platform-evaluation-opik"
+OPIK_EVALUATION_VAULT_PATH = "evaluation-ol-data-platform"
 
 
-def create_opik_sdk_resources(
-    keycloak_provider: keycloak.Provider,
-    keycloak_url: str,
-) -> None:
-    """Declare the Opik SDK client and its secret in each environment's Vault.
+def _opik_sdk_client(
+    resource_prefix: str, client_id: str, keycloak_provider: keycloak.Provider
+) -> keycloak.openid.Client:
+    """Declare a client-credentials-only client whose tokens the Opik gateway admits.
 
+    :param resource_prefix: Prefix of the Pulumi resource names.
+    :param client_id: The Keycloak client id.
     :param keycloak_provider: Provider for the Production Keycloak instance.
-    :param keycloak_url: Base URL of the Production Keycloak instance.
+    :returns: The client.
+    :rtype: keycloak.openid.Client
     """
-    opik_sdk_client = keycloak.openid.Client(
-        "ol-platform-engineering-opik-sdk-client",
-        name="ol-platform-engineering-opik-sdk-client",
+    client = keycloak.openid.Client(
+        f"{resource_prefix}-client",
+        name=f"{resource_prefix}-client",
         realm_id=REALM_NAME,
-        client_id=OPIK_SDK_CLIENT_ID,
+        client_id=client_id,
         enabled=True,
         access_type="CONFIDENTIAL",
         service_accounts_enabled=True,
@@ -57,22 +66,41 @@ def create_opik_sdk_resources(
     # Every client in the realm signs with the same key, so the gateway's audience
     # check (match_with_client_id on ol-opik-client) is what tells an SDK token
     # from another client's. Without ol-opik-client in aud, that check returns
-    # 403 to every SDK.
+    # 403.
     keycloak.openid.AudienceProtocolMapper(
-        "ol-platform-engineering-opik-sdk-audience-mapper",
+        f"{resource_prefix}-audience-mapper",
         realm_id=REALM_NAME,
-        client_id=opik_sdk_client.id,
+        client_id=client.id,
         name="opik-audience",
         included_client_audience=OPIK_GATEWAY_CLIENT_ID,
         add_to_access_token=True,
         add_to_id_token=False,
         opts=ResourceOptions(provider=keycloak_provider),
     )
-    credentials_json = Output.all(
+    return client
+
+
+def _credentials_json(client: keycloak.openid.Client, keycloak_url: str) -> Output[str]:
+    return Output.all(
         url=f"{keycloak_url}/realms/{REALM_NAME}",
-        client_id=opik_sdk_client.client_id,
-        client_secret=opik_sdk_client.client_secret,
+        client_id=client.client_id,
+        client_secret=client.client_secret,
     ).apply(json.dumps)
+
+
+def create_opik_sdk_resources(
+    keycloak_provider: keycloak.Provider,
+    keycloak_url: str,
+) -> None:
+    """Declare the Opik SDK clients and their secrets in the environments' Vaults.
+
+    :param keycloak_provider: Provider for the Production Keycloak instance.
+    :param keycloak_url: Base URL of the Production Keycloak instance.
+    """
+    opik_sdk_client = _opik_sdk_client(
+        "ol-platform-engineering-opik-sdk", OPIK_SDK_CLIENT_ID, keycloak_provider
+    )
+    credentials_json = _credentials_json(opik_sdk_client, keycloak_url)
 
     for env_suffix in OPIK_SDK_ENVIRONMENTS:
         vault_provider = get_vault_provider(
@@ -96,3 +124,15 @@ def create_opik_sdk_resources(
             data_json=credentials_json,
             opts=ResourceOptions(provider=vault_provider, depends_on=[opik_mount]),
         )
+        if env_suffix == "production":
+            evaluation_client = _opik_sdk_client(
+                "ol-platform-engineering-opik-evaluation-ol-data-platform",
+                OPIK_EVALUATION_CLIENT_ID,
+                keycloak_provider,
+            )
+            vault.generic.Secret(
+                "ol-platform-engineering-opik-evaluation-ol-data-platform-vault-credentials",
+                path=f"{OPIK_SDK_VAULT_MOUNT}/{OPIK_EVALUATION_VAULT_PATH}",
+                data_json=_credentials_json(evaluation_client, keycloak_url),
+                opts=ResourceOptions(provider=vault_provider, depends_on=[opik_mount]),
+            )
