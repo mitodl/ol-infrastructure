@@ -336,7 +336,7 @@ def test_set_domain_replaces_the_domains_with_a_json_patch(
 
     patch.assert_called_once()
     args, kwargs = patch.call_args
-    assert args == ("http://openmetadata:8585/api/tables/t-1",)
+    assert args == ("http://openmetadata:8585/api/v1/tables/t-1",)
     assert kwargs["headers"] == {"Content-Type": "application/json-patch+json"}
     assert kwargs["json"] == [
         {"op": "add", "path": "/domains", "value": [{"id": "c-1", "type": "domain"}]}

@@ -335,7 +335,7 @@ class OpenMetadataClient:
     """The few OpenMetadata REST calls this job makes."""
 
     def __init__(self, server_url: str, token: str) -> None:
-        self._url = server_url.rstrip("/")
+        self._url = f"{server_url.rstrip('/')}/v1"
         self._session = requests.Session()
         self._session.headers["Authorization"] = f"Bearer {token}"
 
