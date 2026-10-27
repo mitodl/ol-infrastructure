@@ -429,6 +429,13 @@ spec:
         - embeddings
         - --loglevel=info
         - --concurrency=1
+        # The local GensimEncoder loads its GloVe model inside each pool child,
+        # which puts the child past mit-learn's default
+        # CELERY_WORKER_MAX_MEMORY_PER_CHILD (250,000 KiB) after one task.
+        # Celery then replaces the child, and every task pays ~9s to start a
+        # new one and reload the model. A child peaks around 650 MiB; this cap
+        # (KiB) leaves headroom while keeping parent + child under the 2Gi limit.
+        - --max-memory-per-child=1000000
         envFrom:
         - configMapRef:
             name: mitlearn-env
