@@ -177,7 +177,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "substructure/aws/eks/": ["alloy/"],
     "substructure/consul/": [],
     "substructure/keycloak/": [],
-    "substructure/open_metadata/": [],
+    "substructure/open_metadata/": ["open_metadata/"],
     "substructure/starrocks/": [],
     "substructure/vault/auth/": [],
     "substructure/vault/encryption_mounts/": [],
