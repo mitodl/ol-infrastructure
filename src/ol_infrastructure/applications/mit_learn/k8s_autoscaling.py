@@ -65,6 +65,11 @@ def build_webapp_keda_config(
         container_name="mitlearn-app",
         requests_threshold=mitlearn_config.get("autoscaling_requests_threshold")
         or "20",
+        # On 2026-10-26 the 5m window trailed a crawler step by minutes while
+        # per-pod concurrency pushed workers into RSS respawns. 1m reacts within a
+        # couple of 60s polling intervals; the 25 minute scale-down stabilization
+        # keeps the extra noise from shedding replicas.
+        requests_rate_window="1m",
         # No latency trigger by default (note the absent `or "2000"`): mit-learn's
         # p95 is dominated by Postgres and OpenSearch, and adding webapp replicas
         # against a slow shared backend does not lower it -- it just adds

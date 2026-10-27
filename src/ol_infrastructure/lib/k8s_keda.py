@@ -55,6 +55,7 @@ DEFAULT_REQUESTS_THRESHOLD = "20"
 # p95 latency in milliseconds.
 DEFAULT_LATENCY_THRESHOLD = "2000"
 DEFAULT_CPU_THRESHOLD = "60"
+DEFAULT_REQUESTS_RATE_WINDOW = "5m"
 # 25 minutes. Deliberately long -- see the scale-down comment in
 # build_webapp_keda_config.
 DEFAULT_SCALE_DOWN_SECONDS = 300 * 5
@@ -141,6 +142,7 @@ def build_webapp_keda_config(  # noqa: PLR0913
     route_matcher: str,
     container_name: str,
     requests_threshold: str = DEFAULT_REQUESTS_THRESHOLD,
+    requests_rate_window: str = DEFAULT_REQUESTS_RATE_WINDOW,
     latency_threshold: str | None = DEFAULT_LATENCY_THRESHOLD,
     cpu_threshold: str = DEFAULT_CPU_THRESHOLD,
     scale_down_stabilization_seconds: int = DEFAULT_SCALE_DOWN_SECONDS,
@@ -158,6 +160,9 @@ def build_webapp_keda_config(  # noqa: PLR0913
             which is not derivable from the application name alone.
         container_name: Container the CPU backstop trigger measures.
         requests_threshold: Requests/sec per pod before scaling up.
+        requests_rate_window: PromQL range for the request-rate ``rate()``. A
+            shorter window reacts to a traffic step sooner and is noisier. It has
+            to span at least two APISIX scrapes (15s apart) or the query is empty.
         latency_threshold: p95 latency in ms at which the trigger asks for the
             current replica count (see the ``Value`` note below). Pass None to
             omit the latency trigger -- appropriate where request duration is
@@ -185,7 +190,10 @@ def build_webapp_keda_config(  # noqa: PLR0913
     # webapp using this helper read single-digit-milli against a threshold of 20;
     # mit-learn would have needed ~11,500 rps to add one replica. Do not
     # reintroduce the divisor.
-    requests_query = f'sum(rate(apisix_http_status{{route=~"{route_matcher}"}}[5m]))'
+    requests_query = (
+        f'sum(rate(apisix_http_status{{route=~"{route_matcher}"}}'
+        f"[{requests_rate_window}]))"
+    )
     latency_query = (
         f"histogram_quantile(0.95,sum(rate("
         f'apisix_http_latency_bucket{{route=~"{route_matcher}"}}[5m])) by (le))'
