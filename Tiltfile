@@ -570,6 +570,17 @@ local_resource(
     resource_deps=["local-infra-apps"],
 )
 
+# Give the organization claim the deployed shape (a map carrying each
+# organization's id rather than a list of aliases). Keycloak creates that scope
+# itself, so Pulumi cannot hold its mapper; see the script comment.
+local_resource(
+    "kc-fix-org-claim",
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} {script}".format(rd=root_domain, script="{}/local-dev/scripts/kc-fix-org-claim.sh".format(config.main_dir)),
+    deps=["./local-dev/scripts/kc-fix-org-claim.sh", "./local-dev/scripts/kc-admin.sh"],
+    labels=["infra"],
+    resource_deps=["local-infra-apps"],
+)
+
 # ---------------------------------------------------------------------------
 # Per-app deployment + manual seed resources
 # ---------------------------------------------------------------------------
