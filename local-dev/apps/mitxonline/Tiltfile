@@ -83,14 +83,16 @@ k8s_custom_deploy(
     DEPLOY_NAME,
     apply_cmd=[APPLY, 'mitxonline', 'up'],
     delete_cmd=[APPLY, 'mitxonline', 'down'],
-    # The pin and enabled_apps (which decides whether the pre-deploy Job
-    # registers ol-analytics-api's OAuth client) reach the program through the
-    # environment; naming them here makes a change re-apply, which os.putenv
-    # alone would not.
+    # The pin, and whether the pre-deploy Job registers ol-analytics-api's
+    # OAuth client, reach the program through the environment; naming them
+    # here makes a change re-apply, which os.putenv alone would not. Only the
+    # one app is passed, so toggling an unrelated app does not re-apply this.
     apply_env={
         'LOCAL_DEV_ROOT_DOMAIN': root_domain,
         'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags,
-        'LOCAL_DEV_ENABLED_APPS': os.environ.get('LOCAL_DEV_ENABLED_APPS', ''),
+        'LOCAL_DEV_ANALYTICS_API_ENABLED': str(
+            'ol-analytics-api' in os.environ.get('LOCAL_DEV_ENABLED_APPS', '').split(',')
+        ).lower(),
     },
     delete_env={'LOCAL_DEV_ROOT_DOMAIN': root_domain, 'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags},
     # Everything the render reads; .tiltignore keeps __pycache__ out of these.

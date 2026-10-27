@@ -298,7 +298,8 @@ app_config = deployed_config.model_copy(
         # ANALYTICS_API_OAUTH_APP_SCRIPT.
         "pre_deploy_commands": with_local_steps(
             deployed_config.pre_deploy_commands,
-            enabled_apps=os.environ.get("LOCAL_DEV_ENABLED_APPS", "").split(","),
+            # Set by the Tiltfile; see its apply_env.
+            analytics_api=os.environ.get("LOCAL_DEV_ANALYTICS_API_ENABLED") == "true",
         ),
         "extra_volumes": [
             k8s.core.v1.VolumeArgs(

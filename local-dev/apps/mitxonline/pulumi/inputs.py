@@ -6,7 +6,7 @@ and how the Job fails) are plain functions with tests.
 """
 
 import json
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any, cast
@@ -93,9 +93,8 @@ OPENEDX_OAUTH_APP_STEP = manage_py_shell_step(OPENEDX_OAUTH_APP_SCRIPT)
 # ol-analytics-api's org-manager check authenticates to mitxonline with a
 # client-credentials Application (mitodl/mitxonline#3807), created by hand in
 # the Django admin when deployed. Locally the Job re-asserts it while
-# ol-analytics-api is in enabled_apps. local-dev/apps/ol-analytics-api/
+# ol-analytics-api is enabled. local-dev/apps/ol-analytics-api/
 # secrets.yaml holds the same pair, and tests/local_dev keeps the two equal.
-ANALYTICS_API_APP = "ol-analytics-api"
 ANALYTICS_API_CLIENT_ID = "ol-analytics-api-local"
 ANALYTICS_API_CLIENT_SECRET = "local-dev-ol-analytics-api-mitxonline-secret"  # noqa: S105  # pragma: allowlist secret
 ANALYTICS_API_OAUTH_APP_SCRIPT = f"""\
@@ -118,7 +117,7 @@ print("created" if created else "updated", "ol-analytics-api (local-dev)")
 def with_local_steps(
     pre_deploy_commands: list[tuple[str, list[str]]] | None,
     *,
-    enabled_apps: Collection[str],
+    analytics_api: bool,
 ) -> list[tuple[str, list[str]]]:
     """Append CONFIGURE_WAGTAIL_STEP and OPENEDX_OAUTH_APP_STEP to the first deployed
     pre-deploy command, in that order and in the same shell, so they run after
@@ -134,7 +133,7 @@ def with_local_steps(
         raise ValueError(msg)
     (name, command), *rest = pre_deploy_commands
     scripts = [OPENEDX_OAUTH_APP_SCRIPT]
-    if ANALYTICS_API_APP in enabled_apps:
+    if analytics_api:
         scripts.append(ANALYTICS_API_OAUTH_APP_SCRIPT)
     local_steps = CONFIGURE_WAGTAIL_STEP + manage_py_shell_step(*scripts)
     return [(name, [*command[:-1], command[-1] + local_steps]), *rest]

@@ -138,7 +138,7 @@ def test_with_local_steps_refuses_a_definition_without_pre_deploy_commands():
     to they would be skipped silently, so the program must stop instead.
     """
     with pytest.raises(ValueError, match="pre_deploy_commands"):
-        inputs.with_local_steps(None, enabled_apps=())
+        inputs.with_local_steps(None, analytics_api=False)
 
 
 # Stands in for the image's python: every `manage.py <command>` succeeds, and
@@ -161,10 +161,9 @@ def test_the_composed_pre_deploy_command_runs_each_script_in_one_shell(
     """The steps are only checked as a whole command: a heredoc that swallows
     the next step is valid bash, and each script compiles on its own.
     """
-    apps = ("mitxonline", inputs.ANALYTICS_API_APP) if enabled else ("mitxonline",)
     ((_, command),) = inputs.with_local_steps(
         [("migrate", ["/bin/bash", "-c", "python manage.py migrate --noinput"])],
-        enabled_apps=apps,
+        analytics_api=enabled,
     )
     stub = tmp_path / "python"
     stub.write_text(_STUB_PYTHON)

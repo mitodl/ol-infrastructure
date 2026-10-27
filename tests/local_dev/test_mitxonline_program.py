@@ -85,7 +85,7 @@ def _render(  # noqa: PLR0913
     for key in (
         "TILT_IMAGE_0",
         "LOCAL_DEV_PREBUILT_IMAGE_TAGS",
-        "LOCAL_DEV_ENABLED_APPS",
+        "LOCAL_DEV_ANALYTICS_API_ENABLED",
     ):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("LOCAL_DEV_ROOT_DOMAIN", root_domain)
