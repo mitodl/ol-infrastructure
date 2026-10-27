@@ -8,7 +8,7 @@
 # Pinned to the same nginx digest lehrer uses for its site-project MFE images
 # (lehrer local-dev/Dockerfile.mfe), so local-dev runs one nginx version rather
 # than two.
-FROM nginx:1.31-alpine@sha256:72ba65eb42c10344912a84ff42408db7d34f2feb642204570ab8fc5ffd29f1d3
+FROM nginx:1.31-alpine@sha256:a3554c0d0b48177b1413c26e01f695334428020d9df01243fbae3e11cfd17417
 
 # Into learn/, not the server root. The bundle is built with
 # PUBLIC_PATH=/learn/ and references its own assets absolutely, so the files
