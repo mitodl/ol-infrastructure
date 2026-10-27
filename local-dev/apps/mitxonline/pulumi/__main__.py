@@ -33,6 +33,7 @@ from pulumi import ResourceOptions
 from ol_infrastructure.applications.mitxonline import definition
 from ol_infrastructure.applications.mitxonline.vault_secrets import secret_env_names
 from ol_infrastructure.components.services.apisix import (
+    OLApisixExternalUpstream,
     OLApisixOIDCResources,
     OLApisixRoute,
     OLApisixSharedPlugins,
@@ -293,6 +294,13 @@ bindings = definition.MitxonlineBindings(
     sizing=sizing,
     granian_reload=tilt_built,
     celery_topology="merged",
+    # The deployed CI/QA gate, on the host production serves courseware from.
+    # Local edX (apps/openedx) runs on lms.<root>, outside .learn.<root>, so it
+    # never reaches this route; if it ever moves to courses.learn.<root>, point
+    # the upstream at its `lms` Service instead.
+    openedx_login_gate=definition.OpenedxLoginGate(
+        lms_host=f"courses.learn.{root_domain}"
+    ),
 )
 
 secrets_hash = hashlib.sha256(
@@ -391,4 +399,29 @@ OLApisixRoute(
         shared_plugin_config_name=shared_plugins.resource_name,
     ),
     opts=ResourceOptions(providers=[provider], delete_before_replace=True),
+)
+# The Open edX login gate, built as the deployed __main__.py builds it. Nothing
+# serves the LMS Service it points at unless a stand-in is applied (see PR
+# mitodl/ol-infrastructure#6402); until then only page loads of its login path
+# on courses.learn.<root> are affected, with a 503.
+gate_upstream = OLApisixExternalUpstream(
+    f"mitxonline-openedx-login-gate-upstream-{ENV_SUFFIX}",
+    external_upstream_config=definition.openedx_login_gate_upstream_config(
+        bindings.openedx_login_gate, ENV_SUFFIX, LABELS
+    ),
+    opts=opts,
+)
+OLApisixRoute(
+    name=f"mitxonline-openedx-login-gate-route-{ENV_SUFFIX}",
+    k8s_namespace=definition.NAMESPACE,
+    k8s_labels=LABELS,
+    route_configs=definition.openedx_login_gate_route_configs(
+        bindings,
+        oidc=prefixed_oidc,
+        shared_plugin_config_name=shared_plugins.resource_name,
+        upstream_name=gate_upstream.resource_name,
+    ),
+    opts=ResourceOptions(
+        providers=[provider], delete_before_replace=True, depends_on=[gate_upstream]
+    ),
 )
