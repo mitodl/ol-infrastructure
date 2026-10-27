@@ -91,6 +91,13 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
         display_name="MIT Learn",
         display_name_html="<b>MIT Learn</b>",
         enabled=True,
+        # These match the server defaults an unset realm falls back to. They
+        # are declared because the provider cannot clear them: it omits an
+        # empty theme from the PUT and Keycloak keeps the stored value, so a
+        # theme saved once from the admin console showed up as a removal on
+        # every apply that never took effect.
+        account_theme="keycloak.v3",
+        admin_theme="keycloak.v2",
         email_theme=keycloak_realm_config.get("olapps_email_theme") or "ol",
         login_theme="ol-learn",
         duplicate_emails_allowed=False,
