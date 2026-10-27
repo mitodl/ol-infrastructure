@@ -24,11 +24,6 @@ PersonalData.Personal / PersonalData.SpecialCategory
   UI (Settings → Classifications → PersonalData → <tag> → Edit → Recognizers),
   flip the flag to True and redeploy to start applying the tag automatically.
 
-Teams are declared in ``TEAM_CONFIG``.  Each is created as a ``Group`` (the
-only team type that can own assets and hold users) under ``Organization``.
-Membership is not managed here: it is assigned in the OpenMetadata UI, so a
-team that already exists is never sent a ``users`` list.
-
 Domains are declared in ``DOMAIN_CONFIG``.  Which assets belong to each is set
 from ol-data-platform's dbt manifest, not here.
 
@@ -37,12 +32,11 @@ A missing property is added and one whose description or displayName differs
 is put back.  A property removed from the config is left on the type, because
 deleting it drops its value from every entity that has one.
 
-Access policies and roles are declared in ``POLICY_CONFIG`` and ``ROLE_CONFIG``,
-and code owns them: rules or policies changed in the UI are put back.  Bots are
-not managed here: creating one or assigning it a role needs an admin, and this
-job runs as the ingestion bot, which is not one.  The stack declares them with
-the OpenMetadataBot provider (ol_infrastructure.providers.openmetadata) after
-this job has created the roles they hold.
+Access policies, roles, teams and bots are not managed here: the stack
+declares them with the OpenMetadata providers
+(ol_infrastructure.providers.openmetadata), which connect as an admin, from
+substructure/open_metadata access_control.py.  This job runs after the teams
+exist, because the glossary is owned by one.
 
 The business glossary is declared in ``GLOSSARY_CONFIG`` and ``GLOSSARY_TERMS``.
 The glossary and each term are created when missing and never patched, so a
@@ -129,29 +123,6 @@ _PATCHABLE_FIELDS: list[str] = [
 ]
 
 
-# Desired state for each team, keyed by team name.  Asset ownership and alert
-# routing refer to these names, so renaming one orphans what it owns.
-TEAM_CONFIG: dict[str, dict[str, str]] = {
-    "data-platform": {
-        "displayName": "Data Platform",
-        "description": (
-            "Builds and operates the data platform. Default owner of warehouse assets."
-        ),
-    },
-    "analytics": {
-        "displayName": "Analytics",
-        "description": "Analysts who work with the warehouse.",
-    },
-    "b2b": {
-        "displayName": "B2B",
-        "description": (
-            "Reviews the B2B business metrics and partner dashboard definitions."
-        ),
-    },
-}
-
-_TEAM_TYPE = "Group"
-
 # Desired state for each domain, keyed by domain name.  Domains split the
 # warehouse by business area rather than source platform, because dim_user and
 # the combined marts span every platform.  Assets are assigned to them by the
@@ -212,7 +183,9 @@ DOMAIN_CONFIG: dict[str, dict[str, str]] = {
 
 _DOMAIN_TYPE = "Aggregate"
 
-# displayName is create-only for the same reason as teams.
+# displayName is set when a domain is created and never patched afterwards:
+# IngestionBotPolicy, which this job's token carries, denies EditDisplayName
+# on every resource.
 _DOMAIN_PATCHABLE_FIELDS: list[str] = ["description", "domainType"]
 
 # Custom properties, keyed by entity type and then property name.  propertyType
@@ -619,11 +592,6 @@ GLOSSARY_TERMS: list[dict[str, Any]] = [
     },
 ]
 
-# displayName is set when a team is created and never patched afterwards:
-# IngestionBotPolicy, which this job's token carries, denies EditDisplayName
-# on every resource.
-_TEAM_PATCHABLE_FIELDS: list[str] = ["description"]
-
 
 def _apply_patch(label: str, url: str, ops: list[dict[str, Any]]) -> None:
     """Send a JSON Patch, or report that there is nothing to change.
@@ -692,54 +660,6 @@ def _get_by_name(
         return None
     get_resp.raise_for_status()
     return get_resp.json()
-
-
-def _reconcile_team(name: str, desired: dict[str, str]) -> None:
-    """Create the team if it is missing, else PATCH the fields that differ.
-
-    A missing team is created with POST and no ``parents``, which the server
-    places under ``Organization``.  An existing team is only ever patched on
-    ``_TEAM_PATCHABLE_FIELDS``, so the members assigned in the UI are kept.
-
-    :param name: Team name, e.g. ``"data-platform"``.
-    :param desired: Mapping of team field names to desired values.
-    :raises requests.HTTPError: On any unexpected non-2xx response from the OM API.
-    :raises ValueError: If the team exists with a type other than ``Group``.
-    """
-    team = _get_by_name("teams", name)
-    if team is None:
-        post_resp = requests.post(
-            f"{OM_SERVER_URL}/v1/teams",
-            headers=_AUTH_HEADER,
-            # isJoinable defaults to true, which would let any user add
-            # themselves to a team that owns assets.
-            json={
-                "name": name,
-                "teamType": _TEAM_TYPE,
-                "isJoinable": False,
-                **desired,
-            },
-            timeout=30,
-        )
-        post_resp.raise_for_status()
-        print(f"[done] team {name}: created")  # noqa: T201
-        return
-
-    # The server refuses to change a Group's type, and a non-Group team cannot
-    # own assets, so this needs a person to sort out.
-    if team["teamType"] != _TEAM_TYPE:
-        msg = f"exists with teamType {team['teamType']!r}, expected {_TEAM_TYPE!r}"
-        raise ValueError(msg)
-
-    # "add" replaces a member that is present and sets one that is absent, which
-    # "replace" rejects; a team made by hand may have no description.
-    ops = [
-        {"op": "add", "path": f"/{field}", "value": desired[field]}
-        for field in _TEAM_PATCHABLE_FIELDS
-        if team.get(field) != desired[field]
-    ]
-
-    _apply_patch(f"team {name}", f"{OM_SERVER_URL}/v1/teams/{team['id']}", ops)
 
 
 def _reconcile_domain(name: str, desired: dict[str, str]) -> None:
@@ -838,224 +758,6 @@ def _reconcile_custom_property(
         print(f"[done] {label}: updated {', '.join(changed)}")  # noqa: T201
 
 
-# ── Access control ────────────────────────────────────────────────────────
-# A user's own roles come from the `roles` claim that Keycloak sends at login
-# (authorizer useRolesFromProvider in applications/open_metadata, mapping in
-# substructure/keycloak ol_data_platform.py OPEN_METADATA_ROLE_BY_REALM_ROLE):
-# ol-platform-admin and ol-data-engineer -> DataEngineer, ol-researcher ->
-# DataContributor, the two analyst roles and every other user -> DataConsumer.
-# No realm role maps to Admin; admins come from initialAdmins.  The claim
-# replaces the roles a user holds, so roles assigned to a person in the UI do
-# not survive their next login.  On top of their own roles every user inherits
-# DataConsumer and OrganizationPolicy from the Organization team, and a team's
-# members inherit its defaultRoles.
-#
-# DataEngineer and DataContributor are the custom roles the claim names.  They
-# grant only what DataConsumer does not: DataConsumer already lets everyone
-# view everything and edit descriptions, tags, glossary terms, tier and
-# certification.
-
-# Entity types that hold warehouse and BI metadata, as opposed to governance
-# entities (glossaries, teams, policies).
-_DATA_ASSET_RESOURCES: list[str] = [
-    "apiEndpoint",
-    "chart",
-    "container",
-    "dashboard",
-    "dashboardDataModel",
-    "database",
-    "databaseSchema",
-    "metric",
-    "mlmodel",
-    "pipeline",
-    "searchIndex",
-    "storedProcedure",
-    "table",
-    "topic",
-]
-
-# Desired state for each custom policy, keyed by policy name.  The server
-# stores rules, resources and operations sorted, so they are compared as sets.
-POLICY_CONFIG: dict[str, dict[str, Any]] = {
-    "DataEngineerPolicy": {
-        "displayName": "Data Engineer Policy",
-        "description": (
-            "Technical metadata, lineage and data quality tests on data assets."
-        ),
-        "rules": [
-            {
-                "name": "DataEngineerPolicy-TechnicalMetadata",
-                "description": "Edit technical metadata and lineage of data assets.",
-                "effect": "allow",
-                "resources": _DATA_ASSET_RESOURCES,
-                "operations": [
-                    "EditCustomFields",
-                    "EditDescription",
-                    "EditDisplayName",
-                    "EditLineage",
-                    "EditTags",
-                ],
-            },
-            {
-                "name": "DataEngineerPolicy-DataQuality",
-                "description": (
-                    "Add and edit the tests on a table, and triage their failures."
-                ),
-                "effect": "allow",
-                "resources": ["table", "testCase", "testSuite"],
-                "operations": ["CreateTests", "EditTests"],
-            },
-            {
-                "name": "DataEngineerPolicy-TestCases",
-                "description": "Create and edit test cases and test suites.",
-                "effect": "allow",
-                "resources": ["testCase", "testSuite"],
-                "operations": ["Create", "EditAll"],
-            },
-        ],
-    },
-    "DataContributorPolicy": {
-        "displayName": "Data Contributor Policy",
-        "description": "Save queries against data assets.",
-        "rules": [
-            {
-                # A saved query is owned by its author, so OrganizationPolicy's
-                # owner rule covers editing and deleting it afterwards.
-                "name": "DataContributorPolicy-Queries",
-                "description": "Save SQL queries to data assets.",
-                "effect": "allow",
-                "resources": ["query"],
-                "operations": ["Create"],
-            },
-        ],
-    },
-    # Exactly what ol-data-platform's asset_check_openmetadata_sensor (lakehouse
-    # code location) needs: GET and, when missing, PUT the
-    # dagsterAssetCheck test definition (ViewBasic, Create); GET and POST a test
-    # case (ViewTests, CreateTests on its table); POST its results (EditTests on
-    # the table).  Bots inherit no team policies.  OpenMetadata also gives every
-    # bot DefaultBotRole, which cannot be removed, so the token can still view
-    # everything and edit descriptions, tags, glossary terms, tier and
-    # certification on any entity, and file tasks, through its
-    # DataConsumerPolicy.
-    "DagsterBotPolicy": {
-        "displayName": "Dagster Bot Policy",
-        "description": (
-            "Lets Dagster write its asset check results as test cases on tables."
-        ),
-        "rules": [
-            {
-                "name": "DagsterBotRule-TestDefinition",
-                "description": (
-                    "Read test definitions and create the one Dagster's checks "
-                    "use when it is missing."
-                ),
-                "effect": "allow",
-                "resources": ["testDefinition"],
-                "operations": ["Create", "ViewBasic"],
-            },
-            {
-                "name": "DagsterBotRule-TableTests",
-                "description": (
-                    "Read and create test cases on tables and add their results."
-                ),
-                "effect": "allow",
-                "resources": ["table"],
-                "operations": ["CreateTests", "EditTests", "ViewTests"],
-            },
-        ],
-    },
-    # What ol-data-platform's `ol-dbt metrics sync` needs on top of
-    # DefaultBotRole's ViewAll: PUT a metric (Create when it is new; a PUT to an
-    # existing one is authorized as EditAll, EntityUtil.createOrUpdateOperation),
-    # PATCH its description, owners, reviewers, tags, status and
-    # extension.metricFileSha256 (covered by EditAll; /entityStatus maps to no
-    # narrower operation), and PUT a lineage edge from each implemented_by
-    # entity, which checks EditLineage on both ends (LineageResource.addLineage).
-    # EditAll on metric covers the metric's end; the lineage rule lists every
-    # entity type an implemented_by entry can name (ol-data-platform
-    # ENTITY_COLLECTIONS).  DefaultBotPolicy's EditDisplayName deny does not
-    # block the EditAll PUT, but EntityUpdater.updateDisplayName then keeps the
-    # stored non-empty displayName for any bot it denies, so the sync can set a
-    # metric's displayName only on create or where the metric has none.
-    "MetricsSyncBotPolicy": {
-        "displayName": "Metrics Sync Bot Policy",
-        "description": (
-            "Lets ol-dbt metrics sync create and update Metric entities and add "
-            "lineage to them from the entities that implement them."
-        ),
-        "rules": [
-            {
-                "name": "MetricsSyncBotRule-Metrics",
-                "description": "Create metrics and edit any field of them.",
-                "effect": "allow",
-                "resources": ["metric"],
-                "operations": ["Create", "EditAll"],
-            },
-            {
-                "name": "MetricsSyncBotRule-Lineage",
-                "description": (
-                    "Add lineage edges to metrics from the entities that "
-                    "implement them."
-                ),
-                "effect": "allow",
-                "resources": [
-                    "table",
-                    "topic",
-                    "apiEndpoint",
-                    "dashboardDataModel",
-                    "container",
-                ],
-                "operations": ["EditLineage"],
-            },
-        ],
-    },
-}
-
-# Desired state for each custom role, keyed by role name.  These names are the
-# values Keycloak sends in the `roles` claim, so renaming one here without
-# renaming its Keycloak client role leaves its holders with no role.
-ROLE_CONFIG: dict[str, dict[str, Any]] = {
-    "DataEngineer": {
-        "displayName": "Data Engineer",
-        "description": (
-            "Maintains technical metadata, lineage and data quality tests. "
-            "Granted by the ol-data-engineer and ol-platform-admin Keycloak "
-            "roles."
-        ),
-        "policies": ["DataEngineerPolicy"],
-    },
-    "DataContributor": {
-        "displayName": "Data Contributor",
-        "description": (
-            "Documents data assets and saves queries against them. Granted by "
-            "the ol-researcher Keycloak role."
-        ),
-        "policies": ["DataContributorPolicy"],
-    },
-    "DagsterBotRole": {
-        "displayName": "Dagster Bot Role",
-        "description": "Role of dagster-bot.",
-        "policies": ["DagsterBotPolicy"],
-    },
-    "MetricsSyncBotRole": {
-        "displayName": "Metrics Sync Bot Role",
-        "description": "Role of metrics-sync-bot.",
-        "policies": ["MetricsSyncBotPolicy"],
-    },
-}
-
-# The exact defaultRoles of each listed team.  data-platform members are the
-# stewards: DataSteward adds owners, display names, lineage and running
-# ingestion to what DataConsumer allows.  The team is also who reviews data
-# contracts, but in ol-data-platform pull requests: contracts are synced to
-# OpenMetadata already Approved, so OpenMetadata's own approval step (an
-# In Review contract that only its `reviewers` can approve) is not used.
-TEAM_DEFAULT_ROLES: dict[str, list[str]] = {
-    "data-platform": ["DataSteward"],
-}
-
-
 def _get_by_name_with_fields(
     collection: str, name: str, fields: str
 ) -> dict[str, Any] | None:
@@ -1076,167 +778,6 @@ def _get_by_name_with_fields(
         return None
     get_resp.raise_for_status()
     return get_resp.json()
-
-
-def _entity_refs(
-    collection: str, entity_type: str, names: list[str]
-) -> list[dict[str, str]]:
-    """Resolve entity names to the references a PATCH expects.
-
-    :param collection: The API collection, e.g. ``"roles"``.
-    :param entity_type: The reference type, e.g. ``"role"``.
-    :param names: Entity names, every one of which must exist.
-    :raises ValueError: If a named entity does not exist.
-    """
-    refs = []
-    for name in names:
-        entity = _get_by_name(collection, name)
-        if entity is None:
-            msg = f"{entity_type} {name!r} does not exist"
-            raise ValueError(msg)
-        refs.append({"id": entity["id"], "type": entity_type})
-    return refs
-
-
-def _normalized_rules(rules: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
-    """Reduce policy rules to a form that ignores the server's reordering.
-
-    :param rules: Rules as sent to or returned by the policies API.
-    """
-    return sorted(
-        (
-            rule["name"],
-            rule["effect"],
-            frozenset(resource.lower() for resource in rule["resources"]),
-            frozenset(rule["operations"]),
-            rule.get("condition"),
-            rule.get("description"),
-        )
-        for rule in rules
-    )
-
-
-def _reconcile_policy(name: str, desired: dict[str, Any]) -> None:
-    """Create the policy if it is missing, else PATCH its description and rules.
-
-    displayName is create-only, as for teams.
-
-    :param name: Policy name, e.g. ``"DataEngineerPolicy"``.
-    :param desired: The policy's displayName, description and rules.
-    :raises requests.HTTPError: On any non-2xx response from the OM API.
-    """
-    policy = _get_by_name("policies", name)
-    if policy is None:
-        post_resp = requests.post(
-            f"{OM_SERVER_URL}/v1/policies",
-            headers=_AUTH_HEADER,
-            json={"name": name, **desired},
-            timeout=30,
-        )
-        post_resp.raise_for_status()
-        print(f"[done] policy {name}: created")  # noqa: T201
-        return
-
-    ops = []
-    if policy.get("description") != desired["description"]:
-        ops.append(
-            {"op": "add", "path": "/description", "value": desired["description"]}
-        )
-    if _normalized_rules(policy["rules"]) != _normalized_rules(desired["rules"]):
-        ops.append({"op": "add", "path": "/rules", "value": desired["rules"]})
-
-    _apply_patch(f"policy {name}", f"{OM_SERVER_URL}/v1/policies/{policy['id']}", ops)
-
-
-def _reconcile_role(name: str, desired: dict[str, Any]) -> None:
-    """Create the role if it is missing, else PATCH its description and policies.
-
-    :param name: Role name, e.g. ``"DataEngineer"``.
-    :param desired: The role's displayName, description and policy names.
-    :raises requests.HTTPError: On any non-2xx response from the OM API.
-    :raises ValueError: If a policy the role names does not exist.
-    """
-    role = _get_by_name_with_fields("roles", name, "policies")
-    if role is None:
-        post_resp = requests.post(
-            f"{OM_SERVER_URL}/v1/roles",
-            headers=_AUTH_HEADER,
-            json={"name": name, **desired},
-            timeout=30,
-        )
-        post_resp.raise_for_status()
-        print(f"[done] role {name}: created")  # noqa: T201
-        return
-
-    ops = []
-    if role.get("description") != desired["description"]:
-        ops.append(
-            {"op": "add", "path": "/description", "value": desired["description"]}
-        )
-    if {policy["name"] for policy in role["policies"]} != set(desired["policies"]):
-        ops.append(
-            {
-                "op": "add",
-                "path": "/policies",
-                "value": _entity_refs("policies", "policy", desired["policies"]),
-            }
-        )
-
-    _apply_patch(f"role {name}", f"{OM_SERVER_URL}/v1/roles/{role['id']}", ops)
-
-
-def _reconcile_team_default_roles(team_name: str, role_names: list[str]) -> None:
-    """Set a team's defaultRoles to exactly ``role_names``.
-
-    :param team_name: Team name, e.g. ``"data-platform"``.
-    :param role_names: Names of the roles every member of the team inherits.
-    :raises requests.HTTPError: On any non-2xx response from the OM API.
-    :raises ValueError: If the team or a named role does not exist.
-    """
-    team = _get_by_name_with_fields("teams", team_name, "defaultRoles")
-    if team is None:
-        msg = f"team {team_name!r} does not exist"
-        raise ValueError(msg)
-
-    ops = []
-    if {role["name"] for role in team["defaultRoles"]} != set(role_names):
-        ops.append(
-            {
-                "op": "add",
-                "path": "/defaultRoles",
-                "value": _entity_refs("roles", "role", role_names),
-            }
-        )
-
-    _apply_patch(
-        f"team {team_name} defaultRoles",
-        f"{OM_SERVER_URL}/v1/teams/{team['id']}",
-        ops,
-    )
-
-
-def _access_control_steps() -> list[tuple[str, Callable[[], None]]]:
-    """Return the access-control steps, policies before the roles that use them.
-
-    Runs after the team steps, because team defaultRoles need the team.
-    """
-    return [
-        *(
-            (f"policy {name}", partial(_reconcile_policy, name, policy))
-            for name, policy in POLICY_CONFIG.items()
-        ),
-        *(
-            (f"role {name}", partial(_reconcile_role, name, role))
-            for name, role in ROLE_CONFIG.items()
-        ),
-        *(
-            (
-                f"team {name} defaultRoles",
-                partial(_reconcile_team_default_roles, name, roles),
-            )
-            for name, roles in TEAM_DEFAULT_ROLES.items()
-        ),
-    ]
 
 
 def _create(collection: str, label: str, body: dict[str, Any]) -> None:
@@ -1354,9 +895,7 @@ def _reconcile_glossary_term(term: dict[str, Any]) -> None:
 
 
 def main() -> None:
-    """Reconcile every tag, team, policy, role, domain, custom property and term.
-
-    Each bot is checked, not reconciled.
+    """Reconcile every tag, domain, custom property and glossary term.
 
     Exits non-zero if any step fails.
     """
@@ -1364,11 +903,6 @@ def main() -> None:
 
     steps: list[tuple[str, Callable[[], None]]] = [
         *((fqn, partial(_reconcile_tag, fqn, tag)) for fqn, tag in TAG_CONFIG.items()),
-        *(
-            (f"team {name}", partial(_reconcile_team, name, team))
-            for name, team in TEAM_CONFIG.items()
-        ),
-        *_access_control_steps(),
         *(
             (f"domain {name}", partial(_reconcile_domain, name, domain))
             for name, domain in DOMAIN_CONFIG.items()
