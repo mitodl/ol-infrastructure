@@ -461,6 +461,12 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
     #   - No `client_secret` argument: passing one to a PUBLIC client is silently
     #     ignored by Keycloak and would only mislead a future reader into
     #     thinking one is required.
+    #   - PKCE required (S256): Keycloak checks the challenge on the device
+    #     authorization request and the verifier on the token poll, so a device
+    #     code intercepted between the two cannot be redeemed by anyone else.
+    #     witan-core sends both from 0.46.0 (agent-kit#542), and witan-council
+    #     0.44.1 and witan-code 0.27.1 require it. A CLI on an older witan-core
+    #     cannot log in.
     #
     # No Vault write accompanies this client, unlike every other client in this
     # file: a public client has no secret to distribute, and issuer/client_id/
@@ -477,6 +483,7 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
         implicit_flow_enabled=False,
         direct_access_grants_enabled=False,
         service_accounts_enabled=False,
+        **PKCE_REQUIRED_CLIENT_ARGS,
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
 
