@@ -2081,45 +2081,40 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
             workers=2,
-            # Sized against the VPA *floor* (3.5Gi in production), not the declared
-            # 3200Mi limit, because the floor is the smallest limit a pod can be
-            # running under and therefore the one the cap has to beat. The component's
-            # own floor(limit/workers*0.9) would give 1440, leaving the worker pair at
-            # 2880Mi with almost nothing left for the master under the floor.
+            # Sized against the lowest limit a production pod can run under: the VPA
+            # floor (mitlearn:webapp_vpa_min_allowed_memory, 3.5Gi) at the 1:1
+            # request:limit ratio, so 3584Mi. Not the declared 3200Mi, which the VPA
+            # always raises to at least the floor.
             #
-            # Raised again 2026-08-07, 1350 -> 1500. The previous 1350 (pair 2700Mi,
-            # ~370Mi margin under a 3Gi floor) was sized against a 2774Mi peak that
-            # was itself measured while the fleet was over-scaled (the two inert Prometheus
-            # triggers left the undersized-request CPU trigger pegging the HPA near
-            # max_replicas and spreading traffic thin). PR #5303 raised the CPU request, so
-            # the HPA settled into a much smaller replica range,
-            # container RSS to 3045-3069Mi within a day -- eating the margin and
-            # reviving the OOMKills. 2*1500 = 3000Mi leaves ~580Mi under the new 3.5Gi
-            # floor for the master and transient overshoot, sized with more headroom
-            # than before since this margin has now been eaten twice. See
-            # les-root-cause-found-mit-learn-s-aug-6-cpu-request-b-cfebf0 (witan) for
-            # the full investigation.
+            # The cap has to leave room for a planned respawn. Granian starts the
+            # replacement worker before stopping the old one (one worker at a time),
+            # so at the moment a cap trips the container holds both workers at up to
+            # the cap plus the new worker's import. The component's
+            # resolve_workers_max_rss formula (worker_startup_rss can't be passed
+            # alongside an explicit cap) applied to the floor:
+            #   floor((0.9 * 3584 - 650) / 2) = 1287
+            #   2 * 1287 + 650 = 3224Mi, leaving 360Mi for the master and growth
+            #   between RSS samples.
+            # 650MiB is a fresh worker's share of container RSS about a minute after
+            # an RSS respawn (630-650MiB on 2026-10-27; fresh pods sit at 836/913MiB
+            # p50/p90 for master plus both workers 30-150s after start, 7d).
             #
-            # Coupled to `workers` and to the VPA floor: both must be revisited
-            # together. Dropping to workers=1 without resizing this would cap the sole
-            # worker at 1500Mi of a 3.5Gi pod. See the stage 4 task in
+            # The previous 1500 needed 2 * 1500 + 650 = 3650Mi, over the 3584Mi floor.
+            # On 2026-10-26 a crawler surge pushed workers to the cap while the VPA
+            # held pods at the floor, and the respawns OOMKilled pods until the
+            # Deployment had none available at 04:58Z.
+            #
+            # Coupled to `workers` and to the VPA floor: revisit all three together.
+            # On granian 2.8 (mit-learn#4024) each worker owns its listener, so a
+            # respawn is covered only by the other worker; workers=1 also needs
+            # respawn_interval above the worker cold start. See the stage 4 task in
             # docs/plans/granian-configuration-overhaul.md.
             #
-            # The image runs granian 2.8.3 since mit-learn 0.81.8 (mit-learn#4024). On
-            # 2.8 each worker owns its listener, so a respawn is covered only by the
-            # other worker. Moving to workers=1 also needs respawn_interval set above
-            # the worker cold start, or every respawn refuses connections.
-            #
-            # This is one value across all stacks, while the VPA floor it is sized
-            # against is production-only (CI/QA keep the 256Mi default). That is not
-            # the protection gap it looks like: a cap only guards anything when
-            # 2*cap + master fits under the running limit, and no cap derived from
-            # the 3200Mi declared limit fits under a VPA floor of 256Mi. Below a
-            # ~2300Mi limit the cap is inert at 1080, 1350 and 1500 alike, so CI/QA
-            # are no worse off than before. Making it genuinely track the limit the
-            # kernel enforces needs a runtime cgroup read, not a synth-time constant
-            # -- tracked as tk-evaluate-runtime-cgroup-derived-workers-max-rss.
-            workers_max_rss=1500,
+            # One value across all stacks, but CI/QA keep the 256Mi VPA floor, under
+            # which no cap fits and the cap is inert. Tracking the limit the kernel
+            # enforces needs a runtime cgroup read, not a synth-time constant:
+            # tk-evaluate-runtime-cgroup-derived-workers-max-rss.
+            workers_max_rss=1287,
             enable_metrics=True,
             interface="asginl",
             backlog=None,
