@@ -90,6 +90,11 @@ def test_production_takes_release_and_image_through_build_and_qa(app):
         get = plan[_step_index(plan, "get", name)]
         assert get["passed"] == expected, name
         assert not get["trigger"], name
+    image = plan[_step_index(plan, "get", f"{app}-app-release-ecr-image")]
+    assert image["params"] == {"skip_download": True}
+    assert _step_index(plan, "get", f"{app}-app-release-ecr-image") < _step_index(
+        plan, "task", ASSERT_GATE_TASK_NAME
+    )
 
 
 @pytest.mark.parametrize("app", RELEASE_APPS)
@@ -101,6 +106,8 @@ def test_qa_takes_release_and_image_from_the_build(app):
         get = plan[_step_index(plan, "get", name)]
         assert get["passed"] == [f"build-{app}-release-image"], name
         assert get["trigger"], name
+    image = plan[_step_index(plan, "get", f"{app}-app-release-ecr-image")]
+    assert image["params"] == {"skip_download": True}
 
 
 def test_assertion_reads_the_ol_infra_commit_the_job_deploys():
