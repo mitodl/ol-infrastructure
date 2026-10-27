@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 
+from bridge.settings.apps import APPS, release_resource_workflow
 from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
     _CLASSIFY_SCRIPT,
     CACHE_BUST_TASK_NAME,
@@ -30,7 +31,7 @@ from ol_concourse.pipelines.infrastructure.k8s_apps.scripts import (
 APP = "ol-analytics-api"
 PULUMI = f"pulumi-ol-application-{APP}"
 DOCKER_TAG_ENV = "OL_ANALYTICS_API_DOCKER_TAG"
-RELEASE_APPS = ("ol-analytics-api", "learn-ai", "micromasters")
+RELEASE_APPS = [app for app in APPS if release_resource_workflow(app)]
 VERSION = "2026.10.2.1"
 LIVE = "2026.10.1.1"
 SHA = "c" * 40
