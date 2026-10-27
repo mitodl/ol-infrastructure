@@ -248,6 +248,48 @@ def create_ol_platform_engineering_realm(  # noqa: PLR0913, PLR0915
             aliases=[Alias(name="ol-data-platform-opik-client-vault-oidc-credentials")]
         ),
     )
+    # OSS Opik treats every request as the admin of workspace "default", so who
+    # gets past APISIX can edit any prompt and read every trace. APISIX admits
+    # a browser session only when the ID token's groups claim names this group
+    # (claim_schema on the opik stack's session routes). Membership is managed
+    # in the admin console, not here. A membership change reaches an existing
+    # session on its next token refresh, because Keycloak re-runs the mapper
+    # and lua-resty-openidc replaces the stored ID token.
+    keycloak.Group(
+        "ol-platform-engineering-opik-users-group",
+        realm_id=ol_platform_engineering_realm.id,
+        name="opik-users",
+        opts=resource_options,
+    )
+    keycloak.openid.GroupMembershipProtocolMapper(
+        "ol-platform-engineering-opik-group-mapper",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_opik_client.id,
+        name="groups",
+        claim_name="groups",
+        # The claim_schema matches the bare name, so "/opik-users" would fail.
+        full_path=False,
+        add_to_id_token=True,
+        add_to_access_token=False,
+        add_to_userinfo=False,
+        opts=resource_options,
+    )
+    # Every client in this realm signs with the same key, so the bearer route's
+    # signature and issuer checks alone admit a client-credentials token from
+    # any of them. This client's service-account tokens carry only "account"
+    # in aud, so the opik stack's audience check (match_with_client_id) needs
+    # this mapper in place first or learn-ai, Dagster and gwarek tracing gets
+    # 403s. A per-application client for Opik traffic needs the same audience.
+    keycloak.openid.AudienceProtocolMapper(
+        "ol-platform-engineering-opik-audience-mapper",
+        realm_id=ol_platform_engineering_realm.id,
+        client_id=ol_platform_engineering_opik_client.id,
+        name="opik-audience",
+        included_client_audience=ol_platform_engineering_opik_client.client_id,
+        add_to_access_token=True,
+        add_to_id_token=False,
+        opts=resource_options,
+    )
     # OPIK [END] # noqa: ERA001
 
     # TOOLHIVE [START] # noqa: ERA001
