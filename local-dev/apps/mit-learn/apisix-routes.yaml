@@ -84,6 +84,9 @@ spec:
       config:
         use_jwks: true
         bearer_only: false
+        # PKCE (S256) on the authorization and token requests, as deployed
+        # (OLApisixOIDCConfig.oidc_use_pkce).
+        use_pkce: true
         introspection_endpoint_auth_method: client_secret_post
         scope: "openid profile email ol-profile"
         redirect_uri: "https://api.learn.mit.test/login/ol-oidc/callback/"
@@ -142,6 +145,9 @@ spec:
       config:
         use_jwks: true
         bearer_only: false
+        # PKCE (S256) on the authorization and token requests, as deployed
+        # (OLApisixOIDCConfig.oidc_use_pkce).
+        use_pkce: true
         introspection_endpoint_auth_method: client_secret_post
         scope: "openid profile email ol-profile"
         redirect_uri: "https://api.learn.mit.test/login/ol-oidc/callback/"
@@ -201,6 +207,9 @@ spec:
       config:
         use_jwks: true
         bearer_only: false
+        # PKCE (S256) on the authorization and token requests, as deployed
+        # (OLApisixOIDCConfig.oidc_use_pkce).
+        use_pkce: true
         introspection_endpoint_auth_method: client_secret_post
         scope: "openid profile email ol-profile"
         redirect_uri: "https://api.learn.mit.test/learn/login/ol-oidc/callback/"
@@ -265,6 +274,9 @@ spec:
       config:
         use_jwks: true
         bearer_only: false
+        # PKCE (S256) on the authorization and token requests, as deployed
+        # (OLApisixOIDCConfig.oidc_use_pkce).
+        use_pkce: true
         introspection_endpoint_auth_method: client_secret_post
         scope: "openid profile email ol-profile"
         redirect_uri: "https://api.learn.mit.test/learn/login/ol-oidc/callback/"
