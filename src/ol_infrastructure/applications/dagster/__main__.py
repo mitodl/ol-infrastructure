@@ -2765,6 +2765,13 @@ def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, st
 # connection footprint, two orders of magnitude less blast radius than the
 # location that would otherwise dominate the signal.
 #
+# ml is listed for a different reason: ol-llm sends its model spans (with token
+# usage and cost) to Opik through its own SDK TracerProvider, and that provider
+# hands out NoOp tracers under OTEL_SDK_DISABLED=true like any other, so ml's
+# model calls reach Opik only with the flag off. The same 7-day window puts ml at
+# a peak of 122 concurrent run-worker Jobs against canvas's 123, at well under
+# canvas's mean.
+#
 # Run workers inherit the code location's OTEL_SERVICE_NAME, so their spans
 # arrive as `production-dagster-code-canvas` alongside the code server's and
 # cannot be told apart by service.name -- the launcher cannot override it,
@@ -2773,7 +2780,7 @@ def dagster_otel_env(service_name: str, image_version: str) -> list[dict[str, st
 # `dagster-run-<run-id>`, the server's is the deployment's) or on
 # `service.instance.id`, which the SDK makes unique per process. Both are
 # already present on the spans #5733 is producing.
-OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS = {"canvas"}
+OTEL_INSTRUMENTED_RUN_WORKER_LOCATIONS = {"canvas", "ml"}
 
 
 def dagster_run_worker_otel_env(location_name: str) -> list[dict[str, str]]:
