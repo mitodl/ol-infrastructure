@@ -731,6 +731,11 @@ ol_analytics_api_oidc_resources = OLApisixOIDCResources(
 # shared client, `unauth_action="pass"` below (never redirects), and the cookie
 # name and parent domain mit-learn's login writes, all of which come from
 # LearnSession.
+#
+# The logout path is the plugin default on this host.  Its post-logout landing
+# is mit-learn's /logout/, as learn-ai's is: the session being ended is the
+# shared one, and Keycloak rejects https://analytics.<env>.learn.mit.edu/ for
+# ol-mitlearn-client with a 400 in CI, RC and Production.
 ol_analytics_api_learn_oidc_resources = None
 if ol_analytics_api_learn_domain:
     ol_analytics_api_learn_session = LearnSession.for_host(
@@ -742,7 +747,7 @@ if ol_analytics_api_learn_domain:
             ol_analytics_api_learn_session,
             OLApisixOIDCRouteGroup(
                 hosts=[ol_analytics_api_learn_domain],
-                post_logout_redirect_uri=f"https://{ol_analytics_api_learn_domain}/",
+                post_logout_redirect_uri=ol_analytics_api_learn_session.logout_landing_uri,
             ),
             application_name=f"{APPLICATION_NAME}-learn",
             k8s_labels=k8s_global_labels,
