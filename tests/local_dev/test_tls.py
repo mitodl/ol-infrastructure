@@ -8,6 +8,7 @@ from typing import Any
 import certifi
 import pulumi
 import pytest
+import yaml
 
 try:
     asyncio.get_event_loop()
@@ -109,3 +110,28 @@ def test_apisix_trusts_the_same_bundle_the_apps_do(tmp_path, infra_modules):
     string_data = apisix["stringData"]
     string_data = string_data.get("value", string_data)
     assert string_data[tls.APISIX_TRUSTED_CA_FILENAME] == app_bundle
+
+
+def test_concourse_worker_mounts_the_bundle_as_its_certs_dir(infra_modules):
+    """concourse.yaml is hand-written, so nothing else ties it to tls.py."""
+    tls, _ = infra_modules
+    manifest = (REPO / "local-dev/apps/ocw-studio/concourse.yaml").read_text()
+    pods = [
+        doc["spec"]["template"]["spec"]
+        for doc in yaml.safe_load_all(manifest)
+        if doc and doc["kind"] == "Deployment"
+    ]
+    ((pod, container),) = [
+        (pod, container)
+        for pod in pods
+        for container in pod["containers"]
+        if any(env["name"] == "CONCOURSE_CERTS_DIR" for env in container.get("env", []))
+    ]
+    certs_dir = next(
+        env["value"] for env in container["env"] if env["name"] == "CONCOURSE_CERTS_DIR"
+    )
+    (mount,) = [m for m in container["volumeMounts"] if m["mountPath"] == certs_dir]
+    (volume,) = [v for v in pod["volumes"] if v["name"] == mount["name"]]
+    assert volume["configMap"]["name"] == tls.CA_BUNDLE_CONFIGMAP
+    # Resource containers read the copy at /etc/ssl/certs/ca-certificates.crt.
+    assert tls.CA_BUNDLE_FILENAME == "ca-certificates.crt"
