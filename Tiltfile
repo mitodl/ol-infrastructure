@@ -463,7 +463,13 @@ local_resource(
         "PULUMI_CONFIG_PASSPHRASE": "",
     },
     dir="./local-dev/infra/core",
-    deps=["./local-dev/infra/modules", "./local-dev/infra/core/__main__.py"],
+    deps=[
+        "./local-dev/infra/modules",
+        "./local-dev/infra/core/__main__.py",
+        # APISIX's values come from the deployed definition.
+        "./src/ol_infrastructure/infrastructure/aws/eks/apisix_definition.py",
+        "./src/ol_infrastructure/infrastructure/aws/eks/error_pages",
+    ],
     labels=["infra"],
 )
 
