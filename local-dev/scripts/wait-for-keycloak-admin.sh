@@ -10,9 +10,9 @@
 #   times out ("context deadline exceeded"). A timed-out realm-create still
 #   succeeds server-side but is never recorded in Pulumi state. The apps_infra
 #   program adopts that realm on the next run (live_realm_import_id in
-#   local-dev/infra/modules/keycloak.py), but the failed run still costs a
-#   retry, and a client or other realm child orphaned the same way is not
-#   adopted (see the README's troubleshooting section).
+#   local-dev/infra/modules/keycloak.py), which pulumi-up-retry.sh starts
+#   straight away, but a client or other realm child orphaned the same way is
+#   not adopted (see the README's troubleshooting section).
 #
 #   This gate instead proves the admin API is actually serving: it obtains an
 #   admin token AND performs an authenticated admin read (GET /admin/realms)
