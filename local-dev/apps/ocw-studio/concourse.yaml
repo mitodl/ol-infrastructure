@@ -145,10 +145,6 @@ spec:
           value: allow
         - name: CONCOURSE_CONTENT_SECURITY_POLICY
           value: "*"
-        - name: CONCOURSE_ENABLE_PIPELINE_INSTANCES
-          value: "true"
-        - name: CONCOURSE_ENABLE_ACROSS_STEP
-          value: "true"
         # Short grace periods: local disk is scarce and nobody is forensically
         # examining a failed local build hours later.
         - name: CONCOURSE_GC_ONE_OFF_GRACE_PERIOD
