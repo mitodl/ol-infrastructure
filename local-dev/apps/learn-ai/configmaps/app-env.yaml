@@ -9,7 +9,9 @@ data:
   MITOL_APP_BASE_URL: "https://ai.learn.mit.test"
   MITOL_DB_DISABLE_SSL: "True"
   MITOL_USE_S3: "False"
-  DEBUG: "True"
+  # DEBUG must stay False: settings.py adds debug_toolbar to INSTALLED_APPS
+  # when it is True, and the production image does not have it.
+  DEBUG: "False"
   ALLOWED_HOSTS: "*"
   USE_X_FORWARDED_HOST: "True"
   USE_X_FORWARDED_PORT: "True"
