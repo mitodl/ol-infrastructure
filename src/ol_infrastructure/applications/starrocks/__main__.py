@@ -1158,7 +1158,7 @@ for component, port, keep_metrics in (
                     "port": port,
                     "path": "/metrics",
                     "scheme": "http",
-                    "interval": "30s",
+                    "interval": "60s",
                     "scrapeTimeout": "10s",
                     "relabelings": [
                         {

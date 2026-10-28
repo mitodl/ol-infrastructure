@@ -1716,7 +1716,7 @@ pgbouncer_service_monitor = kubernetes.apiextensions.CustomResource(
                 "port": "metrics",
                 "path": "/metrics",
                 "scheme": "http",
-                "interval": "30s",
+                "interval": "60s",
                 "scrapeTimeout": "10s",
                 "relabelings": [
                     {
