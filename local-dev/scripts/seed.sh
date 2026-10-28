@@ -3,14 +3,14 @@
 #
 # Usage:
 #   ./local-dev/scripts/seed.sh --app <name>              # run all seed commands for an app
-#   ./local-dev/scripts/seed.sh --app <name> --cmd <cmd>  # run a single management command
+#   ./local-dev/scripts/seed.sh --app <name> --cmd <cmd>  # run one shell command in the pod
 #   ./local-dev/scripts/seed.sh --list                    # list available apps and their defaults
 #
 # Examples:
 #   ./local-dev/scripts/seed.sh --app mit-learn
-#   ./local-dev/scripts/seed.sh --app mit-learn --cmd "loaddata platforms schools departments offered_by"
-#   ./local-dev/scripts/seed.sh --app mitxonline --cmd "populate_course_data"
-#   ./local-dev/scripts/seed.sh --app mit-learn --cmd "backpopulate_ocw_data"
+#   ./local-dev/scripts/seed.sh --app mit-learn --cmd "python manage.py loaddata platforms schools departments offered_by"
+#   ./local-dev/scripts/seed.sh --app mitxonline --cmd "python manage.py populate_course_data"
+#   ./local-dev/scripts/seed.sh --app mit-learn --cmd "python manage.py backpopulate_ocw_data"
 #
 # The script delegates execution to `kubectl exec` — the target namespace and
 # deployment name are derived from the app name.  The cluster must be running

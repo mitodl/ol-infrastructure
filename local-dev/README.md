@@ -342,7 +342,7 @@ tilt trigger seed-mit-learn-fixtures
 
 # Or use seed.sh directly
 ./local-dev/scripts/seed.sh --app mit-learn
-./local-dev/scripts/seed.sh --app mit-learn --cmd "backpopulate_ocw_data"
+./local-dev/scripts/seed.sh --app mit-learn --cmd "python manage.py backpopulate_ocw_data"
 ./local-dev/scripts/seed.sh --list
 ```
 
