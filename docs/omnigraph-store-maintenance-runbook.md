@@ -122,6 +122,12 @@ aws s3 ls --recursive s3://ol-data-witan-<env>/<storage_prefix>/graphs/<id>.omni
   | grep -c '/_versions/'
 ```
 
+The `omnigraph-version-census` CronJob runs the same listing every hour and
+logs one line per graph, split into the manifest versions cleanup cannot
+remove and the table versions it can:
+`{namespace="omnigraph", container="count-versions"} |= "graph=<id> "` in
+Loki (QA and Production), or `kubectl -n omnigraph logs` on its latest Job.
+
 The run is the nightly window with a longer budget, so the data tier is down
 for every witan user until it ends. Announce it, and keep it clear of the
 03:20 window and the CI indexer's runs. Create a one-off Job from the CronJob

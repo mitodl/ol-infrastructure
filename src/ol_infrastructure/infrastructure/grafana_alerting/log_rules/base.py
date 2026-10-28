@@ -62,6 +62,11 @@ Sub-modules
   edxapp       — Source: grafana-alerts/loki-rules/edxapp-logs.yaml
   heroku       — Source: grafana-alerts/loki-rules/heroku-logs.yaml
   mit_learn    — Source: grafana-alerts/loki-rules/mit-learn.yaml
+  omnigraph_versions — Per-graph omnigraph cleanup backlog: projected plan
+                 time over an hour, and more than 5,000 versions added in a
+                 day. Not a migration; written 2026-10-28 against the
+                 omnigraph-version-census CronJob's logfmt lines. QA and
+                 Production stacks only.
   vault        — Source: grafana-alerts/loki-rules/vault.yaml
   witan        — Cedar denial rate. Not a migration; written 2026-08-24.
                  Parses with `decolorize` first, because omnigraph writes
@@ -88,6 +93,7 @@ from ol_infrastructure.infrastructure.grafana_alerting.log_rules import (
     edxapp,
     heroku,
     mit_learn,
+    omnigraph_versions,
     vault,
     witan,
 )
@@ -196,5 +202,6 @@ def create(resource_opts: ResourceOptions) -> None:
     edxapp.create(log_alerts_folder.uid, rd, resource_opts)
     heroku.create(log_alerts_folder.uid, rd, resource_opts)
     mit_learn.create(log_alerts_folder.uid, rd, resource_opts)
+    omnigraph_versions.create(log_alerts_folder.uid, rd, resource_opts)
     vault.create(log_alerts_folder.uid, rd, resource_opts)
     witan.create(log_alerts_folder.uid, rd, resource_opts)
