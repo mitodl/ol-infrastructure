@@ -7,7 +7,7 @@ local-dev program builds its Secret's keys from ``secret_env_names``.
 
 from pulumi import Output
 
-from ol_infrastructure.lib.secret_env import VaultSecret, env_names
+from ol_infrastructure.lib.secret_env import Template, VaultSecret, env_names
 
 
 def vault_secrets(
@@ -40,7 +40,9 @@ def vault_secrets(
             mount=database_mount,
             path="creds/app",
             env={
-                "DATABASE_URL": f'postgres://{{{{ get .Secrets "username" }}}}:{{{{ get .Secrets "password" }}}}@{database_host}/mitxonline',
+                "DATABASE_URL": Template(
+                    f'postgres://{{{{ get .Secrets "username" }}}}:{{{{ get .Secrets "password" }}}}@{database_host}/mitxonline'
+                ),
             },
         ),
         VaultSecret(
@@ -141,10 +143,12 @@ def vault_secrets(
                 "RECAPTCHA_SITE_KEY": ("recaptcha", "site-key"),
                 "SECRET_KEY": ("django", "secret-key"),
                 "STATUS_TOKEN": ("django", "status-token"),
-                "TRINO_CATALOG": "ol_data_lake_production",
-                "TRINO_HOST": "mitol-ol-data-interactive.trino.galaxy.starburst.io",
+                "TRINO_CATALOG": Template("ol_data_lake_production"),
+                "TRINO_HOST": Template(
+                    "mitol-ol-data-interactive.trino.galaxy.starburst.io"
+                ),
                 "TRINO_PASSWORD": ("data_platform", "trino_password"),
-                "TRINO_PORT": "443",
+                "TRINO_PORT": Template("443"),
                 "TRINO_USER": ("data_platform", "trino_username"),
             },
         ),
@@ -174,11 +178,13 @@ def vault_secrets(
             mount_type="kv-v1",
             path="keycloak-admin-b2b",
             env={
-                "KEYCLOAK_DISCOVERY_URL": '{{ get .Secrets "url" }}/.well-known/openid-configuration',
+                "KEYCLOAK_DISCOVERY_URL": Template(
+                    '{{ get .Secrets "url" }}/.well-known/openid-configuration'
+                ),
                 "KEYCLOAK_ADMIN_CLIENT_ID": ("client_id",),
                 "KEYCLOAK_ADMIN_CLIENT_SECRET": ("client_secret",),
-                "KEYCLOAK_ADMIN_CLIENT_SCOPES": "openid profile email",
-                "KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL": "False",
+                "KEYCLOAK_ADMIN_CLIENT_SCOPES": Template("openid profile email"),
+                "KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL": Template("False"),
             },
         ),
         VaultSecret(
@@ -204,7 +210,9 @@ def vault_secrets(
             mount_type="kv-v2",
             path="issuer-coordinator",
             env={
-                "VERIFIABLE_CREDENTIAL_BEARER_TOKEN": '{{ get (get .Secrets "tenant_tokens") "TENANT_TOKEN_DEFAULT" }}',
+                "VERIFIABLE_CREDENTIAL_BEARER_TOKEN": Template(
+                    '{{ get (get .Secrets "tenant_tokens") "TENANT_TOKEN_DEFAULT" }}'
+                ),
             },
         ),
         VaultSecret(
@@ -214,7 +222,9 @@ def vault_secrets(
             mount_type="kv-v2",
             path="signing-service",
             env={
-                "VERIFIABLE_CREDENTIAL_DID": '{{ $json := get (get .Secrets "tenants_did_keys") "DEFAULT" | fromJson }}{{ get (get $json "keyPair") "publicKeyMultibase" }}',
+                "VERIFIABLE_CREDENTIAL_DID": Template(
+                    '{{ $json := get (get .Secrets "tenants_did_keys") "DEFAULT" | fromJson }}{{ get (get $json "keyPair") "publicKeyMultibase" }}'
+                ),
             },
         ),
     ]
@@ -224,7 +234,9 @@ def secret_env_names() -> list[str]:
     """Return the variables ``vault_secrets`` writes.
 
     The arguments only reach mounts, paths and template text, so empty ones
-    yield the same names.
+    yield the same names. That holds while no secret depends on an argument;
+    once one is conditional (mit_learn's StarRocks credentials exist only when
+    a mount is set), the argument that decides it has to come from the caller.
     """
     return env_names(
         vault_secrets(database_mount="", database_host="", openedx_environment="")

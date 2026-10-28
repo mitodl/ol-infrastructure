@@ -1,6 +1,8 @@
 import pytest
+from pydantic import ValidationError
 
 from ol_infrastructure.lib.secret_env import (
+    Template,
     VaultSecret,
     env_names,
     local_secret_data,
@@ -24,11 +26,18 @@ def test_a_key_path_renders_get_or_index_and_text_passes_through():
     assert vso_template(("fastly", "api_key")) == (
         '{{ index .Secrets "fastly" "api_key" }}'
     )
-    assert vso_template("443") == "443"
-    assert _secret(A=("x",), B="lit").templates == {
+    assert vso_template(Template("443")) == "443"
+    assert _secret(A=("x",), B=Template("lit")).templates == {
         "A": '{{ get .Secrets "x" }}',
         "B": "lit",
     }
+
+
+@pytest.mark.parametrize("source", ["value", ()])
+def test_a_bare_string_or_empty_key_path_is_refused(source):
+    """A key written as "value" instead of ("value",) would deploy the word."""
+    with pytest.raises(ValidationError):
+        _secret(A=source)
 
 
 def test_mount_type_is_required_for_static_and_refused_for_dynamic():
@@ -76,3 +85,14 @@ def test_names_another_secret_supplies_are_accounted_for_and_left_out():
 def test_local_data_must_account_for_every_name_once(values, unset, message):
     with pytest.raises(ValueError, match=message):
         local_secret_data(["A", "B"], values, unset)
+
+
+def test_an_empty_section_counts_as_no_entries():
+    assert local_secret_data(["A"], {"A": "1"}, None) == {"A": "1"}
+    with pytest.raises(ValueError, match="missing: A;"):
+        local_secret_data(["A"], None, None)
+
+
+def test_unquoted_yaml_values_are_refused():
+    with pytest.raises(ValueError, match=r"must be strings \(quote them\): A, 7$"):
+        local_secret_data(["A", "B"], {"A": 443}, ["B", 7])
