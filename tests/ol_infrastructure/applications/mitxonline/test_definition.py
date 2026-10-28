@@ -41,6 +41,7 @@ from ol_infrastructure.components.services.k8s import (  # noqa: E402
     OLApplicationK8s,
     OLApplicationK8sCeleryRedisConfig,
 )
+from ol_infrastructure.lib.pulumi_helper import docker_image_config_kwargs  # noqa: E402
 
 LOCAL_IMAGE_TAG = "tilt-abc123"
 OPENEDX_BASE_URL = "https://lms.mit.test"
@@ -155,6 +156,27 @@ def test_local_bindings_use_the_image_as_given():
     assert config.registry == "direct"
     assert config.application_image_repository == "mitodl/mitxonline-app"
     assert config.application_docker_tag == LOCAL_IMAGE_TAG
+
+
+def test_release_pipeline_image_kwargs_reach_the_component(monkeypatch):
+    """The release pipeline sends a digest and a version; both must get through.
+
+    The bindings forbid unknown fields, so a kwarg docker_image_config_kwargs
+    returns that the bindings lack fails every deployed stack.
+    """
+    digest = "sha256:" + "a" * 64
+    monkeypatch.delenv("MITXONLINE_DOCKER_TAG", raising=False)
+    monkeypatch.setenv("MITXONLINE_DOCKER_SHA", digest)
+    monkeypatch.setenv("MITXONLINE_RELEASE_VERSION", "2026.10.28.1")
+
+    config = definition.application_config(
+        _local_bindings(
+            application_docker_tag=None, **docker_image_config_kwargs("MITXONLINE")
+        )
+    )
+
+    assert config.application_image_digest == digest
+    assert config.application_version == "2026.10.28.1"
 
 
 def test_deployed_bindings_keep_the_eks_wiring():
