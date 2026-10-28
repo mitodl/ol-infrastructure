@@ -53,6 +53,7 @@ config:
   mitlearn:support_url: "support.qa.learn.mit.edu"
   mitlearn:enable_fastly_shielding: true
   mitlearn:use_granian: true
+  mitlearn:webapp_endpoint_routing: true
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.rc.learn.mit.edu/api/v0/vector_content_files_search/"

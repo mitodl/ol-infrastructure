@@ -724,6 +724,20 @@ def setup_apisix(
                                 client_header_buffer_size 8k;
                                 large_client_header_buffers 4 64k;
 
+                                # Pass a request to the next upstream node only
+                                # on an error connecting, sending the request
+                                # or reading the response header (e.g. a
+                                # refused connect to a pod that just died), not
+                                # on a timeout. The nginx default is "error
+                                # timeout", so on a route with endpoint
+                                # granularity a request that hit its read
+                                # timeout on an overloaded pod is re-sent to
+                                # another pod, adding load during an overload.
+                                # APISIX's ngx_tpl sets no
+                                # proxy_next_upstream of its own, so this
+                                # http-level value applies to every route.
+                                proxy_next_upstream error;
+
                                 # Explicit response-buffering tuning (2026-07-21
                                 # applications-production OOM incident): large,
                                 # slowly-consumed proxied responses (multi-MB
