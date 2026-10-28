@@ -236,7 +236,7 @@ local_secrets = manifest(APP_DIR / "secrets.yaml", root_domain)
 MOUNTED_SECRETS = [SECRET_NAME, "mitxonline-keycloak-admin"]
 unmounted = sorted(set(local_secrets["supplied_by"].values()) - set(MOUNTED_SECRETS))
 if unmounted:
-    msg = f"secrets.yaml supplied_by names Secrets the workloads do not mount: {unmounted}"
+    msg = f"secrets.yaml supplied_by names Secrets no workload mounts: {unmounted}"
     raise ValueError(msg)
 secret_data = local_secret_data(
     secret_env_names(),
