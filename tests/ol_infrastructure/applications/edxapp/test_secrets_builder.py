@@ -195,6 +195,7 @@ class TestBuildBaseGeneralSecretsDict:
         pt_config = secrets["PROCTORING_BACKENDS"]["proctortrack"]
         assert secrets["PROCTORING_BACKENDS"]["DEFAULT"] == "proctortrack"
         assert pt_config["base_url"] == proctortrack_url
+        assert pt_config["requires_escalation_email"] is True
         assert "client_id" in pt_config
         assert "client_secret" in pt_config
         assert "PROCTORING_USER_OBFUSCATION_KEY" in secrets
