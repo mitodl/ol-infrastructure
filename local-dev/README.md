@@ -511,7 +511,7 @@ One registry case zot cannot reclaim on its own is a repo left with no manifest 
 ## Teardown
 
 ```bash
-# Remove the cluster, certs, and /etc/hosts entries (default — removes everything)
+# Remove the cluster, its kubectl context, certs, and /etc/hosts entries (default — removes everything)
 ./local-dev/scripts/teardown.sh
 
 # Keep certs (useful if you want to reuse them on next setup)
