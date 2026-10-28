@@ -255,8 +255,9 @@ pipeline_params = {
     ),
     "mit-learn": AppPipelineParams(
         app_name="mit-learn",
+        build_target="production",
         refresh_stack=False,
-        description="Builds the MIT Learn Django/API backend image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
+        description="Builds the MIT Learn Django/API backend image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
     "ocw-studio": AppPipelineParams(
         app_name="ocw-studio",
