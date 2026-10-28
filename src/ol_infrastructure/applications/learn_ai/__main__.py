@@ -878,7 +878,13 @@ learn_ai_webapp_keda_config = build_webapp_keda_config(
     route_matcher=f"learn-ai_.*learn-ai-{stack_info.env_suffix}-https-olapisixroute_.*",
     container_name="learn-ai-app",
     requests_threshold=learn_ai_config.get("autoscaling_requests_threshold") or "20",
-    latency_threshold=learn_ai_config.get("autoscaling_latency_threshold") or "2000",
+    # No latency trigger by default: about half of learn-ai's requests are LLM
+    # agent calls (/ai/http/*_agent/) that take 2-10s, so p95 sat above 4.4s in
+    # every hourly sample of the week to 2026-10-28 and a 2000ms trigger held
+    # the production webapp at max replicas for 60+ days at ~0.25 req/s. Adding
+    # replicas cannot shorten an LLM response. Set
+    # `learn_ai:autoscaling_latency_threshold` on a stack to opt back in.
+    latency_threshold=learn_ai_config.get("autoscaling_latency_threshold"),
     cpu_threshold=learn_ai_config.get("autoscaling_cpu_threshold") or "60",
 )
 
