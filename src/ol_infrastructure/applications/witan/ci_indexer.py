@@ -88,6 +88,17 @@ INDEX_ACTIVE_DEADLINE_SECONDS = 3 * 60 * 60
 # real reason.
 INDEX_BACKOFF_LIMIT = 1
 
+# WorkloadJobFailed* fires for as long as a failed Job object exists, and
+# without a TTL the CronJob keeps up to `failed_jobs_history_limit` of them
+# until newer failures displace them. On 2026-10-22 operations-qa was still
+# holding the failed Jobs from 10-08, 10-09 and 10-11, and kept them until new
+# failures on 10-23 pushed them out. A day outlives the next run at the
+# default 4h cadence (start up to the starting deadline late, then up to the
+# active deadline), so consecutive failures stay one continuous alert, and it
+# leaves a failed Job and its pod around for a working day of `kubectl
+# describe`. The container logs are in Loki either way.
+INDEX_TTL_SECONDS_AFTER_FINISHED = 24 * 60 * 60
+
 
 def create_ci_indexer(  # noqa: PLR0913
     stack_info: StackInfo,
@@ -302,6 +313,7 @@ def create_ci_indexer(  # noqa: PLR0913
                 spec=kubernetes.batch.v1.JobSpecArgs(
                     backoff_limit=INDEX_BACKOFF_LIMIT,
                     active_deadline_seconds=INDEX_ACTIVE_DEADLINE_SECONDS,
+                    ttl_seconds_after_finished=INDEX_TTL_SECONDS_AFTER_FINISHED,
                     template=kubernetes.core.v1.PodTemplateSpecArgs(
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
                             labels={
