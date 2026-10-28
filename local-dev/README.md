@@ -357,7 +357,7 @@ tilt trigger seed-mit-learn-fixtures
 | mit-learn | `seed-mit-learn-mitxonline` | Backpopulate MITx Online resources |
 | mit-learn | `seed-mit-learn-featured-lists` | Create dev-only featured lists per offeror channel |
 | learn-ai | `seed-learn-ai-checkpoints` | Backpopulate tutor checkpoints |
-| mitxonline | `seed-mitxonline-instance` | Full instance setup (superuser, courses, products) |
+| mitxonline | `seed-mitxonline-instance` | DEDP program with its financial assistance form, two courses with open runs and $999 products; makes `admin@ol.test` a superuser if it has logged in (log in once, then re-run) |
 | mitxonline | `seed-mitxonline-course-data` | Populate test course data |
 | mitxonline | `seed-mitxonline-income-thresholds` | Load country income thresholds |
 | odl-video-service | `seed-ovs-presets` | Create encoding presets (requires real AWS creds) |
@@ -559,7 +559,7 @@ How it works — plain Kubernetes, visible in each app's `deployment.yaml`: ever
 - The definition adds `OTEL_RESOURCE_ATTRIBUTES`, the tracked Secret arrives through `envFrom`, and the component adds `PORT`.
 - Editing the program, the stack file or `secrets.yaml` re-runs the program and rolls the pods; a `secrets.yaml` edit also re-runs the migrate Job. A `configmaps/app-env.local.yaml` for mitxonline is not read: move its `data:` entries under `mitxonline:vars:` in the stack file and delete it; until then the apply log names its keys.
 - The overridden key names and the image in use appear in the `mitxonline-app` resource's log; `kubectl --context local-dev get deploy -n mitxonline mitxonline-app -o yaml` shows the merged result. Override values sit in the pod spec and in the Pulumi state under `local-dev/infra/.pulumi/`, so treat both as sensitive output.
-- The pre-deploy Job also runs `configure_wagtail`, so a fresh database gets its Wagtail site and index pages without a seed step (`seed.sh` has no mitxonline default for the same reason; `tilt trigger mitxonline-app` recreates the stack, Job included, so it repeats them). Logins come from Keycloak; no Django superuser is seeded.
+- The pre-deploy Job also runs `configure_wagtail`, so a fresh database gets its Wagtail site and index pages without a seed step (`seed.sh` has no mitxonline default for the same reason; `tilt trigger mitxonline-app` recreates the stack, Job included, so it repeats them). Logins come from Keycloak, which creates the Django user on first login, so `seed-mitxonline-instance` promotes `admin@ol.test` only after that login; it does not create the user.
 - The Job carries the component's `ttlSecondsAfterFinished` of 30 minutes, so `kubectl --context local-dev -n mitxonline logs job/mitxonline-app-pre-deploy` answers NotFound after that, and the next apply, whatever triggered it, re-creates the Job and re-runs migrate (about 25 s) before the pods roll.
 - Before switching to `main` or any branch from before the program, run `tilt down` (or `local-dev/scripts/pulumi-app-apply.sh mitxonline down`): Tilt does not delete the Pulumi-owned objects, and the old YAML then serves the same hosts beside them.
 

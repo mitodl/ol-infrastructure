@@ -150,6 +150,54 @@ local_resource(
     auto_init=False,
 )
 
+# What mitxonline's configure_instance would seed, minus what cannot run here.
+# configure_instance itself exits 255 with no platform argument (the gateway
+# check), and with `none` it still fails at its first course because it passes
+# create_courseware a run_url option that command no longer takes. Its
+# createsuperuser and create_user steps prompt, and kubectl exec has no TTY.
+# Users come from Keycloak and are matched on global_id, so a superuser created
+# here would collide on email with admin@ol.test's first login; the user that
+# login creates is promoted instead. Each object is created only when missing,
+# in one transaction, so re-triggering the seed is a no-op and a failure leaves
+# nothing half-made. Passed to `manage.py shell -c` in single quotes, so the
+# script must not contain one.
+MITXONLINE_SEED_INSTANCE = """
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.db import transaction
+from courses.models import Course, Program
+
+PROGRAM = "program-v1:MITx+DEDP"
+COURSES = [
+    ("course-v1:edX+DemoX", "Demonstration Course", "Demo_Course", "Science", PROGRAM),
+    ("course-v1:edX+E2E-101", "E2E Test Course", "course", "Math", None),
+]
+with transaction.atomic():
+    if not Program.objects.filter(readable_id=PROGRAM).exists():
+        call_command(
+            "create_courseware", "program", PROGRAM,
+            "Data, Economics and Development Policy",
+            live=True, depts=["Economics"], create_depts=True, create_page=True,
+        )
+        call_command("create_finaid_form", PROGRAM, live=True)
+    for readable_id, title, run_tag, dept, program in COURSES:
+        if not Course.objects.filter(readable_id=readable_id).exists():
+            call_command(
+                "create_courseware", "course", readable_id, title,
+                live=True, create_run=run_tag, program=program,
+                required=program is not None, depts=[dept], create_depts=True,
+                create_page=True, set_courserun_dates_automatically=True,
+                price=999,
+            )
+if get_user_model().objects.filter(email="admin@ol.test").exists():
+    call_command("promote_user", "promote", "--superuser", "--email", "admin@ol.test")
+else:
+    print(
+        "admin@ol.test has no mitxonline account yet: log in to mitxonline "
+        "as admin@ol.test once, then run this seed again to make it a superuser."
+    )
+"""
+
 # ---------------------------------------------------------------------------
 # Application registry
 #
@@ -237,8 +285,8 @@ APPS = [
         "seed_commands": [
             {
                 "label": "seed-mitxonline-instance",
-                "description": "Full instance setup: superuser, OAuth2 app, program, courses, products",
-                "cmd": "python manage.py configure_instance",
+                "description": "DEDP program, two courses with open runs and products, admin@ol.test superuser",
+                "cmd": "python manage.py shell -c '" + MITXONLINE_SEED_INSTANCE + "'",
             },
             {
                 "label": "seed-mitxonline-course-data",
