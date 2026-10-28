@@ -107,6 +107,8 @@ def test_apisix_values_come_from_the_deployed_definition(monkeypatch):
     assert values["service"]["http"]["nodePort"] == 30080
     assert values["service"]["tls"]["nodePort"] == 30443
     assert values["replicaCount"] == 1
+    # The hand-written manifests race the webhook; see ingress.py.
+    assert values["ingress-controller"]["webhook"] == {"enabled": False}
     assert values["autoscaling"] == {"enabled": False}
     assert (
         values["apisix"]["ssl"]

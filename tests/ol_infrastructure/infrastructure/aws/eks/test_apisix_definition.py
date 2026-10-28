@@ -121,3 +121,12 @@ def test_memory_limit_defaults_to_double_the_request():
     assert apisix_helm_values(_single_pod(memory_limit="1Gi"))["resources"][
         "limits"
     ] == {"memory": "1Gi"}
+
+
+def test_admission_webhook_is_on_unless_turned_off():
+    assert apisix_helm_values(_fleet())["ingress-controller"]["webhook"] == {
+        "enabled": True
+    }
+    assert apisix_helm_values(_single_pod(admission_webhook_enabled=False))[
+        "ingress-controller"
+    ]["webhook"] == {"enabled": False}

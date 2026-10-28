@@ -112,6 +112,11 @@ def create_ingress(  # noqa: PLR0913
         # APISIX reads the trusted CA file only at startup, through a subPath
         # mount, so a new bundle has to roll the pod.
         pod_annotations={"checksum/trusted-ca": trusted_ca_checksum},
+        # The hand-written app manifests (mit-learn, learn-ai, ocw-studio,
+        # openedx) apply an ApisixPluginConfig and the route that names it in
+        # one kubectl batch, and the webhook denied those routes on every fresh
+        # cluster. Back on once those apps render through Pulumi programs.
+        admission_webhook_enabled=False,
     )
 
     # Helm installs the chart's CRDs on first install, including the Gateway

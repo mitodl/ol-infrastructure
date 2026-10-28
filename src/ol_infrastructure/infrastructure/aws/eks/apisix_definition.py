@@ -289,6 +289,12 @@ class ApisixGatewayConfig(BaseModel):
     otel_tracing_enabled: bool = False
     # Needs the Prometheus operator's ServiceMonitor CRD.
     service_monitor_enabled: bool = False
+    # The ingress controller's validating webhook checks a route's
+    # plugin_config_name against its informer cache. A manifest that applies a
+    # PluginConfig and the route using it in one batch gets the route denied
+    # until the cache catches up, so only enable it where something orders the
+    # two (Pulumi does).
+    admission_webhook_enabled: bool = True
     trusted_ca: ApisixTrustedCA | None = None
     pod_annotations: dict[str, str] | None = None
 
@@ -922,7 +928,7 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
             "rbac": {
                 "create": True,
             },
-            "webhook": {"enabled": True},
+            "webhook": {"enabled": config.admission_webhook_enabled},
             "serviceAccount": {
                 "create": True,
                 "name": "apache-apisix-ingress-controller",
