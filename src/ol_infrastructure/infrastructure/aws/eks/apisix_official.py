@@ -2,25 +2,33 @@
 """Configure and install the Apache APISIX Helm chart.
 
 This module deploys the Apache APISIX chart from https://apache.github.io/apisix-helm-chart.
+The chart values, Gateway API objects and global rules that local-dev shares
+are built in apisix_definition.py; this module adds the EKS-specific inputs
+and resources.
 """
-
-import textwrap
-from pathlib import Path
 
 import pulumi_eks as eks
 import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
 from pulumi import Config, InvokeOptions, Output, ResourceOptions
 
-from bridge.lib.constants import mit_learn_session_cookie_name
-from bridge.lib.magic_numbers import (
-    AWS_LOAD_BALANCER_NAME_MAX_LENGTH,
-    DEFAULT_HTTPS_PORT,
-)
-from ol_infrastructure.components.services.apisix import (
-    OIDC_RECOVERY_SHARED_DICT,
-    OIDC_RECOVERY_SHARED_DICT_SIZE,
-    gateway_global_pre_function_plugin,
+from bridge.lib.magic_numbers import AWS_LOAD_BALANCER_NAME_MAX_LENGTH
+from ol_infrastructure.infrastructure.aws.eks.apisix_definition import (
+    APISIX_CHART_REPOSITORY,
+    APISIX_RELEASE_NAME,
+    DEFAULT_CPU_REQUEST,
+    DEFAULT_MEMORY_REQUEST,
+    GATEWAY_ERROR_PAGES_CONFIGMAP_NAME,
+    GATEWAY_NAME,
+    IDENTITY_HEADER_STRIP_RULE_NAME,
+    ApisixGatewayConfig,
+    ApisixGatewayService,
+    ApisixHighAvailability,
+    apisix_helm_values,
+    gateway_class_spec,
+    gateway_error_pages,
+    gateway_spec,
+    identity_header_strip_rule_spec,
 )
 from ol_infrastructure.lib.aws.eks_helper import (
     cached_image_uri,
@@ -29,25 +37,6 @@ from ol_infrastructure.lib.k8s_crds import adopt_helm_chart_crds
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
-# TLS 1.2 cipher suites the gateway offers (TLS 1.3 suites are not affected by
-# ssl_ciphers).  This is Mozilla's "intermediate" profile, and also the first
-# nine entries of the chart's own default -- the chart default goes on to add
-# CBC suites, suites without forward secrecy and DES-CBC3-SHA (hq#14079).
-# The DHE suites are inert without an ssl_dhparam and are kept only so this
-# stays a verbatim copy of the profile.
-# Ref: https://wiki.mozilla.org/Security/Server_Side_TLS
-GATEWAY_SSL_CIPHERS = (
-    "ECDHE-ECDSA-AES128-GCM-SHA256:"
-    "ECDHE-RSA-AES128-GCM-SHA256:"
-    "ECDHE-ECDSA-AES256-GCM-SHA384:"
-    "ECDHE-RSA-AES256-GCM-SHA384:"
-    "ECDHE-ECDSA-CHACHA20-POLY1305:"
-    "ECDHE-RSA-CHACHA20-POLY1305:"
-    "DHE-RSA-AES128-GCM-SHA256:"
-    "DHE-RSA-AES256-GCM-SHA384:"
-    "DHE-RSA-CHACHA20-POLY1305"
-)
-
 # Sent on every gateway response by a global rule.  Hosts behind Fastly keep
 # whatever their own Fastly service sets, because Fastly's response header
 # rules run after the origin's.  No includeSubDomains until the subdomains of
@@ -55,162 +44,6 @@ GATEWAY_SSL_CIPHERS = (
 # Starts at one day so a mistake ages out of browsers quickly; raise it to a
 # year (31536000) once it has run without problems.
 GATEWAY_HSTS_HEADER_VALUE = "max-age=86400"
-
-# APISIX's default enabled-plugins list for the version shipped by the pinned
-# chart (chart 2.17.x => APISIX 3.18.x), taken from
-# https://github.com/apache/apisix/blob/3.18.0/apisix/cli/config.lua
-#
-# Setting ``apisix.plugins`` in the Helm values REPLACES this default list
-# rather than extending it, so the full list must be reproduced here.  We do
-# this solely to add ``opentelemetry`` (which is NOT enabled by default) without
-# silently dropping any plugin that applications already rely on.
-#
-# ``server-info`` is absent here because upstream comments it out of its own
-# default list ("deprecated and will be removed in a future release") in both
-# 3.17 and 3.18.  This list is the active set, so it stays out -- no local
-# exception to carry forward on the next upgrade.
-#
-# 3.18 adds ``ai-cache``, ``ai-lakera-guard`` and ``ldap-auth-advanced`` to the
-# defaults and removes none.
-#
-# IMPORTANT: revisit this list on every APISIX major/minor upgrade.  If it
-# drifts from the APISIX default for the running version, plugins omitted here
-# will stop loading.  ``opentelemetry`` is appended at the end below.
-APISIX_DEFAULT_PLUGINS_3_18: list[str] = [
-    "real-ip",
-    "ai",
-    "client-control",
-    "proxy-buffering",
-    "proxy-control",
-    "request-id",
-    "zipkin",
-    "ext-plugin-pre-req",
-    "fault-injection",
-    "mocking",
-    "serverless-pre-function",
-    "cors",
-    "ip-restriction",
-    "ua-restriction",
-    "referer-restriction",
-    "csrf",
-    "uri-blocker",
-    "request-validation",
-    "chaitin-waf",
-    "multi-auth",
-    "openid-connect",
-    "saml-auth",
-    "cas-auth",
-    "authz-casbin",
-    "authz-casdoor",
-    "wolf-rbac",
-    "ldap-auth-advanced",
-    "ldap-auth",
-    "hmac-auth",
-    "basic-auth",
-    "jwt-auth",
-    "jwe-decrypt",
-    "key-auth",
-    "dingtalk-auth",
-    "feishu-auth",
-    "acl",
-    "consumer-restriction",
-    "attach-consumer-label",
-    "forward-auth",
-    "opa",
-    "authz-keycloak",
-    "data-mask",
-    "proxy-cache",
-    "body-transformer",
-    "ai-prompt-template",
-    "ai-prompt-decorator",
-    "ai-prompt-guard",
-    "ai-rag",
-    "ai-rate-limiting",
-    "ai-proxy-multi",
-    "ai-proxy",
-    "ai-cache",
-    "ai-aws-content-moderation",
-    "ai-aliyun-content-moderation",
-    "ai-lakera-guard",
-    "proxy-mirror",
-    "graphql-proxy-cache",
-    "proxy-rewrite",
-    "workflow",
-    "api-breaker",
-    "graphql-limit-count",
-    "limit-conn",
-    "limit-count",
-    "limit-req",
-    "gzip",
-    "traffic-label",
-    "traffic-split",
-    "redirect",
-    "response-rewrite",
-    "oas-validator",
-    "mcp-bridge",
-    "degraphql",
-    "kafka-proxy",
-    "grpc-transcode",
-    "grpc-web",
-    "http-dubbo",
-    "public-api",
-    "prometheus",
-    "datadog",
-    "lago",
-    "loki-logger",
-    "elasticsearch-logger",
-    "echo",
-    "loggly",
-    "http-logger",
-    "splunk-hec-logging",
-    "skywalking-logger",
-    "google-cloud-logging",
-    "sls-logger",
-    "tcp-logger",
-    "kafka-logger",
-    "rocketmq-logger",
-    "syslog",
-    "udp-logger",
-    "file-logger",
-    "clickhouse-logger",
-    "tencent-cloud-cls",
-    "inspect",
-    "example-plugin",
-    "aws-lambda",
-    "azure-functions",
-    "openwhisk",
-    "openfunction",
-    "serverless-post-function",
-    "ext-plugin-post-req",
-    "ext-plugin-post-resp",
-    "ai-request-rewrite",
-]
-
-# Full enabled-plugins list applied via the Helm chart: APISIX defaults plus the
-# opentelemetry plugin, which emits OTLP traces (not metrics) for every request.
-APISIX_ENABLED_PLUGINS: list[str] = [
-    *APISIX_DEFAULT_PLUGINS_3_18,
-    "opentelemetry",
-]
-
-
-def _double_memory_quantity(quantity: str) -> str:
-    """Double a Kubernetes memory quantity, preserving its unit suffix.
-
-    Used to derive a default memory limit with burst headroom above the
-    configured request when no explicit limit override is supplied.
-    Supports the binary (Ki/Mi/Gi/Ti) and decimal (K/M/G/T) suffixes valid
-    for a Kubernetes memory quantity, and fractional prefixes (e.g.
-    "1.5Gi"). Pi/Ei and exponential notation are not supported -- not a
-    realistic unit for a gateway memory request/limit -- and raise the
-    same clear error as any other unrecognized suffix.
-    """
-    for suffix in ("Ki", "Mi", "Gi", "Ti", "K", "M", "G", "T"):
-        if quantity.endswith(suffix):
-            value = float(quantity[: -len(suffix)]) * 2
-            return f"{int(value) if value.is_integer() else value}{suffix}"
-    msg = f"Unsupported memory quantity suffix: {quantity!r}"
-    raise ValueError(msg)
 
 
 def setup_apisix(
@@ -259,65 +92,9 @@ def setup_apisix(
     """
     apisix_domains = eks_config.get_object("apisix_domains") or []
 
-    # Name of the OIDC session cookie the $oidc_session_bytes access-log field
-    # (and the apisix_oidc_session_cookie_bytes dashboard built on it) measures.
-    # There is one such variable per gateway but several OIDC-protected
-    # applications behind it, so it tracks the largest and most-watched session
-    # on the cluster: MIT Learn's, whose cookie is shared by learn-ai and
-    # ol-analytics-api. Purely observational -- lua-resty-session 4.x ignores
-    # these nginx variables, the cookie name itself is set per-application via
-    # OLApisixOIDCConfig.oidc_session_cookie_name.
-    session_cookie_name = mit_learn_session_cookie_name(stack_info.env_suffix)
-
     # APISIX chart uses a different chart version scheme
     # Chart version 2.17.x contains APISIX 3.18.x
     apisix_chart_version = versions["APISIX_CHART"]
-
-    # OpenTelemetry tracing is exported to the in-cluster Grafana Alloy receiver,
-    # which only exists where the grafana k8s-monitoring stack is installed (it is
-    # skipped on CI -- see substructure/aws/eks/grafana.py).  Gate both the plugin
-    # enablement and its collector config on non-CI environments so APISIX does not
-    # repeatedly fail to reach a non-existent collector.
-    otel_tracing_enabled = stack_info.env_suffix.lower() != "ci"
-
-    # Collector/resource/batch settings for the opentelemetry plugin.  In APISIX
-    # 3.14 the plugin reads these from *plugin_metadata*, NOT plugin_attr: its
-    # ``rewrite`` phase calls ``plugin.plugin_metadata("opentelemetry")`` and, if
-    # that is nil, logs "plugin_metadata is required for opentelemetry plugin to
-    # working properly" and returns *without creating or exporting a span* (see
-    # apisix/plugins/opentelemetry.lua).  The ingress controller delivers this to
-    # the data plane via the GatewayProxy ``pluginMetadata`` field (rendered into
-    # the standalone config's ``plugin_metadata`` over the Admin API) -- see the
-    # ingress-controller.gatewayProxy values below.  ``trace_id_source: random``
-    # yields spec-compliant 16-byte trace ids; "x-request-id" would pass the
-    # request-id UUID verbatim, which Tempo drops as malformed.
-    otel_plugin_metadata = {
-        "trace_id_source": "random",
-        "resource": {
-            "service.name": "apisix",
-            "deployment.environment": stack_info.env_suffix.lower(),
-        },
-        "collector": {
-            "address": "grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318",
-            "request_timeout": 3,
-        },
-        "batch_span_processor": {
-            "drop_on_queue_full": False,
-            "max_queue_size": 1024,
-            "batch_timeout": 2,
-            "inactive_timeout": 1,
-            "max_export_batch_size": 16,
-        },
-        "set_ngx_var": False,
-    }
-
-    # Create apache-apisix specific labels that include both global labels
-    # and app-specific labels for proper service selector matching
-    apisix_labels = {
-        **k8s_global_labels,
-        "app.kubernetes.io/name": "apache-apisix",
-        "app.kubernetes.io/component": "gateway",
-    }
 
     # Get Fastly IP ranges for trusted proxy configuration
     fastly_ips = Output.all(
@@ -329,20 +106,67 @@ def setup_apisix(
         ).ipv6_cidr_blocks,
     ).apply(lambda blocks: [*blocks[0], *blocks[1]])
 
-    _error_pages_dir = Path(__file__).resolve().parent / "error_pages"
-    _gateway_error_html = (_error_pages_dir / "gateway_error.html").read_text(
-        encoding="utf-8"
+    gateway_config = ApisixGatewayConfig(
+        env_suffix=stack_info.env_suffix,
+        admin_key=eks_config.require_secret("apisix_admin_key"),
+        viewer_key=eks_config.require_secret("apisix_viewer_key"),
+        service=ApisixGatewayService(
+            type="LoadBalancer",
+            annotations={
+                "external-dns.kubernetes.io/hostname": ",".join(apisix_domains),
+                "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-apache-apisix"[
+                    :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
+                ],
+                "service.beta.kubernetes.io/aws-load-balancer-type": "external",
+                "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
+                "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
+                "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
+                # NLB target-type "ip" disables client IP preservation by
+                # default (unlike "instance" targets). Without this, APISIX
+                # only ever sees the NLB's own address as $remote_addr, which
+                # breaks the "real-ip" plugin's trustedAddresses check (it can
+                # never match a Fastly IP) and any per-client-IP logic
+                # downstream (upstream chash/hashOn=remote_addr, rate
+                # limiting, etc).
+                "service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "preserve_client_ip.enabled=true",
+                "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
+                    lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
+                ),
+                "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": ",".join(
+                    [f"{k}={v}" for k, v in aws_config.tags.items()]
+                ),
+            },
+        ),
+        high_availability=ApisixHighAvailability(
+            min_replicas=eks_config.get_int("apisix_min_replicas") or 3,
+            max_replicas=eks_config.get_int("apisix_max_replicas") or 5,
+            target_cpu_utilization_percentage=(
+                eks_config.get_int("apisix_target_cpu_utilization_percentage") or 50
+            ),
+        ),
+        ingress_controller_replicas=3,
+        image_repository=cached_image_uri("apache/apisix"),
+        tolerations=operations_tolerations,
+        labels=k8s_global_labels,
+        trusted_addresses=fastly_ips,
+        # The Grafana Alloy receiver the traces go to only exists where the
+        # grafana k8s-monitoring stack is installed, which skips CI (see
+        # substructure/aws/eks/grafana.py).
+        otel_tracing_enabled=stack_info.env_suffix.lower() != "ci",
+        service_monitor_enabled=True,
+        cpu_request=eks_config.get("apisix_cpu") or DEFAULT_CPU_REQUEST,
+        memory_request=eks_config.get("apisix_memory") or DEFAULT_MEMORY_REQUEST,
+        memory_limit=eks_config.get("apisix_memory_limit"),
     )
-    _error_pages_configmap_name = "apache-apisix-error-pages"
 
     error_pages_configmap = kubernetes.core.v1.ConfigMap(
         f"{cluster_name}-apisix-error-pages-configmap",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name=_error_pages_configmap_name,
+            name=GATEWAY_ERROR_PAGES_CONFIGMAP_NAME,
             namespace="operations",
             labels=k8s_global_labels,
         ),
-        data={"gateway_error.html": _gateway_error_html},
+        data=gateway_error_pages(),
         opts=ResourceOptions(
             provider=k8s_provider,
             parent=operations_namespace,
@@ -366,7 +190,7 @@ def setup_apisix(
     apisix_crds = adopt_helm_chart_crds(
         f"{cluster_name}-apisix-crds",
         kubeconfig=cluster.kubeconfig,
-        repo="https://apache.github.io/apisix-helm-chart",
+        repo=APISIX_CHART_REPOSITORY,
         chart="apisix",
         version=apisix_chart_version,
         groups={"apisix.apache.org"},
@@ -376,7 +200,7 @@ def setup_apisix(
     apisix_helm_release = kubernetes.helm.v3.Release(
         f"{cluster_name}-apisix-official-helm-release",
         kubernetes.helm.v3.ReleaseArgs(
-            name="apache-apisix",
+            name=APISIX_RELEASE_NAME,
             version=apisix_chart_version,
             namespace="operations",
             cleanup_on_fail=True,
@@ -386,675 +210,9 @@ def setup_apisix(
             # only write them on a fresh install anyway, which is the bug.
             skip_crds=True,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
-                repo="https://apache.github.io/apisix-helm-chart",
+                repo=APISIX_CHART_REPOSITORY,
             ),
-            values={
-                # --- Global/Image Configuration ---
-                "image": {
-                    "repository": cached_image_uri("apache/apisix"),
-                    "pullPolicy": "IfNotPresent",
-                },
-                # --- Autoscaling ---
-                "autoscaling": {
-                    "enabled": True,
-                    "minReplicas": eks_config.get_int("apisix_min_replicas") or 3,
-                    "maxReplicas": eks_config.get_int("apisix_max_replicas") or 5,
-                    "targetCPUUtilizationPercentage": (
-                        eks_config.get_int("apisix_target_cpu_utilization_percentage")
-                        or 50
-                    ),
-                },
-                # --- Pod Configuration ---
-                "tolerations": operations_tolerations,
-                # Spread gateway pods across availability zones and nodes to reduce
-                # the likelihood that an AZ-level failure takes out multiple pods and
-                # to lower the probability that a rolling update places consecutive pods
-                # on the same node (which shrinks the window where a pod with a stale
-                # services_conf_version can block ADC sidecar syncs on a freshly
-                # restarted ingress controller).
-                # These are soft constraints (ScheduleAnyway + preferred anti-affinity):
-                # they improve distribution where possible but do not block scheduling
-                # when the topology cannot be perfectly balanced.
-                "topologySpreadConstraints": [
-                    {
-                        "maxSkew": 1,
-                        "topologyKey": "topology.kubernetes.io/zone",
-                        "whenUnsatisfiable": "ScheduleAnyway",
-                        "labelSelector": {
-                            "matchLabels": {
-                                "app.kubernetes.io/name": "apache-apisix",
-                                "app.kubernetes.io/component": "gateway",
-                            },
-                        },
-                    },
-                    {
-                        "maxSkew": 1,
-                        "topologyKey": "kubernetes.io/hostname",
-                        "whenUnsatisfiable": "ScheduleAnyway",
-                        "labelSelector": {
-                            "matchLabels": {
-                                "app.kubernetes.io/name": "apache-apisix",
-                                "app.kubernetes.io/component": "gateway",
-                            },
-                        },
-                    },
-                ],
-                "affinity": {
-                    "podAntiAffinity": {
-                        "preferredDuringSchedulingIgnoredDuringExecution": [
-                            {
-                                "weight": 100,
-                                "podAffinityTerm": {
-                                    "labelSelector": {
-                                        "matchLabels": {
-                                            "app.kubernetes.io/name": "apache-apisix",
-                                            "app.kubernetes.io/component": "gateway",
-                                        }
-                                    },
-                                    "topologyKey": "kubernetes.io/hostname",
-                                },
-                            }
-                        ]
-                    }
-                },
-                "readinessProbe": {
-                    # Temporarily relax readiness to break chicken-egg problem
-                    # Workers need to be in service to receive config via Admin API
-                    "initialDelaySeconds": 10,
-                    "periodSeconds": 10,
-                    "timeoutSeconds": 1,
-                    "failureThreshold": 30,  # Allow 5 minutes before marking unhealthy
-                },
-                # requests.memory != limits.memory deliberately: a transient
-                # buffering spike (e.g. several concurrent large course-CSV/
-                # JupyterHub-bundle downloads pinned to one pod via HTTP/2)
-                # needs burst headroom above the steady-state baseline.  With
-                # requests == limits (the prior config), the pod was OOMKilled
-                # the instant usage crossed the request value, well before the
-                # VPA's periodic recommendation loop could observe the spike
-                # and react -- VPA cannot prevent an OOM that happens faster
-                # than its sampling/recommendation interval. limits.memory now
-                # defaults to double the request so ordinary bursts are
-                # absorbed as Burstable QoS headroom instead of an instant
-                # hard kill; the VPA (below) still owns raising the baseline
-                # request over time via apisix_memory/apisix_max_memory.
-                "resources": {
-                    "requests": {
-                        # The CPU request is the HPA's denominator: the
-                        # autoscaler above targets
-                        # targetCPUUtilizationPercentage of THIS value, so the
-                        # per-pod scale-out point is target% x request. A
-                        # request far below real per-pod usage makes
-                        # maxReplicas reachable at trivial absolute load and
-                        # turns HPAAtMaxReplicas alerts into noise. Size it per
-                        # stack (apisix_cpu) from measured per-pod usage, not
-                        # as a placeholder.
-                        "cpu": eks_config.get("apisix_cpu") or "100m",
-                        "memory": eks_config.get("apisix_memory") or "400Mi",
-                    },
-                    "limits": {
-                        "memory": eks_config.get("apisix_memory_limit")
-                        or _double_memory_quantity(
-                            eks_config.get("apisix_memory") or "400Mi"
-                        ),
-                    },
-                },
-                # --- Rolling Update Strategy and Pod Lifecycle ---
-                # maxSurge: 0 / maxUnavailable: 1 (drain-first) ensures that an old
-                # pod — which may hold a high services_conf_version accumulated over
-                # days of ADC syncs — is fully removed from endpoint slices BEFORE a
-                # replacement pod starts.  This eliminates the race where a freshly
-                # restarted ingress-controller ADC sidecar resolves a mix of old (high-
-                # version) and new (version-0) APISix pod IPs and gets a
-                # "services_conf_version must be >= N" rejection from the old pod.
-                #
-                # The tradeoff is a brief capacity dip to (desired-1) pods during each
-                # step, which the PDB (maxUnavailable: 1) already accounts for.
-                #
-                # minReadySeconds: 30 forces Kubernetes to observe the new pod as
-                # healthy for 30 s before advancing to the next rollout step, preventing
-                # a bad image from racing through the entire fleet undetected.
-                "updateStrategy": {
-                    "type": "RollingUpdate",
-                    "rollingUpdate": {
-                        "maxSurge": 0,
-                        "maxUnavailable": 1,
-                    },
-                },
-                "minReadySeconds": 30,
-                # Give in-flight requests up to 120 s to complete after the pod is
-                # removed from the NLB target group and endpoint slice.  The preStop
-                # sleep bridges the gap between endpoint-slice propagation (< 5 s) and
-                # the last long-lived connection draining; 90 s < 120 s leaves a 30 s
-                # hard-kill buffer so the kubelet never has to SIGKILL the process.
-                "terminationGracePeriodSeconds": 120,
-                "lifecycle": {
-                    "preStop": {
-                        "exec": {
-                            "command": ["/bin/sh", "-c", "sleep 90"],
-                        }
-                    }
-                },
-                # --- Service (LoadBalancer) ---
-                "service": {
-                    "type": "LoadBalancer",
-                    "annotations": {
-                        "external-dns.kubernetes.io/hostname": ",".join(apisix_domains),
-                        "service.beta.kubernetes.io/aws-load-balancer-name": f"{cluster_name}-apache-apisix"[
-                            :AWS_LOAD_BALANCER_NAME_MAX_LENGTH
-                        ],
-                        "service.beta.kubernetes.io/aws-load-balancer-type": "external",
-                        "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
-                        "service.beta.kubernetes.io/aws-load-balancer-scheme": "internet-facing",
-                        "service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled": "true",
-                        # NLB target-type "ip" disables client IP preservation by
-                        # default (unlike "instance" targets). Without this, APISIX
-                        # only ever sees the NLB's own address as $remote_addr, which
-                        # breaks the "real-ip" plugin's trustedAddresses check (it can
-                        # never match a Fastly IP) and any per-client-IP logic
-                        # downstream (upstream chash/hashOn=remote_addr, rate
-                        # limiting, etc).
-                        "service.beta.kubernetes.io/aws-load-balancer-target-group-attributes": "preserve_client_ip.enabled=true",
-                        "service.beta.kubernetes.io/aws-load-balancer-subnets": target_vpc.apply(
-                            lambda tvpc: ",".join(tvpc["k8s_public_subnet_ids"])
-                        ),
-                        "service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags": ",".join(
-                            [f"{k}={v}" for k, v in aws_config.tags.items()]
-                        ),
-                    },
-                    "http": {
-                        "enabled": True,
-                        "servicePort": 80,
-                        "containerPort": 9080,
-                    },
-                    "tls": {
-                        "enabled": True,
-                        "servicePort": 443,
-                        "containerPort": 9443,
-                    },
-                    "labelsOverride": apisix_labels,
-                },
-                # --- APISIX Configuration ---
-                "apisix": {
-                    "deployment": {
-                        "mode": "traditional",
-                        "role": "traditional",
-                        "role_traditional": {
-                            "config_provider": "yaml",
-                        },
-                    },
-                    # Enable the opentelemetry plugin globally (it is NOT in the
-                    # APISIX default plugin list).  Setting ``plugins`` replaces the
-                    # default list, so APISIX_ENABLED_PLUGINS reproduces the full
-                    # default set plus opentelemetry.  Omitted on CI so the default
-                    # list (which already excludes opentelemetry) remains in effect.
-                    **(
-                        {"plugins": APISIX_ENABLED_PLUGINS}
-                        if otel_tracing_enabled
-                        else {}
-                    ),
-                    # ``pluginAttrs`` renders to ``plugin_attr`` in config.yaml.
-                    # NOTE: the APISIX 3.14 opentelemetry plugin does NOT read its
-                    # collector/resource config from plugin_attr -- it reads it from
-                    # plugin_metadata (delivered via the GatewayProxy below).  The
-                    # same config is mirrored here only so older/other plugin builds
-                    # that still consult plugin_attr keep working; on 3.14 it is
-                    # inert but harmless.  The plugin only supports binary OTLP over
-                    # HTTP, so the collector targets the Alloy receiver's HTTP port
-                    # (4318); the plugin appends ``/v1/traces`` itself.  From the
-                    # receiver, traces flow through the existing tail-sampling
-                    # pipeline to Grafana Cloud (see grafana.py gc-otlp-endpoint).
-                    "pluginAttrs": {
-                        # Redirect http requests to port 443, not APISIX's
-                        # internal TLS port 9443 (hq#10999)
-                        "redirect": {"https_port": DEFAULT_HTTPS_PORT},
-                        **(
-                            {"opentelemetry": otel_plugin_metadata}
-                            if otel_tracing_enabled
-                            else {}
-                        ),
-                    },
-                    "trustedAddresses": fastly_ips,
-                    # Chart default is true, which sends "Server: APISIX/<version>"
-                    # on every response (hq#14079).
-                    "enableServerTokens": False,
-                    # Enable comprehensive per-phase request lifecycle tracing
-                    # (SSL/SNI, rewrite, access, header_filter, body_filter, log).
-                    # Available since chart 2.16.0; without it OpenTelemetry only
-                    # emits a single span per request instead of one per phase.
-                    "tracing": otel_tracing_enabled,
-                    "admin": {
-                        "enabled": True,
-                        "type": "ClusterIP",
-                        "ip": "0.0.0.0",  # noqa: S104 - ClusterIP service, internal only
-                        "port": 9180,
-                        "servicePort": 9180,
-                        "credentials": {
-                            "admin": eks_config.require_secret("apisix_admin_key"),
-                            "viewer": eks_config.require_secret("apisix_viewer_key"),
-                        },
-                        "allow": {
-                            "ipList": [
-                                "0.0.0.0/0",  # Allow all internal access
-                            ],
-                        },
-                    },
-                    "ssl": {
-                        "enabled": True,
-                        "containerPort": 9443,
-                        "sslCiphers": GATEWAY_SSL_CIPHERS,
-                    },
-                    "prometheus": {
-                        "enabled": True,
-                        "containerPort": 9091,
-                        "path": "/apisix/prometheus/metrics",
-                    },
-                    # --- NGINX Configuration (nested under apisix) ---
-                    "nginx": {
-                        "workerProcesses": "auto",
-                        "enableCPUAffinity": True,
-                        "workerConnections": "10620",
-                        # Counts OIDC login restarts per Keycloak session_state;
-                        # see oidc_gateway_pre_function_plugin.
-                        "customLuaSharedDicts": [
-                            {
-                                "name": OIDC_RECOVERY_SHARED_DICT,
-                                "size": OIDC_RECOVERY_SHARED_DICT_SIZE,
-                            },
-                        ],
-                        "logs": {
-                            "enableAccessLog": True,
-                            "accessLog": "/dev/stdout",
-                            "accessLogFormat": 'time_local="$time_local" '
-                            "body_bytes_sent=$body_bytes_sent "
-                            "bytes_sent=$bytes_sent "
-                            "client=$remote_addr "
-                            "host=$host "
-                            "remote_addr=$remote_addr "
-                            "request_id=$request_id "
-                            "request_length=$request_length "
-                            "request_method=$request_method "
-                            "request_time=$request_time "
-                            # Quoted because Loki's logfmt parser silently
-                            # DROPS a key whose unquoted value contains "=":
-                            # every URI with a query string ("?limit=12")
-                            # parsed to an empty request_uri, with no
-                            # __error__ raised to make the loss visible.  The
-                            # already-quoted $request on the same line kept
-                            # its full URI, which is what this mirrors.  Safe
-                            # with accessLogFormatEscape "default": nginx
-                            # escapes any literal quote in the URI as \".
-                            'request_uri="$request_uri" '
-                            "status=$status "
-                            "upstream_addr=$upstream_addr "
-                            "upstream_connect_time=$upstream_connect_time "
-                            "upstream_header_time=$upstream_header_time "
-                            "upstream_response_time=$upstream_response_time "
-                            "upstream_status=$upstream_status "
-                            'http_referer="$http_referer" '
-                            # Referer is subject to the page's referrer policy
-                            # and is often absent on cross-origin API calls;
-                            # Origin is sent on every CORS-mode request no
-                            # matter the policy, and Sec-Fetch-Site says
-                            # same-origin/cross-site/none without any URL.
-                            'http_origin="$http_origin" '
-                            'sec_fetch_site="$http_sec_fetch_site" '
-                            'http_user_agent="$http_user_agent" '
-                            "method=$request_method "
-                            'request="$request" '
-                            "cookie_bytes=$cookie_bytes "
-                            "cookie_count=$cookie_count "
-                            "oidc_session_bytes=$oidc_session_bytes "
-                            'cookie_names="$cookie_names" '
-                            'cookie_sizes="$cookie_sizes" '
-                            # What each client actually negotiated, so a cipher
-                            # change can be checked against real traffic.  Kept
-                            # last: grafana.py's Alloy regex expects the cookie_*
-                            # fields above to stay contiguous.
-                            "ssl_protocol=$ssl_protocol "
-                            "ssl_cipher=$ssl_cipher",
-                            "accessLogFormatEscape": "default",
-                            "errorLog": "/dev/stderr",
-                            "errorLogLevel": "warn",
-                        },
-                        "configurationSnippet": {
-                            "main": "",
-                            "httpStart": textwrap.dedent(
-                                """\
-                                client_header_buffer_size 8k;
-                                large_client_header_buffers 4 64k;
-
-                                # Pass a request to the next upstream node only
-                                # on an error connecting, sending the request
-                                # or reading the response header (e.g. a
-                                # refused connect to a pod that just died), not
-                                # on a timeout. The nginx default is "error
-                                # timeout", so on a route with endpoint
-                                # granularity a request that hit its read
-                                # timeout on an overloaded pod is re-sent to
-                                # another pod, adding load during an overload.
-                                # APISIX's ngx_tpl sets no
-                                # proxy_next_upstream of its own, so this
-                                # http-level value applies to every route.
-                                proxy_next_upstream error;
-
-                                # Explicit response-buffering tuning (2026-07-21
-                                # applications-production OOM incident): large,
-                                # slowly-consumed proxied responses (multi-MB
-                                # course CSVs, JupyterHub notebook_core.<hash>.js
-                                # bundles) were observed with request_time up to
-                                # 46.8s against upstream_response_time under
-                                # 0.1s -- i.e. held in a worker's memory for the
-                                # client's full slow-download duration rather
-                                # than overflowing to disk. proxy_buffering was
-                                # already on by default, but was left implicit
-                                # and unsized; making it explicit here so the
-                                # disk-overflow behavior is documented and
-                                # auditable rather than relying on upstream
-                                # chart/NGINX defaults silently changing.
-                                # proxy_buffers/proxy_buffer_size bound the
-                                # in-memory portion per request to ~72KB
-                                # (8k proxy_buffer_size + 8x8k proxy_buffers,
-                                # which are separate buffer pools -- the
-                                # former for the leading part of the response,
-                                # the latter for the rest); the remainder of
-                                # a large body spills to a temp
-                                # file (bounded by proxy_max_temp_file_size)
-                                # instead of growing worker RSS. If OOMs persist
-                                # after this change, the leading suspect is a
-                                # Lua body_filter-based plugin buffering the
-                                # full response into the Lua VM heap, which
-                                # bypasses these NGINX-level directives entirely
-                                # -- check enabled plugins on the affected
-                                # routes (course CSV / JupyterHub) for anything
-                                # that reads the response body.
-                                proxy_buffering on;
-                                proxy_buffer_size 8k;
-                                proxy_buffers 8 8k;
-                                proxy_busy_buffers_size 16k;
-                                proxy_max_temp_file_size 1024m;
-                                proxy_temp_file_write_size 64k;
-                                """
-                            ),
-                            "httpEnd": "",
-                            "httpSrv": textwrap.dedent(
-                                f"""\
-                                set $session_compressor zlib;
-                                set $session_name {session_cookie_name};
-
-                                set $cookie_bytes 0;
-                                set $cookie_count 0;
-                                set $oidc_session_bytes 0;
-                                set $cookie_names "";
-                                set $cookie_sizes "";
-
-                                # Parse the Cookie request header exactly once per request and
-                                # populate all telemetry variables.  APISix does not use
-                                # rewrite_by_lua_block in its server block so this is safe.
-                                rewrite_by_lua_block {{
-                                    local raw = ngx.var.http_cookie or ""
-                                    ngx.var.cookie_bytes = tostring(#raw)
-                                    if raw == "" then return end
-                                    local session_name = ngx.var.session_name or ""
-                                    local count = 0
-                                    local names = {{}}
-                                    local sizes = {{}}
-                                    local oidc_bytes = 0
-                                    for pair in (raw .. ";"):gmatch("([^;]+);") do
-                                        local name, val = pair:match("^%s*([^=]+)=(.*)")
-                                        if name then
-                                            local trimmed_name = name:match("^%s*(.-)%s*$")
-                                            if trimmed_name ~= "" then
-                                                count = count + 1
-                                                local trimmed_pair = pair:match("^%s*(.-)%s*$")
-                                                table.insert(names, trimmed_name)
-                                                table.insert(sizes, trimmed_name .. ":" .. tostring(#trimmed_pair))
-                                                if trimmed_name == session_name then
-                                                    oidc_bytes = #(trimmed_name .. "=" .. val)
-                                                end
-                                            end
-                                        end
-                                    end
-                                    ngx.var.cookie_count = tostring(count)
-                                    ngx.var.oidc_session_bytes = tostring(oidc_bytes)
-                                    ngx.var.cookie_names = table.concat(names, ",")
-                                    ngx.var.cookie_sizes = table.concat(sizes, ",")
-                                }}
-
-                                # Serve a branded error page for gateway-level errors (HTTP 400/431
-                                # from oversized request headers, HTTP 500 from OIDC plugin failures,
-                                # and other upstream/server errors).  The location is marked
-                                # `internal` so it is only reachable via nginx's error_page redirect
-                                # and cannot be requested directly by clients.
-                                error_page 400 431 500 502 503 504 /gateway_error.html;
-                                location = /gateway_error.html {{
-                                    root /usr/local/apisix/error-pages;
-                                    internal;
-                                }}
-                                """
-                            ),
-                            "httpAdmin": "",
-                            "stream": "",
-                        },
-                    },
-                },
-                # --- Etcd Configuration ---
-                # APISIX runs standalone (role_traditional.config_provider: yaml, set
-                # above); the ingress controller pushes config over the Admin API, so
-                # there is no etcd StatefulSet in any cluster.
-                #
-                # Disabling the subchart does NOT stop the chart emitting etcd
-                # scaffolding: the rendered config.yaml still carries an `etcd:` block
-                # (with upstream's `http://etcd.host:2379` placeholder), the chart still
-                # creates the `etcd-apache-apisix` Secret, and the Deployment still gets
-                # an APISIX_ETCD_PASSWORD env var bound to it. All three are inert --
-                # and all three must stay, since the Deployment's secretKeyRef will fail
-                # to start pods without the Secret.
-                #
-                # Do not read that block as a live endpoint. Doing so once already
-                # produced a cleanup ticket built on a false premise; see the
-                # "Vestigial etcd Artifacts" section of APISIX_STANDALONE_SETUP.md.
-                "etcd": {
-                    "enabled": False,
-                },
-                # --- Ingress Controller Configuration ---
-                "ingress-controller": {
-                    "enabled": True,
-                    "rbac": {
-                        "create": True,
-                    },
-                    "webhook": {"enabled": True},
-                    "serviceAccount": {
-                        "create": True,
-                        "name": "apache-apisix-ingress-controller",
-                    },
-                    "config": {
-                        "execADCTimeout": "60s",  # Increase from default 15s for large config syncs
-                        "provider": {
-                            "type": "apisix-standalone",
-                        },
-                        "kubernetes": {
-                            "ingressClass": "apache-apisix",
-                            "enableGatewayAPI": True,
-                        },
-                    },
-                    "apisix": {
-                        "adminService": {
-                            "name": "apache-apisix-admin",
-                            "namespace": "operations",
-                            "port": 9180,
-                        },
-                    },
-                    "gatewayProxy": {
-                        "createDefault": True,
-                        "publishService": "apache-apisix-gateway",
-                        # Global plugin metadata, keyed by plugin name, shared by
-                        # every instance of that plugin.  The ingress controller
-                        # syncs this into the data plane's ``plugin_metadata`` via
-                        # the Admin API.  This is the config surface the APISIX 3.14
-                        # opentelemetry plugin actually reads (see otel_plugin_metadata
-                        # above); without it the plugin exports nothing.  Omitted on
-                        # CI to match the plugin-enablement gate.
-                        **(
-                            {"pluginMetadata": {"opentelemetry": otel_plugin_metadata}}
-                            if otel_tracing_enabled
-                            else {}
-                        ),
-                        "provider": {
-                            "type": "ControlPlane",
-                            "controlPlane": {
-                                "service": {
-                                    "name": "apache-apisix-admin",
-                                    "port": 9180,
-                                },
-                                "auth": {
-                                    "type": "AdminKey",
-                                    "adminKey": {
-                                        "value": eks_config.require_secret(
-                                            "apisix_admin_key"
-                                        ),
-                                    },
-                                },
-                            },
-                        },
-                    },
-                    "deployment": {
-                        "replicas": 3,  # For high availability and load distribution
-                        "tolerations": operations_tolerations,
-                        "resources": {
-                            "requests": {
-                                "cpu": "50m",
-                                "memory": "256Mi",
-                            },
-                            # The manager OOMs at 256Mi while decoding its initial
-                            # cache sync, and weekly peaks reach it on several
-                            # clusters. The chart gives it no env hook for
-                            # GOMEMLIMIT, so the ceiling needs real headroom.
-                            "limits": {
-                                "memory": "512Mi",
-                            },
-                        },
-                        # Surge-first rolling update (maxUnavailable: 0): a new IC pod
-                        # comes up and resolves *current* APISix endpoint IPs before the
-                        # old IC pod is terminated.  This means every new ADC sidecar
-                        # starts with a fresh, consistent view of the APISix fleet — no
-                        # stale pod IPs that could produce services_conf_version conflicts.
-                        # minReadySeconds: 30 ensures the new IC pod has successfully
-                        # completed at least one ADC sync cycle before the old pod is
-                        # decommissioned.
-                        "strategy": {
-                            "type": "RollingUpdate",
-                            "rollingUpdate": {
-                                "maxSurge": 1,
-                                "maxUnavailable": 0,
-                            },
-                        },
-                        "minReadySeconds": 30,
-                        # Allow in-flight ADC sync operations and leader-election
-                        # transitions to complete gracefully before the pod exits.
-                        "terminationGracePeriodSeconds": 60,
-                        "lifecycle": {
-                            "preStop": {
-                                "exec": {
-                                    "command": ["/bin/sh", "-c", "sleep 20"],
-                                }
-                            }
-                        },
-                        # Spread ingress-controller pods across AZs and nodes to reduce
-                        # the likelihood of multiple replicas landing on the same node or
-                        # AZ.  These are soft constraints (ScheduleAnyway + preferred
-                        # anti-affinity): they improve distribution where possible but do
-                        # not block scheduling when the topology cannot be balanced.
-                        "topologySpreadConstraints": [
-                            {
-                                "maxSkew": 1,
-                                "topologyKey": "topology.kubernetes.io/zone",
-                                "whenUnsatisfiable": "ScheduleAnyway",
-                                "labelSelector": {
-                                    "matchLabels": {
-                                        "app.kubernetes.io/name": "apisix-ingress-controller",
-                                    },
-                                },
-                            },
-                            {
-                                "maxSkew": 1,
-                                "topologyKey": "kubernetes.io/hostname",
-                                "whenUnsatisfiable": "ScheduleAnyway",
-                                "labelSelector": {
-                                    "matchLabels": {
-                                        "app.kubernetes.io/name": "apisix-ingress-controller",
-                                    },
-                                },
-                            },
-                        ],
-                        "affinity": {
-                            "podAntiAffinity": {
-                                "preferredDuringSchedulingIgnoredDuringExecution": [
-                                    {
-                                        "weight": 100,
-                                        "podAffinityTerm": {
-                                            "labelSelector": {
-                                                "matchLabels": {
-                                                    "app.kubernetes.io/name": "apisix-ingress-controller",
-                                                }
-                                            },
-                                            "topologyKey": "kubernetes.io/hostname",
-                                        },
-                                    }
-                                ]
-                            }
-                        },
-                    },
-                    # The ingress-controller sub-chart's built-in PDB is disabled because
-                    # apisix-ingress-controller v1.1.1 has a template name mismatch bug:
-                    # pdb.yaml references "apisix-ingress-controller.fullname" but _helpers.tpl
-                    # only defines "apisix-ingress-controller-manager.*" variants, causing Helm
-                    # to fail with "no template 'apisix-ingress-controller.fullname'".  A
-                    # standalone PodDisruptionBudget Pulumi resource is created below instead.
-                    "podDisruptionBudget": {
-                        "enabled": False,
-                    },
-                },
-                # --- Pod Disruption Budget ---
-                # maxUnavailable: 1 scales correctly as the HPA grows the replica count
-                # above the 3-pod floor: it always limits disruptions to at most one pod
-                # at a time, regardless of the current scale.  minAvailable: 2 would
-                # permit up to 3 simultaneous evictions at maxReplicas: 5, which could
-                # cascade a VPA eviction, a node drain, and a rolling-update step into
-                # a single disruptive event.
-                "podDisruptionBudget": {
-                    "enabled": True,
-                    "maxUnavailable": 1,
-                },
-                # --- Metrics ---
-                "metrics": {
-                    "serviceMonitor": {
-                        "enabled": True,
-                        "namespace": "operations",
-                        "labels": k8s_global_labels,
-                        # Grafana Cloud bills per DPM; the chart's 15s default
-                        # is 4x the included rate. Consumers use >=5m windows.
-                        "interval": "60s",
-                    },
-                },
-                # --- Custom error pages ---
-                # Mount the branded gateway error page ConfigMap into every
-                # APISIX pod so nginx can serve it via the error_page directive
-                # configured above in configurationSnippet.httpSrv.
-                "extraVolumes": [
-                    {
-                        "name": "apisix-error-pages",
-                        "configMap": {"name": _error_pages_configmap_name},
-                    }
-                ],
-                "extraVolumeMounts": [
-                    {
-                        "name": "apisix-error-pages",
-                        "mountPath": "/usr/local/apisix/error-pages",
-                        "readOnly": True,
-                    }
-                ],
-            },
+            values=apisix_helm_values(gateway_config),
         ),
         opts=ResourceOptions(
             provider=k8s_provider,
@@ -1103,56 +261,17 @@ def setup_apisix(
         ),
     )
 
-    # Everything that has to run on every route ahead of openid-connect: send
-    # OIDC routes to their canonical https origin, and refuse the gateway's own
-    # identity headers from a client.  See gateway_global_pre_function_plugin.
-    #
-    # The canonical redirect is here because per-application attachment left
-    # most OIDC hosts answering plain HTTP with a cleartext session cookie.
-    #
-    # The openid-connect plugin clears an inbound X-Userinfo / X-ID-Token /
-    # X-Raw-ID-Token / X-Refresh-Token before setting its own, but only where
-    # it is attached.  Every other route on an OIDC host hands the client's
-    # copy straight to the application, and mitol-apigateway's middleware
-    # authenticates off X-Userinfo without asking who wrote it -- so one
-    # unprotected route on a host that has a login is enough to impersonate
-    # any account.
-    #
-    # A global rule rather than an entry in each application's shared plugin
-    # config: the routes at risk are the ones that reference no plugin config
-    # at all, and a route carrying its own serverless-pre-function (every OIDC
-    # route does) would override a shared one by plugin name instead of running
-    # both.  Global rules run after route matching but ahead of the matched
-    # route's rewrite phase, which is where openid-connect lives, so the strip
-    # lands before the real headers are set and after nothing.
-    #
-    # The ingress controller flattens every ApisixGlobalRule in the cluster
-    # into one plugin-name-keyed map (internal/adc/translator/globalrule.go),
-    # so this is the cluster's only global ``serverless-pre-function``: a
-    # second one anywhere would silently replace it rather than run alongside.
-    # Anything else that has to run globally before openid-connect belongs in
-    # ``gateway_global_pre_function_plugin``'s ``functions`` list.
-    #
-    # The resource and object keep their original identity-header-strip name:
-    # renaming would replace the rule (delete_before_replace), leaving a
-    # window with no strip at all.
+    # See identity_header_strip_rule_spec for why this is a global rule.
     kubernetes.apiextensions.CustomResource(
         f"{cluster_name}-apisix-identity-header-strip-global-rule",
         api_version="apisix.apache.org/v2",
         kind="ApisixGlobalRule",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
-            name="identity-header-strip",
+            name=IDENTITY_HEADER_STRIP_RULE_NAME,
             namespace="operations",
             labels=k8s_global_labels,
         ),
-        spec={
-            "ingressClassName": "apache-apisix",
-            "plugins": [
-                gateway_global_pre_function_plugin().model_dump(
-                    by_alias=True, exclude_none=True
-                )
-            ],
-        },
+        spec=identity_header_strip_rule_spec(),
         opts=ResourceOptions(
             provider=k8s_provider,
             parent=operations_namespace,
@@ -1163,8 +282,9 @@ def setup_apisix(
 
     # HSTS on every gateway response (hq#14079).  A global rule rather than the
     # shared plugin configs' response-rewrite default, for the same two reasons
-    # as the rule above: routes with no plugin config would never get it, and a
-    # route carrying its own response-rewrite (mitxonline, xpro, micromasters,
+    # as identity-header-strip (see identity_header_strip_rule_spec): routes
+    # with no plugin config would never get it, and a route carrying its own
+    # response-rewrite (mitxonline, xpro, micromasters,
     # ocw-studio, jupyterhub) replaces the shared one by name.  A global
     # response-rewrite does not displace a route's: response-rewrite has no
     # run_policy="prefer_route", so APISIX runs the global copy and then the
@@ -1214,16 +334,8 @@ def setup_apisix(
         f"{cluster_name}-gateway-class",
         api_version="gateway.networking.k8s.io/v1",
         kind="GatewayClass",
-        metadata={"name": "apisix"},
-        spec={
-            "controllerName": "apisix.apache.org/apisix-ingress-controller",
-            "parametersRef": {
-                "group": "apisix.apache.org",
-                "kind": "GatewayProxy",
-                "name": "apache-apisix-config",
-                "namespace": "operations",
-            },
-        },
+        metadata={"name": GATEWAY_NAME},
+        spec=gateway_class_spec(),
         opts=ResourceOptions(
             provider=k8s_provider,
             parent=operations_namespace,
@@ -1237,43 +349,10 @@ def setup_apisix(
         api_version="gateway.networking.k8s.io/v1",
         kind="Gateway",
         metadata={
-            "name": "apisix",
+            "name": GATEWAY_NAME,
             "namespace": "operations",
         },
-        spec={
-            "gatewayClassName": "apisix",
-            "listeners": [
-                {
-                    "name": "http",
-                    "protocol": "HTTP",
-                    "port": 80,
-                    "allowedRoutes": {
-                        "namespaces": {
-                            "from": "All",
-                        }
-                    },
-                },
-                {
-                    "name": "https",
-                    "protocol": "HTTPS",
-                    "port": 443,
-                    "allowedRoutes": {
-                        "namespaces": {
-                            "from": "All",
-                        }
-                    },
-                    # TLS configuration is intentionally omitted here because it is handled
-                    # separately by per-application ApisixTls CRDs (see ADR-0003).
-                },
-            ],
-            "infrastructure": {
-                "parametersRef": {
-                    "group": "apisix.apache.org",
-                    "kind": "GatewayProxy",
-                    "name": "apache-apisix-config",
-                }
-            },
-        },
+        spec=gateway_spec(),
         opts=ResourceOptions(
             provider=k8s_provider,
             parent=operations_namespace,
@@ -1365,7 +444,7 @@ def setup_apisix(
                         "controlledResources": ["memory"],
                         "controlledValues": "RequestsAndLimits",
                         "minAllowed": {
-                            "memory": eks_config.get("apisix_memory") or "400Mi",
+                            "memory": gateway_config.memory_request,
                         },
                         "maxAllowed": {
                             "memory": eks_config.get("apisix_max_memory") or "3Gi",
