@@ -17,6 +17,7 @@ from pulumi import (
     ROOT_STACK_RESOURCE,
     Alias,
     Config,
+    Output,
     ResourceOptions,
     export,
 )
@@ -76,6 +77,7 @@ from ol_infrastructure.lib.aws.route53_helper import (
 )
 from ol_infrastructure.lib.fastly import (
     get_fastly_provider,
+    s3_sigv4_signing_vcl,
     vcl_snippet,
 )
 from ol_infrastructure.lib.fastly_logging import fastly_logging_args
@@ -153,14 +155,19 @@ cluster_stack.require_output("namespaces").apply(
 # Bucket used to store files from MITx Online app.
 mitxonline_bucket_name = f"ol-mitxonline-app-{stack_info.env_suffix}"
 
+# Piloting SigV4-signed Fastly->S3 requests, so the bucket can be fully private
+# instead of public-read (hq#13287 item 1; mit-learn and learn-ai run the same
+# pattern). The app only links to media through Fastly's /media/ path.
+_mitxonline_bucket_is_sigv4_piloted = stack_info.env_suffix in {"ci", "qa"}
+
 mitxonline_bucket_config = S3BucketConfig(
     bucket_name=mitxonline_bucket_name,
     versioning_enabled=True,
     ownership_controls="BucketOwnerPreferred",
-    block_public_acls=False,
-    block_public_policy=False,
-    ignore_public_acls=False,
-    restrict_public_buckets=False,
+    block_public_acls=_mitxonline_bucket_is_sigv4_piloted,
+    block_public_policy=_mitxonline_bucket_is_sigv4_piloted,
+    ignore_public_acls=_mitxonline_bucket_is_sigv4_piloted,
+    restrict_public_buckets=_mitxonline_bucket_is_sigv4_piloted,
     intelligent_tiering_archive_access_days=None,  # Fastly backend
     intelligent_tiering_deep_archive_access_days=None,
     tags=aws_config.tags,
@@ -191,10 +198,70 @@ mitxonline_bucket = OLBucket(
     ),
 )
 
-mitxonline_bucket_policy = s3.BucketPolicy(
-    f"mitxonline-{stack_info.env_suffix}-bucket-policy",
-    bucket=mitxonline_bucket.bucket_v2.id,
-    policy=iam.get_policy_document(
+mitxonline_fastly_s3_signer_access_key = None
+mitxonline_bucket_policy_document: Output[str] | str
+if _mitxonline_bucket_is_sigv4_piloted:
+    # Dedicated identity for Fastly to authenticate to S3 with (SigV4), scoped to
+    # GetObject on just this bucket. It must live under /ol-applications/ and carry
+    # no tags: Concourse's deploy role only manages IAM users under that path, via
+    # managed-policy attach, and has no iam:TagUser (see the same note on the
+    # mit-learn signer).
+    mitxonline_fastly_s3_signer_user = iam.User(
+        f"ol-mitxonline-fastly-s3-signer-{stack_info.env_suffix}",
+        name=f"ol-mitxonline-{stack_info.env_suffix}-fastly-s3-signer",
+        path="/ol-applications/",
+    )
+    mitxonline_fastly_s3_signer_policy = iam.Policy(
+        f"ol-mitxonline-fastly-s3-signer-policy-{stack_info.env_suffix}",
+        path="/ol-applications/",
+        policy=json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": ["s3:GetObject"],
+                        "Resource": [f"arn:aws:s3:::{mitxonline_bucket_name}/*"],
+                    }
+                ],
+            }
+        ),
+    )
+    mitxonline_fastly_s3_signer_policy_attachment = iam.UserPolicyAttachment(
+        f"ol-mitxonline-fastly-s3-signer-policy-attachment-{stack_info.env_suffix}",
+        user=mitxonline_fastly_s3_signer_user.name,
+        policy_arn=mitxonline_fastly_s3_signer_policy.arn,
+    )
+    mitxonline_fastly_s3_signer_access_key = iam.AccessKey(
+        f"ol-mitxonline-fastly-s3-signer-access-key-{stack_info.env_suffix}",
+        user=mitxonline_fastly_s3_signer_user.name,
+        opts=ResourceOptions(
+            depends_on=[mitxonline_fastly_s3_signer_policy_attachment]
+        ),
+    )
+    # The durable Vault copy of this key is created further down -- search for
+    # "fastly-s3-signer-vault-secret".
+    mitxonline_bucket_policy_document = Output.all(
+        arn=mitxonline_bucket.bucket_v2.arn,
+        signer_arn=mitxonline_fastly_s3_signer_user.arn,
+    ).apply(
+        lambda args: json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Sid": "FastlySigV4Read",
+                        "Effect": "Allow",
+                        "Principal": {"AWS": args["signer_arn"]},
+                        "Action": "s3:GetObject",
+                        "Resource": f"{args['arn']}/*",
+                    }
+                ],
+            }
+        )
+    )
+else:
+    mitxonline_bucket_policy_document = iam.get_policy_document(
         statements=[
             iam.GetPolicyDocumentStatementArgs(
                 effect="Allow",
@@ -208,7 +275,12 @@ mitxonline_bucket_policy = s3.BucketPolicy(
                 resources=[mitxonline_bucket.bucket_v2.arn.apply("{}/*".format)],
             ),
         ]
-    ).json,
+    ).json
+
+mitxonline_bucket_policy = s3.BucketPolicy(
+    f"mitxonline-{stack_info.env_suffix}-bucket-policy",
+    bucket=mitxonline_bucket.bucket_v2.id,
+    policy=mitxonline_bucket_policy_document,
 )
 
 mitxonline_iam_policy = iam.Policy(
@@ -389,6 +461,22 @@ mitxonline_operations_sentry_dsn = vault.generic.Secret(
         lambda dsn: json.dumps({"value": dsn})
     ),
 )
+if _mitxonline_bucket_is_sigv4_piloted and mitxonline_fastly_s3_signer_access_key:
+    # Durable copy in Vault for visibility/rotation tooling outside of Pulumi state.
+    # Pulumi (via the iam.AccessKey resource) is still the source of truth --
+    # rotating means replacing that resource, which updates this secret in the
+    # same apply.
+    # Deliberately NOT under secret-mitxonline: mitxonline_policy.hcl grants read on
+    # secret-mitxonline/*, and only lists specific secret-operations paths, so a
+    # secret here is unreadable to the app role. Only Fastly needs the key.
+    vault.generic.Secret(
+        f"mitxonline-fastly-s3-signer-vault-secret-{stack_info.env_suffix}",
+        path="secret-operations/mitxonline/fastly-s3-signer",
+        data_json=Output.all(
+            access_key_id=mitxonline_fastly_s3_signer_access_key.id,
+            secret_access_key=mitxonline_fastly_s3_signer_access_key.secret,
+        ).apply(json.dumps),
+    )
 
 mitxonline_vault_policy = vault.Policy(
     f"mitxonline-vault-policy-{stack_info.env_suffix}",
@@ -781,6 +869,24 @@ for k, v in mimetypes.types_map.items():
         gzip_settings["extensions"].add(k.strip("."))
         gzip_settings["content_types"].add(v)
 bucket_backend_name = f"MITx Online {stack_info.name} S3 bucket"
+mitxonline_s3_backend_auth_vcl: Output[str] | str
+if _mitxonline_bucket_is_sigv4_piloted and mitxonline_fastly_s3_signer_access_key:
+    mitxonline_s3_backend_auth_vcl = Output.all(
+        access_key_id=mitxonline_fastly_s3_signer_access_key.id,
+        secret_access_key=mitxonline_fastly_s3_signer_access_key.secret,
+    ).apply(
+        lambda args: s3_sigv4_signing_vcl(
+            args["access_key_id"],
+            args["secret_access_key"],
+            f"{mitxonline_bucket_name}.s3.us-east-1.amazonaws.com",
+            bucket_backend_name,
+        )
+    )
+else:
+    mitxonline_s3_backend_auth_vcl = textwrap.dedent(f"""\
+        if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
+          unset bereq.http.Authorization;
+        }}""")
 mitxonline_service = fastly.ServiceVcl(
     "mitxonline-service",
     backends=[
@@ -966,19 +1072,15 @@ mitxonline_service = fastly.ServiceVcl(
             priority=200,
             type="recv",
         ),
+        # Kept under their old names (as on mit-learn) so piloting only changes
+        # the content: the signing VCL also unsets the client's Authorization.
         vcl_snippet(
-            content=textwrap.dedent(f"""\
-            if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
-              unset bereq.http.Authorization;
-            }}"""),
+            content=mitxonline_s3_backend_auth_vcl,
             name="Strip auth headers in S3 miss requests",
             type="miss",
         ),
         vcl_snippet(
-            content=textwrap.dedent(f"""\
-            if (req.backend == F_{bucket_backend_name.replace(" ", "_")}) {{
-              unset bereq.http.Authorization;
-            }}"""),
+            content=mitxonline_s3_backend_auth_vcl,
             name="Strip auth headers in S3 pass requests",
             type="pass",
         ),
