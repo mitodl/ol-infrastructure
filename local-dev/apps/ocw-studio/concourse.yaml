@@ -106,7 +106,7 @@ spec:
 
       containers:
       - name: web
-        image: concourse/concourse:7.14
+        image: concourse/concourse:__CONCOURSE_VERSION__
         args: ["web"]
         ports:
         - containerPort: 8080
@@ -177,7 +177,7 @@ spec:
           failureThreshold: 12
 
       - name: worker
-        image: concourse/concourse:7.14
+        image: concourse/concourse:__CONCOURSE_VERSION__
         args: ["worker"]
         # Concourse's worker starts containerd and creates containers; there is
         # no unprivileged way to do that.

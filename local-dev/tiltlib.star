@@ -115,7 +115,8 @@ def k8s_yaml_local(paths, local_overrides=None, substitutions=None):
     substitutions is an optional dict of literal token -> value replacements,
     applied after the root-domain pass so a token cannot be mangled by it. Use
     it for a value that varies per developer for some reason other than the
-    root domain."""
+    root domain, or one read from elsewhere in the repo, such as a version
+    pin."""
     rd = current_root_domain()
 
     # read_file(default=...) also registers a watch on the override path —
