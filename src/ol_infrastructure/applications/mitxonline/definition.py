@@ -185,6 +185,9 @@ class MitxonlineBindings(BaseModel):
     ``bridge.lib.constants.oidc_secret_data`` returns."""
     application_docker_tag: str | None = None
     application_image_digest: str | None = None
+    application_version: str | None = None
+    """The release the image was built for; labels the pods. The release
+    pipeline sets it alongside the digest."""
     cluster: ClusterCapabilities
     min_replicas: int
     # The deployed stacks pull the published image; a cluster that serves the
@@ -285,6 +288,7 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
         application_image_repository=bindings.image_repository,
         application_docker_tag=bindings.application_docker_tag,
         application_image_digest=bindings.application_image_digest,
+        application_version=bindings.application_version,
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
