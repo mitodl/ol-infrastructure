@@ -294,10 +294,8 @@ bindings = definition.MitxonlineBindings(
     sizing=sizing,
     granian_reload=tilt_built,
     celery_topology="merged",
-    # The deployed CI/QA gate, on the host production serves courseware from.
-    # Local edX (apps/openedx) runs on lms.<root>, outside .learn.<root>, so it
-    # never reaches this route; if it ever moves to courses.learn.<root>, point
-    # the upstream at its `lms` Service instead.
+    # Local edX runs on lms.<root>, outside .learn.<root>, so it never reaches
+    # the gate. Test it with a stand-in LMS (see PR #6402).
     openedx_login_gate=definition.OpenedxLoginGate(
         lms_host=f"courses.learn.{root_domain}"
     ),
@@ -400,10 +398,8 @@ OLApisixRoute(
     ),
     opts=ResourceOptions(providers=[provider], delete_before_replace=True),
 )
-# The Open edX login gate, built as the deployed __main__.py builds it. Nothing
-# serves the LMS Service it points at unless a stand-in is applied (see PR
-# mitodl/ol-infrastructure#6402); until then only page loads of its login path
-# on courses.learn.<root> are affected, with a 503.
+# The Open edX login gate, as the deployed stack builds it. Without a stand-in
+# LMS, its login path returns 503.
 gate_upstream = OLApisixExternalUpstream(
     f"mitxonline-openedx-login-gate-upstream-{ENV_SUFFIX}",
     external_upstream_config=definition.openedx_login_gate_upstream_config(

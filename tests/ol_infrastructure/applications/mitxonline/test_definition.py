@@ -455,7 +455,7 @@ def test_oidc_credentials_come_from_exactly_one_source(bindings):
 # ─── Open edX login gate ──────────────────────────────────────────────────────
 
 
-LMS_HOST = "courses.learn.mit.dev"
+LMS_HOST = "courses.learn.mit.test"
 
 
 def _gate_bindings(**overrides) -> definition.MitxonlineBindings:
@@ -481,13 +481,14 @@ def test_openedx_login_gate_renders_nothing_unless_bound():
 
 
 def test_openedx_login_gate_matches_only_browser_page_loads_of_the_login_start():
-    """MITx Online replays the Open edX login with python-requests to mint edX
-    API tokens; that client sends no Fetch Metadata, so it must not match.
-    """
+    """MITx Online's server-side login replay sends no Fetch Metadata."""
     [route] = _gate_routes(_gate_bindings())
 
     assert route.hosts == [LMS_HOST]
-    assert route.paths == ["/auth/login/ol-oauth2/*"]
+    assert route.paths == [
+        "/auth/login/ol-oauth2/",
+        "/auth/login/ol-oauth2/.apisix/redirect",
+    ]
     assert {
         (expr["subject"]["name"], expr["op"], expr["value"]) for expr in route.exprs
     } == {
@@ -497,9 +498,7 @@ def test_openedx_login_gate_matches_only_browser_page_loads_of_the_login_start()
 
 
 def test_openedx_login_gate_sends_learners_without_a_session_to_keycloak():
-    """With unauth_action "pass" the route would forward anonymous learners
-    untouched and never write the MIT Learn session.
-    """
+    """With "pass", anonymous learners would never get the MIT Learn session."""
     [route] = _gate_routes(_gate_bindings())
 
     [plugin] = [
@@ -527,10 +526,17 @@ def test_openedx_login_gate_sends_the_lms_no_tokens():
     assert config["set_userinfo_header"] is False
 
 
+def test_openedx_login_gate_rejects_an_lms_host_outside_the_learn_cookie_domain():
+    with pytest.raises(ValueError, match=r"not under '\.learn\.mit\.test'"):
+        _deployed_bindings(
+            openedx_login_gate=definition.OpenedxLoginGate(
+                lms_host="courses.mitxonline.mit.test"
+            )
+        )
+
+
 def test_openedx_login_gate_upstream_passes_the_public_host_to_the_lms():
-    """The LMS rejects any Host but its public one (Django DisallowedHost), so
-    the upstream must not fall back to the Service's DNS name.
-    """
+    """The LMS rejects any Host but its public one."""
     gate = _gate_bindings().openedx_login_gate
     config = definition.openedx_login_gate_upstream_config(gate, "qa", {})
 

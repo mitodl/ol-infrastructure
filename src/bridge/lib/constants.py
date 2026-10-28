@@ -219,8 +219,7 @@ def edxapp_lms_webapp_name(env_prefix: str, env_suffix: str) -> str:
 
     :param env_prefix: The edxapp deployment, e.g. ``"mitxonline"``.
     :param env_suffix: The stack environment suffix, e.g. ``"qa"``.
-
-    :returns: The LMS webapp name.
+    :returns: The Service name.
     :rtype: str
     """
     return f"{env_prefix}-{env_suffix}-edxapp-lms-webapp"
@@ -229,12 +228,8 @@ def edxapp_lms_webapp_name(env_prefix: str, env_suffix: str) -> str:
 def edxapp_lms_service_host(env_prefix: str, env_suffix: str) -> str:
     """Return the cluster DNS name of an Open edX deployment's LMS webapp Service.
 
-    For stacks outside the edxapp namespace that reach the LMS directly, such
-    as mitxonline's Open edX login gate.
-
     :param env_prefix: The edxapp deployment, e.g. ``"mitxonline"``.
     :param env_suffix: The stack environment suffix, e.g. ``"qa"``.
-
     :returns: The Service's DNS name.
     :rtype: str
     """

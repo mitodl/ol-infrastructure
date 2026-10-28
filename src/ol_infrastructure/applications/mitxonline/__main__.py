@@ -576,7 +576,6 @@ DEPLOYED_ENV_DEFAULTS = {
     "ZENDESK_HELP_WIDGET_ENABLED": "True",
 }
 
-# Unset (the default) renders no Open edX login gate route.
 openedx_login_gate_config = mitxonline_config.get_object("openedx_login_gate")
 bindings = definition.MitxonlineBindings(
     env_suffix=stack_info.env_suffix,
@@ -707,8 +706,8 @@ if bindings.openedx_login_gate is not None:
         ),
     )
     mitxonline_apisix_route_openedx_login_gate = OLApisixRoute(
-        # Outside the "mitxonline-apisix-route-*" names the webapp KEDA matcher
-        # aggregates: this route's traffic and latency are the LMS's, not ours.
+        # Not "mitxonline-apisix-route-*", so the webapp KEDA scaler ignores it:
+        # this traffic is the LMS's.
         name=f"mitxonline-openedx-login-gate-route-{stack_info.env_suffix}",
         k8s_namespace=mitxonline_namespace,
         k8s_labels=k8s_app_labels,

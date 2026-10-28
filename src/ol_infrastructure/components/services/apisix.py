@@ -1681,9 +1681,8 @@ def ol_apisix_shared_plugins_variants(
 class OLApisixExternalUpstreamConfig(BaseModel):
     """Configuration for OLApisixExternalUpstream.
 
-    Defines an upstream APISIX reaches by DNS name rather than through a
-    Service in the route's own namespace: a host outside Kubernetes, or a
-    Service in another namespace named by its cluster DNS name.
+    Defines an upstream APISIX reaches by DNS name: a host outside Kubernetes,
+    or a Service in another namespace.
     """
 
     application_name: str
@@ -1692,11 +1691,9 @@ class OLApisixExternalUpstreamConfig(BaseModel):
     k8s_namespace: str
     external_hostname: str
     scheme: str = "https"
-    # Unset means the scheme's default port, which is what a host outside the
-    # cluster serves on; a Service usually listens on its own port.
+    # Unset means the scheme's default port.
     port: PositiveInt | None = None
-    # Unset leaves the controller's default. "pass" sends the client's Host on,
-    # which an in-cluster Service validating Host (Django's ALLOWED_HOSTS) needs.
+    # Unset leaves the controller's default. "pass" sends the client's Host on.
     pass_host: Literal["pass", "node", "rewrite"] | None = None
 
 
