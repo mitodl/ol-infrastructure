@@ -100,7 +100,7 @@ INDEX_BACKOFF_LIMIT = 1
 INDEX_TTL_SECONDS_AFTER_FINISHED = 24 * 60 * 60
 
 # On-demand, not the Karpenter spot fleet. The indexer's memory request often
-# fits no existing node (32 of the 54 indexer pods scheduled in operations-qa
+# fits no existing node (32 of the 53 indexer pods scheduled in operations-qa
 # in the 7 days to 2026-10-28 waited for Karpenter to launch one), and a fresh
 # spot node often receives an EC2 rebalance recommendation within its first
 # minute. aws-node-termination-handler drains on those
