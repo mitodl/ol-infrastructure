@@ -19,7 +19,11 @@ import pulumi_kubernetes as k8s
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from modules.helpers import make_resource_opts
-from modules.keycloak import create_olapps_dev_realm
+from modules.keycloak import (
+    OLAPPS_REALM,
+    create_olapps_dev_realm,
+    live_realm_import_id,
+)
 from pulumi import Config, Output
 
 # ---------------------------------------------------------------------------
@@ -103,23 +107,29 @@ local_infra_ns = k8s.core.v1.Namespace.get(
 # Keycloak realm (depends on Keycloak instance from core stack)
 # ---------------------------------------------------------------------------
 
+KEYCLOAK_ADMIN_USERNAME = "admin"
+KEYCLOAK_ADMIN_PASSWORD = "admin"  # noqa: S105  # pragma: allowlist secret
+
 keycloak_provider = keycloak.Provider(
     "keycloak-local",
     url=keycloak_url,
     realm="master",
     client_id="admin-cli",  # built-in admin client for username/password auth
-    username="admin",
-    password="admin",  # noqa: S106  # pragma: allowlist secret
+    username=KEYCLOAK_ADMIN_USERNAME,
+    password=KEYCLOAK_ADMIN_PASSWORD,
     tls_insecure_skip_verify=True,  # mkcert CA not trusted by provider runtime
     initial_login=False,  # Keycloak must be ready before realm resources run
     # Creating the olapps realm takes about 5s even on a warm Keycloak, which is
     # the provider's default timeout. A create that times out still lands in
-    # Keycloak but never reaches Pulumi state, so every retry then fails with
-    # 409 "Realm olapps already exists".
+    # Keycloak but never reaches Pulumi state; live_realm_import_id below adopts
+    # it on the next run.
     client_timeout=60,
 )
 
 create_olapps_dev_realm(
+    realm_import_id=live_realm_import_id(
+        keycloak_url, OLAPPS_REALM, KEYCLOAK_ADMIN_USERNAME, KEYCLOAK_ADMIN_PASSWORD
+    ),
     keycloak_provider=keycloak_provider,
     keycloak_url=keycloak_url,
     k8s_provider=k8s_provider,

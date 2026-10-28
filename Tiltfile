@@ -496,15 +496,20 @@ local_resource(
 # program computes now. Without it, refresh uses the ones recorded in state,
 # so after a root-domain change every resource fails to refresh against the
 # old hostname before the new URL can be applied.
+#
+# pulumi-up-retry.sh runs the apply a second time when the first fails. A realm
+# create that times out on a fresh cluster still lands in Keycloak, and the
+# second run adopts it; without the retry the resource stays red, and
+# kc-seed-users and every app wait on it until someone retriggers it by hand.
 local_resource(
     "local-infra-apps",
     # FORCE_COLOR is unset for the same reason as local-infra-core above.
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --refresh --run-program --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; {retry} 2 {locks} --refresh --run-program --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir), retry="{}/local-dev/scripts/pulumi-up-retry.sh".format(config.main_dir), locks="{}/local-dev/infra/.pulumi/.pulumi/locks/organization/ol-local-dev-apps-infra/local-dev.apps-infra.Dev".format(config.main_dir)),
     # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
     # the core stack only creates on demand.
     env={"LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps)},
     dir="./local-dev/infra/apps_infra",
-    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/scripts/wait-for-keycloak-admin.sh"],
+    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/scripts/wait-for-keycloak-admin.sh", "./local-dev/scripts/pulumi-up-retry.sh", "./local-dev/scripts/pulumi-clear-stale-lock.sh"],
     labels=["infra"],
     resource_deps=["local-infra-core"],
 )
