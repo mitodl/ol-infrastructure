@@ -32,7 +32,7 @@ app JWT with ``openssl``, which the task image carries.
 Environment:
     APP_NAME: the app whose release gate fired.
     GATE_FILE: ``<release-gate>/gh_issue.json`` from the gate get.
-    VERSION_FILE: the file the job's ``DOCKER_TAG`` comes from.
+    VERSION_FILE: the file the job's ``image_tag`` comes from.
     INFRA_REF_FILE: ``<ol-infra>/.git/ref`` for the commit this job deploys.
     GITHUB_REPOSITORY: ``owner/repo`` holding the app's release issues.
     GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY: the

@@ -62,7 +62,7 @@ def test_assertion_runs_after_the_gate_and_before_anything_deploys():
 
 
 def test_assertion_reads_the_version_the_job_deploys():
-    """The check compares against DOCKER_TAG's source, bound to what QA saw."""
+    """The check compares against image_tag's source, bound to what QA saw."""
     plan = _plan(APP, "-production")
     task = plan[_step_index(plan, "task", ASSERT_GATE_TASK_NAME)]
     release_get = plan[_step_index(plan, "get", f"{APP}-release")]
