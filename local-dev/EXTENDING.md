@@ -46,7 +46,9 @@ In `local-dev/infra/modules/database.py`, add to the `postInitSQL` list:
 
 ### 3. Register the namespace (TLS secret comes with it)
 
-Add `"my-app"` to the `APP_NAMESPACES` tuple in `local-dev/infra/modules/namespaces.py`. `tls.py` reads the same list through `app_namespaces_for()`, so the `local-dev-tls` Secret and mkcert CA ConfigMap appear in the new namespace automatically.
+Add `"my-app"` to the `APP_NAMESPACES` tuple in `local-dev/infra/modules/namespaces.py`. `tls.py` reads the same list through `app_namespaces_for()`, so the `local-dev-tls` Secret, the mkcert CA ConfigMap and the `local-dev-ca-bundle` ConfigMap appear in the new namespace automatically.
+
+If the app calls local hostnames over HTTPS, mount `local-dev-ca-bundle` as a directory at `/etc/ssl/local-dev` and set `SSL_CERT_FILE` and `REQUESTS_CA_BUNDLE` to `/etc/ssl/local-dev/ca-certificates.crt` (or `NODE_EXTRA_CA_CERTS` for Node). In a Pulumi program that is an entry in `extra_volumes` and `extra_volume_mounts`, as in `local-dev/apps/mitxonline/pulumi/__main__.py`. Don't copy the `ca-bundle-merge` init container from the older manifests; see "Trusting local TLS from pods" in [ARCHITECTURE.md](ARCHITECTURE.md#design-decisions).
 
 If the app brings heavyweight infrastructure with it — an object store, a CI system, anything a developer who is not working on that app should not be paying for — or is one most developers will not run (`micromasters`), put its name in `OPTIONAL_APP_NAMESPACES` instead. Namespaces listed there are only created when the app appears in `enabled_apps`, which the Tiltfile forwards to both Pulumi stacks as `LOCAL_DEV_ENABLED_APPS`. Gate the expensive resources on the same value; `ocw-studio` and the RustFS object store are the worked example. `data-platform` (`local-dev/infra/modules/lakehouse.py`) is the example of an `enabled_apps` entry that is infrastructure only, with no namespace or app Tiltfile of its own. An app Tiltfile can read the same variable from `os.environ` to change its own manifests when another app is enabled; `local-dev/apps/mit-learn/Tiltfile` does this for `data-platform`.
 

@@ -42,23 +42,6 @@ spec:
         component: concourse
     spec:
       initContainers:
-        # Pipeline resource and task containers get their own rootfs, so they
-        # do not inherit anything this pod trusts. Anything they clone or
-        # fetch over TLS from a local-dev hostname -- the in-cluster GitLab,
-        # say -- fails certificate verification. CONCOURSE_CERTS_DIR below
-        # bind-mounts this directory into every one of them as
-        # /etc/ssl/certs, so it has to carry the public roots as well; mkcert
-        # alone would break pulls from Docker Hub and clones from github.com.
-      - name: ca-bundle-merge
-        image: alpine:3
-        command: ["/bin/sh", "-c"]
-        args:
-        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /concourse-certs/ca-certificates.crt
-        volumeMounts:
-        - name: mkcert-root-ca
-          mountPath: /mkcert
-        - name: concourse-certs
-          mountPath: /concourse-certs
         # Same keys.sh the compose stack ran, inlined. Regenerated on every
         # pod start: they authenticate the worker to the web in this pod only,
         # and nothing outside it ever sees them.
@@ -215,7 +198,17 @@ spec:
           value: "true"
         - name: CONCOURSE_CONTAINERD_DNS_PROXY_ENABLE
           value: "true"
-        # Mounted into every resource and task container as /etc/ssl/certs.
+        # Pipeline resource containers get their own rootfs, so they do not
+        # inherit anything this pod trusts. Anything they clone or fetch over
+        # TLS from a local-dev hostname (the in-cluster GitLab, say) fails
+        # certificate verification without this. The worker copies this
+        # directory, following symlinks, into a volume it mounts in every
+        # resource container as /etc/ssl/certs. It holds the core stack's
+        # local-dev-ca-bundle ConfigMap: the public roots as well as mkcert,
+        # since mkcert alone would break pulls from Docker Hub and clones from
+        # github.com. The copy is made once per worker and kept in
+        # worker-state, so a changed bundle reaches pipelines only once this
+        # pod is replaced.
         - name: CONCOURSE_CERTS_DIR
           value: /concourse-certs
         volumeMounts:
@@ -223,8 +216,9 @@ spec:
           mountPath: /concourse-keys
         - name: worker-state
           mountPath: /worker-state
-        - name: concourse-certs
+        - name: local-dev-ca-bundle
           mountPath: /concourse-certs
+          readOnly: true
         # Sized for the configured build concurrency, not for an idle
         # worker. Every pipeline task runs in this one pod's containerd, so
         # OCW_MASS_BUILD_MAX_IN_FLIGHT parallel Hugo builds all draw on this
@@ -245,11 +239,9 @@ spec:
         emptyDir: {}
       - name: worker-state
         emptyDir: {}
-      - name: concourse-certs
-        emptyDir: {}
-      - name: mkcert-root-ca
+      - name: local-dev-ca-bundle
         configMap:
-          name: mkcert-root-ca
+          name: local-dev-ca-bundle
 ---
 apiVersion: v1
 kind: Service

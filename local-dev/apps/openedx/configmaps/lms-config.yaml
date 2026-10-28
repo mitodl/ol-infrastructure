@@ -77,9 +77,10 @@ data:
   # mitxonline.mit.test but cannot verify its mkcert-signed certificate -- no CA
   # bundle is merged into this image and no SSL_CERT_FILE is set, unlike the
   # mitxonline and mit-learn pods. Pointing them at the in-cluster Service over
-  # plain HTTP avoids that entirely; revisit if the LMS pod ever grows the
-  # ca-bundle-merge initContainer, at which point DISCOVERY_URL would match
-  # production instead.
+  # plain HTTP avoids that entirely; revisit if the LMS pod ever mounts the
+  # local-dev-ca-bundle ConfigMap (already in the openedx namespace) and points
+  # SSL_CERT_FILE/REQUESTS_CA_BUNDLE at it, at which point DISCOVERY_URL would
+  # match production instead.
   #
   # No DISCOVERY_URL, so OLOAuth2 derives userinfo as API_ROOT + api/users/me,
   # whose serializer returns edx_username as `username` -- which is what the
