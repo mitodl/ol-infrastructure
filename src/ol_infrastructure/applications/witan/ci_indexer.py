@@ -96,7 +96,9 @@ INDEX_BACKOFF_LIMIT = 1
 # default 4h cadence (start up to the starting deadline late, then up to the
 # active deadline), so consecutive failures stay one continuous alert, and it
 # leaves a failed Job and its pod around for a working day of `kubectl
-# describe`. The container logs are in Loki either way.
+# describe`. The container logs are in Loki either way. As of 2026-10-28 the
+# indexer is still excluded from WorkloadJobFailed* (eks_general.py), so this
+# matters once that exclusion is removed.
 INDEX_TTL_SECONDS_AFTER_FINISHED = 24 * 60 * 60
 
 # On-demand, not the Karpenter spot fleet. The indexer's memory request often
@@ -106,8 +108,9 @@ INDEX_TTL_SECONDS_AFTER_FINISHED = 24 * 60 * 60
 # minute. aws-node-termination-handler drains on those
 # (`enableRebalanceDraining`), evicting the indexer mid-clone. All 26 indexer
 # pod evictions in operations-qa in that window were that drain, and every
-# failed QA Job had both of its attempts evicted. Same selector as
-# open_metadata's `long_running` workflow pods.
+# failed QA Job had both of its attempts evicted. Same selector, and the same
+# do-not-disrupt annotation on the pod, as open_metadata's `long_running`
+# workflow pods.
 INDEX_NODE_SELECTOR = {"karpenter.sh/capacity-type": "on-demand"}
 
 
@@ -331,6 +334,10 @@ def create_ci_indexer(  # noqa: PLR0913
                                 **k8s_global_labels,
                                 "app.kubernetes.io/name": "witan-ci-indexer",
                             },
+                            # Karpenter still consolidates on-demand nodes. A
+                            # run it evicts starts over from scratch, and two
+                            # evictions use up INDEX_BACKOFF_LIMIT.
+                            annotations={"karpenter.sh/do-not-disrupt": "true"},
                         ),
                         spec=kubernetes.core.v1.PodSpecArgs(
                             restart_policy="Never",

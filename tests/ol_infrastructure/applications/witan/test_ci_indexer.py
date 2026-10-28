@@ -82,7 +82,12 @@ def test_the_sweep_runs_on_on_demand_capacity():
 
     def check(_: object) -> None:
         (cron_job,) = mocks.of_type("kubernetes:batch/v1:CronJob")
-        pod_spec = cron_job["spec"]["jobTemplate"]["spec"]["template"]["spec"]
+        pod_template = cron_job["spec"]["jobTemplate"]["spec"]["template"]
+        assert (
+            pod_template["metadata"]["annotations"]["karpenter.sh/do-not-disrupt"]
+            == "true"
+        )
+        pod_spec = pod_template["spec"]
         assert pod_spec["nodeSelector"] == {"karpenter.sh/capacity-type": "on-demand"}
 
     return indexer.urn.apply(check)
