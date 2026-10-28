@@ -16,7 +16,6 @@ from unittest import mock
 import pulumi
 import pulumi_vault as vault
 
-from ol_infrastructure.applications.mitxonline import k8s_secrets
 from ol_infrastructure.components.services.vault import OLVaultK8SSecret
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
@@ -103,4 +102,11 @@ def capture(module: ModuleType) -> dict[str, Any]:
 
 
 def test_the_vso_resources_match_main_before_the_description():
+    # Imported here, not at module level: k8s_secrets pulls in an ElastiCache
+    # helper that builds a boto3 client on import, and conftest only sets
+    # AWS_REGION once collection is over.
+    from ol_infrastructure.applications.mitxonline import (  # noqa: PLC0415
+        k8s_secrets,
+    )
+
     assert capture(k8s_secrets) == json.loads(FIXTURE.read_text())
