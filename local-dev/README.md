@@ -1145,12 +1145,13 @@ is loaded. To go from an empty stack to a populated dashboard, using the realm's
 The `UserOrganization` row only exists once MITx Online has seen the organization in the
 user's login, so step 2's update matches nothing if it runs before that login.
 
-The dashboard page is behind the `b2b-analytics-dashboard` PostHog flag. Enabling the app
-sets `NEXT_PUBLIC_FEATURE_b2b_analytics_dashboard` on the frontend, but that only
-bootstraps the flag, and today the page waits for PostHog's server to answer before it
-renders, so the bootstrapped value alone does not open it. Set
+The dashboard is behind the `b2b-analytics-dashboard` PostHog flag, and its per-learner
+pages also need `b2b-learner-analytics`. Enabling the app sets both as
+`NEXT_PUBLIC_FEATURE_*` on the frontend, but that only bootstraps them, and today the
+pages wait for PostHog's server to answer before they render, so the bootstrapped values
+alone do not open them (https://github.com/mitodl/mit-learn/pull/4189 changes that). Set
 `NEXT_PUBLIC_POSTHOG_API_KEY` (and `_API_HOST`) in
-`apps/mit-learn-nextjs/configmaps/app-env.local.yaml` and turn the flag on for yourself,
+`apps/mit-learn-nextjs/configmaps/app-env.local.yaml` and turn the flags on for yourself,
 e.g. with an override from the PostHog toolbar.
 
 ### GitLab
