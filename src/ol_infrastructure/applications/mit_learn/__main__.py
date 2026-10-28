@@ -2004,6 +2004,21 @@ mitlearn_celery_worker_configs = [
         skip_rollout_await=True,
         resource_requests=celery_embeddings_resource_requests,
         resource_limits=celery_embeddings_resource_limits,
+        # 768Mi. Must be set: without it celery falls back to mit-learn's
+        # CELERY_WORKER_MAX_MEMORY_PER_CHILD (250_000 KiB), which a child on
+        # this queue already exceeds at fork (VmHWM ~246Mi inherited from a
+        # ~322Mi master, observed on applications-production 2026-10-27), so
+        # every task paid ~2s of encoder + Qdrant client set-up in a fresh
+        # child. A child reaches ~470Mi after its first chunk (litellm is
+        # imported lazily, +~145Mi), and Opik tracing will add ~140Mi per
+        # encoder-loading process.
+        #
+        # Sized against the floor-derived limit (1Gi VPA min_allowed x this
+        # queue's 2.5:1 ratio = 2560Mi): ~460Mi master (with Opik) +
+        # 2 x (768Mi + one task's growth) leaves ~270Mi of per-task growth
+        # per child. Coupled to --concurrency=2 and to
+        # _embeddings_worker_vpa_bounds["min_allowed"] -- revisit together.
+        max_memory_per_child_kib=786432,
     ),
 ]
 mitlearn_celery_beat_config = OLApplicationK8sCeleryBeatConfig(
