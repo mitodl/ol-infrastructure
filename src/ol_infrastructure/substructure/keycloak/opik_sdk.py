@@ -13,23 +13,29 @@ client-credentials grant, so the CI and QA Vaults never hold the UI client, and 
 can be rotated without signing anyone out of the UI.
 
 ol-data-platform's evaluation gate (ol-llm's evaluation-gate.yml) runs on GitHub
-Actions with a client of its own too. Only the Production Vault holds it; a person
-copies it into that repository's secrets.
+Actions with a client of its own too. Only the Production Vault holds it, and this
+module writes it, with the Opik URL and the gate's AWS role, to that repository's
+Actions secrets and variables.
 """
 
 import json
 
+import pulumi_github as github
 import pulumi_keycloak as keycloak
 import pulumi_vault as vault
 from pulumi import Output, ResourceOptions
 
+from ol_infrastructure.lib import pulumi_projects as projects
+from ol_infrastructure.lib.github_helper import get_github_provider
 from ol_infrastructure.lib.opik import (
     OPIK_APP_ENVIRONMENTS,
     OPIK_SDK_ENVIRONMENTS,
     OPIK_SDK_VAULT_MOUNT,
+    opik_api_url,
     opik_sdk_client_id,
     opik_sdk_vault_path,
 )
+from ol_infrastructure.lib.pulumi_helper import make_stack_reference
 from ol_infrastructure.lib.vault import get_vault_provider
 
 REALM_NAME = "ol-platform-engineering"
@@ -38,6 +44,7 @@ REALM_NAME = "ol-platform-engineering"
 OPIK_GATEWAY_CLIENT_ID = "ol-opik-client"
 OPIK_EVALUATION_CLIENT_ID = "ol-data-platform-evaluation-opik"
 OPIK_EVALUATION_VAULT_PATH = "evaluation-ol-data-platform"
+OPIK_EVALUATION_REPOSITORY = "ol-data-platform"
 
 
 def _opik_sdk_client(
@@ -87,6 +94,47 @@ def _credentials_json(client: keycloak.openid.Client, keycloak_url: str) -> Outp
         client_id=client.client_id,
         client_secret=client.client_secret,
     ).apply(json.dumps)
+
+
+def _evaluation_gate_github_settings(
+    evaluation_client: keycloak.openid.Client, keycloak_url: str
+) -> None:
+    """Write what ol-data-platform's evaluation-gate.yaml reads to its Actions settings.
+
+    :param evaluation_client: The gate's Keycloak client.
+    :param keycloak_url: Base URL of the Production Keycloak instance.
+    """
+    github_opts = ResourceOptions(provider=get_github_provider("mitodl"))
+    iam_stack = make_stack_reference(projects.IAM, "default")
+    variables: dict[str, str | Output[str]] = {
+        "OPIK_URL": opik_api_url(),
+        "OPIK_KEYCLOAK_TOKEN_URL": (
+            f"{keycloak_url}/realms/{REALM_NAME}/protocol/openid-connect/token"
+        ),
+        "EVALUATION_AWS_ROLE_ARN": iam_stack.require_output(
+            "ol_data_platform_evaluation_gate_role_arn"
+        ),
+    }
+    for name, value in variables.items():
+        github.ActionsVariable(
+            f"{OPIK_EVALUATION_REPOSITORY}-actions-variable-{name.lower()}",
+            repository=OPIK_EVALUATION_REPOSITORY,
+            variable_name=name,
+            value=value,
+            opts=github_opts,
+        )
+    secrets = {
+        "OPIK_EVALUATION_CLIENT_ID": evaluation_client.client_id,
+        "OPIK_EVALUATION_CLIENT_SECRET": evaluation_client.client_secret,
+    }
+    for name, value in secrets.items():
+        github.ActionsSecret(
+            f"{OPIK_EVALUATION_REPOSITORY}-actions-secret-{name.lower()}",
+            repository=OPIK_EVALUATION_REPOSITORY,
+            secret_name=name,
+            value=value,
+            opts=github_opts,
+        )
 
 
 def create_opik_sdk_resources(
@@ -139,3 +187,4 @@ def create_opik_sdk_resources(
                 data_json=_credentials_json(evaluation_client, keycloak_url),
                 opts=ResourceOptions(provider=vault_provider, depends_on=[opik_mount]),
             )
+            _evaluation_gate_github_settings(evaluation_client, keycloak_url)
