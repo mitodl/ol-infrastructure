@@ -35,7 +35,9 @@ class RecordingMocks(pulumi.runtime.Mocks):
         return {}
 
 
-def _render(monkeypatch) -> dict[tuple[str, str], dict[str, Any]]:
+def _render(
+    monkeypatch, helm_values_calls: list[dict[str, Any]] | None = None
+) -> dict[tuple[str, str], dict[str, Any]]:
     monkeypatch.syspath_prepend(str(INFRA_DIR))
     for name in [m for m in sys.modules if m == "modules" or m.startswith("modules.")]:
         monkeypatch.delitem(sys.modules, name)
@@ -45,6 +47,14 @@ def _render(monkeypatch) -> dict[tuple[str, str], dict[str, Any]]:
 
     helpers = importlib.import_module("modules.helpers")
     ingress = importlib.import_module("modules.ingress")
+    if helm_values_calls is not None:
+        real_helm_values = ingress.apisix_helm_values
+
+        def recording_helm_values(config):
+            helm_values_calls.append(real_helm_values(config))
+            return helm_values_calls[-1]
+
+        monkeypatch.setattr(ingress, "apisix_helm_values", recording_helm_values)
 
     @pulumi.runtime.test
     def program():
@@ -70,11 +80,27 @@ def _render(monkeypatch) -> dict[tuple[str, str], dict[str, Any]]:
 
 
 def test_apisix_values_come_from_the_deployed_definition(monkeypatch):
-    resources = _render(monkeypatch)
+    helm_values_calls: list[dict[str, Any]] = []
+    resources = _render(monkeypatch, helm_values_calls)
     values = resources[("kubernetes:helm.sh/v3:Release", "apisix")]["values"]
     # The admin keys are secret, so the mocks hand the whole values input
     # back wrapped as a secret.
     values = values["value"]
+
+    # The release gets the shared function's output whole, so a hand-written
+    # dict carrying the local keys below would fail here.
+    assert len(helm_values_calls) == 1
+    shared = helm_values_calls[0]
+    assert values["apisix"]["nginx"] == shared["apisix"]["nginx"]
+    assert (
+        values["apisix"]["ssl"]["sslCiphers"] == shared["apisix"]["ssl"]["sslCiphers"]
+    )
+    # The mocks round-trip ints as floats and keep the admin key an Output,
+    # so compare the shape here rather than the values.
+    assert set(values) == set(shared)
+    assert set(values["apisix"]) == set(shared["apisix"])
+    assert set(values["ingress-controller"]) == set(shared["ingress-controller"])
+    assert values["apisix"]["nginx"]["customLuaSharedDicts"]
 
     assert values["apisix"]["pluginAttrs"]["redirect"] == {"https_port": 443}
     assert values["service"]["type"] == "NodePort"
