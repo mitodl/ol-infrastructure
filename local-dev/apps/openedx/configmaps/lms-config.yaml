@@ -117,3 +117,24 @@ data:
   # rotates the AccessToken to a changed value on its next run (and deletes the
   # account's old one), so change both files together and re-run it.
   OPENEDX_SERVICE_WORKER_API_TOKEN: "local-dev-stub-token" # pragma: allowlist secret
+
+  # The authoring MFE runs on the Studio host and authenticates against this
+  # LMS from there: its JavaScript reads the LMS's JWT and user-info cookies
+  # and POSTs a credentialed cross-origin /login_refresh. Production sets
+  # ENABLE_CORS_HEADERS, CORS_ORIGIN_WHITELIST and LOGIN_REDIRECT_WHITELIST for
+  # the same reason (edxapp config_builder.py and k8s_configmaps.py), and gets
+  # SHARED_COOKIE_DOMAIN by deriving it from SESSION_COOKIE_DOMAIN. These reach
+  # Django only on a lehrer whose settings model declares them; see the
+  # README's Open edX section.
+  #
+  # CORS_ALLOW_CREDENTIALS follows ENABLE_CORS_HEADERS inside lehrer's settings,
+  # as upstream production.py has it, so it is not listed.
+  ENABLE_CORS_HEADERS: "true"
+  CORS_ORIGIN_WHITELIST: '["https://lms.mit.test", "https://studio.mit.test"]'
+  # The JWT and user-info cookies only (user_authn/cookies.py reads this, not
+  # SESSION_COOKIE_DOMAIN), so the LMS's sessionid stays host-only and cannot
+  # collide with mitxonline's default-named session cookie on the same parent.
+  SHARED_COOKIE_DOMAIN: ".mit.test"
+  # Hostnames the LMS may send a `next=` back to after login; the authoring
+  # MFE's LOGIN_URL carries its own Studio-host URL as next.
+  LOGIN_REDIRECT_WHITELIST: '["studio.mit.test"]'
