@@ -4,12 +4,16 @@
 # Usage:
 #   ./local-dev/scripts/kc-user-id.sh admin@ol.test
 #
-# The apps store this id as users_user.global_id. Exits non-zero when the realm
-# has no such user, which for the kc-seed-users trio means that resource has
-# not run yet.
+# The apps store this id as users_user.global_id. Exits non-zero when the
+# lookup fails or the realm has no such user, which for the kc-seed-users trio
+# means that resource has not run yet.
 
 set -euo pipefail
 
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <email>" >&2
+    exit 2
+fi
 email="$1"
 # shellcheck source=/dev/null
 source "$(dirname "${BASH_SOURCE[0]}")/kc-admin.sh"

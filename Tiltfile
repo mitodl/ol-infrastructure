@@ -159,9 +159,12 @@ local_resource(
 # id) and fills in the rest on every login, so admin@ol.test is created here
 # with the id its seed resource resolves on the host (ADMIN_GLOBAL_ID). Its
 # first login then finds this row; a row without the id would collide with the
-# login on email. Objects are created only when missing and configure_tiers
-# matches what exists, all in one transaction, so re-triggering is a no-op and
-# a failure rolls back the whole seed. Passed to `manage.py shell -c` in single
+# login on email. Objects are created only when missing, and configure_tiers
+# matches the current year's discounts, so a re-trigger creates nothing within
+# a calendar year; in a new year configure_tiers adds that year's discounts and
+# expires the old ones. The courseware and the superuser are two transactions:
+# a failure rolls back its own step, and an admin@ol.test row left from an
+# earlier realm fails only the second. Passed to `manage.py shell -c` in single
 # quotes, so the script must not contain one.
 MITXONLINE_SEED_INSTANCE = """
 import os
@@ -169,6 +172,7 @@ import os
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.db import transaction
+from django.db.models import Q
 from courses.models import Course, Program
 
 PROGRAM = "program-v1:MITx+DEDP"
@@ -195,10 +199,22 @@ with transaction.atomic():
                 create_page=True, set_courserun_dates_automatically=True,
                 price=999,
             )
-    get_user_model().objects.get_or_create(
-        global_id=os.environ["ADMIN_GLOBAL_ID"],
-        defaults={"username": ADMIN_EMAIL, "email": ADMIN_EMAIL},
-    )
+User = get_user_model()
+admin_id = os.environ["ADMIN_GLOBAL_ID"]
+with transaction.atomic():
+    if not User.objects.filter(global_id=admin_id).exists():
+        stale = User.objects.filter(
+            Q(email__iexact=ADMIN_EMAIL) | Q(username=ADMIN_EMAIL)
+        ).first()
+        if stale is not None:
+            raise SystemExit(
+                f"mitxonline user {stale.id} ({ADMIN_EMAIL}) has global_id "
+                f"{stale.global_id}, not the current Keycloak id {admin_id}: "
+                "the olapps realm was recreated after it was made. Set its "
+                "global_id to the current id, or delete it, and run this seed "
+                "again. The program and courses are already seeded."
+            )
+        User.objects.create(global_id=admin_id, username=ADMIN_EMAIL, email=ADMIN_EMAIL)
     call_command("promote_user", "promote", "--superuser", "--email", ADMIN_EMAIL)
 """
 
