@@ -197,7 +197,7 @@ with transaction.atomic():
                 live=True, create_run=run_tag, program=program,
                 required=program is not None, depts=[dept], create_depts=True,
                 create_page=True, set_courserun_dates_automatically=True,
-                price=999,
+                price=999, mode_audit=True, mode_verified=True,
             )
 User = get_user_model()
 admin_id = os.environ["ADMIN_GLOBAL_ID"]
