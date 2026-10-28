@@ -20,7 +20,7 @@ if k8s_context() != "local-dev":
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
-config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters gitlab. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
+config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters gitlab ol-analytics-api. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
 config.define_string_list("prebuilt_tags", usage="Published image tag to run for an app with no checkout, instead of latest, e.g. mit-learn=0.82.0 learn-ai=0.37.0")
 config.define_string_list("lake_host_ports", usage="Host ports for the data-platform lake forwards, e.g. rustfs=9100 gravitino=9101 (defaults: starrocks=9030 gravitino=9001 rustfs=9000). Move one that another process on your machine already holds.")
@@ -386,6 +386,17 @@ APPS = [
             },
         ],
     },
+    {
+        # Off by default. Serves MIT Learn's org analytics dashboard from the
+        # data-platform lake, so it needs data-platform and mitxonline enabled
+        # too. See "ol-analytics-api" in local-dev/README.md.
+        "name": "ol-analytics-api",
+        "dir": "ol-analytics-api",
+        "namespace": "ol-analytics-api",
+        "deploy_name": "ol-analytics-api",
+        "images": {"ol-analytics-api": "mitodl/ol-analytics-api-app"},
+        "tiltfile": "./local-dev/apps/ol-analytics-api/Tiltfile",
+    },
 ]
 
 # ---------------------------------------------------------------------------
@@ -553,7 +564,7 @@ if "data-platform" in enabled_apps:
 local_resource(
     "kc-seed-users",
     cmd="LOCAL_DEV_ROOT_DOMAIN={rd} {script}".format(rd=root_domain, script="{}/local-dev/scripts/kc-seed-users.sh".format(config.main_dir)),
-    deps=["./local-dev/scripts/kc-seed-users.sh"],
+    deps=["./local-dev/scripts/kc-seed-users.sh", "./local-dev/scripts/kc-admin.sh"],
     labels=["infra"],
     resource_deps=["local-infra-apps"],
 )
@@ -565,7 +576,18 @@ local_resource(
 local_resource(
     "kc-fix-flow-bindings",
     cmd="LOCAL_DEV_ROOT_DOMAIN={rd} {script}".format(rd=root_domain, script="{}/local-dev/scripts/kc-fix-flow-bindings.sh".format(config.main_dir)),
-    deps=["./local-dev/scripts/kc-fix-flow-bindings.sh"],
+    deps=["./local-dev/scripts/kc-fix-flow-bindings.sh", "./local-dev/scripts/kc-admin.sh"],
+    labels=["infra"],
+    resource_deps=["local-infra-apps"],
+)
+
+# Give the organization claim the deployed shape (a map carrying each
+# organization's id rather than a list of aliases). Keycloak creates that scope
+# itself, so Pulumi cannot hold its mapper; see the script comment.
+local_resource(
+    "kc-fix-org-claim",
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} {script}".format(rd=root_domain, script="{}/local-dev/scripts/kc-fix-org-claim.sh".format(config.main_dir)),
+    deps=["./local-dev/scripts/kc-fix-org-claim.sh", "./local-dev/scripts/kc-admin.sh"],
     labels=["infra"],
     resource_deps=["local-infra-apps"],
 )

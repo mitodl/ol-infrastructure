@@ -786,7 +786,8 @@ does.
 The b2b materialized views are StarRocks tables, not lake tables, so they have a
 profile of their own, `starrocks_local_b2b`. It writes `default_catalog.b2b_analytics`
 and `default_catalog.b2b_learner_records` and reads
-`ol_data_lake_local.ol_warehouse_local_dimensional`, which nothing fills yet. A bare
+`ol_data_lake_local.ol_warehouse_local_dimensional`, which `ol-dbt fixtures
+load-dimensional b2b_organization` fills (see [ol-analytics-api](#ol-analytics-api)). A bare
 `dagster dev` in the lakehouse code location builds on it, and so does:
 
 ```bash
@@ -1066,6 +1067,92 @@ What differs from the other apps:
   checkout changes.
 - **Nothing scheduled runs.** There is no celery beat deployment, so the edX and MIT
   Learn syncs never fire.
+
+### ol-analytics-api
+
+[ol-analytics-api](https://github.com/mitodl/ol-analytics-api) serves MIT Learn's org
+analytics dashboard (`/dashboard/organization/<org>/analytics`) out of StarRocks. It is
+opt-in, and it needs the lake and MITx Online alongside it; the Tiltfile refuses to load
+it without them:
+
+```json
+{
+  "enabled_apps": ["mit-learn", "mitxonline", "data-platform", "ol-analytics-api"]
+}
+```
+
+Re-run `./local-dev/scripts/setup.sh` first if your `/etc/hosts` predates the app. Tilt
+builds the image from a sibling `ol-analytics-api` checkout and syncs `src/` into the
+pod, where granian reloads on change; a `pyproject.toml` or `uv.lock` edit rebuilds the
+image.
+
+It is wired the way the deployed Learn-scoped host is:
+
+- `https://analytics.learn.mit.test` routes to it through an openid-connect plugin that
+  reads mit-learn's session cookie and never redirects, so a browser logged in to MIT
+  Learn reaches it with `X-Userinfo` and an anonymous one gets a JSON 401.
+- The Next.js frontend gets `NEXT_PUBLIC_ANALYTICS_API_BASE_URL` only while the app is
+  enabled (`apps/mit-learn-nextjs/configmaps/analytics-env.yaml`). Without it the
+  dashboard says analytics is unavailable.
+- The app reads the lake's StarRocks as `root`, from the `b2b_analytics` and
+  `b2b_learner_records` databases the lake creates empty.
+- The org-manager check calls the local MITx Online at `https://api.mitxonline.mit.test`
+  with a client-credentials token. MITx Online's pre-deploy Job registers that
+  Application while `ol-analytics-api` is in `enabled_apps`
+  (`ANALYTICS_API_OAUTH_APP_SCRIPT` in `apps/mitxonline/pulumi/inputs.py`), so enabling
+  the app re-applies mitxonline once.
+- MIT Learn's login requests `organization:*`, and `kc-fix-org-claim` sets the realm's
+  organization mapper to add each organization's id, which the deployed realms do. Log
+  out and back in after either reaches your cluster: the claim is fixed when the
+  session is created.
+
+A request passes only when all of these agree on one organization:
+
+- the logged-in user is a member of a Keycloak organization in the `olapps` realm;
+- MITx Online has that organization's page, with `sso_organization_id` set to the
+  Keycloak organization's id, and a `UserOrganization` row marking the user as a
+  manager (deployed, `is_manager` is curated in the Django admin);
+- the StarRocks views have rows for that `sso_organization_id`.
+
+Keycloak assigns organization ids itself (its admin API ignores an id in the request),
+so the StarRocks rows come from a fixture in ol-data-platform that takes the ids when it
+is loaded. To go from an empty stack to a populated dashboard, using the realm's
+`local-dev` organization:
+
+1. In the Keycloak admin console (`https://sso.ol.mit.test/admin/`, `admin` / `admin`),
+   add your test user to the `Local Dev` organization in the `olapps` realm.
+2. Give MITx Online the organization and a contract, then log in to MIT Learn as that
+   user and make them a manager:
+
+   ```bash
+   kubectl --context local-dev -n mitxonline exec deploy/mitxonline-app -- python manage.py sync_keycloak_orgs
+   kubectl --context local-dev -n mitxonline exec deploy/mitxonline-app -- \
+       python manage.py b2b_contract create "Local Dev" "Local Dev contract" managed
+   kubectl --context local-dev -n mitxonline exec -i deploy/mitxonline-app -- python manage.py shell <<'PY'
+   from b2b.models import ContractPage, UserOrganization
+
+   UserOrganization.objects.filter(organization__name="Local Dev").update(is_manager=True)
+   for contract in ContractPage.objects.filter(organization__name="Local Dev"):
+       print(contract.organization.sso_organization_id, contract.id, contract.title)
+   PY
+   ```
+
+3. From an ol-data-platform checkout, load the fixture with the two ids that printed,
+   build the views and refresh them. "B2B views" in
+   [docs/LOCAL_LAKE.md](https://github.com/mitodl/ol-data-platform/blob/main/docs/LOCAL_LAKE.md)
+   has the commands.
+
+The `UserOrganization` row only exists once MITx Online has seen the organization in the
+user's login, so step 2's update matches nothing if it runs before that login.
+
+The dashboard is behind the `b2b-analytics-dashboard` PostHog flag, and its per-learner
+pages also need `b2b-learner-analytics`. Enabling the app sets both as
+`NEXT_PUBLIC_FEATURE_*` on the frontend, but that only bootstraps them, and today the
+pages wait for PostHog's server to answer before they render, so the bootstrapped values
+alone do not open them (https://github.com/mitodl/mit-learn/pull/4189 changes that). Set
+`NEXT_PUBLIC_POSTHOG_API_KEY` (and `_API_HOST`) in
+`apps/mit-learn-nextjs/configmaps/app-env.local.yaml` and turn the flags on for yourself,
+e.g. with an override from the PostHog toolbar.
 
 ### GitLab
 

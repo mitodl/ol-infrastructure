@@ -272,7 +272,9 @@ bindings = definition.MitxonlineBindings(
     ),
     environment_variables=env_vars,
     k8s_labels=LABELS,
-    secret_names=[secret_name],
+    # The admin API's client pair, which apps-infra writes into this namespace
+    # (the deployed stacks read it from keycloak-admin-b2b in Vault).
+    secret_names=[secret_name, "mitxonline-keycloak-admin"],
     # The shared mit-learn client, as deployed (sso/mitlearn); apps-infra writes
     # this Secret into the mitxonline namespace.
     oidc_secret_name="ol-mitlearn-oidc",  # noqa: S106  # pragma: allowlist secret
@@ -293,9 +295,14 @@ secrets_hash = hashlib.sha256(
 deployed_config = definition.application_config(bindings)
 app_config = deployed_config.model_copy(
     update={
-        # Local-dev's fresh-database and Open edX steps; see CONFIGURE_WAGTAIL_STEP
-        # and OPENEDX_OAUTH_APP_STEP.
-        "pre_deploy_commands": with_local_steps(deployed_config.pre_deploy_commands),
+        # Local-dev's fresh-database, Open edX and ol-analytics-api steps; see
+        # CONFIGURE_WAGTAIL_STEP, OPENEDX_OAUTH_APP_STEP and
+        # ANALYTICS_API_OAUTH_APP_SCRIPT.
+        "pre_deploy_commands": with_local_steps(
+            deployed_config.pre_deploy_commands,
+            # Set by the Tiltfile; see its apply_env.
+            analytics_api=os.environ.get("LOCAL_DEV_ANALYTICS_API_ENABLED") == "true",
+        ),
         "extra_volumes": [
             k8s.core.v1.VolumeArgs(
                 name=CA_BUNDLE_CONFIGMAP,

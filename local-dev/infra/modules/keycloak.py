@@ -553,8 +553,14 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     # Same mitlearn creds for the other apps' routes on api.learn that read
     # mit-learn's session via secretRef: both of mitxonline's rendered route
     # groups (they authenticate through this client, as deployed) and learn-ai's
-    # /ai/* routes.
-    for namespace in ("mitxonline", "learn-ai"):
+    # /ai/* routes. ol-analytics-api's analytics.learn route reads the same
+    # session, as its deployed Learn-scoped OIDC resource does (sso/mitlearn);
+    # its namespace only exists when the app is enabled.
+    for namespace in (
+        "mitxonline",
+        "learn-ai",
+        *(("ol-analytics-api",) if "ol-analytics-api" in enabled_apps else ()),
+    ):
         _make_oidc_secret(
             f"oidc-secret-mitlearn-in-{namespace}",
             namespace,
@@ -749,20 +755,22 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             opts=kc_opts,
         )
 
+    # MITx Online's admin API settings, under the names the deployed
+    # keycloak-admin-b2b template writes (applications/mitxonline/k8s_secrets.py);
+    # the local mitxonline program loads this Secret into its workloads. The
+    # discovery URL is in the program's env already.
     k8s.core.v1.Secret(
-        "oidc-secret-mitxonline-b2b",
-        metadata={"name": "ol-mitxonline-b2b-oidc", "namespace": "mitxonline"},
+        "mitxonline-keycloak-admin",
+        metadata={"name": "mitxonline-keycloak-admin", "namespace": "mitxonline"},
         string_data=Output.all(
             client_id=mitxonline_b2b_client.client_id,
             client_secret=mitxonline_b2b_client.client_secret,
-            realm_id=mitxonline_b2b_client.realm_id,
         ).apply(
             lambda args: {
-                "client_id": args["client_id"],
-                "client_secret": args["client_secret"],
-                "realm_id": args["realm_id"],
-                "realm_name": "olapps",
-                "url": f"{keycloak_url}/realms/{args['realm_id']}",
+                "KEYCLOAK_ADMIN_CLIENT_ID": args["client_id"],
+                "KEYCLOAK_ADMIN_CLIENT_SECRET": args["client_secret"],
+                "KEYCLOAK_ADMIN_CLIENT_SCOPES": "openid profile email",
+                "KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL": "False",
             }
         ),
         opts=k8s_opts,
