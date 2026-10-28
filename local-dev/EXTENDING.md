@@ -86,6 +86,11 @@ In `Tiltfile`, add an entry to the `APPS` list:
 )
 ```
 
+Each seed becomes a manual Tilt resource that runs `cmd` in the deployment's pod through `kubectl exec`. Two optional keys cover a seed that needs something from the host first (`seed-mitxonline-instance` is the example):
+
+- `host_env`: `{"NAME": "<host command>"}`. Each command runs on the host before `kubectl exec`; a non-zero exit stops the seed, and its output reaches `cmd` as the environment variable `NAME`.
+- `resource_deps`: Tilt resources to wait for besides the app's deployment, e.g. `["kc-seed-users"]`.
+
 ### 6. Add hosts and DNS
 
 In `setup.sh`, add the hostname to `HOSTS` and ensure it's covered by a `MKCERT_DOMAINS` wildcard. Re-run `setup.sh` to update `/etc/hosts` and regenerate the cert.
