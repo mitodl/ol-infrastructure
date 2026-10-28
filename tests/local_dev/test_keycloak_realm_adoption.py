@@ -1,10 +1,20 @@
-"""live_realm_import_id: adopt the realm only when Keycloak says it exists."""
+"""Adopt the olapps realm only when Keycloak says it exists, and only the realm."""
 
+import asyncio
 import importlib.util
 from pathlib import Path
 
 import httpx
+import pulumi
+import pulumi_keycloak
+import pulumi_kubernetes
 import pytest
+
+# Python 3.14+ compatibility, as tests/local_dev/test_mitxonline_program.py does.
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
 
 REPO = Path(__file__).parents[2]
 _spec = importlib.util.spec_from_file_location(
@@ -65,3 +75,56 @@ def test_unanswered_lookup_fails_the_run(
     _keycloak(monkeypatch, token_status=token_status, realm_status=realm_status)
     with pytest.raises(httpx.HTTPStatusError):
         keycloak_module.live_realm_import_id(URL, "olapps", "admin", "admin")
+
+
+class _RealmMocks(pulumi.runtime.Mocks):
+    def __init__(self) -> None:
+        self.import_ids: dict[tuple[str, str], str | None] = {}
+
+    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
+        self.import_ids[(args.typ, args.name)] = args.resource_id
+        return [args.resource_id or f"{args.name}-id", args.inputs]
+
+    def call(self, args: pulumi.runtime.MockCallArgs):
+        # The OVS Secret reads the realm's first RS256 key.
+        if args.token == "keycloak:index/getRealmKeys:getRealmKeys":  # noqa: S105
+            return {"keys": [{"publicKey": "k"}]}
+        return {}
+
+
+def _realm_import_id(realm_import_id: str | None) -> str | None:
+    """Build the realm under mocks; return the import ID the Realm registered with."""
+    mocks = _RealmMocks()
+    # Set per run, not at import: other test modules set their own mocks at
+    # import time and the last one wins.
+    pulumi.runtime.set_mocks(
+        mocks, project="ol-local-dev-apps-infra", stack="test", preview=False
+    )
+
+    @pulumi.runtime.test
+    def run():
+        keycloak_module.create_olapps_dev_realm(
+            keycloak_provider=pulumi_keycloak.Provider("kc", url=URL),
+            keycloak_url=URL,
+            k8s_provider=pulumi_kubernetes.Provider("k8s"),
+            mitlearn_client_secret=pulumi.Output.secret("a"),
+            learn_ai_client_secret=pulumi.Output.secret("b"),
+            mitxonline_client_secret=pulumi.Output.secret("c"),
+            unified_ecommerce_client_secret=pulumi.Output.secret("d"),
+            ovs_client_secret=pulumi.Output.secret("e"),
+            ocw_studio_client_secret=pulumi.Output.secret("f"),
+            root_domain="mit.test",
+            realm_import_id=realm_import_id,
+        )
+        return pulumi.Output.from_input(True)  # noqa: FBT003
+
+    run()
+    return mocks.import_ids[("keycloak:index/realm:Realm", "olapps")]
+
+
+def test_found_realm_is_registered_as_an_import() -> None:
+    assert _realm_import_id("olapps") == "olapps"
+
+
+def test_missing_realm_is_registered_as_a_create() -> None:
+    assert not _realm_import_id(None)
