@@ -1,8 +1,9 @@
 # shellcheck shell=bash
 # kc-admin.sh — Keycloak admin API access shared by the kc-*.sh scripts.
 #
-# Source it from a script; it defines KC_URL, REALM, KC_CACERT and get_token,
-# resolving the Keycloak URL from LOCAL_DEV_ROOT_DOMAIN (KC_URL overrides it).
+# Source it from a script; it defines KC_URL, REALM, KC_CACERT, get_token and
+# kc_user_id, resolving the Keycloak URL from LOCAL_DEV_ROOT_DOMAIN (KC_URL
+# overrides it).
 # Messages are tagged with the sourcing script's name.
 
 LOG_TAG="$(basename "${BASH_SOURCE[1]}" .sh)"
@@ -48,4 +49,26 @@ get_token() {
     done
     echo "[${LOG_TAG}] ERROR: could not obtain admin token from ${KC_URL}" >&2
     return 1
+}
+
+# Print the id of the olapps user with email $2, or nothing if there is none.
+# Returns 1, with the reason on stderr, when the lookup itself fails, so a
+# rejected token or an unreachable Keycloak is not mistaken for a missing user.
+# Looks up by email, not username: the realm has registrationEmailAsUsername=true,
+# so a username= lookup for "admin" always misses.
+kc_user_id() {
+    local token="$1" email="$2" response status
+    response=$(curl -s --cacert "${KC_CACERT}" --max-time 10 -w '\n%{http_code}' \
+        -H "Authorization: Bearer ${token}" \
+        --get --data-urlencode "email=${email}" --data-urlencode "exact=true" \
+        "${KC_URL}/admin/realms/${REALM}/users") || {
+        echo "[${LOG_TAG}] ERROR: looking up ${email} at ${KC_URL} failed (curl exit $?)" >&2
+        return 1
+    }
+    status="${response##*$'\n'}"
+    if [ "${status}" != "200" ]; then
+        echo "[${LOG_TAG}] ERROR: looking up ${email} at ${KC_URL} returned HTTP ${status}" >&2
+        return 1
+    fi
+    jq -r '.[0].id // empty' <<< "${response%$'\n'*}"
 }

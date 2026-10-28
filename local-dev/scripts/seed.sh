@@ -130,7 +130,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -h|--help)
-            echo "Usage: seed.sh [--app <name>] [--cmd <management-command>] [--list]"
+            echo "Usage: seed.sh [--app <name>] [--cmd <shell command to run in the pod>] [--list]"
             exit 0
             ;;
         *)

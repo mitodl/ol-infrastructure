@@ -151,17 +151,21 @@ local_resource(
 )
 
 # What mitxonline's configure_instance would seed, minus what cannot run here.
-# configure_instance itself exits 255 with no platform argument (the gateway
-# check), and with `none` it still fails at its first course because it passes
+# configure_instance exits 255 with no platform argument (the gateway check),
+# and with `none` it still fails at its first course because it passes
 # create_courseware a run_url option that command no longer takes. Its
 # createsuperuser and create_user steps prompt, and kubectl exec has no TTY.
-# Users come from Keycloak and are matched on global_id, so a superuser created
-# here would collide on email with admin@ol.test's first login; the user that
-# login creates is promoted instead. Each object is created only when missing,
-# in one transaction, so re-triggering the seed is a no-op and a failure leaves
-# nothing half-made. Passed to `manage.py shell -c` in single quotes, so the
-# script must not contain one.
+# mitxonline's gateway backend looks users up by global_id (the Keycloak user
+# id) and fills in the rest on every login, so admin@ol.test is created here
+# with the id its seed resource resolves on the host (ADMIN_GLOBAL_ID). Its
+# first login then finds this row; a row without the id would collide with the
+# login on email. Objects are created only when missing and configure_tiers
+# matches what exists, all in one transaction, so re-triggering is a no-op and
+# a failure rolls back the whole seed. Passed to `manage.py shell -c` in single
+# quotes, so the script must not contain one.
 MITXONLINE_SEED_INSTANCE = """
+import os
+
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.db import transaction
@@ -172,6 +176,7 @@ COURSES = [
     ("course-v1:edX+DemoX", "Demonstration Course", "Demo_Course", "Science", PROGRAM),
     ("course-v1:edX+E2E-101", "E2E Test Course", "course", "Math", None),
 ]
+ADMIN_EMAIL = "admin@ol.test"
 with transaction.atomic():
     if not Program.objects.filter(readable_id=PROGRAM).exists():
         call_command(
@@ -180,6 +185,7 @@ with transaction.atomic():
             live=True, depts=["Economics"], create_depts=True, create_page=True,
         )
         call_command("create_finaid_form", PROGRAM, live=True)
+    call_command("configure_tiers", program=PROGRAM)
     for readable_id, title, run_tag, dept, program in COURSES:
         if not Course.objects.filter(readable_id=readable_id).exists():
             call_command(
@@ -189,13 +195,11 @@ with transaction.atomic():
                 create_page=True, set_courserun_dates_automatically=True,
                 price=999,
             )
-if get_user_model().objects.filter(email="admin@ol.test").exists():
-    call_command("promote_user", "promote", "--superuser", "--email", "admin@ol.test")
-else:
-    print(
-        "admin@ol.test has no mitxonline account yet: log in to mitxonline "
-        "as admin@ol.test once, then run this seed again to make it a superuser."
+    get_user_model().objects.get_or_create(
+        global_id=os.environ["ADMIN_GLOBAL_ID"],
+        defaults={"username": ADMIN_EMAIL, "email": ADMIN_EMAIL},
     )
+    call_command("promote_user", "promote", "--superuser", "--email", ADMIN_EMAIL)
 """
 
 # ---------------------------------------------------------------------------
@@ -205,6 +209,9 @@ else:
 # pod after the deployment is healthy.  Each entry is a dict with:
 #   - label: short name shown in Tilt UI
 #   - cmd:   shell command to exec inside the pod
+#   - host_env (optional): {NAME: host command}; each command runs on the host
+#     first, a failure stops the seed, and its output reaches cmd as env NAME
+#   - resource_deps (optional): resources to wait for besides the deployment
 # All seed resources are TRIGGER_MODE_MANUAL — they never run automatically.
 # ---------------------------------------------------------------------------
 APPS = [
@@ -285,8 +292,14 @@ APPS = [
         "seed_commands": [
             {
                 "label": "seed-mitxonline-instance",
-                "description": "DEDP program, two courses with open runs and products, admin@ol.test superuser",
+                "description": "DEDP program with financial assistance, two courses with open runs and products, admin@ol.test superuser",
                 "cmd": "python manage.py shell -c '" + MITXONLINE_SEED_INSTANCE + "'",
+                "host_env": {
+                    "ADMIN_GLOBAL_ID": "LOCAL_DEV_ROOT_DOMAIN={rd} {main}/local-dev/scripts/kc-user-id.sh admin@ol.test".format(
+                        rd=root_domain, main=config.main_dir,
+                    ),
+                },
+                "resource_deps": ["kc-seed-users"],
             },
             {
                 "label": "seed-mitxonline-course-data",
@@ -653,21 +666,28 @@ for app in [a for a in APPS if a["name"] in enabled_apps]:
         include(frontend_tiltfile)
     # Register one manual-trigger Tilt resource per seed command.
     # These are never auto-run; trigger them from the Tilt UI or with:
-    #   tilt trigger seed-<app>-<label>
-    # or via:
-    #   ./local-dev/scripts/seed.sh --app <app> --cmd <label>
+    #   tilt trigger <label>
+    # or run a seed's cmd via:
+    #   ./local-dev/scripts/seed.sh --app <app> --cmd "<cmd>"
     for seed in app.get("seed_commands", []):
-        exec_cmd = (
-            "kubectl --context local-dev exec -n {ns} deploy/{deploy} -- {cmd}".format(
-                ns=app["namespace"],
-                deploy=app["deploy_name"],
-                cmd=seed["cmd"],
-            )
+        host_env = seed.get("host_env", {})
+        # An assignment takes the exit status of its command substitution, so
+        # NAME="$(host command)" && ... stops at a failed host command.
+        exec_cmd = "".join(['{k}="$({v})" && '.format(k=k, v=v) for k, v in host_env.items()])
+        if host_env:
+            pod_env = "env " + "".join(['{k}="${k}" '.format(k=k) for k in host_env])
+        else:
+            pod_env = ""
+        exec_cmd += "kubectl --context local-dev exec -n {ns} deploy/{deploy} -- {env}{cmd}".format(
+            ns=app["namespace"],
+            deploy=app["deploy_name"],
+            env=pod_env,
+            cmd=seed["cmd"],
         )
         local_resource(
             seed["label"],
             cmd=exec_cmd,
-            resource_deps=[app["deploy_name"]],
+            resource_deps=[app["deploy_name"]] + seed.get("resource_deps", []),
             labels=["seed"],
             trigger_mode=TRIGGER_MODE_MANUAL,
             auto_init=False,
