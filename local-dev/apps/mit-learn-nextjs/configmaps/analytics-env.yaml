@@ -10,3 +10,6 @@ metadata:
   namespace: mit-learn
 data:
   NEXT_PUBLIC_ANALYTICS_API_BASE_URL: "https://analytics.learn.mit.test"
+  # Bootstraps the dashboard's PostHog flag. ConfiguredPostHogProvider maps
+  # only the exact string "True" to true, so not "true".
+  NEXT_PUBLIC_FEATURE_b2b_analytics_dashboard: "True"
