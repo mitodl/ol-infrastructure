@@ -49,6 +49,11 @@ from ol_infrastructure.lib.pulumi_helper import parse_stack
 # The app's Tilt directory (secrets.yaml), this program's parent.
 APP_DIR = Path(__file__).resolve().parents[1]
 ENV_SUFFIX = "dev"
+# Public roots plus the mkcert root, so pods trust both public endpoints and
+# local TLS. The core stack writes this ConfigMap into every app namespace
+# (CA_BUNDLE_CONFIGMAP in local-dev/infra/modules/tls.py).
+CA_BUNDLE_CONFIGMAP = "local-dev-ca-bundle"
+CA_BUNDLE_DIR = "/etc/ssl/local-dev"
 # The deployed label set (environment comes out as the stack's "dev"), plus the
 # key pulumi-app-apply.sh selects the applied objects by. These keys join every
 # Deployment's immutable selector, so changing any of them replaces every
@@ -96,9 +101,9 @@ LOCAL_ENV_DEFAULTS = {
     "DEBUG": "False",
     "ALLOWED_HOSTS": "*",
     "USE_X_FORWARDED_PORT": "True",
-    # Written by ca_bundle_init below.
-    "REQUESTS_CA_BUNDLE": "/etc/ssl/local-dev/rootCA.pem",
-    "SSL_CERT_FILE": "/etc/ssl/local-dev/rootCA.pem",
+    # The CA_BUNDLE_CONFIGMAP mount below.
+    "REQUESTS_CA_BUNDLE": f"{CA_BUNDLE_DIR}/ca-certificates.crt",
+    "SSL_CERT_FILE": f"{CA_BUNDLE_DIR}/ca-certificates.crt",
     # Site config
     "MITX_ONLINE_ENVIRONMENT": "local",
     "MITX_ONLINE_ADMIN_EMAIL": "admin@ol.test",
@@ -282,23 +287,6 @@ bindings = definition.MitxonlineBindings(
     celery_topology="merged",
 )
 
-# The mkcert root merged into the image's CA bundle, so pods trust public
-# endpoints and local TLS; LOCAL_ENV_DEFAULTS points REQUESTS_CA_BUNDLE/
-# SSL_CERT_FILE at the result. Mounts only the ConfigMap: the component adds
-# extra_volume_mounts (the combined-ca target) to every extra init container.
-ca_bundle_init = k8s.core.v1.ContainerArgs(
-    name="ca-bundle-merge",
-    image=f"{repository}:{tag}",
-    command=["/bin/sh", "-c"],
-    args=[
-        "cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem"
-        " > /etc/ssl/local-dev/rootCA.pem"
-    ],
-    volume_mounts=[
-        k8s.core.v1.VolumeMountArgs(name="mkcert-root-ca", mount_path="/mkcert")
-    ],
-)
-
 secrets_hash = hashlib.sha256(
     json.dumps(secret_data, sort_keys=True).encode()
 ).hexdigest()
@@ -308,19 +296,17 @@ app_config = deployed_config.model_copy(
         # Local-dev's fresh-database and Open edX steps; see CONFIGURE_WAGTAIL_STEP
         # and OPENEDX_OAUTH_APP_STEP.
         "pre_deploy_commands": with_local_steps(deployed_config.pre_deploy_commands),
-        "extra_init_containers": [ca_bundle_init],
         "extra_volumes": [
             k8s.core.v1.VolumeArgs(
-                name="mkcert-root-ca",
-                config_map=k8s.core.v1.ConfigMapVolumeSourceArgs(name="mkcert-root-ca"),
-            ),
-            k8s.core.v1.VolumeArgs(
-                name="combined-ca", empty_dir=k8s.core.v1.EmptyDirVolumeSourceArgs()
-            ),
+                name=CA_BUNDLE_CONFIGMAP,
+                config_map=k8s.core.v1.ConfigMapVolumeSourceArgs(
+                    name=CA_BUNDLE_CONFIGMAP
+                ),
+            )
         ],
         "extra_volume_mounts": [
             k8s.core.v1.VolumeMountArgs(
-                name="combined-ca", mount_path="/etc/ssl/local-dev"
+                name=CA_BUNDLE_CONFIGMAP, mount_path=CA_BUNDLE_DIR, read_only=True
             )
         ],
         # Env is in env:, so an env edit changes the pod template; a secrets.yaml

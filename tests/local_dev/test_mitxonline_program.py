@@ -244,6 +244,39 @@ def test_every_container_mounts_each_path_once(tmp_path, monkeypatch):
                 )
 
 
+def test_every_container_reads_the_ca_bundle_the_core_stack_writes(
+    tmp_path, monkeypatch
+):
+    """SSL_CERT_FILE names a file in the core stack's bundle ConfigMap."""
+    monkeypatch.syspath_prepend(str(REPO / "local-dev/infra"))
+    tls = importlib.import_module("modules.tls")
+    mocks = _render(tmp_path, monkeypatch)
+    expected = f"{mocks.program['CA_BUNDLE_DIR']}/{tls.CA_BUNDLE_FILENAME}"
+    for typ in (DEPLOYMENT, JOB):
+        for _, name, inputs in [(t, n, i) for t, n, i in mocks.resources if t == typ]:
+            spec = inputs["spec"]["template"]["spec"]
+            volumes = {
+                v["name"]: v["configMap"]["name"]
+                for v in spec["volumes"]
+                if "configMap" in v
+            }
+            assert not [
+                c["name"]
+                for c in spec.get("initContainers") or []
+                if c["name"] == "ca-bundle-merge"
+            ]
+            for container in spec["containers"]:
+                env = {e["name"]: e.get("value") for e in container["env"]}
+                assert env["SSL_CERT_FILE"] == expected, name
+                assert env["REQUESTS_CA_BUNDLE"] == expected, name
+                (mount,) = [
+                    m
+                    for m in container["volumeMounts"]
+                    if m["mountPath"] == mocks.program["CA_BUNDLE_DIR"]
+                ]
+                assert volumes[mount["name"]] == tls.CA_BUNDLE_CONFIGMAP, name
+
+
 def test_the_pre_deploy_job_is_the_deployed_command_plus_the_oauth_app_step(
     tmp_path, monkeypatch
 ):
