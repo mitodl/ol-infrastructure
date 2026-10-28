@@ -1300,11 +1300,26 @@ Response body: {"errorMessage":"Client ol-mitlearn-client already exists"}
 
 Keycloak has an object the apps-infra state does not. A create that Keycloak applied but Pulumi never recorded leaves one behind: the request timed out, or the run was killed (Ctrl-C, `tilt down`) while it was in flight.
 
-The `olapps` realm itself recovers on its own. Before each run the program asks Keycloak whether the realm exists and, if it does, imports it instead of creating it; Pulumi skips the import once the realm is in state. So a `Realm olapps already exists` error should not repeat past the next run. If it does, the realm lookup failed; the run's output says why.
+The `olapps` realm recovers on its own. Before each run the program asks Keycloak whether the realm exists and, if it does, imports it instead of creating it; Pulumi skips the import once the realm is in state. `local-infra-apps` also runs `pulumi up` a second time when the first attempt fails (`local-dev/scripts/pulumi-up-retry.sh`), so a realm create that times out on a fresh cluster shows one failed attempt in the log followed by one that imports the realm, with nothing to retrigger. If the realm lookup itself fails (Keycloak unreachable, wrong admin credentials), the run stops with a Python traceback ending in an `httpx` error before Pulumi registers anything, not with a 409.
 
-Anything inside the realm (a client, client scope, group, organization, identity provider, flow) is not adopted. Delete the object the error names in the [admin console](https://sso.ol.mit.test/admin/master/console/#/olapps) (log in as `admin` / `admin`) and re-run `local-infra-apps`; Pulumi recreates it from the program. This deletes only that one object, not users.
+Nothing inside the realm (a client, client scope, group, organization, identity provider, flow) is adopted. Pulumi stops at the first failed create and `--parallel 1` keeps one in flight, so each run reports one 409 whichever way the state went wrong. Work out which case you are in before deleting anything:
 
-The same 409 on every Keycloak object at once means the state was lost while the cluster kept its realm, e.g. the `local-dev/infra/.pulumi` directory was removed, or Tilt ran from a second checkout against the same cluster. The realm is adopted but its contents are not. Either run Tilt from the checkout that created the cluster, or, if nothing in the realm matters to you, delete the realm (this removes every user in it, including ones `pg-restore.sh` imported) and let the next run rebuild it:
+```bash
+cd local-dev/infra/apps_infra
+PULUMI_CONFIG_PASSPHRASE='' pulumi stack export --stack local-dev.apps-infra.Dev | jq -r '
+  (.deployment.pending_operations[]? | "pending: \(.type) \(.resource.urn)"),
+  "keycloak resources in state: \([.deployment.resources[] | select(.type | startswith("keycloak:"))] | length)"'
+```
+
+_A killed run left one object behind._ The output lists a `pending: creating` entry for the object the 409 names. A create that timed out leaves no entry, but the earlier run's log shows `context deadline exceeded` on that object; treat it the same way. Delete each listed object that exists in the [admin console](https://sso.ol.mit.test/admin/master/console/#/olapps) (log in as `admin` / `admin`), drop the entries, and retrigger `local-infra-apps`; Pulumi recreates the objects from the program. This touches only those objects, not users.
+
+```bash
+PULUMI_CONFIG_PASSPHRASE='' pulumi refresh --yes --clear-pending-creates --stack local-dev.apps-infra.Dev
+```
+
+The entries are only bookkeeping, so the refresh is also the fix when the realm itself was the interrupted create: the import has already adopted it, and every later run prints `Attempting to deploy or update resources with N pending operations` until they are dropped.
+
+_The state lost track of the realm's contents._ Nothing is pending, no timeout preceded the 409, and the stack holds only a handful of Keycloak resources (the adopted realm and the few that do not conflict) where a stack that has applied once holds about 70 with no optional apps enabled. Something removed the state while the cluster kept its realm, e.g. `local-dev/infra/.pulumi` was deleted, or Tilt ran from a second checkout against the same cluster. Deleting objects one at a time would take a run per object. Either run Tilt from the checkout that created the cluster, or, if nothing in the realm matters to you, delete the realm (this removes every user in it, including ones `pg-restore.sh` imported) and retrigger `local-infra-apps`; its refresh drops the realm from state and the apply rebuilds it:
 
 ```bash
 token=$(curl -sk --data 'client_id=admin-cli&grant_type=password&username=admin&password=admin' \
