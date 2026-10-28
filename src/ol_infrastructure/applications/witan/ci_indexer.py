@@ -99,6 +99,17 @@ INDEX_BACKOFF_LIMIT = 1
 # describe`. The container logs are in Loki either way.
 INDEX_TTL_SECONDS_AFTER_FINISHED = 24 * 60 * 60
 
+# On-demand, not the Karpenter spot fleet. The indexer's memory request often
+# fits no existing node (32 of the 54 indexer pods scheduled in operations-qa
+# in the 7 days to 2026-10-28 waited for Karpenter to launch one), and a fresh
+# spot node often receives an EC2 rebalance recommendation within its first
+# minute. aws-node-termination-handler drains on those
+# (`enableRebalanceDraining`), evicting the indexer mid-clone. All 26 indexer
+# pod evictions in operations-qa in that window were that drain, and every
+# failed QA Job had both of its attempts evicted. Same selector as
+# open_metadata's `long_running` workflow pods.
+INDEX_NODE_SELECTOR = {"karpenter.sh/capacity-type": "on-demand"}
+
 
 def create_ci_indexer(  # noqa: PLR0913
     stack_info: StackInfo,
@@ -323,6 +334,7 @@ def create_ci_indexer(  # noqa: PLR0913
                         ),
                         spec=kubernetes.core.v1.PodSpecArgs(
                             restart_policy="Never",
+                            node_selector=INDEX_NODE_SELECTOR,
                             # This pod talks to omnigraph-server and to GitHub,
                             # never to the Kubernetes API, so the default
                             # projected service-account token would be a

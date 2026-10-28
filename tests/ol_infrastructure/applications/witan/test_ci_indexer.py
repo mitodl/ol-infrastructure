@@ -70,3 +70,19 @@ def test_a_failed_run_outlives_the_next_run():
         assert job_spec["ttlSecondsAfterFinished"] > next_run_done
 
     return indexer.urn.apply(check)
+
+
+@pulumi.runtime.test
+def test_the_sweep_runs_on_on_demand_capacity():
+    """A spot node's rebalance recommendation makes aws-node-termination-handler
+    drain it, and that drain was every indexer eviction in operations-qa over
+    the week to 2026-10-28.
+    """
+    mocks, indexer = _render()
+
+    def check(_: object) -> None:
+        (cron_job,) = mocks.of_type("kubernetes:batch/v1:CronJob")
+        pod_spec = cron_job["spec"]["jobTemplate"]["spec"]["template"]["spec"]
+        assert pod_spec["nodeSelector"] == {"karpenter.sh/capacity-type": "on-demand"}
+
+    return indexer.urn.apply(check)
