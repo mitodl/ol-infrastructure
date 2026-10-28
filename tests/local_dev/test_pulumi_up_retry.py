@@ -1,8 +1,10 @@
 """pulumi-up-retry.sh with pulumi stubbed to fail a set number of times."""
 
 import os
+import signal
 import stat
 import subprocess
+import time
 from pathlib import Path
 
 REPO = Path(__file__).parents[2]
@@ -57,3 +59,38 @@ def test_persistent_failure_stops_at_the_limit(tmp_path: Path) -> None:
     assert code == 7
     assert len(calls) == 2
     assert "attempt 2 of 2" in stderr
+
+
+# Handles Ctrl-C like Pulumi does: logs, then exits 1 rather than dying of it.
+INTERRUPTIBLE_STUB = """#!/usr/bin/env bash
+trap 'exit 1' INT
+echo "$*" >> "$STUB_LOG"
+sleep 10
+exit 7
+"""
+
+
+def test_ctrl_c_stops_the_wrapper_instead_of_retrying(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    stub = bin_dir / "pulumi"
+    stub.write_text(INTERRUPTIBLE_STUB)
+    stub.chmod(stub.stat().st_mode | stat.S_IEXEC)
+    log = tmp_path / "calls.log"
+    log.touch()
+    proc = subprocess.Popen(  # noqa: S603
+        [str(SCRIPT), "2", "--yes"],
+        env={
+            **os.environ,
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "STUB_LOG": str(log),
+        },
+        start_new_session=True,
+    )
+    deadline = time.monotonic() + 5
+    while not log.read_text() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    # A terminal's Ctrl-C reaches the whole foreground process group.
+    os.killpg(proc.pid, signal.SIGINT)
+    assert proc.wait(timeout=5) == 130
+    assert len(log.read_text().splitlines()) == 1

@@ -11,6 +11,10 @@
 # A genuine error fails every attempt, each with its own output, and the
 # resource still goes red after the last one.
 set -uo pipefail
+# Pulumi handles Ctrl-C itself and exits non-zero, which would otherwise read
+# as a failed attempt and start another apply the user just cancelled.
+trap 'exit 130' INT
+trap 'exit 143' TERM
 attempts="${1:?usage: pulumi-up-retry.sh <attempts> <pulumi up args...>}"
 shift
 for attempt in $(seq 1 "${attempts}"); do
