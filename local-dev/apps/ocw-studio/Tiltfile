@@ -55,7 +55,13 @@ k8s_yaml_local([
 # Concourse too -- and since it is a Recreate deployment, that is a hard outage
 # that kills running builds and 503s the UI. It reads none of those ConfigMaps;
 # all of its env is inline below, so nothing is lost by isolating it.
-k8s_yaml_local(['concourse.yaml'])
+# The deployed Concourse's version (src/bridge/lib/versions.py, projected to
+# version_pins/ for readers that are not Python). read_file also watches it, so
+# a Renovate bump redeploys this one.
+CONCOURSE_VERSION = str(read_file(
+    os.path.join(config.main_dir, 'src/bridge/lib/version_pins/CONCOURSE_VERSION'),
+)).strip()
+k8s_yaml_local(['concourse.yaml'], substitutions={'__CONCOURSE_VERSION__': CONCOURSE_VERSION})
 
 k8s_resource(
     DEPLOY_NAME,
