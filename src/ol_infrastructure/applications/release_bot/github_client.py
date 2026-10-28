@@ -29,6 +29,9 @@ log = logging.getLogger(__name__)
 # found no calver tag and release notes silently degraded to "the last 50
 # commits of all history". The old fixtures hid it by testing with padded tags.
 _RELEASE_TAG_RE = re.compile(r"^(\d{4})\.(\d{1,2})\.(\d{1,2})\.(\d+)$")
+# The release resource records an abandoned or superseded version as
+# ``abandoned/<version>`` so it is never cut again.
+_ABANDONED_TAG_PREFIX = "abandoned/"
 # The legacy release-script's tags (v0.37.3), which the release resource falls
 # back to as a baseline until an app's first calver release. Same pattern as
 # the resource's SEMVER_PATTERN.
@@ -126,8 +129,11 @@ def _semver_sort_key(tag: str) -> tuple[int, int, int]:
     return tuple(int(part) for part in match.groups())  # type: ignore[return-value]
 
 
-def _release_tags(repo: Any) -> tuple[list[str], list[str]]:
-    """Return *repo*'s YYYY.M.D.N tags and its semver tags, up to `_TAG_SCAN_LIMIT`.
+def _release_tags(repo: Any) -> tuple[list[str], list[str], list[str]]:
+    """Return *repo*'s YYYY.M.D.N tags, semver tags and abandoned versions.
+
+    All up to `_TAG_SCAN_LIMIT` tags. The abandoned versions come from the
+    release resource's ``abandoned/<version>`` tags.
 
     Ordering from `get_tags()` is not documented to be chronological, so the
     whole listing has to be considered before picking a maximum -- a truncated
@@ -137,19 +143,24 @@ def _release_tags(repo: Any) -> tuple[list[str], list[str]]:
     scanned = 0
     tags = []
     semver_tags = []
+    abandoned = []
     for tag in itertools.islice(repo.get_tags(), _TAG_SCAN_LIMIT):
         scanned += 1
         if _RELEASE_TAG_RE.match(tag.name):
             tags.append(tag.name)
         elif _SEMVER_TAG_RE.match(tag.name):
             semver_tags.append(tag.name)
+        elif tag.name.startswith(_ABANDONED_TAG_PREFIX) and _RELEASE_TAG_RE.match(
+            tag.name.removeprefix(_ABANDONED_TAG_PREFIX)
+        ):
+            abandoned.append(tag.name.removeprefix(_ABANDONED_TAG_PREFIX))
     if scanned == _TAG_SCAN_LIMIT:
         log.warning(
             "Stopped scanning tags at the %s-tag cap; the release baseline may "
             "be wrong because GitHub's tag order is not version-ordered",
             _TAG_SCAN_LIMIT,
         )
-    return tags, semver_tags
+    return tags, semver_tags, abandoned
 
 
 def _release_baseline(repo: Any) -> str | None:
@@ -161,7 +172,7 @@ def _release_baseline(repo: Any) -> str | None:
     Without it a repo moving off the legacy pipeline reads as never released,
     and the preview lists its whole history as the next release.
     """
-    tags, semver_tags = _release_tags(repo)
+    tags, semver_tags, _ = _release_tags(repo)
     if tags:
         return max(tags, key=release_tag_sort_key)
     if semver_tags:
@@ -342,10 +353,13 @@ def _branch_commit_date(branch: Any) -> datetime | None:
 def _release_preview_sync(repo_slug: str) -> dict[str, Any]:
     """Return what the next release would contain, without creating anything."""
     repo = _get_client().get_repo(repo_slug)
-    tags, _ = _release_tags(repo)
+    tags, _, abandoned = _release_tags(repo)
     unreleased = _commits_since_last_tag_sync(repo_slug)
     return {
-        "version": next_release_version(tags, datetime.now(tz=UTC).date()),
+        # The resource never re-cuts an abandoned version, so neither may this.
+        "version": next_release_version(
+            [*tags, *abandoned], datetime.now(tz=UTC).date()
+        ),
         "since": unreleased["since"],
         "commits": unreleased["commits"],
         "omitted": unreleased["omitted"],
