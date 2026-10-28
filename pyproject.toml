@@ -382,9 +382,6 @@ exclude-newer = "7d"
 required-version = ">=0.9.17"
 
 [tool.uv.exclude-newer-package]
-# certifi 2026.10.19 drops the compromised eMudhra CAs; security fix, taken inside the
-# 7-day window on purpose. Remove this line after 2026-10-26.
-certifi = "0d"
 ol-concourse = "0d"
 django-aqueduct = "0d"
 edx-sysadmin = "0d"
