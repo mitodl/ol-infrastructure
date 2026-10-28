@@ -30,14 +30,52 @@ image: docker.io/rancher/k3s:v1.35.8-k3s1
 # image retention (keep the N most recently pushed tags) and garbage
 # collection as its own declarative config — local-dev/cluster/zot-config.json
 # — so no external cleanup process has to reach into its storage.
+#
+# The "*" mirror turns on k3s's embedded registry (Spegel; see
+# --embedded-registry below) for every registry: before going upstream, a
+# node pulls an image from any other node that already has it. Each node
+# would otherwise download the same public image separately over the
+# internet. The node stores outlive the cluster (see `volumes:`), so once any
+# node has had an image, the whole new cluster can get it locally. containerd
+# still falls back to the upstream registry for anything no node has. Spegel
+# never resolves `latest` tags from peers, so those always go upstream.
 registries:
   use:
   - k3d-registry.localhost:5001
   config: |
     mirrors:
+      "*": {}
       "k3d-registry.localhost:5001":
         endpoint:
           - "http://k3d-registry.localhost:5001"
+
+# Each node's containerd store, holding every image the node has pulled, is a
+# NAMED volume so that it outlives `k3d cluster delete`. Left to itself it
+# sits inside the anonymous volume the k3s image declares for
+# /var/lib/rancher/k3s, which is deleted with the node, so every teardown
+# re-downloaded every public image (OpenSearch, MongoDB, Postgres, Tika, the
+# operators) over the internet. Only the image store is kept: the k3s
+# datastore and the PersistentVolumes (local-path, under
+# /var/lib/rancher/k3s/storage) stay in the anonymous volume and still go with
+# the cluster.
+#
+# teardown.sh keeps these volumes, and `teardown.sh --drop-images` removes
+# them. Its one-time migration copies a pre-volume cluster's stores into them.
+# Names follow the node (k3d-local-dev-agent-1 → local-dev-containerd-agent-1),
+# which teardown.sh relies on, so add an entry here when you add a node.
+# Never give these names a `k3d-` prefix: k3d creates volumes named that way
+# itself, labels them with the cluster, and deletes them with it.
+# Applies on cluster (re)create: teardown.sh + setup.sh.
+volumes:
+- volume: local-dev-containerd-server-0:/var/lib/rancher/k3s/agent/containerd
+  nodeFilters:
+  - server:0
+- volume: local-dev-containerd-agent-0:/var/lib/rancher/k3s/agent/containerd
+  nodeFilters:
+  - agent:0
+- volume: local-dev-containerd-agent-1:/var/lib/rancher/k3s/agent/containerd
+  nodeFilters:
+  - agent:1
 
 # Expose HTTPS and HTTP on host ports 443/80 so that *.mit.test ingress routes
 # are reachable without a port suffix.
@@ -76,6 +114,12 @@ options:
   k3s:
     extraArgs:
     - arg: --disable=traefik
+      nodeFilters:
+      - server:*
+    # Node-to-node image sharing; the "*" mirror under `registries:` says
+    # which registries it covers. Set on servers only; agents get it from the
+    # cluster. Applies on cluster (re)create: teardown.sh + setup.sh.
+    - arg: --embedded-registry
       nodeFilters:
       - server:*
     # Each node's containerd image store caches every image it ever pulls and

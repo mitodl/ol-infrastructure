@@ -156,7 +156,7 @@ Day-to-day:
 | Start working | `./local-dev/scripts/start.sh` | Restarts the cluster if paused, heals, syncs deps, runs Tilt |
 | Stop coding but keep apps running | `Ctrl+C` in the Tilt terminal | Apps stay reachable at their `mit.test` URLs; edits no longer sync until Tilt runs again |
 | Shut down for the day | `Ctrl+C` Tilt, then `./local-dev/scripts/stop.sh` | Removes Tilt-managed workloads, pauses the cluster; DB data survives |
-| Destroy everything | `./local-dev/scripts/teardown.sh` | Deletes the cluster, Pulumi resources, certs, /etc/hosts entries |
+| Destroy everything | `./local-dev/scripts/teardown.sh` | Deletes the cluster, Pulumi resources, certs, /etc/hosts entries; keeps downloaded images for the next setup (see [Teardown](#teardown)) |
 
 Closing the Tilt terminal (or Ctrl+C) never deletes anything from the cluster — pods keep running because Kubernetes, not Tilt, keeps them alive. The one thing to remember: with Tilt stopped, a pod that gets recreated comes up from its last-built image *without* your live-synced edits; they re-sync when Tilt next runs.
 
@@ -493,7 +493,7 @@ Each store is bounded by retention config owned by the component that enforces i
 | kubelet image GC | Node containerd stores | Thresholds in `local-dev/cluster/k3d-config.yaml` (applies at cluster creation; existing clusters keep the old 85/80 until you run `local-dev/scripts/migrate-kubelet-gc-thresholds.sh`) |
 | `prune-docker` (manual, break-glass) | Local daemon + registry, destructively (node stores only with `--sweep-nodes` — read the script header first; it orphans running containers) | Tilt UI button / `tilt trigger prune-docker`, or run `local-dev/scripts/prune-docker.sh` directly |
 
-Nothing in that table removes a container or a volume, and that is deliberate: every node's data — the k3s datastore and every local-path PersistentVolume, Postgres included — lives in an anonymous Docker volume owned by its node container. **`docker system prune` removes stopped containers**, so a cluster paused by `stop.sh` loses its nodes and their volumes are left dangling: still on disk, but `k3d cluster create` makes fresh ones and will not adopt them. Add `--volumes` and they are deleted outright. `prune-docker.sh` is scoped to images, build cache, and the registry, and never touches either.
+Nothing in that table removes a container or a volume, and that is deliberate: every node's data — the k3s datastore and every local-path PersistentVolume, Postgres included — lives in an anonymous Docker volume owned by its node container. **`docker system prune` removes stopped containers**, so a cluster paused by `stop.sh` loses its nodes and their volumes are left dangling: still on disk, but `k3d cluster create` makes fresh ones and will not adopt them. Add `--volumes` and they are deleted outright. The one exception is the nodes' image stores, which are named volumes (`local-dev-containerd-<node>`) so that a new cluster does adopt them; see [Teardown](#teardown). `prune-docker.sh` is scoped to images, build cache, and the registry, and never touches any of these.
 
 **Existing setups:** a registry container created before the zot swap (2026-07) still runs `registry:2`, which has no retention and will grow unbounded — the janitor warns about this each cycle until you migrate:
 
@@ -518,7 +518,7 @@ One registry case zot cannot reclaim on its own is a repo left with no manifest 
 ## Teardown
 
 ```bash
-# Remove the cluster, its kubectl context, certs, and /etc/hosts entries (default — removes everything)
+# Remove the cluster, its kubectl context, certs, and /etc/hosts entries (default; downloaded images are kept)
 ./local-dev/scripts/teardown.sh
 
 # Keep certs (useful if you want to reuse them on next setup)
@@ -529,9 +529,18 @@ One registry case zot cannot reclaim on its own is a repo left with no manifest 
 
 # Keep both certs and /etc/hosts entries
 ./local-dev/scripts/teardown.sh --keep-certs --keep-hosts
+
+# Also delete the images the nodes have downloaded (kept by default)
+./local-dev/scripts/teardown.sh --drop-images
 ```
 
 > **Note:** The teardown script calls `pulumi destroy` automatically to clean up Pulumi-managed resources before deleting the cluster, so no orphaned resources are left behind.
+
+> **Images:** teardown keeps every image the nodes have downloaded, so the next `setup.sh` does not fetch OpenSearch, MongoDB, Postgres, Tika and the operators from the internet again. Each node's containerd store is a named volume (`local-dev-containerd-server-0`, `-agent-0`, `-agent-1`; `volumes:` in `local-dev/cluster/k3d-config.yaml`), and the new nodes mount the same volumes. The nodes also share images with each other through k3s's embedded registry ([Spegel](https://docs.k3s.io/installation/registry-mirror)), so an image any node has had is local to the whole new cluster. Tilt's images were already kept: they live in the zot registry, which teardown never deletes. Images still download for anything no node has had (a version bump), and for `latest` tags, which Spegel always fetches upstream.
+>
+> A cluster created before these volumes existed keeps its images inside each node's anonymous volume. The first teardown of such a cluster copies them into the named volumes before deleting it. The copy is a one-time migration that installs GNU `tar` into an `alpine` container, and it needs as much free disk as the stores take up (`teardown.sh` checks). If it fails, teardown removes the partial copies and stops with the cluster stopped, not deleted. Re-run it, or pass `--drop-images` to delete the cluster without its images.
+>
+> The kept volumes hold everything the nodes had pulled, Tilt's multi-GB app images included, up to kubelet's image-GC threshold, so they can run to tens of GB, and so can the free space the migration's copy needs. `--drop-images` removes them, as does `docker volume rm` with the volume names. Use `--drop-images` too if images misbehave on the next cluster (for example after a `k3d-config.yaml` node-image bump changes the containerd version). The next cluster then starts with empty stores and downloads everything again.
 
 > **Data:** deleting the cluster deletes every PersistentVolume, Postgres included. Run `./local-dev/scripts/pg-backup.sh` first if there is anything in the databases you want back — see [Backing Up and Restoring Postgres](#backing-up-and-restoring-postgres).
 

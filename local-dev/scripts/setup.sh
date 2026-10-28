@@ -372,6 +372,12 @@ if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
     # sure the registry is reachable from the cluster network regardless.
     docker network connect "k3d-${CLUSTER_NAME}" "${REGISTRY_NAME}" 2>/dev/null || true
 else
+    # Image stores teardown.sh kept (`volumes:` in k3d-config.yaml); the new
+    # nodes mount them, so images already pulled once don't download again.
+    KEPT_IMAGE_VOLUMES="$(docker volume ls -q | grep -c "^${CLUSTER_NAME}-containerd-" || true)"
+    if (( KEPT_IMAGE_VOLUMES > 0 )); then
+        ok "Reusing node images kept by teardown.sh (${KEPT_IMAGE_VOLUMES} volumes)."
+    fi
     k3d cluster create --config "${K3D_CONFIG}"
     ok "Cluster '${CLUSTER_NAME}' created."
 fi
