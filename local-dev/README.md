@@ -1291,6 +1291,27 @@ PULUMI_CONFIG_PASSPHRASE='' pulumi refresh --yes --parallel 1 --stack local-dev.
 
 The app databases in the new cluster are empty regardless: restore from a dump with [`pg-restore.sh`](#backing-up-and-restoring-postgres) if you have one. The previous cluster's volumes may still be on disk as dangling volumes, but there is no supported way to reattach them to a new k3d cluster — treat them as lost and reclaim the space with `docker volume prune`.
 
+### `local-infra-apps` fails with `409 Conflict` on a Keycloak object
+
+```
+error sending POST request to /admin/realms/olapps/clients: 409 Conflict.
+Response body: {"errorMessage":"Client ol-mitlearn-client already exists"}
+```
+
+Keycloak has an object the apps-infra state does not. A create that Keycloak applied but Pulumi never recorded leaves one behind: the request timed out, or the run was killed (Ctrl-C, `tilt down`) while it was in flight.
+
+The `olapps` realm itself recovers on its own. Before each run the program asks Keycloak whether the realm exists and, if it does, imports it instead of creating it; Pulumi skips the import once the realm is in state. So a `Realm olapps already exists` error should not repeat past the next run. If it does, the realm lookup failed; the run's output says why.
+
+Anything inside the realm (a client, client scope, group, organization, identity provider, flow) is not adopted. Delete the object the error names in the [admin console](https://sso.ol.mit.test/admin/master/console/#/olapps) (log in as `admin` / `admin`) and re-run `local-infra-apps`; Pulumi recreates it from the program. This deletes only that one object, not users.
+
+The same 409 on every Keycloak object at once means the state was lost while the cluster kept its realm, e.g. the `local-dev/infra/.pulumi` directory was removed, or Tilt ran from a second checkout against the same cluster. The realm is adopted but its contents are not. Either run Tilt from the checkout that created the cluster, or, if nothing in the realm matters to you, delete the realm (this removes every user in it, including ones `pg-restore.sh` imported) and let the next run rebuild it:
+
+```bash
+token=$(curl -sk --data 'client_id=admin-cli&grant_type=password&username=admin&password=admin' \
+  https://sso.ol.mit.test/realms/master/protocol/openid-connect/token | jq -r .access_token)
+curl -sk -X DELETE -H "Authorization: Bearer $token" https://sso.ol.mit.test/admin/realms/olapps
+```
+
 ### App pod stuck in `Init:CrashLoopBackOff`
 
 The initContainer runs migrations; check its logs:

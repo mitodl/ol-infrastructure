@@ -13,6 +13,9 @@ seeded by local-dev/scripts/kc-seed-users.sh, which the root Tiltfile runs
 automatically (the "kc-seed-users" resource) after this realm is applied.
 """
 
+from http import HTTPStatus
+
+import httpx
 import pulumi_keycloak as keycloak
 import pulumi_kubernetes as k8s
 from pulumi import InvokeOptions, Output, ResourceOptions
@@ -29,6 +32,57 @@ from ol_infrastructure.substructure.keycloak.org_flows import (
 # cookie.
 LOCAL_OIDC_SESSION_SECRET = "local-dev-oidc-session-secret-32chars!"  # noqa: S105  # pragma: allowlist secret
 
+OLAPPS_REALM = "olapps"
+ADMIN_API_TIMEOUT_SECONDS = 30
+
+
+def live_realm_import_id(
+    keycloak_url: str, realm: str, admin_username: str, admin_password: str
+) -> str | None:
+    """Return ``realm`` as an import ID if Keycloak already has it, else None.
+
+    A realm create that Keycloak applies but Pulumi never records (the POST
+    times out, or the run is killed before the response lands) leaves a realm
+    the stack does not own, and every later create fails with 409 "Realm
+    already exists". Importing adopts that realm instead. Pulumi skips the
+    import for a resource its state already holds under the same ID, so the
+    caller can pass this on every run.
+
+    :param keycloak_url: Base URL of the Keycloak server.
+    :param realm: Realm name, which is also the realm's Pulumi import ID.
+    :param admin_username: Master realm admin user.
+    :param admin_password: Password for ``admin_username``.
+    :returns: ``realm`` when it exists in Keycloak, otherwise None.
+    :rtype: str | None
+    """
+    # verify=False for the same reason as the provider's
+    # tls_insecure_skip_verify: the mkcert CA is not in Python's trust store.
+    with httpx.Client(
+        base_url=keycloak_url,
+        verify=False,  # noqa: S501
+        timeout=ADMIN_API_TIMEOUT_SECONDS,
+    ) as client:
+        token = (
+            client.post(
+                "/realms/master/protocol/openid-connect/token",
+                data={
+                    "client_id": "admin-cli",
+                    "grant_type": "password",
+                    "username": admin_username,
+                    "password": admin_password,
+                },
+            )
+            .raise_for_status()
+            .json()["access_token"]
+        )
+        response = client.get(
+            f"/admin/realms/{realm}", headers={"Authorization": f"Bearer {token}"}
+        )
+    if response.status_code == HTTPStatus.NOT_FOUND:
+        return None
+    response.raise_for_status()
+    return realm
+
 
 def create_olapps_dev_realm(  # noqa: PLR0913
     keycloak_provider: keycloak.Provider,
@@ -42,6 +96,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     ocw_studio_client_secret: Output,
     *,
     root_domain: str,
+    realm_import_id: str | None,
     verify_email: bool = True,
     enabled_apps: tuple[str, ...] = (),
 ) -> None:
@@ -55,6 +110,9 @@ def create_olapps_dev_realm(  # noqa: PLR0913
 
     All client hostnames derive from ``root_domain``, which must match the
     domain the APISIX routes and the TLS certificate were built from.
+
+    ``realm_import_id`` is :func:`live_realm_import_id`'s result; when set, the
+    realm resource adopts the live realm instead of creating it.
     """
     kc_opts = ResourceOptions(provider=keycloak_provider)
     k8s_opts = ResourceOptions(provider=k8s_provider)
@@ -87,7 +145,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             period=30,
             type="totp",
         ),
-        realm="olapps",
+        realm=OLAPPS_REALM,
         registration_allowed=True,
         reset_password_allowed=True,
         login_with_email_allowed=True,
@@ -136,7 +194,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         organizations_enabled=True,
         sso_session_idle_timeout="336h",
         sso_session_max_lifespan="336h",
-        opts=kc_opts,
+        opts=kc_opts.merge(ResourceOptions(import_=realm_import_id)),
     )
 
     keycloak.RealmEvents(
