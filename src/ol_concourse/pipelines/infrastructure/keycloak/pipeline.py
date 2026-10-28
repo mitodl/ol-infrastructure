@@ -199,14 +199,20 @@ def build_keycloak_infrastructure_pipeline() -> PipelineFragment:
                     "DOCKERFILE": (
                         f"{keycloak_customization_repo.name}/Dockerfile.hosted"
                     ),
-                    "IMAGE_PLATFORM": "linux/amd64",
+                    # arm64 is for Apple-silicon local-dev clusters, which
+                    # otherwise run Keycloak under amd64 emulation; it is
+                    # cross-built with the workers' QEMU. Hosted nodes are all
+                    # amd64 and pull that entry of the index. More than one
+                    # platform makes oci-build-task write an OCI layout
+                    # directory (image/image) instead of image.tar.
+                    "IMAGE_PLATFORM": "linux/amd64,linux/arm64",
                 },
                 build_args=[],
             ),
             PutStep(
                 put=keycloak_registry_image.name,
                 params={
-                    "image": "image/image.tar",
+                    "image": "image/image",
                     "additional_tags": (
                         f"./{keycloak_customization_repo.name}/.git/describe_ref"
                     ),
