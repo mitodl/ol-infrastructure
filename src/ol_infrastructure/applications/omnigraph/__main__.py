@@ -98,6 +98,10 @@ from ol_infrastructure.applications.omnigraph.token_sync import (
     SERVICE_TOKENS_VAULT_PATH,
     create_token_sync,
 )
+from ol_infrastructure.applications.omnigraph.version_census import (
+    DEFAULT_CENSUS_SCHEDULE,
+    create_version_census,
+)
 from ol_infrastructure.applications.witan.ci_indexer import (
     CRONJOB_NAME as CI_INDEXER_CRONJOB_NAME,
 )
@@ -1183,6 +1187,23 @@ if MIGRATE_FROM_IMAGE:
         witan_writer_cronjobs=[CI_INDEXER_CRONJOB_NAME, VIEW_REAPER_CRONJOB_NAME],
     )
     export("storage_migration_job", storage_migration.job.metadata.name)
+
+##############################################
+#   Per-graph version census                  #
+##############################################
+# Hourly per-graph counts of the `_versions/` objects cleanup has to plan,
+# read by log_rules/omnigraph_versions.py in the grafana_alerting stack. QA and
+# Production schedule no cleanup (omnigraph:cleanup_iso_weekdays: []), so
+# nothing else reports how far behind they are. See version_census.py.
+create_version_census(
+    stack_info=stack_info,
+    namespace=NAMESPACE,
+    k8s_global_labels=k8s_global_labels,
+    aws_cli_image=cached_image_uri(f"amazon/aws-cli:{AWS_CLI_VERSION}"),
+    service_account_name="omnigraph-server",
+    storage_root=data_tier.storage_uri,
+    schedule=DEFAULT_CENSUS_SCHEDULE,
+)
 
 ##############################################
 #   Council-health synthetic probe            #

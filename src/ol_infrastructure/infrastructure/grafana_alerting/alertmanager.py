@@ -200,6 +200,10 @@ def create(grafana_secrets: dict[str, Any], resource_opts: ResourceOptions) -> N
             "daemon_type",
             "tick_type",
             "relation",
+            # log_rules/omnigraph_versions.py aggregates `by (cluster, graph)`.
+            # Without this, two graphs crossing a threshold together arrive
+            # as one notification.
+            "graph",
         ],
         # "1m", not "60s" — Grafana normalizes durations to the largest unit and
         # a mismatched spelling shows as a perpetual diff on every preview.
