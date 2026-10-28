@@ -45,6 +45,7 @@ This environment runs the MIT Learn application stack as Kubernetes workloads in
 | Keycloak SSO | `https://sso.ol.mit.test` | Identity provider (olapps realm) |
 | Mailpit | `https://mail.mit.test` | Captured outbound email (web UI) |
 | Grafana | `https://grafana.mit.test` | Logs from every service in the cluster (1-week retention) |
+| Qdrant dashboard | `https://qdrant.mit.test/dashboard` | Browse and query the vector collections (see [Inspect vectors](#inspect-vectors-qdrant-dashboard)) |
 | OCW theme dev server | `https://ocw-dev.learn.mit.test` | The ocw-hugo-themes dev server, run on your machine (see below) |
 
 The main app hostnames mirror production with `mit.edu` swapped for `mit.test` (`learn.mit.edu` → `learn.mit.test`, `sso.ol.mit.edu` → `sso.ol.mit.test`), so URLs, CSRF cookies, and OIDC redirect URIs have the same shape as in deployed environments; Open edX, ocw-studio, and the local-only services use local names. `.test` is reserved (RFC 2606) and never resolves on the public internet, so a hostname missing from `/etc/hosts` fails to resolve rather than reaching someone else's server.
@@ -327,6 +328,12 @@ kubectl --context local-dev exec -it -n local-infra local-pg-1 -- psql -U app -d
 ### Inspect emails (Mailpit)
 
 All outbound email is captured by Mailpit. Access the web UI at `https://mail.mit.test`.
+
+### Inspect vectors (Qdrant dashboard)
+
+Qdrant's bundled web UI is at `https://qdrant.mit.test/dashboard` (the bare hostname redirects there). Use it to list mit-learn's collections, browse points and their payloads, and run searches or REST calls from its console. Local Qdrant has no API key, so it opens without a login. The collections are empty until `seed-mit-learn-qdrant` has run (see [Seeding Data](#seeding-data)).
+
+An existing checkout needs the new hostname in `/etc/hosts`: re-run `./local-dev/scripts/setup.sh --skip-certs` once, then let the core stack redeploy so the route exists.
 
 ---
 

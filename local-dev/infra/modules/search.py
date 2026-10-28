@@ -49,8 +49,14 @@ class SearchResources:
 def create_search(
     _k8s: Callable[..., ResourceOptions],
     local_infra_ns: k8s.core.v1.Namespace,
+    apisix_release: k8s.helm.v3.Release,
+    tls_secret: k8s.core.v1.Secret,
+    qdrant_hostname: str,
 ) -> SearchResources:
-    """Deploy Qdrant, OpenSearch, and Tika into the local-infra namespace."""
+    """Deploy Qdrant, OpenSearch, and Tika into the local-infra namespace.
+
+    Qdrant's bundled web UI is exposed at https://{qdrant_hostname}/dashboard.
+    """
     qdrant = k8s.apps.v1.Deployment(
         "qdrant",
         metadata={"name": "qdrant", "namespace": "local-infra"},
@@ -115,7 +121,7 @@ def create_search(
         opts=_k8s(parent=local_infra_ns),
     )
 
-    k8s.core.v1.Service(
+    qdrant_service = k8s.core.v1.Service(
         "qdrant-svc",
         metadata={"name": "qdrant", "namespace": "local-infra"},
         spec={
@@ -126,6 +132,55 @@ def create_search(
             ],
         },
         opts=_k8s(parent=qdrant),
+    )
+
+    # The dashboard ships inside the Qdrant image and is served by the same
+    # REST port the apps use, so the route proxies the whole HTTP API: the
+    # dashboard calls it from the browser. Local Qdrant has no API key, so
+    # nothing is behind a login, same as Mailpit. `/` itself is the API's
+    # version JSON, so the bare hostname redirects to the UI.
+    k8s.apiextensions.CustomResource(
+        "qdrant-apisix-route",
+        api_version="apisix.apache.org/v2",
+        kind="ApisixRoute",
+        metadata={"name": "qdrant-route", "namespace": "local-infra"},
+        spec={
+            "ingressClassName": "apache-apisix",
+            "http": [
+                {
+                    "name": "qdrant-root",
+                    "priority": 10,
+                    "match": {"hosts": [qdrant_hostname], "paths": ["/"]},
+                    "backends": [{"serviceName": "qdrant", "servicePort": 6333}],
+                    "plugins": [
+                        {
+                            "name": "redirect",
+                            "enable": True,
+                            "config": {"uri": "/dashboard"},
+                        }
+                    ],
+                },
+                {
+                    "name": "qdrant",
+                    "match": {"hosts": [qdrant_hostname], "paths": ["/*"]},
+                    "backends": [{"serviceName": "qdrant", "servicePort": 6333}],
+                },
+            ],
+        },
+        opts=_k8s(parent=local_infra_ns, depends_on=[apisix_release, qdrant_service]),
+    )
+
+    k8s.apiextensions.CustomResource(
+        "qdrant-apisix-tls",
+        api_version="apisix.apache.org/v2",
+        kind="ApisixTls",
+        metadata={"name": "qdrant-tls", "namespace": "local-infra"},
+        spec={
+            "ingressClassName": "apache-apisix",
+            "hosts": [qdrant_hostname],
+            "secret": {"name": "local-dev-tls", "namespace": "local-infra"},
+        },
+        opts=_k8s(parent=local_infra_ns, depends_on=[apisix_release, tls_secret]),
     )
 
     opensearch = k8s.helm.v3.Release(
