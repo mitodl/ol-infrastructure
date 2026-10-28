@@ -2,7 +2,10 @@
 # teardown.sh — Destroy the MIT Learn local development environment.
 #
 # Usage:
-#   ./local-dev/scripts/teardown.sh [--keep-certs] [--keep-hosts]
+#   ./local-dev/scripts/teardown.sh [--keep-certs] [--keep-hosts] [--drop-images]
+#
+# Node images are kept for the next setup.sh unless --drop-images is given;
+# see keep_node_images below.
 
 set -euo pipefail
 
@@ -12,13 +15,15 @@ CLUSTER_NAME="local-dev"
 
 KEEP_CERTS=false
 KEEP_HOSTS=false
+DROP_IMAGES=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --keep-certs)  KEEP_CERTS=true;  shift ;;
         --keep-hosts)  KEEP_HOSTS=true;  shift ;;
+        --drop-images) DROP_IMAGES=true; shift ;;
         -h|--help)
-            echo "Usage: teardown.sh [--keep-certs] [--keep-hosts]"
+            echo "Usage: teardown.sh [--keep-certs] [--keep-hosts] [--drop-images]"
             exit 0
             ;;
         *) echo "Unknown argument: $1" >&2; exit 1 ;;
@@ -181,6 +186,123 @@ drop_orphan_stack() {
     discard_stack_state "${dir}" "${stack}" "${label}"
 }
 
+CONTAINERD_DIR="/var/lib/rancher/k3s/agent/containerd"
+
+# The volume that keeps a node's image store: k3d-local-dev-agent-1 →
+# local-dev-containerd-agent-1. Must match `volumes:` in k3d-config.yaml.
+node_image_volume() {
+    echo "${CLUSTER_NAME}-containerd-${1#"k3d-${CLUSTER_NAME}-"}"
+}
+
+# Name of the volume mounted at `dest` in container `node`, empty if none.
+mounted_volume() {
+    local node="$1" dest="$2"
+    docker inspect "${node}" --format \
+        "{{range .Mounts}}{{if eq .Destination \"${dest}\"}}{{.Name}}{{end}}{{end}}"
+}
+
+kept_image_volumes() {
+    docker volume ls -q | grep "^${CLUSTER_NAME}-containerd-" || true
+}
+
+# Stop the cluster so every node's containerd shuts down cleanly and leaves
+# its image store consistent on disk. Then make sure each store is in the
+# named volume (`volumes:` in k3d-config.yaml) that outlives
+# `k3d cluster delete`, so the next cluster starts with the images local.
+#
+# A cluster created from the current k3d-config.yaml already mounts those
+# volumes, so stopping it is all this does. A cluster created before they
+# existed keeps each store inside the node's anonymous /var/lib/rancher/k3s
+# volume, which the delete takes with it, so copy the store across first: a
+# one-time migration per cluster. The copy has to keep everything overlayfs
+# snapshots are built from: whiteout device nodes, hardlinks, and
+# trusted.overlay.* and security.capability xattrs. Without them images come
+# back corrupted, with deleted files reappearing. The k3s image's cp is built
+# without xattr support and busybox tar has none, so this installs GNU tar
+# into alpine. Writing trusted.* xattrs needs CAP_SYS_ADMIN.
+#
+# Every failure returns nonzero, so with `set -e` teardown stops before
+# `k3d cluster delete`. The cluster's own copy of its images is still there
+# for a retry, or for --drop-images.
+keep_node_images() {
+    local node vol src
+    # No mapfile and no expanding a possibly empty array: macOS ships bash
+    # 3.2, which lacks the first and, under `set -u`, rejects the second.
+    local -a mounts=() pending=()
+
+    log "Stopping the cluster so each node's image store is consistent on disk..."
+    if ! k3d cluster stop "${CLUSTER_NAME}" >/dev/null; then
+        warn "Could not stop cluster '${CLUSTER_NAME}'."
+        return 1
+    fi
+
+    while read -r node; do
+        vol="$(node_image_volume "${node}")"
+        if [[ "$(mounted_volume "${node}" "${CONTAINERD_DIR}")" == "${vol}" ]]; then
+            ok "${node}: images already kept in volume ${vol}."
+            continue
+        fi
+        src="$(mounted_volume "${node}" /var/lib/rancher/k3s)"
+        if [[ -z "${src}" ]]; then
+            warn "${node}: no /var/lib/rancher/k3s volume to copy its images from."
+            return 1
+        fi
+        mounts+=(-v "${src}:/src/${vol}:ro" -v "${vol}:/dst/${vol}")
+        pending+=("${vol}")
+    done < <(docker ps -a --format '{{.Names}}' \
+        | grep "^k3d-${CLUSTER_NAME}-\(server\|agent\)-" | sort)
+    (( ${#pending[@]} == 0 )) && return 0
+
+    log "Copying node image stores into named volumes (one-time migration)..."
+    # Any earlier copy, partial or complete, is cleared before free space is
+    # measured; otherwise a re-run after a failed copy counts that copy
+    # against itself. All the volumes share the Docker VM's disk, so the
+    # check compares the total size of the stores with free space on any one
+    # of them.
+    #
+    # Each store is extracted into .migrating/ and moved to the volume's top
+    # level only once tar has succeeded. An interrupted copy (Ctrl+C, a
+    # crash) therefore leaves the volume looking empty to containerd, so a
+    # cluster that mounts it just downloads again. A half-copied store whose
+    # metadata lists layers that never arrived would break pod creation
+    # instead.
+    if ! docker run --rm --cap-add SYS_ADMIN "${mounts[@]}" alpine sh -euc '
+        set -o pipefail
+        need=0
+        for v in "$@"; do
+            find "/dst/$v" -mindepth 1 -delete
+            need=$((need + $(du -sk "/src/$v/agent/containerd" | cut -f1)))
+        done
+        free=$(df -Pk "/dst/$1" | awk "NR == 2 {print \$4}")
+        if [ "${need}" -ge "${free}" ]; then
+            echo "    Copy needs $((need / 1048576)) GB free, $((free / 1048576)) GB available." >&2
+            exit 1
+        fi
+        apk add --no-cache --quiet tar
+        for v in "$@"; do
+            stage="/dst/$v/.migrating"
+            mkdir "${stage}"
+            tar -C "/src/$v/agent/containerd" --xattrs --xattrs-include="*" \
+                --numeric-owner -cf - . \
+                | tar -C "${stage}" --xattrs --xattrs-include="*" \
+                    --numeric-owner -xpf -
+            find "${stage}" -mindepth 1 -maxdepth 1 -exec mv {} "/dst/$v/" \;
+            chown "$(stat -c %u:%g "${stage}")" "/dst/$v"
+            chmod "$(stat -c %a "${stage}")" "/dst/$v"
+            rmdir "${stage}"
+            echo "    $v: $(du -sh "/dst/$v" | cut -f1)"
+        done
+    ' sh "${pending[@]}"; then
+        warn "Copying the image stores failed; removing the partial copies."
+        docker volume rm "${pending[@]}" >/dev/null 2>&1 \
+            || warn "Could not remove ${pending[*]}. Remove them before the next setup.sh."
+        warn "The cluster is stopped, not deleted: re-run teardown, or pass"
+        warn "--drop-images to delete it without its images."
+        return 1
+    fi
+    ok "Node images copied into ${pending[*]}."
+}
+
 log "Destroying k3d cluster '${CLUSTER_NAME}'..."
 if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
     # Ensure cluster is running before destroying Pulumi resources
@@ -210,6 +332,10 @@ if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
 
     cd "${REPO_ROOT}"
 
+    if ! $DROP_IMAGES; then
+        keep_node_images
+    fi
+
     # Now delete the cluster
     k3d cluster delete "${CLUSTER_NAME}"
     ok "Cluster deleted."
@@ -225,6 +351,12 @@ fi
 
 # start.sh's marker refers to the cluster we just deleted.
 rm -f "${REPO_ROOT}/local-dev/infra/.pulumi/cluster-id"
+
+if $DROP_IMAGES; then
+    log "Removing kept node images (--drop-images)..."
+    kept_image_volumes | xargs -r docker volume rm >/dev/null
+    ok "Node image volumes removed."
+fi
 
 # ---------------------------------------------------------------------------
 # Remove /etc/hosts entries
@@ -272,4 +404,8 @@ fi
 
 
 echo ""
+if ! $DROP_IMAGES && [[ -n "$(kept_image_volumes)" ]]; then
+    echo "Node images kept for the next setup.sh in: $(kept_image_volumes | tr '\n' ' ')"
+    echo "(teardown.sh --drop-images removes them.)"
+fi
 echo "Teardown complete. Run ./local-dev/scripts/setup.sh to start fresh."
