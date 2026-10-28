@@ -290,10 +290,11 @@ class ApisixGatewayConfig(BaseModel):
     # Needs the Prometheus operator's ServiceMonitor CRD.
     service_monitor_enabled: bool = False
     # The ingress controller's validating webhook checks a route's
-    # plugin_config_name against its informer cache. A manifest that applies a
-    # PluginConfig and the route using it in one batch gets the route denied
-    # until the cache catches up, so only enable it where something orders the
-    # two (Pulumi does).
+    # plugin_config_name against its informer cache, so a PluginConfig and a
+    # route naming it that are created together can have the route denied
+    # until the cache catches up. Deployed stacks are safe today because their
+    # PluginConfigs already exist; OLApisixRoute names the PluginConfig by a
+    # plain string, so Pulumi does not order a new pair either.
     admission_webhook_enabled: bool = True
     trusted_ca: ApisixTrustedCA | None = None
     pod_annotations: dict[str, str] | None = None

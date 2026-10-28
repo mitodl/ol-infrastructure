@@ -115,7 +115,9 @@ def create_ingress(  # noqa: PLR0913
         # The hand-written app manifests (mit-learn, learn-ai, ocw-studio,
         # openedx) apply an ApisixPluginConfig and the route that names it in
         # one kubectl batch, and the webhook denied those routes on every fresh
-        # cluster. Back on once those apps render through Pulumi programs.
+        # cluster. Turning it back on needs every route to wait for its
+        # PluginConfig, including Pulumi-rendered ones (a depends_on, since
+        # the route names the PluginConfig by string).
         admission_webhook_enabled=False,
     )
 
