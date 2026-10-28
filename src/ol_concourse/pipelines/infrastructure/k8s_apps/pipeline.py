@@ -262,7 +262,7 @@ pipeline_params = {
         app_name="ocw-studio",
         repo_main_branch=app_repo_main_branch("ocw-studio"),
         build_target="production",
-        description="Builds the OCW Studio Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
+        description="Builds the OCW Studio Django app image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
     ),
     "odl-video-service": AppPipelineParams(
         app_name="odl-video-service",

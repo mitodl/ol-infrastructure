@@ -89,7 +89,9 @@ APPS: dict[str, AppRegistration] = {
         slack_channel="product-mitx-online", release_resource_workflow=True
     ),
     "ocw-studio": AppRegistration(
-        repo_main_branch="master", slack_channel="product-ocw"
+        repo_main_branch="master",
+        slack_channel="product-ocw",
+        release_resource_workflow=True,
     ),
     "odl-video-service": AppRegistration(
         repo_main_branch="master",
