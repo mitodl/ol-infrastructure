@@ -114,17 +114,12 @@ LOCAL_ENV_DEFAULTS = {
     "EXPOSE_OIDC_LOGIN": "True",
     # Keycloak
     "KEYCLOAK_BASE_URL": f"https://sso.ol.{root_domain}",
-    "KEYCLOAK_REALM_NAME": "olapps",
     # Django's own Keycloak client (account actions). Gateway login uses the
     # mit-learn client, and the admin API mitxonline-b2b-client (see
     # supplied_by in secrets.yaml). Deployed stacks set the ID in their vars and
     # no secret.
     "KEYCLOAK_CLIENT_ID": "ol-mitxonline-client",
     "KEYCLOAK_CLIENT_SECRET": "local-dev-mitxonline-secret",  # pragma: allowlist secret
-    # Enable the APISIX user middleware: it reads the X-Userinfo header APISIX
-    # injects and authenticates (and auto-creates) the Django user. Defaults to
-    # True (disabled), which leaves every request anonymous. Production sets this.
-    "MITOL_APIGATEWAY_DISABLE_MIDDLEWARE": "false",
     # Required for Django's CSRF origin check on POSTs behind HTTPS (e.g. the
     # admin login form); defaults to empty, which rejects them with DEBUG=False.
     "CSRF_TRUSTED_ORIGINS": (
