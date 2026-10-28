@@ -62,6 +62,11 @@ RUN apt-get update && \
       ca-certificates \
       curl \
       git \
+      # init-system-helpers provides update-rc.d, also absent from the
+      # curated set. Maintainer scripts of packages that ship an init script
+      # call it unconditionally (screen: "update-rc.d: command not found"),
+      # so their postinst fails and apt exits 100.
+      init-system-helpers \
       libffi-dev \
       libjpeg-dev \
       libpq-dev \
@@ -92,6 +97,15 @@ RUN command -v python >/dev/null 2>&1 || ln -s "$(command -v python3)" /usr/loca
 # the alternative itself.
 RUN command -v which >/dev/null 2>&1 || \
     update-alternatives --install /usr/bin/which which /usr/bin/which.debianutils 0
+
+# Restore the `utmp` group. DHI's /etc/group carries only root, shadow,
+# nonroot and nobody, but stock Debian's base-passwd provides utmp (gid 43),
+# and maintainer scripts assume it exists. screen's postinst runs
+# `install -g utmp -d /run/screen` and fails with "invalid group 'utmp'",
+# which broke the mitxonline image build after the DHI rebuild on
+# 2026-10-28 (mitodl/mitxonline#4201). Guarded so it's a no-op once DHI
+# ships the group itself.
+RUN getent group utmp >/dev/null || groupadd --system --gid 43 utmp
 
 # Install uv (pinned via the upstream tag; bump deliberately).
 COPY --from=ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff /uv /uvx /usr/local/bin/
