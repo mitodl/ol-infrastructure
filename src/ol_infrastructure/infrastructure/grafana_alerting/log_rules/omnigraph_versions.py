@@ -62,8 +62,9 @@ Shape
 Both are ``max by (cluster, graph)`` over ``max_over_time`` of the unwrapped
 count. ``logfmt`` extracts every field as a label, so the inner aggregation
 carries one series per distinct value set, and the outer ``max by`` folds them
-back to one per graph. The 2h range keeps the latest sample through one missed
-hourly run. The growth rule subtracts the same expression ``offset 1d``. A
+back to one per graph. The 2h range keeps a sample through one missed hourly
+run. It is the highest count in the window, not the newest, so after a cleanup
+the budget rule reads the pre-cleanup count for up to 2h. The growth rule subtracts the same expression ``offset 1d``. A
 graph with no sample a day earlier has no match on the right and stays silent,
 and a cleanup makes the difference negative. Both comparisons leave the
 positive left-hand value on the row, which is what base.py's ``last(A) > 0``
@@ -107,7 +108,7 @@ _PLAN_SECONDS_PER_VERSION = 0.22
 _PLAN_BUDGET_SECONDS = 3600
 _DAILY_GROWTH_VERSIONS = 5000
 
-# Long enough to keep the latest hourly sample through one missed run.
+# Long enough to keep an hourly sample through one missed run.
 _SAMPLE_WINDOW = "2h"
 
 _ROUTING = {"channel": "devops-warnings", "severity": "warning"}
@@ -120,7 +121,7 @@ _BUDGET_SUMMARY = (
 _BUDGET_DESCRIPTION = (
     "Graph {{ $labels.graph }} in cluster {{ $labels.cluster }} has enough"
     " `_versions/` objects that `omnigraph cleanup` would spend about"
-    " {{ $value }}s planning before it deleted anything (0.22s per object,"
+    " {{ $values.B.Value }}s planning before it deleted anything (0.22s per object,"
     " the slow end of what Production and QA measured). The server is stopped"
     " for that whole time, and a plan that outlasts its command timeout"
     " deletes nothing. Nothing schedules cleanup in QA or Production"
@@ -143,7 +144,7 @@ _GROWTH_SUMMARY = (
 
 _GROWTH_DESCRIPTION = (
     "Graph {{ $labels.graph }} in cluster {{ $labels.cluster }} gained"
-    " {{ $value }} `_versions/` objects in the last 24 hours, about 1,100s of"
+    " {{ $values.B.Value }} `_versions/` objects in the last 24 hours, about 1,100s of"
     " cleanup planning in one day. The largest single-graph day measured"
     " before this rule was 2,739 (open-edx-plugins in Production,"
     " 2026-10-27). Every graph commit adds one manifest version plus one per"
@@ -158,8 +159,8 @@ _GROWTH_DESCRIPTION = (
 )
 
 
-def _latest_versions(cluster_filter: str, offset: str = "") -> str:
-    """Return the latest hourly ``versions`` count per graph, optionally offset."""
+def _recent_max_versions(cluster_filter: str, offset: str = "") -> str:
+    """Return the highest ``versions`` count per graph over the sample window."""
     offset_clause = f" offset {offset}" if offset else ""
     return (
         "max by (cluster, graph) (\n"
@@ -175,7 +176,7 @@ def _latest_versions(cluster_filter: str, offset: str = "") -> str:
 def _plan_budget_expr(cluster_filter: str) -> str:
     """Projected cleanup plan seconds per graph, where over budget."""
     return (
-        f"{_latest_versions(cluster_filter)}\n"
+        f"{_recent_max_versions(cluster_filter)}\n"
         f"* {_PLAN_SECONDS_PER_VERSION} > {_PLAN_BUDGET_SECONDS}"
     )
 
@@ -184,9 +185,9 @@ def _daily_growth_expr(cluster_filter: str) -> str:
     """Versions added per graph over 24h, where above the growth threshold."""
     return (
         "(\n"
-        f"{_latest_versions(cluster_filter)}\n"
+        f"{_recent_max_versions(cluster_filter)}\n"
         "-\n"
-        f"{_latest_versions(cluster_filter, offset='1d')}\n"
+        f"{_recent_max_versions(cluster_filter, offset='1d')}\n"
         f") > {_DAILY_GROWTH_VERSIONS}"
     )
 

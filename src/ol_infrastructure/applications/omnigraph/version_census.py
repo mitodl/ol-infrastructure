@@ -21,6 +21,9 @@ there unchanged from a ConfigMap, with nothing to build. It runs as the
 ``omnigraph-server`` IRSA ServiceAccount, as the migration's S3 steps do. That
 identity can also write the bucket, and this job only lists it; a read-only
 role would be a separate IAM role and binding for one ``ListBucket`` call.
+The same ServiceAccount is bound to the unlock Lease and pod listing
+(lock_handoff.py), so the pod does not mount its Kubernetes token: the IRSA
+token is a separate projected volume, and this job makes no Kubernetes call.
 
 The listing is read-only and takes no omnigraph lock, so it runs whether the
 server is up or stopped for the nightly window.
@@ -93,6 +96,7 @@ def create_version_census(  # noqa: PLR0913
         spec=kubernetes.core.v1.PodSpecArgs(
             restart_policy="Never",
             service_account_name=service_account_name,
+            automount_service_account_token=False,
             security_context=kubernetes.core.v1.PodSecurityContextArgs(
                 run_as_non_root=True,
                 run_as_user=1000,
@@ -166,14 +170,16 @@ def create_version_census(  # noqa: PLR0913
             job_template=kubernetes.batch.v1.JobTemplateSpecArgs(
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(labels=k8s_global_labels),
                 spec=kubernetes.batch.v1.JobSpecArgs(
-                    # The next hourly run is the retry.
-                    backoff_limit=0,
+                    # A read-only listing, so a retry is always safe, and one
+                    # rides out a single S3 error without a failed Job.
+                    backoff_limit=1,
                     active_deadline_seconds=CENSUS_ACTIVE_DEADLINE_SECONDS,
                     # WorkloadJobFailed* fires for as long as a failed Job
                     # exists. Deleting finished Jobs after an hour lets a
-                    # one-off listing failure clear itself, while one that
-                    # fails every run keeps it firing. The lines are in Loki
-                    # by then.
+                    # one-off failure clear itself. One that fails every run
+                    # mostly keeps it firing, with gaps when runs fail at
+                    # different points; ScheduledJobStaleFast* covers it
+                    # after 6h either way. The lines are in Loki by then.
                     ttl_seconds_after_finished=CENSUS_JOB_TTL_SECONDS,
                     template=pod_template,
                 ),

@@ -30,10 +30,10 @@ _LISTING = [
 _GRAPHS_URI = "s3://bucket/fmt14/graphs/"
 
 
-def _fake_listing(stdout: str):
+def _fake_listing(stdout: str, returncode: int = 0):
     def run(args, **_kwargs):
         assert args[-1] == _GRAPHS_URI
-        return subprocess.CompletedProcess(args, 0, stdout=stdout, stderr="")
+        return subprocess.CompletedProcess(args, returncode, stdout=stdout)
 
     return run
 
@@ -67,8 +67,13 @@ def test_main_prints_counts(monkeypatch, capsys):
 
 
 def test_main_fails_when_the_root_holds_no_graph(monkeypatch):
-    """A wrong root would otherwise print nothing, which the rules read as OK."""
-    monkeypatch.setattr(count_store_versions.subprocess, "run", _fake_listing(""))
+    """A wrong root would otherwise print nothing, which the rules read as OK.
+
+    `aws s3 ls --recursive` on an empty prefix exits 1 with no output.
+    """
+    monkeypatch.setattr(
+        count_store_versions.subprocess, "run", _fake_listing("", returncode=1)
+    )
 
     assert main({"OMNIGRAPH_STORAGE_ROOT": "s3://bucket/fmt14"}) == 1
 
@@ -76,10 +81,9 @@ def test_main_fails_when_the_root_holds_no_graph(monkeypatch):
 def test_main_fails_when_the_listing_fails(monkeypatch):
     """A failed listing fails the Job rather than printing a partial count."""
 
-    def run(args, **_kwargs):
-        raise subprocess.CalledProcessError(1, args)
-
-    monkeypatch.setattr(count_store_versions.subprocess, "run", run)
+    monkeypatch.setattr(
+        count_store_versions.subprocess, "run", _fake_listing("", returncode=253)
+    )
 
     with pytest.raises(subprocess.CalledProcessError):
         main({"OMNIGRAPH_STORAGE_ROOT": "s3://bucket/fmt14"})

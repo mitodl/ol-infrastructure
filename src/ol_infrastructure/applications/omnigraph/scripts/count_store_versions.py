@@ -77,20 +77,27 @@ def render(counts: dict[str, Counter[str]]) -> list[str]:
 def main(env: dict[str, str]) -> int:
     """List ``$OMNIGRAPH_STORAGE_ROOT/graphs/`` and print the counts.
 
-    :returns: 0, or 1 when the listing names no graph at all. A failed
-        listing raises, which fails the Job too.
+    The CLI's stderr is left to the pod's, so a credential or permission
+    error reaches the log rather than only an exit status.
+
+    :returns: 0, or 1 when the listing names no graph at all.
+    :raises subprocess.CalledProcessError: when the listing fails.
     """
     graphs_uri = env["OMNIGRAPH_STORAGE_ROOT"].rstrip("/") + "/graphs/"
+    args = ["aws", "s3", "ls", "--recursive", graphs_uri]
     listing = subprocess.run(  # noqa: S603
-        ["aws", "s3", "ls", "--recursive", graphs_uri],  # noqa: S607
-        capture_output=True,
+        args,
+        stdout=subprocess.PIPE,
         text=True,
-        check=True,
+        check=False,
     )
+    # `aws s3 ls` exits 1 with no output on a prefix holding no objects,
+    # which is what a wrong root looks like. Any other failure is the CLI's.
+    if listing.returncode != 0 and (listing.returncode != 1 or listing.stdout):
+        raise subprocess.CalledProcessError(listing.returncode, args)
     counts = count_versions(listing.stdout.splitlines())
     if not counts:
-        # A wrong root lists nothing and would otherwise print nothing, which
-        # the rules read as NoData, i.e. fine.
+        # Printing nothing would read as NoData to the rules, i.e. fine.
         sys.stderr.write(f"no graph versions found under {graphs_uri}\n")
         return 1
     for line in render(counts):
