@@ -112,6 +112,11 @@ keycloak_provider = keycloak.Provider(
     password="admin",  # noqa: S106  # pragma: allowlist secret
     tls_insecure_skip_verify=True,  # mkcert CA not trusted by provider runtime
     initial_login=False,  # Keycloak must be ready before realm resources run
+    # Creating the olapps realm takes about 5s even on a warm Keycloak, which is
+    # the provider's default timeout. A create that times out still lands in
+    # Keycloak but never reaches Pulumi state, so every retry then fails with
+    # 409 "Realm olapps already exists".
+    client_timeout=60,
 )
 
 create_olapps_dev_realm(
