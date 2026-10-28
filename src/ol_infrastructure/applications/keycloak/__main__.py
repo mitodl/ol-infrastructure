@@ -520,7 +520,7 @@ keycloak_resource = kubernetes.apiextensions.CustomResource(
         "ingress": {"enabled": False},
         # Configure the ServiceMonitor the operator auto-creates when
         # metrics-enabled is set in the image build.
-        "serviceMonitor": {"interval": "30s", "scrapeTimeout": "10s"},
+        "serviceMonitor": {"interval": "60s", "scrapeTimeout": "10s"},
         "additionalOptions": [
             {"name": "metrics-enabled", "value": "true"},
             {

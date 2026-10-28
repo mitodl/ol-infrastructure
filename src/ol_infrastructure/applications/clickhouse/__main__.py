@@ -2024,7 +2024,7 @@ clickhouse_service_monitor = kubernetes.apiextensions.CustomResource(
                 "port": "metrics",
                 "path": "/metrics",
                 "scheme": "http",
-                "interval": "30s",
+                "interval": "60s",
                 "scrapeTimeout": "10s",
                 "relabelings": [
                     {"targetLabel": "job", "replacement": "clickhouse"},
@@ -2059,6 +2059,8 @@ keeper_service_monitor = kubernetes.apiextensions.CustomResource(
             {
                 "port": "metrics",
                 "path": "/metrics",
+                # Altinity's vendored Keeper dashboard uses irate(...[1m]), which needs
+                # two samples per minute.
                 "interval": "30s",
                 "scrapeTimeout": "10s",
                 # pod_name, container_name and app are the labels Altinity's
