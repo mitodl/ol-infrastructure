@@ -527,3 +527,17 @@ def test_term_parents_and_related_terms_are_declared_earlier(
         for name in [term.get("parent"), *term.get("relatedTerms", [])]:
             assert name is None or name in seen, term["name"]
         seen.add(term["name"])
+
+
+def test_glossary_descriptions_survive_the_servers_sanitizer(
+    config: ModuleType,
+) -> None:
+    # OpenMetadata runs a description containing "<" through an HTML
+    # sanitizer, which drops e.g. "<platform>" and entity-encodes backticks, so
+    # the stored text would never equal the declared one and every run would
+    # patch it.
+    descriptions = [
+        config.GLOSSARY_CONFIG["description"],
+        *(term["description"] for term in config.GLOSSARY_TERMS),
+    ]
+    assert [d for d in descriptions if "<" in d] == []

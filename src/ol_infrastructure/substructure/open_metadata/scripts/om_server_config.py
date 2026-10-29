@@ -440,7 +440,7 @@ GLOSSARY_TERMS: list[dict[str, Any]] = [
         "synonyms": ["is_active"],
         "description": (
             "A platform account that has not been deactivated: the "
-            "`dim_user.user_is_active_on_<platform>` flags. On MITx Online, xPRO, "
+            "`dim_user.user_is_active_on_*` flags. On MITx Online, xPRO, "
             "Residential, Bootcamps and MIT Learn the flag is the account's own "
             "`is_active`, which the applications use to soft-delete accounts. On "
             "edX.org it is derived instead: false when the account's email or "
