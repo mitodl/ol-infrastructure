@@ -7,6 +7,8 @@ metadata:
   name: ol-analytics-api-env
   namespace: ol-analytics-api
 data:
+  # Apple M4 VMs advertise SME; bundled OpenSSL's CPU probe then SIGILLs on import.
+  OPENSSL_armcap: "0"
   # The data-platform lake's StarRocks. Deployed the pod logs in to Vault for
   # dynamic credentials; with no OL_ANALYTICS_API_VAULT_ADDR it reads
   # STARROCKS_USER and STARROCKS_PASSWORD instead (core/db/vault_credentials.py).

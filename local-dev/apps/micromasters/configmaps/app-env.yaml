@@ -5,6 +5,8 @@ metadata:
   name: micromasters-env
   namespace: micromasters
 data:
+  # Apple M4 VMs advertise SME; bundled OpenSSL's CPU probe then SIGILLs on import.
+  OPENSSL_armcap: "0"
   DJANGO_SETTINGS_MODULE: "micromasters.settings"
   MICROMASTERS_BASE_URL: "https://micromasters.mit.test"
   MICROMASTERS_ENVIRONMENT: "local"

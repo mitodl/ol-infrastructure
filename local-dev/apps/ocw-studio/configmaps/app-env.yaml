@@ -14,6 +14,8 @@ metadata:
   name: ocwstudio-env
   namespace: ocw-studio
 data:
+  # Apple M4 VMs advertise SME; bundled OpenSSL's CPU probe then SIGILLs on import.
+  OPENSSL_armcap: "0"
   # ── Django ────────────────────────────────────────────────────────────────
   DJANGO_SETTINGS_MODULE: "main.settings"
   PYTHONPATH: "."

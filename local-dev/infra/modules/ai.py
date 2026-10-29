@@ -53,6 +53,9 @@ def create_ai_services(
                             ],
                             "ports": [{"containerPort": 4000}],
                             "env": [
+                                # Apple M4 VMs advertise SME; OpenSSL's CPU probe
+                                # then SIGILLs on import.
+                                {"name": "OPENSSL_armcap", "value": "0"},
                                 {
                                     "name": "OPENAI_API_KEY",
                                     "valueFrom": {
