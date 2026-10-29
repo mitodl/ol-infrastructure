@@ -266,6 +266,7 @@ def test_term_with_a_changed_description_patches_only_the_description(
     ("field", "stored"),
     [
         ("synonyms", ["student"]),
+        ("synonyms", ["personal data", "PII", "student"]),
         ("references", []),
     ],
 )
@@ -286,6 +287,29 @@ def test_term_with_changed_list_fields_is_patched(
             [{"op": "add", "path": f"/{field}", "value": pii[field]}],
         )
     ]
+
+
+@pytest.mark.parametrize(
+    ("name", "field"),
+    [
+        ("pii", "synonyms"),
+        ("indirect-identifier", "references"),
+    ],
+)
+def test_term_with_reordered_list_fields_is_not_patched(
+    monkeypatch: pytest.MonkeyPatch, config: ModuleType, name: str, field: str
+) -> None:
+    """The server stores no change that only reorders synonyms or references."""
+    term = _term(config, name)
+    assert len(term[field]) > 1
+    entities = _glossary(config)
+    entities[f"glossaryTerms/{_fqn(term)}"][field] = list(reversed(term[field]))
+    om = FakeOM(entities)
+    _install(monkeypatch, config, om)
+
+    config._reconcile_glossary_term(term)
+
+    assert om.patches == []
 
 
 def test_display_name_and_mutually_exclusive_are_not_patched(

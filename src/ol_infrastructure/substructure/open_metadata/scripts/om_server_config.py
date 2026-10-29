@@ -64,7 +64,7 @@ each term is set from ol-data-platform's dbt column meta
 
 import os
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 from functools import partial
 from typing import Any
 
@@ -619,6 +619,15 @@ GLOSSARY_TERMS: list[dict[str, Any]] = [
 # because the server returns links rather than the names declared here.
 _GLOSSARY_TERM_PATCHABLE_FIELDS: list[str] = ["description", "synonyms", "references"]
 
+# How the server matches the entries of a term's list fields (stringMatch and
+# termReferenceMatch in OpenMetadata's EntityUtil).  It compares them as sets
+# and stores nothing for a change that only reorders one, so a PATCH sent for
+# a different order would be sent again on every run.
+_GLOSSARY_TERM_MEMBER_KEYS: dict[str, Callable[[Any], Hashable]] = {
+    "synonyms": lambda synonym: synonym,
+    "references": lambda reference: (reference["name"], reference["endpoint"]),
+}
+
 
 def _apply_patch(label: str, url: str, ops: list[dict[str, Any]]) -> None:
     """Send a JSON Patch, or report that there is nothing to change.
@@ -944,12 +953,12 @@ def _patch_glossary_term(
         "synonyms": term.get("synonyms", []),
         "references": term.get("references", []),
     }
-    # The server leaves an empty list out of the entity.
-    current = {
-        **entity,
-        "synonyms": entity.get("synonyms") or [],
-        "references": entity.get("references") or [],
-    }
+    current = dict(entity)
+    for field, key in _GLOSSARY_TERM_MEMBER_KEYS.items():
+        # The server leaves an empty list out of the entity.
+        members = {key(value) for value in entity.get(field) or []}
+        if members == {key(value) for value in wanted[field]}:
+            current[field] = wanted[field]
     ops = _add_ops(current, wanted, _GLOSSARY_TERM_PATCHABLE_FIELDS)
     if related_op := _related_terms_op(label, term, entity.get("relatedTerms") or []):
         ops.append(related_op)
