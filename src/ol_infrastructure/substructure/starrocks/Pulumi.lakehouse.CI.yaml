@@ -16,8 +16,9 @@ config:
   # interactive share one slot pool and interactive queues behind batch; with
   # the group-level queue on, interactive's concurrency_limit is enforced
   # nowhere. Both stay off until the FE moves to v1 (enable_query_queue_v2 =
-  # false in fe.conf). Until then the CN enforces concurrency_limit by
-  # rejecting the query over it. See resource_groups.py.
+  # false in fe.conf). Until then the CN would enforce a concurrency_limit by
+  # rejecting the query over it, so interactive's is 0 (unlimited) and its
+  # exclusive cores are what isolate it from batch. See resource_groups.py.
   starrocks:query_queue:
     enable_query_queue_select: false
     enable_group_level_query_queue: false
@@ -36,7 +37,7 @@ config:
     interactive:
       exclusive_cpu_cores: 1
       mem_limit: 0.4
-      concurrency_limit: 10
+      concurrency_limit: 0
     batch:
       cpu_weight_percent: 100
       mem_limit: 0.6
