@@ -26,7 +26,7 @@ from pulumi_aws import ec2, iam, route53, s3
 from bridge.lib.constants import (
     FASTLY_A_TLS_1_3,
     FASTLY_CNAME_TLS_1_3,
-    mit_learn_session_cookie_name,
+    LearnSession,
 )
 from bridge.lib.magic_numbers import (
     DEFAULT_HTTPS_PORT,
@@ -50,8 +50,8 @@ from ol_infrastructure.components.aws.database import OLAmazonDB, OLPostgresDBCo
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services.apisix import (
     FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
-    OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCRouteGroup,
     OLApisixOIDCVaultCredentials,
     OLApisixPluginConfig,
     OLApisixRoute,
@@ -61,6 +61,7 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixUpstream,
     OLApisixUpstreamConfig,
     browser_traffic_match_exprs,
+    learn_session_oidc_config,
     oidc_gateway_pre_function_plugin,
     ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
@@ -213,6 +214,7 @@ learn_frontend_domain = mitlearn_config.require("frontend_domain")
 legacy_learn_frontend_domain = mitlearn_config.require("legacy_frontend_domain")
 nextjs_heroku_domain = mitlearn_config.require("nextjs_heroku_domain")
 mitlearn_api_domain = mitlearn_config.require("api_domain")
+learn_session = LearnSession.for_host(stack_info.env_suffix, mitlearn_api_domain)
 
 aws_config = AWSBase(
     tags={
@@ -1613,7 +1615,6 @@ env_vars = {
 interpolation_vars = mitlearn_config.get_object("interpolation_vars")
 
 csrf_origins_list = interpolation_vars["csrf_domains"] or []
-session_cookie_domain = interpolation_vars["session_cookie_domain"] or ""
 cors_urls_list = interpolation_vars["cors_urls"] or []
 cors_urls_json = json.dumps(cors_urls_list)
 auth_allowed_redirect_hosts_list = (
@@ -1632,7 +1633,9 @@ interpolated_vars = {
     "MAILGUN_URL": f"https://api.mailgun.net/v3/{interpolation_vars['mailgun_sender_domain']}",
     "MITOL_CORS_ORIGIN_WHITELIST": cors_urls_json,
     "OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
-    "SESSION_COOKIE_DOMAIN": session_cookie_domain,
+    # Django's own session cookie, scoped like the gateway's so both reach
+    # every host under the Learn parent domain.
+    "SESSION_COOKIE_DOMAIN": learn_session.cookie_domain,
     "ALLOWED_REDIRECT_HOSTS": auth_allowed_redirect_hosts_json,
     "SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT": f"https://{interpolation_vars['sso_url']}/realms/olapps",
     "USERINFO_URL": f"https://{interpolation_vars['sso_url']}/realms/olapps/protocol/openid-connect/userinfo",
@@ -1762,7 +1765,7 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
             # single entry in the browser's jar. Safe to delete once the old
             # cookies have aged out of circulation.
             stale_session_cookie_cleanup_plugin(
-                cookie_domains=[mitlearn_api_domain.removeprefix("api")],
+                cookie_domains=[learn_session.cookie_domain],
             ),
             # 327 callbacks a day on api.learn.mit.edu come back from Keycloak
             # with error=temporarily_unavailable instead of a code, and the
@@ -1774,9 +1777,7 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
             # currently sends Keycloak an http:// redirect_uri, and answers with
             # an OIDC session cookie over cleartext.
             oidc_gateway_pre_function_plugin(
-                session_cookie_names=[
-                    mit_learn_session_cookie_name(stack_info.env_suffix)
-                ],
+                session_cookie_names=[learn_session.cookie_name],
             ),
         ],
     ),
@@ -2186,71 +2187,44 @@ mitlearn_k8s_app = OLApplicationK8s(
     ),
 )
 
+# Both route groups on this host read and write the shared MIT Learn session;
+# LearnSession pins everything the other participants (learn-ai,
+# mitxonline's /mitxonline/*, ol-analytics-api's Learn host) must agree on.
+# The route groups only decide where each resource's logout happens.
+mitlearn_login_paths = ["/admin/login/*", "/login", "/login/*"]
+mitlearn_route_group_no_prefix = OLApisixOIDCRouteGroup(
+    hosts=[mitlearn_api_domain],
+    login_paths=mitlearn_login_paths,
+)
+mitlearn_route_group = OLApisixOIDCRouteGroup(
+    hosts=[mitlearn_api_domain],
+    path_prefix="learn",
+    login_paths=mitlearn_login_paths,
+)
+mitlearn_oidc_credentials = OLApisixOIDCVaultCredentials(
+    path=LearnSession.vault_path,
+    vaultauth=vault_k8s_resources.auth_name,
+)
 mitlearn_k8s_app_oidc_resources_no_prefix = OLApisixOIDCResources(
     f"ol-mitlearn-k8s-olapisixoidcresources-no-prefix-{stack_info.env_suffix}",
-    oidc_config=OLApisixOIDCConfig(
+    oidc_config=learn_session_oidc_config(
+        learn_session,
+        mitlearn_route_group_no_prefix,
         application_name="mitlearn-k8s-no-prefix",
         k8s_labels=application_labels,
         k8s_namespace=learn_namespace,
-        oidc_logout_path="/logout/oidc",
-        oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/logout/",
-        oidc_session_absolute_timeout=60 * 20160,
-        # Disable APISIX's own idling/rolling checks (which otherwise default
-        # to 15min/60min) so the session envelope lasts the full 14-day
-        # absolute_timeout above, matching the Keycloak SSO session and
-        # browser cookie lifetime instead of expiring early (hq#8416).
-        oidc_session_idling_timeout=0,
-        oidc_session_rolling_timeout=0,
-        # Broadened from the default host-only scope so a logged-in session
-        # cookie is also sent to ol-analytics-api's Learn-scoped host
-        # (analytics.learn.mit.edu et al.), letting its "pass" route recognize
-        # the same session instead of requiring a second login -- see
-        # ol_analytics_api/__main__.py's Learn-scoped OIDC resource, which
-        # shares this same "sso/mitlearn" Vault path/client and mirrors this
-        # cookie domain.
-        oidc_session_cookie_domain=mitlearn_api_domain.removeprefix("api"),
-        # Environment-scoped name instead of lua-resty-session's default
-        # "session". Required because of the broadened cookie domain above:
-        # a *.learn.mit.edu cookie is also sent to the RC and CI hosts, where
-        # a same-named cookie from another environment cannot be decrypted.
-        # Shared with learn-ai and ol-analytics-api -- see the helper's
-        # docstring.
-        oidc_session_cookie_name=mit_learn_session_cookie_name(
-            stack_info.env_suffix,
-        ),
-        oidc_use_session_secret=True,
-        credentials=OLApisixOIDCVaultCredentials(
-            mount="secret-operations",
-            mount_type="kv-v1",
-            path="sso/mitlearn",
-            vaultauth=vault_k8s_resources.auth_name,
-        ),
+        credentials=mitlearn_oidc_credentials,
     ),
 )
 mitlearn_k8s_app_oidc_resources = OLApisixOIDCResources(
     f"ol-mitlearn-k8s-olapisixoidcresources-{stack_info.env_suffix}",
-    oidc_config=OLApisixOIDCConfig(
+    oidc_config=learn_session_oidc_config(
+        learn_session,
+        mitlearn_route_group,
         application_name="mitlearn-k8s",
         k8s_labels=application_labels,
         k8s_namespace=learn_namespace,
-        oidc_logout_path="/learn/logout/oidc",
-        oidc_post_logout_redirect_uri=f"https://{mitlearn_config.get('api_domain')}/learn/logout/",
-        oidc_session_absolute_timeout=60 * 20160,
-        # See the mitlearn-k8s-no-prefix resources above for why these are 0,
-        # and for the cookie domain and name below.
-        oidc_session_idling_timeout=0,
-        oidc_session_rolling_timeout=0,
-        oidc_session_cookie_domain=mitlearn_api_domain.removeprefix("api"),
-        oidc_session_cookie_name=mit_learn_session_cookie_name(
-            stack_info.env_suffix,
-        ),
-        oidc_use_session_secret=True,
-        credentials=OLApisixOIDCVaultCredentials(
-            mount="secret-operations",
-            mount_type="kv-v1",
-            path="sso/mitlearn",
-            vaultauth=vault_k8s_resources.auth_name,
-        ),
+        credentials=mitlearn_oidc_credentials,
     ),
 )
 
@@ -2316,188 +2290,90 @@ if webapp_endpoint_routing:
         ),
     )
 
+
+def mitlearn_route_configs(
+    route_group: OLApisixOIDCRouteGroup, oidc: OLApisixOIDCResources
+) -> list[OLApisixRouteConfig]:
+    """Return one route group's fastly-*, browser-* and unmatched routes.
+
+    :param route_group: Where the routes are served.
+    :param oidc: The OIDC resources built for ``route_group``.
+    :returns: Route configs for one ``OLApisixRoute``.
+    :rtype: list[OLApisixRouteConfig]
+    """
+    # fastly-* sits below browser-*: browser requests via Fastly carry both
+    # Origin and Fastly-Client-IP, so the more specific browser-* match must be
+    # evaluated first or the broad Fastly-Client-IP presence check swallows all
+    # browser traffic and the rate-limited routes never trigger.
+    fastly = route_group.route_configs(
+        oidc,
+        route_name_prefix="fastly-",
+        passauth_priority=20,
+        priority=30,
+        shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+        rewrite_plugins=[proxy_rewrite_plugin_config],
+        exprs=fastly_api_match_exprs,
+        **webapp_backend,
+    )
+    browser = route_group.route_configs(
+        oidc,
+        route_name_prefix="browser-",
+        passauth_priority=40,
+        priority=50,
+        shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
+        rewrite_plugins=[proxy_rewrite_plugin_config],
+        exprs=browser_api_match_exprs,
+        **webapp_backend,
+    )
+    passauth, logout_redirect, reqauth = route_group.route_configs(
+        oidc,
+        shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+        rewrite_plugins=[proxy_rewrite_plugin_config],
+        **webapp_backend,
+    )
+    # Credential metadata generation calls a frontier model once per Open
+    # Badges field (gpt-5 and Claude measure 25-46s each, generated
+    # concurrently), so it does not fit the 60s read timeout every route
+    # takes by default. Since the nginx sidecar was dropped and APISIX
+    # proxies to Granian directly this route's timeout is the only ceiling
+    # in front of the request -- see docs/plans/remove-nginx-sidecar.md.
+    #
+    # A route of its own rather than a raised timeout on "passauth": that
+    # one matches every path, so lifting its ceiling would let any slow
+    # request in the application hold a connection three times as long.
+    # Django bounds the model call itself at CREDENTIAL_METADATA_LLM_TIMEOUT
+    # (120s), below this, so a slow model is recorded as a failed
+    # generation rather than surfacing here as a gateway timeout.
+    credential_metadata = OLApisixRouteConfig(
+        route_name="credential-metadata",
+        priority=10,
+        timeout_read="180s",
+        shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
+        plugins=[
+            proxy_rewrite_plugin_config,
+            oidc.get_full_oidc_plugin_config(unauth_action="pass"),
+        ],
+        hosts=route_group.hosts,
+        paths=[route_group.path("/api/v0/credential_metadata/")],
+        **webapp_backend,
+    )
+    return [
+        *fastly,
+        *browser,
+        passauth,
+        credential_metadata,
+        logout_redirect,
+        reqauth,
+    ]
+
+
 learn_external_service_apisix_route_no_prefix = OLApisixRoute(
     name=f"ol-mitlearn-k8s-apisix-route-no-prefix-{stack_info.env_suffix}",
     k8s_namespace=learn_namespace,
     k8s_labels=application_labels,
     route_configs=[
-        OLApisixRouteConfig(
-            route_name="fastly-passauth",
-            # Lower priority than browser-* (see below): browser requests via
-            # Fastly carry both Origin and Fastly-Client-IP, so the more
-            # specific browser-* match must be evaluated first or the
-            # broader ".+"  Fastly-Client-IP match here swallows all browser
-            # traffic and the rate-limited routes never trigger (found by
-            # Sentry AI review on this PR).
-            priority=20,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/*"],
-            exprs=fastly_api_match_exprs,
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="fastly-logout-redirect",
-            priority=30,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/logout/oidc/*"],
-            exprs=fastly_api_match_exprs,
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="fastly-reqauth",
-            priority=30,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=[
-                "/admin/login/*",
-                "/login",
-                "/login/*",
-            ],
-            exprs=fastly_api_match_exprs,
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="browser-passauth",
-            # Higher priority than fastly-* above: Origin is the more
-            # specific signal for direct browser traffic and must win the
-            # match before the broad Fastly-Client-IP presence check.
-            priority=40,
-            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/*"],
-            exprs=browser_api_match_exprs,
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="browser-logout-redirect",
-            priority=50,
-            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/logout/oidc/*"],
-            exprs=browser_api_match_exprs,
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="browser-reqauth",
-            priority=50,
-            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=[
-                "/admin/login/*",
-                "/login",
-                "/login/*",
-            ],
-            exprs=browser_api_match_exprs,
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="passauth",
-            priority=0,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/*"],
-            **webapp_backend,
-        ),
-        # Credential metadata generation calls a frontier model once per Open
-        # Badges field (gpt-5 and Claude measure 25-46s each, generated
-        # concurrently), so it does not fit the 60s read timeout every route
-        # takes by default. Since the nginx sidecar was dropped and APISIX
-        # proxies to Granian directly this route's timeout is the only ceiling
-        # in front of the request -- see docs/plans/remove-nginx-sidecar.md.
-        #
-        # A route of its own rather than a raised timeout on "passauth": that
-        # one matches every path, so lifting its ceiling would let any slow
-        # request in the application hold a connection three times as long.
-        # Django bounds the model call itself at CREDENTIAL_METADATA_LLM_TIMEOUT
-        # (120s), below this, so a slow model is recorded as a failed
-        # generation rather than surfacing here as a gateway timeout.
-        OLApisixRouteConfig(
-            route_name="credential-metadata",
-            priority=10,
-            timeout_read="180s",
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/api/v0/credential_metadata/"],
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="logout-redirect",
-            priority=10,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/logout/oidc/*"],
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="reqauth",
-            priority=10,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources_no_prefix.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=[
-                "/admin/login/*",
-                "/login",
-                "/login/*",
-            ],
-            **webapp_backend,
+        *mitlearn_route_configs(
+            mitlearn_route_group_no_prefix, mitlearn_k8s_app_oidc_resources_no_prefix
         ),
         # The sidecar answered this with a 204 (EFF Do Not Track convention
         # for "no policy published"). "passauth" above would otherwise proxy
@@ -2546,187 +2422,13 @@ learn_external_service_apisix_route = OLApisixRoute(
     name=f"ol-mitlearn-k8s-apisix-route-{stack_info.env_suffix}",
     k8s_namespace=learn_namespace,
     k8s_labels=application_labels,
-    route_configs=[
-        OLApisixRouteConfig(
-            route_name="fastly-passauth",
-            # See the matching comment on the no-prefix route set above:
-            # lower priority than browser-* so the more specific Origin
-            # match is evaluated first.
-            priority=20,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/*"],
-            exprs=fastly_api_match_exprs,
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="fastly-logout-redirect",
-            priority=30,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/logout/oidc/*"],
-            exprs=fastly_api_match_exprs,
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="fastly-reqauth",
-            priority=30,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=[
-                "/learn/admin/login/*",
-                "/learn/login",
-                "/learn/login/*",
-            ],
-            exprs=fastly_api_match_exprs,
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="browser-passauth",
-            # Higher priority than fastly-* above: see the matching comment
-            # on the no-prefix route set.
-            priority=40,
-            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/*"],
-            exprs=browser_api_match_exprs,
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="browser-logout-redirect",
-            priority=50,
-            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/logout/oidc/*"],
-            exprs=browser_api_match_exprs,
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="browser-reqauth",
-            priority=50,
-            shared_plugin_config_name=learn_external_service_browser_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=[
-                "/learn/admin/login/*",
-                "/learn/login",
-                "/learn/login/*",
-            ],
-            exprs=browser_api_match_exprs,
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="passauth",
-            priority=0,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/*"],
-            **webapp_backend,
-        ),
-        # Credential metadata generation calls a frontier model once per Open
-        # Badges field (gpt-5 and Claude measure 25-46s each, generated
-        # concurrently), so it does not fit the 60s read timeout every route
-        # takes by default. Since the nginx sidecar was dropped and APISIX
-        # proxies to Granian directly this route's timeout is the only ceiling
-        # in front of the request -- see docs/plans/remove-nginx-sidecar.md.
-        #
-        # A route of its own rather than a raised timeout on "passauth": that
-        # one matches every path, so lifting its ceiling would let any slow
-        # request in the application hold a connection three times as long.
-        # Django bounds the model call itself at CREDENTIAL_METADATA_LLM_TIMEOUT
-        # (120s), below this, so a slow model is recorded as a failed
-        # generation rather than surfacing here as a gateway timeout.
-        OLApisixRouteConfig(
-            route_name="credential-metadata",
-            priority=10,
-            timeout_read="180s",
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="pass"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/api/v0/credential_metadata/"],
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="logout-redirect",
-            priority=10,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    name="redirect", secretRef=None, config={"uri": "/logout/oidc"}
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=["/learn/logout/oidc/*"],
-            **webapp_backend,
-        ),
-        OLApisixRouteConfig(
-            route_name="reqauth",
-            priority=10,
-            shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
-            plugins=[
-                proxy_rewrite_plugin_config,
-                mitlearn_k8s_app_oidc_resources.get_full_oidc_plugin_config(
-                    unauth_action="auth"
-                ),
-            ],
-            hosts=[mitlearn_api_domain],
-            paths=[
-                "/learn/admin/login/*",
-                "/learn/login",
-                "/learn/login/*",
-            ],
-            **webapp_backend,
-        ),
-    ],
+    route_configs=mitlearn_route_configs(
+        mitlearn_route_group, mitlearn_k8s_app_oidc_resources
+    ),
     opts=ResourceOptions(
         delete_before_replace=True,
     ),
 )
-
 
 # VPA objects for mit-learn workloads.
 # The webapp's memory VPA is created by OLApplicationK8s (manage_webapp_memory_vpa)

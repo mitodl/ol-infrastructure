@@ -13,6 +13,8 @@ This module verifies:
    cookie cleanup plugin's generated Lua
 6. The identity-header strip plugin's wiring: the Lua it ships, the phase it
    runs in, and the header list it defaults to
+7. The shared MIT Learn session contract (LearnSession) and the logout paths
+   and route triple an OLApisixOIDCRouteGroup derives from where it is served
 """
 
 from __future__ import annotations
@@ -49,6 +51,7 @@ from pydantic import ValidationError  # noqa: E402
 
 from bridge.lib.constants import (  # noqa: E402
     GATEWAY_IDENTITY_HEADERS,
+    LearnSession,
     apisix_oidc_session_cookie_name,
     mit_learn_session_cookie_name,
     oidc_secret_data,
@@ -58,6 +61,7 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
+    OLApisixOIDCRouteGroup,
     OLApisixOIDCSecretCredentials,
     OLApisixOIDCVaultCredentials,
     OLApisixSharedPlugins,
@@ -67,6 +71,7 @@ from ol_infrastructure.components.services.apisix import (  # noqa: E402
     OLApisixUpstreamConfig,
     browser_traffic_match_exprs,
     gateway_global_pre_function_plugin,
+    learn_session_oidc_config,
     oidc_gateway_pre_function_plugin,
     ol_apisix_shared_plugins_variants,
     stale_session_cookie_cleanup_plugin,
@@ -1822,3 +1827,139 @@ def test_cors_origins_accept_a_port_and_plain_http():
         "http://localhost:8063",
         "https://api.ci.learn.mit.edu",
     ]
+
+
+# ─── Shared MIT Learn session and OIDC route groups ───────────────────────────
+
+
+def test_learn_session_is_the_same_from_any_sibling_host():
+    """mit-learn derives the session from api.<env>, ol-analytics-api from
+    analytics.<env>; both have to land on the same cookie or the analytics host
+    stops recognizing a mit-learn login.
+    """
+    from_api = LearnSession.for_host("qa", "api.rc.learn.mit.edu")
+    from_analytics = LearnSession.for_host("qa", "analytics.rc.learn.mit.edu")
+
+    assert from_api == from_analytics
+    assert from_api.cookie_domain == ".rc.learn.mit.edu"
+    assert from_api.cookie_name == mit_learn_session_cookie_name("qa")
+    assert from_api.logout_landing_uri == "https://api.rc.learn.mit.edu/logout/"
+
+
+def test_learn_session_needs_a_parent_domain():
+    """A bare host has no parent domain to scope a shared cookie to."""
+    with pytest.raises(ValueError, match="no parent domain"):
+        LearnSession.for_host("ci", "localhost")
+
+
+@pytest.mark.parametrize(
+    ("path_prefix", "logout_path", "post_logout_uri"),
+    [
+        ("", "/logout/oidc", "https://api.learn.mit.edu/logout/"),
+        ("learn", "/learn/logout/oidc", "https://api.learn.mit.edu/learn/logout/"),
+    ],
+)
+def test_route_group_logout_settings_follow_its_prefix(
+    path_prefix, logout_path, post_logout_uri
+):
+    """logout_path is matched against the un-rewritten URI, so it carries the prefix."""
+    group = OLApisixOIDCRouteGroup(hosts=["api.learn.mit.edu"], path_prefix=path_prefix)
+
+    assert group.logout_path == logout_path
+    assert group.post_logout_uri == post_logout_uri
+
+
+def test_route_group_prefix_takes_no_slashes():
+    """The group adds the slashes; a slashed prefix would render "//learn"."""
+    with pytest.raises(ValidationError):
+        OLApisixOIDCRouteGroup(hosts=["api.learn.mit.edu"], path_prefix="/learn")
+
+
+def _learn_group(**overrides) -> OLApisixOIDCRouteGroup:
+    return OLApisixOIDCRouteGroup(
+        hosts=["api.learn.mit.edu"],
+        login_paths=["/login", "/login/*"],
+        **overrides,
+    )
+
+
+def _learn_oidc(name: str, group: OLApisixOIDCRouteGroup) -> OLApisixOIDCResources:
+    return OLApisixOIDCResources(
+        name,
+        oidc_config=learn_session_oidc_config(
+            LearnSession.for_host("production", "api.learn.mit.edu"),
+            group,
+            application_name=name,
+            k8s_namespace="mitlearn",
+            k8s_labels={},
+            credentials=OLApisixOIDCSecretCredentials(secret_name=LOCAL_SECRET_NAME),
+        ),
+    )
+
+
+def test_prefixed_logout_redirect_feeds_its_own_plugin():
+    """The logout-redirect route has to send the browser to the logout path of
+    the plugin its own passauth route carries.  Pointing a prefixed group at the
+    unprefixed "/logout/oidc" hands the logout to another resource's plugin and
+    leaves this one's logout settings dead.
+    """
+    group = _learn_group(path_prefix="learn", logout_entry_paths=["/logout/"])
+    oidc = _learn_oidc("learn-prefixed", group)
+
+    passauth, logout_redirect, reqauth = group.route_configs(
+        oidc,
+        backend_service_name="mitlearn",
+        backend_service_port="http",
+        rewrite_plugins=[{"name": "proxy-rewrite", "config": {}}],
+    )
+
+    [redirect] = [p for p in logout_redirect.plugins if p.name == "redirect"]
+    assert redirect.config == {"uri": oidc.base_oidc_config["logout_path"]}
+    assert redirect.config == {"uri": "/learn/logout/oidc"}
+    assert logout_redirect.paths == ["/learn/logout/", "/learn/logout/oidc/*"]
+    assert passauth.paths == ["/learn/*"]
+    assert reqauth.paths == ["/learn/login", "/learn/login/*"]
+    # A 302 never reaches the upstream, so it gets no rewrite.
+    assert not any(
+        isinstance(p, dict) and p["name"] == "proxy-rewrite"
+        for p in logout_redirect.plugins
+    )
+    assert [r.route_name for r in (passauth, logout_redirect, reqauth)] == [
+        "passauth",
+        "logout-redirect",
+        "reqauth",
+    ]
+
+
+def test_learn_session_groups_differ_only_in_where_they_log_out():
+    """Every resource sharing the Learn session has to agree on everything that
+    decides whether it accepts another's cookie.
+    """
+    unprefixed = _learn_oidc("learn-unprefixed", _learn_group()).base_oidc_config
+    prefixed = _learn_oidc(
+        "learn-prefixed-2", _learn_group(path_prefix="learn")
+    ).base_oidc_config
+
+    logout_keys = {"logout_path", "post_logout_redirect_uri"}
+    assert {k: v for k, v in unprefixed.items() if k not in logout_keys} == {
+        k: v for k, v in prefixed.items() if k not in logout_keys
+    }
+    assert unprefixed["session"]["cookie_name"] == "mitlearn_apisix_session"
+    assert unprefixed["session"]["cookie_domain"] == ".learn.mit.edu"
+
+
+def test_learn_session_rejects_another_clients_vault_path():
+    """The session is encrypted with the shared client's session secret, so a
+    resource reading another client's credentials cannot decrypt it.
+    """
+    with pytest.raises(ValueError, match="sso/mitlearn"):
+        learn_session_oidc_config(
+            LearnSession.for_host("production", "api.learn.mit.edu"),
+            _learn_group(),
+            application_name="wrong-client",
+            k8s_namespace="mitlearn",
+            k8s_labels={},
+            credentials=OLApisixOIDCVaultCredentials(
+                path="sso/ol-analytics-api", vaultauth="vaultauth"
+            ),
+        )
