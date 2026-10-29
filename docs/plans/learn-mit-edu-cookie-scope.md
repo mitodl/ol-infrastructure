@@ -9,11 +9,15 @@ Every host under `learn.mit.edu` receives the cookies that MITx Online's Open ed
 Learn set at the parent domain. The task asked which of those can be narrowed, what
 depends on the parent scope, and how to migrate each cookie without breaking logins.
 
-The short answer: the MIT Learn gateway session has to stay at `.learn.mit.edu` by design,
-the JupyterHub gateway session is already host-only, and the one sizeable set that can move
-without logging anyone out is Open edX's JWT, user-info and language cookies (about 2.2 KB
-per request). The Open edX session cookie can't move yet because learn-ai started reading
-it from `api.learn.mit.edu` on 2026-10-29.
+The short answer:
+
+- The MIT Learn gateway session has to stay at `.learn.mit.edu` by design.
+- The JupyterHub gateway session is already host-only. It can only get smaller.
+- Open edX's JWT, user-info and language cookies (about 2.2 KB) are the one sizeable set
+  that could move without logging anyone out. Moving them would close the transport that
+  hq#12830 plans for courseware-to-Learn auth, so that's a decision rather than a step.
+- The Open edX session cookie can't move yet, because learn-ai was configured on
+  2026-10-29 to read it from `api.learn.mit.edu`.
 
 Each claim is marked _verified_ (with the file, line and commit, or the query it rests on)
 or _open_. Line numbers are against ol-infrastructure `b621f3beb` unless stated.
@@ -59,6 +63,7 @@ Sizes are from one production request on 2026-10-29 (name plus value).
 | `mitxonline-production-openedx-language-preference` | 52 | Open edX LMS | `.learn.mit.edu` | same |
 | `edxloggedin` | 16 | Open edX LMS | `.learn.mit.edu` | same |
 | `mitxonline-production-edx-lms-sessionid` | 227 | Open edX LMS | `.learn.mit.edu` | `edxapp/k8s_configmaps.py:237` |
+| `mitxonline-production-edx-studio-sessionid` | not seen | Open edX Studio | `.learn.mit.edu` | same, via the shared ConfigMap |
 | `session_mitlearn` | 249 | mit-learn Django | `.learn.mit.edu` | `mit_learn/Pulumi.Production.yaml:40` |
 | `learn_csrftoken` | 48 | mit-learn Django | `.learn.mit.edu` | `mit_learn/__main__.py:1544` |
 | `csrf_mitxonline` | 48 | mitxonline Django | `learn.mit.edu` | mitxonline `main/middleware.py:72-120` |
@@ -66,7 +71,19 @@ Sizes are from one production request on 2026-10-29 (name plus value).
 | `_xsrf`, `jupyterhub-*` | ~550 | JupyterHub | host-only nb | JupyterHub's own |
 
 The five Open edX cookies that follow `SHARED_COOKIE_DOMAIN` add up to about 2,260 bytes
-when present.
+when all are present. Their lifetimes differ (_verified_, edx-platform master `7f0416c`):
+
+- The two JWT cookies expire after `JWT_AUTH['JWT_IN_COOKIE_EXPIRATION']`
+  (`openedx/core/djangoapps/user_authn/cookies.py:300-301`). That defaults to one hour
+  (`openedx/envs/common.py:942`) and ol-infrastructure doesn't override it. This fits
+  only 46% of nb requests carrying them.
+- `edx-user-info` and `edxloggedin` use the session's expiry age (`cookies.py:88-104`,
+  `152-154`).
+- The language cookie lasts 14 days (`openedx/core/djangoapps/lang_pref/__init__.py:10`).
+
+No Studio session cookie reached nb.learn.mit.edu in the 24-hour window. It is still
+scoped to the parent, because the CMS mounts the same interpolated ConfigMap as the LMS
+(`edxapp/k8s_resources.py:1190-1193,1236-1241`).
 
 ## Does anything depend on the parent scope?
 
@@ -117,7 +134,7 @@ Hosts that legitimately need the Open edX cookies, all under `.courses.learn.mit
   and calls `/login_refresh` cross-origin (explained in
   `local-dev/apps/openedx/configmaps/lms-config.yaml:121-137`).
 
-### The one new dependency: learn-ai reads the edX session cookie
+### New dependency: learn-ai is configured to read the edX session cookie
 
 _Verified._ #6671 (merged 2026-10-29, `7489c17fe`) set
 `LEARNER_API_OPENEDX_COOKIE_NAME: "mitxonline-production-edx-lms-sessionid"` for learn-ai
@@ -132,7 +149,23 @@ for everyone.
 learn-ai forwards only the session cookie, not the JWT cookies, so it doesn't constrain
 `SHARED_COOKIE_DOMAIN`.
 
-_Open:_ whether learn-ai#105 is deployed to production yet.
+_Open:_ whether learn-ai#105 is deployed to production yet. Only the config merge is
+verified.
+
+### Planned dependency: hq#12830 needs the edX JWT on Learn hosts
+
+_Verified._ hq#12830 (open) proposes adding a `global_id` claim to the edX JWT so that
+"learn-side validates the edX JWT the browser already holds". The motivating case is a
+courseware page posting to mit-learn on `api.learn.mit.edu`. The signature half of that
+JWT is HttpOnly (`cookies.py:348-353`), so page JavaScript can't forward it. The browser
+only sends it to `api.learn.mit.edu` while `SHARED_COOKIE_DOMAIN` covers that host, i.e.
+while it stays `.learn.mit.edu`. The D1-D7 decisions task also points learn-ai at this
+path, as the way to stop forwarding the session cookie.
+
+Narrowing `SHARED_COOKIE_DOMAIN` therefore closes hq#12830's transport, unless that work
+chooses a different one (e.g. an explicit token exchange). edX sets the JWT, user-info,
+logged-in and language cookies from the one setting (`cookies.py:88-104,152-154`,
+`lang_pref/helpers.py:23`), so they can't be narrowed separately.
 
 ### MIT Learn's gateway session: parent scope is the design
 
@@ -177,6 +210,7 @@ covering `nb.learn.mit.edu`. This spec doesn't propose narrowing it. Its size is
 | Legacy MFEs (frontend-platform) | courses.learn.mit.edu | `ACCESS_TOKEN_COOKIE_NAME` read in JS | `mfe/pipeline.py:129-130`, frontend-platform `src/auth/AxiosJwtTokenService.js:38` |
 | Authoring MFE | studio.courses.learn.mit.edu | same, plus `/login_refresh` to the LMS | `local-dev/.../lms-config.yaml:121-137` |
 | LMS / Studio backends | courses., studio. | edx-drf-extensions JWT cookie auth | edx-platform |
+| mit-learn, later learn-ai (planned, hq#12830) | api.learn.mit.edu | validate the edX JWT the browser sends | hq#12830, not built |
 
 _Verified absent_ (git grep for `jwt-cookie`, `edx-user-info`, `lms-sessionid`,
 `edxapp-csrftoken`, `openedx-language-preference` on each default branch): mit-learn,
@@ -224,7 +258,7 @@ cluster.
   pins `lua-ffi-zlib` (`apisix-master-0.rockspec:86`). The plugin's session schema is
   `additionalProperties = false` (`apisix/plugins/openid-connect.lua:178-309`), so the
   threshold can't be tuned from route config. The `set $session_compressor zlib;` in
-  `apisix_official.py:782` is a lua-resty-session 3.x variable that 4.x doesn't read.
+  `apisix_official.py:783` is a lua-resty-session 3.x variable that 4.x doesn't read.
 - _Open:_ how the ~3.5 KB splits between the five stored values. Nothing measures it
   today. It can be measured in QA by decrypting one session with the client's session
   secret, or by logging `#cjson.encode(v)` per key from a temporary serverless function on
@@ -318,7 +352,8 @@ only (`.courses.rc.learn.mit.edu` and `.courses.ci.learn.mit.edu` in QA and CI).
 mitx, mitx-staging and xpro alone, because their parents (`.mitx.mit.edu`,
 `.xpro.mit.edu`) have their own consumers that this spec didn't check.
 
-What breaks: nothing found outside `*.courses.learn.mit.edu`.
+What breaks: nothing deployed today outside `*.courses.learn.mit.edu`. It does close the
+transport that hq#12830 plans (above). This plan applies only if decision 1 goes that way.
 
 Logout: no. These cookies are minted from the LMS session. When the MFE finds the JWT
 cookie missing or expired, it calls `/login_refresh` and the LMS sets new ones at the new
@@ -331,8 +366,12 @@ Ordering:
    pattern: it matches `<name>_N` (`apisix.py:144`), but lua-resty-session 4.x names chunks
    `<name>N` (`session.lua:1092`). learn-ai's `learner_api.py:100-115` already uses the
    correct form.
-2. In one apply of the edxapp-mitxonline stack, set `SHARED_COOKIE_DOMAIN` explicitly and
-   attach the cleanup plugin to the LMS, preview and Studio routes, with
+2. In one apply of the edxapp-mitxonline stack, set `SHARED_COOKIE_DOMAIN` explicitly in
+   `_build_interpolated_config_dict` next to `SESSION_COOKIE_DOMAIN`
+   (`edxapp/k8s_configmaps.py:237`), not in the LMS-only map. Studio also writes these
+   cookies: it runs `LanguagePreferenceMiddleware` (`cms/envs/common.py:418`) and
+   safe_sessions' `delete_logged_in_cookies` (`safe_sessions/middleware.py:921`). In the
+   same apply, attach the cleanup plugin to the LMS, preview and Studio routes, with
    `cookie_domains=[".learn.mit.edu"]` and the five cookie names. The deletion fires
    whenever the request carries one of those names. It can't tell which copy it got, so it
    keeps re-deleting a parent copy that's already gone. That's a no-op for the browser and
@@ -340,16 +379,18 @@ Ordering:
 3. QA first. In a browser that already has `.rc.learn.mit.edu` copies: load a courseware
    page, confirm DevTools shows only `.courses.rc.learn.mit.edu` copies afterwards, and
    check that `/login_refresh` fires once per page load, not in a loop. Repeat in Safari.
-4. Production. Remove the plugin after the longest JWT cookie lifetime has passed. JWT
-   cookie `max_age` is the session's expiry age (`cookies.py:88-104`). The session age is
-   Django's default of two weeks (`SESSION_COOKIE_AGE` isn't set in
-   `edxapp/config_builder.py` or `openedx/envs/common.py`; the default is
-   `django/conf/global_settings.py:486`). Three weeks covers it.
+4. Production. Remove the plugin after the longest-lived parent copies have expired.
+   Parent JWT copies are gone within an hour without any eviction. `edx-user-info` and
+   `edxloggedin` follow the session age, which is Django's default of two weeks
+   (`SESSION_COOKIE_AGE` isn't set in `edxapp/config_builder.py` or
+   `openedx/envs/common.py`; the default is at `django/conf/global_settings.py:486`). The
+   language cookie lasts 14 days. Three weeks covers all of them.
 
-_Open:_ whether the production settings loader passes an explicit `SHARED_COOKIE_DOMAIN`
-through. lehrer's settings model declares the field (`lehrer
-deployments/mit-ol/settings/lms/models/aqueduct.py:3824`), but I didn't trace which loader
-production uses.
+_Verified._ An explicit `SHARED_COOKIE_DOMAIN` reaches Django. Production pods run
+`lms.envs.mitol.production` (`edxapp/k8s_resources.py:986`), which imports upstream
+`lms/envs/production.py`. That copies every YAML key into settings except a fixed list,
+and `SHARED_COOKIE_DOMAIN` isn't on the list (`lms/envs/production.py:69-90`). `Derived`
+values are resolved afterwards, so they only apply to settings still left unset.
 
 Rollback: revert the setting. That creates the same duplicate problem in reverse, so the
 rollback has to evict the `.courses.learn.mit.edu` copies. Keep the plugin's domain list
@@ -357,18 +398,18 @@ parameterized so rollback is a config change.
 
 Measure:
 
-- Requests to nb.learn.mit.edu carrying `edx-jwt-cookie-header-payload:` (baseline 235,959
-  of 508,291 over 24 hours) should fall toward zero over two weeks. Mean `cookie_bytes` on
-  those requests should drop by about 2.2 KB.
+- Requests to nb.learn.mit.edu carrying `edx-user-info:` should fall toward zero over two
+  weeks. JWT presence (baseline 235,959 of 508,291 over 24 hours) should reach zero
+  within hours. The saving is about 1.1 KB per request for user-info, plus about 1.1 KB
+  on the requests that also carry a live JWT.
 - Watch the `/login_refresh` request rate on the LMS route (a loop shows up as a spike) and
   401s from MFE API calls in the first hour after the production apply.
 
 ### Open edX session cookie (lms-sessionid)
 
 Target, when unblocked: `SESSION_COOKIE_DOMAIN = ".courses.learn.mit.edu"`. That still
-covers preview and Studio. _Open:_ whether the CMS mounts the shared `60-interpolated-config`
-ConfigMap (`k8s_configmaps.py:636-664`). No Studio session cookie reached nb.learn.mit.edu in
-the 24-hour window.
+covers preview and Studio, and it applies to the Studio session cookie too, through the
+shared ConfigMap.
 
 What breaks: learn-ai's due-dates lookup (above). Nothing else found.
 
@@ -409,15 +450,18 @@ No change (see above).
 ## Decisions
 
 1. Narrow `SHARED_COOKIE_DOMAIN` for MITx Online's edX to `.courses.learn.mit.edu`, with
-   gateway eviction of the parent copies. I recommend yes. It removes ~2.2 KB from every
-   non-courseware `learn.mit.edu` request that carries them, with no logout.
+   gateway eviction of the parent copies. This saves 1.1-2.2 KB per request with no logout.
+   It also takes away the transport hq#12830 plans to use. I recommend deciding
+   hq#12830's transport first.
+   - If that work will carry the edX JWT to Learn hosts by cookie, keep the parent scope.
+     The two edX cookie decisions (this one and the next) then become the same question.
+   - If it picks another transport, narrow as planned above.
 2. Narrow the edX session cookie, and if so, force it by logging out every MITx Online edX
-   session. I recommend not narrowing it now. learn-ai started depending on it today, and
-   at 227 bytes it's the smallest of the edX cookies. If learn-ai stops forwarding it
-   (e.g. by reading `global_id` from the edX JWT, hq#12830, which the D1-D7 comment
-   already recommends exposing), migrate passively: change the domain and let parent
-   copies age out over two weeks, with no logout. Force eviction only if a cutover date
-   matters more than the logout.
+   session. I recommend not narrowing it now. learn-ai was configured to read it today, and
+   at 227 bytes it's the smallest of the edX cookies. Revisit if learn-ai stops forwarding
+   it. If it is narrowed, migrate passively: change the domain and let parent copies age
+   out over two weeks, with no logout. Force eviction only if a cutover date matters more
+   than logging everyone out of the edX LMS at once.
 3. Move gateway session data to Redis. I recommend not doing it for cookie bytes alone. It
    adds an availability dependency to every login. Revisit it under P2/P3, and sooner if
    the Learn session crosses 4,096 bytes and starts splitting into two cookies, which the
@@ -433,8 +477,7 @@ Trimming JupyterHub's `session_contents` doesn't need a decision.
 - The running APISIX image version in production (inferred from the chart's `appVersion`).
 - Whether learn-ai#105 is live in production, and whether `LEARNER_API_LEARN_COOKIE_NAME` is
   set anywhere (it isn't in ol-infrastructure).
-- Whether production's edX settings loader honors an explicit `SHARED_COOKIE_DOMAIN`.
 - Duplicate-cookie ordering in Safari, and how frontend-base's `universal-cookie` 8 handles
   duplicates (only frontend-platform's 4.0.4 was checked).
-- Whether the CMS gets `SESSION_COOKIE_DOMAIN` from the shared interpolated config.
+- Which transport hq#12830 will use to get the edX JWT to Learn hosts.
 - Keycloak's behavior on RP-initiated logout without `id_token_hint`.
