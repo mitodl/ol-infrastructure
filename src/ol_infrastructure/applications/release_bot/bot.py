@@ -662,6 +662,7 @@ async def _check_release_gate(
         nonlocal checked, looked_up
         # Don't make the deploy wait for the release-gate resource's normal
         # poll interval to notice the issue just closed.
+        looked_up = False
         await concourse.check_resource(cfg.pipeline, gate)
         checked = True
         found = await concourse.has_version(cfg.pipeline, gate, version)
