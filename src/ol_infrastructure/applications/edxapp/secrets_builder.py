@@ -20,6 +20,7 @@ def build_base_general_secrets_dict(
     redis_hostname: str,
     lms_domain: str,
     proctortrack_url: str | None = None,
+    proctortrack_requires_escalation_email: bool = False,  # noqa: FBT001, FBT002
 ) -> dict[str, Any]:
     """Build general secrets as a dictionary (replaces f-string template).
 
@@ -31,6 +32,8 @@ def build_base_general_secrets_dict(
         redis_hostname: Redis cache hostname
         lms_domain: LMS domain for JWT configuration
         proctortrack_url: Optional Proctortrack base URL
+        proctortrack_requires_escalation_email: Whether Studio requires a
+            course escalation contact for Proctortrack exams
 
     Returns:
         Dictionary of secrets configuration
@@ -83,7 +86,10 @@ def build_base_general_secrets_dict(
 
     # Apply deployment-specific overrides
     return _apply_deployment_secret_overrides(
-        stack_info.env_prefix, base_secrets, proctortrack_url
+        stack_info.env_prefix,
+        base_secrets,
+        proctortrack_url,
+        proctortrack_requires_escalation_email,
     )
 
 
@@ -91,6 +97,7 @@ def _apply_deployment_secret_overrides(
     env_prefix: str,
     base_secrets: dict[str, Any],
     proctortrack_url: str | None = None,
+    proctortrack_requires_escalation_email: bool = False,  # noqa: FBT001, FBT002
 ) -> dict[str, Any]:
     """Apply per-deployment secret overrides to base configuration.
 
@@ -98,6 +105,8 @@ def _apply_deployment_secret_overrides(
         env_prefix: Environment prefix (mitx, xpro, mitxonline, mitx-staging)
         base_secrets: Base secrets dictionary to override
         proctortrack_url: Optional Proctortrack URL for conditional settings
+        proctortrack_requires_escalation_email: Whether Studio requires a
+            course escalation contact for Proctortrack exams
 
     Returns:
         Merged secrets dictionary with deployment-specific settings
@@ -142,7 +151,7 @@ def _apply_deployment_secret_overrides(
             "client_secret": '{{ get .Secrets "proctortrack_client_secret" }}',
             "base_url": proctortrack_url,
             # Tells Studio to show, require and save the exam escalation contact.
-            "requires_escalation_email": True,
+            "requires_escalation_email": proctortrack_requires_escalation_email,
         }
         secrets["PROCTORING_USER_OBFUSCATION_KEY"] = (
             '{{ get .Secrets "proctortrack_user_obfuscation_key" }}'
@@ -404,6 +413,7 @@ def get_general_secrets_yaml(
     redis_hostname: str,
     lms_domain: str,
     proctortrack_url: str | None = None,
+    proctortrack_requires_escalation_email: bool = False,  # noqa: FBT001, FBT002
 ) -> str:
     """Build complete general secrets YAML template.
 
@@ -416,13 +426,19 @@ def get_general_secrets_yaml(
         redis_hostname: Redis cache hostname
         lms_domain: LMS domain for JWT config
         proctortrack_url: Optional Proctortrack URL
+        proctortrack_requires_escalation_email: Whether Studio requires a
+            course escalation contact for Proctortrack exams
 
     Returns:
         YAML string ready for Vault templating
     """
     # Build base secrets
     secrets = build_base_general_secrets_dict(
-        stack_info, redis_hostname, lms_domain, proctortrack_url
+        stack_info,
+        redis_hostname,
+        lms_domain,
+        proctortrack_url,
+        proctortrack_requires_escalation_email,
     )
 
     # Add CACHES configuration (duplicates redis_cache_config for each cache)
@@ -458,7 +474,10 @@ def get_general_secrets_yaml(
 
     # Apply deployment overrides
     secrets = _apply_deployment_secret_overrides(
-        stack_info.env_prefix, secrets, proctortrack_url
+        stack_info.env_prefix,
+        secrets,
+        proctortrack_url,
+        proctortrack_requires_escalation_email,
     )
 
     return secrets_dict_to_yaml_template(secrets)

@@ -92,6 +92,7 @@ config:
   edxapp:elb_healthcheck_interval: '30'
   edxapp:mail_domain: edxapp-mail.ci.learn.mit.edu
   edxapp:proctortrack_url: https://testing.verificient.com
+  edxapp:proctortrack_requires_escalation_email: "true"
   edxapp:sender_email_address: mitlearn-support+ci@mit.edu
   edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.ci.learn.mit.edu
   mongodb:admin_password:

@@ -195,10 +195,23 @@ class TestBuildBaseGeneralSecretsDict:
         pt_config = secrets["PROCTORING_BACKENDS"]["proctortrack"]
         assert secrets["PROCTORING_BACKENDS"]["DEFAULT"] == "proctortrack"
         assert pt_config["base_url"] == proctortrack_url
-        assert pt_config["requires_escalation_email"] is True
+        assert pt_config["requires_escalation_email"] is False
         assert "client_id" in pt_config
         assert "client_secret" in pt_config
         assert "PROCTORING_USER_OBFUSCATION_KEY" in secrets
+
+    def test_proctortrack_requires_escalation_email(self, mock_stack_info_mitxonline):
+        """Studio requires the escalation contact only where the stack enables it."""
+        secrets = build_base_general_secrets_dict(
+            stack_info=mock_stack_info_mitxonline,
+            redis_hostname="redis.example.com",
+            lms_domain="mitxonline.example.com",
+            proctortrack_url="https://proctortrack.example.com",
+            proctortrack_requires_escalation_email=True,
+        )
+
+        pt_config = secrets["PROCTORING_BACKENDS"]["proctortrack"]
+        assert pt_config["requires_escalation_email"] is True
 
     def test_proctortrack_url_not_in_null_backend(self, mock_stack_info_mitx):
         """Verify proctortrack config not added without URL."""
