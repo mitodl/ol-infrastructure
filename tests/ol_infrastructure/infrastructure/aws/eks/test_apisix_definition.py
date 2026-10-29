@@ -46,7 +46,7 @@ def _fleet() -> ApisixGatewayConfig:
         image_repository="registry.example/apache/apisix",
         labels={"ol.mit.edu/stack": "qa"},
         trusted_addresses=["192.0.2.0/24"],
-        otel_tracing_enabled=True,
+        otel_collector_address="collector.example:4318",
         service_monitor_enabled=True,
     )
 
@@ -73,6 +73,10 @@ def test_single_pod_has_no_fleet_settings():
         assert absent not in values
     assert "trustedAddresses" not in values["apisix"]
     assert "plugins" not in values["apisix"]
+    # No collector address, no tracing.
+    assert values["apisix"]["tracing"] is False
+    assert "opentelemetry" not in values["apisix"]["pluginAttrs"]
+    assert "pluginMetadata" not in values["ingress-controller"]["gatewayProxy"]
 
 
 def test_fleet_settings():
@@ -88,7 +92,10 @@ def test_fleet_settings():
     }
     assert values["apisix"]["plugins"][-1] == "opentelemetry"
     gateway_proxy = values["ingress-controller"]["gatewayProxy"]
-    assert "opentelemetry" in gateway_proxy["pluginMetadata"]
+    collector = gateway_proxy["pluginMetadata"]["opentelemetry"]["collector"]
+    assert collector["address"] == "collector.example:4318"
+    assert values["apisix"]["pluginAttrs"]["opentelemetry"]["collector"] == collector
+    assert values["apisix"]["tracing"] is True
     assert values["metrics"]["serviceMonitor"]["labels"] == {"ol.mit.edu/stack": "qa"}
 
 

@@ -284,9 +284,10 @@ class ApisixGatewayConfig(BaseModel):
     labels: dict[str, str] | None = None
     # Source addresses whose X-Forwarded-For APISIX believes (e.g. Fastly).
     trusted_addresses: list[str] | Output[list[str]] | None = None
-    # Export OTLP traces to the in-cluster Grafana Alloy receiver. That
-    # receiver only exists where the grafana k8s-monitoring stack is installed.
-    otel_tracing_enabled: bool = False
+    # host:port of an OTLP/HTTP collector to export traces to; None turns
+    # tracing off. The opentelemetry plugin only speaks binary OTLP over HTTP
+    # and appends /v1/traces itself.
+    otel_collector_address: str | None = None
     # Needs the Prometheus operator's ServiceMonitor CRD.
     service_monitor_enabled: bool = False
     # The ingress controller's validating webhook checks a route's
@@ -298,6 +299,10 @@ class ApisixGatewayConfig(BaseModel):
     admission_webhook_enabled: bool = True
     trusted_ca: ApisixTrustedCA | None = None
     pod_annotations: dict[str, str] | None = None
+
+    @property
+    def otel_tracing_enabled(self) -> bool:
+        return self.otel_collector_address is not None
 
     @property
     def effective_memory_limit(self) -> str:
@@ -318,7 +323,7 @@ def gateway_error_pages() -> dict[str, str]:
     }
 
 
-def _otel_plugin_metadata(env_suffix: str) -> dict[str, Any]:
+def _otel_plugin_metadata(env_suffix: str, collector_address: str) -> dict[str, Any]:
     # Collector/resource/batch settings for the opentelemetry plugin.  In APISIX
     # 3.14 the plugin reads these from *plugin_metadata*, NOT plugin_attr: its
     # ``rewrite`` phase calls ``plugin.plugin_metadata("opentelemetry")`` and, if
@@ -337,7 +342,7 @@ def _otel_plugin_metadata(env_suffix: str) -> dict[str, Any]:
             "deployment.environment": env_suffix.lower(),
         },
         "collector": {
-            "address": "grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318",
+            "address": collector_address,
             "request_timeout": 3,
         },
         "batch_span_processor": {
@@ -749,7 +754,11 @@ def apisix_helm_values(config: ApisixGatewayConfig) -> dict[str, Any]:
     :returns: Values for the ``apisix`` chart from ``APISIX_CHART_REPOSITORY``.
     :rtype: dict[str, Any]
     """
-    otel_plugin_metadata = _otel_plugin_metadata(config.env_suffix)
+    otel_plugin_metadata = (
+        _otel_plugin_metadata(config.env_suffix, config.otel_collector_address)
+        if config.otel_collector_address is not None
+        else {}
+    )
     ssl: dict[str, Any] = {
         "enabled": True,
         "containerPort": 9443,

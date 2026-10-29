@@ -44,6 +44,11 @@ from ol_infrastructure.lib.pulumi_helper import StackInfo
 # Starts at one day so a mistake ages out of browsers quickly; raise it to a
 # year (31536000) once it has run without problems.
 GATEWAY_HSTS_HEADER_VALUE = "max-age=86400"
+# The grafana k8s-monitoring stack's Alloy receiver, OTLP over HTTP. From there
+# traces go through the tail-sampling pipeline to Grafana Cloud (grafana.py).
+GRAFANA_ALLOY_OTLP_HTTP_ADDRESS = (
+    "grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318"
+)
 
 
 def setup_apisix(
@@ -152,7 +157,11 @@ def setup_apisix(
         # The Grafana Alloy receiver the traces go to only exists where the
         # grafana k8s-monitoring stack is installed, which skips CI (see
         # substructure/aws/eks/grafana.py).
-        otel_tracing_enabled=stack_info.env_suffix.lower() != "ci",
+        otel_collector_address=(
+            None
+            if stack_info.env_suffix.lower() == "ci"
+            else GRAFANA_ALLOY_OTLP_HTTP_ADDRESS
+        ),
         service_monitor_enabled=True,
         cpu_request=eks_config.get("apisix_cpu") or DEFAULT_CPU_REQUEST,
         memory_request=eks_config.get("apisix_memory") or DEFAULT_MEMORY_REQUEST,
