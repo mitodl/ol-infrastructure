@@ -63,6 +63,12 @@ RELOAD_IGNORE_DIRS = ["frontend", "static", "staticfiles"]
 # (third-party service hosts, S3, real mailboxes) is a default in the deployed
 # program, not here.
 LOCAL_AND_DEPLOYED_ENV = {
+    "KEYCLOAK_REALM_NAME": "olapps",
+    # The APISIX user middleware reads the X-Userinfo header the gateway injects
+    # and logs in (creating if needed) the Django user. The app defaults it to
+    # disabled, which leaves requests authenticated only by the gateway
+    # anonymous.
+    "MITOL_APIGATEWAY_DISABLE_MIDDLEWARE": "false",
     # The refund sheet's column layout; a developer works against a copy of it.
     "MITOL_GOOGLE_SHEETS_REFUNDS_COMPLETED_DATE_COL": "12",
     "MITOL_GOOGLE_SHEETS_REFUNDS_ERROR_COL": "13",
