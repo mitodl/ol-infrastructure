@@ -46,6 +46,8 @@ config:
     DEV_ENV: "false"
     LANGSMITH_PROJECT: "learn-ai-production"
     LANGSMITH_TRACING: "true"
+    LEARNER_API_OPENEDX_BASE_URL: "https://courses.learn.mit.edu/"
+    LEARNER_API_OPENEDX_COOKIE_NAME: "mitxonline-production-edx-lms-sessionid"
     MIT_LEARN_API_PROXY_BASE_URL: "https://api.learn.mit.edu/api/"
     MITOL_APP_BASE_URL: "https://learn-ai.ol.mit.edu"
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
