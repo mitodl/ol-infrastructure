@@ -570,12 +570,13 @@ def test_cleanup_plugin_expires_each_named_domain_separately():
 
 
 def test_cleanup_plugin_matches_chunked_cookies():
-    """lua-resty-session splits an oversized payload across <name>, <name>_2,
-    <name>_3... and each chunk is its own cookie to expire.
+    """lua-resty-session splits an oversized payload across <name>, <name>2,
+    <name>3... (<name>_2 in 3.x) and each chunk is its own cookie to expire.
+    test_apisix_lua.py runs the pattern against real cookie names.
     """
     (lua,) = stale_session_cookie_cleanup_plugin().config["functions"]
 
-    assert 'name:match("^session_%d+$")' in lua
+    assert 'name:match("^session_?%d+$")' in lua
 
 
 def test_cleanup_plugin_honours_a_custom_stale_name():

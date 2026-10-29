@@ -121,8 +121,9 @@ def stale_session_cookie_cleanup_plugin(
     present on the request, so it costs nothing on the overwhelming majority of
     responses and stops firing for a given browser after the one response that
     clears it.  Chunked cookies are handled too -- lua-resty-session splits an
-    oversized payload across ``<name>``, ``<name>_2``, ``<name>_3``... and each
-    chunk is its own cookie that has to be expired individually.
+    oversized payload across ``<name>``, ``<name>2``, ``<name>3``... (4.x;
+    3.x used ``<name>_2``) and each chunk is its own cookie that has to be
+    expired individually.
 
     A cookie's identity is (name, domain, path), so the domain-scoped and
     host-only variants are separate entries in the browser's jar and each needs
@@ -149,6 +150,10 @@ def stale_session_cookie_cleanup_plugin(
         f'Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax{scope}")'
         for scope in scopes
     )
+    # lua-resty-session 4.x names chunks <name>2, <name>3 (session.lua's
+    # fmt("%s%d", cookie_name, i)); 3.x, bundled with APISIX up to 3.14.1,
+    # used <name>_2.  We ran 3.14.1 until February 2026 and these cookies are
+    # session-scoped, so chunks in the 3.x form can still be in browsers.
     cleanup_function = f"""return function(conf, ctx)
     local cookie = ngx.var.http_cookie
     if not cookie then
@@ -158,7 +163,7 @@ def stale_session_cookie_cleanup_plugin(
     for pair in cookie:gmatch("[^;]+") do
         local name = pair:match("^%s*([^=%s]+)=")
         if name and (name == "{stale_cookie_name}"
-                     or name:match("^{stale_cookie_name}_%d+$")) then
+                     or name:match("^{stale_cookie_name}_?%d+$")) then
 {expirations}
         end
     end
