@@ -2876,6 +2876,47 @@ async def test_promote_says_so_when_the_gate_never_records_the_close(
     assert "/jobs/deploy-ol-application-my-app-production" in said
 
 
+async def test_promote_keeps_checking_the_gate_past_a_transient_error(
+    repos, promote_api
+):
+    """One failed check must not end a wait that a later check would finish."""
+    promote_api.has_version.side_effect = [False, RuntimeError("502"), True]
+    say = AsyncMock()
+
+    await bot._handle_promote_button(
+        repos, AsyncMock(), _promote_body(), say, AsyncMock()
+    )
+
+    assert promote_api.check_resource.await_count == 3
+    assert "Production deploy triggered" in str(say.call_args.args[0])
+
+
+async def test_promote_stops_checking_the_gate_at_the_deadline(
+    repos, slack, promote_api, monkeypatch
+):
+    """A check that hangs must not hold the promotion's reply past the wait."""
+    promote_api.open_release_issues.return_value = [
+        {"number": 7, "title": "Release my-app 2026.9.5.1", "body": ""}
+    ]
+    monkeypatch.setattr(bot, "_GATE_VERSION_TIMEOUT_SECONDS", 0.05)
+
+    async def _hang(*_args):
+        await asyncio.sleep(3600)
+
+    promote_api.check_resource.side_effect = _hang
+
+    await asyncio.wait_for(
+        bot._cmd_promote(
+            repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "U1"}
+        ),
+        timeout=5,
+    )
+
+    promote_api.check_resource.assert_awaited_once()
+    assert "no Production deploy was triggered" in slack.said
+    assert "Production deploy triggered" not in slack.said
+
+
 async def test_promote_matches_the_gate_on_the_number_when_github_omits_closed_at(
     repos, promote_api
 ):

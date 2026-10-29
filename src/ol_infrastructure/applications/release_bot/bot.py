@@ -604,8 +604,9 @@ async def _cmd_promote(repos, ack, respond, command, context):
     await respond(f"✅ `{app_name}` {issues[0]['title']} promoted. {deploy}")
 
 
-# How many times to check the release gate for a just-closed issue, and how
-# long to wait between checks -- about a minute in all.
+# How long to keep checking the release gate for a just-closed issue, the
+# most checks to make in that time, and how long to wait between them.
+_GATE_VERSION_TIMEOUT_SECONDS = 60
 _GATE_CHECK_ATTEMPTS = 6
 _GATE_RECHECK_SECONDS = 10
 # How the github-issues resource writes timestamps into a version
@@ -626,7 +627,9 @@ async def _check_release_gate(
     A check that succeeds can still miss the close: on 2026-10-29 one ran a
     second after mitxonline #4204 closed, succeeded, and recorded nothing. So
     the gate is checked again until it has recorded a version for this issue
-    closed at *closed_at*, up to `_GATE_CHECK_ATTEMPTS` times. Until then
+    closed at *closed_at*, for up to `_GATE_VERSION_TIMEOUT_SECONDS` in all. A
+    check that fails or overruns that time counts as one that found nothing,
+    rather than ending the wait. Until then
     nothing has been triggered: the deploy waits for the gate's next scheduled
     check, and by then it can bind a newer ol-infrastructure revision that the
     issue never approved.
@@ -644,29 +647,42 @@ async def _check_release_gate(
         # earlier close, so the number alone would match too soon. Formatted
         # as the resource formats the same PyGithub field.
         version["issue_closed_at"] = closed_at.strftime(_GATE_TIMESTAMP_FORMAT)
+
+    async def _recorded() -> bool:
+        # Don't make the deploy wait for the release-gate resource's normal
+        # poll interval to notice the issue just closed.
+        await concourse.check_resource(cfg.pipeline, gate)
+        return await concourse.has_version(cfg.pipeline, gate, version)
+
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + _GATE_VERSION_TIMEOUT_SECONDS
+    any_check_ran = False
     for attempt in range(_GATE_CHECK_ATTEMPTS):
         if attempt:
             await asyncio.sleep(_GATE_RECHECK_SECONDS)
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            break
         try:
-            # Don't make the deploy wait for the release-gate resource's
-            # normal poll interval to notice the issue just closed.
-            await concourse.check_resource(cfg.pipeline, gate)
-            recorded = await concourse.has_version(cfg.pipeline, gate, version)
+            recorded = await asyncio.wait_for(_recorded(), remaining)
         except Exception:
             log.exception("Failed to force release-gate check for %s", app_name)
-            return (
-                "⚠️ Could not make Concourse check the release gate, so no "
-                "Production deploy was triggered. One starts only after a later "
-                f"check of the gate succeeds: {url}"
-            )
+            continue
         if recorded:
             return f"Production deploy triggered: {url}"
+        any_check_ran = True
+    if not any_check_ran:
+        return (
+            "⚠️ Could not make Concourse check the release gate, so no "
+            "Production deploy was triggered. One starts only after a later "
+            f"check of the gate succeeds: {url}"
+        )
     log.warning(
-        "Release gate %s/%s has no version %s after %s checks",
+        "Release gate %s/%s has no version %s after %ss",
         cfg.pipeline,
         gate,
         version,
-        _GATE_CHECK_ATTEMPTS,
+        _GATE_VERSION_TIMEOUT_SECONDS,
     )
     return (
         f"⚠️ Concourse has not seen issue #{issue_number} closed yet, so no "
