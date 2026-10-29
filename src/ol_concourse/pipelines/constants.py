@@ -57,6 +57,9 @@ PULUMI_CODE_PATH = Path("src/ol_infrastructure")
 PULUMI_WATCHED_PATHS = [
     "src/ol_infrastructure/lib/",
     "src/ol_infrastructure/components/",
+    # The gateway contract (LearnSession, cookie names, OIDC secret keys) that
+    # several stacks share; a change here has to redeploy each of them.
+    "src/bridge/lib/constants.py",
     "pipelines/infrastructure/scripts/",
     "src/bridge/secrets/sops.py",
     "src/bridge/secrets/__init__.py",
