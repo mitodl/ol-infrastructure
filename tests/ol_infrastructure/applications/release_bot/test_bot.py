@@ -2891,6 +2891,44 @@ async def test_promote_keeps_checking_the_gate_past_a_transient_error(
     assert "Production deploy triggered" in str(say.call_args.args[0])
 
 
+async def test_promote_does_not_deny_a_deploy_it_could_not_look_up(
+    repos, slack, promote_api
+):
+    """The check ran, so the deploy may have started; only the lookup failed."""
+    promote_api.open_release_issues.return_value = [
+        {"number": 7, "title": "Release my-app 2026.9.5.1", "body": ""}
+    ]
+    promote_api.has_version.side_effect = RuntimeError("503 on /versions")
+
+    await bot._cmd_promote(
+        repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "U1"}
+    )
+
+    said = slack.said
+    assert "could not confirm it recorded issue #7 closed" in said
+    assert "may or may not have started" in said
+    assert "no Production deploy was triggered" not in said
+    assert "Production deploy triggered" not in said
+
+
+async def test_promote_does_not_sleep_past_the_deadline(
+    repos, promote_api, monkeypatch
+):
+    """A pause that would end after the deadline is not taken."""
+    monkeypatch.setattr(bot, "_GATE_VERSION_TIMEOUT_SECONDS", 60)
+    monkeypatch.setattr(bot, "_GATE_RECHECK_SECONDS", 3600)
+    promote_api.has_version.return_value = False
+
+    await asyncio.wait_for(
+        bot._handle_promote_button(
+            repos, AsyncMock(), _promote_body(), AsyncMock(), AsyncMock()
+        ),
+        timeout=5,
+    )
+
+    promote_api.check_resource.assert_awaited_once()
+
+
 async def test_promote_stops_checking_the_gate_at_the_deadline(
     repos, slack, promote_api, monkeypatch
 ):

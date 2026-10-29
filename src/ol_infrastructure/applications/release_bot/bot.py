@@ -614,6 +614,17 @@ _GATE_RECHECK_SECONDS = 10
 _GATE_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 
+def _gate_version(issue_number: int, closed_at: datetime | None) -> dict[str, str]:
+    """Return the release-gate version fields that identify this close."""
+    version = {"issue_number": str(issue_number)}
+    if closed_at is not None:
+        # A reopened and re-closed issue already has a version for its
+        # earlier close, so the number alone would match too soon. Formatted
+        # as the resource formats the same PyGithub field.
+        version["issue_closed_at"] = closed_at.strftime(_GATE_TIMESTAMP_FORMAT)
+    return version
+
+
 async def _check_release_gate(
     app_name: str, cfg, issue_number: int, closed_at: datetime | None
 ) -> str:
@@ -641,41 +652,56 @@ async def _check_release_gate(
         cfg.pipeline, f"deploy-ol-application-{app_name}-production"
     )
     gate = f"{app_name}-release-gate"
-    version = {"issue_number": str(issue_number)}
-    if closed_at is not None:
-        # A reopened and re-closed issue already has a version for its
-        # earlier close, so the number alone would match too soon. Formatted
-        # as the resource formats the same PyGithub field.
-        version["issue_closed_at"] = closed_at.strftime(_GATE_TIMESTAMP_FORMAT)
+    version = _gate_version(issue_number, closed_at)
+
+    # Which half of an attempt has ever succeeded, so a failure is described
+    # by what actually failed.
+    checked = looked_up = False
 
     async def _recorded() -> bool:
+        nonlocal checked, looked_up
         # Don't make the deploy wait for the release-gate resource's normal
         # poll interval to notice the issue just closed.
         await concourse.check_resource(cfg.pipeline, gate)
-        return await concourse.has_version(cfg.pipeline, gate, version)
+        checked = True
+        found = await concourse.has_version(cfg.pipeline, gate, version)
+        looked_up = True
+        return found
 
     loop = asyncio.get_running_loop()
     deadline = loop.time() + _GATE_VERSION_TIMEOUT_SECONDS
-    any_check_ran = False
     for attempt in range(_GATE_CHECK_ATTEMPTS):
-        if attempt:
-            await asyncio.sleep(_GATE_RECHECK_SECONDS)
         remaining = deadline - loop.time()
+        if attempt:
+            # No sleep that would end past the deadline.
+            if remaining <= _GATE_RECHECK_SECONDS:
+                break
+            await asyncio.sleep(_GATE_RECHECK_SECONDS)
+            remaining = deadline - loop.time()
         if remaining <= 0:
             break
         try:
             recorded = await asyncio.wait_for(_recorded(), remaining)
         except Exception:
-            log.exception("Failed to force release-gate check for %s", app_name)
+            log.exception(
+                "Release-gate check or version lookup failed for %s", app_name
+            )
             continue
         if recorded:
             return f"Production deploy triggered: {url}"
-        any_check_ran = True
-    if not any_check_ran:
+    if not checked:
         return (
             "⚠️ Could not make Concourse check the release gate, so no "
             "Production deploy was triggered. One starts only after a later "
             f"check of the gate succeeds: {url}"
+        )
+    if not looked_up:
+        # The check ran, so it may well have recorded the close and started
+        # the deploy; only confirming that failed.
+        return (
+            "⚠️ Concourse checked the release gate, but the bot could not "
+            f"confirm it recorded issue #{issue_number} closed, so a Production "
+            f"deploy may or may not have started: {url}"
         )
     log.warning(
         "Release gate %s/%s has no version %s after %ss",
