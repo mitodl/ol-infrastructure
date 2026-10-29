@@ -50,7 +50,9 @@ login: it logs a learner in through `ol-mitlearn-client`, exchanges that token a
 `ol-learn-ai-client` and `ol-mitlearn-memory-client`, and checks retain, recall,
 cross-app read, and that one app cannot overwrite or delete another's note. With
 `--forget` it also runs the forget sequence and checks the fence. That erases the
-learner's whole QA bank, every app's notes, so use a test learner.
+learner's whole QA bank, every app's notes, so use a test learner. The fence then
+holds that bank for an hour (`FENCE_SECONDS`), so another run with the same learner
+inside the hour stops at the first retain with a 409.
 
 ```shell
 kubectl -n hindsight port-forward svc/hindsight 18888:8888   # applications-qa
@@ -67,5 +69,5 @@ uv run --script scripts/hindsight/qa_check.py [--forget]
 
 It prints a Keycloak login URL whose redirect is an unused path on
 `rc.learn.mit.edu`, so the browser ends on mit-learn's 404 page with the code in
-the address bar. Paste that URL back within about a minute, before the code
-expires.
+the address bar. Paste that URL back within five minutes, the olapps realm's
+login code lifespan.

@@ -8,10 +8,10 @@
 # ///
 """End-to-end check of QA Hindsight with tokens exchanged from a real learner login.
 
-Logs a learner in through ol-mitlearn-client (the browser flow learn-ai's routes
-use), exchanges that session token as learn-ai and as mit-learn for the memory
-audience, and checks retain, recall, cross-app read, cross-app overwrite and
-delete refusal, and, with --forget, the forget fence.
+Logs a learner in through ol-mitlearn-client (the client learn-ai's routes log
+learners in through), exchanges that session token as learn-ai and as mit-learn
+for the memory audience, and checks retain, recall, cross-app read, cross-app
+overwrite and delete refusal, and, with --forget, the forget fence.
 
 The client secrets come from QA Vault (secret-operations mount, kv-v1):
     MITLEARN_CLIENT_SECRET          sso/mitlearn          client_secret
@@ -36,6 +36,7 @@ import jwt
 from cyclopts import App
 
 sys.path.insert(0, str(Path(__file__).parent))
+from keycloak import ACCESS_TOKEN_TYPE, AUDIENCE, AUDIENCE_SCOPE, EXCHANGE_GRANT
 from memory_client import ForgetClient, MemoryClient, bank_for
 
 KEYCLOAK_REALM_URL = "https://sso-qa.ol.mit.edu/realms/olapps"
@@ -46,12 +47,9 @@ AUTH_URL = f"{KEYCLOAK_REALM_URL}/protocol/openid-connect/auth"
 REDIRECT_URI = "https://rc.learn.mit.edu/__memory-qa-check"
 LOGIN_CLIENT = "ol-mitlearn-client"
 APPS = {"learn-ai": "ol-learn-ai-client", "mit-learn": "ol-mitlearn-memory-client"}
-AUDIENCE = "ol-memory-client"
-AUDIENCE_SCOPE = "ol-memory-audience"
-EXCHANGE_GRANT = "urn:ietf:params:oauth:grant-type:token-exchange"
-ACCESS_TOKEN_TYPE = "urn:ietf:params:oauth:token-type:access_token"  # noqa: S105
 FORBIDDEN = 403
 UNAUTHORIZED = 401
+NOT_FOUND = 404
 CONFLICT = 409
 
 app = App(help=__doc__)
@@ -67,6 +65,12 @@ def check(name: str, ok: bool, detail: str = "") -> None:
 def claims(token: str) -> dict[str, Any]:
     """Decode without verifying; the server is what verifies."""
     return jwt.decode(token, options={"verify_signature": False})
+
+
+def audiences(token_claims: dict[str, Any]) -> list[str]:
+    """Return ``aud`` as a list."""
+    aud = token_claims.get("aud", [])
+    return [aud] if isinstance(aud, str) else aud
 
 
 def token_request(data: dict[str, str]) -> str:
@@ -103,17 +107,19 @@ def login(mitlearn_secret: str) -> str:
         )
     )
     print(
-        "Open this URL, log in as a QA learner, and paste the URL you land on\n"
-        "(it starts with https://rc.learn.mit.edu/__memory-qa-check?). If the page\n"
-        "redirects away, take it from the browser history, or from the Keycloak\n"
-        "response's Location header in devtools (Network, Preserve log). The code\n"
-        "expires in about a minute.\n"
+        "Open this URL and log in as a QA learner. The browser ends on mit-learn's\n"
+        "404 page; paste the URL from its address bar (it starts with\n"
+        "https://rc.learn.mit.edu/__memory-qa-check?) within five minutes, the\n"
+        "realm's login code lifespan.\n"
     )
     print(url, "\n")
     pasted = input("Redirected URL or code: ").strip()
     query = parse_qs(urlparse(pasted).query) if pasted.startswith("http") else {}
     if query and query.get("state", [None])[0] != state:
         msg = "state does not match this login"
+        raise SystemExit(msg)
+    if query and "code" not in query:
+        msg = f"the redirect carries no code: {query.get('error', query)}"
         raise SystemExit(msg)
     code = query["code"][0] if query else pasted
     return token_request(
@@ -148,18 +154,19 @@ async def run(base_url: str, *, forget: bool) -> None:
     """Run every check against ``base_url``."""
     session = login(os.environ["MITLEARN_CLIENT_SECRET"])
     session_claims = claims(session)
-    # The olapps login clients carry no basic scope, so the session token has
-    # no sub; the ol-memory-audience scope adds it to the exchanged token.
-    print(
-        f"\nsession token: sub={session_claims.get('sub')} "
-        f"sid={session_claims.get('sid')}\n"
-    )
-    aud = session_claims.get("aud", [])
-    aud = [aud] if isinstance(aud, str) else aud
+    sid = session_claims.get("sid")
+    aud = audiences(session_claims)
     check(
         "session token names both exchanging clients as audiences",
         set(APPS.values()) <= set(aud),
         f"aud={aud}",
+    )
+    # ol-mitlearn-client has no basic scope; the memory audience scope's own
+    # sub mapper is what gives the exchanged token a sub.
+    check(
+        "session token carries no sub, and has a session id",
+        "sub" not in session_claims and bool(sid),
+        f"sub={session_claims.get('sub')} sid={sid}",
     )
 
     tokens = {
@@ -170,24 +177,26 @@ async def run(base_url: str, *, forget: bool) -> None:
             APPS["mit-learn"], os.environ["MITLEARN_MEMORY_CLIENT_SECRET"], session
         ),
     }
-    subs = {name: claims(token).get("sub") for name, token in tokens.items()}
-    sub = subs["learn-ai"]
+    exchanged = {name: claims(token) for name, token in tokens.items()}
+    for name, c in exchanged.items():
+        check(
+            f"{name} exchange: sub set, the login's sid, azp {APPS[name]}, "
+            f"aud {AUDIENCE}",
+            bool(c.get("sub"))
+            and c.get("sid") == sid
+            and c["azp"] == APPS[name]
+            and AUDIENCE in audiences(c),
+            f"sub={c.get('sub')} sid={c.get('sid')} azp={c['azp']} aud={audiences(c)}",
+        )
+    sub = exchanged["learn-ai"].get("sub")
     if not sub:
         msg = "the learn-ai exchanged token has no sub"
         raise SystemExit(msg)
-    print(f"learner sub {sub}, bank {bank_for(sub)}\n")
-    for name, token in tokens.items():
-        c = claims(token)
-        token_aud = c["aud"] if isinstance(c["aud"], list) else [c["aud"]]
-        check(
-            f"{name} exchange: sub set and the same for both apps, same session, "
-            f"azp is {APPS[name]}, aud has {AUDIENCE}",
-            c.get("sub") == sub
-            and c.get("sid") == session_claims.get("sid")
-            and c["azp"] == APPS[name]
-            and AUDIENCE in token_aud,
-            f"sub={c.get('sub')} sid={c.get('sid')} azp={c['azp']} aud={token_aud}",
-        )
+    check(
+        "both apps' exchanged tokens name the same learner",
+        exchanged["mit-learn"].get("sub") == sub,
+    )
+    print(f"\nlearner sub {sub}, bank {bank_for(sub)}\n")
 
     bank = f"/v1/default/banks/{bank_for(sub)}"
     async with httpx.AsyncClient(base_url=base_url, timeout=60) as raw:
@@ -204,22 +213,35 @@ async def run(base_url: str, *, forget: bool) -> None:
     mle = MemoryClient(base_url, "mit-learn")
     key = f"qa-check-{uuid.uuid4().hex[:8]}"
     text = f"QA end-to-end check {key}: the learner prefers worked examples."
-    await lai.put(tokens["learn-ai"], key, text)
+    try:
+        await lai.put(tokens["learn-ai"], key, text)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == CONFLICT:
+            msg = (
+                "the bank is fenced by a forget in the last hour; "
+                "use another learner or wait"
+            )
+            raise SystemExit(msg) from exc
+        raise
 
-    notes = await lai.get(tokens["learn-ai"])
-    mine = [n for n in notes if n.key == key]
+    learn_ai_headers = {"authorization": f"Bearer {tokens['learn-ai']}"}
+    async with httpx.AsyncClient(
+        base_url=base_url, timeout=60, headers=learn_ai_headers
+    ) as c:
+        listed = await c.get(
+            f"{bank}/memories/list", params={"document_id": f"learn-ai.{key}"}
+        )
+    items = listed.json()["items"] if listed.status_code == httpx.codes.OK else []
     check(
-        "learn-ai retains a note and reads it back",
-        bool(mine),
-        f"{len(notes)} notes in bank",
+        "learn-ai retains a note under document id learn-ai.<key> and reads it back",
+        len(items) == 1 and items[0]["text"] == text,
+        f"{listed.status_code}, {len(items)} items",
     )
-    if mine:
-        # Note.app is the single app:<name> tag, and key is the document id with
-        # that app's prefix removed, so both together prove the stamp.
+    if items:
         check(
-            "the note is stamped with learn-ai (app tag, learn-ai.<key> document id)",
-            mine[0].app == "learn-ai" and mine[0].text == text,
-            f"app={mine[0].app}",
+            "the note's only app tag is app:learn-ai",
+            [t for t in items[0]["tags"] if t.startswith("app:")] == ["app:learn-ai"],
+            f"tags={items[0]['tags']}",
         )
 
     # Retain embeds asynchronously in some modes; give recall a few tries.
@@ -228,7 +250,7 @@ async def run(base_url: str, *, forget: bool) -> None:
         found = [
             n
             for n in await lai.search(tokens["learn-ai"], "worked examples")
-            if key in n.text
+            if n.key == key
         ]
         if found:
             break
@@ -236,7 +258,10 @@ async def run(base_url: str, *, forget: bool) -> None:
     check("recall finds the note", bool(found))
 
     other = await mle.get(tokens["mit-learn"])
-    check("mit-learn reads learn-ai's note", any(key in n.text for n in other))
+    check(
+        "mit-learn reads learn-ai's note",
+        any(n.key == key and n.app == "learn-ai" for n in other),
+    )
 
     async with httpx.AsyncClient(
         base_url=base_url,
@@ -261,7 +286,7 @@ async def run(base_url: str, *, forget: bool) -> None:
         (put.status_code, delete.status_code) == (FORBIDDEN, FORBIDDEN),
         f"put={put.status_code} delete={delete.status_code}",
     )
-    still = [n for n in await lai.get(tokens["learn-ai"]) if key in n.text]
+    still = [n for n in await lai.get(tokens["learn-ai"]) if n.key == key]
     check("learn-ai's note is unchanged", bool(still) and still[0].text == text)
 
     if forget:
@@ -276,9 +301,14 @@ async def run(base_url: str, *, forget: bool) -> None:
         removed = await forgetter.forget_user(sub)
         await forgetter.aclose()
         check("forget removes the learner's memory", removed > 0, f"{removed} rows")
+        async with httpx.AsyncClient(
+            base_url=base_url, timeout=60, headers=learn_ai_headers
+        ) as c:
+            gone = await c.get(f"{bank}/memories/list")
         check(
-            "learn-ai sees an empty bank after forget",
-            await lai.get(tokens["learn-ai"]) == [],
+            "forget deletes the bank (learn-ai's list gets 404)",
+            gone.status_code == NOT_FOUND,
+            str(gone.status_code),
         )
         try:
             await lai.put(tokens["learn-ai"], key, "late write after forget")
@@ -304,7 +334,8 @@ def main(base_url: str = "http://127.0.0.1:18888", *, forget: bool = False) -> N
     :param base_url: Hindsight API, e.g. through
         ``kubectl -n hindsight port-forward svc/hindsight 18888:8888``.
     :param forget: Also run the forget sequence and check the fence. This erases
-        the learner's whole QA memory bank, every app's notes.
+        the learner's whole QA memory bank, every app's notes, and fences the
+        bank for an hour.
     """
     asyncio.run(run(base_url, forget=forget))
     failed = [name for name, ok, _ in results if not ok]
