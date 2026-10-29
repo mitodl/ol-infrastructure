@@ -229,10 +229,25 @@ kept_image_volumes() {
 # `k3d cluster delete`. The cluster's own copy of its images is still there
 # for a retry, or for --drop-images.
 keep_node_images() {
-    local node vol src
+    local node vol src nodes
     # No mapfile and no expanding a possibly empty array: macOS ships bash
     # 3.2, which lacks the first and, under `set -u`, rejects the second.
     local -a mounts=() pending=()
+
+    # Listed up front, not in the loop's process substitution: `set -e`
+    # never sees a command fail in there. A failed or empty listing would
+    # leave nothing to copy and let teardown delete the images with the
+    # cluster.
+    if ! nodes="$(docker ps -a --format '{{.Names}}')"; then
+        warn "Could not list the node containers of cluster '${CLUSTER_NAME}'."
+        return 1
+    fi
+    nodes="$(printf '%s\n' "${nodes}" \
+        | grep "^k3d-${CLUSTER_NAME}-\(server\|agent\)-" | sort || true)"
+    if [[ -z "${nodes}" ]]; then
+        warn "Found no node containers for cluster '${CLUSTER_NAME}'."
+        return 1
+    fi
 
     log "Stopping the cluster so each node's image store is consistent on disk..."
     if ! k3d cluster stop "${CLUSTER_NAME}" >/dev/null; then
@@ -253,8 +268,7 @@ keep_node_images() {
         fi
         mounts+=(-v "${src}:/src/${vol}:ro" -v "${vol}:/dst/${vol}")
         pending+=("${vol}")
-    done < <(docker ps -a --format '{{.Names}}' \
-        | grep "^k3d-${CLUSTER_NAME}-\(server\|agent\)-" | sort)
+    done <<< "${nodes}"
     (( ${#pending[@]} == 0 )) && return 0
 
     log "Copying node image stores into named volumes (one-time migration)..."
