@@ -666,6 +666,7 @@ if k8s_deploy:
         plugin_config=OLApisixSharedPluginsConfig(
             application_name="xpro",
             resource_suffix="ol-shared-plugins",
+            render_only=True,
             k8s_namespace=xpro_namespace,
             k8s_labels=k8s_app_labels,
             # xpro's pages and API share one origin and Django sets no CORS

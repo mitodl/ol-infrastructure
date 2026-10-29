@@ -95,6 +95,7 @@ def create_ingress_resources(
         plugin_config=OLApisixSharedPluginsConfig(
             application_name="witan",
             resource_suffix="ol-shared-plugins",
+            render_only=True,
             k8s_namespace=namespace,
             k8s_labels=k8s_global_labels,
             enable_cors=False,
