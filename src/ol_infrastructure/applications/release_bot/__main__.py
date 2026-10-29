@@ -134,33 +134,21 @@ LIBRARIES_CONFIG = json.dumps(
 UNPUBLISHABLE_LIBRARIES_CONFIG = json.dumps(UNPUBLISHABLE_LIBRARIES)
 
 
-# Identities are truncated at the first "@" in the slack-user-overrides
-# validation errors below, the way slack_users._fallback redacts them: `pulumi
-# up` for this stack can run in Concourse, whose build log is readable more
-# widely than the secret is, and a commit address is enough to identify
-# someone. A handle (no "@") survives whole, which is the common case and is
-# public anyway.
+# Cuts emails to their local part in the validation errors below: `pulumi up`
+# can run in Concourse, whose build log is more widely readable than the secret.
 def _redact(identity: str) -> str:
     return identity.split("@", 1)[0] or "(blank)"
 
 
-# Commit identity -> Slack member id, for the authors `users.lookupByEmail`
-# cannot find because they commit under a GitHub no-reply or personal address
-# rather than their Slack one (slack_users.py). Kept in the SOPS secret rather
-# than bridge.settings for two reasons: this repository is public and the
-# mapping is a roster of people, and SOPS encrypts values but NOT keys -- so it
-# is stored as one JSON string under a single key, encrypted whole, instead of
-# a YAML mapping that would leave every GitHub handle in plaintext.
-#
-# Read with `.get`, and optional again in bot_config, so a bot image newer than
-# the secret (or older than this stack) still boots and resolves authors
-# exactly as it did before any of this existed.
+# Commit identity -> Slack member id, for authors whose commit email isn't their
+# Slack email (slack_users.py). In SOPS rather than bridge.settings because this
+# repo is public, and one JSON string rather than a YAML mapping because SOPS
+# leaves keys in plaintext. Optional, so a bot image newer than the secret boots.
 slack_user_overrides = bot_secrets.get("slack-user-overrides") or ""
 if slack_user_overrides:
-    # bot_config parses this as is, so malformed JSON would crash-loop the pod.
-    # Checking it here, along with the realistic edits -- a stray list, a
-    # display name pasted into a value -- fails `pulumi up` instead. The regex
-    # is the one in slack_users._SLACK_USER_ID_RE; keep them in step.
+    # Fail `pulumi up` on a bad entry instead of crash-looping the pod (bad JSON)
+    # or dropping it at boot (bad member id). The regex matches
+    # slack_users._SLACK_USER_ID_RE; keep them in step.
     _overrides = json.loads(slack_user_overrides)
     if not isinstance(_overrides, dict):
         msg = (
@@ -181,9 +169,7 @@ if slack_user_overrides:
             f"id (U… or W…), not a display name, handle, or email: {', '.join(_bad)}"
         )
         raise ValueError(msg)
-    # Keys are lowercased at load, so two that differ only in case collapse into
-    # one and the survivor depends on dict order -- silently dropping whichever
-    # entry lost. Cheaper to refuse the file than to debug that later.
+    # Keys are lowercased at load, so case-only duplicates would drop one.
     _collisions = sorted(
         {
             _redact(identity.strip().lower())
@@ -246,37 +232,17 @@ bot_secret = kubernetes.core.v1.Secret(
 )
 
 
-# Adding a key here replaces the Secret rather than updating it, so a preview
-# reports `creation failed: secrets "release-bot-secret-production" already
-# exists`. That is the provider dry-running the create while the original is
-# still there, not a blocked update: the name is pinned, so the provider
-# deletes before replacing. #5169 added the three github-app-* keys the same
-# way and shipped.
+# Adding a key replaces the Secret, so a preview reports `creation failed:
+# secrets "release-bot-secret-production" already exists`. That's the dry-run
+# create, not a blocked update; #5169 shipped the same way.
 #
-# A running pod does not notice the swap: env vars are read once at container
-# start, and the Deployment names this Secret by a fixed string, so changing a
-# value -- an edit to slack-user-overrides, a token rotation -- replaces the
-# Secret and leaves the pod template untouched. `pulumi up` would report
-# success and the bot would keep the old values until something else restarted
-# it. Stamping the Secret's resourceVersion onto the pod template makes any
-# change here roll the pod: Kubernetes bumps it on every write, so it moves
-# whether the provider replaces the Secret (its default for a data change) or
-# updates it in place (enable_secret_mutable).
-#
-# Deliberately not a checksum of the contents, the way the dagster stack's
-# checksum/ol-* annotations are. Those hash config; this would hash credentials
-# into an object readable by anyone who can read the Deployment, which is a
-# wider audience than can read the Secret. CodeQL flagged exactly that
-# (py/weak-sensitive-data-hashing), and the resourceVersion needs none of the
-# values to do the same job. Reading it from the Secret's outputs also makes
-# the Deployment depend on the Secret, so the update cannot land first.
+# Env vars are only read at container start, so the pod template carries the
+# Secret's resourceVersion to roll the pod on any Secret change. Not a content
+# checksum: that would put a hash of credentials on the Deployment (CodeQL
+# py/weak-sensitive-data-hashing).
 def _secret_resource_version(metadata) -> str:
-    # A preview reports this as "": the Secret is being replaced, and the
-    # dry-run create cannot run while the original still exists, so no server
-    # has assigned a version yet. A real apply always has one. If it ever did
-    # not, every later edit would leave the annotation at "" and stop rolling
-    # the pod -- the silent failure this annotation exists to prevent -- so
-    # fail the update instead.
+    # "" only in a preview of a replace. After a real apply it would freeze the
+    # annotation and stop rolling the pod, so fail instead.
     if metadata.resource_version:
         return metadata.resource_version
     if runtime.is_dry_run():
