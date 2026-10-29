@@ -75,6 +75,8 @@ HOSTS=(
     "mail.${ROOT_DOMAIN}"
     # Grafana (logs from every local-dev service)
     "grafana.${ROOT_DOMAIN}"
+    # Qdrant dashboard (the vector database's bundled web UI)
+    "qdrant.${ROOT_DOMAIN}"
     # Open edX (composed from lehrer; only deployed with --enabled_apps openedx,
     # but /etc/hosts has no wildcard so the names must exist unconditionally).
     # No MFE entry: Site Projects are served as an LMS sub-path, and that route
