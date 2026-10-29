@@ -473,6 +473,7 @@ local_resource(
         "./src/ol_infrastructure/components/services/apisix.py",
         "./src/ol_infrastructure/components/services/files",
         "./src/bridge/lib/constants.py",
+        "./src/bridge/lib/magic_numbers.py",
     ],
     labels=["infra"],
 )

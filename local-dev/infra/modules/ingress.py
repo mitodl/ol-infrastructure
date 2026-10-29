@@ -172,4 +172,12 @@ def create_ingress(  # noqa: PLR0913
         opts=_k8s(parent=operations_ns, depends_on=[apisix]),
     )
 
+    # The deployed gateways also add a security-response-headers global rule
+    # (setup_apisix in apisix_official.py) that sends Strict-Transport-Security.
+    # It is left out here on purpose: browsers cache HSTS per host, across
+    # profiles, and clearing it is not obvious, so one visit would pin every
+    # *.<root domain> host to HTTPS on a developer's machine. The cipher list
+    # and enableServerTokens from the same hardening do come through
+    # apisix_helm_values.
+
     return IngressResources(cert_manager=cert_manager, apisix=apisix)
