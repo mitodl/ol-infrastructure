@@ -12,3 +12,33 @@ config:
   starrocks:aws_region: us-east-1
   starrocks:domain: lakehouse.starrocks.ol.mit.edu
   starrocks:oidc_enabled: "true"
+  # ADR 0012 decision 3 asks for query queues, but the FE runs query queue v2,
+  # which ignores resource groups. With the SELECT queue on, batch and
+  # interactive share one slot pool and interactive queues behind batch; with
+  # the group-level queue on, interactive's concurrency_limit is enforced
+  # nowhere. Both stay off until the FE moves to v1 (enable_query_queue_v2 =
+  # false in fe.conf). Until then the CN enforces concurrency_limit by
+  # rejecting the query over it. See resource_groups.py.
+  starrocks:query_queue:
+    enable_query_queue_select: false
+    enable_group_level_query_queue: false
+    query_queue_concurrency_limit: 0
+    query_queue_pending_timeout_second: 300
+  # CN pods here request 4 CPU with a 16 CPU limit. StarRocks caps
+  # exclusive_cpu_cores at the smallest CN's reported cores minus one, and a
+  # CN reports its limit (16 cores), not its request.
+  # The value below is the request minus one, so the dedicated threads have
+  # CPU the pod is guaranteed and one requested core stays shared.
+  # Keep CN pods uniformly sized (applications/starrocks starrocks:cn_config)
+  # and revisit this when they change. mem_limit is a fraction of each CN's
+  # query pool (90% of the CN's mem_limit, itself 90% of the pod memory
+  # limit); big_query_mem_limit is bytes per CN (6Gi).
+  starrocks:resource_groups:
+    interactive:
+      exclusive_cpu_cores: 3
+      mem_limit: 0.4
+      concurrency_limit: 20
+    batch:
+      cpu_weight_percent: 100
+      mem_limit: 0.6
+      big_query_mem_limit: 6442450944
