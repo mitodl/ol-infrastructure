@@ -1441,11 +1441,15 @@ probe, which the VM rejects. Python dies on `import hashlib` or
 Every app's env already sets it. An image build step that hits it (e.g.
 `poetry install`) needs `ENV OPENSSL_armcap=0` in that app's Dockerfile.
 
-To confirm a crash is this one:
+To confirm a crash is this one, run the import that loads the crashing OpenSSL.
+That is `hashlib` when Python's own OpenSSL is affected (e.g. litellm), and
+`cryptography.hazmat.bindings._rust` when only the wheel's bundled copy is
+(e.g. mit-learn, where `hashlib` imports fine). Try both if unsure:
 
 ```bash
-docker run --rm --entrypoint python <image> -c 'import hashlib'                       # exit 132
-docker run --rm -e OPENSSL_armcap=0 --entrypoint python <image> -c 'import hashlib'   # exit 0
+docker run --rm --entrypoint python <image> -c 'import hashlib'                                          # exit 132
+docker run --rm --entrypoint python <image> -c 'import cryptography.hazmat.bindings._rust'               # exit 132
+docker run --rm -e OPENSSL_armcap=0 --entrypoint python <image> -c 'import cryptography.hazmat.bindings._rust'  # exit 0
 ```
 
 ### APISIX returns 404 for a hostname
