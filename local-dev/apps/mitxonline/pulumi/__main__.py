@@ -33,6 +33,7 @@ from pulumi import ResourceOptions
 from ol_infrastructure.applications.mitxonline import definition
 from ol_infrastructure.applications.mitxonline.vault_secrets import secret_env_names
 from ol_infrastructure.components.services.apisix import (
+    OLApisixExternalUpstream,
     OLApisixOIDCResources,
     OLApisixRoute,
     OLApisixSharedPlugins,
@@ -293,6 +294,11 @@ bindings = definition.MitxonlineBindings(
     sizing=sizing,
     granian_reload=tilt_built,
     celery_topology="merged",
+    # Local edX runs on lms.<root>, outside .learn.<root>, so it never reaches
+    # the gate. Test it with a stand-in LMS (see PR #6402).
+    openedx_login_gate=definition.OpenedxLoginGate(
+        lms_host=f"courses.learn.{root_domain}"
+    ),
 )
 
 secrets_hash = hashlib.sha256(
@@ -391,4 +397,27 @@ OLApisixRoute(
         shared_plugin_config_name=shared_plugins.resource_name,
     ),
     opts=ResourceOptions(providers=[provider], delete_before_replace=True),
+)
+# The Open edX login gate, as the deployed stack builds it. Without a stand-in
+# LMS, its login path returns 503.
+gate_upstream = OLApisixExternalUpstream(
+    f"mitxonline-openedx-login-gate-upstream-{ENV_SUFFIX}",
+    external_upstream_config=definition.openedx_login_gate_upstream_config(
+        bindings.openedx_login_gate, ENV_SUFFIX, LABELS
+    ),
+    opts=opts,
+)
+OLApisixRoute(
+    name=f"mitxonline-openedx-login-gate-route-{ENV_SUFFIX}",
+    k8s_namespace=definition.NAMESPACE,
+    k8s_labels=LABELS,
+    route_configs=definition.openedx_login_gate_route_configs(
+        bindings,
+        oidc=prefixed_oidc,
+        shared_plugin_config_name=shared_plugins.resource_name,
+        upstream_name=gate_upstream.resource_name,
+    ),
+    opts=ResourceOptions(
+        providers=[provider], delete_before_replace=True, depends_on=[gate_upstream]
+    ),
 )

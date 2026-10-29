@@ -18,14 +18,16 @@ from typing import Any, Literal
 
 from kubernetes.utils.quantity import parse_quantity
 from pulumi import Output
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from bridge.lib.constants import (
     LearnSession,
     apisix_oidc_session_cookie_name,
+    edxapp_lms_service_host,
 )
 from bridge.lib.magic_numbers import STATIC_ASSET_MAX_AGE_SECONDS
 from ol_infrastructure.components.services.apisix import (
+    OLApisixExternalUpstreamConfig,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixOIDCRouteGroup,
@@ -172,6 +174,16 @@ class ClusterCapabilities(BaseModel):
     pod_monitors: bool = True
 
 
+class OpenedxLoginGate(BaseModel):
+    """Where the Open edX LMS is served."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    lms_host: str
+    """The LMS's public host, e.g. ``courses.learn.mit.edu``."""
+    lms_service_port: int = 8000
+
+
 class MitxonlineBindings(BaseModel):
     """Everything about MITx Online that differs between environments."""
 
@@ -211,6 +223,22 @@ class MitxonlineBindings(BaseModel):
     """``merged`` runs one worker Deployment consuming every queue, for clusters
     where a Deployment per queue costs more than it tells a developer."""
     webapp_keda: OLApplicationK8sKedaWebappScalingConfig | None = None
+    openedx_login_gate: OpenedxLoginGate | None = None
+    """Set to sign learners in to MIT Learn when the Open edX login starts."""
+
+    @model_validator(mode="after")
+    def _gate_host_gets_the_learn_cookie(self) -> "MitxonlineBindings":
+        # Browsers drop a cookie whose domain doesn't cover the host setting it.
+        gate = self.openedx_login_gate
+        if gate is None:
+            return self
+        domain = learn_session(self).cookie_domain
+        if not gate.lms_host.endswith(domain):
+            msg = (
+                f"openedx_login_gate.lms_host {gate.lms_host!r} is not under {domain!r}"
+            )
+            raise ValueError(msg)
+        return self
 
 
 def environment_variables(bindings: MitxonlineBindings) -> dict[str, Any]:
@@ -749,5 +777,104 @@ def prefixed_route_configs(
             plugins=[strip_prefix, _uncached_hash_plugin()],
             backend_service_name=WEBAPP_SERVICE_NAME,
             backend_service_port=WEBAPP_SERVICE_PORT_NAME,
+        ),
+    ]
+
+
+# Every LMS login entry (/login, /register, /auth/idp_redirect/) passes through
+# this path on its way to MITx Online, with or without a MITx Online session.
+OPENEDX_LOGIN_PATH = "/auth/login/ol-oauth2/"
+
+
+def openedx_login_gate_upstream_config(
+    gate: OpenedxLoginGate, env_suffix: str, k8s_labels: dict[str, str]
+) -> OLApisixExternalUpstreamConfig:
+    """Return the gate's upstream: the LMS Service, by cluster DNS name.
+
+    An ApisixRoute can only name Services in its own namespace, and the LMS runs
+    in edxapp's.
+
+    :param gate: Where the LMS is served.
+    :param env_suffix: The stack environment suffix, shared with edxapp's stack.
+    :param k8s_labels: Labels for the ApisixUpstream.
+    :returns: The config for ``OLApisixExternalUpstream``.
+    :rtype: OLApisixExternalUpstreamConfig
+    """
+    return OLApisixExternalUpstreamConfig(
+        application_name="mitxonline-openedx-login-gate",
+        resource_suffix="lms",
+        k8s_labels=k8s_labels,
+        k8s_namespace=NAMESPACE,
+        external_hostname=edxapp_lms_service_host("mitxonline", env_suffix),
+        scheme="http",
+        port=gate.lms_service_port,
+        # The LMS rejects any Host but its public one (DisallowedHost).
+        pass_host="pass",  # noqa: S106 -- APISIX passHost mode, not a password
+    )
+
+
+def openedx_login_gate_route_configs(
+    bindings: MitxonlineBindings,
+    oidc: OLApisixOIDCResources,
+    shared_plugin_config_name: str,
+    upstream_name: str,
+) -> list[OLApisixRouteConfig]:
+    """Return the route that signs learners in to MIT Learn when the Open edX login starts.
+
+    Without it, a learner who signs in on courseware gets MITx Online's session
+    but not MIT Learn's, so learn-ai sees them as anonymous. With no MIT Learn
+    session, the route runs mit-learn's Keycloak login (``oidc``, from
+    ``prefixed_oidc_config``), then returns the learner to the same URL and the
+    edX login carries on.
+
+    Only browser page loads match. MITx Online's server-side replay of this login
+    (``create_edx_auth_token``), ``fetch()``, iframes and browsers without Fetch
+    Metadata go to the LMS's own route as before.
+
+    :param bindings: The environment being rendered for. Renders nothing unless
+        ``openedx_login_gate`` is set.
+    :param oidc: The OIDC resources built from ``prefixed_oidc_config``.
+    :param shared_plugin_config_name: Name of the ``shared_plugins`` ApisixPluginConfig.
+    :param upstream_name: Name of the ApisixUpstream from
+        ``openedx_login_gate_upstream_config``.
+    :returns: Route configs for one ``OLApisixRoute``.
+    :rtype: list[OLApisixRouteConfig]
+    """
+    gate = bindings.openedx_login_gate
+    if gate is None:
+        return []
+    oidc_plugin = oidc.get_full_oidc_plugin_config(unauth_action="auth")
+    # The LMS needs none of the learner's tokens.
+    oidc_plugin["config"].update(
+        set_access_token_header=False,
+        set_id_token_header=False,
+        set_userinfo_header=False,
+    )
+    return [
+        OLApisixRouteConfig(
+            route_name="openedx-login-gate",
+            # Above the LMS's "/*" route (priority 0).
+            priority=10,
+            # The callback URI is built from Host, and Keycloak only accepts
+            # the public one.
+            hosts=[gate.lms_host],
+            # Exact paths: on any other path the plugin would send Keycloak a
+            # callback URI it doesn't accept.
+            paths=[OPENEDX_LOGIN_PATH, f"{OPENEDX_LOGIN_PATH}.apisix/redirect"],
+            exprs=[
+                {
+                    "subject": {"scope": "Header", "name": "Sec-Fetch-Mode"},
+                    "op": "Equal",
+                    "value": "navigate",
+                },
+                {
+                    "subject": {"scope": "Header", "name": "Sec-Fetch-Dest"},
+                    "op": "Equal",
+                    "value": "document",
+                },
+            ],
+            shared_plugin_config_name=shared_plugin_config_name,
+            plugins=[oidc_plugin],
+            upstream=upstream_name,
         ),
     ]

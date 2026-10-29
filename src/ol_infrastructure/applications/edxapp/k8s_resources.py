@@ -15,6 +15,7 @@ import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, StackReference, export
 from pulumi_aws import iam
 
+from bridge.lib.constants import edxapp_lms_webapp_name
 from bridge.settings.openedx.types import EnvStage, OpenEdxSupportedRelease
 from bridge.settings.openedx.version_matrix import OpenLearningOpenEdxDeployment
 from ol_infrastructure.applications.edxapp.k8s_autoscaling import (
@@ -215,7 +216,10 @@ def create_k8s_resources(  # noqa: C901
 ) -> dict[str, Any]:
     """Create all Kubernetes resources for the edxapp LMS and CMS deployments."""
     env_name = f"{stack_info.env_prefix}-{stack_info.env_suffix}"
-    lms_webapp_deployment_name = f"{env_name}-edxapp-lms-webapp"
+    # Also the LMS Service name mitxonline's Open edX login gate reaches.
+    lms_webapp_deployment_name = edxapp_lms_webapp_name(
+        stack_info.env_prefix, stack_info.env_suffix
+    )
     cms_webapp_deployment_name = f"{env_name}-edxapp-cms-webapp"
 
     lms_celery_deployment_name = f"{env_name}-edxapp-lms-celery"
