@@ -467,6 +467,13 @@ event_log_storage:
 #     loads ocw_content_publish_sensor requests. Every load restores and saves the
 #     source's single dlt state, so two at once overwrite each other's course
 #     versions and unpublish bookkeeping. Limit 1 queues the second.
+#   learn_embeddings/model_calls: every run ol-data-platform's
+#     learn_embeddings_automation_sensor launches (a hand-launched backfill is
+#     capped only if given the tag). Each run calls the embedding model and
+#     overwrites its partitions of the shared vector Iceberg tables. Concurrent
+#     overwrites conflict at commit (pyiceberg "Added data files were found
+#     matching the filter"), which failed one of three production runs on
+#     2026-10-26. Limit 1 queues the second.
 run_coordinator:
   module: dagster.core.run_coordinator
   class: QueuedRunCoordinator
@@ -476,6 +483,8 @@ run_coordinator:
     - key: courseware/model_calls
       limit: 3
     - key: ocw/content_load
+      limit: 1
+    - key: learn_embeddings/model_calls
       limit: 1
 
 # Configures how long Dagster waits for code locations
