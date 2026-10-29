@@ -691,9 +691,9 @@ async def _check_release_gate(
             return f"Production deploy triggered: {url}"
     if not checked:
         return (
-            "⚠️ Could not make Concourse check the release gate, so no "
-            "Production deploy was triggered. One starts only after a later "
-            f"check of the gate succeeds: {url}"
+            "⚠️ The bot could not confirm that Concourse finished checking the "
+            "release gate. A check may still be running, so a Production deploy "
+            f"may or may not have started: {url}"
         )
     if not looked_up:
         # The check ran, so it may well have recorded the close and started
