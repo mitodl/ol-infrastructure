@@ -980,6 +980,7 @@ async def test_promote_clears_the_recorded_requester(repos, slack, monkeypatch):
     )
     monkeypatch.setattr(bot.github, "close_release_issue", AsyncMock())
     monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
+    monkeypatch.setattr(bot.concourse, "has_version", AsyncMock(return_value=True))
 
     await bot._cmd_promote(
         repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "UOTHER"}
@@ -2506,6 +2507,9 @@ def _promote_body(app_name="my-app", version="2026.9.5.1", user="U1"):
     }
 
 
+_CLOSED_AT = datetime(2026, 10, 29, 15, 38, 26, tzinfo=UTC)
+
+
 @pytest.fixture
 def promote_api(monkeypatch):
     """Stub the GitHub and Concourse calls behind a successful promotion."""
@@ -2515,11 +2519,15 @@ def promote_api(monkeypatch):
             {"number": 7, "body": "## Release 2026.9.5.1", "url": "http://issue/1"}
         ]
     )
-    api.close_release_issue = AsyncMock()
+    api.close_release_issue = AsyncMock(return_value=_CLOSED_AT)
     api.check_resource = AsyncMock()
+    api.has_version = AsyncMock(return_value=True)
     monkeypatch.setattr(bot.github, "open_release_issues", api.open_release_issues)
     monkeypatch.setattr(bot.github, "close_release_issue", api.close_release_issue)
     monkeypatch.setattr(bot.concourse, "check_resource", api.check_resource)
+    monkeypatch.setattr(bot.concourse, "has_version", api.has_version)
+    # Not asyncio.sleep itself: the double-click test needs its real yield.
+    monkeypatch.setattr(bot, "_GATE_RECHECK_SECONDS", 0)
     return api
 
 
@@ -2821,6 +2829,65 @@ async def test_promote_does_not_claim_a_deploy_started_when_the_gate_check_faile
     assert "Production deploy triggered" not in said
     assert "no Production deploy was triggered" in said
     assert "only after a later check of the gate succeeds" in said
+
+
+async def test_promote_waits_for_the_gate_to_record_this_close(repos, promote_api):
+    """A check that succeeds can still miss the close it was forced for.
+
+    mitxonline 2026.10.28.1: the check ran a second after the close, found
+    nothing, and succeeded. The gate first recorded the close on its hourly
+    check, by which time QA had run a newer ol-infrastructure revision, and
+    Production refused it. So the bot checks again until the version is there.
+    """
+    promote_api.has_version.side_effect = [False, False, True]
+    say = AsyncMock()
+
+    await bot._handle_promote_button(
+        repos, AsyncMock(), _promote_body(), say, AsyncMock()
+    )
+
+    assert promote_api.check_resource.await_count == 3
+    promote_api.has_version.assert_awaited_with(
+        "my-app-pipeline",
+        "my-app-release-gate",
+        {"issue_number": "7", "issue_closed_at": "2026-10-29T15:38:26"},
+    )
+    assert "Production deploy triggered" in str(say.call_args.args[0])
+
+
+async def test_promote_says_so_when_the_gate_never_records_the_close(
+    repos, slack, promote_api
+):
+    """Claiming a deploy started would hide the hour-long wait behind it."""
+    promote_api.open_release_issues.return_value = [
+        {"number": 7, "title": "Release my-app 2026.9.5.1", "body": ""}
+    ]
+    promote_api.has_version.return_value = False
+
+    await bot._cmd_promote(
+        repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "U1"}
+    )
+
+    assert promote_api.check_resource.await_count == bot._GATE_CHECK_ATTEMPTS
+    said = slack.said
+    assert "promoted" in said
+    assert "Production deploy triggered" not in said
+    assert "has not seen issue #7 closed yet" in said
+    assert "/jobs/deploy-ol-application-my-app-production" in said
+
+
+async def test_promote_matches_the_gate_on_the_number_when_github_omits_closed_at(
+    repos, promote_api
+):
+    promote_api.close_release_issue.return_value = None
+
+    await bot._handle_promote_button(
+        repos, AsyncMock(), _promote_body(), AsyncMock(), AsyncMock()
+    )
+
+    promote_api.has_version.assert_awaited_once_with(
+        "my-app-pipeline", "my-app-release-gate", {"issue_number": "7"}
+    )
 
 
 # ---------------------------------------------------------------------------
