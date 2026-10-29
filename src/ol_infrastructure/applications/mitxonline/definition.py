@@ -229,9 +229,11 @@ class MitxonlineBindings(BaseModel):
     @model_validator(mode="after")
     def _gate_host_gets_the_learn_cookie(self) -> "MitxonlineBindings":
         # Browsers drop a cookie whose domain doesn't cover the host setting it.
-        domain = learn_session(self).cookie_domain
         gate = self.openedx_login_gate
-        if gate is not None and not gate.lms_host.endswith(domain):
+        if gate is None:
+            return self
+        domain = learn_session(self).cookie_domain
+        if not gate.lms_host.endswith(domain):
             msg = (
                 f"openedx_login_gate.lms_host {gate.lms_host!r} is not under {domain!r}"
             )
