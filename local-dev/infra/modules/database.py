@@ -100,7 +100,10 @@ def create_database(
             "postgresql": {
                 "parameters": {"max_connections": "100"},
             },
+            # Keycloak's database; a CPU request for the same reason as
+            # Keycloak's own (identity_core.py).
             "resources": {
+                "requests": {"cpu": "250m"},
                 "limits": {"memory": "512Mi"},
             },
         },

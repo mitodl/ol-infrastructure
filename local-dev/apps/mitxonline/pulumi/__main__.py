@@ -293,6 +293,11 @@ bindings = definition.MitxonlineBindings(
     min_replicas=1,
     sizing=sizing,
     granian_reload=tilt_built,
+    # The local Keycloak shares a laptop's CPUs with the whole stack and answers
+    # the gateway's code exchange in over 3s often enough to fail sign-ins
+    # (openidc.lua "accessing token endpoint ... failed: timeout", then a 500 on
+    # /login/.apisix/redirect).
+    oidc_timeout=10,
     celery_topology="merged",
     # Local edX runs on lms.<root>, outside .learn.<root>, so it never reaches
     # the gate. Test it with a stand-in LMS (see PR #6402).
