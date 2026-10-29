@@ -551,7 +551,18 @@ local_resource(
         "PULUMI_CONFIG_PASSPHRASE": "",
     },
     dir="./local-dev/infra/core",
-    deps=["./local-dev/infra/modules", "./local-dev/infra/core/__main__.py"],
+    deps=[
+        "./local-dev/infra/modules",
+        "./local-dev/infra/core/__main__.py",
+        # APISIX's values, Gateway and global rule come from the deployed
+        # definition and the shared APISIX component it builds on.
+        "./src/ol_infrastructure/infrastructure/aws/eks/apisix_definition.py",
+        "./src/ol_infrastructure/infrastructure/aws/eks/error_pages",
+        "./src/ol_infrastructure/components/services/apisix.py",
+        "./src/ol_infrastructure/components/services/files",
+        "./src/bridge/lib/constants.py",
+        "./src/bridge/lib/magic_numbers.py",
+    ],
     labels=["infra"],
 )
 

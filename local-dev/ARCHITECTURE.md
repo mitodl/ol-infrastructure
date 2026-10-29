@@ -204,7 +204,7 @@ The whole stack is roughly 2.9GB and can be switched off with `observability_ena
 
 **Ownership boundary:** `setup.sh` owns only the k3d cluster, TLS certificates, and `/etc/hosts`. _All_ in-cluster resources are owned by either Pulumi (shared infra, and mitxonline's app via its own program) or Tilt (the other apps' manifests, and mitxonline's `ApisixTls`). This prevents drift and conflicts.
 
-**APISIX as ingress:** Traefik is disabled in k3d. APISIX handles all ingress, TLS termination, and OIDC authentication (via the `openid-connect` plugin). Each app's `apisix-routes.yaml` declares its `ApisixRoute` and `ApisixTls` CRDs (mitxonline's routes are rendered by its Pulumi program; its `ApisixTls` is `apisix-tls.yaml`).
+**APISIX as ingress:** Traefik is disabled in k3d. APISIX handles all ingress, TLS termination, and OIDC authentication (via the `openid-connect` plugin). Each app's `apisix-routes.yaml` declares its `ApisixRoute` and `ApisixTls` CRDs (mitxonline's routes are rendered by its Pulumi program; its `ApisixTls` is `apisix-tls.yaml`). APISIX's Helm values, the `apisix` `GatewayClass` and `Gateway`, and the `identity-header-strip` global rule come from the same code the deployed clusters use (`src/ol_infrastructure/infrastructure/aws/eks/apisix_definition.py`); `local-dev/infra/modules/ingress.py` only supplies the local inputs (one pod, NodePort, the mkcert trusted CA).
 
 **Shared database cluster:** All apps share one CloudNativePG (CNPG) cluster in the `local-infra` namespace with isolated databases (`mitlearn`, `learnai`, `mitxonline`, `odlvideo`, `keycloak`, `litellm`). This keeps memory usage low.
 
