@@ -92,6 +92,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "applications/google_ads_optimization/": [],
     "applications/gravitino/": [],
     "applications/gwarek/": [],
+    "applications/hindsight/": [],
     "applications/jupyterhub/": [],
     "applications/jupyterhub_data/": ["jupyterhub_data/"],
     "applications/keycloak/": ["keycloak/"],

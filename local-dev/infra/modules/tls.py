@@ -28,6 +28,9 @@ class TlsResources:
     """Per-app-namespace TLS secrets keyed by namespace name."""
     app_ca_configmaps: dict[str, k8s.core.v1.ConfigMap]
     """Per-app-namespace mkcert CA ConfigMaps keyed by namespace name."""
+    app_ca_bundle_configmaps: dict[str, k8s.core.v1.ConfigMap]
+    """Per-app-namespace ``CA_BUNDLE_CONFIGMAP`` ConfigMaps keyed by namespace
+    name."""
     apisix_trusted_ca: k8s.core.v1.Secret
     """CA bundle APISIX verifies upstream TLS against, in the operations
     namespace; its file is ``APISIX_TRUSTED_CA_FILENAME``."""
@@ -37,6 +40,13 @@ class TlsResources:
 
 
 APISIX_TRUSTED_CA_FILENAME = "ca-bundle.pem"
+# Public roots plus the mkcert root, in every app namespace, for pods that make
+# HTTPS calls to local hostnames. Mounted as a directory: SSL_CERT_FILE and
+# REQUESTS_CA_BUNDLE name the file in it, and Concourse copies the whole
+# directory into resource containers as /etc/ssl/certs, which is why the file
+# has the name Debian and Alpine images read there.
+CA_BUNDLE_CONFIGMAP = "local-dev-ca-bundle"
+CA_BUNDLE_FILENAME = "ca-certificates.crt"
 
 
 def create_tls_resources(
@@ -96,12 +106,21 @@ def create_tls_resources(
         for ns in app_namespaces
     }
 
-    # Setting APISIX's trusted CA replaces its default (the system store), so
-    # the file carries a full public bundle as well as the mkcert root. The
-    # mkcert root is what lets openid-connect verify Keycloak: the discovery
-    # document's token and JWKS endpoints are on sso.ol.<domain>, which the
-    # CoreDNS override sends back through APISIX's own mkcert certificate.
+    # The full public bundle as well as the mkcert root: whoever reads this file
+    # reads it instead of the image's system store. For APISIX the mkcert root
+    # is what lets openid-connect verify Keycloak: the discovery document's
+    # token and JWKS endpoints are on sso.ol.<domain>, which the CoreDNS
+    # override sends back through APISIX's own mkcert certificate.
     trusted_ca_bundle = Path(certifi.where()).read_text() + "\n" + ca_cert_content
+    app_ca_bundle_configmaps = {
+        ns: k8s.core.v1.ConfigMap(
+            f"{CA_BUNDLE_CONFIGMAP}-{ns}",
+            metadata={"name": CA_BUNDLE_CONFIGMAP, "namespace": ns},
+            data={CA_BUNDLE_FILENAME: trusted_ca_bundle},
+            opts=_k8s(parent=namespaces[ns]),
+        )
+        for ns in app_namespaces
+    }
     apisix_trusted_ca = k8s.core.v1.Secret(
         "apisix-trusted-ca",
         metadata={"name": "apisix-trusted-ca", "namespace": "operations"},
@@ -114,6 +133,7 @@ def create_tls_resources(
         tls_secret_ops=tls_secret_ops,
         app_tls_secrets=app_tls_secrets,
         app_ca_configmaps=app_ca_configmaps,
+        app_ca_bundle_configmaps=app_ca_bundle_configmaps,
         apisix_trusted_ca=apisix_trusted_ca,
         apisix_trusted_ca_checksum=hashlib.sha256(
             trusted_ca_bundle.encode()

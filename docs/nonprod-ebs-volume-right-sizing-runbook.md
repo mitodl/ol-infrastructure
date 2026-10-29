@@ -76,16 +76,17 @@ Sizes are not derived from the idle figure alone:
   (+1.95 GiB/month, monotonic over 11 weeks) — and nothing caps it.
   `hot_data_days` is informational only: `clickhouse/__main__.py` reads it at line
   112 and uses it solely in the exported `connection_guide` string, while actual
-  tiering requires a `TTL ... TO VOLUME 'cold'` expression in each table's DDL (see
-  `docs/clickhouse-llmops-runbook.md:150-185`). Nor is the growth tenant data:
-  measured in `data-qa` on 2026-09-15, `/var/lib/clickhouse/store` holds 6.0 GiB, of
-  which the `system` database is 5.38 GiB of active parts — `text_log` 1.71,
-  `asynchronous_metric_log` 1.11, `metric_log` 1.03 and `processors_profile_log`
-  0.63 GiB, none of which carry a TTL at all (only `trace_log` and `query_log` do,
-  at 30 days). `opik_db` is 12.3 MiB. The trend is therefore untiered system-log
-  accumulation at a steady rate, not workload growth, which is what makes linear
-  extrapolation appropriate here: 100Gi is ~11x current usage and ~3.9 years of
-  headroom at +1.95 GiB/month. `data-ci` already runs 100Gi at 7.2 GiB.
+  tiering requires a move TTL to the cold tier in each table's DDL (see "Tiered
+  Storage and the Opik v2 Cutover" in `docs/clickhouse-llmops-runbook.md`). Nor is
+  the growth tenant data: measured in `data-qa` on 2026-09-15,
+  `/var/lib/clickhouse/store` holds 6.0 GiB, of which the `system` database is
+  5.38 GiB of active parts — `text_log` 1.71, `asynchronous_metric_log` 1.11,
+  `metric_log` 1.03 and `processors_profile_log` 0.63 GiB, none of which carry a
+  TTL at all (only `trace_log` and `query_log` do, at 30 days). `opik_db` is
+  12.3 MiB. The trend is therefore untiered system-log accumulation at a steady rate,
+  not workload growth, which is what makes linear extrapolation appropriate here:
+  100Gi is ~11x current usage and ~3.9 years of headroom at +1.95 GiB/month.
+  `data-ci` already runs 100Gi at 7.2 GiB.
 
 Volumes deliberately **not** changed: meilisearch (10Gi, 0.1–2.3 GiB — already
 small), clickhouse keeper (20Gi, 0.27 GiB), opik mysql/redis/minio, and the
@@ -292,7 +293,7 @@ Volume-claim-template prefixes per workload:
   three at once would discard the catalog. Do not batch these.
 - **clickhouse hot (QA)** — **single replica, no re-sync path, and the loss is the
   entire local dataset rather than three days of it.** Checked in `data-qa` on
-  2026-09-15: not one table carries a `TTL ... TO VOLUME 'cold'` expression and
+  2026-09-15: not one table carries a move TTL to the cold tier and
   every table is on `storage_policy = 'default'`, so nothing has ever moved to the
   `cold_s3` disk. `hot_data_days` does not bound this (see the sizing note above).
   Deleting the PVC therefore erases all of `opik_db` — 12.3 MiB of active parts

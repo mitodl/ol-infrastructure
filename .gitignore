@@ -37,6 +37,10 @@ tilt_config.json
 # local-dev/README.md). Broad on purpose: never track a real secret anywhere
 # under local-dev/. Does not match the committed *.local.yaml.example files.
 local-dev/**/*.local.yaml
+# The local Pulumi-rendered apps' stack files: per-developer env (`vars`) and
+# memory limits, created by pulumi-app-apply.sh on the first apply. Does not
+# match the committed *.yaml.example files.
+local-dev/apps/*/pulumi/Pulumi.Dev.yaml
 
 # Generated Concourse pipeline JSON emitted by pipeline.py/meta.py __main__ blocks
 definition.json

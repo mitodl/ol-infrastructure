@@ -9,11 +9,16 @@ It accepts tokens from 'security-admin-console' (browser admin UI), 'admin-cli'
 when KC_SPI_REALM_RESTAPI_EXTENSION_SCIM_ACCEPT_ADMIN_CLI_LOGIN=true is set on
 the Keycloak instance, or (plugin 4.x+) any service account client holding the
 master-realm 'scim-admin' client role. The Keycloak substructure stack
-provisions such a client and writes its credentials to Vault:
+provisions such a client and writes its credentials to Vault.
+
+Query the backend under the realm that issued the token (--realm defaults to
+--auth-realm). The plugin looks up the token's client in the realm from the URL,
+and scim-config-manager only exists in master, so /realms/olapps/... returns
+401. The master listing still includes the olapps providers. With a --token from
+another realm, pass that realm as --realm.
 
     python export_scim_config.py \
         --url https://sso.ol.mit.edu \
-        --realm olapps \
         --client-id scim-config-manager \
         --client-secret "$(vault kv get -field=client_secret \
             secret-operations/keycloak/scim-config-manager)"
@@ -24,7 +29,6 @@ means the incoming Host header must match KC_HOSTNAME (sso.ol.mit.edu).
 Usage against the public URL (simplest — no port-forward needed):
     python export_scim_config.py \
         --url https://sso.ol.mit.edu \
-        --realm olapps \
         --username admin \
         --password "$(vault kv get -field=password secret-operations/keycloak/admin)"
 
@@ -35,7 +39,6 @@ If connecting via port-forward to work around TLS SNI issues:
         --url https://localhost:18443 \
         --insecure \
         --host-header sso.ol.mit.edu \
-        --realm olapps \
         --username admin \
         --password "$(vault kv get -field=password secret-operations/keycloak/admin)"
 
@@ -177,7 +180,12 @@ def main() -> None:
         "instead of using the public URL, also pass --host-header so the admin "
         "backend hostname check passes.",
     )
-    parser.add_argument("--realm", default="olapps")
+    parser.add_argument(
+        "--realm",
+        default=None,
+        help="Realm in the admin backend URL. Defaults to --auth-realm, the realm "
+        "that issued the token.",
+    )
     parser.add_argument("--username")
     parser.add_argument("--password")
     parser.add_argument("--client-id", default="admin-cli")
@@ -233,7 +241,7 @@ def main() -> None:
     else:
         parser.error("Provide --token, --client-secret, or --username+--password")
 
-    realm = args.realm
+    realm = args.realm or args.auth_realm
     result: dict[str, Any] = {"realm": realm, "keycloak_url": url, "resources": {}}
 
     # ── Core plugin resources ────────────────────────────────────────────────
@@ -297,7 +305,7 @@ def main() -> None:
                 f"  [{rp.get('id', '?')}] {rp.get('name', '?')} "
                 f"baseUrl={rp.get('baseUrl', '?')} "
                 f"enabled={rp.get('enabled', '?')} "
-                f"retryOnFailure={rp.get('retryOnFailure', '?')} "
+                f"replayOnFailure={rp.get('replayOnFailure', '?')} "
                 f"retryIntervalInSeconds={rp.get('retryIntervalInSeconds', '?')}",
                 file=sys.stderr,
             )

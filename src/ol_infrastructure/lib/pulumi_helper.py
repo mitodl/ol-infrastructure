@@ -304,6 +304,11 @@ def docker_image_config_kwargs(app_prefix: str) -> dict[str, str]:
 
         {"application_image_digest": "sha256:<digest>"}
 
+    Either way, when ``{app_prefix}_RELEASE_VERSION`` is set it also returns
+    ``"application_version": "<version>"``, which labels the pods with the
+    release they run. The release-workflow pipelines set it alongside the
+    digest, because a digest does not say which release it is.
+
     Use by unpacking into ``OLApplicationK8sConfig``::
 
         OLApplicationK8sConfig(
@@ -313,12 +318,17 @@ def docker_image_config_kwargs(app_prefix: str) -> dict[str, str]:
 
     :param app_prefix: Upper-case application prefix, e.g. ``"MIT_LEARN"``.
     :returns: Dict with exactly one of ``application_docker_tag`` or
-        ``application_image_digest``.
+        ``application_image_digest``, plus ``application_version`` when set.
     """
     sha_value = os.environ.get(f"{app_prefix}_DOCKER_SHA")
     # Validate exactly one is set (raises OSError on violation)
     get_docker_image_tag(app_prefix)
 
-    if sha_value:
-        return {"application_image_digest": _normalize_digest(sha_value)}
-    return {"application_docker_tag": os.environ[f"{app_prefix}_DOCKER_TAG"]}
+    kwargs = (
+        {"application_image_digest": _normalize_digest(sha_value)}
+        if sha_value
+        else {"application_docker_tag": os.environ[f"{app_prefix}_DOCKER_TAG"]}
+    )
+    if release_version := os.environ.get(f"{app_prefix}_RELEASE_VERSION"):
+        kwargs["application_version"] = release_version
+    return kwargs

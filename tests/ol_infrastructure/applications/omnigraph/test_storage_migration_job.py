@@ -11,7 +11,6 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from typing import Any
 
 import pulumi
 import pulumi_kubernetes as kubernetes
@@ -23,22 +22,7 @@ from ol_infrastructure.applications.omnigraph.storage_migration import (
     create_storage_migration,
 )
 from ol_infrastructure.lib.pulumi_helper import StackInfo
-
-
-class _Mocks(pulumi.runtime.Mocks):
-    def __init__(self) -> None:
-        self.resources: list[pulumi.runtime.MockResourceArgs] = []
-
-    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-        self.resources.append(args)
-        return f"{args.name}_id", args.inputs
-
-    def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
-        return {}
-
-
-def _of_type(mocks: _Mocks, typ: str) -> list[dict[str, Any]]:
-    return [r.inputs for r in mocks.resources if r.typ == typ]
+from tests.ol_infrastructure.recording_mocks import RecordingMocks
 
 
 def _cron_job(name: str) -> kubernetes.batch.v1.CronJob:
@@ -63,7 +47,7 @@ def test_the_armed_job_can_check_and_snapshot_before_migrating():
     """Roles in both namespaces, the server and all four writers named,
     snapshot first.
     """
-    mocks = _Mocks()
+    mocks = RecordingMocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
 
     migration = create_storage_migration(
@@ -107,7 +91,7 @@ def test_the_armed_job_can_check_and_snapshot_before_migrating():
     )
 
     def check(_: object) -> None:
-        roles = _of_type(mocks, "kubernetes:rbac.authorization.k8s.io/v1:Role")
+        roles = mocks.of_type("kubernetes:rbac.authorization.k8s.io/v1:Role")
         assert sorted(r["metadata"]["namespace"] for r in roles) == [
             "omnigraph",
             "witan",
@@ -130,9 +114,7 @@ def test_the_armed_job_can_check_and_snapshot_before_migrating():
             },
             {"apiGroups": [""], "resources": ["pods"], "verbs": ["list"]},
         ]
-        bindings = _of_type(
-            mocks, "kubernetes:rbac.authorization.k8s.io/v1:RoleBinding"
-        )
+        bindings = mocks.of_type("kubernetes:rbac.authorization.k8s.io/v1:RoleBinding")
         assert {b["metadata"]["namespace"] for b in bindings} == {"omnigraph", "witan"}
         for binding in bindings:
             assert binding["subjects"] == [
@@ -143,7 +125,7 @@ def test_the_armed_job_can_check_and_snapshot_before_migrating():
                 }
             ]
 
-        (job,) = _of_type(mocks, "kubernetes:batch/v1:Job")
+        (job,) = mocks.of_type("kubernetes:batch/v1:Job")
         pod = job["spec"]["template"]["spec"]
         assert [c["name"] for c in pod["initContainers"]] == [
             "invalidate-verdict",

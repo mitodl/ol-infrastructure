@@ -18,7 +18,15 @@ import json
 from pathlib import Path
 
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, Output, ResourceOptions, StackReference, export
+import pulumi_vault as vault
+from pulumi import (
+    Config,
+    InvokeOptions,
+    Output,
+    ResourceOptions,
+    StackReference,
+    export,
+)
 from pulumi_aws import get_caller_identity, iam
 
 from bridge.lib.versions import OPEN_METADATA_VERSION
@@ -33,6 +41,26 @@ from ol_infrastructure.lib.aws.iam_helper import (
 )
 from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
+from ol_infrastructure.lib.vault import setup_vault_provider
+from ol_infrastructure.providers.openmetadata import (
+    OpenMetadataBot,
+    OpenMetadataBotSpec,
+    OpenMetadataConnection,
+)
+from ol_infrastructure.providers.openmetadata.access_control import (
+    OpenMetadataPolicy,
+    OpenMetadataRole,
+    OpenMetadataTeam,
+)
+from ol_infrastructure.substructure.keycloak.openmetadata_provisioner import (
+    OPENMETADATA_PROVISIONER_VAULT_MOUNT,
+    OPENMETADATA_PROVISIONER_VAULT_NAME,
+)
+from ol_infrastructure.substructure.open_metadata.access_control import (
+    POLICIES,
+    ROLES,
+    TEAMS,
+)
 
 stack_info = parse_stack()
 om_config = Config("open_metadata")
@@ -45,8 +73,10 @@ aws_config = AWSBase(
 
 cluster_stack = StackReference(stack_ref(projects.EKS, f"data.{stack_info.name}"))
 superset_stack = StackReference(stack_ref(projects.SUPERSET, stack_info.name))
+open_metadata_stack = StackReference(stack_ref(projects.OPEN_METADATA, stack_info.name))
 
 setup_k8s_provider(kubeconfig=cluster_stack.require_output("kube_config"))
+vault_provider = setup_vault_provider()
 
 open_metadata_namespace = "open-metadata"
 ingestion_sa_name = "openmetadata-ingestion"
@@ -544,8 +574,8 @@ if om_config.get_bool("enable_airbyte_connector"):
 # Superset metadata ingestion
 # ---------------------------------------------------------------------------
 # Authenticates via an OIDC client_credentials grant (Keycloak).  Superset is
-# configured with AUTH_TYPE=AUTH_OAUTH and validates Bearer tokens using the
-# Keycloak realm public key (JWT_PUBLIC_KEY), so no FAB /security/login step
+# configured with AUTH_TYPE=AUTH_OAUTH and validates Bearer tokens against the
+# Keycloak realm JWKS, so no FAB /security/login step
 # is needed.  OIDC credentials are stored in the om-connector-superset K8s
 # secret, provisioned by the open_metadata application stack via Vault.
 
@@ -653,6 +683,15 @@ _make_cronjob(
 dbt_artifacts_bucket = (
     om_config.get("dbt_artifacts_bucket") or f"dagster-data-{stack_info.env_suffix}"
 )
+dbt_artifacts_prefix = "openmetadata/dbt-artifacts"
+
+# The production dbt layer schemas.  Restricting the dbt job to them keeps it
+# from resolving dev-namespace model names that don't exist in OM; the domains
+# job assigns tables in the same schemas.
+LAKE_DBT_SCHEMA_INCLUDES = [
+    r"ol_warehouse_[a-z]+_(dimensional|external|intermediate|irx|mart|migration|raw|reporting|staging)$",
+    r"ol_data_lake_[a-z]+",
+]
 
 _make_cronjob(
     name="dbt",
@@ -663,8 +702,53 @@ _make_cronjob(
         _plain_env("OM_SERVICE_NAME", service_name_dbt),
         _plain_env("OM_AWS_REGION", aws_region),
         _plain_env("OM_DBT_BUCKET", dbt_artifacts_bucket),
+        _plain_env("OM_DBT_PREFIX", dbt_artifacts_prefix),
+        _plain_env("OM_DBT_SCHEMA_INCLUDES", json.dumps(LAKE_DBT_SCHEMA_INCLUDES)),
     ],
 )
+
+# ---------------------------------------------------------------------------
+# Domains for what dbt does not describe
+# ---------------------------------------------------------------------------
+# The dbt job above sets the domain of each table dbt builds or declares.  This
+# one applies the same rules (ol-data-platform src/ol_dbt/openmetadata_domains.yml,
+# uploaded beside the manifest) to the lake tables dbt does not declare, and
+# derives each Superset dataset's and dashboard's domain from the tables it
+# reads.  Glue tables, pipelines and charts are left without domains; the
+# script's docstring says why.
+#
+# Runs after the dbt job (03:00), which sets the table domains the datasets
+# take, and the Superset job (04:00), which records the dataset lineage.
+#
+# Gated by the required open_metadata:enable_domain_assignment: it reads the
+# rules the lakehouse uploads beside the manifest on each scheduled build, and
+# QA has no scheduled build (its dbt artifacts come from hand-launched
+# dbt_docs_artifacts_job runs), so in QA the rules file never appears.
+if om_config.require_bool("enable_domain_assignment"):
+    _make_cronjob(
+        name="domains",
+        schedule="30 5 * * *",
+        python_script=(
+            Path(__file__).parent / "scripts" / "domain_assignment.py"
+        ).read_text(),
+        extra_env=[
+            _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+            # The service the dbt job enriches, so the tables it leaves to that
+            # job are the ones that job sets.
+            _plain_env("OM_LAKE_SERVICE_NAME", service_name_dbt),
+            _plain_env("OM_SUPERSET_SERVICE_NAME", service_name_superset),
+            _plain_env("OM_AWS_REGION", aws_region),
+            _plain_env("OM_DBT_BUCKET", dbt_artifacts_bucket),
+            _plain_env("OM_DBT_PREFIX", dbt_artifacts_prefix),
+            _plain_env("OM_DBT_SCHEMA_INCLUDES", json.dumps(LAKE_DBT_SCHEMA_INCLUDES)),
+            # true logs each change without making it, e.g. to review a rules
+            # change's effect before it lands.
+            _plain_env(
+                "OM_DOMAINS_DRY_RUN",
+                json.dumps(om_config.get_bool("domains_dry_run", default=False)),
+            ),
+        ],
+    )
 
 # ---------------------------------------------------------------------------
 # StarRocks: metadata, dbt enrichment, and lineage from the lake
@@ -674,10 +758,10 @@ _make_cronjob(
 # through its external catalogs are the lake tables the Trino and Glue
 # services already hold, and are not ingested a second time.
 #
-# open_metadata:starrocks_host_port is the single switch: unset (CI, where
-# there is no StarRocks cluster) creates none of the three jobs.  Credentials
-# come from the om-connector-starrocks secret, a Vault-issued read-only user
-# created by the application stack.
+# open_metadata:starrocks_host_port unset (a stack with no StarRocks cluster)
+# creates none of the three jobs.  Credentials come from the
+# om-connector-starrocks secret, a Vault-issued read-only user created by the
+# application stack.
 #
 # The three run in order after b2b_analytics_starrocks_nightly, the Dagster
 # schedule that builds the models at 06:00 UTC and uploads their manifest and
@@ -685,6 +769,14 @@ _make_cronjob(
 #   08:00  metadata          creates the tables in OM
 #   08:30  dbt enrichment    descriptions, tags, owners and test results
 #   09:00  lake lineage      edges from the lake tables each model reads
+#
+# The last two read the uploaded manifest, so open_metadata:enable_starrocks_dbt
+# creates them only where that schedule runs.  ol-data-platform registers it in
+# production alone (SCHEDULE_ENVIRONMENTS in lakehouse), and a hand
+# materialization in QA can't stand in for it: ol_warehouse_qa_dimensional held
+# none of the models' base tables on 2026-10-20, so the asset fails its
+# base-table check before dbt runs and uploads nothing.  Turn this on in QA
+# together with that schedule.
 starrocks_host_port = om_config.get("starrocks_host_port")
 
 # Name of the single service-level database OM files the StarRocks databases
@@ -699,8 +791,6 @@ STARROCKS_OM_DATABASE_NAME = "default_catalog"
 STARROCKS_DBT_SCHEMAS = ["b2b_analytics", "b2b_learner_records"]
 
 if starrocks_host_port:
-    starrocks_dbt_artifacts_prefix = "openmetadata/dbt-artifacts/starrocks"
-
     _make_cronjob(
         name="starrocks",
         schedule="0 8 * * *",
@@ -716,6 +806,9 @@ if starrocks_host_port:
             _secret_env("om-connector-starrocks", "OM_STARROCKS_PASSWORD"),
         ],
     )
+
+if starrocks_host_port and om_config.require_bool("enable_starrocks_dbt"):
+    starrocks_dbt_artifacts_prefix = f"{dbt_artifacts_prefix}/starrocks"
 
     # Same script as the Trino dbt job, pointed at the StarRocks artifacts.
     # The lake schemas are left out of the filter on purpose: the models'
@@ -756,6 +849,26 @@ if starrocks_host_port:
             _plain_env("OM_DBT_BUCKET", dbt_artifacts_bucket),
             _plain_env("OM_DBT_PREFIX", starrocks_dbt_artifacts_prefix),
             _plain_env("OM_DBT_SCHEMAS", json.dumps(STARROCKS_DBT_SCHEMAS)),
+            # The job deletes the lake edges the manifest no longer declares.
+            # It neither links nor prunes when a run would delete more than
+            # this share of them, since a manifest from the wrong target or a
+            # broken upload looks like every model stopped reading the lake.
+            # Raise it for one run after a refactor that legitimately drops
+            # that many.
+            _plain_env(
+                "OM_LINEAGE_PRUNE_MAX_FRACTION",
+                str(
+                    om_config.get_float(
+                        "starrocks_lineage_prune_max_fraction", default=0.5
+                    )
+                ),
+            ),
+            _plain_env(
+                "OM_LINEAGE_PRUNE_DRY_RUN",
+                json.dumps(
+                    om_config.get_bool("starrocks_lineage_prune_dry_run", default=False)
+                ),
+            ),
         ],
         bot_secret_name="om-lineage-bot",  # noqa: S106  # pragma: allowlist secret
     )
@@ -864,6 +977,76 @@ _make_cronjob(
 )
 
 # ---------------------------------------------------------------------------
+# Access control: policies, roles and teams
+# ---------------------------------------------------------------------------
+# Declared in access_control.py. These and the bots run as the Keycloak service
+# account that the application stack lists in initialAdmins (substructure/keycloak
+# openmetadata_provisioner.py), not as the ingestion bot the Jobs use: assigning
+# roles and editing display names need an admin.
+_provisioner_credentials = vault.kv.get_secret_v2_output(
+    mount=OPENMETADATA_PROVISIONER_VAULT_MOUNT,
+    name=OPENMETADATA_PROVISIONER_VAULT_NAME,
+    # The stack transformation sets the provider on resources only; an invoke
+    # without one would use the default provider, which has no Vault token.
+    opts=InvokeOptions(provider=vault_provider),
+).data
+om_api_url = open_metadata_stack.require_output("open_metadata")["api_url"]
+om_connection = OpenMetadataConnection(
+    server_url=om_api_url,
+    token_url=_provisioner_credentials["token_url"],
+    client_id=_provisioner_credentials["client_id"],
+    client_secret=_provisioner_credentials["client_secret"],
+)
+
+# Every resource here adopts its entity by name, so two Pulumi resources can
+# hold the same OpenMetadata id: renaming a resource's Pulumi name (or giving it
+# a parent) without an alias creates the new one by adopting the entity, then
+# deletes the old one by id. Each is therefore retain_on_delete, as the Job that
+# managed them never deleted anything. Remove a policy, role or team from
+# OpenMetadata by hand after dropping it here.
+om_policies = {
+    spec.name: OpenMetadataPolicy(
+        f"om-policy-{spec.name}-{stack_info.env_suffix}",
+        connection=om_connection,
+        spec=spec,
+        opts=ResourceOptions(retain_on_delete=True),
+    )
+    for spec in POLICIES
+}
+# A role may also name a policy OpenMetadata ships, which has no resource here.
+om_roles = {
+    spec.name: OpenMetadataRole(
+        f"om-role-{spec.name}-{stack_info.env_suffix}",
+        connection=om_connection,
+        spec=spec,
+        opts=ResourceOptions(
+            depends_on=[
+                om_policies[name] for name in spec.policies if name in om_policies
+            ],
+            retain_on_delete=True,
+        ),
+    )
+    for spec in ROLES
+}
+# Deleting a team would also take it off every asset it owns and the glossary
+# it reviews.
+om_teams = [
+    OpenMetadataTeam(
+        f"om-team-{spec.name}-{stack_info.env_suffix}",
+        connection=om_connection,
+        spec=spec,
+        opts=ResourceOptions(
+            depends_on=[
+                om_roles[name] for name in spec.default_roles or [] if name in om_roles
+            ],
+            retain_on_delete=True,
+        ),
+    )
+    for spec in TEAMS
+]
+
+
+# ---------------------------------------------------------------------------
 # Server-side configuration bootstrap
 # ---------------------------------------------------------------------------
 # Applies OM server settings that cannot be expressed in connector workflow
@@ -881,7 +1064,7 @@ _server_config_script = (
 ).read_text()
 _server_config_hash = hashlib.sha256(_server_config_script.encode()).hexdigest()[:8]
 
-kubernetes.batch.v1.Job(
+server_config_job = kubernetes.batch.v1.Job(
     f"om-server-config-{stack_info.env_suffix}",
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=f"om-server-config-{_server_config_hash}",
@@ -932,9 +1115,128 @@ kubernetes.batch.v1.Job(
         ttl_seconds_after_finished=86400,  # auto-clean after 24 h
     ),
     opts=ResourceOptions(
-        depends_on=[ingestion_irsa_role],
+        # The glossary the Job creates is owned by a team.
+        depends_on=[ingestion_irsa_role, *om_teams],
         delete_before_replace=True,
     ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Bots
+# ---------------------------------------------------------------------------
+# Creating a bot, giving it roles and reading its token are admin-only in
+# OpenMetadata. The bots hold roles declared above, so each waits for its role.
+
+# The server names its own bots' users <bot>@<principalDomain>
+# (BotResource.initialize); these follow suit.
+_BOT_EMAIL_DOMAIN = "mit.edu"
+
+# dagster-bot writes the Dagster asset check results, so that an OpenMetadata
+# alert on test case failures can leave them out with matchUpdatedBy (Dagster
+# notifies for its own checks). OpenMetadata 2.0.5's alert filters cannot match
+# on a test case's platform or definition.
+dagster_bot = OpenMetadataBot(
+    f"om-dagster-bot-{stack_info.env_suffix}",
+    connection=om_connection,
+    spec=OpenMetadataBotSpec(
+        name="dagster-bot",
+        display_name="Dagster",
+        description=(
+            "Writes Dagster asset check results to OpenMetadata as test cases."
+            " Managed by Pulumi in ol-infrastructure substructure/open_metadata."
+        ),
+        email=f"dagster-bot@{_BOT_EMAIL_DOMAIN}",
+        roles=["DagsterBotRole"],
+    ),
+    opts=ResourceOptions(depends_on=[om_roles["DagsterBotRole"]]),
+)
+
+# ol-data-platform's lakehouse code location reads secret-data/pipelines/*. A
+# path of its own rather than pipelines/openmetadata, which the application
+# stack filled with the ingestion bot's token until Dagster moved here: two
+# stacks writing one path would each delete it when they stop.
+vault.generic.Secret(
+    f"om-dagster-bot-vault-secret-{stack_info.env_suffix}",
+    path="secret-data/pipelines/openmetadata-dagster-bot",
+    data_json=Output.json_dumps({"token": dagster_bot.token, "server_url": om_api_url}),
+)
+
+# metrics-sync-bot runs ol-data-platform's `ol-dbt metrics sync`, which takes
+# its own name from /v1/users/loggedInUser and reads drift against the versions
+# that name wrote, so it cannot share another bot's identity. It is not a metric
+# reviewer and has no team (ol-data-platform metrics/README.md, "Status and
+# approval").
+metrics_sync_bot = OpenMetadataBot(
+    f"om-metrics-sync-bot-{stack_info.env_suffix}",
+    connection=om_connection,
+    spec=OpenMetadataBotSpec(
+        name="metrics-sync-bot",
+        display_name="Metrics sync",
+        description=(
+            "Publishes ol-data-platform's metrics/ files as Metric entities."
+            " Managed by Pulumi in ol-infrastructure substructure/open_metadata."
+        ),
+        email=f"metrics-sync-bot@{_BOT_EMAIL_DOMAIN}",
+        roles=["MetricsSyncBotRole"],
+    ),
+    opts=ResourceOptions(depends_on=[om_roles["MetricsSyncBotRole"]]),
+)
+
+# Beside the contracts sync's token, since the metrics sync is meant to run from
+# Concourse the same way, and Concourse reads only secret-concourse/<team>/*.
+# The developer policy reads secret-*, so the QA token also serves a manual
+# `--dry-run`.
+vault.generic.Secret(
+    f"om-metrics-sync-bot-vault-secret-{stack_info.env_suffix}",
+    path="secret-concourse/infrastructure/openmetadata_metrics_bot",
+    data_json=Output.json_dumps(
+        {"token": metrics_sync_bot.token, "server_url": om_api_url}
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Team membership -> Keycloak groups
+# ---------------------------------------------------------------------------
+# Team membership is assigned in the OpenMetadata UI. This job mirrors each team
+# declared in access_control.py's TEAMS into a Keycloak group under
+# /openmetadata-teams in the ol-data-platform realm, adding and removing members
+# to match. The Keycloak client and parent group come from the keycloak
+# substructure stack through the om-team-keycloak-sync secret.
+#
+# A schedule rather than OpenMetadata change events: each run reconciles the
+# whole state, so a missed run or a hand edit in Keycloak is corrected by the
+# next one, and there is no webhook receiver to deploy and secure.
+#
+# OpenMetadata's jwtTeamClaimMapping stays unset. With it set, every login would
+# add the Keycloak memberships back into OpenMetadata and undo removals made
+# there.
+
+_make_cronjob(
+    name="team-keycloak-sync",
+    schedule="17 * * * *",
+    python_script=(
+        Path(__file__).parent / "scripts" / "om_team_keycloak_sync.py"
+    ).read_text(),
+    extra_env=[
+        _plain_env("OM_SERVER_URL", OM_SERVER_URL),
+        _plain_env("OM_TEAMS", json.dumps(sorted(spec.name for spec in TEAMS))),
+        *(
+            _secret_env("om-team-keycloak-sync", key)
+            for key in (
+                "KEYCLOAK_REALM_URL",
+                "KEYCLOAK_ADMIN_URL",
+                "KEYCLOAK_CLIENT_ID",
+                "KEYCLOAK_CLIENT_SECRET",
+                "KEYCLOAK_PARENT_GROUP_ID",
+            )
+        ),
+    ],
+    resources={
+        "requests": {"cpu": "100m", "memory": "128Mi"},
+        "limits": {"cpu": "500m", "memory": "256Mi"},
+    },
 )
 
 export(

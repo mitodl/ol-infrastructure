@@ -3,12 +3,19 @@
 The scim-for-keycloak enterprise plugin stores its outbound provisioning targets
 in its own JPA tables, not in Keycloak's component model, so pulumi_keycloak
 cannot manage them. They are only reachable through the plugin's SCIM admin
-backend at ``/realms/{realm}/scim/admin/backend/scim/v2/RemoteScimProviderConfig``.
+backend at ``/realms/master/scim/admin/backend/scim/v2/RemoteScimProviderConfig``.
 
 Since plugin 4.x the backend accepts client_credentials tokens from a master
 realm service account that holds the ``master-realm`` client role
 ``scim-admin``. Earlier releases only accepted ``admin-cli`` and
 ``security-admin-console`` tokens.
+
+Requests go to the backend under the master realm, whatever realm the provider
+belongs to. The plugin verifies the token in its issuer realm but then looks up
+the token's client in the realm from the URL, and the service account client
+only exists in master, so ``/realms/olapps/...`` returns 401. The list endpoint
+under master returns providers from every realm the caller holds
+``<realm>-realm`` ``scim-admin`` on.
 
 Writes are read-modify-write: the live resource is fetched and only the
 declared attributes are overlaid before the PUT. A SCIM PUT replaces the whole
@@ -24,11 +31,14 @@ from pulumi import dynamic
 from pydantic import BaseModel, ConfigDict, field_validator
 from pydantic.alias_generators import to_camel
 
+from ol_infrastructure.providers.http import raise_for_status_with_body
+
 SCIM_REMOTE_PROVIDER_SCHEMA = (
     "urn:goldfish:params:scim:schemas:core:2.0:ScimRemoteProvider"
 )
 SCIM_CONTENT_TYPE = "application/scim+json"
 REQUEST_TIMEOUT_SECONDS = 30
+ADMIN_REALM = "master"
 LIST_PAGE_SIZE = 100
 
 
@@ -114,7 +124,7 @@ class ScimRemoteProviderSpec(BaseModel):
 
 def _session(props: dict[str, Any]) -> requests.Session:
     token_response = requests.post(
-        f"{props['keycloak_url']}/realms/master/protocol/openid-connect/token",
+        f"{props['keycloak_url']}/realms/{ADMIN_REALM}/protocol/openid-connect/token",
         data={
             "grant_type": "client_credentials",
             "client_id": props["client_id"],
@@ -136,27 +146,33 @@ def _session(props: dict[str, Any]) -> requests.Session:
 
 def _endpoint(props: dict[str, Any]) -> str:
     return (
-        f"{props['keycloak_url']}/realms/{props['realm']}"
+        f"{props['keycloak_url']}/realms/{ADMIN_REALM}"
         "/scim/admin/backend/scim/v2/RemoteScimProviderConfig"
     )
 
 
-def _raise_for_status(response: requests.Response) -> None:
-    # The SCIM error body carries the plugin's validation message, which
-    # raise_for_status() alone would drop.
-    if not response.ok:
-        msg = (
-            f"{response.request.method} {response.url} returned "
-            f"{response.status_code}: {response.text}"
-        )
-        raise RuntimeError(msg)
+def _restore_ints(value: Any) -> Any:
+    """Turn integral floats back into ints.
+
+    Dynamic provider inputs cross the engine as a protobuf ``Struct``, which
+    only has doubles, so ``300`` arrives as ``300.0``. The plugin rejects a
+    float for its integer attributes (e.g. ``retryIntervalInSeconds``), and the
+    spec declares no float attributes.
+    """
+    if isinstance(value, dict):
+        return {key: _restore_ints(entry) for key, entry in value.items()}
+    if isinstance(value, list):
+        return [_restore_ints(entry) for entry in value]
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
 
 
 def _declared(props: dict[str, Any]) -> dict[str, Any]:
     declared = dict(props["spec"])
     if props["authentication"] is not None:
         declared["authenticationList"] = props["authentication"]
-    return declared
+    return _restore_ints(declared)
 
 
 def _find_by_name(
@@ -172,7 +188,7 @@ def _find_by_name(
             params={"count": LIST_PAGE_SIZE, "startIndex": len(resources) + 1},
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
-        _raise_for_status(response)
+        raise_for_status_with_body(response)
         page = response.json()
         page_resources = page.get("Resources", [])
         if not page_resources:
@@ -254,7 +270,7 @@ def _put(
         json=body,
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
-    _raise_for_status(response)
+    raise_for_status_with_body(response)
     return response.json()
 
 
@@ -277,7 +293,7 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
                 json={"schemas": [SCIM_REMOTE_PROVIDER_SCHEMA], **_declared(props)},
                 timeout=REQUEST_TIMEOUT_SECONDS,
             )
-            _raise_for_status(response)
+            raise_for_status_with_body(response)
             created = response.json()
         return dynamic.CreateResult(id_=created["id"], outs=props)
 
@@ -288,7 +304,7 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
             # An empty id tells the engine the resource is gone, so a provider
             # deleted in the admin UI drops out of state on refresh.
             return dynamic.ReadResult(id_="", outs={})
-        _raise_for_status(response)
+        raise_for_status_with_body(response)
         live = response.json()
         return dynamic.ReadResult(
             id_=id_,
@@ -324,7 +340,7 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
     ) -> dynamic.UpdateResult:
         session = _session(_news)
         response = _get(session, _news, _id)
-        _raise_for_status(response)
+        raise_for_status_with_body(response)
         _put(session, _news, response.json())
         return dynamic.UpdateResult(outs=_news)
 
@@ -335,7 +351,7 @@ class ScimRemoteProviderProvider(dynamic.ResourceProvider):
         )
         if response.status_code == requests.codes.not_found:
             return
-        _raise_for_status(response)
+        raise_for_status_with_body(response)
 
 
 class ScimRemoteProvider(dynamic.Resource):

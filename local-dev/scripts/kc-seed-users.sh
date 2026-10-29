@@ -6,9 +6,9 @@
 #
 # Users created (the realm has registrationEmailAsUsername=true, so log in with
 # the email address as the username):
-#   admin@odl.local   / localdev123  — realm admin role
-#   student@odl.local / localdev123
-#   prof@odl.local    / localdev123
+#   admin@ol.test   / localdev123  — realm admin role
+#   student@ol.test / localdev123
+#   prof@ol.test    / localdev123
 #
 # Usage:
 #   ./local-dev/scripts/kc-seed-users.sh
@@ -19,50 +19,8 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-
-_ROOT_DOMAIN="${LOCAL_DEV_ROOT_DOMAIN:-mit.dev}"
-KC_URL="${KC_URL:-https://sso.ol.${_ROOT_DOMAIN}}"
-REALM="olapps"
-KC_USER="admin"
-KC_PASS="admin"  # pragma: allowlist secret
-
-# The ingress serves an mkcert-issued cert (setup.sh generates it) whose root CA
-# is not in the system trust store, so every curl below must validate against
-# that CA explicitly. Without it curl exits 60 on the handshake, the token comes
-# back empty, and get_token's retry loop reports it as "waiting for Keycloak" —
-# which sends you looking at a Keycloak that was healthy the whole time.
-KC_CACERT="${KC_CACERT:-${REPO_ROOT}/local-dev/certs/rootCA.pem}"
-if [ ! -f "${KC_CACERT}" ]; then
-    echo "[kc-seed-users] ERROR: CA certificate not found at ${KC_CACERT}" >&2
-    echo "[kc-seed-users] Run local-dev/scripts/setup.sh to generate the local certs." >&2
-    exit 1
-fi
-
-# ---------------------------------------------------------------------------
-# Helper: obtain an admin access token, retrying up to 5 times.
-# ---------------------------------------------------------------------------
-get_token() {
-    local token attempt
-    for attempt in 1 2 3 4 5; do
-        token=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
-            -X POST "${KC_URL}/realms/master/protocol/openid-connect/token" \
-            -d "client_id=admin-cli" \
-            -d "grant_type=password" \
-            -d "username=${KC_USER}" \
-            -d "password=${KC_PASS}" 2>/dev/null \
-            | jq -r '.access_token // empty' 2>/dev/null || true)
-        if [ -n "$token" ] && [ "$token" != "null" ]; then
-            echo "$token"
-            return 0
-        fi
-        echo "[kc-seed-users] attempt ${attempt}/5: waiting for Keycloak..." >&2
-        sleep 5
-    done
-    echo "[kc-seed-users] ERROR: could not obtain admin token from ${KC_URL}" >&2
-    return 1
-}
+# shellcheck source=local-dev/scripts/kc-admin.sh disable=SC1091  # followed only with -x
+source "$(dirname "${BASH_SOURCE[0]}")/kc-admin.sh"
 
 echo "[kc-seed-users] Connecting to Keycloak at ${KC_URL} ..."
 TOKEN=$(get_token)
@@ -100,9 +58,9 @@ ensure_admin_role
 # ---------------------------------------------------------------------------
 user_email() {
     case "$1" in
-        admin) echo "admin@odl.local" ;;
-        student) echo "student@odl.local" ;;
-        prof) echo "prof@odl.local" ;;
+        admin) echo "admin@ol.test" ;;
+        student) echo "student@ol.test" ;;
+        prof) echo "prof@ol.test" ;;
     esac
 }
 user_first() {
@@ -120,7 +78,7 @@ for USERNAME in admin student prof; do
 
     # Check if user already exists. Look up by email, not username: the realm
     # has registrationEmailAsUsername=true, so Keycloak stores the username as
-    # the email address (e.g. "admin@odl.local", not "admin"). A username=
+    # the email address (e.g. "admin@ol.test", not "admin"). A username=
     # lookup would always miss and the script would try to re-create existing
     # users on every run, breaking idempotency.
     EXISTING_ID=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
@@ -144,6 +102,7 @@ for USERNAME in admin student prof; do
             \"email\": \"${EMAIL}\",
             \"firstName\": \"${FIRST}\",
             \"lastName\": \"${LAST}\",
+            \"attributes\": {\"fullName\": [\"${FIRST} ${LAST}\"]},
             \"enabled\": true,
             \"emailVerified\": true,
             \"credentials\": [{
@@ -181,7 +140,7 @@ done
 # The Admin group is provisioned by local-dev/infra/modules/keycloak.py. This
 # runs for existing users too, so it fixes up realms seeded before the group.
 ensure_admin_group_membership() {
-    local email="admin@odl.local"
+    local email="admin@ol.test"
     local user_id group_id
     user_id=$(curl -sf --cacert "${KC_CACERT}" --max-time 10 \
         -H "Authorization: Bearer ${TOKEN}" \

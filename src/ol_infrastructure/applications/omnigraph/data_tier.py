@@ -55,6 +55,7 @@ from pulumi import Output, ResourceOptions
 from ol_infrastructure.applications.omnigraph.cluster_config import (
     build_cluster_graphs,
     build_cluster_policies,
+    require_withheld_graphs_removable,
 )
 from ol_infrastructure.applications.omnigraph.image_schema import (
     ImageSchemaUnavailableError,
@@ -68,7 +69,7 @@ from ol_infrastructure.applications.omnigraph.lock_handoff import (
     validate_graph_removal_allowlist,
 )
 from ol_infrastructure.applications.omnigraph.maintenance import (
-    DEFAULT_CLEANUP_ISO_WEEKDAY,
+    DEFAULT_CLEANUP_ISO_WEEKDAYS,
     DEFAULT_MAINTENANCE_SCHEDULE,
     OmnigraphMaintenance,
     create_maintenance,
@@ -120,6 +121,54 @@ CLUSTER_APPLY_ACTOR = "svc-witan-admin"
 # derived from the memory limit, and a limit raised without revisiting the caps
 # would silently leave them mis-sized.
 SERVER_MEMORY_LIMIT = "2Gi"
+
+# How long the server drains in-flight requests after SIGTERM, and the pod's
+# grace around that. See termination_grace_period_seconds on the Deployment.
+SERVER_SHUTDOWN_GRACE_SECONDS = 120
+SERVER_TERMINATION_GRACE_SECONDS = SERVER_SHUTDOWN_GRACE_SECONDS + 5
+
+# The startupProbe's timing. See startup_probe on the Deployment for how the
+# default budget (135s) was sized.
+STARTUP_PROBE_INITIAL_DELAY_SECONDS = 20
+STARTUP_PROBE_PERIOD_SECONDS = 5
+DEFAULT_STARTUP_PROBE_FAILURE_THRESHOLD = 24
+DEFAULT_BOOT_BUDGET_SECONDS = (
+    STARTUP_PROBE_INITIAL_DELAY_SECONDS
+    + (DEFAULT_STARTUP_PROBE_FAILURE_THRESHOLD - 1) * STARTUP_PROBE_PERIOD_SECONDS
+)
+# Room a raised boot budget's rollout gets beyond the old pod's termination
+# grace and the new pod's boot, for scheduling and the image pull.
+BOOT_ROLLOUT_SLACK_SECONDS = 300
+
+
+def startup_probe_failure_threshold(boot_budget_seconds: int | None) -> int:
+    """Return the startupProbe failure threshold that gives a boot this long.
+
+    The Nth failure lands at initial_delay + (N-1) x period, so this is the
+    smallest N whose kill comes at or after ``boot_budget_seconds``.
+
+    :param boot_budget_seconds: ``omnigraph:boot_budget_seconds``, or ``None``
+        for the default budget.
+    :raises ValueError: when the budget is shorter than the default, which
+        would kill a healthy boot.
+    :returns: the probe's ``failure_threshold``.
+    :rtype: int
+    """
+    if boot_budget_seconds is None:
+        return DEFAULT_STARTUP_PROBE_FAILURE_THRESHOLD
+    if boot_budget_seconds < DEFAULT_BOOT_BUDGET_SECONDS:
+        msg = (
+            f"omnigraph:boot_budget_seconds={boot_budget_seconds} is shorter "
+            f"than the default {DEFAULT_BOOT_BUDGET_SECONDS}s. It exists to "
+            "lengthen a boot, e.g. one whose cluster apply deletes a graph."
+        )
+        raise ValueError(msg)
+    after_first_probe = boot_budget_seconds - STARTUP_PROBE_INITIAL_DELAY_SECONDS
+    # Integer ceiling division: exact for any budget, unlike float division.
+    return (
+        after_first_probe + STARTUP_PROBE_PERIOD_SECONDS - 1
+    ) // STARTUP_PROBE_PERIOD_SECONDS + 1
+
 
 # ── Per-actor admission caps ─────────────────────────────────────────────────
 #
@@ -313,8 +362,10 @@ def create_data_tier(  # noqa: PLR0913
     per_actor_inflight_max: int = DEFAULT_PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max: int = DEFAULT_PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist: list[str] | None = None,
+    withheld_graphs: list[str] | None = None,
+    boot_budget_seconds: int | None = None,
     maintenance_schedule: str = DEFAULT_MAINTENANCE_SCHEDULE,
-    cleanup_iso_weekday: int = DEFAULT_CLEANUP_ISO_WEEKDAY,
+    cleanup_iso_weekdays: tuple[int, ...] = DEFAULT_CLEANUP_ISO_WEEKDAYS,
     *,
     suspend_maintenance: bool = False,
     migration_armed: bool = False,
@@ -346,7 +397,17 @@ def create_data_tier(  # noqa: PLR0913
     delete when ``cluster.yaml`` stops declaring them. Only read once the
     served format is one whose binaries delete on apply (0.13, format 14).
 
-    ``maintenance_schedule`` and ``cleanup_iso_weekday`` set the nightly stop
+    ``withheld_graphs`` leaves graphs out of ``cluster.yaml``, its policy
+    bundles and the maintenance window's graph list, to rebuild a graph
+    whose schema change cannot be migrated in place. See
+    ``build_cluster_graphs``.
+
+    ``boot_budget_seconds`` lengthens the startupProbe's budget, and the
+    Deployment's progress deadline and Pulumi's wait with it, for a deploy
+    whose boot apply runs long (e.g. the delete of a withheld graph). ``None``
+    keeps the default 135s and leaves the Deployment spec unchanged.
+
+    ``maintenance_schedule`` and ``cleanup_iso_weekdays`` set the nightly stop
     window that replaces the optimize and cleanup sweeps on that format, and
     ``optimize_schedule`` / ``cleanup_schedule`` are then unused. See
     ``maintenance.create_maintenance_window``.
@@ -459,10 +520,13 @@ def create_data_tier(  # noqa: PLR0913
     # below is mounted with ``sub_path`` so it overlays only the single
     # ``cluster.yaml`` file and leaves those baked-in schemas visible alongside
     # it, rather than replacing the whole directory.
-    cluster_graphs = build_cluster_graphs(managed_repos)
+    cluster_graphs = build_cluster_graphs(managed_repos, withheld_graphs)
     removable_graphs = validate_graph_removal_allowlist(
         [] if graph_removal_allowlist is None else graph_removal_allowlist,
         list(cluster_graphs),
+    )
+    require_withheld_graphs_removable(
+        [] if withheld_graphs is None else withheld_graphs, removable_graphs
     )
     # Whether the served format is 0.12+'s, where every writer keeps the
     # root's exclusive lock after it exits. Keyed on the served format rather
@@ -716,6 +780,15 @@ def create_data_tier(  # noqa: PLR0913
         if persisted_lock
         else None
     )
+    startup_failure_threshold = startup_probe_failure_threshold(boot_budget_seconds)
+    # The old pod's termination grace (Recreate) plus the new pod's boot.
+    boot_rollout_seconds = (
+        SERVER_TERMINATION_GRACE_SECONDS
+        + boot_budget_seconds
+        + BOOT_ROLLOUT_SLACK_SECONDS
+        if boot_budget_seconds is not None
+        else None
+    )
     omnigraph_deployment = kubernetes.apps.v1.Deployment(
         f"omnigraph-omnigraph-server-deployment-{stack_info.env_suffix}",
         metadata=kubernetes.meta.v1.ObjectMetaArgs(
@@ -741,6 +814,13 @@ def create_data_tier(  # noqa: PLR0913
             annotations={
                 **({MIGRATION_ARMED_ANNOTATION: "true"} if migration_armed else {}),
                 **({"pulumi.com/patchForce": "true"} if persisted_lock else {}),
+                # Pulumi waits 10 minutes for a Deployment by default, which a
+                # raised boot budget can outlast.
+                **(
+                    {"pulumi.com/timeoutSeconds": str(boot_rollout_seconds)}
+                    if boot_rollout_seconds is not None
+                    else {}
+                ),
             }
             or None,
         ),
@@ -764,6 +844,9 @@ def create_data_tier(  # noqa: PLR0913
             # apply scaled the tier back up mid-migration. Clearing
             # migrate_from_image at cutover scales it back to 1.
             replicas=0 if migration_armed else 1,
+            # Unset by default (Kubernetes' 600s). A raised boot budget would
+            # otherwise mark the rollout ProgressDeadlineExceeded mid-boot.
+            progress_deadline_seconds=boot_rollout_seconds,
             # Recreate, NOT the default RollingUpdate: storage is
             # strict-single-version ("a binary reads exactly one storage-format
             # version"; a mixed fleet writing one graph is unsupported), so a
@@ -816,43 +899,38 @@ def create_data_tier(  # noqa: PLR0913
                     # of dead time this task describes no longer reproduces
                     # in the typical case.
                     #
-                    # NOT lowered below 30 despite that, on review: this pod
-                    # already admits writes it expects to take up to the
-                    # tool-call deadline below, not just an instant — see the
-                    # per-actor admission-cap sizing above, MEASURED
-                    # 2026-08-12: n=4 concurrent single-row writes wall
-                    # 15.54s, comfortably admitted as "lands inside the
-                    # deadline". A cap below that would let a routine
-                    # restart SIGKILL a write the server had already decided
-                    # was safe to admit — trading a bounded, expected outage
-                    # for the exact indeterminate-outcome risk
+                    # The server drains for SERVER_SHUTDOWN_GRACE_SECONDS,
+                    # witan's 120s request budget
+                    # (WITAN_REMOTE_CALL_BUDGET_SECONDS). Every write the
+                    # per-actor cap admits is one its caller waits up to that
+                    # long for, and writes to one graph commit one at a time,
+                    # so a restart during a burst has to let the queue finish.
+                    # Cutting it off sooner turns writes the server already
+                    # admitted into the indeterminate outcome
                     # tk-a-502-from-the-deployed-witan-does-not-mean-the--f76dcb
-                    # describes, on every restart rather than only under
-                    # genuine overload. 30 is the tool call's own hard
-                    # deadline (three hardcoded ToolHive constants, same
-                    # comment block) — the client has already given up and
-                    # treated the call as failed by the time the server
-                    # would still be waiting, so there is nothing to gain by
-                    # going higher, and real risk in going lower.
+                    # describes. Waiting longer gains nothing, because the
+                    # caller has given up by then. This was 30 while ToolHive
+                    # cut tool calls at 30s and the cap was 4 (4 concurrent
+                    # writes took 15.54s on 2026-08-12). QA measured 1.3-2.3s
+                    # between commits at 16 writers on 2026-10-21, so a queue
+                    # at Production's cap of 16 can outlast 30s.
                     #
-                    # 35, NOT 30, since omnigraph 0.11 bounds its own shutdown.
-                    # 0.11 holds in-flight requests after SIGTERM for
-                    # OMNIGRAPH_SHUTDOWN_GRACE_SECONDS (upstream default 25)
-                    # and exits 2 at that deadline; upstream says the
-                    # orchestrator's grace must be longer. The server's grace
-                    # is set to 30 below, the tool-call deadline above, which
-                    # covers the measured 15.54s write with the same margin
-                    # this value had. The pod gets 5s more so the process
-                    # exits on its own deadline rather than being SIGKILLed
-                    # at it. An idle server still exits within milliseconds
-                    # (measured locally on 0.11.0), so the extra 5s costs
-                    # nothing on a routine restart.
+                    # omnigraph holds in-flight requests after SIGTERM for
+                    # OMNIGRAPH_SHUTDOWN_GRACE_SECONDS and exits 2 at that
+                    # deadline; upstream says the orchestrator's grace must be
+                    # longer. The pod gets 5s more so the process exits on its
+                    # own deadline rather than being SIGKILLed at it. An idle
+                    # server still exits within milliseconds (measured locally
+                    # on 0.11.0), so this costs nothing on a routine restart.
+                    # A restart during a burst holds the Recreate outage open
+                    # until the queue drains. The maintenance window's wait
+                    # for the server to stop is derived from this value.
                     #
                     # No preStop sleep: one replica under `Recreate` has no
                     # other endpoint to drain traffic to, so a sleep would
                     # only lengthen the outage and spend from this same
                     # budget.
-                    termination_grace_period_seconds=35,
+                    termination_grace_period_seconds=SERVER_TERMINATION_GRACE_SECONDS,
                     containers=[
                         kubernetes.core.v1.ContainerArgs(
                             name="omnigraph-server",
@@ -897,7 +975,7 @@ def create_data_tier(  # noqa: PLR0913
                                 # this can land before the 0.11 image.
                                 kubernetes.core.v1.EnvVarArgs(
                                     name="OMNIGRAPH_SHUTDOWN_GRACE_SECONDS",
-                                    value="30",
+                                    value=str(SERVER_SHUTDOWN_GRACE_SECONDS),
                                 ),
                                 # What the 0.13 entrypoint reads to take over
                                 # the previous pod's lock. See lock_handoff.py.
@@ -987,9 +1065,11 @@ def create_data_tier(  # noqa: PLR0913
                                 # the probe that passed. Going later would
                                 # trade that away, delaying Ready on every
                                 # fast boot to buy the one failure back.
-                                initial_delay_seconds=20,
-                                period_seconds=5,
-                                failure_threshold=24,
+                                initial_delay_seconds=(
+                                    STARTUP_PROBE_INITIAL_DELAY_SECONDS
+                                ),
+                                period_seconds=STARTUP_PROBE_PERIOD_SECONDS,
+                                failure_threshold=startup_failure_threshold,
                             ),
                             # Readiness is on /readyz and liveness on /healthz,
                             # the split upstream's deployment guide
@@ -1143,9 +1223,10 @@ def create_data_tier(  # noqa: PLR0913
                     cluster_configmap_name=CLUSTER_CONFIGMAP_NAME,
                     cluster_config_dir=CLUSTER_CONFIG_DIR,
                     server_deployment_name=OMNIGRAPH_SERVER_SERVICE_NAME,
+                    server_termination_grace_seconds=SERVER_TERMINATION_GRACE_SECONDS,
                     schedule=maintenance_schedule,
                     cleanup_older_than=cleanup_older_than,
-                    cleanup_iso_weekday=cleanup_iso_weekday,
+                    cleanup_iso_weekdays=cleanup_iso_weekdays,
                     # Behind the Deployment: the window needs the Lease the
                     # Deployment already waits for, and a graph the first boot
                     # has not applied yet fails its `optimize`.

@@ -5,7 +5,7 @@ config:
   # Measured 2026-09-15: the hot volume grew 4.17 -> 9.08 GiB over 11 weeks
   # (+1.95 GiB/month, the one non-prod volume with a real upward trend). Note
   # that hot_data_days does NOT bound this -- it is informational only, and no
-  # deployed table carries a TTL ... TO VOLUME 'cold', so nothing ever tiers to
+  # deployed table carries a move TTL to the cold tier, so nothing ever tiers to
   # S3. The growth is untiered system-log accumulation (system holds 5.38 GiB of
   # the 6.0 GiB store; text_log, metric_log, asynchronous_metric_log and
   # processors_profile_log have no TTL), so it is steady rather than
@@ -17,7 +17,9 @@ config:
   # operator's rolling restart, 3 Keeper nodes exercise quorum.
   clickhouse:replicas: '2'
   clickhouse:keeper_replicas: '3'
-  clickhouse:version: 24.8.14.10546.altinitystable
+  # Mid-upgrade to 25.8 (CLICKHOUSE_SERVER_VERSION): keep writing parts 24.8
+  # replicas can read until every replica runs 25.8.
+  clickhouse:compatibility: '24.8'
   vault:address: https://vault-qa.odl.mit.edu
   vault_server:env_namespace: operations.qa
   clickhouse:admin_password:
@@ -26,5 +28,17 @@ config:
     secure: v1:aCDdZ/XQXLi1PjFu:JW3cgJ4QnmYADnRtbJyuUyC8o20RQzJmp9Zaxwyq2xTThaGiA9+iKi+DAvKgVWj59AihbaJYV+E=
   clickhouse:opik_password:
     secure: v1:welcw7aZeYvZE/P1:4a5YIKqFpx7DRcLqOf6HQEkSzj+Ur34KJHD3pZbrc6MePWPSkRSnRxjeFqm+bDXAJM8zBZMejbc=
+  # Set to "true" only after the apply that adds interserver_password has
+  # restarted every replica (see INTERSERVER_CREDENTIALS_XML in __main__.py).
+  clickhouse:interserver_credentials_enabled: "false"
+  # Set to "true" only after Keeper is verified serving TLS on 9281 in this
+  # environment; flipping it restarts every replica (see keeper_tls_enabled
+  # in __main__.py).
+  clickhouse:keeper_tls_enabled: "false"
+  # Set to "true" only after every chi-* pod mounts /etc/clickhouse-server/tls
+  # (see tls_listeners_enabled in __main__.py). Apply opik after this stack.
+  clickhouse:tls_listeners_enabled: "false"
+  clickhouse:interserver_password:
+    secure: v1:LD+fef8012oLTL3k:3h67AkUS7Nfi3uVH3q43ZmlLDck1a2Z6Ew7wuTMW7VXNTerZ9enwdc12ilM+1aD27MJ6tD2cs2B+YsUN
 secretsprovider: awskms://alias/infrastructure-secrets-qa
 encryptedkey: AQICAHjZAY5LtmRWGljev0oiDGn0jR5cRwD4IVXCn50TW5i0qQFJ5ilpKwEX1fFnZEcvabyvAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMkiHCg5JwutG4bAb/AgEQgDvRQvEmWMj3/wmxQkcAhY9N/KfDJD2xcy+97xpIF8CzCM5r6eC/Hspei7YI4EPw4CosTwavWa0jl4bvEw==

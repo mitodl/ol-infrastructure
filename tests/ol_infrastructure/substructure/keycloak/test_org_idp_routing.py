@@ -27,6 +27,7 @@ from ol_infrastructure.substructure.keycloak.org_sso_helpers import (
     onboard_oidc_org,
     onboard_saml_org,
 )
+from tests.ol_infrastructure.recording_mocks import RecordingMocks
 
 REALM = "olapps"
 IDP_TYPES = {
@@ -35,26 +36,17 @@ IDP_TYPES = {
 }
 
 
-class _RecordingMocks(pulumi.runtime.Mocks):
-    def __init__(self) -> None:
-        self.resources: list[pulumi.runtime.MockResourceArgs] = []
-
-    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-        self.resources.append(args)
-        return [f"{args.name}_id", dict(args.inputs)]
-
-    def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
-        return {}
-
-
 def _onboard_oidc(org: OrgConfig, org_domain: str) -> None:
-    with mock.patch.object(
-        org_sso_helpers,
-        "oidc_identity_provider_args_from_discovery_url",
-        return_value={
-            "authorization_url": "https://idp.example.com/auth",
-            "token_url": "https://idp.example.com/token",
-        },
+    with (
+        mock.patch.object(org_sso_helpers, "load_oidc_discovery", return_value={}),
+        mock.patch.object(
+            org_sso_helpers,
+            "oidc_identity_provider_args_from_discovery",
+            return_value={
+                "authorization_url": "https://idp.example.com/auth",
+                "token_url": "https://idp.example.com/token",
+            },
+        ),
     ):
         onboard_oidc_org(
             OIDCIdpConfig(
@@ -78,6 +70,7 @@ def _onboard_oidc(org: OrgConfig, org_domain: str) -> None:
 
 def _onboard_saml(org: OrgConfig, org_domain: str) -> None:
     with (
+        mock.patch.object(org_sso_helpers, "load_saml_metadata"),
         mock.patch.object(org_sso_helpers, "extract_saml_metadata", return_value={}),
         mock.patch.object(
             org_sso_helpers,
@@ -114,7 +107,7 @@ ONBOARD = {"oidc": _onboard_oidc, "saml": _onboard_saml}
 def _idp_inputs(
     protocol: str, org_domains: list[str], org_domain: str = "ANY"
 ) -> dict[str, Any]:
-    recording = _RecordingMocks()
+    recording = RecordingMocks()
     pulumi.runtime.set_mocks(recording, preview=False)
 
     @pulumi.runtime.test

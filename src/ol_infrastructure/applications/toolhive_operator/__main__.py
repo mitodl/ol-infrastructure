@@ -78,6 +78,7 @@ toolhive_crds_release = kubernetes.helm.v3.Release(
         version=TOOLHIVE_OPERATOR_CRDS_CHART_VERSION,
         namespace=TOOLHIVE_NAMESPACE,
         cleanup_on_fail=True,
+        max_history=10,
         skip_await=False,
         values={},
     ),
@@ -94,6 +95,7 @@ toolhive_operator_release = kubernetes.helm.v3.Release(
         version=TOOLHIVE_OPERATOR_CHART_VERSION,
         namespace=TOOLHIVE_NAMESPACE,
         cleanup_on_fail=True,
+        max_history=10,
         skip_await=False,
         # CRDs are managed by the dedicated release above.
         skip_crds=True,

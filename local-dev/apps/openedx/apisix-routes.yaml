@@ -8,9 +8,9 @@ metadata:
 spec:
   ingressClassName: apache-apisix
   hosts:
-  - "lms.mit.dev"
-  - "studio.mit.dev"
-  - "notes.mit.dev"
+  - "lms.mit.test"
+  - "studio.mit.test"
+  - "notes.mit.test"
   secret:
     name: local-dev-tls
     namespace: openedx
@@ -43,7 +43,7 @@ spec:
     priority: 0
     match:
       hosts:
-      - "lms.mit.dev"
+      - "lms.mit.test"
       paths:
       - "/*"
     backends:
@@ -72,7 +72,7 @@ spec:
     priority: 10
     match:
       hosts:
-      - "lms.mit.dev"
+      - "lms.mit.test"
       paths:
       # Both forms: /learn/* covers the SPA routes and the hashed assets,
       # /learn alone is the bare entry point a hand-typed URL or a redirect
@@ -97,7 +97,7 @@ spec:
     priority: 0
     match:
       hosts:
-      - "studio.mit.dev"
+      - "studio.mit.test"
       paths:
       - "/*"
     backends:
@@ -118,10 +118,35 @@ spec:
     priority: 0
     match:
       hosts:
-      - "notes.mit.dev"
+      - "notes.mit.test"
       paths:
       - "/*"
     backends:
     - serviceName: notes
       servicePort: 8000
+    plugin_config_name: openedx-shared-plugins
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: authoring-mfe-route
+  namespace: openedx
+spec:
+  ingressClassName: apache-apisix
+  http:
+  - name: authoring-mfe
+    # Above studio-route's /* on the same host.
+    priority: 10
+    match:
+      hosts:
+      - "studio.mit.test"
+      paths:
+      # Both forms, as for learning-mfe-route: COURSE_AUTHORING_MICROFRONTEND_URL
+      # carries no trailing slash, so Studio's redirect into the MFE lands on
+      # the bare path, which /authoring/* does not match.
+      - "/authoring"
+      - "/authoring/*"
+    backends:
+    - serviceName: mfe-authoring
+      servicePort: 80
     plugin_config_name: openedx-shared-plugins

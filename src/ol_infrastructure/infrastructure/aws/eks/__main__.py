@@ -1231,6 +1231,7 @@ cert_manager_release = setup_cert_manager(
     k8s_provider=k8s_provider,
     operations_namespace=operations_namespace,
     node_groups=node_groups,
+    prometheus_operator_crds=prometheus_operator_crds,
     k8s_global_labels=k8s_global_labels,
     operations_tolerations=operations_tolerations,
     versions=VERSIONS,
@@ -1343,6 +1344,7 @@ metrics_server_release = kubernetes.helm.v3.Release(
             repo="https://kubernetes-sigs.github.io/metrics-server/",
         ),
         cleanup_on_fail=True,
+        max_history=10,
         skip_await=False,
         values={
             "commonLabels": metrics_server_labels,

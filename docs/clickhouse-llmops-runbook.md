@@ -18,7 +18,7 @@ deployed on the data EKS cluster for LLMOps tooling (TensorZero, Opik).
 1. [Initial Cluster Setup](#initial-cluster-setup)
 2. [Adding a New LLMOps Tenant](#adding-a-new-llmops-tenant)
 3. [Rotating Credentials](#rotating-credentials)
-4. [Adjusting Hot/Cold Storage Tier Cutoff](#adjusting-hotcold-storage-tier-cutoff)
+4. [Tiered Storage and the Opik v2 Cutover](#tiered-storage-and-the-opik-v2-cutover)
 5. [Scaling the Cluster](#scaling-the-cluster)
 6. [Monitoring and Alerting](#monitoring-and-alerting)
 7. [Backup and Restore](#backup-and-restore)
@@ -150,38 +150,146 @@ of VSO syncing the new secret).
 
 ---
 
-## Adjusting Hot/Cold Storage Tier Cutoff
+## Tiered Storage and the Opik v2 Cutover
 
-The `hot_data_days` config is **informational only** — it is stored as a Pulumi stack
-config value for operator reference but is **not read by the Pulumi program** and does
-not automatically configure ClickHouse TTL MOVE intervals. The actual data movement
-cutoff is determined by the `TTL … TO VOLUME 'cold'` expressions defined in each
-table's DDL.
+> _Draft. Nothing below has been run in any environment yet._
 
-Each LLMOps tool must define `TTL` expressions in their table DDL pointing to the
-`tiered` storage policy. Example table DDL:
-```sql
-CREATE TABLE IF NOT EXISTS tensorzero_db.spans
-(
-    span_id UUID,
-    timestamp DateTime,
-    -- ... other columns
-)
-ENGINE = ReplicatedMergeTree('/clickhouse/tables/{shard}/tensorzero_db.spans', '{replica}')
-PARTITION BY toYYYYMM(timestamp)
-ORDER BY (timestamp, span_id)
-TTL timestamp + INTERVAL 7 DAY TO VOLUME 'cold'
-SETTINGS storage_policy = 'tiered';
-```
+Every table in every environment is on ClickHouse's built-in `default` policy and
+all parts sit on the hot `default` disk (checked 2026-10-20). The one tiering
+policy defined in `config.d/storage.xml`, `tiered_replicated`, is the Opik
+chart's `clickhouse.tieredStorage` layout (chart 2.2.103): volume `default` on
+the `default` disk, volume `cold` on the `cold` disk, which is a read-through
+cache over `cold_s3`. Tables move onto it one at a time. A table can only switch
+to a policy that keeps every volume and disk of its current one, which is why
+the hot volume is named `default`.
 
-To update the cutoff for a table, alter the TTL expression directly in ClickHouse:
-```sql
-ALTER TABLE tensorzero_db.spans MODIFY TTL timestamp + INTERVAL 14 DAY TO VOLUME 'cold';
-```
+`hot_data_days` is not read by the program. The move-to-cold interval lives in
+each table's TTL.
 
-Updating `clickhouse:hot_data_days` via `pulumi config set` and running `pulumi up`
-will **not** change the TTL of existing tables; it only records the intended policy for
-operator awareness.
+Opik's `traces` and `spans` can't usefully tier as they are: they are
+unpartitioned, so each holds one or two huge parts spanning their whole history,
+and a TTL move takes whole parts. Upstream Opik replaces them with
+`traces_local_v2` / `spans_local_v2` (migrations 000101/000115, already applied
+and empty here), partitioned by `toMonday(id_at)`, through an operator-run
+cutover. After it, a move TTL moves whole weeks.
+
+The upstream policy attachment is the chart's `clickhouse-tiered-storage-ttl`
+Job (`clickhouse.tieredStorage.ttl.enabled`), not a Liquibase migration. It and
+the chart's cold-tier migration Job render only when `clickhouse.enabled` is
+true, i.e. when the chart runs ClickHouse itself. Our opik stack sets it false,
+so we run the equivalent statements ourselves (step 7).
+
+### Before the window
+
+1. The 26.3 server upgrade is done. The upstream cutover scripts and runbook
+   were verified against ClickHouse 26.3, and we run 24.8.
+2. `tiered_replicated` is present on every replica:
+   ```sql
+   SELECT hostName(), policy_name, volume_name, disks
+   FROM clusterAllReplicas('default', system.storage_policies)
+   WHERE policy_name = 'tiered_replicated';
+   ```
+3. Check out `apps/opik-backend/data-migrations/{traces,spans}-local-v2-cutover`
+   from comet-ml/opik at the tag matching `OPIK_CHART_VERSION` in
+   `src/bridge/lib/versions.py`. Read its `README.md` in full; this section only
+   maps it onto our deployment. Install a `clickhouse-client` matching the
+   server major and port-forward `svc/clickhouse` 9000 in namespace
+   `clickhouse`.
+4. Set these in `component.backend.env` in `applications/opik/__main__.py`,
+   apply the opik stack, then `kubectl -n opik rollout restart
+   deployment/opik-backend` (the chart does not roll pods on a ConfigMap
+   change) and confirm with `kubectl -n opik rollout status`:
+   - `ANALYTICS_DB_DATA_MODEL_TRACE_DELETION_EVENTS_CAPTURE_ENABLED=true`
+   - `ANALYTICS_DB_DATA_MODEL_SPAN_DELETION_EVENTS_CAPTURE_ENABLED=true`
+5. Provision the least-privilege cutover user described under "Required
+   privileges" upstream (column-scoped `ALTER UPDATE(_row_exists)`, the
+   four-privilege `RENAME`/`EXCHANGE` rule). Then run `delta_replay.sh` once
+   anchored at the current instant as the privilege smoke test.
+6. Freeze Opik chart upgrades (Renovate) from the backfill until `finalize.sh`.
+   A Liquibase change to `traces` or `spans` mid-window races the swap.
+7. Take an on-demand SQL backup and don't start until it has finished:
+   ```bash
+   kubectl -n clickhouse create job --from=cronjob/clickhouse-backup clickhouse-backup-precutover
+   kubectl -n clickhouse wait --for=condition=complete --timeout=1h job/clickhouse-backup-precutover
+   kubectl -n clickhouse exec chi-clickhouse-default-0-0-0 -- clickhouse-client -q \
+     "SELECT name, status, end_time FROM system.backups ORDER BY start_time DESC LIMIT 1"
+   ```
+   The last row must show `BACKUP_CREATED`. Data retention stays off
+   (`RETENTION_ENABLED` unset), which the drivers require.
+
+### The cutover, QA first
+
+Run traces first, then spans, each per its upstream README. Every upstream
+script takes `--database opik_db`: the README examples say `opik`, but our
+database is `opik_db`. Stop after the `EXCHANGE` (no `--with-wrap`): we run one
+shard, so the `Distributed` wrap buys nothing and adds a maintenance window.
+
+1. `estimate.sh`, then `backfill.sh --dry-run`, then `backfill.sh`. Record the
+   `backfill_start` it prints.
+2. `delta_replay.sh --backfill-start '<backfill_start> UTC'`, then a full
+   `verify.sh` (no sampling).
+3. Set `ANALYTICS_DB_DATA_MODEL_TRACE_COLUMNS_NON_NULLABLE=true` (or the
+   `SPAN_` one), roll the backend as in step 4 above, and check it positively:
+   an in-progress trace written through the API stores the epoch/NaN sentinel.
+4. Final `delta_replay.sh` (record `delta_start`), then immediately
+   `exchange_and_wrap.sh --backfill-start '<backfill_start> UTC'
+   --confirm-retention-paused`, adding `--confirm-columns-non-nullable` for
+   spans only once step 3's check has passed on every backend pod (the spans
+   driver requires it; the traces driver rejects it as an unknown argument).
+   Check that every per-host `ON CLUSTER` row reports status 0, and record
+   `exchange_done`.
+5. Immediately run `reconcile.sh --gap-start '<delta_start> UTC' --swap-done
+   '<exchange_done> UTC' --confirm-retention-paused` until it prints
+   `RECONCILED`, then `verify.sh --old-table traces_pre_cutover_backup
+   --new-table traces --window-from '<delta_start>' --window-to
+   '<exchange_done>'`. The upper bound is the swap, not now: the parked
+   backup froze at the `EXCHANGE` while the live table keeps taking writes, so
+   any row created after it fails the row-count match. The upstream spans
+   README states this; the traces README still says `<now>`, but the same
+   reasoning applies. Work the upstream "When the cutover is done" checklist.
+   Keep `traces_pre_cutover_backup` parked through the soak.
+6. After the soak, `finalize.sh` drops the parked backup. That is the point of
+   no return.
+7. Tier both tables, only after `finalize.sh`. Upstream freezes DDL on these
+   tables until then (prereq 11, "Point of no return"). If one is tiered
+   mid-soak and then rolled back (stage B) and finalized, the recycled empty
+   `*_local_v2` shadow keeps `tiered_replicated` and the TTL, and a retry's
+   `backfill.sh` aborts on the policy mismatch. The tables keep the names
+   `traces` and `spans`, since there is no wrap. These are the chart TTL Job's
+   statements; `<weeks>` is the hot window (chart default 13):
+   ```sql
+   ALTER TABLE opik_db.traces ON CLUSTER '{cluster}'
+     MODIFY SETTING storage_policy = 'tiered_replicated';
+   ALTER TABLE opik_db.traces ON CLUSTER '{cluster}'
+     MODIFY TTL id_at + INTERVAL <weeks> WEEK TO DISK 'cold'
+     SETTINGS materialize_ttl_after_modify = 0;
+
+   ALTER TABLE opik_db.spans ON CLUSTER '{cluster}'
+     MODIFY SETTING storage_policy = 'tiered_replicated';
+   ALTER TABLE opik_db.spans ON CLUSTER '{cluster}'
+     MODIFY TTL id_at + INTERVAL <weeks> WEEK TO DISK 'cold'
+     SETTINGS materialize_ttl_after_modify = 0;
+
+   -- Backfill the TTL onto parts written before it existed, at a quiet time:
+   ALTER TABLE opik_db.traces ON CLUSTER '{cluster}' MATERIALIZE TTL;
+   ALTER TABLE opik_db.spans ON CLUSTER '{cluster}' MATERIALIZE TTL;
+   ```
+   A later Opik migration that rebuilds either table drops its TTL, so check
+   `SHOW CREATE TABLE` after every Opik upgrade.
+8. Confirm parts reach `cold` past the hot window, and that queries spanning
+   both return the pre-cutover counts:
+   ```sql
+   SELECT table, disk_name, count(), formatReadableSize(sum(bytes_on_disk))
+   FROM system.parts WHERE database = 'opik_db' AND table IN ('traces', 'spans') AND active
+   GROUP BY table, disk_name;
+   ```
+   Then set `ANALYTICS_DB_COLD_STORAGE_DISK_HEALTH_CHECK_ENABLED=true` on the
+   backend. That check only counts rows in `system.disks` named `cold_s3`, so
+   it fails readiness when the disk is missing from the server's config, not
+   when S3 is unreachable. Reachability shows up as failed moves and reads in
+   the ClickHouse logs and `system.part_log`.
+
+Run the same sequence in Production after QA has soaked.
 
 ---
 
@@ -206,8 +314,10 @@ Sharding is only recommended when a single shard exceeds ~2 TB hot data.
 
 ### Reducing hot storage tier size
 
-If NVMe is running low, reduce `hot_data_days` (forces earlier eviction to S3).
-Monitor via the `system.disks` query:
+If the hot disk is running low, shorten the move TTL on the tiered tables
+(`ALTER TABLE ... MODIFY TTL id_at + INTERVAL <fewer weeks> WEEK TO DISK
+'cold'`, see [Tiered Storage](#tiered-storage-and-the-opik-v2-cutover)); the
+`hot_data_days` stack config does nothing. Monitor via the `system.disks` query:
 ```sql
 SELECT name, path, free_space, total_space
 FROM system.disks
@@ -292,10 +402,19 @@ backup bucket, and its `backups` disk must point at that bucket. Run the
 restore on replica 0 of the target:
 
 ```sql
-RESTORE DATABASE opik_db FROM Disk('backups', '<UTC timestamp>');
+RESTORE DATABASE opik_db FROM Disk('backups', '<UTC timestamp>')
+SETTINGS allow_different_table_def = 1;
 RESTORE TABLE default.DATABASECHANGELOG, TABLE default.DATABASECHANGELOGLOCK
-FROM Disk('backups', '<UTC timestamp>');
+FROM Disk('backups', '<UTC timestamp>')
+SETTINGS allow_different_table_def = 1;
 ```
+
+`allow_different_table_def` is needed whenever the backup was taken on an older
+server version than the target. RESTORE compares the table it creates against
+the definition stored in the backup, and a newer server renders some DDL
+differently: 25.8 writes `CODEC(Gorilla(8), ...)` where a 24.8 backup holds
+`CODEC(Gorilla, ...)`, so a restore without it fails with `CANNOT_RESTORE_TABLE`
+on `opik_db.experiment_aggregates`.
 
 To recover individual rows into the live cluster, restore into the scratch
 cluster first, then copy across with `INSERT INTO opik_db.<table> SELECT ...
@@ -321,9 +440,12 @@ https://github.com/mitodl/ol-infrastructure/pull/5817#issuecomment-5823823703).
   Never point it at `keeper-clickhouse`: see the warning above.
 
 ```sql
-RESTORE ALL FROM Disk('backups', '<UTC timestamp>') ASYNC;
+RESTORE ALL FROM Disk('backups', '<UTC timestamp>')
+SETTINGS allow_different_table_def = 1 ASYNC;
 SELECT status, error, dateDiff('second', start_time, end_time) FROM system.backups;
 ```
+
+On 2026-10-21 the 33.43 GiB production backup restored into 25.8.28 in 287 s.
 
 Compare `system.tables.total_rows` against replica 0. For the ReplacingMergeTree
 tables (`traces`, `spans`, `trace_threads`), compare counts with
@@ -339,10 +461,21 @@ QA runs 2 ClickHouse replicas and 3 Keeper nodes, so it exercises replication
 and Keeper quorum the way production does. Every server, Keeper and operator
 upgrade goes to QA first.
 
-1. Confirm QA's latest `clickhouse-backup` job succeeded.
+1. Confirm QA's latest `clickhouse-backup` job succeeded, and that
+   `kubectl -n clickhouse get pods` shows both `chi-clickhouse-default-0-*`
+   pods and all three `chk-clickhouse-cluster1-0-*` pods Ready. Don't go by the
+   CHI status: it reported `Completed` for the three weeks QA ran one replica
+   with the second Pending (see
+   [Replica pod Pending on its data volume](#replica-pod-pending-on-its-data-volume)).
 2. Change the version for QA only, and apply the stack that owns it:
-   - Server: `clickhouse:version` in `Pulumi.QA.yaml`, applied with the
-     `applications/clickhouse` QA stack.
+   - Server: `CLICKHOUSE_SERVER_VERSION` in `bridge/lib/versions.py`, applied
+     with the `applications/clickhouse` QA stack. Production stays on the old
+     version by setting `clickhouse:version` in `Pulumi.Production.yaml` until
+     the canary passes. In every stack that rolls, set `clickhouse:compatibility`
+     to the version being upgraded from (e.g. `'24.8'`), so an upgraded replica
+     writes parts the others can still read, and remove it in a later change
+     once every replica runs the new version. A target more than a year or two
+     LTS lines newer needs an intermediate version first.
    - Operator: `CLICKHOUSE_OPERATOR_VERSION` in `bridge/lib/versions.py`,
      applied with the `data.QA` stack of `substructure/aws/eks`, which installs the
      operator.
@@ -361,7 +494,11 @@ upgrade goes to QA first.
      total_replicas < 2 OR absolute_delay > 0 OR queue_size > 0`.
      Also compare `SELECT count() FROM system.replicas` across both replicas: a
      replica that failed to create its tables has an empty `system.replicas`,
-     so a delay check alone passes on it.
+     so a delay check alone passes on it. In Production use `< 3` and add
+     `AND database != 'default'`: the Liquibase ledger tables
+     (`default.DATABASECHANGELOG*`) are replicated only on replica 0 there, and
+     replicas 1 and 2 hold plain `MergeTree` copies, so they always report
+     `total_replicas = 1`.
    - Keeper quorum: `echo mntr | nc localhost 2181` on each Keeper pod. One
      reports `zk_server_state leader` with `zk_synced_followers 2`, the others
      `follower`.
@@ -384,28 +521,83 @@ upgrade goes to QA first.
 If Keeper pods are unhealthy:
 ```bash
 # Check Keeper status
-kubectl exec -n clickhouse clickhouse-keeper-0 -- \
+kubectl exec -n clickhouse chk-clickhouse-cluster1-0-0-0 -- \
   bash -c "echo ruok | nc localhost 2181"
 
 # Check Keeper logs
-kubectl logs -n clickhouse clickhouse-keeper-0 --tail=100
+kubectl logs -n clickhouse chk-clickhouse-cluster1-0-0-0 --tail=100
 
 # Force pod restart (Keeper uses Raft; majority must be healthy before restart)
-kubectl delete pod -n clickhouse clickhouse-keeper-2
+kubectl delete pod -n clickhouse chk-clickhouse-cluster1-0-2-0
 ```
 
 ### ClickHouseInstallation not ready
 
 ```bash
 # Check operator logs
-kubectl logs -n clickhouse-operator -l app=clickhouse-operator --tail=50
+kubectl logs -n kube-system deploy/clickhouse-operator -c clickhouse-operator --tail=50
 
 # Check CHI status
 kubectl get chi -n clickhouse clickhouse -o yaml | grep -A20 status:
 
 # Check pod events
-kubectl describe pod -n clickhouse chi-clickhouse-default-0-0
+kubectl describe pod -n clickhouse chi-clickhouse-default-0-0-0
 ```
+
+### Replica pod Pending on its data volume
+
+A PVC keeps the StorageClass it was created with, so fixing the claim
+template doesn't fix a PVC that is already Pending. Check why it is stuck:
+
+```bash
+kubectl -n clickhouse describe pvc clickhouse-data-chi-clickhouse-default-0-<n>-0
+```
+
+`specify either IOPS or IOPSPerGb, not both` means the PVC predates
+https://github.com/mitodl/ol-infrastructure/pull/6361 and
+sits under `ebs-gp3-sc` with the `ebs-gp3-iops-3000` VolumeAttributesClass.
+Confirm the StatefulSet's template now names `ebs-gp3-iops-3000-sc`, otherwise
+the recreated PVC fails the same way:
+
+```bash
+kubectl -n clickhouse get sts chi-clickhouse-default-0-<n> \
+  -o jsonpath='{.spec.volumeClaimTemplates[*].spec.storageClassName}'
+```
+
+Then delete the Pending PVC and pod, and the StatefulSet recreates both from the
+template. Only do this for a PVC with no volume bound (`kubectl get pvc` shows
+`Pending` and an empty `VOLUME`); a bound PVC holds that replica's data.
+
+```bash
+kubectl -n clickhouse delete pvc clickhouse-data-chi-clickhouse-default-0-<n>-0 --wait=false
+kubectl -n clickhouse delete pod chi-clickhouse-default-0-<n>-0
+```
+
+The pod comes back with an empty data volume. The operator does not create the
+schema on it, because it already counted that host as part of the CHI (on QA on
+2026-10-20 the recreated replica started with only the `default` database and
+an empty `system.replicas`). Compare the two counts from step 3 of the
+[Upgrade Canary](#upgrade-canary-qa) on both replicas. If the new one is short,
+copy each replicated table's DDL from replica 0. The engine arguments use the
+`{shard}`/`{replica}` macros, so the same statement registers the new replica in
+Keeper and it fetches the parts:
+
+```bash
+K="kubectl -n clickhouse exec"
+SRC=chi-clickhouse-default-0-0-0; DST=chi-clickhouse-default-0-<n>-0
+$K "$DST" -- clickhouse-client -q "CREATE DATABASE IF NOT EXISTS opik_db ENGINE = Atomic"
+for t in $($K "$SRC" -- clickhouse-client -q "SELECT database || '.' || name FROM system.tables
+    WHERE database IN ('opik_db', 'default') AND engine LIKE 'Replicated%'"); do
+  $K "$SRC" -- clickhouse-client -q "SHOW CREATE TABLE $t FORMAT TSVRaw" \
+    | sed 's/^CREATE TABLE/CREATE TABLE IF NOT EXISTS/' \
+    | $K -i "$DST" -- clickhouse-client --multiquery
+done
+```
+
+Check first that `opik_db` holds only `Replicated*` tables (no views or
+dictionaries), since this loop copies nothing else. The replica is caught up
+when its `system.replicas` lists the same number of tables as replica 0 with
+`absolute_delay = 0` and `queue_size = 0`.
 
 ### VSO not syncing users.xml
 

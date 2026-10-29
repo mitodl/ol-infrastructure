@@ -6,10 +6,10 @@ metadata:
   namespace: odl-video-service
 data:
   DJANGO_SETTINGS_MODULE: "odl_video.settings"
-  ODL_VIDEO_BASE_URL: "https://video.odl.mit.dev"
+  ODL_VIDEO_BASE_URL: "https://video.odl.mit.test"
   ODL_VIDEO_DB_DISABLE_SSL: "True"
   ODL_VIDEO_ENVIRONMENT: "local"
-  ODL_VIDEO_ADMIN_EMAIL: "admin@odl.local"
+  ODL_VIDEO_ADMIN_EMAIL: "admin@ol.test"
   ODL_VIDEO_FROM_EMAIL: "MIT ODL Video <ol-engineering-support@mit.edu>"
   ODL_VIDEO_SUPPORT_EMAIL: "MIT ODL Video <ol-engineering-support@mit.edu>"
   ODL_VIDEO_SECURE_SSL_REDIRECT: "False"
@@ -30,8 +30,8 @@ data:
 
   # Valkey
   # Each app needs its own Valkey DBs, or Celery and RedBeat pick up another
-  # app's tasks. The allocation is listed next to the Valkey settings in
-  # apps/mitxonline/configmaps/app-env.yaml.
+  # app's tasks. The allocation is listed under Shared Valkey in
+  # local-dev/ARCHITECTURE.md.
   REDIS_URL: "redis://valkey.local-infra.svc.cluster.local:6379/10"
   CELERY_BROKER_URL: "redis://valkey.local-infra.svc.cluster.local:6379/11"
   REDIS_MAX_CONNECTIONS: "65000"

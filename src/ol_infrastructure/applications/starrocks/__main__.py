@@ -38,7 +38,7 @@ from ol_infrastructure.lib.aws.eks_helper import (
 )
 from ol_infrastructure.lib.aws.iam_helper import (
     cross_environment_glue_denial,
-    readable_data_lake_environments,
+    query_engine_lake_access,
 )
 from ol_infrastructure.lib.ol_types import (
     Application,
@@ -282,29 +282,33 @@ if starrocks_config.get_bool("oidc_enabled"):
 # corresponding S3 buckets.
 #
 # The role gets query-engine access to the same lakes the substructure stack
-# registers catalogs for (readable_data_lake_environments): its own, plus QA's on
-# production for the QA mirror. QA must not get production's policy: the
+# registers catalogs for (query_engine_lake_access): its own, read/write; QA's on
+# production, read/write, for the QA mirror; and QA's on CI, read-only, so slim
+# data CI can defer to QA relations. QA must not get production's policy: the
 # cross-environment denial below covers Glue only, so that policy left the QA role
 # with Get/Put/DeleteObject on production's data lake buckets.
 #
 # The Iceberg external catalogs are created and maintained by the substructure stack
 # (substructure/starrocks) using the pulumi-command local.Command resource.
-_DATA_LAKE_STACK_NAMES = {"qa": "QA", "production": "Production"}
-_DATA_LAKE_ENVS = [
-    _DATA_LAKE_STACK_NAMES[env]
-    for env in readable_data_lake_environments(stack_info.env_suffix)
-]
+_DATA_LAKE_STACK_NAMES = {"ci": "CI", "qa": "QA", "production": "Production"}
+_DATA_LAKE_POLICY_OUTPUTS = {
+    "write": "data_lake_query_engine_iam_policy_arn",
+    "read": "data_lake_query_engine_read_only_iam_policy_arn",
+}
 
 if starrocks_config.get_bool("enable_data_lake_integration"):
     _dw_stacks = {}
-    for _data_lake_env in _DATA_LAKE_ENVS:
-        _dw_stacks[_data_lake_env] = make_stack_reference(
-            projects.DATA_WAREHOUSE, _data_lake_env
+    for _data_lake_env, _access in query_engine_lake_access(
+        stack_info.env_suffix
+    ).items():
+        _data_lake_stack_name = _DATA_LAKE_STACK_NAMES[_data_lake_env]
+        _dw_stacks[_data_lake_stack_name] = make_stack_reference(
+            projects.DATA_WAREHOUSE, _data_lake_stack_name
         )
         iam.RolePolicyAttachment(
-            f"starrocks-data-lake-policy-{stack_info.env_suffix}-{_data_lake_env}",
-            policy_arn=_dw_stacks[_data_lake_env].require_output(
-                "data_lake_query_engine_iam_policy_arn"
+            f"starrocks-data-lake-policy-{stack_info.env_suffix}-{_data_lake_stack_name}",
+            policy_arn=_dw_stacks[_data_lake_stack_name].require_output(
+                _DATA_LAKE_POLICY_OUTPUTS[_access]
             ),
             role=starrocks_auth_binding.irsa_role.name,
             opts=ResourceOptions(parent=starrocks_auth_binding),
@@ -321,15 +325,9 @@ if starrocks_config.get_bool("enable_data_lake_integration"):
     # cannot be applied from CI. Gate on the helper rather than on the presence of
     # the stack output -- it is empty in production, where no such policy exists.
     if cross_environment_glue_denial(stack_info.env_suffix):
-        # Reuse the reference from the loop when this environment is one of the
-        # data lake envs; a second StackReference to the same stack is a
-        # duplicate-URN error. CI is not in _DATA_LAKE_ENVS and needs its own.
-        _same_env_dw_stack = _dw_stacks.get(stack_info.name) or make_stack_reference(
-            projects.DATA_WAREHOUSE, stack_info.name
-        )
         iam.RolePolicyAttachment(
             f"starrocks-{stack_info.env_prefix}-{stack_info.env_suffix}-cross-environment-glue-denial",
-            policy_arn=_same_env_dw_stack.require_output(
+            policy_arn=_dw_stacks[stack_info.name].require_output(
                 "data_lake_cross_environment_glue_denial_policy_arn"
             ),
             role=starrocks_auth_binding.irsa_role.name,
@@ -437,11 +435,10 @@ if not starrocks_config.get_bool("use_be") and not starrocks_config.get_bool("us
 # Requires StarRocks >= 3.4.1. When enabled:
 #   - cert-manager adds a PKCS12 keystore to the TLS secret.
 #   - FE pods mount the secret and configure fe.conf with the keystore path/password.
-#   - Set ssl_force_secure_transport=true only after updating all clients (e.g. Vault
-#     JDBC URL) to use useSSL=true, as it rejects plain-text connections.
-# Note: once PR #732 in starrocks-kubernetes-operator merges, CN pods will additionally
-#   need cnEnvVars FE_TLS_MODE=skip-verify (or preferred) for the operator's internal
-#   CN→FE MySQL connection to use TLS.
+#   - Set ssl_force_secure_transport=true only after every client uses TLS, as it
+#     rejects plain-text connections (Vault's connection URL uses tls=skip-verify).
+# The operator's own connection to FE is covered by its feSslMode chart value
+# (starrocks:operator_fe_ssl_mode in substructure/aws/eks), not by anything here.
 ssl_enabled = starrocks_config.get_bool("ssl_enabled") or False
 ssl_force_secure_transport = (
     starrocks_config.get_bool("ssl_force_secure_transport") or False
@@ -453,6 +450,15 @@ starrocks_tls_secret_name = f"{stack_info.env_prefix}-starrocks-tls-secret"
 ssl_keystore_password_secret: kubernetes.core.v1.Secret | None = None
 ssl_keystore_password: Output[str] | None = None
 ssl_keystore_password_secret_name: str | None = None
+
+
+def _require_nonblank_keystore_password(password: str) -> str:
+    if not password.strip():
+        msg = "starrocks:ssl_keystore_password must not be empty or whitespace-only"
+        raise ValueError(msg)
+    return password
+
+
 if ssl_enabled:
     ssl_keystore_password = starrocks_config.require_secret("ssl_keystore_password")
     ssl_keystore_password_secret_name = (
@@ -465,7 +471,9 @@ if ssl_enabled:
             namespace=namespace,
             labels=k8s_app_labels.model_dump(),
         ),
-        string_data={"password": ssl_keystore_password},
+        string_data={
+            "password": ssl_keystore_password.apply(_require_nonblank_keystore_password)
+        },
     )
 
 # Ref: https://github.com/StarRocks/starrocks-kubernetes-operator/blob/main/helm-charts/charts/kube-starrocks/charts/starrocks/values.yaml
@@ -725,6 +733,8 @@ if starrocks_config.get_bool("use_cn"):
 # Reviewed for 1.11.7: the only diff from 1.11.6 is unrelated csiVolumes
 # support (CSI ephemeral inline volumes); the fe.conf config block is
 # byte-identical.
+# Reviewed for 1.11.8: the starrocks subchart changed only its Chart.yaml
+# version; values.yaml and the fe.conf config block are unchanged.
 #
 # fe.conf is rendered into a ConfigMap, which the shared cluster readonly role
 # can read, so no secret value goes into it. The FE's config loader
@@ -738,9 +748,9 @@ if (
     ssl_enabled
     or starrocks_config.get_bool("use_cn")
     or starrocks_config.get_bool("use_be")
-) and (STARROCKS_CHART_VERSION not in ("1.11.6", "1.11.7")):
+) and (STARROCKS_CHART_VERSION not in ("1.11.6", "1.11.7", "1.11.8")):
     msg = (
-        f"_FE_CONFIG_BASE was sourced from chart 1.11.6/1.11.7; review defaults"
+        f"_FE_CONFIG_BASE was sourced from chart 1.11.6-1.11.8; review defaults"
         f" for {STARROCKS_CHART_VERSION} before deploying with SSL, CN, or BE"
         f" enabled"
     )
@@ -1033,6 +1043,7 @@ starrocks_release = kubernetes.helm.v3.Release(
         version=STARROCKS_CHART_VERSION,
         namespace=namespace,
         cleanup_on_fail=True,
+        max_history=10,
         skip_await=True,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://starrocks.github.io/starrocks-kubernetes-operator",
@@ -1041,9 +1052,13 @@ starrocks_release = kubernetes.helm.v3.Release(
     ),
     opts=ResourceOptions(
         delete_before_replace=True,
+        # The FE reads its keystore password from this Secret through feEnvVars
+        # and sits in CreateContainerConfigError until it exists. The OIDC config
+        # Secret is already covered as a descendant of starrocks_auth_binding.
         depends_on=[
             starrocks_root_password_secret,
             starrocks_auth_binding,
+            *([ssl_keystore_password_secret] if ssl_keystore_password_secret else []),
         ],
     ),
 )
@@ -1143,7 +1158,7 @@ for component, port, keep_metrics in (
                     "port": port,
                     "path": "/metrics",
                     "scheme": "http",
-                    "interval": "30s",
+                    "interval": "60s",
                     "scrapeTimeout": "10s",
                     "relabelings": [
                         {

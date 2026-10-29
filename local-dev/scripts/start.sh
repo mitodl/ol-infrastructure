@@ -72,6 +72,14 @@ if ! kubectl config get-contexts "local-dev" &>/dev/null; then
 fi
 ok "kubectl context 'local-dev' configured."
 
+# scripts/eks/eks.py setup can leave QA/Production contexts in ~/.kube/config
+# (older versions wrote there by default). They authenticate through eks.py, so a
+# bare kubectl can land on them. Best-effort: only eks.py's entries are detected.
+if kubectl config view --kubeconfig "${HOME}/.kube/config" -o jsonpath='{.users[*].user.exec.args}' 2>/dev/null |
+	grep -qF 'scripts/eks/eks.py","exec-credential"'; then
+	err "${HOME}/.kube/config holds EKS contexts from scripts/eks/eks.py. Remove them with: uv run python scripts/eks/eks.py prune-default-kubeconfig"
+fi
+
 # Set active context
 kubectl config use-context "local-dev" &>/dev/null
 
@@ -87,7 +95,7 @@ ok "TLS certificates found."
 # Is this the cluster the Pulumi state was written against?
 # ---------------------------------------------------------------------------
 # State lives in this checkout and outlives the cluster. The stacks recover on
-# their own (both `pulumi refresh` before applying), but the databases in a
+# their own (every stack refreshes before applying), but the databases in a
 # replaced cluster are empty, and unannounced that reads as data disappearing.
 # kube-system's UID is assigned at bootstrap, so it changes with the cluster.
 # The marker sits under .pulumi so wiping the state wipes the claim too.
@@ -133,6 +141,21 @@ elif [[ "$(cat "${CLUSTER_ID_FILE}")" != "${live_cluster_id}" ]]; then
 	echo "${live_cluster_id}" >"${CLUSTER_ID_FILE}"
 else
 	ok "Pulumi state matches this cluster."
+fi
+
+# ---------------------------------------------------------------------------
+# Heal stale container DNS (post-network-change recovery)
+# ---------------------------------------------------------------------------
+# Docker bakes a container's resolv.conf at start and never revisits it, so
+# moving the host between networks leaves long-running containers pointing at
+# resolvers they can no longer reach — image pulls and dagger builds then time
+# out on the registry. This runs before the exec heal on purpose: re-baking DNS
+# restarts the container anyway, and heal-exec.sh only bounces nodes that fail
+# its own probe, so a node healed here is not restarted twice.
+# This is a no-op when everything is current. Best-effort: never block startup.
+log "Checking container DNS freshness..."
+if ! "${SCRIPT_DIR}/heal-dns.sh"; then
+	warn "DNS heal reported problems; continuing to start Tilt anyway."
 fi
 
 # ---------------------------------------------------------------------------

@@ -61,6 +61,7 @@ def _build(
     served_format: int,
     image_format: int,
     migration_armed: bool = False,
+    boot_budget_seconds: int | None = None,
 ) -> tuple[_Mocks, data_tier.OmnigraphDataTier]:
     mocks = _Mocks()
     pulumi.runtime.set_mocks(mocks, preview=False)
@@ -89,6 +90,7 @@ def _build(
         migrate_to_prefix=f"fmt{image_format}" if migration_armed else "",
         suspend_maintenance=migration_armed,
         migration_armed=migration_armed,
+        boot_budget_seconds=boot_budget_seconds,
     )
     return mocks, tier
 
@@ -144,6 +146,10 @@ def test_format_14_has_the_plan_gate_and_one_stop_window(monkeypatch):
         assert deployment["metadata"]["annotations"] == {
             "pulumi.com/patchForce": "true"
         }
+        # No boot budget, no new inputs: the spec a deploy without one sees.
+        assert "progressDeadlineSeconds" not in deployment["spec"]
+        (container,) = deployment["spec"]["template"]["spec"]["containers"]
+        assert container["startupProbe"]["failureThreshold"] == 24
 
     return pulumi.Output.all(
         tier.deployment.urn,
@@ -220,3 +226,41 @@ def test_an_armed_migration_from_format_9_keeps_the_sweeps_suspended(monkeypatch
     return pulumi.Output.all(
         tier.deployment.urn, *(cj.urn for cj in tier.maintenance.cron_jobs)
     ).apply(check)
+
+
+@pulumi.runtime.test
+def test_a_boot_budget_lengthens_the_probe_and_both_rollout_waits(monkeypatch):
+    """A withheld graph's delete runs in the boot apply, before the server
+    listens. CI's 15,438-object code-bridge delete was killed by the default
+    probe with 11,356 objects left.
+    """
+    mocks, tier = _build(
+        monkeypatch, served_format=14, image_format=14, boot_budget_seconds=3600
+    )
+
+    def check(_: object) -> None:
+        (deployment,) = mocks.of_type(DEPLOYMENT)
+        (container,) = deployment["spec"]["template"]["spec"]["containers"]
+        # 20 + (717 - 1) x 5 = 3600.
+        assert container["startupProbe"]["failureThreshold"] == 717
+        # 125s termination grace + 3600s boot + 300s slack.
+        assert deployment["spec"]["progressDeadlineSeconds"] == 4025
+        assert deployment["metadata"]["annotations"] == {
+            "pulumi.com/patchForce": "true",
+            "pulumi.com/timeoutSeconds": "4025",
+        }
+
+    return tier.deployment.urn.apply(check)
+
+
+@pytest.mark.parametrize(
+    ("budget", "threshold"),
+    [(None, 24), (135, 24), (136, 25), (140, 25), (1800, 357)],
+)
+def test_the_failure_threshold_kills_no_sooner_than_the_budget(budget, threshold):
+    assert data_tier.startup_probe_failure_threshold(budget) == threshold
+
+
+def test_a_boot_budget_shorter_than_the_default_is_refused():
+    with pytest.raises(ValueError, match="shorter than the default 135s"):
+        data_tier.startup_probe_failure_threshold(120)

@@ -50,16 +50,24 @@ from ol_concourse.lib.tasks import TASK_IMAGE, bump_version_task
 from pydantic import BaseModel, model_validator
 
 from bridge.settings.apps import github_repo as app_github_repo
+from bridge.settings.apps import release_changelog as app_release_changelog
 from bridge.settings.apps import (
     release_resource_workflow as app_release_resource_workflow,
 )
 from bridge.settings.apps import repo_main_branch as app_repo_main_branch
+from ol_concourse.pipelines.applications.learn_ai_frontend.values import (
+    ENVIRONMENTS as LEARN_AI_FRONTEND_ENVIRONMENTS,
+)
 from ol_concourse.pipelines.constants import (
     ECR_REGION,
     PULUMI_WATCHED_PATHS,
     dockerhub_ecr_image_uri,
 )
 from ol_concourse.pipelines.ecr import configure_ecr_repository_task
+from ol_concourse.pipelines.infrastructure.k8s_apps.static_frontend import (
+    StaticFrontendConfig,
+    static_frontend_fragment,
+)
 from ol_concourse.pipelines.jobs import pulumi_job, pulumi_jobs_chain
 from ol_concourse.pipelines.pipeline_output import pipeline_json_with_user_data
 from ol_concourse.pipelines.secrets_map import project_secrets_paths
@@ -149,6 +157,7 @@ class AppPipelineParams(BaseModel):
     github_repo: str | None = None
     sentry_sourcemaps: SentrySourcemapsConfig | None = None
     refresh_stack: bool = True
+    static_frontend: StaticFrontendConfig | None = None
     description: str = ""
     category: str = "applications"
 
@@ -203,7 +212,7 @@ pipeline_params = {
         app_name="mitxonline",
         build_target="production",
         refresh_stack=False,
-        description="Builds the MITx Online Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
+        description="Builds the MITx Online Django app image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
     ),
     "mit-learn-nextjs": AppPipelineParams(
         app_name="mit-learn-nextjs",
@@ -234,30 +243,34 @@ pipeline_params = {
         build_target="production",
         settings_dir="mitxpro",
         refresh_stack=False,
-        description="Builds the xPRO Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
+        description="Builds the xPRO Django app image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
     ),
     "learn-ai": AppPipelineParams(
         app_name="learn-ai",
         refresh_stack=False,
-        description="Builds the Learn AI service image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
+        static_frontend=StaticFrontendConfig(
+            path="frontend-demo", environments=LEARN_AI_FRONTEND_ENVIRONMENTS
+        ),
+        description="Builds the Learn AI service image and deploys it to Kubernetes via Pulumi, and ships its static frontend with each release, following the modernized GitHub Release/Deployment workflow.",
     ),
     "mit-learn": AppPipelineParams(
         app_name="mit-learn",
+        build_target="production",
         refresh_stack=False,
-        description="Builds the MIT Learn Django/API backend image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
+        description="Builds the MIT Learn Django/API backend image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
     ),
     "ocw-studio": AppPipelineParams(
         app_name="ocw-studio",
         repo_main_branch=app_repo_main_branch("ocw-studio"),
         build_target="production",
-        description="Builds the OCW Studio Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
+        description="Builds the OCW Studio Django app image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
     ),
     "odl-video-service": AppPipelineParams(
         app_name="odl-video-service",
         repo_main_branch=app_repo_main_branch("odl-video-service"),
         build_target="production",
         settings_dir="odl_video",
-        description="Builds the ODL Video Service Django app image and deploys it to Kubernetes via Pulumi, following the legacy release-candidate/release-branch workflow.",
+        description="Builds the ODL Video Service Django app image and deploys it to Kubernetes via Pulumi, following the modernized GitHub Release/Deployment workflow.",
     ),
     "ol-analytics-api": AppPipelineParams(
         app_name="ol-analytics-api",
@@ -932,8 +945,15 @@ def _define_release_resources(
     app_name: str,
     github_repo: str,
     repo_main_branch: str,
+    *,
+    generated_changelog: bool = True,
 ) -> tuple[Resource, Resource, Resource, Resource, Resource]:
-    """Define the release-flow resources: release resource, gates, issues, and GitHub Deployments."""
+    """Define the release-flow resources: release resource, gates, issues, and GitHub Deployments.
+
+    ``generated_changelog`` has the release resource fold a Keep a Changelog
+    entry into the ``Release <version>`` commit; see
+    ``AppRegistration.release_changelog`` for when to turn it off.
+    """
     # Shared GitHub App installation ol-concourse-lib no longer defaults --
     # every consumer of this library supplies its own credential reference.
     # Backed by the "shared/github_app" entry in
@@ -958,6 +978,7 @@ def _define_release_resources(
         private_ssh_key=github_app_private_key,
         repository=github_repo,
         semver_tag_fallback=True,
+        changelog_style="cumulative" if generated_changelog else None,
     ).model_copy(
         # Not the library's `never`. Rebuilding the release resource image
         # gives this resource a fresh, empty version history on its next
@@ -1204,7 +1225,7 @@ def _assert_gate_names_deploy_task(
     Accepts ``Release <app> <version>`` and ``Release <app> infrastructure @
     <version>``, and requires ``<version>`` to equal the contents of
     ``<version_input>/version``, which has to be the same file the job's
-    ``DOCKER_TAG`` comes from. The issue body's revision marker must also name
+    ``image_tag`` comes from. The issue body's revision marker must also name
     the ol-infrastructure commit in ``<infra_input>``, which has to resolve to
     the same commit the job's Pulumi code get does. The gate get has already
     tombstoned the issue, so a refused issue does not fire again. A failure
@@ -1356,11 +1377,12 @@ def _supersede_gate_issues_task(
 def _preview_production_step(
     pulumi_resource: Resource,
     pulumi_code: Resource,
-    docker_tag_env: str,
+    docker_sha_env: str,
+    release_version_env: str,
     *,
     refresh_stack: bool,
 ) -> PutStep:
-    """Preview the Production stack at the image tag it would deploy.
+    """Preview the Production stack at the image digest it would deploy.
 
     Fail-closed, unlike the retired ``preview_next_stack``: the preview is the
     content of the gate issue, so one that fails fails the job and no issue is
@@ -1381,7 +1403,8 @@ def _preview_production_step(
                 "AWS_DEFAULT_REGION": "us-east-1",
                 "PYTHONPATH": f"/usr/lib/:/tmp/build/put/{pulumi_code.name}/src/",
                 "GITHUB_TOKEN": "((github.public_repo_access_token))",
-                docker_tag_env: "((.:image_tag))",
+                docker_sha_env: "((.:image_digest))",
+                release_version_env: "((.:image_tag))",
             },
             "stack_name": "Production",
             "preview": True,
@@ -1639,6 +1662,7 @@ def _build_release_resource_app_pipeline(
         app_name=app_name,
         github_repo=github_repo,
         repo_main_branch=pipeline_parameters.repo_main_branch,
+        generated_changelog=app_release_changelog(app_name),
     )
 
     main_image_build_job = _build_image_job(
@@ -1707,7 +1731,10 @@ def _build_release_resource_app_pipeline(
 
     # Build per-stack additional_post_steps and custom_dependencies for QA+Production
     project_name = f"ol-application-{app_name}"
-    docker_tag_env = f"{app_name.replace('-', '_').upper()}_DOCKER_TAG"
+    docker_sha_env = f"{app_name.replace('-', '_').upper()}_DOCKER_SHA"
+    # The digest does not say which release it is, so the calver travels
+    # alongside it and becomes the pods' ol.mit.edu/version label.
+    release_version_env = f"{app_name.replace('-', '_').upper()}_RELEASE_VERSION"
     release_current = Identifier(f"{app_name}-release-current")
     # The ol-infra commit Production deploys, fetched again under its own name
     # so the gate check can read it before anything deploys: pulumi_job puts
@@ -1719,7 +1746,7 @@ def _build_release_resource_app_pipeline(
     infra_revision = Identifier(f"{ol_infra_repo.name}-revision")
     qa_job_name = f"deploy-{project_name}-qa"
     qa_post_steps: list[GetStep | PutStep | TaskStep | TryStep] = [
-        # Preview Production at the tag it would deploy, then fold that diff
+        # Preview Production at the image it would deploy, then fold that diff
         # and the app checklist into one release issue, so a single approval
         # covers everything the Production deploy would change. See
         # _preview_production_step: this fails the job rather than posting a
@@ -1727,7 +1754,8 @@ def _build_release_resource_app_pipeline(
         _preview_production_step(
             pulumi_resource,
             ol_infra_repo,
-            docker_tag_env,
+            docker_sha_env,
+            release_version_env,
             refresh_stack=pipeline_parameters.refresh_stack,
         ),
         # What Production is running has to be current, not whatever the first
@@ -1738,9 +1766,22 @@ def _build_release_resource_app_pipeline(
             file=f"{CACHE_BUST_DIR}/value",
             reveal=True,
         ),
+        # `passed:` the release build, like the release get above. Concourse
+        # records a job's inputs by resource, not by step name, and Production
+        # takes the release `passed:` this job, so whatever version this get
+        # resolves to is one Production can deploy. Unconstrained, it took the
+        # resource's latest check, which is the next, uncut release once the
+        # main branch moves past the last one, and Production resolved to it
+        # (micromasters, 2026-10-27). The files read from it, production_version
+        # and production_state, come from the GitHub Deployments API on every
+        # `in` and do not depend on the version, so a cut version serves.
+        # Do not instead add the release build to Production's `passed:`: an
+        # input whose `passed:` names two jobs bound the Production job to an
+        # older QA build than the newest (mitodl/ol-infrastructure#6685).
         GetStep(
             get=release_current,
             resource=release_res.name,
+            passed=[release_image_build_job.name],
             params={"cache_bust": "((.:cache_bust))"},
         ),
         _classify_promotion_task(
@@ -1877,8 +1918,8 @@ def _build_release_resource_app_pipeline(
                 params={"skip_download": True},
             ),
             # release_res carries the authoritative calver version; load it here
-            # so image_tag is available to all jobs in the chain, including the
-            # GitHub Deployment start steps and the Pulumi DOCKER_TAG env var.
+            # so image_tag is available to all jobs in the chain, for the
+            # GitHub Deployment refs, the gate check and the pods' version label.
             GetStep(
                 get=release_res.name,
                 trigger=False,
@@ -1886,6 +1927,19 @@ def _build_release_resource_app_pipeline(
             ),
             LoadVarStep(
                 load_var="image_tag", file=f"{release_res.name}/version", reveal=True
+            ),
+            # Deploy by digest, not by the calver tag. Abandoning a release
+            # deletes its git tag, so a same-day re-cut computes the same
+            # version and overwrites the same image tag. A tag-pinned pod spec
+            # would then be unchanged: nothing rolls out, and RC keeps serving
+            # the abandoned build while every job reports success. The image
+            # get above is chained `passed:` QA in the Production job, so
+            # Production deploys the digest QA ran. skip_download still writes
+            # the digest file.
+            LoadVarStep(
+                load_var="image_digest",
+                file=f"{app_rc_image.name}/digest",
+                reveal=True,
             ),
         ],
         # QA: get checklist.md from release resource; start RC GitHub Deployment.
@@ -1934,7 +1988,8 @@ def _build_release_resource_app_pipeline(
             ],
         },
         additional_env_vars={
-            f"{app_name.replace('-', '_').upper()}_DOCKER_TAG": "((.:image_tag))",
+            docker_sha_env: "((.:image_digest))",
+            release_version_env: "((.:image_tag))",
         },
         enable_github_issue_resource=False,
         slack_url_path="eks.slack_url",
@@ -1985,13 +2040,26 @@ def _build_release_resource_app_pipeline(
         jobs=ci_fragment.jobs,
     )
 
-    combined_fragment = PipelineFragment.combine_fragments(
+    fragments = [
         ci_deployment_fragment,
         qa_and_production_fragment,
         main_branch_container_fragement,
         release_container_fragment,
-    )
-    return combined_fragment.to_pipeline()
+    ]
+    if pipeline_parameters.static_frontend is not None:
+        fragments.append(
+            static_frontend_fragment(
+                app_name=app_name,
+                repo_uri=f"https://github.com/{github_repo}",
+                repo_main_branch=pipeline_parameters.repo_main_branch,
+                config=pipeline_parameters.static_frontend,
+                deployment_rc=deployment_rc,
+                deployment_prod=deployment_prod,
+                qa_job_name=qa_job_name,
+                production_job_name=f"deploy-{project_name}-production",
+            )
+        )
+    return PipelineFragment.combine_fragments(*fragments).to_pipeline()
 
 
 def build_app_pipeline(app_name: str) -> Pipeline:
@@ -2010,6 +2078,14 @@ def build_app_pipeline(app_name: str) -> Pipeline:
     )
     if app_release_resource_workflow(app_name):
         return _build_release_resource_app_pipeline(app_name, pipeline_parameters)
+    if pipeline_parameters.static_frontend is not None:
+        # The frontend jobs chain off the release workflow's GitHub Deployments;
+        # the legacy shape has none, and would silently drop the frontend.
+        msg = (
+            f"{app_name}: static_frontend requires release_resource_workflow=True "
+            "in bridge.settings.apps."
+        )
+        raise ValueError(msg)
     return _build_legacy_app_pipeline(app_name, pipeline_parameters)
 
 

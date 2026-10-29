@@ -185,6 +185,9 @@ class MitxonlineBindings(BaseModel):
     ``bridge.lib.constants.oidc_secret_data`` returns."""
     application_docker_tag: str | None = None
     application_image_digest: str | None = None
+    application_version: str | None = None
+    """The release the image was built for; labels the pods. The release
+    pipeline sets it alongside the digest."""
     cluster: ClusterCapabilities
     min_replicas: int
     # The deployed stacks pull the published image; a cluster that serves the
@@ -285,6 +288,7 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
         application_image_repository=bindings.image_repository,
         application_docker_tag=bindings.application_docker_tag,
         application_image_digest=bindings.application_image_digest,
+        application_version=bindings.application_version,
         application_cmd_array=["uwsgi"],
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
@@ -477,6 +481,27 @@ def prefixed_oidc_config(bindings: MitxonlineBindings) -> OLApisixOIDCConfig:
         # domain set, all of them read and write the one shared cookie.
         oidc_session_cookie_domain=learn_api_domain.removeprefix("api"),
     )
+
+
+def cors_allow_origins(bindings: MitxonlineBindings) -> list[str]:
+    """Return the origins allowed to read either route group cross-origin.
+
+    The same origins Django is given as ``CORS_ALLOWED_ORIGINS``: the gateway
+    answers CORS preflights itself, so an origin missing here is blocked on
+    every preflighted request whatever django-cors-headers allows.  The shared
+    config is attached to routes on api.mitxonline.mit.edu, mitxonline.mit.edu
+    *and* the /mitxonline/* paths on api.<env>.learn.mit.edu, so the list has to
+    cover every frontend that calls any of them.
+
+    :param bindings: The environment being rendered for.
+    :returns: Origins for ``OLApisixSharedPluginsConfig.cors_allow_origins``.
+    :rtype: list[str]
+    """
+    return [
+        origin.strip()
+        for origin in environment_variables(bindings)["CORS_ALLOWED_ORIGINS"].split(",")
+        if origin.strip()
+    ]
 
 
 def shared_plugins(bindings: MitxonlineBindings) -> list[OLApisixPluginConfig]:

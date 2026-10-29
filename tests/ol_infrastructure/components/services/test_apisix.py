@@ -189,6 +189,26 @@ def test_chash_spec_has_hash_on_and_key():
 
 
 @pulumi.runtime.test
+def test_retries_zero_is_rendered():
+    """retries=0 must reach the spec; a falsy check would drop it and leave
+    APISIX retrying on every remaining node.
+    """
+    upstream = OLApisixUpstream(
+        "test-no-retry-upstream",
+        OLApisixUpstreamConfig(
+            service_name="tika",
+            k8s_namespace="tika",
+            retries=0,
+        ),
+    )
+
+    def check(spec):
+        assert spec == {"loadbalancer": {"type": "roundrobin"}, "retries": 0}
+
+    return upstream.apisix_upstream_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
 def test_resource_name_matches_service_name():
     """apisix-ingress-controller matches ApisixUpstream to a Service by exact
     same-name, same-namespace lookup -- metadata.name must equal service_name,
@@ -378,16 +398,25 @@ def test_session_cookie_name_and_domain_coexist():
     assert oidc.base_oidc_config["session"] == {
         "cookie_name": "mitlearn_apisix_session",
         "cookie_domain": ".learn.mit.edu",
+        "cookie_secure": True,
     }
 
 
-def test_session_block_omitted_when_nothing_set():
-    """Callers that opt into none of the session settings must not get an empty
-    session block, which would override lua-resty-session's own defaults.
+def test_session_cookie_is_secure_when_nothing_else_is_set():
+    """A caller that sets none of the session options still gets the Secure
+    flag, and nothing else, so lua-resty-session keeps its own defaults.
     """
     oidc = oidc_resources("test-oidc-no-session-config")
 
-    assert "session" not in oidc.base_oidc_config
+    assert oidc.base_oidc_config["session"] == {"cookie_secure": True}
+
+
+def test_session_cookie_secure_can_be_turned_off():
+    oidc = oidc_resources(
+        "test-oidc-cookie-not-secure", oidc_session_cookie_secure=False
+    )
+
+    assert oidc.base_oidc_config["session"]["cookie_secure"] is False
 
 
 def test_session_cookie_name_survives_plugin_rendering():
@@ -403,6 +432,7 @@ def test_session_cookie_name_survives_plugin_rendering():
 
     assert plugin["name"] == "openid-connect"
     assert plugin["config"]["session"]["cookie_name"] == "mitlearn_apisix_session"
+    assert plugin["config"]["session"]["cookie_secure"] is True
     assert plugin["config"]["unauth_action"] == "pass"
 
 
@@ -660,7 +690,13 @@ def test_recovery_lua_reads_its_settings_off_conf():
 
 
 def shared_plugins(name: str, **overrides) -> OLApisixSharedPlugins:
-    """Build a shared plugin config with the fields every caller has to supply."""
+    """Build a shared plugin config with the fields every caller has to supply.
+
+    ``cors_allow_origins`` has no default on the model on purpose, so that a
+    new gateway cannot inherit a wildcard by omission. Tests that are not about
+    CORS get a placeholder here; the ones that are pass their own.
+    """
+    overrides.setdefault("cors_allow_origins", ["https://myapp.mit.edu"])
     return OLApisixSharedPlugins(
         name,
         plugin_config=OLApisixSharedPluginsConfig(
@@ -897,11 +933,8 @@ _NON_CORS_DEFAULTS = ("redirect", "response-rewrite", "prometheus")
 
 @pulumi.runtime.test
 def test_cors_is_attached_by_default():
-    """Documents what the default actually grants: allow_origins "**" with
-    allow_credential True is not the credentialless `Access-Control-Allow-Origin:
-    *` it reads like -- APISIX reflects the request Origin and the browser will
-    hand over cookies. Anything that narrows this default should have to change
-    this assertion on purpose.
+    """The default plugin grants credentials only to the supplied origins; the
+    old "**" reflected any request Origin and let the browser send cookies.
     """
     plugins = shared_plugins("test-shared-plugins-cors-default")
 
@@ -909,7 +942,7 @@ def test_cors_is_attached_by_default():
         cors = plugin_named(spec["plugins"], "cors")
         assert cors is not None
         assert cors["enable"] is True
-        assert cors["config"]["allow_origins"] == "**"
+        assert cors["config"]["allow_origins"] == "https://myapp.mit.edu"
         assert cors["config"]["allow_credential"] is True
 
     return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
@@ -1223,6 +1256,7 @@ def learn_shaped_variants():
         plugin_config=OLApisixSharedPluginsConfig(
             application_name="myapp",
             k8s_namespace="myapp-ns",
+            cors_allow_origins=["https://myapp.mit.edu"],
             plugins=[oidc_gateway_pre_function_plugin()],
         ),
         variants=[
@@ -1327,6 +1361,7 @@ def test_variants_reject_a_duplicate_resource_suffix():
             plugin_config=OLApisixSharedPluginsConfig(
                 application_name="myapp",
                 k8s_namespace="myapp-ns",
+                cors_allow_origins=["https://myapp.mit.edu"],
             ),
             variants=[
                 OLApisixSharedPluginsVariant(
@@ -1358,6 +1393,7 @@ def test_variants_reject_per_variant_fields_on_the_shared_config(field):
             plugin_config=OLApisixSharedPluginsConfig(
                 application_name="myapp",
                 k8s_namespace="myapp-ns",
+                cors_allow_origins=["https://myapp.mit.edu"],
                 **{field: values[field]},
             ),
             variants=[
@@ -1650,3 +1686,139 @@ def test_browser_traffic_match_exprs_requires_an_explicit_ua_regex():
     """
     with pytest.raises(TypeError):
         browser_traffic_match_exprs(r"^https://learn\.mit\.edu$")
+
+
+# ─── CORS origins ──────────────────────────────────────────────────────────────
+
+
+@pulumi.runtime.test
+def test_cors_renders_the_supplied_origins_with_credentials():
+    """APISIX matches the request Origin against this comma-separated list and
+    echoes back only a member of it, which is what makes allow_credential safe
+    here. The previous default was "**", which reflects whatever Origin the
+    browser sent -- allow_credential alongside it let any origin a user's
+    session cookie reached read authenticated JSON.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-cors-origins",
+        cors_allow_origins=["https://learn.mit.edu", "https://ocw.mit.edu"],
+    )
+
+    def check(spec):
+        cors = plugin_named(spec["plugins"], "cors")
+        assert cors is not None
+        assert (
+            cors["config"]["allow_origins"]
+            == "https://learn.mit.edu,https://ocw.mit.edu"
+        )
+        assert cors["config"]["allow_credential"] is True
+        # Nothing here may reintroduce a wildcard origin by another route.
+        assert "*" not in cors["config"]["allow_origins"]
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_cors_is_omitted_entirely_for_an_empty_origin_list():
+    """A service whose only callers are same-origin browsers or server-to-server
+    clients gets no cors plugin at all rather than one with an empty allow list:
+    no Access-Control-Allow-Origin header means no cross-origin read is
+    possible. tika, opik, marimo-data and both JupyterHubs pass [].
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-cors-empty",
+        cors_allow_origins=[],
+    )
+
+    def check(spec):
+        assert plugin_named(spec["plugins"], "cors") is None
+        # The rest of the defaults still render -- [] opts out of CORS only.
+        assert plugin_named(spec["plugins"], "redirect") is not None
+        assert plugin_named(spec["plugins"], "prometheus") is not None
+
+    return plugins.shared_plugin_apisix_pluginconfig_resource.spec.apply(check)
+
+
+@pulumi.runtime.test
+def test_cors_origins_reach_the_gateway_api_plugin_config():
+    """The v1alpha1 PluginConfig is rendered by a separate comprehension, so
+    Gateway API HTTPRoutes need their own assertion rather than inheriting the
+    v2 one.
+    """
+    plugins = shared_plugins(
+        "test-shared-plugins-cors-gateway-api",
+        cors_allow_origins=["https://learn.mit.edu"],
+    )
+
+    def check(spec):
+        cors = plugin_named(spec["plugins"], "cors")
+        assert cors is not None
+        assert cors["config"]["allow_origins"] == "https://learn.mit.edu"
+        # v1alpha1 accepts only name and config -- ``enable`` is v2-only.
+        assert set(cors) == {"name", "config"}
+
+    return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
+
+
+def test_cors_origins_are_required_when_defaults_are_enabled():
+    """Omitting the list is rejected rather than defaulted, so a new gateway
+    cannot inherit a wildcard by saying nothing. [] is how a caller opts out.
+    """
+    with pytest.raises(ValidationError, match="cors_allow_origins is required"):
+        OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+        )
+
+
+def test_cors_origins_are_not_required_without_defaults():
+    """enable_defaults=False renders no cors plugin either way, so demanding an
+    origin list there would be a pointless argument for every caller that has
+    opted out of the shared defaults entirely.
+    """
+    config = OLApisixSharedPluginsConfig(
+        application_name="myapp",
+        k8s_namespace="myapp-ns",
+        enable_defaults=False,
+    )
+
+    assert config.cors_allow_origins is None
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "**",
+        "*",
+        "null",
+        "https://learn.mit.edu/",
+        "https://learn.mit.edu/learn",
+        "https://Learn.mit.edu",
+        "learn.mit.edu",
+        "https://*.mit.edu",
+    ],
+)
+def test_cors_origins_must_be_bare_origins(origin):
+    """APISIX matches allow_origins by exact equality with the Origin header, so
+    a wildcard brings back reflect-any with credentials and anything with a path
+    or upper case never matches and silently blocks that frontend.
+    """
+    with pytest.raises(ValidationError, match="must be bare origins"):
+        OLApisixSharedPluginsConfig(
+            application_name="myapp",
+            k8s_namespace="myapp-ns",
+            cors_allow_origins=["https://ocw.mit.edu", origin],
+        )
+
+
+def test_cors_origins_accept_a_port_and_plain_http():
+    config = OLApisixSharedPluginsConfig(
+        application_name="myapp",
+        k8s_namespace="myapp-ns",
+        cors_allow_origins=["http://localhost:8063", "https://api.ci.learn.mit.edu"],
+    )
+
+    assert config.cors_allow_origins == [
+        "http://localhost:8063",
+        "https://api.ci.learn.mit.edu",
+    ]

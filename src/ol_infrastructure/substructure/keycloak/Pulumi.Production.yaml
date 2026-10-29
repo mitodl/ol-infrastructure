@@ -78,9 +78,6 @@ config:
   - "ol_instructor"
   - "ol_business_analyst"
   keycloak_realm:ol-data-platform-openmetadata-redirect-uris: ["https://data.ol.mit.edu/*"]
-  keycloak_realm:ol-data-platform-openmetadata-client-roles:
-  - "open_metadata_admin"
-  - "open_metadata_user"
   keycloak_realm:ol-data-platform-starrocks-redirect-uris:
   - "https://lakehouse.starrocks.ol.mit.edu/*"
   - "https://lakehouse.starrocks.ol.mit.edu/api/oauth2"
@@ -94,6 +91,7 @@ config:
   vault:address: https://vault-production.odl.mit.edu
   vault_server:env_namespace: operations.production
   keycloak_realm:olapps_email_theme: ol-learn
+  keycloak_realm:olapps-ol-memory-enabled: "true"
   keycloak_realm:olapps-learn-ai-client-secret:
     secure: v1:MvvmStk26rnq2N4+:+Y2bvHkdIfHaWwJ/X7qQuPgffR6MzJOUv6fqoxTszk135voTcnJb6Dhz8dWT6Yhs
   keycloak_realm:olapps-mitlearn-client-secret:
@@ -140,3 +138,24 @@ config:
     secure: v1:iFYB4lyZL2yEzN9/:zVNvb12vZLSLJBS6rNfuCS0yUnhsexlw4SXM9D1v59Ox2MBtks4WYu/9IdHi7xDuLMcWcTGS7Ds=
   keycloak_realm:ol-platform-engineering-gwarek-client-secret:
     secure: v1:YUJQNsDmwoj6hz94:KKCnkZ2K3w4BN6qZTRkOFuu2K1l/NpXDgKL2iMslRJpFnIBj4fdXBO0BDVy+E5Za1sZN
+  keycloak_scim:remote_providers:
+  - realm: olapps
+    name: ol-learn-scim
+    base_url: https://api.learn.mit.edu/scim/v2
+    enabled: true
+    replay_on_failure: true
+    retry_interval_in_seconds: 3600
+    authentication_list:
+    - authentication_type: BEARER
+      authentication_token:
+        secure: v1:GFTtU+8s043CbTYY:AoVrwqMDcCSUZkg89QS2OppmQmKyYfWHlJ0oAtGRcLinbt+HB1n0yVWLoEJc8xN2
+  - realm: olapps
+    name: ol-mitxonline-scim
+    base_url: https://api.mitxonline.mit.edu/scim/v2
+    enabled: true
+    replay_on_failure: true
+    retry_interval_in_seconds: 300
+    authentication_list:
+    - authentication_type: BEARER
+      authentication_token:
+        secure: v1:kDZRbqo76iCYpTGk:VVakUHhcGzUjZteFp/P7xAqRGTopj7TySAOCnoHIMJrCqFCFTc9/c6HJttaDlWdB22+UxfyuxCk=

@@ -712,8 +712,8 @@ cert_manager_certificate = OLCertManagerCert(
 
 # Shared plugin defaults for every route below: prometheus (per-route series),
 # opentelemetry (OTLP spans), gzip (these routes served every response
-# uncompressed), cors, the http->https redirect and Referrer-Policy. Each route
-# also keeps its own plugins -- OLApisixHTTPRoute merges the two lists, with the
+# uncompressed), the http->https redirect and Referrer-Policy. Each route also
+# keeps its own plugins -- OLApisixHTTPRoute merges the two lists, with the
 # route's entries winning by name.
 ocw_studio_shared_plugins = OLApisixSharedPlugins(
     f"ocw-studio-{stack_info.env_suffix}-ol-shared-plugins",
@@ -722,6 +722,10 @@ ocw_studio_shared_plugins = OLApisixSharedPlugins(
         resource_suffix="ol-shared-plugins",
         k8s_namespace=ocw_studio_namespace,
         k8s_labels=k8s_app_labels,
+        # Studio's pages and API share one origin and Django sets no CORS
+        # headers, so no cross-origin page reads these responses. An empty list
+        # attaches no cors plugin, as before the shared config.
+        cors_allow_origins=[],
     ),
 )
 
@@ -762,10 +766,8 @@ ocw_studio_apisix_httproute = OLApisixHTTPRoute(
             ],
         ),
         # Granian serves static without a CORS header; the sidecar added a
-        # blanket one. Kept even though the shared config now supplies `cors`:
-        # that plugin only answers requests that carry an Origin, while this
-        # header went out unconditionally, and static assets are exactly the
-        # thing a cross-origin font or stylesheet load fetches without one.
+        # blanket one, and the shared config attaches no `cors` plugin. Static
+        # assets are what a cross-origin font or stylesheet load fetches.
         OLApisixHTTPRouteConfig(
             route_name="static",
             shared_plugins=ocw_studio_shared_plugins,

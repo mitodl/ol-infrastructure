@@ -17,27 +17,27 @@ data:
   CELERY_BROKER_HOSTNAME: "valkey.local-infra.svc.cluster.local"
   # lehrer leaves the vhost empty, which is DB 0 (mit-learn's broker). The LMS
   # and Studio share one broker, so both override files use 12. The allocation
-  # is listed next to the Valkey settings in apps/mitxonline/configmaps/app-env.yaml.
+  # is listed under Shared Valkey in local-dev/ARCHITECTURE.md.
   CELERY_BROKER_VHOST: "12"
   ELASTIC_SEARCH_HOST: "opensearch-cluster-master.local-infra.svc.cluster.local"
 
   # Served through APISIX on the shared wildcard cert rather than the
-  # port-forwards lehrer's standalone cluster uses. 'mit.dev' is substituted for
-  # LOCAL_DEV_ROOT_DOMAIN at apply time — see local-dev/tiltlib.star.
-  LMS_BASE_URL: "https://lms.mit.dev"
-  CMS_BASE_URL: "https://studio.mit.dev"
+  # port-forwards lehrer's standalone cluster uses. LOCAL_DEV_ROOT_DOMAIN
+  # replaces 'mit.test' at apply time — see local-dev/tiltlib.star.
+  LMS_BASE_URL: "https://lms.mit.test"
+  CMS_BASE_URL: "https://studio.mit.test"
   # Host forms of the two above. lehrer sets them to its standalone
   # localhost:8000/8010, which is where the LMS's Studio links would point.
-  LMS_BASE: "lms.mit.dev"
-  CMS_BASE: "studio.mit.dev"
+  LMS_BASE: "lms.mit.test"
+  CMS_BASE: "studio.mit.test"
   # Points the LMS's own courseware links at the learning MFE instead of the
   # legacy /courses/<id>/course/ pages. Unset, the setting is None and the LMS
   # silently keeps using the legacy courseware -- which works, but then the LMS
   # and mitxonline disagree about where a course is, since
   # CourseRun.courseware_url is hardcoded to the /learn/... shape. Same value
   # production derives in edxapp's k8s_configmaps.py.
-  LEARNING_MICROFRONTEND_URL: "https://lms.mit.dev/learn"
-  EDXNOTES_PUBLIC_API: "https://notes.mit.dev/api/v1"
+  LEARNING_MICROFRONTEND_URL: "https://lms.mit.test/learn"
+  EDXNOTES_PUBLIC_API: "https://notes.mit.test/api/v1"
   HTTPS: "on"
 
   # --------------------------------------------------------------------------
@@ -74,20 +74,21 @@ data:
   #
   # AUTHORIZATION_URL is browser-facing and so must be the public host. The
   # other two are called server-side from the LMS pod, which resolves
-  # mitxonline.mit.dev but cannot verify its mkcert-signed certificate -- no CA
+  # mitxonline.mit.test but cannot verify its mkcert-signed certificate -- no CA
   # bundle is merged into this image and no SSL_CERT_FILE is set, unlike the
   # mitxonline and mit-learn pods. Pointing them at the in-cluster Service over
-  # plain HTTP avoids that entirely; revisit if the LMS pod ever grows the
-  # ca-bundle-merge initContainer, at which point DISCOVERY_URL would match
-  # production instead.
+  # plain HTTP avoids that entirely; revisit if the LMS pod ever mounts the
+  # local-dev-ca-bundle ConfigMap (already in the openedx namespace) and points
+  # SSL_CERT_FILE/REQUESTS_CA_BUNDLE at it, at which point DISCOVERY_URL would
+  # match production instead.
   #
   # No DISCOVERY_URL, so OLOAuth2 derives userinfo as API_ROOT + api/users/me,
   # whose serializer returns edx_username as `username` -- which is what the
   # backend's ID_KEY resolves accounts on.
   OL_OAUTH2_OTHER_SETTINGS: >-
-    {"AUTHORIZATION_URL": "https://mitxonline.mit.dev/oauth2/authorize/",
-     "ACCESS_TOKEN_URL": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8010/oauth2/token/",
-     "API_ROOT": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8010/"}
+    {"AUTHORIZATION_URL": "https://mitxonline.mit.test/oauth2/authorize/",
+     "ACCESS_TOKEN_URL": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8073/oauth2/token/",
+     "API_ROOT": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8073/"}
 
   # Back on now that there is a provider to redirect to: this is what sends an
   # anonymous visitor into the SSO flow instead of leaving the MFE staring at a
@@ -112,7 +113,28 @@ data:
   # enrolled in mitxonline with edx_enrolled=False and simply has no courseware,
   # even though login succeeded.
   #
-  # The literal is mitxonline's, verbatim. It is named "stub" there from when
-  # there was no local LMS to accept an enrollment; it is a working token now,
-  # and the two sides have to stay in lockstep.
+  # mitxonline's secrets.yaml copies this value verbatim. edxapp-provision
+  # rotates the AccessToken to a changed value on its next run (and deletes the
+  # account's old one), so change both files together and re-run it.
   OPENEDX_SERVICE_WORKER_API_TOKEN: "local-dev-stub-token" # pragma: allowlist secret
+
+  # The authoring MFE runs on the Studio host and authenticates against this
+  # LMS from there: its JavaScript reads the LMS's JWT and user-info cookies
+  # and POSTs a credentialed cross-origin /login_refresh. Production sets
+  # ENABLE_CORS_HEADERS, CORS_ORIGIN_WHITELIST and LOGIN_REDIRECT_WHITELIST for
+  # the same reason (edxapp config_builder.py and k8s_configmaps.py), and gets
+  # SHARED_COOKIE_DOMAIN by deriving it from SESSION_COOKIE_DOMAIN. These reach
+  # Django only on a lehrer whose settings model declares them; see the
+  # README's Open edX section.
+  #
+  # CORS_ALLOW_CREDENTIALS follows ENABLE_CORS_HEADERS inside lehrer's settings,
+  # as upstream production.py has it, so it is not listed.
+  ENABLE_CORS_HEADERS: "true"
+  CORS_ORIGIN_WHITELIST: '["https://lms.mit.test", "https://studio.mit.test"]'
+  # The JWT and user-info cookies only (user_authn/cookies.py reads this, not
+  # SESSION_COOKIE_DOMAIN), so the LMS's sessionid stays host-only and cannot
+  # collide with mitxonline's default-named session cookie on the same parent.
+  SHARED_COOKIE_DOMAIN: ".mit.test"
+  # Hostnames the LMS may send a `next=` back to after login; the authoring
+  # MFE's LOGIN_URL carries its own Studio-host URL as next.
+  LOGIN_REDIRECT_WHITELIST: '["studio.mit.test"]'

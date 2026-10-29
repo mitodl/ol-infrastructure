@@ -19,7 +19,7 @@ data:
   # config ships credentials for neither, so only the Django admin login
   # works out of the box. To sign in through an OAuth provider, register an
   # application there with the redirect URI
-  # https://micromasters.mit.dev/complete/mitxonline/ (or /complete/edxorg/)
+  # https://micromasters.mit.test/complete/mitxonline/ (or /complete/edxorg/)
   # and set:
   # FEATURE_MITXONLINE_LOGIN: "True"
   # MITXONLINE_BASE_URL: ""

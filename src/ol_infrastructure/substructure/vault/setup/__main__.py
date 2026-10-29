@@ -144,7 +144,9 @@ vault_user_pass_auth = vault.AuthBackend(
 vault_autopilot = vault.RaftAutopilot(
     "vault-configure-raft-autopilot",
     cleanup_dead_servers=True,
-    dead_server_last_contact_threshold="1m0s",
+    # A joining peer is silent while it installs the raft snapshot (2.4 GB, ~60s
+    # in Production); at 1m autopilot reaped it mid-install and the ASG replaced it.
+    dead_server_last_contact_threshold="5m0s",
     last_contact_threshold="10s",
     max_trailing_logs=1000,
     min_quorum=3,

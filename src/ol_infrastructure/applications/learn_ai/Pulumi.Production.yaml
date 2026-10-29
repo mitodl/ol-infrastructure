@@ -5,8 +5,17 @@ config:
   aws:region: us-east-1
 
   learn_ai:backend_domain: "api-learn-ai.ol.mit.edu"
+  # Browser origins outside learn-ai's own hosts that call it with credentials.
+  # The gateway's cors plugin answers for all of them (see __main__.py).
+  learn_ai:cors_frontend_origins:
+  - "https://learn.mit.edu"   # MIT Learn, which embeds the chat widget
+  - "https://courses.learn.mit.edu"   # MITx Online LMS: ol-openedx-chat (AskTIM) in the learning MFE
+  - "https://lms.mitx.mit.edu"   # MITx LMS: ol-openedx-chat
+  - "https://staging.mitx.mit.edu"   # MITx Staging LMS: ol-openedx-chat
+  - "https://courses.xpro.mit.edu"   # xPRO LMS: ol-openedx-chat
   learn_ai:db_password:
     secure: v1:DIaoiP0dVXpI2w72:zcSTWgD6DInTMOdD1oH1FTdlUJCney7MLeAfL5Q5hcL9lDfW7AjVGynLDeDtpL3DQIZvFBUvcbjIHVaBYQf8Ikf8tdjWamNBv+4Ymwe2
+  learn_ai:enable_azure_openai: true
   learn_ai:env_vars:
     AI_CHATBOTS_SESSION_EXPIRY_DAYS: 36500
     AI_CITED_PROMPTS: '["syllabus_canvas"]'
@@ -17,6 +26,13 @@ config:
     AI_MIT_CONTENTFILE_URL: "https://api.learn.mit.edu/api/v1/contentfiles/"
     AI_MIT_SEARCH_URL: "https://api.learn.mit.edu/api/v0/vector_learning_resources_search/"
     AI_PROMPT_CACHE_FUNCTION: "ai_chatbots.utils.get_django_cache"
+    # Contact us support intake (hq#13712). Unset defaults. Field ids are minted
+    # per Zendesk instance -- take them from this environment's own, never
+    # another's, since an unrecognised id rejects the whole ticket.
+    AI_ZENDESK_API_URL: ""
+    AI_ZENDESK_NAME_FIELD_ID: "0"
+    AI_ZENDESK_URL_FIELD_ID: "0"
+    AI_ZENDESK_USERNAME_FIELD_ID: "0"
     CANVAS_SYLLABUS_DEMO_READABLE_IDS: ["14566-kaleba:20211202", "34642-15.095_FA25"]
     CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: ["14566-kaleba:20211202+canvas", "34642-15.095_FA25+canvas"]
     CELERY_TASK_ALWAYS_EAGER: "false"

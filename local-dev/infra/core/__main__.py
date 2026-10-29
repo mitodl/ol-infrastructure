@@ -73,7 +73,7 @@ mkcert_ca_cert_path = config.get("mkcert_ca_cert_path") or "local-dev/certs/root
 
 # Root domain for all local-dev hostnames.
 root_domain = config.get("root_domain") or os.environ.get(
-    "LOCAL_DEV_ROOT_DOMAIN", "mit.dev"
+    "LOCAL_DEV_ROOT_DOMAIN", "mit.test"
 )
 
 keycloak_hostname = config.get("keycloak_hostname") or f"sso.ol.{root_domain}"
@@ -82,7 +82,7 @@ keycloak_url = config.get("keycloak_url") or f"https://{keycloak_hostname}"
 apisix_admin_key = config.require_secret("apisix_admin_key")
 apisix_viewer_key = config.require_secret("apisix_viewer_key")
 
-# Observability (Grafana + Loki + Alloy). Roughly 1.9GB of workloads, so it is
+# Observability (Grafana + Loki + Alloy). Roughly 2.9GB of workloads, so it is
 # opt-out for developers on a constrained Docker VM.
 observability_enabled = config.get_bool("observability_enabled") is not False
 
@@ -159,8 +159,14 @@ _ca_cert_path = _repo_root / mkcert_ca_cert_path
 # ---------------------------------------------------------------------------
 
 k8s_provider_opts: dict[str, Any] = {}
-if kubeconfig_path:
-    k8s_provider_opts["kubeconfig"] = kubeconfig_path
+# Always an explicit path. Tilt hands the commands it runs a KUBECONFIG under
+# ~/Library/Application Support/tilt-dev that exists only while Tilt runs, and
+# the provider records whatever kubeconfig it was given as a provider input, so
+# a later pulumi run outside Tilt (tilt down's delete command, teardown.sh) would
+# try to read a file that is gone and fail to reach the cluster.
+k8s_provider_opts["kubeconfig"] = str(
+    Path(kubeconfig_path or "~/.kube/config").expanduser()
+)
 
 k8s_provider = k8s.Provider("k3d-local", context="local-dev", **k8s_provider_opts)
 _k8s = make_resource_opts(k8s_provider)

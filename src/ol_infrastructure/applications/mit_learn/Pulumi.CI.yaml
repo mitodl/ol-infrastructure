@@ -24,6 +24,10 @@ config:
     - "ci.learn.mit.edu"
     cors_urls:
     - "https://ci.learn.mit.edu"
+    - "https://courses.ci.learn.mit.edu"   # MITxOnline courseware MFE, same as csrf_domains below
+    - "https://lms-ci.mitx.mit.edu"   # MITx LMS: ol-openedx-chat video summary/flashcard fetch
+    - "https://staging-ci.mitx.mit.edu"   # MITx Staging LMS: ol-openedx-chat video summary/flashcard fetch
+    - "https://courses-ci.xpro.mit.edu"   # xPRO LMS: ol-openedx-chat video summary/flashcard fetch
     - "https://ocw-next.netlify.app"
     - "https://draft-ci.ocw.mit.edu"
     - "https://live-ci.ocw.mit.edu"
@@ -46,6 +50,7 @@ config:
   mitlearn:support_url: "support.ci.learn.mit.edu"
   mitlearn:enable_fastly_shielding: true
   mitlearn:use_granian: true
+  mitlearn:webapp_endpoint_routing: true
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.ci.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.ci.learn.mit.edu/api/v0/vector_content_files_search/"

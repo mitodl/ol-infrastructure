@@ -6,6 +6,7 @@ import mimetypes
 import textwrap
 from pathlib import Path
 from string import Template
+from typing import Any
 
 import pulumi_fastly as fastly
 import pulumi_kubernetes as kubernetes
@@ -57,6 +58,8 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixRouteConfig,
     OLApisixSharedPluginsConfig,
     OLApisixSharedPluginsVariant,
+    OLApisixUpstream,
+    OLApisixUpstreamConfig,
     browser_traffic_match_exprs,
     oidc_gateway_pre_function_plugin,
     ol_apisix_shared_plugins_variants,
@@ -110,6 +113,7 @@ from ol_infrastructure.lib.ol_types import (
     Product,
     Services,
 )
+from ol_infrastructure.lib.opik import opik_api_url
 from ol_infrastructure.lib.pulumi_helper import (
     docker_image_config_kwargs,
     make_stack_reference,
@@ -170,6 +174,38 @@ qdrant_api_key = qdrant_cloud.AccountsDatabaseApiKeyV2(
         additional_secret_outputs=["key"],
     ),
 )
+# Read-only key for ol-data-platform's ml code location, whose Learn embeddings
+# smokecheck reads these collections. Created here rather than in the dagster stack
+# because this stack already holds the Qdrant Cloud provider and Learn's cluster, and
+# the key belongs to that cluster. Dagster's policy can read secret-mitlearn, but that
+# holds the manage key above, so this goes to secret-data/pipelines/*, the kv-v1 path
+# its pipeline resources read: QdrantResource takes the cluster URL as `host`.
+# Dagster runs Azure embeddings, and so the smokecheck, in qa and production only,
+# as with its YouTube key in secret-data/pipelines.
+if stack_info.env_suffix in ("qa", "production"):
+    qdrant_dagster_read_only_api_key = qdrant_cloud.AccountsDatabaseApiKeyV2(
+        f"mitlearn-qdrant-dagster-read-only-api-key-{stack_info.env_suffix}",
+        cluster_id=qdrant_cluster_id,
+        name=f"dagster-read-only-{stack_info.env_suffix}",
+        global_access_rule=qdrant_cloud.AccountsDatabaseApiKeyV2GlobalAccessRuleArgs(
+            access_type="GLOBAL_ACCESS_RULE_ACCESS_TYPE_READ_ONLY",
+        ),
+        opts=ResourceOptions(
+            provider=qdrant_provider,
+            additional_secret_outputs=["key"],
+        ),
+    )
+    vault.generic.Secret(
+        f"mitlearn-qdrant-dagster-read-only-vault-secret-{stack_info.env_suffix}",
+        path="secret-data/pipelines/qdrant",
+        data_json=Output.json_dumps(
+            {
+                "host": qdrant_cloud_stack.require_output("cluster_url"),
+                "api_key": qdrant_dagster_read_only_api_key.key,
+            }
+        ),
+        opts=ResourceOptions(delete_before_replace=True),
+    )
 mitodl_zone_id = dns_stack.require_output("odl_zone_id")
 learn_zone_id = dns_stack.require_output("learn")["id"]
 
@@ -1632,6 +1668,22 @@ else:
     azure_identity_volumes = []
     azure_identity_volume_mounts = []
 
+# Opik tracing of the embedding encoder through ol-llm. mit-learn leaves tracing off
+# unless OPIK_URL_OVERRIDE is set. Every environment traces to the Production Opik
+# (lib/opik.py), so OL_LLM_ENVIRONMENT is what tells the environments apart there.
+# It is explicit because the app otherwise falls back to MITOL_ENVIRONMENT, which is
+# "rc" in QA. The Keycloak client arrives through the secret-opik/sdk-mit-learn secret
+# in k8s_secrets.py. OPIK_API_KEY stays unset: ol-llm refuses to start with it
+# alongside the OPIK_KEYCLOAK_* variables.
+env_vars.update(
+    {
+        "OL_LLM_ENVIRONMENT": stack_info.env_suffix,
+        "OPIK_URL_OVERRIDE": opik_api_url(),
+        "OPIK_WORKSPACE": "default",
+        "OPIK_PROJECT_NAME": "mit-learn",
+    }
+)
+
 # Unconditionally append k8s labels to OTEL_RESOURCE_ATTRIBUTES so all telemetry
 # carries organizational metadata regardless of stack environment.
 merge_otel_resource_attributes(env_vars, k8s_app_labels)
@@ -1691,6 +1743,10 @@ learn_external_service_shared_plugin_variants = ol_apisix_shared_plugins_variant
         k8s_namespace=learn_namespace,
         k8s_labels=application_labels,
         enable_defaults=True,
+        # The same list Django gets as CORS_ALLOWED_ORIGINS above.  The gateway
+        # answers CORS preflights itself, so an origin missing here is blocked
+        # on every preflighted request whatever django-cors-headers allows.
+        cors_allow_origins=cors_urls_list,
         plugins=[
             # Everyone currently logged in is holding a session cookie under
             # lua-resty-session's old default name, which the renamed plugins
@@ -1971,16 +2027,15 @@ starrocks_vault_mount_path = (
     "database-starrocks" if env_vars.get("STARROCKS_HOST") else None
 )
 
-# The StarRocks credential reaches the app through env_from_secret_names, i.e.
-# envFrom, so its values become pod environment variables fixed at pod start.
-# Re-rendering the Kubernetes Secret does not touch a running pod. Vault
-# rotates this lease on its own (the StarRocks role's max TTL is six months),
-# so without these restart targets the rotation lands in the Secret, Vault
-# revokes the old StarRocks user with DROP USER, and beat keeps authenticating
-# as a user that no longer exists -- the sync stops until something unrelated
-# rolls the pods. That failure is silent in exactly the way the missing
-# configuration this PR fixes was.
-starrocks_secret_restart_targets = [
+# The StarRocks and Opik credentials reach the app through env_from_secret_names,
+# i.e. envFrom, so their values become pod environment variables fixed at pod
+# start. Re-rendering the Kubernetes Secret does not touch a running pod. Vault
+# rotates the StarRocks lease on its own (the StarRocks role's max TTL is six
+# months), so without these restart targets the rotation lands in the Secret,
+# Vault revokes the old StarRocks user with DROP USER, and beat keeps
+# authenticating as a user that no longer exists -- the sync stops until
+# something unrelated rolls the pods, and nothing reports it.
+env_secret_restart_targets = [
     OLVaultRestartTarget(kind="Deployment", name=deployment_name)
     for deployment_name in application_deployment_names(
         application_name="mitlearn",
@@ -1990,7 +2045,7 @@ starrocks_secret_restart_targets = [
 ]
 
 # Create all Kubernetes secrets needed by the application
-secret_names, secret_resources = create_mitlearn_k8s_secrets(
+secret_names, optional_secret_names, secret_resources = create_mitlearn_k8s_secrets(
     stack_info=stack_info,
     mitlearn_namespace=learn_namespace,
     k8s_global_labels=k8s_app_labels,
@@ -2000,7 +2055,7 @@ secret_names, secret_resources = create_mitlearn_k8s_secrets(
     redis_password=redis_config.require("password"),
     redis_cache=redis_cache,
     starrocks_vault_mount_path=starrocks_vault_mount_path,
-    starrocks_restart_targets=starrocks_secret_restart_targets,
+    restart_targets=env_secret_restart_targets,
 )
 
 # Configure and deploy the mitlearn application using OLApplicationK8s
@@ -2015,6 +2070,7 @@ mitlearn_k8s_app = OLApplicationK8s(
         k8s_global_labels=k8s_app_labels,
         # Reference all Kubernetes secrets containing environment variables
         env_from_secret_names=secret_names,
+        optional_env_from_secret_names=optional_secret_names,
         application_min_replicas=mitlearn_config.get_int("min_replicas") or 2,
         application_max_replicas=mitlearn_config.get_int("max_replicas") or 10,
         application_security_group_id=mitlearn_app_security_group.id,
@@ -2028,45 +2084,40 @@ mitlearn_k8s_app = OLApplicationK8s(
         application_arg_array=["/tmp/uwsgi.ini"],  # noqa: S108
         granian_config=GranianConfig(
             workers=2,
-            # Sized against the VPA *floor* (3.5Gi in production), not the declared
-            # 3200Mi limit, because the floor is the smallest limit a pod can be
-            # running under and therefore the one the cap has to beat. The component's
-            # own floor(limit/workers*0.9) would give 1440, leaving the worker pair at
-            # 2880Mi with almost nothing left for the master under the floor.
+            # Sized against the lowest limit a production pod can run under: the VPA
+            # floor (mitlearn:webapp_vpa_min_allowed_memory, 3.5Gi) at the 1:1
+            # request:limit ratio, so 3584Mi as admitted by the VPA. Not the declared
+            # 3200Mi, which a pod only runs under if VPA admission doesn't mutate it.
             #
-            # Raised again 2026-08-07, 1350 -> 1500. The previous 1350 (pair 2700Mi,
-            # ~370Mi margin under a 3Gi floor) was sized against a 2774Mi peak that
-            # was itself measured while the fleet was over-scaled (the two inert Prometheus
-            # triggers left the undersized-request CPU trigger pegging the HPA near
-            # max_replicas and spreading traffic thin). PR #5303 raised the CPU request, so
-            # the HPA settled into a much smaller replica range,
-            # container RSS to 3045-3069Mi within a day -- eating the margin and
-            # reviving the OOMKills. 2*1500 = 3000Mi leaves ~580Mi under the new 3.5Gi
-            # floor for the master and transient overshoot, sized with more headroom
-            # than before since this margin has now been eaten twice. See
-            # les-root-cause-found-mit-learn-s-aug-6-cpu-request-b-cfebf0 (witan) for
-            # the full investigation.
+            # The cap has to leave room for a planned respawn. Granian starts the
+            # replacement worker before stopping the old one (one worker at a time),
+            # so at the moment a cap trips the container holds both workers at up to
+            # the cap plus the new worker's import. The component's
+            # resolve_workers_max_rss formula (worker_startup_rss can't be passed
+            # alongside an explicit cap) applied to the floor:
+            #   floor((0.9 * 3584 - 650) / 2) = 1287
+            #   2 * 1287 + 650 = 3224Mi, leaving 360Mi for the master and growth
+            #   between RSS samples.
+            # 650MiB is a fresh worker's share of container RSS about a minute after
+            # an RSS respawn (630-650MiB on 2026-10-27; fresh pods sit at 836/913MiB
+            # p50/p90 for master plus both workers 30-150s after start, 7d).
             #
-            # Coupled to `workers` and to the VPA floor: both must be revisited
-            # together. Dropping to workers=1 without resizing this would cap the sole
-            # worker at 1500Mi of a 3.5Gi pod. See the stage 4 task in
+            # The previous 1500 needed 2 * 1500 + 650 = 3650Mi, over the 3584Mi floor.
+            # On 2026-10-26 a crawler surge pushed workers to the cap while the VPA
+            # held pods at the floor, and the respawns OOMKilled pods until the
+            # Deployment had none available at 04:58Z.
+            #
+            # Coupled to `workers` and to the VPA floor: revisit all three together.
+            # On granian 2.8 (mit-learn#4024) each worker owns its listener, so a
+            # respawn is covered only by the other worker; workers=1 also needs
+            # respawn_interval above the worker cold start. See the stage 4 task in
             # docs/plans/granian-configuration-overhaul.md.
             #
-            # The image runs granian 2.8.3 since mit-learn 0.81.8 (mit-learn#4024). On
-            # 2.8 each worker owns its listener, so a respawn is covered only by the
-            # other worker. Moving to workers=1 also needs respawn_interval set above
-            # the worker cold start, or every respawn refuses connections.
-            #
-            # This is one value across all stacks, while the VPA floor it is sized
-            # against is production-only (CI/QA keep the 256Mi default). That is not
-            # the protection gap it looks like: a cap only guards anything when
-            # 2*cap + master fits under the running limit, and no cap derived from
-            # the 3200Mi declared limit fits under a VPA floor of 256Mi. Below a
-            # ~2300Mi limit the cap is inert at 1080, 1350 and 1500 alike, so CI/QA
-            # are no worse off than before. Making it genuinely track the limit the
-            # kernel enforces needs a runtime cgroup read, not a synth-time constant
-            # -- tracked as tk-evaluate-runtime-cgroup-derived-workers-max-rss.
-            workers_max_rss=1500,
+            # One value across all stacks, but CI/QA keep the 256Mi VPA floor, under
+            # which no cap fits and the cap is inert. Tracking the limit the kernel
+            # enforces needs a runtime cgroup read, not a synth-time constant:
+            # tk-evaluate-runtime-cgroup-derived-workers-max-rss.
+            workers_max_rss=1287,
             enable_metrics=True,
             interface="asginl",
             backlog=None,
@@ -2243,6 +2294,28 @@ fastly_api_match_exprs = [
     }
 ]
 
+# With "service" granularity APISIX has a single node (the ClusterIP), so when
+# a webapp pod dies (OOMKill, crash, spot interruption) the refused connection
+# has nowhere to be retried and the client gets a 502. Resolving to pod IPs
+# lets APISIX retry it on another pod. retries=1 caps the extra attempts at one
+# instead of APISIX's default of one per remaining pod.
+webapp_endpoint_routing = mitlearn_config.get_bool("webapp_endpoint_routing") or False
+webapp_backend: dict[str, Any] = {
+    "backend_service_name": mitlearn_k8s_app.application_lb_service_name,
+    "backend_service_port": mitlearn_k8s_app.application_lb_service_port_name,
+    "backend_resolve_granularity": "endpoint" if webapp_endpoint_routing else "service",
+}
+if webapp_endpoint_routing:
+    OLApisixUpstream(
+        name=f"ol-mitlearn-k8s-apisix-upstream-{stack_info.env_suffix}",
+        upstream_config=OLApisixUpstreamConfig(
+            service_name=mitlearn_k8s_app.application_lb_service_name,
+            k8s_namespace=learn_namespace,
+            k8s_labels=application_labels,
+            retries=1,
+        ),
+    )
+
 learn_external_service_apisix_route_no_prefix = OLApisixRoute(
     name=f"ol-mitlearn-k8s-apisix-route-no-prefix-{stack_info.env_suffix}",
     k8s_namespace=learn_namespace,
@@ -2267,8 +2340,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/*"],
             exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="fastly-logout-redirect",
@@ -2282,8 +2354,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/logout/oidc/*"],
             exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="fastly-reqauth",
@@ -2302,8 +2373,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
                 "/login/*",
             ],
             exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="browser-passauth",
@@ -2321,8 +2391,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/*"],
             exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="browser-logout-redirect",
@@ -2336,8 +2405,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/logout/oidc/*"],
             exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="browser-reqauth",
@@ -2356,8 +2424,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
                 "/login/*",
             ],
             exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="passauth",
@@ -2371,8 +2438,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/*"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         # Credential metadata generation calls a frontier model once per Open
         # Badges field (gpt-5 and Claude measure 25-46s each, generated
@@ -2400,8 +2466,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/api/v0/credential_metadata/"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="logout-redirect",
@@ -2414,8 +2479,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/logout/oidc/*"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="reqauth",
@@ -2433,8 +2497,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
                 "/login",
                 "/login/*",
             ],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         # The sidecar answered this with a 204 (EFF Do Not Track convention
         # for "no policy published"). "passauth" above would otherwise proxy
@@ -2459,8 +2522,7 @@ learn_external_service_apisix_route_no_prefix = OLApisixRoute(
             shared_plugin_config_name=learn_external_service_shared_plugins.resource_name,
             hosts=[mitlearn_api_domain],
             paths=["/.well-known/dnt-policy.txt"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
             plugins=[
                 OLApisixPluginConfig(
                     name="mocking",
@@ -2501,8 +2563,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/learn/*"],
             exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="fastly-logout-redirect",
@@ -2516,8 +2577,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/learn/logout/oidc/*"],
             exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="fastly-reqauth",
@@ -2536,8 +2596,7 @@ learn_external_service_apisix_route = OLApisixRoute(
                 "/learn/login/*",
             ],
             exprs=fastly_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="browser-passauth",
@@ -2554,8 +2613,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/learn/*"],
             exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="browser-logout-redirect",
@@ -2569,8 +2627,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             hosts=[mitlearn_api_domain],
             paths=["/learn/logout/oidc/*"],
             exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="browser-reqauth",
@@ -2589,8 +2646,7 @@ learn_external_service_apisix_route = OLApisixRoute(
                 "/learn/login/*",
             ],
             exprs=browser_api_match_exprs,
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="passauth",
@@ -2604,8 +2660,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/learn/*"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         # Credential metadata generation calls a frontier model once per Open
         # Badges field (gpt-5 and Claude measure 25-46s each, generated
@@ -2633,8 +2688,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/learn/api/v0/credential_metadata/"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="logout-redirect",
@@ -2647,8 +2701,7 @@ learn_external_service_apisix_route = OLApisixRoute(
             ],
             hosts=[mitlearn_api_domain],
             paths=["/learn/logout/oidc/*"],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
         OLApisixRouteConfig(
             route_name="reqauth",
@@ -2666,8 +2719,7 @@ learn_external_service_apisix_route = OLApisixRoute(
                 "/learn/login",
                 "/learn/login/*",
             ],
-            backend_service_name=mitlearn_k8s_app.application_lb_service_name,
-            backend_service_port=mitlearn_k8s_app.application_lb_service_port_name,
+            **webapp_backend,
         ),
     ],
     opts=ResourceOptions(

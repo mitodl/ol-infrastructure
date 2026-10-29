@@ -41,9 +41,10 @@ from ol_infrastructure.components.services.k8s import (  # noqa: E402
     OLApplicationK8s,
     OLApplicationK8sCeleryRedisConfig,
 )
+from ol_infrastructure.lib.pulumi_helper import docker_image_config_kwargs  # noqa: E402
 
 LOCAL_IMAGE_TAG = "tilt-abc123"
-OPENEDX_BASE_URL = "https://lms.mit.dev"
+OPENEDX_BASE_URL = "https://lms.mit.test"
 LOCAL_OIDC_SECRET = "ol-mitlearn-oidc"  # noqa: S105  # pragma: allowlist secret
 
 
@@ -52,13 +53,13 @@ def _local_bindings(**overrides) -> definition.MitxonlineBindings:
     settings = {
         "env_suffix": "dev",
         "hostnames": definition.MitxonlineHostnames(
-            api="api.mitxonline.mit.dev",
-            frontend="mitxonline.mit.dev",
-            learn_api="api.learn.mit.dev",
+            api="api.mitxonline.mit.test",
+            frontend="mitxonline.mit.test",
+            learn_api="api.learn.mit.test",
         ),
         "environment_variables": {
             "OPENEDX_API_BASE_URL": OPENEDX_BASE_URL,
-            "MITX_ONLINE_ADMIN_EMAIL": "admin@odl.local",
+            "MITX_ONLINE_ADMIN_EMAIL": "admin@ol.test",
         },
         "k8s_labels": {"ol.mit.edu/application": "mitxonline"},
         "secret_names": ["mitxonline-secrets"],
@@ -122,6 +123,20 @@ def test_rendering_does_not_mutate_the_bindings_environment():
     assert bindings.environment_variables == given
 
 
+def test_gateway_cors_origins_are_djangos_cors_allowed_origins():
+    bindings = _local_bindings(
+        environment_variables={
+            "OPENEDX_API_BASE_URL": OPENEDX_BASE_URL,
+            "CORS_ALLOWED_ORIGINS": "https://mitxonline.mit.dev, https://learn.mit.dev,",
+        }
+    )
+
+    assert definition.cors_allow_origins(bindings) == [
+        "https://mitxonline.mit.dev",
+        "https://learn.mit.dev",
+    ]
+
+
 # ─── Workloads ────────────────────────────────────────────────────────────────
 
 
@@ -141,6 +156,27 @@ def test_local_bindings_use_the_image_as_given():
     assert config.registry == "direct"
     assert config.application_image_repository == "mitodl/mitxonline-app"
     assert config.application_docker_tag == LOCAL_IMAGE_TAG
+
+
+def test_release_pipeline_image_kwargs_reach_the_component(monkeypatch):
+    """The release pipeline sends a digest and a version; both must get through.
+
+    The bindings forbid unknown fields, so a kwarg docker_image_config_kwargs
+    returns that the bindings lack fails every deployed stack.
+    """
+    digest = "sha256:" + "a" * 64
+    monkeypatch.delenv("MITXONLINE_DOCKER_TAG", raising=False)
+    monkeypatch.setenv("MITXONLINE_DOCKER_SHA", digest)
+    monkeypatch.setenv("MITXONLINE_RELEASE_VERSION", "2026.10.28.1")
+
+    config = definition.application_config(
+        _local_bindings(
+            application_docker_tag=None, **docker_image_config_kwargs("MITXONLINE")
+        )
+    )
+
+    assert config.application_image_digest == digest
+    assert config.application_version == "2026.10.28.1"
 
 
 def test_deployed_bindings_keep_the_eks_wiring():
@@ -323,9 +359,9 @@ def test_routes_follow_the_bound_hostnames():
     direct, prefixed = _route_groups(_deployed_bindings())
 
     assert {tuple(route.hosts) for route in direct} == {
-        ("api.mitxonline.mit.dev", "mitxonline.mit.dev")
+        ("api.mitxonline.mit.test", "mitxonline.mit.test")
     }
-    assert {tuple(route.hosts) for route in prefixed} == {("api.learn.mit.dev",)}
+    assert {tuple(route.hosts) for route in prefixed} == {("api.learn.mit.test",)}
     assert [route.route_name for route in direct] == [
         "passauth",
         "logout-redirect",
@@ -371,8 +407,8 @@ def test_session_cookies_are_named_for_the_environment():
     assert direct.oidc_session_cookie_name != prefixed.oidc_session_cookie_name
     assert bindings.env_suffix in direct.oidc_session_cookie_name
     assert bindings.env_suffix in prefixed.oidc_session_cookie_name
-    assert direct.oidc_session_cookie_domain == ".mitxonline.mit.dev"
-    assert prefixed.oidc_session_cookie_domain == ".learn.mit.dev"
+    assert direct.oidc_session_cookie_domain == ".mitxonline.mit.test"
+    assert prefixed.oidc_session_cookie_domain == ".learn.mit.test"
 
 
 def test_deployed_routes_read_oidc_credentials_from_the_mitlearn_vault_client():

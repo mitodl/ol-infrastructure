@@ -20,7 +20,6 @@ workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "mit-learn")
 IMAGE = 'mitodl/mit-learn-nextjs-app'
 _DIR = config.main_dir + "/local-dev/apps/mit-learn-nextjs"
-_rd = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
 
 if os.path.exists(os.path.join(APP_DIR, '.git')):
     docker_build(
@@ -57,8 +56,15 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         ],
     )
 
+# Applied with the rest so that enabling or disabling the analytics API changes
+# the config fingerprint and rolls the pod (see apps/mit-learn's warehouse-env).
+_analytics_env = 'configmaps/analytics-env-off.yaml'
+if 'ol-analytics-api' in os.environ.get('LOCAL_DEV_ENABLED_APPS', '').split(','):
+    _analytics_env = 'configmaps/analytics-env.yaml'
+
 k8s_yaml_local([
     'configmaps/app-env.yaml',
+    _analytics_env,
     'deployment.yaml',
     'apisix-routes.yaml',
 ], local_overrides='configmaps/app-env.local.yaml')

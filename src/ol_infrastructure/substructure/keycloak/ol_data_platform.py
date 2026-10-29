@@ -39,6 +39,32 @@ STARROCKS_SHARED_REALM_ROLES = frozenset(
         "ol_business_analyst",
     }
 )
+# The OpenMetadata role each realm role grants. Each value is a client role on
+# ol-open_metadata-client, sent in the `roles` claim that OpenMetadata reads at
+# login (authorizer useRolesFromProvider). Each name must be an OpenMetadata
+# Role, and the claim replaces the roles the user had. The custom roles are
+# defined in substructure/open_metadata's access_control.py. No realm role
+# maps to "Admin": it would set isAdmin, and OpenMetadata never clears isAdmin
+# when it leaves the claim, so Keycloak could grant admin but not take it back.
+# Admins come from initialAdmins in applications/open_metadata, and
+# ol-platform-admin gets DataEngineer (stewardship comes from the data-platform
+# team). ol-instructor is left out. That is not no access: instructors can
+# still log in, and like every user they hold DataConsumer through the realm's
+# default roles and inherit it from the Organization team.
+OPEN_METADATA_ROLE_BY_REALM_ROLE = {
+    "ol-platform-admin": "DataEngineer",
+    "ol-data-engineer": "DataEngineer",
+    "ol-researcher": "DataContributor",
+    "ol-data-analyst": "DataConsumer",
+    "ol-business-analyst": "DataConsumer",
+}
+# The composites of default-roles-<realm> in a realm Keycloak creates.
+KEYCLOAK_STOCK_DEFAULT_ROLES = (
+    "offline_access",
+    "uma_authorization",
+    "account/view-profile",
+    "account/manage-account",
+)
 
 
 def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
@@ -263,8 +289,7 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ),
         enabled=True,
         access_type="CONFIDENTIAL",
-        # Needed to use for Superset API access
-        direct_access_grants_enabled=True,
+        direct_access_grants_enabled=False,
         standard_flow_enabled=True,
         implicit_flow_enabled=False,
         service_accounts_enabled=True,
@@ -460,25 +485,63 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         enabled=True,
         access_type="CONFIDENTIAL",
         standard_flow_enabled=True,
-        implicit_flow_enabled=True,
+        implicit_flow_enabled=False,
         service_accounts_enabled=True,
         valid_redirect_uris=keycloak_realm_config.get_object(
             "ol-data-platform-openmetadata-redirect-uris"
         ),
         opts=resource_options.merge(ResourceOptions(delete_before_replace=True)),
     )
-    ol_data_platform_openmetadata_client_roles = (
-        keycloak_realm_config.get_object("ol-data-platform-openmetadata-client-roles")
-        or []
-    )
-    for role in ol_data_platform_openmetadata_client_roles:
-        keycloak.Role(
+    ol_data_platform_openmetadata_client_role_refs = {
+        role: keycloak.Role(
             f"ol-data-platform-openmetadata-client-{role}",
             name=role,
-            realm_id="ol-data-platform",
+            realm_id=ol_data_platform_realm.id,
             client_id=ol_data_platform_openmetadata_client.id,
             opts=resource_options,
         )
+        for role in sorted(set(OPEN_METADATA_ROLE_BY_REALM_ROLE.values()))
+    }
+    # OpenMetadata reads a top-level `roles` claim from the ID token it gets at
+    # the login callback (AuthenticationCodeFlowHandler.syncRolesFromProvider),
+    # and from the access token when a provider token is presented directly
+    # (JwtFilter). Keycloak omits the claim for a user with none of these
+    # client roles, and OpenMetadata then leaves their roles alone, which is
+    # why every user holds DataConsumer (below). Team membership is not part
+    # of this claim.
+    keycloak.openid.UserClientRoleProtocolMapper(
+        "ol-data-platform-openmetadata-roles-mapper",
+        realm_id=ol_data_platform_realm.id,
+        client_id=ol_data_platform_openmetadata_client.id,
+        name="openmetadata-roles",
+        claim_name="roles",
+        claim_value_type="String",
+        client_id_for_role_mappings="ol-open_metadata-client",
+        multivalued=True,
+        add_to_id_token=True,
+        add_to_access_token=True,
+        add_to_userinfo=True,
+        opts=resource_options,
+    )
+    # Every user holds DataConsumer through the realm's default roles, so the
+    # claim is never omitted and losing a realm role takes its OpenMetadata
+    # role away at the next login. It changes no one's access, because every
+    # user already inherits DataConsumer from the Organization team.
+    # This resource owns the realm's whole default-role list, so it repeats
+    # Keycloak's stock defaults.
+    keycloak.DefaultRoles(
+        "ol-data-platform-default-roles",
+        realm_id=ol_data_platform_realm.id,
+        default_roles=[
+            *KEYCLOAK_STOCK_DEFAULT_ROLES,
+            Output.concat(
+                ol_data_platform_openmetadata_client.client_id,
+                "/",
+                ol_data_platform_openmetadata_client_role_refs["DataConsumer"].name,
+            ),
+        ],
+        opts=resource_options,
+    )
     vault.generic.Secret(
         "ol-data-platform-openmetadata-client-vault-oidc-credentials",
         path="secret-operations/sso/open_metadata",
@@ -541,11 +604,12 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
         ol_data_platform_starrocks_client_role_refs[role] = role_ref
 
     # Realm roles are what people get assigned. Each one is a composite of the
-    # matching client role on ol-superset-client and, for the roles in
-    # STARROCKS_SHARED_REALM_ROLES, on ol-starrocks-client, so one assignment
-    # gives a person that role in both. They are created here, after both
-    # clients, because composite_roles needs both sets of client role ids. A
-    # stack with no StarRocks client roles configured (CI) gets Superset-only
+    # matching client role on ol-superset-client, for the roles in
+    # STARROCKS_SHARED_REALM_ROLES on ol-starrocks-client, and of its
+    # OpenMetadata role from OPEN_METADATA_ROLE_BY_REALM_ROLE, so one assignment
+    # gives a person that role in each. They are created here, after the
+    # clients, because composite_roles needs every set of client role ids. A
+    # stack with no StarRocks client roles configured (CI) gets no StarRocks
     # composites.
     for resource_name, realm_role, client_role, description in (
         (
@@ -601,6 +665,15 @@ def create_ol_data_platform_realm(  # noqa: C901, PLR0912, PLR0913, PLR0915
                     [ol_data_platform_starrocks_client_role_refs[client_role].id]
                     if ol_data_platform_starrocks_client_role_refs
                     and client_role in STARROCKS_SHARED_REALM_ROLES
+                    else []
+                ),
+                *(
+                    [
+                        ol_data_platform_openmetadata_client_role_refs[
+                            OPEN_METADATA_ROLE_BY_REALM_ROLE[realm_role]
+                        ].id
+                    ]
+                    if realm_role in OPEN_METADATA_ROLE_BY_REALM_ROLE
                     else []
                 ),
             ],

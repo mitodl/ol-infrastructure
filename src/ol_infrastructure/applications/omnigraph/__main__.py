@@ -76,7 +76,7 @@ from ol_infrastructure.applications.omnigraph.lock_handoff import (
     uses_persisted_lock,
 )
 from ol_infrastructure.applications.omnigraph.maintenance import (
-    DEFAULT_CLEANUP_ISO_WEEKDAY,
+    DEFAULT_CLEANUP_ISO_WEEKDAYS,
     DEFAULT_CLEANUP_OLDER_THAN,
     DEFAULT_CLEANUP_SCHEDULE,
     DEFAULT_MAINTENANCE_SCHEDULE,
@@ -97,6 +97,10 @@ from ol_infrastructure.applications.omnigraph.token_sync import (
     DEFAULT_SYNC_SCHEDULE,
     SERVICE_TOKENS_VAULT_PATH,
     create_token_sync,
+)
+from ol_infrastructure.applications.omnigraph.version_census import (
+    DEFAULT_CENSUS_SCHEDULE,
+    create_version_census,
 )
 from ol_infrastructure.applications.witan.ci_indexer import (
     CRONJOB_NAME as CI_INDEXER_CRONJOB_NAME,
@@ -191,6 +195,18 @@ validate_internal_schema_version(STORAGE_PREFIX, INTERNAL_SCHEMA_VERSION)
 GRAPH_REMOVAL_ALLOWLIST: list[str] = omnigraph_config.get_object(
     "graph_removal_allowlist", []
 )
+
+# Graphs left out of cluster.yaml that it would otherwise declare, to rebuild
+# one whose schema change omnigraph cannot migrate in place. Listed together
+# with GRAPH_REMOVAL_ALLOWLIST, the deploy deletes the graph; clearing both
+# re-adds it, empty, from the image's schema. See build_cluster_graphs.
+WITHHELD_GRAPHS: list[str] = omnigraph_config.get_object("withheld_graphs", [])
+
+# Seconds the server's boot may take before the startupProbe kills it, when
+# the default 135s is too short. Set it with a withheld graph whose delete runs
+# in the boot apply at about 1,000 objects a minute, and clear it with the
+# withheld graph. Unset leaves the Deployment spec as it is.
+BOOT_BUDGET_SECONDS: int | None = omnigraph_config.get_int("boot_budget_seconds")
 
 # The image to migrate FROM — the one currently deployed, whose binary can
 # still read the old root. Set only while a storage-format migration is being
@@ -328,18 +344,29 @@ CLEANUP_SCHEDULE = omnigraph_config.get("cleanup_schedule") or DEFAULT_CLEANUP_S
 MAINTENANCE_SCHEDULE = (
     omnigraph_config.get("maintenance_schedule") or DEFAULT_MAINTENANCE_SCHEDULE
 )
-# `is None`, not `or`: a configured 0 has to reach the range check below
-# rather than read as "unset" and become the default.
-_configured_cleanup_weekday = omnigraph_config.get_int("cleanup_iso_weekday")
-CLEANUP_ISO_WEEKDAY = (
-    DEFAULT_CLEANUP_ISO_WEEKDAY
-    if _configured_cleanup_weekday is None
-    else _configured_cleanup_weekday
-)
-if not 1 <= CLEANUP_ISO_WEEKDAY <= 7:  # noqa: PLR2004
+# `is None`, not `or`: a configured empty list means "optimize only, never
+# clean up" and must not read as "unset" and become the default. The image
+# renders it as an empty OMNIGRAPH_CLEANUP_ISO_WEEKDAY, which it parses as no
+# cleanup days (agent-kit docker/omnigraph_maintenance.py parse_iso_weekdays).
+# A bare `7` (the old cleanup_iso_weekday shape) and a boolean (an int subclass
+# the image would refuse at start) are both rejected here, at preview.
+_configured_cleanup_weekdays = omnigraph_config.get_object("cleanup_iso_weekdays")
+if _configured_cleanup_weekdays is None:
+    CLEANUP_ISO_WEEKDAYS = DEFAULT_CLEANUP_ISO_WEEKDAYS
+elif (
+    isinstance(_configured_cleanup_weekdays, list)
+    and all(
+        type(day) is int and 1 <= day <= 7  # noqa: PLR2004
+        for day in _configured_cleanup_weekdays
+    )
+    and len(set(_configured_cleanup_weekdays)) == len(_configured_cleanup_weekdays)
+):
+    CLEANUP_ISO_WEEKDAYS = tuple(_configured_cleanup_weekdays)
+else:
     msg = (
-        "omnigraph:cleanup_iso_weekday must be 1 (Monday) to 7 (Sunday), got "
-        f"{CLEANUP_ISO_WEEKDAY}"
+        "omnigraph:cleanup_iso_weekdays must be a list of distinct days from "
+        "1 (Monday) to 7 (Sunday), or [] to never clean up, got "
+        f"{_configured_cleanup_weekdays!r}"
     )
     raise ValueError(msg)
 if (
@@ -1088,8 +1115,10 @@ data_tier = create_data_tier(
     per_actor_inflight_max=PER_ACTOR_INFLIGHT_MAX,
     per_actor_bytes_max=PER_ACTOR_BYTES_MAX,
     graph_removal_allowlist=GRAPH_REMOVAL_ALLOWLIST,
+    withheld_graphs=WITHHELD_GRAPHS,
+    boot_budget_seconds=BOOT_BUDGET_SECONDS,
     maintenance_schedule=MAINTENANCE_SCHEDULE,
-    cleanup_iso_weekday=CLEANUP_ISO_WEEKDAY,
+    cleanup_iso_weekdays=CLEANUP_ISO_WEEKDAYS,
     # Arming a migration suspends the maintenance CronJobs for its duration.
     # They write directly to the store, so scaling the Deployment to zero does
     # not stop them, and `optimize` rewriting fragments between the export and
@@ -1158,6 +1187,23 @@ if MIGRATE_FROM_IMAGE:
         witan_writer_cronjobs=[CI_INDEXER_CRONJOB_NAME, VIEW_REAPER_CRONJOB_NAME],
     )
     export("storage_migration_job", storage_migration.job.metadata.name)
+
+##############################################
+#   Per-graph version census                  #
+##############################################
+# Hourly per-graph counts of the `_versions/` objects cleanup has to plan,
+# read by log_rules/omnigraph_versions.py in the grafana_alerting stack. QA and
+# Production schedule no cleanup (omnigraph:cleanup_iso_weekdays: []), so
+# nothing else reports how far behind they are. See version_census.py.
+create_version_census(
+    stack_info=stack_info,
+    namespace=NAMESPACE,
+    k8s_global_labels=k8s_global_labels,
+    aws_cli_image=cached_image_uri(f"amazon/aws-cli:{AWS_CLI_VERSION}"),
+    service_account_name="omnigraph-server",
+    storage_root=data_tier.storage_uri,
+    schedule=DEFAULT_CENSUS_SCHEDULE,
+)
 
 ##############################################
 #   Council-health synthetic probe            #

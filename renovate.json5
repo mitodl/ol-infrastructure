@@ -69,6 +69,52 @@
       ],
       allowedVersions: '/^7\\.2\\.\\d+-alpine$/',
     },
+    {
+      // Altinity Stable tags (e.g. 25.8.28.10001.altinitystable) have four
+      // numeric parts and a dotted suffix, which docker versioning cannot parse,
+      // so the dependency dashboard listed CLICKHOUSE_SERVER_VERSION with no
+      // updates and it was never bumped. `build` carries the fourth part, and
+      // `compatibility` keeps updates on altinitystable rather than the antalya
+      // or fips builds or the -alpine images.
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'altinity/clickhouse-server',
+      ],
+      versioning: 'regex:^(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\.(?<build>\\d+)\\.(?<compatibility>altinitystable)$',
+    },
+    {
+      // Server and Keeper releases go to QA, the upgrade canary, before
+      // production (docs/clickhouse-llmops-runbook.md). A merged bump applies to
+      // CI by itself, and QA and Production each wait on a preview gate, so no
+      // automerge: someone has to own the QA run. A new major or minor line also
+      // needs clickhouse:compatibility set for the rolling restart (and an
+      // intermediate version when it is more than a year newer), so those wait
+      // for approval on the dependency dashboard.
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'altinity/clickhouse-server',
+        'clickhouse/clickhouse-keeper',
+      ],
+      automerge: false,
+    },
+    {
+      matchDatasources: [
+        'docker',
+      ],
+      matchPackageNames: [
+        'altinity/clickhouse-server',
+        'clickhouse/clickhouse-keeper',
+      ],
+      matchUpdateTypes: [
+        'major',
+        'minor',
+      ],
+      dependencyDashboardApproval: true,
+    },
   ],
   pip_requirements: {
     managerFilePatterns: [

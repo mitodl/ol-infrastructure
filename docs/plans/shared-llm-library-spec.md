@@ -9,7 +9,7 @@ decision task and stays Proposed until the decision is recorded here.
 | §2 Packaging, home, footprint | `tk-decide-the-shared-library-s-packaging-home-repo--451af4` | Decided: home 2026-09-11 (`mitodl/ol-llm`); SDK-based Opik integration and translation-plugin adoption 2026-10-01 (§2.3) |
 | §3 Error contract | `tk-policy-error-contract-for-llm-calls-d27bd1` | Decided 2026-09-11 |
 | §4 Attribution schema | `tk-define-the-attribution-schema-shared-by-gateway--d6f26b` | Decided 2026-10-01, with a platform-wide key for anonymous ids (§4.3) |
-| §5 Memory | `tk-memory-for-the-shared-llm-pattern-supported-stor-063935` | Categories decided 2026-10-01: a shared service, not coupled to any app (§5.5); backend PoCs open |
+| §5 Memory | `tk-memory-for-the-shared-llm-pattern-supported-stor-063935` | Categories decided 2026-10-01: a shared service, not coupled to any app. Backend decided 2026-10-15: Hindsight, one memory per learner shared across apps, authorized by token exchange (§5.5) |
 | §6 Call contract | `tk-specify-the-library-s-call-contract-timeouts-ret-badb39` | Specified 2026-10-01 from the §3 decision |
 | §7 Durable execution | `tk-evaluate-dbos-and-temporal-for-durable-agent-wor-819e78` | Direction set 2026-10-01; nothing decided |
 
@@ -29,7 +29,8 @@ was read from installed source of pydantic-ai-slim 2.42.0, opik 2.2.59, and
 opentelemetry-exporter-otlp-proto-http 1.44.0, the latest releases on 2026-09-11, plus
 comet-ml/opik at `59df1fb9`. §6 was written on 2026-10-01 against pydantic-ai-slim 2.52.0 (openai
 3.22.1, anthropic 1.11.0, google-genai 2.26.0, mistralai 3.0.0, boto3 1.43.107), and the §3
-facts it depends on were re-checked at that version.
+facts it depends on were re-checked at that version. The in-stream 424 row of §6.3 and the
+stream fallback boundary in §6.4 were re-read against pydantic-ai-slim 2.59.0 on 2026-10-22.
 
 ## 1. Consumers
 
@@ -148,11 +149,11 @@ Packages
 
 | Package | Import | Depends on | Holds |
 | --- | --- | --- | --- |
-| `ol-llm` | `ol_llm` | `opik` (pinned), `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http`, `httpx` | What every call site needs whatever it is built on: tracing wiring (SDK root trace, OTel spans linked by `OpikSpanProcessor`, Keycloak-refreshing auth), §4 attribution, the §3 policy values (`resolve_policy`), prompt fetch through the SDK with embedded fallback, batch helpers |
+| `ol-llm` | `ol_llm` | `opik` (pinned), `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http`, `httpx` | What every call site needs whatever it is built on: tracing wiring (SDK root trace, OTel spans linked by `OpikSpanProcessor`, Keycloak-refreshing auth, `traced_embedding` for embedding calls made by the application's own client), §4 attribution, the §3 policy values (`resolve_policy`), prompt fetch through the SDK with embedded fallback, batch helpers |
 | `ol-llm[pydantic-ai]` | | `pydantic-ai-slim` | Model factory, the §6 call contract's retry wrapper, both entry points (agent and traced completion) |
 | `ol-llm[openai]`, `[anthropic]`, `[bedrock]`, `[google]`, `[mistral]` | | the matching `pydantic-ai-slim` extra, so each also installs PydanticAI | Provider SDKs, chosen per consumer |
 | `ol-llm[harness]` | | `pydantic-ai-harness` (0.x, pinned to a minor series) | In-session memory and compaction (§5 categories A and B). Each harness release pins `pydantic-ai-slim` exactly, so this extra fixes the PydanticAI version |
-| `ol-llm[memory]` | | `hindsight-client` | Client for the shared memory service (§5.5). Provisional until the Hindsight PoC reports |
+| `ol-llm[memory]` | | `hindsight-client` | Client for the shared memory service (§5.5), which runs Hindsight 1.0.0. The extra still pins `hindsight-client>=0.10,<0.11`, and the PoC shim used raw httpx, so the client is untested against the 1.0.0 server and its token auth. Re-pinning it is a follow-up |
 | `ol_llm.eval` (module) | `ol_llm.eval` | the full opik install, including litellm | Datasets, experiments, `evaluate(prompts=…)`, LLM-judge metrics. Runs in CI eval jobs and on developer machines, never in slimmed runtime images |
 | `ol-llm[django]` | `ol_llm.django` | Django | Settings reader, app-ready tracer setup, Celery helpers. Add only when the Django glue outgrows a settings reader |
 
@@ -240,9 +241,9 @@ Consequences:
   unreachable.
 
 litellm is not a dependency. mit-learn's non-chat uses of litellm (token counting,
-`litellm.embedding`) stay in mit-learn until the library's embedding entry point exists.
-Embeddings come under the library after the chat core (decided 2026-10-01,
-`llm-usage-policies-spec.md` §4.1).
+`litellm.embedding`) stay in mit-learn. Embeddings come under the library after the chat core
+(decided 2026-10-01, `llm-usage-policies-spec.md` §4.1), and mit-learn's encoder keeps calling
+`litellm.embedding` inside `traced_embedding` (§6.6, decided 2026-10-21).
 
 Python floor `>=3.11`, the oldest Python among edx-platform releases in use (ulmo).
 pydantic-ai-slim and the OTel packages require `>=3.10`, so the floor costs nothing and keeps
@@ -315,9 +316,9 @@ missing (inventory, 2026-09-10).
    | `ModelHTTPError` 429 | rate limited | yes, honoring `retry_after` | yes |
    | `ModelHTTPError` 408, 500, 502, 503, 504, 529 | provider unavailable | yes | yes |
    | `ModelAPIError` that is not `ModelHTTPError` (connection errors; OpenAI, Anthropic, and Bedrock timeouts arrive this way) | provider unavailable | yes | yes |
-   | `ModelHTTPError` 400, 401, 403, 404, 422 | rejected (our bug or config) | no | no |
+   | `ModelHTTPError` 400, 401, 403, 404, 413, 422 | rejected (our bug or config; a 400, 413, or 422 can be one batch row's input, rule 7) | no | no |
    | `ContentFilterError` | content filtered | no | no |
-   | `UnexpectedModelBehavior` after output retries are spent | invalid output | no | no |
+   | `UnexpectedModelBehavior` after output retries are spent (at once for a stream) | invalid output | no | no |
    | `UsageLimitExceeded` | budget exceeded | no | no |
 
    There is exactly one retry layer per provider. The OpenAI and Anthropic SDKs retry twice by
@@ -328,12 +329,13 @@ missing (inventory, 2026-09-10).
 3. Validation failures retry on the same model, not a fallback. Output validators raise
    `ModelRetry`; `Agent(retries=…)` bounds them (PydanticAI's default is 1 for tools and 1 for
    output). A model that cannot produce the schema is not fixed by a different model mid-run.
+   A streamed run does not retry invalid output (§6.5).
 4. Fallback is a declared per-use-case policy. Composed as `FallbackModel` with
    `fallback_on` set to the "fall back" rows above, not PydanticAI's default of every
    `ModelAPIError`, which would mask 401s and 400s. Streams fall back only before the first
-   chunk (`models/fallback.py:334`); a failure mid-stream reaches the caller. If a gateway
-   route does its own fallback, the library policy for that route has none, so retries do not
-   multiply.
+   event (`models/fallback.py:363-365` in 2.59.0); a failure mid-stream reaches the caller.
+   If a gateway route does its own fallback, the library policy for that route has none, so
+   retries do not multiply.
 5. Callers see typed errors. The library raises its own small set (`LLMRateLimited`,
    `LLMUnavailable`, `LLMRejected`, `LLMContentFiltered`, `LLMInvalidOutput`,
    `LLMBudgetExceeded`), each carrying the original as `__cause__`. Request-time surfaces map
@@ -343,9 +345,11 @@ missing (inventory, 2026-09-10).
    value and `opik.metadata.degraded` plus a reason on the trace. The translation plugins'
    silent keep-source behavior becomes a marked partial result.
 7. Batch isolates rows. A row failure records its class and does not fail the chunk;
-   rejected-class failures open the circuit immediately, since retrying a config bug burns
-   budget; unavailable-class failures open it after a threshold. ol-data-platform's
-   summarize module is the reference.
+   rejected-class failures of the account or model open the circuit immediately, since
+   retrying a config bug burns budget; a rejection of one row's input fails that row, and
+   opens the circuit only after a threshold of them with no accepted request between them;
+   unavailable-class failures open it after a threshold of their own (§6.7).
+   ol-data-platform's summarize module is the reference.
 
 ### 3.3 Decision
 
@@ -371,9 +375,10 @@ gateway logs, and Prometheus. The library applies them; call sites supply values
 | `thread_id` | conversations | chat thread id | `thread_id` on the root trace; `gen_ai.conversation.id` via `run(conversation_id=…)` on spans | none | never |
 | `run_id` | batch | Dagster run id, Celery task id | `opik.metadata.run_id` | none | never |
 | `degraded` | when true | `true` plus a reason | `opik.metadata.degraded`, `opik.metadata.degraded_reason` | none | `degraded` counter (library) |
+| `model_status` | a model in the use case's chain is deprecated or not in the catalog | `deprecated`, `uncataloged` | tag `model_status:…` on the root trace (`llm-usage-policies-spec.md` §2.2) | none | none |
 
 Conventions: snake_case keys. Tags carry only low-cardinality `key:value` pairs (app,
-use_case, environment) for filtering; everything goes in `opik.metadata.*`. Prometheus labels
+use_case, environment, model_status) for filtering; everything goes in `opik.metadata.*`. Prometheus labels
 never carry user, thread, or run identifiers.
 
 Where the library writes them. The root of every run is an `@opik.track` trace, so the
@@ -668,6 +673,51 @@ is at v0.10.0, and one contributor accounts for about 58% of commits. Production
 are unnamed, and the primary benchmark is built, run and hosted by the vendor with its own
 product as the subject.
 
+Hindsight PoC results (2026-10-15, `tk-hindsight-poc-self-hosted-per-learner-memory-on--e57a70`).
+Run locally against Hindsight 1.0.0 (released 2026-10-13; the v0.10.0 details above predate
+it) on the slim image, with pgvector 0.8.1 on Postgres 17 and Ollama for
+embeddings. It passed. The shape that works is storage only: ol-llm makes the gate and
+extraction calls (§5.3 item 1) and Hindsight stores the notes it is handed, in chunks mode
+with observations and consolidation off. Server-side extraction would bypass the library:
+Hindsight's provider factory is hard-coded with no pluggable LLM client, and its OTel LLM spans
+always carry prompt content with no off switch.
+
+Against the five items above:
+
+1. With `LLM_TRACE_ENABLED=false`, `llm_requests` stayed empty. `STORE_DOCUMENT_TEXT=false`
+   too, since the default keeps the raw transcript in `documents.original_text`. Both
+   `audit_log_enabled` and `store_document_text` are bank-configurable, so the tenant
+   extension allows no per-bank config change.
+2. The race is real. With stock delete, an in-flight retain wrote 40 memory units with no bank
+   row after the delete returned success, and the bank delete had cascaded away the operation
+   rows that would have shown the work in flight. A fence plus a two-phase forget (§5.5) left 0
+   rows across 10 delays from 0 to 5 s, with 84 queued worker attempts refused by the fence.
+3. Custom extensions enforce isolation (§5.5); the PoC suite passed 55 of 55 against live
+   Hindsight and Keycloak 26.7.4. Per-learner Postgres schemas are not viable: 111 migrations
+   run per schema at startup and the worker polls every schema. `RequestContext.allowed_bank_ids`
+   is never read.
+4. The §5.3 shim is put, get, search, delete and forget over the HTTP API, now the harness
+   client in ol-infrastructure `scripts/hindsight/memory_client.py`. put is a retain with
+   `document_id=<app>.<key>`, so a second put replaces the first. Gateway routing of LLM
+   calls, Opik over OTLP and the per-conversation call count stop applying, because Hindsight
+   makes no LLM calls. It still makes embedding calls (§5.5, Server settings).
+   The mental-model recommendation above does not carry over either: the deployed design
+   refuses mental model create and refresh, which need an LLM.
+5. Deployed against RDS (§5.5), not the bundled database. The migrations run
+   `CREATE EXTENSION vector` themselves and stop when the role cannot, as on RDS, so the Vault
+   role statements create it first. Locally, 111 migrations ran in about 2.5 s on an empty
+   database.
+
+Load, at 50,000 banks and 250,000 notes (5,000 written through the API, the rest cloned in SQL):
+serial recall p50 75 ms and p95 121 ms, against 82 ms and 300 ms at 5,000 banks, with under 2 ms
+of database time per recall. At concurrency 16, p50 773 ms at about 19 recalls/s, bound by the
+single Python API process while Postgres sat idle. That suggests throughput scales with API
+replicas, which was not measured. `VECTOR_INDEX_MIN_ROWS=10000` is required. The default 0
+builds three partial HNSW indexes per bank with a blocking `CREATE INDEX`: 1,144 banks gave
+3,452 indexes and seed p50 rose from 2.3 s to 6.3 s, where 10000 left 20 indexes in total. These
+are local numbers with Ollama embeddings; they have not been re-measured on RDS or with Bedrock
+embeddings.
+
 Proposal. Split the decision by category rather than picking one backend for all of
 memory:
 
@@ -683,15 +733,16 @@ memory:
   not already run, its model calls are redirectable to our gateway by supported configuration,
   and it deletes for real. cognee's PoC gates stay on file, but its graph-database requirement
   and in-process litellm calls make it the weaker of the two unless the Hindsight PoC fails.
-  Neither is adopted without a PoC that clears the items listed against it here.
+  Neither is adopted without a PoC that clears the items listed against it here. (Hindsight
+  cleared its PoC on 2026-10-15 and was adopted, §5.5.)
 - Omnigraph is not a candidate for learner memory, for the reasons above. Erasure and
   per-learner isolation are the binding constraints, and neither is an engineering gap against
   a known design. It remains the right store for what it does today, which is team-shared agent
   memory where every principal is a staff member and nothing is a learner's to delete.
 
-### 5.5 Decisions (2026-10-01) and what stays open
+### 5.5 Decisions and what stays open
 
-Decided by the project owner:
+Decided by the project owner on 2026-10-01:
 
 1. The category split in §5.4 is adopted. A and B are library concerns on PydanticAI's
    message history. C and D sit behind the §5.3 interface. Hindsight's PoC runs first for the
@@ -714,11 +765,113 @@ What item 2 changes in this part:
 - Tenancy has to be designed, not inherited from an app's tables. The Hindsight PoC decides
   whether a learner has one memory shared by every app or one per app, how a caller proves
   which learner it is acting for (§5.4 item 3 under Hindsight: isolation is not enforced out
-  of the box), and what one app may read of what another wrote.
+  of the box), and what one app may read of what another wrote. (Answered 2026-10-15, below.)
 - Deletion gets simpler. One call to the shared service removes a learner's memory for every
   app, so account deletion in mit-learn has a single place to reach.
 - Memory is keyed on the platform user id from the authenticated identity (§5.3 item 5), not
   on an app-local user row.
+
+Decided by the project owner since:
+
+3. 2026-10-15: Hindsight is the backend for C and D, used for storage and search only (§5.4,
+   PoC results). A learner has one memory, shared by every app, and every app call on a
+   learner's memory is authorized by a token derived from the learner's own session.
+4. 2026-10-16: the service is deployed from ol-infrastructure (`applications/hindsight`), QA
+   first. General memory that belongs to no learner (e.g. product and course facts) is allowed
+   under a separate grant.
+5. 2026-10-21: embeddings are Cohere Embed v4 on Bedrock (`bedrock/cohere.embed-v4:0`, 1536
+   dimensions), called with the pod's IRSA role. The requirements are multilingual input and a
+   long support window. The first deployment's in-cluster bge-base-en-v1.5 is English-only and
+   truncates past 512 tokens, and Azure text-embedding-3 retires on 2028-02-09. Learner content
+   already goes to OpenAI, so a hosted embedding provider needs no separate approval.
+
+The design as deployed (ol-infrastructure #6423, #6424, #6492):
+
+Identity. An app calls with a token from Keycloak standard token exchange (RFC 8693) of the
+learner's session token, requesting the `ol-memory-audience` scope. Verified on Keycloak 26.7.4
+(our pinned version): the result has `sub` set to the Keycloak user id, the same in every app
+and the value both apps store as `global_id`, so §5.3 item 5 holds; `azp` set to the exchanging
+client; `aud` set to `ol-memory-client` alone; the user's `sid`; and a 300 s lifetime (the olapps
+realm has no lifespan override). `KeycloakTenantExtension` verifies the signature against JWKS,
+the issuer, audience and expiry, maps `azp` to an app name through the stack's
+`hindsight:app_clients`, and takes the learner from `sub`, so no header can point an app at
+another learner. A token with a `client_id` claim or no `sid` is a service account and never
+reaches a learner bank, except through the admin client's forget sequence (Forget, below).
+Keycloak itself refuses an exchange that does not request the audience
+scope ("Requested audience not available"), one from a client without standard token exchange
+enabled, and one of a token whose `azp` and `aud` do not name the requesting client ("Client is
+not within the token audience"). The olapps app clients predate Keycloak's `basic` scope, so
+their tokens carry no `sub`; the audience scope adds a `sub` mapper, which puts it on memory
+tokens only. Exchange is not the only way to get such a token: an app's own login can request
+the optional audience scope, and the service cannot tell the two apart. Both take the app
+client's secret, and neither reaches past the token's own learner.
+
+Which client each app exchanges as. APISIX 3.19.0 forwards the session access token upstream as
+`X-Access-Token` by default and strips a client-supplied one, and ol-infrastructure does not
+override that. Both of learn-ai's OIDC resources log learners in through `ol-mitlearn-client`
+(Vault `secret-operations/sso/mitlearn`); the `/ai/*` routes also share mit-learn's session
+cookie, while the legacy host keeps its own. Every token either app receives therefore has `azp`
+`ol-mitlearn-client`, and `azp` cannot tell them apart. That client cannot be a memory identity
+either: mit-learn, learn-ai, mitxonline, ol-analytics-api and jupyterhub all read its secret, so
+any of them could write as mit-learn. Each app exchanges with a client only it holds:
+
+- learn-ai as `ol-learn-ai-client` (Vault `secret-operations/sso/learn-ai`, already in
+  learn-ai's policy).
+- mit-learn as `ol-mitlearn-memory-client`, which has no login flow and only exchanges (Vault
+  `secret-operations/sso/mitlearn-memory`, not yet in mit-learn's policy).
+
+`ol-mitlearn-client`'s default scopes name both clients as audiences of its tokens, which is what
+lets them exchange. The Canvas bot routes use key-auth and carry no learner token, so they cannot
+write learner memory.
+
+Sharing. A learner's bank is `u-<sub>`, and every app reads all of it. Every app write carries
+exactly the tag `app:<name>` (Hindsight's write tag scope refuses anything else), its document
+ids must start with `<app>.`, and Hindsight refuses one app changing or deleting another app's
+note with a 403. The prefix stops one app taking a key another app will write. Apps may retain,
+retag and delete their own notes and nothing else. Editing memory units is refused because
+Memory Defense screens only retain, so an edit would store its text unredacted; an app replaces
+a note by retaining it again. Config changes, export, statistics, reflect, mental models,
+directives and other whole-bank operations are refused. Another learner's bank answers 404,
+not 403, so banks cannot be probed.
+
+General memory. `g-<name>` banks, readable by every app and written only with a
+client-credentials token carrying the `ol-memory-general` scope. The grant is honored only on a
+service-account token, so a learner token never writes general memory, and the grant never
+reaches a learner bank. No client holds the scope yet.
+
+Forget. Only `ol-memory-admin-client` deletes a learner's memory. It uses client credentials and
+names the learner in `x-ol-learner`, and the validator limits it to the forget sequence. The
+sequence has two phases because deleting a bank cascades away its operation rows, the only
+record of work in flight. Clearing the bank's memories raises a fence (one hour, in
+`ol_memory_bank_fence`) and keeps the bank row; pending operations are cancelled and processing
+ones drained; then the bank is deleted. While fenced, the validator refuses bank creation, worker
+retries, and every write except an app deleting its own notes. The validator checks a worker task only
+when it starts, so a `BEFORE INSERT` trigger on every content table with a `bank_id` also
+refuses inserts into a fenced bank, whatever the writer. It was added after a retain whose
+embeddings timed out inserted 24 notes 45 s after its learner's bank was deleted. The harness
+(`scripts/hindsight/test_isolation.py`) passed 84 of 84 on a fresh database on 2026-10-17,
+including a forget racing an async retain.
+
+Server settings. `LLM_PROVIDER=none`, `RETAIN_EXTRACTION_MODE=chunks`, observations and
+auto-consolidation off, `LLM_TRACE_ENABLED=false`, `STORE_DOCUMENT_TEXT=false`,
+`VECTOR_INDEX_MIN_ROWS=10000`, MCP off, and the file upload API off with attachments refused
+(attachment bytes sit in a table with no `bank_id`, out of the trigger's reach). Hindsight makes
+no LLM calls, so extraction stays in ol-llm under §5.3 item 1. It does embed every note and every
+recall query itself, calling Bedrock through LiteLLM in-process with the pod's IRSA role (open
+item 8). Before storage, a retain's content, context, metadata keys and values, and entity text
+are redacted with the built-in secret and card screen plus email and phone patterns. Document
+ids, entity types and timestamps are not, so a document-id key must not carry learner content.
+Names and assessment content are not pattern-matchable and stay the ol-llm gate's job (§5.3
+item 2).
+
+Where it runs. Hindsight `1.0.0-slim` on the applications EKS cluster, cluster-internal at
+`hindsight.hindsight.svc.cluster.local` with no APISIX route, one API replica, and RDS Postgres
+18 with Vault dynamic credentials. Hindsight reads `DATABASE_URL` once, so rotation restarts the
+pod. QA came up on 2026-10-20 and Production on 2026-10-21. The Keycloak change was applied in
+QA by 2026-10-20 and in Production on 2026-10-22: the Production deploy gate that carried the
+memory resources was consumed that day, and the next Production preview (2026-10-23) shows none
+of them pending. Not yet exercised: a QA retain and recall with a learn-ai token exchanged from
+a forwarded session.
 
 Still open:
 
@@ -733,6 +886,31 @@ Still open:
 3. Whether learn-ai keeps its custom Django LangGraph checkpointer or moves to the official
    `PostgresSaver` (3.1.2), which adds `delete_thread`, `delete_for_runs`, `copy_thread` and
    `prune` at the cost of living outside Django migrations.
+4. Writers without a learner session (`tk-grant-for-services-to-write-per-learner-memory-w-f03a14`).
+   The owner named four writers on 2026-10-20: learn-ai, mit-learn, the data platform
+   (aggregated per-learner behavioral records) and possibly mitxonline (enrollments). The last
+   two write from batch or server-side paths that hold no session, so they have no token to
+   exchange, and the admin client is limited to forget. The key-auth Canvas bot routes carry no
+   learner token either. The proposal is a client-credentials
+   scope that lets a service name the learner for retain only, under its own app tag and
+   document-id prefix, with one client per writer. mitxonline logs learners in through
+   `ol-mitlearn-client`, so it needs its own memory client as mit-learn did. Whether the fence
+   and redaction apply unchanged is undecided.
+5. A restore resurrects forgotten learners. In the PoC, `hindsight-admin` restore brought back
+   a learner forgotten after the backup, and an RDS snapshot restore would do the same. Forget
+   needs a permanent deletion ledger replayed after any restore, which does not exist. Who
+   runs it belongs with item 2.
+6. APISIX's `access_token_expires_leeway` defaults to 0, so it can forward a token with about
+   1 s left, and the exchange then fails. It should be about 60 s on learn-ai's and mit-learn's
+   `OLApisixOIDCConfig` before either integrates. Not yet set.
+7. Hindsight fixes the vector column to the model's dimension once a bank holds data, so
+   changing the embedding model means re-embedding every bank through export and import, which
+   is untested.
+8. Hindsight's embedding calls carry learner content outside ol-llm. Every retained note and
+   every recall query goes to Bedrock from Hindsight's own LiteLLM client, with no §4
+   attribution, no Opik trace and no budget count, which is the gap §5.3 item 1 says the
+   library exists to close. Whether that is accepted or routed through the library is the
+   owner's call.
 
 ## 6. Call contract
 
@@ -827,10 +1005,18 @@ by type and status:
 | --- | --- | --- | --- | --- |
 | `ModelHTTPError` 429 | rate limited | `LLMRateLimited` (carries `retry_after`) | yes | yes |
 | `ModelHTTPError` 408, 500, 502, 503, 504, 529 | provider unavailable | `LLMUnavailable` | yes | yes |
+| `ModelHTTPError` 424 with `in_stream` set | provider unavailable | `LLMUnavailable` | yes | yes |
 | `ModelAPIError` that is not `ModelHTTPError`; `TimeoutException`, `NetworkError`, and `RemoteProtocolError` from `httpx` or `httpx2` | provider unavailable | `LLMUnavailable` | yes | yes |
 | `ModelHTTPError`, any other status; any other `httpx` or `httpx2` `TransportError` | rejected | `LLMRejected` (carries `status_code`, `None` for a transport error) | no | no |
 
-The retry rows are the §3.2 statuses and the transport errors that mean no answer came back.
+The retry rows are the §3.2 statuses, an in-stream 424, and the transport errors that mean no
+answer came back. PydanticAI 2.59 gives Bedrock's in-stream `modelStreamErrorException` status
+424 and sets `in_stream`, and Bedrock says to retry it; before 2.59 it arrived as a
+`ModelAPIError` with no status. Bedrock's 424 before a stream opens is a `ModelErrorException`,
+which it gives no retry advice for, so it is rejected like any other status. Like every retry
+row, an in-stream 424 is retried only when it is the stream's first event (the library reads
+Bedrock's first event while the stream can still be retried); after the first event it reaches
+the caller unretried (§6.4).
 Everything else is rejected, which closes the table so nothing is unclassified. A permanent
 failure (a 501 or 505, `UnsupportedProtocol` from a bad base URL, `LocalProtocolError`,
 `ProxyError`) then costs one attempt, not the full retry budget on every model in the
@@ -872,11 +1058,14 @@ primary made one attempt and raised `LLMRejected` without trying the fallback.
   `FallbackExceptionGroup` as `__cause__`.
 - When a fallback model answers, the result is marked degraded with reason `fallback_model`
   (§6.7), and `LLMResult.model` names the model that answered.
-- Streams fall back only while opening (`models/fallback.py:325-337` in 2.52.0). A failure
-  after the first chunk reaches the caller as `LLMUnavailable`.
+- Streams fall back until their first event (`FallbackModel.request_stream`,
+  `models/fallback.py:349-365` in 2.59.0). A failure after the first event reaches the
+  caller as the class its error maps to: a throttle as `LLMRateLimited`, a stream error or a
+  dropped connection as `LLMUnavailable`.
 - A model whose gateway route already falls back takes no `fallback_models`. The model catalog
   (`tk-policy-model-catalog-and-lifecycle-ba2fc7`) records which routes do, and
-  `build_model` raises `ValueError` for a use case that sets both.
+  `build_model` raises `ValueError` for a use case that sets both. A primary the catalog does
+  not list is not checked.
 
 ### 6.5 Structured output
 
@@ -894,6 +1083,10 @@ primary made one attempt and raised `LLMRejected` without trying the fallback.
 - Validation failures retry on the same model (§3.2 rule 3). `UseCase.output_retries` sets
   `Agent(retries={"output": n})`, default 1, which is PydanticAI's default. When they are
   spent the caller gets `LLMInvalidOutput`.
+- A streamed run is the exception. PydanticAI's `run_stream` keeps the first output that
+  matches the output type, so invalid output raises `LLMInvalidOutput` with no retry. A retry
+  would stream a second answer after chunks of the discarded one, which the caller may
+  already have shown. Decided 2026-10-20 (mitodl/ol-llm#11).
 
 ### 6.6 Entry points
 
@@ -909,10 +1102,27 @@ Both paths share the model factory, policy, attribution, tracing, and errors.
 - The `_sync` variants exist for Celery tasks and Dagster assets.
 - Streaming is for the request profile. `run_stream` is an async context manager yielding an
   object with `stream_text()`, `stream_output()`, and `result()`; `result()` is available
-  once the stream is consumed and carries the same markers as a non-streamed call.
+  once the stream is consumed and carries the same markers as a non-streamed call. Invalid
+  output is not retried (§6.5).
 - Call sites that are not built on PydanticAI (learn-ai's LangGraph bots) take the numbers
   from `resolve_policy(use_case)` and apply them to their own client. The retry wrapper and
   typed errors apply only to models the library builds.
+- Embeddings: `embed` and `embed_sync` take a use case and texts and return the vectors with
+  the model id, dimension, and usage. They need the `pydantic-ai` extra plus the provider's
+  extra. A call site built on LangChain or LangGraph keeps its own embedding client instead and
+  wraps each provider request in `traced_embedding(use_case, texts, attribution=...)`, a
+  context manager in the base package.
+  - It opens the root trace with the §4 fields, or a span under the caller's trace when one is
+    active, and records a span for the request under the use case's catalog id. The client
+    must call that same model.
+  - It runs the catalog checks `embed` runs for an embedding model: a retired id raises, an
+    unlisted or deprecated id logs the warning and takes the `model_status` tag.
+  - It yields a handle on which the caller reports the input token count from the response. On
+    a cache hit the caller reports zero, since litellm fills in usage for cached items. Each
+    request gets its own wrap, so a hedged call records every request it sent.
+  - It lets the caller's exceptions through unchanged. The texts are recorded only when
+    `include_content` is on, and the vectors never are, as with `embed`.
+  - Whether Opik prices an embedding span from its model and usage is not verified.
 
 ### 6.7 Errors and degraded results
 
@@ -923,7 +1133,7 @@ exception as `__cause__` and with `use_case`, `model`, and `retryable` set.
 | --- | --- |
 | `LLMRateLimited`, `LLMUnavailable`, `LLMRejected` | the retry wrapper (§6.3) |
 | `LLMContentFiltered` | `ContentFilterError` |
-| `LLMInvalidOutput` | `UnexpectedModelBehavior` once output retries are spent, including a response cut off at the token limit |
+| `LLMInvalidOutput` | `UnexpectedModelBehavior` once output retries are spent (at once for a stream), including a response cut off at the token limit |
 | `LLMBudgetExceeded` | `UsageLimitExceeded` |
 
 `ContentFilterError` subclasses `UnexpectedModelBehavior`, so it is matched first. By default
@@ -948,9 +1158,28 @@ trace are marked together. `LLMResult` is frozen and the trace is closed once th
 returns, so a check done after the call cannot mark either. `postprocess` keeps the output
 type, and an exception it raises reaches the caller unchanged.
 
-For the batch helpers (§3.2 rule 7): `LLMRejected` opens the circuit at once,
-`LLMRateLimited` and `LLMUnavailable` count toward its threshold, and `LLMInvalidOutput`,
-`LLMContentFiltered`, and `LLMBudgetExceeded` are failures of that row only.
+For the batch helpers (§3.2 rule 7): `LLMRejected` with a 400, 413, or 422 rejects one row's
+input (too long, malformed, or refused by a provider's input moderation that answers with a
+400) and is a failure of that row only, not retried under the same key (a hash of the row's
+input, the prompt name and template, and the use case's primary model); ten of them with no
+accepted request between them open the circuit, because then the request itself is wrong (e.g.
+a parameter the model no longer takes). Any other `LLMRejected` (401, 403, 404, other
+statuses, or a transport error with no status) opens the circuit at once. `LLMRateLimited` and
+`LLMUnavailable` count toward a separate threshold of three in a row, and `LLMInvalidOutput`,
+`LLMContentFiltered`, and `LLMBudgetExceeded` are failures of that row only; an input filter
+that PydanticAI raises as `ContentFilterError` (Azure's) is `LLMContentFiltered`, a row
+failure that resets both counts below rather than adding to one. The counts belong to one
+batch call (or to a breaker the caller passes to several) and take rows in the order they
+finish, across workers. A success or a row's own failure shows the provider accepted the
+request and resets both counts. A rate limit or an outage says nothing about the request, so
+it leaves the rejection count alone (400s alternating with 503s still reach ten); a row
+rejection resets the transient count. Once the circuit is open, rows still in flight do not
+clear the rejection run, and those rejected for their input join it. When a run of row
+rejections opens the circuit, or every row a batch attempted was rejected for its input (a
+batch shorter than the threshold), the batch report lists those rows: each was persisted as
+not to retry, and a fixed request parameter does not change the key, so the caller clears
+their skip marks once the request is fixed. Decided 2026-10-20: one oversized or filtered row
+stopped the whole batch when every rejection opened the circuit.
 
 ### 6.8 Usage limits
 
@@ -959,7 +1188,8 @@ requests per run unless the use case sets it. `cost_limit` is a per-run dollar c
 unset in phase one: the budgets decision (2026-10-01, `llm-usage-policies-spec.md` §1) is
 alerts only until the spend baseline exists. PydanticAI prices a run from `genai-prices` and only warns
 (`CostNotFoundWarning`) when it has no price for the model, so a `cost_limit` on an unpriced
-model enforces nothing. The library's test suite checks that every catalog model has a price.
+model enforces nothing. The library's test suite checks that every catalog model has a price;
+a model the catalog does not list (`llm-usage-policies-spec.md` §2.2) may have none.
 
 ### 6.9 Type stubs
 

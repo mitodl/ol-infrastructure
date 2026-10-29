@@ -1,0 +1,50 @@
+---
+# Omnibus configuration, passed to the container as GITLAB_OMNIBUS_CONFIG.
+#
+# Everything here is either required to sit behind APISIX or exists to cut the
+# footprint. GitLab Omnibus ships a full observability stack and several
+# services this setup has no use for, and they are a large share of its
+# memory at rest.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitlab-omnibus-config
+  namespace: gitlab
+data:
+  gitlab.rb: |
+    external_url 'https://__GITLAB_HOSTNAME__';
+
+    # APISIX terminates TLS and forwards plain HTTP, so the bundled nginx must
+    # keep listening on 80 and must not do TLS itself. Without both of these,
+    # an https external_url makes Omnibus serve 443 and redirect http->https,
+    # which against a TLS-terminating proxy is an infinite redirect loop.
+    nginx['listen_port'] = 80;
+    nginx['listen_https'] = false;
+    nginx['proxy_set_headers'] = { 'X-Forwarded-Proto' => 'https', 'X-Forwarded-Ssl' => 'on' };
+
+    # Trust the cluster network, so GitLab sees real client IPs through APISIX
+    # rather than rate-limiting everything as one source.
+    gitlab_rails['trusted_proxies'] = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'];
+
+    # /-/readiness and friends answer 404 to anything outside this list, which
+    # defaults to loopback only. kubelet probes from the node address, so
+    # without this the startup probe fails with a 404 forever and the pod
+    # never goes ready even though GitLab is serving perfectly well.
+    gitlab_rails['monitoring_whitelist'] = ['127.0.0.0/8', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'];
+
+    # Trimming. Each of these is a separate process in the container.
+    prometheus_monitoring['enable'] = false;
+    gitlab_kas['enable'] = false;
+    registry['enable'] = false;
+    gitlab_pages['enable'] = false;
+    mattermost['enable'] = false;
+
+    # Single-process puma and a small sidekiq pool. The defaults size
+    # themselves for a production host and are far larger than a local
+    # instance with one user needs.
+    puma['worker_processes'] = 0;
+    sidekiq['max_concurrency'] = 5;
+
+    # Nothing here should mail anyone.
+    gitlab_rails['smtp_enable'] = false;
+    gitlab_rails['gitlab_email_enabled'] = false;

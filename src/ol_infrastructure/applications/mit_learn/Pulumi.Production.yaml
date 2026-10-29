@@ -20,6 +20,10 @@ config:
     cors_urls:
     - "https://api.learn.mit.edu"
     - "https://learn.mit.edu"
+    - "https://courses.learn.mit.edu"   # MITxOnline courseware MFE, same as csrf_domains below
+    - "https://lms.mitx.mit.edu"   # MITx LMS: ol-openedx-chat video summary/flashcard fetch
+    - "https://staging.mitx.mit.edu"   # MITx Staging LMS: ol-openedx-chat video summary/flashcard fetch
+    - "https://courses.xpro.mit.edu"   # xPRO LMS: ol-openedx-chat video summary/flashcard fetch
     - "https://api.mitopen.odl.mit.edu"   # legacy
     - "https://mitopen.odl.mit.edu"   # legacy
     - "https://draft.ocw.mit.edu"
@@ -42,7 +46,10 @@ config:
   mitlearn:learn_ai_syllabus_endpoint: "https://api.learn.mit.edu/ai/http/syllabus_agent/"
   mitlearn:legacy_api_domain: "api.mitopen.odl.mit.edu"
   mitlearn:legacy_frontend_domain: "mitopen.odl.mit.edu"
-  mitlearn:min_replicas: 4
+  # Raised 4 -> 6 after a crawler surge on 2026-10-26 took all 4 pods down
+  # together before KEDA added any. A larger floor spreads a step in traffic
+  # thinner while the request trigger catches up.
+  mitlearn:min_replicas: 6
   mitlearn:max_replicas: 30
   mitlearn:nextjs_heroku_domain: "next.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"

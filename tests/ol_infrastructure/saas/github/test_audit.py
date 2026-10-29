@@ -436,8 +436,9 @@ def test_population_counts_tier_one_actives_only() -> None:
 
 def test_sec03_accepts_checks_required_outside_pulumi() -> None:
     """`lehrer` and `ol-analytics-api` solved this before we did, via hand-made
-    repo-level rulesets Pulumi does not model. Reporting them would make the audit
-    wrong about the two repos that are already compliant.
+    repo-level rulesets Pulumi does not model. Their contexts are now also declared in
+    the managed ruleset, but a repo whose only required checks live in a hand-made
+    ruleset is still compliant, and reporting it would make the audit wrong.
     """
     assert "SEC-03" not in fired(
         [repo(tier="tier-1", _required_status_checks_live=["gate"])]

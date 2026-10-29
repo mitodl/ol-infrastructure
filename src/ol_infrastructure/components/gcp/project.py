@@ -8,6 +8,8 @@ downloaded keys:
 * **enabled services** -- ``gcp.projects.Service``
 * **service accounts and their project role bindings** -- ``gcp.serviceaccount``
 * **API keys, with mandatory restrictions** -- ``gcp.projects.ApiKey``
+* **reCAPTCHA web keys, with mandatory allowed domains** --
+  ``gcp.recaptcha.EnterpriseKey``
 * **workload identity pools and their OIDC providers** --
   ``gcp.iam.WorkloadIdentityPool`` / ``WorkloadIdentityPoolProvider``
 
@@ -30,25 +32,31 @@ to authenticate as a service account gets Workload Identity Federation, and a
 credential that genuinely cannot is created by hand and recorded as an
 exception.
 
-Two GCP credential types are absent because no API can manage them:
+Generic OAuth 2.0 clients ("Sign in with Google") are absent because no API
+can manage them: there is no create, update or even *list* API. They are
+hand-created and stored in Vault/SOPS.
 
-* **Generic OAuth 2.0 clients** ("Sign in with Google") have no create, update
-  or even *list* API. They are hand-created and stored in Vault/SOPS.
-* **reCAPTCHA keys** are manageable (``gcp.recaptcha.EnterpriseKey``) but the
-  site key is baked into deployed frontends, so rotating one is an application
-  release rather than an infrastructure change. They get their own component
-  once the app-side cutover is designed.
+A reCAPTCHA key's site key is baked into deployed frontends, so replacing one
+is an application release rather than an infrastructure change. The key's
+legacy secret, which classic ``siteverify`` needs, is not exposed by the
+provider at all; see the reCAPTCHA section of
+``infrastructure/gcp/README.md`` for how it is read and how a property is cut
+over.
 """
 
 import re
+from collections.abc import Sequence
 from enum import StrEnum
 from typing import Any
 
 import pulumi_gcp as gcp
-from pulumi import ComponentResource, Output, ResourceOptions
+from pulumi import ComponentResource, Output, Resource, ResourceOptions
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ol_infrastructure.lib.ol_types import GCPBase
+
+RECAPTCHA_SERVICE = "recaptchaenterprise.googleapis.com"
+RECAPTCHA_ADMIN_ROLE = "roles/recaptchaenterprise.admin"
 
 
 class APIKeyRestrictionType(StrEnum):
@@ -148,6 +156,65 @@ class OLGCPAPIKeyConfig(BaseModel):
         return self
 
 
+class RecaptchaIntegrationType(StrEnum):
+    """How a site renders the reCAPTCHA widget.
+
+    These are the three types a classic integration (``api.js`` plus
+    ``siteverify``) can use: CHECKBOX is v2 "I'm not a robot", INVISIBLE is v2
+    invisible, SCORE is v3. ``integration_type`` is ForceNew in the provider,
+    so changing it mints a new site key.
+    """
+
+    checkbox = "CHECKBOX"
+    invisible = "INVISIBLE"
+    score = "SCORE"
+
+
+# A bare hostname. The provider documents an allowed domain as a host with no
+# path, port, query or fragment; checking it here fails the preview rather than
+# the apply.
+RECAPTCHA_DOMAIN_PATTERN = re.compile(
+    r"[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+"
+)
+
+
+class OLGCPRecaptchaKeyConfig(BaseModel):
+    """A reCAPTCHA key for a website. Allowed domains are required."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    key_name: str
+    display_name: str
+    integration_type: RecaptchaIntegrationType
+    # Subdomains of each entry are allowed implicitly. allow_all_domains is not
+    # offered: a site key is public, so a key without a domain list can be
+    # lifted from one page and used on any other.
+    allowed_domains: list[str]
+    import_id: str | None = None
+    # As for API keys: set it once a frontend renders the site key, because a
+    # replacement mints a new one.
+    protect: bool = False
+
+    @field_validator("allowed_domains")
+    @classmethod
+    def require_bare_domains(cls, domains: list[str]) -> list[str]:
+        """Refuse an empty domain list or anything but a bare hostname."""
+        if not domains:
+            msg = "A reCAPTCHA key must declare at least one allowed domain."
+            raise ValueError(msg)
+        if invalid := [
+            domain
+            for domain in domains
+            if not RECAPTCHA_DOMAIN_PATTERN.fullmatch(domain)
+        ]:
+            msg = (
+                f"Invalid reCAPTCHA domain(s) {invalid}: use lowercase bare "
+                "hostnames, e.g. rc.learn.mit.edu, with no scheme, port or path."
+            )
+            raise ValueError(msg)
+        return domains
+
+
 # Pool and provider ids share one contract: 4-32 lowercase letters, digits or
 # hyphens, and the "gcp-" prefix is reserved by Google.
 WORKLOAD_IDENTITY_ID_PATTERN = re.compile(r"[a-z0-9-]{4,32}")
@@ -206,6 +273,7 @@ class OLGCPProjectConfig(GCPBase):
     enabled_services: list[str] = Field(default_factory=list)
     service_accounts: list[OLGCPServiceAccountConfig] = Field(default_factory=list)
     api_keys: list[OLGCPAPIKeyConfig] = Field(default_factory=list)
+    recaptcha_keys: list[OLGCPRecaptchaKeyConfig] = Field(default_factory=list)
     workload_identity_pools: list[OLGCPWorkloadIdentityPoolConfig] = Field(
         default_factory=list
     )
@@ -248,6 +316,9 @@ class OLGCPProject(ComponentResource):
         self.service_accounts: dict[str, gcp.serviceaccount.Account] = {}
         self.service_account_emails: dict[str, Output[str]] = {}
         self.api_keys: dict[str, gcp.projects.ApiKey] = {}
+        self.recaptcha_keys: dict[str, gcp.recaptcha.EnterpriseKey] = {}
+        # Keyed (account_id, role).
+        self.project_role_grants: dict[tuple[str, str], gcp.projects.IAMMember] = {}
         # Keyed "<pool_id>/<provider_id>"; provider ids are only unique per pool.
         self.workload_identity_providers: dict[
             str, gcp.iam.WorkloadIdentityPoolProvider
@@ -320,14 +391,16 @@ class OLGCPProject(ComponentResource):
             self.service_account_emails[account.account_id] = service_account.email
             for role in account.project_roles:
                 role_slug = role.replace("/", "-").replace(".", "-")
-                gcp.projects.IAMMember(
-                    f"{name}-{account.account_id}-{role_slug}",
-                    project=config.project_id,
-                    role=role,
-                    member=service_account.email.apply(
-                        lambda email: f"serviceAccount:{email}"
-                    ),
-                    opts=child_opts,
+                self.project_role_grants[account.account_id, role] = (
+                    gcp.projects.IAMMember(
+                        f"{name}-{account.account_id}-{role_slug}",
+                        project=config.project_id,
+                        role=role,
+                        member=service_account.email.apply(
+                            lambda email: f"serviceAccount:{email}"
+                        ),
+                        opts=child_opts,
+                    )
                 )
             for index, grant in enumerate(account.iam_members):
                 grant_slug = grant.role.rsplit("/", 1)[-1].replace(".", "-")
@@ -345,20 +418,17 @@ class OLGCPProject(ComponentResource):
                 )
 
         for api_key in config.api_keys:
-            # Without an explicit edge Pulumi creates a key in parallel with the
-            # service it targets, and a key restricted to a service that is not
-            # enabled yet can fail on first apply. A target this stack does not
-            # enable is assumed to be enabled out of band.
             target_services = [
                 self.services[target["service"]]
                 for target in api_key.restrictions.get("api_targets") or []
                 if target["service"] in self.services
             ]
-            key_opts = adoption_opts(child_opts, api_key.import_id)
-            if api_key.protect:
-                key_opts = key_opts.merge(ResourceOptions(protect=True))
-            if target_services:
-                key_opts = key_opts.merge(ResourceOptions(depends_on=target_services))
+            key_opts = credential_opts(
+                child_opts,
+                import_id=api_key.import_id,
+                protect=api_key.protect,
+                depends_on=target_services,
+            )
             self.api_keys[api_key.key_name] = gcp.projects.ApiKey(
                 f"{name}-api-key-{api_key.key_name}",
                 # The number, not the id -- see project_number on the config.
@@ -370,12 +440,69 @@ class OLGCPProject(ComponentResource):
                 opts=key_opts,
             )
 
+        recaptcha_services = (
+            [self.services[RECAPTCHA_SERVICE]]
+            if RECAPTCHA_SERVICE in self.services
+            else []
+        )
+        # The stack's own identity needs this role to create a key. Waiting on
+        # the grant orders the creates, but IAM can take minutes to propagate,
+        # so the apply that adds the grant can still fail on the keys and pass
+        # on a re-run.
+        recaptcha_admin_grants = [
+            grant
+            for (_, role), grant in self.project_role_grants.items()
+            if role == RECAPTCHA_ADMIN_ROLE
+        ]
+        for recaptcha_key in config.recaptcha_keys:
+            self.recaptcha_keys[recaptcha_key.key_name] = gcp.recaptcha.EnterpriseKey(
+                f"{name}-recaptcha-key-{recaptcha_key.key_name}",
+                # The id, unlike ApiKey: the provider keeps the configured value
+                # for `project` rather than reading it back from the API, so the
+                # id does not produce a diff.
+                project=config.project_id,
+                display_name=recaptcha_key.display_name,
+                web_settings=gcp.recaptcha.EnterpriseKeyWebSettingsArgs(
+                    integration_type=recaptcha_key.integration_type.value,
+                    allowed_domains=recaptcha_key.allowed_domains,
+                ),
+                opts=credential_opts(
+                    child_opts,
+                    import_id=recaptcha_key.import_id,
+                    protect=recaptcha_key.protect,
+                    depends_on=[*recaptcha_services, *recaptcha_admin_grants],
+                ),
+            )
+
         self.register_outputs(
             {
                 "project_id": config.project_id,
                 "service_account_emails": self.service_account_emails,
             }
         )
+
+
+def credential_opts(
+    opts: ResourceOptions,
+    *,
+    import_id: str | None,
+    protect: bool,
+    depends_on: Sequence[Resource],
+) -> ResourceOptions:
+    """Options for a key whose value a consumer holds.
+
+    Adoption as in :func:`adoption_opts`, explicit protection for a key this
+    stack created, and an edge to the services it needs. Without that edge
+    Pulumi creates the key in parallel with enabling its API, and the create
+    can fail on first apply. A service this stack does not enable is assumed
+    to be enabled out of band.
+    """
+    key_opts = adoption_opts(opts, import_id)
+    if protect:
+        key_opts = key_opts.merge(ResourceOptions(protect=True))
+    if depends_on:
+        key_opts = key_opts.merge(ResourceOptions(depends_on=list(depends_on)))
+    return key_opts
 
 
 def adoption_opts(opts: ResourceOptions, import_id: str | None) -> ResourceOptions:
@@ -399,8 +526,11 @@ __all__ = [
     "OLGCPOIDCProviderConfig",
     "OLGCPProject",
     "OLGCPProjectConfig",
+    "OLGCPRecaptchaKeyConfig",
     "OLGCPServiceAccountConfig",
     "OLGCPServiceAccountIAMMemberConfig",
     "OLGCPWorkloadIdentityPoolConfig",
+    "RecaptchaIntegrationType",
     "adoption_opts",
+    "credential_opts",
 ]

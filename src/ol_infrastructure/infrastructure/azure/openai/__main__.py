@@ -128,7 +128,10 @@ class ModelConfig(BaseModel):
     # mit-learn's dense vectors come from text-embedding-3-large (-small on CI), and a
     # vector is only comparable with vectors from the same model, so the Azure
     # deployment must be that exact model for mit-learn to switch provider without
-    # reindexing Qdrant.
+    # reindexing Qdrant. The QA and Production stacks also give dagster-ml
+    # text-embedding-3-large, for the ml code location's Learn embeddings, which have
+    # to match Learn's vectors for the same reason. Setting this key in a stack
+    # replaces the default, so those stacks repeat mitlearn's list.
     consumer_extra_models: dict[str, list[str]] = Field(
         default_factory=lambda: {
             "mitlearn": ["text-embedding-3-large", "text-embedding-3-small"],
@@ -138,6 +141,14 @@ class ModelConfig(BaseModel):
     # Per-model capacity overrides. Each model draws on its own quota pool, so a model
     # whose pool is smaller or larger than the chat models' can be sized on its own.
     model_capacities: dict[str, PositiveInt] = Field(default_factory=dict)
+
+    # {consumer: {model: capacity}}, applied over model_capacities for one consumer's
+    # deployment of a model. For a consumer whose load on a model differs from the
+    # others' in the same environment, without resizing every account's deployment of
+    # it.
+    consumer_model_capacities: dict[str, dict[str, PositiveInt]] = Field(
+        default_factory=dict
+    )
 
     # Version strings are deliberately not hardcoded here -- which versions exist is a
     # property of the subscription and region, not of this code, and a wrong string
@@ -160,14 +171,15 @@ class ModelConfig(BaseModel):
         deploys, so a misspelled key (e.g. `mit-learn`) previews clean and changes
         nothing.
         """
-        unknown_consumers = set(self.consumer_extra_models) - set(CONSUMER_SUBJECTS)
-        if unknown_consumers:
-            msg = (
-                "consumer_extra_models has unknown consumers "
-                f"{sorted(unknown_consumers)}; expected a subset of "
-                f"{sorted(CONSUMER_SUBJECTS)}"
-            )
-            raise ValueError(msg)
+        for field_name in ("consumer_extra_models", "consumer_model_capacities"):
+            unknown_consumers = set(getattr(self, field_name)) - set(CONSUMER_SUBJECTS)
+            if unknown_consumers:
+                msg = (
+                    f"{field_name} has unknown consumers "
+                    f"{sorted(unknown_consumers)}; expected a subset of "
+                    f"{sorted(CONSUMER_SUBJECTS)}"
+                )
+                raise ValueError(msg)
         deployed = set(self.models).union(*self.consumer_extra_models.values())
         for field_name in ("model_capacities", "model_versions"):
             undeployed = set(getattr(self, field_name)) - deployed
@@ -175,6 +187,19 @@ class ModelConfig(BaseModel):
                 msg = (
                     f"{field_name} names models that are not deployed "
                     f"{sorted(undeployed)}; deployed models are {sorted(deployed)}"
+                )
+                raise ValueError(msg)
+        for consumer, capacities in self.consumer_model_capacities.items():
+            consumer_models = {
+                *self.models,
+                *self.consumer_extra_models.get(consumer, []),
+            }
+            undeployed = set(capacities) - consumer_models
+            if undeployed:
+                msg = (
+                    f"consumer_model_capacities names models that are not deployed "
+                    f"on {consumer}'s account {sorted(undeployed)}; its models are "
+                    f"{sorted(consumer_models)}"
                 )
                 raise ValueError(msg)
         return self
@@ -190,6 +215,7 @@ deployment_config = ModelConfig.model_validate(
 model_names = deployment_config.models
 consumer_extra_models = deployment_config.consumer_extra_models
 model_capacities = deployment_config.model_capacities
+consumer_model_capacities = deployment_config.consumer_model_capacities
 model_versions = deployment_config.model_versions
 
 azure_provider = azure_native.Provider(
@@ -271,7 +297,9 @@ for consumer, (cluster, namespace, service_account) in CONSUMER_SUBJECTS.items()
             resource_group_name=resource_group.name,
             sku=azure_native.cognitiveservices.SkuArgs(
                 name="GlobalStandard",
-                capacity=model_capacities.get(model_name, default_capacity),
+                capacity=consumer_model_capacities.get(consumer, {}).get(
+                    model_name, model_capacities.get(model_name, default_capacity)
+                ),
             ),
             properties=azure_native.cognitiveservices.DeploymentPropertiesArgs(
                 model=azure_native.cognitiveservices.DeploymentModelArgs(

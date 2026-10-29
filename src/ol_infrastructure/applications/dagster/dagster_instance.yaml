@@ -241,7 +241,7 @@ run_launcher:
         # parentbased_traceidratio at DEFAULT_TRACE_SAMPLING_RATE -- and that is
         # "1.0" (lib/otel.py), not a fraction. Run workers are launched by the
         # daemon, so most of their traces are parentless roots and the ratio is
-        # the one that applies: every canvas run worker trace is head-sampled in.
+        # the one that applies: every canvas and ml run worker trace is head-sampled in.
         # Deliberate rather than overlooked. Alloy's tailSampling is what decides
         # what to keep -- errors, slow traces, everything from services that are
         # not high-volume -- and head sampling upstream of it only discards
@@ -344,7 +344,12 @@ run_monitoring:
   cancel_timeout_seconds: 300
   max_resume_run_attempts: 3
   poll_interval_seconds: 120
-  max_runtime_seconds: 0
+  # Two days. ol-data-platform's Iceberg orphan-file pass deletes unreferenced
+  # files older than 7 days, so a writer still running past that would lose
+  # files it has written but not yet committed. The longest production run in
+  # the 30 days to 2026-10-21 lasted 26.7 hours (two runs attached to a stuck
+  # Airbyte sync). A run tagged dagster/max_runtime overrides this.
+  max_runtime_seconds: 172800
   # A run worker killed mid-step leaves its step's pool claim behind. Once
   # max_resume_run_attempts is spent the run is marked failed with the claim
   # still recorded, and on a pool with a limit of 1 every retry and every later
@@ -447,11 +452,30 @@ event_log_storage:
 # rationale there. It is a placeholder rather than a literal because run
 # concurrency has to be sized against the environment's PgBouncer connection
 # budget, and QA's is 5.5x smaller than production's.
+#
+# tag_concurrency_limits caps runs by tag where a pool cannot. Dagster's instance
+# config has no per-pool limit (only pools.default_limit, which would bind every
+# pool at once), so a pool's limit exists only if someone set it by hand.
+#   courseware/model_calls: every run ol-data-platform's courseware_automation_sensor
+#     launches (claim extraction, concept resolution and description, each making
+#     several concurrent model calls and committing to shared Iceberg tables, and
+#     the concept graph, which calls no model but shares those tables).
+#     Promoting a batch of course runs in courseware_extraction_allowlist would
+#     otherwise start one extraction run per course run at once.
+#   ocw/content_load: ol-data-platform's daily OCW content sweep and the scoped
+#     loads ocw_content_publish_sensor requests. Every load restores and saves the
+#     source's single dlt state, so two at once overwrite each other's course
+#     versions and unpublish bookkeeping. Limit 1 queues the second.
 run_coordinator:
   module: dagster.core.run_coordinator
   class: QueuedRunCoordinator
   config:
     max_concurrent_runs: MAX_CONCURRENT_RUNS
+    tag_concurrency_limits:
+    - key: courseware/model_calls
+      limit: 3
+    - key: ocw/content_load
+      limit: 1
 
 # Configures how long Dagster waits for code locations
 # to load before timing out.

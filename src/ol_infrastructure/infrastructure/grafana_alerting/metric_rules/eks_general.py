@@ -4,6 +4,8 @@ Source: grafana-alerts/cortex-rules/eks_general.yaml
 
 Warning rules filter cluster=~".*-(ci|qa)"    — fire on CI and QA stacks.
 Critical rules filter cluster=~".*-(production)" — fire on prod stack only.
+DeploymentReplicasMissingProduction is the exception: production-filtered
+but warning tier, so it follows the warning rules below.
 Rules with no matching data on a given stack stay silent (no_data_state=OK).
 
 exec_err_state (query-evaluation failure, distinct from no_data_state) was
@@ -72,33 +74,63 @@ def create(
                 ),
             ),
             # --- Deployment replicas ---
-            # Fires when available replicas / total replicas < 1.0.
+            # Fires when fewer replicas are available than desired. The value is
+            # the number missing. This used to divide available by
+            # kube_deployment_status_replicas, which has no series in the QA or
+            # Production Mimir, so the rule never evaluated to anything. The ratio
+            # form could not have fired on a full outage either: it is 0 there, and
+            # base.py fires on a value > 0 (the bug #6489 fixed for StatefulSets).
+            # QA opik-backend ran 0 of 2 from 2026-10-05 to 2026-10-15 and 1 of 2
+            # from then to 2026-10-21 with no replicas alert.
+            #
+            # for_ is 30m because KEDA scale-ups raise spec_replicas before the new
+            # pods are ready. Replayed over the 30 days to 2026-10-26, 10m would
+            # have fired 108 times on 14 Production Deployments (mostly the
+            # KEDA-scaled edxapp celery workers, lms-edxapp-app and the mitlearn
+            # embeddings worker), and 55 of those started within 25 minutes of a
+            # spec increase. 30m fires 7 times on 5 (QA: 5 on 3), and what is left
+            # is mostly real: xpro-app at 1 of 2 for 14h on 2026-10-22, and
+            # operations celery-monitoring 1 short for four days to 2026-09-28. A
+            # KEDA-scoped exclusion would drop most of the celery workers and edxapp
+            # webapps from the rule rather than only their scale-ups, so there is
+            # none.
+            #
+            # Production is warning tier, not critical: a partly degraded Deployment
+            # is not worth waking anyone for, and a total outage is
+            # DeploymentUnavailable's job. The Production Rootly source maps
+            # severity=warning to Low urgency, which posts to #devops-warnings
+            # (held until 9am ET outside business hours) and pages nobody. On a
+            # total outage the value is spec_replicas, so this rule also fires, 20
+            # minutes after DeploymentUnavailable, as a second notification under
+            # its own alertname. The rule was renamed from DeploymentReplicasMissingCritical
+            # so its name does not claim a tier it no longer has; it had never fired,
+            # so no alert history or silence followed the old name.
             alerting.RuleGroupRuleArgs(
                 name="DeploymentReplicasMissingWarning",
                 condition="C",
-                for_="10m",
+                for_="30m",
                 no_data_state="OK",
                 exec_err_state="OK",
                 labels={"severity": "warning"},
                 annotations={
-                    "description": "There is a mismatch between the requested number of instances for deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
+                    "description": "Deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has had fewer available replicas than desired for 30 minutes."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(ci|qa)"}) / sum by (cluster, namespace, deployment) (kube_deployment_status_replicas) < 1.0'
+                    'sum by (cluster, namespace, deployment) (kube_deployment_spec_replicas{cluster=~".*-(ci|qa)"}) - sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(ci|qa)"}) > 0'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
-                name="DeploymentReplicasMissingCritical",
+                name="DeploymentReplicasMissingProduction",
                 condition="C",
-                for_="10m",
+                for_="30m",
                 no_data_state="OK",
-                exec_err_state="KeepLast",
-                labels={"severity": "critical"},
+                exec_err_state="OK",
+                labels={"severity": "warning"},
                 annotations={
-                    "description": "There is a mismatch between the requested number of instances for deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
+                    "description": "Deployment {{ $labels.deployment }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }} has had fewer available replicas than desired for 30 minutes."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(production)"}) / sum by (cluster, namespace, deployment) (kube_deployment_status_replicas) < 1.0'
+                    'sum by (cluster, namespace, deployment) (kube_deployment_spec_replicas{cluster=~".*-(production)"}) - sum by (cluster, namespace, deployment) (kube_deployment_status_replicas_available{cluster=~".*-(production)"}) > 0'
                 ),
             ),
             # --- Deployment availability ---
@@ -166,7 +198,14 @@ def create(
                 ),
             ),
             # --- StatefulSet replicas ---
-            # Fires when ready replicas / desired replicas < 1.0.
+            # Fires when fewer replicas are ready than desired. The value is the
+            # number missing, not the ready/desired ratio this used to compare
+            # against 1.0: base.py fires on a value > 0, so a ratio of 0 (no
+            # replica ready) never fired, and every single-replica StatefulSet
+            # was invisible when its only pod was down (data-qa's second
+            # ClickHouse replica sat Pending that way from 2026-09-30 to
+            # 2026-10-20). ClickHouse and Keeper have their own rule in
+            # clickhouse.py, which carries the service label Rootly routes on.
             #
             # for_ is 20m, not the more typical 10m, because EBS-backed StatefulSets
             # (Typesense, etc.) can legitimately drop below full readiness for well
@@ -192,7 +231,7 @@ def create(
                     "description": "There is a mismatch between the requested number of instances for statefulset {{ $labels.statefulset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, statefulset) (kube_statefulset_status_replicas_ready{cluster=~".*-(ci|qa)"}) / sum by (cluster, namespace, statefulset) (kube_statefulset_replicas) < 1.0'
+                    'sum by (cluster, namespace, statefulset) (kube_statefulset_replicas{cluster=~".*-(ci|qa)", namespace!="clickhouse"}) - sum by (cluster, namespace, statefulset) (kube_statefulset_status_replicas_ready{cluster=~".*-(ci|qa)", namespace!="clickhouse"}) > 0'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -206,7 +245,7 @@ def create(
                     "description": "There is a mismatch between the requested number of instances for statefulset {{ $labels.statefulset }} in namespace {{ $labels.namespace }} in cluster {{ $labels.cluster }}."
                 },
                 datas=rd(
-                    'sum by (cluster, namespace, statefulset) (kube_statefulset_status_replicas_ready{cluster=~".*-(production)"}) / sum by (cluster, namespace, statefulset) (kube_statefulset_replicas) < 1.0'
+                    'sum by (cluster, namespace, statefulset) (kube_statefulset_replicas{cluster=~".*-(production)", namespace!="clickhouse"}) - sum by (cluster, namespace, statefulset) (kube_statefulset_status_replicas_ready{cluster=~".*-(production)", namespace!="clickhouse"}) > 0'
                 ),
             ),
             # --- Node readiness ---
@@ -240,7 +279,24 @@ def create(
                 ),
             ),
             # --- Pod crash looping ---
-            # Fires when a container is in CrashLoopBackOff state.
+            # Fires when a container or an init container is in
+            # CrashLoopBackOff state.
+            #
+            # Init containers report through their own KSM family,
+            # kube_pod_init_container_status_waiting_reason, so a pod stuck in
+            # Init:CrashLoopBackOff never matched the container-only expression
+            # (data-qa's opik-backend migrations, 2026-10-15 to 2026-10-20).
+            # Init and main container names differ within a pod, so the `or`
+            # keeps both sides as separate series.
+            #
+            # A looping init container that runs for minutes between restarts
+            # (a migration waiting on a lock) drops out of CrashLoopBackOff
+            # while it runs, so its raw series flaps and rarely holds for 5m
+            # straight. When it is the only crash loop, the whole query goes
+            # empty during those runs, no_data_state="OK" resets Pending, and
+            # the alert never fires. max_over_time over 10m keeps the series
+            # present across the gaps (the opik ones ran up to 7 minutes), so
+            # the init side does not depend on missing-series handling.
             #
             # keep_firing_for + missing_series_evals_to_resolve attack the
             # storm mechanism directly: a churning pod's series vanishes the
@@ -265,6 +321,8 @@ def create(
                 },
                 datas=rd(
                     'sum by (cluster, namespace, pod, container) (kube_pod_container_status_waiting_reason{cluster=~".*-(ci|qa)", reason="CrashLoopBackOff"}) > 0'
+                    " or "
+                    'sum by (cluster, namespace, pod, container) (max_over_time(kube_pod_init_container_status_waiting_reason{cluster=~".*-(ci|qa)", reason="CrashLoopBackOff"}[10m])) > 0'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -281,6 +339,8 @@ def create(
                 },
                 datas=rd(
                     'sum by (cluster, namespace, pod, container) (kube_pod_container_status_waiting_reason{cluster=~".*-(production)", reason="CrashLoopBackOff"}) > 0'
+                    " or "
+                    'sum by (cluster, namespace, pod, container) (max_over_time(kube_pod_init_container_status_waiting_reason{cluster=~".*-(production)", reason="CrashLoopBackOff"}[10m])) > 0'
                 ),
             ),
             # --- Celery Beat restarts ---
@@ -590,6 +650,7 @@ def create(
             #   */15 * * * * witan-council-probe                   -> fast
             #   */15 * * * * gravitino-posture                     -> fast
             #   */15 * * * * gravitino-reconcile                   -> fast
+            #   41 * * * *   omnigraph-version-census              -> fast
             #   20 3 * * *   omnigraph-optimize                    -> slow
             #
             # omnigraph-optimize is NIGHTLY and the slow bucket is 15 days, so
@@ -651,7 +712,7 @@ def create(
                 datas=rd(
                     "max by (cluster, namespace, cronjob) (time() - "
                     "(kube_cronjob_status_last_successful_time"
-                    '{cluster=~".*-(ci|qa)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync|witan-council-probe|gravitino-posture|gravitino-reconcile"} > 0)) > 21600'
+                    '{cluster=~".*-(ci|qa)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync|witan-council-probe|gravitino-posture|gravitino-reconcile|omnigraph-version-census"} > 0)) > 21600'
                 ),
             ),
             alerting.RuleGroupRuleArgs(
@@ -667,7 +728,7 @@ def create(
                 datas=rd(
                     "max by (cluster, namespace, cronjob) (time() - "
                     "(kube_cronjob_status_last_successful_time"
-                    '{cluster=~".*-(production)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync|witan-council-probe|gravitino-posture|gravitino-reconcile"} > 0)) > 21600'
+                    '{cluster=~".*-(production)", cronjob=~"cron-deploy-pipelines|cron-reindex|witan-token-sync|witan-council-probe|gravitino-posture|gravitino-reconcile|omnigraph-version-census"} > 0)) > 21600'
                 ),
             ),
             alerting.RuleGroupRuleArgs(

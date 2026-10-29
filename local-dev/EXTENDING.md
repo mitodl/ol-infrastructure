@@ -10,6 +10,16 @@ How to add a new app to the stack or change the shared in-cluster infrastructure
 
 ## Adding a New App
 
+### Which surface?
+
+Pick one:
+
+- **The app has a deployed definition** (`src/ol_infrastructure/applications/<app>/definition.py`): a Pulumi program under `local-dev/apps/<app>/pulumi/` renders it with k3d bindings, and Tilt applies it through `local-dev/scripts/pulumi-app-apply.sh` as a `k8s_custom_deploy`. mitxonline is the example: its `pulumi/` and Tiltfile are the template. A developer's env and memory limits for such an app live in its gitignored stack file (`pulumi/Pulumi.Dev.yaml`; `vars` and `web_memory_limit` are the deployed stacks' keys, the other limits local ones in the same style; mitxonline ships a `.example`), not in an `app-env.local.yaml`. Two touchpoints sit outside the app directory: the root `Tiltfile` raises the apply timeout per Pulumi-rendered app, and `teardown.sh` destroys each program's stack by name.
+- **No deployed definition** (local-only services, apps not yet on `OLApplicationK8s`): Kubernetes manifests under `local-dev/apps/<app>/`, as step 1 below describes.
+- **Shared infrastructure several apps use** (a database engine, a cache, an identity provider): a module under `local-dev/infra/modules/`, called from the `core` stack; see [Modifying Shared Infrastructure](#modifying-shared-infrastructure).
+
+Either kind of app also needs its prerequisites from the `apps_infra` stack: the database (step 2), the namespace and TLS Secret (step 3) and the Keycloak client (step 4). Steps 2 to 6 apply to both kinds.
+
 ### 1. Create the app manifests directory
 
 ```
@@ -36,7 +46,9 @@ In `local-dev/infra/modules/database.py`, add to the `postInitSQL` list:
 
 ### 3. Register the namespace (TLS secret comes with it)
 
-Add `"my-app"` to the `APP_NAMESPACES` tuple in `local-dev/infra/modules/namespaces.py`. `tls.py` reads the same list through `app_namespaces_for()`, so the `local-dev-tls` Secret and mkcert CA ConfigMap appear in the new namespace automatically.
+Add `"my-app"` to the `APP_NAMESPACES` tuple in `local-dev/infra/modules/namespaces.py`. `tls.py` reads the same list through `app_namespaces_for()`, so the `local-dev-tls` Secret, the mkcert CA ConfigMap and the `local-dev-ca-bundle` ConfigMap appear in the new namespace automatically.
+
+If the app calls local hostnames over HTTPS, mount `local-dev-ca-bundle` as a directory at `/etc/ssl/local-dev` and set `SSL_CERT_FILE` and `REQUESTS_CA_BUNDLE` to `/etc/ssl/local-dev/ca-certificates.crt` (or `NODE_EXTRA_CA_CERTS` for Node). In a Pulumi program that is an entry in `extra_volumes` and `extra_volume_mounts`, as in `local-dev/apps/mitxonline/pulumi/__main__.py`. Don't copy the `ca-bundle-merge` init container from the older manifests; see "Trusting local TLS from pods" in [ARCHITECTURE.md](ARCHITECTURE.md#design-decisions).
 
 If the app brings heavyweight infrastructure with it — an object store, a CI system, anything a developer who is not working on that app should not be paying for — or is one most developers will not run (`micromasters`), put its name in `OPTIONAL_APP_NAMESPACES` instead. Namespaces listed there are only created when the app appears in `enabled_apps`, which the Tiltfile forwards to both Pulumi stacks as `LOCAL_DEV_ENABLED_APPS`. Gate the expensive resources on the same value; `ocw-studio` and the RustFS object store are the worked example. `data-platform` (`local-dev/infra/modules/lakehouse.py`) is the example of an `enabled_apps` entry that is infrastructure only, with no namespace or app Tiltfile of its own. An app Tiltfile can read the same variable from `os.environ` to change its own manifests when another app is enabled; `local-dev/apps/mit-learn/Tiltfile` does this for `data-platform`.
 
@@ -73,6 +85,11 @@ In `Tiltfile`, add an entry to the `APPS` list:
     },
 )
 ```
+
+Each seed becomes a manual Tilt resource that runs `cmd` in the deployment's pod through `kubectl exec`. Two optional keys cover a seed that needs something from the host first (`seed-mitxonline-instance` is the example):
+
+- `host_env`: `{"NAME": "<host command>"}`. Each command runs on the host before `kubectl exec`; a non-zero exit stops the seed, and its output reaches `cmd` as the environment variable `NAME`.
+- `resource_deps`: Tilt resources to wait for besides the app's deployment, e.g. `["kc-seed-users"]`.
 
 ### 6. Add hosts and DNS
 

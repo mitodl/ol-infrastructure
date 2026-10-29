@@ -559,6 +559,12 @@ policy_definition = {
                 # CreatePolicyVersion when its content drifts from the
                 # imported document.
                 "arn:aws:iam::*:policy/edx-data-extracts-read-only",
+                # substructure/aws/eks/karpenter.py creates one controller
+                # policy per cluster at the default "/" path -- confirmed by a
+                # live AccessDenied on CreatePolicyVersion after #6459 changed
+                # its content. Moving it under a scoped path would force a
+                # replacement, which needs DeletePolicy on "/" anyway.
+                "arn:aws:iam::*:policy/KarpenterControllerPolicy-*",
             ],
         },
         {
@@ -632,6 +638,28 @@ policy_definition = {
                 "arn:aws:iam::*:role/ol-operations/*",
             ],
             "Condition": {"StringEquals": {"iam:PassedToService": "ec2.amazonaws.com"}},
+        },
+        {
+            # infrastructure/aws/iam/__main__.py manages the account's GitHub
+            # Actions OIDC provider, and the pipeline refreshes that stack on
+            # every run, so it needs reads as well as the lifecycle. Scoped to
+            # that one provider so the worker can't add another identity
+            # provider to the account.
+            "Effect": "Allow",
+            "Action": [
+                "iam:AddClientIDToOpenIDConnectProvider",
+                "iam:CreateOpenIDConnectProvider",
+                "iam:DeleteOpenIDConnectProvider",
+                "iam:GetOpenIDConnectProvider",
+                "iam:ListOpenIDConnectProviderTags",
+                "iam:RemoveClientIDFromOpenIDConnectProvider",
+                "iam:TagOpenIDConnectProvider",
+                "iam:UntagOpenIDConnectProvider",
+                "iam:UpdateOpenIDConnectProviderThumbprint",
+            ],
+            "Resource": (
+                "arn:aws:iam::*:oidc-provider/token.actions.githubusercontent.com"
+            ),
         },
     ],
 }

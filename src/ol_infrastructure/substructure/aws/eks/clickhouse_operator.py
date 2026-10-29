@@ -105,6 +105,8 @@ def setup_clickhouse_operator(
             "endpoints": [
                 {
                     "port": "ch-metrics",
+                    # Altinity's vendored operator dashboard hardcodes [1m] rate
+                    # windows, which need two samples per minute.
                     "interval": "30s",
                     "scrapeTimeout": "20s",
                     "honorLabels": True,

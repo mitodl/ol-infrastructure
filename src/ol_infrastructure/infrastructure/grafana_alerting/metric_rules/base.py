@@ -102,11 +102,22 @@ Sub-modules
                  shared-data (S3) failures, replay lag and CN memory. Off the
                  FE/CN ServiceMonitors' allowlisted families; pairs with
                  dashboards/starrocks_overview.py.
+  cert_manager — New in 2026-10. ClusterIssuer and Certificate readiness,
+                 overdue renewals, and missing cert-manager metrics. Replaces
+                 the ACME log rules in log_rules/cert_manager.py, which paged
+                 on controller restarts.
   vector_edxapp_tracking
                — New in 2026-09. Source: grafana-alerts#9, recreated here rather
                  than merged there. edxapp tracking-log delivery off the Vector
                  sidecar's own metrics (PodMonitor added in #4822): source
                  silence, S3 sink errors, and no-bytes-delivered.
+  alloy_pipeline
+               — New in 2026-10. An Alloy instance whose config reload was
+                 rejected and that is running its last good config. New pods
+                 on the rejected config crash-loop and are caught by
+                 PodCrashLoopingCritical; this covers the pods that keep
+                 running, which nothing else alerted on during the
+                 2026-10-23 log gap.
 """
 
 import json
@@ -116,7 +127,9 @@ from pulumiverse_grafana import alerting
 from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
+    alloy_pipeline,
     apisix_edge,
+    cert_manager,
     clickhouse,
     dagster_control_plane,
     dagster_pgbouncer,
@@ -232,10 +245,12 @@ def create(resource_opts: ResourceOptions) -> None:
     dagster_control_plane.create(alerts_folder.uid, rd, resource_opts)
     witan.create(alerts_folder.uid, rd, resource_opts)
     clickhouse.create(alerts_folder.uid, rd, resource_opts)
+    cert_manager.create(alerts_folder.uid, rd, resource_opts)
     starrocks.create(alerts_folder.uid, rd, resource_opts)
     otel_service_red.create(alerts_folder.uid, rd, resource_opts)
     otel_trace_pipeline.create(alerts_folder.uid, rd, resource_opts)
     vector_edxapp_tracking.create(alerts_folder.uid, rd, resource_opts)
+    alloy_pipeline.create(alerts_folder.uid, rd, resource_opts)
     # No folder_uid: these rules live in the Synthetic Monitoring plugin's own
     # folder rather than the one created above. See the module docstring.
     synthetic_monitoring.create(rd, resource_opts)

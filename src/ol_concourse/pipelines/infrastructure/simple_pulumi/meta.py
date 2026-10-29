@@ -204,6 +204,7 @@ if __name__ == "__main__":
         "github-repositories",
         "grafana-alerting",
         "gravitino",
+        "hindsight",
         "jupyterhub-data",
         "mailgun",
         "marimo-data",

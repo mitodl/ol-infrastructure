@@ -20,7 +20,7 @@ if k8s_context() != "local-dev":
 # ---------------------------------------------------------------------------
 # Developer configuration
 # ---------------------------------------------------------------------------
-config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
+config.define_string_list("enabled_apps", usage="Apps to run: mit-learn learn-ai mitxonline odl-video-service ocw-studio openedx micromasters gitlab ol-analytics-api. Add data-platform for the local data lake (RustFS, Gravitino, StarRocks).")
 config.define_bool("per_app_databases", usage="Deploy isolated DB/Valkey per app namespace")
 config.define_string_list("prebuilt_tags", usage="Published image tag to run for an app with no checkout, instead of latest, e.g. mit-learn=0.82.0 learn-ai=0.37.0")
 config.define_string_list("lake_host_ports", usage="Host ports for the data-platform lake forwards, e.g. rustfs=9100 gravitino=9101 (defaults: starrocks=9030 gravitino=9001 rustfs=9000). Move one that another process on your machine already holds.")
@@ -48,11 +48,17 @@ per_app_databases = cfg.get("per_app_databases", False)
 # An included Tiltfile shares no variables with this one, so an app that
 # configures itself differently when another is enabled reads the list here.
 os.putenv("LOCAL_DEV_ENABLED_APPS", ",".join(enabled_apps))
+# update_settings is session-wide, so this applies to every app's apply:
+# mitxonline's runs its migrate Job inside `pulumi up`, which Tilt's 30 s
+# default cuts off on a first apply.
+if "mitxonline" in enabled_apps:
+    update_settings(k8s_upsert_timeout_secs=300)
 
 # Every service hostname, CORS origin, APISIX route, and Keycloak redirect URI
-# derives from this value. local-dev/tiltlib.star reads the same environment
-# variable when applying app manifests.
-root_domain = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", "mit.dev")
+# derives from this value, the same one local-dev/tiltlib.star substitutes into
+# app manifests.
+load("./local-dev/tiltlib.star", "current_root_domain")
+root_domain = current_root_domain()
 
 # The TLS certificate covers only this domain, so an unresolvable hostname means
 # nothing the stack serves is reachable. DNS and /etc/hosts both satisfy this.
@@ -67,7 +73,7 @@ if str(local(
          "  Fix by either:\n" +
          "    - running ./local-dev/scripts/setup.sh (adds 127.0.0.1 entries to /etc/hosts), or\n" +
          "    - pointing DNS for *.%s at this host, or\n" +
-         "    - unsetting LOCAL_DEV_ROOT_DOMAIN to use the mit.dev default.")
+         "    - unsetting LOCAL_DEV_ROOT_DOMAIN to use the mit.test default.")
         % (_probe_host, root_domain, root_domain)
     )
 
@@ -144,6 +150,74 @@ local_resource(
     auto_init=False,
 )
 
+# What mitxonline's configure_instance would seed, minus what cannot run here.
+# configure_instance exits 255 with no platform argument (the gateway check),
+# and with `none` it still fails at its first course because it passes
+# create_courseware a run_url option that command no longer takes. Its
+# createsuperuser and create_user steps prompt, and kubectl exec has no TTY.
+# mitxonline's gateway backend looks users up by global_id (the Keycloak user
+# id) and fills in the rest on every login, so admin@ol.test is created here
+# with the id its seed resource resolves on the host (ADMIN_GLOBAL_ID). Its
+# first login then finds this row; a row without the id would collide with the
+# login on email. Objects are created only when missing, and configure_tiers
+# matches the current year's discounts, so a re-trigger creates nothing within
+# a calendar year; in a new year configure_tiers adds that year's discounts and
+# expires the old ones. The courseware and the superuser are two transactions:
+# a failure rolls back its own step, and an admin@ol.test row left from an
+# earlier realm fails only the second. Passed to `manage.py shell -c` in single
+# quotes, so the script must not contain one.
+MITXONLINE_SEED_INSTANCE = """
+import os
+
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.db import transaction
+from django.db.models import Q
+from courses.models import Course, Program
+
+PROGRAM = "program-v1:MITx+DEDP"
+COURSES = [
+    ("course-v1:edX+DemoX", "Demonstration Course", "Demo_Course", "Science", PROGRAM),
+    ("course-v1:edX+E2E-101", "E2E Test Course", "course", "Math", None),
+]
+ADMIN_EMAIL = "admin@ol.test"
+with transaction.atomic():
+    if not Program.objects.filter(readable_id=PROGRAM).exists():
+        call_command(
+            "create_courseware", "program", PROGRAM,
+            "Data, Economics and Development Policy",
+            live=True, depts=["Economics"], create_depts=True, create_page=True,
+        )
+        call_command("create_finaid_form", PROGRAM, live=True)
+    call_command("configure_tiers", program=PROGRAM)
+    for readable_id, title, run_tag, dept, program in COURSES:
+        if not Course.objects.filter(readable_id=readable_id).exists():
+            call_command(
+                "create_courseware", "course", readable_id, title,
+                live=True, create_run=run_tag, program=program,
+                required=program is not None, depts=[dept], create_depts=True,
+                create_page=True, set_courserun_dates_automatically=True,
+                price=999, mode_audit=True, mode_verified=True,
+            )
+User = get_user_model()
+admin_id = os.environ["ADMIN_GLOBAL_ID"]
+with transaction.atomic():
+    if not User.objects.filter(global_id=admin_id).exists():
+        stale = User.objects.filter(
+            Q(email__iexact=ADMIN_EMAIL) | Q(username=ADMIN_EMAIL)
+        ).first()
+        if stale is not None:
+            raise SystemExit(
+                f"mitxonline user {stale.id} ({ADMIN_EMAIL}) has global_id "
+                f"{stale.global_id}, not the current Keycloak id {admin_id}: "
+                "the olapps realm was recreated after it was made. Set its "
+                "global_id to the current id, or delete it, and run this seed "
+                "again. The program and courses are already seeded."
+            )
+        User.objects.create(global_id=admin_id, username=ADMIN_EMAIL, email=ADMIN_EMAIL)
+    call_command("promote_user", "promote", "--superuser", "--email", ADMIN_EMAIL)
+"""
+
 # ---------------------------------------------------------------------------
 # Application registry
 #
@@ -151,6 +225,9 @@ local_resource(
 # pod after the deployment is healthy.  Each entry is a dict with:
 #   - label: short name shown in Tilt UI
 #   - cmd:   shell command to exec inside the pod
+#   - host_env (optional): {NAME: host command}; each command runs on the host
+#     first, a failure stops the seed, and its output reaches cmd as env NAME
+#   - resource_deps (optional): resources to wait for besides the deployment
 # All seed resources are TRIGGER_MODE_MANUAL — they never run automatically.
 # ---------------------------------------------------------------------------
 APPS = [
@@ -225,14 +302,20 @@ APPS = [
         "name": "mitxonline",
         "dir": "mitxonline",
         "namespace": "mitxonline",
-        "deploy_name": "mitxonline-webapp",
+        "deploy_name": "mitxonline-app",
         "images": {"mitxonline": "mitodl/mitxonline-app"},
         "tiltfile": "./local-dev/apps/mitxonline/Tiltfile",
         "seed_commands": [
             {
                 "label": "seed-mitxonline-instance",
-                "description": "Full instance setup: superuser, OAuth2 app, program, courses, products",
-                "cmd": "python manage.py configure_instance",
+                "description": "DEDP program with financial assistance, two courses with open runs and products, admin@ol.test superuser",
+                "cmd": "python manage.py shell -c '" + MITXONLINE_SEED_INSTANCE + "'",
+                "host_env": {
+                    "ADMIN_GLOBAL_ID": "LOCAL_DEV_ROOT_DOMAIN={rd} {main}/local-dev/scripts/kc-user-id.sh admin@ol.test".format(
+                        rd=root_domain, main=config.main_dir,
+                    ),
+                },
+                "resource_deps": ["kc-seed-users"],
             },
             {
                 "label": "seed-mitxonline-course-data",
@@ -287,14 +370,14 @@ APPS = [
                 # email, and createsuperuser then fails on the unique email
                 # with no way out short of exec'ing in. No password is set;
                 # login goes through Keycloak.
-                "description": "Create or promote the admin@odl.local superuser",
+                "description": "Create or promote the admin@ol.test superuser",
                 "cmd": (
                     "python manage.py shell -c " +
                     "'from django.contrib.auth import get_user_model; " +
                     "U = get_user_model(); " +
                     "u, created = U.objects.get_or_create(" +
-                    "email=\"admin@odl.local\", " +
-                    "defaults={\"username\": \"admin\", \"name\": \"Admin\"}); " +
+                    "email=\"admin@ol.test\", " +
+                    "defaults={\"username\": \"admin@ol.test\", \"name\": \"Admin\"}); " +
                     "u.is_staff = True; u.is_superuser = True; u.save(); " +
                     "print((\"created\" if created else \"promoted\"), u.email)'"
                 ),
@@ -326,6 +409,17 @@ APPS = [
         ],
     },
     {
+        # Off by default, and the heaviest thing here by some margin. It
+        # exists so ocw-studio's GitLab content-sync backend has somewhere to
+        # push to without an external server. See the GitLab section of
+        # local-dev/README.md for what it costs to run.
+        "name": "gitlab",
+        "dir": "gitlab",
+        "namespace": "gitlab",
+        "deploy_name": "gitlab",
+        "tiltfile": "./local-dev/apps/gitlab/Tiltfile",
+    },
+    {
         # Off by default: it exists so the data platform's micromasters dlt
         # source has a local database to read, which most developers do not
         # need running.
@@ -348,7 +442,7 @@ APPS = [
                     "U = get_user_model(); " +
                     "u, created = U.objects.get_or_create(" +
                     "username=\"admin\", " +
-                    "defaults={\"email\": \"admin@odl.local\"}); " +
+                    "defaults={\"email\": \"admin@ol.test\"}); " +
                     "u.is_staff = True; u.is_superuser = True; " +
                     "u.set_password(\"admin\"); u.save(); " +
                     "print((\"created\" if created else \"reset\"), u.username)'"
@@ -380,6 +474,17 @@ APPS = [
         "deploy_name": "analytics-api",
         "tiltfile": "./local-dev/apps/analytics-api/Tiltfile",
         "seed_commands": [],
+    },
+    {
+        # Off by default. Serves MIT Learn's org analytics dashboard from the
+        # data-platform lake, so it needs data-platform and mitxonline enabled
+        # too. See "ol-analytics-api" in local-dev/README.md.
+        "name": "ol-analytics-api",
+        "dir": "ol-analytics-api",
+        "namespace": "ol-analytics-api",
+        "deploy_name": "ol-analytics-api",
+        "images": {"ol-analytics-api": "mitodl/ol-analytics-api-app"},
+        "tiltfile": "./local-dev/apps/ol-analytics-api/Tiltfile",
     },
 ]
 
@@ -486,15 +591,25 @@ local_resource(
 # path (even while Keycloak itself is idle) and a batch of them trip
 # "context deadline exceeded" together. Serialising keeps one admin request in
 # flight at a time, which the path handles comfortably.
+#
+# `--run-program` makes the refresh use the Keycloak provider settings the
+# program computes now. Without it, refresh uses the ones recorded in state,
+# so after a root-domain change every resource fails to refresh against the
+# old hostname before the new URL can be applied.
+#
+# pulumi-up-retry.sh runs the apply a second time when the first fails. A realm
+# create that times out on a fresh cluster still lands in Keycloak, and the
+# second run adopts it; without the retry the resource stays red, and
+# kc-seed-users and every app wait on it until someone retriggers it by hand.
 local_resource(
     "local-infra-apps",
     # FORCE_COLOR is unset for the same reason as local-infra-core above.
-    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; pulumi up --refresh --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir)),
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} PULUMI_CONFIG_PASSPHRASE='' bash -c 'unset FORCE_COLOR CLICOLOR_FORCE; {wait} sso.ol.{rd} && {{ pulumi stack init local-dev.apps-infra.Dev 2>/dev/null; {retry} 2 {locks} --refresh --run-program --yes --skip-preview --parallel 1 --logtostderr --stack local-dev.apps-infra.Dev; }}'".format(rd=root_domain, wait="{}/local-dev/scripts/wait-for-keycloak-admin.sh".format(config.main_dir), retry="{}/local-dev/scripts/pulumi-up-retry.sh".format(config.main_dir), locks="{}/local-dev/infra/.pulumi/.pulumi/locks/organization/ol-local-dev-apps-infra/local-dev.apps-infra.Dev".format(config.main_dir)),
     # Gates the per-app Keycloak clients whose k8s Secrets land in a namespace
     # the core stack only creates on demand.
     env={"LOCAL_DEV_ENABLED_APPS": ",".join(enabled_apps)},
     dir="./local-dev/infra/apps_infra",
-    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/scripts/wait-for-keycloak-admin.sh"],
+    deps=["./local-dev/infra/modules", "./local-dev/infra/apps_infra/__main__.py", "./local-dev/scripts/wait-for-keycloak-admin.sh", "./local-dev/scripts/pulumi-up-retry.sh", "./local-dev/scripts/pulumi-clear-stale-lock.sh"],
     labels=["infra"],
     resource_deps=["local-infra-core"],
 )
@@ -538,7 +653,7 @@ if "data-platform" in enabled_apps:
 local_resource(
     "kc-seed-users",
     cmd="LOCAL_DEV_ROOT_DOMAIN={rd} {script}".format(rd=root_domain, script="{}/local-dev/scripts/kc-seed-users.sh".format(config.main_dir)),
-    deps=["./local-dev/scripts/kc-seed-users.sh"],
+    deps=["./local-dev/scripts/kc-seed-users.sh", "./local-dev/scripts/kc-admin.sh"],
     labels=["infra"],
     resource_deps=["local-infra-apps"],
 )
@@ -550,7 +665,18 @@ local_resource(
 local_resource(
     "kc-fix-flow-bindings",
     cmd="LOCAL_DEV_ROOT_DOMAIN={rd} {script}".format(rd=root_domain, script="{}/local-dev/scripts/kc-fix-flow-bindings.sh".format(config.main_dir)),
-    deps=["./local-dev/scripts/kc-fix-flow-bindings.sh"],
+    deps=["./local-dev/scripts/kc-fix-flow-bindings.sh", "./local-dev/scripts/kc-admin.sh"],
+    labels=["infra"],
+    resource_deps=["local-infra-apps"],
+)
+
+# Give the organization claim the deployed shape (a map carrying each
+# organization's id rather than a list of aliases). Keycloak creates that scope
+# itself, so Pulumi cannot hold its mapper; see the script comment.
+local_resource(
+    "kc-fix-org-claim",
+    cmd="LOCAL_DEV_ROOT_DOMAIN={rd} {script}".format(rd=root_domain, script="{}/local-dev/scripts/kc-fix-org-claim.sh".format(config.main_dir)),
+    deps=["./local-dev/scripts/kc-fix-org-claim.sh", "./local-dev/scripts/kc-admin.sh"],
     labels=["infra"],
     resource_deps=["local-infra-apps"],
 )
@@ -568,21 +694,28 @@ for app in [a for a in APPS if a["name"] in enabled_apps]:
         include(frontend_tiltfile)
     # Register one manual-trigger Tilt resource per seed command.
     # These are never auto-run; trigger them from the Tilt UI or with:
-    #   tilt trigger seed-<app>-<label>
-    # or via:
-    #   ./local-dev/scripts/seed.sh --app <app> --cmd <label>
+    #   tilt trigger <label>
+    # or run a seed's cmd via:
+    #   ./local-dev/scripts/seed.sh --app <app> --cmd "<cmd>"
     for seed in app.get("seed_commands", []):
-        exec_cmd = (
-            "kubectl --context local-dev exec -n {ns} deploy/{deploy} -- {cmd}".format(
-                ns=app["namespace"],
-                deploy=app["deploy_name"],
-                cmd=seed["cmd"],
-            )
+        host_env = seed.get("host_env", {})
+        # An assignment takes the exit status of its command substitution, so
+        # NAME="$(host command)" && ... stops at a failed host command.
+        exec_cmd = "".join(['{k}="$({v})" && '.format(k=k, v=v) for k, v in host_env.items()])
+        if host_env:
+            pod_env = "env " + "".join(['{k}="${k}" '.format(k=k) for k in host_env])
+        else:
+            pod_env = ""
+        exec_cmd += "kubectl --context local-dev exec -n {ns} deploy/{deploy} -- {env}{cmd}".format(
+            ns=app["namespace"],
+            deploy=app["deploy_name"],
+            env=pod_env,
+            cmd=seed["cmd"],
         )
         local_resource(
             seed["label"],
             cmd=exec_cmd,
-            resource_deps=[app["deploy_name"]],
+            resource_deps=[app["deploy_name"]] + seed.get("resource_deps", []),
             labels=["seed"],
             trigger_mode=TRIGGER_MODE_MANUAL,
             auto_init=False,

@@ -656,6 +656,9 @@ mitxonline_shared_plugins = OLApisixSharedPlugins(
         k8s_namespace=mitxonline_namespace,
         k8s_labels=k8s_app_labels,
         enable_defaults=True,
+        # The same origins Django is given as CORS_ALLOWED_ORIGINS; see
+        # definition.cors_allow_origins for why the gateway needs them too.
+        cors_allow_origins=definition.cors_allow_origins(bindings),
         plugins=definition.shared_plugins(bindings),
     ),
 )

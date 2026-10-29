@@ -34,7 +34,7 @@ from ol_infrastructure.components.services.cert_manager import (  # noqa: E402
 )
 
 
-def _rendered_spec(name: str, **overrides):
+def _certificate(name: str, **overrides):
     config = OLCertManagerCertConfig(
         application_name=name,
         k8s_namespace="test-ns",
@@ -42,7 +42,11 @@ def _rendered_spec(name: str, **overrides):
         dns_names=[f"{name}.example.com"],
         **overrides,
     )
-    return OLCertManagerCert(name, cert_config=config).certificate_resource.spec
+    return OLCertManagerCert(name, cert_config=config).certificate_resource
+
+
+def _rendered_spec(name: str, **overrides):
+    return _certificate(name, **overrides).spec
 
 
 @pulumi.runtime.test
@@ -76,3 +80,19 @@ def test_duration_is_rendered_when_set():
         assert spec["duration"] == "87600h"
 
     return _rendered_spec("long-cert", duration="87600h").apply(check)
+
+
+@pulumi.runtime.test
+def test_wait_for_ready_adds_the_pulumi_wait_annotation():
+    def check(metadata):
+        assert metadata["annotations"] == {"pulumi.com/waitFor": "condition=Ready"}
+
+    return _certificate("waited-cert", wait_for_ready=True).metadata.apply(check)
+
+
+@pulumi.runtime.test
+def test_default_sets_no_annotations():
+    def check(metadata):
+        assert "annotations" not in metadata
+
+    return _certificate("unwaited-cert").metadata.apply(check)

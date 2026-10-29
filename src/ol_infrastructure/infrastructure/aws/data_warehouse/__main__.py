@@ -319,6 +319,64 @@ query_engine_iam_policy = iam.Policy(
 
 export("data_lake_query_engine_iam_policy_arn", query_engine_iam_policy.arn)
 
+# For an engine that registers this lake without owning it (CI StarRocks reads
+# QA's, see query_engine_lake_access). It can plan and scan Iceberg tables here but
+# cannot create, alter or drop them, or write their files.
+query_engine_read_only_iam_permissions = {
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "glue:BatchGetPartition",
+                "glue:GetColumnStatisticsForPartition",
+                "glue:GetColumnStatisticsForTable",
+                "glue:GetDatabase",
+                "glue:GetDatabases",
+                "glue:GetPartition",
+                "glue:GetPartitions",
+                "glue:GetTable",
+                "glue:GetTables",
+            ],
+            "Resource": [
+                "arn:aws:glue:*:*:database/information_schema",
+                *data_lake_glue_resources(stack_info.env_suffix),
+            ],
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:GetObjectAttributes",
+                "s3:GetObjectVersion",
+                "s3:ListBucket",
+            ],
+            "Resource": data_lake_bucket_arns(stack_info.env_suffix),
+        },
+    ],
+}
+
+query_engine_read_only_iam_policy = iam.Policy(
+    f"data-lake-query-engine-read-only-policy-{stack_info.env_suffix}",
+    name=f"data-lake-query-engine-read-only-policy-{stack_info.env_suffix}",
+    path=f"/ol-data/etl-policy-{stack_info.env_suffix}/",
+    policy=json.dumps(
+        lint_iam_policy(
+            query_engine_read_only_iam_permissions,
+            parliament_config=parliament_config,
+        )
+    ),
+    description=(
+        "Read-only Glue and S3 access to this data lake for a query engine in "
+        "another environment"
+    ),
+)
+
+export(
+    "data_lake_query_engine_read_only_iam_policy_arn",
+    query_engine_read_only_iam_policy.arn,
+)
+
 # A standalone managed policy rather than an inline RolePolicy on each principal.
 # The Concourse deploy role is granted iam:CreatePolicy, iam:CreatePolicyVersion
 # and iam:AttachRolePolicy but NOT iam:PutRolePolicy, so an inline policy cannot

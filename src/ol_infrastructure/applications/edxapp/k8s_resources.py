@@ -24,6 +24,7 @@ from ol_infrastructure.applications.edxapp.k8s_autoscaling import (
     create_webapp_trigger_auth,
 )
 from ol_infrastructure.applications.edxapp.k8s_configmaps import (
+    browser_origins,
     create_k8s_configmaps,
 )
 from ol_infrastructure.applications.edxapp.k8s_secrets import create_k8s_secrets
@@ -705,12 +706,21 @@ def create_k8s_resources(  # noqa: C901
                     "port": "vector-metrics",
                     "path": "/metrics",
                     "scheme": "http",
-                    "interval": "30s",
+                    "interval": "60s",
                     "relabelings": [
                         {
                             "sourceLabels": ["__meta_kubernetes_pod_container_name"],
                             "action": "keep",
                             "regex": "vector",
+                        }
+                    ],
+                    # The histogram buckets were ~29k prod series with no reader;
+                    # the vector_edxapp_tracking alerts only use counters.
+                    "metricRelabelings": [
+                        {
+                            "sourceLabels": ["__name__"],
+                            "action": "drop",
+                            "regex": "vector_.*_bucket",
                         }
                     ],
                 }
@@ -2318,6 +2328,12 @@ def create_k8s_resources(  # noqa: C901
             k8s_namespace=namespace,
             k8s_labels=k8s_global_labels,
             enable_defaults=True,
+            # Same source as Django's CORS_ORIGIN_WHITELIST in
+            # k8s_configmaps.py.  The gateway answers CORS preflights itself, so
+            # an origin missing here is blocked on every preflighted request
+            # whatever Django allows; simple requests still carry Django's own
+            # headers through.
+            cors_allow_origins=browser_origins(stack_info, edxapp_config),
         ),
     )
 

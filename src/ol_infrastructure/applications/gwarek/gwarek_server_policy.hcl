@@ -31,3 +31,8 @@ path "secret-gwarek/data/*" {
 path "secret-operations/sso/gwarek" {
   capabilities = ["read"]
 }
+
+# Keycloak client credentials for Opik (traces and managed prompts)
+path "secret-opik/sdk-gwarek" {
+  capabilities = ["read"]
+}

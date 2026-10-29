@@ -89,7 +89,7 @@ spec:
 
       containers:
       - name: web
-        image: concourse/concourse:7.14
+        image: concourse/concourse:__CONCOURSE_VERSION__
         args: ["web"]
         ports:
         - containerPort: 8080
@@ -116,7 +116,7 @@ spec:
         # Must match what Studio puts in pipeline definitions and what the
         # browser uses, or build links in the UI point nowhere.
         - name: CONCOURSE_EXTERNAL_URL
-          value: https://concourse.ocw.mit.dev
+          value: https://concourse.ocw.mit.test
         - name: CONCOURSE_ADD_LOCAL_USER
           value: test:test  # pragma: allowlist secret
         - name: CONCOURSE_MAIN_TEAM_LOCAL_USER
@@ -128,10 +128,6 @@ spec:
           value: allow
         - name: CONCOURSE_CONTENT_SECURITY_POLICY
           value: "*"
-        - name: CONCOURSE_ENABLE_PIPELINE_INSTANCES
-          value: "true"
-        - name: CONCOURSE_ENABLE_ACROSS_STEP
-          value: "true"
         # Short grace periods: local disk is scarce and nobody is forensically
         # examining a failed local build hours later.
         - name: CONCOURSE_GC_ONE_OFF_GRACE_PERIOD
@@ -160,7 +156,7 @@ spec:
           failureThreshold: 12
 
       - name: worker
-        image: concourse/concourse:7.14
+        image: concourse/concourse:__CONCOURSE_VERSION__
         args: ["worker"]
         # Concourse's worker starts containerd and creates containers; there is
         # no unprivileged way to do that.
@@ -198,11 +194,27 @@ spec:
           value: "true"
         - name: CONCOURSE_CONTAINERD_DNS_PROXY_ENABLE
           value: "true"
+        # Pipeline resource containers get their own rootfs, so they do not
+        # inherit anything this pod trusts. Anything they clone or fetch over
+        # TLS from a local-dev hostname (the in-cluster GitLab, say) fails
+        # certificate verification without this. The worker copies this
+        # directory, following symlinks, into a volume it mounts in every
+        # resource container as /etc/ssl/certs. It holds the core stack's
+        # local-dev-ca-bundle ConfigMap: the public roots as well as mkcert,
+        # since mkcert alone would break pulls from Docker Hub and clones from
+        # github.com. The copy is made once per worker and kept in
+        # worker-state, so a changed bundle reaches pipelines only once this
+        # pod is replaced.
+        - name: CONCOURSE_CERTS_DIR
+          value: /concourse-certs
         volumeMounts:
         - name: concourse-keys
           mountPath: /concourse-keys
         - name: worker-state
           mountPath: /worker-state
+        - name: local-dev-ca-bundle
+          mountPath: /concourse-certs
+          readOnly: true
         # Sized for the configured build concurrency, not for an idle
         # worker. Every pipeline task runs in this one pod's containerd, so
         # OCW_MASS_BUILD_MAX_IN_FLIGHT parallel Hugo builds all draw on this
@@ -223,7 +235,9 @@ spec:
         emptyDir: {}
       - name: worker-state
         emptyDir: {}
-
+      - name: local-dev-ca-bundle
+        configMap:
+          name: local-dev-ca-bundle
 ---
 apiVersion: v1
 kind: Service

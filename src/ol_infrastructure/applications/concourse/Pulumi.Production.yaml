@@ -72,8 +72,8 @@ config:
     # deployment's infrastructure team and analyzes this pool's Production
     # role, so CI/QA workers have no reason to hold Access Analyzer access.
     - iam_drift_analysis
-    # Production only, like iam_drift_analysis: ol-data-contracts-sync is set
-    # on this deployment's infrastructure team.
+    # Production only, like iam_drift_analysis: ol-data-contracts-sync and
+    # ol-data-metrics-sync are set on this deployment's infrastructure team.
     - openmetadata_contracts_sync
     instance_type: general_purpose_intel_flex_4xlarge
     name: infra

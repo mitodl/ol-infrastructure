@@ -24,6 +24,7 @@ from typing import Any
 
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
+import pulumi_tls as tls
 import pulumi_vault as vault
 from pulumi import Config, Output, ResourceOptions, export
 
@@ -37,6 +38,10 @@ from ol_infrastructure.components.applications.eks import (
     OLEKSAuthBindingConfig,
 )
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
+from ol_infrastructure.components.services.cert_manager import (
+    OLCertManagerCert,
+    OLCertManagerCertConfig,
+)
 from ol_infrastructure.components.services.vault import (
     OLVaultK8SSecret,
     OLVaultK8SStaticSecretConfig,
@@ -70,9 +75,14 @@ vault_mount_stack = make_stack_reference(
     projects.VAULT_STATIC_MOUNTS, f"operations.{stack_info.name}"
 )
 cluster_stack = make_stack_reference(projects.EKS, f"data.{stack_info.name}")
+network_stack = make_stack_reference(projects.NETWORKING, stack_info.name)
 stateful_workload_storage = require_stack_output_value(
     cluster_stack, "stateful_workload_storage"
 )
+# Every pod on the data cluster, including Opik and the backup CronJob, gets its
+# address from these subnets (VPC CNI). Traffic from a peered VPC arrives
+# SNATed to a node in that VPC, so it falls outside them.
+data_pod_subnet_cidrs = network_stack.require_output("data_vpc")["k8s_pod_subnet_cidrs"]
 
 clickhouse_vault_kv_path = vault_mount_stack.require_output("clickhouse_kv")["path"]
 
@@ -131,6 +141,56 @@ EBS_GP3_IOPS_3000_VAC = "ebs-gp3-iops-3000"
 EBS_GP3_IOPS_3000_STORAGE_CLASS = "ebs-gp3-iops-3000-sc"
 # ClickHouse's conventional Prometheus port, used for both server and Keeper.
 CLICKHOUSE_METRICS_PORT = 9363
+# Free space the server keeps on the hot disk before TTL moves stop placing
+# parts there; the Opik chart's tieredStorage.hot.keepFreeSpaceBytes default.
+COLD_TIER_HOT_KEEP_FREE_SPACE_BYTES = 10 * 1024**3
+CLICKHOUSE_INTERSERVER_USER = "interserver"
+# Set on every server pod from the VSO-synced Secret, whether or not the
+# credentials file below is rendered; see INTERSERVER_CREDENTIALS_XML.
+CLICKHOUSE_INTERSERVER_PASSWORD_ENV = "CLICKHOUSE_INTERSERVER_PASSWORD"  # noqa: S105  # pragma: allowlist secret
+# Replicas authenticate to each other's interserver port (9009) when fetching
+# parts. Without credentials anything that can reach 9009 can pull table data,
+# and ClickHouse documents them as the guard against a server being made to
+# fetch from an attacker.
+#
+# Rolled out in two applies so no replica ever holds a different password from
+# its peers for longer than a kubelet ConfigMap sync:
+#   1. The env var above reaches every pod. That is a pod template change, so
+#      the operator restarts each replica, but nothing reads the variable yet.
+#   2. clickhouse:interserver_credentials_enabled renders this file. The
+#      operator puts `files` in the shared configd ConfigMap before touching
+#      any host, and its restart policy (`files/config.d/*no_restart*: "no"`,
+#      the last matching rule) does not restart for this name. Each server's
+#      config reloader then picks the file up and replaces its interserver
+#      credentials live (Server.cpp updateInterserverCredentials).
+# Setting the password through the operator's settings secretKeyRef instead
+# does both in one apply and breaks replication for the whole roll: the
+# ConfigMap reaches pods that have not restarted yet, where the operator's env
+# var does not exist and from_env resolves to an empty password.
+#
+# Between the first and last pod picking up the file, fetches between a
+# replica that has the credentials and one that does not are refused in both
+# directions and retried from the replication queue.
+INTERSERVER_CREDENTIALS_XML = dedent(f"""\
+    <clickhouse>
+      <interserver_http_credentials>
+        <user>{CLICKHOUSE_INTERSERVER_USER}</user>
+        <password from_env="{CLICKHOUSE_INTERSERVER_PASSWORD_ENV}"/>
+      </interserver_http_credentials>
+    </clickhouse>
+""")
+CLICKHOUSE_LOOPBACK_NETWORKS = ("127.0.0.1", "::1")
+# Names the operator derives its per-host Services from: chi-<chi>-<cluster>-
+# <shard>-<replica> and chk-<chk>-<cluster>-<shard>-<replica>.
+CHI_CLUSTER_NAME = "default"
+CHK_CLUSTER_NAME = "cluster1"
+# TLS listeners, next to the plaintext ones rather than replacing them.
+CLICKHOUSE_HTTPS_PORT = 8443
+CLICKHOUSE_NATIVE_TLS_PORT = 9440
+KEEPER_TLS_PORT = 9281
+CLICKHOUSE_TLS_DIR = "/etc/clickhouse-server/tls"
+KEEPER_TLS_DIR = "/etc/clickhouse-keeper/tls"
+TLS_DISABLED_PROTOCOLS = "sslv2,sslv3,tlsv1,tlsv1_1"
 
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(CLICKHOUSE_NAMESPACE, ns)
@@ -164,8 +224,8 @@ keeper_resources = clickhouse_config.get_object("keeper_resources") or {
 }
 # Server waits on SIGTERM for running queries (shutdown_wait_unfinished_queries)
 # and, by default, for a running BACKUP (shutdown_wait_backups_and_restores).
-# The daily backup takes ~165s on production replica 0, so the kubelet's
-# default 30s would SIGKILL a replica restarted during it.
+# The daily backup took 274s on production replica 0 on 2026-10-21, so the
+# kubelet's default 30s would SIGKILL a replica restarted during it.
 CLICKHOUSE_TERMINATION_GRACE_SECONDS = 300
 CLICKHOUSE_SHUTDOWN_WAIT_QUERIES_SECONDS = 60
 
@@ -189,6 +249,16 @@ def _zone_spread(label_selector: dict[str, str]) -> list[dict[str, Any]]:
 
 ch_version = clickhouse_config.get("version") or CLICKHOUSE_SERVER_VERSION
 ch_image = f"altinity/clickhouse-server:{ch_version}"
+# The server takes its MergeTree defaults from the default profile's
+# `compatibility` setting, once, at startup (Context::getMergeTreeSettings,
+# 25.8+). During a rolling upgrade, set it to the version being upgraded from so
+# an upgraded replica keeps writing parts the others can still read: 25.11, 26.1
+# and 26.3 change String, nested-type and index file serialization in ways older
+# servers cannot read. Altinity 25.8 changes no part format we use, so the 24.8
+# value is a precaution there; on a 25.8 replica it shows as
+# allow_part_offset_column_in_projections = 0. Remove it once every replica runs
+# the new version; it then takes effect at each replica's next restart.
+ch_compatibility = clickhouse_config.get("compatibility")
 keeper_image = f"clickhouse/clickhouse-keeper:{CLICKHOUSE_KEEPER_VERSION}"
 
 IO_OPTIMIZED_NODE_SELECTOR = {"ol.mit.edu/io_optimized": "true"}
@@ -304,6 +374,8 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
     ebs_storageclass_output: "Output[Any]",
     fallback_storage_class: str,
     resources: dict[str, Any],
+    tls_secret_name: str,
+    tls_certificate: Any,
 ) -> "Output[kubernetes.apiextensions.CustomResource]":
     """Create a ClickHouseKeeperInstallation CRD resource managed by the Altinity operator.
 
@@ -384,6 +456,16 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                     ],
                     "settings": {
                         "keeper_server/tcp_port": "2181",
+                        # TLS client port beside 2181. The operator's
+                        # keeper-clickhouse Service is headless, so 9281 is
+                        # reachable through it without being declared. Raft
+                        # (9444) stays plaintext: turning on raft TLS is all
+                        # or nothing across the ensemble, and a rolling
+                        # restart would split it.
+                        "keeper_server/tcp_port_secure": str(KEEPER_TLS_PORT),
+                        "openSSL/server/certificateFile": f"{KEEPER_TLS_DIR}/tls.crt",
+                        "openSSL/server/privateKeyFile": f"{KEEPER_TLS_DIR}/tls.key",
+                        "openSSL/server/disableProtocols": TLS_DISABLED_PROTOCOLS,
                         "keeper_server/coordination_settings/raft_logs_level": "warning",
                         "keeper_server/coordination_settings/operation_timeout_ms": "10000",
                         "keeper_server/coordination_settings/session_timeout_ms": "30000",
@@ -437,6 +519,27 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                                         "name": "clickhouse-keeper",
                                         "image": image,
                                         "resources": resources,
+                                        "volumeMounts": [
+                                            {
+                                                "name": "keeper-tls",
+                                                "mountPath": KEEPER_TLS_DIR,
+                                                "readOnly": True,
+                                            }
+                                        ],
+                                    }
+                                ],
+                                # Mounted as a directory, not by subPath, so a
+                                # renewed certificate reaches the pod. Keeper
+                                # watches the certificate files and reloads
+                                # them. Group-readable through fsGroup 101,
+                                # the Keeper process's group.
+                                "volumes": [
+                                    {
+                                        "name": "keeper-tls",
+                                        "secret": {
+                                            "secretName": tls_secret_name,
+                                            "defaultMode": 0o440,
+                                        },
                                     }
                                 ],
                             },
@@ -464,6 +567,7 @@ def _create_clickhouse_keeper_installation(  # noqa: PLR0913
                     ],
                 },
             },
+            opts=ResourceOptions(depends_on=[tls_certificate]),
         )
     )
 
@@ -482,11 +586,20 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     cold_bucket_name: "Output[str]",
     backup_bucket_name: "Output[str]",
     users_secret_name: str,
+    interserver_secret_name: str,
+    interserver_credentials_enabled: bool,
+    client_networks: "Output[list[str]]",
     irsa_role_arn: "Output[str]",
     keeper_installation: "Output[kubernetes.apiextensions.CustomResource]",
     users_secret: Any,
+    interserver_secret: Any,
     vault_k8s_resources: Any,
     resources: dict[str, Any],
+    tls_secret_name: str,
+    tls_certificate: Any,
+    tls_listeners_enabled: bool,
+    keeper_tls_enabled: bool,
+    reconcile_task_id: str | None,
 ) -> "Output[kubernetes.apiextensions.CustomResource]":
     """Build the ClickHouseInstallation CRD and return it wrapped in an Output.
 
@@ -565,6 +678,9 @@ def _create_clickhouse_installation(  # noqa: PLR0913
         )
     )
 
+    # hot_storage_size is a Kubernetes quantity in Gi, e.g. "1500Gi"; anything
+    # else fails the int() conversion.
+    cold_cache_max_size_bytes = int(hot_storage_size.removesuffix("Gi")) * 1024**3 // 10
     storage_config_xml = Output.all(cold_bucket_name, backup_bucket_name).apply(
         lambda buckets: dedent(f"""\
             <clickhouse>
@@ -574,13 +690,43 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                        which points at the server's main path
                        (/var/lib/clickhouse/, the NVMe or EBS PVC). A custom
                        local disk at that same path is rejected with
-                       UNKNOWN_ELEMENT_IN_CONFIG ("cannot be equal to <path>"). -->
+                       UNKNOWN_ELEMENT_IN_CONFIG ("cannot be equal to <path>"),
+                       so only its free-space headroom is tuned here: the
+                       Opik chart's tieredStorage.hot.keepFreeSpaceBytes plus
+                       the cold cache's max_size. The cache sits on this same
+                       filesystem, so without the extra reservation hot parts
+                       could take the room the cache later grows into and the
+                       volume could fill. -->
+                  <default>
+                    <keep_free_space_bytes>{COLD_TIER_HOT_KEEP_FREE_SPACE_BYTES + cold_cache_max_size_bytes}</keep_free_space_bytes>
+                  </default>
+                  <!-- Opik's backend readiness check
+                       (ANALYTICS_DB_COLD_STORAGE_DISK_HEALTH_CHECK_ENABLED)
+                       looks for a disk named exactly cold_s3. Its object
+                       metadata lives on the data PVC, so a pod restart does
+                       not orphan the S3 objects under live parts. -->
                   <cold_s3>
                     <type>s3</type>
                     <endpoint>https://{buckets[0]}.s3.amazonaws.com/data/</endpoint>
                     <use_environment_credentials>true</use_environment_credentials>
                     <metadata_path>/var/lib/clickhouse/disks/cold_s3/</metadata_path>
+                    <s3_max_get_rps>1000</s3_max_get_rps>
+                    <s3_max_put_rps>500</s3_max_put_rps>
                   </cold_s3>
+                  <!-- Read-through cache over cold_s3, as the Opik chart's
+                       tieredStorage renders it, so repeat reads of cold parts
+                       stay off S3. The chart puts it on a separate PVC; it
+                       sits on the data PVC here because adding a volume claim
+                       template means recreating every StatefulSet. Sized at a
+                       tenth of the data volume, which the default disk's
+                       keep_free_space_bytes reserves. -->
+                  <cold>
+                    <type>cache</type>
+                    <disk>cold_s3</disk>
+                    <path>/var/lib/clickhouse/caches/cold/</path>
+                    <max_size>{cold_cache_max_size_bytes}</max_size>
+                    <cache_on_write_operations>0</cache_on_write_operations>
+                  </cold>
                   <!-- Destination for BACKUP ... TO Disk('backups', ...).
                        s3_plain rather than s3: an s3 disk keeps its object
                        metadata on the local PVC, so a backup written through
@@ -596,17 +742,25 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                   </backups>
                 </disks>
                 <policies>
-                  <tiered>
+                  <!-- The Opik chart's tieredStorage policy, under the name
+                       its TTL job attaches (ALTER TABLE ... MODIFY SETTING
+                       storage_policy = 'tiered_replicated', then MODIFY TTL
+                       id_at + INTERVAL n WEEK TO DISK 'cold'). The hot volume
+                       must be named "default": a table can only switch to a
+                       policy that keeps every volume, and every disk in it, of
+                       its current policy, and every table starts on the
+                       built-in policy whose one volume is "default". Inert
+                       until a table is moved onto it. -->
+                  <tiered_replicated>
                     <volumes>
-                      <hot>
+                      <default>
                         <disk>default</disk>
-                      </hot>
+                      </default>
                       <cold>
-                        <disk>cold_s3</disk>
-                        <prefer_not_to_merge>true</prefer_not_to_merge>
+                        <disk>cold</disk>
                       </cold>
                     </volumes>
-                  </tiered>
+                  </tiered_replicated>
                 </policies>
               </storage_configuration>
               <!-- Without this, Disk() is refused outright as a BACKUP target
@@ -622,58 +776,67 @@ def _create_clickhouse_installation(  # noqa: PLR0913
     # Operator-native user definitions. Password hashes are referenced from the
     # Vault-synced K8s secret via secretKeyRef (keys: <user>_sha256); the
     # operator reads them at reconcile and bakes them into its usersd configmap.
-    # networks/ip is left open at the ClickHouse layer because the actual access
-    # boundary is the NetworkPolicy defined below (only the LLMOps namespaces +
-    # the clickhouse namespace can reach the data ports).
+    #
+    # networks/ip limits both users to loopback (kubectl exec clickhouse-client)
+    # and the data cluster's pod subnets. NetworkPolicy is not enforced on the
+    # data clusters, so without this any host routed into the VPC, including
+    # pods in peered VPCs, could log in with a leaked password. Users changes
+    # reload without a restart.
     def _secret_ref(key: str) -> dict[str, Any]:
         return {"valueFrom": {"secretKeyRef": {"name": users_secret_name, "key": key}}}
 
-    ch_users = {
-        "admin/password_sha256_hex": _secret_ref("admin_sha256"),
-        "admin/access_management": "1",
-        "admin/profile": "default",
-        "admin/quota": "default",
-        "admin/networks/ip": ["::/0", "0.0.0.0/0"],
-        "opik/password_sha256_hex": _secret_ref("opik_sha256"),
-        "opik/profile": "llmops_profile",
-        "opik/quota": "llmops_quota",
-        "opik/networks/ip": ["::/0", "0.0.0.0/0"],
-        # Explicit RBAC grants (rendered as <grants><query>…</query></grants> in
-        # the user's XML) instead of the legacy <allow_databases> whitelist.
-        # ``allow_databases`` restricts the user's grants to *only* the listed
-        # application databases, which denies opik the SELECT on ``system.parts``
-        # it needs to compute per-workspace/table storage metrics (Code: 497
-        # ACCESS_DENIED SELECT(...) ON system.parts). Enumerating grants lets us
-        # add that one system-table read without opening the whole ``system``
-        # database (preserving cross-tenant isolation vs. e.g. system.query_log).
-        #
-        # ``default`` is granted in addition to ``opik_db``: opik's Liquibase
-        # migrations hard-code the DATABASECHANGELOG / DATABASECHANGELOGLOCK
-        # bookkeeping tables (and the replicated ``...1`` shadow tables from
-        # 000017_change_tables_to_replicated) into the ``default`` database,
-        # while application tables live in ``opik_db``. ``default`` is otherwise
-        # an unused scratch database in this cluster.
-        #
-        # ``CLUSTER ON *.*`` is required because newer opik migrations issue
-        # distributed DDL with an explicit ``ON CLUSTER '{cluster}'`` clause
-        # (e.g. 000098_create_cipx_spend_blocks). Altinity 24.8 defaults
-        # ``on_cluster_queries_require_cluster_grant`` to true, and CLUSTER is a
-        # global-only privilege not implied by the database-scoped ``GRANT ALL``
-        # above (without it: Code 497 ACCESS_DENIED, grant CLUSTER ON *.*). This
-        # only permits *issuing* ON CLUSTER queries; the underlying object access
-        # stays constrained by the opik_db / default grants, so cross-tenant
-        # isolation is preserved.
-        "opik/grants/query": [
-            "GRANT ALL ON opik_db.*",
-            "GRANT ALL ON default.*",
-            "GRANT SELECT ON system.parts",
-            "GRANT CLUSTER ON *.*",
-        ],
-    }
+    def _users(networks: list[str]) -> dict[str, Any]:
+        return {
+            "admin/password_sha256_hex": _secret_ref("admin_sha256"),
+            "admin/access_management": "1",
+            "admin/profile": "default",
+            "admin/quota": "default",
+            "admin/networks/ip": networks,
+            "opik/password_sha256_hex": _secret_ref("opik_sha256"),
+            "opik/profile": "llmops_profile",
+            "opik/quota": "llmops_quota",
+            "opik/networks/ip": networks,
+            # Explicit RBAC grants (rendered as <grants><query>…</query></grants> in
+            # the user's XML) instead of the legacy <allow_databases> whitelist.
+            # ``allow_databases`` restricts the user's grants to *only* the listed
+            # application databases, which denies opik the SELECT on ``system.parts``
+            # it needs to compute per-workspace/table storage metrics (Code: 497
+            # ACCESS_DENIED SELECT(...) ON system.parts). Enumerating grants lets us
+            # add that one system-table read without opening the whole ``system``
+            # database (preserving cross-tenant isolation vs. e.g. system.query_log).
+            #
+            # ``default`` is granted in addition to ``opik_db``: opik's Liquibase
+            # migrations hard-code the DATABASECHANGELOG / DATABASECHANGELOGLOCK
+            # bookkeeping tables (and the replicated ``...1`` shadow tables from
+            # 000017_change_tables_to_replicated) into the ``default`` database,
+            # while application tables live in ``opik_db``. ``default`` is otherwise
+            # an unused scratch database in this cluster.
+            #
+            # ``CLUSTER ON *.*`` is required because newer opik migrations issue
+            # distributed DDL with an explicit ``ON CLUSTER '{cluster}'`` clause
+            # (e.g. 000098_create_cipx_spend_blocks). Altinity 24.8 defaults
+            # ``on_cluster_queries_require_cluster_grant`` to true, and CLUSTER is a
+            # global-only privilege not implied by the database-scoped ``GRANT ALL``
+            # above (without it: Code 497 ACCESS_DENIED, grant CLUSTER ON *.*). This
+            # only permits *issuing* ON CLUSTER queries; the underlying object access
+            # stays constrained by the opik_db / default grants, so cross-tenant
+            # isolation is preserved.
+            "opik/grants/query": [
+                "GRANT ALL ON opik_db.*",
+                "GRANT ALL ON default.*",
+                "GRANT SELECT ON system.parts",
+                "GRANT CLUSTER ON *.*",
+            ],
+        }
+
+    task_id_spec: dict[str, Any] = (
+        {"taskID": reconcile_task_id} if reconcile_task_id else {}
+    )
 
     return Output.all(
         storage_config=storage_config_xml,
         irsa_role_arn=irsa_role_arn,
+        client_networks=client_networks,
     ).apply(
         lambda kwargs: kubernetes.apiextensions.CustomResource(
             f"clickhouse-installation-{env_suffix}",
@@ -685,6 +848,7 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                 labels=labels,
             ),
             spec={
+                **task_id_spec,
                 # wait: after restarting a replica, wait for it to rejoin the
                 # cluster before moving to the next. The operator default
                 # (0.26.0 reconcile.host.wait) waits for exclusion and
@@ -708,7 +872,11 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                         "nodes": [
                             {
                                 "host": f"keeper-clickhouse.{namespace}.svc.cluster.local",
-                                "port": 2181,
+                                **(
+                                    {"port": KEEPER_TLS_PORT, "secure": "yes"}
+                                    if keeper_tls_enabled
+                                    else {"port": 2181}
+                                ),
                             }
                         ]
                     },
@@ -724,9 +892,19 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     "files": {
                         "config.d/storage.xml": kwargs["storage_config"],
                         "config.d/system_log_tables.xml": SYSTEM_LOG_TABLES_XML,
+                        **(
+                            {
+                                "config.d/interserver_credentials_no_restart.xml": INTERSERVER_CREDENTIALS_XML
+                            }
+                            if interserver_credentials_enabled
+                            else {}
+                        ),
                     },
                     "settings": {
-                        "default_storage_policy": "tiered",
+                        # No default_storage_policy here: it is not a server
+                        # setting and was ignored. New tables land on the
+                        # built-in "default" policy and move to
+                        # tiered_replicated per table.
                         # Server default is 0.9 of the cgroup memory limit;
                         # 0.85 matches the Opik chart and leaves more of the
                         # limit for memory the server does not track before
@@ -754,6 +932,32 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                         "shutdown_wait_unfinished": str(
                             CLICKHOUSE_SHUTDOWN_WAIT_QUERIES_SECONDS
                         ),
+                        **(
+                            {
+                                # TLS listeners beside 8123 and 9000, which
+                                # stay open for the operator, the backup job
+                                # and Opik until each moves over. The operator
+                                # reaches the server on 8123 while that port
+                                # exists (access.scheme auto).
+                                "https_port": str(CLICKHOUSE_HTTPS_PORT),
+                                "tcp_port_secure": str(CLICKHOUSE_NATIVE_TLS_PORT),
+                                # The server watches these two files and
+                                # reloads them when cert-manager renews the
+                                # certificate.
+                                "openSSL/server/certificateFile": f"{CLICKHOUSE_TLS_DIR}/tls.crt",
+                                "openSSL/server/privateKeyFile": f"{CLICKHOUSE_TLS_DIR}/tls.key",
+                                "openSSL/server/disableProtocols": TLS_DISABLED_PROTOCOLS,
+                                # Adds the stack's CA to what the server
+                                # trusts as a client (Keeper over TLS, a TLS
+                                # peer replica). loadDefaultCAFile stays true
+                                # in the base config, and Poco loads both, so
+                                # S3 (cold tier, backups) still verifies
+                                # against the system CAs.
+                                "openSSL/client/caConfig": f"{CLICKHOUSE_TLS_DIR}/ca.crt",
+                            }
+                            if tls_listeners_enabled
+                            else {}
+                        ),
                     },
                     # Users, profiles, and quotas are managed by the operator
                     # (merged into its generated usersd configmap) rather than
@@ -762,9 +966,18 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                     # clickhouse_operator management user and base profiles).
                     # Password hashes are pulled from the Vault-synced secret
                     # via secretKeyRef so plaintext never enters the CHI spec.
-                    "profiles": _LLMOPS_PROFILES,
+                    "profiles": {
+                        **_LLMOPS_PROFILES,
+                        **(
+                            {"default/compatibility": ch_compatibility}
+                            if ch_compatibility
+                            else {}
+                        ),
+                    },
                     "quotas": _LLMOPS_QUOTAS,
-                    "users": ch_users,
+                    "users": _users(
+                        [*CLICKHOUSE_LOOPBACK_NETWORKS, *kwargs["client_networks"]]
+                    ),
                 },
                 "templates": {
                     "podTemplates": [
@@ -813,7 +1026,40 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                                                 "name": "AWS_WEB_IDENTITY_TOKEN_FILE",
                                                 "value": "/var/run/secrets/eks.amazonaws.com/serviceaccount/token",
                                             },
+                                            {
+                                                "name": CLICKHOUSE_INTERSERVER_PASSWORD_ENV,
+                                                "valueFrom": {
+                                                    "secretKeyRef": {
+                                                        "name": interserver_secret_name,
+                                                        "key": "password",
+                                                    }
+                                                },
+                                            },
                                         ],
+                                        "volumeMounts": [
+                                            {
+                                                "name": "clickhouse-tls",
+                                                "mountPath": CLICKHOUSE_TLS_DIR,
+                                                "readOnly": True,
+                                            }
+                                        ],
+                                    }
+                                ],
+                                # Mounted as a directory, not by subPath, so a
+                                # renewed certificate reaches the pod.
+                                # World-readable because the server runs as
+                                # uid/gid 101 and the pod has no fsGroup.
+                                # Adding fsGroup would have the kubelet re-own
+                                # every file on the data volume at the next
+                                # mount (its root is 0755, not group-writable,
+                                # so OnRootMismatch does not skip it).
+                                "volumes": [
+                                    {
+                                        "name": "clickhouse-tls",
+                                        "secret": {
+                                            "secretName": tls_secret_name,
+                                            "defaultMode": 0o444,
+                                        },
                                     }
                                 ],
                             },
@@ -858,7 +1104,9 @@ def _create_clickhouse_installation(  # noqa: PLR0913
                 depends_on=[
                     keeper_installation,
                     users_secret,
+                    interserver_secret,
                     vault_k8s_resources,
+                    tls_certificate,
                 ],
             ),
         )
@@ -877,11 +1125,92 @@ opik_password = _require_password(
     "opik",
 )
 
+# from_env substitutes the variable's value into the config as XML, so a
+# password containing markup characters would corrupt or reshape the config.
+_XML_SPECIAL_CHARACTERS = frozenset("<>&'\"")
+
+
+def _require_xml_safe(password: str) -> str:
+    if _XML_SPECIAL_CHARACTERS.intersection(password):
+        msg = (
+            "clickhouse:interserver_password must not contain any of "
+            f"{''.join(sorted(_XML_SPECIAL_CHARACTERS))}"
+        )
+        raise ValueError(msg)
+    return password
+
+
+interserver_password = clickhouse_config.require_secret("interserver_password").apply(
+    _require_xml_safe
+)
+# Second step of the interserver credentials rollout (INTERSERVER_CREDENTIALS_XML).
+interserver_credentials_enabled = clickhouse_config.require_bool(
+    "interserver_credentials_enabled"
+)
+# Turns on the server's 8443 and 9440 listeners. Rolled out in two applies,
+# like the interserver credentials, because the settings and the certificate
+# volume reach a replica at different times. When a config change needs a
+# reboot, operator 0.26 restarts the host (SYSTEM SHUTDOWN, via
+# hostForceRestart in reconcileHostStatefulSet) before it reconciles that
+# host's StatefulSet, so the server comes back reading certificate paths that
+# are not mounted yet. 25.8 then never finishes startup: on 2026-10-23
+# production and QA replica 0 stopped after the interserver listener and was
+# killed, the operator recreated its not-Ready StatefulSet, the delete outlasted
+# reconcile.statefulSet.update.timeout, and the reconcile gave up with the
+# StatefulSet deleted. So:
+#   1. With this false, the pod template change (certificate volume,
+#      interserver password env var) rolls every replica as a plain
+#      StatefulSet update. The operator diffs against the last completed
+#      reconcile (status.normalizedCompleted), which a failed one never
+#      replaces, so a stack whose TLS apply failed sees no settings change and
+#      no restart in front of the update.
+#   2. Set it true once every chi-* pod has /etc/clickhouse-server/tls. The
+#      operator then restarts each replica into the new settings with the
+#      files already there.
+# applications/opik reads this from the stack outputs to choose 8443 or 8123,
+# so apply this stack before it after flipping.
+tls_listeners_enabled = clickhouse_config.require_bool("tls_listeners_enabled")
+# Points the servers at Keeper's TLS port. Flip it per stack only after Keeper
+# is serving 9281 there. Operator 0.26 restarts a host for any zookeeper change
+# (isZookeeperChangeRequiresReboot is !a.Equals(b); the zookeeper/* "no" restart
+# rule is never consulted), so this rolls every replica in turn. A replica that
+# cannot complete the TLS handshake comes back with no Keeper session, its
+# replicated tables read-only, and the operator, which only waits for /ping,
+# moves on to the next one. Check system.zookeeper_connection (no row, or a
+# port other than 9281, both mean stop) and system.replicas.is_readonly on the
+# first restarted replica.
+#
+# The operator does not abort an in-flight reconcile when the CHI changes. To
+# stop the roll: scale kube-system/clickhouse-operator to 0, set this back to
+# false and clickhouse:reconcile_task_id to a value not used before, apply, and
+# scale the operator back up. The task ID is what makes it reconcile: the
+# interrupted reconcile never completed, so the reverted spec equals the last
+# completed one and the operator would otherwise find nothing to do. The
+# server hot-reloads its zookeeper section, so any replica whose host
+# ConfigMap was already rewritten is on 9281 even if the operator stopped
+# before restarting it; check every chi-clickhouse-deploy-confd-default-0-N
+# ConfigMap shows 2181 again afterwards.
+keeper_tls_enabled = clickhouse_config.require_bool("keeper_tls_enabled")
+# The server trusts the stack CA, which signs Keeper's certificate, only through
+# openSSL/client/caConfig, and that ships with the TLS listener settings.
+if keeper_tls_enabled and not tls_listeners_enabled:
+    msg = "clickhouse:keeper_tls_enabled requires clickhouse:tls_listeners_enabled"
+    raise ValueError(msg)
+# A non-auto spec.taskID is part of the operator's change detection (auto-
+# prefixed IDs are excluded), so a new value forces a reconcile of an
+# otherwise unchanged CHI. Unset in normal operation.
+reconcile_task_id = clickhouse_config.get("reconcile_task_id")
+
 ############################################################
 # S3 Cold Storage Bucket
 ############################################################
 cold_bucket_name = f"ol-data-clickhouse-cold-{stack_info.env_suffix}"
 
+# Never add an expiration rule here, and leave versioning off. Once a table
+# tiers, each S3 object is part of a live data part whose metadata sits on a
+# replica's PVC, so an object expired under it corrupts that part and the table
+# reading it. Retention belongs in table TTLs, which delete the part and its
+# objects together.
 cold_bucket_config = S3BucketConfig(
     bucket_name=cold_bucket_name,
     tags=aws_config.tags,
@@ -1026,13 +1355,14 @@ aws.iam.RolePolicyAttachment(
 ############################################################
 # Vault KV Secrets — store credentials in Vault
 ############################################################
-vault.kv.SecretV2(
+clickhouse_credentials_kv = vault.kv.SecretV2(
     f"clickhouse-vault-kv-secrets-{stack_info.env_suffix}",
     mount=clickhouse_vault_kv_path,
     name="credentials",
     data_json=Output.all(
         admin=admin_password,
         opik=opik_password,
+        interserver=interserver_password,
     ).apply(json.dumps),
 )
 
@@ -1077,6 +1407,163 @@ users_secret = OLVaultK8SSecret(
     ),
 )
 
+# Plaintext on purpose: the server reads it as the interserver password, not as
+# a user's hash. Kept out of clickhouse-users, whose keys are hashes only.
+interserver_secret_name = (
+    "clickhouse-interserver-credentials"  # pragma: allowlist secret  # noqa: S105
+)
+interserver_secret = OLVaultK8SSecret(
+    f"clickhouse-interserver-credentials-{stack_info.env_suffix}",
+    resource_config=OLVaultK8SStaticSecretConfig(
+        name="clickhouse-interserver-credentials",
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels=k8s_global_labels,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name=interserver_secret_name,
+        dest_secret_type="Opaque",  # pragma: allowlist secret  # noqa: S106
+        mount=clickhouse_vault_kv_path,
+        mount_type="kv-v2",
+        path="credentials",
+        templates={"password": '{{- get .Secrets "interserver" -}}'},
+        refresh_after="1h",
+        vaultauth=clickhouse_app.vault_k8s_resources.auth_name,
+    ),
+    # The KV write adds the interserver key. Synced before it, the template
+    # renders an empty password into the Secret.
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        depends_on=[clickhouse_app.vault_k8s_resources, clickhouse_credentials_kv],
+    ),
+)
+
+############################################################
+# TLS: a CA owned by this stack
+#
+# Unlike gravitino's namespace-local CA, which cert-manager generates, this one
+# is generated here so its certificate can be a stack output: Opik runs in
+# another namespace and has to trust it, and there is no trust-manager on the
+# data clusters to copy it there. The key lives in this stack's state,
+# encrypted with the stack's KMS key. cert-manager issues and renews the leaf
+# certificates from it.
+############################################################
+CA_VALIDITY_HOURS = 10 * 365 * 24
+clickhouse_ca_key = tls.PrivateKey(
+    f"clickhouse-ca-key-{stack_info.env_suffix}",
+    algorithm="ECDSA",
+    ecdsa_curve="P256",
+)
+# Clients embed this certificate in their trust stores, so renewing it is a
+# planned event for every client at once. Ten years keeps it one.
+clickhouse_ca_cert = tls.SelfSignedCert(
+    f"clickhouse-ca-cert-{stack_info.env_suffix}",
+    private_key_pem=clickhouse_ca_key.private_key_pem,
+    is_ca_certificate=True,
+    validity_period_hours=CA_VALIDITY_HOURS,
+    allowed_uses=["cert_signing", "crl_signing", "digital_signature"],
+    subject=tls.SelfSignedCertSubjectArgs(
+        common_name=f"clickhouse-ca-{stack_info.env_suffix}",
+        organization="Massachusetts Institute of Technology",
+        organizational_unit="Open Learning",
+    ),
+)
+clickhouse_ca_secret_name = "clickhouse-ca"  # noqa: S105  # pragma: allowlist secret
+clickhouse_ca_secret = kubernetes.core.v1.Secret(
+    f"clickhouse-ca-secret-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=clickhouse_ca_secret_name,
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels=k8s_global_labels,
+    ),
+    type="kubernetes.io/tls",
+    string_data={
+        "tls.crt": clickhouse_ca_cert.cert_pem,
+        "tls.key": clickhouse_ca_key.private_key_pem,
+    },
+)
+clickhouse_ca_issuer = kubernetes.apiextensions.CustomResource(
+    f"clickhouse-ca-issuer-{stack_info.env_suffix}",
+    api_version="cert-manager.io/v1",
+    kind="Issuer",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name="clickhouse-ca",
+        namespace=CLICKHOUSE_NAMESPACE,
+        labels=k8s_global_labels,
+    ),
+    spec={"ca": {"secretName": clickhouse_ca_secret_name}},
+    opts=ResourceOptions(depends_on=[clickhouse_ca_secret]),
+)
+
+
+def _service_dns_names(service: str) -> list[str]:
+    """Every name a client in the cluster can reach ``service`` by.
+
+    The operator's own config uses the bare Service name (remote_servers,
+    interserver_http_host), so the short forms are included as well as the FQDN.
+    """
+    return [
+        service,
+        f"{service}.{CLICKHOUSE_NAMESPACE}",
+        f"{service}.{CLICKHOUSE_NAMESPACE}.svc",
+        f"{service}.{CLICKHOUSE_NAMESPACE}.svc.cluster.local",
+    ]
+
+
+clickhouse_tls_secret_name = "clickhouse-server-tls"  # noqa: S105  # pragma: allowlist secret
+clickhouse_server_certificate = OLCertManagerCert(
+    f"clickhouse-server-cert-{stack_info.env_suffix}",
+    cert_config=OLCertManagerCertConfig(
+        application_name="clickhouse",
+        resource_suffix="server",
+        k8s_namespace=CLICKHOUSE_NAMESPACE,
+        k8s_labels=k8s_global_labels,
+        issuer_name="clickhouse-ca",
+        # The CHI and CHK mount the Secret; gate their update on issuance.
+        wait_for_ready=True,
+        dest_secret_name=clickhouse_tls_secret_name,
+        dns_names=[
+            "localhost",
+            # The load-balanced client Service and the operator's own.
+            *_service_dns_names("clickhouse"),
+            *_service_dns_names("clickhouse-clickhouse"),
+            *(
+                name
+                for replica in range(ch_replicas)
+                for name in _service_dns_names(
+                    f"chi-clickhouse-{CHI_CLUSTER_NAME}-0-{replica}"
+                )
+            ),
+        ],
+    ),
+    opts=ResourceOptions(depends_on=[clickhouse_ca_issuer]),
+)
+
+keeper_tls_secret_name = "clickhouse-keeper-tls"  # noqa: S105  # pragma: allowlist secret
+keeper_server_certificate = OLCertManagerCert(
+    f"clickhouse-keeper-cert-{stack_info.env_suffix}",
+    cert_config=OLCertManagerCertConfig(
+        application_name="clickhouse",
+        resource_suffix="keeper",
+        k8s_namespace=CLICKHOUSE_NAMESPACE,
+        k8s_labels=k8s_global_labels,
+        issuer_name="clickhouse-ca",
+        # The CHI and CHK mount the Secret; gate their update on issuance.
+        wait_for_ready=True,
+        dest_secret_name=keeper_tls_secret_name,
+        dns_names=[
+            "localhost",
+            *_service_dns_names("keeper-clickhouse"),
+            *(
+                name
+                for replica in range(keeper_replicas)
+                for name in _service_dns_names(
+                    f"chk-clickhouse-{CHK_CLUSTER_NAME}-0-{replica}"
+                )
+            ),
+        ],
+    ),
+    opts=ResourceOptions(depends_on=[clickhouse_ca_issuer]),
+)
+
 ############################################################
 # ClickHouse Keeper — ClickHouseKeeperInstallation CRD
 #
@@ -1095,6 +1582,8 @@ keeper_installation = _create_clickhouse_keeper_installation(
     ebs_storageclass_output=cluster_stack.get_output("ebs_storageclass"),
     fallback_storage_class=storage_class,
     resources=keeper_resources,
+    tls_secret_name=keeper_tls_secret_name,
+    tls_certificate=keeper_server_certificate,
 )
 
 ############################################################
@@ -1125,10 +1614,19 @@ clickhouse_installation = _create_clickhouse_installation(
     cold_bucket_name=cold_bucket.bucket_v2.bucket,
     backup_bucket_name=backup_bucket.bucket_v2.bucket,
     users_secret_name=users_secret_name,
+    interserver_secret_name=interserver_secret_name,
+    interserver_credentials_enabled=interserver_credentials_enabled,
+    client_networks=data_pod_subnet_cidrs,
     irsa_role_arn=clickhouse_app.irsa_role.arn,
     keeper_installation=keeper_installation,
     users_secret=users_secret,
+    interserver_secret=interserver_secret,
     vault_k8s_resources=clickhouse_app.vault_k8s_resources,
+    tls_secret_name=clickhouse_tls_secret_name,
+    tls_certificate=clickhouse_server_certificate,
+    tls_listeners_enabled=tls_listeners_enabled,
+    keeper_tls_enabled=keeper_tls_enabled,
+    reconcile_task_id=reconcile_task_id,
 )
 
 ############################################################
@@ -1345,6 +1843,16 @@ clickhouse_client_service = kubernetes.core.v1.Service(
                 port=9000,
                 target_port=9000,
             ),
+            kubernetes.core.v1.ServicePortArgs(
+                name="https",
+                port=CLICKHOUSE_HTTPS_PORT,
+                target_port=CLICKHOUSE_HTTPS_PORT,
+            ),
+            kubernetes.core.v1.ServicePortArgs(
+                name="native-tls",
+                port=CLICKHOUSE_NATIVE_TLS_PORT,
+                target_port=CLICKHOUSE_NATIVE_TLS_PORT,
+            ),
         ],
     ),
 )
@@ -1445,6 +1953,12 @@ clickhouse_network_policy = kubernetes.networking.v1.NetworkPolicy(
                 ports=[
                     kubernetes.networking.v1.NetworkPolicyPortArgs(port=8123),
                     kubernetes.networking.v1.NetworkPolicyPortArgs(port=9000),
+                    kubernetes.networking.v1.NetworkPolicyPortArgs(
+                        port=CLICKHOUSE_HTTPS_PORT
+                    ),
+                    kubernetes.networking.v1.NetworkPolicyPortArgs(
+                        port=CLICKHOUSE_NATIVE_TLS_PORT
+                    ),
                 ],
             ),
             # Allow Prometheus scraping from Alloy, which runs in the `grafana`
@@ -1510,7 +2024,7 @@ clickhouse_service_monitor = kubernetes.apiextensions.CustomResource(
                 "port": "metrics",
                 "path": "/metrics",
                 "scheme": "http",
-                "interval": "30s",
+                "interval": "60s",
                 "scrapeTimeout": "10s",
                 "relabelings": [
                     {"targetLabel": "job", "replacement": "clickhouse"},
@@ -1545,6 +2059,8 @@ keeper_service_monitor = kubernetes.apiextensions.CustomResource(
             {
                 "port": "metrics",
                 "path": "/metrics",
+                # Altinity's vendored Keeper dashboard uses irate(...[1m]), which needs
+                # two samples per minute.
                 "interval": "30s",
                 "scrapeTimeout": "10s",
                 # pod_name, container_name and app are the labels Altinity's
@@ -1581,6 +2097,13 @@ export(
 )
 export("clickhouse_native_port", 9000)
 export("clickhouse_http_port", 8123)
+export("clickhouse_native_tls_port", CLICKHOUSE_NATIVE_TLS_PORT)
+export("clickhouse_https_port", CLICKHOUSE_HTTPS_PORT)
+export("tls_listeners_enabled", tls_listeners_enabled)
+export("keeper_tls_port", KEEPER_TLS_PORT)
+# Public half only. Clients outside the clickhouse namespace add it to their
+# trust stores (applications/opik).
+export("ca_certificate_pem", clickhouse_ca_cert.cert_pem)
 export(
     "keeper_service",
     f"keeper-clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local",
@@ -1590,8 +2113,11 @@ export(
     "connection_guide",
     dedent(f"""\
         ClickHouse HTTP: http://clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:8123
+        ClickHouse HTTPS: https://clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:{CLICKHOUSE_HTTPS_PORT}
         ClickHouse Native: clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:9000
+        ClickHouse Native TLS: clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:{CLICKHOUSE_NATIVE_TLS_PORT}
         Keeper: keeper-clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:2181
+        Keeper TLS: keeper-clickhouse.{CLICKHOUSE_NAMESPACE}.svc.cluster.local:{KEEPER_TLS_PORT}
 
         Tenants: opik_db
         Hot/cold cutoff: {hot_data_days} days (table TTL MOVE expressions)

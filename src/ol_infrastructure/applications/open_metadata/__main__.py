@@ -6,7 +6,7 @@ from typing import Any
 
 import pulumi_kubernetes as kubernetes
 import pulumi_vault as vault
-from pulumi import Config, Output, ResourceOptions
+from pulumi import Config, Output, ResourceOptions, export
 from pulumi_aws import ec2, get_caller_identity, iam
 
 from bridge.lib.magic_numbers import (
@@ -65,6 +65,9 @@ from ol_infrastructure.lib.pulumi_helper import (
 )
 from ol_infrastructure.lib.stack_defaults import defaults
 from ol_infrastructure.lib.vault import postgres_role_statements, setup_vault_provider
+from ol_infrastructure.substructure.keycloak.openmetadata_provisioner import (
+    OPENMETADATA_PROVISIONER_USERNAME,
+)
 
 # Resolve the bridge secrets directory once at module level using the sops
 # module's own __file__ — the same base path read_yaml_secrets uses internally.
@@ -114,6 +117,39 @@ aws_account = get_caller_identity()
 
 open_metadata_namespace = "open-metadata"
 open_metadata_service_account_name = "openmetadata"
+# Users' roles come from the `roles` claim that the ol-open_metadata-client
+# Keycloak client sends (substructure/keycloak ol_data_platform.py
+# OPEN_METADATA_ROLE_BY_REALM_ROLE). The claim never carries `Admin`, because
+# OpenMetadata only ever promotes from it and never clears isAdmin when it is
+# absent. Admins come only from initialAdmins below, which also names the
+# Keycloak service account that Pulumi manages bots with.
+#
+# Tokens OpenMetadata issues itself (session JWTs, personal access tokens) carry
+# a snapshot of the user's roles, `Admin` included, and GET
+# /users/loggedInUser resyncs the user from that snapshot. An old personal
+# access token can therefore give a demoted user back a role or admin, or drop
+# a role they were given after it was issued, until they next log in. Demoting
+# anyone fully means revoking their personal access tokens.
+#
+# To demote an admin: remove them from initialAdmins below and from
+# adminPrincipals in the authorizerConfiguration row, unset isAdmin on their
+# OpenMetadata user, and revoke their personal access tokens.
+open_metadata_use_roles_from_provider = True
+# CI's authenticationConfiguration row was seeded while this was still "public",
+# and public means the implicit flow, which ol-open_metadata-client no longer
+# allows. The auth-config Job reconciles the row to this value.
+open_metadata_client_type = "confidential"
+# The chart renders this into AUTHORIZER_ADMIN_PRINCIPALS in a Secret the server
+# reads through envFrom, with no checksum on the pods, so its hash is a pod
+# annotation below: the server only creates the admins at startup.
+open_metadata_initial_admins = [
+    "tmacey",
+    "shaidar",
+    "mas48",
+    "cpatti",
+    "qhoque",
+    OPENMETADATA_PROVISIONER_USERNAME,
+]
 # Used both for the chart's own ingestion pods and for the om-auth-config Job,
 # which borrows it for psycopg2 rather than carrying a second image.
 om_ingestion_image = (
@@ -472,6 +508,36 @@ superset_connector_secret = OLVaultK8SSecret(
 )
 connector_secrets.append(superset_connector_secret)
 
+# Keycloak client and parent group for the team-keycloak-sync CronOMJob, which
+# mirrors OpenMetadata team membership into Keycloak groups. Written to Vault by
+# the keycloak substructure stack. Only that job reads it, so like the Superset
+# secret it has no restart target.
+OLVaultK8SSecret(
+    f"open-metadata-{stack_info.name}-team-keycloak-sync-secret",
+    OLVaultK8SStaticSecretConfig(
+        name="openmetadata-team-keycloak-sync",
+        namespace=open_metadata_namespace,
+        dest_secret_labels=k8s_global_labels,
+        dest_secret_name="om-team-keycloak-sync",  # noqa: S106  # pragma: allowlist secret
+        labels=k8s_global_labels,
+        mount="secret-openmetadata",
+        mount_type="kv-v2",
+        path="keycloak-team-sync",
+        templates={
+            "KEYCLOAK_REALM_URL": '{{ get .Secrets "url" }}',
+            "KEYCLOAK_ADMIN_URL": '{{ get .Secrets "admin_url" }}',
+            "KEYCLOAK_CLIENT_ID": '{{ get .Secrets "client_id" }}',
+            "KEYCLOAK_CLIENT_SECRET": '{{ get .Secrets "client_secret" }}',
+            "KEYCLOAK_PARENT_GROUP_ID": '{{ get .Secrets "parent_group_id" }}',
+        },
+        vaultauth=vault_k8s_resources.auth_name,
+    ),
+    opts=ResourceOptions(
+        delete_before_replace=True,
+        parent=vault_k8s_resources,
+    ),
+)
+
 # Read-only StarRocks credentials for the StarRocks ingestion job, issued by
 # Vault's `database-starrocks` mount. The mount name is not environment
 # qualified: QA and Production each run their own Vault server. The jobs that
@@ -552,36 +618,24 @@ for _bot_key, _bot_name in _OM_BOTS.items():
     )
     connector_secret_names.append(_k8s_secret_name)
 
-# Copies of the ingestion bot token for consumers that read only their own Vault
-# mounts. Each copy reads the same SOPS key, which keeps a rotation to one place.
-# Concourse shares this Vault.
-# - The contracts sync pipeline (ol_concourse/pipelines/applications/
-#   ol_data_contracts_sync.py) publishes ol-data-platform's contracts/ to
-#   production OpenMetadata. Concourse reads only secret-concourse/<team>/*.
-# - ol-data-platform's lakehouse code location pushes Dagster asset check
-#   results to production OpenMetadata as test cases. Dagster's Vault policy
-#   reads secret-data/pipelines/*. Its sensor is registered only in production,
-#   since the tables it names come from the production dbt manifest.
+# A copy of the ingestion bot token for the contracts sync pipeline in
+# ol_concourse/pipelines/applications/ol_data_contracts_sync.py, which
+# publishes ol-data-platform's contracts/ to production OpenMetadata. Concourse
+# shares this Vault but reads only secret-concourse/<team>/*. Dagster's token
+# is dagster-bot's, written by substructure/open_metadata.
 if stack_info.env_suffix == "production":
-    _ingestion_bot_api_secret = Output.secret(
-        json.dumps(
-            {
-                "token": open_metadata_connector_secrets["ingestion_bot"]["token"],
-                "server_url": f"https://{open_metadata_config.require('domain')}/api",
-            }
-        )
-    )
-    for _consumer, _vault_path in {
-        "concourse-contracts": (
-            "secret-concourse/infrastructure/openmetadata_contracts_bot"
+    vault.generic.Secret(
+        f"open-metadata-concourse-contracts-bot-secret-{stack_info.env_suffix}",
+        path="secret-concourse/infrastructure/openmetadata_contracts_bot",
+        data_json=Output.secret(
+            json.dumps(
+                {
+                    "token": open_metadata_connector_secrets["ingestion_bot"]["token"],
+                    "server_url": f"https://{open_metadata_config.require('domain')}/api",
+                }
+            )
         ),
-        "dagster": "secret-data/pipelines/openmetadata",
-    }.items():
-        vault.generic.Secret(
-            f"open-metadata-{_consumer}-bot-secret-{stack_info.env_suffix}",
-            path=_vault_path,
-            data_json=_ingestion_bot_api_secret,
-        )
+    )
 
 # IRSA trust role granting the OpenMetadata server pod read access to AWS Glue and S3.
 # Uses OLEKSTrustRole directly (rather than OLEKSAuthBinding) because Vault K8s
@@ -756,19 +810,22 @@ open_metadata_assets_policy_attachment = iam.RolePolicyAttachment(
     opts=ResourceOptions(parent=open_metadata_irsa_role),
 )
 
-# Reconcile the two 2.0 session settings into the database row the server
-# actually reads.  The AUTHENTICATION_* entries in extraEnvs below only bind on
-# an install whose `authenticationConfiguration` row does not exist yet, because
-# `SettingsCache.createDefaultConfiguration` seeds that row from the YAML only
-# when it is absent and `SecurityConfigurationManager` reads it back from the
-# database on every boot.  Our row was written by 1.13.x and has neither key.
+# Reconcile the two 2.0 session settings, clientType and useRolesFromProvider into the
+# database rows the server actually reads.  The AUTHENTICATION_* entries in
+# extraEnvs below and the authorizer Helm values only bind on an install whose
+# `authenticationConfiguration` / `authorizerConfiguration` row does not exist
+# yet, because `SettingsCache.createDefaultConfiguration` seeds each row from the
+# YAML only when it is absent and `SecurityConfigurationManager` reads them back
+# from the database on every boot.  Our rows were written by 1.13.x.
 #
 # This is a dependency of the Helm release rather than a follower of it: the
 # server snapshots its auth configuration during startup, so the write has to
 # land before the release rolls the pods for the release's own rollout to pick
 # it up.  The Job name embeds a hash of the script and of the desired values so
 # that changing either recreates the Job and re-runs it; the script itself is
-# idempotent and does nothing when the row already agrees.
+# idempotent and does nothing when the rows already agree.  The same hash is a
+# pod annotation on the server, because a change that only touches the chart's
+# config Secret would not otherwise roll the pods.
 _auth_config_script = (
     Path(__file__).parent / "scripts" / "om_auth_config.py"
 ).read_text()
@@ -778,6 +835,8 @@ _auth_config_hash = hashlib.sha256(
             _auth_config_script,
             str(OPEN_METADATA_SESSION_EXPIRY_SECONDS),
             str(OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER),
+            open_metadata_client_type,
+            json.dumps(open_metadata_use_roles_from_provider),
         ]
     ).encode()
 ).hexdigest()[:8]
@@ -827,6 +886,14 @@ open_metadata_auth_config_job = kubernetes.batch.v1.Job(
                                 name="OM_MAX_ACTIVE_SESSIONS_PER_USER",
                                 value=str(OPEN_METADATA_MAX_ACTIVE_SESSIONS_PER_USER),
                             ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="OM_CLIENT_TYPE",
+                                value=open_metadata_client_type,
+                            ),
+                            kubernetes.core.v1.EnvVarArgs(
+                                name="OM_USE_ROLES_FROM_PROVIDER",
+                                value=json.dumps(open_metadata_use_roles_from_provider),
+                            ),
                         ],
                         env_from=[
                             kubernetes.core.v1.EnvFromSourceArgs(
@@ -863,6 +930,7 @@ open_metadata_application = kubernetes.helm.v3.Release(
         version=OPEN_METADATA_VERSION,
         namespace=open_metadata_namespace,
         cleanup_on_fail=True,
+        max_history=10,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://helm.open-metadata.org",
         ),
@@ -872,6 +940,12 @@ open_metadata_application = kubernetes.helm.v3.Release(
             # metadata, which do not share a role, so it carries the tier and no
             # component. The operator's pod template takes no labels at all.
             "commonLabels": k8s_labels.workload_labels(alert_tier=AlertTier.notify),
+            "podAnnotations": {
+                "ol.mit.edu/om-auth-config": _auth_config_hash,
+                "ol.mit.edu/om-initial-admins": hashlib.sha256(
+                    json.dumps(open_metadata_initial_admins).encode()
+                ).hexdigest()[:8],
+            },
             "openmetadata": {
                 "config": {
                     # Ref: https://docs.open-metadata.org/latest/deployment/security/keycloak/kubernetes
@@ -879,19 +953,28 @@ open_metadata_application = kubernetes.helm.v3.Release(
                         "enabled": True,
                         "className": "org.openmetadata.service.security.DefaultAuthorizer",  # noqa: E501
                         "containerRequestFilter": "org.openmetadata.service.security.JwtFilter",  # noqa: E501
-                        "initialAdmins": [
-                            "tmacey",
-                            "shaidar",
-                            "mas48",
-                            "cpatti",
-                            "qhoque",
-                        ],
+                        # Not bootstrap-only. The chart renders this into
+                        # adminPrincipals, which the authorizerConfiguration row
+                        # keeps (om_auth_config.py merges around it), and every
+                        # OIDC login makes anyone in adminPrincipals an admin
+                        # again (AuthenticationCodeFlowHandler.getOrCreateOidcUser).
+                        # These are the only admins: no Keycloak role maps to
+                        # `Admin`. See the demotion steps at
+                        # open_metadata_use_roles_from_provider.
+                        #
+                        # The server also creates each entry as an admin user on
+                        # every boot (UserRepository.initializeUsers), which is
+                        # what makes the provisioner's service account an admin
+                        # without an OIDC login. substructure/open_metadata uses
+                        # it to create bots, which only an admin can do.
+                        "initialAdmins": open_metadata_initial_admins,
                         "principalDomain": "mit.edu",
+                        "useRolesFromProvider": open_metadata_use_roles_from_provider,
                     },
                     "authentication": {
                         "provider": "custom-oidc",
                         # Ref: https://docs.open-metadata.org/v1.12.x/deployment/security/keycloak/kubernetes
-                        "clientType": "confidential",
+                        "clientType": open_metadata_client_type,
                         "callbackUrl": f"https://{open_metadata_config.require('domain')}/callback",
                         # publicKeys, authority, clientId loaded from vault via env vars
                         "oidcConfiguration": {
@@ -1196,4 +1279,11 @@ gateway = OLEKSGateway(
         parent=open_metadata_application,
         delete_before_replace=True,
     ),
+)
+
+# Read by substructure/open_metadata, whose OpenMetadata dynamic providers call
+# the API from wherever Pulumi runs rather than from inside the cluster.
+export(
+    "open_metadata",
+    {"api_url": f"https://{open_metadata_config.require('domain')}/api"},
 )

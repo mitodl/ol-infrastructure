@@ -1,0 +1,14 @@
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: mitxonline-tls
+  namespace: mitxonline
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - "mitxonline.mit.test"
+  - "api.mitxonline.mit.test"
+  secret:
+    name: local-dev-tls
+    namespace: mitxonline

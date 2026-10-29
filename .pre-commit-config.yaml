@@ -91,6 +91,11 @@ repos:
     # cannot contain a credential by construction. See the data/README.md there.
     - --exclude-files
     - src/ol_infrastructure/saas/github/repositories/data/
+    # VSO resource configs captured under mocks: Secret names, Vault paths and
+    # template text naming Vault keys, never a value. JSON has no comments, so
+    # the keyword detector's hits on `dest_secret_name` can't be allowlisted inline.
+    - --exclude-files
+    - tests/ol_infrastructure/applications/mitxonline/fixtures/vso_secrets_main\.json
 - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
   rev: "v0.17.0"

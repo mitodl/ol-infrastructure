@@ -10,6 +10,8 @@ allow_rebase_merge: true
 allow_squash_merge: true
 archetype: fork
 default_branch: master
+description: MIT Open Learning fork of edx/frontend-component-header-edx, the edX
+  React header component
 has_discussions: false
 has_issues: true
 has_projects: true

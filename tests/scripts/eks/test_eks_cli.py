@@ -36,6 +36,22 @@ def eks_module():
     return load_eks_module()
 
 
+@pytest.fixture(autouse=True)
+def default_kubeconfig_path(eks_module, monkeypatch, tmp_path):
+    """Point kubectl's default kubeconfig at tmp_path so `setup` never edits ~/.kube."""
+    path = tmp_path / "default-kubeconfig"
+    monkeypatch.setattr(eks_module, "KUBECTL_DEFAULT_KUBECONFIG_PATH", path)
+    return path
+
+
+@pytest.fixture(autouse=True)
+def isolated_cache_dir(eks_module, monkeypatch, tmp_path):
+    """Keep tests away from the developer's real ~/.cache files."""
+    monkeypatch.setattr(eks_module, "CACHE_DIR", tmp_path)
+    monkeypatch.setattr(eks_module, "EXEC_DEBUG_LOG_PATH", tmp_path / "exec-debug.log")
+    return tmp_path
+
+
 @pytest.fixture
 def two_clusters(eks_module):
     """Two ClusterConfig fixtures covering common test cases."""
@@ -180,6 +196,35 @@ def test_load_valid_vault_token_refuses_noninteractive_login_when_blocked(
         eks_module.load_valid_vault_token(
             eks_module.AccessMode.DEVELOPER, block_noninteractive_login=True
         )
+
+
+@pytest.mark.unit
+def test_load_valid_vault_token_discards_expired_cached_token(eks_module, monkeypatch):
+    """An expired cached token is checked against Vault on one call, then dropped.
+
+    Long-running kubectl clients keep retrying the exec plugin; keeping the dead
+    token made every retry call auth/token/lookup-self indefinitely.
+    """
+    token_path = eks_module.cache_file("vault-token-developer")
+    eks_module.dump_json(token_path, {"token": "expired-token"})
+    vault_checks = []
+
+    class ExpiredClient:
+        def is_authenticated(self) -> bool:
+            vault_checks.append(1)
+            return False
+
+    monkeypatch.setattr(eks_module, "vault_client", lambda _token=None: ExpiredClient())
+    monkeypatch.setattr(eks_module, "exec_invocation_is_interactive", lambda: False)
+
+    for _ in range(3):
+        with pytest.raises(RuntimeError, match="non-interactive"):
+            eks_module.load_valid_vault_token(
+                eks_module.AccessMode.DEVELOPER, block_noninteractive_login=True
+            )
+
+    assert not token_path.exists()
+    assert len(vault_checks) == 2  # the pre- and post-lock checks of the first call
 
 
 @pytest.mark.unit
@@ -461,6 +506,96 @@ def test_setup_writes_kubeconfig_with_operator_contexts_by_default(
 
     user_names = [user["name"] for user in kubeconfig["users"]]
     assert "applications-qa-readonly" not in user_names
+
+
+@pytest.fixture
+def legacy_default_kubeconfig(eks_module, two_clusters, default_kubeconfig_path):
+    """Write a default kubeconfig holding an earlier setup's EKS entries plus local-dev.
+
+    A hand-written context also uses the applications-qa cluster.
+    """
+    kube_config = eks_module.build_kubeconfig(
+        two_clusters, eks_module.AccessMode.DEVELOPER, "applications-qa"
+    )
+    kube_config["clusters"].append(
+        {"name": "local-dev", "cluster": {"server": "https://127.0.0.1:6443"}}
+    )
+    kube_config["users"] += [
+        {"name": "local-dev-admin", "user": {"client-key-data": "key"}},
+        {"name": "sso-user", "user": {"token": "token"}},
+    ]
+    kube_config["contexts"] += [
+        {
+            "name": "local-dev",
+            "context": {"cluster": "local-dev", "user": "local-dev-admin"},
+        },
+        {
+            "name": "qa-sso",
+            "context": {"cluster": "applications-qa", "user": "sso-user"},
+        },
+    ]
+    default_kubeconfig_path.write_text(yaml.safe_dump(kube_config))
+    return default_kubeconfig_path
+
+
+@pytest.mark.unit
+def test_prune_default_kubeconfig_removes_only_eks_entries(
+    eks_module, legacy_default_kubeconfig
+):
+    """Pruning keeps other entries and any cluster a remaining context still uses."""
+    original = legacy_default_kubeconfig.read_text()
+
+    eks_module.prune_default_kubeconfig(path=legacy_default_kubeconfig)
+
+    kubeconfig = yaml.safe_load(legacy_default_kubeconfig.read_text())
+    assert [ctx["name"] for ctx in kubeconfig["contexts"]] == ["local-dev", "qa-sso"]
+    assert [user["name"] for user in kubeconfig["users"]] == [
+        "local-dev-admin",
+        "sso-user",
+    ]
+    assert [cluster["name"] for cluster in kubeconfig["clusters"]] == [
+        "applications-qa",
+        "local-dev",
+    ]
+    assert "current-context" not in kubeconfig
+    (backup,) = legacy_default_kubeconfig.parent.glob("default-kubeconfig.bak-*")
+    assert backup.read_text() == original
+
+
+@pytest.mark.unit
+def test_setup_refuses_while_default_kubeconfig_holds_eks_entries(
+    tmp_path, eks_module, monkeypatch, legacy_default_kubeconfig
+):
+    """Setup fails before any Vault login and leaves both files alone."""
+    original = legacy_default_kubeconfig.read_text()
+    fetch = MagicMock()
+    monkeypatch.setattr(eks_module, "fetch_all_cluster_configs", fetch)
+    output_path = tmp_path / "ol-eks.yaml"
+
+    with pytest.raises(RuntimeError, match="prune-default-kubeconfig"):
+        eks_module.setup(output_path=output_path)
+
+    fetch.assert_not_called()
+    assert not output_path.exists()
+    assert legacy_default_kubeconfig.read_text() == original
+
+
+@pytest.mark.unit
+def test_setup_can_target_the_default_kubeconfig(
+    eks_module, monkeypatch, two_clusters, legacy_default_kubeconfig
+):
+    """Setup aimed at the default kubeconfig overwrites it despite its EKS entries."""
+    monkeypatch.setattr(
+        eks_module, "fetch_all_cluster_configs", lambda _mode: two_clusters
+    )
+
+    eks_module.setup(output_path=legacy_default_kubeconfig)
+
+    kubeconfig = yaml.safe_load(legacy_default_kubeconfig.read_text())
+    assert [ctx["name"] for ctx in kubeconfig["contexts"]] == [
+        "applications-qa",
+        "data-production",
+    ]
 
 
 # ---------------------------------------------------------------------------

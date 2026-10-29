@@ -5,7 +5,9 @@ config:
   clickhouse:hot_storage_size: 100Gi
   clickhouse:replicas: '1'
   clickhouse:keeper_replicas: '1'
-  clickhouse:version: 24.8.14.10546.altinitystable
+  # Mid-upgrade to 25.8 (CLICKHOUSE_SERVER_VERSION): keep writing parts 24.8
+  # replicas can read until every replica runs 25.8.
+  clickhouse:compatibility: '24.8'
   vault:address: https://vault-ci.odl.mit.edu
   vault_server:env_namespace: operations.ci
   clickhouse:admin_password:
@@ -14,5 +16,17 @@ config:
     secure: v1:AMc5gNbfEXdrlMHd:/lGrtFcrSDG2axMxsUGfyapcRo3S6OAXWH7vzU68bXob6lItKMFCPdxVNUPHrz3Jwyed6dkoch0=
   clickhouse:opik_password:
     secure: v1:RtackrcicJi2E3h/:/Z6bXECBGn7RaYItxmCnRV6vDorbQZYqsufZ+eWRkLTWO9N4mWRAUlIp4PkyDtI3aaMsIzD9TAU=
+  clickhouse:interserver_password:
+    secure: v1:5TsvTYi1qME7+skj:ZOeN5wa+Dcc+syhX3V6PZ7oduoHdOy5sVLElFN4JRxS30azstlIKoy/2ZPo3/kWODPZU9hoHS/oL8Ug=
+  # Set to "true" only after the apply that adds interserver_password has
+  # restarted every replica (see INTERSERVER_CREDENTIALS_XML in __main__.py).
+  clickhouse:interserver_credentials_enabled: "false"
+  # Set to "true" only after Keeper is verified serving TLS on 9281 in this
+  # environment; flipping it restarts every replica (see keeper_tls_enabled
+  # in __main__.py).
+  clickhouse:keeper_tls_enabled: "false"
+  # Set to "true" only after every chi-* pod mounts /etc/clickhouse-server/tls
+  # (see tls_listeners_enabled in __main__.py). Apply opik after this stack.
+  clickhouse:tls_listeners_enabled: "false"
 secretsprovider: awskms://alias/infrastructure-secrets-ci
 encryptedkey: AQICAHhMkpkBpCvmFjhyfy75ENALRrbg42uOs9cUsFNLXqPnagGUp1319rLamkN4eXvfsQY7AAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM2fssuyKGmrRZnYJHAgEQgDuzjYP/SqDU3f6u+sc6BYB8R5jwXmcSylT7mNXA7saz6SbK++3EWAaeGNBn6rdv8MMj2SrcgOZP3Ol1hQ==
