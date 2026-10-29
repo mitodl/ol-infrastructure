@@ -27,7 +27,7 @@ config:
   vault_server:env_namespace: operations.production
   dagster:db_instance_type: db.r7g.2xlarge
   # Exports OTel metrics (db.client.connections.usage, the client-side
-  # QueuePool occupancy) from the control plane and canvas run workers, the
+  # QueuePool occupancy) from the control plane and data_loading run workers, the
   # only client-side view of pool saturation -- PgBouncer's exporter measures
   # the server end, so a saturated client pool reads as a healthy PgBouncer.
   # See dagster_otel_metrics_enabled in __main__.py.
@@ -89,6 +89,17 @@ config:
   #    control. This one is bounded by how many canvas runs are ever
   #    in flight at once, a number the K8sRunLauncher and
   #    max_concurrent_runs already cap.
+  #
+  #    2026-10-21: canvas was retired into data_loading (mitodl/ol-data-platform
+  #    #2260) and the run-worker opt-in moved with its course export, so the
+  #    bound above now covers data_loading. That adds data_loading's own dlt
+  #    runs, which peaked at 8 concurrent Jobs over the 7 days to 2026-10-21
+  #    (kube_job_labels, data-production) against the canvas export's 133.
+  #    Some of those jobs run more than one op (the course_xml_blocks load
+  #    has one per table), so each can add more than two processes. Those
+  #    runs also call instrumented clients (botocore, requests, sqlalchemy)
+  #    where the canvas export's httpx2 calls were not. Not measured: the
+  #    series count after the move.
   dagster:otel_metrics_enabled: "true"
   # 6 -> 4. The first replica count set from the exporter rather than from a
   # guess. Six days of 1-minute samples (8640 points) taken entirely after the
