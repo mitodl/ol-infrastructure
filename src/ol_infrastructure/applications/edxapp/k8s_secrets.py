@@ -280,6 +280,9 @@ def create_k8s_secrets(
                         redis_hostname=redis_cache["redis_hostname"],
                         lms_domain=edxapp_config.require_object("domains")["lms"],
                         proctortrack_url=edxapp_config.get("proctortrack_url"),
+                        proctortrack_requires_escalation_email=edxapp_config.get_bool(
+                            "proctortrack_requires_escalation_email", default=False
+                        ),
                     ),
                 },
                 vaultauth=vault_k8s_resources.auth_name,

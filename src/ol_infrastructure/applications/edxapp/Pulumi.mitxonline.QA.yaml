@@ -94,6 +94,7 @@ config:
   edxapp:google_analytics_id: UA-5145472-46
   edxapp:mail_domain: edxapp-mail.rc.learn.mit.edu
   edxapp:proctortrack_url: "https://testing.verificient.com"
+  edxapp:proctortrack_requires_escalation_email: "true"
   edxapp:sender_email_address: mitlearn-support+rc@mit.edu
   edxapp:email_use_course_id_from_for_bulk: "True"
   edxapp:bulk_email_default_from_email: no-reply@edxapp-mail.rc.learn.mit.edu
