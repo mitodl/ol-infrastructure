@@ -78,7 +78,7 @@ release_announce_channel = (
     bot_config.get("release_announce_channel") or "product-infrastructure"
 )
 # How long a release may sit cut-but-unfinished before the bot reports it in
-# Slack. Left unset the bot uses 24h, matching the cadence Doof nagged at.
+# Slack. Left unset the bot uses 16h; see _DEFAULT_STUCK_AFTER_HOURS in bot.py.
 release_stuck_after_hours = bot_config.get("release_stuck_after_hours")
 
 # Derived from bridge.settings.apps -- the shared app registry also used by

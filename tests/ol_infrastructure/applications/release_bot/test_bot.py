@@ -1534,6 +1534,33 @@ def test_the_reminder_window_is_10_to_10_30_eastern(now, in_window):
     assert (bot._stuck_nag_window_start(now) is not None) == in_window
 
 
+@pytest.mark.parametrize(
+    ("age", "reported"),
+    [
+        # Cut at 14:00 ET the day before: 20h old when the window opens.
+        pytest.param(timedelta(hours=20, minutes=5), True, id="cut-14:00"),
+        pytest.param(timedelta(hours=16, minutes=5), True, id="cut-18:00"),
+        pytest.param(timedelta(hours=15, minutes=5), False, id="cut-19:00"),
+    ],
+)
+@pytest.mark.usefixtures("_no_release_issue", "_in_nag_window")
+async def test_a_release_cut_by_18_00_is_reported_the_next_morning(
+    repos, slack_app, monkeypatch, age, reported
+):
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.10.27.1", age)),
+    )
+    monkeypatch.setattr(
+        bot.github, "latest_successful_deployment", _deployments_by_environment({})
+    )
+
+    await bot._nag_stuck_releases(slack_app, repos, bot.ReleaseProgressState())
+
+    assert slack_app.client.chat_postMessage.called == reported
+
+
 @pytest.mark.usefixtures("_no_release_issue")
 async def test_a_restart_outside_the_window_does_not_re_report(
     repos, slack_app, monkeypatch

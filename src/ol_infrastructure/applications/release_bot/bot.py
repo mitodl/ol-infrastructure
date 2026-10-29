@@ -1650,7 +1650,10 @@ _RELEASE_PROGRESS_POLL_SECONDS = 120
 # every 24h; that nag was the only thing in Slack that made a stalled release
 # visible. ol-analytics-api's releases/2026.8.3.1 sat cut-but-unfinished from
 # 2026-08-03 with no red build and no message anywhere.
-_DEFAULT_STUCK_AFTER_HOURS = 24.0
+# 16h rather than 24h because reminders only go out in the 10:00 ET window
+# below: a release cut by 18:00 ET is reminded about the next morning instead
+# of the morning after.
+_DEFAULT_STUCK_AFTER_HOURS = 16.0
 
 # The reminder goes out in one fixed daily window, not 24h after the last one.
 # "The last one" lived only in process memory, so every bot rollout or pod
