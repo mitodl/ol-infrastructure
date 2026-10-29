@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import { mkdirSync } from "node:fs"
 import { dirname, join } from "node:path"
+import { resourceCards, resourceCardsOfType } from "../../specs/mit-learn/helpers/cards"
 import {
   CHANNEL_PATH,
   CHANNEL_TITLE,
@@ -51,7 +52,7 @@ test("channel listing", async ({ page }) => {
   await shot(page, "channel-and-drawer/01-channel-heading")
 
   const results = page.getByRole("tabpanel")
-  await expect(results.getByRole("article").first()).toBeVisible()
+  await expect(resourceCards(results).first()).toBeVisible()
   await expect(page.getByRole("tab", { name: /^All \([1-9]\d*\)/ })).toBeVisible()
   await page.getByRole("tab", { name: /^All \(/ }).scrollIntoViewIfNeeded()
   await shot(page, "channel-and-drawer/02-indexed-listing")
@@ -59,7 +60,7 @@ test("channel listing", async ({ page }) => {
 
 test("resource drawer", async ({ page }) => {
   await page.goto(CHANNEL_PATH)
-  const cardLink = page.getByRole("tabpanel").getByRole("article").first().getByRole("link").first()
+  const cardLink = resourceCards(page.getByRole("tabpanel")).first().getByRole("link").first()
   await expect(cardLink).toBeVisible()
   const resourceName = (await cardLink.innerText()).trim()
 
@@ -88,7 +89,7 @@ test("search by URL", async ({ page }) => {
   await expect(page.getByRole("tab", { name: /^Courses \([1-9]\d*\)/ })).toBeVisible()
   await expect(page.getByRole("tab", { name: /^Programs \(0\)/ })).toBeVisible()
   await expect(page.getByRole("tab", { name: /^Learning Materials \(0\)/ })).toBeVisible()
-  await expect(page.getByRole("tabpanel").getByRole("article", { name: /^Course:/ }).first()).toBeVisible()
+  await expect(resourceCardsOfType(page.getByRole("tabpanel"), "Course").first()).toBeVisible()
   await shot(page, "search-direct-url/01-filtered-results")
 })
 
@@ -126,7 +127,7 @@ test("signed in: login, dashboard, header search", async ({ page }) => {
   }).toPass({ timeout: 30_000 })
   await expect(page.getByText(/^\d+ results$/)).toBeAttached()
   await expect(page.getByRole("heading", { name: "Search Results" })).toBeVisible()
-  await expect(page.getByRole("article").first()).toBeVisible()
+  await expect(resourceCards(page.getByRole("tabpanel")).first()).toBeVisible()
   const coursesTab = page.getByRole("tab", { name: /^Courses/ })
   await expect(coursesTab).toBeVisible()
   await expect(page.getByRole("tab", { name: /^Courses \([1-9]\d*\)/ })).toBeVisible()
@@ -137,7 +138,9 @@ test("signed in: login, dashboard, header search", async ({ page }) => {
   await expect(page).toHaveURL(/[?&]resource_type_group=course/)
   await expect(page.getByText(new RegExp(`^${coursesCount} results$`))).toBeAttached()
   await expect(
-    page.getByRole("article", { name: new RegExp(`^Course:.*${SEARCH_QUERY}`, "i") }).first(),
+    resourceCardsOfType(page.getByRole("tabpanel"), "Course")
+      .filter({ has: page.getByRole("heading", { name: new RegExp(SEARCH_QUERY, "i") }) })
+      .first(),
   ).toBeVisible()
   await shot(page, "login-and-search/06-courses-tab")
 })
