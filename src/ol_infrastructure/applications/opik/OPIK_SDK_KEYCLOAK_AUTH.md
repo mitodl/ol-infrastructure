@@ -40,7 +40,14 @@ refreshes a Keycloak token per request. No SDK fork or patch required.
 ## Reusable implementation
 
 Drop this into a small shared module (e.g. `opik_keycloak_auth.py`) that each
-instrumented application imports once at startup.
+instrumented application imports once at startup. An application on
+[ol-llm](https://github.com/mitodl/ol-llm) 0.0.4 or later doesn't need it while tracing
+is on: `ol_llm.configure_tracing` with a `KeycloakClient` registers the same auth, and
+`import ol_llm` sets the two `OPIK_*_ENABLE` defaults below, as long as it is imported
+before opik (0.0.3 and earlier set only `OPIK_SENTRY_ENABLE`). ol-llm registers that
+auth only when tracing is enabled, so a process that runs with `OPIK_TRACK_DISABLE=true`
+or `TracingConfig(enabled=False)` and still calls the SDK directly (prompts, datasets,
+experiments) gets 401s unless it also registers the hook from this module.
 
 ```python
 """Keycloak client-credentials auth for the Opik SDK.
@@ -75,8 +82,14 @@ from typing import Generator, Optional
 
 import httpx
 
-import opik
-from opik.hooks import HttpxClientHook, add_httpx_client_hook
+# Before the first `import opik` anywhere in the process: importing opik with
+# sentry_enable on calls sentry_sdk.init() with Comet's DSN, replacing the app's own
+# Sentry client. analytics_enable sends SDK feature usage to Comet.
+os.environ.setdefault("OPIK_SENTRY_ENABLE", "false")
+os.environ.setdefault("OPIK_ANALYTICS_ENABLE", "false")
+
+import opik  # noqa: E402
+from opik.hooks import HttpxClientHook, add_httpx_client_hook  # noqa: E402
 
 # Renew this many seconds before the server-stated expiry to avoid edge races.
 _REFRESH_SKEW_SECONDS = 30
@@ -203,11 +216,14 @@ import opik
 client = opik.Opik()  # picks up OPIK_URL_OVERRIDE / OPIK_WORKSPACE from env
 ```
 
-Ordering is the one hard constraint: `add_httpx_client_hook` mutates a
+Ordering is the hard constraint, twice over. `add_httpx_client_hook` mutates a
 process-global list that the SDK reads when it lazily constructs its `httpx.Client`.
 Register the hook before the first SDK call (the first trace, the first
 `opik.Opik()`, or the first `@opik.track`-decorated function), and it applies to
-everything thereafter.
+everything thereafter. `OPIK_SENTRY_ENABLE` is read once, when opik is first imported,
+so the module above has to be the first thing in the process that imports opik. If
+something else might import it first (a Django app should set both variables in
+`settings.py`, as learn-ai and mit-learn do), set them there instead.
 
 ## Sourcing the client secret from Vault
 
