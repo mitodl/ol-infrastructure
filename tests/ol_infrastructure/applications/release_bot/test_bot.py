@@ -2827,8 +2827,8 @@ async def test_promote_does_not_claim_a_deploy_started_when_the_gate_check_faile
     said = slack.said
     assert "promoted" in said
     assert "Production deploy triggered" not in said
-    assert "no Production deploy was triggered" in said
-    assert "only after a later check of the gate succeeds" in said
+    assert "could not confirm that Concourse finished checking" in said
+    assert "may or may not have started" in said
 
 
 async def test_promote_waits_for_the_gate_to_record_this_close(repos, promote_api):
@@ -2951,7 +2951,9 @@ async def test_promote_stops_checking_the_gate_at_the_deadline(
     )
 
     promote_api.check_resource.assert_awaited_once()
-    assert "no Production deploy was triggered" in slack.said
+    # The check the bot stopped waiting for is still running in Concourse, so
+    # the reply must not deny a deploy either.
+    assert "A check may still be running" in slack.said
     assert "Production deploy triggered" not in slack.said
 
 

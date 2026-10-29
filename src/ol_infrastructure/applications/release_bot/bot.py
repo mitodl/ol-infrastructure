@@ -654,8 +654,10 @@ async def _check_release_gate(
     gate = f"{app_name}-release-gate"
     version = _gate_version(issue_number, closed_at)
 
-    # Which half of an attempt has ever succeeded, so a failure is described
-    # by what actually failed.
+    # What is known at the end, so a failure is described by what actually
+    # failed: whether any check ever finished, and whether the latest
+    # attempt's version lookup finished (an earlier lookup saying "not yet"
+    # is no evidence about a later one that failed).
     checked = looked_up = False
 
     async def _recorded() -> bool:
