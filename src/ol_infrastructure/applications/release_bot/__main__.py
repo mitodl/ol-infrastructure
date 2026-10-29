@@ -11,6 +11,7 @@ The bot uses Slack Socket Mode (outbound WebSocket) — no Service or Ingress re
 Single replica: Socket Mode connections are not multiplexed.
 """
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -220,29 +221,30 @@ image_repository = (
 bot_image_name = format_docker_image_ref(image_repository, "RELEASE_BOT")
 
 secret_resource_name = "release-bot-secret-production"  # pragma: allowlist secret  # noqa: S105
+bot_secret_data = {
+    # The bot token needs "users:read.email" on top of the usual
+    # chat/commands scopes: slack_users.py resolves each commit author's
+    # email to a Slack id so release notifications @-mention real people
+    # instead of pasting addresses. Without the scope the bot logs one
+    # error and degrades to plain-text names. "users:read" is wanted on top
+    # of that, for the boot-time check that every slack-user-overrides
+    # entry still points at a live account.
+    "slack-bot-token": bot_secrets["slack-bot-token"],
+    "slack-app-token": bot_secrets["slack-app-token"],
+    "slack-user-overrides": slack_user_overrides,
+    "concourse-user": bot_secrets["concourse-username"],
+    "concourse-password": bot_secrets["concourse-password"],
+    "github-app-id": str(github_app_id),
+    "github-app-installation-id": str(github_app_installation_id),
+    "github-app-private-key": github_app_private_key,
+}
 bot_secret = kubernetes.core.v1.Secret(
     "release-bot-secret-production",  # pragma: allowlist secret
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=secret_resource_name,
         namespace=namespace,
     ),
-    string_data={
-        # The bot token needs "users:read.email" on top of the usual
-        # chat/commands scopes: slack_users.py resolves each commit author's
-        # email to a Slack id so release notifications @-mention real people
-        # instead of pasting addresses. Without the scope the bot logs one
-        # error and degrades to plain-text names. "users:read" is wanted on top
-        # of that, for the boot-time check that every slack-user-overrides
-        # entry still points at a live account.
-        "slack-bot-token": bot_secrets["slack-bot-token"],
-        "slack-app-token": bot_secrets["slack-app-token"],
-        "slack-user-overrides": slack_user_overrides,
-        "concourse-user": bot_secrets["concourse-username"],
-        "concourse-password": bot_secrets["concourse-password"],
-        "github-app-id": str(github_app_id),
-        "github-app-installation-id": str(github_app_installation_id),
-        "github-app-private-key": github_app_private_key,
-    },
+    string_data=bot_secret_data,
 )
 # Adding a key here replaces the Secret rather than updating it, so a preview
 # reports `creation failed: secrets "release-bot-secret-production" already
@@ -251,9 +253,21 @@ bot_secret = kubernetes.core.v1.Secret(
 # deletes before replacing. #5169 added the three github-app-* keys the same
 # way and shipped.
 #
-# A running pod does not notice the swap -- env vars are read once at container
-# start -- which is also why the Deployment below has to change for a new key
-# to reach the bot at all.
+# A running pod does not notice the swap: env vars are read once at container
+# start, and the Deployment names this Secret by a fixed string, so changing a
+# value -- an edit to slack-user-overrides, a token rotation -- replaces the
+# Secret and leaves the pod template untouched. `pulumi up` would report
+# success and the bot would keep the old values until something else restarted
+# it. Hashing the contents into a pod-template annotation makes any change here
+# roll the pod, the same way the checksum/ol-* annotations in the dagster stack
+# do. Hashed together rather than per key: an annotation is readable by anyone
+# who can read the Deployment, and the high-entropy tokens keep the digest from
+# being a fingerprint someone could test a guessed override list against.
+bot_secret_checksum_annotation = {
+    "checksum/release-bot-secret": hashlib.sha256(
+        json.dumps(bot_secret_data, sort_keys=True).encode()
+    ).hexdigest(),
+}
 
 
 def _secret_env(name: str, key: str) -> kubernetes.core.v1.EnvVarArgs:
@@ -297,6 +311,7 @@ bot_deployment = kubernetes.apps.v1.Deployment(
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 labels={"app": resource_name},
+                annotations=bot_secret_checksum_annotation,
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
                 containers=[

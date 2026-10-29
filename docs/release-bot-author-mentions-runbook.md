@@ -94,10 +94,18 @@ grep -i newhandle release_bot/secrets.production.yaml   # must print nothing
 
 ### 4. Deploy
 
-`pulumi up` on `applications.release_bot.default`. The secret value changes, so
-the Deployment's pod spec changes and the pod restarts; the list is read once at
-boot. `pulumi up` fails fast if the JSON is malformed, rather than shipping a
-pod that logs a parse error and quietly goes back to notifying nobody.
+`pulumi up` on `applications.release_bot.default`. The list reaches the bot as
+an env var, read once at container start, so a running pod only sees an edit
+after it restarts. The Deployment names the Secret by a fixed string, so the
+edit by itself would leave the pod template untouched. A
+`checksum/release-bot-secret` annotation hashes the Secret's contents into the
+pod template, so any change to the list (or to any other value in that Secret)
+changes the template and rolls the pod. The preview should show the Deployment
+updating with `~ annotations`; if it shows only the Secret, the pod will not
+restart.
+
+`pulumi up` fails fast if the JSON is malformed, rather than shipping a pod
+that logs a parse error and quietly goes back to notifying nobody.
 
 ## Verifying
 
