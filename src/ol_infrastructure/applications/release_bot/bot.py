@@ -1477,6 +1477,10 @@ def create_app():
     repos = config.load_repos_config()
     _libraries.update(config.load_libraries_config())
     _unpublishable_libraries.update(config.load_unpublishable_libraries())
+    # Before any handler can run: an author resolved once is cached for a day,
+    # so installing the overrides late would leave the first poll's fallbacks
+    # in place well past boot.
+    slack_users.configure_overrides(config.load_slack_user_overrides())
     app = AsyncApp(token=os.environ["SLACK_BOT_TOKEN"])
     app.command("/doof")(partial(_cmd_doof, repos))
     app.action("promote_production")(partial(_handle_promote_button, repos))
@@ -2015,12 +2019,36 @@ async def _report_unreachable_channels(app, repos) -> None:
         )
 
 
+async def _report_unusable_user_overrides(app) -> None:
+    """Log author overrides pointing at an unmentionable Slack account, at boot.
+
+    Same reasoning as _report_unreachable_channels: the override list exists so
+    that certain authors get a real ping, and a stale or mistyped id in it fails
+    by producing a mention that notifies nobody -- which, read in the channel,
+    is indistinguishable from the bug the list was added to fix.
+    """
+    try:
+        unusable = await slack_users.unusable_overrides(app.client)
+    except Exception:
+        log.exception("Failed to check the Slack user overrides at startup")
+        return
+    if unusable:
+        log.error(
+            "%s SLACK_USER_OVERRIDES entr(ies) point at an account that cannot "
+            "be mentioned, so those authors will be named without being "
+            "notified: %s",
+            len(unusable),
+            "; ".join(unusable),
+        )
+
+
 async def main():
     app, repos = create_app()
     # Channel reachability is checked across every registered app, including
     # the legacy ones: an unresolvable channel is the kind of thing you want
     # to have found before the app is migrated, not on its first release.
     await _report_unreachable_channels(app, repos)
+    await _report_unusable_user_overrides(app)
     watched = config.release_workflow_apps(repos)
     log.info(
         "Polling %s of %s registered app(s) on the release-resource workflow: %s",

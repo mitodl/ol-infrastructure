@@ -3394,3 +3394,81 @@ async def test_a_clean_pass_reports_success(repos, monkeypatch):
     assert await bot._notify_ready_to_promote(MagicMock(), repos) is True
     assert await bot._announce_deployments(MagicMock(), repos, state) is True
     assert await bot._nag_stuck_releases(MagicMock(), repos, state) is True
+
+
+class _FakeSlackError(Exception):
+    """Stand-in for slack_sdk's SlackApiError, which isn't installed here."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.response = {"error": code}
+
+
+class _FakeLookupClient:
+    """Records email lookups so a test can prove none was needed."""
+
+    def __init__(self):
+        self.lookups: list[str] = []
+
+    async def users_lookupByEmail(self, email):  # noqa: N802
+        self.lookups.append(email)
+        raise _FakeSlackError(_NOT_FOUND)
+
+
+async def test_create_app_installs_the_slack_user_overrides(monkeypatch):
+    """The boot wiring, not the resolver, is what makes the overrides real.
+
+    Every slack_users test calls `configure_overrides` itself, so the resolver
+    can be entirely correct while nothing in the running bot ever loads the
+    list -- which is exactly how this shipped broken the first time. Drive
+    `create_app()` and assert the environment reached the module.
+    """
+    # Fresh dicts that monkeypatch puts back, so this test cannot leak an
+    # override or a cached mention into the rest of the suite.
+    monkeypatch.setattr(slack_users, "_overrides", {})
+    monkeypatch.setattr(slack_users, "_cache", {})
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-test")
+    monkeypatch.setenv(
+        "REPOS_CONFIG",
+        '{"my-app": {"pipeline": "my-app-pipeline", "repo": "mitodl/my-app",'
+        ' "branch": "main", "release_workflow": true}}',
+    )
+    monkeypatch.setenv("LIBRARIES_CONFIG", "{}")
+    monkeypatch.setenv("UNPUBLISHABLE_LIBRARIES", "{}")
+    monkeypatch.setenv("SLACK_USER_OVERRIDES", '{"octocat": "UTESTUSER1"}')
+
+    bot.create_app()
+
+    client = _FakeLookupClient()
+    assert (
+        await slack_users.mention(client, "octocat@users.noreply.github.com")
+        == "<@UTESTUSER1>"
+    )
+    assert client.lookups == []
+
+
+async def test_main_reports_unusable_overrides_at_boot(mixed_repos, monkeypatch):
+    """A stale id in the list fails exactly like the bug the list fixes.
+
+    Same reasoning as the channel check above: the report being correct proves
+    nothing if `main()` never calls it.
+    """
+    monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-test")
+    checked = AsyncMock(return_value=[])
+    monkeypatch.setattr(bot, "create_app", lambda: (MagicMock(), mixed_repos))
+    monkeypatch.setattr(bot, "_report_unreachable_channels", AsyncMock())
+    monkeypatch.setattr(slack_users, "unusable_overrides", checked)
+
+    async def _loop(_app, _repos):
+        return
+
+    monkeypatch.setattr(bot, "_poll_ready_to_promote_loop", _loop)
+    monkeypatch.setattr(bot, "_poll_release_progress_loop", _loop)
+    handler = MagicMock()
+    handler.start_async = AsyncMock()
+    monkeypatch.setattr(bot, "AsyncSocketModeHandler", MagicMock(return_value=handler))
+
+    await bot.main()
+    await asyncio.sleep(0)
+
+    checked.assert_awaited_once()

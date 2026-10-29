@@ -12,11 +12,12 @@ Single replica: Socket Mode connections are not multiplexed.
 """
 
 import json
+import re
 from pathlib import Path
 
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, export, log
+from pulumi import Config, export, log, runtime
 
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.apps import APPS
@@ -132,6 +133,61 @@ LIBRARIES_CONFIG = json.dumps(
 # so the bot answers a request for one instead of calling it unknown.
 UNPUBLISHABLE_LIBRARIES_CONFIG = json.dumps(UNPUBLISHABLE_LIBRARIES)
 
+
+# Cuts emails to their local part in the validation errors below: `pulumi up`
+# can run in Concourse, whose build log is more widely readable than the secret.
+def _redact(identity: str) -> str:
+    return identity.split("@", 1)[0] or "(blank)"
+
+
+# Commit identity -> Slack member id, for authors whose commit email isn't their
+# Slack email (slack_users.py). In SOPS rather than bridge.settings because this
+# repo is public, and one JSON string rather than a YAML mapping because SOPS
+# leaves keys in plaintext. Optional, so a bot image newer than the secret boots.
+slack_user_overrides = bot_secrets.get("slack-user-overrides") or ""
+if slack_user_overrides:
+    # Fail `pulumi up` on a bad entry instead of crash-looping the pod (bad JSON)
+    # or dropping it at boot (bad member id). The regex matches
+    # slack_users._SLACK_USER_ID_RE; keep them in step.
+    _overrides = json.loads(slack_user_overrides)
+    if not isinstance(_overrides, dict):
+        msg = (
+            "slack-user-overrides must be a JSON object of identity -> Slack "
+            f"member id, got {type(_overrides).__name__}"
+        )
+        raise TypeError(msg)
+
+    _bad = sorted(
+        _redact(identity)
+        for identity, user_id in _overrides.items()
+        if not identity.strip()
+        or not re.match(r"^[UW][A-Z0-9]{7,}$", str(user_id).strip().lstrip("@").upper())
+    )
+    if _bad:
+        msg = (
+            "slack-user-overrides entries must map an identity to a Slack member "
+            f"id (U… or W…), not a display name, handle, or email: {', '.join(_bad)}"
+        )
+        raise ValueError(msg)
+    # Keys are lowercased at load, so case-only duplicates would drop one.
+    _collisions = sorted(
+        {
+            _redact(identity.strip().lower())
+            for identity in _overrides
+            if sum(
+                other.strip().lower() == identity.strip().lower()
+                for other in _overrides
+            )
+            > 1
+        }
+    )
+    if _collisions:
+        msg = (
+            "slack-user-overrides has entries differing only by case, which "
+            f"collapse into one at load: {', '.join(_collisions)}"
+        )
+        raise ValueError(msg)
+
 resource_name = "release-bot-production"
 namespace = "operations"
 
@@ -149,27 +205,60 @@ image_repository = (
 bot_image_name = format_docker_image_ref(image_repository, "RELEASE_BOT")
 
 secret_resource_name = "release-bot-secret-production"  # pragma: allowlist secret  # noqa: S105
+bot_secret_data = {
+    # The bot token needs "users:read.email" on top of the usual
+    # chat/commands scopes: slack_users.py resolves each commit author's
+    # email to a Slack id so release notifications @-mention real people
+    # instead of pasting addresses. Without the scope the bot logs one
+    # error and degrades to plain-text names. "users:read" is wanted on top
+    # of that, for the boot-time check that every slack-user-overrides
+    # entry still points at a live account.
+    "slack-bot-token": bot_secrets["slack-bot-token"],
+    "slack-app-token": bot_secrets["slack-app-token"],
+    "slack-user-overrides": slack_user_overrides,
+    "concourse-user": bot_secrets["concourse-username"],
+    "concourse-password": bot_secrets["concourse-password"],
+    "github-app-id": str(github_app_id),
+    "github-app-installation-id": str(github_app_installation_id),
+    "github-app-private-key": github_app_private_key,
+}
 bot_secret = kubernetes.core.v1.Secret(
     "release-bot-secret-production",  # pragma: allowlist secret
     metadata=kubernetes.meta.v1.ObjectMetaArgs(
         name=secret_resource_name,
         namespace=namespace,
     ),
-    string_data={
-        # The bot token needs "users:read.email" on top of the usual
-        # chat/commands scopes: slack_users.py resolves each commit author's
-        # email to a Slack id so release notifications @-mention real people
-        # instead of pasting addresses. Without the scope the bot logs one
-        # error and degrades to plain-text names.
-        "slack-bot-token": bot_secrets["slack-bot-token"],
-        "slack-app-token": bot_secrets["slack-app-token"],
-        "concourse-user": bot_secrets["concourse-username"],
-        "concourse-password": bot_secrets["concourse-password"],
-        "github-app-id": str(github_app_id),
-        "github-app-installation-id": str(github_app_installation_id),
-        "github-app-private-key": github_app_private_key,
-    },
+    string_data=bot_secret_data,
 )
+
+
+# Adding a key replaces the Secret, so a preview reports `creation failed:
+# secrets "release-bot-secret-production" already exists`. That's the dry-run
+# create, not a blocked update; #5169 shipped the same way.
+#
+# Env vars are only read at container start, so the pod template carries the
+# Secret's resourceVersion to roll the pod on any Secret change. Not a content
+# checksum: that would put a hash of credentials on the Deployment (CodeQL
+# py/weak-sensitive-data-hashing).
+def _secret_resource_version(metadata) -> str:
+    # "" only in a preview of a replace. After a real apply it would freeze the
+    # annotation and stop rolling the pod, so fail instead.
+    if metadata.resource_version:
+        return metadata.resource_version
+    if runtime.is_dry_run():
+        return ""
+    msg = (
+        "release-bot Secret has no resourceVersion after apply, so the pod "
+        "template cannot track it and Secret edits would not restart the bot"
+    )
+    raise RuntimeError(msg)
+
+
+bot_secret_version_annotation = {
+    "release-bot/secret-resource-version": bot_secret.metadata.apply(
+        _secret_resource_version
+    ),
+}
 
 
 def _secret_env(name: str, key: str) -> kubernetes.core.v1.EnvVarArgs:
@@ -213,6 +302,7 @@ bot_deployment = kubernetes.apps.v1.Deployment(
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 labels={"app": resource_name},
+                annotations=bot_secret_version_annotation,
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
                 containers=[
@@ -222,6 +312,7 @@ bot_deployment = kubernetes.apps.v1.Deployment(
                         env=[
                             _secret_env("SLACK_BOT_TOKEN", "slack-bot-token"),
                             _secret_env("SLACK_APP_TOKEN", "slack-app-token"),
+                            _secret_env("SLACK_USER_OVERRIDES", "slack-user-overrides"),
                             _secret_env("CONCOURSE_USER", "concourse-user"),
                             _secret_env("CONCOURSE_PASSWORD", "concourse-password"),
                             _secret_env("GITHUB_APP_ID", "github-app-id"),
