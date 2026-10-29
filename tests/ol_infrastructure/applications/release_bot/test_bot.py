@@ -1406,15 +1406,25 @@ async def test_a_failed_post_is_retried_on_the_next_poll(repos, slack_app, monke
 # ---------------------------------------------------------------------------
 
 
+# 10:05 ET, inside the daily reminder window.
+_IN_NAG_WINDOW = datetime(2026, 10, 28, 14, 5, tzinfo=UTC)
+
+
+@pytest.fixture
+def _in_nag_window(monkeypatch):
+    monkeypatch.setattr(bot, "_now", lambda: _IN_NAG_WINDOW)
+
+
 def _in_flight(version: str, age: timedelta) -> dict[str, Any]:
     return {
         "version": version,
         "branch": f"releases/{version}",
         "url": f"https://github.com/mitodl/my-app/tree/releases/{version}",
-        "cut_at": datetime.now(tz=UTC) - age,
+        "cut_at": bot._now() - age,
     }
 
 
+@pytest.mark.usefixtures("_in_nag_window")
 async def test_a_young_release_is_not_reported_as_stuck(repos, slack_app, monkeypatch):
     monkeypatch.setattr(
         bot.github,
@@ -1427,7 +1437,7 @@ async def test_a_young_release_is_not_reported_as_stuck(repos, slack_app, monkey
     slack_app.client.chat_postMessage.assert_not_called()
 
 
-@pytest.mark.usefixtures("_no_release_issue")
+@pytest.mark.usefixtures("_no_release_issue", "_in_nag_window")
 async def test_a_release_deployed_to_production_but_unfinished_is_called_out(
     repos, slack_app, monkeypatch
 ):
@@ -1469,7 +1479,7 @@ async def test_a_release_deployed_to_production_but_unfinished_is_called_out(
     assert state.nagged_at[("my-app", "2026.8.3.1")] is not None
 
 
-@pytest.mark.usefixtures("_no_release_issue")
+@pytest.mark.usefixtures("_no_release_issue", "_in_nag_window")
 async def test_a_release_that_never_reached_rc_says_so(repos, slack_app, monkeypatch):
     monkeypatch.setattr(
         bot.github,
@@ -1486,7 +1496,7 @@ async def test_a_release_that_never_reached_rc_says_so(repos, slack_app, monkeyp
     assert "has not reached RC" in text
 
 
-@pytest.mark.usefixtures("_no_release_issue")
+@pytest.mark.usefixtures("_no_release_issue", "_in_nag_window")
 async def test_a_stuck_release_is_not_re_reported_every_poll(
     repos, slack_app, monkeypatch
 ):
@@ -1508,7 +1518,122 @@ async def test_a_stuck_release_is_not_re_reported_every_poll(
     slack_app.client.chat_postMessage.assert_called_once()
 
 
+@pytest.mark.parametrize(
+    ("now", "in_window"),
+    [
+        pytest.param(datetime(2026, 10, 28, 13, 59, tzinfo=UTC), False, id="09:59"),
+        pytest.param(datetime(2026, 10, 28, 14, 0, tzinfo=UTC), True, id="10:00"),
+        pytest.param(datetime(2026, 10, 28, 14, 29, tzinfo=UTC), True, id="10:29"),
+        pytest.param(datetime(2026, 10, 28, 14, 30, tzinfo=UTC), False, id="10:30"),
+        # After the switch to EST, 10:00 ET is 15:00 UTC.
+        pytest.param(datetime(2026, 12, 1, 14, 0, tzinfo=UTC), False, id="est-09:00"),
+        pytest.param(datetime(2026, 12, 1, 15, 0, tzinfo=UTC), True, id="est-10:00"),
+    ],
+)
+def test_the_reminder_window_is_10_to_10_30_eastern(now, in_window):
+    assert (bot._stuck_nag_window_start(now) is not None) == in_window
+
+
+@pytest.mark.parametrize(
+    ("age", "reported"),
+    [
+        # Cut at 14:00 ET the day before: 20h old when the window opens.
+        pytest.param(timedelta(hours=20, minutes=5), True, id="cut-14:00"),
+        pytest.param(timedelta(hours=16, minutes=5), True, id="cut-18:00"),
+        pytest.param(timedelta(hours=15, minutes=5), False, id="cut-19:00"),
+    ],
+)
+@pytest.mark.usefixtures("_no_release_issue", "_in_nag_window")
+async def test_a_release_cut_by_18_00_is_reported_the_next_morning(
+    repos, slack_app, monkeypatch, age, reported
+):
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.10.27.1", age)),
+    )
+    monkeypatch.setattr(
+        bot.github, "latest_successful_deployment", _deployments_by_environment({})
+    )
+
+    await bot._nag_stuck_releases(slack_app, repos, bot.ReleaseProgressState())
+
+    assert slack_app.client.chat_postMessage.called == reported
+
+
 @pytest.mark.usefixtures("_no_release_issue")
+async def test_a_restart_outside_the_window_does_not_re_report(
+    repos, slack_app, monkeypatch
+):
+    """The xpro 2026.10.27.1 repeats: each new pod re-posted on its first poll.
+
+    A fresh state is what a restarted bot has. Outside the window it says
+    nothing, and does not even ask GitHub.
+    """
+    monkeypatch.setattr(bot, "_now", lambda: datetime(2026, 10, 28, 17, 35, tzinfo=UTC))
+    in_flight = AsyncMock(return_value=_in_flight("2026.10.27.1", timedelta(days=1)))
+    monkeypatch.setattr(bot.github, "in_flight_release", in_flight)
+
+    assert (
+        await bot._nag_stuck_releases(slack_app, repos, bot.ReleaseProgressState())
+        is True
+    )
+
+    slack_app.client.chat_postMessage.assert_not_called()
+    in_flight.assert_not_called()
+
+
+@pytest.mark.usefixtures("_no_release_issue")
+async def test_a_stuck_release_is_reported_again_the_next_day(
+    repos, slack_app, monkeypatch
+):
+    cut_at = _IN_NAG_WINDOW - timedelta(days=2)
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(
+            return_value=dict(_in_flight("2026.9.1.1", timedelta()), cut_at=cut_at)
+        ),
+    )
+    monkeypatch.setattr(
+        bot.github, "latest_successful_deployment", _deployments_by_environment({})
+    )
+    state = bot.ReleaseProgressState()
+
+    for now in (
+        _IN_NAG_WINDOW,
+        _IN_NAG_WINDOW + timedelta(minutes=10),
+        _IN_NAG_WINDOW + timedelta(days=1),
+    ):
+        monkeypatch.setattr(bot, "_now", lambda now=now: now)
+        await bot._nag_stuck_releases(slack_app, repos, state)
+
+    assert slack_app.client.chat_postMessage.call_count == 2
+
+
+@pytest.mark.usefixtures("_no_release_issue", "_in_nag_window")
+async def test_a_failed_reminder_is_retried_within_the_window(
+    repos, slack_app, monkeypatch
+):
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.9.1.1", timedelta(days=2))),
+    )
+    monkeypatch.setattr(
+        bot.github, "latest_successful_deployment", _deployments_by_environment({})
+    )
+    slack_app.client.chat_postMessage.side_effect = [RuntimeError("slack down"), None]
+    state = bot.ReleaseProgressState()
+
+    assert await bot._nag_stuck_releases(slack_app, repos, state) is False
+    assert await bot._nag_stuck_releases(slack_app, repos, state) is True
+
+    assert slack_app.client.chat_postMessage.call_count == 2
+    assert ("my-app", "2026.9.1.1") in state.nagged_at
+
+
+@pytest.mark.usefixtures("_no_release_issue", "_in_nag_window")
 async def test_the_stuck_threshold_is_configurable(repos, slack_app, monkeypatch):
     monkeypatch.setenv("RELEASE_STUCK_AFTER_HOURS", "1")
     monkeypatch.setattr(
@@ -1527,6 +1652,7 @@ async def test_the_stuck_threshold_is_configurable(repos, slack_app, monkeypatch
 
 async def _nag_stuck(repos, slack_app, monkeypatch, deployed_to, issue):
     """Report 2026.9.2.1, cut 3d ago and deployed to *deployed_to*; return the text."""
+    monkeypatch.setattr(bot, "_now", lambda: _IN_NAG_WINDOW)
     slack_app.client = _slack_client(
         {"alice@example.com": "UALICE", "bob@example.com": "UBOB"}
     )
