@@ -41,7 +41,9 @@ tier, so this is one graph keeping every witan user offline for an hour in a
 planned run, and twice the runbook's 1,800s per-command timeout for clearing
 a backlog. Past it a long run stops being a reasonable way to clean that graph,
 and the choice is between rebuilding it and waiting for upstream
-(tk-decide-how-to-bound-omnigraph-cleanup-planning-w-d9fa8f). On the
+(tk-decide-how-to-bound-omnigraph-cleanup-planning-w-d9fa8f). Decided
+2026-10-28: rebuild a derived graph, and leave council for upstream. The
+runbook section ``_RUNBOOK_URL`` links has the procedure. On the
 2026-10-28 numbers council is at 2,050s and gained about 800 versions a day
 averaged over 2026-10-22 to 10-27, so at that rate it fires in Production
 around 2026-11-06, and ol-data-platform (about 770 a day) around 11-08. That firing is the signal this
@@ -113,6 +115,11 @@ _SAMPLE_WINDOW = "2h"
 
 _ROUTING = {"channel": "devops-warnings", "severity": "warning"}
 
+_RUNBOOK_URL = (
+    "https://github.com/mitodl/ol-infrastructure/blob/main/docs/"
+    "omnigraph-store-maintenance-runbook.md#when-a-graphs-cleanup-plan-is-over-budget"
+)
+
 _BUDGET_SUMMARY = (
     "omnigraph graph {{ $labels.graph }} in {{ $labels.cluster }} would take"
     " over an hour to plan a cleanup"
@@ -130,11 +137,10 @@ _BUDGET_DESCRIPTION = (
     " Read the counts with"
     ' `{namespace="omnigraph", container="count-versions"} |='
     ' "graph={{ $labels.graph }} "`: manifest_versions cannot be reduced by any'
-    " cleanup, table_versions can. A derived code-* graph can be rebuilt by"
-    " dropping it and reindexing. For council, see"
-    " tk-decide-how-to-bound-omnigraph-cleanup-planning-w-d9fa8f and"
-    ' docs/omnigraph-store-maintenance-runbook.md ("Clearing a cleanup'
-    ' backlog") before planning a long run.'
+    " cleanup, table_versions can. Until upstream bounds cleanup planning, a"
+    " derived graph (code-bridge, code-<repo>) is rebuilt and reindexed rather"
+    " than cleaned, and council waits for upstream. Procedure, downtime and"
+    f" how to confirm the reset: {_RUNBOOK_URL}"
 )
 
 _GROWTH_SUMMARY = (
@@ -217,6 +223,7 @@ def create(
                 annotations={
                     "summary": _BUDGET_SUMMARY,
                     "description": _BUDGET_DESCRIPTION,
+                    "runbook_url": _RUNBOOK_URL,
                 },
                 datas=rd(_plan_budget_expr(_NON_PROD_CLUSTERS)),
             ),
@@ -230,6 +237,7 @@ def create(
                 annotations={
                     "summary": _BUDGET_SUMMARY,
                     "description": _BUDGET_DESCRIPTION,
+                    "runbook_url": _RUNBOOK_URL,
                 },
                 datas=rd(_plan_budget_expr(_PROD_CLUSTERS)),
             ),
