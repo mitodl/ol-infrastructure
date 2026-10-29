@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import pulumi_kubernetes as k8s
 import requests
 import yaml as pyyaml
-from pulumi import ResourceOptions
+from pulumi import Alias, ResourceOptions, get_project, get_stack
 
 from bridge.lib.versions import (
     OPENSEARCH_CHART_VERSION,
@@ -41,7 +41,7 @@ def tika_image_tag() -> str:
 
 @dataclass
 class SearchResources:
-    qdrant: k8s.apps.v1.Deployment
+    qdrant: k8s.apps.v1.StatefulSet
     opensearch: k8s.helm.v3.Release
     tika: k8s.apps.v1.Deployment
 
@@ -57,12 +57,20 @@ def create_search(
 
     Qdrant's bundled web UI is exposed at https://{qdrant_hostname}/dashboard.
     """
-    qdrant = k8s.apps.v1.Deployment(
+    # A StatefulSet with a volume claim, like OpenSearch and RustFS, rather than
+    # a Deployment with an emptyDir: a container restart keeps an
+    # emptyDir, but any edit to the pod template (image bump, limit change)
+    # replaces the pod and empties it, and rebuilding mit-learn's collections
+    # takes about three minutes of generate_embeddings each time. A
+    # StatefulSet also stops the old pod before starting the new one, so two
+    # Qdrants never share the storage directory.
+    qdrant = k8s.apps.v1.StatefulSet(
         "qdrant",
         metadata={"name": "qdrant", "namespace": "local-infra"},
         spec={
             "replicas": 1,
             "selector": {"matchLabels": {"app": "qdrant"}},
+            "serviceName": "qdrant",
             "template": {
                 "metadata": {"labels": {"app": "qdrant"}},
                 "spec": {
@@ -103,6 +111,10 @@ def create_search(
                                 {"containerPort": 6333, "name": "http"},
                                 {"containerPort": 6334, "name": "grpc"},
                             ],
+                            # Tight on purpose: idle Qdrant uses ~180Mi, so a
+                            # limit near real use turns a memory regression into
+                            # an OOMKill someone notices rather than a slow
+                            # creep.
                             "resources": {
                                 "limits": {"memory": "512Mi"},
                             },
@@ -114,9 +126,17 @@ def create_search(
                             ],
                         }
                     ],
-                    "volumes": [{"name": "qdrant-storage", "emptyDir": {}}],
                 },
             },
+            "volumeClaimTemplates": [
+                {
+                    "metadata": {"name": "qdrant-storage"},
+                    "spec": {
+                        "accessModes": ["ReadWriteOnce"],
+                        "resources": {"requests": {"storage": "5Gi"}},
+                    },
+                }
+            ],
         },
         opts=_k8s(parent=local_infra_ns),
     )
@@ -131,7 +151,21 @@ def create_search(
                 {"name": "grpc", "port": 6334, "targetPort": 6334},
             ],
         },
-        opts=_k8s(parent=qdrant),
+        opts=_k8s(parent=qdrant).merge(
+            # The parent's type is part of the URN, so on a cluster whose
+            # Service was created under the Deployment, Pulumi would otherwise
+            # see a new resource and fail creating a second Service of the
+            # same name.
+            ResourceOptions(
+                aliases=[
+                    Alias(
+                        parent=f"urn:pulumi:{get_stack()}::{get_project()}::"
+                        "kubernetes:core/v1:Namespace$kubernetes:apps/v1:Deployment"
+                        "::qdrant"
+                    )
+                ]
+            )
+        ),
     )
 
     # The dashboard ships inside the Qdrant image and is served by the same
