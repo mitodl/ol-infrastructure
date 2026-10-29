@@ -98,11 +98,14 @@ grep -i newhandle release_bot/secrets.production.yaml   # must print nothing
 an env var, read once at container start, so a running pod only sees an edit
 after it restarts. The Deployment names the Secret by a fixed string, so the
 edit by itself would leave the pod template untouched. A
-`checksum/release-bot-secret` annotation hashes the Secret's contents into the
-pod template, so any change to the list (or to any other value in that Secret)
-changes the template and rolls the pod. The preview should show the Deployment
-updating with `~ annotations`; if it shows only the Secret, the pod will not
-restart.
+`release-bot/secret-resource-version` annotation copies the Secret's
+`resourceVersion` onto the pod template, so any change to the list (or to any
+other value in that Secret) changes the template and rolls the pod. The
+preview should show the Deployment updating, with that annotation's value
+shown as `""`. That is expected: the version is assigned when the Secret is
+written, which a preview doesn't do, and `pulumi up` fails rather than apply
+an empty one. If the preview shows only the Secret changing and no Deployment
+update, the pod will not restart.
 
 `pulumi up` fails fast if the JSON is malformed, rather than shipping a pod
 that logs a parse error and quietly goes back to notifying nobody.

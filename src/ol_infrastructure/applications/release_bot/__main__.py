@@ -11,14 +11,13 @@ The bot uses Slack Socket Mode (outbound WebSocket) — no Service or Ingress re
 Single replica: Socket Mode connections are not multiplexed.
 """
 
-import hashlib
 import json
 import re
 from pathlib import Path
 
 import pulumi_aws as aws
 import pulumi_kubernetes as kubernetes
-from pulumi import Config, export, log
+from pulumi import Config, export, log, runtime
 
 from bridge.secrets.sops import read_yaml_secrets
 from bridge.settings.apps import APPS
@@ -246,6 +245,8 @@ bot_secret = kubernetes.core.v1.Secret(
     ),
     string_data=bot_secret_data,
 )
+
+
 # Adding a key here replaces the Secret rather than updating it, so a preview
 # reports `creation failed: secrets "release-bot-secret-production" already
 # exists`. That is the provider dry-running the create while the original is
@@ -258,15 +259,40 @@ bot_secret = kubernetes.core.v1.Secret(
 # value -- an edit to slack-user-overrides, a token rotation -- replaces the
 # Secret and leaves the pod template untouched. `pulumi up` would report
 # success and the bot would keep the old values until something else restarted
-# it. Hashing the contents into a pod-template annotation makes any change here
-# roll the pod, the same way the checksum/ol-* annotations in the dagster stack
-# do. Hashed together rather than per key: an annotation is readable by anyone
-# who can read the Deployment, and the high-entropy tokens keep the digest from
-# being a fingerprint someone could test a guessed override list against.
-bot_secret_checksum_annotation = {
-    "checksum/release-bot-secret": hashlib.sha256(
-        json.dumps(bot_secret_data, sort_keys=True).encode()
-    ).hexdigest(),
+# it. Stamping the Secret's resourceVersion onto the pod template makes any
+# change here roll the pod: Kubernetes bumps it on every write, so it moves
+# whether the provider replaces the Secret (its default for a data change) or
+# updates it in place (enable_secret_mutable).
+#
+# Deliberately not a checksum of the contents, the way the dagster stack's
+# checksum/ol-* annotations are. Those hash config; this would hash credentials
+# into an object readable by anyone who can read the Deployment, which is a
+# wider audience than can read the Secret. CodeQL flagged exactly that
+# (py/weak-sensitive-data-hashing), and the resourceVersion needs none of the
+# values to do the same job. Reading it from the Secret's outputs also makes
+# the Deployment depend on the Secret, so the update cannot land first.
+def _secret_resource_version(metadata) -> str:
+    # A preview reports this as "": the Secret is being replaced, and the
+    # dry-run create cannot run while the original still exists, so no server
+    # has assigned a version yet. A real apply always has one. If it ever did
+    # not, every later edit would leave the annotation at "" and stop rolling
+    # the pod -- the silent failure this annotation exists to prevent -- so
+    # fail the update instead.
+    if metadata.resource_version:
+        return metadata.resource_version
+    if runtime.is_dry_run():
+        return ""
+    msg = (
+        "release-bot Secret has no resourceVersion after apply, so the pod "
+        "template cannot track it and Secret edits would not restart the bot"
+    )
+    raise RuntimeError(msg)
+
+
+bot_secret_version_annotation = {
+    "release-bot/secret-resource-version": bot_secret.metadata.apply(
+        _secret_resource_version
+    ),
 }
 
 
@@ -311,7 +337,7 @@ bot_deployment = kubernetes.apps.v1.Deployment(
         template=kubernetes.core.v1.PodTemplateSpecArgs(
             metadata=kubernetes.meta.v1.ObjectMetaArgs(
                 labels={"app": resource_name},
-                annotations=bot_secret_checksum_annotation,
+                annotations=bot_secret_version_annotation,
             ),
             spec=kubernetes.core.v1.PodSpecArgs(
                 containers=[
