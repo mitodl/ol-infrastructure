@@ -1221,9 +1221,8 @@ vault.generic.Secret(
 # ViewAll on eventsubscription, which every user holds through the default
 # policies, so the webhook URL is readable inside OpenMetadata.
 #
-# Each environment's webhook posts to the data platform Slack channel Dagster
-# uses for that environment: notifications-data-platform in Production and
-# notifications-data-platform-qa in QA.
+# QA and Production hold the same webhook, so both environments' contract
+# failures post to one channel.
 _alert_secrets = read_yaml_secrets(
     Path(f"open_metadata/secrets.{stack_info.env_suffix}.yaml")
 )
