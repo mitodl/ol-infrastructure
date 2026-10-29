@@ -719,27 +719,26 @@ are local numbers with Ollama embeddings; they have not been re-measured on RDS 
 embeddings.
 
 QA end to end (2026-10-29, `tk-hindsight-qa-retain-and-recall-with-an-exchanged-8c044f`). Run
-with an earlier revision of `scripts/hindsight/qa_check.py --forget` against the deployed QA
-service (RDS, Cohere Embed v4 on Bedrock) and the QA `olapps` realm, with a real learner login
-through `ol-mitlearn-client`. All 13 of its checks passed:
+with `scripts/hindsight/qa_check.py --forget` against the deployed QA service (RDS, Cohere
+Embed v4 on Bedrock) and the QA `olapps` realm, with a real learner login through
+`ol-mitlearn-client`. 15 of 15 checks passed:
 
 - The session token's `aud` names `ol-learn-ai-client` and `ol-mitlearn-memory-client`. It
-  carries no `sub` (a first run failed reading it), since `ol-mitlearn-client` has no `basic`
-  scope.
+  carries a `sid` and no `sub`, since `ol-mitlearn-client` has no `basic` scope.
 - Exchanging it as `ol-learn-ai-client` and as `ol-mitlearn-memory-client` gives tokens with
-  the same `sub` and the session's `sid`, `azp` set to the exchanging client, and `aud`
+  the same `sub` and the login's `sid`, `azp` set to the exchanging client, and `aud`
   `ol-memory-client`. Neither exchanging client carries `basic`, so that `sub` comes from the
   `sub` mapper on the `ol-memory-audience` scope.
-- The un-exchanged session token gets 401. A learn-ai retain with tag `app:learn-ai` lands in
-  `u-<sub>`, reads back with that tag, and recall finds it.
+- The un-exchanged session token gets 401. A learn-ai retain lands in `u-<sub>` under document
+  id `learn-ai.<key>` with `app:learn-ai` as its only app tag, and recall finds it.
 - mit-learn reads the note. Its overwrite and delete of it get 403, and the note is unchanged.
-- The admin client's forget removed 1 row and deleted the bank, after which learn-ai lists no
-  notes. A learn-ai write after it gets 409 from the fence.
+- The admin client's forget removed 1 row and deleted the bank (learn-ai's list then gets 404).
+  A learn-ai write after it gets 409 from the fence.
 
-The run was made from a workstation through a port-forward. It used a token from a direct
-code exchange, not one APISIX forwarded to a learn-ai pod, and it did not measure latency.
-The committed script asserts more than the run did: that the session token has no `sub` and
-a `sid`, that the note's document id is `learn-ai.<key>`, and that forget leaves a 404.
+An earlier run in the same session also showed the fence holding the bank: a retain about 13
+minutes after the forget got 409. The runs were made from a workstation through a port-forward,
+with a token from a direct code exchange rather than one APISIX forwarded to a learn-ai pod,
+and they did not measure latency.
 
 Proposal. Split the decision by category rather than picking one backend for all of
 memory:
