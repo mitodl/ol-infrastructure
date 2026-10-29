@@ -2,6 +2,9 @@
 
 from typing import Any
 
+import pytest
+from pydantic import ValidationError
+
 from ol_infrastructure.infrastructure.aws.eks.apisix_definition import (
     ApisixGatewayConfig,
     ApisixGatewayService,
@@ -29,7 +32,13 @@ def _single_pod(**overrides: Any) -> ApisixGatewayConfig:
         service=ApisixGatewayService(
             type="NodePort", http_node_port=30080, tls_node_port=30443
         ),
-        **overrides,
+        **{
+            "high_availability": None,
+            "otel_collector_address": None,
+            "service_monitor_enabled": False,
+            "admission_webhook_enabled": True,
+            **overrides,
+        },
     )
 
 
@@ -48,6 +57,7 @@ def _fleet() -> ApisixGatewayConfig:
         trusted_addresses=["192.0.2.0/24"],
         otel_collector_address="collector.example:4318",
         service_monitor_enabled=True,
+        admission_webhook_enabled=True,
     )
 
 
@@ -137,3 +147,20 @@ def test_admission_webhook_is_on_unless_turned_off():
     assert apisix_helm_values(_single_pod(admission_webhook_enabled=False))[
         "ingress-controller"
     ]["webhook"] == {"enabled": False}
+
+
+def test_cluster_capabilities_must_be_stated():
+    with pytest.raises(ValidationError) as raised:
+        ApisixGatewayConfig(
+            env_suffix="dev",
+            admin_key="admin",  # pragma: allowlist secret
+            viewer_key="viewer",  # pragma: allowlist secret
+            service=ApisixGatewayService(type="NodePort"),
+        )
+    missing = {error["loc"][0] for error in raised.value.errors()}
+    assert missing == {
+        "high_availability",
+        "otel_collector_address",
+        "service_monitor_enabled",
+        "admission_webhook_enabled",
+    }

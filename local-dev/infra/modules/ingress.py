@@ -103,6 +103,15 @@ def create_ingress(  # noqa: PLR0913
         # sessions), crash-looping the gateway and dropping all app auth.
         # The deployed default is double the 400Mi request, 800Mi.
         memory_limit="1Gi",
+        # One pod, so none of the deployed fleet settings (HPA, spreading,
+        # drain-first rollout, PDB).
+        high_availability=None,
+        # local-dev runs its own Alloy receiver, but nothing sends APISIX
+        # traces to it yet; the mitxonline program also keeps OpenTelemetry
+        # off.
+        otel_collector_address=None,
+        # No Prometheus operator, so no ServiceMonitor CRD.
+        service_monitor_enabled=False,
         # Lets openid-connect verify Keycloak's mkcert certificate with the
         # deployed default ssl_verify=true (see tls.py).
         trusted_ca=ApisixTrustedCA(

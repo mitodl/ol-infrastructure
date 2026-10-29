@@ -260,7 +260,14 @@ class ApisixTrustedCA(BaseModel):
 
 
 class ApisixGatewayConfig(BaseModel):
-    """Everything about the gateway that depends on where it runs."""
+    """Everything about the gateway that depends on where it runs.
+
+    What the cluster provides (high_availability, otel_collector_address,
+    service_monitor_enabled, admission_webhook_enabled) has no default, so a
+    new caller states each one rather than inheriting EKS or bare-cluster
+    behaviour by accident. Sizing defaults are the deployed values, which
+    local-dev shares on purpose.
+    """
 
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
@@ -268,7 +275,7 @@ class ApisixGatewayConfig(BaseModel):
     admin_key: str | Output[str]
     viewer_key: str | Output[str]
     service: ApisixGatewayService
-    high_availability: ApisixHighAvailability | None = None
+    high_availability: ApisixHighAvailability | None
     ingress_controller_replicas: int = 1
     cpu_request: str = DEFAULT_CPU_REQUEST
     memory_request: str = DEFAULT_MEMORY_REQUEST
@@ -287,16 +294,16 @@ class ApisixGatewayConfig(BaseModel):
     # host:port of an OTLP/HTTP collector to export traces to; None turns
     # tracing off. The opentelemetry plugin only speaks binary OTLP over HTTP
     # and appends /v1/traces itself.
-    otel_collector_address: str | None = None
+    otel_collector_address: str | None
     # Needs the Prometheus operator's ServiceMonitor CRD.
-    service_monitor_enabled: bool = False
+    service_monitor_enabled: bool
     # The ingress controller's validating webhook checks a route's
     # plugin_config_name against its informer cache, so a PluginConfig and a
     # route naming it that are created together can have the route denied
     # until the cache catches up. Deployed stacks are safe today because their
     # PluginConfigs already exist; OLApisixRoute names the PluginConfig by a
     # plain string, so Pulumi does not order a new pair either.
-    admission_webhook_enabled: bool = True
+    admission_webhook_enabled: bool
     trusted_ca: ApisixTrustedCA | None = None
     pod_annotations: dict[str, str] | None = None
 

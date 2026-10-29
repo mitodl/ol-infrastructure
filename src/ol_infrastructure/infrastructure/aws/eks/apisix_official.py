@@ -163,6 +163,7 @@ def setup_apisix(
             else GRAFANA_ALLOY_OTLP_HTTP_ADDRESS
         ),
         service_monitor_enabled=True,
+        admission_webhook_enabled=True,
         cpu_request=eks_config.get("apisix_cpu") or DEFAULT_CPU_REQUEST,
         memory_request=eks_config.get("apisix_memory") or DEFAULT_MEMORY_REQUEST,
         memory_limit=eks_config.get("apisix_memory_limit"),
