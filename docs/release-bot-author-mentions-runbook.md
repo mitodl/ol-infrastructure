@@ -108,7 +108,7 @@ an empty one. If the preview shows only the Secret changing and no Deployment
 update, the pod will not restart.
 
 `pulumi up` fails fast if the JSON is malformed, rather than shipping a pod
-that logs a parse error and quietly goes back to notifying nobody.
+that cannot parse it.
 
 ## Verifying
 

@@ -157,14 +157,10 @@ def _redact(identity: str) -> str:
 # exactly as it did before any of this existed.
 slack_user_overrides = bot_secrets.get("slack-user-overrides") or ""
 if slack_user_overrides:
-    # Fail at `pulumi up` rather than shipping a pod that logs an error and
-    # quietly goes back to notifying nobody. The runtime loader degrades to "no
-    # overrides" on anything malformed, which is the right behaviour for a
-    # running bot and the wrong one for a deploy: checking the same three
-    # things here (object, non-empty keys, member-id-shaped values) means the
-    # realistic edits -- a stray list, a display name pasted into a value --
-    # are caught by the person making them. The regex is the one in
-    # slack_users._SLACK_USER_ID_RE; keep them in step.
+    # bot_config parses this as is, so malformed JSON would crash-loop the pod.
+    # Checking it here, along with the realistic edits -- a stray list, a
+    # display name pasted into a value -- fails `pulumi up` instead. The regex
+    # is the one in slack_users._SLACK_USER_ID_RE; keep them in step.
     _overrides = json.loads(slack_user_overrides)
     if not isinstance(_overrides, dict):
         msg = (

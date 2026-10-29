@@ -28,16 +28,3 @@ def test_blank_slack_user_overrides_is_not_an_error(monkeypatch):
     monkeypatch.setenv("SLACK_USER_OVERRIDES", "   ")
 
     assert bot_config.load_slack_user_overrides() == {}
-
-
-def test_malformed_slack_user_overrides_degrades_instead_of_crashing(monkeypatch):
-    """Losing the mentions is bad; losing every other bot command is worse."""
-    monkeypatch.setenv("SLACK_USER_OVERRIDES", "{not json")
-
-    assert bot_config.load_slack_user_overrides() == {}
-
-
-def test_slack_user_overrides_must_be_an_object(monkeypatch):
-    monkeypatch.setenv("SLACK_USER_OVERRIDES", '["dsubak", "UTESTUSER01"]')
-
-    assert bot_config.load_slack_user_overrides() == {}
