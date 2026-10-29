@@ -30,6 +30,7 @@ from pulumi import (
 from pulumi_aws import get_caller_identity, iam
 
 from bridge.lib.versions import OPEN_METADATA_VERSION
+from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.lib import pulumi_projects as projects
 from ol_infrastructure.lib.aws.eks_helper import setup_k8s_provider
@@ -43,9 +44,13 @@ from ol_infrastructure.lib.ol_types import AWSBase
 from ol_infrastructure.lib.pulumi_helper import parse_stack, stack_ref
 from ol_infrastructure.lib.vault import setup_vault_provider
 from ol_infrastructure.providers.openmetadata import (
+    AlertArgument,
+    AlertCondition,
     OpenMetadataBot,
     OpenMetadataBotSpec,
     OpenMetadataConnection,
+    OpenMetadataEventSubscription,
+    OpenMetadataEventSubscriptionSpec,
 )
 from ol_infrastructure.providers.openmetadata.access_control import (
     OpenMetadataPolicy,
@@ -1193,6 +1198,55 @@ vault.generic.Secret(
     data_json=Output.json_dumps(
         {"token": metrics_sync_bot.token, "server_url": om_api_url}
     ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Alerts
+# ---------------------------------------------------------------------------
+# A contract's status is the one result OpenMetadata alone produces: it fails on
+# a missing contracted column or a failed semantics rule after ingestion. Test
+# case failures are not alerted here, because Dagster already posts both kinds
+# to the same channel: a dbt test failing past its error_if threshold fails its
+# run (run failure sensor), and a failing Dagster check is posted by
+# asset_check_failure_sensor. A dbt test that only warns is reported by neither.
+#
+# The filter matches every change event of a contract whose latest result is
+# Failed, so a contract that stays failing is posted again on each daily
+# validation. Aborted is left out: OpenMetadata sets it when a newer validation
+# supersedes a running one or the quality run cannot be triggered, neither of
+# which says the contract failed.
+#
+# OpenMetadata returns a Slack destination's endpoint unmasked to anyone with
+# ViewAll on eventsubscription, which every user holds through the default
+# policies, so the webhook URL is readable inside OpenMetadata.
+#
+# QA and Production hold the same webhook, so both environments' contract
+# failures post to one channel.
+_alert_secrets = read_yaml_secrets(
+    Path(f"open_metadata/secrets.{stack_info.env_suffix}.yaml")
+)
+
+OpenMetadataEventSubscription(
+    f"om-alert-data-contract-failures-{stack_info.env_suffix}",
+    connection=om_connection,
+    spec=OpenMetadataEventSubscriptionSpec(
+        name="data-contract-failures",
+        display_name="Data contract failures",
+        description=(
+            "Posts to Slack when a data contract's latest result is Failed."
+            " Managed by Pulumi in ol-infrastructure substructure/open_metadata."
+        ),
+        alert_type="Observability",
+        resource="dataContract",
+        actions=[
+            AlertCondition(
+                name="GetDataContractStatusUpdates",
+                arguments=[AlertArgument(name="contractStatusList", input=["Failed"])],
+            )
+        ],
+    ),
+    slack_webhook_url=_alert_secrets["slack_notifications_data_platform"],
 )
 
 
