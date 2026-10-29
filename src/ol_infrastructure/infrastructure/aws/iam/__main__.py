@@ -167,6 +167,7 @@ evaluation_gate_bedrock_policy = {
         account_id,
         inference_profiles=[
             "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+            "us.anthropic.claude-haiku-5-5",
             "us.anthropic.claude-sonnet-5",
         ],
     ),
