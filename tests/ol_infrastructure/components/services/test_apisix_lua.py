@@ -21,6 +21,7 @@ from ol_infrastructure.components.services.apisix import (
     OIDC_RECOVERY_SHARED_DICT,
     gateway_global_pre_function_plugin,
     oidc_gateway_pre_function_plugin,
+    stale_session_cookie_cleanup_plugin,
 )
 
 # Stubs the generated function's whole world: the two ngx.var reads, the
@@ -701,3 +702,73 @@ def test_per_application_attachment_is_not_scoped_to_oidc_routes():
     uri, _ = OriginHarness().request(scheme="http", route_plugins={})
 
     assert uri == "https://learn.mit.edu/"
+
+
+# ─── Stale session cookie cleanup ──────────────────────────────────────────────
+
+CLEANUP_STUBS = """
+local added = {}
+
+package.loaded["apisix.core"] = {
+    response = {
+        add_header = function(_, value) table.insert(added, value) end,
+    },
+}
+
+ngx = { var = {} }
+
+function run_cleanup(fn, cookie_header)
+    added = {}
+    ngx.var.http_cookie = cookie_header
+    fn({}, {})
+    return added
+end
+"""
+
+
+def cleanup_set_cookies(cookie_header: str, **plugin_kwargs) -> list[str]:
+    """Return the Set-Cookie values the cleanup function adds for a request."""
+    lua = lupa.LuaRuntime(unpack_returned_tuples=True)
+    lua.execute(CLEANUP_STUBS)
+    (source,) = stale_session_cookie_cleanup_plugin(**plugin_kwargs).config["functions"]
+    return list(lua.globals().run_cleanup(lua.execute(source), cookie_header).values())
+
+
+def expired_cookie_names(cookie_header: str) -> set[str]:
+    """Return the cookie names the cleanup function deletes for a request."""
+    return {header.split("=", 1)[0] for header in cleanup_set_cookies(cookie_header)}
+
+
+def test_cleanup_expires_lua_resty_session_4_chunks():
+    """4.x names chunks <name>2, <name>3 with no separator."""
+    assert expired_cookie_names("session=a; session2=b; session3=c") == {
+        "session",
+        "session2",
+        "session3",
+    }
+
+
+def test_cleanup_expires_lua_resty_session_3_chunks():
+    """APISIX up to 3.14.1 bundled 3.x, which named chunks <name>_2."""
+    assert expired_cookie_names("session=a; session_2=b") == {
+        "session",
+        "session_2",
+    }
+
+
+def test_cleanup_leaves_cookies_that_only_share_the_prefix():
+    """Only the stale name itself and its numbered chunks are expired."""
+    cookies = (
+        "sessionid=a; session_other=b; session2x=c; "
+        "mitlearn_apisix_session=d; mitlearn_apisix_session2=e"
+    )
+
+    assert expired_cookie_names(cookies) == set()
+
+
+def test_cleanup_emits_one_deletion_per_scope_for_each_chunk():
+    """Each chunk is its own (name, domain, path) entry in every scope."""
+    added = cleanup_set_cookies("session2=b", cookie_domains=[".learn.mit.edu"])
+
+    assert len(added) == 2
+    assert all(header.startswith("session2=;") for header in added)
