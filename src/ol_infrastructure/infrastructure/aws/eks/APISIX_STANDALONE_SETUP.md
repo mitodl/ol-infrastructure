@@ -1,7 +1,7 @@
 # Apache APISIX Standalone Mode Setup
 
 **Last Updated:** October 29, 2025 (17:28 UTC)
-**Configuration File:** `apisix_official.py`
+**Configuration Files:** `apisix_official.py`, with the chart values in `apisix_definition.py` (shared with local-dev)
 **Chart Version:** 2.12.2 (APISIX 3.14.1)
 **Deployment Status:** ✅ Fully Operational
 

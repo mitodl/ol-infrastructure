@@ -88,6 +88,31 @@ INDEX_ACTIVE_DEADLINE_SECONDS = 3 * 60 * 60
 # real reason.
 INDEX_BACKOFF_LIMIT = 1
 
+# WorkloadJobFailed* fires for as long as a failed Job object exists, and
+# without a TTL the CronJob keeps up to `failed_jobs_history_limit` of them
+# until newer failures displace them. On 2026-10-22 operations-qa was still
+# holding the failed Jobs from 10-08, 10-09 and 10-11, and kept them until new
+# failures on 10-23 pushed them out. A day outlives the next run at the
+# default 4h cadence (start up to the starting deadline late, then up to the
+# active deadline), so consecutive failures stay one continuous alert, and it
+# leaves a failed Job and its pod around for a working day of `kubectl
+# describe`. The container logs are in Loki either way. As of 2026-10-28 the
+# indexer is still excluded from WorkloadJobFailed* (eks_general.py), so this
+# matters once that exclusion is removed.
+INDEX_TTL_SECONDS_AFTER_FINISHED = 24 * 60 * 60
+
+# On-demand, not the Karpenter spot fleet. The indexer's memory request often
+# fits no existing node (32 of the 53 indexer pods scheduled in operations-qa
+# in the 7 days to 2026-10-28 waited for Karpenter to launch one), and a fresh
+# spot node often receives an EC2 rebalance recommendation within its first
+# minute. aws-node-termination-handler drains on those
+# (`enableRebalanceDraining`), evicting the indexer mid-clone. All 26 indexer
+# pod evictions in operations-qa in that window were that drain, and every
+# failed QA Job had both of its attempts evicted. Same selector, and the same
+# do-not-disrupt annotation on the pod, as open_metadata's `long_running`
+# workflow pods.
+INDEX_NODE_SELECTOR = {"karpenter.sh/capacity-type": "on-demand"}
+
 
 def create_ci_indexer(  # noqa: PLR0913
     stack_info: StackInfo,
@@ -302,15 +327,21 @@ def create_ci_indexer(  # noqa: PLR0913
                 spec=kubernetes.batch.v1.JobSpecArgs(
                     backoff_limit=INDEX_BACKOFF_LIMIT,
                     active_deadline_seconds=INDEX_ACTIVE_DEADLINE_SECONDS,
+                    ttl_seconds_after_finished=INDEX_TTL_SECONDS_AFTER_FINISHED,
                     template=kubernetes.core.v1.PodTemplateSpecArgs(
                         metadata=kubernetes.meta.v1.ObjectMetaArgs(
                             labels={
                                 **k8s_global_labels,
                                 "app.kubernetes.io/name": "witan-ci-indexer",
                             },
+                            # Karpenter still consolidates on-demand nodes. A
+                            # run it evicts starts over from scratch, and two
+                            # evictions use up INDEX_BACKOFF_LIMIT.
+                            annotations={"karpenter.sh/do-not-disrupt": "true"},
                         ),
                         spec=kubernetes.core.v1.PodSpecArgs(
                             restart_policy="Never",
+                            node_selector=INDEX_NODE_SELECTOR,
                             # This pod talks to omnigraph-server and to GitHub,
                             # never to the Kubernetes API, so the default
                             # projected service-account token would be a

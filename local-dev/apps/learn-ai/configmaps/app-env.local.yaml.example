@@ -13,7 +13,9 @@ metadata:
   name: learn-ai-env-local
   namespace: learn-ai
 data:
-  # DEBUG: "False"
+  # Only with a learn-ai checkout, which builds the local-dev stage: the
+  # published image has no debug_toolbar, so DEBUG crashes it at startup.
+  # DEBUG: "True"
 
   # Needed for any AI feature. RC and production call OpenAI directly too.
   # OPENAI_API_KEY: "sk-..."  # pragma: allowlist secret

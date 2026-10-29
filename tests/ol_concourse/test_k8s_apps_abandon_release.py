@@ -87,7 +87,7 @@ def test_load_var_runs_before_the_abandon_deletes_anything():
     )
 
 
-@pytest.mark.parametrize("app_name", ["mitxonline", "mit-learn"])
+@pytest.mark.parametrize("app_name", ["mit-learn"])
 def test_legacy_pipelines_have_no_abandon_job(app_name):
     """Only release-resource apps get the job, and so the issue step."""
     jobs = {j["name"] for j in _pipeline(app_name)["jobs"]}

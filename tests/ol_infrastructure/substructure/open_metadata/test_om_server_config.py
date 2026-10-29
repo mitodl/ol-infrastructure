@@ -1,12 +1,16 @@
-"""Glossary terms are create-only, and a steward's deletes and moves must stick.
+"""Glossary terms follow the code, and a steward's deletes and moves must stick.
 
 om_server_config.py runs as a Job on every change to the script, and a failed
-Job fails the next ``pulumi up``. A term a steward soft-deleted, or moved under
-another parent, is missing at the FQN the script asks for, while OpenMetadata
-still holds its name: the glossary-wide, case-insensitive duplicate check
-counts deleted rows. Recreating it would get a 400 on every run. A term
-declared under a moved or soft-deleted parent, or under a soft-deleted glossary,
-would get a 404, because the server checks that both are live first.
+Job fails the next ``pulumi up``. An existing term whose description, synonyms,
+references or related terms differ from GLOSSARY_TERMS is patched back, and
+only in the fields that differ: every patch puts the term back In Review.
+
+A term a steward soft-deleted, or moved under another parent, is missing at the
+FQN the script asks for, while OpenMetadata still holds its name: the
+glossary-wide, case-insensitive duplicate check counts deleted rows. Recreating
+it would get a 400 on every run. A term declared under a moved or soft-deleted
+parent, or under a soft-deleted glossary, would get a 404, because the server
+checks that both are live first.
 """
 
 import importlib
@@ -32,6 +36,10 @@ class FakeResponse(requests.Response):
 class FakeOM:
     """GET by name from a dict of entities; POST answers with a fixed status.
 
+    Like the server, GET returns relatedTerms only when the fields ask for it.
+
+    PATCHes are recorded by entity id and always succeed.
+
     Like the server, a term POST whose glossary or parent is missing or
     soft-deleted gets a 404 before any other check.
     """
@@ -42,13 +50,16 @@ class FakeOM:
         self.entities = entities
         self.post_status = post_status
         self.posts: list[tuple[str, dict[str, Any]]] = []
+        self.patches: list[tuple[str, list[dict[str, Any]]]] = []
 
     def get(self, url: str, **kwargs: Any) -> FakeResponse:
         collection, name = url.split("/v1/")[1].split("/name/")
         entity = self.entities.get(f"{collection}/{name}")
-        include = (kwargs.get("params") or {}).get("include")
-        if entity is None or (entity.get("deleted") and include != "all"):
+        params = kwargs.get("params") or {}
+        if entity is None or (entity.get("deleted") and params.get("include") != "all"):
             return FakeResponse(404)
+        if "relatedTerms" not in params.get("fields", ""):
+            entity = {k: v for k, v in entity.items() if k != "relatedTerms"}
         return FakeResponse(200, entity)
 
     def _live(self, key: str) -> bool:
@@ -68,6 +79,10 @@ class FakeOM:
             return FakeResponse(400, {"code": 400, "message": DUPLICATE})
         return FakeResponse(self.post_status, {})
 
+    def patch(self, url: str, **kwargs: Any) -> FakeResponse:
+        self.patches.append((url.split("/v1/")[1], kwargs["json"]))
+        return FakeResponse(200, {})
+
 
 @pytest.fixture
 def config(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
@@ -80,6 +95,7 @@ def config(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
 def _install(monkeypatch: pytest.MonkeyPatch, config: ModuleType, om: FakeOM) -> None:
     monkeypatch.setattr(config.requests, "get", om.get)
     monkeypatch.setattr(config.requests, "post", om.post)
+    monkeypatch.setattr(config.requests, "patch", om.patch)
 
 
 def _term(config: ModuleType, name: str) -> dict[str, Any]:
@@ -91,27 +107,61 @@ def _fqn(term: dict[str, Any]) -> str:
     return f"{parent}.{term['name']}"
 
 
+def _stored_term(term: dict[str, Any], *, deleted: bool = False) -> dict[str, Any]:
+    """Return *term* as the server stores it, matching its declaration.
+
+    The server leaves empty lists out, and its id is the FQN here.
+    """
+    fqn = _fqn(term)
+    stored: dict[str, Any] = {
+        "id": fqn,
+        "fullyQualifiedName": fqn,
+        "deleted": deleted,
+        "description": term["description"],
+        "displayName": term["displayName"],
+    }
+    for field in ("synonyms", "references"):
+        if term.get(field):
+            stored[field] = term[field]
+    return stored
+
+
 def _glossary(
     config: ModuleType, *, deleted: bool = False, without: tuple[str, ...] = ()
 ) -> dict[str, dict[str, Any]]:
     """Return the glossary and its terms at their declared FQNs, minus *without*."""
     return {
-        "glossaries/open-learning": {"deleted": deleted},
+        "glossaries/open-learning": {
+            "id": "open-learning",
+            "deleted": deleted,
+            **config.GLOSSARY_CONFIG,
+        },
         **{
-            f"glossaryTerms/{_fqn(term)}": {"deleted": deleted}
+            f"glossaryTerms/{_fqn(term)}": _stored_term(term, deleted=deleted)
             for term in config.GLOSSARY_TERMS
             if term["name"] not in without
         },
     }
 
 
+def _link(fqn: str, relation_type: str = "relatedTo") -> dict[str, Any]:
+    """Return a related-term link as the server returns it."""
+    return {
+        "relationType": relation_type,
+        "term": {"id": fqn, "type": "glossaryTerm", "fullyQualifiedName": fqn},
+    }
+
+
+RELATED_TERMS: list[dict[str, Any]] = [
+    {"name": "a", "displayName": "A", "description": "Term a."},
+    {"name": "b", "displayName": "B", "description": "Term b.", "relatedTerms": ["a"]},
+    {"name": "c", "displayName": "C", "description": "Term c.", "relatedTerms": ["a"]},
+]
+
+
 def _run_glossary_steps(monkeypatch: pytest.MonkeyPatch, config: ModuleType) -> None:
     for name in (
         "TAG_CONFIG",
-        "TEAM_CONFIG",
-        "POLICY_CONFIG",
-        "ROLE_CONFIG",
-        "TEAM_DEFAULT_ROLES",
         "DOMAIN_CONFIG",
         "CUSTOM_PROPERTY_CONFIG",
     ):
@@ -166,7 +216,256 @@ def test_soft_deleted_term_is_left_alone(
     config._reconcile_glossary_term(_term(config, "learner"))
 
     assert om.posts == []
+    assert om.patches == []
     assert "[skip]" in capsys.readouterr().out
+
+
+def test_soft_deleted_term_with_a_stale_description_is_left_alone(
+    monkeypatch: pytest.MonkeyPatch,
+    config: ModuleType,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    learner = _term(config, "learner")
+    om = FakeOM(
+        {
+            "glossaryTerms/open-learning.learner": {
+                **_stored_term(learner, deleted=True),
+                "description": "Edited in the UI.",
+            }
+        }
+    )
+    _install(monkeypatch, config, om)
+
+    config._reconcile_glossary_term(learner)
+
+    assert om.posts == []
+    assert om.patches == []
+    assert "[skip]" in capsys.readouterr().out
+
+
+def test_term_with_a_changed_description_patches_only_the_description(
+    monkeypatch: pytest.MonkeyPatch, config: ModuleType
+) -> None:
+    learner = _term(config, "learner")
+    entities = _glossary(config)
+    entities["glossaryTerms/open-learning.learner"]["description"] = "Edited in the UI."
+    om = FakeOM(entities)
+    _install(monkeypatch, config, om)
+
+    config._reconcile_glossary_term(learner)
+
+    assert om.patches == [
+        (
+            "glossaryTerms/open-learning.learner",
+            [{"op": "add", "path": "/description", "value": learner["description"]}],
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    ("field", "stored"),
+    [
+        ("synonyms", ["student"]),
+        ("synonyms", ["personal data", "PII", "student"]),
+        ("references", []),
+    ],
+)
+def test_term_with_changed_list_fields_is_patched(
+    monkeypatch: pytest.MonkeyPatch, config: ModuleType, field: str, stored: Any
+) -> None:
+    pii = _term(config, "pii")
+    entities = _glossary(config)
+    entities["glossaryTerms/open-learning.pii"][field] = stored
+    om = FakeOM(entities)
+    _install(monkeypatch, config, om)
+
+    config._reconcile_glossary_term(pii)
+
+    assert om.patches == [
+        (
+            "glossaryTerms/open-learning.pii",
+            [{"op": "add", "path": f"/{field}", "value": pii[field]}],
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    ("name", "field"),
+    [
+        ("pii", "synonyms"),
+        ("indirect-identifier", "references"),
+    ],
+)
+def test_term_with_reordered_list_fields_is_not_patched(
+    monkeypatch: pytest.MonkeyPatch, config: ModuleType, name: str, field: str
+) -> None:
+    """The server stores no change that only reorders synonyms or references."""
+    term = _term(config, name)
+    assert len(term[field]) > 1
+    entities = _glossary(config)
+    entities[f"glossaryTerms/{_fqn(term)}"][field] = list(reversed(term[field]))
+    om = FakeOM(entities)
+    _install(monkeypatch, config, om)
+
+    config._reconcile_glossary_term(term)
+
+    assert om.patches == []
+
+
+def test_display_name_and_mutually_exclusive_are_not_patched(
+    monkeypatch: pytest.MonkeyPatch, config: ModuleType
+) -> None:
+    identifiability = _term(config, "identifiability")
+    entities = _glossary(config)
+    entities["glossaryTerms/open-learning.identifiability"].update(
+        displayName="Renamed in the UI", mutuallyExclusive=False
+    )
+    om = FakeOM(entities)
+    _install(monkeypatch, config, om)
+
+    config._reconcile_glossary_term(identifiability)
+
+    assert om.patches == []
+
+
+def test_glossary_matching_the_code_is_not_patched(
+    monkeypatch: pytest.MonkeyPatch,
+    config: ModuleType,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    om = FakeOM(_glossary(config))
+    _install(monkeypatch, config, om)
+
+    _run_glossary_steps(monkeypatch, config)
+
+    assert om.posts == []
+    assert om.patches == []
+    assert "[fail]" not in capsys.readouterr().err
+
+
+def test_glossary_with_a_changed_description_is_patched(
+    monkeypatch: pytest.MonkeyPatch, config: ModuleType
+) -> None:
+    entities = _glossary(config)
+    entities["glossaries/open-learning"]["description"] = "Edited in the UI."
+    om = FakeOM(entities)
+    _install(monkeypatch, config, om)
+
+    config._reconcile_glossary()
+
+    assert om.patches == [
+        (
+            "glossaries/open-learning",
+            [
+                {
+                    "op": "add",
+                    "path": "/description",
+                    "value": config.GLOSSARY_CONFIG["description"],
+                }
+            ],
+        )
+    ]
+
+
+def _related_glossary(
+    config: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    links: dict[str, list[dict[str, Any]]],
+) -> FakeOM:
+    """Install a glossary of RELATED_TERMS whose terms hold *links*, by name."""
+    monkeypatch.setattr(config, "GLOSSARY_TERMS", RELATED_TERMS)
+    entities = _glossary(config)
+    for name, term_links in links.items():
+        entities[f"glossaryTerms/open-learning.{name}"]["relatedTerms"] = term_links
+    om = FakeOM(entities)
+    _install(monkeypatch, config, om)
+    return om
+
+
+def test_missing_related_term_link_is_added_by_reference(
+    monkeypatch: pytest.MonkeyPatch, config: ModuleType
+) -> None:
+    om = _related_glossary(config, monkeypatch, {"c": [_link("open-learning.a")]})
+
+    config._reconcile_glossary_term(RELATED_TERMS[1])
+
+    assert om.patches == [
+        (
+            "glossaryTerms/open-learning.b",
+            [
+                {
+                    "op": "add",
+                    "path": "/relatedTerms",
+                    "value": [
+                        {
+                            "relationType": "relatedTo",
+                            "term": {"id": "open-learning.a", "type": "glossaryTerm"},
+                        }
+                    ],
+                }
+            ],
+        )
+    ]
+
+
+def test_undeclared_related_term_link_is_removed_and_declared_ones_kept(
+    monkeypatch: pytest.MonkeyPatch, config: ModuleType
+) -> None:
+    declared = _link("open-learning.a", relation_type="broader")
+    om = _related_glossary(
+        config,
+        monkeypatch,
+        {"c": [declared, _link("other-glossary.added-in-ui")]},
+    )
+
+    config._reconcile_glossary_term(RELATED_TERMS[2])
+
+    assert om.patches == [
+        (
+            "glossaryTerms/open-learning.c",
+            [{"op": "add", "path": "/relatedTerms", "value": [declared]}],
+        )
+    ]
+
+
+def test_links_declared_on_later_terms_are_left_to_them(
+    monkeypatch: pytest.MonkeyPatch, config: ModuleType
+) -> None:
+    # The server returns b's and c's links to a on a as well.
+    om = _related_glossary(
+        config,
+        monkeypatch,
+        {
+            "a": [_link("open-learning.b"), _link("open-learning.c")],
+            "b": [_link("open-learning.a")],
+            "c": [_link("open-learning.a")],
+        },
+    )
+
+    _run_glossary_steps(monkeypatch, config)
+
+    assert om.patches == []
+
+
+def test_link_to_a_missing_related_term_fails(
+    monkeypatch: pytest.MonkeyPatch, config: ModuleType
+) -> None:
+    om = _related_glossary(config, monkeypatch, {})
+    del om.entities["glossaryTerms/open-learning.a"]
+
+    with pytest.raises(ValueError, match=r"open-learning\.a is missing"):
+        config._reconcile_glossary_term(RELATED_TERMS[1])
+
+
+def test_missing_term_is_created_with_related_term_fqns(
+    monkeypatch: pytest.MonkeyPatch, config: ModuleType
+) -> None:
+    om = _related_glossary(config, monkeypatch, {})
+    del om.entities["glossaryTerms/open-learning.b"]
+
+    config._reconcile_glossary_term(RELATED_TERMS[1])
+
+    assert [body["relatedTerms"] for _, body in om.posts] == [["open-learning.a"]]
 
 
 def test_moved_term_is_left_alone(
@@ -244,9 +543,25 @@ def test_missing_term_in_a_soft_deleted_glossary_is_left_alone(
     assert "[skip] glossary term open-learning.verified" in capsys.readouterr().out
 
 
-def test_term_parents_are_declared_before_their_children(config: ModuleType) -> None:
+def test_term_parents_and_related_terms_are_declared_earlier(
+    config: ModuleType,
+) -> None:
     seen: set[str] = set()
     for term in config.GLOSSARY_TERMS:
-        if parent := term.get("parent"):
-            assert parent in seen, term["name"]
+        for name in [term.get("parent"), *term.get("relatedTerms", [])]:
+            assert name is None or name in seen, term["name"]
         seen.add(term["name"])
+
+
+def test_glossary_descriptions_survive_the_servers_sanitizer(
+    config: ModuleType,
+) -> None:
+    # OpenMetadata runs a description containing "<" through an HTML
+    # sanitizer, which drops e.g. "<platform>" and entity-encodes backticks, so
+    # the stored text would never equal the declared one and every run would
+    # patch it.
+    descriptions = [
+        config.GLOSSARY_CONFIG["description"],
+        *(term["description"] for term in config.GLOSSARY_TERMS),
+    ]
+    assert [d for d in descriptions if "<" in d] == []

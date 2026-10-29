@@ -6,9 +6,10 @@ import os
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from functools import partial
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import bot_config as config
 import concourse_client as concourse
@@ -1476,6 +1477,10 @@ def create_app():
     repos = config.load_repos_config()
     _libraries.update(config.load_libraries_config())
     _unpublishable_libraries.update(config.load_unpublishable_libraries())
+    # Before any handler can run: an author resolved once is cached for a day,
+    # so installing the overrides late would leave the first poll's fallbacks
+    # in place well past boot.
+    slack_users.configure_overrides(config.load_slack_user_overrides())
     app = AsyncApp(token=os.environ["SLACK_BOT_TOKEN"])
     app.command("/doof")(partial(_cmd_doof, repos))
     app.action("promote_production")(partial(_handle_promote_button, repos))
@@ -1649,8 +1654,35 @@ _RELEASE_PROGRESS_POLL_SECONDS = 120
 # every 24h; that nag was the only thing in Slack that made a stalled release
 # visible. ol-analytics-api's releases/2026.8.3.1 sat cut-but-unfinished from
 # 2026-08-03 with no red build and no message anywhere.
-_STUCK_RENAG_INTERVAL = timedelta(hours=24)
-_DEFAULT_STUCK_AFTER_HOURS = 24.0
+# 16h rather than 24h because reminders only go out in the 10:00 ET window
+# below: a release cut by 18:00 ET is reminded about the next morning instead
+# of the morning after.
+_DEFAULT_STUCK_AFTER_HOURS = 16.0
+
+# The reminder goes out in one fixed daily window, not 24h after the last one.
+# "The last one" lived only in process memory, so every bot rollout or pod
+# reschedule reset it and the next poll re-posted: xpro 2026.10.27.1 was
+# reminded at 13:35, 15:38 and 23:07 ET on 2026-10-28, each a new pod. A fixed
+# window needs no stored state. A restart repeats a reminder only if it lands
+# inside the window, and the reminder arrives in working hours rather than
+# whenever the release happened to be cut. The window spans many polls, so a
+# failed post is retried.
+_STUCK_NAG_TIMEZONE = ZoneInfo("America/New_York")
+_STUCK_NAG_AT = time(10, 0)
+_STUCK_NAG_WINDOW = timedelta(minutes=30)
+
+
+def _now() -> datetime:
+    return datetime.now(tz=UTC)
+
+
+def _stuck_nag_window_start(now: datetime) -> datetime | None:
+    """Return when today's reminder window opened if *now* is inside it, else None."""
+    local = now.astimezone(_STUCK_NAG_TIMEZONE)
+    start = datetime.combine(local.date(), _STUCK_NAG_AT, tzinfo=_STUCK_NAG_TIMEZONE)
+    if start <= local < start + _STUCK_NAG_WINDOW:
+        return start
+    return None
 
 
 def _stuck_release_after() -> timedelta:
@@ -1680,8 +1712,9 @@ class ReleaseProgressState:
     poll -- much cheaper than a release channel that repeats itself, which is
     the failure that makes people mute it.
 
-    `nagged_at` is deliberately not seeded: a stuck release is still stuck
-    after a restart, and re-reporting it once is the point.
+    `nagged_at` only stops repeat posts within one daily reminder window.
+    The window itself is what limits a stuck release to one reminder a day
+    across restarts (see `_stuck_nag_window_start`).
     """
 
     # The release version of the newest successful deployment, not its
@@ -1876,10 +1909,13 @@ async def _stuck_release_text(app_name, cfg, in_flight, age: timedelta, client) 
 
 
 async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> bool:
-    """Report releases that were cut and never shipped."""
+    """Report releases that were cut and never shipped, once a day."""
+    now = _now()
+    window_start = _stuck_nag_window_start(now)
+    if window_start is None:
+        return True
     ok = True
     threshold = _stuck_release_after()
-    now = datetime.now(tz=UTC)
     for app_name, cfg in repos.items():
         channel = _announce_channel(cfg)
         if not channel:
@@ -1897,7 +1933,7 @@ async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> bool:
             continue
         key = (app_name, in_flight["version"])
         last_nag = state.nagged_at.get(key)
-        if last_nag is not None and now - last_nag < _STUCK_RENAG_INTERVAL:
+        if last_nag is not None and last_nag >= window_start:
             continue
         try:
             text = await _stuck_release_text(app_name, cfg, in_flight, age, app.client)
@@ -1983,12 +2019,36 @@ async def _report_unreachable_channels(app, repos) -> None:
         )
 
 
+async def _report_unusable_user_overrides(app) -> None:
+    """Log author overrides pointing at an unmentionable Slack account, at boot.
+
+    Same reasoning as _report_unreachable_channels: the override list exists so
+    that certain authors get a real ping, and a stale or mistyped id in it fails
+    by producing a mention that notifies nobody -- which, read in the channel,
+    is indistinguishable from the bug the list was added to fix.
+    """
+    try:
+        unusable = await slack_users.unusable_overrides(app.client)
+    except Exception:
+        log.exception("Failed to check the Slack user overrides at startup")
+        return
+    if unusable:
+        log.error(
+            "%s SLACK_USER_OVERRIDES entr(ies) point at an account that cannot "
+            "be mentioned, so those authors will be named without being "
+            "notified: %s",
+            len(unusable),
+            "; ".join(unusable),
+        )
+
+
 async def main():
     app, repos = create_app()
     # Channel reachability is checked across every registered app, including
     # the legacy ones: an unresolvable channel is the kind of thing you want
     # to have found before the app is migrated, not on its first release.
     await _report_unreachable_channels(app, repos)
+    await _report_unusable_user_overrides(app)
     watched = config.release_workflow_apps(repos)
     log.info(
         "Polling %s of %s registered app(s) on the release-resource workflow: %s",

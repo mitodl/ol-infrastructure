@@ -1,5 +1,8 @@
 from collections.abc import Mapping
+from dataclasses import dataclass
 from ipaddress import IPv4Address
+from types import MappingProxyType
+from typing import ClassVar
 
 FASTLY_CNAME_TLS_1_2 = "d.sni.global.fastly.net"
 FASTLY_CNAME_TLS_1_3 = "j.sni.global.fastly.net"
@@ -129,6 +132,109 @@ def mit_learn_session_cookie_name(env_suffix: str) -> str:
     :rtype: str
     """
     return apisix_oidc_session_cookie_name("mitlearn", env_suffix)
+
+
+@dataclass(frozen=True)
+class LearnSession:
+    """The one APISIX OIDC session shared by every route group on MIT Learn's hosts.
+
+    mit-learn's own routes, learn-ai's ``/ai/*``, mitxonline's ``/mitxonline/*``
+    and ol-analytics-api's Learn-scoped host all read (and some write) the same
+    session cookie, so every setting that decides whether a cookie written by one
+    of them is accepted by another lives here rather than in each stack.  A
+    change to any of them has to reach all of those stacks at once or users are
+    silently logged out of the routes that lag behind.
+
+    Only the environment and the parent domain vary.  Everything else is a class
+    attribute so that no stack can override it for its own route group.
+
+    :param env_suffix: The stack environment suffix, e.g. ``"qa"``.
+    :param cookie_domain: The parent domain the session cookie is scoped to,
+        with its leading dot, e.g. ``".rc.learn.mit.edu"``.
+    """
+
+    env_suffix: str
+    cookie_domain: str
+
+    # The Keycloak client (ol-mitlearn-client) every participant shares, and so
+    # the session.secret the cookie is encrypted with.
+    vault_path: ClassVar[str] = "sso/mitlearn"
+    # 14 days, matching the Keycloak SSO session.  Idling and rolling are off so
+    # the envelope lasts the full absolute timeout instead of lua-resty-session's
+    # compiled-in 15min/60min (hq#8416).
+    absolute_timeout_seconds: ClassVar[int] = 14 * 24 * 60 * 60
+    idling_timeout_seconds: ClassVar[int] = 0
+    rolling_timeout_seconds: ClassVar[int] = 0
+    # organization:* is what mit-learn maps to users.User.organizations through
+    # APISIX_USERDATA_MAP, so any route group that performs a login has to
+    # request it or the user it writes into the shared session lacks it.
+    scope: ClassVar[str] = "openid profile email organization:*"
+    session_contents: ClassVar[Mapping[str, bool]] = MappingProxyType(
+        {"access_token": True, "enc_id_token": True, "id_token": True, "user": True}
+    )
+
+    @classmethod
+    def for_host(cls, env_suffix: str, host: str) -> "LearnSession":
+        """Return the session for a host directly under MIT Learn's parent domain.
+
+        Any sibling works (``api.rc.learn.mit.edu``,
+        ``analytics.rc.learn.mit.edu``): the cookie domain is the host minus its
+        first label.
+
+        :param env_suffix: The stack environment suffix, e.g. ``"qa"``.
+        :param host: A host one label below the Learn parent domain.
+        :returns: The shared session for that environment.
+        :rtype: LearnSession
+        """
+        _, separator, parent = host.partition(".")
+        if not separator or not parent:
+            msg = f"{host!r} has no parent domain to scope the Learn session to"
+            raise ValueError(msg)
+        return cls(env_suffix=env_suffix, cookie_domain=f".{parent}")
+
+    @property
+    def cookie_name(self) -> str:
+        """The session cookie's name in this environment."""
+        return mit_learn_session_cookie_name(self.env_suffix)
+
+    @property
+    def api_host(self) -> str:
+        """The host mit-learn's own login and logout views are served from."""
+        return f"api{self.cookie_domain}"
+
+    @property
+    def logout_landing_uri(self) -> str:
+        """Where a logout of the shared session should end up.
+
+        mit-learn's CustomLogoutView clears its Django session (which otherwise
+        outlives the gateway session) and sends the browser on to the Learn
+        frontend.  A route group whose application has no logout view of its own
+        uses this as its post-logout redirect.
+        """
+        return f"https://{self.api_host}/logout/"
+
+
+def edxapp_lms_webapp_name(env_prefix: str, env_suffix: str) -> str:
+    """Return the name of an Open edX deployment's LMS webapp Service.
+
+    :param env_prefix: The edxapp deployment, e.g. ``"mitxonline"``.
+    :param env_suffix: The stack environment suffix, e.g. ``"qa"``.
+    :returns: The Service name.
+    :rtype: str
+    """
+    return f"{env_prefix}-{env_suffix}-edxapp-lms-webapp"
+
+
+def edxapp_lms_service_host(env_prefix: str, env_suffix: str) -> str:
+    """Return the cluster DNS name of an Open edX deployment's LMS webapp Service.
+
+    :param env_prefix: The edxapp deployment, e.g. ``"mitxonline"``.
+    :param env_suffix: The stack environment suffix, e.g. ``"qa"``.
+    :returns: The Service's DNS name.
+    :rtype: str
+    """
+    name = edxapp_lms_webapp_name(env_prefix, env_suffix)
+    return f"{name}.{env_prefix}-openedx.svc.cluster.local"
 
 
 # The fields of a Keycloak client's credentials in Vault

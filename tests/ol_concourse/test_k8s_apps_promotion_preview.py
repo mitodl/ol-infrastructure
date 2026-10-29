@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 
+from bridge.settings.apps import APPS, release_resource_workflow
 from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
     _CLASSIFY_SCRIPT,
     CACHE_BUST_TASK_NAME,
@@ -30,7 +31,10 @@ from ol_concourse.pipelines.infrastructure.k8s_apps.scripts import (
 APP = "ol-analytics-api"
 PULUMI = f"pulumi-ol-application-{APP}"
 DOCKER_TAG_ENV = "OL_ANALYTICS_API_DOCKER_TAG"
-RELEASE_APPS = ("ol-analytics-api", "learn-ai", "micromasters")
+DOCKER_SHA_ENV = "OL_ANALYTICS_API_DOCKER_SHA"
+RELEASE_VERSION_ENV = "OL_ANALYTICS_API_RELEASE_VERSION"
+RELEASE_IMAGE = f"{APP}-app-release-ecr-image"
+RELEASE_APPS = [app for app in APPS if release_resource_workflow(app)]
 VERSION = "2026.10.2.1"
 LIVE = "2026.10.1.1"
 SHA = "c" * 40
@@ -77,7 +81,9 @@ def test_qa_preview_is_a_production_preview_at_the_cut_version():
 
     assert preview["params"]["stack_name"] == "Production"
     assert preview["params"]["preview"] is True
-    assert preview["params"]["env_os"][DOCKER_TAG_ENV] == "((.:image_tag))"
+    assert preview["params"]["env_os"][DOCKER_SHA_ENV] == "((.:image_digest))"
+    assert DOCKER_TAG_ENV not in preview["params"]["env_os"]
+    assert preview["params"]["env_os"][RELEASE_VERSION_ENV] == "((.:image_tag))"
     assert preview["get_params"]["summary_file"] == "preview_summary.md"
     assert preview["get_params"]["preview_stack"] == "Production"
     assert preview["get_params"]["read_outputs"] is False
@@ -92,7 +98,9 @@ def test_qa_still_deploys_the_cut_version_to_qa():
     qa_up = plan[_index(plan, "put", PULUMI, 0)]
 
     assert qa_up["params"]["stack_name"] == "QA"
-    assert qa_up["params"]["env_os"][DOCKER_TAG_ENV] == "((.:image_tag))"
+    assert qa_up["params"]["env_os"][DOCKER_SHA_ENV] == "((.:image_digest))"
+    assert DOCKER_TAG_ENV not in qa_up["params"]["env_os"]
+    assert qa_up["params"]["env_os"][RELEASE_VERSION_ENV] == "((.:image_tag))"
 
 
 def test_production_state_is_read_with_a_cache_busting_get():
@@ -171,9 +179,36 @@ def test_production_deploys_the_cut_version_the_gate_names():
     plan = _job(APP, "-production")["plan"]
     up = plan[_index(plan, "put", PULUMI)]
 
-    assert up["params"]["env_os"][DOCKER_TAG_ENV] == "((.:image_tag))"
+    assert up["params"]["env_os"][DOCKER_SHA_ENV] == "((.:image_digest))"
+    assert DOCKER_TAG_ENV not in up["params"]["env_os"]
+    assert up["params"]["env_os"][RELEASE_VERSION_ENV] == "((.:image_tag))"
     assert not any(step.get("task") == CLASSIFY_TASK_NAME for step in plan)
     assert not any(step.get("task") == CACHE_BUST_TASK_NAME for step in plan)
+
+
+@pytest.mark.parametrize(
+    ("job_suffix", "passed"),
+    [
+        ("-qa", [f"build-{APP}-release-image"]),
+        ("-production", [f"deploy-ol-application-{APP}-qa"]),
+    ],
+)
+def test_release_deploys_pin_the_image_digest_qa_ran(job_suffix, passed):
+    """Deploy the pushed digest, not the calver tag.
+
+    Abandoning a release deletes its tag, so a same-day re-cut gets the same
+    version and overwrites the same image tag. A tag-pinned pod spec would not
+    change, nothing would roll out, and RC would keep the abandoned build.
+    Production's image get is passed through QA, so it deploys the digest QA
+    ran.
+    """
+    plan = _job(APP, job_suffix)["plan"]
+    image_get = _index(plan, "get", RELEASE_IMAGE)
+    load = _index(plan, "load_var", "image_digest")
+
+    assert plan[image_get]["passed"] == passed
+    assert plan[load]["file"] == f"{RELEASE_IMAGE}/digest"
+    assert image_get < load < _index(plan, "put", PULUMI)
 
 
 def test_qa_and_production_share_the_production_stack_serial_group():
@@ -195,9 +230,7 @@ def test_every_release_workflow_app_gets_the_preview(app_name):
 
 def test_legacy_pipelines_are_untouched():
     """Legacy pipelines have no release issue, so they get none of it."""
-    pipeline = json.dumps(
-        json.loads(build_app_pipeline("mitxonline").model_dump_json())
-    )
+    pipeline = json.dumps(json.loads(build_app_pipeline("mit-learn").model_dump_json()))
     assert CLASSIFY_TASK_NAME not in pipeline
     assert CACHE_BUST_TASK_NAME not in pipeline
     assert "serial_groups" not in pipeline

@@ -1,0 +1,133 @@
+---
+# Mirrors what OLApplicationK8s renders for the deployed stack
+# (src/ol_infrastructure/applications/ol_analytics_api/__main__.py): one granian
+# ASGI worker on 8000 with no nginx sidecar, the same probe paths, and the same
+# pod security context. The read-only root filesystem is left off so Tilt can
+# sync source into /app/src.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ol-analytics-api
+  namespace: ol-analytics-api
+  labels:
+    app: ol-analytics-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ol-analytics-api
+  template:
+    metadata:
+      labels:
+        app: ol-analytics-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Merge the image's system CA bundle with the mkcert root so the app
+        # trusts the local-dev gateway's TLS (SSL_CERT_FILE in app-env.yaml).
+      - name: ca-bundle-merge
+        image: mitodl/ol-analytics-api-app:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/bin/sh", "-c"]
+        args:
+        - cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem > /etc/ssl/local-dev/rootCA.pem
+        volumeMounts:
+        - name: mkcert-root-ca
+          mountPath: /mkcert
+          readOnly: true
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+      containers:
+      - name: app
+        image: mitodl/ol-analytics-api-app:latest
+        imagePullPolicy: IfNotPresent
+        # The image's CMD plus --reload, watching only the source Tilt syncs.
+        command:
+        - granian
+        - --interface
+        - asgi
+        - --host
+        - 0.0.0.0
+        - --port
+        - "8000"
+        - --reload
+        - --reload-paths
+        - /app/src
+        - ol_analytics_api.main:app
+        ports:
+        - containerPort: 8000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: ol-analytics-api-env
+        - secretRef:
+            name: ol-analytics-api-secrets
+        # Gitignored per-developer overrides; must stay LAST so its keys win
+        # over both sources above. See "Local Configuration Overrides" in
+        # local-dev/README.md.
+        - configMapRef:
+            name: ol-analytics-api-env-local
+            optional: true
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+        # Startup and readiness ping the StarRocks pool only. Whether MITx
+        # Online answers is /health/readiness/b2b_dashboard/, which no probe
+        # calls, so a pod whose org-manager checks fail still reports Ready.
+        startupProbe:
+          httpGet:
+            path: /health/startup/
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          failureThreshold: 12
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health/readiness/
+            port: 8000
+          periodSeconds: 15
+          failureThreshold: 6
+          timeoutSeconds: 5
+        livenessProbe:
+          tcpSocket:
+            port: 8000
+          periodSeconds: 30
+          failureThreshold: 3
+          timeoutSeconds: 3
+        volumeMounts:
+        - name: combined-ca
+          mountPath: /etc/ssl/local-dev
+          readOnly: true
+      volumes:
+      - name: mkcert-root-ca
+        configMap:
+          name: mkcert-root-ca
+      - name: combined-ca
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ol-analytics-api
+  namespace: ol-analytics-api
+spec:
+  selector:
+    app: ol-analytics-api
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000

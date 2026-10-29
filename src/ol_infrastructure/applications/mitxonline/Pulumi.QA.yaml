@@ -15,6 +15,8 @@ config:
   mitxonline:k8s_deploy: "true"
   mitxonline:dev_shell_enabled: false
   mitxonline:learn_backend_domain: "api.rc.learn.mit.edu"
+  mitxonline:openedx_login_gate:
+    lms_host: "courses.rc.learn.mit.edu"
   mitxonline:min_replicas: 2
   mitxonline:vars:
     AWS_STORAGE_BUCKET_NAME: "ol-mitxonline-app-qa"
@@ -27,12 +29,10 @@ config:
     GTM_TRACKING_ID: "GTM-TW97MNR"
     KEYCLOAK_BASE_URL: "https://sso-qa.ol.mit.edu"
     KEYCLOAK_CLIENT_ID: "ol-mitxonline-client"
-    KEYCLOAK_REALM_NAME: "olapps"
     LOGOUT_REDIRECT_URL: "https://courses.rc.learn.mit.edu/logout"
     MAILGUN_FROM_EMAIL: "MITx Online <no-reply@mitxonline-rc-mail.mitxonline.mit.edu>"
     MAILGUN_SENDER_DOMAIN: "mitxonline-rc-mail.mitxonline.mit.edu"
     MAILGUN_WEBHOOK_VALIDATE_SIGNATURE: "true"
-    MITOL_APIGATEWAY_DISABLE_MIDDLEWARE: "false"
     MITOL_APIGATEWAY_USERINFO_UPDATE: "false"
     MITOL_GOOGLE_SHEETS_PROCESSOR_APP_NAME: "MITx Online (rc)"
     MITOL_GOOGLE_SHEETS_REFUNDS_FIRST_ROW: "4"

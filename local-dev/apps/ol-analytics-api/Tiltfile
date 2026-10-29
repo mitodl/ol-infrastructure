@@ -1,0 +1,69 @@
+# ol-analytics-api Tiltfile
+# Builds the FastAPI analytics gateway and deploys it to the ol-analytics-api
+# namespace, behind analytics.learn.<root-domain> the way MIT Learn's dashboard
+# reaches it when deployed. When the sibling ol-analytics-api repo is not
+# checked out, Tilt uses the prebuilt DockerHub image
+# (mitodl/ol-analytics-api-app:latest) without attempting a local build.
+
+load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
+
+workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
+APP_DIR = os.path.join(workspace_root, "ol-analytics-api")
+IMAGE = 'mitodl/ol-analytics-api-app'
+DEPLOY_NAME = 'ol-analytics-api'
+_rd = current_root_domain()
+
+# Its StarRocks pool is opened at startup, so without the lake the pod
+# crash-loops on an unresolvable host; and every dashboard request is gated on
+# MITx Online's org-manager check.
+_enabled = os.environ.get("LOCAL_DEV_ENABLED_APPS", "").split(",")
+_missing = [app for app in ("data-platform", "mitxonline") if app not in _enabled]
+if _missing:
+    fail("ol-analytics-api needs %s in enabled_apps as well." % " and ".join(_missing))
+
+if os.path.exists(os.path.join(APP_DIR, '.git')):
+    docker_build(
+        IMAGE,
+        context=APP_DIR,
+        dockerfile=APP_DIR + '/Dockerfile',
+        # .claude/ holds agent worktrees, which are not part of the app.
+        ignore=['.claude/'],
+        # The project is installed editable over /app/src, and granian runs
+        # with --reload (deployment.yaml), so a sync is all a code edit needs.
+        # The runtime image has no uv, so a dependency change rebuilds it.
+        live_update=[
+            fall_back_on([APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock']),
+            sync(APP_DIR + '/src', '/app/src'),
+        ],
+    )
+
+k8s_yaml_local([
+    'configmaps/app-env.yaml',
+    'secrets.yaml',
+    'deployment.yaml',
+    'apisix-routes.yaml',
+], local_overrides='configmaps/app-env.local.yaml')
+
+k8s_resource(
+    DEPLOY_NAME,
+    labels=['ol-analytics-api'],
+    resource_deps=['local-infra-core'],
+    links=[
+        link('https://analytics.learn.' + _rd + '/api/v1/analytics/docs', 'b2b_dashboard API docs'),
+    ],
+)
+
+# The route's openid-connect block reads the ol-mitlearn-oidc Secret
+# local-infra-apps writes into this namespace. Applied before it exists, the
+# route fails APISIX's schema check and APISIX rejects the whole config push
+# (see the same grouping in apps/mit-learn/Tiltfile).
+k8s_resource(
+    new_name='ol-analytics-api-routes',
+    objects=[
+        'ol-analytics-api-shared-plugins:apisixpluginconfig',
+        'ol-analytics-api-tls:apisixtls',
+        'ol-analytics-api-learn:apisixroute',
+    ],
+    labels=['ol-analytics-api'],
+    resource_deps=['local-infra-apps'],
+)

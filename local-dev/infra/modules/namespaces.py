@@ -31,10 +31,12 @@ APP_NAMESPACES = (
 
 # Namespaces created only when the matching app is in enabled_apps, because
 # what fills them is expensive. ocw-studio brings an object store and a
-# Concourse install along with it. micromasters is here because it was added
-# after per-app gating existed, so an unconditional namespace would churn
-# every stack for an app most developers do not run.
-OPTIONAL_APP_NAMESPACES = ("ocw-studio", "micromasters")
+# Concourse install along with it. micromasters and ol-analytics-api are here
+# because they were added after per-app gating existed, so an unconditional
+# namespace would churn every stack for an app most developers do not run.
+# Deployed, ol-analytics-api runs in the ol-analytics namespace; here the
+# namespace is named after the app, which is what this gating keys on.
+OPTIONAL_APP_NAMESPACES = ("ocw-studio", "micromasters", "ol-analytics-api")
 
 
 def app_namespaces_for(enabled_apps: Iterable[str]) -> tuple[str, ...]:

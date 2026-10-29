@@ -50,6 +50,11 @@ config:
     DEV_ENV: "false"
     LANGSMITH_PROJECT: "learn-ai-rc"
     LANGSMITH_TRACING: "true"
+    LEARNER_API_LEARN_BASE_URL: "https://api.rc.learn.mit.edu/"
+    LEARNER_API_LEARN_COOKIE_NAME: "mitlearn_apisix_session_qa"
+    LEARNER_API_MITXONLINE_BASE_URL: "https://rc.mitxonline.mit.edu/"
+    LEARNER_API_OPENEDX_BASE_URL: "https://courses.rc.learn.mit.edu/"
+    LEARNER_API_OPENEDX_COOKIE_NAME: "mitxonline-qa-edx-lms-sessionid"
     LOGIN_REDIRECT_ALLOWED_HOSTS: '["learn-ai-qa.ol.mit.edu", "rc.learn.mit.edu",
       "courses.rc.learn.mit.edu", "rc.mitxonline.mit.edu"]'
     MIT_LEARN_API_PROXY_BASE_URL: "https://api.rc.learn.mit.edu/api/"

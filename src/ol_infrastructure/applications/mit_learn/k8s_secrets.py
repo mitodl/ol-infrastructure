@@ -22,6 +22,11 @@ from ol_infrastructure.components.services.vault import (
     OLVaultK8SStaticSecretConfig,
     OLVaultRestartTarget,
 )
+from ol_infrastructure.lib.opik import (
+    OPIK_KEYCLOAK_SECRET_TEMPLATES,
+    OPIK_SDK_VAULT_MOUNT,
+    opik_sdk_vault_path,
+)
 from ol_infrastructure.lib.pulumi_helper import StackInfo
 
 
@@ -36,6 +41,7 @@ def _create_static_secret(
     vaultauth: str,
     mount_type: Literal["kv-v1", "kv-v2"] = "kv-v1",
     opts: ResourceOptions | None = None,
+    restart_targets: list[OLVaultRestartTarget] | None = None,
 ) -> tuple[str, OLVaultK8SSecret]:
     """
     Create an OLVaultK8SSecret resource for a static Vault secret.
@@ -51,6 +57,9 @@ def _create_static_secret(
         vaultauth: Name of the Vault Kubernetes auth backend role.
         mount_type: Type of the Vault mount (e.g., "kv-v1", "kv-v2"). Defaults to "kv-v1".
         opts: Optional Pulumi resource options.
+        restart_targets: Deployments to rolling-restart when this secret's
+            contents change. Without them, pods reading it via envFrom keep the
+            old values until something else rolls them.
 
     Returns:
         A tuple containing the generated Kubernetes secret name and the resource object.
@@ -71,6 +80,7 @@ def _create_static_secret(
             exclude_raw=True,
             templates=templates,
             vaultauth=vaultauth,
+            restart_targets=restart_targets,
         ),
         opts=opts,
     )
@@ -140,9 +150,9 @@ def create_mitlearn_k8s_secrets(
     db_config: OLVaultDatabaseBackend,
     redis_password: str,
     redis_cache: OLAmazonCache,
+    restart_targets: list[OLVaultRestartTarget],
     starrocks_vault_mount_path: str | None = None,
-    starrocks_restart_targets: list[OLVaultRestartTarget] | None = None,
-) -> tuple[list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
+) -> tuple[list[str], list[str], list[OLVaultK8SSecret | kubernetes.core.v1.Secret]]:
     """
     Create all Kubernetes secrets required by the mitlearn application.
 
@@ -156,15 +166,18 @@ def create_mitlearn_k8s_secrets(
         vault_k8s_resources: Vault Kubernetes auth backend resources.
         mitlearn_vault_mount: The Vault mount resource for mitlearn secrets.
         db_config: Configuration for the Vault dynamic PostgreSQL database backend.
+        restart_targets: Every Deployment that reads these secrets through
+            envFrom, rolled when the StarRocks lease rotates or the Opik
+            Keycloak client changes. Without these the new value lands in the
+            Secret while running pods keep the old one.
         starrocks_vault_mount_path: Vault mount serving dynamic StarRocks
             credentials, or None to skip them. None for any stack that has no
             STARROCKS_HOST configured -- see the caller.
-        starrocks_restart_targets: Deployments to roll when Vault rotates the
-            StarRocks lease. Without these the rotated credential lands in the
-            Secret while running pods keep authenticating as the revoked user.
 
     Returns:
-        A list of the names of the created Kubernetes secrets.
+        The names of the secrets pods require, the names of the secrets pods
+        mount as optional (the Opik client, which another stack writes to Vault),
+        and the secret resources.
     """
     secret_names: list[str] = []
     secret_resources: list[
@@ -286,6 +299,25 @@ def create_mitlearn_k8s_secrets(
         secret_names.append(secret_name)
         secret_resources.append(secret_resource)
 
+    # mit-learn's Production Keycloak client for this environment
+    # (opik-mit-learn-<env>) for ol-llm's embedding traces, which the Production
+    # keycloak substructure writes to this environment's Vault.
+    # Optional, so pods still start if that stack hasn't applied yet. VSO doesn't
+    # restart the targets on a secret's first sync, so pods that started without it
+    # trace unauthenticated (and get 401s) until something else rolls them.
+    opik_secret_name, opik_secret = _create_static_secret(
+        stack_info=stack_info,
+        secret_base_name="secret-opik-sdk-client",  # pragma: allowlist secret  # noqa: S106
+        namespace=mitlearn_namespace,
+        labels=k8s_global_labels,
+        mount=OPIK_SDK_VAULT_MOUNT,
+        path=opik_sdk_vault_path("mit-learn"),
+        templates=OPIK_KEYCLOAK_SECRET_TEMPLATES,
+        vaultauth=vault_k8s_resources.auth_name,
+        restart_targets=restart_targets,
+    )
+    secret_resources.append(opik_secret)
+
     # 3. Static secrets from the shared 'secret-global' KV-v1 mount
     # Mailgun API key
     secret_global_mailgun_name, secret_global_mailgun = _create_static_secret(
@@ -385,7 +417,7 @@ def create_mitlearn_k8s_secrets(
                 "STARROCKS_PASSWORD": '{{ get .Secrets "password" }}',
             },
             vaultauth=vault_k8s_resources.auth_name,
-            restart_targets=starrocks_restart_targets,
+            restart_targets=restart_targets,
         )
         secret_names.append(starrocks_secret_name)
         secret_resources.append(starrocks_secret)
@@ -417,7 +449,7 @@ def create_mitlearn_k8s_secrets(
         redis_creds
     )  # This is different from everything else in the list but allowed per the type hints above
 
-    return secret_names, secret_resources
+    return secret_names, [opik_secret_name], secret_resources
 
 
 # OIDC secret is a little different so we do that one with its own function.

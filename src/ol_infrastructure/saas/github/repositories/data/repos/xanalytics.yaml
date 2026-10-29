@@ -8,7 +8,7 @@ _visibility: public
 allow_merge_commit: true
 allow_rebase_merge: true
 allow_squash_merge: true
-archetype: library
+archetype: archived
 default_branch: master
 description: Analytics for edX platform courses
 has_discussions: false

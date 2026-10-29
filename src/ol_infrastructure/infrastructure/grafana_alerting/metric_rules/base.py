@@ -111,6 +111,13 @@ Sub-modules
                  than merged there. edxapp tracking-log delivery off the Vector
                  sidecar's own metrics (PodMonitor added in #4822): source
                  silence, S3 sink errors, and no-bytes-delivered.
+  alloy_pipeline
+               — New in 2026-10. An Alloy instance whose config reload was
+                 rejected and that is running its last good config. New pods
+                 on the rejected config crash-loop and are caught by
+                 PodCrashLoopingCritical; this covers the pods that keep
+                 running, which nothing else alerted on during the
+                 2026-10-23 log gap.
 """
 
 import json
@@ -120,6 +127,7 @@ from pulumiverse_grafana import alerting
 from pulumiverse_grafana.oss.folder import Folder
 
 from ol_infrastructure.infrastructure.grafana_alerting.metric_rules import (
+    alloy_pipeline,
     apisix_edge,
     cert_manager,
     clickhouse,
@@ -242,6 +250,7 @@ def create(resource_opts: ResourceOptions) -> None:
     otel_service_red.create(alerts_folder.uid, rd, resource_opts)
     otel_trace_pipeline.create(alerts_folder.uid, rd, resource_opts)
     vector_edxapp_tracking.create(alerts_folder.uid, rd, resource_opts)
+    alloy_pipeline.create(alerts_folder.uid, rd, resource_opts)
     # No folder_uid: these rules live in the Synthetic Monitoring plugin's own
     # folder rather than the one created above. See the module docstring.
     synthetic_monitoring.create(rd, resource_opts)

@@ -9,8 +9,11 @@ from pathlib import Path
 from typing import Any
 
 import pulumi
+import pytest
+import yaml
 
-from ol_infrastructure.applications.mitxonline import definition
+from ol_infrastructure.applications.mitxonline import definition, vault_secrets
+from ol_infrastructure.lib.secret_env import VaultSecret
 
 # Python 3.14+ compatibility, as
 # tests/ol_infrastructure/applications/mitxonline/test_definition.py does.
@@ -28,6 +31,7 @@ PLUGIN_CONFIG = "kubernetes:apisix.apache.org/v2:ApisixPluginConfig"
 DEPLOYMENT = "kubernetes:apps/v1:Deployment"
 SERVICE = "kubernetes:core/v1:Service"
 JOB = "kubernetes:batch/v1:Job"
+SECRET_TYPE = "kubernetes:core/v1:Secret"  # noqa: S105  # pragma: allowlist secret
 APP_COMPONENT = "ol:infrastructure:components:services:OLApplicationK8s"
 
 
@@ -54,17 +58,12 @@ class RecordingMocks(pulumi.runtime.Mocks):
 MOCKS = RecordingMocks()
 
 
-def _tree(
-    tmp_path: Path, secrets_extra: str = "", app_files: dict[str, str] | None = None
-) -> Path:
+def _tree(tmp_path: Path, app_files: dict[str, str] | None = None) -> Path:
     """Copy the app dir with pulumi/ inside; the program takes its parent as APP_DIR."""
     root = tmp_path / "local-dev"
     shutil.copytree(
         APP_DIR, root / "apps/mitxonline", ignore=shutil.ignore_patterns("__pycache__")
     )
-    if secrets_extra:
-        with (root / "apps/mitxonline/secrets.yaml").open("a") as f:
-            f.write(secrets_extra)
     for relpath, text in (app_files or {}).items():
         target = root / "apps/mitxonline" / relpath
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -79,10 +78,13 @@ def _render(  # noqa: PLR0913
     root_domain="mit.test",
     config=None,
     environ=None,
-    secrets_extra="",
     app_files=None,
 ):
-    for key in ("TILT_IMAGE_0", "LOCAL_DEV_PREBUILT_IMAGE_TAGS"):
+    for key in (
+        "TILT_IMAGE_0",
+        "LOCAL_DEV_PREBUILT_IMAGE_TAGS",
+        "LOCAL_DEV_ANALYTICS_API_ENABLED",
+    ):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("LOCAL_DEV_ROOT_DOMAIN", root_domain)
     for key, value in (environ or {}).items():
@@ -104,7 +106,7 @@ def _render(  # noqa: PLR0913
             for key, value in (config or {}).items()
         }
     )
-    program_dir = _tree(tmp_path, secrets_extra, app_files)
+    program_dir = _tree(tmp_path, app_files)
 
     @pulumi.runtime.test
     def run():
@@ -123,6 +125,16 @@ def _one(mocks, typ, name):
     ]
     assert len(matches) == 1, f"{typ} {name}: {len(matches)} found"
     return matches[0]
+
+
+def _secret_data(mocks):
+    """Return the local Secret's stringData, which the provider marks secret.
+
+    The mock sees the marked value as Pulumi's wire form, a dict with the
+    secret signature key beside the value.
+    """
+    data = _one(mocks, SECRET_TYPE, "mitxonline-secrets")["stringData"]
+    return data["value"] if pulumi.runtime.rpc._special_sig_key in data else data
 
 
 def _plugin(route_inputs, rule, plugin):
@@ -244,6 +256,39 @@ def test_every_container_mounts_each_path_once(tmp_path, monkeypatch):
                 )
 
 
+def test_every_container_reads_the_ca_bundle_the_core_stack_writes(
+    tmp_path, monkeypatch
+):
+    """SSL_CERT_FILE names a file in the core stack's bundle ConfigMap."""
+    monkeypatch.syspath_prepend(str(REPO / "local-dev/infra"))
+    tls = importlib.import_module("modules.tls")
+    mocks = _render(tmp_path, monkeypatch)
+    expected = f"{mocks.program['CA_BUNDLE_DIR']}/{tls.CA_BUNDLE_FILENAME}"
+    for typ in (DEPLOYMENT, JOB):
+        for _, name, inputs in [(t, n, i) for t, n, i in mocks.resources if t == typ]:
+            spec = inputs["spec"]["template"]["spec"]
+            volumes = {
+                v["name"]: v["configMap"]["name"]
+                for v in spec["volumes"]
+                if "configMap" in v
+            }
+            assert not [
+                c["name"]
+                for c in spec.get("initContainers") or []
+                if c["name"] == "ca-bundle-merge"
+            ]
+            for container in spec["containers"]:
+                env = {e["name"]: e.get("value") for e in container["env"]}
+                assert env["SSL_CERT_FILE"] == expected, name
+                assert env["REQUESTS_CA_BUNDLE"] == expected, name
+                (mount,) = [
+                    m
+                    for m in container["volumeMounts"]
+                    if m["mountPath"] == mocks.program["CA_BUNDLE_DIR"]
+                ]
+                assert volumes[mount["name"]] == tls.CA_BUNDLE_CONFIGMAP, name
+
+
 def test_the_pre_deploy_job_is_the_deployed_command_plus_the_oauth_app_step(
     tmp_path, monkeypatch
 ):
@@ -361,6 +406,29 @@ def test_env_is_exactly_the_three_local_layers(tmp_path, monkeypatch):
     )
 
 
+def test_the_admin_api_takes_the_b2b_clients_pair(tmp_path, monkeypatch):
+    """The admin roles are on mitxonline-b2b-client, whose pair apps-infra
+    writes into mitxonline-keycloak-admin. A KEYCLOAK_ADMIN_* key left in
+    secrets.yaml would compete with it, and ol-mitxonline-client gets a 403.
+    """
+    mocks = _render(tmp_path, monkeypatch)
+    secrets_yaml = mocks.program["secret_data"]
+    workloads = [
+        _one(mocks, DEPLOYMENT, "mitxonline-app"),
+        _one(mocks, JOB, "mitxonline-app-pre-deploy"),
+    ]
+
+    assert not [key for key in secrets_yaml if key.startswith("KEYCLOAK_ADMIN_")]
+    for workload in workloads:
+        for container in workload["spec"]["template"]["spec"]["containers"]:
+            secret_refs = [
+                source["secretRef"]["name"]
+                for source in container.get("envFrom", [])
+                if "secretRef" in source
+            ]
+            assert "mitxonline-keycloak-admin" in secret_refs
+
+
 def test_the_root_domain_flows_into_hosts_and_env(tmp_path, monkeypatch):
     mocks = _render(tmp_path, monkeypatch, root_domain="mit.localhost")
     direct = _one(mocks, ROUTE, "mitxonline-apisix-route-direct-dev")
@@ -370,13 +438,14 @@ def test_the_root_domain_flows_into_hosts_and_env(tmp_path, monkeypatch):
     }
     env = _env(_one(mocks, DEPLOYMENT, "mitxonline-app"))
     assert env["MITX_ONLINE_BASE_URL"] == "https://mitxonline.mit.localhost"
+    secret = _secret_data(mocks)
     assert (
-        env["KEYCLOAK_DISCOVERY_URL"]
+        secret["KEYCLOAK_DISCOVERY_URL"]
         == "https://sso.ol.mit.localhost/realms/olapps/.well-known/openid-configuration"
     )
     # Every host in LOCAL_ENV_DEFAULTS is an f-string on the root domain; a
     # literal would pass the two checks above and point at the wrong cluster.
-    assert not [v for v in env.values() if "mit.test" in v]
+    assert not [v for v in [*env.values(), *secret.values()] if "mit.test" in v]
 
 
 def _webapp_container(mocks):
@@ -422,8 +491,11 @@ def test_a_secrets_edit_changes_the_hash_on_the_pods_and_the_job(tmp_path, monke
         )
 
     before = hashes(_render(tmp_path / "a", monkeypatch))
+    secrets = (APP_DIR / "secrets.yaml").read_text()
+    edited = secrets.replace("local-dev-stub-token", "another-stub-token")
+    assert edited != secrets
     after = hashes(
-        _render(tmp_path / "b", monkeypatch, secrets_extra='  NEW_SECRET: "1"\n')
+        _render(tmp_path / "b", monkeypatch, app_files={"secrets.yaml": edited})
     )
     # The component folds its own sources into the pod hash, so the two differ;
     # both must move.
@@ -483,3 +555,66 @@ def test_the_overrides_replace_fields_the_definition_leaves_empty():
     assert config.extra_volume_mounts == []
     assert config.config_hash_inputs == {}
     assert len(config.pre_deploy_commands) == 1
+
+
+def _deployed_env_names():
+    """Return the variables the deployed VSO templates write."""
+    secrets = vault_secrets.vault_secrets(
+        database_mount="postgres-mitxonline",
+        database_host="db.example:5432",
+        openedx_environment="mitxonline-qa",
+    )
+    return [name for secret in secrets for name in secret.templates]
+
+
+def test_the_secret_is_keyed_by_the_deployed_vault_variables(tmp_path, monkeypatch):
+    """Locally there is no Vault: one plain Secret stands in for the VSO resources.
+
+    Its keys are the deployed templates' variable names, less those secrets.yaml
+    leaves unset so the app's default applies and those another Secret supplies.
+    """
+    mocks = _render(tmp_path, monkeypatch)
+    local = yaml.safe_load((APP_DIR / "secrets.yaml").read_text())
+    unset, supplied_by = local["unset"], local["supplied_by"]
+    deployed = _deployed_env_names()
+    assert set(unset) <= set(deployed)
+    assert set(supplied_by) <= set(deployed)
+    # A set: the mock receives the data as a protobuf map, which keeps no order.
+    assert set(_secret_data(mocks)) == set(deployed) - set(unset) - set(supplied_by)
+    webapp = _one(mocks, DEPLOYMENT, "mitxonline-app")
+    env_from = webapp["spec"]["template"]["spec"]["containers"][0]["envFrom"]
+    for name in {"mitxonline-secrets", *supplied_by.values()}:
+        assert {"secretRef": {"name": name}} in env_from
+
+
+def test_a_variable_added_for_deployed_stacks_stops_the_local_program(
+    tmp_path, monkeypatch
+):
+    """The drift check: a new deployed variable needs a value or an unset entry."""
+    original = vault_secrets.vault_secrets
+
+    def with_new_variable(**kwargs):
+        return [
+            *original(**kwargs),
+            VaultSecret(
+                name="new",
+                kind="static",
+                mount="secret-mitxonline",
+                mount_type="kv-v1",
+                path="new",
+                env={"NEW_DEPLOYED_VARIABLE": ("value",)},
+            ),
+        ]
+
+    monkeypatch.setattr(vault_secrets, "vault_secrets", with_new_variable)
+    with pytest.raises(ValueError, match="missing: NEW_DEPLOYED_VARIABLE;"):
+        _render(tmp_path, monkeypatch)
+
+
+def test_a_local_only_secret_stops_the_local_program(tmp_path, monkeypatch):
+    """A key deployed stacks do not read belongs in LOCAL_ENV_DEFAULTS, not here."""
+    secrets = (APP_DIR / "secrets.yaml").read_text()
+    edited = secrets.replace("unset:\n", "unset:\n- LOCAL_ONLY_VARIABLE\n", 1)
+    assert edited != secrets
+    with pytest.raises(ValueError, match=r"not deployed: LOCAL_ONLY_VARIABLE$"):
+        _render(tmp_path, monkeypatch, app_files={"secrets.yaml": edited})

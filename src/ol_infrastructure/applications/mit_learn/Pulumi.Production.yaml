@@ -37,7 +37,6 @@ config:
     - "https://draft.ocw.mit.edu"
     - "https://ocw.mit.edu"
     mailgun_sender_domain: "mail.learn.mit.edu" # Need to verify
-    session_cookie_domain: ".learn.mit.edu"
     sso_url: "sso.ol.mit.edu"
   mitlearn:k8s_deploy: "true"
   mitlearn:k8s_cutover: "true"
@@ -46,7 +45,10 @@ config:
   mitlearn:learn_ai_syllabus_endpoint: "https://api.learn.mit.edu/ai/http/syllabus_agent/"
   mitlearn:legacy_api_domain: "api.mitopen.odl.mit.edu"
   mitlearn:legacy_frontend_domain: "mitopen.odl.mit.edu"
-  mitlearn:min_replicas: 4
+  # Raised 4 -> 6 after a crawler surge on 2026-10-26 took all 4 pods down
+  # together before KEDA added any. A larger floor spreads a step in traffic
+  # thinner while the request trigger catches up.
+  mitlearn:min_replicas: 6
   mitlearn:max_replicas: 30
   mitlearn:nextjs_heroku_domain: "next.learn.mit.edu"
   mitlearn:posthog_proxy: "ph.ol.mit.edu"
@@ -103,7 +105,7 @@ config:
     MITOL_APP_BASE_URL: "https://learn.mit.edu"
     MITOL_APP_URL: "https://learn.mit.edu"
     MITOL_BASE_URL: "https://learn.mit.edu"
-    MITOL_COOKIE_DOMAIN: "mit.edu"
+    MITOL_COOKIE_DOMAIN: "learn.mit.edu"
     MITOL_COOKIE_NAME: "learn"
     MITOL_LOG_LEVEL: "INFO"
     MITOL_NEW_USER_LOGIN_URL: "https://learn.mit.edu/onboarding"

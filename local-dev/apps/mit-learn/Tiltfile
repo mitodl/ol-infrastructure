@@ -42,17 +42,16 @@ if os.path.exists(os.path.join(MIT_LEARN_DIR, ".git")):
         # Live update: sync source changes into the container; granian runs
         # with --reload (see deployment.yaml) and restarts workers on change.
         live_update=[
+            # Dependency changes rebuild the image rather than running uv sync
+            # in the pods: Celery doesn't reload, so running processes would
+            # keep the old packages, and a restarted container loses the sync.
+            fall_back_on([
+                os.path.join(MIT_LEARN_DIR, "pyproject.toml"),
+                os.path.join(MIT_LEARN_DIR, "uv.lock"),
+            ]),
             sync(
                 os.path.join(MIT_LEARN_DIR),
                 "/src",
-            ),
-            # Reinstall Python deps if pyproject.toml or uv.lock changes.
-            run(
-                "cd /src && uv sync --frozen",
-                trigger=[
-                    os.path.join(MIT_LEARN_DIR, "pyproject.toml"),
-                    os.path.join(MIT_LEARN_DIR, "uv.lock"),
-                ],
             ),
         ],
     )

@@ -13,6 +13,9 @@ seeded by local-dev/scripts/kc-seed-users.sh, which the root Tiltfile runs
 automatically (the "kc-seed-users" resource) after this realm is applied.
 """
 
+from http import HTTPStatus
+
+import httpx
 import pulumi_keycloak as keycloak
 import pulumi_kubernetes as k8s
 from pulumi import InvokeOptions, Output, ResourceOptions
@@ -29,6 +32,57 @@ from ol_infrastructure.substructure.keycloak.org_flows import (
 # cookie.
 LOCAL_OIDC_SESSION_SECRET = "local-dev-oidc-session-secret-32chars!"  # noqa: S105  # pragma: allowlist secret
 
+OLAPPS_REALM = "olapps"
+ADMIN_API_TIMEOUT_SECONDS = 30
+
+
+def live_realm_import_id(
+    keycloak_url: str, realm: str, admin_username: str, admin_password: str
+) -> str | None:
+    """Return ``realm`` as an import ID if Keycloak already has it, else None.
+
+    A realm create that Keycloak applies but Pulumi never records (the POST
+    times out, or the run is killed before the response lands) leaves a realm
+    the stack does not own, and every later create fails with 409 "Realm
+    already exists". Importing adopts that realm instead. Pulumi skips the
+    import for a resource its state already holds under the same ID, so the
+    caller can pass this on every run.
+
+    :param keycloak_url: Base URL of the Keycloak server.
+    :param realm: Realm name, which is also the realm's Pulumi import ID.
+    :param admin_username: Master realm admin user.
+    :param admin_password: Password for ``admin_username``.
+    :returns: ``realm`` when it exists in Keycloak, otherwise None.
+    :rtype: str | None
+    """
+    # verify=False for the same reason as the provider's
+    # tls_insecure_skip_verify: the mkcert CA is not in Python's trust store.
+    with httpx.Client(
+        base_url=keycloak_url,
+        verify=False,  # noqa: S501
+        timeout=ADMIN_API_TIMEOUT_SECONDS,
+    ) as client:
+        token = (
+            client.post(
+                "/realms/master/protocol/openid-connect/token",
+                data={
+                    "client_id": "admin-cli",
+                    "grant_type": "password",
+                    "username": admin_username,
+                    "password": admin_password,
+                },
+            )
+            .raise_for_status()
+            .json()["access_token"]
+        )
+        response = client.get(
+            f"/admin/realms/{realm}", headers={"Authorization": f"Bearer {token}"}
+        )
+    if response.status_code == HTTPStatus.NOT_FOUND:
+        return None
+    response.raise_for_status()
+    return realm
+
 
 def create_olapps_dev_realm(  # noqa: PLR0913
     keycloak_provider: keycloak.Provider,
@@ -42,6 +96,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     ocw_studio_client_secret: Output,
     *,
     root_domain: str,
+    realm_import_id: str | None,
     verify_email: bool = True,
     enabled_apps: tuple[str, ...] = (),
 ) -> None:
@@ -55,6 +110,9 @@ def create_olapps_dev_realm(  # noqa: PLR0913
 
     All client hostnames derive from ``root_domain``, which must match the
     domain the APISIX routes and the TLS certificate were built from.
+
+    ``realm_import_id`` is :func:`live_realm_import_id`'s result; when set, the
+    realm resource adopts the live realm instead of creating it.
     """
     kc_opts = ResourceOptions(provider=keycloak_provider)
     k8s_opts = ResourceOptions(provider=k8s_provider)
@@ -87,7 +145,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             period=30,
             type="totp",
         ),
-        realm="olapps",
+        realm=OLAPPS_REALM,
         registration_allowed=True,
         reset_password_allowed=True,
         login_with_email_allowed=True,
@@ -136,7 +194,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         organizations_enabled=True,
         sso_session_idle_timeout="336h",
         sso_session_max_lifespan="336h",
-        opts=kc_opts,
+        opts=kc_opts.merge(ResourceOptions(import_=realm_import_id)),
     )
 
     keycloak.RealmEvents(
@@ -474,6 +532,9 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             # client (sso/mitlearn), so rendering them locally needs its hosts.
             f"https://mitxonline.{root_domain}/*",
             f"https://api.mitxonline.{root_domain}/*",
+            # mitxonline's Open edX login gate on the LMS host; see
+            # openedx_login_gate_route_configs.
+            f"https://courses.learn.{root_domain}/auth/login/ol-oauth2/.apisix/redirect",
         ],
         web_origins=["+"],
         opts=kc_opts.merge(ResourceOptions(delete_before_replace=True)),
@@ -495,8 +556,14 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     # Same mitlearn creds for the other apps' routes on api.learn that read
     # mit-learn's session via secretRef: both of mitxonline's rendered route
     # groups (they authenticate through this client, as deployed) and learn-ai's
-    # /ai/* routes.
-    for namespace in ("mitxonline", "learn-ai"):
+    # /ai/* routes. ol-analytics-api's analytics.learn route reads the same
+    # session, as its deployed Learn-scoped OIDC resource does (sso/mitlearn);
+    # its namespace only exists when the app is enabled.
+    for namespace in (
+        "mitxonline",
+        "learn-ai",
+        *(("ol-analytics-api",) if "ol-analytics-api" in enabled_apps else ()),
+    ):
         _make_oidc_secret(
             f"oidc-secret-mitlearn-in-{namespace}",
             namespace,
@@ -691,20 +758,22 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             opts=kc_opts,
         )
 
+    # MITx Online's admin API settings, under the names the deployed
+    # keycloak-admin-b2b template writes (applications/mitxonline/k8s_secrets.py);
+    # the local mitxonline program loads this Secret into its workloads. The
+    # discovery URL is in the program's env already.
     k8s.core.v1.Secret(
-        "oidc-secret-mitxonline-b2b",
-        metadata={"name": "ol-mitxonline-b2b-oidc", "namespace": "mitxonline"},
+        "mitxonline-keycloak-admin",
+        metadata={"name": "mitxonline-keycloak-admin", "namespace": "mitxonline"},
         string_data=Output.all(
             client_id=mitxonline_b2b_client.client_id,
             client_secret=mitxonline_b2b_client.client_secret,
-            realm_id=mitxonline_b2b_client.realm_id,
         ).apply(
             lambda args: {
-                "client_id": args["client_id"],
-                "client_secret": args["client_secret"],
-                "realm_id": args["realm_id"],
-                "realm_name": "olapps",
-                "url": f"{keycloak_url}/realms/{args['realm_id']}",
+                "KEYCLOAK_ADMIN_CLIENT_ID": args["client_id"],
+                "KEYCLOAK_ADMIN_CLIENT_SECRET": args["client_secret"],
+                "KEYCLOAK_ADMIN_CLIENT_SCOPES": "openid profile email",
+                "KEYCLOAK_ADMIN_CLIENT_NO_VERIFY_SSL": "False",
             }
         ),
         opts=k8s_opts,

@@ -26,8 +26,8 @@ can produce the local app manifests) to the whole stack.
 
 | Service | Local | Deployed | Shared code |
 |---|---|---|---|
-| APISIX | chart 2.17.0 (APISIX 3.18.0, controller chart 1.3.0) | chart 2.17.0 (APISIX 3.18.0, controller chart 1.3.0) | version pin |
-| Gateway API | no `GatewayClass` or `Gateway` | `GatewayClass`/`Gateway` `apisix`, CRDs v1.6.2 | none |
+| APISIX | one pod, NodePort | HPA and VPA, NLB | version pin, chart values (`apisix_definition.py`) |
+| Gateway API | `GatewayClass`/`Gateway` `apisix`, CRDs from the APISIX chart (standard channel) | `GatewayClass`/`Gateway` `apisix`, experimental CRDs at `GATEWAY_API_VERSION` | `GatewayClass`/`Gateway` specs |
 | cert-manager | v1.21.2, installed, used by nothing | v1.21.2, `ClusterIssuer` per environment | version pin |
 | Keycloak operator | 26.7.4, CR `v2beta1`, behind APISIX over HTTP | 26.7.4, CR `v2beta1`, behind Traefik over HTTPS | version pin, CRD list helper |
 | Keycloak realm | 861 lines, credentials in k8s Secrets | about 1800 lines, credentials in Vault | flow builders |
@@ -48,10 +48,11 @@ are still hardcoded; the sidecar goes away with the app definitions.
 
 Two of these change behaviour an application developer depends on.
 
-- No `Gateway` locally. `OLApisixHTTPRoute` attaches to the `apisix` Gateway
-  (`src/ol_infrastructure/components/services/apisix_gateway_api.py:220-221`),
-  so apps already migrated to Gateway API (ocw_studio, xpro) cannot use their
-  deployed route definitions locally. ADR 0002 makes that the direction for
+- Gateway API CRDs. Local has the `apisix` Gateway that `OLApisixHTTPRoute`
+  attaches to, but its Gateway API CRDs are the standard-channel copy the
+  APISIX chart installs on first install, not the experimental bundle at
+  `GATEWAY_API_VERSION`, so a route that uses an experimental-only field is
+  not supported locally. ADR 0002 makes Gateway API routes the direction for
   every app.
 - Redis without TLS or auth. Deployed apps connect with `rediss://` and a
   token. That connection handling is never run locally.

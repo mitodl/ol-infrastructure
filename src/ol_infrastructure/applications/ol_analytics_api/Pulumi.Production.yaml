@@ -11,6 +11,10 @@ config:
   ol_analytics_api:learn_domain: analytics.learn.mit.edu
   ol_analytics_api:env_vars:
     OL_ANALYTICS_API_ENVIRONMENT: production
+    # TLS to the StarRocks FE, verified against the name its cert-manager
+    # certificate is issued for (starrocks:domain in the StarRocks stack), not
+    # the in-cluster Service name the app dials.
+    OL_ANALYTICS_API_STARROCKS_TLS_SERVER_NAME: lakehouse.starrocks.ol.mit.edu
     LOG_LEVEL: INFO
     DEBUG: "false"
     OPENTELEMETRY_SERVICE_NAME: ol-analytics-api

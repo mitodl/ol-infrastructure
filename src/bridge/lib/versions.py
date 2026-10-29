@@ -77,11 +77,11 @@ MEILISEARCH_CHART_VERSION = "0.42.0"
 # renovate: datasource=helm depName=opik packageName=opik registryUrl=https://comet-ml.github.io/opik
 OPIK_CHART_VERSION = "2.2.119"
 # renovate: datasource=helm depName=operator packageName=operator registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
-STARROCKS_OPERATOR_CHART_VERSION = "1.11.7"
+STARROCKS_OPERATOR_CHART_VERSION = "1.11.8"
 # renovate: datasource=helm depName=operator packageName=starrocks registryUrl=https://starrocks.github.io/starrocks-kubernetes-operator
-STARROCKS_CHART_VERSION = "1.11.7"
+STARROCKS_CHART_VERSION = "1.11.8"
 # renovate: datasource=docker depName=starrocks packageName=starrocks/fe-ubuntu
-STARROCKS_VERSION = "4.1.6"
+STARROCKS_VERSION = "4.1.7"
 # renovate: datasource=github-releases depName=starrocks-vault-plugin packageName=mitodl/vault-plugin-database-starrocks
 VAULT_PLUGIN_STARROCKS_VERSION = "0.1.0"
 # Checksum of that release's `vault-plugin-database-starrocks` asset, which
@@ -101,7 +101,7 @@ CLICKHOUSE_SERVER_VERSION = "25.8.33.10001.altinitystable"
 # renovate: datasource=docker depName=clickhouse/clickhouse-keeper packageName=clickhouse/clickhouse-keeper
 CLICKHOUSE_KEEPER_VERSION = "26.8-alpine"
 # renovate: datasource=helm depName=traefik packageName=traefik registryUrl=https://traefik.github.io/charts
-TRAEFIK_CHART_VERSION = "42.0.0"
+TRAEFIK_CHART_VERSION = "42.1.3"
 # renovate: datasource=helm depName=vantage-kubernetes-agent packageName=vantage-kubernetes-agent registryUrl=https://vantage-sh.github.io/helm-charts
 VANTAGE_K8S_AGENT_CHART_VERSION = "1.10.2"
 # renovate: datasource=helm depName=vault-secrets-operator packageName=vault-secrets-operator registryUrl=https://helm.releases.hashicorp.com
@@ -138,17 +138,17 @@ SQL_EXPORTER_VERSION = "0.24.11"
 # renovate: datasource=github-releases depName=local-path-provisioner packageName=rancher/local-path-provisioner
 LOCAL_PATH_PROVISIONER_CHART_VERSION = "0.0.37"
 # renovate: datasource=github-releases depName=qdrant packageName=qdrant/qdrant
-QDRANT_VERSION = "v1.19.2"
+QDRANT_VERSION = "v1.20.0"
 # renovate: datasource=helm depName=typesense-operator packageName=typesense-operator registryUrl=https://akyriako.github.io/typesense-operator
 TYPESENSE_OPERATOR_CHART_VERSION = "0.4.2"
 # renovate: datasource=helm depName=vertical-pod-autoscaler packageName=vertical-pod-autoscaler registryUrl=https://kubernetes.github.io/autoscaler
-VPA_CHART_VERSION = "0.14.0"
+VPA_CHART_VERSION = "0.15.0"
 # renovate: datasource=docker depName=toolhive-operator-crds packageName=ghcr.io/stacklok/toolhive/toolhive-operator-crds
 TOOLHIVE_OPERATOR_CRDS_CHART_VERSION = "0.56.0"
 # renovate: datasource=docker depName=toolhive-operator packageName=ghcr.io/stacklok/toolhive/toolhive-operator
-TOOLHIVE_OPERATOR_CHART_VERSION = "0.54.0"
+TOOLHIVE_OPERATOR_CHART_VERSION = "0.56.0"
 # renovate: datasource=docker depName=mcp-grafana packageName=grafana/mcp-grafana
-MCP_GRAFANA_VERSION = "2.0.2"
+MCP_GRAFANA_VERSION = "2.1.1"
 # ToolHive-built npx wrapper image for the Sentry MCP server (getsentry/sentry-mcp
 # self-hosted stdio mode). Tag tracks the dockyard build, not the upstream npm pkg.
 # renovate: datasource=docker depName=sentry-mcp-server packageName=ghcr.io/stacklok/dockyard/npx/sentry-mcp-server

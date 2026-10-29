@@ -2,8 +2,9 @@
 
 The same ``definition.*`` calls as src/ol_infrastructure/applications/mitxonline/
 __main__.py, with bindings for k3d: environment from LOCAL_ENV_DEFAULTS with
-the ``vars`` of the developer's gitignored stack file merged over it, the
-tracked Secret, the image Tilt built (or the published one without a checkout),
+the ``vars`` of the developer's gitignored stack file merged over it, a
+Secret holding the deployed Vault-backed variables (local values from
+secrets.yaml), the image Tilt built (or the published one without a checkout),
 laptop sizing with the memory limits from that stack file, and the
 ``ol-mitlearn-oidc`` Secret the apps-infra stack already wrote for the gateway
 routes. Tilt runs this through local-dev/scripts/pulumi-app-apply.sh.
@@ -30,7 +31,9 @@ from inputs import (
 from pulumi import ResourceOptions
 
 from ol_infrastructure.applications.mitxonline import definition
+from ol_infrastructure.applications.mitxonline.vault_secrets import secret_env_names
 from ol_infrastructure.components.services.apisix import (
+    OLApisixExternalUpstream,
     OLApisixOIDCResources,
     OLApisixRoute,
     OLApisixSharedPlugins,
@@ -45,10 +48,17 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.secret_env import local_secret_data
 
 # The app's Tilt directory (secrets.yaml), this program's parent.
 APP_DIR = Path(__file__).resolve().parents[1]
+SECRET_NAME = "mitxonline-secrets"  # noqa: S105  # pragma: allowlist secret
 ENV_SUFFIX = "dev"
+# Public roots plus the mkcert root, so pods trust both public endpoints and
+# local TLS. The core stack writes this ConfigMap into every app namespace
+# (CA_BUNDLE_CONFIGMAP in local-dev/infra/modules/tls.py).
+CA_BUNDLE_CONFIGMAP = "local-dev-ca-bundle"
+CA_BUNDLE_DIR = "/etc/ssl/local-dev"
 # The deployed label set (environment comes out as the stack's "dev"), plus the
 # key pulumi-app-apply.sh selects the applied objects by. These keys join every
 # Deployment's immutable selector, so changing any of them replaces every
@@ -96,23 +106,21 @@ LOCAL_ENV_DEFAULTS = {
     "DEBUG": "False",
     "ALLOWED_HOSTS": "*",
     "USE_X_FORWARDED_PORT": "True",
-    # Written by ca_bundle_init below.
-    "REQUESTS_CA_BUNDLE": "/etc/ssl/local-dev/rootCA.pem",
-    "SSL_CERT_FILE": "/etc/ssl/local-dev/rootCA.pem",
+    # The CA_BUNDLE_CONFIGMAP mount below.
+    "REQUESTS_CA_BUNDLE": f"{CA_BUNDLE_DIR}/ca-certificates.crt",
+    "SSL_CERT_FILE": f"{CA_BUNDLE_DIR}/ca-certificates.crt",
     # Site config
     "MITX_ONLINE_ENVIRONMENT": "local",
     "MITX_ONLINE_ADMIN_EMAIL": "admin@ol.test",
     "EXPOSE_OIDC_LOGIN": "True",
     # Keycloak
     "KEYCLOAK_BASE_URL": f"https://sso.ol.{root_domain}",
-    "KEYCLOAK_REALM_NAME": "olapps",
-    "KEYCLOAK_DISCOVERY_URL": (
-        f"https://sso.ol.{root_domain}/realms/olapps/.well-known/openid-configuration"
-    ),
-    # Enable the APISIX user middleware: it reads the X-Userinfo header APISIX
-    # injects and authenticates (and auto-creates) the Django user. Defaults to
-    # True (disabled), which leaves every request anonymous. Production sets this.
-    "MITOL_APIGATEWAY_DISABLE_MIDDLEWARE": "false",
+    # Django's own Keycloak client (account actions). Gateway login uses the
+    # mit-learn client, and the admin API mitxonline-b2b-client (see
+    # supplied_by in secrets.yaml). Deployed stacks set the ID in their vars and
+    # no secret.
+    "KEYCLOAK_CLIENT_ID": "ol-mitxonline-client",
+    "KEYCLOAK_CLIENT_SECRET": "local-dev-mitxonline-secret",  # pragma: allowlist secret
     # Required for Django's CSRF origin check on POSTs behind HTTPS (e.g. the
     # admin login form); defaults to empty, which rejects them with DEBUG=False.
     "CSRF_TRUSTED_ORIGINS": (
@@ -129,16 +137,9 @@ LOCAL_ENV_DEFAULTS = {
     "EMAIL_HOST": "mailpit.local-infra.svc.cluster.local",
     "EMAIL_PORT": "1025",
     "EMAIL_USE_TLS": "False",
-    # Required mitxonline email vars (stubs: EMAIL_BACKEND above sends to mailpit,
+    # Required mitxonline email var (stub: EMAIL_BACKEND above sends to mailpit,
     # never Mailgun)
     "MAILGUN_SENDER_DOMAIN": "local.dev",
-    "MAILGUN_KEY": "local-dev-stub-mailgun-key",
-    # Required Open edX API credentials (stubs; the Open edX integration is
-    # degraded locally)
-    "OPENEDX_API_CLIENT_ID": "local-dev-openedx-client-id",  # pragma: allowlist secret
-    "OPENEDX_API_CLIENT_SECRET": (
-        "local-dev-openedx-client-secret"  # pragma: allowlist secret
-    ),
     # Open edX hostnames: the hosts lehrer's LMS and Studio are served on
     # (local-dev/apps/openedx/configmaps/lms-config.yaml). Each has a devstack
     # default in mitxonline's main/settings.py that resolves to nothing here, so
@@ -223,13 +224,26 @@ kubeconfig = str(
 provider = k8s.Provider("k3d-local", context="local-dev", kubeconfig=kubeconfig)
 opts = ResourceOptions(providers=[provider])
 
-secret_manifest = manifest(APP_DIR / "secrets.yaml", root_domain)
-secret_name = secret_manifest["metadata"]["name"]
-secret_data: dict[str, str] = secret_manifest["stringData"]
+# Deployed stacks get these variables from Vault through VSO. Here one plain
+# Secret carries the same names, with the values secrets.yaml gives them.
+local_secrets = manifest(APP_DIR / "secrets.yaml", root_domain)
+# The admin API's client pair, which apps-infra writes into this namespace (the
+# deployed stacks read it from keycloak-admin-b2b in Vault).
+MOUNTED_SECRETS = [SECRET_NAME, "mitxonline-keycloak-admin"]
+unmounted = sorted(set(local_secrets["supplied_by"].values()) - set(MOUNTED_SECRETS))
+if unmounted:
+    msg = f"secrets.yaml supplied_by names Secrets no workload mounts: {unmounted}"
+    raise ValueError(msg)
+secret_data = local_secret_data(
+    secret_env_names(),
+    local_secrets["values"],
+    local_secrets["unset"],
+    supplied_elsewhere=local_secrets["supplied_by"],
+)
 secret = k8s.core.v1.Secret(
-    secret_name,
+    SECRET_NAME,
     metadata=k8s.meta.v1.ObjectMetaArgs(
-        name=secret_name, namespace=definition.NAMESPACE, labels=LABELS
+        name=SECRET_NAME, namespace=definition.NAMESPACE, labels=LABELS
     ),
     string_data=secret_data,
     opts=opts,
@@ -267,7 +281,7 @@ bindings = definition.MitxonlineBindings(
     ),
     environment_variables=env_vars,
     k8s_labels=LABELS,
-    secret_names=[secret_name],
+    secret_names=MOUNTED_SECRETS,
     # The shared mit-learn client, as deployed (sso/mitlearn); apps-infra writes
     # this Secret into the mitxonline namespace.
     oidc_secret_name="ol-mitlearn-oidc",  # noqa: S106  # pragma: allowlist secret
@@ -280,23 +294,11 @@ bindings = definition.MitxonlineBindings(
     sizing=sizing,
     granian_reload=tilt_built,
     celery_topology="merged",
-)
-
-# The mkcert root merged into the image's CA bundle, so pods trust public
-# endpoints and local TLS; LOCAL_ENV_DEFAULTS points REQUESTS_CA_BUNDLE/
-# SSL_CERT_FILE at the result. Mounts only the ConfigMap: the component adds
-# extra_volume_mounts (the combined-ca target) to every extra init container.
-ca_bundle_init = k8s.core.v1.ContainerArgs(
-    name="ca-bundle-merge",
-    image=f"{repository}:{tag}",
-    command=["/bin/sh", "-c"],
-    args=[
-        "cat /etc/ssl/certs/ca-certificates.crt /mkcert/rootCA.pem"
-        " > /etc/ssl/local-dev/rootCA.pem"
-    ],
-    volume_mounts=[
-        k8s.core.v1.VolumeMountArgs(name="mkcert-root-ca", mount_path="/mkcert")
-    ],
+    # Local edX runs on lms.<root>, outside .learn.<root>, so it never reaches
+    # the gate. Test it with a stand-in LMS (see PR #6402).
+    openedx_login_gate=definition.OpenedxLoginGate(
+        lms_host=f"courses.learn.{root_domain}"
+    ),
 )
 
 secrets_hash = hashlib.sha256(
@@ -305,22 +307,25 @@ secrets_hash = hashlib.sha256(
 deployed_config = definition.application_config(bindings)
 app_config = deployed_config.model_copy(
     update={
-        # Local-dev's fresh-database and Open edX steps; see CONFIGURE_WAGTAIL_STEP
-        # and OPENEDX_OAUTH_APP_STEP.
-        "pre_deploy_commands": with_local_steps(deployed_config.pre_deploy_commands),
-        "extra_init_containers": [ca_bundle_init],
+        # Local-dev's fresh-database, Open edX and ol-analytics-api steps; see
+        # CONFIGURE_WAGTAIL_STEP, OPENEDX_OAUTH_APP_STEP and
+        # ANALYTICS_API_OAUTH_APP_SCRIPT.
+        "pre_deploy_commands": with_local_steps(
+            deployed_config.pre_deploy_commands,
+            # Set by the Tiltfile; see its apply_env.
+            analytics_api=os.environ.get("LOCAL_DEV_ANALYTICS_API_ENABLED") == "true",
+        ),
         "extra_volumes": [
             k8s.core.v1.VolumeArgs(
-                name="mkcert-root-ca",
-                config_map=k8s.core.v1.ConfigMapVolumeSourceArgs(name="mkcert-root-ca"),
-            ),
-            k8s.core.v1.VolumeArgs(
-                name="combined-ca", empty_dir=k8s.core.v1.EmptyDirVolumeSourceArgs()
-            ),
+                name=CA_BUNDLE_CONFIGMAP,
+                config_map=k8s.core.v1.ConfigMapVolumeSourceArgs(
+                    name=CA_BUNDLE_CONFIGMAP
+                ),
+            )
         ],
         "extra_volume_mounts": [
             k8s.core.v1.VolumeMountArgs(
-                name="combined-ca", mount_path="/etc/ssl/local-dev"
+                name=CA_BUNDLE_CONFIGMAP, mount_path=CA_BUNDLE_DIR, read_only=True
             )
         ],
         # Env is in env:, so an env edit changes the pod template; a secrets.yaml
@@ -392,4 +397,27 @@ OLApisixRoute(
         shared_plugin_config_name=shared_plugins.resource_name,
     ),
     opts=ResourceOptions(providers=[provider], delete_before_replace=True),
+)
+# The Open edX login gate, as the deployed stack builds it. Without a stand-in
+# LMS, its login path returns 503.
+gate_upstream = OLApisixExternalUpstream(
+    f"mitxonline-openedx-login-gate-upstream-{ENV_SUFFIX}",
+    external_upstream_config=definition.openedx_login_gate_upstream_config(
+        bindings.openedx_login_gate, ENV_SUFFIX, LABELS
+    ),
+    opts=opts,
+)
+OLApisixRoute(
+    name=f"mitxonline-openedx-login-gate-route-{ENV_SUFFIX}",
+    k8s_namespace=definition.NAMESPACE,
+    k8s_labels=LABELS,
+    route_configs=definition.openedx_login_gate_route_configs(
+        bindings,
+        oidc=prefixed_oidc,
+        shared_plugin_config_name=shared_plugins.resource_name,
+        upstream_name=gate_upstream.resource_name,
+    ),
+    opts=ResourceOptions(
+        providers=[provider], delete_before_replace=True, depends_on=[gate_upstream]
+    ),
 )

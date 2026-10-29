@@ -478,8 +478,11 @@ if ssl_enabled:
 
 # Ref: https://github.com/StarRocks/starrocks-kubernetes-operator/blob/main/helm-charts/charts/kube-starrocks/charts/starrocks/values.yaml
 fe_config = starrocks_config.get_object("fe_config") or {}
+starrocks_cluster_name = f"{stack_info.env_prefix}-starrocks"
+# The operator names the FE ClusterIP Service after the cluster.
+fe_service_name = f"{starrocks_cluster_name}-fe-service"
 starrocks_values: dict[str, Any] = {
-    "nameOverride": f"{stack_info.env_prefix}-starrocks",
+    "nameOverride": starrocks_cluster_name,
     "initPassword": {
         "enabled": True,
         "passwordSecret": starrocks_root_password_secret_name,
@@ -733,6 +736,8 @@ if starrocks_config.get_bool("use_cn"):
 # Reviewed for 1.11.7: the only diff from 1.11.6 is unrelated csiVolumes
 # support (CSI ephemeral inline volumes); the fe.conf config block is
 # byte-identical.
+# Reviewed for 1.11.8: the starrocks subchart changed only its Chart.yaml
+# version; values.yaml and the fe.conf config block are unchanged.
 #
 # fe.conf is rendered into a ConfigMap, which the shared cluster readonly role
 # can read, so no secret value goes into it. The FE's config loader
@@ -746,9 +751,9 @@ if (
     ssl_enabled
     or starrocks_config.get_bool("use_cn")
     or starrocks_config.get_bool("use_be")
-) and (STARROCKS_CHART_VERSION not in ("1.11.6", "1.11.7")):
+) and (STARROCKS_CHART_VERSION not in ("1.11.6", "1.11.7", "1.11.8")):
     msg = (
-        f"_FE_CONFIG_BASE was sourced from chart 1.11.6/1.11.7; review defaults"
+        f"_FE_CONFIG_BASE was sourced from chart 1.11.6-1.11.8; review defaults"
         f" for {STARROCKS_CHART_VERSION} before deploying with SSL, CN, or BE"
         f" enabled"
     )
@@ -1041,6 +1046,7 @@ starrocks_release = kubernetes.helm.v3.Release(
         version=STARROCKS_CHART_VERSION,
         namespace=namespace,
         cleanup_on_fail=True,
+        max_history=10,
         skip_await=True,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://starrocks.github.io/starrocks-kubernetes-operator",
@@ -1125,7 +1131,6 @@ STARROCKS_CN_KEEP_METRICS = [
     "starrocks_be_network_(receive|send)_bytes",
 ]
 
-starrocks_cluster_name = f"{stack_info.env_prefix}-starrocks"
 for component, port, keep_metrics in (
     ("fe", "http", STARROCKS_FE_KEEP_METRICS),
     ("cn", "webserver", STARROCKS_CN_KEEP_METRICS),
@@ -1155,7 +1160,7 @@ for component, port, keep_metrics in (
                     "port": port,
                     "path": "/metrics",
                     "scheme": "http",
-                    "interval": "30s",
+                    "interval": "60s",
                     "scrapeTimeout": "10s",
                     "relabelings": [
                         {
@@ -1280,7 +1285,7 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
             # holding native credentials, who can port-forward instead.
             paths=["/api/oauth2"],
             path_match_type="Exact",
-            backend_service_name=f"{stack_info.env_prefix}-starrocks-fe-service",
+            backend_service_name=fe_service_name,
             backend_service_port=8030,
             plugins=[],
         ),
@@ -1305,7 +1310,16 @@ starrocks_apisix_httproute = OLApisixHTTPRoute(
 # SecurityGroupBlockedFlowCount_Inbound_TCP metric recorded a burst of dropped
 # flows at every failed MIT Learn warehouse sync. Listing the node group SG
 # means any pod on those nodes can reach this port; StarRocks authentication is
-# what gates access.
+# what gates access. MITx Online runs on those nodes too, so it is admitted by
+# the same entry and needs none of its own. Karpenter nodes, GPU ones included,
+# launch with this SG too; only the managed gpu-worker-xlarge node group has its
+# own SG and is not admitted.
+#
+# Consumers on the data cluster (OpenMetadata, Superset, ol-analytics-api,
+# JupyterHub, Marimo) do not use this NLB. They dial the operator's in-cluster
+# FE Service, exported below as fe_mysql_internal_host. That path needs no SG
+# entry: NetworkPolicy is not enforced on the data clusters (the VPC CNI runs
+# with enableNetworkPolicy false), and the FE pods carry no pod security group.
 FE_MYSQL_PORT = 9030
 
 # Stable name for the FE MySQL endpoint, published by external-dns from the
@@ -1404,6 +1418,13 @@ fe_mysql_nlb_service = kubernetes.core.v1.Service(
 )
 
 export("fe_mysql_domain", fe_mysql_domain)
+
+# In-cluster endpoint for consumers on the data cluster. The FE certificate is
+# issued for starrocks:domain, not for the Service name, so a client that
+# verifies TLS needs both values. CI runs with ssl_enabled false, so no CI
+# client can use TLS whatever this says.
+export("fe_mysql_internal_host", f"{fe_service_name}.{namespace}.svc.cluster.local")
+export("fe_tls_server_name", starrocks_config.require("domain"))
 
 export(
     "fe_mysql_host",

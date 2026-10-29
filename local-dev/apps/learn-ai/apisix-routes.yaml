@@ -233,7 +233,7 @@ spec:
         use_jwks: true
         bearer_only: false
         introspection_endpoint_auth_method: client_secret_post
-        scope: "openid profile email ol-profile"
+        scope: "openid profile email ol-profile organization:*"
         unauth_action: pass
         session:
           # Same as mit-learn's routes (local-dev/apps/mit-learn/apisix-routes.yaml),
@@ -271,7 +271,7 @@ spec:
         use_jwks: true
         bearer_only: false
         introspection_endpoint_auth_method: client_secret_post
-        scope: "openid profile email ol-profile"
+        scope: "openid profile email ol-profile organization:*"
         unauth_action: auth
         session:
           # Same as mit-learn's routes (local-dev/apps/mit-learn/apisix-routes.yaml),

@@ -42,6 +42,9 @@ HOSTS=(
     # ocw-hugo-themes dev server, run on the host and fronted by APISIX so it
     # has an origin inside .learn.${ROOT_DOMAIN} (see apps/mit-learn/ocw-hugo-dev.yaml)
     "ocw-dev.learn.${ROOT_DOMAIN}"
+    # ol-analytics-api's Learn-scoped host, which the org analytics dashboard
+    # calls (only deployed when ol-analytics-api is in enabled_apps)
+    "analytics.learn.${ROOT_DOMAIN}"
     # mitxonline's routes serve the api host too, and its post-logout
     # redirect goes there
     "mitxonline.${ROOT_DOMAIN}"

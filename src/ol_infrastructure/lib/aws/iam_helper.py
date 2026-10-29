@@ -1,5 +1,6 @@
 import json
 import re
+from collections.abc import Sequence
 from typing import Any, Literal
 
 from parliament import analyze_policy_string
@@ -551,9 +552,16 @@ def query_engine_lake_access(env_suffix: str) -> dict[str, DataLakeAccess]:
 # no "actions" location, which _is_parliament_finding_filtered indexes.
 BEDROCK_PARLIAMENT_CONFIG: dict[str, Any] = {"RESOURCE_MISMATCH": {}}
 
+# A system-defined inference profile ID: a Region-group prefix (us, eu, apac, jp,
+# us-gov, global, ...; AWS adds more) and then the model ID, <vendor>.<model>. No
+# * or ?, since IAM would read either as a wildcard in the resource ARN.
+_INFERENCE_PROFILE_ID = re.compile(r"[a-z-]+\.[a-z0-9-]+\.[A-Za-z0-9.:_-]+")
+
 
 def bedrock_invoke_statements(
-    account_id: str, vendor: str | None = None
+    account_id: str,
+    vendor: str | None = None,
+    inference_profiles: Sequence[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Statements that let a principal invoke Bedrock models on demand.
 
@@ -587,12 +595,45 @@ def bedrock_invoke_statements(
         a configuration change rather than an infrastructure one.
     :type vendor: str | None
 
+    :param inference_profiles: Restrict to these system-defined inference
+        profiles (e.g. ``us.anthropic.claude-sonnet-5``) and the model each one
+        routes to, instead of a whole vendor. A global profile routes to the
+        foundation model with an empty Region, which the Region wildcard also
+        matches.
+    :type inference_profiles: Sequence[str] | None
+
+    :raises ValueError: If both ``vendor`` and ``inference_profiles`` are given,
+        or ``inference_profiles`` is empty or names something other than a
+        system-defined profile ID.
+
     :returns: The invoke statement.
 
     :rtype: list[dict[str, Any]]
     """
-    model_glob = f"{vendor}.*" if vendor else "*"
-    profile_glob = f"*{vendor}*" if vendor else "*"
+    if vendor is not None and inference_profiles is not None:
+        msg = "Pass vendor or inference_profiles, not both"
+        raise ValueError(msg)
+    if inference_profiles is not None:
+        if not inference_profiles:
+            # Falling through to the unscoped globs would allow every model.
+            msg = "inference_profiles is empty; name at least one profile"
+            raise ValueError(msg)
+        invalid = [
+            profile
+            for profile in inference_profiles
+            if not _INFERENCE_PROFILE_ID.fullmatch(profile)
+        ]
+        if invalid:
+            msg = f"Not system-defined inference profile IDs: {invalid}"
+            raise ValueError(msg)
+        # A system-defined profile ID is the model ID behind a Region-group
+        # prefix: global.anthropic.claude-haiku-4-5-... routes to
+        # anthropic.claude-haiku-4-5-...
+        model_globs = [profile.split(".", 1)[1] for profile in inference_profiles]
+        profile_globs = list(inference_profiles)
+    else:
+        model_globs = [f"{vendor}.*" if vendor else "*"]
+        profile_globs = [f"*{vendor}*" if vendor else "*"]
     return [
         {
             "Effect": "Allow",
@@ -601,8 +642,12 @@ def bedrock_invoke_statements(
                 "bedrock:InvokeModelWithResponseStream",
             ],
             "Resource": [
-                f"arn:aws:bedrock:*::foundation-model/{model_glob}",
-                f"arn:aws:bedrock:*:{account_id}:inference-profile/{profile_glob}",
+                f"arn:aws:bedrock:*::foundation-model/{model_glob}"
+                for model_glob in model_globs
+            ]
+            + [
+                f"arn:aws:bedrock:*:{account_id}:inference-profile/{profile_glob}"
+                for profile_glob in profile_globs
             ],
         },
     ]

@@ -305,7 +305,7 @@ def main() -> None:
                 f"  [{rp.get('id', '?')}] {rp.get('name', '?')} "
                 f"baseUrl={rp.get('baseUrl', '?')} "
                 f"enabled={rp.get('enabled', '?')} "
-                f"retryOnFailure={rp.get('retryOnFailure', '?')} "
+                f"replayOnFailure={rp.get('replayOnFailure', '?')} "
                 f"retryIntervalInSeconds={rp.get('retryIntervalInSeconds', '?')}",
                 file=sys.stderr,
             )

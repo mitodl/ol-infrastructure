@@ -42,7 +42,7 @@ config:
   # at once is still unmeasured.
   dagster:max_concurrent_runs: 20
   # Exports OTel metrics (db.client.connections.usage, the client-side
-  # QueuePool occupancy) from the control plane and canvas run workers. QA
+  # QueuePool occupancy) from the control plane and data_loading run workers. QA
   # only until its series count is measured; see dagster_otel_metrics_enabled
   # in __main__.py.
   dagster:otel_metrics_enabled: "true"

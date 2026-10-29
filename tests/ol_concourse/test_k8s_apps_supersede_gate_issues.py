@@ -107,7 +107,7 @@ def test_supersede_uses_the_app_registry_repo():
 def test_production_and_legacy_pipelines_do_not_supersede():
     """Only QA posts gate issues, and legacy pipelines have none."""
     production = json.dumps(_job(APP, "-production"))
-    legacy = build_app_pipeline("mitxonline").model_dump_json()
+    legacy = build_app_pipeline("mit-learn").model_dump_json()
 
     assert SUPERSEDE_TASK_NAME not in production
     assert SUPERSEDE_TASK_NAME not in legacy

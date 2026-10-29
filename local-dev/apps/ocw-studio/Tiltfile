@@ -23,6 +23,10 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
         # hot-reloading — see the ocw-studio section of local-dev/README.md.
         target='local-dev',
         live_update=[
+            # Dependency changes rebuild the image rather than running uv sync
+            # in the pods: Celery doesn't reload, so running processes would
+            # keep the old packages, and a restarted container loses the sync.
+            fall_back_on([APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock']),
             sync(APP_DIR + '/main', '/src/main'),
             sync(APP_DIR + '/content_sync', '/src/content_sync'),
             sync(APP_DIR + '/websites', '/src/websites'),
@@ -34,10 +38,6 @@ if os.path.exists(os.path.join(APP_DIR, '.git')):
             sync(APP_DIR + '/external_resources', '/src/external_resources'),
             sync(APP_DIR + '/ocw_import', '/src/ocw_import'),
             sync(APP_DIR + '/templates', '/src/templates'),
-            run(
-                'cd /src && uv sync --frozen',
-                trigger=[APP_DIR + '/pyproject.toml', APP_DIR + '/uv.lock'],
-            ),
         ],
     )
 
@@ -55,7 +55,13 @@ k8s_yaml_local([
 # Concourse too -- and since it is a Recreate deployment, that is a hard outage
 # that kills running builds and 503s the UI. It reads none of those ConfigMaps;
 # all of its env is inline below, so nothing is lost by isolating it.
-k8s_yaml_local(['concourse.yaml'])
+# The deployed Concourse's version (src/bridge/lib/versions.py, projected to
+# version_pins/ for readers that are not Python). read_file also watches it, so
+# a Renovate bump redeploys this one.
+CONCOURSE_VERSION = str(read_file(
+    os.path.join(config.main_dir, 'src/bridge/lib/version_pins/CONCOURSE_VERSION'),
+)).strip()
+k8s_yaml_local(['concourse.yaml'], substitutions={'__CONCOURSE_VERSION__': CONCOURSE_VERSION})
 
 k8s_resource(
     DEPLOY_NAME,

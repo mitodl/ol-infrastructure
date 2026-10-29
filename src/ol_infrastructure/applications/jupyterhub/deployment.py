@@ -313,6 +313,7 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
         kubernetes.helm.v3.ReleaseArgs(
             chart="jupyterhub",
             cleanup_on_fail=True,
+            max_history=10,
             version=JUPYTERHUB_CHART_VERSION,
             namespace=namespace,
             repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(

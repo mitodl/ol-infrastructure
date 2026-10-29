@@ -38,7 +38,6 @@ config:
     - "https://draft-ci.ocw.mit.edu"
     - "https://live-ci.ocw.mit.edu"
     mailgun_sender_domain: "mail-ci.learn.mit.edu"
-    session_cookie_domain: ".rc.learn.mit.edu"
     sso_url: "sso-ci.ol.mit.edu"
   mitlearn:k8s_deploy: "true"
   mitlearn:k8s_cutover: "true"
@@ -50,6 +49,7 @@ config:
   mitlearn:support_url: "support.ci.learn.mit.edu"
   mitlearn:enable_fastly_shielding: true
   mitlearn:use_granian: true
+  mitlearn:webapp_endpoint_routing: true
   mitlearn:vars:
     AI_MIT_SYLLABUS_URL: "https://api.ci.learn.mit.edu/api/v0/vector_content_files_search/"
     AI_MIT_VIDEO_TRANSCRIPT_URL: "https://api.ci.learn.mit.edu/api/v0/vector_content_files_search/"

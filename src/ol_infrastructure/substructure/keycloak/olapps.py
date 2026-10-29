@@ -36,6 +36,16 @@ from ol_infrastructure.substructure.keycloak.registration_flow import (
     create_recaptcha_registration_flow,
 )
 
+# Saved copies of partner IdPs' SAML metadata and OIDC discovery documents. An
+# IdP with a URL is built from the live document; its copy is the fallback that
+# keeps the stack deployable while that partner's endpoint is down. Refresh a
+# copy when a run warns that it differs from the live document.
+SAVED_IDP_METADATA_DIR = Path(__file__).parent.joinpath("files/olapps")
+
+
+def _saved_idp_metadata(filename: str) -> str:
+    return SAVED_IDP_METADATA_DIR.joinpath(filename).read_text()
+
 
 def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
     keycloak_provider: keycloak.Provider,
@@ -299,6 +309,18 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             keycloak.RealmUserProfileAttributeArgs(
                 name="emailOptIn",
                 display_name="${emailOptIn}",
+                # ol-learn-scim declares emailOptIn as an integer, and
+                # scim-for-keycloak validates each PATCH locally before sending it.
+                # One user holding "false" fails that validation, which aborts and
+                # rolls back the whole retry run for the provider.
+                validators=[
+                    keycloak.RealmUserProfileAttributeValidatorArgs(
+                        name="options",
+                        config={
+                            "options": json.dumps(["0", "1"], separators=(",", ":"))
+                        },
+                    ),
+                ],
                 required_for_roles=[],
                 permissions=keycloak.RealmUserProfileAttributePermissionsArgs(
                     views=["admin", "user"], edits=["admin", "user"]
@@ -1098,6 +1120,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="HHC",
                 idp_display_name="Hartford Health Care",
                 org_saml_metadata_url="https://adfs.hhchealth.org/federationmetadata/2007-06/federationmetadata.xml",
+                org_saml_metadata_xml=_saved_idp_metadata("hhc_metadata.xml"),
                 keycloak_url=keycloak_url,
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
@@ -1119,6 +1142,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="NTUA",
                 idp_display_name="National Technical University of Athens",
                 org_saml_metadata_url="https://login.ntua.gr/metadata-signed.xml",
+                org_saml_metadata_xml=_saved_idp_metadata("ntua_metadata.xml"),
                 principal_type="ATTRIBUTE",
                 principal_attribute="urn:oid:1.3.6.1.4.1.5923.1.1.1.6",
                 name_id_format=NameIdFormat.transient,
@@ -1159,9 +1183,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             SamlIdpConfig(
                 idp_alias="CEIDE",
                 idp_display_name="Coordinación de Evaluación, Innovación y Desarrollo Educativos, UNAM",  # noqa: E501
-                org_saml_metadata_xml=Path(__file__)
-                .parent.joinpath("files/olapps/ceide_metadata.xml")
-                .read_text(),
+                org_saml_metadata_xml=_saved_idp_metadata("ceide_metadata.xml"),
                 principal_type="ATTRIBUTE",
                 principal_attribute="Email",
                 name_id_format=NameIdFormat.unspecified,
@@ -1190,6 +1212,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="SEU",
                 idp_display_name="Georgian National University Seu",
                 org_saml_metadata_url="https://emis1.seu.edu.ge/saml/metadata",
+                org_saml_metadata_xml=_saved_idp_metadata("seu_metadata.xml"),
                 principal_type="ATTRIBUTE",
                 principal_attribute="urn:oid:0.9.2342.19200300.100.1.3",
                 name_id_format=NameIdFormat.email,
@@ -1221,6 +1244,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="IBSU",
                 idp_display_name="International Black Sea University",
                 org_saml_metadata_url="https://emis.ibsu.edu.ge/saml/metadata",
+                org_saml_metadata_xml=_saved_idp_metadata("ibsu_metadata.xml"),
                 principal_type="ATTRIBUTE",
                 principal_attribute="urn:oid:0.9.2342.19200300.100.1.3",
                 name_id_format=NameIdFormat.email,
@@ -1252,14 +1276,10 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="UKM",
                 idp_display_name="Universiti Kebangsaan Malaysia",
                 org_saml_metadata_url="https://sso.ukm.my/saml2/idp/metadata.php",
-                # The endpoint went unreachable on 2026-10-21 and every run that
-                # fetched it failed. This copy is the Wayback Machine's capture
-                # of 2025-07-29, whose SSO/SLO URLs and signing cert match what
-                # Production had deployed. Remove it once metadata.php answers
-                # again, or a moved endpoint or rotated cert won't be picked up.
-                org_saml_metadata_xml=Path(__file__)
-                .parent.joinpath("files/olapps/ukm_metadata.xml")
-                .read_text(),
+                # The Wayback Machine's capture of 2025-07-29, saved while the
+                # endpoint was down from 2026-10-21. Its SSO/SLO URLs and signing
+                # cert match what metadata.php served again on 2026-10-23.
+                org_saml_metadata_xml=_saved_idp_metadata("ukm_metadata.xml"),
                 # UKM gave one value per field for "attribute name and friendly
                 # name", so the plain name (SimpleSAMLphp's basic format) is
                 # the identifier; matching on the Name attribute works whether
@@ -1311,6 +1331,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 org_domain="aydin.edu.tr",
                 idp_display_name="Istanbul Aydin University - Staff",
                 org_saml_metadata_url="https://login.microsoftonline.com/dafbbeb4-3113-49c7-bce6-faeb84139bf6/federationmetadata/2007-06/federationmetadata.xml?appid=3b4d02b1-8482-4837-b8c4-2db32d8a93ee",
+                org_saml_metadata_xml=_saved_idp_metadata(
+                    "istanbul_aydin_staff_metadata.xml"
+                ),
                 principal_type="SUBJECT",
                 principal_attribute="user.email",
                 login_hint=False,
@@ -1336,6 +1359,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 org_domain="stu.aydin.edu.tr",
                 idp_display_name="Istanbul Aydin University - Students",
                 org_saml_metadata_url="https://login.microsoftonline.com/1220f94e-b228-4761-9501-da9e83e540ac/federationmetadata/2007-06/federationmetadata.xml?appid=d134d48b-ca70-46fd-a008-ab83b9a565fe",
+                org_saml_metadata_xml=_saved_idp_metadata(
+                    "istanbul_aydin_students_metadata.xml"
+                ),
                 principal_type="SUBJECT",
                 principal_attribute="user.email",
                 login_hint=False,
@@ -1374,6 +1400,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 org_domain="cau.edu.tr",
                 idp_display_name="Cyprus Aydin University - Staff",
                 org_saml_metadata_url="https://login.microsoftonline.com/b250b687-5037-48da-a6d7-7471164c4b43/federationmetadata/2007-06/federationmetadata.xml?appid=09b2e0c2-79e9-4498-bf8f-560a6647d53d",
+                org_saml_metadata_xml=_saved_idp_metadata(
+                    "cyprus_aydin_staff_metadata.xml"
+                ),
                 principal_type="SUBJECT",
                 principal_attribute="user.mail",
                 login_hint=False,
@@ -1399,6 +1428,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 org_domain="stu.cau.edu.tr",
                 idp_display_name="Cyprus Aydin University - Students",
                 org_saml_metadata_url="https://login.microsoftonline.com/7b2d4163-41c3-478f-8911-e9117b736dfb/federationmetadata/2007-06/federationmetadata.xml?appid=59324ddf-cc35-40c2-a91b-fa7c0def6e78",
+                org_saml_metadata_xml=_saved_idp_metadata(
+                    "cyprus_aydin_students_metadata.xml"
+                ),
                 principal_type="SUBJECT",
                 principal_attribute="user.mail",
                 login_hint=False,
@@ -1423,6 +1455,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="University_Of_Dubai",
                 idp_display_name="University Of Dubai",
                 org_saml_metadata_url="https://login.microsoftonline.com/5813cc51-31c7-4d29-a1be-fc6cb1b77e1c/federationmetadata/2007-06/federationmetadata.xml?appid=cbe26906-056e-49b5-92c3-a01836310582",
+                org_saml_metadata_xml=_saved_idp_metadata(
+                    "university_of_dubai_metadata.xml"
+                ),
                 principal_type="SUBJECT",
                 principal_attribute="user.mail",
                 login_hint=False,
@@ -1455,6 +1490,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="RobCol",
                 idp_display_name="American Robert College of Istanbul",
                 org_saml_metadata_url="https://login.microsoftonline.com/d4bc61be-6893-44c0-8f85-a6e62e5bebee/federationmetadata/2007-06/federationmetadata.xml?appid=90601514-0347-4331-99cc-e2947959d287",
+                org_saml_metadata_xml=_saved_idp_metadata("robcol_metadata.xml"),
                 principal_type="SUBJECT",
                 principal_attribute="user.mail",
                 login_hint=False,
@@ -1485,9 +1521,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
             SamlIdpConfig(
                 idp_alias="UCV",
                 idp_display_name="Universidad Cesar Vallejo",
-                org_saml_metadata_xml=Path(__file__)
-                .parent.joinpath("files/olapps/ucv_metadata.xml")
-                .read_text(),
+                org_saml_metadata_xml=_saved_idp_metadata("ucv_metadata.xml"),
                 # Google Workspace SAML reliably provides NameID as email.
                 # Use SUBJECT to avoid login failures when custom attributes
                 # like "Email" are not included in the assertion.
@@ -1526,6 +1560,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="DUTH",
                 idp_display_name="Democritus University of Thrace",
                 org_oidc_metadata_url="https://sso.duth.gr/realms/main/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata("duth_oidc_discovery.json"),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1586,6 +1621,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="HAEF",
                 idp_display_name="Hellenic American Educational Foundation",
                 org_oidc_metadata_url="https://login.microsoftonline.com/35a07f23-c5cb-4b42-81ad-10d269586c9a/v2.0/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata("haef_oidc_discovery.json"),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1605,6 +1641,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="NUST",
                 idp_display_name="Namibia University of Science and Technology",
                 org_oidc_metadata_url="https://login.microsoftonline.com/d5cf20c2-4a84-4902-a3e6-c4a3190ea239/v2.0/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata("nust_oidc_discovery.json"),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1628,6 +1665,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="UPGRAD",
                 idp_display_name="upGrad",
                 org_oidc_metadata_url="https://idp.upgrad.com/realms/upgrad/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata(
+                    "upgrad_oidc_discovery.json"
+                ),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1651,6 +1691,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="DYNIDEAS",
                 idp_display_name="Dynamic Ideas, LLC.",
                 org_oidc_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata(
+                    "google_oidc_discovery.json"
+                ),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1671,6 +1714,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="VELTISTON",
                 idp_display_name="Veltiston AI",
                 org_oidc_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata(
+                    "google_oidc_discovery.json"
+                ),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1691,6 +1737,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="UCR",
                 idp_display_name="Universidad de Costa Rica",
                 org_oidc_metadata_url="https://sso.ucr.ac.cr/realms/UCR/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata("ucr_oidc_discovery.json"),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1710,6 +1757,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="USEK",
                 idp_display_name="Holy Spirit University of Kaslik",
                 org_oidc_metadata_url="https://login.microsoftonline.com/06d0a2c4-59b9-4cf8-a36a-9190f22cd1f6/v2.0/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata("usek_oidc_discovery.json"),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1732,6 +1780,7 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="UBSU",
                 idp_display_name="University of Business and Science",
                 org_oidc_metadata_url="https://sso.ubsu.uz/o/.well-known/openid-configuration/",
+                org_oidc_discovery_json=_saved_idp_metadata("ubsu_oidc_discovery.json"),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1760,6 +1809,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="MASAI",
                 idp_display_name="Masai School",
                 org_oidc_metadata_url="https://admissions-api.masaischool.com/oidc/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata(
+                    "masai_oidc_discovery.json"
+                ),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1784,6 +1836,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="APPLY7",
                 idp_display_name="Apply7",
                 org_oidc_metadata_url="https://keycloak.apply7.cn/realms/mit-learn/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata(
+                    "apply7_oidc_discovery.json"
+                ),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,
@@ -1845,6 +1900,9 @@ def create_olapps_realm(  # noqa: C901, PLR0913, PLR0915
                 idp_alias="BOARDINFINITY",
                 idp_display_name="Board Infinity",
                 org_oidc_metadata_url="https://platform.boardinfinity.com/auth-api/oidc/.well-known/openid-configuration",
+                org_oidc_discovery_json=_saved_idp_metadata(
+                    "boardinfinity_oidc_discovery.json"
+                ),
                 realm_id=ol_apps_realm.id,
                 first_login_flow=ol_first_login_flow,
                 resource_options=resource_options,

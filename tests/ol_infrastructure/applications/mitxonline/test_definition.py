@@ -41,6 +41,7 @@ from ol_infrastructure.components.services.k8s import (  # noqa: E402
     OLApplicationK8s,
     OLApplicationK8sCeleryRedisConfig,
 )
+from ol_infrastructure.lib.pulumi_helper import docker_image_config_kwargs  # noqa: E402
 
 LOCAL_IMAGE_TAG = "tilt-abc123"
 OPENEDX_BASE_URL = "https://lms.mit.test"
@@ -155,6 +156,27 @@ def test_local_bindings_use_the_image_as_given():
     assert config.registry == "direct"
     assert config.application_image_repository == "mitodl/mitxonline-app"
     assert config.application_docker_tag == LOCAL_IMAGE_TAG
+
+
+def test_release_pipeline_image_kwargs_reach_the_component(monkeypatch):
+    """The release pipeline sends a digest and a version; both must get through.
+
+    The bindings forbid unknown fields, so a kwarg docker_image_config_kwargs
+    returns that the bindings lack fails every deployed stack.
+    """
+    digest = "sha256:" + "a" * 64
+    monkeypatch.delenv("MITXONLINE_DOCKER_TAG", raising=False)
+    monkeypatch.setenv("MITXONLINE_DOCKER_SHA", digest)
+    monkeypatch.setenv("MITXONLINE_RELEASE_VERSION", "2026.10.28.1")
+
+    config = definition.application_config(
+        _local_bindings(
+            application_docker_tag=None, **docker_image_config_kwargs("MITXONLINE")
+        )
+    )
+
+    assert config.application_image_digest == digest
+    assert config.application_version == "2026.10.28.1"
 
 
 def test_deployed_bindings_keep_the_eks_wiring():
@@ -428,3 +450,100 @@ def test_local_routes_read_oidc_credentials_from_the_bound_secret():
 def test_oidc_credentials_come_from_exactly_one_source(bindings):
     with pytest.raises(ValueError, match="oidc_secret_name"):
         definition.direct_oidc_config(bindings)
+
+
+# ─── Open edX login gate ──────────────────────────────────────────────────────
+
+
+LMS_HOST = "courses.learn.mit.test"
+
+
+def _gate_bindings(**overrides) -> definition.MitxonlineBindings:
+    return _deployed_bindings(
+        openedx_login_gate=definition.OpenedxLoginGate(
+            lms_host=LMS_HOST,
+        ),
+        **overrides,
+    )
+
+
+def _gate_routes(bindings: definition.MitxonlineBindings):
+    oidc = OLApisixOIDCResources(
+        "gate-oidc", oidc_config=definition.prefixed_oidc_config(bindings)
+    )
+    return definition.openedx_login_gate_route_configs(
+        bindings, oidc=oidc, shared_plugin_config_name="shared", upstream_name="lms"
+    )
+
+
+def test_openedx_login_gate_renders_nothing_unless_bound():
+    assert _gate_routes(_deployed_bindings()) == []
+
+
+def test_openedx_login_gate_matches_only_browser_page_loads_of_the_login_start():
+    """MITx Online's server-side login replay sends no Fetch Metadata."""
+    [route] = _gate_routes(_gate_bindings())
+
+    assert route.hosts == [LMS_HOST]
+    assert route.paths == [
+        "/auth/login/ol-oauth2/",
+        "/auth/login/ol-oauth2/.apisix/redirect",
+    ]
+    assert {
+        (expr["subject"]["name"], expr["op"], expr["value"]) for expr in route.exprs
+    } == {
+        ("Sec-Fetch-Mode", "Equal", "navigate"),
+        ("Sec-Fetch-Dest", "Equal", "document"),
+    }
+
+
+def test_openedx_login_gate_sends_learners_without_a_session_to_keycloak():
+    """With "pass", anonymous learners would never get the MIT Learn session."""
+    [route] = _gate_routes(_gate_bindings())
+
+    [plugin] = [
+        plugin
+        for plugin in route.plugins
+        if (plugin.get("name") if isinstance(plugin, dict) else plugin.name)
+        == "openid-connect"
+    ]
+    config = plugin["config"] if isinstance(plugin, dict) else plugin.config
+    assert config["unauth_action"] == "auth"
+
+
+def test_openedx_login_gate_sends_the_lms_no_tokens():
+    [route] = _gate_routes(_gate_bindings())
+
+    [plugin] = [
+        plugin
+        for plugin in route.plugins
+        if (plugin.get("name") if isinstance(plugin, dict) else plugin.name)
+        == "openid-connect"
+    ]
+    config = plugin["config"] if isinstance(plugin, dict) else plugin.config
+    assert config["set_access_token_header"] is False
+    assert config["set_id_token_header"] is False
+    assert config["set_userinfo_header"] is False
+
+
+def test_openedx_login_gate_rejects_an_lms_host_outside_the_learn_cookie_domain():
+    with pytest.raises(ValueError, match=r"not under '\.learn\.mit\.test'"):
+        _deployed_bindings(
+            openedx_login_gate=definition.OpenedxLoginGate(
+                lms_host="courses.mitxonline.mit.test"
+            )
+        )
+
+
+def test_openedx_login_gate_upstream_passes_the_public_host_to_the_lms():
+    """The LMS rejects any Host but its public one."""
+    gate = _gate_bindings().openedx_login_gate
+    config = definition.openedx_login_gate_upstream_config(gate, "qa", {})
+
+    # The name edxapp gives the mitxonline QA LMS Service.
+    assert (
+        config.external_hostname
+        == "mitxonline-qa-edxapp-lms-webapp.mitxonline-openedx.svc.cluster.local"
+    )
+    assert config.port == 8000
+    assert config.pass_host == "pass"  # noqa: S105

@@ -4,8 +4,8 @@ Team membership is assigned by hand in the OpenMetadata UI. This job makes the
 ``ol-data-platform`` realm hold one group per team, with exactly the members the
 team has in OpenMetadata. It only writes to Keycloak; nothing flows back.
 
-The teams are the ones ``om_server_config.py`` declares in ``TEAM_CONFIG``; the
-stack passes their names in ``OM_TEAMS``. Each becomes a child of the parent
+The teams are the ones ``access_control.py`` declares in ``TEAMS``; the stack
+passes their names in ``OM_TEAMS``. Each becomes a child of the parent
 group named by ``KEYCLOAK_PARENT_GROUP_ID``, which the keycloak substructure
 stack owns. This job owns every child of that parent: it creates a missing one,
 and deletes one whose team is no longer declared, so a dropped team does not
@@ -219,7 +219,7 @@ class OpenMetadata:
 
         :param team: The team name.
         :raises SyncError: If the team is not a ``Group``, since only a Group
-            holds users and ``om_server_config.py`` creates nothing else.
+            holds users and the stack creates nothing else.
         :raises requests.HTTPError: On any non-2xx response, including a 404
             for a team that does not exist yet.
         """

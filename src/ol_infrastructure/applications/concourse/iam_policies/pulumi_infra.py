@@ -639,5 +639,27 @@ policy_definition = {
             ],
             "Condition": {"StringEquals": {"iam:PassedToService": "ec2.amazonaws.com"}},
         },
+        {
+            # infrastructure/aws/iam/__main__.py manages the account's GitHub
+            # Actions OIDC provider, and the pipeline refreshes that stack on
+            # every run, so it needs reads as well as the lifecycle. Scoped to
+            # that one provider so the worker can't add another identity
+            # provider to the account.
+            "Effect": "Allow",
+            "Action": [
+                "iam:AddClientIDToOpenIDConnectProvider",
+                "iam:CreateOpenIDConnectProvider",
+                "iam:DeleteOpenIDConnectProvider",
+                "iam:GetOpenIDConnectProvider",
+                "iam:ListOpenIDConnectProviderTags",
+                "iam:RemoveClientIDFromOpenIDConnectProvider",
+                "iam:TagOpenIDConnectProvider",
+                "iam:UntagOpenIDConnectProvider",
+                "iam:UpdateOpenIDConnectProviderThumbprint",
+            ],
+            "Resource": (
+                "arn:aws:iam::*:oidc-provider/token.actions.githubusercontent.com"
+            ),
+        },
     ],
 }

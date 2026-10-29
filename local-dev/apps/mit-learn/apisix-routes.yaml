@@ -84,8 +84,14 @@ spec:
       config:
         use_jwks: true
         bearer_only: false
+        # PKCE (S256) on the authorization and token requests, as deployed
+        # (OLApisixOIDCConfig.oidc_use_pkce).
+        use_pkce: true
         introspection_endpoint_auth_method: client_secret_post
-        scope: "openid profile email ol-profile"
+        # organization:* as deployed (OLApisixOIDCConfig.oidc_scope): the
+        # organization mapper emits nothing unless the login requests it, and
+        # ol-analytics-api reads the claim from this session.
+        scope: "openid profile email ol-profile organization:*"
         redirect_uri: "https://api.learn.mit.test/login/ol-oidc/callback/"
         logout_path: "/logout/oidc"
         post_logout_redirect_uri: "https://api.learn.mit.test/logout/"
@@ -142,8 +148,14 @@ spec:
       config:
         use_jwks: true
         bearer_only: false
+        # PKCE (S256) on the authorization and token requests, as deployed
+        # (OLApisixOIDCConfig.oidc_use_pkce).
+        use_pkce: true
         introspection_endpoint_auth_method: client_secret_post
-        scope: "openid profile email ol-profile"
+        # organization:* as deployed (OLApisixOIDCConfig.oidc_scope): the
+        # organization mapper emits nothing unless the login requests it, and
+        # ol-analytics-api reads the claim from this session.
+        scope: "openid profile email ol-profile organization:*"
         redirect_uri: "https://api.learn.mit.test/login/ol-oidc/callback/"
         logout_path: "/logout/oidc"
         post_logout_redirect_uri: "https://api.learn.mit.test/logout/"
@@ -201,8 +213,14 @@ spec:
       config:
         use_jwks: true
         bearer_only: false
+        # PKCE (S256) on the authorization and token requests, as deployed
+        # (OLApisixOIDCConfig.oidc_use_pkce).
+        use_pkce: true
         introspection_endpoint_auth_method: client_secret_post
-        scope: "openid profile email ol-profile"
+        # organization:* as deployed (OLApisixOIDCConfig.oidc_scope): the
+        # organization mapper emits nothing unless the login requests it, and
+        # ol-analytics-api reads the claim from this session.
+        scope: "openid profile email ol-profile organization:*"
         redirect_uri: "https://api.learn.mit.test/learn/login/ol-oidc/callback/"
         logout_path: "/learn/logout/oidc"
         post_logout_redirect_uri: "https://api.learn.mit.test/learn/logout/"
@@ -265,8 +283,14 @@ spec:
       config:
         use_jwks: true
         bearer_only: false
+        # PKCE (S256) on the authorization and token requests, as deployed
+        # (OLApisixOIDCConfig.oidc_use_pkce).
+        use_pkce: true
         introspection_endpoint_auth_method: client_secret_post
-        scope: "openid profile email ol-profile"
+        # organization:* as deployed (OLApisixOIDCConfig.oidc_scope): the
+        # organization mapper emits nothing unless the login requests it, and
+        # ol-analytics-api reads the claim from this session.
+        scope: "openid profile email ol-profile organization:*"
         redirect_uri: "https://api.learn.mit.test/learn/login/ol-oidc/callback/"
         logout_path: "/learn/logout/oidc"
         post_logout_redirect_uri: "https://api.learn.mit.test/learn/logout/"

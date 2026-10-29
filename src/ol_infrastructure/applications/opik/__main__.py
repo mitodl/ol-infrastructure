@@ -85,6 +85,12 @@ clickhouse_stack = make_stack_reference(projects.CLICKHOUSE, stack_info.name)
 setup_k8s_provider(kubeconfig=require_stack_output_value(cluster_stack, "kube_config"))
 
 OPIK_NAMESPACE = "opik"
+OPIK_USERS_GROUP = "opik-users"
+if stack_info.env_suffix == "production":
+    KEYCLOAK_DOMAIN = "sso.ol.mit.edu"
+else:
+    KEYCLOAK_DOMAIN = f"sso-{stack_info.env_suffix}.ol.mit.edu"
+KEYCLOAK_ISSUER = f"https://{KEYCLOAK_DOMAIN}/realms/ol-platform-engineering"
 
 cluster_stack.require_output("namespaces").apply(
     lambda ns: check_cluster_namespace(OPIK_NAMESPACE, ns)
@@ -231,6 +237,44 @@ clickhouse_ca_configmap = kubernetes.core.v1.ConfigMap(
     data={"clickhouse-ca.pem": clickhouse_stack.require_output("ca_certificate_pem")},
 )
 
+############################################################
+# Backend version, per ReplicaSet
+#
+# The backend image starts with `java -jar opik-backend-$OPIK_VERSION.jar`, in
+# both entrypoint.sh and the backend-migrations init container's
+# run_db_migrations.sh. The image bakes in the right OPIK_VERSION, but the
+# chart also writes OPIK_VERSION into the opik-backend ConfigMap, and that one
+# ConfigMap is shared by every ReplicaSet. A chart bump rewrites it in place
+# while the old ReplicaSet's pods are still running, and envFrom is resolved
+# at each container start, so any old pod that restarts or is recreated (a
+# liveness kill, a node drain) launches the old image looking for the new
+# jar. That is how data-qa's 2.2.96 pods crash-looped on "Unable to access
+# jarfile opik-backend-2.2.103.jar" for days while the 2.2.103 rollout was
+# blocked on its migrations.
+#
+# A ConfigMap named for the version, listed after the chart's in envFrom,
+# gives each pod template its own OPIK_VERSION that a later bump cannot
+# change. The Pulumi resource name carries the version too, so a bump adds a
+# new resource and drops the old one from the program. Pulumi deletes a
+# dropped resource only at the end of an update that succeeded, so while a
+# Helm upgrade is failing on stuck migrations the old ConfigMap stays, and
+# reverting to that version re-registers it unchanged rather than trying to
+# create a ConfigMap that still exists. The image tag is pinned to the
+# same value: the opik chart publishes appVersion equal to its version, so
+# this renders the image the chart would pick anyway, but now from the
+# constant the ConfigMap uses.
+############################################################
+OPIK_BACKEND_VERSION = OPIK_CHART_VERSION
+opik_backend_version_configmap = kubernetes.core.v1.ConfigMap(
+    f"opik-backend-version-{OPIK_BACKEND_VERSION}-{stack_info.env_suffix}",
+    metadata=kubernetes.meta.v1.ObjectMetaArgs(
+        name=f"opik-backend-version-{OPIK_BACKEND_VERSION}",
+        namespace=OPIK_NAMESPACE,
+        labels=k8s_global_labels,
+    ),
+    data={"OPIK_VERSION": OPIK_BACKEND_VERSION},
+)
+
 ###################################
 #   Opik Helm Release (K8S)       #
 ###################################
@@ -242,6 +286,7 @@ opik_helm_release = kubernetes.helm.v3.Release(
         version=OPIK_CHART_VERSION,
         namespace=OPIK_NAMESPACE,
         cleanup_on_fail=True,
+        max_history=10,
         repository_opts=kubernetes.helm.v3.RepositoryOptsArgs(
             repo="https://comet-ml.github.io/opik/",
         ),
@@ -291,6 +336,7 @@ opik_helm_release = kubernetes.helm.v3.Release(
                     # the same rate, so that failure is correlated, not
                     # independent.
                     "replicaCount": 2,
+                    "image": {"tag": OPIK_BACKEND_VERSION},
                     "podDisruptionBudget": {"enabled": True, "minAvailable": 1},
                     # The chart ships only an ephemeral-storage request, which
                     # leaves the pod BestEffort with no cgroup memory limit. That
@@ -419,9 +465,15 @@ opik_helm_release = kubernetes.helm.v3.Release(
                     # ConfigMap. Listing the Secret last lets it override the
                     # placeholder password values, and because the migration
                     # init container also consumes ``envFrom`` it gets the real
-                    # password too.
+                    # password too. The version ConfigMap comes after the
+                    # chart's so its OPIK_VERSION wins (see above).
                     "envFrom": [
                         {"configMapRef": {"name": "opik-backend"}},
+                        {
+                            "configMapRef": {
+                                "name": opik_backend_version_configmap.metadata.name
+                            }
+                        },
                         {"secretRef": {"name": clickhouse_credentials_secret_name}},
                     ],
                 },
@@ -521,6 +573,24 @@ opik_oidc = OLApisixOIDCResources(
 # the user once at ``/`` and then calls ``/api/*`` from the browser carrying
 # only the APISIX session cookie (no bearer token).
 opik_session_oidc_plugin = opik_oidc.get_full_oidc_plugin_config(unauth_action="auth")
+# OSS Opik makes everyone it sees the admin of workspace "default", so a session
+# is admitted only when its ID token names the opik-users Keycloak group (the
+# groups mapper on ol-opik-client in substructure/keycloak). The plugin checks
+# the ID token it holds after any refresh, so membership changes land within
+# one access-token lifetime. A non-member gets a 401; /logout/oidc still works.
+opik_session_oidc_plugin["config"]["claim_schema"] = {
+    "type": "object",
+    "required": ["id_token"],
+    "properties": {
+        "id_token": {
+            "type": "object",
+            "required": ["groups"],
+            "properties": {
+                "groups": {"type": "array", "contains": {"const": OPIK_USERS_GROUP}}
+            },
+        }
+    },
+}
 # Bearer auth: validate a Keycloak access token from the Authorization header
 # and reject (rather than redirect) unauthenticated requests, so SDK / machine
 # clients get a clean 401 instead of an HTML login page.
@@ -531,6 +601,23 @@ opik_bearer_oidc_plugin["config"]["bearer_only"] = True
 # for client-credentials service-account tokens (transient sessions), so every
 # SDK request would 401 even with a freshly-issued valid token.
 opik_bearer_oidc_plugin["config"]["use_jwks"] = True
+# Every client in the realm signs with the same key, so without an audience
+# check a client-credentials token from any of them is admitted. The audience
+# mapper on ol-opik-client puts its own client id in aud. The issuer is pinned
+# here rather than taken from the discovery document at request time.
+opik_bearer_oidc_plugin["config"]["claim_validator"] = {
+    "issuer": {"valid_issuers": [KEYCLOAK_ISSUER]},
+    "audience": {"required": True, "match_with_client_id": True},
+}
+# An ID token for ol-opik-client also has that aud, and a non-member can read
+# their own from the id_token_hint on the /logout/oidc redirect. ID tokens have
+# typ "ID", and only service-account access tokens carry client_id (from the
+# service_account client scope), so users' ID and access tokens both get a 401.
+opik_bearer_oidc_plugin["config"]["claim_schema"] = {
+    "type": "object",
+    "required": ["typ", "client_id"],
+    "properties": {"typ": {"const": "Bearer"}, "client_id": {"type": "string"}},
+}
 
 # Match ``/api/*`` requests that carry a Bearer ``Authorization`` header so they
 # are routed to the bearer-only rule; everything else under ``/api`` falls
@@ -600,11 +687,7 @@ opik_apisix_route = OLApisixRoute(
             backend_service_name="opik-frontend",
             backend_service_port=5173,
             shared_plugin_config_name=opik_shared_plugins.resource_name,
-            plugins=[
-                OLApisixPluginConfig(
-                    **opik_oidc.get_full_oidc_plugin_config(unauth_action="auth")
-                )
-            ],
+            plugins=[OLApisixPluginConfig(**opik_session_oidc_plugin)],
         ),
     ],
     opts=ResourceOptions(

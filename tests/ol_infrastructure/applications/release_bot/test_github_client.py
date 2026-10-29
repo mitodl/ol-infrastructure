@@ -537,6 +537,22 @@ def test_release_preview_counts_from_the_semver_baseline(fake_repo, monkeypatch)
     assert preview["omitted"] == 0
 
 
+def test_release_preview_skips_an_abandoned_version(fake_repo, monkeypatch):
+    """The resource records it as abandoned/<version> and never cuts it again."""
+    monkeypatch.setattr(github, "_in_flight_release_sync", lambda _slug: None)
+    today = datetime.now(tz=UTC).date()
+    abandoned = f"{today.year}.{today.month}.{today.day}.1"
+    fake_repo(
+        _FakeRepo(
+            tags=[_FakeTag("v0.37.3"), _FakeTag(f"abandoned/{abandoned}")],
+            comparison=_FakeComparison("ahead", []),
+        )
+    )
+    preview = github._release_preview_sync("mitodl/thing")
+    assert preview["version"] == f"{today.year}.{today.month}.{today.day}.2"
+    assert preview["since"] == "v0.37.3", "an abandoned version is not a baseline"
+
+
 # ---------------------------------------------------------------------------
 # Next version computation
 # ---------------------------------------------------------------------------

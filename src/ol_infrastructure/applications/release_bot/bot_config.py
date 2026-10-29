@@ -66,3 +66,16 @@ def load_libraries_config() -> dict[str, LibraryConfig]:
 def load_unpublishable_libraries() -> dict[str, str]:
     """Load name -> why-it-has-no-pipeline, for libraries Doof could publish."""
     return json.loads(os.environ.get("UNPUBLISHABLE_LIBRARIES", "{}"))
+
+
+def load_slack_user_overrides() -> dict[str, str]:
+    """Load commit-identity -> Slack member id overrides for author mentions.
+
+    Maps a commit email or GitHub handle to the Slack account to @-mention,
+    for the authors ``users.lookupByEmail`` cannot find (see slack_users.py).
+    Sourced from the SOPS-encrypted release_bot secret rather than
+    bridge.settings so a roster of people is not published in a public
+    repository. Optional, like LIBRARIES_CONFIG; its shape is validated at
+    ``pulumi up`` in __main__.py.
+    """
+    return json.loads(os.environ.get("SLACK_USER_OVERRIDES", "").strip() or "{}")
