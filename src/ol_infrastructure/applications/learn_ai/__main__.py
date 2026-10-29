@@ -36,6 +36,7 @@ from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleC
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
 from ol_infrastructure.components.services import appdb
 from ol_infrastructure.components.services.apisix import (
+    FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixOIDCRouteGroup,
@@ -1144,6 +1145,7 @@ learn_ai_oidc_resources = OLApisixOIDCResources(
     f"learn-ai-{stack_info.env_suffix}-oidc-resources",
     oidc_config=OLApisixOIDCConfig(
         application_name="learn-ai",
+        oidc_access_token_expires_leeway=FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
         k8s_labels=k8s_global_labels,
         k8s_namespace=learn_ai_namespace,
         # Narrower than the component default, which adds organization:*.  Safe

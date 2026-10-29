@@ -59,6 +59,7 @@ from bridge.lib.constants import (  # noqa: E402
 from ol_infrastructure.components.services import apisix as apisix_module  # noqa: E402
 from ol_infrastructure.components.services.apisix import (  # noqa: E402
     FIRST_PARTY_SERVICE_CLIENT_UA_REGEX,
+    FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
     OLApisixOIDCConfig,
     OLApisixOIDCResources,
     OLApisixOIDCRouteGroup,
@@ -468,6 +469,31 @@ def test_pkce_can_be_turned_off_per_application():
     oidc = oidc_resources("test-oidc-pkce-off", oidc_use_pkce=False)
 
     assert oidc.base_oidc_config["use_pkce"] is False
+
+
+def test_access_token_leeway_is_omitted_by_default():
+    """0 is the plugin's own default, so callers that don't set it render the
+    same plugin config as before the field existed.
+    """
+    oidc = oidc_resources("test-oidc-no-leeway")
+
+    config = oidc.get_full_oidc_plugin_config(unauth_action="pass")["config"]
+
+    assert "access_token_expires_leeway" not in config
+
+
+def test_access_token_leeway_reaches_the_plugin_config():
+    oidc = oidc_resources(
+        "test-oidc-leeway",
+        oidc_access_token_expires_leeway=FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
+    )
+
+    config = oidc.get_full_oidc_plugin_config(unauth_action="pass")["config"]
+
+    assert (
+        config["access_token_expires_leeway"]
+        == FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS
+    )
 
 
 # ─── Session cookie naming ─────────────────────────────────────────────────────
@@ -1946,6 +1972,18 @@ def test_learn_session_groups_differ_only_in_where_they_log_out():
     }
     assert unprefixed["session"]["cookie_name"] == "mitlearn_apisix_session"
     assert unprefixed["session"]["cookie_domain"] == ".learn.mit.edu"
+
+
+def test_learn_session_writers_all_refresh_with_the_forwarded_token_leeway():
+    """lua-resty-openidc subtracts the leeway when it stores a refreshed token,
+    so one participant without it hands /ai/* a token with no headroom.
+    """
+    config = _learn_oidc("learn-leeway", _learn_group()).base_oidc_config
+
+    assert (
+        config["access_token_expires_leeway"]
+        == FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS
+    )
 
 
 def test_learn_session_rejects_another_clients_vault_path():

@@ -58,6 +58,22 @@ NGX_REDIRECT_STATUSES = (301, 302, 303, 307, 308)
 OIDC_RECOVERY_SHARED_DICT = "ol-oidc-recovery"
 OIDC_RECOVERY_SHARED_DICT_SIZE = "1m"
 
+# access_token_expires_leeway for applications whose upstream reuses the
+# forwarded X-Access-Token (e.g. exchanging it at Keycloak for an ol-memory
+# token).  lua-resty-openidc refreshes only once expires_in - 1 - leeway has
+# passed on the gateway's clock, so with 0 a token can reach the upstream with
+# about 1s left and expire before Keycloak sees the exchange.  60s covers the
+# request's own processing time and gateway/Keycloak clock skew, and stays
+# well under the olapps realm's 300s access token lifespan (unset, so
+# Keycloak's default), so the gateway does not refresh on every request.
+#
+# The leeway is applied when a route stores a refreshed token in the session
+# (lua-resty-openidc saves the expiry with it subtracted), not when a route
+# reads one.  So every resource that writes a shared session has to set it,
+# not only the one whose upstream needs the headroom: learn_session_oidc_config
+# sets it for every participant in the MIT Learn session.
+FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS = 60
+
 # A serialized Origin header: scheme, lower-case host and optional port, with no
 # path, query or trailing slash.  APISIX's cors plugin compares the request
 # Origin against each allow_origins entry for exact equality, so anything else
@@ -688,6 +704,10 @@ class OLApisixOIDCConfig(BaseModel):
         Field(discriminator="source"),
     ]
 
+    # Seconds before expiry at which the plugin refreshes the session's access
+    # token; see FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS.  0 is the
+    # plugin's own default, so it is only emitted when set.
+    oidc_access_token_expires_leeway: NonNegativeInt = 0
     oidc_bearer_only: bool = False
     oidc_introspection_endpoint_auth_method: str = "client_secret_basic"
     oidc_logout_path: str = "/logout/oidc"
@@ -854,6 +874,11 @@ class OLApisixOIDCResources(ComponentResource):
             "use_pkce": oidc_config.oidc_use_pkce,
             **session_config,
         }
+
+        if oidc_config.oidc_access_token_expires_leeway:
+            self.base_oidc_config["access_token_expires_leeway"] = (
+                oidc_config.oidc_access_token_expires_leeway
+            )
 
         if oidc_config.oidc_session_contents:
             self.base_oidc_config["session_contents"] = (
@@ -1057,6 +1082,7 @@ def learn_session_oidc_config(  # noqa: PLR0913
         credentials=credentials,
         oidc_logout_path=route_group.logout_path,
         oidc_post_logout_redirect_uri=route_group.post_logout_uri,
+        oidc_access_token_expires_leeway=FORWARDED_ACCESS_TOKEN_EXPIRES_LEEWAY_SECONDS,
         oidc_scope=session.scope,
         oidc_session_contents=dict(session.session_contents),
         oidc_session_absolute_timeout=session.absolute_timeout_seconds,
