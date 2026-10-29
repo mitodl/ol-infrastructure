@@ -257,6 +257,14 @@ def provision_jupyterhub_deployment(  # noqa: PLR0913
             ),
             oidc_session_idling_timeout=0,
             oidc_session_rolling_timeout=0,
+            # The tmp and shared-password authenticators read no gateway
+            # headers, so the session keeps only what the plugin itself uses:
+            # access_token (with its refresh token) for renewal and
+            # enc_id_token for id_token_hint on logout.  Leaving out user and
+            # id_token takes them out of the cookie sent on every request, and
+            # with them X-Userinfo/X-ID-Token, from each user's next login.
+            # An authenticator that reads X-Userinfo would need "user" back.
+            oidc_session_contents={"access_token": True, "enc_id_token": True},
             oidc_use_session_secret=True,
             oidc_scope="openid email",
             credentials=OLApisixOIDCVaultCredentials(
