@@ -133,6 +133,17 @@ LIBRARIES_CONFIG = json.dumps(
 # so the bot answers a request for one instead of calling it unknown.
 UNPUBLISHABLE_LIBRARIES_CONFIG = json.dumps(UNPUBLISHABLE_LIBRARIES)
 
+
+# Identities are truncated at the first "@" in the slack-user-overrides
+# validation errors below, the way slack_users._fallback redacts them: `pulumi
+# up` for this stack can run in Concourse, whose build log is readable more
+# widely than the secret is, and a commit address is enough to identify
+# someone. A handle (no "@") survives whole, which is the common case and is
+# public anyway.
+def _redact(identity: str) -> str:
+    return identity.split("@", 1)[0] or "(blank)"
+
+
 # Commit identity -> Slack member id, for the authors `users.lookupByEmail`
 # cannot find because they commit under a GitHub no-reply or personal address
 # rather than their Slack one (slack_users.py). Kept in the SOPS secret rather
@@ -161,14 +172,6 @@ if slack_user_overrides:
             f"member id, got {type(_overrides).__name__}"
         )
         raise TypeError(msg)
-
-    # Identities are truncated at the first "@" in any message raised below, the
-    # way slack_users._fallback redacts them: `pulumi up` for this stack can run
-    # in Concourse, whose build log is readable more widely than the secret is,
-    # and a commit address is enough to identify someone. A handle (no "@")
-    # survives whole, which is the common case and is public anyway.
-    def _redact(identity: str) -> str:
-        return identity.split("@", 1)[0] or "(blank)"
 
     _bad = sorted(
         _redact(identity)
