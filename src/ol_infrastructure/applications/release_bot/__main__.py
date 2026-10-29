@@ -12,6 +12,7 @@ Single replica: Socket Mode connections are not multiplexed.
 """
 
 import json
+import re
 from pathlib import Path
 
 import pulumi_aws as aws
@@ -132,6 +133,76 @@ LIBRARIES_CONFIG = json.dumps(
 # so the bot answers a request for one instead of calling it unknown.
 UNPUBLISHABLE_LIBRARIES_CONFIG = json.dumps(UNPUBLISHABLE_LIBRARIES)
 
+# Commit identity -> Slack member id, for the authors `users.lookupByEmail`
+# cannot find because they commit under a GitHub no-reply or personal address
+# rather than their Slack one (slack_users.py). Kept in the SOPS secret rather
+# than bridge.settings for two reasons: this repository is public and the
+# mapping is a roster of people, and SOPS encrypts values but NOT keys -- so it
+# is stored as one JSON string under a single key, encrypted whole, instead of
+# a YAML mapping that would leave every GitHub handle in plaintext.
+#
+# Read with `.get`, and optional again in bot_config, so a bot image newer than
+# the secret (or older than this stack) still boots and resolves authors
+# exactly as it did before any of this existed.
+slack_user_overrides = bot_secrets.get("slack-user-overrides") or ""
+if slack_user_overrides:
+    # Fail at `pulumi up` rather than shipping a pod that logs an error and
+    # quietly goes back to notifying nobody. The runtime loader degrades to "no
+    # overrides" on anything malformed, which is the right behaviour for a
+    # running bot and the wrong one for a deploy: checking the same three
+    # things here (object, non-empty keys, member-id-shaped values) means the
+    # realistic edits -- a stray list, a display name pasted into a value --
+    # are caught by the person making them. The regex is the one in
+    # slack_users._SLACK_USER_ID_RE; keep them in step.
+    _overrides = json.loads(slack_user_overrides)
+    if not isinstance(_overrides, dict):
+        msg = (
+            "slack-user-overrides must be a JSON object of identity -> Slack "
+            f"member id, got {type(_overrides).__name__}"
+        )
+        raise TypeError(msg)
+
+    # Identities are truncated at the first "@" in any message raised below, the
+    # way slack_users._fallback redacts them: `pulumi up` for this stack can run
+    # in Concourse, whose build log is readable more widely than the secret is,
+    # and a commit address is enough to identify someone. A handle (no "@")
+    # survives whole, which is the common case and is public anyway.
+    def _redact(identity: str) -> str:
+        return identity.split("@", 1)[0] or "(blank)"
+
+    _bad = sorted(
+        _redact(identity)
+        for identity, user_id in _overrides.items()
+        if not identity.strip()
+        or not re.match(r"^[UW][A-Z0-9]{7,}$", str(user_id).strip().lstrip("@").upper())
+    )
+    if _bad:
+        msg = (
+            "slack-user-overrides entries must map an identity to a Slack member "
+            f"id (U… or W…), not a display name, handle, or email: {', '.join(_bad)}"
+        )
+        raise ValueError(msg)
+    # Keys are lowercased at load, so two that differ only in case collapse into
+    # one and the survivor depends on dict order -- silently dropping whichever
+    # entry lost. Cheaper to refuse the file than to debug that later.
+    _collisions = sorted(
+        {
+            _redact(identity.strip().lower())
+            for identity in _overrides
+            if sum(
+                other.strip().lower() == identity.strip().lower()
+                for other in _overrides
+            )
+            > 1
+        }
+    )
+    if _collisions:
+        msg = (
+            "slack-user-overrides has entries differing only by case, which "
+            f"collapse into one at load: {', '.join(_collisions)}"
+        )
+        raise ValueError(msg)
+
 resource_name = "release-bot-production"
 namespace = "operations"
 
@@ -160,9 +231,12 @@ bot_secret = kubernetes.core.v1.Secret(
         # chat/commands scopes: slack_users.py resolves each commit author's
         # email to a Slack id so release notifications @-mention real people
         # instead of pasting addresses. Without the scope the bot logs one
-        # error and degrades to plain-text names.
+        # error and degrades to plain-text names. "users:read" is wanted on top
+        # of that, for the boot-time check that every slack-user-overrides
+        # entry still points at a live account.
         "slack-bot-token": bot_secrets["slack-bot-token"],
         "slack-app-token": bot_secrets["slack-app-token"],
+        "slack-user-overrides": slack_user_overrides,
         "concourse-user": bot_secrets["concourse-username"],
         "concourse-password": bot_secrets["concourse-password"],
         "github-app-id": str(github_app_id),
@@ -170,6 +244,16 @@ bot_secret = kubernetes.core.v1.Secret(
         "github-app-private-key": github_app_private_key,
     },
 )
+# Adding a key here replaces the Secret rather than updating it, so a preview
+# reports `creation failed: secrets "release-bot-secret-production" already
+# exists`. That is the provider dry-running the create while the original is
+# still there, not a blocked update: the name is pinned, so the provider
+# deletes before replacing. #5169 added the three github-app-* keys the same
+# way and shipped.
+#
+# A running pod does not notice the swap -- env vars are read once at container
+# start -- which is also why the Deployment below has to change for a new key
+# to reach the bot at all.
 
 
 def _secret_env(name: str, key: str) -> kubernetes.core.v1.EnvVarArgs:
@@ -222,6 +306,7 @@ bot_deployment = kubernetes.apps.v1.Deployment(
                         env=[
                             _secret_env("SLACK_BOT_TOKEN", "slack-bot-token"),
                             _secret_env("SLACK_APP_TOKEN", "slack-app-token"),
+                            _secret_env("SLACK_USER_OVERRIDES", "slack-user-overrides"),
                             _secret_env("CONCOURSE_USER", "concourse-user"),
                             _secret_env("CONCOURSE_PASSWORD", "concourse-password"),
                             _secret_env("GITHUB_APP_ID", "github-app-id"),

@@ -1,8 +1,11 @@
 """Configuration loader for the release bot."""
 
 import json
+import logging
 import os
 from dataclasses import dataclass
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -66,3 +69,38 @@ def load_libraries_config() -> dict[str, LibraryConfig]:
 def load_unpublishable_libraries() -> dict[str, str]:
     """Load name -> why-it-has-no-pipeline, for libraries Doof could publish."""
     return json.loads(os.environ.get("UNPUBLISHABLE_LIBRARIES", "{}"))
+
+
+def load_slack_user_overrides() -> dict[str, str]:
+    """Load commit-identity -> Slack member id overrides for author mentions.
+
+    Maps a commit email or GitHub handle to the Slack account to @-mention,
+    for the authors whose commit email is not their Slack email and so cannot
+    be found with ``users.lookupByEmail`` (see slack_users.py). Sourced from
+    the SOPS-encrypted release_bot secret rather than bridge.settings so a
+    roster of people is not published in a public repository.
+
+    Optional and non-fatal in both directions: an absent variable just means
+    no overrides, and malformed JSON degrades to no overrides with a log line.
+    Both leave every author resolving exactly as before this existed, which
+    beats a crash loop that takes every other command down with it.
+    """
+    raw = os.environ.get("SLACK_USER_OVERRIDES", "").strip()
+    if not raw:
+        return {}
+    try:
+        overrides = json.loads(raw)
+    except ValueError:
+        log.exception(
+            "SLACK_USER_OVERRIDES is not valid JSON; release notifications "
+            "will fall back to naming authors without @-mentioning them"
+        )
+        return {}
+    if not isinstance(overrides, dict):
+        log.error(
+            "SLACK_USER_OVERRIDES must be a JSON object of identity -> Slack "
+            "member id, got %s",
+            type(overrides).__name__,
+        )
+        return {}
+    return {str(key): str(value) for key, value in overrides.items()}
