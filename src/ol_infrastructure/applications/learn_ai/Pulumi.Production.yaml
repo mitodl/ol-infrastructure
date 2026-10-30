@@ -33,17 +33,12 @@ config:
     AI_ZENDESK_NAME_FIELD_ID: "0"
     AI_ZENDESK_URL_FIELD_ID: "0"
     AI_ZENDESK_USERNAME_FIELD_ID: "0"
-    CANVAS_SYLLABUS_DEMO_READABLE_IDS: ["14566-kaleba:20211202", "34642-15.095_FA25"]
-    CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: ["14566-kaleba:20211202+canvas", "34642-15.095_FA25+canvas"]
-    CELERY_TASK_ALWAYS_EAGER: "false"
     CSRF_COOKIE_NAME: learn_ai_csrftoken
     CSRF_COOKIE_DOMAIN: "learn.mit.edu"
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",
       "https://learn.mit.edu", "https://api.learn.mit.edu"]'
     CSRF_TRUSTED_ORIGINS: '["https://learn-ai.ol.mit.edu", "https://api-learn-ai.ol.mit.edu",
       "https://learn.mit.edu", "https://api.learn.mit.edu"]'
-    DEBUG: "false"
-    DEV_ENV: "false"
     LANGSMITH_PROJECT: "learn-ai-production"
     LANGSMITH_TRACING: "true"
     LEARNER_API_LEARN_BASE_URL: "https://api.learn.mit.edu/"
@@ -56,8 +51,6 @@ config:
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_COOKIE_NAME: "mitol"
     MITOL_ENVIRONMENT: "production"
-    MITOL_FEATURES_DEFAULT: "true"
-    MITOL_SECURE_SSL_REDIRECT: "False"
     NODE_ENV: "development"
     OTEL_EXPORTER_OTLP_ENDPOINT: "http://grafana-k8s-monitoring-alloy-receiver.grafana.svc.cluster.local:4318"
     OPENTELEMETRY_SERVICE_NAME: "learn-ai-webapp"

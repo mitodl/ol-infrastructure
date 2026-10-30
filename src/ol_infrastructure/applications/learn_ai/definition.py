@@ -82,7 +82,26 @@ CANVAS_AGENT_CONSUMER_NAME = "canvas-agent"
 
 # Values local-dev wants as much as the deployed stacks do. A value only the
 # deployed stacks want belongs in their learn_ai:env_vars or the deployed program.
-LOCAL_AND_DEPLOYED_ENV: dict[str, Any] = {}
+LOCAL_AND_DEPLOYED_ENV: dict[str, Any] = {
+    # The demo courses every environment allows. These are lists because
+    # OLApplicationK8sConfig renders every env value with str(), so a list
+    # reaches the pod as its Python repr, which learn-ai's main/envs.py parses
+    # with literal_eval. A JSON string here would reach the pod as a different
+    # value.
+    "CANVAS_SYLLABUS_DEMO_READABLE_IDS": ["14566-kaleba:20211202", "34642-15.095_FA25"],
+    "CANVAS_TUTOR_DEMO_RUN_READABLE_IDS": [
+        "14566-kaleba:20211202+canvas",
+        "34642-15.095_FA25+canvas",
+    ],
+    # The published image has no debug_toolbar, so a true value crashes it at
+    # startup. Only the local-dev image built from a learn-ai checkout can run
+    # with DEBUG on, and a developer sets that per cluster.
+    "DEBUG": "false",
+    # Feature flags default on where no PostHog key decides them.
+    "MITOL_FEATURES_DEFAULT": "true",
+    # TLS terminates at the gateway in every environment.
+    "MITOL_SECURE_SSL_REDIRECT": "False",
+}
 
 # Nothing routes to edx_content (learn-ai's task_routes is empty), but the
 # deployed stacks run a worker for it.

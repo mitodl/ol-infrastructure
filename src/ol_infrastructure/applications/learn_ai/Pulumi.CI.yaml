@@ -33,15 +33,10 @@ config:
     AI_ZENDESK_NAME_FIELD_ID: "0"
     AI_ZENDESK_URL_FIELD_ID: "0"
     AI_ZENDESK_USERNAME_FIELD_ID: "0"
-    CANVAS_SYLLABUS_DEMO_READABLE_IDS: ["14566-kaleba:20211202", "34642-15.095_FA25"]
-    CANVAS_TUTOR_DEMO_RUN_READABLE_IDS: ["14566-kaleba:20211202+canvas", "34642-15.095_FA25+canvas"]
-    CELERY_TASK_ALWAYS_EAGER: "false"
     CSRF_COOKIE_NAME: learn_ai_ci_csrftoken
     CSRF_COOKIE_DOMAIN: "ci.learn.mit.edu"
     CSRF_ALLOWED_ORIGINS: '["https://learn-ai-ci.ol.mit.edu", "https://api-learn-ai-ci.ol.mit.edu"]'
     CSRF_TRUSTED_ORIGINS: '["https://learn-ai-ci.ol.mit.edu", "https://api-learn-ai-ci.ol.mit.edu"]'
-    DEBUG: "false"
-    DEV_ENV: "false"
     LANGSMITH_PROJECT: "learn-ai-ci"
     LANGSMITH_TRACING: "true"
     LOGIN_REDIRECT_ALLOWED_HOSTS: '["learn-ai-ci.ol.mit.edu", "ci.learn.mit.edu",
@@ -50,8 +45,6 @@ config:
     MITOL_COOKIE_DOMAIN: "ol.mit.edu"
     MITOL_COOKIE_NAME: "mitol"
     MITOL_ENVIRONMENT: "ci"
-    MITOL_FEATURES_DEFAULT: "true"
-    MITOL_SECURE_SSL_REDIRECT: "False"
     NODE_ENV: "development"
     PROBLEM_SET_URL: https://api.ci.learn.mit.edu/api/v0/tutor/problems/
     SENTRY_LOG_LEVEL: "ERROR"
