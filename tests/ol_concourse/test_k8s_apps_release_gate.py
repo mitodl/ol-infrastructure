@@ -409,3 +409,16 @@ def test_script_fails_closed_on_an_empty_gate_file(tmp_path):
     )
     assert result.returncode != 0
     assert "Nothing was deployed" in result.stderr
+
+
+def test_the_gate_is_checked_every_five_minutes():
+    """An hourly gate check left a promotion waiting long enough to be refused.
+
+    Production binds the newest ol-infrastructure revision that passed QA when
+    it starts. Until a check records the closed issue, every ol-infrastructure
+    merge that reaches QA moves that revision past the one the issue approved.
+    """
+    pipeline = json.loads(build_app_pipeline(APP).model_dump_json())
+    (gate,) = [r for r in pipeline["resources"] if r["name"] == f"{APP}-release-gate"]
+
+    assert gate["check_every"] == "5m"

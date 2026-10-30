@@ -209,6 +209,7 @@ class _FakeIssue:
         self.labels = [_FakeLabel(name) for name in labels]
         self.comments = []
         self.state = "open"
+        self.closed_at = None
 
     def add_to_labels(self, label):
         self.labels.append(_FakeLabel(label))
@@ -219,6 +220,8 @@ class _FakeIssue:
     def edit(self, **kwargs):
         if "state" in kwargs:
             self.state = kwargs["state"]
+            if self.state == "closed":
+                self.closed_at = datetime(2026, 10, 29, 15, 38, 26, tzinfo=UTC)
 
 
 class _FakeDeploymentStatus:
@@ -430,10 +433,14 @@ def test_close_release_issue_comments_and_closes(fake_repo):
     repo = fake_repo(
         _FakeRepo(issues=[_FakeIssue(42, "Release app", "body", ["release"])])
     )
-    github._close_release_issue_sync("mitodl/thing", 42, "Promoted by @tmacey.")
+    closed_at = github._close_release_issue_sync(
+        "mitodl/thing", 42, "Promoted by @tmacey."
+    )
     issue = repo.get_issue(42)
     assert issue.comments == ["Promoted by @tmacey."]
     assert issue.state == "closed"
+    # The bot looks for the gate version stamped with this exact close.
+    assert closed_at == datetime(2026, 10, 29, 15, 38, 26, tzinfo=UTC)
 
 
 # ---------------------------------------------------------------------------

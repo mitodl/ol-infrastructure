@@ -461,19 +461,32 @@ async def add_issue_label(repo_slug: str, issue_number: int, label: str) -> None
     await asyncio.to_thread(_add_issue_label_sync, repo_slug, issue_number, label)
 
 
-def _close_release_issue_sync(repo_slug: str, issue_number: int, comment: str) -> None:
+def _close_release_issue_sync(
+    repo_slug: str, issue_number: int, comment: str
+) -> datetime | None:
     issue = _get_client().get_repo(repo_slug).get_issue(issue_number)
     issue.create_comment(comment)
+    # PyGithub refreshes the issue from the PATCH response, so this is the
+    # closed_at GitHub recorded.
     issue.edit(state="closed")
+    return issue.closed_at
 
 
-async def close_release_issue(repo_slug: str, issue_number: int, comment: str) -> None:
+async def close_release_issue(
+    repo_slug: str, issue_number: int, comment: str
+) -> datetime | None:
     """Add a comment and close the given issue (triggers Concourse production deploy).
 
     Closing the release issue is the entire production promotion mechanism --
     Concourse's github-issues resource polls for closed issues.
+
+    :returns: When GitHub recorded the close, or None if the response omitted
+        it. The release-gate version Concourse records for this close carries
+        the same timestamp.
     """
-    await asyncio.to_thread(_close_release_issue_sync, repo_slug, issue_number, comment)
+    return await asyncio.to_thread(
+        _close_release_issue_sync, repo_slug, issue_number, comment
+    )
 
 
 # Environments the release pipeline creates GitHub Deployments for (see

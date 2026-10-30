@@ -1016,6 +1016,15 @@ def _define_release_resources(
         app_installation_id=github_app_installation_id,
         private_ssh_key=github_app_private_key,
         gh_host=None,
+        # Production binds the newest ol-infrastructure revision that passed
+        # QA when it starts, and refuses one its gate issue did not approve.
+        # Every minute between a close and the check that records it is a
+        # minute in which an ol-infrastructure merge reaching QA strands the
+        # promotion. The release bot checks right after it closes an issue,
+        # but that check can miss the close, and a close made on GitHub gets
+        # no forced check at all. The default 60m left mitxonline 2026.10.28.1
+        # waiting an hour and then refused.
+        poll_frequency=Duration("5m"),
     )
     # Open release issues are created after each QA deployment.
     release_issue = github_issues(

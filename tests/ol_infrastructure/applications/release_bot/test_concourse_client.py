@@ -459,3 +459,67 @@ async def test_active_build_url_stops_on_a_cursor_that_does_not_move(monkeypatch
     )
     with pytest.raises(RuntimeError, match="repeated page"):
         await concourse.active_build_url("p", "j")
+
+
+# ---------------------------------------------------------------------------
+# has_version: did a check actually record the version a caller waits for?
+# ---------------------------------------------------------------------------
+
+
+class _VersionsSession:
+    """Serves one version list and records the query each GET sent."""
+
+    def __init__(self, versions):
+        self.versions = versions
+        self.requests: list[tuple[str, object]] = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    def get(self, url, params=None, **_kwargs):
+        self.requests.append((url, params))
+        return _FakeResponse(self.versions)
+
+
+_CLOSED = {"issue_number": "4204", "issue_closed_at": "2026-10-29T15:38:26"}
+
+
+async def test_has_version_filters_on_every_field(monkeypatch):
+    session = _install(
+        monkeypatch,
+        _VersionsSession([{"id": 1, "version": dict(_CLOSED, issue_state="closed")}]),
+    )
+
+    assert await concourse.has_version(
+        "my-app-pipeline", "my-app-release-gate", _CLOSED
+    )
+
+    ((url, params),) = session.requests
+    assert url.endswith(
+        "/pipelines/my-app-pipeline/resources/my-app-release-gate/versions"
+    )
+    assert params == [
+        ("filter", "issue_number:4204"),
+        ("filter", "issue_closed_at:2026-10-29T15:38:26"),
+    ]
+
+
+async def test_has_version_is_false_when_nothing_matches(monkeypatch):
+    _install(monkeypatch, _VersionsSession([]))
+
+    assert not await concourse.has_version("p", "r", _CLOSED)
+
+
+async def test_has_version_does_not_trust_an_ignored_filter(monkeypatch):
+    """A version list the filter did not narrow is not a match."""
+    _install(
+        monkeypatch,
+        _VersionsSession(
+            [{"id": 1, "version": dict(_CLOSED, issue_closed_at="2026-10-28T17:43:24")}]
+        ),
+    )
+
+    assert not await concourse.has_version("p", "r", _CLOSED)

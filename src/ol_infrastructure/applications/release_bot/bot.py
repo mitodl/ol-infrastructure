@@ -590,7 +590,7 @@ async def _cmd_promote(repos, ack, respond, command, context):
         return
     user = context["user_id"]
     try:
-        await github.close_release_issue(
+        closed_at = await github.close_release_issue(
             cfg.repo,
             issues[0]["number"],
             comment=f"Promoted to Production by <@{user}> via `/doof promote`.",
@@ -599,18 +599,51 @@ async def _cmd_promote(repos, ack, respond, command, context):
         log.exception("Failed to promote %s", app_name)
         await respond(f"❌ Failed to promote `{app_name}`.")
         return
-    deploy = await _check_release_gate(app_name, cfg)
+    deploy = await _check_release_gate(app_name, cfg, issues[0]["number"], closed_at)
     _release_requesters.pop(app_name, None)
     await respond(f"✅ `{app_name}` {issues[0]['title']} promoted. {deploy}")
 
 
-async def _check_release_gate(app_name: str, cfg) -> str:
+# How long to keep checking the release gate for a just-closed issue, the
+# most checks to make in that time, and how long to wait between them.
+_GATE_VERSION_TIMEOUT_SECONDS = 60
+_GATE_CHECK_ATTEMPTS = 6
+_GATE_RECHECK_SECONDS = 10
+# How the github-issues resource writes timestamps into a version
+# (ISO_8601_FORMAT in ol-concourse's resources/github-issues/concourse.py).
+_GATE_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S"
+
+
+def _gate_version(issue_number: int, closed_at: datetime | None) -> dict[str, str]:
+    """Return the release-gate version fields that identify this close."""
+    version = {"issue_number": str(issue_number)}
+    if closed_at is not None:
+        # A reopened and re-closed issue already has a version for its
+        # earlier close, so the number alone would match too soon. Formatted
+        # as the resource formats the same PyGithub field.
+        version["issue_closed_at"] = closed_at.strftime(_GATE_TIMESTAMP_FORMAT)
+    return version
+
+
+async def _check_release_gate(
+    app_name: str, cfg, issue_number: int, closed_at: datetime | None
+) -> str:
     """Make Production notice a just-closed gate issue; describe the deploy.
 
     The check only records the closed issue as a new gate version -- the
     build it triggers is scheduled by Concourse afterwards and has no id yet
     -- so the link is to the Production job, whose newest build is listed
     first.
+
+    A check that succeeds can still miss the close: on 2026-10-29 one ran a
+    second after mitxonline #4204 closed, succeeded, and recorded nothing. So
+    the gate is checked again until it has recorded a version for this issue
+    closed at *closed_at*, for up to `_GATE_VERSION_TIMEOUT_SECONDS` in all. A
+    check that fails or overruns that time counts as one that found nothing,
+    rather than ending the wait. Until then
+    nothing has been triggered: the deploy waits for the gate's next scheduled
+    check, and by then it can bind a newer ol-infrastructure revision that the
+    issue never approved.
     """
     # Matches the Production deploy job k8s_apps/pipeline.py's release-resource
     # workflow generates for the `ol-application-<app>` Pulumi project
@@ -618,18 +651,73 @@ async def _check_release_gate(app_name: str, cfg) -> str:
     url = concourse.job_url(
         cfg.pipeline, f"deploy-ol-application-{app_name}-production"
     )
-    try:
+    gate = f"{app_name}-release-gate"
+    version = _gate_version(issue_number, closed_at)
+
+    # What is known at the end, so a failure is described by what actually
+    # failed: whether any check ever finished, and whether the latest
+    # attempt's version lookup finished (an earlier lookup saying "not yet"
+    # is no evidence about a later one that failed).
+    checked = looked_up = False
+
+    async def _recorded() -> bool:
+        nonlocal checked, looked_up
         # Don't make the deploy wait for the release-gate resource's normal
-        # poll interval (default 60m) to notice the issue just closed.
-        await concourse.check_resource(cfg.pipeline, f"{app_name}-release-gate")
-    except Exception:
-        log.exception("Failed to force release-gate check for %s", app_name)
+        # poll interval to notice the issue just closed.
+        looked_up = False
+        await concourse.check_resource(cfg.pipeline, gate)
+        checked = True
+        found = await concourse.has_version(cfg.pipeline, gate, version)
+        looked_up = True
+        return found
+
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + _GATE_VERSION_TIMEOUT_SECONDS
+    for attempt in range(_GATE_CHECK_ATTEMPTS):
+        remaining = deadline - loop.time()
+        if attempt:
+            # No sleep that would end past the deadline.
+            if remaining <= _GATE_RECHECK_SECONDS:
+                break
+            await asyncio.sleep(_GATE_RECHECK_SECONDS)
+            remaining = deadline - loop.time()
+        if remaining <= 0:
+            break
+        try:
+            recorded = await asyncio.wait_for(_recorded(), remaining)
+        except Exception:
+            log.exception(
+                "Release-gate check or version lookup failed for %s", app_name
+            )
+            continue
+        if recorded:
+            return f"Production deploy triggered: {url}"
+    if not checked:
         return (
-            "⚠️ Could not make Concourse check the release gate, so no "
-            "Production deploy was triggered. One starts only after a later "
-            f"check of the gate succeeds: {url}"
+            "⚠️ The bot could not confirm that Concourse finished checking the "
+            "release gate. A check may still be running, so a Production deploy "
+            f"may or may not have started: {url}"
         )
-    return f"Production deploy triggered: {url}"
+    if not looked_up:
+        # The check ran, so it may well have recorded the close and started
+        # the deploy; only confirming that failed.
+        return (
+            "⚠️ Concourse checked the release gate, but the bot could not "
+            f"confirm it recorded issue #{issue_number} closed, so a Production "
+            f"deploy may or may not have started: {url}"
+        )
+    log.warning(
+        "Release gate %s/%s has no version %s after %ss",
+        cfg.pipeline,
+        gate,
+        version,
+        _GATE_VERSION_TIMEOUT_SECONDS,
+    )
+    return (
+        f"⚠️ Concourse has not seen issue #{issue_number} closed yet, so no "
+        "Production deploy was triggered. One starts when a later check of "
+        f"the gate finds it: {url}"
+    )
 
 
 def _known_libraries() -> str:
@@ -919,7 +1007,7 @@ async def _promote_from_button(repos, body, say, client):
         )
         return
     try:
-        await github.close_release_issue(
+        closed_at = await github.close_release_issue(
             cfg.repo,
             matching[0]["number"],
             comment=f"Promoted to Production by <@{user_id}> via Slack button.",
@@ -928,7 +1016,7 @@ async def _promote_from_button(repos, body, say, client):
         log.exception("Failed to close issue for %s %s", app_name, version)
         await say(f"⚠️ Failed to promote `{app_name}` `{version}`.")
         return
-    deploy = await _check_release_gate(app_name, cfg)
+    deploy = await _check_release_gate(app_name, cfg, matching[0]["number"], closed_at)
     _release_requesters.pop(app_name, None)
     await _update_promote_message(
         client,
