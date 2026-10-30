@@ -1,3 +1,4 @@
+import { courseCards, resourceCards } from "./helpers/cards"
 import { SEARCH_QUERY } from "./helpers/fixtures"
 import { expect, test } from "./helpers/signed-in-test"
 
@@ -51,7 +52,7 @@ test.describe("MIT Learn signed-in journey", () => {
     await expect(page.getByText(/^\d+ results$/)).toBeAttached()
 
     await expect(page.getByRole("heading", { name: "Search Results" })).toBeVisible()
-    await expect(page.getByRole("article").first()).toBeVisible()
+    await expect(resourceCards(page.getByRole("tabpanel")).first()).toBeVisible()
 
     // The tab set present but reading "Courses (0)" is what an emptied or
     // half-rebuilt index looks like from a user's seat, so assert the count is
@@ -69,7 +70,9 @@ test.describe("MIT Learn signed-in journey", () => {
     // Relevance, not an exact count: any specific number is a false page waiting
     // for the next content sync.
     await expect(
-      page.getByRole("article", { name: new RegExp(`^Course:.*${SEARCH_QUERY}`, "i") }).first(),
+      courseCards(page.getByRole("tabpanel"))
+        .filter({ has: page.getByRole("heading", { name: new RegExp(SEARCH_QUERY, "i") }) })
+        .first(),
     ).toBeVisible()
   })
 })

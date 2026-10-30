@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { courseCards } from "./helpers/cards"
 import { SEARCH_QUERY } from "./helpers/fixtures"
 
 // `/search` is the second most-rendered route in production (21,470 non-bot
@@ -43,9 +44,9 @@ test.describe("MIT Learn search by URL", () => {
 
     // And the results themselves agree with the facet. Scoped to the tabpanel
     // so it is the search listing being asserted on. Matching on the card's
-    // "Course:" name prefix rather than on any course's title keeps this true
-    // of every environment and every content sync.
+    // "Course" type label rather than on any course's title keeps this true of
+    // every environment and every content sync.
     const results = page.getByRole("tabpanel")
-    await expect(results.getByRole("article", { name: /^Course:/ }).first()).toBeVisible()
+    await expect(courseCards(results).first()).toBeVisible()
   })
 })

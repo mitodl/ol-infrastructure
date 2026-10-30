@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test"
+import { resourceCards } from "./helpers/cards"
 import { CHANNEL_PATH, CHANNEL_TITLE } from "./helpers/fixtures"
 
 // The most-rendered route on the property: `/c/[channelType]/[name]` at 39,086
@@ -28,10 +29,10 @@ test.describe("MIT Learn channel browse", () => {
     // carousel. The page carries both: a "Featured Courses" strip whose
     // contents are configured on the channel, and the tabpanel below it fed by
     // vector_learning_resources_search. Only the second one goes dark when
-    // search breaks, and an unscoped getByRole("article") would match the
+    // search breaks, and an unscoped card locator would match the
     // carousel first and pass straight through an empty index.
     const results = page.getByRole("tabpanel")
-    await expect(results.getByRole("article").first()).toBeVisible()
+    await expect(resourceCards(results).first()).toBeVisible()
 
     // Non-zero, asserted through the tab's own accessible name so it keeps
     // auto-retrying. "All (0)" is what a channel looks like when the index has
@@ -46,7 +47,7 @@ test.describe("MIT Learn channel browse", () => {
   }) => {
     await page.goto(CHANNEL_PATH)
 
-    const card = page.getByRole("tabpanel").getByRole("article").first()
+    const card = resourceCards(page.getByRole("tabpanel")).first()
     const cardLink = card.getByRole("link").first()
     await expect(cardLink).toBeVisible()
     // Read the resource's name off the card instead of pinning one. Everything
