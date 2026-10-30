@@ -1,6 +1,6 @@
 """Abandoning a release must also neutralise its gate issue.
 
-``release_gate`` is configured ``skip_if_labeled=["abandoned"]``, but only a
+``release_gate`` skips issues labelled ``ops:abandoned``, but only a
 step that applies the label makes that do anything. These tests pin that the
 abandon job applies it, in an order that cannot retire an issue for a release
 the abandon refused to cancel.
@@ -56,14 +56,14 @@ def test_issue_put_labels_the_version_being_abandoned():
 
     assert put["params"] == {
         "title_template": f"Release {APP} ((.:abandoned_version))",
-        "close_with_labels": ["abandoned"],
+        "close_with_labels": ["ops:abandoned"],
     }
     # The same file the abandon put reads its version from, so the two cannot
     # disagree about which release this build cancels.
     abandon = plan[_index(plan, "put", f"{APP}-release")]
     assert load["file"] == abandon["params"]["version_file"]
     # A closed issue must not be handed to the implicit get, which would
-    # rename it [CONSUMED ...] and lose its version.
+    # label it consumed.
     assert put["no_get"] is True
 
 
