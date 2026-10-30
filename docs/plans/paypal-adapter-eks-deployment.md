@@ -175,9 +175,10 @@ with a unit test, and is worth doing in step 5 but is not required for the adapt
 (`apisix_official.py:132`, `preserve_client_ip.enabled=true`) and the `real-ip` plugin only
 believes `X-Forwarded-For` from Fastly, so a request from elsewhere cannot spoof a Stripe
 address. The IP list is a constant in the stack with the source URL in a comment, and
-comparing it against the published list is part of each adapter upgrade. If the
-list goes stale, payments fail closed, so the first alert on `/paypal/payments` 403s (step 8)
-is what catches it.
+comparing it against the published list is part of each adapter upgrade. If the list goes stale,
+payments fail closed. If `ip-restriction` remains enabled, add an alert for `/paypal/payments`
+403s and verify notification delivery before the Production deployment; healthy pods alone will
+not detect this failure.
 
 No route covers `/monitor/health` or `/monitor/metrics`. APISIX returns 404 for an unmatched
 path on a known host, which is the "restrict public access" the docs ask for without a second
@@ -204,10 +205,10 @@ probe with 30 attempts covers the first Vault fetch.
 
 Observability: the PodMonitor scrapes port 8080 at `/monitor/metrics` every 30 s. The webapp
 pods carry `AlertTier.page` in Production, so the existing Deployment-availability and
-crash-loop rules page without a new rule. One new rule is worth adding once the metric names
-are known: a 5xx or 403 rate on the `/paypal/payments` route from the gateway's metrics, since
-that is the Stripe-facing failure and the one that stales the IP list would cause. The
-synthetic-monitoring checks (`metric_rules/synthetic_monitoring.py`) can also probe
+crash-loop rules page without a new rule. If `ip-restriction` remains enabled, add an alert for
+403s on `/paypal/payments` once the gateway metric names are known, and verify notification
+delivery before the Production deployment. A 5xx-rate alert on that route is also worth adding.
+The synthetic-monitoring checks (`metric_rules/synthetic_monitoring.py`) can also probe
 `GET https://paypal-adapter.ol.mit.edu/paypal/canceled` for a non-5xx answer to prove the
 whole path from DNS to pod; that is optional and depends on what the adapter returns for a
 bare GET, which the spike will show.
@@ -226,14 +227,14 @@ credential exists; step 8 is the first `pulumi up` that needs them.
 
 2. **Registration**: `lib/pulumi_projects.py` (`PAYPAL_ADAPTER = "ol-application-paypal-adapter"`
    and its `applications.paypal_adapter` mapping), `lib/ol_types.py` (`Application.paypal_adapter`,
-   `Services.paypal_adapter`), `bridge/lib/versions.py` (tag and digest constants with the
-   Renovate marker), `src/ol_concourse/pipelines/versions_map.py` and `secrets_map.py`
-   entries. `tests/ol_concourse/test_secrets_map.py` enforces the latter.
+   `Services.paypal_adapter`), and `bridge/lib/versions.py` (tag and digest constants with the
+   Renovate marker).
 
-3. **EKS stack config**: add `paypal-adapter` to `eks:namespaces` and the two hostnames to
-   `eks:apisix_domains` in `infrastructure/aws/eks/Pulumi.applications.QA.yaml` and
-   `Pulumi.applications.Production.yaml`. Deploy the EKS stacks; `check_cluster_namespace` in
-   the app stack fails until this is live.
+3. **EKS stack config**: add `paypal-adapter` to `eks:namespaces` in
+   `infrastructure/aws/eks/Pulumi.applications.QA.yaml` and
+   `Pulumi.applications.Production.yaml`. Add `paypal-adapter-qa.ol.mit.edu` only to the QA
+   stack's `eks:apisix_domains`, and `paypal-adapter.ol.mit.edu` only to Production's.
+   Deploy the EKS stacks; `check_cluster_namespace` in the app stack fails until this is live.
 
 4. **Secrets**: create `src/bridge/secrets/paypal_adapter/secrets.{qa,production}.yaml` with
    placeholder values and the four keys, encrypted with `sops`. Real values replace them in
@@ -246,7 +247,9 @@ credential exists; step 8 is the first `pulumi up` that needs them.
    `OLVaultK8SStaticSecret` with the template, `OLApplicationK8s`, the PodMonitor, the
    certificate, the upstream, the shared plugins and the four routes. Keep the stack config
    small: everything that does not differ between QA and Production is a constant in
-   `__main__.py`.
+   `__main__.py`. Add the `versions_map.py` and `secrets_map.py` entries in this change, after
+   the project and secret paths exist; `test_secrets_map.py` and `test_versions_map.py` reject
+   entries without them.
 
 6. **Vault policy**: `applications/paypal_adapter/paypal_adapter_policy.hcl` granting read on
    `secret-paypal-adapter` and `secret-paypal-adapter/*`, following
@@ -255,16 +258,17 @@ credential exists; step 8 is the first `pulumi up` that needs them.
 7. **Pipeline**: a `SimplePulumiParams` entry `"paypal-adapter"` in
    `src/ol_concourse/pipelines/infrastructure/simple_pulumi/pipeline.py` with
    `category="applications"`, `topology="preview-gated"`, `stages=["QA", "Production"]`,
-   `auto_deploy_stages=["QA"]`, and the matching name in `simple_pulumi/meta.py`. QA deploys on
-   merge; Production waits for a reviewed preview, which is the right gate for a payment-path
-   service.
+   `auto_deploy_stages=[]`, and the matching name in `simple_pulumi/meta.py`. During bootstrap,
+   both stages remain preview-gated so no deploy runs with placeholder credentials.
 
 8. **First deploy, QA**: once the Stripe-side owner has created the sandbox custom payment
    method against `https://paypal-adapter-qa.ol.mit.edu/paypal/payments`, the restricted key
    and the signing secret, and accounting has supplied PayPal sandbox credentials, replace the
-   placeholders in `secrets.qa.yaml`, merge, and let the pipeline deploy. Then run the
-   verification below. Production repeats this with live credentials after mitxonline RC has
-   completed real sandbox payments through it.
+   placeholders in `secrets.qa.yaml`, enable QA auto-deployment, merge, and let the pipeline
+   deploy. Then run the verification below. Before Production's first deploy, create the
+   `/paypal/payments` 403 alert and verify notification delivery if `ip-restriction` remains
+   enabled. Production repeats this with live credentials after mitxonline RC has completed
+   real sandbox payments through it.
 
 ## Verification
 
