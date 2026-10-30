@@ -1034,6 +1034,7 @@ CACHE_KEY_QUERY_PARAM_WHITELIST = [
     "is_new_user",
     "status",
     "module",
+    "modules",
     "needs_attention",
     "view",
     # LearningResourceDrawer params (not in mit-learn's registry).
