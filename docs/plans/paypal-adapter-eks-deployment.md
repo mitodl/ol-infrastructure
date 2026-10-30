@@ -154,10 +154,11 @@ The applications gateway already fronts hostnames under `ol.mit.edu`
 `eks:apisix_domains`). Adding the two adapter hostnames to `eks:apisix_domains` makes
 external-dns publish them on the gateway's NLB, which is a deploy of the EKS stack before the
 app stack. The app stack follows tika (`applications/tika/__main__.py`) for the certificate
-(`OLCertManagerCert`, `create_apisixtls_resource=True`), the upstream
-(`OLApisixUpstream`, `backend_resolve_granularity="endpoint"` so a pod in its preStop sleep
-leaves the pool) and the routes (`OLApisixRoute` with `OLApisixSharedPlugins`,
-`cors_allow_origins=[]` because no browser page fetches these endpoints with XHR).
+(`OLCertManagerCert`, `create_apisixtls_resource=True`), the upstream (`OLApisixUpstream`)
+and the routes (`OLApisixRoute`, with `backend_resolve_granularity="endpoint"` on each
+`OLApisixRouteConfig` so terminating or unready pods leave the pool). Use
+`OLApisixSharedPlugins` with `cors_allow_origins=[]` because no browser page fetches
+these endpoints with XHR.
 
 | Route | Caller | Plugins | Why |
 |---|---|---|---|
