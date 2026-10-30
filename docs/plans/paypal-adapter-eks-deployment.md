@@ -119,13 +119,13 @@ whose `templates` entry renders the config file:
 ```json
 {
   "adapter": {"base_url": "https://paypal-adapter-qa.ol.mit.edu", "livemode": false},
-  "stripe": {"secret_key": "{{ get .Secrets \"stripe_secret_key\" }}"},
+  "stripe": {"secret_key": "{{ get .Secrets "stripe_secret_key" }}"},
   "logging": {"level": "debug", "json": true},
   "adapter_configs": {
     "paypal": {
-      "client_id": "{{ get .Secrets \"paypal_client_id\" }}",
-      "client_secret": "{{ get .Secrets \"paypal_client_secret\" }}",
-      "stripe_signing_key": "{{ get .Secrets \"stripe_signing_key\" }}",
+      "client_id": "{{ get .Secrets "paypal_client_id" }}",
+      "client_secret": "{{ get .Secrets "paypal_client_secret" }}",
+      "stripe_signing_key": "{{ get .Secrets "stripe_signing_key" }}",
       "enable_webhooks": true
     }
   }
