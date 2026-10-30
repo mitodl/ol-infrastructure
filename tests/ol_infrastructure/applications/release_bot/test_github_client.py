@@ -211,6 +211,7 @@ class _FakeIssue:
         self.state = "open"
         self.closed_at = None
         self.pull_request = None
+        self.updated_at = datetime(2026, 10, 29, 15, 38, 26, tzinfo=UTC)
 
     def add_to_labels(self, label):
         self.labels.append(_FakeLabel(label))

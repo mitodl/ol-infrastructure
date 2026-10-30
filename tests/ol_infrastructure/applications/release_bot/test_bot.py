@@ -2862,7 +2862,7 @@ async def test_promote_never_claims_a_deploy_started(
     assert "triggered" not in said
     assert "deploy started" not in said
     assert "within 5m" in said
-    assert ("could not ask Concourse" in said) is check_fails
+    assert ("could not confirm that Concourse checked" in said) is check_fails
 
 
 async def test_promote_button_reports_success_when_the_gate_check_fails(
@@ -2877,7 +2877,7 @@ async def test_promote_button_reports_success_when_the_gate_check_fails(
 
     posted = str(say.call_args.args[0])
     assert "approved `my-app` `2026.9.5.1` for Production" in posted
-    assert "could not ask Concourse to check sooner" in posted
+    assert "could not confirm that Concourse checked it sooner" in posted
     # A terminal outcome: the button goes.
     edit = client.chat_update.call_args.kwargs
     assert [b for b in edit["blocks"] if b.get("type") == "actions"] == []
@@ -2904,7 +2904,7 @@ async def test_promote_does_not_wait_on_a_hung_gate_check(
         timeout=5,
     )
 
-    assert "could not ask Concourse" in slack.said
+    assert "could not confirm that Concourse checked" in slack.said
 
 
 async def test_promote_asks_for_one_gate_check_and_reads_no_versions(
@@ -2936,6 +2936,7 @@ def _refused_issue(number=7, title="Release my-app 2026.9.5.1", labels=None):
         "labels": labels
         if labels is not None
         else ["ops:release", "ops:consumed", "ops:refused"],
+        "updated_at": datetime.now(tz=UTC),
     }
 
 
@@ -2952,12 +2953,20 @@ def refusals(monkeypatch):
     return lookup, app
 
 
-async def test_a_refusal_is_announced_once(repos, refusals):
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Release my-app 2026.9.5.1",
+        "Release my-app infrastructure @ 2026.9.5.1",
+        "Release my-app",
+    ],
+)
+async def test_a_refusal_is_announced_once(repos, refusals, title):
     lookup, app = refusals
     state = bot.ReleaseProgressState()
     # The first poll seeds: a refusal already there when the bot starts is old.
     assert await bot._announce_refusals(app, repos, state)
-    lookup.return_value = [_refused_issue()]
+    lookup.return_value = [_refused_issue(title=title)]
 
     assert await bot._announce_refusals(app, repos, state)
     assert await bot._announce_refusals(app, repos, state)
@@ -2969,16 +2978,36 @@ async def test_a_refusal_is_announced_once(repos, refusals):
     assert "/jobs/deploy-ol-application-my-app-production" in text
 
 
-async def test_a_refusal_present_at_startup_is_not_announced(repos, refusals):
+async def test_an_old_refusal_present_at_startup_is_not_announced(
+    repos, refusals, monkeypatch
+):
     """Like deployments: seeding is cheaper than repeating old news on restart."""
     lookup, app = refusals
-    lookup.return_value = [_refused_issue()]
+    monkeypatch.setattr(bot, "_started_at", datetime.now(tz=UTC))
+    old = _refused_issue()
+    old["updated_at"] = datetime.now(tz=UTC) - timedelta(hours=2)
+    lookup.return_value = [old]
     state = bot.ReleaseProgressState()
 
     await bot._announce_refusals(app, repos, state)
     await bot._announce_refusals(app, repos, state)
 
     app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_a_refusal_during_a_restart_is_announced(repos, refusals, monkeypatch):
+    """A deploy of the bot is the likeliest restart; a refusal in it is news."""
+    lookup, app = refusals
+    monkeypatch.setattr(bot, "_started_at", datetime.now(tz=UTC))
+    recent = _refused_issue()
+    recent["updated_at"] = datetime.now(tz=UTC) - timedelta(minutes=3)
+    lookup.return_value = [recent]
+    state = bot.ReleaseProgressState()
+
+    await bot._announce_refusals(app, repos, state)
+    await bot._announce_refusals(app, repos, state)
+
+    app.client.chat_postMessage.assert_awaited_once()
 
 
 async def test_an_abandoned_refusal_is_not_announced(repos, refusals):

@@ -544,6 +544,7 @@ def _refused_release_issues_sync(
             "url": i.html_url,
             "body": i.body or "",
             "labels": [lbl.name for lbl in i.labels],
+            "updated_at": i.updated_at,
         }
         for i in itertools.islice(issues, _RELEASE_ISSUE_SCAN_LIMIT)
         if i.pull_request is None

@@ -658,7 +658,8 @@ async def _nudge_release_gate(app_name: str, cfg) -> str:
         log.exception("Release-gate check failed for %s", app_name)
         return (
             "Production starts at the release gate's next scheduled check "
-            f"(within 5m); the bot could not ask Concourse to check sooner: {url}"
+            "(within 5m); the bot could not confirm that Concourse checked it "
+            f"sooner: {url}"
         )
     return (
         "Concourse was asked to check the release gate; Production starts when "
@@ -1761,7 +1762,7 @@ class ReleaseProgressState:
     nagged_at: dict[tuple[str, str], datetime] = field(default_factory=dict)
     # Refused issues already reported, by (app, issue number). An app absent
     # from `refusals_seeded` has not been polled yet; its first poll records
-    # the refusals already there without posting them, as `last_version` does.
+    # the refusals from before this process started without posting them.
     refusals_announced: set[tuple[str, int]] = field(default_factory=set)
     refusals_seeded: set[str] = field(default_factory=set)
 
@@ -2001,8 +2002,13 @@ async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> bool:
 
 
 # How far back to look for a refused release issue. A refusal is reported on
-# the next poll, so this only has to cover a bot that was down for a while.
+# the next poll; this bounds the query.
 _REFUSAL_LOOKBACK = timedelta(days=1)
+# On the first pass after the bot starts, a refusal labelled this long before
+# the start is still reported. The common restart is a deploy of the bot, which
+# takes minutes, and a refusal landing in it is exactly the one nobody saw.
+# One reported just before a restart may be reported twice.
+_REFUSAL_STARTUP_GRACE = timedelta(minutes=15)
 
 
 def _is_gate_title(app_name: str, title: str) -> bool:
@@ -2012,9 +2018,11 @@ def _is_gate_title(app_name: str, title: str) -> bool:
     attributed to an app by its whole title, as the pipeline's
     supersede_gate_issues.py does.
     """
+    # The bare title names no version, and Production refuses it.
     shapes = (
         rf"Release {re.escape(app_name)} infrastructure @ \S+",
         rf"Release {re.escape(app_name)} \S+",
+        rf"Release {re.escape(app_name)}",
     )
     return any(re.fullmatch(shape, title.strip()) for shape in shapes)
 
@@ -2052,7 +2060,13 @@ async def _announce_refusals(app, repos, state: ReleaseProgressState) -> bool:
             key = (app_name, issue["number"])
             if key in state.refusals_announced:
                 continue
-            if seeding or github.release_state(issue["labels"]) != "refused":
+            from_before_start = (
+                issue["updated_at"] is None
+                or issue["updated_at"] < _started_at - _REFUSAL_STARTUP_GRACE
+            )
+            if (seeding and from_before_start) or github.release_state(
+                issue["labels"]
+            ) != "refused":
                 state.refusals_announced.add(key)
                 continue
             version = github.extract_version(issue["body"]) or issue["title"]
