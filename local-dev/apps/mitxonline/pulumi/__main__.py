@@ -109,6 +109,8 @@ LOCAL_ENV_DEFAULTS = {
     # The CA_BUNDLE_CONFIGMAP mount below.
     "REQUESTS_CA_BUNDLE": f"{CA_BUNDLE_DIR}/ca-certificates.crt",
     "SSL_CERT_FILE": f"{CA_BUNDLE_DIR}/ca-certificates.crt",
+    # Apple M4 VMs advertise SME; bundled OpenSSL's CPU probe then SIGILLs on import.
+    "OPENSSL_armcap": "0",
     # Site config
     "MITX_ONLINE_ENVIRONMENT": "local",
     "MITX_ONLINE_ADMIN_EMAIL": "admin@ol.test",

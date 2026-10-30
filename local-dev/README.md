@@ -1438,6 +1438,27 @@ Common causes:
 - Database not ready yet (CNPG takes ~30s on first run — Tilt will retry automatically).
 - Missing required env var — check the configmap and secrets against the app's `settings.py`.
 
+### Pods or image builds die with exit code 132 / `Illegal instruction` (Apple M4)
+
+On Apple M4 Macs the Docker VM advertises SME to Linux, and the OpenSSL that
+`cryptography` and other wheels bundle runs an SME instruction during its CPU
+probe, which the VM rejects. Python dies on `import hashlib` or
+`import cryptography` with no traceback, only exit code 132. The fix is
+`OPENSSL_armcap=0`, which skips the probe (ARM-only; no effect elsewhere).
+Every app's env already sets it. An image build step that hits it (e.g.
+`poetry install`) needs `ENV OPENSSL_armcap=0` in that app's Dockerfile.
+
+To confirm a crash is this one, run the import that loads the crashing OpenSSL.
+That is `hashlib` when Python's own OpenSSL is affected (e.g. litellm), and
+`cryptography.hazmat.bindings._rust` when only the wheel's bundled copy is
+(e.g. mit-learn, where `hashlib` imports fine). Try both if unsure:
+
+```bash
+docker run --rm --entrypoint python <image> -c 'import hashlib'                                          # exit 132
+docker run --rm --entrypoint python <image> -c 'import cryptography.hazmat.bindings._rust'               # exit 132
+docker run --rm -e OPENSSL_armcap=0 --entrypoint python <image> -c 'import cryptography.hazmat.bindings._rust'  # exit 0
+```
+
 ### APISIX returns 404 for a hostname
 
 ```bash
