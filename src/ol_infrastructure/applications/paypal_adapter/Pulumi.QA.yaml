@@ -1,0 +1,9 @@
+---
+secretsprovider: awskms://alias/infrastructure-secrets-qa
+encryptedkey: AQICAHjE+jMY5DL7M1LMYX6YgtMueHEDNg05lsdN5Z0zeGHyJgH6wJN1AWMTywEozteNPlEOAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMeIA4+2wsSLa1Te0IAgEQgDuIEnorP2XCAGOt1FIEkIBIWBs5RYXdfQge/pHSCRFa4YrvY7Om2yMugcVW3WVELpfbfiL8Ln3ZTeX4lQ==
+config:
+  aws:region: us-east-1
+  paypal_adapter:k8s_domain: paypal-adapter-qa.ol.mit.edu
+  paypal_adapter:livemode: "false"
+  vault:address: https://vault-qa.odl.mit.edu
+  vault_server:env_namespace: operations.qa

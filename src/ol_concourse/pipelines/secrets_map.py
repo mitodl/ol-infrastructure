@@ -124,6 +124,7 @@ PROJECT_SECRETS: dict[str, list[str]] = {
     "applications/open_discussions/": ["heroku/"],
     "applications/open_metadata/": ["open_metadata/"],
     "applications/opik/": [],
+    "applications/paypal_adapter/": ["paypal_adapter/"],
     "applications/release_bot/": ["concourse/", "release_bot/"],
     "applications/starburst/": [],
     "applications/starrocks/": [],
