@@ -127,7 +127,7 @@ search engines), not by typing.
 - `Courses (N)` has N ≥ 1.
 - `Programs (0)` and `Learning Materials (0)`. This is what proves the facet was
   *applied*. A backend that ignored it would leave those tabs populated.
-- The first card in the listing is named `Course: …`.
+- A card in the listing is labelled `Course`. Cards are found as list items with a heading, which both the legacy card and the `resource-card-redesign` card share (see `specs/mit-learn/helpers/cards.ts`).
 
 `mathematics` lives in `specs/mit-learn/helpers/fixtures.ts`, shared with the signed-in
 search below. The whole catalogue losing every mathematics course is not a realistic
@@ -188,7 +188,7 @@ own and is not asserted on.
 
 ![The Courses tab selected](images/mit-learn/login-and-search/06-courses-tab.jpg)
 
-**6. On the Courses tab, a card named `Course: …mathematics…` is visible.** This checks
+**6. On the Courses tab, a `Course` card with `mathematics` in its title is visible.** This checks
 relevance, not a count, because any specific number goes stale at the next content sync.
 The tab click refetches, so the journey waits for the URL to carry
 `resource_type_group=course` and for the live region to announce the Courses tab's own
