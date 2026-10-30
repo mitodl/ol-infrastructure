@@ -96,6 +96,7 @@ PROJECT_VERSIONS: dict[str, list[str]] = {
     "applications/open_metadata/": ["OPEN_METADATA_VERSION"],
     "applications/opik/": ["OPIK_CHART_VERSION"],
     "applications/paypal_adapter/": [
+        "NGINX_VERSION",
         "PAYPAL_ADAPTER_IMAGE_DIGEST",
         "PAYPAL_ADAPTER_VERSION",
     ],

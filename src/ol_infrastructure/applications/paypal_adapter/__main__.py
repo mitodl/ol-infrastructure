@@ -382,8 +382,8 @@ shared_plugins = OLApisixSharedPlugins(
 
 # Four paths and nothing else. /monitor/* has no route, so the gateway answers
 # 404 for it and only the probes and the PodMonitor reach it, on the pod.
-# OLApisixRouteConfig matches on host and path only; the adapter answers 404
-# or 405 for a wrong method.
+# OLApisixRouteConfig matches on host and path only, so the gateway forwards
+# any method and the adapter decides what a wrong one gets.
 def adapter_route(
     route_name: str,
     paths: list[str],
