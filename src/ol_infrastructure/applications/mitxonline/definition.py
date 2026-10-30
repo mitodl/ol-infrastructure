@@ -12,12 +12,9 @@ Nothing in this module may read Pulumi config, a stack reference, or a cloud
 API, so that importing it needs no provider.
 """
 
-from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
 
-from kubernetes.utils.quantity import parse_quantity
-from pulumi import Output
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from bridge.lib.constants import (
@@ -48,8 +45,49 @@ from ol_infrastructure.components.services.k8s import (
     OLApplicationK8sDevShellConfig,
     OLApplicationK8sKedaWebappScalingConfig,
 )
+from ol_infrastructure.lib.app_bindings import (
+    ClusterCapabilities,
+    WorkloadResources,
+    oidc_credentials,
+    validate_queue_sizing,
+)
+from ol_infrastructure.lib.app_bindings import (
+    celery_worker_configs as _celery_worker_configs,
+)
 from ol_infrastructure.lib.ol_types import Services
 from ol_infrastructure.lib.pulumi_helper import merge_otel_resource_attributes
+
+__all__ = [
+    "API_PATH_PREFIX",
+    "CELERY_QUEUE_NAMES",
+    "LOCAL_AND_DEPLOYED_ENV",
+    "NAMESPACE",
+    "OPENEDX_LOGIN_PATH",
+    "RELOAD_IGNORE_DIRS",
+    "WEBAPP_SERVICE_NAME",
+    "WEBAPP_SERVICE_PORT_NAME",
+    "WEB_MEMORY_CEILING",
+    "ClusterCapabilities",
+    "MitxonlineBindings",
+    "MitxonlineHostnames",
+    "MitxonlineSizing",
+    "OpenedxLoginGate",
+    "WorkloadResources",
+    "application_config",
+    "celery_worker_configs",
+    "cors_allow_origins",
+    "direct_oidc_config",
+    "direct_route_configs",
+    "direct_route_group",
+    "environment_variables",
+    "learn_session",
+    "openedx_login_gate_route_configs",
+    "openedx_login_gate_upstream_config",
+    "prefixed_oidc_config",
+    "prefixed_route_configs",
+    "prefixed_route_group",
+    "shared_plugins",
+]
 
 NAMESPACE = "mitxonline"
 WEBAPP_SERVICE_NAME = "mitxonline-webapp"
@@ -101,15 +139,6 @@ class MitxonlineHostnames(BaseModel):
     learn_api: str
 
 
-class WorkloadResources(BaseModel):
-    """Requests and limits for one workload, in the component's shape."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    requests: dict[str, str]
-    limits: dict[str, str]
-
-
 class MitxonlineSizing(BaseModel):
     """Requests and limits per workload. The defaults are the deployed stacks'."""
 
@@ -146,32 +175,7 @@ class MitxonlineSizing(BaseModel):
     def _every_queue_once(
         cls, queues: dict[str, WorkloadResources]
     ) -> dict[str, WorkloadResources]:
-        expected = set(CELERY_QUEUE_NAMES)
-        if set(queues) != expected:
-            msg = (
-                f"celery_queues must size exactly {sorted(expected)}: "
-                f"missing {sorted(expected - set(queues))}, "
-                f"unknown {sorted(set(queues) - expected)}"
-            )
-            raise ValueError(msg)
-        return queues
-
-
-class ClusterCapabilities(BaseModel):
-    """What the target cluster provides beyond plain Kubernetes.
-
-    The defaults describe EKS. A cluster without the AWS VPC CNI, ECR, KEDA, the
-    VPA or the Prometheus operator turns the matching capability off.
-    """
-
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
-
-    registry: Literal["dockerhub", "ecr", "direct"] = "ecr"
-    security_group_id: Output[str] | None = None
-    security_group_name: Output[str] | None = None
-    vault_auth_name: str | None = None
-    autoscalers: bool = True
-    pod_monitors: bool = True
+        return validate_queue_sizing(queues, CELERY_QUEUE_NAMES)
 
 
 class OpenedxLoginGate(BaseModel):
@@ -269,35 +273,7 @@ def celery_worker_configs(
     :returns: Worker configs for ``OLApplicationK8sConfig.celery_worker_configs``.
     :rtype: list[OLApplicationK8sCeleryWorkerConfig]
     """
-    if topology == "merged":
-
-        def memory_limit(resources: WorkloadResources) -> Decimal:
-            # A queue with no memory limit is unbounded, so it is the largest.
-            limit = resources.limits.get("memory")
-            return Decimal("Infinity") if limit is None else parse_quantity(limit)
-
-        largest = max(
-            (sizing.celery_queues[name] for name in CELERY_QUEUE_NAMES),
-            key=memory_limit,
-        )
-        return [
-            OLApplicationK8sCeleryWorkerConfig(
-                # Explicit because the name lands in the Deployment name and a
-                # label value, where the comma in queue_name is not valid.
-                worker_name="all",
-                queue_name=",".join(CELERY_QUEUE_NAMES),
-                resource_requests=largest.requests,
-                resource_limits=largest.limits,
-            )
-        ]
-    return [
-        OLApplicationK8sCeleryWorkerConfig(
-            queue_name=name,
-            resource_requests=sizing.celery_queues[name].requests,
-            resource_limits=sizing.celery_queues[name].limits,
-        )
-        for name in CELERY_QUEUE_NAMES
-    ]
+    return _celery_worker_configs(CELERY_QUEUE_NAMES, topology, sizing.celery_queues)
 
 
 def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
@@ -420,21 +396,11 @@ def application_config(bindings: MitxonlineBindings) -> OLApplicationK8sConfig:
 def _oidc_credentials(
     bindings: MitxonlineBindings,
 ) -> OLApisixOIDCVaultCredentials | OLApisixOIDCSecretCredentials:
-    vault_auth_name = bindings.cluster.vault_auth_name
-    secret_name = bindings.oidc_secret_name
-    if secret_name is not None and vault_auth_name is None:
-        return OLApisixOIDCSecretCredentials(secret_name=secret_name)
-    if vault_auth_name is not None and secret_name is None:
-        return OLApisixOIDCVaultCredentials(
-            path=LearnSession.vault_path,
-            vaultauth=vault_auth_name,
-        )
-    msg = (
-        "The OIDC routes need exactly one credential source: "
-        "cluster.vault_auth_name (from Vault) or oidc_secret_name "
-        "(a Secret already in the namespace)."
+    return oidc_credentials(
+        vault_auth_name=bindings.cluster.vault_auth_name,
+        secret_name=bindings.oidc_secret_name,
+        vault_path=LearnSession.vault_path,
     )
-    raise ValueError(msg)
 
 
 def _oidc_config(bindings: MitxonlineBindings, **settings: Any) -> OLApisixOIDCConfig:
