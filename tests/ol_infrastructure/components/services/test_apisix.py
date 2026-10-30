@@ -1054,6 +1054,44 @@ def test_cors_disabled_reaches_the_gateway_api_plugin_config():
     return plugins.shared_plugin_pluginconfig_resource.spec.apply(check)
 
 
+# ─── render_only ───────────────────────────────────────────────────────────────
+
+
+def test_shared_plugins_create_both_crs_by_default():
+    """Legacy ApisixRoute/Ingress callers reference the v2 CR by name, so the
+    default must keep creating it.
+    """
+    plugins = shared_plugins("test-shared-plugins-default-crs")
+
+    assert plugins.shared_plugin_apisix_pluginconfig_resource is not None
+    assert plugins.shared_plugin_pluginconfig_resource is not None
+    assert plugins.resource_name == "myapp-shared-plugins"
+
+
+def test_render_only_creates_no_crs_but_keeps_plugin_list():
+    """A Gateway API-only application needs the rendered list for
+    OLApisixHTTPRoute to merge, and nothing else: no route references either
+    shared CR by name.
+    """
+    plugins = shared_plugins("test-shared-plugins-render-only", render_only=True)
+
+    assert plugins.shared_plugin_apisix_pluginconfig_resource is None
+    assert plugins.shared_plugin_pluginconfig_resource is None
+    names = [plugin.name for plugin in plugins.plugin_list]
+    for expected in ("redirect", "cors", "response-rewrite", "prometheus", "gzip"):
+        assert expected in names, expected
+
+
+def test_render_only_refuses_to_hand_out_resource_name():
+    """A route given this name as plugin_config_name would point at a CR that
+    does not exist, so asking for it fails at preview instead.
+    """
+    plugins = shared_plugins("test-shared-plugins-render-only-name", render_only=True)
+
+    with pytest.raises(ValueError, match="render_only"):
+        _ = plugins.resource_name
+
+
 # ─── gateway_global_pre_function_plugin wiring ────────────────────────────────
 #
 # The test-nginx suite drives the Lua directly with a hand-built config, so it

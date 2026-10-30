@@ -328,16 +328,15 @@ def provision_jupyterhub_data_deployment(  # noqa: PLR0913
     )
 
     # APISIX shared plugins (cors, redirect, response-rewrite, prometheus,
-    # opentelemetry, gzip) — creates both v2 ApisixPluginConfig (legacy) and
-    # v1alpha1 PluginConfig (Gateway API) resources under the same name.
-    # OLApisixHTTPRoute merges this list into each referencing route's own
-    # plugins, so request-id (added by OLApisixHTTPRouteConfig's validator) no
-    # longer has to be restated here.
+    # opentelemetry, gzip).  OLApisixHTTPRoute merges this list into each
+    # referencing route's own plugins, so request-id (added by
+    # OLApisixHTTPRouteConfig's validator) no longer has to be restated here.
     shared_plugins = OLApisixSharedPlugins(
         name=f"ol-{base_name}-external-service-apisix-plugins",
         plugin_config=OLApisixSharedPluginsConfig(
             application_name=base_name,
             resource_suffix="ol-shared-plugins",
+            render_only=True,
             k8s_namespace=namespace,
             k8s_labels=application_labels,
             # JupyterHub serves its own UI, its API and every single-user server

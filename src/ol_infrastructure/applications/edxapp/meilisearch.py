@@ -61,6 +61,7 @@ def create_meilisearch_resources(
         plugin_config=OLApisixSharedPluginsConfig(
             application_name="meilisearch",
             resource_suffix="ol-shared-plugins",
+            render_only=True,
             k8s_namespace=namespace,
             k8s_labels=k8s_global_labels,
             # Meilisearch is queried straight from the browser by Open edX's

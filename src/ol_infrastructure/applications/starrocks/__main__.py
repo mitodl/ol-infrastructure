@@ -1247,6 +1247,7 @@ starrocks_shared_plugins = OLApisixSharedPlugins(
     plugin_config=OLApisixSharedPluginsConfig(
         application_name=f"{stack_info.env_prefix}-starrocks",
         resource_suffix="ol-shared-plugins",
+        render_only=True,
         k8s_namespace=namespace,
         k8s_labels=k8s_app_labels.model_dump(),
         enable_cors=False,

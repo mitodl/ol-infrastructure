@@ -720,6 +720,7 @@ ocw_studio_shared_plugins = OLApisixSharedPlugins(
     plugin_config=OLApisixSharedPluginsConfig(
         application_name="ocw-studio",
         resource_suffix="ol-shared-plugins",
+        render_only=True,
         k8s_namespace=ocw_studio_namespace,
         k8s_labels=k8s_app_labels,
         # Studio's pages and API share one origin and Django sets no CORS

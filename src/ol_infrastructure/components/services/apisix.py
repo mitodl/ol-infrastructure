@@ -1105,11 +1105,18 @@ class OLApisixSharedPluginsConfig(BaseModel):
 
     Defines the plugin list that will be materialised as both a v2
     ApisixPluginConfig (for legacy ApisixRoute/Ingress) and a v1alpha1
-    PluginConfig (for Gateway API HTTPRoute).
+    PluginConfig, unless ``render_only`` is set.
     """
 
     application_name: str
     resource_suffix: str = "shared-plugins"
+    # Build ``plugin_list`` without creating either CR.  For an application
+    # whose routes are all Gateway API HTTPRoutes: OLApisixHTTPRoute merges
+    # ``plugin_list`` into a PluginConfig of its own per route, so nothing
+    # references the shared CRs by name.  Leave it off for anything that passes
+    # ``resource_name`` to an ApisixRoute/Ingress, or that references the name
+    # from outside Pulumi (marimo_data's per-notebook routes).
+    render_only: bool = False
     enable_defaults: bool = True
     # Origins the cors default plugin will echo back with
     # Access-Control-Allow-Credentials: true.  Required whenever
@@ -1246,7 +1253,8 @@ class OLApisixSharedPlugins(ComponentResource):
     ``OLApisixHTTPRouteConfig(shared_plugins=...)``, which reads
     ``self.plugin_list`` to merge these defaults into each route's own plugins
     (HTTPRoute allows only one ExtensionRef per rule, so the merge has to happen
-    here rather than in APISIX).
+    here rather than in APISIX).  An application with only Gateway API callers
+    sets ``render_only`` so neither CR is created.
     """
 
     def __init__(
@@ -1455,7 +1463,8 @@ class OLApisixSharedPlugins(ComponentResource):
         if plugin_config.enable_gzip:
             plugins.append(__gzip_plugin)
 
-        self.resource_name = (
+        self._render_only = plugin_config.render_only
+        self._resource_name = (
             f"{plugin_config.application_name}-{plugin_config.resource_suffix}"
         )
         # The rendered plugin list, exposed so OLApisixHTTPRoute can merge these
@@ -1466,15 +1475,23 @@ class OLApisixSharedPlugins(ComponentResource):
         self.plugin_list: list[OLApisixPluginConfig] = [
             OLApisixPluginConfig(**p) for p in plugins
         ]
+        self.shared_plugin_apisix_pluginconfig_resource: (
+            kubernetes.apiextensions.CustomResource | None
+        ) = None
+        self.shared_plugin_pluginconfig_resource: (
+            kubernetes.apiextensions.CustomResource | None
+        ) = None
+        if plugin_config.render_only:
+            return
         # v2/ApisixPluginConfig — consumed by legacy ApisixRoute/Ingress resources
         # via ``plugin_config_name`` in the route spec.
         self.shared_plugin_apisix_pluginconfig_resource = (
             kubernetes.apiextensions.CustomResource(
-                f"OLApisixSharedPlugin-{self.resource_name}",
+                f"OLApisixSharedPlugin-{self._resource_name}",
                 api_version="apisix.apache.org/v2",
                 kind="ApisixPluginConfig",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    name=self.resource_name,
+                    name=self._resource_name,
                     labels=plugin_config.k8s_labels,
                     namespace=plugin_config.k8s_namespace,
                 ),
@@ -1484,11 +1501,9 @@ class OLApisixSharedPlugins(ComponentResource):
                 opts=resource_options,
             )
         )
-        # v1alpha1/PluginConfig — consumed by Gateway API HTTPRoute resources
-        # via ExtensionRef filters (kind: PluginConfig).  Both resources share
-        # the same metadata.name; callers pass self.resource_name to either
-        # OLApisixRouteConfig (legacy) or OLApisixHTTPRouteConfig (Gateway API)
-        # without distinction.
+        # v1alpha1/PluginConfig — the Gateway API kind, under the same
+        # metadata.name.  OLApisixHTTPRoute does not reference it: it merges
+        # plugin_list into a PluginConfig of its own per route.
         #
         # The v1alpha1 schema only allows ``name`` and ``config`` per plugin;
         # ``enable`` and ``secretRef`` are v2-only fields.  Plugins with
@@ -1501,11 +1516,11 @@ class OLApisixSharedPlugins(ComponentResource):
         ]
         self.shared_plugin_pluginconfig_resource = (
             kubernetes.apiextensions.CustomResource(
-                f"OLApisixSharedPluginConfig-{self.resource_name}",
+                f"OLApisixSharedPluginConfig-{self._resource_name}",
                 api_version="apisix.apache.org/v1alpha1",
                 kind="PluginConfig",
                 metadata=kubernetes.meta.v1.ObjectMetaArgs(
-                    name=self.resource_name,
+                    name=self._resource_name,
                     labels=plugin_config.k8s_labels,
                     namespace=plugin_config.k8s_namespace,
                 ),
@@ -1515,6 +1530,25 @@ class OLApisixSharedPlugins(ComponentResource):
                 opts=resource_options,
             )
         )
+
+    @property
+    def resource_name(self) -> str:
+        """Return the CRs' ``metadata.name``, for a route's ``plugin_config_name``.
+
+        :raises ValueError: if the config is ``render_only``, since no CR
+            exists under that name for a route to reference.
+        :returns: ``<application_name>-<resource_suffix>``.
+        :rtype: str
+        """
+        if self._render_only:
+            msg = (
+                f"{self._resource_name} is render_only, so no ApisixPluginConfig "
+                "exists for a route to reference by name. Pass the component to "
+                "OLApisixHTTPRouteConfig(shared_plugins=...) instead, or drop "
+                "render_only."
+            )
+            raise ValueError(msg)
+        return self._resource_name
 
 
 # User-Agent of the first-party server-side callers that must not be treated
