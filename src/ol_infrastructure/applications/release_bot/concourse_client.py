@@ -212,38 +212,6 @@ async def _get_resource(pipeline: str, resource: str) -> dict[str, Any]:
         return await resp.json()
 
 
-async def has_version(pipeline: str, resource: str, fields: dict[str, str]) -> bool:
-    """Return whether *resource* has recorded a version containing *fields*.
-
-    A check that succeeds has not necessarily found anything: it reports the
-    same success whether or not the version a caller is waiting for was
-    there to find. This is how a caller tells the two apart.
-
-    Each `filter=key:value` narrows the version list to versions whose fields
-    contain that exact pair (all of them, when repeated). Each returned
-    version is matched again here, so a Concourse that ignored the filter and
-    returned every version would not produce a false yes.
-    """
-    token = await _get_token()
-    url = (
-        f"{CONCOURSE_URL}/api/v1/teams/{CONCOURSE_TEAM}"
-        f"/pipelines/{pipeline}/resources/{resource}/versions"
-    )
-    params = [("filter", f"{key}:{value}") for key, value in fields.items()]
-    async with (
-        aiohttp.ClientSession() as session,
-        session.get(
-            url, headers={"Authorization": f"Bearer {token}"}, params=params
-        ) as resp,
-    ):
-        resp.raise_for_status()
-        versions = await resp.json()
-    return any(
-        (entry.get("version") or {}).items() >= fields.items()
-        for entry in versions or []
-    )
-
-
 async def _read_build(resp: aiohttp.ClientResponse) -> dict[str, Any] | None:
     """Return the check build from a response, or None if there isn't one.
 
