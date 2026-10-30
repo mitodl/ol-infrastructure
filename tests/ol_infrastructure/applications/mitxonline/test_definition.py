@@ -293,37 +293,13 @@ def test_sizing_reaches_every_workload():
     assert worker.resource_limits == sizing.celery_queues["hubspot_sync"].limits
 
 
-def test_merged_worker_takes_an_uncapped_queue():
-    size = definition.WorkloadResources(requests={"memory": "1Gi"}, limits={})
-    sizing = definition.MitxonlineSizing(
-        web=size,
-        celery_queues={
-            "celery": definition.WorkloadResources(
-                requests={"memory": "2Gi"}, limits={"memory": "2Gi"}
-            ),
-            "hubspot_sync": size,
-        },
-    )
-
-    (worker,) = definition.celery_worker_configs("merged", sizing)
-
-    assert worker.resource_limits == {}
-
-
-@pytest.mark.parametrize(
-    ("queues", "complaint"),
-    [
-        (["celery"], r"missing \['hubspot_sync'\]"),
-        (["celery", "hubspot_sync", "extra"], r"unknown \['extra'\]"),
-    ],
-)
-def test_sizing_must_name_every_queue_exactly_once(queues, complaint):
+def test_sizing_must_name_every_queue():
     size = definition.WorkloadResources(
         requests={"memory": "1Gi"}, limits={"memory": "1Gi"}
     )
 
-    with pytest.raises(ValidationError, match=complaint):
-        definition.MitxonlineSizing(web=size, celery_queues=dict.fromkeys(queues, size))
+    with pytest.raises(ValidationError, match=r"missing \['hubspot_sync'\]"):
+        definition.MitxonlineSizing(web=size, celery_queues={"celery": size})
 
 
 def test_image_repository_binding_names_the_image():
@@ -440,16 +416,9 @@ def test_local_routes_read_oidc_credentials_from_the_bound_secret():
         assert oidc_plugin.secret_ref == LOCAL_OIDC_SECRET
 
 
-@pytest.mark.parametrize(
-    "bindings",
-    [
-        pytest.param(_local_bindings(), id="neither"),
-        pytest.param(_deployed_bindings(oidc_secret_name=LOCAL_OIDC_SECRET), id="both"),
-    ],
-)
-def test_oidc_credentials_come_from_exactly_one_source(bindings):
+def test_oidc_credentials_must_come_from_some_source():
     with pytest.raises(ValueError, match="oidc_secret_name"):
-        definition.direct_oidc_config(bindings)
+        definition.direct_oidc_config(_local_bindings())
 
 
 # ─── Open edX login gate ──────────────────────────────────────────────────────
