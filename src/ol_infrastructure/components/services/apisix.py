@@ -746,6 +746,9 @@ class OLApisixOIDCConfig(BaseModel):
     oidc_session_idling_timeout: NonNegativeInt | None = None
     oidc_session_rolling_timeout: NonNegativeInt | None = None
     oidc_ssl_verify: bool = True
+    # Seconds the plugin waits on each call to the provider (the token
+    # exchange, userinfo, discovery). None leaves the plugin's default, 3.
+    oidc_timeout: PositiveInt | None = None
     # Sends code_challenge (S256) on the authorization request and
     # code_verifier on the token request. Keycloak accepts both from a client
     # that does not require PKCE, so this has to be on, and deployed in every
@@ -878,6 +881,12 @@ class OLApisixOIDCResources(ComponentResource):
             "post_logout_redirect_uri": oidc_config.oidc_post_logout_redirect_uri,
             "use_pkce": oidc_config.oidc_use_pkce,
             **session_config,
+            # Unset leaves the plugin default (3s).
+            **(
+                {"timeout": oidc_config.oidc_timeout}
+                if oidc_config.oidc_timeout is not None
+                else {}
+            ),
         }
 
         if oidc_config.oidc_access_token_expires_leeway:

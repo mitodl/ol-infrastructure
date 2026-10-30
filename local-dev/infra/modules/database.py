@@ -100,7 +100,11 @@ def create_database(
             "postgresql": {
                 "parameters": {"max_connections": "100"},
             },
+            # The shared cluster every local app's database lives in, Keycloak's
+            # included; a CPU request for the same reason as Keycloak's own
+            # (identity_core.py).
             "resources": {
+                "requests": {"cpu": "250m"},
                 "limits": {"memory": "512Mi"},
             },
         },

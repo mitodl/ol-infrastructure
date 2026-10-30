@@ -85,10 +85,17 @@ data:
   # No DISCOVERY_URL, so OLOAuth2 derives userinfo as API_ROOT + api/users/me,
   # whose serializer returns edx_username as `username` -- which is what the
   # backend's ID_KEY resolves accounts on.
+  #
+  # REQUESTS_TIMEOUT raises social-core's 5s default for these server-side
+  # calls. Registration links the new account through API_ROOT, and on a
+  # laptop-sized cluster mitxonline answers that in over 5s often enough to
+  # fail sign-ups (HTTP 500 from /user_api/v1/account/registration/:
+  # ReadTimeout in _link_user_to_third_party_provider).
   OL_OAUTH2_OTHER_SETTINGS: >-
     {"AUTHORIZATION_URL": "https://mitxonline.mit.test/oauth2/authorize/",
      "ACCESS_TOKEN_URL": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8073/oauth2/token/",
-     "API_ROOT": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8073/"}
+     "API_ROOT": "http://mitxonline-webapp.mitxonline.svc.cluster.local:8073/",
+     "REQUESTS_TIMEOUT": 15}
 
   # Back on now that there is a provider to redirect to: this is what sends an
   # anonymous visitor into the SSO flow instead of leaving the MFE staring at a
