@@ -59,8 +59,9 @@ up)
     # A Deployment, Service, Secret, ConfigMap or route Tilt applied as YAML
     # (label managed-by=tilt) has a rendered object's name or shadows its routes,
     # and Pulumi adopts nothing. An ApisixTls Tilt applies on purpose is not
-    # listed.
-    legacy="deploy,svc,secret,cm,apisixroute,apisixpluginconfig -l app.kubernetes.io/managed-by=tilt"
+    # listed, and neither is any object Tilt applies beside the program on
+    # purpose (learn-ai's sandbox): those carry ol.mit.edu/yaml-by-design.
+    legacy="deploy,svc,secret,cm,apisixroute,apisixpluginconfig -l app.kubernetes.io/managed-by=tilt,!ol.mit.edu/yaml-by-design"
     # shellcheck disable=SC2086
     if leftovers="$(kubectl_ get $legacy -o name)" && [ -n "$leftovers" ]; then
         echo "$app objects Tilt applied as YAML are still in the cluster:" >&2
