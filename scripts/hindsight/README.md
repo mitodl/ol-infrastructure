@@ -42,3 +42,32 @@ them. `hindsight.env` mirrors `hindsight_settings` in the stack's
 change to either belongs in both places.
 
 Tear down with `docker compose -f scripts/hindsight/compose.yaml down -v`.
+
+## Checking a deployed environment
+
+`qa_check.py` runs the learner path against the deployed QA service with a real
+login: it logs a learner in through `ol-mitlearn-client`, exchanges that token as
+`ol-learn-ai-client` and `ol-mitlearn-memory-client`, and checks retain, recall,
+cross-app read, and that one app cannot overwrite or delete another's note. With
+`--forget` it also runs the forget sequence and checks the fence. That erases the
+learner's whole QA bank, every app's notes, so use a test learner. The fence then
+holds that bank for an hour (`FENCE_SECONDS`), so another run with the same learner
+inside the hour stops at the first retain with a 409.
+
+```shell
+kubectl -n hindsight port-forward svc/hindsight 18888:8888   # applications-qa
+
+export VAULT_ADDR=https://vault-qa.odl.mit.edu
+vault login -method=oidc
+export MITLEARN_CLIENT_SECRET=$(vault read -field=client_secret secret-operations/sso/mitlearn)
+export LEARN_AI_CLIENT_SECRET=$(vault read -field=client_secret secret-operations/sso/learn-ai)
+export MITLEARN_MEMORY_CLIENT_SECRET=$(vault read -field=client_secret secret-operations/sso/mitlearn-memory)
+export MEMORY_ADMIN_CLIENT_SECRET=$(vault read -field=client_secret secret-operations/sso/ol-memory-admin)
+
+uv run --script scripts/hindsight/qa_check.py [--forget]
+```
+
+It prints a Keycloak login URL whose redirect is an unused path on
+`rc.learn.mit.edu`, so the browser ends on mit-learn's 404 page with the code in
+the address bar. Paste that URL back within five minutes, the olapps realm's
+login code lifespan.
