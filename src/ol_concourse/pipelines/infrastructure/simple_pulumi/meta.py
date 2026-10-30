@@ -216,6 +216,7 @@ if __name__ == "__main__":
         "open-metadata-substructure",
         "opensearch",
         "opik",
+        "paypal-adapter",
         "qdrant-cloud",
         "release-bot",
         "rootly",

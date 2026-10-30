@@ -34,6 +34,16 @@ AIRBYTE_CHART_VERSION = "2.4.0"
 SUPERSET_CHART_VERSION = "0.22.8"
 # renovate: datasource=helm depName=tika packageName=tika registryUrl=https://apache.jfrog.io/artifactory/tika
 TIKA_CHART_VERSION = "3.2.2"
+# The Stripe-written PayPal adapter, run unmodified from the vendor image
+# (docs/plans/paypal-adapter-eks-deployment.md, P4). The pod pulls by digest so
+# a re-pushed tag cannot change what runs in the payment path. No datasource
+# can derive a digest from a tag, so when Renovate moves the tag the digest is
+# updated by hand in the same commit, from
+#   docker buildx imagetools inspect stripe/orchestration-adapters:<tag>
+# after `cosign verify` as the vendor docs show.
+# renovate: datasource=docker depName=orchestration-adapters packageName=stripe/orchestration-adapters
+PAYPAL_ADAPTER_VERSION = "2.4.2"
+PAYPAL_ADAPTER_IMAGE_DIGEST = "sha256:89ef36f0a06aa83788c1a465f95ffabd9b5b1a1e9e8e99eef57e484d67c28ba8"  # pragma: allowlist secret
 # renovate: datasource=helm depName=apisix packageName=apisix registryUrl=https://apache.github.io/apisix-helm-chart
 APISIX_CHART_VERSION = "2.18.2"
 # renovate: datasource=helm depName=aws-load-balancer-controller packageName=aws-load-balancer-controller registryUrl=https://aws.github.io/eks-charts
