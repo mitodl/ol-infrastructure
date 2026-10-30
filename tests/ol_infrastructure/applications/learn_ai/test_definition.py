@@ -1,10 +1,4 @@
-"""Tests for the learn-ai application definition.
-
-The definition is called by the deployed program and is shaped for a local one
-too. These tests render it with bindings shaped like a local k3d cluster (no
-AWS, Vault, KEDA, VPA or Prometheus operator) and like the deployed stacks, and
-pin what the bindings are allowed to change.
-"""
+"""Tests for the learn-ai application definition."""
 
 from __future__ import annotations
 
@@ -34,6 +28,12 @@ import pytest  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
 from ol_infrastructure.applications.learn_ai import definition  # noqa: E402
+from ol_infrastructure.components.services.apisix import (  # noqa: E402
+    OLApisixOIDCResources,
+    OLApisixOIDCSecretCredentials,
+    OLApisixOIDCVaultCredentials,
+    stale_session_cookie_cleanup_plugin,
+)
 from ol_infrastructure.components.services.k8s import (  # noqa: E402
     OLApplicationK8s,
     OLApplicationK8sCeleryRedisConfig,
@@ -164,11 +164,7 @@ def test_deployed_bindings_keep_the_eks_wiring():
 
 
 def test_release_pipeline_image_kwargs_reach_the_component(monkeypatch):
-    """The release pipeline sends a digest and a version; both must get through.
-
-    The bindings forbid unknown fields, so a kwarg docker_image_config_kwargs
-    returns that the bindings lack fails every deployed stack.
-    """
+    """A kwarg the bindings lack fails every deployed stack; they forbid extras."""
     digest = "sha256:" + "a" * 64
     monkeypatch.delenv("LEARN_AI_DOCKER_TAG", raising=False)
     monkeypatch.setenv("LEARN_AI_DOCKER_SHA", digest)
@@ -244,3 +240,183 @@ def test_the_bound_volumes_reach_the_component_config():
 
     assert config.extra_volumes == [volume]
     assert config.extra_volume_mounts == [mount]
+
+
+# ─── Gateway ──────────────────────────────────────────────────────────────────
+
+
+def _oidc(bindings, config_fn):
+    return OLApisixOIDCResources(
+        f"test-{config_fn.__name__}", oidc_config=config_fn(bindings)
+    )
+
+
+def _routes(bindings):
+    direct = definition.direct_route_configs(
+        bindings,
+        _oidc(bindings, definition.direct_oidc_config),
+        shared_plugin_config_name="shared",
+    )
+    prefixed = definition.prefixed_route_configs(
+        bindings,
+        _oidc(bindings, definition.prefixed_oidc_config),
+        shared_plugin_config_name="shared",
+    )
+    return direct, prefixed
+
+
+def _plugin_name(plugin):
+    return plugin["name"] if isinstance(plugin, dict) else plugin.name
+
+
+def _plugin_config(plugin):
+    return plugin["config"] if isinstance(plugin, dict) else plugin.config
+
+
+def test_direct_routes_are_the_deployed_six():
+    direct, _ = _routes(_local_bindings())
+
+    assert [(r.route_name, r.priority, r.paths) for r in direct] == [
+        ("canvas_syllabus_agent", 20, ["/http/canvas_*"]),
+        ("passauth", 2, ["/*"]),
+        ("logout-redirect", 10, ["/logout/*"]),
+        ("reqauth", 10, ["/admin/login/*", "/http/login/*"]),
+        ("websocket", 1, ["/ws/*"]),
+        ("dnt-policy", 10, ["/.well-known/dnt-policy.txt"]),
+    ]
+    # OLApisixRouteConfig appends request-id to every route.
+    plugin_names = {
+        r.route_name: [
+            _plugin_name(p) for p in r.plugins if _plugin_name(p) != "request-id"
+        ]
+        for r in direct
+    }
+    assert plugin_names["canvas_syllabus_agent"] == ["key-auth"]
+    assert plugin_names["logout-redirect"] == ["redirect"]
+    assert plugin_names["dnt-policy"] == ["mocking"]
+    assert all(r.hosts == ["ai.learn.mit.test"] for r in direct)
+    assert [r.route_name for r in direct if r.websocket] == ["websocket"]
+    unauth_actions = {
+        r.route_name: _plugin_config(p)["unauth_action"]
+        for r in direct
+        for p in r.plugins
+        if _plugin_name(p) == "openid-connect"
+    }
+    assert unauth_actions == {
+        "passauth": "pass",
+        "reqauth": "auth",
+        "websocket": "pass",
+    }
+
+
+def test_prefixed_routes_sit_under_the_prefix_on_the_learn_host():
+    _, prefixed = _routes(_local_bindings())
+
+    assert [r.route_name for r in prefixed] == [
+        "canvas_syllabus_agent",
+        "passauth",
+        "logout-redirect",
+        "reqauth",
+        "websocket",
+    ]
+    assert {r.route_name: r.priority for r in prefixed} == {
+        "canvas_syllabus_agent": 20,
+        "passauth": 2,
+        "logout-redirect": 10,
+        "reqauth": 10,
+        "websocket": 1,
+    }
+    assert all(r.hosts == ["api.learn.mit.test"] for r in prefixed)
+    assert all(path.startswith("/ai/") for r in prefixed for path in r.paths)
+    assert [r.route_name for r in prefixed if r.websocket] == ["websocket"]
+
+
+def test_the_prefix_is_stripped_before_the_upstream():
+    _, prefixed = _routes(_local_bindings())
+
+    for name in ("passauth", "reqauth", "websocket"):
+        (route,) = [r for r in prefixed if r.route_name == name]
+        first = route.plugins[0]
+        assert _plugin_name(first) == "proxy-rewrite"
+        assert _plugin_config(first)["regex_uri"] == ["/ai/(.*)", "/$1"]
+
+
+def test_session_cookies_are_named_for_the_environment():
+    b = _local_bindings()
+
+    assert (
+        definition.direct_oidc_config(b).oidc_session_cookie_name
+        == "learn_ai_apisix_session_dev"
+    )
+    assert (
+        definition.prefixed_oidc_config(b).oidc_session_cookie_name
+        == "mitlearn_apisix_session_dev"
+    )
+    assert (
+        definition.prefixed_oidc_config(b).oidc_session_cookie_domain
+        == ".learn.mit.test"
+    )
+    assert definition.direct_oidc_config(b).oidc_session_cookie_domain is None
+
+
+def test_the_direct_host_keeps_its_own_logout_and_scope():
+    config = definition.direct_oidc_config(_local_bindings())
+
+    assert (
+        config.oidc_logout_path,
+        config.oidc_post_logout_redirect_uri,
+        config.oidc_scope,
+    ) == ("/logout", "/", "openid profile email")
+
+
+def test_the_prefixed_group_logs_out_through_learn():
+    config = definition.prefixed_oidc_config(_local_bindings())
+
+    assert config.oidc_logout_path == "/ai/logout/oidc"
+    assert config.oidc_post_logout_redirect_uri == "https://api.learn.mit.test/logout/"
+
+
+def test_deployed_routes_read_oidc_credentials_from_the_mitlearn_vault_client():
+    for config_fn in (definition.direct_oidc_config, definition.prefixed_oidc_config):
+        creds = config_fn(_deployed_bindings()).credentials
+
+        assert isinstance(creds, OLApisixOIDCVaultCredentials)
+        assert (creds.path, creds.vaultauth) == ("sso/mitlearn", "learn-ai-auth")
+
+
+def test_local_routes_read_oidc_credentials_from_the_bound_secret():
+    for config_fn in (definition.direct_oidc_config, definition.prefixed_oidc_config):
+        creds = config_fn(_local_bindings()).credentials
+
+        assert isinstance(creds, OLApisixOIDCSecretCredentials)
+        assert creds.secret_name == LOCAL_OIDC_SECRET
+
+
+def test_oidc_credentials_must_come_from_some_source():
+    with pytest.raises(ValueError, match="oidc_secret_name"):
+        definition.direct_oidc_config(_local_bindings(oidc_secret_name=None))
+
+
+def test_gateway_cors_origins_are_the_three_hosts_plus_the_frontends():
+    assert definition.cors_allow_origins(_local_bindings()) == [
+        "https://ai-sandbox.learn.mit.test",
+        "https://ai.learn.mit.test",
+        "https://api.learn.mit.test",
+        "https://learn.mit.test",
+    ]
+
+
+def test_shared_plugins_evict_the_stale_default_cookie():
+    expected = stale_session_cookie_cleanup_plugin()
+
+    plugins = definition.shared_plugins(_local_bindings())
+
+    assert [p.name for p in plugins] == [expected.name]
+    assert [p.config for p in plugins] == [expected.config]
+
+
+def test_the_canvas_consumer_carries_the_key():
+    spec = definition.canvas_agent_consumer_spec("the-key")
+
+    assert spec["authParameter"]["keyAuth"]["value"]["key"] == "the-key"
+    assert spec["ingressClassName"] == "apache-apisix"
