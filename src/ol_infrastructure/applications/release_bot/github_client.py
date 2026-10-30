@@ -15,6 +15,7 @@ import itertools
 import logging
 import os
 import re
+from collections.abc import Iterable
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -61,10 +62,35 @@ _UNCHECKED_ITEM_RE = re.compile(r"^- \[ \]\s+(?P<item>.*)\s+by\s+(?P<author>\S+)
 # ever appears here.
 _VERSION_HEADER_RE = re.compile(r"^## Release (?P<version>\S+)", re.MULTILINE)
 
+# Release issue labels. Each records that something happened, and nothing
+# removes one, so an issue collects them; `release_state` resolves them by
+# precedence. The legacy unprefixed names are read too, so renaming the labels
+# in a repository never hides an issue from the bot. Labels other components
+# write are best-effort: a missing label never means the thing did not happen.
+#
+# The QA job's issue put labels every release issue.
+RELEASE_LABELS = ("ops:release", "release")
 # Applied once a release issue's checklist is fully checked, so subsequent
 # polls don't re-notify Slack every cycle. Not a gate signal itself -- purely
 # a "have we already posted about this" marker for the bot.
-PROMOTE_READY_LABEL = "promote-ready"
+PROMOTE_READY_LABEL = "ops:promote-ready"
+PROMOTE_READY_LABELS = (PROMOTE_READY_LABEL, "promote-ready")
+# The release gate's get labels an issue a Production build took.
+CONSUMED_LABEL = "ops:consumed"
+# The Production job labels an issue its assert-gate-names-deploy refused:
+# the approval no longer matched what would deploy, so nothing deployed.
+REFUSED_LABEL = "ops:refused"
+# The abandon job and the QA job's supersede step label an issue they retire.
+ABANDONED_LABELS = ("ops:abandoned", "abandoned")
+
+# Highest precedence first.
+_STATE_LABELS = (
+    ("abandoned", ABANDONED_LABELS),
+    ("refused", (REFUSED_LABEL,)),
+    ("consumed", (CONSUMED_LABEL,)),
+    ("promote-ready", PROMOTE_READY_LABELS),
+    ("release", RELEASE_LABELS),
+)
 
 # Cap on tags scanned when picking the release baseline. Selection sorts by
 # parsed version rather than trusting GitHub's tag ordering, so this must cover
@@ -391,9 +417,39 @@ async def commits_since_last_tag(repo_slug: str) -> dict[str, Any]:
     return await asyncio.to_thread(_commits_since_last_tag_sync, repo_slug)
 
 
+def release_state(labels: Iterable[str]) -> str | None:
+    """Return what *labels* say happened to a release issue, or None.
+
+    One of ``abandoned``, ``refused``, ``consumed``, ``promote-ready`` and
+    ``release``: the highest-precedence one present, since an issue carries
+    every label written to it. ``refused`` with ``consumed`` means Production
+    took the issue and refused it.
+    """
+    present = set(labels)
+    for state, names in _STATE_LABELS:
+        if present.intersection(names):
+            return state
+    return None
+
+
+def _release_issues(repo, limit: int, **filters: Any) -> list[Any]:
+    """Return up to *limit* issues labelled with any release label, newest first.
+
+    The issues API ANDs the labels it is given, so each name is its own query.
+    Each is capped at *limit*, so the merge is the newest *limit* of either.
+    """
+    found = {}
+    for label in RELEASE_LABELS:
+        listed = repo.get_issues(
+            labels=[label], sort="created", direction="desc", **filters
+        )
+        for issue in itertools.islice(listed, limit):
+            found[issue.number] = issue
+    return sorted(found.values(), key=lambda issue: issue.number, reverse=True)[:limit]
+
+
 def _open_release_issues_sync(repo_slug: str) -> list[dict[str, Any]]:
     repo = _get_client().get_repo(repo_slug)
-    issues = repo.get_issues(state="open", labels=["release"])
     return [
         {
             "number": i.number,
@@ -402,12 +458,12 @@ def _open_release_issues_sync(repo_slug: str) -> list[dict[str, Any]]:
             "body": i.body or "",
             "labels": [lbl.name for lbl in i.labels],
         }
-        for i in itertools.islice(issues, 10)
+        for i in _release_issues(repo, 10, state="open")
     ]
 
 
 async def open_release_issues(repo_slug: str) -> list[dict[str, Any]]:
-    """Return open GitHub Issues labelled 'release'."""
+    """Return open GitHub Issues labelled with any of `RELEASE_LABELS`."""
     return await asyncio.to_thread(_open_release_issues_sync, repo_slug)
 
 
@@ -461,32 +517,44 @@ async def add_issue_label(repo_slug: str, issue_number: int, label: str) -> None
     await asyncio.to_thread(_add_issue_label_sync, repo_slug, issue_number, label)
 
 
-def _close_release_issue_sync(
-    repo_slug: str, issue_number: int, comment: str
-) -> datetime | None:
+def _close_release_issue_sync(repo_slug: str, issue_number: int, comment: str) -> None:
     issue = _get_client().get_repo(repo_slug).get_issue(issue_number)
     issue.create_comment(comment)
-    # PyGithub refreshes the issue from the PATCH response, so this is the
-    # closed_at GitHub recorded.
     issue.edit(state="closed")
-    return issue.closed_at
 
 
-async def close_release_issue(
-    repo_slug: str, issue_number: int, comment: str
-) -> datetime | None:
-    """Add a comment and close the given issue (triggers Concourse production deploy).
+async def close_release_issue(repo_slug: str, issue_number: int, comment: str) -> None:
+    """Add a comment and close the given issue (approves the Production deploy).
 
     Closing the release issue is the entire production promotion mechanism --
     Concourse's github-issues resource polls for closed issues.
-
-    :returns: When GitHub recorded the close, or None if the response omitted
-        it. The release-gate version Concourse records for this close carries
-        the same timestamp.
     """
-    return await asyncio.to_thread(
-        _close_release_issue_sync, repo_slug, issue_number, comment
-    )
+    await asyncio.to_thread(_close_release_issue_sync, repo_slug, issue_number, comment)
+
+
+def _refused_release_issues_sync(
+    repo_slug: str, since: datetime
+) -> list[dict[str, Any]]:
+    repo = _get_client().get_repo(repo_slug)
+    issues = repo.get_issues(state="closed", labels=[REFUSED_LABEL], since=since)
+    return [
+        {
+            "number": i.number,
+            "title": i.title,
+            "url": i.html_url,
+            "body": i.body or "",
+            "labels": [lbl.name for lbl in i.labels],
+        }
+        for i in itertools.islice(issues, _RELEASE_ISSUE_SCAN_LIMIT)
+        if i.pull_request is None
+    ]
+
+
+async def refused_release_issues(
+    repo_slug: str, since: datetime
+) -> list[dict[str, Any]]:
+    """Return closed issues labelled `REFUSED_LABEL` and updated since *since*."""
+    return await asyncio.to_thread(_refused_release_issues_sync, repo_slug, since)
 
 
 # Environments the release pipeline creates GitHub Deployments for (see
@@ -576,16 +644,14 @@ def _release_issue_for_version_sync(
     # state="all": the production milestone fires *after* the release issue was
     # closed to open the promotion gate, so an open-only search would find
     # nothing for exactly the announcement that most needs the link.
-    issues = repo.get_issues(
-        state="all", labels=["release"], sort="created", direction="desc"
-    )
-    for issue in itertools.islice(issues, _RELEASE_ISSUE_SCAN_LIMIT):
+    for issue in _release_issues(repo, _RELEASE_ISSUE_SCAN_LIMIT, state="all"):
         if extract_version(issue.body or "") == version:
             return {
                 "number": issue.number,
                 "url": issue.html_url,
                 "title": issue.title,
                 "body": issue.body or "",
+                "labels": [lbl.name for lbl in issue.labels],
             }
     return None
 

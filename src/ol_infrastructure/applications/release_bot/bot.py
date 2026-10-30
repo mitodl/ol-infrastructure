@@ -524,8 +524,25 @@ async def _in_flight_status(name, cfg, *, has_open_issue: bool) -> str:
     if not has_open_issue and (
         issue := await _find_release_issue(name, cfg, in_flight["version"])
     ):
-        status += f" <{issue['url']}|Release issue>"
+        status += f" <{issue['url']}|Release issue>{_release_state_suffix(issue)}"
     return status
+
+
+# How release-status describes each label-derived state of a release issue.
+# `release` says nothing the line does not already say, so it is not shown.
+_RELEASE_STATE_TEXT = {
+    "abandoned": "abandoned",
+    "refused": "⛔ refused by Production",
+    "consumed": "taken by Production",
+    "promote-ready": "ready to promote",
+}
+
+
+def _release_state_suffix(issue: dict[str, Any]) -> str:
+    """Render what the issue's labels say happened to it, or ""."""
+    state = github.release_state(issue.get("labels", []))
+    text = _RELEASE_STATE_TEXT.get(state or "")
+    return f" · {text}" if text else ""
 
 
 async def _cmd_release_status(repos, ack, respond, command, _context):
@@ -559,6 +576,7 @@ async def _cmd_release_status(repos, ack, respond, command, _context):
             checked, total = github.checklist_status(issues[0]["body"])
             title = _slack_escape(issues[0]["title"])
             status = f"🟡 <{issues[0]['url']}|{title}> ({checked}/{total} checked)"
+            status += _release_state_suffix(issues[0])
         else:
             status = "✅ no open release"
         status += await _in_flight_status(name, cfg, has_open_issue=bool(issues))
@@ -590,7 +608,7 @@ async def _cmd_promote(repos, ack, respond, command, context):
         return
     user = context["user_id"]
     try:
-        closed_at = await github.close_release_issue(
+        await github.close_release_issue(
             cfg.repo,
             issues[0]["number"],
             comment=f"Promoted to Production by <@{user}> via `/doof promote`.",
@@ -599,124 +617,52 @@ async def _cmd_promote(repos, ack, respond, command, context):
         log.exception("Failed to promote %s", app_name)
         await respond(f"❌ Failed to promote `{app_name}`.")
         return
-    deploy = await _check_release_gate(app_name, cfg, issues[0]["number"], closed_at)
+    deploy = await _nudge_release_gate(app_name, cfg)
     _release_requesters.pop(app_name, None)
-    await respond(f"✅ `{app_name}` {issues[0]['title']} promoted. {deploy}")
+    await respond(f"✅ `{app_name}` {issues[0]['title']} approved. {deploy}")
 
 
-# How long to keep checking the release gate for a just-closed issue, the
-# most checks to make in that time, and how long to wait between them.
-_GATE_VERSION_TIMEOUT_SECONDS = 60
-_GATE_CHECK_ATTEMPTS = 6
-_GATE_RECHECK_SECONDS = 10
-# How the github-issues resource writes timestamps into a version
-# (ISO_8601_FORMAT in ol-concourse's resources/github-issues/concourse.py).
-_GATE_TIMESTAMP_FORMAT = "%Y-%m-%dT%H:%M:%S"
+# How long the promote reply waits for the release-gate check it asks for. The
+# check is a nudge: the gate also checks itself every five minutes, so the
+# reply does not depend on it.
+_GATE_NUDGE_TIMEOUT_SECONDS = 30
 
 
-def _gate_version(issue_number: int, closed_at: datetime | None) -> dict[str, str]:
-    """Return the release-gate version fields that identify this close."""
-    version = {"issue_number": str(issue_number)}
-    if closed_at is not None:
-        # A reopened and re-closed issue already has a version for its
-        # earlier close, so the number alone would match too soon. Formatted
-        # as the resource formats the same PyGithub field.
-        version["issue_closed_at"] = closed_at.strftime(_GATE_TIMESTAMP_FORMAT)
-    return version
-
-
-async def _check_release_gate(
-    app_name: str, cfg, issue_number: int, closed_at: datetime | None
-) -> str:
-    """Make Production notice a just-closed gate issue; describe the deploy.
-
-    The check only records the closed issue as a new gate version -- the
-    build it triggers is scheduled by Concourse afterwards and has no id yet
-    -- so the link is to the Production job, whose newest build is listed
-    first.
-
-    A check that succeeds can still miss the close: on 2026-10-29 one ran a
-    second after mitxonline #4204 closed, succeeded, and recorded nothing. So
-    the gate is checked again until it has recorded a version for this issue
-    closed at *closed_at*, for up to `_GATE_VERSION_TIMEOUT_SECONDS` in all. A
-    check that fails or overruns that time counts as one that found nothing,
-    rather than ending the wait. Until then
-    nothing has been triggered: the deploy waits for the gate's next scheduled
-    check, and by then it can bind a newer ol-infrastructure revision that the
-    issue never approved.
-    """
+def _production_job_url(app_name: str, cfg) -> str:
     # Matches the Production deploy job k8s_apps/pipeline.py's release-resource
     # workflow generates for the `ol-application-<app>` Pulumi project
     # (deploy-<project>-<stack>).
-    url = concourse.job_url(
+    return concourse.job_url(
         cfg.pipeline, f"deploy-ol-application-{app_name}-production"
     )
-    gate = f"{app_name}-release-gate"
-    version = _gate_version(issue_number, closed_at)
 
-    # What is known at the end, so a failure is described by what actually
-    # failed: whether any check ever finished, and whether the latest
-    # attempt's version lookup finished (an earlier lookup saying "not yet"
-    # is no evidence about a later one that failed).
-    checked = looked_up = False
 
-    async def _recorded() -> bool:
-        nonlocal checked, looked_up
-        # Don't make the deploy wait for the release-gate resource's normal
-        # poll interval to notice the issue just closed.
-        looked_up = False
-        await concourse.check_resource(cfg.pipeline, gate)
-        checked = True
-        found = await concourse.has_version(cfg.pipeline, gate, version)
-        looked_up = True
-        return found
+async def _nudge_release_gate(app_name: str, cfg) -> str:
+    """Ask Concourse to check the release gate now; say what happens next.
 
-    loop = asyncio.get_running_loop()
-    deadline = loop.time() + _GATE_VERSION_TIMEOUT_SECONDS
-    for attempt in range(_GATE_CHECK_ATTEMPTS):
-        remaining = deadline - loop.time()
-        if attempt:
-            # No sleep that would end past the deadline.
-            if remaining <= _GATE_RECHECK_SECONDS:
-                break
-            await asyncio.sleep(_GATE_RECHECK_SECONDS)
-            remaining = deadline - loop.time()
-        if remaining <= 0:
-            break
-        try:
-            recorded = await asyncio.wait_for(_recorded(), remaining)
-        except Exception:
-            log.exception(
-                "Release-gate check or version lookup failed for %s", app_name
-            )
-            continue
-        if recorded:
-            return f"Production deploy triggered: {url}"
-    if not checked:
-        return (
-            "⚠️ The bot could not confirm that Concourse finished checking the "
-            "release gate. A check may still be running, so a Production deploy "
-            f"may or may not have started: {url}"
+    Closing the issue is the approval. The deploy starts when a check of the
+    gate records the close, and the gate checks every five minutes on its
+    own. Asking for a check now usually saves that wait, but a check that
+    succeeds can still miss a close made a second earlier (mitxonline #4204 on
+    2026-10-29), so the reply never says a deploy started. Whether one did is
+    on the release issue (`ops:consumed`, or `ops:refused` if Production
+    refused it) and in the channel when the deploy lands.
+    """
+    url = _production_job_url(app_name, cfg)
+    try:
+        await asyncio.wait_for(
+            concourse.check_resource(cfg.pipeline, f"{app_name}-release-gate"),
+            _GATE_NUDGE_TIMEOUT_SECONDS,
         )
-    if not looked_up:
-        # The check ran, so it may well have recorded the close and started
-        # the deploy; only confirming that failed.
+    except Exception:
+        log.exception("Release-gate check failed for %s", app_name)
         return (
-            "⚠️ Concourse checked the release gate, but the bot could not "
-            f"confirm it recorded issue #{issue_number} closed, so a Production "
-            f"deploy may or may not have started: {url}"
+            "Production starts at the release gate's next scheduled check "
+            f"(within 5m); the bot could not ask Concourse to check sooner: {url}"
         )
-    log.warning(
-        "Release gate %s/%s has no version %s after %ss",
-        cfg.pipeline,
-        gate,
-        version,
-        _GATE_VERSION_TIMEOUT_SECONDS,
-    )
     return (
-        f"⚠️ Concourse has not seen issue #{issue_number} closed yet, so no "
-        "Production deploy was triggered. One starts when a later check of "
-        f"the gate finds it: {url}"
+        "Concourse was asked to check the release gate; Production starts when "
+        f"a check records the close (within 5m): {url}"
     )
 
 
@@ -966,7 +912,7 @@ async def _handle_promote_button(repos, ack, body, say, client):
 
 
 async def _promote_from_button(repos, body, say, client):
-    """Close the release issue behind the button and trigger the deploy.
+    """Close the release issue behind the button, which approves the deploy.
 
     The clicked message is edited only on a terminal outcome (promoted, or no
     open release issue remains for this version). On a retryable failure it is
@@ -990,7 +936,7 @@ async def _promote_from_button(repos, body, say, client):
     matching = [i for i in issues if github.extract_version(i["body"]) == version]
     if not matching:
         # The issue is already closed: promoted some other way, abandoned
-        # (the abandon job closes the gate issue with the `abandoned` label),
+        # (the abandon job closes the gate issue labelled `ops:abandoned`),
         # closed by hand, or closed by an earlier click the bot died before
         # narrating. Settle the stale button rather than leave it reporting a
         # lookup failure, and keep the channel post neutral -- ✅ would read
@@ -1007,7 +953,7 @@ async def _promote_from_button(repos, body, say, client):
         )
         return
     try:
-        closed_at = await github.close_release_issue(
+        await github.close_release_issue(
             cfg.repo,
             matching[0]["number"],
             comment=f"Promoted to Production by <@{user_id}> via Slack button.",
@@ -1016,16 +962,16 @@ async def _promote_from_button(repos, body, say, client):
         log.exception("Failed to close issue for %s %s", app_name, version)
         await say(f"⚠️ Failed to promote `{app_name}` `{version}`.")
         return
-    deploy = await _check_release_gate(app_name, cfg, matching[0]["number"], closed_at)
+    deploy = await _nudge_release_gate(app_name, cfg)
     _release_requesters.pop(app_name, None)
     await _update_promote_message(
         client,
         body,
-        f"🚀 <@{user_id}> promoted this to Production. {deploy}",
+        f"🚀 <@{user_id}> approved this for Production. {deploy}",
     )
     # The edit above fires no notification; this channel post is what does.
     await say(
-        f"🚀 <@{user_id}> promoted `{app_name}` `{version}` to Production. {deploy}"
+        f"🚀 <@{user_id}> approved `{app_name}` `{version}` for Production. {deploy}"
     )
 
 
@@ -1656,7 +1602,7 @@ async def _notify_ready_to_promote(app, repos) -> bool:
             log.exception("Failed to poll release issues for %s", app_name)
             continue
         for issue in issues:
-            if github.PROMOTE_READY_LABEL in issue["labels"]:
+            if set(issue["labels"]).intersection(github.PROMOTE_READY_LABELS):
                 continue
             if not github.is_fully_checked(issue["body"]):
                 continue
@@ -1813,6 +1759,11 @@ class ReleaseProgressState:
     # polled at all (absent from the dict). See _announce_deployments.
     last_version: dict[tuple[str, str], str | None] = field(default_factory=dict)
     nagged_at: dict[tuple[str, str], datetime] = field(default_factory=dict)
+    # Refused issues already reported, by (app, issue number). An app absent
+    # from `refusals_seeded` has not been polled yet; its first poll records
+    # the refusals already there without posting them, as `last_version` does.
+    refusals_announced: set[tuple[str, int]] = field(default_factory=set)
+    refusals_seeded: set[str] = field(default_factory=set)
 
 
 def _format_age(age: timedelta) -> str:
@@ -2049,12 +2000,92 @@ async def _nag_stuck_releases(app, repos, state: ReleaseProgressState) -> bool:
     return ok
 
 
+# How far back to look for a refused release issue. A refusal is reported on
+# the next poll, so this only has to cover a bot that was down for a while.
+_REFUSAL_LOOKBACK = timedelta(days=1)
+
+
+def _is_gate_title(app_name: str, title: str) -> bool:
+    """Return whether *title* is one of *app_name*'s release gate titles.
+
+    mit-learn and mit-learn-nextjs share a repository, so a refused issue is
+    attributed to an app by its whole title, as the pipeline's
+    supersede_gate_issues.py does.
+    """
+    shapes = (
+        rf"Release {re.escape(app_name)} infrastructure @ \S+",
+        rf"Release {re.escape(app_name)} \S+",
+    )
+    return any(re.fullmatch(shape, title.strip()) for shape in shapes)
+
+
+async def _announce_refusals(app, repos, state: ReleaseProgressState) -> bool:
+    """Post to Slack when Production refuses a release issue it took.
+
+    The Production job's assert-gate-names-deploy refuses an approval that no
+    longer matches what would deploy -- usually because QA moved past the
+    ol-infrastructure commit the issue approved -- and labels the issue
+    `ops:refused`. Before the label, a refusal was only a red build, and the
+    Slack thread said the deploy had started.
+
+    The label is best-effort: Concourse can lose an `on_failure` hook. So its
+    absence never means the deploy went ahead; that is only ever read from the
+    GitHub Deployment (`_announce_deployments`). An issue also labelled
+    abandoned is not reported: it was retired, so nobody is waiting on it.
+    """
+    ok = True
+    since = _now() - _REFUSAL_LOOKBACK
+    for app_name, cfg in repos.items():
+        channel = _announce_channel(cfg)
+        if not channel:
+            continue
+        try:
+            refused = await github.refused_release_issues(cfg.repo, since)
+        except Exception:
+            ok = False
+            log.exception("Failed to look for refused release issues for %s", app_name)
+            continue
+        seeding = app_name not in state.refusals_seeded
+        for issue in refused:
+            if not _is_gate_title(app_name, issue["title"]):
+                continue
+            key = (app_name, issue["number"])
+            if key in state.refusals_announced:
+                continue
+            if seeding or github.release_state(issue["labels"]) != "refused":
+                state.refusals_announced.add(key)
+                continue
+            version = github.extract_version(issue["body"]) or issue["title"]
+            try:
+                await app.client.chat_postMessage(
+                    channel=await slack_channels.resolve(app.client, channel),
+                    text=(
+                        f"⛔ `{app_name}` {version} was not deployed: Production "
+                        f"refused <{issue['url']}|#{issue['number']}> because it "
+                        "no longer matches what would deploy, usually because QA "
+                        "has moved past the ol-infrastructure commit it approved. "
+                        "Approve the newest release issue instead. "
+                        f"{_production_job_url(app_name, cfg)}"
+                    ),
+                )
+            except Exception:
+                ok = False
+                log.exception(
+                    "Failed to report the refusal of %s #%s", app_name, issue["number"]
+                )
+                continue
+            state.refusals_announced.add(key)
+        state.refusals_seeded.add(app_name)
+    return ok
+
+
 async def _poll_release_progress_loop(app, repos) -> None:
     state = ReleaseProgressState()
     while True:
         ok = True
         for step, name in (
             (_announce_deployments, "deployment milestone"),
+            (_announce_refusals, "refused release"),
             (_nag_stuck_releases, "stuck release"),
         ):
             try:
