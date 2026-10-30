@@ -1241,21 +1241,31 @@ _LABEL_GATE_SCRIPT = (
     Path(__file__).parent / "scripts" / "label_gate_issue.py"
 ).read_text()
 LABEL_GATE_TASK_NAME = "label-gate-issue"
+# assert-gate-names-deploy writes `refused` here only when it refuses the issue.
+GATE_REFUSAL_DIR = "gate-refusal"
 
 
 def _label_gate_issue_task(
     github_repo: str, release_gate: Resource, labels: list[str]
 ) -> TaskStep:
-    """Add *labels* to the issue the gate get took. It never removes one."""
+    """Add *labels* to the issue the gate get took, if the check refused it.
+
+    It never removes a label. A check that failed without refusing (GitHub
+    unreachable) wrote no marker, so the issue is left alone.
+    """
     return TaskStep(
         task=Identifier(LABEL_GATE_TASK_NAME),
         attempts=3,
         config=TaskConfig(
             platform=Platform.linux,
             image_resource=TASK_IMAGE,
-            inputs=[Input(name=release_gate.name)],
+            inputs=[
+                Input(name=release_gate.name),
+                Input(name=Identifier(GATE_REFUSAL_DIR)),
+            ],
             params={
                 "GATE_FILE": f"{release_gate.name}/gh_issue.json",
+                "ONLY_IF_FILE": f"{GATE_REFUSAL_DIR}/refused",
                 "ADD_LABELS": ",".join(labels),
                 "GITHUB_REPOSITORY": github_repo,
                 "GITHUB_APP_ID": GITHUB_APP_ID,
@@ -1286,10 +1296,12 @@ def _assert_gate_names_deploy_task(
     here means nothing deployed, which turns gate/deploy drift into a red build
     instead of an unapproved release.
 
-    On failure the issue is labelled ``ops:refused``, so the refusal shows on
-    the issue and the release bot can report it, not only as a red build. The
-    hook is on this task, not the job, so a failed deploy after the check
-    passed does not label the issue refused.
+    On a refusal the issue is labelled ``ops:refused``, so the refusal shows
+    on the issue and the release bot can report it, not only as a red build.
+    The hook is on this task, not the job, so a failed deploy after the check
+    passed does not label the issue refused, and it labels only when the
+    check wrote its refusal marker, so a check that could not reach GitHub
+    does not either.
     """
     return TaskStep(
         task=Identifier(ASSERT_GATE_TASK_NAME),
@@ -1302,8 +1314,11 @@ def _assert_gate_names_deploy_task(
                 Input(name=version_input.name),
                 Input(name=infra_input),
             ],
+            # Concourse hands a failed task's outputs to its on_failure hook.
+            outputs=[Output(name=Identifier(GATE_REFUSAL_DIR))],
             params={
                 "APP_NAME": app_name,
+                "REFUSAL_DIR": GATE_REFUSAL_DIR,
                 "GATE_FILE": f"{release_gate.name}/gh_issue.json",
                 "VERSION_FILE": f"{version_input.name}/version",
                 "INFRA_REF_FILE": f"{infra_input}/.git/ref",

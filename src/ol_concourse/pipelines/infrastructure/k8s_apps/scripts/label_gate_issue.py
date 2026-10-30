@@ -6,6 +6,12 @@ fired the gate. A refusal used to show only as a red build, which nothing
 outside Concourse reads. The label puts it on the issue, where the release bot
 and people looking at the issue see it.
 
+That task also fails when it cannot check the issue at all (GitHub
+unreachable, say), and the issue must not then be labelled refused: a re-run
+could deploy it, and the label would outrank that. So the hook labels only
+when ``ONLY_IF_FILE`` exists, which the task writes on a refusal and nothing
+else.
+
 It only ever adds labels. Each label records that something happened, so
 several on one issue are expected (``ops:consumed`` and ``ops:refused`` mean
 Production took the issue and refused it), and no writer removes one. Adding a
@@ -22,6 +28,8 @@ app JWT with ``openssl``, which the task image carries.
 Environment:
     GATE_FILE: ``<release-gate>/gh_issue.json`` from the gate get.
     ADD_LABELS: comma-separated label names to add.
+    ONLY_IF_FILE: optional. When set and the file does not exist, nothing is
+        labelled and the task succeeds.
     GITHUB_REPOSITORY: ``owner/repo`` holding the app's release issues.
     GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY: the
         release GitHub App's credentials.
@@ -166,6 +174,10 @@ def main() -> None:
     """Add ``ADD_LABELS`` to the gate issue."""
     repo = os.environ["GITHUB_REPOSITORY"]
     api_url = os.environ.get("GITHUB_API_URL") or "https://api.github.com"
+    only_if = os.environ.get("ONLY_IF_FILE")
+    if only_if and not Path(only_if).exists():
+        print(f"{only_if} does not exist -- not labelling the gate issue.")  # noqa: T201
+        return
     labels = parse_labels(os.environ.get("ADD_LABELS", ""))
     if not labels:
         sys.exit("ADD_LABELS names no label.")

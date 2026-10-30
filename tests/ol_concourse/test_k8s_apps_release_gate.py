@@ -196,10 +196,12 @@ def _run(  # noqa: PLR0913
     gate_file.write_text(json.dumps({"issue_number": str(GATE_NUMBER), **gate}))
     version_file.write_text(version)
     ref_file.write_text(revision + "\n")
+    (tmp_path / "refusal").mkdir(exist_ok=True)
     return subprocess.run(  # noqa: S603
         [sys.executable, "-c", _ASSERT_GATE_SCRIPT],
         env={
             **os.environ,
+            "REFUSAL_DIR": str(tmp_path / "refusal"),
             "APP_NAME": APP,
             "GATE_FILE": str(gate_file),
             "VERSION_FILE": str(version_file),
@@ -473,6 +475,11 @@ def test_a_refusal_labels_the_gate_issue():
 
     assert hook["task"] == LABEL_GATE_TASK_NAME
     assert params["ADD_LABELS"] == "ops:refused"
+    # Only a refusal, which the check marks in its output, labels the issue.
+    assert task["config"]["outputs"] == [{"name": "gate-refusal"}]
+    assert task["config"]["params"]["REFUSAL_DIR"] == "gate-refusal"
+    assert params["ONLY_IF_FILE"] == "gate-refusal/refused"
+    assert "gate-refusal" in {i["name"] for i in hook["config"]["inputs"]}
     assert params["GATE_FILE"] == f"{APP}-release-gate/gh_issue.json"
     assert params["GITHUB_REPOSITORY"] == REPO
     assert hook["config"]["run"]["args"] == ["-c", _LABEL_GATE_SCRIPT]
@@ -654,3 +661,81 @@ def test_label_script_refuses_a_gate_file_naming_no_issue(
 )
 def test_parse_labels(raw, expected):
     assert label_gate_issue.parse_labels(raw) == expected
+
+
+@pytest.mark.parametrize(
+    ("title", "body"),
+    [
+        # The issue approved another version.
+        (f"Release {APP} 2026.9.17.1", f"<!-- ol-infrastructure-revision: {SHA} -->"),
+        # The issue approved another ol-infrastructure commit.
+        (
+            f"Release {APP} 2026.9.22.1",
+            f"<!-- ol-infrastructure-revision: {OTHER_SHA} -->",
+        ),
+        # The issue does not say which commit it approved.
+        (f"Release {APP} 2026.9.22.1", "## Release 2026.9.22.1"),
+    ],
+)
+def test_a_refusal_leaves_the_marker_the_label_hook_needs(
+    tmp_path, fake_github, private_key, title, body
+):
+    _FakeGitHub.body = body
+    result = _run(
+        tmp_path, fake_github, private_key, {"issue_title": title}, "2026.9.22.1"
+    )
+
+    assert result.returncode != 0
+    marker = tmp_path / "refusal" / "refused"
+    assert marker.read_text().startswith("Refusing to deploy")
+
+
+@pytest.mark.parametrize(
+    ("response", "revision"),
+    [
+        # GitHub could not be read: not a refusal.
+        ({"data": {"repository": {"issue": None}}, "errors": [{"type": "x"}]}, SHA),
+        # A bad ref is a pipeline problem, not the approval's.
+        (None, "v1.2.3"),
+    ],
+)
+def test_a_failure_that_is_not_a_refusal_leaves_no_marker(
+    tmp_path, fake_github, private_key, response, revision
+):
+    """An outage must not label an approved issue refused; a re-run deploys it."""
+    _FakeGitHub.graphql_response = response
+    gate = {"issue_title": f"Release {APP} 2026.9.22.1"}
+    result = _run(
+        tmp_path, fake_github, private_key, gate, "2026.9.22.1", revision=revision
+    )
+
+    assert result.returncode != 0
+    assert not (tmp_path / "refusal" / "refused").exists()
+
+
+def test_label_script_does_nothing_without_the_refusal_marker(
+    tmp_path, fake_label_github, private_key
+):
+    gate_file = tmp_path / "gh_issue.json"
+    gate_file.write_text(json.dumps({"issue_number": str(GATE_NUMBER)}))
+    result = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", _LABEL_GATE_SCRIPT],
+        env={
+            **os.environ,
+            "GATE_FILE": str(gate_file),
+            "ONLY_IF_FILE": str(tmp_path / "gate-refusal" / "refused"),
+            "ADD_LABELS": "ops:refused",
+            "GITHUB_REPOSITORY": REPO,
+            "GITHUB_APP_ID": "123",
+            "GITHUB_APP_INSTALLATION_ID": "456",
+            "GITHUB_APP_PRIVATE_KEY": private_key,
+            "GITHUB_API_URL": f"http://127.0.0.1:{fake_label_github.server_address[1]}",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert _FakeLabelGitHub.calls == []
+    assert _FakeLabelGitHub.issue_labels == ["ops:release", "ops:consumed"]
