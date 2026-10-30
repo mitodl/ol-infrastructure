@@ -48,11 +48,14 @@ per_app_databases = cfg.get("per_app_databases", False)
 # An included Tiltfile shares no variables with this one, so an app that
 # configures itself differently when another is enabled reads the list here.
 os.putenv("LOCAL_DEV_ENABLED_APPS", ",".join(enabled_apps))
-# update_settings is session-wide, so this applies to every app's apply:
-# a Pulumi-rendered app's apply includes its migrate Job, which Tilt's 30 s
-# default cuts off on a first apply.
-if "mitxonline" in enabled_apps or "learn-ai" in enabled_apps:
-    update_settings(k8s_upsert_timeout_secs=300)
+# A Pulumi-rendered app's apply (mitxonline, learn-ai) runs its migrate Job
+# inside `pulumi up`, which Tilt's 30 s default cuts off on a first apply.
+# update_settings is session-wide, and Tilt copies this timeout into every
+# Kubernetes resource's apply spec, so it is set whatever the selection. When
+# it followed the selection, selecting the first of those apps or dropping the
+# last changed every resource's definition, and Tilt rebuilt every image. For
+# other resources the longer limit only delays the error from a hung apply.
+update_settings(k8s_upsert_timeout_secs=300)
 
 # Every service hostname, CORS origin, APISIX route, and Keycloak redirect URI
 # derives from this value, the same one local-dev/tiltlib.star substitutes into
