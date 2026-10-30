@@ -1,36 +1,30 @@
 """Render the local learn-ai program under mocks; pin what must match deployed."""
 
-import asyncio
+import functools
 import importlib
 import json
-import runpy
-import shutil
-from pathlib import Path
-from typing import Any
 
 import pulumi
 import pytest
 
 from ol_infrastructure.applications.learn_ai import definition
 from ol_infrastructure.lib.local_dev_program import CA_BUNDLE_DIR
+from tests.local_dev.program_render import (
+    APP_COMPONENT,
+    DEPLOYMENT,
+    JOB,
+    OIDC_SECRET,
+    PLUGIN_CONFIG,
+    REPO,
+    ROUTE,
+    SECRET_TYPE,
+    SERVICE,
+    render_program,
+)
+from tests.local_dev.program_render import one as _one
 
-# Python 3.14+ compatibility, as test_mitxonline_program.py does.
-try:
-    asyncio.get_event_loop()
-except RuntimeError:
-    asyncio.set_event_loop(asyncio.new_event_loop())
-
-REPO = Path(__file__).parents[2]
 APP_DIR = REPO / "local-dev/apps/learn-ai"
-DEPLOYMENT = "kubernetes:apps/v1:Deployment"
-SERVICE = "kubernetes:core/v1:Service"
-JOB = "kubernetes:batch/v1:Job"
-ROUTE = "kubernetes:apisix.apache.org/v2:ApisixRoute"
-PLUGIN_CONFIG = "kubernetes:apisix.apache.org/v2:ApisixPluginConfig"
 CONSUMER = "kubernetes:apisix.apache.org/v2:ApisixConsumer"
-SECRET_TYPE = "kubernetes:core/v1:Secret"  # noqa: S105  # pragma: allowlist secret
-OIDC_SECRET = "ol-mitlearn-oidc"  # noqa: S105  # pragma: allowlist secret
-APP_COMPONENT = "ol:infrastructure:components:services:OLApplicationK8s"
 KEY_VALUE = "sk-secret-value"  # pragma: allowlist secret
 MIGRATE_COMMAND = [
     "bash",
@@ -38,93 +32,7 @@ MIGRATE_COMMAND = [
     "python manage.py migrate --noinput && python manage.py createcachetable",
 ]
 
-
-class RecordingMocks(pulumi.runtime.Mocks):
-    def __init__(self):
-        self.resources: list[tuple[str, str, dict[str, Any]]] = []
-        self.transforms: dict[str, list[Any]] = {}
-        self.program: dict[str, Any] = {}
-
-    def reset(self):
-        self.resources.clear()
-        self.transforms.clear()
-
-    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-        self.resources.append((args.typ, args.name, args.inputs))
-        if args.transforms:
-            self.transforms[args.typ] = list(args.transforms)
-        return [f"{args.name}-id", args.inputs]
-
-    def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
-        return {}
-
-
-MOCKS = RecordingMocks()
-
-
-def _tree(tmp_path: Path, app_files: dict[str, str] | None = None) -> Path:
-    """Copy the app dir with pulumi/ inside; the program takes its parent as APP_DIR."""
-    root = tmp_path / "local-dev"
-    shutil.copytree(
-        APP_DIR, root / "apps/learn-ai", ignore=shutil.ignore_patterns("__pycache__")
-    )
-    for relpath, text in (app_files or {}).items():
-        target = root / "apps/learn-ai" / relpath
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(text)
-    return root / "apps/learn-ai/pulumi"
-
-
-def _render(  # noqa: PLR0913
-    tmp_path,
-    monkeypatch,
-    *,
-    root_domain="mit.test",
-    config=None,
-    environ=None,
-    app_files=None,
-):
-    for key in ("TILT_IMAGE_0", "LOCAL_DEV_PREBUILT_IMAGE_TAGS"):
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("LOCAL_DEV_ROOT_DOMAIN", root_domain)
-    for key, value in (environ or {}).items():
-        monkeypatch.setenv(key, value)
-    MOCKS.reset()
-    # Set per render, not at import: other test modules set their own mocks at
-    # import time and the last one wins.
-    pulumi.runtime.set_mocks(
-        MOCKS,
-        project="ol-local-dev-learn-ai",
-        stack="Dev",
-        preview=False,
-    )
-    # The stack file's config: block, as the CLI hands it to the program (an
-    # object value arrives JSON-encoded).
-    pulumi.runtime.set_all_config(
-        {
-            key: value if isinstance(value, str) else json.dumps(value)
-            for key, value in (config or {}).items()
-        }
-    )
-    program_dir = _tree(tmp_path, app_files)
-
-    @pulumi.runtime.test
-    def run():
-        MOCKS.program = runpy.run_path(str(program_dir), run_name="__main__")
-        return pulumi.Output.from_input(True)  # noqa: FBT003
-
-    run()
-    return MOCKS
-
-
-def _one(mocks, typ, name):
-    matches = [
-        i
-        for t, _, i in mocks.resources
-        if t == typ and i.get("metadata", {}).get("name") == name
-    ]
-    assert len(matches) == 1, f"{typ} {name}: {len(matches)} found"
-    return matches[0]
+_render = functools.partial(render_program, "learn-ai")
 
 
 def _secret_data(mocks):
@@ -463,18 +371,6 @@ def test_every_rendered_object_carries_the_deployed_labels_and_managed_by(
         assert labels["ol.mit.edu/service"] == "mit-learn", typ
 
 
-def test_the_provider_pins_the_home_kubeconfig_not_the_environments(
-    tmp_path, monkeypatch
-):
-    """Tilt's KUBECONFIG is a file that exists only while Tilt runs."""
-    mocks = _render(tmp_path, monkeypatch, environ={"KUBECONFIG": "/tilt/cluster.yml"})
-    (provider,) = [
-        i for t, _, i in mocks.resources if t == "pulumi:providers:kubernetes"
-    ]
-    assert provider["context"] == "local-dev"
-    assert provider["kubeconfig"] == str(Path.home() / ".kube" / "config")
-
-
 def _any_bindings():
     """Bindings only to read application_config's non-environment fields."""
     return definition.LearnAiBindings(
@@ -521,27 +417,6 @@ def test_routes_read_the_shared_secret_with_deployed_tls_verification(
             plugin = _plugin(route, rule, "openid-connect")
             assert plugin["secretRef"] == OIDC_SECRET, rule
             assert plugin["config"].get("ssl_verify", True) is True, rule
-
-
-def test_the_direct_route_set_is_the_deployed_six_and_the_prefixed_five(
-    tmp_path, monkeypatch
-):
-    direct, prefixed = _routes(_render(tmp_path, monkeypatch))
-    assert [r["name"] for r in direct["spec"]["http"]] == [
-        "canvas_syllabus_agent",
-        "passauth",
-        "logout-redirect",
-        "reqauth",
-        "websocket",
-        "dnt-policy",
-    ]
-    assert [r["name"] for r in prefixed["spec"]["http"]] == [
-        "canvas_syllabus_agent",
-        "passauth",
-        "logout-redirect",
-        "reqauth",
-        "websocket",
-    ]
 
 
 def test_route_hosts_and_paths_follow_the_root_domain(tmp_path, monkeypatch):

@@ -4,6 +4,7 @@ import importlib
 from pathlib import Path
 from typing import Any
 
+import pulumi
 import pytest
 from pulumi import ResourceOptions, ResourceTransformArgs
 
@@ -15,12 +16,15 @@ from ol_infrastructure.lib.local_dev_program import (
     await_policy,
     ca_bundle_env,
     image_reference,
+    k3d_provider,
     merged_env,
     secrets_hash,
     warn_leftover_app_env_local,
 )
+from tests.local_dev.program_render import ProgramMocks
 
 REPO = Path(__file__).parents[2]
+PROVIDER_TYPE = "pulumi:providers:kubernetes"
 
 
 @pytest.mark.parametrize(
@@ -164,3 +168,19 @@ def test_no_leftover_file_prints_nothing(tmp_path, capsys):
 def test_secrets_hash_is_order_independent():
     assert secrets_hash({"a": "1", "b": "2"}) == secrets_hash({"b": "2", "a": "1"})
     assert secrets_hash({"a": "1"}) != secrets_hash({"a": "2"})
+
+
+def test_k3d_provider_pins_the_home_kubeconfig_not_the_environments(monkeypatch):
+    """Tilt's KUBECONFIG is a file that exists only while Tilt runs."""
+    monkeypatch.setenv("KUBECONFIG", "/tilt/cluster.yml")
+    mocks = ProgramMocks()
+    pulumi.runtime.set_mocks(mocks, project="p", stack="s", preview=False)
+
+    @pulumi.runtime.test
+    def run():
+        k3d_provider()
+
+    run()
+    (provider,) = [i for t, _, i in mocks.resources if t == PROVIDER_TYPE]
+    assert provider["context"] == "local-dev"
+    assert provider["kubeconfig"] == str(Path.home() / ".kube" / "config")
