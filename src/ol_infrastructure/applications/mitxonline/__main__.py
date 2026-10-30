@@ -587,6 +587,7 @@ bindings = definition.MitxonlineBindings(
     environment_variables={
         **DEPLOYED_ENV_DEFAULTS,
         **mitxonline_config.require_object("vars"),
+        "MIT_LEARN_API_BASE_URL": f"https://{learn_backend_domain}",
     },
     k8s_labels=k8s_app_labels,
     # Use the secret names returned by create_mitxonline_k8s_secrets
