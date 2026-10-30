@@ -20,11 +20,14 @@ import pytest
 
 from ol_concourse.pipelines.infrastructure.k8s_apps.pipeline import (
     _ASSERT_GATE_SCRIPT,
+    _LABEL_GATE_SCRIPT,
     ASSERT_GATE_TASK_NAME,
+    LABEL_GATE_TASK_NAME,
     build_app_pipeline,
 )
 from ol_concourse.pipelines.infrastructure.k8s_apps.scripts import (
     assert_gate_names_deploy,
+    label_gate_issue,
 )
 
 APP = "ol-analytics-api"
@@ -422,3 +425,232 @@ def test_the_gate_is_checked_every_five_minutes():
     (gate,) = [r for r in pipeline["resources"] if r["name"] == f"{APP}-release-gate"]
 
     assert gate["check_every"] == "5m"
+
+
+def _gate_resource(app_name: str = APP) -> dict[str, Any]:
+    pipeline = json.loads(build_app_pipeline(app_name).model_dump_json())
+    (gate,) = [
+        r for r in pipeline["resources"] if r["name"] == f"{app_name}-release-gate"
+    ]
+    return gate
+
+
+def test_the_gate_labels_an_issue_it_consumes():
+    """A consumed issue keeps its versioned title; the label marks it instead.
+
+    The release-issue resource carries the same label name, because its
+    close_with_labels looks for consumed issues by it.
+    """
+    pipeline = json.loads(build_app_pipeline(APP).model_dump_json())
+    resources = {r["name"]: r for r in pipeline["resources"]}
+
+    assert resources[f"{APP}-release-gate"]["source"]["consume_with_label"] == (
+        "ops:consumed"
+    )
+    assert resources[f"{APP}-release-issue"]["source"]["consume_with_label"] == (
+        "ops:consumed"
+    )
+
+
+def test_the_gate_skips_both_abandoned_label_names():
+    """Renaming `abandoned` in a repository must never let the gate fire."""
+    assert set(_gate_resource()["source"]["skip_if_labeled"]) == {
+        "ops:abandoned",
+        "abandoned",
+    }
+
+
+def test_a_refusal_labels_the_gate_issue():
+    """A refused approval is recorded on the issue, not only as a red build.
+
+    The hook is on the check task, not the job, so a deploy that fails after
+    the check passed does not label the issue refused.
+    """
+    plan = _plan(APP, "-production")
+    task = plan[_step_index(plan, "task", ASSERT_GATE_TASK_NAME)]
+    hook = task["on_failure"]
+    params = hook["config"]["params"]
+
+    assert hook["task"] == LABEL_GATE_TASK_NAME
+    assert params["ADD_LABELS"] == "ops:refused"
+    assert params["GATE_FILE"] == f"{APP}-release-gate/gh_issue.json"
+    assert params["GITHUB_REPOSITORY"] == REPO
+    assert hook["config"]["run"]["args"] == ["-c", _LABEL_GATE_SCRIPT]
+    assert f"{APP}-release-gate" in {i["name"] for i in hook["config"]["inputs"]}
+    pipeline = json.loads(build_app_pipeline(APP).model_dump_json())
+    (job,) = [j for j in pipeline["jobs"] if j["name"].endswith("-production")]
+    assert "label-gate-issue" not in json.dumps(job.get("on_failure"))
+
+
+class _FakeLabelGitHub(BaseHTTPRequestHandler):
+    """Token exchange, label creation, issue labelling and the re-read."""
+
+    repo_labels: ClassVar[set[str]] = set()
+    issue_labels: ClassVar[list[str]] = []
+    # Labels another writer removes right after each add.
+    strip_after_add: ClassVar[set[str]] = set()
+    calls: ClassVar[list[tuple[str, str, Any]]] = []
+
+    def log_message(self, *_args: Any) -> None:
+        pass
+
+    def _reply(self, status: int, body: Any) -> None:
+        payload = json.dumps(body).encode()
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def _body(self) -> Any:
+        length = int(self.headers.get("Content-Length") or 0)
+        return json.loads(self.rfile.read(length)) if length else None
+
+    def do_POST(self) -> None:
+        body = self._body()
+        self.calls.append(("POST", self.path, body))
+        if self.path == "/app/installations/456/access_tokens":
+            self._reply(201, {"token": "installation-token"})
+            return
+        assert self.headers["Authorization"] == "token installation-token"
+        if self.path == f"/repos/{REPO}/labels":
+            if body["name"] in self.repo_labels:
+                self._reply(422, {"message": "already_exists"})
+                return
+            self.repo_labels.add(body["name"])
+            self._reply(201, body)
+            return
+        assert self.path == f"/repos/{REPO}/issues/{GATE_NUMBER}/labels"
+        for name in body["labels"]:
+            if name not in self.issue_labels:
+                self.issue_labels.append(name)
+        for name in self.strip_after_add:
+            if name in self.issue_labels:
+                self.issue_labels.remove(name)
+        self._reply(200, [{"name": n} for n in self.issue_labels])
+
+    def do_GET(self) -> None:
+        self.calls.append(("GET", self.path, None))
+        assert self.path == f"/repos/{REPO}/issues/{GATE_NUMBER}"
+        self._reply(200, {"labels": [{"name": n} for n in self.issue_labels]})
+
+    def do_DELETE(self) -> None:
+        msg = "the label script must never remove a label"
+        raise AssertionError(msg)
+
+
+@pytest.fixture
+def fake_label_github():
+    """Serve the fake GitHub API for the label script on a free local port."""
+    _FakeLabelGitHub.repo_labels = set()
+    _FakeLabelGitHub.issue_labels = ["ops:release", "ops:consumed"]
+    _FakeLabelGitHub.strip_after_add = set()
+    _FakeLabelGitHub.calls = []
+    server = HTTPServer(("127.0.0.1", 0), _FakeLabelGitHub)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield server
+    server.shutdown()
+
+
+def _run_label(
+    tmp_path: Path,
+    server: HTTPServer,
+    private_key: str,
+    gate: dict[str, Any],
+    labels: str = "ops:refused",
+) -> subprocess.CompletedProcess[str]:
+    gate_file = tmp_path / "gh_issue.json"
+    gate_file.write_text(json.dumps(gate))
+    return subprocess.run(  # noqa: S603
+        [sys.executable, "-c", _LABEL_GATE_SCRIPT],
+        env={
+            **os.environ,
+            "GATE_FILE": str(gate_file),
+            "ADD_LABELS": labels,
+            "GITHUB_REPOSITORY": REPO,
+            "GITHUB_APP_ID": "123",
+            "GITHUB_APP_INSTALLATION_ID": "456",
+            "GITHUB_APP_PRIVATE_KEY": private_key,
+            "GITHUB_API_URL": f"http://127.0.0.1:{server.server_address[1]}",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_label_script_adds_the_label_and_keeps_the_others(
+    tmp_path, fake_label_github, private_key
+):
+    """Additive only: the consumed label stays alongside the refusal."""
+    result = _run_label(
+        tmp_path, fake_label_github, private_key, {"issue_number": str(GATE_NUMBER)}
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert _FakeLabelGitHub.issue_labels == [
+        "ops:release",
+        "ops:consumed",
+        "ops:refused",
+    ]
+    calls = [(m, p) for m, p, _ in _FakeLabelGitHub.calls]
+    # The label exists before the issue is labelled with it.
+    assert calls.index(("POST", f"/repos/{REPO}/labels")) < calls.index(
+        ("POST", f"/repos/{REPO}/issues/{GATE_NUMBER}/labels")
+    )
+    assert ("GET", f"/repos/{REPO}/issues/{GATE_NUMBER}") in calls
+
+
+def test_label_script_tolerates_an_existing_label(
+    tmp_path, fake_label_github, private_key
+):
+    _FakeLabelGitHub.repo_labels = {"ops:refused"}
+    _FakeLabelGitHub.issue_labels = ["ops:consumed", "ops:refused"]
+    result = _run_label(
+        tmp_path, fake_label_github, private_key, {"issue_number": str(GATE_NUMBER)}
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert _FakeLabelGitHub.issue_labels == ["ops:consumed", "ops:refused"]
+
+
+def test_label_script_fails_when_the_label_keeps_disappearing(
+    tmp_path, fake_label_github, private_key
+):
+    _FakeLabelGitHub.strip_after_add = {"ops:refused"}
+    result = _run_label(
+        tmp_path, fake_label_github, private_key, {"issue_number": str(GATE_NUMBER)}
+    )
+
+    assert result.returncode != 0
+    assert "keep disappearing" in result.stderr
+    adds = [
+        c
+        for c in _FakeLabelGitHub.calls
+        if c[:2] == ("POST", f"/repos/{REPO}/issues/{GATE_NUMBER}/labels")
+    ]
+    assert len(adds) == 3
+
+
+@pytest.mark.parametrize("gate", [{}, {"issue_number": "0"}])
+def test_label_script_refuses_a_gate_file_naming_no_issue(
+    tmp_path, fake_label_github, private_key, gate
+):
+    result = _run_label(tmp_path, fake_label_github, private_key, gate)
+
+    assert result.returncode != 0
+    assert "names no issue" in result.stderr
+    assert _FakeLabelGitHub.calls == []
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("ops:refused", ["ops:refused"]),
+        (" ops:refused , ops:x ,ops:refused,", ["ops:refused", "ops:x"]),
+        ("", []),
+    ],
+)
+def test_parse_labels(raw, expected):
+    assert label_gate_issue.parse_labels(raw) == expected

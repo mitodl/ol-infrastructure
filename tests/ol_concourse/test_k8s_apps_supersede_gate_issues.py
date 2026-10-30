@@ -450,7 +450,7 @@ def test_script_supersedes_stale_issues_end_to_end(tmp_path, fake_github, privat
         if (method, path) == ("PATCH", f"/repos/{REPO}/issues/83")
     ]
     assert patches == [
-        {"state": "closed", "state_reason": "not_planned", "labels": ["abandoned"]}
+        {"state": "closed", "state_reason": "not_planned", "labels": ["ops:abandoned"]}
     ]
     # The label exists before anything is closed with it.
     calls = [(m, p) for m, p, _ in _FakeGitHub.calls]
@@ -461,11 +461,11 @@ def test_script_supersedes_stale_issues_end_to_end(tmp_path, fake_github, privat
     (since,) = _FakeGitHub.closed_since
     age = datetime.now(UTC) - datetime.strptime(since, "%Y-%m-%dT%H:%M:%S%z")
     assert timedelta(hours=23) < age < timedelta(hours=25)
-    assert {label["name"] for label in issues[94]["labels"]} == {"abandoned"}
+    assert {label["name"] for label in issues[94]["labels"]} == {"ops:abandoned"}
     assert issues[90]["labels"] == issues[95]["labels"] == []
     assert {label["name"] for label in issues[96]["labels"]} == {
         "release",
-        "abandoned",
+        "ops:abandoned",
     }
     assert issues[97]["state"] == issues[99]["state"] == "open"
     comments = [
@@ -480,7 +480,7 @@ def test_script_supersedes_stale_issues_end_to_end(tmp_path, fake_github, privat
     ]
     assert "Superseded by #97" in comments[0][1]
     assert "Closed and labelled" in comments[0][1]
-    assert "Labelled `abandoned`" in comments[1][1]
+    assert "Labelled `ops:abandoned`" in comments[1][1]
     # Each comment lands before its close, so a closed issue always says why.
     methods = [(m, p) for m, p, _ in _FakeGitHub.calls if "/issues/83" in p]
     assert methods.index(("POST", f"/repos/{REPO}/issues/83/comments")) < (
@@ -578,7 +578,7 @@ def test_script_supersedes_the_posted_issue_once_the_release_tag_is_gone(
     assert result.returncode == 0, result.stderr
     issues = _FakeGitHub.issues
     assert [n for n, i in sorted(issues.items()) if i["state"] == "open"] == [99]
-    assert {label["name"] for label in issues[97]["labels"]} == {"abandoned"}
+    assert {label["name"] for label in issues[97]["labels"]} == {"ops:abandoned"}
     comment = next(
         body["body"]
         for method, path, body in _FakeGitHub.calls
@@ -618,7 +618,7 @@ def test_script_puts_back_a_label_another_writer_removed(
 
     assert result.returncode == 0, result.stderr
     assert {label["name"] for label in _FakeGitHub.issues[96]["labels"]} == {
-        "abandoned"
+        "ops:abandoned"
     }
 
 
@@ -631,14 +631,16 @@ def test_a_retry_finds_an_issue_closed_without_its_label(
     result = _run(tmp_path, fake_github, private_key, posted=97)
 
     assert result.returncode == 0, result.stderr
-    assert "abandoned" in {label["name"] for label in _FakeGitHub.issues[96]["labels"]}
+    assert "ops:abandoned" in {
+        label["name"] for label in _FakeGitHub.issues[96]["labels"]
+    }
 
 
 def test_script_succeeds_when_the_label_already_exists(
     tmp_path, fake_github, private_key
 ):
     """Creating the label is idempotent: GitHub's 422 for an existing one is fine."""
-    _FakeGitHub.repo_labels.add("abandoned")
+    _FakeGitHub.repo_labels.add("ops:abandoned")
     result = _run(tmp_path, fake_github, private_key, posted=97)
 
     assert result.returncode == 0, result.stderr
@@ -669,3 +671,47 @@ def test_script_fails_when_the_label_keeps_disappearing(
 
     assert result.returncode != 0
     assert "keeps disappearing" in result.stderr
+
+
+@pytest.mark.parametrize("label", ["ops:abandoned", "abandoned"])
+def test_either_abandoned_name_counts_as_labelled(label):
+    """The gate skips both names, so neither needs labelling again."""
+    issue = _issue(
+        94,
+        f"Release {APP} 2026.10.6.1",
+        state="closed",
+        state_reason=DROP,
+        labels=[{"name": label}],
+    )
+    assert supersede_gate_issues.stale_issues(APP, [issue], keep_number=97) == []
+
+
+@pytest.mark.parametrize(
+    ("state", "state_reason"), [("closed", DONE), ("closed", DROP), ("open", None)]
+)
+def test_a_consumed_issue_is_never_superseded(state, state_reason):
+    """A consumed issue keeps its gate title, so the label is what excludes it."""
+    issue = _issue(
+        92,
+        f"Release {APP} 2026.10.4.1",
+        state=state,
+        state_reason=state_reason,
+        labels=[{"name": "ops:release"}, {"name": "ops:consumed"}],
+    )
+    assert supersede_gate_issues.stale_issues(APP, [issue], keep_number=97) == []
+
+
+def test_a_consumed_issue_is_left_alone_end_to_end(tmp_path, fake_github, private_key):
+    """Labelled ops:consumed and closed as not planned, it is still an approval."""
+    _FakeGitHub.issues[91] = _issue(
+        91,
+        f"Release {APP} 2026.10.3.1",
+        state="closed",
+        state_reason=DROP,
+        labels=[{"name": "ops:consumed"}],
+    )
+    result = _run(tmp_path, fake_github, private_key, posted=97)
+
+    assert result.returncode == 0, result.stderr
+    assert _FakeGitHub.issues[91]["labels"] == [{"name": "ops:consumed"}]
+    assert not [c for c in _FakeGitHub.calls if "/issues/91" in c[1]]

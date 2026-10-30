@@ -21,8 +21,8 @@ The body has to be the one the issue was closed with. The issue put finds the
 issue to update through the search API, whose index lags, so a QA run that
 lands just after the issue is closed can still rewrite the closed issue's
 body, marker included. So the issue is refused if its body was edited at or
-after it was closed. Renaming the title, which the gate get does to consume
-the issue, is not a body edit.
+after it was closed. Labelling the issue, which the gate get does to consume
+it, is not a body edit.
 
 ``pipeline.py`` inlines this file's text into the task (``python3 -c``), so it
 must stay standard-library only and self-contained. It authenticates as the

@@ -940,6 +940,16 @@ GITHUB_APP_ID = "((github_app.release_bot_app_id))"
 GITHUB_APP_INSTALLATION_ID = "((github_app.release_bot_app_installation_id))"
 GITHUB_APP_PRIVATE_KEY = "((github_app.release_bot_app_pem))"
 
+# Release gate issue labels. Each records that something happened, so an issue
+# collects them and nothing removes one; readers resolve them by precedence.
+# The legacy unprefixed names are still read wherever a label is read, so
+# renaming the labels in a repository never opens a window between the names.
+RELEASE_LABEL = "ops:release"
+CONSUMED_LABEL = "ops:consumed"
+REFUSED_LABEL = "ops:refused"
+ABANDONED_LABEL = "ops:abandoned"
+ABANDONED_LABELS = [ABANDONED_LABEL, "abandoned"]
+
 
 def _define_release_resources(
     app_name: str,
@@ -1010,7 +1020,7 @@ def _define_release_resources(
         issue_prefix=f"Release {app_name}",
         issue_title_template=f"Release {app_name}",
         issue_state="closed",
-        skip_if_labeled=["abandoned"],
+        skip_if_labeled=ABANDONED_LABELS,
         auth_method="app",
         app_id=github_app_id,
         app_installation_id=github_app_installation_id,
@@ -1026,6 +1036,10 @@ def _define_release_resources(
         # waiting an hour and then refused.
         poll_frequency=Duration("5m"),
     )
+    # The gate's get labels the issue it consumes instead of renaming it
+    # `[CONSUMED #n]...`, so the issue keeps the version in its title. The
+    # release bot reads the label; check skips an issue carrying it.
+    release_gate.source["consume_with_label"] = CONSUMED_LABEL
     # Open release issues are created after each QA deployment.
     release_issue = github_issues(
         name=Identifier(f"{app_name}-release-issue"),
@@ -1033,7 +1047,7 @@ def _define_release_resources(
         issue_prefix=f"Release {app_name}",
         issue_title_template=f"Release {app_name}",
         issue_state="open",
-        labels=["release"],
+        labels=[RELEASE_LABEL],
         auth_method="app",
         app_id=github_app_id,
         app_installation_id=github_app_installation_id,
@@ -1045,6 +1059,9 @@ def _define_release_resources(
         # all-unchecked checklist for a release that hasn't actually changed.
         update_in_place=True,
     )
+    # The abandon job's close_with_labels runs on this resource and labels
+    # only the newest issue a gate consumed, which it finds by this label.
+    release_issue.source["consume_with_label"] = CONSUMED_LABEL
     deployment_rc = github_deployment(
         name=Identifier(f"{app_name}-deployment-rc"),
         repository=github_repo,
@@ -1220,6 +1237,34 @@ _ASSERT_GATE_SCRIPT = (
     Path(__file__).parent / "scripts" / "assert_gate_names_deploy.py"
 ).read_text()
 ASSERT_GATE_TASK_NAME = "assert-gate-names-deploy"
+_LABEL_GATE_SCRIPT = (
+    Path(__file__).parent / "scripts" / "label_gate_issue.py"
+).read_text()
+LABEL_GATE_TASK_NAME = "label-gate-issue"
+
+
+def _label_gate_issue_task(
+    github_repo: str, release_gate: Resource, labels: list[str]
+) -> TaskStep:
+    """Add *labels* to the issue the gate get took. It never removes one."""
+    return TaskStep(
+        task=Identifier(LABEL_GATE_TASK_NAME),
+        attempts=3,
+        config=TaskConfig(
+            platform=Platform.linux,
+            image_resource=TASK_IMAGE,
+            inputs=[Input(name=release_gate.name)],
+            params={
+                "GATE_FILE": f"{release_gate.name}/gh_issue.json",
+                "ADD_LABELS": ",".join(labels),
+                "GITHUB_REPOSITORY": github_repo,
+                "GITHUB_APP_ID": GITHUB_APP_ID,
+                "GITHUB_APP_INSTALLATION_ID": GITHUB_APP_INSTALLATION_ID,
+                "GITHUB_APP_PRIVATE_KEY": GITHUB_APP_PRIVATE_KEY,
+            },
+            run=Command(path="python3", args=["-c", _LABEL_GATE_SCRIPT]),
+        ),
+    )
 
 
 def _assert_gate_names_deploy_task(
@@ -1237,12 +1282,18 @@ def _assert_gate_names_deploy_task(
     ``image_tag`` comes from. The issue body's revision marker must also name
     the ol-infrastructure commit in ``<infra_input>``, which has to resolve to
     the same commit the job's Pulumi code get does. The gate get has already
-    tombstoned the issue, so a refused issue does not fire again. A failure
+    labelled the issue ``ops:consumed``, so a refused issue does not fire again. A failure
     here means nothing deployed, which turns gate/deploy drift into a red build
     instead of an unapproved release.
+
+    On failure the issue is labelled ``ops:refused``, so the refusal shows on
+    the issue and the release bot can report it, not only as a red build. The
+    hook is on this task, not the job, so a failed deploy after the check
+    passed does not label the issue refused.
     """
     return TaskStep(
         task=Identifier(ASSERT_GATE_TASK_NAME),
+        on_failure=_label_gate_issue_task(github_repo, release_gate, [REFUSED_LABEL]),
         config=TaskConfig(
             platform=Platform.linux,
             image_resource=TASK_IMAGE,
@@ -1352,7 +1403,7 @@ SUPERSEDE_TASK_NAME = "supersede-gate-issues"
 def _supersede_gate_issues_task(
     app_name: str, github_repo: str, release_issue: Resource
 ) -> TaskStep:
-    """Close, and label ``abandoned``, every open gate issue but the one just posted.
+    """Close, and label ``ops:abandoned``, every open gate issue but the one just posted.
 
     Runs after the release issue put, so the comment on each superseded issue
     can name the issue that replaced it. See the script's docstring for which
@@ -1590,7 +1641,7 @@ def _build_abandon_release_job(
     recomputes the next version normally.  Use it when a release was cut but
     must be cancelled before it reaches production.
 
-    It then labels the release's gate issue ``abandoned`` and closes it. That
+    It then labels the release's gate issue ``ops:abandoned`` and closes it. That
     label is what ``release_gate``'s ``skip_if_labeled`` looks for; without
     it the open issue outlives the release it names, and closing it later
     would deploy a version whose branch and tag are gone.  The issue step runs
@@ -1621,7 +1672,7 @@ def _build_abandon_release_job(
                 put=release_issue.name,
                 params={
                     "title_template": f"Release {app_name} ((.:abandoned_version))",
-                    "close_with_labels": ["abandoned"],
+                    "close_with_labels": [ABANDONED_LABEL],
                 },
                 no_get=True,
             ),
@@ -1825,10 +1876,14 @@ def _build_release_resource_app_pipeline(
             put=release_issue.name,
             params={
                 "body_file": f"{PROMOTION_DIR}/body.md",
-                "labels": ["release"],
+                "labels": [RELEASE_LABEL],
                 "title_template": "((.:promotion_title))",
                 "skip_if_file": f"{PROMOTION_DIR}/skip",
                 "skip_if_tag_missing": "((.:release_tag))",
+                # A QA re-run after the issue was approved opens a new issue
+                # for the same release; keep the ticks the approval had,
+                # unless the release was abandoned and this is its re-cut.
+                "carry_checks_unless_labeled": ABANDONED_LABELS,
             },
         ),
         # Mark the RC GitHub Deployment as successful.
