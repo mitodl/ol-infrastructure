@@ -675,12 +675,19 @@ def test_parse_labels(raw, expected):
         ),
         # The issue does not say which commit it approved.
         (f"Release {APP} 2026.9.22.1", "## Release 2026.9.22.1"),
+        # The title names no version.
+        (f"Release {APP}", f"<!-- ol-infrastructure-revision: {SHA} -->"),
+        # The body was edited after the close.
+        (f"Release {APP} 2026.9.22.1", None),
     ],
 )
 def test_a_refusal_leaves_the_marker_the_label_hook_needs(
     tmp_path, fake_github, private_key, title, body
 ):
-    _FakeGitHub.body = body
+    if body is None:
+        _FakeGitHub.last_edited_at = "2026-10-15T19:43:50Z"
+    else:
+        _FakeGitHub.body = body
     result = _run(
         tmp_path, fake_github, private_key, {"issue_title": title}, "2026.9.22.1"
     )
