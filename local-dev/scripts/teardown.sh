@@ -181,8 +181,12 @@ drop_orphan_stack() {
     discard_stack_state "${dir}" "${stack}" "${label}"
 }
 
+cluster_listed() {
+    k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}[[:space:]]"
+}
+
 log "Destroying k3d cluster '${CLUSTER_NAME}'..."
-if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
+if cluster_listed; then
     # Ensure cluster is running before destroying Pulumi resources
     log "  Ensuring cluster is running..."
     if ! k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}.*1/1"; then
@@ -210,8 +214,20 @@ if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
 
     cd "${REPO_ROOT}"
 
-    # Now delete the cluster
+    # A node container can outlive a `k3d cluster delete` that exits 0 (seen
+    # with an agent OOM-killed during teardown). k3d still lists the cluster
+    # then, so setup.sh would skip creating it; a second delete removes the
+    # straggler.
     k3d cluster delete "${CLUSTER_NAME}"
+    if cluster_listed; then
+        warn "k3d left part of the cluster behind; deleting again."
+        k3d cluster delete "${CLUSTER_NAME}"
+    fi
+    if cluster_listed; then
+        warn "Cluster '${CLUSTER_NAME}' is still listed by 'k3d cluster list'."
+        warn "Remove its containers by hand (docker ps -a --filter label=k3d.cluster=${CLUSTER_NAME}), then re-run teardown."
+        exit 1
+    fi
     ok "Cluster deleted."
 else
     warn "Cluster '${CLUSTER_NAME}' not found — nothing to delete."
@@ -225,6 +241,18 @@ fi
 
 # start.sh's marker refers to the cluster we just deleted.
 rm -f "${REPO_ROOT}/local-dev/infra/.pulumi/cluster-id"
+
+# setup.sh renames k3d's k3d-<cluster> context to local-dev. k3d's kubeconfig
+# cleanup removes the cluster and user entries but not the renamed context,
+# which would be left pointing at a cluster entry that no longer exists.
+# delete-context leaves current-context naming the deleted context, so clear
+# that too.
+if [[ "$(kubectl config current-context 2>/dev/null)" == "local-dev" ]]; then
+    kubectl config unset current-context >/dev/null
+fi
+if kubectl config get-contexts local-dev &>/dev/null; then
+    kubectl config delete-context local-dev >/dev/null
+fi
 
 # ---------------------------------------------------------------------------
 # Remove /etc/hosts entries
