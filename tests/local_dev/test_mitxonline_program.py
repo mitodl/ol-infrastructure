@@ -13,6 +13,7 @@ import pytest
 import yaml
 
 from ol_infrastructure.applications.mitxonline import definition, vault_secrets
+from ol_infrastructure.lib.local_dev_program import CA_BUNDLE_DIR
 from ol_infrastructure.lib.secret_env import VaultSecret
 
 # Python 3.14+ compatibility, as
@@ -177,7 +178,7 @@ def test_workloads_are_the_deployed_shape_without_a_readiness_wait(
     assert containers[0]["ports"][0]["containerPort"] == 8073
     service = _one(mocks, SERVICE, "mitxonline-webapp")
     assert service["spec"]["ports"][0]["port"] == 8073
-    # await_policy itself is covered in test_mitxonline_inputs.py; here, that the
+    # await_policy itself is covered in test_local_dev_program.py; here, that the
     # component gets it.
     (transform,) = mocks.transforms[APP_COMPONENT]
     assert getattr(transform, "func", transform).__name__ == "await_policy"
@@ -263,7 +264,7 @@ def test_every_container_reads_the_ca_bundle_the_core_stack_writes(
     monkeypatch.syspath_prepend(str(REPO / "local-dev/infra"))
     tls = importlib.import_module("modules.tls")
     mocks = _render(tmp_path, monkeypatch)
-    expected = f"{mocks.program['CA_BUNDLE_DIR']}/{tls.CA_BUNDLE_FILENAME}"
+    expected = f"{CA_BUNDLE_DIR}/{tls.CA_BUNDLE_FILENAME}"
     for typ in (DEPLOYMENT, JOB):
         for _, name, inputs in [(t, n, i) for t, n, i in mocks.resources if t == typ]:
             spec = inputs["spec"]["template"]["spec"]
@@ -284,7 +285,7 @@ def test_every_container_reads_the_ca_bundle_the_core_stack_writes(
                 (mount,) = [
                     m
                     for m in container["volumeMounts"]
-                    if m["mountPath"] == mocks.program["CA_BUNDLE_DIR"]
+                    if m["mountPath"] == CA_BUNDLE_DIR
                 ]
                 assert volumes[mount["name"]] == tls.CA_BUNDLE_CONFIGMAP, name
 
