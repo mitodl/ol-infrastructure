@@ -123,6 +123,31 @@ def test_the_environment_is_the_shared_values_under_the_bindings():
     assert "ol.mit.edu/application=learn-ai" in env["OTEL_RESOURCE_ATTRIBUTES"]
 
 
+def test_the_shared_environment_holds_everywhere():
+    assert definition.LOCAL_AND_DEPLOYED_ENV == {
+        "CANVAS_SYLLABUS_DEMO_READABLE_IDS": [
+            "14566-kaleba:20211202",
+            "34642-15.095_FA25",
+        ],
+        "CANVAS_TUTOR_DEMO_RUN_READABLE_IDS": [
+            "14566-kaleba:20211202+canvas",
+            "34642-15.095_FA25+canvas",
+        ],
+        "DEBUG": "false",
+        "MITOL_FEATURES_DEFAULT": "true",
+        "MITOL_SECURE_SSL_REDIRECT": "False",
+    }
+
+
+def test_the_bindings_win_over_the_shared_environment():
+    env = definition.environment_variables(
+        _local_bindings(environment_variables={"DEBUG": "true"})
+    )
+
+    assert env["DEBUG"] == "true"
+    assert env["MITOL_FEATURES_DEFAULT"] == "true"
+
+
 def test_rendering_does_not_mutate_the_bindings_environment():
     given = {"MITOL_APP_BASE_URL": "https://ai.example"}
     bindings = _local_bindings(environment_variables=given)
