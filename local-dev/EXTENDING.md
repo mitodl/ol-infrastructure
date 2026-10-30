@@ -14,7 +14,7 @@ How to add a new app to the stack or change the shared in-cluster infrastructure
 
 Pick one:
 
-- **The app has a deployed definition** (`src/ol_infrastructure/applications/<app>/definition.py`): a Pulumi program under `local-dev/apps/<app>/pulumi/` renders it with k3d bindings, and Tilt applies it through `local-dev/scripts/pulumi-app-apply.sh` as a `k8s_custom_deploy`. mitxonline is the example: its `pulumi/` and Tiltfile are the template. A developer's env and memory limits for such an app live in its gitignored stack file (`pulumi/Pulumi.Dev.yaml`; `vars` and `web_memory_limit` are the deployed stacks' keys, the other limits local ones in the same style; mitxonline ships a `.example`), not in an `app-env.local.yaml`. Two touchpoints sit outside the app directory: the root `Tiltfile` raises the apply timeout per Pulumi-rendered app, and `teardown.sh` destroys each program's stack by name.
+- **The app has a deployed definition** (`src/ol_infrastructure/applications/<app>/definition.py`): a Pulumi program under `local-dev/apps/<app>/pulumi/` renders it with k3d bindings, and Tilt applies it through `local-dev/scripts/pulumi-app-apply.sh` as a `k8s_custom_deploy`. mitxonline and learn-ai are the examples: their `pulumi/` directories and Tiltfiles are the template. YAML applied beside the program (learn-ai's sandbox) passes `labels={'ol.mit.edu/yaml-by-design': 'true'}` to `k8s_yaml_local`, or the apply's leftover guard stops on it. A developer's env and memory limits for such an app live in its gitignored stack file (`pulumi/Pulumi.Dev.yaml`, beside a tracked `.example`), not in an `app-env.local.yaml`. The env map uses the deployed stacks' key (`mitxonline:vars`, `learn_ai:env_vars`); the memory limits are local keys in the same style, except `mitxonline:web_memory_limit`, which production also sets. Two touchpoints sit outside the app directory: the root `Tiltfile` raises the apply timeout per Pulumi-rendered app, and `teardown.sh` destroys each program's stack by name.
 - **No deployed definition** (local-only services, apps not yet on `OLApplicationK8s`): Kubernetes manifests under `local-dev/apps/<app>/`, as step 1 below describes.
 - **Shared infrastructure several apps use** (a database engine, a cache, an identity provider): a module under `local-dev/infra/modules/`, called from the `core` stack; see [Modifying Shared Infrastructure](#modifying-shared-infrastructure).
 
@@ -34,7 +34,7 @@ local-dev/apps/<app-name>/
     └── nginx.yaml        # (if using nginx sidecar)
 ```
 
-Use an existing app (e.g., `learn-ai/`) as a template. In particular, copy the `envFrom` pattern from an existing `deployment.yaml`: every container lists the tracked ConfigMap, the tracked Secret, then the optional `<app>-env-local` override ConfigMap **last** (see [Local Configuration Overrides](README.md#local-configuration-overrides) in the README), and pass `local_overrides='configmaps/app-env.local.yaml'` to `k8s_yaml_local` in the Tiltfile.
+Use an existing app (e.g., `odl-video-service/`) as a template. In particular, copy the `envFrom` pattern from an existing `deployment.yaml`: every container lists the tracked ConfigMap, the tracked Secret, then the optional `<app>-env-local` override ConfigMap **last** (see [Local Configuration Overrides](README.md#local-configuration-overrides) in the README), and pass `local_overrides='configmaps/app-env.local.yaml'` to `k8s_yaml_local` in the Tiltfile.
 
 ### 2. Add the app database to the CNPG cluster
 
