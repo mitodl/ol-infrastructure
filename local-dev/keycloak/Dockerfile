@@ -18,7 +18,7 @@ ARG BASE_IMAGE
 
 # The jar is platform-independent, so build it on the host's own architecture.
 # Only the Keycloak stage below has to be linux/amd64 (the base is amd64-only).
-FROM --platform=$BUILDPLATFORM node:24-bookworm AS theme
+FROM --platform=$BUILDPLATFORM node:26-bookworm@sha256:fa52d1669505e29b58c042875b1d65c229e0787a3610fd52869b22b68e480853 AS theme
 # keycloakify packages the theme with Maven; Debian's package brings a JDK.
 # Any Maven 3 works for that, so the exact Debian package version is not
 # worth pinning (and pins rot as bookworm point releases roll).
