@@ -35,7 +35,7 @@ WORKDIR /src
 COPY reporter/pyproject.toml reporter/uv.lock ./
 RUN uv sync --frozen --no-dev
 
-FROM gcr.io/distroless/base-debian13:nonroot@sha256:6c591b4ac789b683ab3665327181e7cfb7a39b5834f42dcb73d7becb8d18a5d9
+FROM gcr.io/distroless/base-debian13:nonroot@sha256:9039a88709bcc2bacf5a2faac331d65dd6840f763f225ad9594cc0c67bcd0fba
 
 # `:nonroot`, not the bare tag -- the bare tag sets no USER at all (confirmed
 # via `docker inspect ... --format '{{.Config.User}}'`, empty string), which
