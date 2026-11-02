@@ -3754,3 +3754,84 @@ async def test_main_reports_unusable_overrides_at_boot(mixed_repos, monkeypatch)
     await asyncio.sleep(0)
 
     checked.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# Job names from the registry (tag-only releases)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def tag_repos():
+    """Return a tag-only app, whose pipeline names its jobs differently."""
+    return {
+        "my-theme": bot_config.AppConfig(
+            pipeline="my-theme-pipeline",
+            repo="mitodl/my-theme",
+            branch="main",
+            channel="C789",
+            release_workflow=True,
+            release_job="cut-my-theme-release",
+            production_job="promote-my-theme-production",
+            abandon_job="abandon-my-theme-release",
+        )
+    }
+
+
+def test_job_names_default_to_the_k8s_pipeline(repos):
+    cfg = repos["my-app"]
+    assert bot_config.job_name("my-app", cfg, "release_job") == (
+        "build-my-app-release-image"
+    )
+    assert bot_config.job_name("my-app", cfg, "production_job") == (
+        "deploy-ol-application-my-app-production"
+    )
+    assert bot_config.job_name("my-app", cfg, "abandon_job") == "abandon-my-app-release"
+
+
+async def test_release_triggers_the_configured_release_job(
+    tag_repos, slack, monkeypatch
+):
+    calls: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+    monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(side_effect=_record_trigger(calls))
+    )
+
+    await bot._cmd_release(
+        tag_repos, slack.ack, slack.respond, _command("my-theme"), {}
+    )
+
+    assert calls == [("trigger", "my-theme-pipeline", "cut-my-theme-release")]
+    bot.concourse.active_build_url.assert_awaited_once_with(
+        "my-theme-pipeline", "cut-my-theme-release"
+    )
+
+
+async def test_abandon_triggers_the_configured_abandon_job(
+    tag_repos, slack, monkeypatch
+):
+    calls: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        bot.github, "cancel_hotfix_requests", AsyncMock(return_value=[])
+    )
+    monkeypatch.setattr(
+        bot.github,
+        "in_flight_release",
+        AsyncMock(return_value=_in_flight("2026.9.9.1", timedelta(days=1))),
+    )
+    monkeypatch.setattr(
+        bot.concourse, "trigger_job", AsyncMock(side_effect=_record_trigger(calls))
+    )
+
+    await bot._cmd_abandon(
+        tag_repos, slack.ack, slack.respond, _command("my-theme"), {}
+    )
+
+    assert calls == [("trigger", "my-theme-pipeline", "abandon-my-theme-release")]
+
+
+def test_production_link_names_the_configured_production_job(tag_repos):
+    url = bot._production_job_url("my-theme", tag_repos["my-theme"])
+    assert url.endswith("/pipelines/my-theme-pipeline/jobs/promote-my-theme-production")

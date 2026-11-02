@@ -41,6 +41,9 @@ Environment:
     GATE_FILE: ``<release-gate>/gh_issue.json`` from the gate get.
     VERSION_FILE: the file the job's ``image_tag`` comes from.
     INFRA_REF_FILE: ``<ol-infra>/.git/ref`` for the commit this job deploys.
+        Unset or empty for a release that deploys no ol-infrastructure code (a
+        tag-only release): then the issue approves the version alone, so only
+        its title, its author and that it is still closed are checked.
     GITHUB_REPOSITORY: ``owner/repo`` holding the app's release issues.
     GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY: the
         release GitHub App's credentials.
@@ -258,8 +261,9 @@ def main() -> None:
             f"{deploying}, close the release issue for {deploying}."
         )
 
-    revision = Path(os.environ["INFRA_REF_FILE"]).read_text().strip()
-    if not _SHA.fullmatch(revision):
+    infra_ref_file = os.environ.get("INFRA_REF_FILE") or ""
+    revision = Path(infra_ref_file).read_text().strip() if infra_ref_file else ""
+    if infra_ref_file and not _SHA.fullmatch(revision):
         sys.exit(
             f"Refusing to deploy {app} {deploying}: the ol-infrastructure ref "
             f"{revision!r} is not a full commit SHA. Nothing was deployed."
@@ -277,6 +281,17 @@ def main() -> None:
             "Nothing was deployed. Close the release issue the App opened, or "
             "re-run the QA job to post one if there is none."
         )
+    if not revision:
+        if issue.get("closed") is not True:
+            refuse(
+                f"Refusing to promote {app} {deploying}: gate issue #{number} "
+                f"({title!r}) was reopened after it was closed, which withdraws "
+                "the approval. Nothing was promoted. Close it again to promote."
+            )
+        print(  # noqa: T201
+            f"Gate issue #{number} ({title!r}) approves promoting {app} {deploying}."
+        )
+        return
     if edited_after_close(issue):
         refuse(
             f"Refusing to deploy {app} {deploying}: gate issue #{number} "

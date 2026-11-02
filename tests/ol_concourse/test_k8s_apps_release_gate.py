@@ -201,14 +201,15 @@ def _run(  # noqa: PLR0913
     private_key: str,
     gate: dict[str, Any],
     version: str,
-    revision: str = SHA,
+    revision: str | None = SHA,
 ) -> subprocess.CompletedProcess[str]:
     gate_file = tmp_path / "gh_issue.json"
     version_file = tmp_path / "version"
     ref_file = tmp_path / "ref"
     gate_file.write_text(json.dumps({"issue_number": str(GATE_NUMBER), **gate}))
     version_file.write_text(version)
-    ref_file.write_text(revision + "\n")
+    if revision is not None:
+        ref_file.write_text(revision + "\n")
     (tmp_path / "refusal").mkdir(exist_ok=True)
     return subprocess.run(  # noqa: S603
         [sys.executable, "-c", _ASSERT_GATE_SCRIPT],
@@ -218,7 +219,8 @@ def _run(  # noqa: PLR0913
             "APP_NAME": APP,
             "GATE_FILE": str(gate_file),
             "VERSION_FILE": str(version_file),
-            "INFRA_REF_FILE": str(ref_file),
+            # None is a tag-only release, which deploys no ol-infrastructure.
+            **({"INFRA_REF_FILE": str(ref_file)} if revision is not None else {}),
             "GITHUB_REPOSITORY": REPO,
             "GITHUB_APP_ID": "123",
             "GITHUB_APP_INSTALLATION_ID": "456",
@@ -386,6 +388,60 @@ def test_script_fails_closed_when_the_issue_cannot_be_read(
     assert result.returncode != 0
     assert message in result.stderr
     assert "approves deploying" not in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("body", "last_edited_at"),
+    [
+        # A checklist, with no revision marker: nothing infrastructure to bind.
+        ("## Release 2026.9.22.1\n- [x] a change by someone", None),
+        # Edited after the close (a lagging QA put): the body approves nothing
+        # a tag-only promotion depends on, so it is not refused.
+        ("## Release 2026.9.22.1\n", "2026-10-15T19:43:50Z"),
+    ],
+)
+def test_tag_only_mode_approves_the_version_alone(
+    tmp_path, fake_github, private_key, body, last_edited_at
+):
+    """With no ol-infrastructure ref, the title and the author decide."""
+    _FakeGitHub.body = body
+    _FakeGitHub.last_edited_at = last_edited_at
+    gate = {"issue_title": f"Release {APP} 2026.9.22.1"}
+    result = _run(tmp_path, fake_github, private_key, gate, "2026.9.22.1", None)
+
+    assert result.returncode == 0, result.stderr
+    assert "approves promoting" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"author": {"__typename": "User", "login": "outsider"}}, "was not opened"),
+        ({"closed": False}, "was reopened"),
+    ],
+)
+def test_tag_only_mode_still_refuses_a_forged_or_reopened_issue(
+    tmp_path, fake_github, private_key, change, message
+):
+    """Tag-only mode drops the infrastructure checks, not the author check."""
+    for name, value in change.items():
+        setattr(_FakeGitHub, name, value)
+    gate = {"issue_title": f"Release {APP} 2026.9.22.1"}
+    result = _run(tmp_path, fake_github, private_key, gate, "2026.9.22.1", None)
+
+    assert result.returncode != 0
+    assert message in result.stderr
+    assert (tmp_path / "refusal" / "refused").exists()
+
+
+def test_tag_only_mode_still_refuses_another_version(
+    tmp_path, fake_github, private_key
+):
+    gate = {"issue_title": f"Release {APP} 2026.9.17.1"}
+    result = _run(tmp_path, fake_github, private_key, gate, "2026.9.22.1", None)
+
+    assert result.returncode != 0
+    assert "approved 2026.9.17.1" in result.stderr
 
 
 def test_script_refuses_a_ref_that_is_not_a_commit(tmp_path, fake_github, private_key):
