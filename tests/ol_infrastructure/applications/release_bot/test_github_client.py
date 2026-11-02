@@ -1278,6 +1278,21 @@ def test_refused_release_issues_reads_closed_refused_issues(fake_repo):
     assert repo.label_queries == ["ops:refused"]
 
 
+def test_refused_release_issues_reads_every_issue_in_the_window(fake_repo):
+    """The window bounds the query, so no refusal is cut off by a page cap."""
+    issues = []
+    for n in range(1, 41):
+        issue = _FakeIssue(n, f"Release app 2026.9.{n}.1", "", ["ops:refused"])
+        issue.edit(state="closed")
+        issue.pull_request = None
+        issues.append(issue)
+    fake_repo(_FakeRepo(issues=issues))
+    found = github._refused_release_issues_sync(
+        "mitodl/thing", datetime(2026, 10, 29, tzinfo=UTC)
+    )
+    assert len(found) == 40
+
+
 @pytest.mark.parametrize(
     ("labels", "expected"),
     [

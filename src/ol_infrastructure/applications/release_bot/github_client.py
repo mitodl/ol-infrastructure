@@ -536,6 +536,9 @@ def _refused_release_issues_sync(
     repo_slug: str, since: datetime
 ) -> list[dict[str, Any]]:
     repo = _get_client().get_repo(repo_slug)
+    # Every issue in the window, not a capped page: the listing is in creation
+    # order, so a cap could drop an older issue that has just been refused,
+    # poll after poll. The label and *since* already keep the query small.
     issues = repo.get_issues(state="closed", labels=[REFUSED_LABEL], since=since)
     return [
         {
@@ -546,7 +549,7 @@ def _refused_release_issues_sync(
             "labels": [lbl.name for lbl in i.labels],
             "updated_at": i.updated_at,
         }
-        for i in itertools.islice(issues, _RELEASE_ISSUE_SCAN_LIMIT)
+        for i in issues
         if i.pull_request is None
     ]
 
