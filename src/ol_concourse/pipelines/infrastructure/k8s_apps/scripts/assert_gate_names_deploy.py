@@ -286,7 +286,9 @@ def main() -> None:
             refuse(
                 f"Refusing to promote {app} {deploying}: gate issue #{number} "
                 f"({title!r}) was reopened after it was closed, which withdraws "
-                "the approval. Nothing was promoted. Close it again to promote."
+                "the approval. Nothing was promoted. The gate will not fire on "
+                f"this issue again: re-run deploy-{app}-rc to post a new one for "
+                f"{deploying}, and close that one."
             )
         print(  # noqa: T201
             f"Gate issue #{number} ({title!r}) approves promoting {app} {deploying}."

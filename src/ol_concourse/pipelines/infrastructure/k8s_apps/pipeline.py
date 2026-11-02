@@ -2220,6 +2220,12 @@ def _build_tag_release_pipeline(app_name: str) -> Pipeline:
 
     The RC and Production jobs share a serial group, so a promotion never
     finishes a release while the RC job is reading what Production runs.
+
+    Before the first release the repository needs what the k8s apps have: a
+    ``[tool.bumpversion]`` table in ``pyproject.toml`` (bump_version_task reads
+    that file, even in an npm repository) naming the files to bump, such as a
+    ``VERSION`` file. Without it the cut job fails at bump-version and nothing
+    is tagged.
     """
     jobs = app_release_job_names(app_name)
     github_repo = app_github_repo(app_name)
