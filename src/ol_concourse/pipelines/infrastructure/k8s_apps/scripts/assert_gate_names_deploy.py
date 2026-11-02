@@ -269,7 +269,7 @@ def main() -> None:
     issue, app_slug = fetch_issue(api_url, os.environ["GITHUB_REPOSITORY"], number)
     if not opened_by(issue, app_slug):
         author = issue.get("author") or {}
-        sys.exit(
+        refuse(
             f"Refusing to deploy {app} {deploying}: gate issue #{number} "
             f"({title!r}) was not opened by the release App ({app_slug}) but by "
             f"{author.get('login') or 'a deleted account'} "

@@ -360,6 +360,8 @@ def test_script_refuses_an_issue_the_release_app_did_not_open(
     assert result.returncode != 0
     assert f"was not opened by the release App ({APP_SLUG})" in result.stderr
     assert "approves deploying" not in result.stdout
+    # Labelled ops:refused, so the bot reports it in Slack.
+    assert (tmp_path / "refusal" / "refused").exists()
 
 
 @pytest.mark.parametrize(
