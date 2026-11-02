@@ -1,130 +1,33 @@
 """Render the local mitxonline program under mocks; pin what must match deployed."""
 
-import asyncio
+import functools
+import importlib
 import importlib.util
-import json
-import runpy
-import shutil
-from pathlib import Path
-from typing import Any
 
 import pulumi
 import pytest
 import yaml
 
 from ol_infrastructure.applications.mitxonline import definition, vault_secrets
+from ol_infrastructure.lib.local_dev_program import CA_BUNDLE_DIR
 from ol_infrastructure.lib.secret_env import VaultSecret
+from tests.local_dev.program_render import (
+    APP_COMPONENT,
+    DEPLOYMENT,
+    JOB,
+    OIDC_SECRET,
+    PLUGIN_CONFIG,
+    REPO,
+    ROUTE,
+    SECRET_TYPE,
+    SERVICE,
+    render_program,
+)
+from tests.local_dev.program_render import one as _one
 
-# Python 3.14+ compatibility, as
-# tests/ol_infrastructure/applications/mitxonline/test_definition.py does.
-try:
-    asyncio.get_event_loop()
-except RuntimeError:
-    asyncio.set_event_loop(asyncio.new_event_loop())
-
-REPO = Path(__file__).parents[2]
 PROGRAM_DIR = REPO / "local-dev/apps/mitxonline/pulumi"
 APP_DIR = REPO / "local-dev/apps/mitxonline"
-OIDC_SECRET = "ol-mitlearn-oidc"  # noqa: S105  # pragma: allowlist secret
-ROUTE = "kubernetes:apisix.apache.org/v2:ApisixRoute"
-PLUGIN_CONFIG = "kubernetes:apisix.apache.org/v2:ApisixPluginConfig"
-DEPLOYMENT = "kubernetes:apps/v1:Deployment"
-SERVICE = "kubernetes:core/v1:Service"
-JOB = "kubernetes:batch/v1:Job"
-SECRET_TYPE = "kubernetes:core/v1:Secret"  # noqa: S105  # pragma: allowlist secret
-APP_COMPONENT = "ol:infrastructure:components:services:OLApplicationK8s"
-
-
-class RecordingMocks(pulumi.runtime.Mocks):
-    def __init__(self):
-        self.resources: list[tuple[str, str, dict[str, Any]]] = []
-        self.transforms: dict[str, list[Any]] = {}
-        self.program: dict[str, Any] = {}
-
-    def reset(self):
-        self.resources.clear()
-        self.transforms.clear()
-
-    def new_resource(self, args: pulumi.runtime.MockResourceArgs):
-        self.resources.append((args.typ, args.name, args.inputs))
-        if args.transforms:
-            self.transforms[args.typ] = list(args.transforms)
-        return [f"{args.name}-id", args.inputs]
-
-    def call(self, args: pulumi.runtime.MockCallArgs):  # noqa: ARG002
-        return {}
-
-
-MOCKS = RecordingMocks()
-
-
-def _tree(tmp_path: Path, app_files: dict[str, str] | None = None) -> Path:
-    """Copy the app dir with pulumi/ inside; the program takes its parent as APP_DIR."""
-    root = tmp_path / "local-dev"
-    shutil.copytree(
-        APP_DIR, root / "apps/mitxonline", ignore=shutil.ignore_patterns("__pycache__")
-    )
-    for relpath, text in (app_files or {}).items():
-        target = root / "apps/mitxonline" / relpath
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(text)
-    return root / "apps/mitxonline/pulumi"
-
-
-def _render(  # noqa: PLR0913
-    tmp_path,
-    monkeypatch,
-    *,
-    root_domain="mit.test",
-    config=None,
-    environ=None,
-    app_files=None,
-):
-    for key in (
-        "TILT_IMAGE_0",
-        "LOCAL_DEV_PREBUILT_IMAGE_TAGS",
-        "LOCAL_DEV_ANALYTICS_API_ENABLED",
-    ):
-        monkeypatch.delenv(key, raising=False)
-    monkeypatch.setenv("LOCAL_DEV_ROOT_DOMAIN", root_domain)
-    for key, value in (environ or {}).items():
-        monkeypatch.setenv(key, value)
-    MOCKS.reset()
-    # Set per render, not at import: other test modules set their own mocks at
-    # import time and the last one wins.
-    pulumi.runtime.set_mocks(
-        MOCKS,
-        project="ol-local-dev-mitxonline",
-        stack="Dev",
-        preview=False,
-    )
-    # The stack file's config: block, as the CLI hands it to the program (an
-    # object value arrives JSON-encoded).
-    pulumi.runtime.set_all_config(
-        {
-            key: value if isinstance(value, str) else json.dumps(value)
-            for key, value in (config or {}).items()
-        }
-    )
-    program_dir = _tree(tmp_path, app_files)
-
-    @pulumi.runtime.test
-    def run():
-        MOCKS.program = runpy.run_path(str(program_dir), run_name="__main__")
-        return pulumi.Output.from_input(True)  # noqa: FBT003
-
-    run()
-    return MOCKS
-
-
-def _one(mocks, typ, name):
-    matches = [
-        i
-        for t, _, i in mocks.resources
-        if t == typ and i.get("metadata", {}).get("name") == name
-    ]
-    assert len(matches) == 1, f"{typ} {name}: {len(matches)} found"
-    return matches[0]
+_render = functools.partial(render_program, "mitxonline")
 
 
 def _secret_data(mocks):
@@ -177,7 +80,7 @@ def test_workloads_are_the_deployed_shape_without_a_readiness_wait(
     assert containers[0]["ports"][0]["containerPort"] == 8073
     service = _one(mocks, SERVICE, "mitxonline-webapp")
     assert service["spec"]["ports"][0]["port"] == 8073
-    # await_policy itself is covered in test_mitxonline_inputs.py; here, that the
+    # await_policy itself is covered in test_local_dev_program.py; here, that the
     # component gets it.
     (transform,) = mocks.transforms[APP_COMPONENT]
     assert getattr(transform, "func", transform).__name__ == "await_policy"
@@ -263,7 +166,7 @@ def test_every_container_reads_the_ca_bundle_the_core_stack_writes(
     monkeypatch.syspath_prepend(str(REPO / "local-dev/infra"))
     tls = importlib.import_module("modules.tls")
     mocks = _render(tmp_path, monkeypatch)
-    expected = f"{mocks.program['CA_BUNDLE_DIR']}/{tls.CA_BUNDLE_FILENAME}"
+    expected = f"{CA_BUNDLE_DIR}/{tls.CA_BUNDLE_FILENAME}"
     for typ in (DEPLOYMENT, JOB):
         for _, name, inputs in [(t, n, i) for t, n, i in mocks.resources if t == typ]:
             spec = inputs["spec"]["template"]["spec"]
@@ -284,7 +187,7 @@ def test_every_container_reads_the_ca_bundle_the_core_stack_writes(
                 (mount,) = [
                     m
                     for m in container["volumeMounts"]
-                    if m["mountPath"] == mocks.program["CA_BUNDLE_DIR"]
+                    if m["mountPath"] == CA_BUNDLE_DIR
                 ]
                 assert volumes[mount["name"]] == tls.CA_BUNDLE_CONFIGMAP, name
 
@@ -530,18 +433,6 @@ def test_every_rendered_object_carries_the_managed_by_label(tmp_path, monkeypatc
         assert (
             inputs["metadata"]["labels"]["ol.mit.edu/managed-by"] == "local-dev-pulumi"
         ), typ
-
-
-def test_the_provider_pins_the_home_kubeconfig_not_the_environments(
-    tmp_path, monkeypatch
-):
-    """Tilt's KUBECONFIG is a file that exists only while Tilt runs."""
-    mocks = _render(tmp_path, monkeypatch, environ={"KUBECONFIG": "/tilt/cluster.yml"})
-    (provider,) = [
-        i for t, _, i in mocks.resources if t == "pulumi:providers:kubernetes"
-    ]
-    assert provider["context"] == "local-dev"
-    assert provider["kubeconfig"] == str(Path.home() / ".kube" / "config")
 
 
 def test_the_overrides_replace_fields_the_definition_leaves_empty():

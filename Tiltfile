@@ -49,9 +49,9 @@ per_app_databases = cfg.get("per_app_databases", False)
 # configures itself differently when another is enabled reads the list here.
 os.putenv("LOCAL_DEV_ENABLED_APPS", ",".join(enabled_apps))
 # update_settings is session-wide, so this applies to every app's apply:
-# mitxonline's runs its migrate Job inside `pulumi up`, which Tilt's 30 s
+# a Pulumi-rendered app's apply includes its migrate Job, which Tilt's 30 s
 # default cuts off on a first apply.
-if "mitxonline" in enabled_apps:
+if "mitxonline" in enabled_apps or "learn-ai" in enabled_apps:
     update_settings(k8s_upsert_timeout_secs=300)
 
 # Every service hostname, CORS origin, APISIX route, and Keycloak redirect URI
@@ -287,7 +287,7 @@ APPS = [
         "name": "learn-ai",
         "dir": "learn-ai",
         "namespace": "learn-ai",
-        "deploy_name": "learnai-webapp",
+        "deploy_name": "learn-ai-app",
         "images": {"learn-ai": "mitodl/learn-ai-app"},
         "tiltfile": "./local-dev/apps/learn-ai/Tiltfile",
         "seed_commands": [

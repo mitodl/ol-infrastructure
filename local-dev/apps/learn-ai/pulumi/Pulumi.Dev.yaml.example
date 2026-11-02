@@ -1,0 +1,56 @@
+# Per-developer configuration for the local learn-ai stack.
+#
+# The real file, Pulumi.Dev.yaml, is gitignored and appears next to this one on
+# the first apply (it starts with just an encryptionsalt).
+# Add a config: block to it; Tilt re-applies the program when it changes and the
+# pods roll. `env_vars` is the deployed stacks' key (compare
+# src/ol_infrastructure/applications/learn_ai/Pulumi.Production.yaml); the
+# memory limits are local keys:
+#
+#   learn_ai:env_vars                  env merged over LOCAL_ENV_DEFAULTS into
+#                                      each container's env:, which beats the
+#                                      tracked Secret's envFrom. Values must be
+#                                      strings: quote "True" and "8080".
+#   learn_ai:web_memory_limit          the webapp's memory limit (default 2Gi).
+#                                      Not below 1335Mi: Granian's RSS cap is
+#                                      0.9 * limit less 600MiB (the definition's
+#                                      GRANIAN_WORKER_STARTUP_RSS), and a cap at
+#                                      or below that respawns continuously, so
+#                                      the apply fails.
+#   learn_ai:worker_memory_limit       the celery worker's (1536Mi)
+#   learn_ai:beat_memory_limit         celery beat's (1Gi)
+#   learn_ai:pre_deploy_memory_limit   the migrate Job's (1Gi)
+#   ol-local-dev-learn-ai:kubeconfig   the kubeconfig holding the local-dev
+#                                      context (default ~/.kube/config; the
+#                                      KUBECONFIG variable is not read)
+#
+# Edit the file rather than `pulumi config set`, which quotes values a second
+# time. Secret values are fine here: the file never leaves your machine.
+config:
+  learn_ai:web_memory_limit: 2Gi  # the default, written out as the key to raise
+  # Uncomment learn_ai:env_vars and the keys you need under it:
+  # learn_ai:env_vars:
+    # Needed for any AI feature. RC and production call OpenAI directly too.
+    # OPENAI_API_KEY: "sk-..."  # pragma: allowlist secret
+
+    # Needed for the bots' course search (syllabus, content files, video
+    # transcripts), which calls production MIT Learn by default (the AI_MIT_*
+    # URLs). Without it, those calls fail with "Illegal header value b'Bearer '".
+    # LEARN_ACCESS_TOKEN: "..."  # pragma: allowlist secret
+
+    # Only with a learn-ai checkout, which builds the local-dev stage: the
+    # published image has no debug_toolbar, so DEBUG crashes it at startup.
+    # DEBUG: "True"
+
+    # Opt-in: route AI calls through local-infra's LiteLLM instead (no
+    # deployed environment does this). That LiteLLM needs its own key in the
+    # litellm-secrets Secret; see local-dev/README.md.
+    # AI_PROXY_URL: "http://litellm.local-infra.svc.cluster.local:4000"
+    # AI_PROXY_CLASS: "LiteLLMProxy"
+    # AI_PROXY_AUTH_TOKEN: "local-dev-litellm-master-key"  # pragma: allowlist secret
+    # # litellm's litellm_proxy provider ignores the key learn-ai passes it
+    # LITELLM_PROXY_API_KEY: "local-dev-litellm-master-key"  # pragma: allowlist secret
+    # # LiteLLM's "*" route adds its own "openai/", so drop learn-ai's prefix
+    # # (AI_DEFAULT_TUTOR_MODEL has its own default; the rest follow AI_DEFAULT_MODEL)
+    # AI_DEFAULT_MODEL: "gpt-4o-mini"
+    # AI_DEFAULT_TUTOR_MODEL: "gpt-4o"

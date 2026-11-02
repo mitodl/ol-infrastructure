@@ -35,7 +35,7 @@ This environment runs the MIT Learn application stack as Kubernetes workloads in
 |-----|-----------|-------------|
 | mit-learn (frontend) | `https://learn.mit.test` | Next.js frontend |
 | mit-learn (backend) | `https://api.learn.mit.test` | Django/granian API |
-| learn-ai | `https://ai.learn.mit.test`, `https://api.learn.mit.test/ai/` | Django AI proxy service. The frontend uses the `/ai/` path, which shares mit-learn's login session. |
+| learn-ai | `https://ai.learn.mit.test`, `https://api.learn.mit.test/ai/` | Django AI proxy service. The frontend's `/ai/` path shares mit-learn's login session, and both hosts log in through mit-learn's Keycloak client. |
 | learn-ai sandbox | `https://ai-sandbox.learn.mit.test` | Static build of `learn-ai/frontend-demo`, learn-ai checkout only, see [learn-ai sandbox](#learn-ai-sandbox-frontend-demo) |
 | mitxonline | `https://mitxonline.mit.test` | MITx Online LMS (Django/granian) |
 | Open edX LMS | `https://lms.mit.test` | Courseware, opt-in, see [Open edX](#open-edx); logs in through mitxonline; the learning MFE is at `/learn` |
@@ -114,7 +114,7 @@ cp tilt_config.json.example tilt_config.json
 
 At minimum, review `enabled_apps` to enable only the services you need.
 
-For per-developer app env vars and secrets (API keys, feature flags), don't edit the tracked manifests — drop a gitignored `app-env.local.yaml` ConfigMap next to the app's tracked one instead (for mitxonline, its gitignored stack file). See [Local Configuration Overrides](#local-configuration-overrides).
+For per-developer app env vars and secrets (API keys, feature flags), don't edit the tracked manifests — drop a gitignored `app-env.local.yaml` ConfigMap next to the app's tracked one instead (for mitxonline and learn-ai, the gitignored stack file of their programs). See [Local Configuration Overrides](#local-configuration-overrides).
 
 ### 3. Start the environment
 
@@ -296,7 +296,7 @@ Available labels are `namespace`, `pod`, `container`, and `app`, plus `service_n
 
 ```bash
 kubectl --context local-dev exec -it -n mit-learn deploy/mitlearn-webapp -c app -- python manage.py shell
-kubectl --context local-dev exec -it -n learn-ai deploy/learnai-webapp -c app -- python manage.py dbshell
+kubectl --context local-dev exec -it -n learn-ai deploy/learn-ai-app -- python manage.py dbshell
 ```
 
 ### Run tests
@@ -420,7 +420,7 @@ The `keycloak` database is deliberately never restored — Pulumi owns the realm
 | `keycloak_image` | published `mitodl/keycloak` digest | Keycloak server image for the core stack — see [Testing a local ol-keycloakify build](#testing-a-local-ol-keycloakify-build). |
 | `per_app_databases` | — | Declared but not wired to anything yet; setting it has no effect. |
 
-The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags) go in `tilt_config.json`; anything that sets an **env var or secret value inside a workload** (API keys, feature flags, endpoints) goes in a gitignored `app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides). mitxonline, whose workloads a Pulumi program renders, takes both its env and its memory limits from its gitignored stack file instead (same section).
+The rule of thumb for which config surface a knob belongs to: settings that change **which/how Tilt runs things** (apps, image tags) go in `tilt_config.json`; anything that sets an **env var or secret value inside a workload** (API keys, feature flags, endpoints) goes in a gitignored `app-env.local.yaml` override ConfigMap — see [Local Configuration Overrides](#local-configuration-overrides). mitxonline and learn-ai, whose workloads a Pulumi program renders, take both their env and their memory limits from the gitignored stack file of their programs instead (same section).
 
 ### Root domain
 
@@ -428,7 +428,7 @@ Every service hostname derives from the `LOCAL_DEV_ROOT_DOMAIN` environment vari
 
 `tilt up` fails immediately if `sso.ol.<root_domain>` does not resolve, whether through DNS or `/etc/hosts`.
 
-After changing the value, or pulling a change to its default, re-run `./local-dev/scripts/setup.sh` to reissue the TLS certificate and rewrite the `/etc/hosts` block; pass `--skip-hosts` to reissue the certificate only, which is what you want when the hostnames already resolve through DNS. The certificate's SANs cover one root domain, so requests to hostnames outside it fail at the TLS layer. Tilt rewrites only the current default (`mit.test`) in app manifests, so a hostname under any other domain in a gitignored `app-env.local.yaml`, or in mitxonline's `mitxonline:vars`, passes through unchanged; check those files for the old domain after a change. Hostnames that apps stored in their databases keep the old domain until rewritten: re-run `seed-mit-learn-mitxonline` for Learn's resource URLs and `seed-ocw-studio-theme-pipeline` for ocw-studio's theme-assets pipeline, and edit the redirect URIs of any OAuth application you registered by hand.
+After changing the value, or pulling a change to its default, re-run `./local-dev/scripts/setup.sh` to reissue the TLS certificate and rewrite the `/etc/hosts` block; pass `--skip-hosts` to reissue the certificate only, which is what you want when the hostnames already resolve through DNS. The certificate's SANs cover one root domain, so requests to hostnames outside it fail at the TLS layer. Tilt rewrites only the current default (`mit.test`) in app manifests, so a hostname under any other domain in a gitignored `app-env.local.yaml`, or in a stack file's `mitxonline:vars` or `learn_ai:env_vars`, passes through unchanged; check those files for the old domain after a change. Hostnames that apps stored in their databases keep the old domain until rewritten: re-run `seed-mit-learn-mitxonline` for Learn's resource URLs and `seed-ocw-studio-theme-pipeline` for ocw-studio's theme-assets pipeline, and edit the redirect URIs of any OAuth application you registered by hand.
 
 ### Log retention
 
@@ -563,34 +563,36 @@ it prints the exact `pulumi stack rm` to run; do that and re-run teardown.
 The ConfigMaps and Secrets are tracked by the repository. For per-developer customizations (API keys, feature flags, custom endpoints), each app has an optional, gitignored override ConfigMap:
 
 ```bash
-cp local-dev/apps/learn-ai/configmaps/app-env.local.yaml.example \
-   local-dev/apps/learn-ai/configmaps/app-env.local.yaml
+cp local-dev/apps/mit-learn/configmaps/app-env.local.yaml.example \
+   local-dev/apps/mit-learn/configmaps/app-env.local.yaml
 # then add your overrides under data:, e.g.
-#   OPENAI_API_KEY: "sk-..."  # pragma: allowlist secret
+#   CONTENT_FILE_EMBEDDING_CHUNK_SIZE: "1024"
 ```
 
-How it works — plain Kubernetes, visible in each app's `deployment.yaml`: every container's `envFrom` list references the override ConfigMap (`learn-ai-env-local` etc.) **last** and with `optional: true`. Kubernetes resolves duplicate `envFrom` keys by letting the last source win, so your overrides beat the tracked ConfigMaps *and* the tracked Secret — secret values are fine in this file, it never leaves your machine. `optional: true` means no file → no ConfigMap → no-op for everyone else.
+How it works — plain Kubernetes, visible in each YAML-applied app's `deployment.yaml`: every container's `envFrom` list references the override ConfigMap (`mitlearn-env-local` etc.) **last** and with `optional: true`. Kubernetes resolves duplicate `envFrom` keys by letting the last source win, so your overrides beat the tracked ConfigMaps *and* the tracked Secret — secret values are fine in this file, it never leaves your machine. `optional: true` means no file → no ConfigMap → no-op for everyone else.
 
-**mitxonline** has no `deployment.yaml`: a Pulumi program renders its workloads and routes from the deployed definition (`local-dev/apps/mitxonline/pulumi/`). What that changes for overrides:
+**mitxonline and learn-ai** have no `deployment.yaml`: a Pulumi program renders each app's workloads and routes from its deployed definition (`local-dev/apps/mitxonline/pulumi/`, `local-dev/apps/learn-ai/pulumi/`). What that changes for overrides:
 
-- Its tracked environment is `LOCAL_ENV_DEFAULTS` in the program, the local counterpart of the deployed program's `DEPLOYED_ENV_DEFAULTS`; the definition's `LOCAL_AND_DEPLOYED_ENV` sits under it.
-- Its override file is the stack file, `local-dev/apps/mitxonline/pulumi/Pulumi.Dev.yaml`: gitignored, written on the first apply, with the `.example` next to it listing the keys. Its `mitxonline:vars` map is merged over both into each container's `env:`, so the precedence is the same as for the other apps; because `env:` beats `envFrom`, a key set there also beats the same key in `secrets.yaml`. The keys are the deployed stacks' own: `src/ol_infrastructure/applications/mitxonline/Pulumi.Production.yaml` carries the same `vars` block.
-- The same file sets memory limits: `mitxonline:web_memory_limit` (production's key) plus `worker_memory_limit`, `pre_deploy_memory_limit` and `beat_memory_limit`. Requests stay at the program's laptop values, so a limit below the request fails Kubernetes' validation and the apply says so.
-- The definition adds `OTEL_RESOURCE_ATTRIBUTES`, the `mitxonline-secrets` Secret arrives through `envFrom`, and the component adds `PORT`.
-- That Secret's keys are the variables deployed stacks read from Vault, described once in `src/ol_infrastructure/applications/mitxonline/vault_secrets.py`. `secrets.yaml` gives each of them a local value (`values:`) or leaves it unset (`unset:`), and the apply stops on a variable it does not account for, so a variable added for deployed stacks needs a local decision. A variable deployed stacks set outside Vault belongs in `LOCAL_ENV_DEFAULTS`, not in `secrets.yaml`.
-- Editing the program, the stack file or `secrets.yaml` re-runs the program and rolls the pods; a `secrets.yaml` edit also re-runs the migrate Job. A `configmaps/app-env.local.yaml` for mitxonline is not read: move its `data:` entries under `mitxonline:vars:` in the stack file and delete it; until then the apply log names its keys.
-- The overridden key names and the image in use appear in the `mitxonline-app` resource's log; `kubectl --context local-dev get deploy -n mitxonline mitxonline-app -o yaml` shows the merged result. Override values sit in the pod spec and in the Pulumi state under `local-dev/infra/.pulumi/`, so treat both as sensitive output.
-- The pre-deploy Job also runs `configure_wagtail`, so a fresh database gets its Wagtail site and index pages without a seed step (`seed.sh` has no mitxonline default for the same reason; `tilt trigger mitxonline-app` recreates the stack, Job included, so it repeats them). Logins come from Keycloak, and mitxonline finds the Django user by its Keycloak user id, so `seed-mitxonline-instance` looks up `admin@ol.test`'s id in Keycloak on the host and creates the superuser with it; the first login then signs in as that user.
-- The Job carries the component's `ttlSecondsAfterFinished` of 30 minutes, so `kubectl --context local-dev -n mitxonline logs job/mitxonline-app-pre-deploy` answers NotFound after that, and the next apply, whatever triggered it, re-creates the Job and re-runs migrate (about 25 s) before the pods roll.
-- Before switching to `main` or any branch from before the program, run `tilt down` (or `local-dev/scripts/pulumi-app-apply.sh mitxonline down`): Tilt does not delete the Pulumi-owned objects, and the old YAML then serves the same hosts beside them.
+- Each app's tracked environment is `LOCAL_ENV_DEFAULTS` in its program (for mitxonline, the local counterpart of the deployed program's `DEPLOYED_ENV_DEFAULTS`); the definition's `LOCAL_AND_DEPLOYED_ENV` sits under it.
+- The override file is the program's stack file, `local-dev/apps/mitxonline/pulumi/Pulumi.Dev.yaml` or `local-dev/apps/learn-ai/pulumi/Pulumi.Dev.yaml`: gitignored, written on the first apply, with the `.example` next to it listing the keys. The `mitxonline:vars` or `learn_ai:env_vars` map is merged over both into each container's `env:`, so the precedence is the same as for the other apps; because `env:` beats `envFrom`, a key set there also beats the same key in `secrets.yaml`. The keys are the deployed stacks' own: `src/ol_infrastructure/applications/mitxonline/Pulumi.Production.yaml` carries the same `vars` block, and `src/ol_infrastructure/applications/learn_ai/Pulumi.Production.yaml` the same `env_vars` block. Values must be strings: quote `"True"` and `"8080"`.
+- The same file sets memory limits: `mitxonline:web_memory_limit` (production's key) plus `worker_memory_limit`, `pre_deploy_memory_limit` and `beat_memory_limit`; learn-ai's are `learn_ai:web_memory_limit` (2Gi), `worker_memory_limit` (1536Mi), `beat_memory_limit` (1Gi) and `pre_deploy_memory_limit` (1Gi). Requests stay at the program's laptop values, so a limit below the request fails Kubernetes' validation and the apply says so. learn-ai's web limit cannot go below 1335Mi, where Granian's derived RSS cap would respawn workers continuously; the apply fails below it (the `.example` gives the arithmetic).
+- The definition adds `OTEL_RESOURCE_ATTRIBUTES`, the `mitxonline-secrets` or `learn-ai-secrets` Secret arrives through `envFrom`, and the component adds `PORT`.
+- Each app's Secret holds the variables deployed stacks read from Vault, described once in `src/ol_infrastructure/applications/<app>/vault_secrets.py`. Its `secrets.yaml` gives each of them a local value (`values:`) or leaves it unset (`unset:`), and the apply stops on a variable it does not account for, so a variable added for deployed stacks needs a local decision. A variable deployed stacks set outside Vault belongs in `LOCAL_ENV_DEFAULTS`, not in `secrets.yaml`. learn-ai's file also carries `canvas_syllabus_token`, the gateway's key for the `/http/canvas_*` routes, which is not a pod variable. mitxonline's also has `supplied_by:`, for variables another local Secret sets.
+- Editing the program, the stack file or `secrets.yaml` re-runs the program and rolls the pods; a `secrets.yaml` edit also re-runs the migrate Job. A `configmaps/app-env.local.yaml` for either app is not read: move its `data:` entries under `mitxonline:vars:` or `learn_ai:env_vars:` in the stack file and delete it; until then the apply log names its keys.
+- The overridden key names and the image in use appear in the `mitxonline-app` or `learn-ai-app` resource's log; `kubectl --context local-dev get deploy -n <app> <app>-app -o yaml` shows the merged result. Override values sit in the pod spec and in the Pulumi state under `local-dev/infra/.pulumi/`, so treat both as sensitive output.
+- learn-ai has one Tilt resource, `learn-ai-app`, for its webapp, Celery worker, beat and routes, so all their logs are under it.
+- mitxonline's pre-deploy Job also runs `configure_wagtail`, so a fresh database gets its Wagtail site and index pages without a seed step (`seed.sh` has no mitxonline default for the same reason; `tilt trigger mitxonline-app` recreates the stack, Job included, so it repeats them). Logins come from Keycloak, and mitxonline finds the Django user by its Keycloak user id, so `seed-mitxonline-instance` looks up `admin@ol.test`'s id in Keycloak on the host and creates the superuser with it; the first login then signs in as that user.
+- The Job carries the component's `ttlSecondsAfterFinished` of 30 minutes, so `kubectl --context local-dev -n <app> logs job/<app>-app-pre-deploy` answers NotFound after that, and the next apply, whatever triggered it, re-creates the Job and re-runs migrate (about 25 s for mitxonline) before the pods roll. learn-ai's Job runs `migrate` then `createcachetable`, which is why `seed.sh` has no learn-ai default.
+- Before switching to a branch from before an app's program, run `tilt down` (or `local-dev/scripts/pulumi-app-apply.sh <app> down`, `<app>` being `mitxonline` or `learn-ai`): Tilt does not delete the Pulumi-owned objects, and the old YAML then serves the same hosts beside them.
+- One-time step for a cluster that still runs learn-ai from YAML manifests (`learnai-webapp`): run `tilt down` before pulling, or the apply stops and prints the `kubectl delete` that removes the leftovers. If Tilt was running when you pulled, run `tilt trigger learnai-sandbox`, then `tilt trigger learn-ai-app`: `learnai-sandbox` is a manual resource, so its Deployment, Service and route count as leftovers until it is re-applied with its new label. Move `configmaps/app-env.local.yaml` under `learn_ai:env_vars` as above; `ai.learn` then asks for one login, because its gateway cookie is `learn_ai_apisix_session_dev`.
 
 Day-to-day behavior:
 
-- Creating or editing the file mid-session re-applies it — no Tilt restart. Pods roll automatically so new values actually take effect: because Kubernetes does not restart pods on ConfigMap/Secret changes, `tiltlib.star` stamps a fingerprint of every applied ConfigMap's and Secret's data onto each Deployment's pod template (the `ol.mit.edu/config-hash` annotation; this is for the apps Tilt applies as YAML — mitxonline's program hashes the Secret onto the pod template itself) — this covers edits to the tracked `app-env.yaml`/`secrets.yaml` too, not just this override file — which is also the idiomatic production pattern (cf. Helm `checksum/config` annotations).
-- Overridden key **names** (never values) are printed in the **Tiltfile resource's log** in the Tilt UI, and your full delta is inspectable in-cluster at any time: `kubectl --context local-dev get cm -n learn-ai learn-ai-env-local -o yaml` (mitxonline applies no such ConfigMap; see above)
+- Creating or editing the file mid-session re-applies it — no Tilt restart. Pods roll automatically so new values actually take effect: because Kubernetes does not restart pods on ConfigMap/Secret changes, `tiltlib.star` stamps a fingerprint of every applied ConfigMap's and Secret's data onto each Deployment's pod template (the `ol.mit.edu/config-hash` annotation; this is for the apps Tilt applies as YAML — the mitxonline and learn-ai programs hash the Secret onto the pod template themselves) — this covers edits to the tracked `app-env.yaml`/`secrets.yaml` too, not just this override file — which is also the idiomatic production pattern (cf. Helm `checksum/config` annotations).
+- Overridden key **names** (never values) are printed in the **Tiltfile resource's log** in the Tilt UI, and your full delta is inspectable in-cluster at any time: `kubectl --context local-dev get cm -n mit-learn mitlearn-env-local -o yaml` (the Pulumi-rendered apps apply no such ConfigMap; see above)
 - Gotchas: for the YAML-applied apps the ConfigMap's `metadata.name` must match what `deployment.yaml` references (`<app>-env-local` — copy the example, don't type it), and all `data:` values must be YAML **strings** (quote things like `"True"` and `"8080"`). A typo'd key is applied but ignored by the app. If you *delete* the file mid-session, prefer emptying `data:` instead — the already-applied ConfigMap can linger in-cluster until `tilt down`.
 
-Every YAML-applied app supports this, including **mit-learn-nextjs** (e.g. per-developer PostHog credentials — see its `app-env.local.yaml.example`); mitxonline's equivalent is its stack file, above.
+Every YAML-applied app supports this, including **mit-learn-nextjs** (e.g. per-developer PostHog credentials — see its `app-env.local.yaml.example`); the Pulumi-rendered apps' equivalent is their stack file, above.
 
 Scope notes:
 
@@ -600,7 +602,8 @@ Scope notes:
     --from-literal=openai_api_key=sk-your-key  # pragma: allowlist secret
   ```
   (That `openai_api_key` Secret *data key* is unrelated to the old `tilt_config.json` key of the same name, which was never wired to anything and has been removed.)
-- **learn-ai calls OpenAI directly**, like RC and production, so the LiteLLM key above does not reach it. Set `OPENAI_API_KEY` in learn-ai's `app-env.local.yaml`, plus `LEARN_ACCESS_TOKEN` for the bots' course search (see `apps/learn-ai/configmaps/app-env.local.yaml.example`). To route learn-ai through LiteLLM instead, copy the proxy block from `apps/learn-ai/configmaps/app-env.local.yaml.example` into your `app-env.local.yaml` and uncomment it.
+- **learn-ai calls OpenAI directly**, like RC and production, so the LiteLLM key above does not reach it. Set `OPENAI_API_KEY` under `learn_ai:env_vars` in `local-dev/apps/learn-ai/pulumi/Pulumi.Dev.yaml`, plus `LEARN_ACCESS_TOKEN` for the bots' course search (see `Pulumi.Dev.yaml.example` next to it). To route learn-ai through LiteLLM instead, copy the proxy block from that `.example` into `learn_ai:env_vars` and uncomment it.
+- **Every learn-ai feature flag is on locally**: the definition sets `MITOL_FEATURES_DEFAULT` to `true`, and with no PostHog key that default decides each flag. To turn one off, set `FEATURE_<flag>: "False"` under `learn_ai:env_vars` (`FEATURE_bot_hybrid_search_enabled`, say); `settings.FEATURES` beats `MITOL_FEATURES_DEFAULT` in `features.is_enabled`.
 
 ### GPU Support for Ollama
 
@@ -1301,14 +1304,14 @@ hostname needs an entry. The TLS certificate already covers it through the
 With a learn-ai checkout, Tilt builds `learn-ai/frontend-demo` as a static
 export and serves it with nginx at `https://ai-sandbox.learn.<root_domain>`,
 the way CI, QA and Production serve it. There is no published image, so
-without a checkout the sandbox is not deployed. The `learnai-webapp` row in the
+without a checkout the sandbox is not deployed. The `learn-ai-app` row in the
 Tilt UI links to it and to the learn-ai Django admin.
 
 `learnai-sandbox` is a manual resource. Saving a file never starts a `next
 build` (about a minute, several GiB of memory); click the resource's update
 button in the Tilt UI when you want your changes, and after editing
 `configmaps/sandbox-env.local.yaml`. It still builds once on `tilt up`, after
-`learnai-webapp`.
+`learn-ai-app`.
 
 The sandbox calls learn-ai at `https://api.learn.<root_domain>/ai`, so it shares
 mit-learn's login, and mit-learn at `/learn/`. Search goes to production, as

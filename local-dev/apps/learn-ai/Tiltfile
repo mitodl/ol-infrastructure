@@ -1,7 +1,7 @@
 # learn-ai Tiltfile
 # Builds the learn-ai Django/ASGI app and deploys it to the learn-ai namespace.
-# When the sibling learn-ai repo is not checked out, Tilt uses the prebuilt
-# DockerHub image (mitodl/learn-ai-app:latest) without attempting a local build.
+# When the sibling learn-ai repo is not checked out, the published
+# mitodl/learn-ai-app image runs (latest, or the prebuilt_tags pin).
 # With a checkout it also serves the sandbox (frontend-demo); see sandbox.yaml.
 
 load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
@@ -9,9 +9,13 @@ load("../../tiltlib.star", "k8s_yaml_local", "current_root_domain")
 workspace_root = os.environ.get("MITOL_WORKSPACE_ROOT", config.main_dir + "/..")
 APP_DIR = os.path.join(workspace_root, "learn-ai")
 IMAGE = 'mitodl/learn-ai-app'
-NAMESPACE = 'learn-ai'
-DEPLOY_NAME = 'learnai-webapp'
-_rd = current_root_domain()
+# Must equal the root Tiltfile's deploy_name for learn-ai, which seeds use as
+# this resource's name and as the Deployment they exec into (the component names
+# it learn-ai-app).
+DEPLOY_NAME = 'learn-ai-app'
+PROGRAM_DIR = os.path.join(config.main_dir, 'local-dev/apps/learn-ai/pulumi')
+APPLY = os.path.join(config.main_dir, 'local-dev/scripts/pulumi-app-apply.sh')
+root_domain = current_root_domain()
 HAS_CHECKOUT = os.path.exists(os.path.join(APP_DIR, '.git'))
 
 # Static export of frontend-demo, served by nginx. NEXT_PUBLIC_* values are
@@ -62,38 +66,54 @@ if HAS_CHECKOUT:
         ],
     )
 
-k8s_yaml_local([
-    'configmaps/app-env.yaml',
-    'configmaps/nginx.yaml',
-    'secrets.yaml',
-    'deployment.yaml',
-    'apisix-routes.yaml',
-], local_overrides='configmaps/app-env.local.yaml')
+# ApisixTls is hand-written: the deployed program gets it from an
+# OLCertManagerCert this program does not render. It references the
+# local-dev-tls wildcard the core stack writes into this namespace.
+k8s_yaml_local(['apisix-tls.yaml'])
+k8s_resource(
+    new_name='learnai-tls',
+    objects=['learnai-tls:apisixtls'],
+    labels=['learn-ai'],
+    resource_deps=['local-infra-core'],
+)
 
+# The workloads and the gateway routes come from the deployed definition,
+# rendered by local-dev/apps/learn-ai/pulumi (pulumi up as a custom deploy).
+# The apply timeout this resource needs (its apply includes the migrate Job)
+# is session-wide, so the root Tiltfile sets it.
+prebuilt_tags = os.environ.get('LOCAL_DEV_PREBUILT_IMAGE_TAGS', '')
+k8s_custom_deploy(
+    DEPLOY_NAME,
+    apply_cmd=[APPLY, 'learn-ai', 'up'],
+    delete_cmd=[APPLY, 'learn-ai', 'down'],
+    # The pin and the root domain reach the program through the environment;
+    # naming them here makes a change re-apply, which os.putenv alone would not.
+    apply_env={'LOCAL_DEV_ROOT_DOMAIN': root_domain, 'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags},
+    delete_env={'LOCAL_DEV_ROOT_DOMAIN': root_domain, 'LOCAL_DEV_PREBUILT_IMAGE_TAGS': prebuilt_tags},
+    # Everything the render reads; .tiltignore keeps __pycache__ out of these.
+    deps=[
+        PROGRAM_DIR,
+        APPLY,
+        os.path.join(config.main_dir, 'local-dev/scripts/pulumi-clear-stale-lock.sh'),
+        os.path.join(config.main_dir, 'local-dev/scripts/pulumi-pending-objects.py'),
+        os.path.join(config.main_dir, 'src/ol_infrastructure/applications/learn_ai'),
+        os.path.join(config.main_dir, 'src/ol_infrastructure/components/services'),
+        os.path.join(config.main_dir, 'src/ol_infrastructure/lib'),
+        os.path.join(config.main_dir, 'src/bridge/lib'),
+        'secrets.yaml',
+    ],
+    # Without a checkout nothing registers the image, and naming it here would
+    # fail the Tiltfile load; the program then runs the published image.
+    image_deps=[IMAGE] if HAS_CHECKOUT else [],
+)
 k8s_resource(
     DEPLOY_NAME,
     labels=['learn-ai'],
+    # local-infra-apps writes ol-mitlearn-oidc, which every rendered route reads.
     resource_deps=['local-infra-apps'],
-    links=[link('https://ai.learn.' + _rd + '/admin/', 'learn-ai Django admin')] + (
-        [link('https://ai-sandbox.learn.' + _rd, 'learn-ai sandbox')] if HAS_CHECKOUT else []
+    links=[link('https://ai.learn.' + root_domain + '/admin/', 'learn-ai Django admin')] + (
+        [link('https://ai-sandbox.learn.' + root_domain, 'learn-ai sandbox')] if HAS_CHECKOUT else []
     ),
-)
-
-k8s_resource('learnai-celery-default', labels=['learn-ai'], resource_deps=['local-infra-apps'])
-k8s_resource('learnai-celery-edx-content', labels=['learn-ai'], resource_deps=['local-infra-apps'])
-k8s_resource('learnai-celery-beat', labels=['learn-ai'], resource_deps=['local-infra-apps'])
-
-# The route reads discovery and session.secret from a Secret local-infra-apps
-# writes; see the mitlearn-routes resource in local-dev/apps/mit-learn/Tiltfile.
-k8s_resource(
-    new_name='learnai-routes',
-    objects=[
-        'learnai-shared-plugins:apisixpluginconfig',
-        'learnai-tls:apisixtls',
-        'learnai-route:apisixroute',
-    ],
-    labels=['learn-ai'],
-    resource_deps=['local-infra-apps'],
 )
 
 # No image is published for the sandbox, so it exists only with a checkout.
@@ -106,12 +126,12 @@ if HAS_CHECKOUT:
         context=os.path.join(APP_DIR, 'frontend-demo'),
         dockerfile_contents=SANDBOX_DOCKERFILE,
         build_args={
-            'NEXT_PUBLIC_MITOL_API_BASE_URL': 'https://api.learn.' + _rd + '/ai',
+            'NEXT_PUBLIC_MITOL_API_BASE_URL': 'https://api.learn.' + root_domain + '/ai',
             'NEXT_PUBLIC_AI_CSRF_COOKIE_NAME': 'learn_ai_csrftoken',
-            'NEXT_PUBLIC_AI_FEEDBACK_URL': 'https://api.learn.' + _rd + '/ai/api/v0/chat_sessions/:threadId/messages/:checkpointPk/rate/',
-            'NEXT_PUBLIC_MIT_LEARN_AI_LOGIN_URL': 'https://api.learn.' + _rd + '/ai/http/login/',
-            'NEXT_PUBLIC_MIT_LEARN_API_BASE_URL': 'https://api.learn.' + _rd + '/learn/',
-            'NEXT_PUBLIC_MIT_LEARN_APP_BASE_URL': 'https://learn.' + _rd + '/',
+            'NEXT_PUBLIC_AI_FEEDBACK_URL': 'https://api.learn.' + root_domain + '/ai/api/v0/chat_sessions/:threadId/messages/:checkpointPk/rate/',
+            'NEXT_PUBLIC_MIT_LEARN_AI_LOGIN_URL': 'https://api.learn.' + root_domain + '/ai/http/login/',
+            'NEXT_PUBLIC_MIT_LEARN_API_BASE_URL': 'https://api.learn.' + root_domain + '/learn/',
+            'NEXT_PUBLIC_MIT_LEARN_APP_BASE_URL': 'https://learn.' + root_domain + '/',
             # Production search, as every deployed sandbox uses
             # (src/ol_concourse/pipelines/applications/learn_ai_frontend/values.py).
             'NEXT_PUBLIC_MIT_SEARCH_ELASTIC_URL': 'https://api.learn.mit.edu/api/v1/learning_resources_search/',
@@ -126,10 +146,14 @@ if HAS_CHECKOUT:
         ],
     )
 
-    # Own call: local_overrides takes one ConfigMap, and sharing learn-ai's call
-    # would fold the sandbox ConfigMaps into its fingerprint (rolling webapp and
-    # celery on every nginx template edit).
-    k8s_yaml_local(['sandbox.yaml'], local_overrides='configmaps/sandbox-env.local.yaml')
+    # The sandbox has no deployed definition, so it is plain YAML outside the
+    # Pulumi program. The leftover guard in pulumi-app-apply.sh skips objects
+    # with this label, overrides included.
+    k8s_yaml_local(
+        ['sandbox.yaml'],
+        local_overrides='configmaps/sandbox-env.local.yaml',
+        labels={'ol.mit.edu/yaml-by-design': 'true'},
+    )
 
     k8s_resource(
         'learnai-sandbox',

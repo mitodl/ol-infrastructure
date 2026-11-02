@@ -77,7 +77,7 @@ mit-learn (`/api/v2/courses/` locally, `/api/internal/courses/` in QA and
 Production), `OCW_MASS_BUILD_BATCH_SIZE` in ocw-studio (80 vs 160), and
 `ET_PRESET_IDS` in odl-video-service (one ID vs six).
 
-Workload shape differs in every YAML-applied app (mitxonline is rendered from its definition now, so the points below no longer describe it):
+Workload shape differs in every YAML-applied app (mitxonline and learn-ai are rendered from their definitions, so the points below do not describe them):
 
 - Names. The component creates `<app>-app` with container `<app>-app`; local
   uses `<x>-webapp` with container `app`.
@@ -473,7 +473,7 @@ program.
 4. Platform parity: APISIX and Gateway, cert-manager issuer, Keycloak and
    realm, data service versions and TLS.
 5. Catalog, per-app stacks, profiles.
-6. Remaining apps: learn-ai, mit-learn, odl-video-service, ocw-studio.
+6. Remaining apps: mit-learn, odl-video-service, ocw-studio.
 7. mit-learn-nextjs and Open edX (see "Decisions" below).
 
 Steps 2 and 4 do not depend on step 3 and can run in parallel with it.

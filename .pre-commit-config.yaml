@@ -20,6 +20,24 @@ repos:
     language: python
     files: ^src/bridge/lib/(versions\.py|version_pins/)
     pass_filenames: false
+    # mypy names each local-dev/apps/*/pulumi/__main__.py script `__main__` (the
+    # hyphenated directories cannot form a package name), so two programs in one
+    # run collide; one run per file keeps each checked. The mypy hook below skips
+    # them. Same mypy, flags and extra packages as that hook, in prek's own
+    # environment: CI installs nothing but prek.
+  - id: mypy-local-dev-programs
+    name: mypy (local-dev app Pulumi programs)
+    entry: bash -c 'for f in "$@"; do mypy --explicit-package-bases --namespace-packages
+      --scripts-are-modules --config-file=pyproject.toml --warn-unused-configs "$f"
+      || exit 1; done' --
+    language: python
+    additional_dependencies:
+    - mypy==2.4.0
+    - pydantic>2.10
+    - types-PyYAML
+    - types-requests
+    files: ^local-dev/apps/[^/]+/pulumi/__main__\.py$
+    require_serial: true
 - repo: https://github.com/pre-commit/pre-commit-hooks
   rev: v6.0.0
   hooks:
@@ -107,7 +125,12 @@ repos:
   rev: v2.4.0
   hooks:
   - id: mypy
-    exclude: dockerfiles/|sdks/
+    exclude: |
+      (?x)(
+        dockerfiles/|
+        sdks/|
+        ^local-dev/apps/[^/]+/pulumi/__main__\.py$
+      )
     args:
     - --explicit-package-bases
     - --namespace-packages

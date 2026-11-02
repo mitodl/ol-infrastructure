@@ -58,14 +58,15 @@ case "${2:-}" in
 up)
     # A Deployment, Service, Secret, ConfigMap or route Tilt applied as YAML
     # (label managed-by=tilt) has a rendered object's name or shadows its routes,
-    # and Pulumi adopts nothing. An ApisixTls Tilt applies on purpose is not
-    # listed.
-    legacy="deploy,svc,secret,cm,apisixroute,apisixpluginconfig -l app.kubernetes.io/managed-by=tilt"
+    # and Pulumi adopts nothing. ApisixTls is not in the list, so hand-written
+    # ones pass; objects Tilt applies beside the program on purpose (learn-ai's
+    # sandbox) carry ol.mit.edu/yaml-by-design, which the selector excludes.
+    legacy="deploy,svc,secret,cm,apisixroute,apisixpluginconfig -l app.kubernetes.io/managed-by=tilt,!ol.mit.edu/yaml-by-design"
     # shellcheck disable=SC2086
     if leftovers="$(kubectl_ get $legacy -o name)" && [ -n "$leftovers" ]; then
         echo "$app objects Tilt applied as YAML are still in the cluster:" >&2
         echo "$leftovers" >&2
-        echo "remove them first: kubectl --context local-dev -n $app delete $legacy" >&2
+        echo "remove them first: kubectl --context local-dev -n $app delete ${legacy%% -l *} -l '${legacy#* -l }'" >&2
         exit 1
     fi
     # --refresh: state lives in the checkout and outlives the cluster, as for

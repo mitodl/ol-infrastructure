@@ -32,7 +32,7 @@ declare -A APP_NAMESPACE=(
 
 declare -A APP_DEPLOY=(
     [mit-learn]="mitlearn-webapp"
-    [learn-ai]="learnai-webapp"
+    [learn-ai]="learn-ai-app"
     [mitxonline]="mitxonline-app"
     [odl-video-service]="odlvideo-webapp"
     [ocw-studio]="ocwstudio-webapp"
@@ -49,13 +49,14 @@ python manage.py loaddata platforms schools departments offered_by
 python manage.py create_qdrant_collections
 python manage.py prune_subscription_queries"
 
-    [learn-ai]="python manage.py migrate --noinput
-RUN_DATA_MIGRATIONS=true python manage.py migrate --noinput
-python manage.py createcachetable"
+    # No learn-ai default: its pre-deploy Job runs migrate and createcachetable
+    # whenever an apply creates or replaces it, and `tilt trigger learn-ai-app`
+    # recreates the stack, Job included, so it re-runs them.
 
-    # No mitxonline default: its pre-deploy Job runs migrate and configure_wagtail
-    # on every apply, and `tilt trigger mitxonline-app` recreates the stack, Job
-    # included, so it re-runs them.
+    # No mitxonline default: its pre-deploy Job runs migrate and
+    # configure_wagtail whenever an apply creates or replaces it, and
+    # `tilt trigger mitxonline-app` recreates the stack, Job included, so it
+    # re-runs them.
 
     [odl-video-service]="python manage.py migrate --noinput
 python manage.py createpresets"

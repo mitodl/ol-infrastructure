@@ -1,0 +1,17 @@
+---
+# Terminates TLS for ai.learn.<root>. pulumi/__main__.py renders this host's
+# routes and plugins, and the canvas-agent consumer. api.learn, which also
+# serves learn-ai's /ai/* routes, gets its ApisixTls from mit-learn's
+# apisix-routes.yaml.
+apiVersion: apisix.apache.org/v2
+kind: ApisixTls
+metadata:
+  name: learnai-tls
+  namespace: learn-ai
+spec:
+  ingressClassName: apache-apisix
+  hosts:
+  - "ai.learn.mit.test"
+  secret:
+    name: local-dev-tls
+    namespace: learn-ai
