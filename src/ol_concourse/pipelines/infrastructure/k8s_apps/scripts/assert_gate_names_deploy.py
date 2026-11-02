@@ -262,7 +262,8 @@ def main() -> None:
             f"({title!r}) was not opened by the release App ({app_slug}) but by "
             f"{author.get('login') or 'a deleted account'} "
             f"({author.get('__typename') or 'unknown'}), so it approves nothing. "
-            "Nothing was deployed. Close the release issue the App opened."
+            "Nothing was deployed. Close the release issue the App opened, or "
+            "re-run the QA job to post one if there is none."
         )
     if edited_after_close(issue):
         sys.exit(
