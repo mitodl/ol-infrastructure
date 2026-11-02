@@ -212,6 +212,15 @@ developers who have no use for them. The
 Tiltfile forwards `enabled_apps` to both Pulumi stacks and to the app Tiltfiles as
 `LOCAL_DEV_ENABLED_APPS` so they can make that call.
 
+Editing `enabled_apps` while Tilt runs re-runs both Pulumi stacks and builds the
+added apps. The other apps keep their images, because Tilt rebuilds a resource on
+reload only when its definition changed. An app is rebuilt only when its own config
+depends on the toggled app: mit-learn on `data-platform`, and mit-learn's Next.js
+frontend and mitxonline on `ol-analytics-api`. Keep the selection out of everything
+else. That includes session-wide settings such as `update_settings`, which Tilt
+copies into every resource: when `k8s_upsert_timeout_secs` depended on mitxonline,
+adding or dropping it rebuilt every app's image.
+
 Remove an app from `enabled_apps` while Tilt is running and Tilt deletes its
 workloads when it reloads. A later `tilt up` cleans up only what it applied
 itself, so an app removed while Tilt was stopped keeps running: start Tilt
