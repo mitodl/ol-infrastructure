@@ -28,6 +28,11 @@ from bridge.lib.magic_numbers import (
 )
 from bridge.secrets.sops import read_yaml_secrets
 from ol_infrastructure.applications.learn_ai import definition
+from ol_infrastructure.applications.learn_ai.vault_secrets import (
+    secret_named,
+    undescribed_static_keys,
+    vault_secrets,
+)
 from ol_infrastructure.components.aws.cache import OLAmazonCache, OLAmazonRedisConfig
 from ol_infrastructure.components.aws.eks import OLEKSTrustRole, OLEKSTrustRoleConfig
 from ol_infrastructure.components.aws.s3 import OLBucket, S3BucketConfig
@@ -85,7 +90,6 @@ from ol_infrastructure.lib.ol_types import (
     Services,
 )
 from ol_infrastructure.lib.opik import (
-    OPIK_KEYCLOAK_SECRET_TEMPLATES,
     OPIK_SDK_VAULT_MOUNT,
     opik_api_url,
     opik_sdk_vault_path,
@@ -539,11 +543,24 @@ if _learn_ai_bucket_is_sigv4_piloted and learn_ai_fastly_s3_signer_access_key:
             secret_access_key=learn_ai_fastly_s3_signer_access_key.secret,
         ).apply(json.dumps),
     )
+
+
+def learn_ai_static_secret_data(sentry_dsn: str) -> dict[str, str]:
+    """Return what the stack writes to secret-learn-ai/secrets."""
+    return {**learn_ai_vault_secrets, "SENTRY_DSN": sentry_dsn}
+
+
+# vault_secrets.py describes what pods read from this path; a key it lacks would
+# reach the pods deployed and go unnoticed by the local-dev program.
+undescribed = undescribed_static_keys(learn_ai_static_secret_data(""))
+if undescribed:
+    msg = f"Keys not described in learn_ai/vault_secrets.py: {', '.join(undescribed)}"
+    raise ValueError(msg)
 learn_ai_static_vault_secrets = vault.generic.Secret(
     f"learn-ai-secrets-{stack_info.env_suffix}",
     path=learn_ai_vault_mount.path.apply("{}/secrets".format),
     data_json=sentry_stack.require_output("learn_ai_sentry_dsn").apply(
-        lambda dsn: json.dumps({**learn_ai_vault_secrets, "SENTRY_DSN": dsn})
+        lambda dsn: json.dumps(learn_ai_static_secret_data(dsn))
     ),
 )
 
@@ -696,9 +713,14 @@ db_creds_secret = Output.all(
             path="creds/app",
             restart_target_kind="Deployment",
             restart_target_name="learn-ai-app",
-            templates={
-                "DATABASE_URL": f'postgres://{{{{ get .Secrets "username"}}}}:{{{{ get .Secrets "password" }}}}@{db["address"]}:{db["port"]}/{db["db_name"]}',
-            },
+            templates=secret_named(
+                vault_secrets(
+                    database_mount=learn_ai_db.app_db_vault_backend.db_mount.path,
+                    database_host=f"{db['address']}:{db['port']}",
+                    database_name=db["db_name"],
+                ),
+                "learn-ai-db-creds",
+            ).templates,
             vaultauth=vault_k8s_resources.auth_name,
         ),
         opts=ResourceOptions(
@@ -778,7 +800,10 @@ opik_keycloak_secret = OLVaultK8SSecret(
         mount_type="kv-v1",
         path=opik_sdk_vault_path("learn-ai"),
         restart_targets=[{"kind": "Deployment", "name": "learn-ai-app"}],
-        templates=OPIK_KEYCLOAK_SECRET_TEMPLATES,
+        templates=secret_named(
+            vault_secrets(database_mount="", database_host="", database_name=""),
+            "learn-ai-opik-keycloak",
+        ).templates,
         vaultauth=vault_k8s_resources.auth_name,
     ),
     opts=ResourceOptions(
