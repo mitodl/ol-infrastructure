@@ -15,10 +15,11 @@ metadata:
 data:
   # VIDEO_S3_BUCKET: "my-test-bucket"
   #
-  # OVS refuses to start (ui.apps: "The following settings are missing")
-  # unless every entry in settings.MANDATORY_SETTINGS has a value, and most
-  # of them are third-party credentials the tracked config can't ship. Fill
-  # these in from your own accounts / the odl-video-service compose .env:
+  # The tracked config sets ENFORCE_MANDATORY_SETTINGS=False, so OVS starts
+  # without these third-party credentials, but the features behind them
+  # (transcoding, CloudFront playback, Dropbox import, YouTube upload,
+  # Mailgun email) fail when used. Fill them in from your own accounts / the odl-video-service
+  # compose .env to use those features:
   # AWS_ACCOUNT_ID: ""
   # AWS_ROLE_NAME: ""
   # CLOUDFRONT_KEY_ID: ""
