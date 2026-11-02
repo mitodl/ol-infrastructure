@@ -152,10 +152,11 @@ def test_issue_put_carries_the_composed_body_and_skip_marker():
 
     assert issue["params"] == {
         "body_file": "promotion/body.md",
-        "labels": ["release"],
+        "labels": ["ops:release"],
         "title_template": "((.:promotion_title))",
         "skip_if_file": "promotion/skip",
         "skip_if_tag_missing": "((.:release_tag))",
+        "carry_checks_unless_labeled": ["ops:abandoned", "abandoned"],
     }
     # An issue that does not exist must not auto-close: closing approves it.
     assert "close_if_file" not in issue["params"]
