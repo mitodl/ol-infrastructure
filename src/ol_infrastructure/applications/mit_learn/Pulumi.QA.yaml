@@ -124,20 +124,17 @@ config:
     SESSION_COOKIE_NAME: "session_mitlearn_rc"
     SHOW_OCW_LECTURE_VIDEOS: "true"
     SOCIAL_AUTH_OL_OIDC_OIDC_ENDPOINT:
-    # STARROCKS_HOST/STARROCKS_PORT are deliberately unset here, even though
-    # QA has both a StarRocks cluster and the Vault mount behind it.
-    # SyncProgramCertificatesTask pins its view_name to the
-    # ol_data_lake_production catalog with no setting to override it. QA's
-    # StarRocks does not register that catalog (RFC 12711 step 7), so the
-    # sync would fail rather than rehearse against QA data. It must never be
-    # pointed at production learner PII from the RC database either. mit-learn
-    # declines to register the beat entry while these are unset. Set them
-    # once the view name is environment-aware.
+    STARROCKS_HOST: "mysql.lakehouse.qa.starrocks.ol.mit.edu"
+    STARROCKS_PORT: 9030
     TIKA_SERVER_ENDPOINT: "https://tika-qa.ol.mit.edu"
     UWSGI_THREADS: 15
     UWSGI_WORKERS: 3
     VECTOR_HYBRID_SEARCH_PREFETCH_MULTIPLIER: 3
     VECTOR_HYBRID_SEARCH_PREFETCH_MAX_LIMIT: 300
+    # mit-learn defaults these to the production catalog, which QA's StarRocks
+    # does not register (RFC 12711 step 7).
+    WAREHOUSE_CATALOG: "ol_data_lake_qa"
+    WAREHOUSE_SCHEMA: "ol_warehouse_qa_integrations"
     YOUTUBE_CONFIG_URL: "https://raw.githubusercontent.com/mitodl/open-video-data/main/youtube/channels.yaml"
   mitlearn:zendesk_help_url: "mitlearn.zendesk.com"
   redis:password:
