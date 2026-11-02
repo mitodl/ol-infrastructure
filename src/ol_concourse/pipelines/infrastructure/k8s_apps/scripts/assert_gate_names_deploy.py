@@ -21,8 +21,8 @@ The body has to be the one the issue was closed with. The issue put finds the
 issue to update through the search API, whose index lags, so a QA run that
 lands just after the issue is closed can still rewrite the closed issue's
 body, marker included. So the issue is refused if its body was edited at or
-after it was closed. Renaming the title, which the gate get does to consume
-the issue, is not a body edit.
+after it was closed. Labelling the issue, which the gate get does to consume
+it, is not a body edit.
 
 The issue also has to be one the release App opened. The gate fires on any
 closed issue whose title matches, and these repositories are public: anyone
@@ -45,6 +45,11 @@ Environment:
     GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, GITHUB_APP_PRIVATE_KEY: the
         release GitHub App's credentials.
     GITHUB_API_URL: optional, defaults to ``https://api.github.com``.
+    REFUSAL_DIR: optional. When the issue does not approve this deploy, a
+        ``refused`` file is written here, holding the reason, before the
+        task fails. A failure for any other reason (GitHub unreachable, a bad
+        ref) writes nothing, so the ``on_failure`` hook that labels the issue
+        ``ops:refused`` can tell a refusal from an outage.
 """
 
 import base64
@@ -59,7 +64,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 #: Kept in step with ``REVISION_MARKER`` in ``classify_promotion.py``.
 _REVISION_MARKER = re.compile(r"<!-- ol-infrastructure-revision: ([0-9a-f]{40}) -->")
@@ -224,6 +229,13 @@ def fetch_issue(api_url: str, repo: str, number: int) -> tuple[dict[str, Any], s
     return issue, app_slug
 
 
+def refuse(message: str) -> NoReturn:
+    """Record that the gate issue does not approve this deploy, then exit."""
+    if refusal_dir := os.environ.get("REFUSAL_DIR"):
+        Path(refusal_dir, "refused").write_text(message + "\n")
+    sys.exit(message)
+
+
 def main() -> None:
     """Exit non-zero unless the gate issue approves this version and commit."""
     app = os.environ["APP_NAME"]
@@ -235,12 +247,12 @@ def main() -> None:
 
     approved = approved_version(app, title)
     if approved is None:
-        sys.exit(
+        refuse(
             f"Refusing to deploy {app} {deploying}: the gate issue that fired "
             f"({title!r}) does not name a version. Nothing was deployed."
         )
     if approved != deploying:
-        sys.exit(
+        refuse(
             f"Refusing to deploy {app} {deploying}: the gate issue that fired "
             f"({title!r}) approved {approved}. Nothing was deployed. To ship "
             f"{deploying}, close the release issue for {deploying}."
@@ -266,7 +278,7 @@ def main() -> None:
             "re-run the QA job to post one if there is none."
         )
     if edited_after_close(issue):
-        sys.exit(
+        refuse(
             f"Refusing to deploy {app} {deploying}: gate issue #{number} "
             f"({title!r}) is not closed, or its body was edited at or after it "
             f"was closed (closed {issue.get('closedAt')}, last edited "
@@ -276,14 +288,14 @@ def main() -> None:
         )
     previewed = approved_revision(issue.get("body") or "")
     if previewed is None:
-        sys.exit(
+        refuse(
             f"Refusing to deploy {app} {deploying}: gate issue #{number} "
             f"({title!r}) does not say which ol-infrastructure commit it "
             "approved. Nothing was deployed. Re-run the QA job to post an "
             "issue that does, and close that one."
         )
     if previewed != revision:
-        sys.exit(
+        refuse(
             f"Refusing to deploy {app} {deploying} at ol-infrastructure "
             f"{revision[:8]}: gate issue #{number} ({title!r}) approved the "
             f"Production preview of {previewed[:8]}. Nothing was deployed. "
