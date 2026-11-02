@@ -980,7 +980,6 @@ async def test_promote_clears_the_recorded_requester(repos, slack, monkeypatch):
     )
     monkeypatch.setattr(bot.github, "close_release_issue", AsyncMock())
     monkeypatch.setattr(bot.concourse, "check_resource", AsyncMock())
-    monkeypatch.setattr(bot.concourse, "has_version", AsyncMock(return_value=True))
 
     await bot._cmd_promote(
         repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "UOTHER"}
@@ -1038,6 +1037,41 @@ async def test_a_failed_post_keeps_the_requester_for_the_next_poll(repos, monkey
     await bot._notify_ready_to_promote(app, repos)
 
     assert bot._release_requesters["my-app"] == "UDANA"
+
+
+@pytest.mark.parametrize("label", ["ops:promote-ready", "promote-ready"])
+async def test_ready_to_promote_skips_either_ready_label_name(
+    repos, monkeypatch, label
+):
+    """Renaming `promote-ready` in a repo must not re-announce every release."""
+    issue = _ready_issue()
+    issue["labels"] = ["release", label]
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[issue])
+    )
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+
+    await bot._notify_ready_to_promote(app, repos)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_ready_to_promote_writes_the_ops_label(repos, monkeypatch):
+    monkeypatch.setattr(
+        bot.github, "open_release_issues", AsyncMock(return_value=[_ready_issue()])
+    )
+    add = AsyncMock()
+    monkeypatch.setattr(bot.github, "add_issue_label", add)
+    monkeypatch.setattr(
+        bot.slack_channels, "resolve", AsyncMock(side_effect=lambda _c, ch: ch)
+    )
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+
+    await bot._notify_ready_to_promote(app, repos)
+
+    add.assert_awaited_once_with("mitodl/my-app", 1, "ops:promote-ready")
 
 
 # ---------------------------------------------------------------------------
@@ -2507,9 +2541,6 @@ def _promote_body(app_name="my-app", version="2026.9.5.1", user="U1"):
     }
 
 
-_CLOSED_AT = datetime(2026, 10, 29, 15, 38, 26, tzinfo=UTC)
-
-
 @pytest.fixture
 def promote_api(monkeypatch):
     """Stub the GitHub and Concourse calls behind a successful promotion."""
@@ -2519,15 +2550,11 @@ def promote_api(monkeypatch):
             {"number": 7, "body": "## Release 2026.9.5.1", "url": "http://issue/1"}
         ]
     )
-    api.close_release_issue = AsyncMock(return_value=_CLOSED_AT)
+    api.close_release_issue = AsyncMock()
     api.check_resource = AsyncMock()
-    api.has_version = AsyncMock(return_value=True)
     monkeypatch.setattr(bot.github, "open_release_issues", api.open_release_issues)
     monkeypatch.setattr(bot.github, "close_release_issue", api.close_release_issue)
     monkeypatch.setattr(bot.concourse, "check_resource", api.check_resource)
-    monkeypatch.setattr(bot.concourse, "has_version", api.has_version)
-    # Not asyncio.sleep itself: the double-click test needs its real yield.
-    monkeypatch.setattr(bot, "_GATE_RECHECK_SECONDS", 0)
     return api
 
 
@@ -2550,9 +2577,9 @@ async def test_promote_button_is_removed_once_the_promotion_lands(repos):
     ]
     assert edit["blocks"][:-1] == kept
     assert edit["blocks"][-1]["type"] == "context"
-    assert "<@U1> promoted this to Production" in edit["text"]
+    assert "<@U1> approved this for Production" in edit["text"]
     # The edit is silent, so the channel post is what actually notifies.
-    assert "promoted `my-app`" in str(say.call_args.args[0])
+    assert "approved `my-app`" in str(say.call_args.args[0])
 
 
 async def test_promote_button_is_left_alone_when_the_promotion_fails(
@@ -2639,7 +2666,7 @@ async def test_a_broken_message_edit_does_not_stop_the_promotion(repos, promote_
     promote_api.check_resource.assert_awaited_once_with(
         "my-app-pipeline", "my-app-release-gate"
     )
-    assert "promoted `my-app`" in str(say.call_args.args[0])
+    assert "approved `my-app`" in str(say.call_args.args[0])
 
 
 # ---------------------------------------------------------------------------
@@ -2778,6 +2805,12 @@ def test_promote_button_asks_for_confirmation():
     assert len(confirm["deny"]["text"]) <= 30
 
 
+_JOB = (
+    f"{bot.concourse.CONCOURSE_URL}/teams/{bot.concourse.CONCOURSE_TEAM}"
+    "/pipelines/my-app-pipeline/jobs/deploy-ol-application-my-app-production"
+)
+
+
 @pytest.mark.usefixtures("promote_api")
 async def test_promote_button_links_the_production_deploy_job(repos):
     client = AsyncMock()
@@ -2785,12 +2818,8 @@ async def test_promote_button_links_the_production_deploy_job(repos):
 
     await bot._handle_promote_button(repos, AsyncMock(), _promote_body(), say, client)
 
-    job = (
-        f"{bot.concourse.CONCOURSE_URL}/teams/{bot.concourse.CONCOURSE_TEAM}"
-        "/pipelines/my-app-pipeline/jobs/deploy-ol-application-my-app-production"
-    )
-    assert f"Production deploy triggered: {job}" in str(say.call_args.args[0])
-    assert job in client.chat_update.call_args.kwargs["text"]
+    assert _JOB in str(say.call_args.args[0])
+    assert _JOB in client.chat_update.call_args.kwargs["text"]
 
 
 async def test_promote_command_links_the_production_deploy_job(
@@ -2804,139 +2833,64 @@ async def test_promote_command_links_the_production_deploy_job(
         repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "U1"}
     )
 
-    assert (
-        "Production deploy triggered: "
-        f"{bot.concourse.CONCOURSE_URL}/teams/{bot.concourse.CONCOURSE_TEAM}"
-        "/pipelines/my-app-pipeline/jobs/deploy-ol-application-my-app-production"
-    ) in slack.said
+    assert _JOB in slack.said
+    assert "approved" in slack.said
 
 
-async def test_promote_does_not_claim_a_deploy_started_when_the_gate_check_failed(
-    repos, slack, promote_api
+@pytest.mark.parametrize("check_fails", [False, True])
+async def test_promote_never_claims_a_deploy_started(
+    repos, slack, promote_api, check_fails
 ):
-    """The issue is closed either way, but no deploy is promised."""
-    promote_api.open_release_issues.return_value = [
-        {"number": 7, "title": "Release my-app 2026.9.5.1", "body": ""}
-    ]
-    promote_api.check_resource.side_effect = RuntimeError("Concourse is down")
+    """Closing the issue approves; only a gate check that records it deploys.
 
-    await bot._cmd_promote(
-        repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "U1"}
-    )
-
-    said = slack.said
-    assert "promoted" in said
-    assert "Production deploy triggered" not in said
-    assert "could not confirm that Concourse finished checking" in said
-    assert "may or may not have started" in said
-
-
-async def test_promote_waits_for_the_gate_to_record_this_close(repos, promote_api):
-    """A check that succeeds can still miss the close it was forced for.
-
-    mitxonline 2026.10.28.1: the check ran a second after the close, found
-    nothing, and succeeded. The gate first recorded the close on its hourly
-    check, by which time QA had run a newer ol-infrastructure revision, and
-    Production refused it. So the bot checks again until the version is there.
+    mitxonline 2026.10.28.1: Slack said "Production deploy triggered", the
+    forced check found nothing, and the hourly check that did find the close an
+    hour later was refused.
     """
-    promote_api.has_version.side_effect = [False, False, True]
-    say = AsyncMock()
-
-    await bot._handle_promote_button(
-        repos, AsyncMock(), _promote_body(), say, AsyncMock()
-    )
-
-    assert promote_api.check_resource.await_count == 3
-    promote_api.has_version.assert_awaited_with(
-        "my-app-pipeline",
-        "my-app-release-gate",
-        {"issue_number": "7", "issue_closed_at": "2026-10-29T15:38:26"},
-    )
-    assert "Production deploy triggered" in str(say.call_args.args[0])
-
-
-async def test_promote_says_so_when_the_gate_never_records_the_close(
-    repos, slack, promote_api
-):
-    """Claiming a deploy started would hide the hour-long wait behind it."""
     promote_api.open_release_issues.return_value = [
         {"number": 7, "title": "Release my-app 2026.9.5.1", "body": ""}
     ]
-    promote_api.has_version.return_value = False
+    if check_fails:
+        promote_api.check_resource.side_effect = RuntimeError("Concourse is down")
 
     await bot._cmd_promote(
         repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "U1"}
     )
 
-    assert promote_api.check_resource.await_count == bot._GATE_CHECK_ATTEMPTS
     said = slack.said
-    assert "promoted" in said
-    assert "Production deploy triggered" not in said
-    assert "has not seen issue #7 closed yet" in said
-    assert "/jobs/deploy-ol-application-my-app-production" in said
+    assert "approved" in said
+    assert "triggered" not in said
+    assert "deploy started" not in said
+    assert "within 5m" in said
+    assert ("could not confirm that Concourse checked" in said) is check_fails
 
 
-async def test_promote_keeps_checking_the_gate_past_a_transient_error(
+async def test_promote_button_reports_success_when_the_gate_check_fails(
     repos, promote_api
 ):
-    """One failed check must not end a wait that a later check would finish."""
-    promote_api.has_version.side_effect = [False, RuntimeError("502"), True]
+    """The issue is closed, so the approval stands; the gate checks itself."""
+    promote_api.check_resource.side_effect = RuntimeError("Concourse is down")
+    client = AsyncMock()
     say = AsyncMock()
 
-    await bot._handle_promote_button(
-        repos, AsyncMock(), _promote_body(), say, AsyncMock()
-    )
+    await bot._handle_promote_button(repos, AsyncMock(), _promote_body(), say, client)
 
-    assert promote_api.check_resource.await_count == 3
-    assert "Production deploy triggered" in str(say.call_args.args[0])
-
-
-async def test_promote_does_not_deny_a_deploy_it_could_not_look_up(
-    repos, slack, promote_api
-):
-    """The check ran, so the deploy may have started; only the lookup failed."""
-    promote_api.open_release_issues.return_value = [
-        {"number": 7, "title": "Release my-app 2026.9.5.1", "body": ""}
-    ]
-    promote_api.has_version.side_effect = RuntimeError("503 on /versions")
-
-    await bot._cmd_promote(
-        repos, slack.ack, slack.respond, _command("my-app"), {"user_id": "U1"}
-    )
-
-    said = slack.said
-    assert "could not confirm it recorded issue #7 closed" in said
-    assert "may or may not have started" in said
-    assert "no Production deploy was triggered" not in said
-    assert "Production deploy triggered" not in said
+    posted = str(say.call_args.args[0])
+    assert "approved `my-app` `2026.9.5.1` for Production" in posted
+    assert "could not confirm that Concourse checked it sooner" in posted
+    # A terminal outcome: the button goes.
+    edit = client.chat_update.call_args.kwargs
+    assert [b for b in edit["blocks"] if b.get("type") == "actions"] == []
 
 
-async def test_promote_does_not_sleep_past_the_deadline(
-    repos, promote_api, monkeypatch
-):
-    """A pause that would end after the deadline is not taken."""
-    monkeypatch.setattr(bot, "_GATE_VERSION_TIMEOUT_SECONDS", 60)
-    monkeypatch.setattr(bot, "_GATE_RECHECK_SECONDS", 3600)
-    promote_api.has_version.return_value = False
-
-    await asyncio.wait_for(
-        bot._handle_promote_button(
-            repos, AsyncMock(), _promote_body(), AsyncMock(), AsyncMock()
-        ),
-        timeout=5,
-    )
-
-    promote_api.check_resource.assert_awaited_once()
-
-
-async def test_promote_stops_checking_the_gate_at_the_deadline(
+async def test_promote_does_not_wait_on_a_hung_gate_check(
     repos, slack, promote_api, monkeypatch
 ):
-    """A check that hangs must not hold the promotion's reply past the wait."""
+    """A check that hangs must not hold the reply; the gate checks itself."""
     promote_api.open_release_issues.return_value = [
         {"number": 7, "title": "Release my-app 2026.9.5.1", "body": ""}
     ]
-    monkeypatch.setattr(bot, "_GATE_VERSION_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr(bot, "_GATE_NUDGE_TIMEOUT_SECONDS", 0.05)
 
     async def _hang(*_args):
         await asyncio.sleep(3600)
@@ -2950,25 +2904,204 @@ async def test_promote_stops_checking_the_gate_at_the_deadline(
         timeout=5,
     )
 
-    promote_api.check_resource.assert_awaited_once()
-    # The check the bot stopped waiting for is still running in Concourse, so
-    # the reply must not deny a deploy either.
-    assert "A check may still be running" in slack.said
-    assert "Production deploy triggered" not in slack.said
+    assert "could not confirm that Concourse checked" in slack.said
 
 
-async def test_promote_matches_the_gate_on_the_number_when_github_omits_closed_at(
+async def test_promote_asks_for_one_gate_check_and_reads_no_versions(
     repos, promote_api
 ):
-    promote_api.close_release_issue.return_value = None
-
+    """No Concourse version-history read: the acknowledgement is asynchronous."""
     await bot._handle_promote_button(
         repos, AsyncMock(), _promote_body(), AsyncMock(), AsyncMock()
     )
 
-    promote_api.has_version.assert_awaited_once_with(
-        "my-app-pipeline", "my-app-release-gate", {"issue_number": "7"}
+    promote_api.check_resource.assert_awaited_once_with(
+        "my-app-pipeline", "my-app-release-gate"
     )
+    assert not hasattr(bot.concourse, "has_version")
+    promote_api.close_release_issue.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# release state labels: refusals and release-status
+# ---------------------------------------------------------------------------
+
+
+def _refused_issue(number=7, title="Release my-app 2026.9.5.1", labels=None):
+    return {
+        "number": number,
+        "title": title,
+        "url": f"https://github.com/mitodl/my-app/issues/{number}",
+        "body": "## Release 2026.9.5.1\n",
+        "labels": labels
+        if labels is not None
+        else ["ops:release", "ops:consumed", "ops:refused"],
+        "updated_at": datetime.now(tz=UTC),
+    }
+
+
+@pytest.fixture
+def refusals(monkeypatch):
+    """Stub the refused-issue lookup and capture what is posted."""
+    lookup = AsyncMock(return_value=[])
+    monkeypatch.setattr(bot.github, "refused_release_issues", lookup)
+    monkeypatch.setattr(
+        bot.slack_channels, "resolve", AsyncMock(side_effect=lambda _c, ch: ch)
+    )
+    app = MagicMock()
+    app.client.chat_postMessage = AsyncMock()
+    return lookup, app
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Release my-app 2026.9.5.1",
+        "Release my-app infrastructure @ 2026.9.5.1",
+        "Release my-app",
+    ],
+)
+async def test_a_refusal_is_announced_once(repos, refusals, title):
+    lookup, app = refusals
+    state = bot.ReleaseProgressState()
+    # The first poll seeds: a refusal already there when the bot starts is old.
+    assert await bot._announce_refusals(app, repos, state)
+    lookup.return_value = [_refused_issue(title=title)]
+
+    assert await bot._announce_refusals(app, repos, state)
+    assert await bot._announce_refusals(app, repos, state)
+
+    app.client.chat_postMessage.assert_awaited_once()
+    text = app.client.chat_postMessage.call_args.kwargs["text"]
+    assert "`my-app` 2026.9.5.1 was not deployed" in text
+    assert "|#7>" in text
+    assert "/jobs/deploy-ol-application-my-app-production" in text
+
+
+async def test_an_old_refusal_present_at_startup_is_not_announced(
+    repos, refusals, monkeypatch
+):
+    """Like deployments: seeding is cheaper than repeating old news on restart."""
+    lookup, app = refusals
+    monkeypatch.setattr(bot, "_started_at", datetime.now(tz=UTC))
+    old = _refused_issue()
+    old["updated_at"] = datetime.now(tz=UTC) - timedelta(hours=2)
+    lookup.return_value = [old]
+    state = bot.ReleaseProgressState()
+
+    await bot._announce_refusals(app, repos, state)
+    await bot._announce_refusals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_a_refusal_during_a_restart_is_announced(repos, refusals, monkeypatch):
+    """A deploy of the bot is the likeliest restart; a refusal in it is news."""
+    lookup, app = refusals
+    monkeypatch.setattr(bot, "_started_at", datetime.now(tz=UTC))
+    recent = _refused_issue()
+    recent["updated_at"] = datetime.now(tz=UTC) - timedelta(minutes=3)
+    lookup.return_value = [recent]
+    state = bot.ReleaseProgressState()
+
+    await bot._announce_refusals(app, repos, state)
+    await bot._announce_refusals(app, repos, state)
+
+    app.client.chat_postMessage.assert_awaited_once()
+
+
+async def test_an_abandoned_refusal_is_not_announced(repos, refusals):
+    lookup, app = refusals
+    state = bot.ReleaseProgressState()
+    await bot._announce_refusals(app, repos, state)
+    lookup.return_value = [
+        _refused_issue(labels=["ops:consumed", "ops:refused", "ops:abandoned"])
+    ]
+
+    await bot._announce_refusals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_another_apps_refusal_in_a_shared_repo_is_not_announced(repos, refusals):
+    lookup, app = refusals
+    state = bot.ReleaseProgressState()
+    await bot._announce_refusals(app, repos, state)
+    lookup.return_value = [_refused_issue(title="Release my-app-nextjs 2026.9.5.1")]
+
+    await bot._announce_refusals(app, repos, state)
+
+    app.client.chat_postMessage.assert_not_awaited()
+
+
+async def test_a_failed_refusal_post_is_retried(repos, refusals):
+    lookup, app = refusals
+    state = bot.ReleaseProgressState()
+    await bot._announce_refusals(app, repos, state)
+    lookup.return_value = [_refused_issue()]
+    app.client.chat_postMessage.side_effect = [RuntimeError("Slack is down"), None]
+
+    assert not await bot._announce_refusals(app, repos, state)
+    assert await bot._announce_refusals(app, repos, state)
+
+    assert app.client.chat_postMessage.await_count == 2
+
+
+async def test_a_failed_refusal_lookup_is_reported_not_raised(repos, refusals):
+    lookup, app = refusals
+    lookup.side_effect = RuntimeError("GitHub is down")
+
+    assert not await bot._announce_refusals(app, repos, bot.ReleaseProgressState())
+
+
+@pytest.mark.parametrize(
+    ("labels", "shown", "hidden"),
+    [
+        (["ops:release"], "", "·"),
+        (["release", "promote-ready"], "· ready to promote", "refused"),
+        (["ops:release", "ops:promote-ready"], "· ready to promote", "refused"),
+    ],
+)
+async def test_release_status_shows_the_issue_label_state(  # noqa: PLR0913
+    repos, slack, monkeypatch, labels, shown, hidden
+):
+    monkeypatch.setattr(
+        bot.github,
+        "open_release_issues",
+        AsyncMock(
+            return_value=[
+                {
+                    "number": 1,
+                    "title": "Release my-app 2026.9.5.1",
+                    "url": "https://github.com/mitodl/my-app/issues/1",
+                    "body": "## Release 2026.9.5.1\n- [x] **A** (#1) by a\n",
+                    "labels": labels,
+                }
+            ]
+        ),
+    )
+    monkeypatch.setattr(bot.github, "in_flight_release", AsyncMock(return_value=None))
+
+    await bot._cmd_release_status(
+        repos, slack.ack, slack.respond, _command("my-app"), {}
+    )
+
+    assert shown in slack.said
+    assert hidden not in slack.said
+
+
+@pytest.mark.parametrize(
+    ("labels", "expected"),
+    [
+        (["ops:consumed", "ops:refused"], " · ⛔ refused by Production"),
+        (["ops:consumed", "ops:refused", "abandoned"], " · abandoned"),
+        (["release", "ops:consumed"], " · taken by Production"),
+        (["ops:release"], ""),
+        ([], ""),
+    ],
+)
+def test_release_state_suffix_follows_label_precedence(labels, expected):
+    assert bot._release_state_suffix({"labels": labels}) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -3478,6 +3611,7 @@ async def test_poll_loops_record_a_heartbeat_even_when_an_iteration_fails(
         bot, "_notify_ready_to_promote", AsyncMock(side_effect=RuntimeError("boom"))
     )
     monkeypatch.setattr(bot, "_announce_deployments", AsyncMock(return_value=True))
+    monkeypatch.setattr(bot, "_announce_refusals", AsyncMock(return_value=True))
     monkeypatch.setattr(bot, "_nag_stuck_releases", AsyncMock(return_value=True))
 
     async def _stop(_seconds):
