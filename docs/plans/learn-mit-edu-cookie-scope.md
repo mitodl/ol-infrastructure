@@ -379,12 +379,28 @@ Ordering:
 3. QA first. In a browser that already has `.rc.learn.mit.edu` copies: load a courseware
    page, confirm DevTools shows only `.courses.rc.learn.mit.edu` copies afterwards, and
    check that `/login_refresh` fires once per page load, not in a loop. Repeat in Safari.
-4. Production. Remove the plugin after the longest-lived parent copies have expired.
-   Parent JWT copies are gone within an hour without any eviction. `edx-user-info` and
-   `edxloggedin` follow the session age, which is Django's default of two weeks
-   (`SESSION_COOKIE_AGE` isn't set in `edxapp/config_builder.py` or
-   `openedx/envs/common.py`; the default is at `django/conf/global_settings.py:486`). The
-   language cookie lasts 14 days. Three weeks covers all of them.
+4. Production. Keep the plugin for five weeks after the last pod with the old setting
+   stops. That's the longest parent copy lifetime (four weeks) plus a week of margin.
+   Removing it sooner can leave a returning learner with a stale parent copy that shadows
+   the narrowed one.
+
+   _Verified_ (edx-platform `7f0416c`). Parent JWT copies are gone within an hour without
+   any eviction, and the language cookie lasts 14 days. `edx-user-info` and `edxloggedin`
+   take their age from the session when they're written (`cookies.py:88-104`), and that
+   age depends on the login path:
+
+   - `login_user` sets four weeks on every success
+     (`user_authn/views/login.py:330,652`). That includes its third-party branch
+     (`login.py:583-592`), so turning off password login wouldn't remove this path.
+   - Logins that finish in social-auth get two weeks. `_do_login` calls
+     `set_expiry(None)` unless the provider enables `SESSION_EXPIRATION` or sets
+     `max_session_length` (social-auth-app-django 5.4.1, `views.py:54-100,102-136`).
+     That falls back to `SESSION_COOKIE_AGE`, which neither edx-platform nor
+     ol-infrastructure `src/` sets, so it's Django's default
+     (`django/conf/global_settings.py:486`).
+
+   The window uses the four-week path, so the mix of logins in production doesn't
+   change it.
 
 _Verified._ An explicit `SHARED_COOKIE_DOMAIN` reaches Django. Production pods run
 `lms.envs.mitol.production` (`edxapp/k8s_resources.py:986`), which imports upstream
@@ -398,7 +414,7 @@ parameterized so rollback is a config change.
 
 Measure:
 
-- Requests to nb.learn.mit.edu carrying `edx-user-info:` should fall toward zero over two
+- Requests to nb.learn.mit.edu carrying `edx-user-info:` should fall toward zero over four
   weeks. JWT presence (baseline 235,959 of 508,291 over 24 hours) should reach zero
   within hours. The saving is about 1.1 KB per request for user-info, plus about 1.1 KB
   on the requests that also carry a live JWT.
@@ -460,8 +476,10 @@ No change (see above).
    session. I recommend not narrowing it now. learn-ai was configured to read it today, and
    at 227 bytes it's the smallest of the edX cookies. Revisit if learn-ai stops forwarding
    it. If it is narrowed, migrate passively: change the domain and let parent copies age
-   out over two weeks, with no logout. Force eviction only if a cutover date matters more
-   than logging everyone out of the edX LMS at once.
+   out over four weeks, with no logout. safe_sessions rejects a cookie signed more than
+   `SESSION_COOKIE_AGE` ago (`safe_sessions/middleware.py:278`), but the browser keeps
+   sending it until it expires, so plan on the full four weeks. Force eviction only if a
+   cutover date matters more than logging everyone out of the edX LMS at once.
 3. Move gateway session data to Redis. I recommend not doing it for cookie bytes alone. It
    adds an availability dependency to every login. Revisit it under P2/P3, and sooner if
    the Learn session crosses 4,096 bytes and starts splitting into two cookies, which the
@@ -481,3 +499,7 @@ Trimming JupyterHub's `session_contents` doesn't need a decision.
   duplicates (only frontend-platform's 4.0.4 was checked).
 - Which transport hq#12830 will use to get the edX JWT to Learn hosts.
 - Keycloak's behavior on RP-initiated logout without `id_token_hint`.
+- Whether any MITx Online provider row sets `max_session_length` or enables
+  `SESSION_EXPIRATION`. Both live in the LMS database, not in code
+  (`third_party_auth/models.py:209`, `third_party_auth/strategy.py:51`). A
+  `max_session_length` above four weeks would extend the five-week window.
