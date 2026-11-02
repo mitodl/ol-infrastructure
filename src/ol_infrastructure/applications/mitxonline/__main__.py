@@ -676,6 +676,12 @@ bindings = definition.MitxonlineBindings(
         **DEPLOYED_ENV_DEFAULTS,
         **mitxonline_config.require_object("vars"),
         "MIT_LEARN_API_BASE_URL": f"https://{learn_backend_domain}",
+        # The bucket is private here, so media URLs must go through Fastly's /media/ route.
+        **(
+            {"AWS_S3_CUSTOM_DOMAIN": f"{frontend_domain}/media"}
+            if _mitxonline_bucket_is_sigv4_piloted
+            else {}
+        ),
     },
     k8s_labels=k8s_app_labels,
     # Use the secret names returned by create_mitxonline_k8s_secrets
