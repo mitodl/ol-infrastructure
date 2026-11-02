@@ -22,6 +22,7 @@ from pulumi import ResourceOptions
 from pulumi_kubernetes.meta.v1 import ObjectMetaArgs
 
 from ol_infrastructure.applications.learn_ai import definition
+from ol_infrastructure.applications.learn_ai.vault_secrets import secret_env_names
 from ol_infrastructure.components.services.apisix import (
     OLApisixOIDCResources,
     OLApisixRoute,
@@ -45,6 +46,7 @@ from ol_infrastructure.lib.local_dev_program import (
 )
 from ol_infrastructure.lib.ol_types import BusinessUnit, K8sGlobalLabels, Services
 from ol_infrastructure.lib.pulumi_helper import parse_stack
+from ol_infrastructure.lib.secret_env import local_secret_data
 
 # The app's Tilt directory (secrets.yaml), this program's parent.
 APP_DIR = Path(__file__).resolve().parents[1]
@@ -141,17 +143,12 @@ sys.stderr.write(f"image: {repository}:{tag}\n")
 provider = k3d_provider()
 opts = ResourceOptions(providers=[provider])
 
-# Deployed stacks read their secret variables from Vault through VSO. Here one
-# plain Secret carries the ones local-dev needs, with the values secrets.yaml
-# gives them.
+# Deployed stacks get these variables from Vault through VSO. Here one plain
+# Secret carries the same names, with the values secrets.yaml gives them.
 local_secrets = manifest(APP_DIR / "secrets.yaml", root_domain)
-secret_data = local_secrets["values"]
-non_strings = sorted(
-    key for key, value in secret_data.items() if not isinstance(value, str)
+secret_data = local_secret_data(
+    secret_env_names(), local_secrets["values"], local_secrets["unset"]
 )
-if non_strings:
-    msg = f"secrets.yaml values must be strings (quote them): {non_strings}"
-    raise ValueError(msg)
 # The canvas consumer's key is the gateway's, not a pod variable, so it stays out
 # of the Secret.
 canvas_key = local_secrets["canvas_syllabus_token"]

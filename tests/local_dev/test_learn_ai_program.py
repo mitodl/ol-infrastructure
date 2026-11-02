@@ -6,9 +6,11 @@ import json
 
 import pulumi
 import pytest
+import yaml
 
-from ol_infrastructure.applications.learn_ai import definition
+from ol_infrastructure.applications.learn_ai import definition, vault_secrets
 from ol_infrastructure.lib.local_dev_program import CA_BUNDLE_DIR
+from ol_infrastructure.lib.secret_env import VaultSecret
 from tests.local_dev.program_render import (
     APP_COMPONENT,
     DEPLOYMENT,
@@ -257,13 +259,56 @@ def test_the_root_domain_flows_into_hosts_and_env(tmp_path, monkeypatch):
     assert not [v for v in [*env.values(), *secret.values()] if "mit.test" in v]
 
 
-def test_the_secret_holds_the_values_and_not_the_canvas_key(tmp_path, monkeypatch):
+def test_the_secret_is_keyed_by_the_deployed_vault_variables(tmp_path, monkeypatch):
+    """Locally there is no Vault: one plain Secret stands in for the VSO resources.
+
+    Its keys are the deployed description's variable names, less those
+    secrets.yaml leaves unset so the app's default applies; the canvas key
+    beside them is the gateway's, not a pod variable.
+    """
     mocks = _render(tmp_path, monkeypatch)
-    data = _secret_data(mocks)
-    assert set(data) == {"SECRET_KEY", "DATABASE_URL", "OPENAI_API_KEY", "MAILGUN_KEY"}
+    local = yaml.safe_load((APP_DIR / "secrets.yaml").read_text())
+    deployed = vault_secrets.secret_env_names()
+    assert set(local["unset"]) <= set(deployed)
+    # A set: the mock receives the data as a protobuf map, which keeps no order.
+    assert set(_secret_data(mocks)) == set(deployed) - set(local["unset"])
+    assert "canvas_syllabus_token" not in _secret_data(mocks)
     webapp = _one(mocks, DEPLOYMENT, "learn-ai-app")
     env_from = webapp["spec"]["template"]["spec"]["containers"][0]["envFrom"]
     assert {"secretRef": {"name": "learn-ai-secrets"}} in env_from
+
+
+def test_a_variable_added_for_deployed_stacks_stops_the_local_program(
+    tmp_path, monkeypatch
+):
+    """The drift check: a new deployed variable needs a value or an unset entry."""
+    original = vault_secrets.vault_secrets
+
+    def with_new_variable(**kwargs):
+        return [
+            *original(**kwargs),
+            VaultSecret(
+                name="new",
+                kind="static",
+                mount="secret-learn-ai",
+                mount_type="kv-v2",
+                path="new",
+                env={"NEW_DEPLOYED_VARIABLE": ("value",)},
+            ),
+        ]
+
+    monkeypatch.setattr(vault_secrets, "vault_secrets", with_new_variable)
+    with pytest.raises(ValueError, match="missing: NEW_DEPLOYED_VARIABLE;"):
+        _render(tmp_path, monkeypatch)
+
+
+def test_a_local_only_secret_stops_the_local_program(tmp_path, monkeypatch):
+    """A key deployed stacks do not read belongs in LOCAL_ENV_DEFAULTS, not here."""
+    secrets = (APP_DIR / "secrets.yaml").read_text()
+    edited = secrets.replace("unset:\n", "unset:\n- LOCAL_ONLY_VARIABLE\n", 1)
+    assert edited != secrets
+    with pytest.raises(ValueError, match=r"not deployed: LOCAL_ONLY_VARIABLE$"):
+        _render(tmp_path, monkeypatch, app_files={"secrets.yaml": edited})
 
 
 def test_a_non_string_secret_value_names_its_key(tmp_path, monkeypatch):
