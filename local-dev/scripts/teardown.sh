@@ -340,6 +340,9 @@ if cluster_listed; then
     log "  Destroying mitxonline stack..."
     destroy_stack "local-dev/apps/mitxonline/pulumi" "Dev" "mitxonline"
 
+    log "  Destroying learn-ai stack..."
+    destroy_stack "local-dev/apps/learn-ai/pulumi" "Dev" "learn-ai"
+
     # Destroy apps_infra before core (it depends on core stack)
     log "  Destroying apps_infra stack..."
     destroy_stack "local-dev/infra/apps_infra" "local-dev.apps-infra.Dev" "Apps infrastructure"
@@ -374,6 +377,7 @@ else
 
     log "Checking for Pulumi state left behind by the missing cluster..."
     drop_orphan_stack "local-dev/apps/mitxonline/pulumi" "Dev" "mitxonline"
+    drop_orphan_stack "local-dev/apps/learn-ai/pulumi" "Dev" "learn-ai"
     drop_orphan_stack "local-dev/infra/apps_infra" "local-dev.apps-infra.Dev" "Apps infrastructure"
     drop_orphan_stack "local-dev/infra/core" "local-dev.core.Dev" "Core infrastructure"
     cd "${REPO_ROOT}"

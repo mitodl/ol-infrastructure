@@ -10,8 +10,6 @@ laptop sizing with the memory limits from that stack file, and the
 routes. Tilt runs this through local-dev/scripts/pulumi-app-apply.sh.
 """
 
-import hashlib
-import json
 import os
 import sys
 from functools import partial
@@ -19,15 +17,7 @@ from pathlib import Path
 
 import pulumi
 import pulumi_kubernetes as k8s
-import yaml
-from inputs import (
-    ROOT_DOMAIN_DEFAULT,
-    await_policy,
-    image_reference,
-    manifest,
-    merged_env,
-    with_local_steps,
-)
+from inputs import IMAGE_REPOSITORY, with_local_steps
 from pulumi import ResourceOptions
 
 from ol_infrastructure.applications.mitxonline import definition
@@ -40,6 +30,20 @@ from ol_infrastructure.components.services.apisix import (
     OLApisixSharedPluginsConfig,
 )
 from ol_infrastructure.components.services.k8s import OLApplicationK8s
+from ol_infrastructure.lib.local_dev_program import (
+    MANAGED_BY_LABEL,
+    ROOT_DOMAIN_DEFAULT,
+    await_policy,
+    ca_bundle_env,
+    ca_bundle_mount,
+    ca_bundle_volume,
+    image_reference,
+    k3d_provider,
+    manifest,
+    merged_env,
+    secrets_hash,
+    warn_leftover_app_env_local,
+)
 from ol_infrastructure.lib.ol_types import (
     Application,
     BusinessUnit,
@@ -54,26 +58,24 @@ from ol_infrastructure.lib.secret_env import local_secret_data
 APP_DIR = Path(__file__).resolve().parents[1]
 SECRET_NAME = "mitxonline-secrets"  # noqa: S105  # pragma: allowlist secret
 ENV_SUFFIX = "dev"
-# Public roots plus the mkcert root, so pods trust both public endpoints and
-# local TLS. The core stack writes this ConfigMap into every app namespace
-# (CA_BUNDLE_CONFIGMAP in local-dev/infra/modules/tls.py).
-CA_BUNDLE_CONFIGMAP = "local-dev-ca-bundle"
-CA_BUNDLE_DIR = "/etc/ssl/local-dev"
 # The deployed label set (environment comes out as the stack's "dev"), plus the
-# key pulumi-app-apply.sh selects the applied objects by. These keys join every
-# Deployment's immutable selector, so changing any of them replaces every
-# Deployment on every developer's cluster.
-LABELS = K8sAppLabels(
-    application=Application.mitxonline,
-    product=Product.mitlearn,
-    service=Services.mitxonline,
-    ou=BusinessUnit.mitx_online,
-    source_repository="https://github.com/mitodl/mitxonline",
-    stack=parse_stack(),
-).model_dump() | {"ol.mit.edu/managed-by": "local-dev-pulumi"}
+# key pulumi-app-apply.sh selects the applied objects by (MANAGED_BY_LABEL).
+# These keys join every Deployment's immutable selector, so changing any of them
+# replaces every Deployment on every developer's cluster.
+LABELS = (
+    K8sAppLabels(
+        application=Application.mitxonline,
+        product=Product.mitlearn,
+        service=Services.mitxonline,
+        ou=BusinessUnit.mitx_online,
+        source_repository="https://github.com/mitodl/mitxonline",
+        stack=parse_stack(),
+    ).model_dump()
+    | MANAGED_BY_LABEL
+)
 
 root_domain = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", ROOT_DOMAIN_DEFAULT)
-repository, tag = image_reference(os.environ)
+repository, tag = image_reference(IMAGE_REPOSITORY, os.environ)
 # Only the image Tilt builds (the Dockerfile's local-dev stage, dev deps included)
 # carries granian[reload]; with --reload the published image exits at startup.
 tilt_built = bool(os.environ.get("TILT_IMAGE_0"))
@@ -106,9 +108,8 @@ LOCAL_ENV_DEFAULTS = {
     "DEBUG": "False",
     "ALLOWED_HOSTS": "*",
     "USE_X_FORWARDED_PORT": "True",
-    # The CA_BUNDLE_CONFIGMAP mount below.
-    "REQUESTS_CA_BUNDLE": f"{CA_BUNDLE_DIR}/ca-certificates.crt",
-    "SSL_CERT_FILE": f"{CA_BUNDLE_DIR}/ca-certificates.crt",
+    # Mounted by ca_bundle_mount() below.
+    **ca_bundle_env(),
     # Site config
     "MITX_ONLINE_ENVIRONMENT": "local",
     "MITX_ONLINE_ADMIN_EMAIL": "admin@ol.test",
@@ -193,35 +194,16 @@ LOCAL_ENV_DEFAULTS = {
 # other three memory limits are local keys in the same style.
 stack_config = pulumi.Config("mitxonline")
 env_vars, override_keys = merged_env(
-    LOCAL_ENV_DEFAULTS, stack_config.get_object("vars"), root_domain
+    "mitxonline:vars", LOCAL_ENV_DEFAULTS, stack_config.get_object("vars"), root_domain
 )
 if override_keys:
     # Key names only, never values: the file may hold secrets.
     sys.stderr.write(f"mitxonline:vars overrides: {', '.join(override_keys)}\n")
-# The YAML-applied apps take overrides from configmaps/app-env.local.yaml; for
-# this app that file is inert, so name its keys instead of letting it sit
-# unread (names only: the values may be secrets). Delete this check once no
-# app reads app-env.local.yaml.
-leftover = APP_DIR / "configmaps/app-env.local.yaml"
-if leftover.exists():
-    keys = ", ".join((yaml.safe_load(leftover.read_text()) or {}).get("data") or {})
-    sys.stderr.write(
-        f"configmaps/app-env.local.yaml is not read: move {keys or 'its data:'} "
-        "under mitxonline:vars in pulumi/Pulumi.Dev.yaml, then delete it\n"
-    )
+warn_leftover_app_env_local(APP_DIR, "mitxonline:vars")
 # Which image runs is the one input a teammate cannot see from the files.
 sys.stderr.write(f"image: {repository}:{tag}\n")
 
-# An explicit kubeconfig path, as the core and apps-infra stacks pass. Tilt hands
-# the commands it runs a KUBECONFIG under ~/Library/Application Support/tilt-dev
-# (the macOS path) that exists only while Tilt runs, and the provider records the
-# kubeconfig it was given as a provider input: left to the environment, `tilt
-# down` after Tilt has exited (its delete command runs this program's destroy)
-# and teardown.sh would read a file that is gone and fail to reach the cluster.
-kubeconfig = str(
-    Path(pulumi.Config().get("kubeconfig") or "~/.kube/config").expanduser()
-)
-provider = k8s.Provider("k3d-local", context="local-dev", kubeconfig=kubeconfig)
+provider = k3d_provider()
 opts = ResourceOptions(providers=[provider])
 
 # Deployed stacks get these variables from Vault through VSO. Here one plain
@@ -301,9 +283,7 @@ bindings = definition.MitxonlineBindings(
     ),
 )
 
-secrets_hash = hashlib.sha256(
-    json.dumps(secret_data, sort_keys=True).encode()
-).hexdigest()
+config_hash = secrets_hash(secret_data)
 deployed_config = definition.application_config(bindings)
 app_config = deployed_config.model_copy(
     update={
@@ -315,22 +295,11 @@ app_config = deployed_config.model_copy(
             # Set by the Tiltfile; see its apply_env.
             analytics_api=os.environ.get("LOCAL_DEV_ANALYTICS_API_ENABLED") == "true",
         ),
-        "extra_volumes": [
-            k8s.core.v1.VolumeArgs(
-                name=CA_BUNDLE_CONFIGMAP,
-                config_map=k8s.core.v1.ConfigMapVolumeSourceArgs(
-                    name=CA_BUNDLE_CONFIGMAP
-                ),
-            )
-        ],
-        "extra_volume_mounts": [
-            k8s.core.v1.VolumeMountArgs(
-                name=CA_BUNDLE_CONFIGMAP, mount_path=CA_BUNDLE_DIR, read_only=True
-            )
-        ],
+        "extra_volumes": [ca_bundle_volume()],
+        "extra_volume_mounts": [ca_bundle_mount()],
         # Env is in env:, so an env edit changes the pod template; a secrets.yaml
         # edit changes only the Secret, and pods must roll for that too.
-        "config_hash_inputs": {"secrets.yaml": secrets_hash},
+        "config_hash_inputs": {"secrets.yaml": config_hash},
     }
 )
 
@@ -344,7 +313,7 @@ OLApplicationK8s(
         # local steps, which the Deployments' pod-template hash alone would not.
         transforms=[
             partial(
-                await_policy, job_annotations={"ol.mit.edu/config-hash": secrets_hash}
+                await_policy, job_annotations={"ol.mit.edu/config-hash": config_hash}
             )
         ],
     ),

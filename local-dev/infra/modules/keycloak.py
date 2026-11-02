@@ -425,7 +425,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         ingress controller merges these over the route's inline plugin config,
         so the routes do not repeat them. session.secret is lua-resty-session's
         cookie encryption key; every Secret carries LOCAL_OIDC_SESSION_SECRET so
-        the two ol-mitlearn-oidc copies agree (mit-learn's routes write the
+        every ol-mitlearn-oidc copy agrees (mit-learn's routes write the
         Learn cookie, mitxonline's /mitxonline/* proxy route reads it).
         """
         return k8s.core.v1.Secret(
@@ -482,6 +482,11 @@ def create_olapps_dev_realm(  # noqa: PLR0913
     )
 
     # --- Learn AI ---
+    # ol-learn-ai-client mirrors the deployed realm, where learn-ai exchanges
+    # tokens as this client
+    # (src/ol_infrastructure/substructure/keycloak/ol_memory.py); nothing local
+    # signs in through it. learn-ai's gateway routes use the mit-learn client
+    # below.
     learn_ai_client = keycloak.openid.Client(
         "olapps-learn-ai-client",
         name="ol-learn-ai-client",
@@ -505,13 +510,6 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         default_scopes=DEFAULT_SCOPES,
         opts=kc_opts,
     )
-    _make_oidc_secret(
-        "oidc-secret-learn-ai",
-        "learn-ai",
-        "ol-learn-ai-oidc",
-        learn_ai_client,
-        learn_ai_client_secret,
-    )
 
     # --- MIT Learn ---
     mitlearn_client = keycloak.openid.Client(
@@ -528,6 +526,10 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         valid_redirect_uris=[
             f"https://learn.{root_domain}/*",
             f"https://api.learn.{root_domain}/*",
+            # learn-ai's own host authenticates through this client, as deployed
+            # (both of its OIDC resources read sso/mitlearn), so its callback
+            # must be allowed here.
+            f"https://ai.learn.{root_domain}/*",
             # mitxonline's deployed gateway routes authenticate through this
             # client (sso/mitlearn), so rendering them locally needs its hosts.
             f"https://mitxonline.{root_domain}/*",
@@ -553,12 +555,11 @@ def create_olapps_dev_realm(  # noqa: PLR0913
         mitlearn_client,
         mitlearn_client_secret,
     )
-    # Same mitlearn creds for the other apps' routes on api.learn that read
-    # mit-learn's session via secretRef: both of mitxonline's rendered route
-    # groups (they authenticate through this client, as deployed) and learn-ai's
-    # /ai/* routes. ol-analytics-api's analytics.learn route reads the same
-    # session, as its deployed Learn-scoped OIDC resource does (sso/mitlearn);
-    # its namespace only exists when the app is enabled.
+    # The same mitlearn creds for the other apps whose gateway routes
+    # authenticate through this client, as deployed: both route groups of
+    # mitxonline and both of learn-ai. ol-analytics-api's analytics.learn route
+    # reads the same session, as its deployed Learn-scoped OIDC resource does
+    # (sso/mitlearn); its namespace only exists when the app is enabled.
     for namespace in (
         "mitxonline",
         "learn-ai",
