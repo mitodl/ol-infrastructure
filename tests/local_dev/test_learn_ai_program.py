@@ -28,6 +28,7 @@ from tests.local_dev.program_render import one as _one
 APP_DIR = REPO / "local-dev/apps/learn-ai"
 CONSUMER = "kubernetes:apisix.apache.org/v2:ApisixConsumer"
 KEY_VALUE = "sk-secret-value"  # pragma: allowlist secret
+LLM_STUB = "learn-ai-llm-stub"
 MIGRATE_COMMAND = [
     "bash",
     "-c",
@@ -97,6 +98,7 @@ def test_workloads_are_the_deployed_shape_without_a_readiness_wait(
         "learn-ai-app",
         "learn-ai-all-celery-worker",
         "learn-ai-celery-beat",
+        LLM_STUB,
     }
     # await_policy itself is covered in test_local_dev_program.py; here, that the
     # component gets it.
@@ -182,13 +184,18 @@ def test_every_container_mounts_each_path_once(tmp_path, monkeypatch):
 def test_every_container_reads_the_ca_bundle_the_core_stack_writes(
     tmp_path, monkeypatch
 ):
-    """SSL_CERT_FILE names a file in the core stack's bundle ConfigMap."""
+    """SSL_CERT_FILE names a file in the core stack's bundle ConfigMap.
+
+    The model stub calls nothing, so it has no bundle.
+    """
     monkeypatch.syspath_prepend(str(REPO / "local-dev/infra"))
     tls = importlib.import_module("modules.tls")
     mocks = _render(tmp_path, monkeypatch)
     expected = f"{CA_BUNDLE_DIR}/{tls.CA_BUNDLE_FILENAME}"
     for typ in (DEPLOYMENT, JOB):
-        for _, name, inputs in [(t, n, i) for t, n, i in mocks.resources if t == typ]:
+        for _, name, inputs in [
+            (t, n, i) for t, n, i in mocks.resources if t == typ and n != LLM_STUB
+        ]:
             spec = inputs["spec"]["template"]["spec"]
             volumes = {
                 v["name"]: v["configMap"]["name"]
@@ -313,7 +320,10 @@ def test_a_local_only_secret_stops_the_local_program(tmp_path, monkeypatch):
 
 def test_a_non_string_secret_value_names_its_key(tmp_path, monkeypatch):
     secrets = (APP_DIR / "secrets.yaml").read_text()
-    edited = secrets.replace('OPENAI_API_KEY: ""', "OPENAI_API_KEY: 5")
+    edited = secrets.replace(
+        'OPENAI_API_KEY: "local-dev-stub-key"',  # pragma: allowlist secret
+        "OPENAI_API_KEY: 5",
+    )
     assert edited != secrets
     with pytest.raises(ValueError, match="OPENAI_API_KEY"):
         _render(tmp_path, monkeypatch, app_files={"secrets.yaml": edited})
@@ -407,7 +417,8 @@ def test_every_rendered_object_carries_the_deployed_labels_and_managed_by(
     rendered = [
         (t, i) for t, _, i in mocks.resources if t.startswith("kubernetes:") and i
     ]
-    # Three Deployments, the Service, the Job, the Secret.
+    # Four Deployments (the model stub's among them), two Services, the Job, the
+    # Secret, the stub's ConfigMap.
     assert len(rendered) >= 6
     for typ, inputs in rendered:
         labels = inputs["metadata"]["labels"]
@@ -525,3 +536,96 @@ def test_the_canvas_consumer_carries_the_secrets_yaml_key(tmp_path, monkeypatch)
         spec = spec["value"]
     key = spec["authParameter"]["keyAuth"]["value"]["key"]
     assert key == "local-dev-canvas-syllabus-token"
+
+
+def _stub_url(mocks):
+    service = _one(mocks, SERVICE, LLM_STUB)
+    # The mock hands numbers back as floats.
+    port = int(service["spec"]["ports"][0]["port"])
+    return f"http://{LLM_STUB}.{definition.NAMESPACE}.svc.cluster.local:{port}/v1"
+
+
+def test_without_a_chosen_backend_learn_ai_calls_the_model_stub(
+    tmp_path, monkeypatch, capsys
+):
+    mocks = _render(tmp_path, monkeypatch)
+    env = _env(_one(mocks, DEPLOYMENT, "learn-ai-app"))
+    assert env["OPENAI_BASE_URL"] == _stub_url(mocks)
+    assert "model: local stub" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("env_vars", "base_url"),
+    [
+        ({"OPENAI_API_KEY": KEY_VALUE}, None),
+        (
+            {"OPENAI_BASE_URL": "http://ollama.test:11434/v1"},
+            "http://ollama.test:11434/v1",
+        ),
+        # LiteLLM reads OPENAI_BASE_URL first, so the stub's must stay out.
+        ({"OPENAI_API_BASE": "http://ollama.test:11434/v1"}, None),
+        # Its proxy passes the proxy's URL on every call.
+        ({"AI_PROXY_CLASS": "LiteLLMProxy"}, None),
+    ],
+)
+def test_a_chosen_backend_keeps_learn_ai_off_the_stub(
+    tmp_path, monkeypatch, env_vars, base_url
+):
+    mocks = _render(tmp_path, monkeypatch, config={"learn_ai:env_vars": env_vars})
+    assert _env(_one(mocks, DEPLOYMENT, "learn-ai-app")).get("OPENAI_BASE_URL") == (
+        base_url
+    )
+
+
+@pytest.mark.parametrize(
+    ("key", "empty"),
+    [
+        # In env: it would override the Secret's placeholder, and LiteLLM refuses
+        # an empty key whatever the base URL.
+        ("OPENAI_API_KEY", ""),
+        # A bare `KEY:` in the stack file.
+        ("OPENAI_API_KEY", None),
+        # Each would turn the stub off while LiteLLM or learn-ai reads it as unset.
+        ("OPENAI_BASE_URL", None),
+        ("OPENAI_API_BASE", None),
+        ("AI_PROXY_CLASS", None),
+    ],
+)
+def test_an_empty_backend_key_stops_the_program(tmp_path, monkeypatch, key, empty):
+    with pytest.raises(ValueError, match=f"{key} in learn_ai:env_vars is empty"):
+        _render(tmp_path, monkeypatch, config={"learn_ai:env_vars": {key: empty}})
+
+
+def test_the_stub_service_selects_only_the_stub(tmp_path, monkeypatch):
+    mocks = _render(tmp_path, monkeypatch)
+    stub_pods = _one(mocks, DEPLOYMENT, LLM_STUB)["spec"]["template"]["metadata"]
+    selector = _one(mocks, SERVICE, LLM_STUB)["spec"]["selector"]
+    assert selector.items() <= stub_pods["labels"].items()
+    for name in ("learn-ai-app", "learn-ai-all-celery-worker", "learn-ai-celery-beat"):
+        app_pods = _one(mocks, DEPLOYMENT, name)["spec"]["template"]["metadata"]
+        assert not selector.items() <= app_pods["labels"].items(), name
+    webapp_selector = _one(mocks, SERVICE, "learn-ai-webapp")["spec"]["selector"]
+    assert not webapp_selector.items() <= stub_pods["labels"].items()
+
+
+def test_the_stub_skips_the_readiness_wait(tmp_path, monkeypatch):
+    mocks = _render(tmp_path, monkeypatch)
+    for typ in (DEPLOYMENT, SERVICE):
+        (transform,) = mocks.transforms[typ]
+        assert getattr(transform, "func", transform).__name__ == "await_policy"
+
+
+def test_a_stub_edit_rolls_its_pod(tmp_path, monkeypatch):
+    def config_hash(mocks):
+        template = _one(mocks, DEPLOYMENT, LLM_STUB)["spec"]["template"]
+        return template["metadata"]["annotations"]["ol.mit.edu/config-hash"]
+
+    before = config_hash(_render(tmp_path / "before", monkeypatch))
+    after = config_hash(
+        _render(
+            tmp_path / "after",
+            monkeypatch,
+            app_files={"llm-stub/server.py": "print('edited')\n"},
+        )
+    )
+    assert before != after

@@ -167,7 +167,7 @@ Inside the cluster, workloads are grouped into namespaces: one per app, plus `lo
 │  │  (ns)     │  │   (ns)    │  │   (ns)   │  │ video  │ │   │
 │  │ Next.js   │  │ granian   │  │ granian  │  │  uwsgi │ │   │
 │  │ Django    │  │ Celery×2  │  │  Celery  │  │ Celery │ │   │
-│  │ Celery×3  │  │           │  │          │  │        │ │   │
+│  │ Celery×3  │  │ LLM stub  │  │          │  │        │ │   │
 │  └───────────┘  └───────────┘  └──────────┘  └────────┘ │   │
 └──────────────────────────────────────────────────────────────┘
          ▲
@@ -298,6 +298,7 @@ mitxonline and learn-ai instead:
       pre-deploy Job: migrate, then createcachetable, then (mitxonline, local only) re-assert the
         OAuth2 Application the composed Open edX signs in through
       Deployments, Service, ApisixPluginConfig, ApisixRoutes (and learn-ai's ApisixConsumer) from the deployed definition
+      learn-ai only, local only: a model stub (Deployment, Service, ConfigMap) learn-ai calls until a model backend is chosen
 ```
 
 ## The raw k8s dev flow (what Tilt automates)

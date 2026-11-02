@@ -101,6 +101,7 @@ k8s_custom_deploy(
         os.path.join(config.main_dir, 'src/ol_infrastructure/lib'),
         os.path.join(config.main_dir, 'src/bridge/lib'),
         'secrets.yaml',
+        'llm-stub',
     ],
     # Without a checkout nothing registers the image, and naming it here would
     # fail the Tiltfile load; the program then runs the published image.

@@ -7,14 +7,19 @@ Secret with local values (secrets.yaml) for variables deployed stacks read from
 Vault, the image Tilt built (or the published one without a checkout),
 laptop sizing with the memory limits from that stack file, a pre-deploy Job
 that migrates and creates the cache tables, and the gateway's OIDC resources,
-shared plugins, routes and canvas-agent consumer. Tilt runs this through
-local-dev/scripts/pulumi-app-apply.sh.
+shared plugins, routes and canvas-agent consumer. Local only: that Secret, and
+a model stub (../llm-stub/server.py, with its Deployment, Service and
+ConfigMap) learn-ai calls until the stack file picks a model backend. Tilt runs
+this through local-dev/scripts/pulumi-app-apply.sh.
 """
 
+import hashlib
 import os
 import sys
+from collections.abc import Mapping
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 import pulumi
 import pulumi_kubernetes as k8s
@@ -63,8 +68,70 @@ LABELS = (
     | MANAGED_BY_LABEL
 )
 
+LLM_STUB_NAME = "learn-ai-llm-stub"
+LLM_STUB_PORT = 8099
+# The org's Python base, which learn-ai's own image starts from. Not learn-ai's
+# image: with a checkout, every rebuild would roll the stub for nothing.
+LLM_STUB_IMAGE = (
+    "mitodl/ol-python-base:3.14"
+    "@sha256:dc53d5c041fec52b30cd9be8a8fdbb777730773d1f3eb3d0bd9ca7d832268b62"
+)
+# The base image's mitodl user; the image itself runs as root.
+LLM_STUB_USER = 1000
+LLM_STUB_URL = (
+    f"http://{LLM_STUB_NAME}.{definition.NAMESPACE}.svc.cluster.local:"
+    f"{LLM_STUB_PORT}/v1"
+)
+LLM_STUB_LABELS = LABELS | {
+    "ol.mit.edu/application": "learn-ai",
+    "ol.mit.edu/component": "llm-stub",
+}
+
+
+def model_backend(env_vars: Mapping[str, Any]) -> tuple[str, dict[str, str]]:
+    """Return a name for learn-ai's model backend and the variables it needs.
+
+    ``env_vars`` is the stack file's ``learn_ai:env_vars``. LiteLLM sends every
+    ``openai/`` model to OPENAI_BASE_URL when it is set, so the stub needs only
+    that; the Secret's placeholder OPENAI_API_KEY satisfies LiteLLM, which
+    refuses an empty key whatever the URL. LiteLLM reads OPENAI_BASE_URL before
+    OPENAI_API_BASE, so a developer's OPENAI_API_BASE also keeps the stub's URL
+    out. learn-ai's proxy (AI_PROXY_CLASS) passes its own URL on every call.
+
+    An empty value for any of these keys stops the apply. An empty
+    OPENAI_API_KEY would override the Secret's placeholder, so LiteLLM would
+    refuse every call; an empty backend key would turn the stub off while
+    LiteLLM and learn-ai read it as unset, sending the placeholder key to
+    OpenAI.
+    """
+    backend_keys = ("OPENAI_BASE_URL", "OPENAI_API_BASE", "AI_PROXY_CLASS")
+    for key in ("OPENAI_API_KEY", *backend_keys):
+        if key in env_vars and not env_vars[key]:
+            msg = (
+                f"{key} in learn_ai:env_vars is empty; remove it to use the "
+                "local model stub, or set a value"
+            )
+            raise ValueError(msg)
+    for key in backend_keys:
+        if key in env_vars:
+            return f"{key} from env_vars", {}
+    if "OPENAI_API_KEY" in env_vars:
+        return "OpenAI", {}
+    return (
+        "local stub (set OPENAI_API_KEY in learn_ai:env_vars for OpenAI)",
+        {"OPENAI_BASE_URL": LLM_STUB_URL},
+    )
+
+
 root_domain = os.environ.get("LOCAL_DEV_ROOT_DOMAIN", ROOT_DOMAIN_DEFAULT)
 repository, tag = image_reference(IMAGE_REPOSITORY, os.environ)
+# The developer's gitignored stack file, Pulumi.Dev.yaml next to this program
+# (pulumi-app-apply.sh creates it on the first apply; the .example lists the
+# keys). `env_vars` is the deployed stacks' key; the four memory limits are
+# local keys in the same style.
+stack_config = pulumi.Config("learn_ai")
+developer_env = stack_config.get_object("env_vars") or {}
+backend, backend_env = model_backend(developer_env)
 # Values for a developer's cluster, applied over definition.LOCAL_AND_DEPLOYED_ENV
 # and under the stack file's `learn_ai:env_vars`; `env_vars` means the same in
 # the deployed stacks' files.
@@ -121,17 +188,10 @@ LOCAL_ENV_DEFAULTS = {
         f'["ai.learn.{root_domain}","ai-sandbox.learn.{root_domain}",'
         f'"learn.{root_domain}","lms.{root_domain}","mitxonline.{root_domain}"]'
     ),
+    **backend_env,
 }
-# The developer's gitignored stack file, Pulumi.Dev.yaml next to this program
-# (pulumi-app-apply.sh creates it on the first apply; the .example lists the
-# keys). `env_vars` is the deployed stacks' key; the four memory limits are
-# local keys in the same style.
-stack_config = pulumi.Config("learn_ai")
 env_vars, override_keys = merged_env(
-    "learn_ai:env_vars",
-    LOCAL_ENV_DEFAULTS,
-    stack_config.get_object("env_vars"),
-    root_domain,
+    "learn_ai:env_vars", LOCAL_ENV_DEFAULTS, developer_env, root_domain
 )
 if override_keys:
     # Key names only, never values: the file may hold secrets.
@@ -139,9 +199,99 @@ if override_keys:
 warn_leftover_app_env_local(APP_DIR, "learn_ai:env_vars")
 # Which image runs is the one input a teammate cannot see from the files.
 sys.stderr.write(f"image: {repository}:{tag}\n")
+sys.stderr.write(f"model: {backend}\n")
 
 provider = k3d_provider()
 opts = ResourceOptions(providers=[provider])
+
+# The stub exists whichever backend is chosen, so switching changes only
+# OPENAI_BASE_URL. Its labels add a component of its own: LABELS alone is on
+# every learn-ai pod, and a selector on it would match them all.
+llm_stub_source = (APP_DIR / "llm-stub" / "server.py").read_text()
+llm_stub_opts = ResourceOptions(providers=[provider], transforms=[await_policy])
+llm_stub_metadata = ObjectMetaArgs(
+    name=LLM_STUB_NAME, namespace=definition.NAMESPACE, labels=LLM_STUB_LABELS
+)
+k8s.core.v1.ConfigMap(
+    LLM_STUB_NAME,
+    metadata=llm_stub_metadata,
+    data={"server.py": llm_stub_source},
+    opts=llm_stub_opts,
+)
+k8s.apps.v1.Deployment(
+    LLM_STUB_NAME,
+    metadata=llm_stub_metadata,
+    spec=k8s.apps.v1.DeploymentSpecArgs(
+        replicas=1,
+        selector=k8s.meta.v1.LabelSelectorArgs(match_labels=LLM_STUB_LABELS),
+        template=k8s.core.v1.PodTemplateSpecArgs(
+            metadata=ObjectMetaArgs(
+                labels=LLM_STUB_LABELS,
+                # A server.py edit changes only the ConfigMap; this rolls the pod.
+                annotations={
+                    "ol.mit.edu/config-hash": hashlib.sha256(
+                        llm_stub_source.encode()
+                    ).hexdigest()
+                },
+            ),
+            spec=k8s.core.v1.PodSpecArgs(
+                security_context=k8s.core.v1.PodSecurityContextArgs(
+                    run_as_user=LLM_STUB_USER,
+                    run_as_group=LLM_STUB_USER,
+                    run_as_non_root=True,
+                ),
+                containers=[
+                    k8s.core.v1.ContainerArgs(
+                        name="llm-stub",
+                        image=LLM_STUB_IMAGE,
+                        command=["python", "/stub/server.py"],
+                        ports=[
+                            k8s.core.v1.ContainerPortArgs(
+                                name="http", container_port=LLM_STUB_PORT
+                            )
+                        ],
+                        readiness_probe=k8s.core.v1.ProbeArgs(
+                            http_get=k8s.core.v1.HTTPGetActionArgs(
+                                path="/health", port="http"
+                            )
+                        ),
+                        resources=k8s.core.v1.ResourceRequirementsArgs(
+                            requests={"cpu": "10m", "memory": "32Mi"},
+                            limits={"memory": "64Mi"},
+                        ),
+                        volume_mounts=[
+                            k8s.core.v1.VolumeMountArgs(
+                                name="server", mount_path="/stub", read_only=True
+                            )
+                        ],
+                    )
+                ],
+                volumes=[
+                    k8s.core.v1.VolumeArgs(
+                        name="server",
+                        config_map=k8s.core.v1.ConfigMapVolumeSourceArgs(
+                            name=LLM_STUB_NAME
+                        ),
+                    )
+                ],
+            ),
+        ),
+    ),
+    opts=llm_stub_opts,
+)
+k8s.core.v1.Service(
+    LLM_STUB_NAME,
+    metadata=llm_stub_metadata,
+    spec=k8s.core.v1.ServiceSpecArgs(
+        selector=LLM_STUB_LABELS,
+        ports=[
+            k8s.core.v1.ServicePortArgs(
+                name="http", port=LLM_STUB_PORT, target_port="http"
+            )
+        ],
+    ),
+    opts=llm_stub_opts,
+)
 
 # Deployed stacks get these variables from Vault through VSO. Here one plain
 # Secret carries the same names, with the values secrets.yaml gives them.

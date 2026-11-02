@@ -30,7 +30,8 @@ config:
   learn_ai:web_memory_limit: 2Gi  # the default, written out as the key to raise
   # Uncomment learn_ai:env_vars and the keys you need under it:
   # learn_ai:env_vars:
-    # Needed for any AI feature. RC and production call OpenAI directly too.
+    # For real answers; without it learn-ai answers from the local model stub
+    # (local-dev/README.md). RC and production call OpenAI directly too.
     # OPENAI_API_KEY: "sk-..."  # pragma: allowlist secret
 
     # Needed for the bots' course search (syllabus, content files, video
