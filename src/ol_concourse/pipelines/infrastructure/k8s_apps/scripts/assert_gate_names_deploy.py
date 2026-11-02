@@ -24,6 +24,13 @@ body, marker included. So the issue is refused if its body was edited at or
 after it was closed. Labelling the issue, which the gate get does to consume
 it, is not a body edit.
 
+The issue also has to be one the release App opened. The gate fires on any
+closed issue whose title matches, and these repositories are public: anyone
+can open an issue with the real one's title and body, marker included, and
+close it, since an author can close their own issue. Only the App opens gate
+issues, so its bot is the only author that approves anything. The App's name
+is read from the API with its own credentials, not configured.
+
 ``pipeline.py`` inlines this file's text into the task (``python3 -c``), so it
 must stay standard-library only and self-contained. It authenticates as the
 release GitHub App the same way ``supersede_gate_issues.py`` does, signing the
@@ -66,7 +73,10 @@ _ATTEMPTS = 3
 _ISSUE_QUERY = """
 query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
-    issue(number: $number) { body closed closedAt lastEditedAt }
+    issue(number: $number) {
+      author { __typename login }
+      body closed closedAt lastEditedAt
+    }
   }
 }
 """
@@ -170,13 +180,27 @@ def edited_after_close(issue: dict[str, Any]) -> bool:
     return _timestamp(edited) >= _timestamp(closed)
 
 
+def opened_by(issue: dict[str, Any], app_slug: str) -> bool:
+    """Return whether the release App's bot opened *issue*.
+
+    GraphQL names a bot by its App's slug, without REST's ``[bot]`` suffix, so
+    the type is checked too: a user can be named like an App.
+    """
+    author = issue.get("author") or {}
+    return author.get("__typename") == "Bot" and author.get("login") == app_slug
+
+
 def _timestamp(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
-def fetch_issue(api_url: str, repo: str, number: int) -> dict[str, Any]:
-    """Return issue *number*'s body and close/edit state, read as the release App."""
+def fetch_issue(api_url: str, repo: str, number: int) -> tuple[dict[str, Any], str]:
+    """Return issue *number*, read as the release App, and that App's slug.
+
+    The issue carries its author, body and close/edit state.
+    """
     jwt = app_jwt(os.environ["GITHUB_APP_ID"], os.environ["GITHUB_APP_PRIVATE_KEY"])
+    app_slug = _request(api_url, "GET", "/app", f"Bearer {jwt}")["slug"]
     installation = os.environ["GITHUB_APP_INSTALLATION_ID"]
     token = _request(
         api_url,
@@ -202,7 +226,7 @@ def fetch_issue(api_url: str, repo: str, number: int) -> dict[str, Any]:
     if issue is None:
         msg = f"issue #{number} was not found in {repo}"
         raise RuntimeError(msg)
-    return issue
+    return issue, app_slug
 
 
 def refuse(message: str) -> NoReturn:
@@ -242,7 +266,17 @@ def main() -> None:
         )
     number = int(gate.get("issue_number") or 0)
     api_url = os.environ.get("GITHUB_API_URL") or "https://api.github.com"
-    issue = fetch_issue(api_url, os.environ["GITHUB_REPOSITORY"], number)
+    issue, app_slug = fetch_issue(api_url, os.environ["GITHUB_REPOSITORY"], number)
+    if not opened_by(issue, app_slug):
+        author = issue.get("author") or {}
+        refuse(
+            f"Refusing to deploy {app} {deploying}: gate issue #{number} "
+            f"({title!r}) was not opened by the release App ({app_slug}) but by "
+            f"{author.get('login') or 'a deleted account'} "
+            f"({author.get('__typename') or 'unknown'}), so it approves nothing. "
+            "Nothing was deployed. Close the release issue the App opened, or "
+            "re-run the QA job to post one if there is none."
+        )
     if edited_after_close(issue):
         refuse(
             f"Refusing to deploy {app} {deploying}: gate issue #{number} "

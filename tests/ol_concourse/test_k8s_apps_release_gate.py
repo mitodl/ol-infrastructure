@@ -108,9 +108,14 @@ def test_legacy_pipelines_are_untouched():
 CLOSED_AT = "2026-10-15T19:43:38Z"
 
 
-class _FakeGitHub(BaseHTTPRequestHandler):
-    """The two GitHub calls the check makes: an installation token, one issue."""
+APP_SLUG = "ol-release-bot"
+RELEASE_APP_AUTHOR = {"__typename": "Bot", "login": APP_SLUG}
 
+
+class _FakeGitHub(BaseHTTPRequestHandler):
+    """The GitHub calls the check makes: the App, an installation token, one issue."""
+
+    author: ClassVar[dict[str, str] | None] = RELEASE_APP_AUTHOR
     body: ClassVar[str | None] = ""
     closed: ClassVar[bool] = True
     closed_at: ClassVar[str | None] = CLOSED_AT
@@ -130,6 +135,12 @@ class _FakeGitHub(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def do_GET(self) -> None:
+        self.calls.append(("GET", self.path))
+        assert self.path == "/app"
+        assert self.headers["Authorization"].startswith("Bearer ")
+        self._reply({"slug": APP_SLUG, "id": 123})
+
     def do_POST(self) -> None:
         self.calls.append(("POST", self.path))
         if self.path == "/app/installations/456/access_tokens":
@@ -146,6 +157,7 @@ class _FakeGitHub(BaseHTTPRequestHandler):
             self._reply(self.graphql_response)
             return
         issue = {
+            "author": self.author,
             "body": self.body,
             "closed": self.closed,
             "closedAt": self.closed_at,
@@ -157,6 +169,7 @@ class _FakeGitHub(BaseHTTPRequestHandler):
 @pytest.fixture
 def fake_github():
     """Serve the fake GitHub API on a free local port."""
+    _FakeGitHub.author = RELEASE_APP_AUTHOR
     _FakeGitHub.body = f"<!-- ol-infrastructure-revision: {SHA} -->\n## Release x\n"
     _FakeGitHub.closed = True
     _FakeGitHub.closed_at = CLOSED_AT
@@ -321,6 +334,34 @@ def test_script_refuses_a_body_edited_after_the_close(  # noqa: PLR0913
     assert (result.returncode == 0) is allowed, result.stderr
     if not allowed:
         assert "edited at or after it was closed" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "author",
+    [
+        # Anyone can open an issue in these public repositories and close it,
+        # with the real issue's title and body copied over.
+        {"__typename": "User", "login": "outsider"},
+        # Another App's bot, or a user named like the release App's bot.
+        {"__typename": "Bot", "login": "dependabot"},
+        {"__typename": "User", "login": APP_SLUG},
+        # A deleted account.
+        None,
+    ],
+)
+def test_script_refuses_an_issue_the_release_app_did_not_open(
+    tmp_path, fake_github, private_key, author
+):
+    """Only the release App opens gate issues, so no other author approves."""
+    _FakeGitHub.author = author
+    gate = {"issue_title": f"Release {APP} 2026.9.22.1"}
+    result = _run(tmp_path, fake_github, private_key, gate, "2026.9.22.1")
+
+    assert result.returncode != 0
+    assert f"was not opened by the release App ({APP_SLUG})" in result.stderr
+    assert "approves deploying" not in result.stdout
+    # Labelled ops:refused, so the bot reports it in Slack.
+    assert (tmp_path / "refusal" / "refused").exists()
 
 
 @pytest.mark.parametrize(
