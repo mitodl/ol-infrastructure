@@ -109,22 +109,35 @@ def test_a_managed_client_always_has_both_grants_off(client_args):
 
 KEYCLOAK_PACKAGE = Path(client_policies.__file__).parent
 # The master realm has no client policies, so its clients carry no marker.
-UNMARKED_CLIENT_MODULES = {"scim.py"}
+UNMARKED_CLIENT_RESOURCES = {"master-scim-config-manager-client"}
 CLIENT_ARG_SPREADS = {"MANAGED_CLIENT_ARGS", "PKCE_REQUIRED_CLIENT_ARGS"}
+
+
+def _is_openid_client_call(node: ast.AST) -> bool:
+    """Match ``keycloak.openid.Client(...)`` and ``openid.Client(...)``."""
+    if not (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "Client"
+    ):
+        return False
+    owner = node.func.value
+    return (isinstance(owner, ast.Attribute) and owner.attr == "openid") or (
+        isinstance(owner, ast.Name) and owner.id == "openid"
+    )
 
 
 def _client_calls_without_spread() -> list[str]:
     missing = []
-    for module in sorted(KEYCLOAK_PACKAGE.glob("*.py")):
-        if module.name in UNMARKED_CLIENT_MODULES:
-            continue
+    for module in sorted(KEYCLOAK_PACKAGE.rglob("*.py")):
         for node in ast.walk(ast.parse(module.read_text())):
-            if not (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Attribute)
-                and node.func.attr == "Client"
-                and isinstance(node.func.value, ast.Attribute)
-                and node.func.value.attr == "openid"
+            if not _is_openid_client_call(node):
+                continue
+            assert isinstance(node, ast.Call)
+            resource_name = node.args[0] if node.args else None
+            if (
+                isinstance(resource_name, ast.Constant)
+                and resource_name.value in UNMARKED_CLIENT_RESOURCES
             ):
                 continue
             spreads = {
