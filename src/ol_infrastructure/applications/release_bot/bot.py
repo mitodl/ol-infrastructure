@@ -1765,6 +1765,10 @@ class ReleaseProgressState:
     # the refusals from before this process started without posting them.
     refusals_announced: set[tuple[str, int]] = field(default_factory=set)
     refusals_seeded: set[str] = field(default_factory=set)
+    # Closed release issues Production never took, already reported; seeded
+    # per app the same way as refusals.
+    stranded_announced: set[tuple[str, int]] = field(default_factory=set)
+    stranded_seeded: set[str] = field(default_factory=set)
 
 
 def _format_age(age: timedelta) -> str:
@@ -2093,6 +2097,131 @@ async def _announce_refusals(app, repos, state: ReleaseProgressState) -> bool:
     return ok
 
 
+# A closed release issue that Production has not labelled consumed after this
+# long is reported. The gate is checked every 5 minutes, and Production queues
+# behind a running QA job for that app, which has taken up to about 30 minutes,
+# so a shorter wait would report deploys that are only slow.
+_STRANDED_AFTER = timedelta(minutes=45)
+# Only issues closed this recently are considered, which also keeps old
+# releases from before the consumed label existed out of it.
+_STRANDED_LOOKBACK = timedelta(days=1)
+
+
+async def _production_started_since(repo_slug: str, since: datetime) -> bool:
+    """Return whether a Production Deployment was recorded at or after *since*."""
+    report = await github.deployment_report(repo_slug, github.PRODUCTION_ENVIRONMENT)
+    success, newer = report["success"], report["newer"]
+    return (success is not None and success["deployed_at"] >= since) or (
+        newer is not None and newer["created_at"] >= since
+    )
+
+
+def _qa_job_url(app_name: str, cfg) -> str:
+    # The QA job of the same Pulumi project as _production_job_url.
+    return concourse.job_url(cfg.pipeline, f"deploy-ol-application-{app_name}-qa")
+
+
+def _overdue_approval(app_name: str, issue: dict[str, Any], now: datetime) -> bool:
+    """Return whether *issue* approved a deploy that should have started by now.
+
+    It must be one of *app_name*'s gate issues, closed within the lookback and
+    at least _STRANDED_AFTER ago, and still unclaimed: not consumed, refused
+    or abandoned.
+    """
+    closed_at = issue["closed_at"]
+    return (
+        closed_at is not None
+        and now - _STRANDED_LOOKBACK <= closed_at <= now - _STRANDED_AFTER
+        and _is_gate_title(app_name, issue["title"])
+        and github.release_state(issue["labels"]) in {"release", "promote-ready"}
+    )
+
+
+def _stranded_text(app_name: str, cfg, issue: dict[str, Any], age: timedelta) -> str:
+    minutes = int(age.total_seconds() // 60)
+    return (
+        f"⚠️ `{app_name}` <{issue['url']}|#{issue['number']}> was closed "
+        f"{minutes} minutes ago, but Production has not taken it, so nothing "
+        "has deployed. If the Production job has no pending build, Concourse "
+        "has no QA run it can deploy (this happens after the release resource "
+        "types are updated): re-run the QA job, then approve the release issue "
+        f"it posts. QA: {_qa_job_url(app_name, cfg)} "
+        f"Production: {_production_job_url(app_name, cfg)}"
+    )
+
+
+async def _announce_stranded_approvals(app, repos, state: ReleaseProgressState) -> bool:
+    """Post to Slack when a closed release issue has not been taken by Production.
+
+    Closing the issue is the approval, and the Production build that takes it
+    labels it `ops:consumed`. If no build does, nothing says so: the issue
+    reads as approved and nothing deploys. On 2026-11-03
+    https://github.com/mitodl/mitxpro/issues/4172 sat closed for 19 minutes
+    because Production had no QA build it could use after the release
+    resource's history was reset, then was refused once a newer QA build ran.
+    A gate check that does not see the close, or a paused pipeline, looks the
+    same from here, so the message points at the jobs rather than one cause.
+
+    A refused or abandoned issue is handled elsewhere or nobody is waiting on
+    it, so only issues still in the release or promote-ready state count. The
+    consumed label is best-effort, so a Production Deployment started after the
+    close also counts as taken.
+    """
+    ok = True
+    now = _now()
+    for app_name, cfg in repos.items():
+        channel = _announce_channel(cfg)
+        if not channel:
+            continue
+        try:
+            closed = await github.closed_release_issues(
+                cfg.repo, now - _STRANDED_LOOKBACK
+            )
+        except Exception:
+            ok = False
+            log.exception("Failed to look for closed release issues for %s", app_name)
+            continue
+        seeding = app_name not in state.stranded_seeded
+        for issue in closed:
+            key = (app_name, issue["number"])
+            if key in state.stranded_announced or not _overdue_approval(
+                app_name, issue, now
+            ):
+                continue
+            closed_at = issue["closed_at"]
+            due = closed_at + _STRANDED_AFTER
+            if seeding and due < _started_at - _REFUSAL_STARTUP_GRACE:
+                # Already reportable before this process started, so assumed
+                # reported; as with refusals, a restart does not repeat it.
+                state.stranded_announced.add(key)
+                continue
+            try:
+                taken = await _production_started_since(cfg.repo, closed_at)
+            except Exception:
+                ok = False
+                log.exception("Failed to read Production deployments for %s", app_name)
+                continue
+            if taken:
+                state.stranded_announced.add(key)
+                continue
+            try:
+                await app.client.chat_postMessage(
+                    channel=await slack_channels.resolve(app.client, channel),
+                    text=_stranded_text(app_name, cfg, issue, now - closed_at),
+                )
+            except Exception:
+                ok = False
+                log.exception(
+                    "Failed to report the unconsumed release issue %s #%s",
+                    app_name,
+                    issue["number"],
+                )
+                continue
+            state.stranded_announced.add(key)
+        state.stranded_seeded.add(app_name)
+    return ok
+
+
 async def _poll_release_progress_loop(app, repos) -> None:
     state = ReleaseProgressState()
     while True:
@@ -2100,6 +2229,7 @@ async def _poll_release_progress_loop(app, repos) -> None:
         for step, name in (
             (_announce_deployments, "deployment milestone"),
             (_announce_refusals, "refused release"),
+            (_announce_stranded_approvals, "unconsumed release issue"),
             (_nag_stuck_releases, "stuck release"),
         ):
             try:

@@ -561,6 +561,36 @@ async def refused_release_issues(
     return await asyncio.to_thread(_refused_release_issues_sync, repo_slug, since)
 
 
+def _closed_release_issues_sync(
+    repo_slug: str, since: datetime
+) -> list[dict[str, Any]]:
+    repo = _get_client().get_repo(repo_slug)
+    # Uncapped for the same reason as _refused_release_issues_sync. The issues
+    # API ANDs the labels it is given, so each name is its own query.
+    found = {}
+    for label in RELEASE_LABELS:
+        for issue in repo.get_issues(state="closed", labels=[label], since=since):
+            if issue.pull_request is None:
+                found[issue.number] = issue
+    return [
+        {
+            "number": i.number,
+            "title": i.title,
+            "url": i.html_url,
+            "labels": [lbl.name for lbl in i.labels],
+            "closed_at": i.closed_at,
+        }
+        for i in sorted(found.values(), key=lambda i: i.number, reverse=True)
+    ]
+
+
+async def closed_release_issues(
+    repo_slug: str, since: datetime
+) -> list[dict[str, Any]]:
+    """Return closed issues with any of `RELEASE_LABELS`, updated since *since*."""
+    return await asyncio.to_thread(_closed_release_issues_sync, repo_slug, since)
+
+
 # Environments the release pipeline creates GitHub Deployments for (see
 # _define_release_resources in
 # src/ol_concourse/pipelines/infrastructure/k8s_apps/pipeline.py). Each

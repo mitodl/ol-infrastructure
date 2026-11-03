@@ -1293,6 +1293,27 @@ def test_refused_release_issues_reads_every_issue_in_the_window(fake_repo):
     assert len(found) == 40
 
 
+def test_closed_release_issues_reads_both_label_names_once_each(fake_repo):
+    """An issue under both the ops: and legacy names is returned once."""
+    both = _FakeIssue(9, "Release app 2026.9.2.1", "", ["ops:release", "release"])
+    legacy = _FakeIssue(8, "Release app 2026.9.1.1", "", ["release"])
+    still_open = _FakeIssue(10, "Release app 2026.9.3.1", "", ["ops:release"])
+    pull = _FakeIssue(11, "Release app 2026.9.4.1", "", ["ops:release"])
+    for issue in (both, legacy, pull):
+        issue.edit(state="closed")
+    pull.pull_request = object()
+    repo = fake_repo(_FakeRepo(issues=[both, legacy, still_open, pull]))
+
+    issues = github._closed_release_issues_sync(
+        "mitodl/thing", datetime(2026, 10, 29, tzinfo=UTC)
+    )
+
+    assert [issue["number"] for issue in issues] == [9, 8]
+    assert issues[0]["closed_at"] == datetime(2026, 10, 29, 15, 38, 26, tzinfo=UTC)
+    assert issues[0]["labels"] == ["ops:release", "release"]
+    assert sorted(repo.label_queries) == ["ops:release", "release"]
+
+
 @pytest.mark.parametrize(
     ("labels", "expected"),
     [
