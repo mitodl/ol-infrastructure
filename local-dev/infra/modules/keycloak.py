@@ -824,9 +824,7 @@ def create_olapps_dev_realm(  # noqa: PLR0913
             # replaces a client's default scopes rather than adding to them, so
             # DEFAULT_SCOPES alone drops "sub" from the access token -- which
             # social-auth-core 6 needs as the Keycloak ID_KEY (it was "username"
-            # through 5.x). ocw-studio is the only local app on social-auth-core
-            # 6 so far; the deployed ol-mit client sets no scope override and so
-            # keeps Keycloak's stock default, which includes "basic".
+            # through 5.x).
             default_scopes=[*DEFAULT_SCOPES, "basic"],
             opts=kc_opts,
         )
